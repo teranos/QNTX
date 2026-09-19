@@ -11,26 +11,26 @@ import { describe, test, expect, beforeEach } from 'bun:test';
 import { registerGlyphType, replacePluginGlyphType, getGlyphTypeBySymbol } from './glyph-registry';
 import { redrawPlacedGlyphs } from './canvas/canvas-workspace-builder';
 import { uiState } from '../../state/ui';
-import { storeCleanup } from '@qntx/glyphs';
-import type { Glyph } from '@qntx/glyphs';
+import { storeCleanup } from '@teranos/elements';
+import type { Element } from '@teranos/elements';
 
 const SYMBOL = '\u{1F52C}'; // 🔬, held by no built-in
 
 function entry(saying: string, onTearDown?: () => void) {
     return {
         symbol: SYMBOL,
-        className: 'canvas-plugin-glyph plugin-scope',
+        className: 'canvas-plugin-element plugin-scope',
         title: 'Scope',
         label: 'scope',
         pluginName: 'scope',
-        render: ((glyph: Glyph) => {
+        render: ((glyph: Element) => {
             const el = document.createElement('div');
-            el.dataset.glyphId = glyph.id;
-            el.className = 'canvas-plugin-glyph plugin-scope';
+            el.dataset.elementId = glyph.id;
+            el.className = 'canvas-plugin-element plugin-scope';
             el.textContent = saying;
             if (onTearDown) storeCleanup(el, onTearDown);
             return el;
-        }) as unknown as (glyph: Glyph) => HTMLElement,
+        }) as unknown as (glyph: Element) => HTMLElement,
     };
 }
 
@@ -56,8 +56,8 @@ async function canvasHolding(id: string): Promise<HTMLElement> {
     uiState.addCanvasGlyph({ id, symbol: SYMBOL, x: 10, y: 20 });
 
     const el = document.createElement('div');
-    el.dataset.glyphId = id;
-    el.className = 'canvas-plugin-glyph plugin-scope';
+    el.dataset.elementId = id;
+    el.className = 'canvas-plugin-element plugin-scope';
     el.textContent = 'first';
     canvas.appendChild(el);
     return canvas;
@@ -76,7 +76,7 @@ describe('redrawPlacedGlyphs', () => {
         const redrawn = await redrawPlacedGlyphs(SYMBOL);
 
         expect(redrawn).toBe(1);
-        const el = canvas.querySelector('[data-glyph-id="scope-1"]');
+        const el = canvas.querySelector('[data-element-id="scope-1"]');
         expect(el?.textContent).toBe('second');
     });
 

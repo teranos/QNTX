@@ -10,23 +10,23 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition, detachGlyph, MELD_THRESHOLD, configureGlyphs } from '@qntx/glyphs';
-import type { Glyph } from '@qntx/glyphs';
+import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition, detachElement, MELD_THRESHOLD, configureElements } from '@teranos/elements';
+import type { Element } from '@teranos/elements';
 import { uiState } from '../../../state/ui';
 import { addComposition, removeComposition, findCompositionByGlyph } from '../../../state/compositions';
 
 // Wire CanvasHost so package meld code can access composition state
 beforeEach(() => {
-    configureGlyphs({
+    configureElements({
         canvasHost: {
-            saveCanvasGlyph: (glyph) => uiState.addCanvasGlyph(glyph),
-            getCanvasGlyphs: () => uiState.getCanvasGlyphs(),
+            saveCanvasElement: (glyph) => uiState.addCanvasGlyph(glyph),
+            getCanvasElements: () => uiState.getCanvasGlyphs(),
             getTransform: () => ({ panX: 0, panY: 0, scale: 1 }),
-            getSelectedGlyphIds: () => [],
-            isGlyphSelected: () => false,
+            getSelectedElementIds: () => [],
+            isElementSelected: () => false,
             saveComposition: (composition) => addComposition(composition),
             removeComposition: (id) => removeComposition(id),
-            findCompositionByGlyph: (glyphId) => findCompositionByGlyph(glyphId),
+            findCompositionByElement: (glyphId) => findCompositionByGlyph(glyphId),
             flushSync() {},
         },
     });
@@ -34,7 +34,7 @@ beforeEach(() => {
 
 /** Get direct glyph children of a composition (no column wrappers with absolute positioning) */
 function getGlyphChildren(composition: HTMLElement): HTMLElement[] {
-    return Array.from(composition.querySelectorAll('[data-glyph-id]')) as HTMLElement[];
+    return Array.from(composition.querySelectorAll('[data-element-id]')) as HTMLElement[];
 }
 
 describe('Meld System - Critical Behavior', () => {
@@ -44,23 +44,23 @@ describe('Meld System - Critical Behavior', () => {
         document.body.appendChild(canvas);
 
         const axElement = document.createElement('div');
-        axElement.className = 'canvas-ax-glyph';
-        axElement.setAttribute('data-glyph-id', 'ax-test');
+        axElement.className = 'canvas-ax-element';
+        axElement.setAttribute('data-element-id', 'ax-test');
         axElement.style.position = 'absolute';
         axElement.style.left = '100px';
         axElement.style.top = '100px';
         canvas.appendChild(axElement);
 
         const promptElement = document.createElement('div');
-        promptElement.className = 'canvas-prompt-glyph';
-        promptElement.setAttribute('data-glyph-id', 'prompt-test');
+        promptElement.className = 'canvas-prompt-element';
+        promptElement.setAttribute('data-element-id', 'prompt-test');
         promptElement.style.position = 'absolute';
         promptElement.style.left = `${100 + MELD_THRESHOLD - 5}px`;
         promptElement.style.top = '100px';
         canvas.appendChild(promptElement);
 
-        const axGlyph: Glyph = { id: 'ax-test', title: 'AX', renderContent: () => axElement };
-        const promptGlyph: Glyph = { id: 'prompt-test', title: 'Prompt', renderContent: () => promptElement };
+        const axGlyph: Element = { id: 'ax-test', title: 'AX', renderContent: () => axElement };
+        const promptGlyph: Element = { id: 'prompt-test', title: 'Prompt', renderContent: () => promptElement };
 
         const originalAxElement = axElement;
         const originalPromptElement = promptElement;
@@ -91,31 +91,31 @@ describe('Meld System - Critical Behavior', () => {
         document.body.appendChild(canvas);
 
         const axElement = document.createElement('div');
-        axElement.className = 'canvas-ax-glyph';
-        axElement.setAttribute('data-glyph-id', 'ax-test');
+        axElement.className = 'canvas-ax-element';
+        axElement.setAttribute('data-element-id', 'ax-test');
         axElement.style.position = 'absolute';
         axElement.style.left = '100px';
         axElement.style.top = '100px';
         canvas.appendChild(axElement);
 
         const promptElement = document.createElement('div');
-        promptElement.className = 'canvas-prompt-glyph';
-        promptElement.setAttribute('data-glyph-id', 'prompt-test');
+        promptElement.className = 'canvas-prompt-element';
+        promptElement.setAttribute('data-element-id', 'prompt-test');
         promptElement.style.position = 'absolute';
         promptElement.style.left = `${100 + MELD_THRESHOLD - 5}px`;
         promptElement.style.top = '100px';
         canvas.appendChild(promptElement);
 
-        const axGlyph: Glyph = { id: 'ax-test', title: 'AX', renderContent: () => axElement };
-        const promptGlyph: Glyph = { id: 'prompt-test', title: 'Prompt', renderContent: () => promptElement };
+        const axGlyph: Element = { id: 'ax-test', title: 'AX', renderContent: () => axElement };
+        const promptGlyph: Element = { id: 'prompt-test', title: 'Prompt', renderContent: () => promptElement };
 
         const composition = performMeld(axElement, promptElement, axGlyph, promptGlyph);
         const result = unmeldComposition(composition);
 
         expect(result).not.toBe(null);
-        expect(result?.glyphElements).toHaveLength(2);
-        expect(result?.glyphElements[0]).toBe(axElement);
-        expect(result?.glyphElements[1]).toBe(promptElement);
+        expect(result?.members).toHaveLength(2);
+        expect(result?.members[0]).toBe(axElement);
+        expect(result?.members[1]).toBe(promptElement);
         expect(axElement.parentElement).toBe(canvas);
         expect(promptElement.parentElement).toBe(canvas);
         expect(axElement.style.position).toBe('absolute');
@@ -133,23 +133,23 @@ describe('Meld Composition - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const axElement = document.createElement('div');
-        axElement.className = 'canvas-ax-glyph';
-        axElement.setAttribute('data-glyph-id', 'ax-test');
+        axElement.className = 'canvas-ax-element';
+        axElement.setAttribute('data-element-id', 'ax-test');
         axElement.style.position = 'absolute';
         axElement.style.left = '100px';
         axElement.style.top = '100px';
         canvas.appendChild(axElement);
 
         const promptElement = document.createElement('div');
-        promptElement.className = 'canvas-prompt-glyph';
-        promptElement.setAttribute('data-glyph-id', 'prompt-test');
+        promptElement.className = 'canvas-prompt-element';
+        promptElement.setAttribute('data-element-id', 'prompt-test');
         promptElement.style.position = 'absolute';
         promptElement.style.left = `${100 + MELD_THRESHOLD - 5}px`;
         promptElement.style.top = '100px';
         canvas.appendChild(promptElement);
 
-        const axGlyph: Glyph = { id: 'ax-test', title: 'AX', renderContent: () => axElement };
-        const promptGlyph: Glyph = { id: 'prompt-test', title: 'Prompt', renderContent: () => promptElement };
+        const axGlyph: Element = { id: 'ax-test', title: 'AX', renderContent: () => axElement };
+        const promptGlyph: Element = { id: 'prompt-test', title: 'Prompt', renderContent: () => promptElement };
 
         const composition = performMeld(axElement, promptElement, axGlyph, promptGlyph);
 
@@ -167,7 +167,7 @@ describe('Meld Composition - Spike (Edge Cases)', () => {
         document.body.appendChild(canvas);
 
         const regularGlyph = document.createElement('div');
-        regularGlyph.className = 'canvas-ax-glyph';
+        regularGlyph.className = 'canvas-ax-element';
         canvas.appendChild(regularGlyph);
 
         const result = unmeldComposition(regularGlyph);
@@ -183,23 +183,23 @@ describe('Directional Melding', () => {
         document.body.appendChild(canvas);
 
         const pyElement = document.createElement('div');
-        pyElement.className = 'canvas-py-glyph';
-        pyElement.setAttribute('data-glyph-id', 'py1');
+        pyElement.className = 'canvas-py-element';
+        pyElement.setAttribute('data-element-id', 'py1');
         pyElement.style.position = 'absolute';
         pyElement.style.left = '100px';
         pyElement.style.top = '100px';
         canvas.appendChild(pyElement);
 
         const resultElement = document.createElement('div');
-        resultElement.className = 'canvas-result-glyph';
-        resultElement.setAttribute('data-glyph-id', 'result1');
+        resultElement.className = 'canvas-result-element';
+        resultElement.setAttribute('data-element-id', 'result1');
         resultElement.style.position = 'absolute';
         resultElement.style.left = '100px';
         resultElement.style.top = '200px';
         canvas.appendChild(resultElement);
 
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => pyElement };
-        const resultGlyph: Glyph = { id: 'result1', title: 'Result', renderContent: () => resultElement };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => pyElement };
+        const resultGlyph: Element = { id: 'result1', title: 'Result', renderContent: () => resultElement };
 
         const composition = performMeld(pyElement, resultElement, pyGlyph, resultGlyph, 'bottom');
 
@@ -218,23 +218,23 @@ describe('Directional Melding', () => {
         document.body.appendChild(canvas);
 
         const noteElement = document.createElement('div');
-        noteElement.className = 'canvas-note-glyph';
-        noteElement.setAttribute('data-glyph-id', 'note1');
+        noteElement.className = 'canvas-note-element';
+        noteElement.setAttribute('data-element-id', 'note1');
         noteElement.style.position = 'absolute';
         noteElement.style.left = '100px';
         noteElement.style.top = '100px';
         canvas.appendChild(noteElement);
 
         const promptElement = document.createElement('div');
-        promptElement.className = 'canvas-prompt-glyph';
-        promptElement.setAttribute('data-glyph-id', 'prompt1');
+        promptElement.className = 'canvas-prompt-element';
+        promptElement.setAttribute('data-element-id', 'prompt1');
         promptElement.style.position = 'absolute';
         promptElement.style.left = '100px';
         promptElement.style.top = '200px';
         canvas.appendChild(promptElement);
 
-        const noteGlyph: Glyph = { id: 'note1', title: 'Note', renderContent: () => noteElement };
-        const promptGlyph: Glyph = { id: 'prompt1', title: 'Prompt', renderContent: () => promptElement };
+        const noteGlyph: Element = { id: 'note1', title: 'Note', renderContent: () => noteElement };
+        const promptGlyph: Element = { id: 'prompt1', title: 'Prompt', renderContent: () => promptElement };
 
         const composition = performMeld(noteElement, promptElement, noteGlyph, promptGlyph, 'bottom');
 
@@ -253,23 +253,23 @@ describe('Directional Melding', () => {
         document.body.appendChild(canvas);
 
         const axElement = document.createElement('div');
-        axElement.className = 'canvas-ax-glyph';
-        axElement.setAttribute('data-glyph-id', 'ax1');
+        axElement.className = 'canvas-ax-element';
+        axElement.setAttribute('data-element-id', 'ax1');
         axElement.style.position = 'absolute';
         axElement.style.left = '100px';
         axElement.style.top = '100px';
         canvas.appendChild(axElement);
 
         const pyElement = document.createElement('div');
-        pyElement.className = 'canvas-py-glyph';
-        pyElement.setAttribute('data-glyph-id', 'py1');
+        pyElement.className = 'canvas-py-element';
+        pyElement.setAttribute('data-element-id', 'py1');
         pyElement.style.position = 'absolute';
         pyElement.style.left = '200px';
         pyElement.style.top = '100px';
         canvas.appendChild(pyElement);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => axElement };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => pyElement };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => axElement };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => pyElement };
 
         const composition = performMeld(axElement, pyElement, axGlyph, pyGlyph, 'right');
         const children = getGlyphChildren(composition);
@@ -285,26 +285,26 @@ describe('Directional Melding', () => {
         document.body.appendChild(canvas);
 
         const pyElement = document.createElement('div');
-        pyElement.className = 'canvas-py-glyph';
-        pyElement.setAttribute('data-glyph-id', 'py1');
+        pyElement.className = 'canvas-py-element';
+        pyElement.setAttribute('data-element-id', 'py1');
         pyElement.style.position = 'absolute';
         pyElement.style.left = '100px';
         pyElement.style.top = '100px';
         canvas.appendChild(pyElement);
 
         const resultElement = document.createElement('div');
-        resultElement.className = 'canvas-result-glyph';
-        resultElement.setAttribute('data-glyph-id', 'result1');
+        resultElement.className = 'canvas-result-element';
+        resultElement.setAttribute('data-element-id', 'result1');
         resultElement.style.position = 'absolute';
         resultElement.style.left = '100px';
         resultElement.style.top = '200px';
         canvas.appendChild(resultElement);
 
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => pyElement };
-        const resultGlyph: Glyph = { id: 'result1', title: 'Result', renderContent: () => resultElement };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => pyElement };
+        const resultGlyph: Element = { id: 'result1', title: 'Result', renderContent: () => resultElement };
 
         const composition = performMeld(pyElement, resultElement, pyGlyph, resultGlyph, 'bottom');
-        expect(composition.getAttribute('data-glyph-id')).toBe('melded-py1-result1');
+        expect(composition.getAttribute('data-element-id')).toBe('melded-py1-result1');
 
         document.body.innerHTML = '';
     });
@@ -316,11 +316,11 @@ describe('Direction-aware reconstructMeld', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.setAttribute('data-element-id', 'ax1');
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.setAttribute('data-glyph-id', 'py1');
+        py.setAttribute('data-element-id', 'py1');
         canvas.appendChild(py);
 
         const edges = [{ from: 'ax1', to: 'py1', direction: 'right', position: 0 }];
@@ -341,11 +341,11 @@ describe('Direction-aware reconstructMeld', () => {
         document.body.appendChild(canvas);
 
         const py = document.createElement('div');
-        py.setAttribute('data-glyph-id', 'py1');
+        py.setAttribute('data-element-id', 'py1');
         canvas.appendChild(py);
 
         const result = document.createElement('div');
-        result.setAttribute('data-glyph-id', 'result1');
+        result.setAttribute('data-element-id', 'result1');
         canvas.appendChild(result);
 
         const edges = [{ from: 'py1', to: 'result1', direction: 'bottom', position: 0 }];
@@ -366,15 +366,15 @@ describe('Direction-aware reconstructMeld', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.setAttribute('data-element-id', 'ax1');
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.setAttribute('data-glyph-id', 'py1');
+        py.setAttribute('data-element-id', 'py1');
         canvas.appendChild(py);
 
         const result = document.createElement('div');
-        result.setAttribute('data-glyph-id', 'result1');
+        result.setAttribute('data-element-id', 'result1');
         canvas.appendChild(result);
 
         const edges = [
@@ -398,11 +398,11 @@ describe('Direction-aware reconstructMeld', () => {
         document.body.appendChild(canvas);
 
         const py = document.createElement('div');
-        py.setAttribute('data-glyph-id', 'py1');
+        py.setAttribute('data-element-id', 'py1');
         canvas.appendChild(py);
 
         const result = document.createElement('div');
-        result.setAttribute('data-glyph-id', 'result1');
+        result.setAttribute('data-element-id', 'result1');
         canvas.appendChild(result);
 
         const originalPy = py;
@@ -431,29 +431,29 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         py.style.left = '200px';
         py.style.top = '100px';
         canvas.appendChild(py);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
 
         const prompt = document.createElement('div');
-        prompt.className = 'canvas-prompt-glyph';
-        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.className = 'canvas-prompt-element';
+        prompt.setAttribute('data-element-id', 'prompt1');
         prompt.style.position = 'absolute';
         prompt.style.left = '400px';
         prompt.style.top = '100px';
@@ -463,7 +463,7 @@ describe('Composition Extension - Tim (Happy Path)', () => {
 
         expect(composition.contains(prompt)).toBe(true);
         expect(prompt.style.position).toBe('absolute');
-        expect(composition.getAttribute('data-glyph-id')).toBe('melded-py1-prompt1');
+        expect(composition.getAttribute('data-element-id')).toBe('melded-py1-prompt1');
 
         // All 3 elements are direct children
         const children = getGlyphChildren(composition);
@@ -481,35 +481,35 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         py.style.left = '200px';
         py.style.top = '100px';
         canvas.appendChild(py);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
 
         const prompt = document.createElement('div');
-        prompt.className = 'canvas-prompt-glyph';
-        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.className = 'canvas-prompt-element';
+        prompt.setAttribute('data-element-id', 'prompt1');
         canvas.appendChild(prompt);
         extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
 
         const py2 = document.createElement('div');
-        py2.className = 'canvas-py-glyph';
-        py2.setAttribute('data-glyph-id', 'py2');
+        py2.className = 'canvas-py-element';
+        py2.setAttribute('data-element-id', 'py2');
         canvas.appendChild(py2);
         extendComposition(composition, py2, 'py2', 'prompt1', 'right', 'to');
 
@@ -530,33 +530,33 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         py.style.left = '200px';
         py.style.top = '100px';
         canvas.appendChild(py);
 
         const prompt = document.createElement('div');
-        prompt.className = 'canvas-prompt-glyph';
-        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.className = 'canvas-prompt-element';
+        prompt.setAttribute('data-element-id', 'prompt1');
         prompt.style.position = 'absolute';
         prompt.style.left = '300px';
         prompt.style.top = '100px';
         canvas.appendChild(prompt);
 
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
-        const promptGlyph: Glyph = { id: 'prompt1', title: 'Prompt', renderContent: () => prompt };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
+        const promptGlyph: Element = { id: 'prompt1', title: 'Prompt', renderContent: () => prompt };
 
         const composition = performMeld(py, prompt, pyGlyph, promptGlyph, 'right');
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         canvas.appendChild(ax);
         extendComposition(composition, ax, 'ax1', 'py1', 'right', 'from');
 
-        expect(composition.getAttribute('data-glyph-id')).toBe('melded-ax1-py1');
+        expect(composition.getAttribute('data-element-id')).toBe('melded-ax1-py1');
 
         // All 3 elements are direct children
         const children = getGlyphChildren(composition);
@@ -574,29 +574,29 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         py.style.left = '200px';
         py.style.top = '100px';
         canvas.appendChild(py);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
 
         const result = document.createElement('div');
-        result.className = 'canvas-result-glyph';
-        result.setAttribute('data-glyph-id', 'result1');
+        result.className = 'canvas-result-element';
+        result.setAttribute('data-element-id', 'result1');
         result.style.position = 'absolute';
         canvas.appendChild(result);
 
@@ -618,33 +618,33 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         ax.style.position = 'absolute';
         canvas.appendChild(py);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
 
         const result1 = document.createElement('div');
-        result1.className = 'canvas-result-glyph';
-        result1.setAttribute('data-glyph-id', 'r1');
+        result1.className = 'canvas-result-element';
+        result1.setAttribute('data-element-id', 'r1');
         canvas.appendChild(result1);
         extendComposition(composition, result1, 'r1', 'py1', 'bottom', 'to');
 
         const result2 = document.createElement('div');
-        result2.className = 'canvas-result-glyph';
-        result2.setAttribute('data-glyph-id', 'r2');
+        result2.className = 'canvas-result-element';
+        result2.setAttribute('data-element-id', 'r2');
         canvas.appendChild(result2);
         extendComposition(composition, result2, 'r2', 'py1', 'bottom', 'to');
 
@@ -665,30 +665,30 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         py.style.left = '200px';
         py.style.top = '100px';
         canvas.appendChild(py);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
-        const oldId = composition.getAttribute('data-glyph-id');
+        const oldId = composition.getAttribute('data-element-id');
 
         const prompt = document.createElement('div');
-        prompt.className = 'canvas-prompt-glyph';
-        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.className = 'canvas-prompt-element';
+        prompt.setAttribute('data-element-id', 'prompt1');
         canvas.appendChild(prompt);
         extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
 
@@ -705,7 +705,7 @@ describe('Composition Extension - Tim (Happy Path)', () => {
     });
 });
 
-describe('Detach Glyph - Tim (Happy Path)', () => {
+describe('Detach Element - Tim (Happy Path)', () => {
     function clearState() {
         uiState.setCanvasCompositions([]);
         document.body.innerHTML = '';
@@ -717,35 +717,35 @@ describe('Detach Glyph - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         ax.style.left = '200px';
         ax.style.top = '100px';
         canvas.appendChild(py);
 
         const prompt = document.createElement('div');
-        prompt.className = 'canvas-prompt-glyph';
-        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.className = 'canvas-prompt-element';
+        prompt.setAttribute('data-element-id', 'prompt1');
         prompt.style.position = 'absolute';
         canvas.appendChild(prompt);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
         extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
 
         // Detach the leaf (prompt1)
-        const result = detachGlyph('prompt1', composition);
+        const result = detachElement('prompt1', composition);
 
         expect(result).not.toBe(null);
         expect(result!.detachedElement).toBe(prompt);
@@ -772,33 +772,33 @@ describe('Detach Glyph - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         canvas.appendChild(py);
 
         const prompt = document.createElement('div');
-        prompt.className = 'canvas-prompt-glyph';
-        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.className = 'canvas-prompt-element';
+        prompt.setAttribute('data-element-id', 'prompt1');
         prompt.style.position = 'absolute';
         canvas.appendChild(prompt);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
         extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
 
         // Detach the root (ax1)
-        const result = detachGlyph('ax1', composition);
+        const result = detachElement('ax1', composition);
 
         expect(result).not.toBe(null);
         expect(result!.detachedElement).toBe(ax);
@@ -823,33 +823,33 @@ describe('Detach Glyph - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         canvas.appendChild(py);
 
         const prompt = document.createElement('div');
-        prompt.className = 'canvas-prompt-glyph';
-        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.className = 'canvas-prompt-element';
+        prompt.setAttribute('data-element-id', 'prompt1');
         prompt.style.position = 'absolute';
         canvas.appendChild(prompt);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
         extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
 
         // Detach the middle (py1) → disconnects graph → full unmeld
-        const result = detachGlyph('py1', composition);
+        const result = detachElement('py1', composition);
 
         expect(result).not.toBe(null);
         expect(result!.detachedElement).toBe(py);
@@ -870,24 +870,24 @@ describe('Detach Glyph - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         canvas.appendChild(py);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
-        const result = detachGlyph('py1', composition);
+        const result = detachElement('py1', composition);
 
         expect(result).not.toBe(null);
         expect(result!.remainingComposition).toBe(null); // full unmeld
@@ -904,33 +904,33 @@ describe('Detach Glyph - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         canvas.appendChild(py);
 
         const result = document.createElement('div');
-        result.className = 'canvas-result-glyph';
-        result.setAttribute('data-glyph-id', 'result1');
+        result.className = 'canvas-result-element';
+        result.setAttribute('data-element-id', 'result1');
         result.style.position = 'absolute';
         canvas.appendChild(result);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
         extendComposition(composition, result, 'result1', 'py1', 'bottom', 'to');
 
         // Detach bottom leaf (result1) — ax→py stays connected
-        const detachResult = detachGlyph('result1', composition);
+        const detachResult = detachElement('result1', composition);
 
         expect(detachResult).not.toBe(null);
         expect(detachResult!.detachedElement).toBe(result);
@@ -954,33 +954,33 @@ describe('Detach Glyph - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         ax.style.position = 'absolute';
         ax.style.left = '100px';
         ax.style.top = '100px';
         canvas.appendChild(ax);
 
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
         py.style.position = 'absolute';
         canvas.appendChild(py);
 
         const prompt = document.createElement('div');
-        prompt.className = 'canvas-prompt-glyph';
-        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.className = 'canvas-prompt-element';
+        prompt.setAttribute('data-element-id', 'prompt1');
         prompt.style.position = 'absolute';
         canvas.appendChild(prompt);
 
-        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
-        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const axGlyph: Element = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Element = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
         extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
 
-        const oldId = composition.getAttribute('data-glyph-id');
-        detachGlyph('prompt1', composition);
+        const oldId = composition.getAttribute('data-element-id');
+        detachElement('prompt1', composition);
 
         const comps = uiState.getCanvasCompositions();
         // Old composition ID should be gone

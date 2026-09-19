@@ -1,11 +1,11 @@
 /**
- * Plugin Glyph Discovery — fetches and registers plugin-provided glyph types.
+ * Plugin Element Discovery — fetches and registers plugin-provided glyph types.
  *
  * Called at app startup to discover glyphs from plugins.
  * Registers each glyph type in the global registry for spawn menu and canvas rendering.
  *
  * Two rendering paths:
- * 1. module_url set → TypeScript module with GlyphUI injection (preferred)
+ * 1. module_url set → TypeScript module with ElementUI injection (preferred)
  * 2. content_url only → server-rendered HTML via innerHTML (legacy)
  *
  * A module whose glyphDef says 'panel' is added to the tray.
@@ -18,9 +18,9 @@ import { redrawPlacedGlyphs } from './canvas/canvas-workspace-builder';
 import { apiFetch } from '../../client';
 import { importScript } from '../../client/url';
 import { log, SEG } from '../../logger';
-import { glyphRun, runCleanup } from '@qntx/glyphs';
-import type { Glyph } from '@qntx/glyphs';
-import type { GlyphDef, GlyphModule } from './glyph-ui';
+import { tray, runCleanup } from '@teranos/elements';
+import type { Element } from '@teranos/elements';
+import type { ElementDef, ElementModule } from './glyph-ui';
 import { createGlyphUI } from './glyph-ui';
 
 export interface PluginGlyphDef {
@@ -157,7 +157,7 @@ export async function discoverPublishedGlyphs(): Promise<void> {
         const url = `${glyph.url}?v=${glyph.as}`;
         try {
             const raw: Record<string, unknown> = await importScript(url);
-            const mod = (raw.default ?? raw) as GlyphModule & { glyphDef?: GlyphDef };
+            const mod = (raw.default ?? raw) as ElementModule & { glyphDef?: ElementDef };
             const def = mod.glyphDef;
 
             if (!def) {
@@ -169,7 +169,7 @@ export async function discoverPublishedGlyphs(): Promise<void> {
                 continue;
             }
 
-            await place(glyph, def, mod as GlyphModule);
+            await place(glyph, def, mod as ElementModule);
             whyAbsent.delete(glyph.name);
         } catch (err) {
             // The node published this. Failing to load it is a fault, and the
@@ -180,16 +180,16 @@ export async function discoverPublishedGlyphs(): Promise<void> {
 }
 
 /** Put a published glyph where its own glyphDef says it goes. */
-async function place(glyph: PublishedGlyph, def: GlyphDef, mod: GlyphModule): Promise<void> {
+async function place(glyph: PublishedGlyph, def: ElementDef, mod: ElementModule): Promise<void> {
     const name = glyph.name;
 
-    if (def.manifestation === 'panel') {
+    if (def.form === 'panel') {
         const id = `glyph-${name}`;
         if (replacePanel(id, `${name} (${glyph.as})`, def, mod)) {
             publishedAs.set(name, glyph.as);
             return;
         }
-        if (glyphRun.has(id)) {
+        if (tray.has(id)) {
             // Nothing on this page put it there, so replacing it would take
             // over something this code does not own.
             log.error(SEG.GLYPH, `[Glyphs] ${name} cannot take tray id ${id}; something else holds it`);
@@ -203,16 +203,16 @@ async function place(glyph: PublishedGlyph, def: GlyphDef, mod: GlyphModule): Pr
 
     const entry = {
         symbol: def.symbol,
-        className: `canvas-published-glyph glyph-${name}`,
+        className: `canvas-published-element glyph-${name}`,
         title: def.title,
         label: def.label,
         // Published, not a plugin. There is no process, no am.toml line and
         // nothing to enable — the module is an attestation this node serves.
         publishedName: name,
-        render: async (canvasGlyph: Glyph) => {
+        render: async (canvasGlyph: Element) => {
             const ui = createGlyphUI(canvasGlyph, name);
             const rendered = await mod.render(canvasGlyph, ui);
-            if (!rendered.dataset.glyphId) {
+            if (!rendered.dataset.elementId) {
                 return wrapInCanvasPlaced(canvasGlyph, rendered, {
                     plugin: name,
                     title: def.title,
@@ -289,13 +289,13 @@ async function discoverTSPluginModules(): Promise<void> {
             : `/api/${name}/glyph-module.js`;
         try {
             const raw: Record<string, unknown> = await import(/* @vite-ignore */ moduleUrl);
-            const mod = (raw.default ?? raw) as GlyphModule & { glyphDef?: GlyphDef };
+            const mod = (raw.default ?? raw) as ElementModule & { glyphDef?: ElementDef };
             const def = mod.glyphDef;
             if (!def || typeof mod.render !== 'function') continue;
 
-            const cachedMod = mod as GlyphModule;
+            const cachedMod = mod as ElementModule;
 
-            if (def.manifestation === 'panel') {
+            if (def.form === 'panel') {
                 // A tray glyph is keyed by id, and discovery runs more than once per page.
                 const id = `plugin-${name}`;
                 if (livePanels.has(id)) {
@@ -306,7 +306,7 @@ async function discoverTSPluginModules(): Promise<void> {
                     }
                     continue;
                 }
-                if (glyphRun.has(id)) continue;
+                if (tray.has(id)) continue;
 
                 addPanel(id, name, def, cachedMod);
                 if (digest) registeredDigests.set(name, digest);
@@ -317,14 +317,14 @@ async function discoverTSPluginModules(): Promise<void> {
 
             const entry = {
                 symbol: def.symbol,
-                className: `canvas-plugin-glyph plugin-${name}`,
+                className: `canvas-plugin-element plugin-${name}`,
                 title: def.title,
                 label: def.label,
                 pluginName: name,
-                render: async (glyph: Glyph) => {
+                render: async (glyph: Element) => {
                     const ui = createGlyphUI(glyph, name);
                     const rendered = await cachedMod.render(glyph, ui);
-                    if (!rendered.dataset.glyphId) {
+                    if (!rendered.dataset.elementId) {
                         return wrapInCanvasPlaced(glyph, rendered, {
                             plugin: name,
                             title: def.title,
@@ -372,14 +372,14 @@ async function discoverTSPluginModules(): Promise<void> {
 }
 
 /**
- * The module a tray glyph is drawing from now, held apart from the Glyph so a
+ * The module a tray glyph is drawing from now, held apart from the Element so a
  * replacement reaches the panel that is already open.
  *
  * redraw is set while the panel holds an element and cleared when it lets go.
  */
 interface LiveModule {
-    mod: GlyphModule;
-    def: GlyphDef;
+    mod: ElementModule;
+    def: ElementDef;
     redraw: (() => void) | null;
 }
 
@@ -392,7 +392,7 @@ const livePanels = new Map<string, LiveModule>();
  * Returns false when nothing on this page owns that id, which is a collision
  * rather than a replacement.
  */
-function replacePanel(id: string, what: string, def: GlyphDef, mod: GlyphModule): boolean {
+function replacePanel(id: string, what: string, def: ElementDef, mod: ElementModule): boolean {
     const live = livePanels.get(id);
     if (!live) return false;
 
@@ -407,8 +407,8 @@ function replacePanel(id: string, what: string, def: GlyphDef, mod: GlyphModule)
     return true;
 }
 
-// The tray's contract, glyphRun.add, met by a module's render(). The ui it gets is the one a canvas glyph gets.
-function makePanelGlyph(id: string, name: string, live: LiveModule): Glyph {
+// The tray's contract, tray.add, met by a module's render(). The ui it gets is the one a canvas glyph gets.
+function makePanelGlyph(id: string, name: string, live: LiveModule): Element {
     let container: HTMLElement | null = null;
 
     // Whatever the module registered runs before its element is filled again,
@@ -427,11 +427,11 @@ function makePanelGlyph(id: string, name: string, live: LiveModule): Glyph {
             });
     };
 
-    const glyph: Glyph = {
+    const glyph: Element = {
         id,
         title: live.def.title,
         symbol: live.def.symbol,
-        manifestationType: 'panel',
+        opensAs: 'panel',
         renderContent: () => {
             // The panel wants its element now; the module fills it when render() resolves.
             const el = document.createElement('div');
@@ -452,10 +452,10 @@ function makePanelGlyph(id: string, name: string, live: LiveModule): Glyph {
 }
 
 /** Put a glyph in the tray for the first time, holding the module it draws from. */
-function addPanel(id: string, name: string, def: GlyphDef, mod: GlyphModule): void {
+function addPanel(id: string, name: string, def: ElementDef, mod: ElementModule): void {
     const live: LiveModule = { mod, def, redraw: null };
     livePanels.set(id, live);
-    glyphRun.add(makePanelGlyph(id, name, live));
+    tray.add(makePanelGlyph(id, name, live));
 }
 
 function registerPluginGlyphType(def: PluginGlyphDef): void {
@@ -464,12 +464,12 @@ function registerPluginGlyphType(def: PluginGlyphDef): void {
 
     // module_url → TypeScript SDK path; content_url → legacy HTML path
     const renderer = def.module_url
-        ? (glyph: Glyph) => createPluginGlyphFromModule(glyph, def)
-        : (glyph: Glyph) => createPluginGlyph(glyph, def);
+        ? (glyph: Element) => createPluginGlyphFromModule(glyph, def)
+        : (glyph: Element) => createPluginGlyph(glyph, def);
 
     registerGlyphType({
         symbol: def.symbol,
-        className: `canvas-plugin-glyph plugin-${def.plugin}`,
+        className: `canvas-plugin-element plugin-${def.plugin}`,
         title: def.title,
         label: def.label,
         pluginName: def.plugin,

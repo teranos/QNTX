@@ -25,7 +25,7 @@ bunMock.module('../../../logger', () => ({
 
 const fakeEntry: GlyphTypeEntry = {
     symbol: 'T',
-    className: 'canvas-test-glyph',
+    className: 'canvas-test-element',
     title: 'Test',
     label: 'Test',
     render: () => document.createElement('div'),
@@ -63,10 +63,10 @@ describe('Placement Mode - Tim (Happy Path)', () => {
 
         expect(isPlacementActive()).toBe(true);
         // Cursor glyph is in the DOM
-        const cursorGlyph = document.querySelector('.glyph-cursor');
+        const cursorGlyph = document.querySelector('.cursor');
         expect(cursorGlyph).not.toBeNull();
         // Symbol is in a child span
-        const symSpan = cursorGlyph!.querySelector('.glyph-cursor-symbol');
+        const symSpan = cursorGlyph!.querySelector('.cursor-symbol');
         expect(symSpan).not.toBeNull();
         expect(symSpan!.textContent).toBe('T');
     });
@@ -77,7 +77,7 @@ describe('Placement Mode - Tim (Happy Path)', () => {
 
         cancelPlacement();
         expect(isPlacementActive()).toBe(false);
-        expect(document.querySelector('.glyph-cursor')).toBeNull();
+        expect(document.querySelector('.cursor')).toBeNull();
         expect(document.querySelector('.placement-scrim')).toBeNull();
     });
 
@@ -121,7 +121,7 @@ describe('Placement Mode - Spike (Edge Cases)', () => {
         enterPlacementMode(fakeEntry, canvas, () => {});
 
         // Only one cursor glyph should exist
-        const cursorGlyphs = document.querySelectorAll('.glyph-cursor');
+        const cursorGlyphs = document.querySelectorAll('.cursor');
         expect(cursorGlyphs.length).toBe(1);
     });
 

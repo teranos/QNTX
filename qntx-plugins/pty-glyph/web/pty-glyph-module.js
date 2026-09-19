@@ -6700,7 +6700,7 @@ var require_addon_fit = __commonJS((exports, module) => {
 var import_xterm = __toESM(require_xterm(), 1);
 var import_addon_fit = __toESM(require_addon_fit(), 1);
 var render = async (glyph, ui) => {
-  const { element, content } = ui.glyph({
+  const { element, content } = ui.element({
     defaults: {
       x: glyph.x ?? 200,
       y: glyph.y ?? 200,

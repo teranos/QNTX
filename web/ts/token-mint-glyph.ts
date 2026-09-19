@@ -1,11 +1,11 @@
 /**
- * Mint Token Glyph — creating one access token (ADR-025, TOKATTEST).
+ * Mint Token Element — creating one access token (ADR-025, TOKATTEST).
  * Split out of the Access Tokens glyph, which stays the place you see every
  * token at once. The raw value is shown once, here and nowhere else.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { glyphRun } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { createPrimaryButton } from './components/button';
 import { ordered, type Namespace } from './namespaces-view';
@@ -199,12 +199,12 @@ function labelled(text: string, field: HTMLElement): HTMLElement {
     return wrap;
 }
 
-function mintGlyph(): Glyph {
+function mintGlyph(): Element {
     return {
         id: GLYPH_ID,
         title: 'Mint Token',
         symbol: '⚿',
-        onClose: () => { glyphRun.remove(GLYPH_ID); },
+        onClose: () => { tray.remove(GLYPH_ID); },
         renderContent: () => {
             const content = document.createElement('div');
             renderMint(content);
@@ -312,8 +312,8 @@ export function renderMint(content: HTMLElement): void {
  */
 export function openTokenMintGlyph(minted?: () => void): void {
     onMinted = minted;
-    if (!glyphRun.has(GLYPH_ID)) {
-        glyphRun.add(mintGlyph());
+    if (!tray.has(GLYPH_ID)) {
+        tray.add(mintGlyph());
     }
-    glyphRun.openGlyph(GLYPH_ID);
+    tray.open(GLYPH_ID);
 }

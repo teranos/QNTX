@@ -1,5 +1,5 @@
 /**
- * Response Glyph — unified output display for LLM responses.
+ * Response Element — unified output display for LLM responses.
  *
  * Handles both live streaming (tokens arrive via WebSocket) and static
  * results (execution output, non-streaming providers). A single glyph
@@ -14,12 +14,12 @@
  * TODO(CLR/#750): Use embedding dimensions (PCA 4-6) to drive particle hue — semantic color.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import type { LLMStreamMessage } from '../../../types/websocket';
 import type { LLMTokenSignal, SamplerStageSignal } from '../../generated/proto/plugin/grpc/protocol/server';
 import { log, SEG } from '../../logger';
-import { canvasPlaced } from '@qntx/glyphs';
-import { unmeldComposition, makeDraggable, storeCleanup, preventDrag, wireExpandToWindow } from '@qntx/glyphs';
+import { canvasPlaced } from '@teranos/elements';
+import { unmeldComposition, makeDraggable, storeCleanup, preventDrag, wireExpandToWindow } from '@teranos/elements';
 import { autoMeldResultBelow } from './meld/auto-meld-result';
 import { setResponseState } from './response-state';
 import { uiState } from '../../state/ui';
@@ -267,19 +267,19 @@ function renderOutput(container: HTMLElement, result: ExecutionResult): void {
     }
 }
 
-// ── Response Glyph Factory ──────────────────────────────────────────
+// ── Response Element Factory ──────────────────────────────────────────
 
 /**
  * Create a response glyph — handles both streaming and static results.
  *
- * @param glyph - Glyph metadata
+ * @param glyph - Element metadata
  * @param result - Static execution result (null for streaming mode)
  * @param promptConfig - Model/provider config
  * @param prompt - Prompt text for header display
  * @param streamJobId - WebSocket job ID to subscribe to (enables streaming mode)
  */
 export function createResultGlyph(
-    glyph: Glyph,
+    glyph: Element,
     result?: ExecutionResult,
     promptConfig?: PromptConfig,
     prompt?: string,
@@ -294,7 +294,7 @@ export function createResultGlyph(
 
     // ── Header ──────────────────────────────────────────────────────
 
-    const header = el('div', { class: 'glyph-title-bar glyph-title-bar--auto result-glyph-header' });
+    const header = el('div', { class: 'title-bar title-bar--auto result-glyph-header' });
 
     if (prompt) {
         const promptLabel = el('span', {
@@ -368,13 +368,13 @@ export function createResultGlyph(
         if (composition) {
             const unmelded = unmeldComposition(composition);
             if (unmelded) {
-                for (const glyphElement of unmelded.glyphElements) {
-                    const glyphId = glyphElement.getAttribute('data-glyph-id');
+                for (const glyphElement of unmelded.members) {
+                    const glyphId = glyphElement.getAttribute('data-element-id');
                     if (glyphId && glyphId !== glyph.id) {
-                        const glyphObj: Glyph = {
+                        const glyphObj: Element = {
                             id: glyphId,
-                            title: glyphElement.getAttribute('data-glyph-symbol') || 'Glyph',
-                            symbol: glyphElement.getAttribute('data-glyph-symbol') || undefined,
+                            title: glyphElement.getAttribute('data-symbol') || 'Element',
+                            symbol: glyphElement.getAttribute('data-symbol') || undefined,
                             renderContent: () => glyphElement
                         };
                         makeDraggable(glyphElement, glyphElement, glyphObj, {
@@ -387,7 +387,7 @@ export function createResultGlyph(
         }
 
         element.remove();
-        uiState.removeCanvasGlyph(glyph.id);
+        uiState.removeCanvasElement(glyph.id);
         log.debug(SEG.GLYPH, `[ResultGlyph] Closed ${glyph.id}`);
     });
     buttonContainer.appendChild(closeBtn);
@@ -405,8 +405,8 @@ export function createResultGlyph(
     glyph.border ??= '1px solid var(--border-on-dark)';
 
     const { element } = canvasPlaced({
-        glyph,
-        className: 'canvas-result-glyph',
+        item: glyph,
+        className: 'canvas-result-element',
         defaults: { x: 200, y: 200, width: 420, height: calculatedHeight },
         dragHandle: header,
         draggableOptions: { ignoreButtons: true },
@@ -426,7 +426,7 @@ export function createResultGlyph(
     wireExpandToWindow({
         element,
         expandBtn: toWindowBtn,
-        glyphId: glyph.id,
+        elementId: glyph.id,
         title: prompt || 'Result',
         symbol: 'result',
         border: glyph.border,
@@ -450,7 +450,7 @@ export function createResultGlyph(
     // ── Output container ────────────────────────────────────────────
 
     const output = el('div', {
-        class: 'result-glyph-output glyph-content-area',
+        class: 'result-glyph-output content-area',
         style: {
             position: 'relative', zIndex: '1', fontFamily: 'monospace', fontSize: '12px',
             whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'break-word',
@@ -973,7 +973,7 @@ export function updateResultGlyphContent(resultElement: HTMLElement, result: Exe
 
     renderOutput(output, result);
 
-    const glyphId = resultElement.getAttribute('data-glyph-id');
+    const glyphId = resultElement.getAttribute('data-element-id');
     if (glyphId) {
         const existing = uiState.getCanvasGlyph(glyphId);
         if (existing) {
@@ -1001,7 +1001,7 @@ export function buildResultTitleBar(
     tokens: StreamToken[],
     promptText?: string,
 ): HTMLElement {
-    const header = el('div', { class: 'glyph-title-bar glyph-title-bar--auto result-glyph-header' });
+    const header = el('div', { class: 'title-bar title-bar--auto result-glyph-header' });
 
     if (promptText) {
         const promptLabel = el('span', {
@@ -1083,7 +1083,7 @@ export function renderResultContent(
 
 async function executeStreamFollowUp(
     parentElement: HTMLElement,
-    parentGlyph: Glyph,
+    parentGlyph: Element,
     request: FollowUpRequest,
     controls: FollowUpControls,
 ): Promise<void> {
@@ -1109,7 +1109,7 @@ async function executeStreamFollowUp(
         height: 200,
     });
 
-    const responseGlyph: Glyph = {
+    const responseGlyph: Element = {
         id: responseGlyphId,
         title: 'Result',
         symbol: 'result',
@@ -1122,7 +1122,7 @@ async function executeStreamFollowUp(
     const responseElement = createResultGlyph(responseGlyph, undefined, undefined, request.text, responseGlyphId);
     canvas.appendChild(responseElement);
 
-    const parentGlyphId = parentElement.dataset.glyphId;
+    const parentGlyphId = parentElement.dataset.elementId;
     if (parentGlyphId) {
         autoMeldResultBelow(
             parentElement, parentGlyphId, 'result',
@@ -1156,7 +1156,7 @@ async function executeStreamFollowUp(
             if (data.error) {
                 unsubscribeStream(responseGlyphId);
                 responseElement.remove();
-                uiState.removeCanvasGlyph(responseGlyphId);
+                uiState.removeCanvasElement(responseGlyphId);
                 controls.error(`Failed: ${data.error}`);
                 return;
             }
@@ -1171,7 +1171,7 @@ async function executeStreamFollowUp(
         .catch((err) => {
             unsubscribeStream(request.glyphId);
             responseElement.remove();
-            uiState.removeCanvasGlyph(responseGlyphId);
+            uiState.removeCanvasElement(responseGlyphId);
 
             const errMsg = err instanceof Error ? err.message : String(err);
             controls.error(`Failed: ${errMsg}`);

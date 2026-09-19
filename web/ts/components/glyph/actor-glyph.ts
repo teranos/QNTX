@@ -1,5 +1,5 @@
 /**
- * Actor Glyph (⌬) — who stood behind a claim, as a thing in its own right.
+ * Actor Element (⌬) — who stood behind a claim, as a thing in its own right.
  *
  * An actor is not a segment of the triple: the triple is the claim, and the
  * actor is the one part of an attestation that can be trusted, doubted or

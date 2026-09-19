@@ -16,8 +16,8 @@ import {
     resetCanvasState,
     flushSaveState
 } from './canvas-pan';
-import { makeDraggable, makeResizable, configureGlyphs } from '@qntx/glyphs';
-import type { Glyph } from '@qntx/glyphs';
+import { makeDraggable, makeResizable, configureElements } from '@teranos/elements';
+import type { Element } from '@teranos/elements';
 import { uiState } from '../../../state/ui';
 
 // Helper to create wheel event in test environment
@@ -280,8 +280,8 @@ describe('Canvas Pan', () => {
 
         // Create a mock glyph inside the content layer
         const glyph = document.createElement('div');
-        glyph.setAttribute('data-glyph-id', 'test-glyph');
-        glyph.className = 'canvas-py-glyph';
+        glyph.setAttribute('data-element-id', 'test-glyph');
+        glyph.className = 'canvas-py-element';
         contentLayer.appendChild(glyph);
 
         document.body.appendChild(container);
@@ -514,7 +514,7 @@ function buildCanvasWithGlyph(canvasId: string) {
     container.appendChild(contentLayer);
 
     const el = document.createElement('div');
-    el.setAttribute('data-glyph-id', 'g1');
+    el.setAttribute('data-element-id', 'g1');
     el.style.position = 'absolute';
     el.style.left = '100px';
     el.style.top = '100px';
@@ -529,7 +529,7 @@ function buildCanvasWithGlyph(canvasId: string) {
 
     document.body.appendChild(container);
 
-    const glyph: Glyph = {
+    const glyph: Element = {
         id: 'g1',
         title: 'Test',
         symbol: '⊨',
@@ -555,16 +555,16 @@ describe('Drag respects canvas zoom - Tim (Happy Path)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         resetCanvasState('drag-zoom');
-        configureGlyphs({
+        configureElements({
             canvasHost: {
-                saveCanvasGlyph() {},
-                getCanvasGlyphs: () => [],
+                saveCanvasElement() {},
+                getCanvasElements: () => [],
                 getTransform: (canvasId) => getTransform(canvasId),
-                getSelectedGlyphIds: () => [],
-                isGlyphSelected: () => false,
+                getSelectedElementIds: () => [],
+                isElementSelected: () => false,
                 saveComposition() {},
                 removeComposition() {},
-                findCompositionByGlyph: () => null,
+                findCompositionByElement: () => null,
                 flushSync() {},
             },
         });
@@ -627,16 +627,16 @@ describe('Resize respects canvas zoom - Tim (Happy Path)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         resetCanvasState('resize-zoom');
-        configureGlyphs({
+        configureElements({
             canvasHost: {
-                saveCanvasGlyph() {},
-                getCanvasGlyphs: () => [],
+                saveCanvasElement() {},
+                getCanvasElements: () => [],
                 getTransform: (canvasId) => getTransform(canvasId),
-                getSelectedGlyphIds: () => [],
-                isGlyphSelected: () => false,
+                getSelectedElementIds: () => [],
+                isElementSelected: () => false,
                 saveComposition() {},
                 removeComposition() {},
-                findCompositionByGlyph: () => null,
+                findCompositionByElement: () => null,
                 flushSync() {},
             },
         });

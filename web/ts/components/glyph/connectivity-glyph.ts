@@ -1,5 +1,5 @@
 /**
- * Connectivity Glyph — surfaces raw fetch/WebSocket failures directly to the user.
+ * Connectivity Element — surfaces raw fetch/WebSocket failures directly to the user.
  *
  * Auto-opens on the first failure. Subscribes to `connectivity.subscribeFailures`
  * and updates the failure list live. No user interaction required — load the
@@ -9,8 +9,8 @@
 import { connectivity, type Failure } from '../../client';
 import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
-import { glyphRun } from '@qntx/glyphs';
-import type { Glyph } from '@qntx/glyphs';
+import { tray } from '@teranos/elements';
+import type { Element } from '@teranos/elements';
 
 const CONNECTIVITY_GLYPH_ID = 'connectivity';
 
@@ -58,7 +58,7 @@ function renderConnectivityContent(): HTMLElement {
     const list = document.createElement('pre');
     list.style.margin = '0';
     // Let the widest line drive the window's intrinsic width via the
-    // ResizeObserver in packages/glyphs/manifestations/window.ts. maxWidth
+    // ResizeObserver in @teranos/elements window/window.ts. maxWidth
     // (viewport * MAX_VIEWPORT_WIDTH_RATIO) still caps very long URLs.
     list.style.whiteSpace = 'pre';
     list.style.color = '#e06060';
@@ -87,12 +87,12 @@ function renderConnectivityContent(): HTMLElement {
  * Called on the first failure event via subscribeFailures.
  */
 export function spawnConnectivityGlyph(): void {
-    if (glyphRun.has(CONNECTIVITY_GLYPH_ID)) {
-        glyphRun.openGlyph(CONNECTIVITY_GLYPH_ID);
+    if (tray.has(CONNECTIVITY_GLYPH_ID)) {
+        tray.open(CONNECTIVITY_GLYPH_ID);
         return;
     }
 
-    const glyph: Glyph = {
+    const glyph: Element = {
         id: CONNECTIVITY_GLYPH_ID,
         title: 'Connectivity',
         renderContent: renderConnectivityContent,
@@ -102,6 +102,6 @@ export function spawnConnectivityGlyph(): void {
         },
     };
 
-    glyphRun.add(glyph);
-    glyphRun.openGlyph(CONNECTIVITY_GLYPH_ID);
+    tray.add(glyph);
+    tray.open(CONNECTIVITY_GLYPH_ID);
 }

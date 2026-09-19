@@ -226,7 +226,7 @@ describe('Plugin glyph creation', () => {
         const glyph = createPluginGlyph();
 
         expect(glyph.id).toBe('plugin-glyph');
-        expect(glyph.manifestationType).toBe('panel');
+        expect(glyph.opensAs).toBe('panel');
         expect(glyph.title).toContain('Domain Plugins');
         expect(typeof glyph.renderContent).toBe('function');
     });

@@ -6,8 +6,8 @@
  */
 
 import { log, SEG } from '../../../logger';
-import type { Glyph } from '@qntx/glyphs';
-import { performMeld, extendComposition, makeDraggable } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { performMeld, extendComposition, makeDraggable } from '@teranos/elements';
 
 /**
  * Auto-meld a result glyph below a parent glyph.
@@ -36,8 +36,8 @@ export function autoMeldResultBelow(
         try {
             extendComposition(parentComposition, resultElement, resultGlyphId, parentGlyphId, 'bottom', 'to');
 
-            const updatedId = parentComposition.getAttribute('data-glyph-id') || '';
-            const compositionGlyph: Glyph = {
+            const updatedId = parentComposition.getAttribute('data-element-id') || '';
+            const compositionGlyph: Element = {
                 id: updatedId,
                 title: 'Melded Composition',
                 renderContent: () => parentComposition
@@ -54,14 +54,14 @@ export function autoMeldResultBelow(
     }
 
     // Standalone parent — create new composition
-    const parentGlyph: Glyph = {
+    const parentGlyph: Element = {
         id: parentGlyphId,
         title: parentTitle,
         symbol: parentSymbol,
         renderContent: () => parentElement
     };
 
-    const resultGlyph: Glyph = {
+    const resultGlyph: Element = {
         id: resultGlyphId,
         title: 'Result',
         symbol: 'result',
@@ -71,8 +71,8 @@ export function autoMeldResultBelow(
     try {
         const composition = performMeld(parentElement, resultElement, parentGlyph, resultGlyph, 'bottom');
 
-        const compositionGlyph: Glyph = {
-            id: composition.getAttribute('data-glyph-id') || `melded-${parentGlyphId}-${resultGlyphId}`,
+        const compositionGlyph: Element = {
+            id: composition.getAttribute('data-element-id') || `melded-${parentGlyphId}-${resultGlyphId}`,
             title: 'Melded Composition',
             renderContent: () => composition
         };

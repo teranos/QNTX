@@ -22,7 +22,7 @@ import { createMockUiState } from '../../test/mock-ui-state';
 const { uiState } = createMockUiState();
 mock.module('../../state/ui', () => ({ uiState }));
 
-describe('Error Glyph - Tim (Happy Path)', () => {
+describe('Error Element - Tim (Happy Path)', () => {
     test('Tim sees error glyph for failed result rendering', () => {
         // Tim has a canvas
         const container = document.createElement('div');
@@ -43,13 +43,13 @@ describe('Error Glyph - Tim (Happy Path)', () => {
         container.appendChild(errorGlyph);
 
         // Error glyph is visible
-        expect(errorGlyph.classList.contains('canvas-error-glyph')).toBe(true);
-        expect(errorGlyph.dataset.glyphSymbol).toBe('error');
+        expect(errorGlyph.classList.contains('canvas-error-element')).toBe(true);
+        expect(errorGlyph.dataset.symbol).toBe('error');
 
         // Shows diagnostic information
         const content = errorGlyph.querySelector('.error-glyph-content');
         expect(content).toBeTruthy();
-        expect(content?.textContent).toContain('Failed Glyph: result');
+        expect(content?.textContent).toContain('Failed Element: result');
         expect(content?.textContent).toContain('missing_data');
     });
 
@@ -98,7 +98,7 @@ describe('Error Glyph - Tim (Happy Path)', () => {
     });
 });
 
-describe('Error Glyph - Spike (Edge Cases)', () => {
+describe('Error Element - Spike (Edge Cases)', () => {
     test('Spike creates error glyph with empty error details', () => {
         const container = document.createElement('div');
         container.className = 'canvas-workspace';
@@ -116,7 +116,7 @@ describe('Error Glyph - Spike (Edge Cases)', () => {
         container.appendChild(errorGlyph);
 
         // Error glyph still renders
-        expect(errorGlyph.classList.contains('canvas-error-glyph')).toBe(true);
+        expect(errorGlyph.classList.contains('canvas-error-element')).toBe(true);
 
         const content = errorGlyph.querySelector('.error-glyph-content');
         expect(content).toBeTruthy();
@@ -145,13 +145,13 @@ describe('Error Glyph - Spike (Edge Cases)', () => {
         container.appendChild(errorGlyph);
 
         // Error glyph handles large data
-        expect(errorGlyph.classList.contains('canvas-error-glyph')).toBe(true);
+        expect(errorGlyph.classList.contains('canvas-error-element')).toBe(true);
         const content = errorGlyph.querySelector('.error-glyph-content');
         expect(content).toBeTruthy();
     });
 });
 
-describe('Error Glyph - Jenny (Complex Scenarios)', () => {
+describe('Error Element - Jenny (Complex Scenarios)', () => {
     test('Jenny rapidly clicks dismiss button twice', () => {
         // Jenny creates an error glyph
         const container = document.createElement('div');
@@ -189,7 +189,7 @@ describe('Error Glyph - Jenny (Complex Scenarios)', () => {
 
         // Error glyph remains removed (no resurrection)
         expect(container.contains(errorGlyph)).toBe(false);
-        expect(container.querySelectorAll('.canvas-error-glyph').length).toBe(0);
+        expect(container.querySelectorAll('.canvas-error-element').length).toBe(0);
 
         // Cleanup
         document.body.innerHTML = '';

@@ -6,12 +6,12 @@
  *
  * The gallery itself is built from glyph primitives — title bars
  * as section headers, glyph containers as specimen wrappers.
- * Mini glyphs use the real GlyphUI SDK — actual ui.glyph(), ui.input(),
+ * Mini glyphs use the real ElementUI SDK — actual ui.element(), ui.input(),
  * ui.button(), ui.statusLine() calls on a mini canvas.
  */
 
 import { createGlyphUI } from '../../ts/components/glyph/glyph-ui'
-import type { Glyph } from '@qntx/glyphs'
+import type { Element } from '@teranos/elements'
 
 interface ButtonSpec {
   label: string
@@ -35,13 +35,13 @@ export function renderComponentGallery(root: HTMLElement) {
   // ── SDK Primitives ──
   section.appendChild(sectionGlyph('SDK Primitives', 'What plugins get through ui.* — the canonical components for plugin-authored glyphs'))
 
-  // glyph-btn (SDK: ui.button())
-  const glyphBtnMatrix = buttonMatrix('ui.button()', 'glyph-btn — default and primary variants', ['default', 'primary'], [
+  // btn (SDK: ui.button())
+  const glyphBtnMatrix = buttonMatrix('ui.button()', 'btn — default and primary variants', ['default', 'primary'], [
     {
       rowLabel: '',
       cells: [
-        { label: 'Cancel', classes: 'glyph-btn' },
-        { label: 'Execute', classes: 'glyph-btn glyph-btn--primary' },
+        { label: 'Cancel', classes: 'btn' },
+        { label: 'Execute', classes: 'btn btn--primary' },
       ]
     },
   ])
@@ -58,7 +58,7 @@ export function renderComponentGallery(root: HTMLElement) {
   canvas.style.overflow = 'hidden'
 
   // ix-json: default title bar + SDK primitives
-  const ixJsonGlyph: Glyph = { id: 'demo-ix-json', title: 'ix-json', symbol: 'ix-json', x: 10, y: 10, renderContent: () => document.createElement('div') }
+  const ixJsonGlyph: Element = { id: 'demo-ix-json', title: 'ix-json', symbol: 'ix-json', x: 10, y: 10, renderContent: () => document.createElement('div') }
   const ixJsonUI = createGlyphUI(ixJsonGlyph, 'ix-json')
   const ixJson = ixJsonUI.glyph({
     defaults: { x: 10, y: 10, width: 280, height: 190 },
@@ -92,7 +92,7 @@ export function renderComponentGallery(root: HTMLElement) {
   canvas.appendChild(ixJson.element)
 
   // py-glyph: Python blue title bar
-  const pyGlyphData: Glyph = { id: 'demo-py', title: 'py-glyph', symbol: 'py', x: 300, y: 10, renderContent: () => document.createElement('div') }
+  const pyGlyphData: Element = { id: 'demo-py', title: 'py-glyph', symbol: 'py', x: 300, y: 10, renderContent: () => document.createElement('div') }
   const pyUI = createGlyphUI(pyGlyphData, 'py')
   const py = pyUI.glyph({
     defaults: { x: 300, y: 10, width: 280, height: 190 },
@@ -109,7 +109,7 @@ export function renderComponentGallery(root: HTMLElement) {
   canvas.appendChild(py.element)
 
   // ts-glyph: TypeScript amber title bar
-  const tsGlyphData: Glyph = { id: 'demo-ts', title: 'ts-glyph', symbol: 'ts', x: 590, y: 10, renderContent: () => document.createElement('div') }
+  const tsGlyphData: Element = { id: 'demo-ts', title: 'ts-glyph', symbol: 'ts', x: 590, y: 10, renderContent: () => document.createElement('div') }
   const tsUI = createGlyphUI(tsGlyphData, 'ts')
   const ts = tsUI.glyph({
     defaults: { x: 590, y: 10, width: 280, height: 190 },
@@ -239,28 +239,28 @@ export function renderComponentGallery(root: HTMLElement) {
   }))
 
   // titlebar specimens
-  section.appendChild(glyphSection('glyph-title-bar', 'Unified title bar for all glyph manifestations', (body) => {
+  section.appendChild(glyphSection('title-bar', 'Unified title bar for all glyph manifestations', (body) => {
     const tbRow = document.createElement('div')
     tbRow.className = 'titlebar-row'
 
-    tbRow.appendChild(titleBarStrip('Standard', 'glyph-title-bar', 'ix-prompt', [
+    tbRow.appendChild(titleBarStrip('Standard', 'title-bar', 'ix-prompt', [
       { label: '\u25B6', cls: 'titlebar-btn' },
       { label: '\u2715', cls: 'titlebar-btn' },
     ]))
 
-    tbRow.appendChild(titleBarStrip('Generic buttons', 'glyph-title-bar', 'result-glyph', [
+    tbRow.appendChild(titleBarStrip('Generic buttons', 'title-bar', 'result-glyph', [
       { label: '\u229E', cls: '' },
       { label: '\u2715', cls: '' },
     ]))
 
     const panelWrap = document.createElement('div')
-    panelWrap.className = 'glyph-panel titlebar-specimen'
+    panelWrap.className = 'panel titlebar-specimen'
     const panelLabel = document.createElement('span')
     panelLabel.className = 'titlebar-specimen-label'
     panelLabel.textContent = 'Panel (no drag cursor)'
     panelWrap.appendChild(panelLabel)
     const panelBar = document.createElement('div')
-    panelBar.className = 'glyph-title-bar'
+    panelBar.className = 'title-bar'
     const panelTitle = document.createElement('span')
     panelTitle.textContent = 'plugin-config'
     panelTitle.style.flex = '1'
@@ -275,7 +275,7 @@ export function renderComponentGallery(root: HTMLElement) {
     body.appendChild(tbRow)
 
     // Auto-height
-    body.appendChild(titleBarStrip('Auto-height (--auto)', 'glyph-title-bar glyph-title-bar--auto', 'attestation with a longer title that wraps to demonstrate auto-height behavior', [
+    body.appendChild(titleBarStrip('Auto-height (--auto)', 'title-bar title-bar--auto', 'attestation with a longer title that wraps to demonstrate auto-height behavior', [
       { label: '\u27F3', cls: 'titlebar-btn' },
       { label: '\u2715', cls: 'titlebar-btn' },
     ]))
@@ -293,7 +293,7 @@ function sectionGlyph(title: string, description: string): HTMLElement {
   wrapper.style.marginBottom = '6px'
 
   const bar = document.createElement('div')
-  bar.className = 'glyph-title-bar'
+  bar.className = 'title-bar'
 
   const titleSpan = document.createElement('span')
   titleSpan.style.flex = '1'
@@ -323,7 +323,7 @@ function glyphSection(title: string, description: string, buildContent: (body: H
   container.style.marginBottom = '10px'
 
   const bar = document.createElement('div')
-  bar.className = 'glyph-title-bar'
+  bar.className = 'title-bar'
 
   const titleSpan = document.createElement('span')
   titleSpan.style.flex = '1'
@@ -339,7 +339,7 @@ function glyphSection(title: string, description: string, buildContent: (body: H
   container.appendChild(bar)
 
   const body = document.createElement('div')
-  body.className = 'glyph-content-area'
+  body.className = 'content-area'
   buildContent(body)
   container.appendChild(body)
 

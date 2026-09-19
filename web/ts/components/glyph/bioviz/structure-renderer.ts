@@ -6,7 +6,7 @@
  * Arc height proportional to pair distance. Color by nesting depth.
  */
 
-import { preventDrag } from '@qntx/glyphs';
+import { preventDrag } from '@teranos/elements';
 
 const BASE_COLORS: Record<string, string> = {
     A: '#66bb6a',

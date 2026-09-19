@@ -1,5 +1,5 @@
 /**
- * ix-json Glyph Module — pure TypeScript plugin glyph using the GlyphUI.
+ * ix-json Element Module — pure TypeScript plugin glyph using the ElementUI.
  *
  * No Go backend required. Config is persisted via ui.saveConfig/loadConfig,
  * API fetches happen directly from the browser (CORS-permitting).
@@ -7,9 +7,9 @@
  * Dynamically imported by the QNTX frontend when registered in glyph-registry.
  */
 
-import type { Glyph, GlyphUI, GlyphDef, RenderFn, MeldEvent } from '@qntx/glyphs';
+import type { Element, ElementUI, ElementDef, RenderFn, MeldEvent } from '@teranos/elements';
 
-export const glyphDef: GlyphDef = {
+export const glyphDef: ElementDef = {
     symbol: '🔄',
     title: 'JSON API Ingestor',
     label: 'ix-json',
@@ -17,8 +17,8 @@ export const glyphDef: GlyphDef = {
     defaultHeight: 700,
 };
 
-export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLElement> => {
-    const { element, titleBar, content } = ui.glyph({
+export const render: RenderFn = async (glyph: Element, ui: ElementUI): Promise<HTMLElement> => {
+    const { element, titleBar, content } = ui.element({
         defaults: {
             x: glyph.x ?? 200,
             y: glyph.y ?? 200,
@@ -175,7 +175,7 @@ function setInputValue(wrapper: HTMLElement, value: string): void {
 }
 
 async function saveConfig(
-    ui: GlyphUI,
+    ui: ElementUI,
     apiUrlEl: HTMLElement,
     authTokenEl: HTMLElement,
     status: StatusLine,

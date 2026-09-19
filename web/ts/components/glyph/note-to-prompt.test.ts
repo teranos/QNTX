@@ -23,7 +23,7 @@ import { createMockUiState } from '../../test/mock-ui-state';
 const { uiState, glyphs: mockCanvasGlyphs } = createMockUiState();
 mock.module('../../state/ui', () => ({ uiState }));
 
-describe('Glyph Conversions - Tim (Happy Path)', () => {
+describe('Element Conversions - Tim (Happy Path)', () => {
     test('Tim converts note to prompt successfully', async () => {
         // Clear mock state
         mockCanvasGlyphs.length = 0;
@@ -34,9 +34,9 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
 
         // Tim creates a note glyph with some content
         const noteElement = document.createElement('div');
-        noteElement.className = 'canvas-note-glyph canvas-glyph';
-        noteElement.dataset.glyphId = 'note-123';
-        noteElement.dataset.glyphSymbol = Prose;
+        noteElement.className = 'canvas-note-element canvas-element';
+        noteElement.dataset.elementId = 'note-123';
+        noteElement.dataset.symbol = Prose;
 
         const textarea = document.createElement('textarea');
         textarea.value = 'Write a haiku about canvas';
@@ -64,9 +64,9 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
         const convertedElement = container.firstElementChild as HTMLElement;
 
         // It's now a prompt glyph
-        expect(convertedElement.classList.contains('canvas-prompt-glyph')).toBe(true);
-        expect(convertedElement.classList.contains('canvas-note-glyph')).toBe(false);
-        expect(convertedElement.dataset.glyphSymbol).toBe(SO);
+        expect(convertedElement.classList.contains('canvas-prompt-element')).toBe(true);
+        expect(convertedElement.classList.contains('canvas-note-element')).toBe(false);
+        expect(convertedElement.dataset.symbol).toBe(SO);
     });
 
     test('Tim converts result to note successfully', async () => {
@@ -79,9 +79,9 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
 
         // Tim has a result glyph with execution output
         const resultElement = document.createElement('div');
-        resultElement.className = 'canvas-result-glyph canvas-glyph';
-        resultElement.dataset.glyphId = 'result-456';
-        resultElement.dataset.glyphSymbol = 'result';
+        resultElement.className = 'canvas-result-element canvas-element';
+        resultElement.dataset.elementId = 'result-456';
+        resultElement.dataset.symbol = 'result';
 
         // Result has output content
         const outputDiv = document.createElement('div');
@@ -110,9 +110,9 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
         const convertedElement = container.firstElementChild as HTMLElement;
 
         // It's now a note glyph
-        expect(convertedElement.classList.contains('canvas-note-glyph')).toBe(true);
-        expect(convertedElement.classList.contains('canvas-result-glyph')).toBe(false);
-        expect(convertedElement.dataset.glyphSymbol).toBe(Prose);
+        expect(convertedElement.classList.contains('canvas-note-element')).toBe(true);
+        expect(convertedElement.classList.contains('canvas-result-element')).toBe(false);
+        expect(convertedElement.dataset.symbol).toBe(Prose);
 
         // Note glyph structure exists (uses ProseMirror editor, not textarea)
         const editorContainer = convertedElement.querySelector('.note-editor-container');
@@ -120,7 +120,7 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
     });
 });
 
-describe('Glyph Conversions - Spike (Edge Cases)', () => {
+describe('Element Conversions - Spike (Edge Cases)', () => {
     test('Spike tries to convert non-existent glyph', async () => {
         // Clear mock state
         mockCanvasGlyphs.length = 0;
@@ -138,7 +138,7 @@ describe('Glyph Conversions - Spike (Edge Cases)', () => {
     });
 });
 
-describe('Glyph Conversions - Jenny (Complex Scenarios)', () => {
+describe('Element Conversions - Jenny (Complex Scenarios)', () => {
     test('Jenny cannot convert glyph inside melded composition', async () => {
         // Clear mock state
         mockCanvasGlyphs.length = 0;
@@ -154,9 +154,9 @@ describe('Glyph Conversions - Jenny (Complex Scenarios)', () => {
 
         // Add note glyph inside composition
         const noteElement = document.createElement('div');
-        noteElement.className = 'canvas-note-glyph canvas-glyph';
-        noteElement.dataset.glyphId = 'note-nested';
-        noteElement.dataset.glyphSymbol = Prose;
+        noteElement.className = 'canvas-note-element canvas-element';
+        noteElement.dataset.elementId = 'note-nested';
+        noteElement.dataset.symbol = Prose;
 
         const textarea = document.createElement('textarea');
         textarea.value = 'Note inside composition';
@@ -184,11 +184,11 @@ describe('Glyph Conversions - Jenny (Complex Scenarios)', () => {
         expect(composition.children.length).toBe(1);
         const unchangedElement = composition.firstElementChild as HTMLElement;
 
-        // Glyph is still a note (not converted)
-        expect(unchangedElement.classList.contains('canvas-note-glyph')).toBe(true);
-        expect(unchangedElement.classList.contains('canvas-prompt-glyph')).toBe(false);
-        expect(unchangedElement.dataset.glyphSymbol).toBe(Prose);
-        expect(unchangedElement.dataset.glyphId).toBe('note-nested');
+        // Element is still a note (not converted)
+        expect(unchangedElement.classList.contains('canvas-note-element')).toBe(true);
+        expect(unchangedElement.classList.contains('canvas-prompt-element')).toBe(false);
+        expect(unchangedElement.dataset.symbol).toBe(Prose);
+        expect(unchangedElement.dataset.elementId).toBe('note-nested');
 
         // Composition is intact
         expect(composition.classList.contains('melded-composition')).toBe(true);

@@ -33,11 +33,11 @@ if (!origCreateElementNS || typeof origCreateElementNS !== 'function') {
     };
 }
 
-/** Create a fake glyph with a .glyph-symbol inside, append to container */
+/** Create a fake glyph with a .symbol inside, append to container */
 function createGlyph(container: HTMLElement, id: string, symbol: string): HTMLElement {
     const glyph = document.createElement('div');
-    glyph.className = 'canvas-glyph';
-    glyph.dataset.glyphId = id;
+    glyph.className = 'canvas-element';
+    glyph.dataset.elementId = id;
     glyph.style.position = 'absolute';
     glyph.style.left = '100px';
     glyph.style.top = '100px';
@@ -45,7 +45,7 @@ function createGlyph(container: HTMLElement, id: string, symbol: string): HTMLEl
     glyph.style.height = '40px';
 
     const sym = document.createElement('span');
-    sym.className = 'glyph-symbol';
+    sym.className = 'symbol';
     sym.textContent = symbol;
     glyph.appendChild(sym);
 
@@ -54,7 +54,7 @@ function createGlyph(container: HTMLElement, id: string, symbol: string): HTMLEl
 }
 
 function getSymbol(glyph: HTMLElement): HTMLElement {
-    return glyph.querySelector('.glyph-symbol') as HTMLElement;
+    return glyph.querySelector('.symbol') as HTMLElement;
 }
 
 // happy-dom exposes event constructors on window, not globalThis
@@ -103,7 +103,7 @@ describe('Thread Building Mode - Tim (Happy Path)', () => {
     test('Tim extends an existing thread — pre-populated nodes appear in result', () => {
         createGlyph(container, 'glyph-a', 'A');
         createGlyph(container, 'glyph-b', 'B');
-        const glyphB = container.querySelector('[data-glyph-id="glyph-b"]') as HTMLElement;
+        const glyphB = container.querySelector('[data-element-id="glyph-b"]') as HTMLElement;
         const symB = getSymbol(glyphB);
 
         let result: ThreadBuildResult | null = null;
@@ -129,7 +129,7 @@ describe('Thread Building Mode - Tim (Happy Path)', () => {
         createGlyph(container, 'glyph-x', 'X');
         createGlyph(container, 'glyph-y', 'Y');
         createGlyph(container, 'glyph-z', 'Z');
-        const glyphZ = container.querySelector('[data-glyph-id="glyph-z"]') as HTMLElement;
+        const glyphZ = container.querySelector('[data-element-id="glyph-z"]') as HTMLElement;
         const symZ = getSymbol(glyphZ);
 
         let result: ThreadBuildResult | null = null;
@@ -159,7 +159,7 @@ describe('Thread Building Mode - Spike (Edge Cases)', () => {
 
     test('Spike cancels extend with Escape — onCancel fires', () => {
         createGlyph(container, 'glyph-a', 'A');
-        const glyphA = container.querySelector('[data-glyph-id="glyph-a"]') as HTMLElement;
+        const glyphA = container.querySelector('[data-element-id="glyph-a"]') as HTMLElement;
         const symA = getSymbol(glyphA);
 
         let cancelled = false;
@@ -178,7 +178,7 @@ describe('Thread Building Mode - Spike (Edge Cases)', () => {
     test('Spike extends with a missing glyph in existingNodeIds — skips missing', () => {
         createGlyph(container, 'glyph-a', 'A');
         // glyph-missing does not exist in DOM
-        const glyphA = container.querySelector('[data-glyph-id="glyph-a"]') as HTMLElement;
+        const glyphA = container.querySelector('[data-element-id="glyph-a"]') as HTMLElement;
         const symA = getSymbol(glyphA);
 
         let result: ThreadBuildResult | null = null;

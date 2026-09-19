@@ -121,7 +121,7 @@ export async function refusal(response: Response): Promise<string> {
 function row(label: string, value: string): string {
     return `
                 <div class="glyph-row">
-                    <span class="glyph-label">${escapeHtml(label)}</span>
+                    <span class="label">${escapeHtml(label)}</span>
                     <span class="glyph-value">${escapeHtml(value)}</span>
                 </div>`;
 }

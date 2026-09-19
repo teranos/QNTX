@@ -1,5 +1,5 @@
 /**
- * Context Glyph (∈) — the context as a thing in its own right.
+ * Context Element (∈) — the context as a thing in its own right.
  *
  * Clicking a context spawns the context glyph, the same way clicking an
  * attestation spawns the attestation glyph. It draws ∈, which is the mark of

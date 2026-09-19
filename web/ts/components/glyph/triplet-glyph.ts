@@ -1,5 +1,5 @@
 /**
- * Triplet Glyph (⫶) — the primary attestation interaction surface
+ * Triplet Element (⫶) — the primary attestation interaction surface
  *
  * Groups all attestations sharing the same subject + predicate + context
  * into one browsable glyph. Individual attestations (differing timestamps,
@@ -9,8 +9,8 @@
  * Falls back to attestation glyph (+) for lone ungroupable attestations.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Triplet, AX } from '../../sym';
 import { renderTriple } from './attestation-triple';
@@ -273,7 +273,7 @@ function buildTripletContent(attestations: Attestation[]): HTMLElement {
 // ─── Canvas glyph ────────────────────────────────────────────
 
 /** Create a Triplet glyph for canvas placement */
-export function createTripletGlyph(glyph: Glyph): HTMLElement {
+export function createTripletGlyph(glyph: Element): HTMLElement {
     let attestations: Attestation[] = [];
     try {
         if (glyph.content) {
@@ -288,7 +288,7 @@ export function createTripletGlyph(glyph: Glyph): HTMLElement {
 
     // Title bar: ⫶ + triple + count
     const titleBar = el('div', {
-        class: 'glyph-title-bar glyph-title-bar--auto',
+        class: 'title-bar title-bar--auto',
         style: { position: 'relative' },
     });
 
@@ -344,8 +344,8 @@ export function createTripletGlyph(glyph: Glyph): HTMLElement {
     const hasContent = attestations.length > 0;
 
     const { element } = canvasPlaced({
-        glyph,
-        className: 'canvas-triplet-glyph',
+        item: glyph,
+        className: 'canvas-triplet-element',
         defaults: { x: 200, y: 200, width: 420, height: hasContent ? 240 : 28 },
         resizable: hasContent,
         useMinHeight: true,
@@ -356,7 +356,7 @@ export function createTripletGlyph(glyph: Glyph): HTMLElement {
 
     if (hasContent) {
         const content = el('div', {
-            class: 'glyph-content-area',
+            class: 'content-area',
             style: {
                 backgroundColor: TRIPLET_BG,
                 borderTop: '1px solid var(--border)',
@@ -374,7 +374,7 @@ export function createTripletGlyph(glyph: Glyph): HTMLElement {
     wireExpandToWindow({
         element,
         expandBtn,
-        glyphId: glyph.id,
+        elementId: glyph.id,
         title,
         symbol: Triplet,
         renderContent: () => {

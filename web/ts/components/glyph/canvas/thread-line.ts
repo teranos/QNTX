@@ -11,7 +11,7 @@
  * with a live segment from the last symbol to the cursor.
  */
 
-import { createCursorElement, attachCursorToMouse } from '@qntx/glyphs';
+import { createCursorElement, attachCursorToMouse } from '@teranos/elements';
 import { showMenuScrim, removeScrim } from './placement-mode';
 import { log, SEG } from '../../../logger';
 
@@ -76,23 +76,23 @@ function buildFullPath(nodes: HTMLElement[], cursorX: number, cursorY: number): 
 }
 
 export interface ThreadBuildResult {
-    /** Glyph IDs in thread order (from data-glyph-id on parent .canvas-glyph) */
+    /** Element IDs in thread order (from data-element-id on parent .canvas-element) */
     nodeIds: string[];
     /** Screen position where 〽 was placed */
     placeX: number;
     placeY: number;
     /** The cursor element that was following the mouse — handed off to become the placed 〽 */
     cursorElement: HTMLElement;
-    /** The cursor's symbol span (.glyph-cursor-symbol) — to be reused as the placed .glyph-symbol */
+    /** The cursor's symbol span (.cursor-symbol) — to be reused as the placed .symbol */
     symbolElement: HTMLElement | null;
 }
 
 /** Snap radius in pixels — clicks within this distance of a symbol snap to it */
 const SNAP_RADIUS = 40;
 
-/** Find the nearest .glyph-symbol within SNAP_RADIUS, excluding already-added nodes */
+/** Find the nearest .symbol within SNAP_RADIUS, excluding already-added nodes */
 function findNearestSymbol(cx: number, cy: number, exclude: HTMLElement[]): HTMLElement | null {
-    const symbols = document.querySelectorAll('.glyph-symbol');
+    const symbols = document.querySelectorAll('.symbol');
     let best: HTMLElement | null = null;
     let bestDist = SNAP_RADIUS;
 
@@ -116,7 +116,7 @@ function findNearestSymbol(cx: number, cy: number, exclude: HTMLElement[]): HTML
 /**
  * Enter thread building mode.
  *
- * @param originSymbol    The .glyph-symbol element that was right-clicked (or last symbol when extending)
+ * @param originSymbol    The .symbol element that was right-clicked (or last symbol when extending)
  * @param color           Thread color (e.g. red for first thread)
  * @param onComplete      Called with the built thread when user places 〽
  * @param onCancel        Called if user presses Escape
@@ -133,12 +133,12 @@ export function enterThreadBuildingMode(
     existingNodeIds?: string[],
     existingCursor?: HTMLElement,
 ): void {
-    // Track connected symbol elements — resolve existing nodes to their .glyph-symbol elements
+    // Track connected symbol elements — resolve existing nodes to their .symbol elements
     const nodes: HTMLElement[] = [];
     if (existingNodeIds && existingNodeIds.length > 0) {
         for (const id of existingNodeIds) {
-            const glyphEl = document.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement | null;
-            const sym = glyphEl?.querySelector('.glyph-symbol') as HTMLElement | null;
+            const glyphEl = document.querySelector(`[data-element-id="${id}"]`) as HTMLElement | null;
+            const sym = glyphEl?.querySelector('.symbol') as HTMLElement | null;
             if (sym) nodes.push(sym);
         }
     } else {
@@ -235,12 +235,12 @@ export function enterThreadBuildingMode(
         if (scrim) scrim.style.display = '';
 
         // Check if clicking on a glyph symbol
-        const symbolTarget = target?.closest('.glyph-symbol') as HTMLElement | null;
-        const glyphTarget = target?.closest('.canvas-glyph') as HTMLElement | null;
+        const symbolTarget = target?.closest('.symbol') as HTMLElement | null;
+        const glyphTarget = target?.closest('.canvas-element') as HTMLElement | null;
 
         if (symbolTarget && glyphTarget) {
             // Add this symbol to the thread path (skip if already added)
-            const glyphId = glyphTarget.dataset.glyphId;
+            const glyphId = glyphTarget.dataset.elementId;
             if (glyphId && !nodes.includes(symbolTarget)) {
                 nodes.push(symbolTarget);
                 // Redraw with new node
@@ -251,7 +251,7 @@ export function enterThreadBuildingMode(
             // No direct hit — snap to nearest symbol within radius
             const snapped = findNearestSymbol(e.clientX, e.clientY, nodes);
             if (snapped) {
-                const glyphId = snapped.closest('.canvas-glyph')?.getAttribute('data-glyph-id');
+                const glyphId = snapped.closest('.canvas-element')?.getAttribute('data-element-id');
                 if (glyphId) {
                     nodes.push(snapped);
                     path.setAttribute('d', buildFullPath(nodes, mouseX, mouseY));
@@ -263,12 +263,12 @@ export function enterThreadBuildingMode(
             // Clicked empty canvas — finish thread
             const nodeIds: string[] = [];
             for (const node of nodes) {
-                const glyph = node.closest('.canvas-glyph') as HTMLElement | null;
-                if (glyph?.dataset.glyphId) nodeIds.push(glyph.dataset.glyphId);
+                const glyph = node.closest('.canvas-element') as HTMLElement | null;
+                if (glyph?.dataset.elementId) nodeIds.push(glyph.dataset.elementId);
             }
 
             // Hand off the cursor element to become the placed 〽 (preserves DOM identity)
-            const cursorSymbol = cursor.querySelector('.glyph-cursor-symbol') as HTMLElement | null;
+            const cursorSymbol = cursor.querySelector('.cursor-symbol') as HTMLElement | null;
             cleanup({ keepCursor: true });
             onComplete({
                 nodeIds,

@@ -5,7 +5,7 @@ function glyphWithTitleBar(): { element: HTMLElement; titleBar: HTMLElement } {
     const element = document.createElement('div');
     element.style.backgroundColor = 'rgb(10, 20, 30)';
     const titleBar = document.createElement('div');
-    titleBar.className = 'glyph-title-bar';
+    titleBar.className = 'title-bar';
     titleBar.style.backgroundColor = 'rgb(40, 50, 60)';
     element.appendChild(titleBar);
     return { element, titleBar };

@@ -1,5 +1,5 @@
 /**
- * Chart Glyph - Generic time-series visualization
+ * Chart Element - Generic time-series visualization
  *
  * A reusable glyph for displaying time-series data with D3 charts.
  * Supports multiple chart types (area, line, bar) and flexible data sources.

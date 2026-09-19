@@ -1,5 +1,5 @@
 /**
- * Sigma Glyph (Σ) — report card for distilled attestations
+ * Sigma Element (Σ) — report card for distilled attestations
  *
  * Sigma attestations are summaries of many observations, not single events.
  * The glyph renders as a report: big observation count, time range,
@@ -8,8 +8,8 @@
  * Opened via double-click on sigma result items in AX or SE glyphs.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, getManifestation, glyphRun, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { wireExpandToWindow, getForm, tray, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Sigma, Watcher } from '../../sym';
 import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
@@ -464,7 +464,7 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
 // ─── Canvas glyph ────────────────────────────────────────────
 
 /** Create a Sigma glyph for canvas placement */
-export function createSigmaGlyph(glyph: Glyph): HTMLElement {
+export function createSigmaGlyph(glyph: Element): HTMLElement {
     let attestation: Attestation | null = null;
     try {
         if (glyph.content) attestation = JSON.parse(glyph.content);
@@ -476,7 +476,7 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
 
     // Title bar: Σ + predicate + count
     const titleBar = el('div', {
-        class: 'glyph-title-bar glyph-title-bar--auto',
+        class: 'title-bar title-bar--auto',
         style: { position: 'relative' },
     });
 
@@ -503,8 +503,8 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
     titleBar.appendChild(expandBtn);
 
     const { element } = canvasPlaced({
-        glyph,
-        className: 'canvas-sigma-glyph',
+        item: glyph,
+        className: 'canvas-sigma-element',
         defaults: { x: 200, y: 200, width: 520, height: 400 },
         resizable: true,
         useMinHeight: true,
@@ -516,7 +516,7 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
     // Report content
     if (attestation && attrs) {
         const content = el('div', {
-            class: 'glyph-content-area',
+            class: 'content-area',
             style: {
                 backgroundColor: 'rgba(25, 25, 30, 0.95)',
                 borderTop: '1px solid var(--border)',
@@ -534,7 +534,7 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
     wireExpandToWindow({
         element,
         expandBtn,
-        glyphId: glyph.id,
+        elementId: glyph.id,
         title,
         symbol: Sigma,
         renderContent: () => {
@@ -567,21 +567,21 @@ export function spawnSigmaGlyph(attestation: Attestation, mouseX?: number, mouse
     }, mouseX || window.innerWidth / 2, mouseY || window.innerHeight / 2);
 }
 
-/** Spawn a sigma attestation as a window via glyphRun */
+/** Spawn a sigma attestation as a window via tray */
 export function spawnSigmaAsWindow(attestation: Attestation): void {
     const glyphId = `sigma-${attestation.id || crypto.randomUUID()}`;
 
-    const existing = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    const existing = document.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
     if (existing) {
-        const manifestation = getManifestation(existing);
+        const manifestation = getForm(existing);
         if (manifestation === 'window' || manifestation === 'canvasExpanded') {
             existing.style.zIndex = '1001';
             setTimeout(() => { existing.style.zIndex = '1000'; }, 2000);
         }
         return;
     }
-    if (glyphRun.has(glyphId)) {
-        glyphRun.openGlyph(glyphId);
+    if (tray.has(glyphId)) {
+        tray.open(glyphId);
         return;
     }
 
@@ -589,14 +589,14 @@ export function spawnSigmaAsWindow(attestation: Attestation): void {
     const total = attrs?._total || attrs?._count || 0;
     const title = `${Sigma} ${formatNum(total)} · ${extractPredicate(attestation)}${watcherEyes(extractPredicate(attestation))}`;
 
-    glyphRun.add({
+    tray.add({
         id: glyphId,
         title,
         symbol: Sigma,
         initialWidth: '380px',
         initialHeight: '400px',
         onClose: () => {
-            glyphRun.remove(glyphId);
+            tray.remove(glyphId);
             log.debug(SEG.GLYPH, `[SigmaGlyph] Closed window ${glyphId}`);
         },
         renderContent: () => {
@@ -610,7 +610,7 @@ export function spawnSigmaAsWindow(attestation: Attestation): void {
         },
     });
 
-    glyphRun.openGlyph(glyphId);
+    tray.open(glyphId);
     log.debug(SEG.GLYPH, `[SigmaGlyph] Spawned ${glyphId} as window`);
 }
 

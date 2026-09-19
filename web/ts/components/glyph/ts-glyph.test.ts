@@ -6,7 +6,7 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
@@ -79,7 +79,7 @@ mock.module('@codemirror/lang-javascript', () => ({
 
 const { createTsGlyph } = await import('./ts-glyph');
 
-function makeGlyph(id: string, extras: Partial<Glyph> = {}): Glyph {
+function makeGlyph(id: string, extras: Partial<Element> = {}): Element {
     return {
         id,
         title: 'TypeScript',
@@ -91,7 +91,7 @@ function makeGlyph(id: string, extras: Partial<Glyph> = {}): Glyph {
     };
 }
 
-describe('TS Glyph - Tim (Happy Path)', () => {
+describe('TS Element - Tim (Happy Path)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         localStorage.clear();
@@ -100,16 +100,16 @@ describe('TS Glyph - Tim (Happy Path)', () => {
     test('Tim creates TS glyph with correct DOM structure', async () => {
         const element = await createTsGlyph(makeGlyph('ts-tim-1'));
 
-        expect(element.dataset.glyphId).toBe('ts-tim-1');
-        expect(element.dataset.glyphSymbol).toBe('ts');
-        expect(element.classList.contains('canvas-ts-glyph')).toBe(true);
-        expect(element.classList.contains('canvas-glyph')).toBe(true);
+        expect(element.dataset.elementId).toBe('ts-tim-1');
+        expect(element.dataset.symbol).toBe('ts');
+        expect(element.classList.contains('canvas-ts-element')).toBe(true);
+        expect(element.classList.contains('canvas-element')).toBe(true);
     });
 
     test('Tim sees title bar with label and run button', async () => {
         const element = await createTsGlyph(makeGlyph('ts-tim-2'));
 
-        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.title-bar') as HTMLElement;
         expect(titleBar).toBeTruthy();
         expect(titleBar.querySelector('span')?.textContent).toBe('ts');
         expect(element.querySelector('.titlebar-btn')).toBeTruthy();
@@ -123,15 +123,15 @@ describe('TS Glyph - Tim (Happy Path)', () => {
         expect(element.dataset.localActive).toBe('true');
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
 
-        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.title-bar') as HTMLElement;
         expect(titleBar.style.backgroundColor).toMatch(/#5c3d1a|rgb\(92, 61, 26\)/);
     });
 
     test('Tim sees title bar label styled warm to match orange tint', async () => {
         const element = await createTsGlyph(makeGlyph('ts-tim-4'));
 
-        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
-        const label = titleBar.querySelector('span:not(.glyph-symbol)') as HTMLElement;
+        const titleBar = element.querySelector('.title-bar') as HTMLElement;
+        const label = titleBar.querySelector('span:not(.symbol)') as HTMLElement;
         expect(label.style.color).toMatch(/#f0c878|rgb\(240, 200, 120\)/);
     });
 

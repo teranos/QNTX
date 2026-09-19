@@ -6,13 +6,13 @@
  * triplet, and sigma glyphs.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { getGlyphTypeBySymbol } from './glyph-registry';
 
 export interface SpawnOpts {
-    /** Glyph symbol (used for registry lookup and uiState tracking) */
+    /** Element symbol (used for registry lookup and uiState tracking) */
     symbol: string;
     /** ID prefix (e.g. 'as', 'triplet', 'sigma') */
     prefix: string;
@@ -52,7 +52,7 @@ export function spawnOnCanvas(opts: SpawnOpts): HTMLElement | null {
         ? Math.round(opts.mouseY - layerRect.top - 20)
         : Math.round(window.innerHeight / 2 - fallbackH / 2);
 
-    const glyph: Glyph = {
+    const glyph: Element = {
         id: glyphId,
         title: opts.title,
         symbol: opts.symbol,
@@ -102,7 +102,7 @@ export function spawnOnCanvasDragging(opts: Omit<SpawnOpts, 'mouseX' | 'mouseY'>
     const fallbackW = opts.fallbackWidth || 420;
     const fallbackH = opts.fallbackHeight || 200;
 
-    const glyph: Glyph = {
+    const glyph: Element = {
         id: glyphId,
         title: opts.title,
         symbol: opts.symbol,

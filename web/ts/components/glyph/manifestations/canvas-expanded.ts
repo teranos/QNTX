@@ -1,12 +1,12 @@
 /**
- * Canvas-Expanded Manifestation — canvasPlaced ↔ canvasExpanded morph path
+ * Canvas-Expanded Form — canvasPlaced ↔ canvasExpanded morph path
  *
  * General capability: any canvas-placed glyph can fill the viewport and come
  * back. The subcanvas glyph is the first consumer.
  *
  * This file used to call the far end "fullscreen", which named nothing: the
  * workspace fills the viewport too, and so does a panel dragged past 90% of it.
- * `canvasExpanded` is the row it has in MANIFESTATIONS.
+ * `canvasExpanded` is the row it has in FORMS.
  *
  * Element Axiom: the glyph element is reparented (not recreated):
  * - canvasPlaced: child of `.canvas-content-layer` (inside CSS transform)
@@ -14,12 +14,12 @@
  *
  * Two minimize paths:
  * - Default: morph back to compact canvas position (morphCanvasExpandedToCanvasPlaced)
- * - Escape to tray: morph to glyph-run dot (future — uses morphWorkspaceToDot)
+ * - Escape to tray: morph to tray dot (future — uses morphWorkspaceToDot)
  */
 
 import { log, SEG } from '../../../logger';
-import type { Glyph } from '@qntx/glyphs';
-import { getMaximizeDuration, getMinimizeDuration, setManifestation, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMaximizeMorph, beginMorphToCanvasPlaced } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { getOpenDuration, getRestDuration, setForm, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMorphToBox, beginMorphToCanvasPlaced } from '@teranos/elements';
 import { canvasToScreen, getTransform } from '../canvas/canvas-pan';
 import { buildCanvasWorkspace } from '../canvas/canvas-workspace-builder';
 import { uiState } from '../../../state/ui';
@@ -33,15 +33,15 @@ import { Button } from '../../button';
  * Morph a canvas-placed glyph to fullscreen workspace
  *
  * @param element - The glyph's persistent DOM element (Axiom: same element throughout)
- * @param glyph - Glyph data (id, position, size)
+ * @param glyph - Element data (id, position, size)
  * @param canvasId - The parent canvas ID (for coordinate conversion on return)
  * @param onMinimize - Called when the glyph is minimized back to canvas-placed
  */
 export function morphCanvasPlacedToCanvasExpanded(
     element: HTMLElement,
-    glyph: Glyph,
+    glyph: Element,
     canvasId: string,
-    onMinimize: (element: HTMLElement, glyph: Glyph) => void
+    onMinimize: (element: HTMLElement, glyph: Element) => void
 ): void {
     // Capture current screen-space rect (accounts for CSS transform from pan/zoom)
     const fromRect = element.getBoundingClientRect();
@@ -57,9 +57,9 @@ export function morphCanvasPlacedToCanvasExpanded(
 
     // Remove from canvas content layer and reparent to body
     element.remove();
-    // In flight; setManifestation below says what it is morphing into. The
+    // In flight; setForm below says what it is morphing into. The
     // class this used to carry named the workspace, which this is not.
-    element.className = 'glyph-morphing';
+    element.className = 'morphing';
     element.style.position = 'fixed';
     element.style.zIndex = '1000';
     element.innerHTML = '';
@@ -67,12 +67,12 @@ export function morphCanvasPlacedToCanvasExpanded(
 
     // The manifestation this file's header names. It used to say "window",
     // because the boolean it wrote had no other way to say "off the canvas".
-    setManifestation(element, 'canvasExpanded');
+    setForm(element, 'canvasExpanded');
 
     // Target: full viewport
     const toRect = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
 
-    beginMaximizeMorph(element, fromRect, toRect, getMaximizeDuration())
+    beginMorphToBox(element, fromRect, toRect, getOpenDuration())
         .then(() => {
             log.debug(SEG.GLYPH, `[CanvasExpanded] Morph to fullscreen committed for ${glyph.id}`);
 
@@ -179,8 +179,8 @@ export function morphCanvasPlacedToCanvasExpanded(
  */
 export function morphCanvasExpandedToCanvasPlaced(
     element: HTMLElement,
-    glyph: Glyph,
-    onRestoreComplete: (element: HTMLElement, glyph: Glyph) => void
+    glyph: Element,
+    onRestoreComplete: (element: HTMLElement, glyph: Element) => void
 ): void {
     log.debug(SEG.GLYPH, `[CanvasExpanded] Minimizing ${glyph.id} back to canvas`);
 
@@ -210,12 +210,12 @@ export function morphCanvasExpandedToCanvasPlaced(
         height: origin.height * scale
     };
 
-    beginMorphToCanvasPlaced(element, currentRect, toRect, getMinimizeDuration())
+    beginMorphToCanvasPlaced(element, currentRect, toRect, getRestDuration())
         .then(() => {
             log.debug(SEG.GLYPH, `[CanvasExpanded] Restore animation committed for ${glyph.id}`);
 
             // Back on the canvas, and the element now says so
-            setManifestation(element, 'canvasPlaced');
+            setForm(element, 'canvasPlaced');
             clearCanvasOrigin(element);
 
             // Remove from body
@@ -238,14 +238,14 @@ export function morphCanvasExpandedToCanvasPlaced(
  */
 function collapseImmediately(
     element: HTMLElement,
-    glyph: Glyph,
-    onRestoreComplete: (element: HTMLElement, glyph: Glyph) => void
+    glyph: Element,
+    onRestoreComplete: (element: HTMLElement, glyph: Element) => void
 ): void {
     log.debug(SEG.GLYPH, `[CanvasExpanded] Instant collapse ${glyph.id}`);
 
     destroyCanvasSelection(glyph.id);
     element.innerHTML = '';
-    setManifestation(element, 'canvasPlaced');
+    setForm(element, 'canvasPlaced');
     clearCanvasOrigin(element);
     element.remove();
     element.style.cssText = '';
@@ -255,7 +255,7 @@ function collapseImmediately(
 /**
  * Load inner glyphs for a subcanvas workspace from uiState
  */
-function loadInnerGlyphs(subcanvasId: string): Glyph[] {
+function loadInnerGlyphs(subcanvasId: string): Element[] {
     const saved = uiState.getCanvasGlyphs(subcanvasId);
     return saved
         .filter(g => g.symbol !== 'error')
@@ -263,7 +263,7 @@ function loadInnerGlyphs(subcanvasId: string): Glyph[] {
             const entry = g.symbol ? getGlyphTypeBySavedSymbol(g.symbol, g.content) : undefined;
             return {
                 id: g.id,
-                title: entry?.title ?? 'Glyph',
+                title: entry?.title ?? 'Element',
                 symbol: g.symbol,
                 x: g.x,
                 y: g.y,

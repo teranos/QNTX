@@ -1,8 +1,8 @@
 /**
- * Glyph Conversions
+ * Element Conversions
  *
  * Transforms one glyph type into another, preserving the SAME DOM element.
- * Respects the axiom: "A Glyph is exactly ONE DOM element for its entire lifetime."
+ * Respects the axiom: "A Element is exactly ONE DOM element for its entire lifetime."
  *
  * Conversion pattern:
  * 1. Capture layout and content from the existing element
@@ -11,11 +11,11 @@
  * 4. Update uiState atomically
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { SO, Prose } from '../../sym';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { runCleanup } from '@qntx/glyphs';
+import { runCleanup } from '@teranos/elements';
 import { setupPromptGlyph } from './prompt-glyph';
 import { setupNoteGlyph } from './note-glyph';
 
@@ -37,10 +37,10 @@ function captureLayout(container: HTMLElement, element: HTMLElement) {
  * Convert a note glyph to a prompt glyph (in-place mutation)
  */
 export async function convertNoteToPrompt(container: HTMLElement, glyphId: string): Promise<boolean> {
-    const element = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    const element = container.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
     if (!element) {
-        const existingGlyphs = Array.from(container.querySelectorAll('[data-glyph-id]'))
-            .map(el => (el as HTMLElement).dataset.glyphId)
+        const existingGlyphs = Array.from(container.querySelectorAll('[data-element-id]'))
+            .map(el => (el as HTMLElement).dataset.elementId)
             .filter(Boolean);
         log.error(SEG.GLYPH,
             `[Note→Prompt] Note glyph ${glyphId} not found in container.${container.className} ` +
@@ -63,7 +63,7 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
     const noteContent = existingGlyph?.content ?? '';
 
     // Build new glyph model
-    const promptGlyph: Glyph = {
+    const promptGlyph: Element = {
         id: `prompt-${crypto.randomUUID()}`,
         title: 'Prompt',
         symbol: SO,
@@ -89,7 +89,7 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
     await setupPromptGlyph(element, promptGlyph);
 
     // Update state atomically — remove old, keep the already-added new glyph
-    uiState.removeCanvasGlyph(glyphId);
+    uiState.removeCanvasElement(glyphId);
 
     log.info(SEG.GLYPH, `[Note→Prompt] Converted ${glyphId} → ${promptGlyph.id} (same element)`);
     return true;
@@ -101,10 +101,10 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
  * Captures the execution output text and repopulates as a note.
  */
 export async function convertResultToNote(container: HTMLElement, glyphId: string): Promise<boolean> {
-    const element = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    const element = container.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
     if (!element) {
-        const existingGlyphs = Array.from(container.querySelectorAll('[data-glyph-id]'))
-            .map(el => (el as HTMLElement).dataset.glyphId)
+        const existingGlyphs = Array.from(container.querySelectorAll('[data-element-id]'))
+            .map(el => (el as HTMLElement).dataset.elementId)
             .filter(Boolean);
         log.error(SEG.GLYPH,
             `[Result→Note] Result glyph ${glyphId} not found in container.${container.className} ` +
@@ -127,7 +127,7 @@ export async function convertResultToNote(container: HTMLElement, glyphId: strin
     const outputText = outputEl?.textContent?.trim() ?? '';
 
     // Build new glyph model
-    const noteGlyph: Glyph = {
+    const noteGlyph: Element = {
         id: `note-${crypto.randomUUID()}`,
         title: 'Note',
         symbol: Prose,
@@ -153,7 +153,7 @@ export async function convertResultToNote(container: HTMLElement, glyphId: strin
     await setupNoteGlyph(element, noteGlyph);
 
     // Remove old glyph from state
-    uiState.removeCanvasGlyph(glyphId);
+    uiState.removeCanvasElement(glyphId);
 
     log.info(SEG.GLYPH, `[Result→Note] Converted ${glyphId} → ${noteGlyph.id} (same element)`);
     return true;

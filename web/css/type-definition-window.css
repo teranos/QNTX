@@ -74,7 +74,7 @@
     border-top: 1px solid var(--panel-border-color, #333);
 }
 
-.btn {
+.type-definition-content .btn {
     padding: 8px 16px;
     font-size: var(--font-size-sm);
     font-weight: 600;
@@ -84,22 +84,22 @@
     transition: background 0.2s ease;
 }
 
-.btn-primary {
+.type-definition-content .btn-primary {
     background: var(--accent-color, #4a9eff);
     color: white;
 }
 
-.btn-primary:hover {
+.type-definition-content .btn-primary:hover {
     background: var(--accent-hover, #3a8eef);
 }
 
-.btn-secondary {
+.type-definition-content .btn-secondary {
     background: var(--panel-bg-secondary, #252525);
     color: var(--text-primary, #e0e0e0);
     border: 1px solid var(--panel-border-color, #333);
 }
 
-.btn-secondary:hover {
+.type-definition-content .btn-secondary:hover {
     background: var(--panel-bg-hover, #2a2a2a);
 }
 

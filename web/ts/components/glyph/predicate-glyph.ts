@@ -1,5 +1,5 @@
 /**
- * Predicate Glyph (=) — the predicate as a thing in its own right.
+ * Predicate Element (=) — the predicate as a thing in its own right.
  *
  * Clicking a predicate spawns the predicate glyph, the same way clicking an
  * attestation spawns the attestation glyph.

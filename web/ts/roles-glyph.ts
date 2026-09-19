@@ -1,5 +1,5 @@
 /**
- * Roles Glyph — every line the gate reads about roles (ADR-034), as written.
+ * Roles Element — every line the gate reads about roles (ADR-034), as written.
  *
  * "its a fucking audit trail". Each row is one attestation, read out loud as
  * X is Y of Z by W, with who wrote it and when. Newest first, and a line a
@@ -8,8 +8,8 @@
  * folded.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { glyphRun } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { createGhostButton, createPrimaryButton } from './components/button';
 import { el } from './html-utils';
@@ -201,7 +201,7 @@ function slot(name: string, offered: string[], onInput: (value: string) => void)
         option.value = value;
         list.appendChild(option);
     }
-    const input = el('input', { class: 'glyph-input' });
+    const input = el('input', { class: 'input' });
     input.setAttribute('list', listId);
     input.placeholder = name;
     input.autocomplete = 'off';
@@ -327,7 +327,7 @@ function renderComposer(container: HTMLElement, listContainer: HTMLElement, k: K
     const impliedBox = el('div');
     const redraw = () => { sentence.textContent = s.kind === 'GRANT' ? previewAll(s, implied) : preview(s); };
 
-    const kind = el('select', { class: 'glyph-input' });
+    const kind = el('select', { class: 'input' });
     for (const each of KINDS) {
         const option = el('option', { text: each });
         option.value = each;
@@ -366,7 +366,7 @@ function renderComposer(container: HTMLElement, listContainer: HTMLElement, k: K
     drawSlots();
 }
 
-export function createRolesGlyph(): Glyph {
+export function createRolesGlyph(): Element {
     return {
         id: GLYPH_ID,
         title: 'Roles',
@@ -421,5 +421,5 @@ export function createRolesGlyph(): Glyph {
 
 /** Opens the roles glyph. Called from ⍟. */
 export function openRolesGlyph(): void {
-    glyphRun.openGlyph(GLYPH_ID);
+    tray.open(GLYPH_ID);
 }

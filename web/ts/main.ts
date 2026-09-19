@@ -45,8 +45,8 @@ import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts'
 // while keyboard shortcuts in individual panels use the toggle functions directly.
 // plugin-panel.ts is now a glyph module registered via default-glyphs.ts
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
-import { glyphRun } from '@qntx/glyphs';
-import { configureGlyphs } from '@qntx/glyphs';
+import { tray } from '@teranos/elements';
+import { configureElements } from '@teranos/elements';
 import { canvasToScreen, screenToCanvas, getTransform } from './components/glyph/canvas/canvas-pan.ts';
 import { isGlyphSelected, getSelectedGlyphIds } from './components/glyph/canvas/selection.ts';
 import { addComposition, removeComposition, findCompositionByGlyph } from './state/compositions.ts';
@@ -329,30 +329,30 @@ async function init(): Promise<void> {
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
 
-    // Wire @qntx/glyphs with QNTX's logger, persistence, and canvas bridge
-    configureGlyphs({
+    // Wire @teranos/elements with QNTX's logger, persistence, and canvas bridge
+    configureElements({
         logger: log,
         logSegment: SEG.GLYPH,
         persistence: {
-            getMinimizedGlyphs: () => uiState.getMinimizedWindows(),
-            addMinimizedGlyph: (id) => uiState.addMinimizedWindow(id),
-            removeMinimizedGlyph: (id) => uiState.removeMinimizedWindow(id),
+            getResting: () => uiState.getMinimizedWindows(),
+            addResting: (id) => uiState.addMinimizedWindow(id),
+            removeResting: (id) => uiState.removeMinimizedWindow(id),
         },
         canvas: {
             toScreen: canvasToScreen,
             fromScreen: screenToCanvas,
             getScale: (canvasId) => getTransform(canvasId).scale,
         },
-        removeCanvasGlyph: (glyphId) => uiState.removeCanvasGlyph(glyphId),
+        removeCanvasElement: (glyphId) => uiState.removeCanvasElement(glyphId),
         canvasHost: {
-            saveCanvasGlyph: (glyph) => uiState.addCanvasGlyph(glyph),
-            getCanvasGlyphs: (canvasId) => uiState.getCanvasGlyphs(canvasId),
+            saveCanvasElement: (item) => uiState.addCanvasGlyph(item),
+            getCanvasElements: (canvasId) => uiState.getCanvasGlyphs(canvasId),
             getTransform: (canvasId) => getTransform(canvasId),
-            getSelectedGlyphIds: (canvasId) => getSelectedGlyphIds(canvasId),
-            isGlyphSelected: (canvasId, glyphId) => isGlyphSelected(canvasId, glyphId),
+            getSelectedElementIds: (canvasId) => getSelectedGlyphIds(canvasId),
+            isElementSelected: (canvasId, elementId) => isGlyphSelected(canvasId, elementId),
             saveComposition: (composition) => addComposition(composition),
             removeComposition: (id) => removeComposition(id),
-            findCompositionByGlyph: (glyphId) => findCompositionByGlyph(glyphId),
+            findCompositionByElement: (elementId) => findCompositionByGlyph(elementId),
             flushSync: () => canvasSyncQueue.flush(),
         },
         // Touch devices get a bigger resting dot so it stays findable with a thumb.
@@ -364,7 +364,7 @@ async function init(): Promise<void> {
 
     // Initialize glyph run FIRST (before any glyphs are created)
     // This ensures the run is ready to receive glyphs
-    glyphRun.init();
+    tray.init();
 
     registerDefaultGlyphs();
 
@@ -372,7 +372,7 @@ async function init(): Promise<void> {
     const minimizedIds = uiState.getMinimizedWindows();
     if (minimizedIds.length > 0) {
         for (const id of minimizedIds) {
-            if (glyphRun.has(id)) continue;
+            if (tray.has(id)) continue;
 
             const glyph = uiState.getCanvasGlyph(id);
             if (!glyph || !glyph.content) {
@@ -386,14 +386,14 @@ async function init(): Promise<void> {
                 const promptConfig = parsed.promptConfig;
                 const prompt = parsed.prompt;
                 const { renderResultContent } = await import('./components/glyph/result-glyph.ts');
-                glyphRun.add({
+                tray.add({
                     id: glyph.id,
                     title: prompt || 'Result',
                     symbol: glyph.symbol || 'result',
                     renderContent: () => renderResultContent(result, parsed.tokens ?? [], promptConfig, prompt),
                     onClose: () => {
                         uiState.removeMinimizedWindow(id);
-                        uiState.removeCanvasGlyph(id);
+                        uiState.removeCanvasElement(id);
                         log.debug(SEG.GLYPH, `[Init] Closed restored tray glyph ${id}`);
                     },
                 });
@@ -409,7 +409,7 @@ async function init(): Promise<void> {
     // Plugin glyphs load in background; unknown types show placeholders that
     // auto-replace when the plugin becomes available (see renderGlyph retry).
     console.log('[TIMING] canvas opening:', (performance.now() - _t0).toFixed(0), 'ms');
-    glyphRun.openGlyph('canvas-workspace');
+    tray.open('canvas-workspace');
 
     // Load plugin glyphs in background — non-blocking
     import('./components/glyph/plugin-provided-glyphs.ts')
@@ -434,15 +434,15 @@ async function init(): Promise<void> {
         // Menu items always show (never toggle/hide)
         // Panel show events from menu bar (menu items always show, never toggle)
         listenOrSay('show-pulse-panel', () => {
-            glyphRun.openGlyph('pulse-glyph');
+            tray.open('pulse-glyph');
         });
 
         listenOrSay('show-plugin-panel', () => {
-            glyphRun.openGlyph('plugin-glyph');
+            tray.open('plugin-glyph');
         });
 
         listenOrSay('show-handlers-panel', () => {
-            glyphRun.openGlyph('handlers-glyph');
+            tray.open('handlers-glyph');
         });
 
         listenOrSay('toggle-logs', () => {

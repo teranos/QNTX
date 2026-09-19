@@ -1,5 +1,5 @@
 /**
- * Semantic Search Glyph (⊨) — natural language query on canvas
+ * Semantic Search Element (⊨) — natural language query on canvas
  *
  * Structurally identical to AX glyph: query input → watcher on backend → live results.
  * Difference: AX sends structured AX query syntax; SE sends natural language matched
@@ -8,11 +8,11 @@
  * No local WASM query — semantic matching requires server-side embeddings.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { SE } from '../../sym';
 import { log, SEG } from '../../logger';
-import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
-import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import { preventDrag, storeCleanup, setupElementResizeObserver } from '@teranos/elements';
+import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
 import { sendMessage, apiFetch, connectivity } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
@@ -31,10 +31,10 @@ import {
 /**
  * Create a Semantic Search glyph using canvasPlaced() with custom title bar.
  *
- * @param glyph - Glyph model with id, position, and size
+ * @param glyph - Element model with id, position, and size
  * @returns The canvas-placed HTMLElement
  */
-export function createSemanticGlyph(glyph: Glyph): HTMLElement {
+export function createSemanticGlyph(glyph: Element): HTMLElement {
     const glyphId = glyph.id;
 
     // Load persisted state from canvas (query + threshold stored as JSON)
@@ -70,8 +70,8 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     Object.assign(symbol.style, { cursor: 'move', fontWeight: 'bold', color: 'var(--glyph-status-running-text)' });
 
     const { element } = canvasPlaced({
-        glyph,
-        className: 'canvas-se-glyph',
+        item: glyph,
+        className: 'canvas-se-element',
         defaults: { x: 200, y: 200, width: 400, height: 200 },
         dragHandle: symbol,
         resizable: true,
@@ -207,7 +207,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
 
     // Title bar (symbol + query input + threshold)
     const titleBar = el('div', {
-        class: 'glyph-title-bar',
+        class: 'title-bar',
         style: { padding: '4px 4px 4px 8px' },
     });
 
@@ -224,7 +224,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
 
     // Results container
     const resultsContainer = el('div', {
-        class: 'se-glyph-results glyph-content-area',
+        class: 'se-glyph-results content-area',
         style: {
             backgroundColor: 'rgba(25, 25, 30, 0.95)',
             borderTop: '1px solid var(--border)',
@@ -307,7 +307,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     });
 
     // ResizeObserver for auto-sizing
-    setupGlyphResizeObserver(element, resultsContainer, `SE ${glyphId}`);
+    setupElementResizeObserver(element, resultsContainer, `SE ${glyphId}`);
 
     // Disable server-side watcher on cleanup (glyph deletion)
     storeCleanup(element, () => {
@@ -453,7 +453,7 @@ function renderAttestation(attestation: Attestation, score?: number): HTMLElemen
  * Results are sorted by similarity score (highest first).
  */
 export function updateSemanticGlyphResults(glyphId: string, attestation: Attestation, score?: number): void {
-    const glyph = document.querySelector(`[data-glyph-id="${glyphId}"]`);
+    const glyph = document.querySelector(`[data-element-id="${glyphId}"]`);
     if (!glyph) {
         log.warn(SEG.GLYPH, `[SeGlyph] Cannot update results: glyph ${glyphId} not found in DOM`);
         return;
@@ -541,7 +541,7 @@ export function updateSemanticGlyphResults(glyphId: string, attestation: Attesta
  * Update SE glyph with error message and optional structured details
  */
 export function updateSemanticGlyphError(glyphId: string, errorMsg: string, severity: string, details?: string[]): void {
-    const glyph = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement;
+    const glyph = document.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement;
     if (!glyph) {
         log.warn(SEG.GLYPH, `[SeGlyph] Cannot update error: glyph ${glyphId} not found in DOM`);
         return;

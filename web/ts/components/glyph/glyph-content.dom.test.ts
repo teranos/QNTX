@@ -11,11 +11,11 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { createGlyphUI } from './glyph-ui';
 import { uiState } from '../../state/ui';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 const SYMBOL = '\u{1F4D4}'; // 📔
 
-function placed(id: string): Glyph {
+function placed(id: string): Element {
     return { id, title: 'Notebook', symbol: SYMBOL, renderContent: () => document.createElement('div') };
 }
 

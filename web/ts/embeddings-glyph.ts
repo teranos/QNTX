@@ -521,7 +521,7 @@ function renderEmbeddings(): void {
             const dimLabel = m.dimensions ? ` <span style="color:#6b7280">(${m.dimensions}d)</span>` : '';
             return `
             <div class="glyph-row emb-model-row" data-model="${escapeHtml(m.name)}" style="cursor:pointer">
-                <span class="glyph-label" style="padding-left:12px">${escapeHtml(m.name)}${dimLabel}</span>
+                <span class="label" style="padding-left:12px">${escapeHtml(m.name)}${dimLabel}</span>
                 <span class="glyph-value" style="display:flex;align-items:center;gap:6px">
                     ${m.count}
                     ${m.count >= 5 ? `<button class="emb-model-cluster-btn panel-btn" data-model="${escapeHtml(m.name)}" style="padding:1px 6px;font-size:10px;line-height:1.2" title="Cluster ${escapeHtml(m.name)}">cluster</button>` : ''}
@@ -531,18 +531,18 @@ function renderEmbeddings(): void {
 
         sectionInfo.innerHTML = `
             <div class="glyph-row">
-                <span class="glyph-label">Status:</span>
+                <span class="label">Status:</span>
                 <span class="glyph-value">${available ? '<span style="color:#4ade80">Active</span>' : '<span style="color:#fbbf24">Unavailable</span>'}</span>
             </div>
             ${(models ?? []).length > 0 ? `
             <div class="glyph-row">
-                <span class="glyph-label">Models:</span>
+                <span class="label">Models:</span>
                 <span class="glyph-value">${models.length}</span>
             </div>
             ${modelRows}
             ` : ''}
             <div class="glyph-row">
-                <span class="glyph-label">Embedded:</span>
+                <span class="label">Embedded:</span>
                 <span class="glyph-value">${embedding_count} / ${attestation_count}</span>
             </div>
             ${info.lag ? (() => {
@@ -554,7 +554,7 @@ function renderEmbeddings(): void {
                 const oldestDate = oldestEmb ? new Date(oldestEmb).toLocaleDateString('en-CA') : '';
                 return `
                 <div class="glyph-row">
-                    <span class="glyph-label">Coverage:</span>
+                    <span class="label">Coverage:</span>
                     <span class="glyph-value">${lagLabel}${oldestDate ? ` (from ${oldestDate})` : ''}</span>
                 </div>`;
             })() : ''}
@@ -633,11 +633,11 @@ function renderEmbeddings(): void {
                     .join('');
                 clusterRows = `
                     <div class="glyph-row">
-                        <span class="glyph-label">Clusters:</span>
+                        <span class="label">Clusters:</span>
                         <span class="glyph-value">${ci.n_clusters}</span>
                     </div>
                     <div class="glyph-row">
-                        <span class="glyph-label">Noise:</span>
+                        <span class="label">Noise:</span>
                         <span class="glyph-value">${ci.n_noise}</span>
                     </div>
                     <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${clusterPills}</div>
@@ -645,7 +645,7 @@ function renderEmbeddings(): void {
             } else {
                 clusterRows = `
                     <div class="glyph-row">
-                        <span class="glyph-label">Clusters:</span>
+                        <span class="label">Clusters:</span>
                         <span class="glyph-value" style="color:#6b7280">not computed</span>
                     </div>
                 `;
@@ -810,7 +810,7 @@ function renderEmbeddings(): void {
                     <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                         <h3 class="glyph-section-title">Projections</h3>
                         <div class="glyph-row">
-                            <span class="glyph-label">Status:</span>
+                            <span class="label">Status:</span>
                             <span class="glyph-value" style="color:#6b7280">not computed</span>
                         </div>
                         <div style="display:flex;justify-content:flex-end;margin-top:6px">
@@ -1540,7 +1540,7 @@ export function createEmbeddingsGlyph() {
         id: 'embeddings-glyph',
         title: 'Embeddings',
         symbol: '\u29C9',
-        manifestationType: 'panel' as const,
+        opensAs: 'panel' as const,
         renderContent: () => {
             const content = el('div');
             embeddingsElement = content;

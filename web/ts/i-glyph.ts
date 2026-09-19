@@ -80,7 +80,7 @@ function renderI(): void {
             <div class="glyph-section">
                 <h3 class="glyph-section-title">Identity</h3>
                 <div class="glyph-row">
-                    <span class="glyph-label">You:</span>
+                    <span class="label">You:</span>
                     <span class="glyph-value">${value}</span>
                 </div>
             </div>

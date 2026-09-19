@@ -8,7 +8,7 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { AX } from '../../sym';
 
 // Mock ResizeObserver
@@ -61,7 +61,7 @@ mock.module('../../ats-wasm', () => ({
 
 const { createAxGlyph, updateAxGlyphError } = await import('./ax-glyph');
 
-function makeGlyph(id: string, extras: Partial<Glyph> = {}): Glyph {
+function makeGlyph(id: string, extras: Partial<Element> = {}): Element {
     return {
         id,
         title: 'AX Query',
@@ -78,7 +78,7 @@ function setConnectivity(state: 'online' | 'degraded' | 'offline') {
     for (const cb of subscribers) cb(state);
 }
 
-describe('AX Glyph - Tim (Happy Path)', () => {
+describe('AX Element - Tim (Happy Path)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         mockCanvasGlyphs.length = 0;
@@ -89,18 +89,18 @@ describe('AX Glyph - Tim (Happy Path)', () => {
     test('Tim creates AX glyph with correct DOM structure', () => {
         const element = createAxGlyph(makeGlyph('ax-tim-1'));
 
-        expect(element.dataset.glyphId).toBe('ax-tim-1');
-        expect(element.dataset.glyphSymbol).toBe(AX);
-        expect(element.classList.contains('canvas-ax-glyph')).toBe(true);
-        expect(element.classList.contains('canvas-glyph')).toBe(true);
+        expect(element.dataset.elementId).toBe('ax-tim-1');
+        expect(element.dataset.symbol).toBe(AX);
+        expect(element.classList.contains('canvas-ax-element')).toBe(true);
+        expect(element.classList.contains('canvas-element')).toBe(true);
         expect(element.querySelector('.ax-query-input')).toBeTruthy();
         expect(element.querySelector('.ax-glyph-results')).toBeTruthy();
     });
 
-    test('Tim sees title bar with shared glyph-title-bar class', () => {
+    test('Tim sees title bar with shared title-bar class', () => {
         const element = createAxGlyph(makeGlyph('ax-tim-2'));
 
-        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.title-bar') as HTMLElement;
         expect(titleBar).toBeTruthy();
         expect(titleBar.style.padding).toBe('4px 4px 4px 8px');
         expect(titleBar.querySelector('span')?.textContent).toBe(AX);
@@ -109,7 +109,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
 
     test('Tim creates fresh glyph, starts in idle color state', () => {
         const element = createAxGlyph(makeGlyph('ax-tim-3'));
-        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.title-bar') as HTMLElement;
 
         expect(element.style.backgroundColor).toBe('var(--glyph-status-idle-bg)');
         expect(titleBar.style.backgroundColor).toBe('var(--glyph-status-idle-section-bg)');
@@ -129,7 +129,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
 
         const element = createAxGlyph(makeGlyph('ax-tim-5'));
         document.body.appendChild(element);
-        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.title-bar') as HTMLElement;
 
         // Offline → orange
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
@@ -146,7 +146,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
 
         const element = createAxGlyph(makeGlyph('ax-tim-6'));
         document.body.appendChild(element);
-        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.title-bar') as HTMLElement;
 
         // Offline → orange pair
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
@@ -164,7 +164,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
     });
 });
 
-describe('AX Glyph - Spike (Edge Cases)', () => {
+describe('AX Element - Spike (Edge Cases)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         mockCanvasGlyphs.length = 0;
@@ -178,14 +178,14 @@ describe('AX Glyph - Spike (Edge Cases)', () => {
 
         updateAxGlyphError('ax-spike-1', 'bad query', 'error');
 
-        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.title-bar') as HTMLElement;
         expect(element.dataset.responseState).toBe('error');
         expect(element.style.backgroundColor).toBe('var(--glyph-status-error-bg)');
         expect(titleBar.style.backgroundColor).toBe('var(--glyph-status-error-section-bg)');
     });
 });
 
-describe('AX Glyph - Jenny (Power User)', () => {
+describe('AX Element - Jenny (Power User)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         mockCanvasGlyphs.length = 0;
@@ -198,7 +198,7 @@ describe('AX Glyph - Jenny (Power User)', () => {
 
         const element = createAxGlyph(makeGlyph('ax-jenny-1'));
         document.body.appendChild(element);
-        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.title-bar') as HTMLElement;
 
         // Online → teal
         expect(element.style.backgroundColor).toBe('rgba(31, 61, 61, 0.92)');

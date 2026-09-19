@@ -62,7 +62,7 @@ export const SEG = {
     // UI-specific extensions (not in core)
     WS: '⥂' as const,       // WebSocket communications
     UI: '▦' as const,       // UI components
-    GLYPH: '⧉' as const,    // Glyph system
+    GLYPH: '⧉' as const,    // Element system
     GRAPH: '◇' as const,    // Graph visualization
     ERROR: '⚠' as const,    // Errors/warnings
     VID: '⮀' as const,      // Video

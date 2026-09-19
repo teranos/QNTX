@@ -1,6 +1,6 @@
 {
   "name": "qntx-canvas-renderer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "qntx-plugin": true,
   "description": "Canvas renderer plugin - server-side canvas HTML generation",

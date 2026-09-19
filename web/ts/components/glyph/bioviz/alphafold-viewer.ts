@@ -3,7 +3,7 @@
  * Renders inline in attestation glyphs when AlphaFold structure data is detected.
  */
 
-import { preventDrag } from '@qntx/glyphs';
+import { preventDrag } from '@teranos/elements';
 import { createMolstarViewer } from './molstar-loader';
 
 /**

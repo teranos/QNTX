@@ -33,13 +33,13 @@ function tickRAF(): void {
     if (cb) cb(performance.now());
 }
 
-mock.module('@qntx/glyphs', () => ({
+mock.module('@teranos/elements', () => ({
     createCursorElement: (symbol: string, glyphType: string) => {
         const el = document.createElement('div');
-        el.className = 'glyph-cursor';
-        el.setAttribute('data-glyph-type', glyphType);
+        el.className = 'cursor';
+        el.setAttribute('data-element-type', glyphType);
         const sym = document.createElement('span');
-        sym.className = 'glyph-cursor-symbol';
+        sym.className = 'cursor-symbol';
         sym.textContent = symbol;
         el.appendChild(sym);
         return el;
@@ -67,8 +67,8 @@ const _KeyboardEvent = (globalThis as any).KeyboardEvent ?? (globalThis as any).
 
 function createGlyph(container: HTMLElement, id: string, symbol: string, threadGlyph = false): HTMLElement {
     const glyph = document.createElement('div');
-    glyph.className = threadGlyph ? 'canvas-thread-glyph canvas-glyph' : 'canvas-glyph';
-    glyph.dataset.glyphId = id;
+    glyph.className = threadGlyph ? 'canvas-thread-element canvas-element' : 'canvas-element';
+    glyph.dataset.elementId = id;
     glyph.style.position = 'absolute';
     glyph.style.left = '100px';
     glyph.style.top = '100px';
@@ -76,7 +76,7 @@ function createGlyph(container: HTMLElement, id: string, symbol: string, threadG
     glyph.style.height = '40px';
 
     const sym = document.createElement('span');
-    sym.className = 'glyph-symbol';
+    sym.className = 'symbol';
     sym.textContent = symbol;
     glyph.appendChild(sym);
 
@@ -148,7 +148,7 @@ describe('Thread Extend - Tim (Happy Path)', () => {
         threadGlyphEl.style.visibility = 'hidden';
 
         const existingNodeIds = initialSpine.nodes.slice(0, -1);
-        const symbolEl = threadGlyphEl.querySelector('.glyph-symbol') as HTMLElement;
+        const symbolEl = threadGlyphEl.querySelector('.symbol') as HTMLElement;
 
         let dropResult: any = null;
         enterThreadBuildingMode(symbolEl, '#c45454', (result) => {
@@ -170,7 +170,7 @@ describe('Thread Extend - Tim (Happy Path)', () => {
 
         // Each spine node must be findable in the container (otherwise the path can't render)
         for (const nodeId of survivingSpine!.nodes) {
-            const el = container.querySelector(`[data-glyph-id="${nodeId}"]`);
+            const el = container.querySelector(`[data-element-id="${nodeId}"]`);
             expect(el).not.toBeNull();
         }
 
@@ -199,7 +199,7 @@ describe('Thread Extend - Tim (Happy Path)', () => {
         threadGlyphEl.style.visibility = 'hidden';
 
         const existingNodeIds = initialSpine.nodes.slice(0, -1);
-        const symbolEl = threadGlyphEl.querySelector('.glyph-symbol') as HTMLElement;
+        const symbolEl = threadGlyphEl.querySelector('.symbol') as HTMLElement;
 
         enterThreadBuildingMode(symbolEl, '#c45454', (result) => {
             runExtendDrop(canvasId, container, threadGlyphEl, 'glyph-thread', initialSpine, result);
@@ -255,7 +255,7 @@ describe('Thread Extend - Axiom (DOM identity)', () => {
         expect(threadGlyphEl.parentElement).toBe(document.body);
         expect(threadGlyphEl).toBe(captured); // identity preserved
 
-        const symbolEl = threadGlyphEl.querySelector('.glyph-cursor-symbol') as HTMLElement;
+        const symbolEl = threadGlyphEl.querySelector('.cursor-symbol') as HTMLElement;
         expect(symbolEl).not.toBeNull();
 
         let droppedElement: HTMLElement | null = null;
@@ -275,11 +275,11 @@ describe('Thread Extend - Axiom (DOM identity)', () => {
         expect(droppedElement).toBe(captured);
         expect(threadGlyphEl).toBe(captured);
         expect(threadGlyphEl.parentElement).toBe(container); // back on canvas
-        expect(threadGlyphEl.classList.contains('canvas-thread-glyph')).toBe(true);
-        expect(threadGlyphEl.querySelector('.glyph-symbol')).not.toBeNull();
+        expect(threadGlyphEl.classList.contains('canvas-thread-element')).toBe(true);
+        expect(threadGlyphEl.querySelector('.symbol')).not.toBeNull();
     });
 
-    test('Axiom: no second element with the same data-glyph-id exists at any point', async () => {
+    test('Axiom: no second element with the same data-element-id exists at any point', async () => {
         const canvasId = 'axiom-unique-id';
         createGlyph(container, 'unique-a', 'A');
         const threadGlyphEl = createGlyph(container, 'unique-thread', '〽', true);
@@ -291,10 +291,10 @@ describe('Thread Extend - Axiom (DOM identity)', () => {
         unpinThreadGlyph(threadGlyphEl);
 
         // During cursor mode: still exactly one element with this id
-        const matchesMid = document.querySelectorAll('[data-glyph-id="unique-thread"]');
+        const matchesMid = document.querySelectorAll('[data-element-id="unique-thread"]');
         expect(matchesMid.length).toBe(1);
 
-        const symbolEl = threadGlyphEl.querySelector('.glyph-cursor-symbol') as HTMLElement;
+        const symbolEl = threadGlyphEl.querySelector('.cursor-symbol') as HTMLElement;
         enterThreadBuildingMode(symbolEl, '#c45454', (result) => {
             pinThreadGlyph(threadGlyphEl, container, result.placeX, result.placeY, '#c45454', 'unique-thread');
         }, () => {}, ['unique-a'], threadGlyphEl);
@@ -302,7 +302,7 @@ describe('Thread Extend - Axiom (DOM identity)', () => {
         simulateClick(500, 500);
 
         // After drop: still exactly one
-        const matchesAfter = document.querySelectorAll('[data-glyph-id="unique-thread"]');
+        const matchesAfter = document.querySelectorAll('[data-element-id="unique-thread"]');
         expect(matchesAfter.length).toBe(1);
     });
 });
@@ -334,7 +334,7 @@ describe('Thread Extend - Spike (Edge Cases)', () => {
         threadGlyphEl.style.visibility = 'hidden';
 
         const existingNodeIds = initialSpine.nodes.slice(0, -1);
-        const symbolEl = threadGlyphEl.querySelector('.glyph-symbol') as HTMLElement;
+        const symbolEl = threadGlyphEl.querySelector('.symbol') as HTMLElement;
 
         enterThreadBuildingMode(symbolEl, '#c45454', () => {}, () => {
             // Cancel handler: re-add old spine, restore 〽 visibility

@@ -1,5 +1,5 @@
 /**
- * Type Definition Glyph — configures type field metadata as a window glyph.
+ * Type Definition Element — configures type field metadata as a window glyph.
  *
  * Spawned from search view "+" button. Opens as a window manifestation.
  * Two modes: "create new type" form, then "edit type fields" after creation.
@@ -9,8 +9,8 @@ import { apiFetch } from './client';
 import { assertOk, jsonBody } from './http-utils';
 import { log, SEG } from './logger.ts';
 import { escapeHtml } from './html-utils.js';
-import { glyphRun } from '@qntx/glyphs';
-import type { Glyph } from '@qntx/glyphs';
+import { tray } from '@teranos/elements';
+import type { Element } from '@teranos/elements';
 
 const GLYPH_ID = 'type-definition';
 
@@ -128,11 +128,11 @@ export function createNewType(): void {
 
 function spawnGlyph(title: string, renderContent: () => HTMLElement): void {
     // Remove existing instance to re-render with new state
-    if (glyphRun.has(GLYPH_ID)) {
-        glyphRun.remove(GLYPH_ID);
+    if (tray.has(GLYPH_ID)) {
+        tray.remove(GLYPH_ID);
     }
 
-    const glyph: Glyph = {
+    const glyph: Element = {
         id: GLYPH_ID,
         title,
         renderContent,
@@ -143,8 +143,8 @@ function spawnGlyph(title: string, renderContent: () => HTMLElement): void {
         },
     };
 
-    glyphRun.add(glyph);
-    glyphRun.openGlyph(GLYPH_ID);
+    tray.add(glyph);
+    tray.open(GLYPH_ID);
 }
 
 // ── Field population ─────────────────────────────────────────────────
@@ -640,8 +640,8 @@ function attachCreateListeners(container: HTMLElement): void {
 
     // Cancel button
     cancelBtn?.addEventListener('click', () => {
-        if (glyphRun.has(GLYPH_ID)) {
-            glyphRun.remove(GLYPH_ID);
+        if (tray.has(GLYPH_ID)) {
+            tray.remove(GLYPH_ID);
         }
     });
 

@@ -8,7 +8,7 @@
  * TODO: Mobile layout only tested in browser responsive mode, not on real iPhone.
  */
 
-.glyph-run {
+.tray {
     position: fixed;
     top: 50%;
     right: 4px;
@@ -28,12 +28,12 @@
 }
 
 /* Hide when empty */
-.glyph-run[data-empty="true"] {
+.tray[data-empty="true"] {
     pointer-events: none;
 }
 
 /* Container for glyph dot manifestations */
-.glyph-run-indicators {
+.tray-dots {
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -46,11 +46,11 @@
 
 /* Mobile: wider gap between dots for touch distinguishability */
 @media (max-width: 768px) {
-    .glyph-run-indicators {
+    .tray-dots {
         gap: 6px;
     }
 }
 
-.glyph-run:hover .glyph-run-indicators {
+.tray:hover .tray-dots {
     opacity: 1;
 }

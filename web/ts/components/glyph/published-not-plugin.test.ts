@@ -13,7 +13,7 @@
 
 import { describe, test, expect } from 'bun:test';
 import { registerGlyphType, replacePluginGlyphType, getGlyphTypeBySymbol } from './glyph-registry';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 const said = (what: string) => () => {
     const el = document.createElement('div');
@@ -24,22 +24,22 @@ const said = (what: string) => () => {
 function published(symbol: string, name: string, what: string) {
     return {
         symbol,
-        className: `canvas-published-glyph glyph-${name}`,
+        className: `canvas-published-element glyph-${name}`,
         title: 'CRIER',
         label: name,
         publishedName: name,
-        render: said(what) as unknown as (glyph: Glyph) => HTMLElement,
+        render: said(what) as unknown as (glyph: Element) => HTMLElement,
     };
 }
 
 function plugin(symbol: string, name: string, what: string) {
     return {
         symbol,
-        className: `canvas-plugin-glyph plugin-${name}`,
+        className: `canvas-plugin-element plugin-${name}`,
         title: 'Capy',
         label: name,
         pluginName: name,
-        render: said(what) as unknown as (glyph: Glyph) => HTMLElement,
+        render: said(what) as unknown as (glyph: Element) => HTMLElement,
     };
 }
 
@@ -60,7 +60,7 @@ describe('a published glyph', () => {
         registerGlyphType(published(symbol, 'radar', 'first'));
 
         expect(replacePluginGlyphType(published(symbol, 'radar', 'second'))).toBe(true);
-        expect(getGlyphTypeBySymbol(symbol)?.render({} as Glyph)).toBeDefined();
+        expect(getGlyphTypeBySymbol(symbol)?.render({} as Element)).toBeDefined();
     });
 
     test('cannot be taken over by a plugin of the same name', () => {

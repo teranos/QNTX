@@ -32,7 +32,7 @@ interface GlyphQueueData {
     lastError: string;
 }
 
-// ── Glyph ID resolution ─────────────────────────────────────────────
+// ── Element ID resolution ─────────────────────────────────────────────
 
 function resolveGlyphId(
     watcherId: string,
@@ -175,7 +175,7 @@ function ensureMetaPill(glyphEl: HTMLElement): HTMLElement | null {
     if (pill) return pill;
 
     // Find the title bar — pill is positioned relative to it
-    const titleBar = glyphEl.querySelector('.glyph-title-bar') as HTMLElement | null;
+    const titleBar = glyphEl.querySelector('.title-bar') as HTMLElement | null;
     if (!titleBar) return null;
 
     // Title bar becomes the positioning context (matches attestation glyph's wrapper pattern)
@@ -226,9 +226,9 @@ export function handleWatcherQueueStatus(data: WatcherQueueStatusMessage): void 
 
     // Update visuals from cache
     for (const [glyphId, cached] of statsCache) {
-        const glyphEl = document.querySelector(`[data-glyph-id="${CSS.escape(glyphId)}"]`) as HTMLElement | null;
+        const glyphEl = document.querySelector(`[data-element-id="${CSS.escape(glyphId)}"]`) as HTMLElement | null;
         if (!glyphEl) {
-            // Glyph removed from DOM — drop from cache
+            // Element removed from DOM — drop from cache
             statsCache.delete(glyphId);
             continue;
         }
@@ -244,12 +244,12 @@ export function handleWatcherQueueStatus(data: WatcherQueueStatusMessage): void 
 
     // Clear particles for glyphs whose queue has drained
     for (const container of document.querySelectorAll('.queue-particles')) {
-        const glyphEl = container.closest('[data-glyph-id]') as HTMLElement | null;
+        const glyphEl = container.closest('[data-element-id]') as HTMLElement | null;
         if (!glyphEl) {
             container.remove();
             continue;
         }
-        const glyphId = glyphEl.dataset.glyphId;
+        const glyphId = glyphEl.dataset.elementId;
         if (glyphId) {
             const cached = statsCache.get(glyphId);
             if (!cached || cached.queueCount === 0) {

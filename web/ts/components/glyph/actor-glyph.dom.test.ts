@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  *
- * Actor Glyph — what an actor is often paired with.
+ * Actor Element — what an actor is often paired with.
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';

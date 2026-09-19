@@ -10,7 +10,7 @@
  */
 
 import type { GlyphTypeEntry } from '../glyph-registry';
-import { createCursorElement, attachCursorToMouse, prepareCursorForPlacement } from '@qntx/glyphs';
+import { createCursorElement, attachCursorToMouse, prepareCursorForPlacement } from '@teranos/elements';
 import { log, SEG } from '../../../logger';
 
 export interface PlacementOptions {
@@ -66,16 +66,16 @@ function adoptAsCursor(el: HTMLElement, symbol: string, glyphType: string): HTML
     if (reveal) reveal.remove();
 
     // Reset to cursor glyph styling
-    el.className = 'glyph-cursor';
-    el.setAttribute('data-glyph-type', glyphType);
+    el.className = 'cursor';
+    el.setAttribute('data-element-type', glyphType);
     el.style.cssText = 'position: fixed; pointer-events: none; z-index: 10003;';
 
     // Ensure symbol span exists
-    let sym = el.querySelector('.glyph-cursor-symbol') as HTMLElement | null;
+    let sym = el.querySelector('.cursor-symbol') as HTMLElement | null;
     if (!sym) {
         el.textContent = '';
         sym = document.createElement('span');
-        sym.className = 'glyph-cursor-symbol';
+        sym.className = 'cursor-symbol';
         sym.textContent = symbol;
         el.appendChild(sym);
     }

@@ -20,8 +20,8 @@
 }
 
 /* Hover: reveal at compact height (but not when showing an error) */
-.canvas-result-glyph:hover .result-followup-zone:not(.has-error),
-.canvas-stream-glyph:hover .result-followup-zone:not(.has-error) {
+.canvas-result-element:hover .result-followup-zone:not(.has-error),
+.canvas-stream-element:hover .result-followup-zone:not(.has-error) {
     height: 42px;
     opacity: 1;
     padding: 4px 8px;

@@ -4,7 +4,7 @@
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { createPyGlyph, PY_DEFAULT_CODE } from './py-glyph';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 // Mock uiState — process-global, must be superset-complete (see test/mock-ui-state.ts)
 import { createMockUiState } from '../../test/mock-ui-state';
@@ -61,7 +61,7 @@ describe('PyGlyph', () => {
         return;
     }
 
-    let glyph: Glyph;
+    let glyph: Element;
 
     beforeEach(() => {
         localStorage.clear();
@@ -78,14 +78,14 @@ describe('PyGlyph', () => {
     });
 
     describe('initialization', () => {
-        test('sets data-glyph-id attribute', async () => {
+        test('sets data-element-id attribute', async () => {
             const element = await createPyGlyph(glyph);
-            expect(element.dataset.glyphId).toBe('py-test-123');
+            expect(element.dataset.elementId).toBe('py-test-123');
         });
 
         test('has title bar with py label', async () => {
             const element = await createPyGlyph(glyph);
-            const titleBar = element.querySelector('.glyph-title-bar');
+            const titleBar = element.querySelector('.title-bar');
             expect(titleBar).not.toBeNull();
             expect(titleBar?.textContent).toContain('py');
         });
@@ -145,7 +145,7 @@ describe('PyGlyph', () => {
 
         test('has resize handle', async () => {
             const element = await createPyGlyph(glyph);
-            const resizeHandle = element.querySelector('.glyph-resize-handle');
+            const resizeHandle = element.querySelector('.resize-handle');
             expect(resizeHandle).not.toBeNull();
         });
     });

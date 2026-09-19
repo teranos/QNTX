@@ -3,15 +3,15 @@
  *
  * The result glyph carries a ⬆ that takes it off the canvas and makes it a
  * window; so does the wrapper the loader puts around a bare element. A glyph
- * module that builds its own frame through ui.glyph() was the one path that
+ * module that builds its own frame through ui.element() was the one path that
  * got neither, so it sat on the canvas with no way off it.
  */
 
 import { describe, test, expect } from 'bun:test';
 import { createGlyphUI } from './glyph-ui';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
-function placed(): Glyph {
+function placed(): Element {
     return {
         id: 'lift-1',
         title: 'Test',
@@ -25,7 +25,7 @@ const defaults = { x: 10, y: 20, width: 400, height: 300 };
 describe('ui.glyph', () => {
     test('a glyph with a title bar gets the lift', () => {
         const ui = createGlyphUI(placed(), 'crier');
-        const { titleBar } = ui.glyph({ defaults, titleBar: { label: 'CRIER' }, resizable: true });
+        const { titleBar } = ui.element({ defaults, titleBar: { label: 'CRIER' }, resizable: true });
 
         const lift = titleBar?.querySelector('button[aria-label="Expand to window"]');
         expect(lift).not.toBeNull();
@@ -36,7 +36,7 @@ describe('ui.glyph', () => {
         mine.setAttribute('aria-label', 'Mine');
 
         const ui = createGlyphUI(placed(), 'crier');
-        const { titleBar } = ui.glyph({
+        const { titleBar } = ui.element({
             defaults,
             titleBar: { label: 'CRIER', actions: [mine] },
         });
@@ -47,14 +47,14 @@ describe('ui.glyph', () => {
 
     test('a glyph that says lift:false gets none', () => {
         const ui = createGlyphUI(placed(), 'crier');
-        const { titleBar } = ui.glyph({ defaults, titleBar: { label: 'CRIER' }, lift: false });
+        const { titleBar } = ui.element({ defaults, titleBar: { label: 'CRIER' }, lift: false });
 
         expect(titleBar?.querySelector('button[aria-label="Expand to window"]')).toBeNull();
     });
 
     test('a glyph with no title bar has nowhere to put one', () => {
         const ui = createGlyphUI(placed(), 'crier');
-        const { element } = ui.glyph({ defaults });
+        const { element } = ui.element({ defaults });
 
         expect(element.querySelector('button[aria-label="Expand to window"]')).toBeNull();
     });
@@ -63,7 +63,7 @@ describe('ui.glyph', () => {
     // canvas rather than a border with the workspace showing through.
     test('a placed glyph is given a background', () => {
         const ui = createGlyphUI(placed(), 'crier');
-        const { element } = ui.glyph({ defaults, titleBar: { label: 'CRIER' } });
+        const { element } = ui.element({ defaults, titleBar: { label: 'CRIER' } });
 
         expect(element.style.backgroundColor).not.toBe('');
     });

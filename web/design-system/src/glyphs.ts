@@ -1,5 +1,5 @@
 /**
- * Glyph specimens — live demos of @qntx/glyphs capabilities.
+ * Element specimens — live demos of @teranos/elements capabilities.
  *
  * Each specimen imports directly from the package and demonstrates
  * a specific subsystem: proximity engine, morph transactions,
@@ -7,11 +7,11 @@
  */
 
 import {
-    GlyphProximity,
-    beginMaximizeMorph,
+    Proximity,
+    beginMorphToBox,
     beginMinimizeMorph,
-    getMaximizeDuration,
-    getMinimizeDuration,
+    getOpenDuration,
+    getRestDuration,
     addWindowControls,
     removeWindowControls,
     stashContent,
@@ -19,9 +19,9 @@ import {
     hasStash,
     WINDOW_BORDER_RADIUS,
     WINDOW_BOX_SHADOW,
-    setGlyphId,
-    setGlyphSymbol,
-} from '@qntx/glyphs'
+    setElementId,
+    setSymbol,
+} from '@teranos/elements'
 
 // ── Entry point ──────────────────────────────────────────────────────
 
@@ -30,14 +30,14 @@ export function renderGlyphSpecimens(root: HTMLElement) {
     section.className = 'token-group'
 
     const h2 = document.createElement('h2')
-    h2.textContent = '@qntx/glyphs'
+    h2.textContent = '@teranos/elements'
     section.appendChild(h2)
 
     const intro = document.createElement('div')
     intro.style.fontSize = 'var(--font-size-xs)'
     intro.style.color = 'var(--text-on-dark-tertiary)'
     intro.style.marginBottom = '8px'
-    intro.textContent = 'Live specimens imported directly from the @qntx/glyphs package. Each demo exercises real package code.'
+    intro.textContent = 'Live specimens imported directly from the @teranos/elements package. Each demo exercises real package code.'
     section.appendChild(intro)
 
     // Proximity and morph side by side
@@ -71,7 +71,7 @@ function specimenCard(title: string, description: string, build: (body: HTMLElem
     container.style.marginBottom = '10px'
 
     const bar = document.createElement('div')
-    bar.className = 'glyph-title-bar'
+    bar.className = 'title-bar'
 
     const titleSpan = document.createElement('span')
     titleSpan.style.flex = '1'
@@ -87,7 +87,7 @@ function specimenCard(title: string, description: string, build: (body: HTMLElem
     container.appendChild(bar)
 
     const body = document.createElement('div')
-    body.className = 'glyph-content-area'
+    body.className = 'content-area'
     body.style.padding = '12px'
     build(body)
     container.appendChild(body)
@@ -97,7 +97,7 @@ function specimenCard(title: string, description: string, build: (body: HTMLElem
 
 function demoButton(label: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement('button')
-    btn.className = 'glyph-btn'
+    btn.className = 'btn'
     btn.textContent = label
     btn.addEventListener('click', onClick)
     btn.style.marginRight = '6px'
@@ -119,7 +119,7 @@ function statusText(): { element: HTMLElement; set: (msg: string) => void } {
 
 function proximitySpecimen(section: HTMLElement) {
     section.appendChild(specimenCard(
-        'GlyphProximity',
+        'Proximity',
         'Pointer-distance morphing — move cursor toward the dots',
         (body) => {
             // Container simulating a tray
@@ -141,7 +141,7 @@ function proximitySpecimen(section: HTMLElement) {
             indicators.style.gap = '2px'
             indicators.style.alignItems = 'flex-end'
 
-            const proximity = new GlyphProximity()
+            const proximity = new Proximity()
             const items = new Map<string, { title: string; symbol: string }>()
 
             const glyphNames = [
@@ -154,9 +154,9 @@ function proximitySpecimen(section: HTMLElement) {
 
             for (const g of glyphNames) {
                 const dot = document.createElement('div')
-                dot.className = 'glyph-run-glyph'
-                setGlyphId(dot, g.id)
-                setGlyphSymbol(dot, g.symbol)
+                dot.className = 'dot'
+                setElementId(dot, g.id)
+                setSymbol(dot, g.symbol)
                 indicators.appendChild(dot)
                 items.set(g.id, { title: g.title, symbol: g.symbol })
             }
@@ -216,7 +216,7 @@ function morphSpecimen(section: HTMLElement) {
 
             // The ONE element that morphs between states
             const glyphEl = document.createElement('div')
-            glyphEl.className = 'glyph-run-glyph'
+            glyphEl.className = 'dot'
             glyphEl.style.position = 'relative'
             glyphEl.style.marginBottom = '10px'
 
@@ -260,10 +260,10 @@ function morphSpecimen(section: HTMLElement) {
                 const targetY = stageRect.top + (stageRect.height - targetH) / 2
 
                 try {
-                    await beginMaximizeMorph(
+                    await beginMorphToBox(
                         glyphEl, fromRect,
                         { x: targetX, y: targetY, width: targetW, height: targetH },
-                        getMaximizeDuration()
+                        getOpenDuration()
                     )
 
                     // Commit: apply window styles
@@ -281,7 +281,7 @@ function morphSpecimen(section: HTMLElement) {
 
                     // Add content
                     const tb = document.createElement('div')
-                    tb.className = 'glyph-title-bar'
+                    tb.className = 'title-bar'
                     const tbText = document.createElement('span')
                     tbText.style.flex = '1'
                     tbText.textContent = 'Morphed Window'
@@ -322,13 +322,13 @@ function morphSpecimen(section: HTMLElement) {
                     await beginMinimizeMorph(
                         glyphEl, fromRect,
                         { x: targetX, y: targetY },
-                        getMinimizeDuration()
+                        getRestDuration()
                     )
 
                     // Commit: restore dot state
                     glyphEl.remove()
                     glyphEl.style.cssText = ''
-                    glyphEl.className = 'glyph-run-glyph'
+                    glyphEl.className = 'dot'
                     glyphEl.style.position = 'absolute'
                     glyphEl.style.right = '10px'
                     glyphEl.style.bottom = '10px'
@@ -367,12 +367,12 @@ function titleBarSpecimen(section: HTMLElement) {
 
             // A title bar to add/remove controls on
             const bar = document.createElement('div')
-            bar.className = 'glyph-title-bar'
+            bar.className = 'title-bar'
             bar.style.marginBottom = '8px'
 
             const titleText = document.createElement('span')
             titleText.style.flex = '1'
-            titleText.textContent = 'Sample Glyph'
+            titleText.textContent = 'Sample Element'
             bar.appendChild(titleText)
 
             let hasControls = false
@@ -423,7 +423,7 @@ function stashSpecimen(section: HTMLElement) {
             win.style.marginBottom = '8px'
 
             const tb = document.createElement('div')
-            tb.className = 'glyph-title-bar'
+            tb.className = 'title-bar'
             const tbText = document.createElement('span')
             tbText.style.flex = '1'
             tbText.textContent = 'Stash Demo'

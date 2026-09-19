@@ -13,7 +13,7 @@ import { isStructureItem, buildStructureViewer } from './bioviz/structure-render
 import { buildAlphaFoldViewer } from './bioviz/alphafold-viewer';
 import { isPdbData, buildPdbViewer } from './bioviz/pdb-viewer';
 import { isGenbankData, buildGenbankViewer } from './bioviz/genbank-renderer';
-import { preventDrag } from '@qntx/glyphs';
+import { preventDrag } from '@teranos/elements';
 
 // Muted azure palette — shared with attestation-glyph.ts
 export const AZURE = '#8a969b';

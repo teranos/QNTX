@@ -8,9 +8,9 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
-    "baseUrl": "..",
+    "baseUrl": "../..",
     "paths": {
-      "@qntx/glyphs": ["packages/glyphs/index.ts"]
+      "@teranos/elements": ["web/node_modules/@teranos/elements/index.ts"]
     }
   },
   "include": ["web/**/*.ts"]

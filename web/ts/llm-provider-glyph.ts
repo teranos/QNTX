@@ -9,7 +9,7 @@
  * is an edit to that file and a restart, not a click.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { BY } from './sym';
 import { log, SEG } from './logger';
 import { apiFetch } from './client';
@@ -21,7 +21,7 @@ interface PluginRoute {
     roles?: string[];
 }
 
-export function createLlmProviderGlyph(): Glyph {
+export function createLlmProviderGlyph(): Element {
     return {
         id: 'llm-provider-glyph',
         title: 'LLM Provider',
@@ -75,7 +75,7 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
 
         listEl.innerHTML = providers.map(name => `
                 <div class="glyph-row llm-provider-row">
-                    <span class="glyph-label">${escapeHtml(name)}</span>
+                    <span class="label">${escapeHtml(name)}</span>
                 </div>
             `).join('');
 

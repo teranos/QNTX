@@ -12,9 +12,9 @@
  * Nobody should have to open a console to find out why a glyph is missing.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { canvasPlaced } from '@qntx/glyphs';
-import { createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { canvasPlaced } from '@teranos/elements';
+import { createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
 import { apiFetch } from '../../client';
 import { log, SEG } from '../../logger';
 import { el } from '../../html-utils';
@@ -34,11 +34,11 @@ const FAULT = '#ef4444';
  * The frame and the first thing it says. What it says is replaced as soon as
  * the node answers — the element is on the canvas before either call returns.
  */
-export function createAbsentGlyph(glyph: Glyph, name: string): HTMLElement {
+export function createAbsentGlyph(glyph: Element, name: string): HTMLElement {
     glyph.border ??= '1px solid var(--border)';
 
     const { element } = canvasPlaced({
-        glyph,
+        item: glyph,
         className: `canvas-glyph-absent absent-${name}`,
         defaults: {
             x: glyph.x ?? 200,
@@ -60,7 +60,7 @@ export function createAbsentGlyph(glyph: Glyph, name: string): HTMLElement {
         text: `${name} (absent)`,
         style: { fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.4', color: MUTED },
     });
-    element.appendChild(el('div', { class: 'glyph-title-bar glyph-title-bar--auto' }, [symbol, titleText]));
+    element.appendChild(el('div', { class: 'title-bar title-bar--auto' }, [symbol, titleText]));
 
     const content = el('div', {
         class: 'glyph-absent-content',

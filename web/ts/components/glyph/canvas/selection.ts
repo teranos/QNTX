@@ -9,7 +9,7 @@
  *
  * Exists as a separate module so glyph-interaction.ts can read
  * selection state without importing the canvas orchestrator
- * (breaking the circular canvas-glyph ↔ glyph-interaction import).
+ * (breaking the circular canvas-element ↔ glyph-interaction import).
  */
 
 const selectionsByCanvas = new Map<string, Set<string>>();
@@ -33,7 +33,7 @@ export function getSelectedGlyphIds(canvasId: string): string[] {
 
 export function getSelectedGlyphElements(canvasId: string, container: HTMLElement): HTMLElement[] {
     return [...getSet(canvasId)]
-        .map(id => container.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement | null)
+        .map(id => container.querySelector(`[data-element-id="${id}"]`) as HTMLElement | null)
         .filter((el): el is HTMLElement => el !== null);
 }
 

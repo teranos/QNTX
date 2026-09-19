@@ -10,7 +10,7 @@
 
 /* ── Base ─────────────────────────────────────────────────────────── */
 
-.glyph-title-bar {
+.title-bar {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -26,8 +26,8 @@
     cursor: move;
 }
 
-.glyph-title-bar > span:first-child,
-.glyph-title-bar > .glyph-symbol + span {
+.title-bar > span:first-child,
+.title-bar > .symbol + span {
     flex: 1;
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
@@ -38,13 +38,13 @@
 }
 
 /* The symbol keeps its natural width; the title span beside it takes flex: 1 */
-.glyph-title-bar > .glyph-symbol {
+.title-bar > .symbol {
     flex: none;
 }
 
 /* ── Buttons (averaged from window controls + result header) ────── */
 
-.glyph-title-bar button {
+.title-bar button {
     width: 22px;
     height: 22px;
     padding: 1px 2px;
@@ -62,7 +62,7 @@
     transition: background 0.15s ease;
 }
 
-.glyph-title-bar button:hover {
+.title-bar button:hover {
     background: #808281;
 }
 
@@ -93,24 +93,24 @@
 }
 
 /* Reset the generic title bar button margin */
-.glyph-title-bar .titlebar-btn {
+.title-bar .titlebar-btn {
     margin-left: 0;
 }
 
 /* Touch devices: enlarge buttons for reliable thumb targeting */
 @media (pointer: coarse) {
-    .glyph-title-bar {
+    .title-bar {
         height: 44px;
     }
 
-    .glyph-title-bar button {
+    .title-bar button {
         width: 44px;
         height: 44px;
         font-size: 17px;
         margin-left: 2px;
     }
 
-    .glyph-title-bar .titlebar-btn {
+    .title-bar .titlebar-btn {
         width: 44px;
         height: 44px;
         font-size: var(--font-size-lg);
@@ -119,7 +119,7 @@
 
 /* ── Auto-height modifier ─────────────────────────────────────────── */
 
-.glyph-title-bar--auto {
+.title-bar--auto {
     height: auto;
     min-height: 0;
     padding: 3px 8px;
@@ -129,6 +129,6 @@
 
 /* ── Panel override: not draggable ─────────────────────────────────── */
 
-.glyph-panel .glyph-title-bar {
+.panel .title-bar {
     cursor: default;
 }

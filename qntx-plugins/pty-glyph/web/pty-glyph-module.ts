@@ -1,17 +1,17 @@
 /**
- * PTY Glyph Module — terminal on canvas via GlyphUI.
+ * PTY Element Module — terminal on canvas via ElementUI.
  *
  * Replaces legacy terminal.html. xterm.js is bundled by bun build
- * instead of loaded from CDN. Backend URL comes from GlyphUI
+ * instead of loaded from CDN. Backend URL comes from ElementUI
  * instead of being hardcoded.
  */
 
-import type { Glyph, GlyphUI, RenderFn } from '@qntx/glyphs';
+import type { Element, ElementUI, RenderFn } from '@teranos/elements';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 
-export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLElement> => {
-    const { element, content } = ui.glyph({
+export const render: RenderFn = async (glyph: Element, ui: ElementUI): Promise<HTMLElement> => {
+    const { element, content } = ui.element({
         defaults: {
             x: glyph.x ?? 200,
             y: glyph.y ?? 200,

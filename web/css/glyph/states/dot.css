@@ -10,9 +10,9 @@
  * inline on every frame, so a rule here can never win — it only described the
  * first frame, and it described it differently from the code. The dot's
  * geometry lives in one place now: configureGlyphs({ dotGeometry }) in
- * @qntx/glyphs, applied via applyRestingDotGeometry().
+ * @teranos/elements, applied via applyRestingDotGeometry().
  */
-.glyph-run-glyph {
+.dot {
     background: transparent;
     border: 1px solid var(--border-on-dark);
     color: var(--text-on-dark);
@@ -28,7 +28,7 @@
     margin-left: auto;
 }
 
-.glyph-run-glyph:hover {
+.dot:hover {
     filter: brightness(1.2);
 }
 

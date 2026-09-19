@@ -11,7 +11,7 @@ import { join, dirname } from 'path';
 
 export default {
     name: 'canvas-renderer',
-    version: '1.0.0',
+    version: '1.0.1',
     qntx_version: '>= 0.1.0',
     description: 'Server-side canvas HTML renderer',
     author: 'QNTX Team',
@@ -125,8 +125,8 @@ function buildCanvasHTML(document: Document, canvasId: string, glyphs: any[]): H
  */
 function renderGlyphSimple(document: Document, glyph: any): HTMLElement {
     const container = document.createElement('div');
-    container.className = 'canvas-glyph';
-    container.setAttribute('data-glyph-id', glyph.id);
+    container.className = 'canvas-element';
+    container.setAttribute('data-element-id', glyph.id);
     container.style.cssText = `
         position: absolute;
         left: ${glyph.x || 0}px;

@@ -1,5 +1,5 @@
 /**
- * TypeScript Glyph - CodeMirror-based JS/TS editor on canvas
+ * TypeScript Element - CodeMirror-based JS/TS editor on canvas
  *
  * Browser-native JavaScript execution via AsyncFunction constructor.
  * No server round-trip needed — scripts run directly in the browser
@@ -11,7 +11,7 @@
  * ts-glyph is a power-user tool, not a public-facing sandbox.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
@@ -118,7 +118,7 @@ function buildQntxApi(outputLines: string[]) {
 /**
  * Create a TypeScript/JavaScript editor glyph with CodeMirror
  */
-export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
+export async function createTsGlyph(glyph: Element): Promise<HTMLElement> {
     // Load code from canvas state or use default
     const existingGlyph = uiState.getCanvasGlyph(glyph.id);
     const code = existingGlyph?.content ?? TS_DEFAULT_CODE;
@@ -140,11 +140,11 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     if (!glyph.color) glyph.color = 'rgba(61, 45, 20, 0.92)';
 
     const ui = createGlyphUI(glyph, 'ts');
-    const { element, content } = ui.glyph({
+    const { element, content } = ui.element({
         defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
         titleBar: { label: 'ts', actions: [runButton], color: '#5c3d1a', labelColor: '#f0c878' },
         resizable: true,
-        className: 'canvas-ts-glyph',
+        className: 'canvas-ts-element',
     });
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';

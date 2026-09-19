@@ -1,13 +1,13 @@
 /**
- * Plugin Glyph Renderer — generic renderer for all plugin-provided glyphs.
+ * Plugin Element Renderer — generic renderer for all plugin-provided glyphs.
  *
  * Fetches HTML content from plugin endpoints and mounts in canvas-placed wrapper.
  * Handles retry logic for 503 (plugin unavailable) and error states.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import type { PluginGlyphDef } from './plugin-provided-glyphs';
-import { canvasPlaced, wireExpandToWindow, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import { canvasPlaced, wireExpandToWindow, preventDrag, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
 import { loadPluginCSS } from './plugin-provided-glyphs';
 import { apiFetch, connectivity } from '../../client';
 import { log, SEG } from '../../logger';
@@ -15,7 +15,7 @@ import { el } from '../../html-utils';
 
 /** Create a plugin glyph element */
 export async function createPluginGlyph(
-    glyph: Glyph,
+    glyph: Element,
     def: PluginGlyphDef
 ): Promise<HTMLElement> {
     // Load CSS if provided (cached globally)
@@ -25,8 +25,8 @@ export async function createPluginGlyph(
 
     // Create canvas-placed wrapper without title bar
     const { element } = canvasPlaced({
-        glyph,
-        className: `canvas-plugin-glyph plugin-${def.plugin}`,
+        item: glyph,
+        className: `canvas-plugin-element plugin-${def.plugin}`,
         defaults: {
             x: glyph.x ?? 200,
             y: glyph.y ?? 200,
@@ -37,7 +37,7 @@ export async function createPluginGlyph(
         logLabel: 'PluginGlyph',
     });
 
-    // Custom title bar with expand button — .glyph-symbol via the package so
+    // Custom title bar with expand button — .symbol via the package so
     // thread-line snapping and spine anchoring can find this glyph
     const symbol = createSymbolSpan(def.symbol);
     Object.assign(symbol.style, { fontWeight: 'bold', color: '#adbcc1' });
@@ -51,11 +51,11 @@ export async function createPluginGlyph(
     });
     expandBtn.title = 'Expand to window';
     preventDrag(expandBtn);
-    const titleBar = el('div', { class: 'glyph-title-bar glyph-title-bar--auto' }, [symbol, titleText, expandBtn]);
+    const titleBar = el('div', { class: 'title-bar title-bar--auto' }, [symbol, titleText, expandBtn]);
     element.appendChild(titleBar);
 
     // Content container
-    const content = el('div', { class: 'plugin-glyph-content glyph-content-area' });
+    const content = el('div', { class: 'plugin-glyph-content content-area' });
     element.appendChild(content);
 
     // Fetch and render plugin content
@@ -65,11 +65,11 @@ export async function createPluginGlyph(
     wireExpandToWindow({
         element,
         expandBtn,
-        glyphId: glyph.id,
+        elementId: glyph.id,
         title: def.title,
         symbol: def.symbol,
         renderContent: () => {
-            const trayContent = el('div', { class: 'plugin-glyph-content glyph-content-area' });
+            const trayContent = el('div', { class: 'plugin-glyph-content content-area' });
             fetchPluginContent(trayContent, def.content_url, glyph.id, glyph.content ?? '').catch((err: unknown) => log.error(SEG.GLYPH, `[PluginGlyph] content for ${glyph.id} failed:`, err));
             return trayContent;
         },
@@ -188,7 +188,7 @@ async function fetchPluginContent(
             <div class="plugin-error">
                 <p>Failed to load plugin content</p>
                 <p>${message}</p>
-                <button onclick="this.parentElement.parentElement.remove()">Remove Glyph</button>
+                <button onclick="this.parentElement.parentElement.remove()">Remove Element</button>
             </div>
         `;
     }
@@ -201,7 +201,7 @@ async function fetchPluginContent(
  * Not alarming (no red error styling), just a muted placeholder.
  */
 export function createPluginPlaceholderGlyph(
-    glyph: Glyph,
+    glyph: Element,
     pluginName: string
 ): HTMLElement {
     const isOffline = connectivity.state === 'offline';
@@ -211,7 +211,7 @@ export function createPluginPlaceholderGlyph(
 
     // Create canvas-placed wrapper without title bar
     const { element } = canvasPlaced({
-        glyph,
+        item: glyph,
         className: `canvas-plugin-placeholder plugin-${pluginName}`,
         defaults: {
             x: glyph.x ?? 200,
@@ -232,7 +232,7 @@ export function createPluginPlaceholderGlyph(
         text: `${pluginName} (unavailable)`,
         style: { fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.4', color: '#999' },
     });
-    const titleBar = el('div', { class: 'glyph-title-bar glyph-title-bar--auto' }, [symbol, titleText]);
+    const titleBar = el('div', { class: 'title-bar title-bar--auto' }, [symbol, titleText]);
     element.appendChild(titleBar);
 
     // Content area with instructions (like SE glyph degraded state)

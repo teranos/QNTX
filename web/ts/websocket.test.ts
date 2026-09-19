@@ -285,7 +285,7 @@ describe('glyph_fired handler', () => {
     test('sets data-execution-state on matching DOM element', () => {
         // Set up a glyph element in the DOM
         const el = document.createElement('div');
-        el.dataset.glyphId = 'py-glyph-1';
+        el.dataset.elementId = 'py-glyph-1';
         document.body.appendChild(el);
 
         routeMessage(
@@ -301,7 +301,7 @@ describe('glyph_fired handler', () => {
 
     test('maps status values to execution states', () => {
         const el = document.createElement('div');
-        el.dataset.glyphId = 'py-map-test';
+        el.dataset.elementId = 'py-map-test';
         document.body.appendChild(el);
 
         // started → running
@@ -330,7 +330,7 @@ describe('glyph_fired handler', () => {
 
     test('invokes registered glyph_fired handler after builtin', () => {
         const el = document.createElement('div');
-        el.dataset.glyphId = 'py-cb-test';
+        el.dataset.elementId = 'py-cb-test';
         document.body.appendChild(el);
 
         const handler = mock(() => {});

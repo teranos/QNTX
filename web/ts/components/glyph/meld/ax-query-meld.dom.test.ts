@@ -14,9 +14,9 @@
 import { describe, test, expect, beforeEach, jest } from 'bun:test';
 import { createAxGlyph, updateAxGlyphResults } from '../ax-glyph';
 import { createPromptGlyph } from '../prompt-glyph';
-import { findMeldTarget, performMeld, MELD_THRESHOLD } from '@qntx/glyphs';
+import { findMeldTarget, performMeld, MELD_THRESHOLD } from '@teranos/elements';
 import type { Attestation } from '../../../generated/proto/plugin/grpc/protocol/atsstore';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { AX, SO } from '../../../sym';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
@@ -66,7 +66,7 @@ describe('AX Query Meld - Jenny (Complex Scenarios)', () => {
         document.body.appendChild(canvas);
 
         // 2. Jenny creates AX glyph and renders it
-        const axGlyph: Glyph = {
+        const axGlyph: Element = {
             id: 'ax-jenny-qntx',
             title: 'AX Query',
             symbol: AX,
@@ -222,7 +222,7 @@ describe('AX Query Meld - Jenny (Complex Scenarios)', () => {
 
         // Verify AX glyph detected prompt as meld target
         expect(meldResult.target).toBeTruthy();
-        expect(meldResult.target?.dataset.glyphId).toBe('prompt-jenny-meld');
+        expect(meldResult.target?.dataset.elementId).toBe('prompt-jenny-meld');
 
         // Verify distance is within MELD_THRESHOLD (20px < 30px)
         const axRight = 950;
@@ -243,14 +243,14 @@ describe('AX Query Meld - Jenny (Complex Scenarios)', () => {
         expect(composition?.children.length).toBe(2); // AX + Prompt
 
         // Verify both glyphs are inside composition
-        const glyphsInComposition = composition?.querySelectorAll('.canvas-glyph');
+        const glyphsInComposition = composition?.querySelectorAll('.canvas-element');
         expect(glyphsInComposition?.length).toBe(2);
 
         // Verify AX glyph is first (left), prompt is second (right)
         const firstGlyph = glyphsInComposition?.[0] as HTMLElement;
         const secondGlyph = glyphsInComposition?.[1] as HTMLElement;
-        expect(firstGlyph.dataset.glyphId).toBe('ax-jenny-qntx');
-        expect(secondGlyph.dataset.glyphId).toBe('prompt-jenny-meld');
+        expect(firstGlyph.dataset.elementId).toBe('ax-jenny-qntx');
+        expect(secondGlyph.dataset.elementId).toBe('prompt-jenny-meld');
 
         // Verify AX results are still displayed inside the melded AX glyph
         const meldedResultsContainer = firstGlyph.querySelector('.ax-glyph-results');

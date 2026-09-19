@@ -1,13 +1,13 @@
 /**
  * Canvas Workspace Builder — reusable workspace DOM for root and subcanvas
  *
- * Extracted from canvas-glyph.ts renderContent() so both the root canvas
+ * Extracted from canvas-element.ts renderContent() so both the root canvas
  * glyph and expanded subcanvas glyphs share the same workspace infrastructure:
  * content layer, spawn menu, selection, keyboard shortcuts, pan/zoom,
  * rectangle selection, glyph restoration, and composition restoration.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { Doc } from '../../../sym';
 import { log, SEG } from '../../../logger';
 import { toast } from '../../../toast';
@@ -21,10 +21,10 @@ import type { SpawnResultDetail } from '../glyph-ui';
 import { uploadFile } from '../../../api/files';
 
 import { uiState } from '../../../state/ui';
-import { getMinimizeDuration } from '@qntx/glyphs';
-import { unmeldComposition, reconstructMeld, detachGlyph } from '@qntx/glyphs';
+import { getRestDuration } from '@teranos/elements';
+import { unmeldComposition, reconstructMeld, detachElement } from '@teranos/elements';
 import { autoMeldResultBelow } from '../meld/auto-meld-result';
-import { makeDraggable, runCleanup } from '@qntx/glyphs';
+import { makeDraggable, runCleanup } from '@teranos/elements';
 import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu, isSpawnMenuOpen } from './spawn-menu';
 import { isPlacementActive } from './placement-mode';
@@ -35,7 +35,7 @@ import { navigateThread } from './thread-navigation';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
 import { setupCanvasPan, resetTransform, panToGlyph, centerOnGlyphSymbol, screenToCanvas, getTransform } from './canvas-pan';
-import { getAllCompositions, removeComposition, extractGlyphIds } from '../../../state/compositions';
+import { getAllCompositions, removeComposition, extractElementIds } from '../../../state/compositions';
 import { convertNoteToPrompt, convertResultToNote } from '../conversions';
 import {
     hasSelection, selectionSize, getSelectedGlyphIds,
@@ -52,11 +52,11 @@ function selectGlyph(canvasId: string, glyphId: string, container: HTMLElement, 
     if (shiftKey) {
         if (isGlyphSelected(canvasId, glyphId)) {
             removeFromSelection(canvasId, glyphId);
-            const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+            const el = container.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
             if (el) el.classList.remove('canvas-glyph-selected');
         } else {
             addToSelection(canvasId, glyphId);
-            const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+            const el = container.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
             log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Adding to selection', {
                 glyphId, foundElement: !!el, elementClass: el?.className
             });
@@ -66,7 +66,7 @@ function selectGlyph(canvasId: string, glyphId: string, container: HTMLElement, 
     } else {
         deselectAll(canvasId, container);
         replaceSelection(canvasId, [glyphId]);
-        const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        const el = container.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
         log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Replace mode', {
             glyphId, foundElement: !!el, elementClass: el?.className
         });
@@ -96,13 +96,13 @@ function selectGlyph(canvasId: string, glyphId: string, container: HTMLElement, 
 }
 
 /**
- * Create a Glyph object from a DOM element by detecting its type.
+ * Create a Element object from a DOM element by detecting its type.
  */
-function createGlyphFromElement(element: HTMLElement, id: string): Glyph {
+function createGlyphFromElement(element: HTMLElement, id: string): Element {
     const entry = getGlyphTypeByElement(element);
     return {
         id,
-        title: entry?.title ?? 'Glyph',
+        title: entry?.title ?? 'Element',
         symbol: entry?.symbol,
         renderContent: () => element,
     };
@@ -121,7 +121,7 @@ function deselectAll(canvasId: string, container: HTMLElement): void {
 function unmeldFromSelection(canvasId: string, container: HTMLElement): void {
     if (!hasSelection(canvasId)) return;
     for (const glyphId of getSelectedGlyphIds(canvasId)) {
-        const glyphEl = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        const glyphEl = container.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
         if (!glyphEl) continue;
         const composition = glyphEl.closest('.melded-composition') as HTMLElement | null;
         if (composition) {
@@ -139,34 +139,34 @@ function unmeldSelectedGlyphs(canvasId: string, container: HTMLElement, composit
     // Single glyph selected inside a composition → try partial detach
     if (selectedIds.length === 1) {
         const glyphId = selectedIds[0];
-        const glyphEl = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        const glyphEl = container.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
         if (glyphEl?.closest('.melded-composition') === composition) {
-            const detachResult = detachGlyph(glyphId, composition);
+            const detachResult = detachElement(glyphId, composition);
             if (detachResult) {
                 const { detachedElement, remainingComposition } = detachResult;
 
                 // Restore drag on detached element
-                const detachedId = detachedElement.dataset.glyphId || detachedElement.getAttribute('data-glyph-id') || 'unknown';
+                const detachedId = detachedElement.dataset.elementId || detachedElement.getAttribute('data-element-id') || 'unknown';
                 const detachedGlyph = createGlyphFromElement(detachedElement, detachedId);
                 const detachedEntry = detachedGlyph.symbol ? getGlyphTypeBySymbol(detachedGlyph.symbol) : undefined;
-                makeDraggable(detachedElement, detachedElement, detachedGlyph, { logLabel: detachedEntry?.label ?? 'Glyph' });
+                makeDraggable(detachedElement, detachedElement, detachedGlyph, { logLabel: detachedEntry?.label ?? 'Element' });
 
                 if (remainingComposition) {
                     // Remaining composition needs drag handler refreshed
-                    const compId = remainingComposition.getAttribute('data-glyph-id') || 'unknown';
-                    const compGlyph: Glyph = { id: compId, title: 'Melded Composition', renderContent: () => remainingComposition };
+                    const compId = remainingComposition.getAttribute('data-element-id') || 'unknown';
+                    const compGlyph: Element = { id: compId, title: 'Melded Composition', renderContent: () => remainingComposition };
                     makeDraggable(remainingComposition, remainingComposition, compGlyph, { logLabel: 'MeldedComposition' });
                 } else {
                     // Full unmeld happened — restore drag on all freed elements
-                    const allFreed = container.querySelectorAll('[data-glyph-id]');
+                    const allFreed = container.querySelectorAll('[data-element-id]');
                     allFreed.forEach((el) => {
                         const element = el as HTMLElement;
-                        const id = element.dataset.glyphId || element.getAttribute('data-glyph-id') || 'unknown';
+                        const id = element.dataset.elementId || element.getAttribute('data-element-id') || 'unknown';
                         if (id === detachedId) return; // already handled
                         if (element.closest('.melded-composition')) return; // still in a composition
                         const glyph = createGlyphFromElement(element, id);
                         const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
-                        makeDraggable(element, element, glyph, { logLabel: entry?.label ?? 'Glyph' });
+                        makeDraggable(element, element, glyph, { logLabel: entry?.label ?? 'Element' });
                     });
                 }
 
@@ -182,28 +182,28 @@ function unmeldSelectedGlyphs(canvasId: string, container: HTMLElement, composit
     // Full unmeld: multiple selected or detach not applicable
     const result = unmeldComposition(composition);
     if (!result) {
-        const compId = composition.dataset.glyphId || 'unknown';
+        const compId = composition.dataset.elementId || 'unknown';
         log.error(SEG.GLYPH, `[Canvas] Failed to unmeld composition ${compId}`);
         return;
     }
-    const { glyphElements } = result;
+    const { members: glyphElements } = result;
     glyphElements.forEach((element) => {
-        const glyphId = element.dataset.glyphId || element.getAttribute('data-glyph-id') || 'unknown';
+        const glyphId = element.dataset.elementId || element.getAttribute('data-element-id') || 'unknown';
         const glyph = createGlyphFromElement(element, glyphId);
         const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
-        makeDraggable(element, element, glyph, { logLabel: entry?.label ?? 'Glyph' });
+        makeDraggable(element, element, glyph, { logLabel: entry?.label ?? 'Element' });
     });
     deselectAll(canvasId, container);
     log.debug(SEG.GLYPH, '[Canvas] Unmelded composition', {
         count: glyphElements.length,
-        glyphIds: glyphElements.map(el => el.dataset.glyphId).filter(Boolean)
+        glyphIds: glyphElements.map(el => el.dataset.elementId).filter(Boolean)
     });
 }
 
 /** Remove a single glyph element from the canvas with animation */
 function removeGlyphElement(container: HTMLElement, glyphId: string, duration: number): void {
-    const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
-    uiState.removeCanvasGlyph(glyphId);
+    const el = container.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
+    uiState.removeCanvasElement(glyphId);
     container.dispatchEvent(new CustomEvent('glyph-deleted', { detail: { glyphId } }));
     if (!el) return;
     runCleanup(el);
@@ -222,7 +222,7 @@ function deleteSelectedGlyphs(canvasId: string, container: HTMLElement): void {
     const glyphIdsToDelete = getSelectedGlyphIds(canvasId);
     hideActionBar(container);
     clearSelection(canvasId);
-    const duration = getMinimizeDuration();
+    const duration = getRestDuration();
 
     // Collect spines that need to be deleted (any selected glyph is on a spine)
     const spinesToDelete = new Set<string>();
@@ -261,7 +261,7 @@ function deleteSelectedGlyphs(canvasId: string, container: HTMLElement): void {
  * Render a glyph on the canvas.
  * Uses glyph-registry for dispatch instead of per-type if/else.
  */
-export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
+export async function renderGlyph(glyph: Element): Promise<HTMLElement> {
     log.debug(SEG.GLYPH, `[Canvas] Rendering glyph ${glyph.id}`, {
         symbol: glyph.symbol, hasContent: !!glyph.content
     });
@@ -279,7 +279,7 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
                 { type: 'missing_data', message: 'Execution result data missing',
                   details: { 'Has content': false, 'Position': `(${glyph.x}, ${glyph.y})`,
                     'Size': `${glyph.width}x${glyph.height}`,
-                    'Cause': 'Glyph metadata saved without execution result (migration bug)' } }
+                    'Cause': 'Element metadata saved without execution result (migration bug)' } }
             );
         }
         try {
@@ -318,7 +318,7 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Stream glyphs: skip if no saved content (orphaned empty stream)
     if (glyph.symbol === 'stream' && !glyph.content) {
         log.debug(SEG.GLYPH, `[Canvas] Skipping empty stream glyph ${glyph.id}`);
-        uiState.removeCanvasGlyph(glyph.id);
+        uiState.removeCanvasElement(glyph.id);
         return document.createElement('div'); // invisible placeholder
     }
 
@@ -375,12 +375,12 @@ export async function redrawPlacedGlyphs(symbol: string): Promise<number> {
     if (!entry) return 0;
 
     const placed = Array.from(
-        document.querySelectorAll<HTMLElement>('.canvas-workspace [data-glyph-id]')
+        document.querySelectorAll<HTMLElement>('.canvas-workspace [data-element-id]')
     );
 
     let redrawn = 0;
     for (const el of placed) {
-        const id = el.dataset.glyphId;
+        const id = el.dataset.elementId;
         const saved = id ? uiState.getCanvasGlyph(id) : undefined;
         if (!id || saved?.symbol !== symbol) continue;
 
@@ -418,7 +418,7 @@ export async function redrawPlacedGlyphs(symbol: string): Promise<number> {
  */
 export function buildCanvasWorkspace(
     canvasId: string,
-    glyphs: Glyph[]
+    glyphs: Element[]
 ): HTMLElement {
     const container = document.createElement('div');
     container.className = 'canvas-workspace';
@@ -450,9 +450,9 @@ export function buildCanvasWorkspace(
         if (isPlacementActive() || isSpawnMenuOpen()) return;
         const target = e.target as HTMLElement;
         // Find the actual symbol span — walk up from click target or search within glyph
-        const glyphEl = target.closest('.canvas-glyph') as HTMLElement | null;
-        const symbolEl = target.closest('.glyph-symbol') as HTMLElement | null
-            ?? glyphEl?.querySelector('.glyph-symbol') as HTMLElement | null;
+        const glyphEl = target.closest('.canvas-element') as HTMLElement | null;
+        const symbolEl = target.closest('.symbol') as HTMLElement | null
+            ?? glyphEl?.querySelector('.symbol') as HTMLElement | null;
         showSpawnMenu(e.clientX, e.clientY, contentLayer, glyphs, canvasId, symbolEl);
     });
 
@@ -495,7 +495,7 @@ export function buildCanvasWorkspace(
                         ext,
                     };
 
-                    const glyph: Glyph = {
+                    const glyph: Element = {
                         id: `doc-${crypto.randomUUID()}`,
                         title: result.filename,
                         symbol: Doc,
@@ -547,8 +547,8 @@ export function buildCanvasWorkspace(
     // TODO [TS-5]: Extract shared spawnResultBelow — this pattern is repeated
     // in prompt-glyph.ts and glyph-followup.ts.
     container.addEventListener('glyph:spawn-result', ((e: CustomEvent<SpawnResultDetail>) => {
-        const { glyphId, name, result } = e.detail;
-        const parentElement = (e.target as HTMLElement).closest('[data-glyph-id]') as HTMLElement | null;
+        const { elementId: glyphId, name, result } = e.detail;
+        const parentElement = (e.target as HTMLElement).closest('[data-element-id]') as HTMLElement | null;
         if (!parentElement) {
             log.error(SEG.GLYPH, `[Canvas] spawn-result: no parent glyph element for ${glyphId}`);
             return;
@@ -560,7 +560,7 @@ export function buildCanvasWorkspace(
         const y = Math.round(parentRect.bottom - canvasRect.top);
 
         const resultGlyphId = `result-${crypto.randomUUID()}`;
-        const resultGlyph: Glyph = {
+        const resultGlyph: Element = {
             id: resultGlyphId,
             title: `${name} Result`,
             symbol: 'result',
@@ -607,13 +607,13 @@ export function buildCanvasWorkspace(
         // Pick up 〽: left-click on a thread end marker resumes threading from its spine.
         // The same DOM element becomes the cursor and gets re-pinned at the new endpoint —
         // one element across the entire pickup → drop cycle (glyph axiom).
-        const threadGlyphEl = target.closest('.canvas-thread-glyph') as HTMLElement | null;
+        const threadGlyphEl = target.closest('.canvas-thread-element') as HTMLElement | null;
         if (threadGlyphEl && container.contains(threadGlyphEl)) {
-            const threadGlyphId = threadGlyphEl.dataset.glyphId;
+            const threadGlyphId = threadGlyphEl.dataset.elementId;
             const spine = threadGlyphId ? getSpineByNode(canvasId, threadGlyphId) : null;
             if (spine && threadGlyphId) {
                 e.stopPropagation();
-                const symbolEl = threadGlyphEl.querySelector('.glyph-symbol') as HTMLElement | null;
+                const symbolEl = threadGlyphEl.querySelector('.symbol') as HTMLElement | null;
                 if (!symbolEl) return;
                 const existingNodeIds = spine.nodes.slice(0, -1);
                 const originPos = uiState.getCanvasGlyphs().find(g => g.id === threadGlyphId);
@@ -659,10 +659,10 @@ export function buildCanvasWorkspace(
         container.focus({ preventScroll: true });
 
         // Walk up from click target to find a glyph element (must be inside this workspace)
-        const glyphEl = target.closest('[data-glyph-id]') as HTMLElement | null;
+        const glyphEl = target.closest('[data-element-id]') as HTMLElement | null;
         const isInsideWorkspace = glyphEl ? container.contains(glyphEl) : false;
-        if (glyphEl && isInsideWorkspace && glyphEl.dataset.glyphId !== 'canvas-workspace') {
-            const glyphId = glyphEl.dataset.glyphId;
+        if (glyphEl && isInsideWorkspace && glyphEl.dataset.elementId !== 'canvas-workspace') {
+            const glyphId = glyphEl.dataset.elementId;
             if (glyphId) {
                 e.stopPropagation();
                 selectGlyph(canvasId, glyphId, container, e.shiftKey);
@@ -696,7 +696,7 @@ export function buildCanvasWorkspace(
         });
 
         if (result.targetGlyphId) {
-            const targetEl = contentLayer.querySelector(`[data-glyph-id="${result.targetGlyphId}"]`) as HTMLElement | null;
+            const targetEl = contentLayer.querySelector(`[data-element-id="${result.targetGlyphId}"]`) as HTMLElement | null;
             if (targetEl) {
                 selectGlyph(canvasId, result.targetGlyphId, container, false);
                 centerOnGlyphSymbol(container, canvasId, targetEl);
@@ -708,15 +708,15 @@ export function buildCanvasWorkspace(
     function getNavigationCandidates(): HTMLElement[] {
         if (drilledComposition) {
             // Inside a composition — only direct glyph children, skip error glyphs
-            return ([...drilledComposition.querySelectorAll(':scope > [data-glyph-id]')] as HTMLElement[])
-                .filter(el => !el.classList.contains('canvas-error-glyph'));
+            return ([...drilledComposition.querySelectorAll(':scope > [data-element-id]')] as HTMLElement[])
+                .filter(el => !el.classList.contains('canvas-error-element'));
         }
         // Top level — compositions as units + standalone glyphs
-        const all = [...container.querySelectorAll('[data-glyph-id]')] as HTMLElement[];
+        const all = [...container.querySelectorAll('[data-element-id]')] as HTMLElement[];
         return all.filter(el => {
-            if (!el.dataset.glyphId || el.dataset.glyphId === 'canvas-workspace') return false;
+            if (!el.dataset.elementId || el.dataset.elementId === 'canvas-workspace') return false;
             // Skip error glyphs
-            if (el.classList.contains('canvas-error-glyph')) return false;
+            if (el.classList.contains('canvas-error-element')) return false;
             // Skip glyphs that are inside a composition (the composition itself is the nav target)
             const parentComp = el.parentElement?.closest('.melded-composition');
             if (parentComp && parentComp !== el) return false;
@@ -729,7 +729,7 @@ export function buildCanvasWorkspace(
 
         // Auto-drill: if selected glyph is inside a composition we haven't drilled into, do it now
         if (!drilledComposition && selected.length > 0) {
-            const selEl = container.querySelector(`[data-glyph-id="${selected[0]}"]`) as HTMLElement | null;
+            const selEl = container.querySelector(`[data-element-id="${selected[0]}"]`) as HTMLElement | null;
             if (selEl) {
                 const parentComp = selEl.parentElement?.closest('.melded-composition') as HTMLElement | null;
                 if (parentComp && parentComp !== selEl) {
@@ -744,7 +744,7 @@ export function buildCanvasWorkspace(
         // Reference point: selected glyph center, or viewport center
         let cx: number, cy: number;
         if (selected.length > 0) {
-            const currentEl = candidates.find(el => el.dataset.glyphId === selected[0]);
+            const currentEl = candidates.find(el => el.dataset.elementId === selected[0]);
             if (!currentEl) return;
             cx = currentEl.offsetLeft + currentEl.offsetWidth / 2;
             cy = currentEl.offsetTop + currentEl.offsetHeight / 2;
@@ -758,7 +758,7 @@ export function buildCanvasWorkspace(
         let best: HTMLElement | null = null;
         let bestDist = Infinity;
         for (const el of candidates) {
-            if (el.dataset.glyphId === currentId) continue;
+            if (el.dataset.elementId === currentId) continue;
             const ex = el.offsetLeft + el.offsetWidth / 2;
             const ey = el.offsetTop + el.offsetHeight / 2;
             const dx = ex - cx;
@@ -778,7 +778,7 @@ export function buildCanvasWorkspace(
             }
         }
         if (best) {
-            selectGlyph(canvasId, best.dataset.glyphId!, container, false);
+            selectGlyph(canvasId, best.dataset.elementId!, container, false);
             panToGlyph(container, canvasId, best);
         }
     }
@@ -790,7 +790,7 @@ export function buildCanvasWorkspace(
         () => {
             // ESC: if drilled into a composition, pop out and select the composition
             if (drilledComposition) {
-                const compId = drilledComposition.dataset.glyphId;
+                const compId = drilledComposition.dataset.elementId;
                 drilledComposition = null;
                 if (compId) {
                     selectGlyph(canvasId, compId, container, false);
@@ -810,15 +810,15 @@ export function buildCanvasWorkspace(
             // Otherwise, focus textarea.
             const selected = getSelectedGlyphIds(canvasId);
             if (selected.length !== 1) return;
-            const el = container.querySelector(`[data-glyph-id="${selected[0]}"]`) as HTMLElement | null;
+            const el = container.querySelector(`[data-element-id="${selected[0]}"]`) as HTMLElement | null;
             if (!el) return;
 
             if (el.classList.contains('melded-composition') && !drilledComposition) {
                 // Drill into composition — select first child
                 drilledComposition = el;
-                const firstChild = el.querySelector(':scope > [data-glyph-id]') as HTMLElement | null;
-                if (firstChild && firstChild.dataset.glyphId) {
-                    selectGlyph(canvasId, firstChild.dataset.glyphId, container, false);
+                const firstChild = el.querySelector(':scope > [data-element-id]') as HTMLElement | null;
+                if (firstChild && firstChild.dataset.elementId) {
+                    selectGlyph(canvasId, firstChild.dataset.elementId, container, false);
                 }
                 log.debug(SEG.GLYPH, '[Canvas] Drilled into composition', { id: selected[0] });
                 return;
@@ -870,9 +870,9 @@ export function buildCanvasWorkspace(
                 continue;
             }
 
-            const glyphIds = extractGlyphIds(comp.edges);
+            const glyphIds = extractElementIds(comp.edges);
             const glyphElements = glyphIds
-                .map(id => container.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement)
+                .map(id => container.querySelector(`[data-element-id="${id}"]`) as HTMLElement)
                 .filter(el => el !== null);
 
             if (glyphElements.length !== glyphIds.length) {
@@ -883,7 +883,7 @@ export function buildCanvasWorkspace(
 
             try {
                 const composition = reconstructMeld(glyphElements, comp.edges, comp.id, comp.x, comp.y);
-                const compositionGlyph: Glyph = {
+                const compositionGlyph: Element = {
                     id: comp.id,
                     title: 'Melded Composition',
                     renderContent: () => composition
@@ -902,7 +902,7 @@ export function buildCanvasWorkspace(
         for (const spine of savedSpines) {
             // Verify all nodes exist on canvas
             const allExist = spine.nodes.every(id =>
-                contentLayer.querySelector(`[data-glyph-id="${id}"]`) !== null
+                contentLayer.querySelector(`[data-element-id="${id}"]`) !== null
             );
             if (!allExist) {
                 log.debug(SEG.GLYPH, `[Canvas] Removing stale spine ${spine.id} — missing nodes`);

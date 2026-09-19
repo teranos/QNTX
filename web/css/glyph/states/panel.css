@@ -10,7 +10,7 @@
  */
 
 /* Panel container - full width, fixed position */
-.glyph-panel {
+.panel {
     position: fixed;
     left: 0;
     width: 100vw;
@@ -23,18 +23,18 @@
 }
 
 /* Direction variants */
-.glyph-panel--from-top {
+.panel--from-top {
     top: 0;
     border-radius: 0 0 12px 12px;
 }
 
-.glyph-panel--from-bottom {
+.panel--from-bottom {
     bottom: 0;
     border-radius: 12px 12px 0 0;
 }
 
 /* Fullscreen: no border radius */
-.glyph-panel--fullscreen {
+.panel--fullscreen {
     border-radius: 0;
 }
 
@@ -43,7 +43,7 @@
 /* ── Resize handle ── */
 
 /* Invisible drag zone on the panel edge for resizing */
-.glyph-panel-resize-handle {
+.panel-resize-handle {
     position: absolute;
     left: 0;
     width: 100%;
@@ -55,22 +55,22 @@
     transition: background 150ms ease;
 }
 
-.glyph-panel-resize-handle:hover,
-.glyph-panel--resizing .glyph-panel-resize-handle {
+.panel-resize-handle:hover,
+.panel--resizing .panel-resize-handle {
     background: rgba(255, 255, 255, 0.15);
 }
 
 /* Bottom handle: for panels sliding from top */
-.glyph-panel-resize-handle--bottom {
+.panel-resize-handle--bottom {
     bottom: 0;
 }
 
 /* Top handle: for panels sliding from bottom */
-.glyph-panel-resize-handle--top {
+.panel-resize-handle--top {
     top: 0;
 }
 
 /* During resize, prevent pointer events on content so mouse tracking is smooth */
-.glyph-panel--resizing .glyph-content-area {
+.panel--resizing .content-area {
     pointer-events: none;
 }

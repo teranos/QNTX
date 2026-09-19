@@ -125,7 +125,7 @@ function dispatchSearch(text: string): void {
 // --- Subcanvas navigation ---
 
 function navigateToSubcanvas(glyphId: string): void {
-    const el = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    const el = document.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
     if (!el) return;
     el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 }

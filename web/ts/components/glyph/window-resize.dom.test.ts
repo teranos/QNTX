@@ -68,7 +68,7 @@ describe('Window ResizeObserver', () => {
 
         // Create content structure that matches window manifestation
         const contentElement = document.createElement('div');
-        contentElement.className = 'glyph-content-area';
+        contentElement.className = 'content-area';
 
         const innerContent = document.createElement('div');
         innerContent.className = 'glyph-content';
@@ -150,7 +150,7 @@ describe('Window ResizeObserver', () => {
 
     test('Multiple render calls cleanup old observer before creating new one', () => {
         const glyphElement = document.createElement('div');
-        glyphElement.className = 'canvas-ax-glyph';
+        glyphElement.className = 'canvas-ax-element';
         document.body.appendChild(glyphElement);
 
         // First render - create observer

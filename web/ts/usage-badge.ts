@@ -23,7 +23,7 @@ export function createUsageBadge(): HTMLDivElement {
 
     // Open usage-chart glyph on click
     badge.addEventListener('click', () => {
-        const usageGlyph = document.querySelector('[data-glyph-id="usage-chart"]') as HTMLElement;
+        const usageGlyph = document.querySelector('[data-element-id="usage-chart"]') as HTMLElement;
         if (usageGlyph) {
             usageGlyph.click();
         }

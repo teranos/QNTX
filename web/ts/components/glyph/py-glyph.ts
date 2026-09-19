@@ -1,5 +1,5 @@
 /**
- * Python Glyph - CodeMirror-based Python editor on canvas
+ * Python Element - CodeMirror-based Python editor on canvas
  *
  * These are resizable code preview glyphs that live on the canvas workspace.
  * They show a small amount of actual code and are spatially positioned.
@@ -19,7 +19,7 @@
  * 7. File path association (show file path in title bar)
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
@@ -50,7 +50,7 @@ else:
  *
  * Code is stored in uiState.canvasGlyphs (synced to IndexedDB + backend)
  */
-export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
+export async function createPyGlyph(glyph: Element): Promise<HTMLElement> {
     // Load code from canvas state or use default
     const existingGlyph = uiState.getCanvasGlyph(glyph.id);
     const code = existingGlyph?.content ?? PY_DEFAULT_CODE;
@@ -70,11 +70,11 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     runButton.title = 'Run Python code';
 
     const ui = createGlyphUI(glyph, 'python');
-    const { element, content } = ui.glyph({
+    const { element, content } = ui.element({
         defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
         titleBar: { label: 'py', actions: [runButton], color: '#2a5578', labelColor: '#FFD43B' },
         resizable: true,
-        className: 'canvas-py-glyph',
+        className: 'canvas-py-element',
     });
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';

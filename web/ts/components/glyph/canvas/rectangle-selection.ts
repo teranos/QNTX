@@ -66,7 +66,7 @@ export function setupRectangleSelection(
         // Only start rectangle selection on canvas background (not on glyphs)
         // Scope check to this workspace: glyph ancestors outside the container
         // (e.g. parent subcanvas element) are ignored
-        const glyphEl = target.closest('[data-glyph-id]') as HTMLElement | null;
+        const glyphEl = target.closest('[data-element-id]') as HTMLElement | null;
         if (glyphEl && glyphEl !== container && container.contains(glyphEl)) {
             return;
         }
@@ -155,11 +155,11 @@ export function setupRectangleSelection(
 
             // Find all glyphs that intersect with selection rectangle
             const glyphsInSelection: string[] = [];
-            const allGlyphElements = container.querySelectorAll('[data-glyph-id]');
+            const allGlyphElements = container.querySelectorAll('[data-element-id]');
 
             allGlyphElements.forEach((el) => {
                 const glyphEl = el as HTMLElement;
-                const glyphId = glyphEl.dataset.glyphId;
+                const glyphId = glyphEl.dataset.elementId;
 
                 // Skip canvas itself
                 if (glyphId === 'canvas-workspace') return;

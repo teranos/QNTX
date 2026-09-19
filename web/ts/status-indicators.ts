@@ -12,7 +12,7 @@ import { DB, Sigma } from './sym';
 import { openDoor, signedIn, standAtTheDoor } from './signin';
 import { log, SEG } from './logger';
 import { spawnConnectivityGlyph } from './components/glyph/connectivity-glyph';
-import { glyphRun } from '@qntx/glyphs';
+import { tray } from '@teranos/elements';
 import { connectingLabel } from './reconnect';
 
 interface StatusIndicator {
@@ -312,7 +312,7 @@ class StatusIndicatorManager {
      * Show database information modal
      */
     private showDatabaseInfo(): void {
-        glyphRun.openGlyph('database-glyph');
+        tray.open('database-glyph');
     }
 
     /**
@@ -337,7 +337,7 @@ class StatusIndicatorManager {
             id: 'sigma',
             label: `${Sigma}`,
             clickable: true,
-            onClick: () => glyphRun.openGlyph('sigma-panel'),
+            onClick: () => tray.open('sigma-panel'),
             initialState: 'inactive'
         });
     }

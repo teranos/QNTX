@@ -1,5 +1,5 @@
 /**
- * Canvas Glyph - Fractal container with spatial grid layout
+ * Canvas Element - Fractal container with spatial grid layout
  *
  * The canvas is a glyph that morphs to full-screen and contains other glyphs
  * arranged on a spatial grid. Right-click spawns new glyphs.
@@ -19,7 +19,7 @@
  * This demonstrates the fractal principle: all glyphs are containers.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { Pulse, AX } from '../../../sym';
 import { log, SEG } from '../../../logger';
 import { getGlyphTypeBySavedSymbol } from '../glyph-registry';
@@ -29,7 +29,7 @@ import { buildCanvasWorkspace } from './canvas-workspace-builder';
 /**
  * Factory function to create a Canvas glyph
  */
-export function createCanvasGlyph(): Glyph {
+export function createCanvasGlyph(): Element {
     // Load persisted glyphs from uiState
     const allSavedGlyphs = uiState.getCanvasGlyphs('canvas-workspace');
 
@@ -39,7 +39,7 @@ export function createCanvasGlyph(): Glyph {
         log.warn(SEG.GLYPH, `[Canvas] Removing ${errorGlyphs.length} persisted error glyphs (should be ephemeral)`, {
             ids: errorGlyphs.map(g => g.id)
         });
-        errorGlyphs.forEach(g => uiState.removeCanvasGlyph(g.id));
+        errorGlyphs.forEach(g => uiState.removeCanvasElement(g.id));
     }
 
     const savedGlyphs = allSavedGlyphs.filter(g => g.symbol !== 'error');
@@ -52,7 +52,7 @@ export function createCanvasGlyph(): Glyph {
         }))
     });
 
-    const glyphs: Glyph[] = savedGlyphs.map(saved => {
+    const glyphs: Element[] = savedGlyphs.map(saved => {
         if (saved.symbol === 'result') {
             log.debug(SEG.GLYPH, `[Canvas] Restoring result glyph ${saved.id}`, {
                 hasContent: !!saved.content,
@@ -64,7 +64,7 @@ export function createCanvasGlyph(): Glyph {
         const entry = saved.symbol ? getGlyphTypeBySavedSymbol(saved.symbol, saved.content) : undefined;
         return {
             id: saved.id,
-            title: entry?.title ?? 'Glyph',
+            title: entry?.title ?? 'Element',
             symbol: saved.symbol,
             x: saved.x,
             y: saved.y,
@@ -78,7 +78,7 @@ export function createCanvasGlyph(): Glyph {
     return {
         id: 'canvas-workspace',
         title: 'Canvas',
-        manifestationType: 'workspace', // Full-viewport, no chrome
+        opensAs: 'workspace', // Full-viewport, no chrome
         layoutStrategy: 'grid',
         children: glyphs,
         onSpawnMenu: () => [Pulse, AX],

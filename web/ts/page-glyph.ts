@@ -11,8 +11,8 @@
  * being where you are.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { glyphRun } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { tray } from '@teranos/elements';
 import { renderTally } from './components/tally.ts';
 import type { StaandInfo, StandCount } from './market-glyph.ts';
 
@@ -137,16 +137,16 @@ export function renderPageStats(container: HTMLElement, s: StaandInfo, page: str
  *  made, the way a stand's activity is (stand-activity-glyph.ts). */
 export function openPageGlyph(s: StaandInfo, page: string, site: string): void {
     const glyphId = pageGlyphId(s.market, s.slug, page);
-    if (glyphRun.has(glyphId)) {
-        glyphRun.openGlyph(glyphId);
+    if (tray.has(glyphId)) {
+        tray.open(glyphId);
         return;
     }
 
-    glyphRun.add({
+    tray.add({
         id: glyphId,
         title: page,
         symbol: '⌸',
-        onClose: () => { glyphRun.remove(glyphId); },
+        onClose: () => { tray.remove(glyphId); },
         renderContent: () => {
             const content = document.createElement('div');
             content.className = 'page-glyph-content';
@@ -158,7 +158,7 @@ export function openPageGlyph(s: StaandInfo, page: string, site: string): void {
         },
         initialWidth: '560px',
         initialHeight: '420px',
-    } satisfies Glyph);
+    } satisfies Element);
 
-    glyphRun.openGlyph(glyphId);
+    tray.open(glyphId);
 }

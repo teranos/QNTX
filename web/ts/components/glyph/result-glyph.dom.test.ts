@@ -5,7 +5,7 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -17,7 +17,7 @@ describe('ResultGlyph', () => {
         return;
     }
 
-    let glyph: Glyph;
+    let glyph: Element;
     let result: ExecutionResult;
 
     beforeEach(() => {
@@ -44,13 +44,13 @@ describe('ResultGlyph', () => {
     describe('rendering', () => {
         test('creates element with result and base glyph classes', () => {
             const element = createResultGlyph(glyph, result);
-            expect(element.classList.contains('canvas-result-glyph')).toBe(true);
-            expect(element.classList.contains('canvas-glyph')).toBe(true);
+            expect(element.classList.contains('canvas-result-element')).toBe(true);
+            expect(element.classList.contains('canvas-element')).toBe(true);
         });
 
-        test('sets data-glyph-id attribute', () => {
+        test('sets data-element-id attribute', () => {
             const element = createResultGlyph(glyph, result);
-            expect(element.dataset.glyphId).toBe('result-test-123');
+            expect(element.dataset.elementId).toBe('result-test-123');
         });
 
         test('has header with copy button', () => {

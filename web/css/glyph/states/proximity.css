@@ -10,7 +10,7 @@
  */
 
 /* Text appearance during proximity expansion */
-.glyph-run-glyph[data-has-text="true"] {
+.dot[data-has-text="true"] {
     display: flex;
     align-items: center;
     justify-content: flex-start;

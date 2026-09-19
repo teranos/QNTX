@@ -45,7 +45,7 @@ function render(groups: TokenGroup[]) {
   // Component galleries — simpler first, then more complex
   renderComponentGallery(root)
 
-  // Glyph package specimens — live demos of @qntx/glyphs
+  // Element package specimens — live demos of @teranos/elements
   renderGlyphSpecimens(root)
 }
 

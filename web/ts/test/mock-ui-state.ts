@@ -28,7 +28,7 @@ export function createMockUiState() {
             const i = glyphs.findIndex((x: any) => x.id === g.id);
             if (i >= 0) glyphs[i] = g; else glyphs.push(g);
         },
-        removeCanvasGlyph: (id: string) => {
+        removeCanvasElement: (id: string) => {
             const i = glyphs.findIndex((g: any) => g.id === id);
             if (i >= 0) glyphs.splice(i, 1);
         },

@@ -117,7 +117,7 @@ describe('Rectangle Selection - Tim (Happy Path)', () => {
 
         canvas = document.createElement('div');
         canvas.className = 'canvas-workspace';
-        canvas.setAttribute('data-glyph-id', 'canvas-workspace');
+        canvas.setAttribute('data-element-id', 'canvas-workspace');
         canvas.style.position = 'relative';
         canvas.style.width = '1000px';
         canvas.style.height = '800px';
@@ -139,8 +139,8 @@ describe('Rectangle Selection - Tim (Happy Path)', () => {
 
     function createMockGlyph(id: string, x: number, y: number, width = 100, height = 100): HTMLElement {
         const glyph = document.createElement('div');
-        glyph.className = 'canvas-ax-glyph canvas-glyph';
-        glyph.setAttribute('data-glyph-id', id);
+        glyph.className = 'canvas-ax-element canvas-element';
+        glyph.setAttribute('data-element-id', id);
         glyph.style.position = 'absolute';
         glyph.style.left = `${x}px`;
         glyph.style.top = `${y}px`;
@@ -172,7 +172,7 @@ describe('Rectangle Selection - Tim (Happy Path)', () => {
             selectedGlyphIds = [glyphId];
         }
 
-        const el = canvas.querySelector(`[data-glyph-id="${glyphId}"]`);
+        const el = canvas.querySelector(`[data-element-id="${glyphId}"]`);
         if (el) {
             el.classList.add('canvas-glyph-selected');
         }
@@ -312,7 +312,7 @@ describe('Rectangle Selection - Spike (Edge Cases)', () => {
 
         canvas = document.createElement('div');
         canvas.className = 'canvas-workspace';
-        canvas.setAttribute('data-glyph-id', 'canvas-workspace');
+        canvas.setAttribute('data-element-id', 'canvas-workspace');
         canvas.style.position = 'relative';
         canvas.style.width = '1000px';
         canvas.style.height = '800px';
@@ -334,8 +334,8 @@ describe('Rectangle Selection - Spike (Edge Cases)', () => {
 
     function createMockGlyph(id: string, x: number, y: number, width = 100, height = 100): HTMLElement {
         const glyph = document.createElement('div');
-        glyph.className = 'canvas-ax-glyph canvas-glyph';
-        glyph.setAttribute('data-glyph-id', id);
+        glyph.className = 'canvas-ax-element canvas-element';
+        glyph.setAttribute('data-element-id', id);
         glyph.style.position = 'absolute';
         glyph.style.left = `${x}px`;
         glyph.style.top = `${y}px`;
@@ -366,7 +366,7 @@ describe('Rectangle Selection - Spike (Edge Cases)', () => {
             selectedGlyphIds = [glyphId];
         }
 
-        const el = canvas.querySelector(`[data-glyph-id="${glyphId}"]`);
+        const el = canvas.querySelector(`[data-element-id="${glyphId}"]`);
         if (el) {
             el.classList.add('canvas-glyph-selected');
         }
@@ -443,7 +443,7 @@ describe('Rectangle Selection - Spike (Edge Cases)', () => {
         // Create melded composition
         const composition = document.createElement('div');
         composition.className = 'melded-composition';
-        composition.setAttribute('data-glyph-id', 'melded-ax1-py1');
+        composition.setAttribute('data-element-id', 'melded-ax1-py1');
         composition.style.position = 'absolute';
         composition.style.left = '100px';
         composition.style.top = '100px';

@@ -4,7 +4,7 @@ import { escapeHtml } from './html-utils';
 import { DB, Watcher } from './sym';
 import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, getPredicateBreakdown, type PredicateDetail } from './eviction-chart';
 import { getWatchersByPredicate, setDilation, eyeStyle } from './watcher-predicates';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 let dbStatsElement: HTMLElement | null = null;
 let dbStats: any = null;
@@ -89,7 +89,7 @@ function renderStatsError(err: any): string {
         return `<div class="glyph-error">${escapeHtml(err)}</div>`;
     }
     const rows = [
-        `<div class="glyph-error"><span class="glyph-label">${escapeHtml(err.surface ?? 'database stats')}</span> ${escapeHtml(err.error ?? 'failed')}</div>`,
+        `<div class="glyph-error"><span class="label">${escapeHtml(err.surface ?? 'database stats')}</span> ${escapeHtml(err.error ?? 'failed')}</div>`,
     ];
     for (const detail of err.details ?? []) {
         rows.push(`<div class="glyph-error-detail">${escapeHtml(detail)}</div>`);
@@ -133,13 +133,13 @@ function renderDbStats(): void {
     // backend does not answer it; zero is an answer and renders as one.
     const countSpan = (label: string, value: unknown): string =>
         typeof value === 'number'
-            ? `<span><span class="glyph-label">${label}:</span> <span class="glyph-value">${value.toLocaleString()}</span></span>`
+            ? `<span><span class="label">${label}:</span> <span class="glyph-value">${value.toLocaleString()}</span></span>`
             : '';
 
     sectionOverview.innerHTML = `
         <div style="display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border-color, #333); font-size: 11px;">
-            <span><span class="glyph-label">Path:</span> <span class="glyph-value">${escapeHtml(String(dbStats.path ?? ''))}</span></span>
-            <span><span class="glyph-label">Backend:</span> <span class="glyph-value">${storageBackend}</span></span>
+            <span><span class="label">Path:</span> <span class="glyph-value">${escapeHtml(String(dbStats.path ?? ''))}</span></span>
+            <span><span class="label">Backend:</span> <span class="glyph-value">${storageBackend}</span></span>
             ${countSpan('Attestations', dbStats.total_attestations)}
             ${countSpan('Actors', dbStats.unique_actors)}
             ${countSpan('Subjects', dbStats.unique_subjects)}
@@ -163,7 +163,7 @@ function renderDbStats(): void {
 
         predicatesHTML += `
             <div style="margin-bottom: 8px;">
-                <span class="glyph-label">Types (${richFields.length}):</span>
+                <span class="label">Types (${richFields.length}):</span>
                 <span class="glyph-value" style="display: flex; flex-wrap: wrap; gap: 4px;">${fieldItems}</span>
             </div>
         `;
@@ -179,7 +179,7 @@ function renderDbStats(): void {
 
         predicatesHTML += `
             <div style="margin-bottom: 4px;">
-                <span class="glyph-label">Distillation:</span>
+                <span class="label">Distillation:</span>
                 <span class="glyph-value">${d.sigmas} sigmas, ${preserved} original preserved</span>
                 ${timeRange ? `<span style="color: #64748b; margin-left: 8px;">${timeRange}</span>` : ''}
             </div>
@@ -233,7 +233,7 @@ function renderDbStats(): void {
             }).join('');
             predicateRows = `
                 <div style="margin-top: 6px;" class="eviction-predicates-container">
-                    <span class="glyph-label" style="font-size: 11px;">Evicted predicates:</span>
+                    <span class="label" style="font-size: 11px;">Evicted predicates:</span>
                     ${items}
                 </div>
             `;
@@ -242,7 +242,7 @@ function renderDbStats(): void {
         sectionEvictions.innerHTML = `
             <div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
                 <div style="margin-bottom: 4px;">
-                    <span class="glyph-label">Evictions:</span>
+                    <span class="label">Evictions:</span>
                     <span class="glyph-value">${summary.count} events, ${summary.totalEvicted.toLocaleString()} attestations evicted</span>
                 </div>
                 <div class="eviction-chart-container"></div>
@@ -650,7 +650,7 @@ function renderPerformanceSection(container: HTMLElement, perf: PerfData | null,
     container.innerHTML = `
         <div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
             ${liveHTML}
-            <span class="glyph-label" style="font-size: 11px;">Performance (5m windows):</span>
+            <span class="label" style="font-size: 11px;">Performance (5m windows):</span>
             <div style="margin-top: 4px;">${rows}</div>
         </div>
     `;
@@ -714,12 +714,12 @@ function renderPredicateDetail(container: HTMLElement, detail: PredicateDetail):
     container.innerHTML = `<div style="padding: 4px 0 4px 12px; border-left: 2px solid #334155; margin: 2px 0 4px 4px; word-break: break-word; overflow-wrap: break-word;">${rows.join('')}</div>`;
 }
 
-export function createDbGlyph(): Glyph {
+export function createDbGlyph(): Element {
     return {
         id: 'database-glyph',
         title: 'Database',
         symbol: DB,
-        manifestationType: 'panel' as const,
+        opensAs: 'panel' as const,
         renderContent: () => {
             const content = document.createElement('div');
             dbStatsElement = content;

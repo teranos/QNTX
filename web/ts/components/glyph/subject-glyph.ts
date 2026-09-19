@@ -1,5 +1,5 @@
 /**
- * Subject Glyph (+) — the subject as a thing in its own right.
+ * Subject Element (+) — the subject as a thing in its own right.
  *
  * Clicking a subject spawns the subject glyph, the same way clicking an
  * attestation spawns the attestation glyph. It draws +, which is the mark of

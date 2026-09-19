@@ -1,14 +1,14 @@
 /**
  * @jest-environment jsdom
  *
- * Critical path tests for Glyph morphing system
+ * Critical path tests for Element morphing system
  * Focus: Single element axiom, state transitions, invariant enforcement
  *
  * These tests run only with USE_JSDOM=1 (CI environment)
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import type { Glyph } from './glyph.ts';
+import type { Element } from './glyph.ts';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -40,10 +40,10 @@ const { uiState } = createMockUiState();
 mock.module('../../state/ui', () => ({ uiState }));
 
 // Import after JSDOM + mock setup
-const { glyphRun } = await import('@qntx/glyphs');
-const { findPeakedGlyph } = await import('@qntx/glyphs');
+const { tray } = await import('@teranos/elements');
+const { findPeakedElement } = await import('@teranos/elements');
 
-describe('Glyph Single Element Axiom', () => {
+describe('Element Single Element Axiom', () => {
     if (!USE_JSDOM) {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
         return;
@@ -53,19 +53,19 @@ describe('Glyph Single Element Axiom', () => {
         // Clear the glyph run state
         document.body.innerHTML = '';
         // Reset the singleton (this is a bit hacky but needed for testing)
-        (glyphRun as any).element = null;
-        (glyphRun as any).indicatorContainer = null;
-        (glyphRun as any).items.clear();
-        (glyphRun as any).glyphElements.clear();
-        (glyphRun as any).deferredItems = [];
+        (tray as any).element = null;
+        (tray as any).indicatorContainer = null;
+        (tray as any).items.clear();
+        (tray as any).elements.clear();
+        (tray as any).deferredItems = [];
     });
 
     test('Single element axiom: Each glyph is exactly ONE DOM element', () => {
-        glyphRun.init();
+        tray.init();
 
-        const testGlyph: Glyph = {
+        const testGlyph: Element = {
             id: 'test-glyph-1',
-            title: 'Test Glyph',
+            title: 'Test Element',
             renderContent: () => {
                 const content = document.createElement('div');
                 content.textContent = 'Test Content';
@@ -74,88 +74,88 @@ describe('Glyph Single Element Axiom', () => {
         };
 
         // Add glyph
-        glyphRun.add(testGlyph);
+        tray.add(testGlyph);
 
         // Verify exactly one element exists
-        const elements = document.querySelectorAll('[data-glyph-id="test-glyph-1"]');
+        const elements = document.querySelectorAll('[data-element-id="test-glyph-1"]');
         expect(elements.length).toBe(1);
 
         // Verify it's tracked
-        expect(glyphRun.has('test-glyph-1')).toBe(true);
+        expect(tray.has('test-glyph-1')).toBe(true);
 
         // Attempting to add the same glyph again should be a no-op
-        glyphRun.add(testGlyph);
-        const elementsAfter = document.querySelectorAll('[data-glyph-id="test-glyph-1"]');
+        tray.add(testGlyph);
+        const elementsAfter = document.querySelectorAll('[data-element-id="test-glyph-1"]');
         expect(elementsAfter.length).toBe(1); // Still exactly one
 
         // The invariant should pass
-        expect(() => glyphRun.verifyInvariant()).not.toThrow();
+        expect(() => tray.verifyInvariant()).not.toThrow();
     });
 
     test('Axiom violation: Creating duplicate elements throws error', () => {
-        glyphRun.init();
+        tray.init();
 
-        const testGlyph: Glyph = {
+        const testGlyph: Element = {
             id: 'test-glyph-2',
-            title: 'Test Glyph 2',
+            title: 'Test Element 2',
             renderContent: () => document.createElement('div')
         };
 
         // Add glyph properly
-        glyphRun.add(testGlyph);
+        tray.add(testGlyph);
 
         // Manually create a duplicate element (violating axiom)
         const duplicate = document.createElement('div');
-        duplicate.setAttribute('data-glyph-id', 'test-glyph-2');
+        duplicate.setAttribute('data-element-id', 'test-glyph-2');
         document.body.appendChild(duplicate);
 
         // Verify invariant catches this violation
-        expect(() => glyphRun.verifyInvariant()).toThrow(/INVARIANT VIOLATION.*2 elements/);
+        expect(() => tray.verifyInvariant()).toThrow(/INVARIANT VIOLATION.*2 elements/);
     });
 
     test('Axiom violation: Untracked elements are detected', () => {
-        glyphRun.init();
+        tray.init();
 
         // Create an element outside the factory (violating axiom)
         const rogue = document.createElement('div');
-        rogue.setAttribute('data-glyph-id', 'rogue-glyph');
+        rogue.setAttribute('data-element-id', 'rogue-glyph');
         document.body.appendChild(rogue);
 
         // Verify invariant catches this violation
-        expect(() => glyphRun.verifyInvariant()).toThrow(/INVARIANT VIOLATION.*not tracked/);
+        expect(() => tray.verifyInvariant()).toThrow(/INVARIANT VIOLATION.*not tracked/);
     });
 
     test('Element persistence: Same element through add/remove from tray', () => {
-        glyphRun.init();
+        tray.init();
 
-        const testGlyph: Glyph = {
+        const testGlyph: Element = {
             id: 'test-glyph-3',
-            title: 'Test Glyph 3',
+            title: 'Test Element 3',
             renderContent: () => document.createElement('div')
         };
 
         // Add glyph
-        glyphRun.add(testGlyph);
-        const element = document.querySelector('[data-glyph-id="test-glyph-3"]');
+        tray.add(testGlyph);
+        const element = document.querySelector('[data-element-id="test-glyph-3"]');
         expect(element).not.toBeNull();
 
         // Store a reference to verify it's the same element later
         const elementRef = element;
 
         // The element should be in the indicator container
-        const indicatorContainer = document.querySelector('.glyph-run-indicators');
+        const indicatorContainer = document.querySelector('.tray-dots');
         expect(indicatorContainer?.contains(element!)).toBe(true);
 
         // Remove the glyph
-        glyphRun.remove('test-glyph-3');
+        tray.remove('test-glyph-3');
 
         // Element should be removed from DOM
-        const removedElement = document.querySelector('[data-glyph-id="test-glyph-3"]');
+        const removedElement = document.querySelector('[data-element-id="test-glyph-3"]');
         expect(removedElement).toBeNull();
 
         // Adding again would create a new element (since we removed it)
-        glyphRun.add(testGlyph);
-        const newElement = document.querySelector('[data-glyph-id="test-glyph-3"]');
+        tray.add(testGlyph);
+        const newElement = document.querySelector('[data-element-id="test-glyph-3"]');
         expect(newElement).not.toBeNull();
 
         // Note: After removal, a new element is created - this is allowed
@@ -163,11 +163,11 @@ describe('Glyph Single Element Axiom', () => {
     });
 
     test('Click handler persists with element', () => {
-        glyphRun.init();
+        tray.init();
 
-        const testGlyph: Glyph = {
+        const testGlyph: Element = {
             id: 'test-glyph-4',
-            title: 'Test Glyph 4',
+            title: 'Test Element 4',
             renderContent: () => {
                 const content = document.createElement('div');
                 content.textContent = 'Content';
@@ -175,8 +175,8 @@ describe('Glyph Single Element Axiom', () => {
             }
         };
 
-        glyphRun.add(testGlyph);
-        const element = document.querySelector('[data-glyph-id="test-glyph-4"]') as HTMLElement;
+        tray.add(testGlyph);
+        const element = document.querySelector('[data-element-id="test-glyph-4"]') as HTMLElement;
         expect(element).not.toBeNull();
 
         // Verify click handler works by checking that clicking changes state
@@ -187,29 +187,29 @@ describe('Glyph Single Element Axiom', () => {
     });
 
     test('Auto-initialization: Glyphs added before explicit init() auto-initialize', () => {
-        // glyphRun.element is null (beforeEach resets it), but add() calls init() internally
-        const testGlyph: Glyph = {
+        // tray.element is null (beforeEach resets it), but add() calls init() internally
+        const testGlyph: Element = {
             id: 'deferred-glyph',
             title: 'Deferred',
             renderContent: () => document.createElement('div')
         };
 
         // Add glyph before explicit init — add() auto-initializes via document.body
-        glyphRun.add(testGlyph);
+        tray.add(testGlyph);
 
         // Should be in DOM immediately (auto-init succeeds because body always exists)
-        const element = document.querySelector('[data-glyph-id="deferred-glyph"]');
+        const element = document.querySelector('[data-element-id="deferred-glyph"]');
         expect(element).not.toBeNull();
 
         // Verify invariant holds
-        expect(() => glyphRun.verifyInvariant()).not.toThrow();
+        expect(() => tray.verifyInvariant()).not.toThrow();
     });
 
     test('Element tracking: Tracked elements match DOM elements', () => {
-        glyphRun.init();
+        tray.init();
 
         // Add multiple glyphs
-        const glyphs: Glyph[] = [
+        const glyphs: Element[] = [
             {
                 id: 'track-1',
                 title: 'Track 1',
@@ -227,29 +227,29 @@ describe('Glyph Single Element Axiom', () => {
             }
         ];
 
-        glyphs.forEach(g => glyphRun.add(g));
+        glyphs.forEach(g => tray.add(g));
 
         // All should be tracked
-        expect(glyphRun.has('track-1')).toBe(true);
-        expect(glyphRun.has('track-2')).toBe(true);
-        expect(glyphRun.has('track-3')).toBe(true);
-        expect(glyphRun.count).toBe(3);
+        expect(tray.has('track-1')).toBe(true);
+        expect(tray.has('track-2')).toBe(true);
+        expect(tray.has('track-3')).toBe(true);
+        expect(tray.count).toBe(3);
 
         // All should be in DOM
-        const elements = document.querySelectorAll('[data-glyph-id]');
+        const elements = document.querySelectorAll('[data-element-id]');
         expect(elements.length).toBe(3);
 
         // Invariant should pass
-        expect(() => glyphRun.verifyInvariant()).not.toThrow();
+        expect(() => tray.verifyInvariant()).not.toThrow();
 
         // Remove one
-        glyphRun.remove('track-2');
-        expect(glyphRun.count).toBe(2);
-        const remainingElements = document.querySelectorAll('[data-glyph-id]');
+        tray.remove('track-2');
+        expect(tray.count).toBe(2);
+        const remainingElements = document.querySelectorAll('[data-element-id]');
         expect(remainingElements.length).toBe(2);
 
         // Invariant should still pass
-        expect(() => glyphRun.verifyInvariant()).not.toThrow();
+        expect(() => tray.verifyInvariant()).not.toThrow();
     });
 });
 
@@ -293,32 +293,32 @@ describe('Touch Browse', () => {
 
     beforeEach(() => {
         document.body.innerHTML = '';
-        (glyphRun as any).element = null;
-        (glyphRun as any).indicatorContainer = null;
-        (glyphRun as any).items.clear();
-        (glyphRun as any).glyphElements.clear();
-        (glyphRun as any).deferredItems = [];
+        (tray as any).element = null;
+        (tray as any).indicatorContainer = null;
+        (tray as any).items.clear();
+        (tray as any).elements.clear();
+        (tray as any).deferredItems = [];
 
         // Reset touch browse state from previous test (singleton leaks state)
-        (glyphRun as any).proximity.isTouchBrowsing = false;
+        (tray as any).proximity.isTouchBrowsing = false;
 
-        glyphRun.init();
+        tray.init();
 
         // Mock geometry on the tray container
-        const trayEl = (glyphRun as any).element as HTMLElement;
+        const trayEl = (tray as any).element as HTMLElement;
         if (trayEl) mockRect(trayEl, TRAY_RECT);
     });
 
-    function addTestGlyphs(count: number): Glyph[] {
-        const glyphs: Glyph[] = [];
+    function addTestGlyphs(count: number): Element[] {
+        const glyphs: Element[] = [];
         for (let i = 0; i < count; i++) {
-            const g: Glyph = {
+            const g: Element = {
                 id: `touch-glyph-${i}`,
-                title: `Glyph ${i}`,
+                title: `Element ${i}`,
                 renderContent: () => document.createElement('div')
             };
             glyphs.push(g);
-            glyphRun.add(g);
+            tray.add(g);
         }
         return glyphs;
     }
@@ -326,7 +326,7 @@ describe('Touch Browse', () => {
     test('touchstart near tray enters browse mode', () => {
         addTestGlyphs(3);
 
-        const proximity = (glyphRun as any).proximity;
+        const proximity = (tray as any).proximity;
         expect(proximity.isTouchBrowsing).toBe(false);
 
         // Touch within activation margin of tray
@@ -338,7 +338,7 @@ describe('Touch Browse', () => {
     test('touchstart far from tray does NOT enter browse mode', () => {
         addTestGlyphs(3);
 
-        const proximity = (glyphRun as any).proximity;
+        const proximity = (tray as any).proximity;
 
         // Touch on the opposite side of the screen
         document.dispatchEvent(createTouchEvent('touchstart', 50, 230));
@@ -348,7 +348,7 @@ describe('Touch Browse', () => {
 
     test('touchstart with empty tray does NOT enter browse mode', () => {
         // No glyphs added
-        const proximity = (glyphRun as any).proximity;
+        const proximity = (tray as any).proximity;
 
         document.dispatchEvent(createTouchEvent('touchstart', 355, 230));
 
@@ -358,7 +358,7 @@ describe('Touch Browse', () => {
     test('touchmove updates pointer position during browse', () => {
         addTestGlyphs(3);
 
-        const proximity = (glyphRun as any).proximity;
+        const proximity = (tray as any).proximity;
 
         // Enter browse
         document.dispatchEvent(createTouchEvent('touchstart', 355, 230));
@@ -375,7 +375,7 @@ describe('Touch Browse', () => {
     test('touchmove outside browse mode is ignored', () => {
         addTestGlyphs(3);
 
-        const proximity = (glyphRun as any).proximity;
+        const proximity = (tray as any).proximity;
 
         // Move without starting browse (isTouchBrowsing is false)
         document.dispatchEvent(createTouchEvent('touchmove', 355, 250));
@@ -388,7 +388,7 @@ describe('Touch Browse', () => {
     test('touchend exits browse mode', () => {
         addTestGlyphs(3);
 
-        const proximity = (glyphRun as any).proximity;
+        const proximity = (tray as any).proximity;
 
         // Enter browse
         document.dispatchEvent(createTouchEvent('touchstart', 355, 230));
@@ -403,7 +403,7 @@ describe('Touch Browse', () => {
     test('touchend collapses pointer to offscreen', () => {
         addTestGlyphs(3);
 
-        const proximity = (glyphRun as any).proximity;
+        const proximity = (tray as any).proximity;
 
         // Enter and browse
         document.dispatchEvent(createTouchEvent('touchstart', 355, 230));
@@ -418,35 +418,35 @@ describe('Touch Browse', () => {
         expect(pos.y).toBe(-9999);
     });
 
-    test('findPeakedGlyph returns null when no glyphs are close', () => {
+    test('findPeakedElement returns null when no glyphs are close', () => {
         addTestGlyphs(3);
 
-        const proximity = (glyphRun as any).proximity;
+        const proximity = (tray as any).proximity;
         // Set pointer far from everything
         proximity.setPointerPosition(-9999, -9999);
 
-        const peaked = findPeakedGlyph(glyphRun as any);
+        const peaked = findPeakedElement(tray as any);
         expect(peaked).toBeNull();
     });
 
-    test('findPeakedGlyph returns the glyph with highest proximity', () => {
+    test('findPeakedElement returns the glyph with highest proximity', () => {
         const testGlyphs = addTestGlyphs(3);
 
         // Give glyphs real geometry so proximity calculations work.
         // Stack them vertically at x=350-360
-        const indicatorContainer = (glyphRun as any).indicatorContainer as HTMLElement;
-        const dots = indicatorContainer.querySelectorAll('.glyph-run-glyph') as NodeListOf<HTMLElement>;
+        const indicatorContainer = (tray as any).indicatorContainer as HTMLElement;
+        const dots = indicatorContainer.querySelectorAll('.dot') as NodeListOf<HTMLElement>;
 
         mockRect(dots[0], { left: 350, right: 360, top: 200, bottom: 212 });
         mockRect(dots[1], { left: 350, right: 360, top: 218, bottom: 230 });
         mockRect(dots[2], { left: 350, right: 360, top: 236, bottom: 248 });
 
-        const proximity = (glyphRun as any).proximity;
+        const proximity = (tray as any).proximity;
 
         // Place pointer right on top of the second glyph (y=224 is center of 218-230)
         proximity.setPointerPosition(355, 224);
 
-        const peaked = findPeakedGlyph(glyphRun as any);
+        const peaked = findPeakedElement(tray as any);
         expect(peaked).not.toBeNull();
         expect(peaked.item.id).toBe('touch-glyph-1');
     });
@@ -455,22 +455,22 @@ describe('Touch Browse', () => {
         addTestGlyphs(1);
 
         // Give the dot real geometry on the tray
-        const indicatorContainer = (glyphRun as any).indicatorContainer as HTMLElement;
-        const dot = indicatorContainer.querySelector('.glyph-run-glyph') as HTMLElement;
+        const indicatorContainer = (tray as any).indicatorContainer as HTMLElement;
+        const dot = indicatorContainer.querySelector('.dot') as HTMLElement;
         mockRect(dot, { left: 350, right: 360, top: 220, bottom: 232 });
 
-        // Glyph should be in dot state before browse
+        // Element should be in dot state before browse
         expect(dot.dataset.windowState).toBeUndefined();
 
         // Enter browse near glyph
         document.dispatchEvent(createTouchEvent('touchstart', 355, 226));
-        expect((glyphRun as any).proximity.isTouchBrowsing).toBe(true);
+        expect((tray as any).proximity.isTouchBrowsing).toBe(true);
 
         // Release on glyph — triggers morphGlyph which sets isRestoring
         document.dispatchEvent(createTouchEvent('touchend', 355, 226));
 
         // morphGlyph was called: isRestoring is set during the morph animation
-        expect((glyphRun as any).isRestoring).toBe(true);
+        expect((tray as any).isRestoring).toBe(true);
     });
 });
 
@@ -482,96 +482,96 @@ describe('Tray Identity', () => {
 
     beforeEach(() => {
         document.body.innerHTML = '';
-        (glyphRun as any).element = null;
-        (glyphRun as any).indicatorContainer = null;
-        (glyphRun as any).items.clear();
-        (glyphRun as any).glyphElements.clear();
-        (glyphRun as any).deferredItems = [];
+        (tray as any).element = null;
+        (tray as any).indicatorContainer = null;
+        (tray as any).items.clear();
+        (tray as any).elements.clear();
+        (tray as any).deferredItems = [];
     });
 
     test('Tim clicks a tray item and gets that item, not a different one', () => {
-        glyphRun.init();
+        tray.init();
 
-        const glyphA: Glyph = { id: 'glyph-a', title: 'Alpha', renderContent: () => document.createElement('div') };
-        const glyphB: Glyph = { id: 'glyph-b', title: 'Beta', renderContent: () => document.createElement('div') };
-        const glyphC: Glyph = { id: 'glyph-c', title: 'Gamma', renderContent: () => document.createElement('div') };
+        const glyphA: Element = { id: 'glyph-a', title: 'Alpha', renderContent: () => document.createElement('div') };
+        const glyphB: Element = { id: 'glyph-b', title: 'Beta', renderContent: () => document.createElement('div') };
+        const glyphC: Element = { id: 'glyph-c', title: 'Gamma', renderContent: () => document.createElement('div') };
 
-        glyphRun.add(glyphA);
-        glyphRun.add(glyphB);
-        glyphRun.add(glyphC);
+        tray.add(glyphA);
+        tray.add(glyphB);
+        tray.add(glyphC);
 
-        const dots = document.querySelectorAll('.glyph-run-glyph') as NodeListOf<HTMLElement>;
+        const dots = document.querySelectorAll('.dot') as NodeListOf<HTMLElement>;
         expect(dots.length).toBe(3);
 
         // Each dot's identity matches its glyph — DOM order matches registration order
-        expect(dots[0].dataset.glyphId).toBe('glyph-a');
-        expect(dots[1].dataset.glyphId).toBe('glyph-b');
-        expect(dots[2].dataset.glyphId).toBe('glyph-c');
+        expect(dots[0].dataset.elementId).toBe('glyph-a');
+        expect(dots[1].dataset.elementId).toBe('glyph-b');
+        expect(dots[2].dataset.elementId).toBe('glyph-c');
 
         // The items map has the correct glyph for each ID
-        const items = (glyphRun as any).items as Map<string, Glyph>;
+        const items = (tray as any).items as Map<string, Element>;
         expect(items.get('glyph-a')!.title).toBe('Alpha');
         expect(items.get('glyph-b')!.title).toBe('Beta');
         expect(items.get('glyph-c')!.title).toBe('Gamma');
 
         // Click the second dot — isRestoring flag proves morphGlyph was called for this element
         dots[1].click();
-        expect((glyphRun as any).isRestoring).toBe(true);
+        expect((tray as any).isRestoring).toBe(true);
     });
 
     test('Tim adds glyphs out of order via adopt — tray labels still match', () => {
-        glyphRun.init();
+        tray.init();
 
-        const glyphA: Glyph = { id: 'glyph-a', title: 'Alpha', renderContent: () => document.createElement('div') };
-        const glyphB: Glyph = { id: 'glyph-b', title: 'Beta', renderContent: () => document.createElement('div') };
+        const glyphA: Element = { id: 'glyph-a', title: 'Alpha', renderContent: () => document.createElement('div') };
+        const glyphB: Element = { id: 'glyph-b', title: 'Beta', renderContent: () => document.createElement('div') };
 
-        glyphRun.add(glyphA);
+        tray.add(glyphA);
 
         // Adopt an existing element (simulates canvas-placed glyph minimized to tray)
         const adoptedEl = document.createElement('div');
-        glyphRun.adopt(adoptedEl, glyphB);
+        tray.adopt(adoptedEl, glyphB);
 
         // Both dots exist
-        const dots = document.querySelectorAll('.glyph-run-glyph') as NodeListOf<HTMLElement>;
+        const dots = document.querySelectorAll('.dot') as NodeListOf<HTMLElement>;
         expect(dots.length).toBe(2);
 
-        // Each dot's data-glyph-id matches its item
-        expect(dots[0].dataset.glyphId).toBe('glyph-a');
-        expect(dots[1].dataset.glyphId).toBe('glyph-b');
+        // Each dot's data-element-id matches its item
+        expect(dots[0].dataset.elementId).toBe('glyph-a');
+        expect(dots[1].dataset.elementId).toBe('glyph-b');
     });
 
     test('Tim: system glyph is not overwritten by persistence restore', () => {
-        glyphRun.init();
+        tray.init();
 
         let systemRenderCalled = false;
-        const systemGlyph: Glyph = {
+        const systemGlyph: Element = {
             id: 'llm-provider',
             title: 'LLM Provider',
             renderContent: () => { systemRenderCalled = true; return document.createElement('div'); },
         };
 
         // System glyph registers first
-        glyphRun.add(systemGlyph);
+        tray.add(systemGlyph);
 
         // Persistence restore tries to add a glyph with the same ID
-        const imposterGlyph: Glyph = {
+        const imposterGlyph: Element = {
             id: 'llm-provider',
             title: 'Result',
             renderContent: () => document.createElement('div'),
         };
-        glyphRun.add(imposterGlyph);
+        tray.add(imposterGlyph);
 
         // Only one element exists
-        const dots = document.querySelectorAll('[data-glyph-id="llm-provider"]');
+        const dots = document.querySelectorAll('[data-element-id="llm-provider"]');
         expect(dots.length).toBe(1);
 
         // The stored item is the system glyph, not the imposter
-        const storedItem = (glyphRun as any).items.get('llm-provider');
+        const storedItem = (tray as any).items.get('llm-provider');
         expect(storedItem.title).toBe('LLM Provider');
     });
 });
 
-describe('Glyph State Transitions', () => {
+describe('Element State Transitions', () => {
     if (!USE_JSDOM) {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
         return;
@@ -579,42 +579,42 @@ describe('Glyph State Transitions', () => {
 
     beforeEach(() => {
         document.body.innerHTML = '';
-        (glyphRun as any).element = null;
-        (glyphRun as any).indicatorContainer = null;
-        (glyphRun as any).items.clear();
-        (glyphRun as any).glyphElements.clear();
-        (glyphRun as any).deferredItems = [];
+        (tray as any).element = null;
+        (tray as any).indicatorContainer = null;
+        (tray as any).items.clear();
+        (tray as any).elements.clear();
+        (tray as any).deferredItems = [];
     });
 
-    test('Glyph starts in dot state', () => {
-        glyphRun.init();
+    test('Element starts in dot state', () => {
+        tray.init();
 
-        const testGlyph: Glyph = {
+        const testGlyph: Element = {
             id: 'state-test-1',
             title: 'State Test',
             renderContent: () => document.createElement('div')
         };
 
-        glyphRun.add(testGlyph);
-        const element = document.querySelector('[data-glyph-id="state-test-1"]') as HTMLElement;
+        tray.add(testGlyph);
+        const element = document.querySelector('[data-element-id="state-test-1"]') as HTMLElement;
 
         // Should have glyph class, not window state
-        expect(element.className).toBe('glyph-run-glyph');
+        expect(element.className).toBe('dot');
         expect(element.dataset.windowState).toBeUndefined();
         expect(element.dataset.hasText).toBeUndefined();
     });
 
     test('Window state flag is set/cleared correctly', () => {
-        glyphRun.init();
+        tray.init();
 
-        const testGlyph: Glyph = {
+        const testGlyph: Element = {
             id: 'state-test-2',
             title: 'Window State Test',
             renderContent: () => document.createElement('div')
         };
 
-        glyphRun.add(testGlyph);
-        const element = document.querySelector('[data-glyph-id="state-test-2"]') as HTMLElement;
+        tray.add(testGlyph);
+        const element = document.querySelector('[data-element-id="state-test-2"]') as HTMLElement;
 
         // Initially no window state
         expect(element.dataset.windowState).toBeUndefined();

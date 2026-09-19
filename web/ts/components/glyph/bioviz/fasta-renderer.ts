@@ -5,7 +5,7 @@
  * with colored nucleotide bases (A/T/G/C).
  */
 
-import { preventDrag } from '@qntx/glyphs';
+import { preventDrag } from '@teranos/elements';
 
 const AZURE_KEYWORD = '#919599';
 const AZURE_VALUE = '#d7dee3';

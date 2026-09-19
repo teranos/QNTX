@@ -2,12 +2,12 @@
  * Canvas Spawn Menu
  *
  * Right-click menu for spawning new glyphs on the canvas.
- * Glyph types and their spawn configuration come from glyph-registry.ts.
+ * Element types and their spawn configuration come from glyph-registry.ts.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { log, SEG } from '../../../logger';
-import { getMinimizeDuration } from '@qntx/glyphs';
+import { getRestDuration } from '@teranos/elements';
 import { uiState } from '../../../state/ui';
 import { getTransform } from './canvas-pan';
 import {
@@ -20,7 +20,7 @@ import {
     getCommandLabel,
 } from '../glyph-registry';
 import { showMenuScrim, removeScrim, enterPlacementMode } from './placement-mode';
-import { commitCursorPlacement } from '@qntx/glyphs';
+import { commitCursorPlacement } from '@teranos/elements';
 import { enterThreadBuildingMode } from './thread-line';
 import { getThreadColor } from '../thread-glyph';
 import { addSpine } from './spine-renderer';
@@ -52,7 +52,7 @@ const FLOAT_DEPTH = 15;
 /** Cursor-facing tilt intensity */
 const FACE_INTENSITY = 0.08;
 
-/** Glyph descriptions for context reveal */
+/** Element descriptions for context reveal */
 const GLYPH_DESCRIPTIONS: Record<string, { desc: string; hint?: string }> = {
     'AX':        { desc: 'Query the attestation graph', hint: 'subject predicate context actor' },
     'SE':        { desc: 'Semantic similarity search', hint: 'Find attestations by meaning' },
@@ -83,7 +83,7 @@ export function showSpawnMenu(
     mouseX: number,
     mouseY: number,
     canvas: HTMLElement,
-    glyphs: Glyph[],
+    glyphs: Element[],
     canvasId: string = 'canvas-workspace',
     symbolContext: HTMLElement | null = null
 ): void {
@@ -116,7 +116,7 @@ export function showSpawnMenu(
 
     const removeMenu = (keepScrim = false) => {
         cancelAnimationFrame(driftAnimId);
-        const duration = getMinimizeDuration() * 0.4;
+        const duration = getRestDuration() * 0.4;
         if (duration === 0) {
             menu.remove();
             if (!keepScrim) removeScrim();
@@ -187,7 +187,7 @@ export function showSpawnMenu(
         ? getSymbolContextEntries()
         : [
             ...getSpawnableGlyphs(),
-            ...getAllGlyphTypes().filter(g => g.className.includes('canvas-plugin-glyph'))
+            ...getAllGlyphTypes().filter(g => g.className.includes('canvas-plugin-element'))
         ];
 
     // Assign each glyph a vertical list position with per-glyph float phase
@@ -339,7 +339,7 @@ async function spawnGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
-    glyphs: Glyph[],
+    glyphs: Element[],
     canvasId: string,
     entry: GlyphTypeEntry,
     cursorElement?: HTMLElement,
@@ -348,7 +348,7 @@ async function spawnGlyph(
     content?: string
 ): Promise<string> {
     const glyphId = `${entry.label.toLowerCase()}-${crypto.randomUUID()}`;
-    const glyph: Glyph = {
+    const glyph: Element = {
         id: glyphId,
         title: entry.title,
         symbol: entry.symbol,
@@ -367,7 +367,7 @@ async function spawnGlyph(
     glyphs.push(glyph);
 
     // If we have a cursor element, morph the box first, then render content
-    if (cursorElement && cursorRect && getMinimizeDuration() > 0) {
+    if (cursorElement && cursorRect && getRestDuration() > 0) {
         await morphCursorToPlaced(
             cursorElement, cursorRect, canvas, glyph, entry, canvasId, glyphs, symbolElement
         );
@@ -385,10 +385,10 @@ async function morphCursorToPlaced(
     _cursorElement: HTMLElement,
     cursorRect: DOMRect,
     canvas: HTMLElement,
-    glyph: Glyph,
+    glyph: Element,
     entry: GlyphTypeEntry,
     canvasId: string,
-    _glyphs: Glyph[],
+    _glyphs: Element[],
     symbolElement?: HTMLElement | null
 ): Promise<void> {
     // The cursor element is on document.body with position: fixed.
@@ -455,7 +455,7 @@ async function morphCursorToPlaced(
 /** Persist glyph to UI state */
 function persistGlyph(
     glyphElement: HTMLElement,
-    glyph: Glyph,
+    glyph: Element,
     entry: GlyphTypeEntry,
     canvasId: string
 ): void {
@@ -495,7 +495,7 @@ export function spawnGlyphByCommand(command: string): boolean {
     const contentLayer = workspace.querySelector('.canvas-content-layer') as HTMLElement | null;
     if (!contentLayer) return false;
 
-    const glyphs: Glyph[] = (workspace as any).__glyphs || [];
+    const glyphs: Element[] = (workspace as any).__glyphs || [];
     const canvasId = workspace.dataset.canvasId || 'canvas-workspace';
 
     // Spawn at center of visible canvas
@@ -503,7 +503,7 @@ export function spawnGlyphByCommand(command: string): boolean {
     const x = Math.round(rect.width / 2);
     const y = Math.round(rect.height / 2);
 
-    // TODO(#547): Glyph spawning from search bar needs refinement — ghost preview under cursor, click-to-place, visual distinction in search results
+    // TODO(#547): Element spawning from search bar needs refinement — ghost preview under cursor, click-to-place, visual distinction in search results
     spawnGlyph(x, y, contentLayer, glyphs, canvasId, entry)
         .catch(err => log.error(SEG.GLYPH, `Failed to spawn glyph "${command}": ${err}`));
     return true;

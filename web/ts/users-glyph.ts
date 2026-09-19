@@ -1,5 +1,5 @@
 /**
- * Users Glyph — ROOT over every User (ADR-031).
+ * Users Element — ROOT over every User (ADR-031).
  */
 
 // "could you create a ts Users glyph to let us do the minimal management of users as ROOT ?"
@@ -9,8 +9,8 @@
 // cannot switch it back; on is on whoever switched it off. The minimal
 // management is seeing everyone and the one act on a person.
 
-import type { Glyph } from '@qntx/glyphs';
-import { glyphRun } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { createDangerButton, createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
@@ -193,7 +193,7 @@ async function refreshList(container: HTMLElement): Promise<void> {
     renderList(container, users, who.via !== 'token');
 }
 
-export function createUsersGlyph(): Glyph {
+export function createUsersGlyph(): Element {
     return {
         id: GLYPH_ID,
         title: 'Users',
@@ -236,5 +236,5 @@ export function createUsersGlyph(): Glyph {
 
 /** Opens the Users glyph. Called from the Self glyph. */
 export function openUsersGlyph(): void {
-    glyphRun.openGlyph(GLYPH_ID);
+    tray.open(GLYPH_ID);
 }

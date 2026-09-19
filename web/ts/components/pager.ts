@@ -10,7 +10,7 @@
  * The caller says how to draw one. The pager owns nothing else.
  */
 
-import { preventDrag } from '@qntx/glyphs';
+import { preventDrag } from '@teranos/elements';
 
 export interface PagerOptions {
     /** Border colour for the arrows. Callers differ; neither should guess. */

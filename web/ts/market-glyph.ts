@@ -10,8 +10,8 @@
 // to paste — and is the only place a stand is deleted. The pixel side names the
 // event; a stand writes only under staand:*, so nothing here sets a predicate.
 
-import type { Glyph } from '@qntx/glyphs';
-import { glyphRun } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { backendUrl } from './client/url';
 import { createPrimaryButton, createDangerButton, createGhostButton } from './components/button';
@@ -517,7 +517,7 @@ function showRefusal(root: HTMLElement, err: unknown): void {
     root.appendChild(box);
 }
 
-export function createMarketGlyph(): Glyph {
+export function createMarketGlyph(): Element {
     return {
         id: GLYPH_ID,
         title: 'Stands',
@@ -543,5 +543,5 @@ export function createMarketGlyph(): Glyph {
 
 /** Opens the Stands glyph. */
 export function openMarketGlyph(): void {
-    glyphRun.openGlyph(GLYPH_ID);
+    tray.open(GLYPH_ID);
 }

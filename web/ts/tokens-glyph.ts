@@ -1,13 +1,13 @@
 /**
- * Access Tokens Glyph — machine-access token management (ADR-025).
+ * Access Tokens Element — machine-access token management (ADR-025).
  *
  * Plain window (no panel manifestation). Reached from the Self glyph. Lists
  * tokens without raw values, revokes and enables them. Minting one is its own
  * glyph: surveying and creating are different acts.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { glyphRun } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { createDangerButton, createGhostButton, createPrimaryButton } from './components/button';
 import { openTokenMintGlyph } from './token-mint-glyph';
@@ -268,13 +268,13 @@ function renderMintLink(container: HTMLElement, listContainer: HTMLElement): voi
     });
 }
 
-export function createTokensGlyph(): Glyph {
+export function createTokensGlyph(): Element {
     return {
         id: GLYPH_ID,
         title: 'Access Tokens',
         symbol: '⚿',
         // No initialWidth: the window then owns width and clips what does not
-        // fit (packages/glyphs/manifestations/window.ts). A row carries a
+        // fit (@teranos/elements window/window.ts). A row carries a
         // profile URL and two timestamps, so what it needs is what it gets.
         renderContent: () => {
             const content = document.createElement('div');
@@ -320,5 +320,5 @@ export function createTokensGlyph(): Glyph {
 
 /** Opens the access tokens glyph. Called from the Self glyph. */
 export function openTokensGlyph(): void {
-    glyphRun.openGlyph(GLYPH_ID);
+    tray.open(GLYPH_ID);
 }

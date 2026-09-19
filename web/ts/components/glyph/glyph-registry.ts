@@ -1,13 +1,13 @@
 /**
- * Glyph Type Registry — single source of truth for canvas glyph types.
+ * Element Type Registry — single source of truth for canvas glyph types.
  *
  * Maps symbol ↔ className ↔ title ↔ label ↔ factory, eliminating
- * parallel if/else chains in canvas-glyph.ts.
+ * parallel if/else chains in canvas-element.ts.
  *
  * Add a new glyph type → add one entry here.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { AX, SO, SE, AS, Attestation, Sigma, Type, Triplet, Prose, Subcanvas } from '../../sym';
 import { createAxGlyph } from './ax-glyph';
 import { createSemanticGlyph } from './semantic-glyph';
@@ -26,18 +26,18 @@ import { createThreadGlyph } from './thread-glyph';
 export interface GlyphTypeEntry {
     /** Symbol identifier (e.g., AX, 'py', SO, Prose) */
     symbol: string;
-    /** CSS class on the canvas element (e.g., 'canvas-py-glyph') */
+    /** CSS class on the canvas element (e.g., 'canvas-py-element') */
     className: string;
     /** Human-readable name */
     title: string;
     /** Short label for log messages */
     label: string;
     /** Create the DOM element for this glyph type */
-    render: (glyph: Glyph) => Promise<HTMLElement> | HTMLElement;
+    render: (glyph: Element) => Promise<HTMLElement> | HTMLElement;
     /** Plugin name for plugin-provided glyphs (undefined for built-in glyphs) */
     pluginName?: string;
     /**
-     * Glyph name for a glyph published as an attestation and served from /g/.
+     * Element name for a glyph published as an attestation and served from /g/.
      *
      * Separate from pluginName because it is a different kind of thing: there
      * is no plugin, no process and no am.toml line. Calling one a plugin is
@@ -53,19 +53,19 @@ export interface GlyphTypeEntry {
 }
 
 const GLYPH_TYPES: GlyphTypeEntry[] = [
-    { symbol: AX,       className: 'canvas-ax-glyph',      title: 'AX Query',        label: 'AX',        render: createAxGlyph,        spawnMenuOrder: 0 },
-    { symbol: SE,       className: 'canvas-se-glyph',      title: 'Semantic Search', label: 'SE',        render: createSemanticGlyph,  spawnMenuOrder: 1 },
-    { symbol: 'py',     className: 'canvas-py-glyph',      title: 'Python',          label: 'Py',        render: createPyGlyph,        spawnMenuOrder: 2, defaultContent: PY_DEFAULT_CODE },
-    { symbol: 'ts',     className: 'canvas-ts-glyph',      title: 'TypeScript',      label: 'TS',        render: createTsGlyph,        spawnMenuOrder: 3, defaultContent: TS_DEFAULT_CODE },
-    { symbol: SO,       className: 'canvas-prompt-glyph',  title: 'Prompt',          label: 'Prompt',    render: createPromptGlyph,    spawnMenuOrder: 4, defaultContent: PROMPT_DEFAULT_TEMPLATE, commandAliases: ['so'] },
-    { symbol: Prose,    className: 'canvas-note-glyph',    title: 'Note',            label: 'Note',      render: createNoteGlyph,      spawnMenuOrder: 5, defaultContent: 'Write here — select and click ⟶ to convert to a prompt glyph.', commandAliases: ['prose'] },
-    { symbol: Subcanvas, className: 'canvas-subcanvas-glyph', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasGlyph, spawnMenuOrder: 6 },
-    { symbol: Attestation, className: 'canvas-attestation-glyph', title: 'Attestation', label: 'Attestation', render: createAttestationGlyph },
-    { symbol: Triplet,  className: 'canvas-triplet-glyph',     title: 'Triplet',     label: 'Triplet',   render: createTripletGlyph },
-    { symbol: Sigma,    className: 'canvas-sigma-glyph',       title: 'Sigma',       label: 'Sigma',     render: createSigmaGlyph },
-    { symbol: Type,     className: 'canvas-type-glyph',        title: 'Type',        label: 'Type',      render: createTypeGlyph },
-    { symbol: 'stream', className: 'canvas-stream-glyph',      title: 'Stream',      label: 'Stream',    render: (g) => createResultGlyph(g) },
-    { symbol: '\u303D', className: 'canvas-thread-glyph',     title: 'Thread',      label: 'Thread',    render: createThreadGlyph },
+    { symbol: AX,       className: 'canvas-ax-element',      title: 'AX Query',        label: 'AX',        render: createAxGlyph,        spawnMenuOrder: 0 },
+    { symbol: SE,       className: 'canvas-se-element',      title: 'Semantic Search', label: 'SE',        render: createSemanticGlyph,  spawnMenuOrder: 1 },
+    { symbol: 'py',     className: 'canvas-py-element',      title: 'Python',          label: 'Py',        render: createPyGlyph,        spawnMenuOrder: 2, defaultContent: PY_DEFAULT_CODE },
+    { symbol: 'ts',     className: 'canvas-ts-element',      title: 'TypeScript',      label: 'TS',        render: createTsGlyph,        spawnMenuOrder: 3, defaultContent: TS_DEFAULT_CODE },
+    { symbol: SO,       className: 'canvas-prompt-element',  title: 'Prompt',          label: 'Prompt',    render: createPromptGlyph,    spawnMenuOrder: 4, defaultContent: PROMPT_DEFAULT_TEMPLATE, commandAliases: ['so'] },
+    { symbol: Prose,    className: 'canvas-note-element',    title: 'Note',            label: 'Note',      render: createNoteGlyph,      spawnMenuOrder: 5, defaultContent: 'Write here — select and click ⟶ to convert to a prompt glyph.', commandAliases: ['prose'] },
+    { symbol: Subcanvas, className: 'canvas-subcanvas-element', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasGlyph, spawnMenuOrder: 6 },
+    { symbol: Attestation, className: 'canvas-attestation-element', title: 'Attestation', label: 'Attestation', render: createAttestationGlyph },
+    { symbol: Triplet,  className: 'canvas-triplet-element',     title: 'Triplet',     label: 'Triplet',   render: createTripletGlyph },
+    { symbol: Sigma,    className: 'canvas-sigma-element',       title: 'Sigma',       label: 'Sigma',     render: createSigmaGlyph },
+    { symbol: Type,     className: 'canvas-type-element',        title: 'Type',        label: 'Type',      render: createTypeGlyph },
+    { symbol: 'stream', className: 'canvas-stream-element',      title: 'Stream',      label: 'Stream',    render: (g) => createResultGlyph(g) },
+    { symbol: '\u303D', className: 'canvas-thread-element',     title: 'Thread',      label: 'Thread',    render: createThreadGlyph },
 ];
 
 const _bySymbol = new Map(GLYPH_TYPES.map(e => [e.symbol, e]));

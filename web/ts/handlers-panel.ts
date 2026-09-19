@@ -15,7 +15,7 @@ import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstor
 import type { WatcherResponse, WatcherFire } from './generated/proto/plugin/grpc/protocol/server';
 import { formatInterval } from './pulse/types';
 import { log, SEG } from './logger.ts';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 interface HandlerAttestation {
     id: string;
@@ -605,11 +605,11 @@ function attachEventDelegation(el: HTMLElement): void {
     });
 }
 
-export function createHandlersGlyph(): Glyph {
+export function createHandlersGlyph(): Element {
     return {
         id: 'handlers-glyph',
         title: 'Handlers',
-        manifestationType: 'panel',
+        opensAs: 'panel',
         renderContent: () => {
             const content = document.createElement('div');
             contentElement = content;

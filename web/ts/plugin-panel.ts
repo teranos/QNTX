@@ -1,7 +1,7 @@
 /**
  * Plugin Panel - Shows installed domain plugins and their status
  *
- * Manifests as a glyph with 'panel' manifestationType — slides in from
+ * Manifests as a glyph with 'panel' opensAs — slides in from
  * the opposite edge of the system drawer.
  *
  * Displays plugin information:
@@ -19,7 +19,7 @@ import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
 import { buttonPlaceholder, hydrateButtons, registerButton, type HydrateConfig } from './components/button';
 import { tooltip } from './components/tooltip.ts';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 interface PluginInfo {
     name: string;
@@ -908,14 +908,14 @@ function filterPlugins(searchText: string): void {
 }
 
 /**
- * Create a Glyph definition for the plugin panel
+ * Create a Element definition for the plugin panel
  */
-export function createPluginGlyph(): Glyph {
+export function createPluginGlyph(): Element {
     return {
         id: 'plugin-glyph',
         title: 'Domain Plugins',
         symbol: '\u2699',
-        manifestationType: 'panel',
+        opensAs: 'panel',
         renderContent: () => {
             const content = document.createElement('div');
             contentElement = content;

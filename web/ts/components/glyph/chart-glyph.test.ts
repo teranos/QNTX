@@ -1,5 +1,5 @@
 /**
- * Chart Glyph Critical Path Tests
+ * Chart Element Critical Path Tests
  *
  * Focus: chart instance creation, field mapping, data rendering
  */

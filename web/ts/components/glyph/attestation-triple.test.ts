@@ -14,7 +14,7 @@ mock.module('../../watcher-predicates', () => ({
     eyeStyle: () => ({ color: '#fff', shadow: 'none' }),
 }));
 
-mock.module('@qntx/glyphs', () => ({
+mock.module('@teranos/elements', () => ({
     preventDrag: () => {},
 }));
 

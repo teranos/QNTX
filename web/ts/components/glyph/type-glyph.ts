@@ -1,5 +1,5 @@
 /**
- * Type Glyph (⊢) — canvas glyph for type attestations
+ * Type Element (⊢) — canvas glyph for type attestations
  *
  * Shows a type definition: name, label, color swatch, field list,
  * and how many actors attested it. Simpler than sigma — it's a type,
@@ -8,8 +8,8 @@
  * Opened via double-click on type result lines in AX or SE glyphs.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Type } from '../../sym';
 import { log, SEG } from '../../logger';
@@ -142,17 +142,17 @@ function groupFromContent(content: string | undefined): TypeGroup | null {
 // ─── Canvas glyph ────────────────────────────────────────────
 
 /** Create a Type glyph for canvas placement */
-export function createTypeGlyph(glyph: Glyph): HTMLElement {
+export function createTypeGlyph(glyph: Element): HTMLElement {
     const group = groupFromContent(glyph.content);
 
     const titleBar = el('div', {
-        class: 'glyph-title-bar glyph-title-bar--auto',
+        class: 'title-bar title-bar--auto',
         style: { position: 'relative' },
     });
 
     const color = group?.color || TYPE_COLOR;
 
-    // .glyph-symbol via the package — thread-line snapping and spine
+    // .symbol via the package — thread-line snapping and spine
     // anchoring locate glyphs by that class
     const symbolEl = glyph.symbolElement ? settleSymbolSpan(glyph.symbolElement) : createSymbolSpan(Type);
     Object.assign(symbolEl.style, { fontWeight: 'bold', color });
@@ -176,8 +176,8 @@ export function createTypeGlyph(glyph: Glyph): HTMLElement {
     titleBar.appendChild(expandBtn);
 
     const { element } = canvasPlaced({
-        glyph,
-        className: 'canvas-type-glyph',
+        item: glyph,
+        className: 'canvas-type-element',
         defaults: { x: 200, y: 200, width: 320, height: 280 },
         resizable: true,
         useMinHeight: true,
@@ -188,7 +188,7 @@ export function createTypeGlyph(glyph: Glyph): HTMLElement {
 
     if (group) {
         const content = el('div', {
-            class: 'glyph-content-area',
+            class: 'content-area',
             style: {
                 backgroundColor: 'rgba(25, 25, 30, 0.95)',
                 borderTop: '1px solid var(--border)',
@@ -206,7 +206,7 @@ export function createTypeGlyph(glyph: Glyph): HTMLElement {
     wireExpandToWindow({
         element,
         expandBtn,
-        glyphId: glyph.id,
+        elementId: glyph.id,
         title,
         symbol: Type,
         renderContent: () => {
@@ -240,7 +240,7 @@ export function spawnTypeGlyph(attestations: Attestation[], mouseX?: number, mou
     const group = groups[0];
 
     const glyphId = `type-${group.subject}-${crypto.randomUUID().slice(0, 8)}`;
-    const glyph: Glyph = {
+    const glyph: Element = {
         id: glyphId,
         title: group.subject,
         symbol: Type,

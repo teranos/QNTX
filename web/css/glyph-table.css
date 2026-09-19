@@ -138,10 +138,10 @@
 }
 
 /* Each slot is its own width, never the row's: the window stylesheet gives
-   .glyph-input flex: 1, and a who that grew to the row broke the sentence. */
-.roles-compose-row .glyph-input,
-.roles-compose-row select.glyph-input,
-.roles-compose-row span > .glyph-input {
+   .input flex: 1, and a who that grew to the row broke the sentence. */
+.roles-compose-row .input,
+.roles-compose-row select.input,
+.roles-compose-row span > .input {
     flex: 0 0 auto;
     width: 11em;
     min-width: 0;
@@ -154,7 +154,7 @@
     flex: 0 0 auto;
 }
 
-.roles-compose-row select.glyph-input {
+.roles-compose-row select.input {
     width: auto;
 }
 

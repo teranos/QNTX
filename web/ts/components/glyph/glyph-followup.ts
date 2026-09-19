@@ -6,17 +6,17 @@
  * or delegates to a custom onExecute (stream glyph).
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../client';
 import { assertOk, jsonBody } from '../../http-utils';
 import { canvasSyncQueue } from '../../api/canvas-sync';
 import { uiState } from '../../state/ui';
 import { Doc, Prose } from '../../sym';
-import { preventDrag } from '@qntx/glyphs';
+import { preventDrag } from '@teranos/elements';
 import { setResponseState } from './response-state';
 import { autoMeldResultBelow } from './meld/auto-meld-result';
-import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
+import { findCompositionByGlyph, extractElementIds } from '../../state/compositions';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 
 /** UI controls exposed to custom onExecute callbacks */
@@ -49,8 +49,8 @@ export interface FollowUpRequest {
 export interface FollowUpConfig {
     /** The parent glyph DOM element */
     element: HTMLElement;
-    /** Glyph metadata */
-    glyph: Glyph;
+    /** Element metadata */
+    glyph: Element;
     /** Returns the text to use as system_prompt for the follow-up */
     getSystemPrompt: () => string;
     /** Returns model name at call time (may be set after construction) */
@@ -72,7 +72,7 @@ export interface FollowUpConfig {
 
 export interface FollowUpResult {
     parentElement: HTMLElement;
-    parentGlyph: Glyph;
+    parentGlyph: Element;
     result: ExecutionResult;
     model?: string;
     provider?: string;
@@ -142,7 +142,7 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
             const noteTexts: string[] = [];
             const comp = findCompositionByGlyph(glyph.id);
             if (comp) {
-                const memberIds = extractGlyphIds(comp.edges);
+                const memberIds = extractElementIds(comp.edges);
                 for (const mid of memberIds) {
                     if (mid === glyph.id) continue;
                     const g = uiState.getCanvasGlyph(mid);
@@ -210,7 +210,7 @@ async function defaultExecute(
     request: FollowUpRequest,
     controls: FollowUpControls,
     element: HTMLElement,
-    glyph: Glyph,
+    glyph: Element,
     logLabel: string,
 ): Promise<void> {
     // Ensure composition edges are persisted before the API call.
@@ -287,7 +287,7 @@ export function spawnFollowUpResult(data: FollowUpResult): void {
     const ry = parentRect.bottom - canvasRect.top;
 
     const resultGlyphId = `result-${crypto.randomUUID()}`;
-    const resultGlyph: Glyph = {
+    const resultGlyph: Element = {
         id: resultGlyphId,
         title: 'Follow-up Result',
         symbol: 'result',
@@ -301,10 +301,10 @@ export function spawnFollowUpResult(data: FollowUpResult): void {
     const resultElement = createResultGlyph(resultGlyph, result, promptConfig, prompt);
     canvas.appendChild(resultElement);
 
-    const parentGlyphId = parentElement.dataset.glyphId;
+    const parentGlyphId = parentElement.dataset.elementId;
     if (parentGlyphId) {
         autoMeldResultBelow(
-            parentElement, parentGlyphId, parentElement.dataset.glyphSymbol ?? 'glyph',
+            parentElement, parentGlyphId, parentElement.dataset.symbol ?? 'glyph',
             logLabel, resultElement, resultGlyphId, `${logLabel}FollowUp`,
         );
     }

@@ -1,5 +1,5 @@
 /**
- * Ax Glyph - Ax query editor on canvas grid
+ * Ax Element - Ax query editor on canvas grid
  *
  * Text editor for writing ax queries like "is git", "has certification", etc.
  * Similar to ATS editor or prompt editor - just the query text itself.
@@ -21,11 +21,11 @@
  * - Support query templates/snippets
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { AX } from '../../sym';
 import { log, SEG } from '../../logger';
-import { preventDrag, storeCleanup, setupGlyphResizeObserver } from '@qntx/glyphs';
-import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import { preventDrag, storeCleanup, setupElementResizeObserver } from '@teranos/elements';
+import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
 import { sendMessage, connectivity } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { queryAttestations, parseQuery } from '../../ats-wasm';
@@ -46,10 +46,10 @@ import {
 /**
  * Create an AX glyph using canvasPlaced() with custom title bar.
  *
- * @param glyph - Glyph model with id, position, and size
+ * @param glyph - Element model with id, position, and size
  * @returns The canvas-placed HTMLElement
  */
-export function createAxGlyph(glyph: Glyph): HTMLElement {
+export function createAxGlyph(glyph: Element): HTMLElement {
     const glyphId = glyph.id;
 
     // Load persisted query from canvas state (or glyph argument on restore)
@@ -64,8 +64,8 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     symbol.style.color = 'var(--glyph-status-running-text)';
 
     const { element } = canvasPlaced({
-        glyph,
-        className: 'canvas-ax-glyph',
+        item: glyph,
+        className: 'canvas-ax-element',
         defaults: { x: 200, y: 200, width: 400, height: 200 },
         dragHandle: symbol,
         resizable: true,
@@ -94,7 +94,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
 
     // Title bar (custom layout: symbol + query input) — shared CSS class for state styling
     const titleBar = document.createElement('div');
-    titleBar.className = 'glyph-title-bar';
+    titleBar.className = 'title-bar';
     titleBar.style.padding = '4px 4px 4px 8px'; // Compact: reduced top/bottom/right, keep left for symbol
 
     titleBar.appendChild(symbol);
@@ -108,7 +108,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
 
     // Results container - scrollable list of matched attestations (gets all remaining space)
     const resultsContainer = document.createElement('div');
-    resultsContainer.className = 'ax-glyph-results glyph-content-area';
+    resultsContainer.className = 'ax-glyph-results content-area';
     resultsContainer.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
     resultsContainer.style.borderTop = '1px solid var(--border)';
     resultsContainer.style.fontSize = '12px';
@@ -208,7 +208,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
                 type: 'watcher_upsert',
                 watcher_id: `ax-glyph-${glyphId}`,
                 watcher_query: query,
-                watcher_name: `AX Glyph: ${query.substring(0, 30)}${query.length > 30 ? '...' : ''}`,
+                watcher_name: `AX Element: ${query.substring(0, 30)}${query.length > 30 ? '...' : ''}`,
                 enabled: true
             });
             setColorState('teal');
@@ -252,7 +252,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     });
 
     // Set up ResizeObserver for auto-sizing glyph to content
-    setupGlyphResizeObserver(element, resultsContainer, `AX ${glyphId}`);
+    setupElementResizeObserver(element, resultsContainer, `AX ${glyphId}`);
 
     // Disable server-side watcher on cleanup (glyph deletion)
     storeCleanup(element, () => {
@@ -261,7 +261,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
                 type: 'watcher_upsert',
                 watcher_id: `ax-glyph-${glyphId}`,
                 watcher_query: currentQuery,
-                watcher_name: `AX Glyph: ${currentQuery.substring(0, 30)}`,
+                watcher_name: `AX Element: ${currentQuery.substring(0, 30)}`,
                 enabled: false
             });
         }
@@ -311,7 +311,7 @@ function renderAttestation(attestation: Attestation): HTMLElement {
  * Update the results display with new attestations
  */
 export function updateAxGlyphResults(glyphId: string, attestation: Attestation): void {
-    const glyph = document.querySelector(`[data-glyph-id="${glyphId}"]`);
+    const glyph = document.querySelector(`[data-element-id="${glyphId}"]`);
     if (!glyph) {
         log.debug(SEG.GLYPH, `[AxGlyph] Cannot update results: glyph ${glyphId} not found in DOM`);
         return;
@@ -407,7 +407,7 @@ export function updateAxGlyphResults(glyphId: string, attestation: Attestation):
  * Called by WebSocket handler when watcher_error message arrives
  */
 export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: string, details?: string[]): void {
-    const glyph = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement;
+    const glyph = document.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement;
     if (!glyph) {
         log.warn(SEG.GLYPH, `[AxGlyph] Cannot update error: glyph ${glyphId} not found in DOM`);
         return;

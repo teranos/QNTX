@@ -12,7 +12,7 @@
 import { describe, test, expect } from 'bun:test';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { createErrorGlyph } from './error-glyph';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
@@ -33,7 +33,7 @@ describe('Error Recovery Workflow - Jenny (Complex Scenarios)', () => {
             duration_ms: 156
         };
 
-        const resultGlyph: Glyph = {
+        const resultGlyph: Element = {
             id: 'result-abc',
             title: 'Result',
             symbol: 'result',
@@ -112,8 +112,8 @@ describe('Error Recovery Workflow - Jenny (Complex Scenarios)', () => {
             '',
             '# Debug Error',
             '',
-            '## Failed Glyph: result',
-            'Glyph ID: result-abc',
+            '## Failed Element: result',
+            'Element ID: result-abc',
             '',
             '## Error Type: missing_execution_data',
             'Message: Result glyph missing execution data after drag',
@@ -129,7 +129,7 @@ describe('Error Recovery Workflow - Jenny (Complex Scenarios)', () => {
         ].join('\n');
 
         // Verify template structure matches what Jenny would see in the prompt
-        expect(expectedPromptTemplate).toContain('Failed Glyph: result');
+        expect(expectedPromptTemplate).toContain('Failed Element: result');
         expect(expectedPromptTemplate).toContain('missing_execution_data');
         expect(expectedPromptTemplate).toContain('result-abc');
         expect(expectedPromptTemplate).toContain('Help me debug this error');
@@ -186,7 +186,7 @@ describe('Error Recovery Workflow - Jenny (Complex Scenarios)', () => {
         });
 
         // Jenny sees all error glyphs
-        const errorGlyphs = canvas.querySelectorAll('.canvas-error-glyph');
+        const errorGlyphs = canvas.querySelectorAll('.canvas-error-element');
         expect(errorGlyphs.length).toBe(3);
 
         // Each has convert button

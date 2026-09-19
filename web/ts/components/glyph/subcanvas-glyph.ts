@@ -1,5 +1,5 @@
 /**
- * Subcanvas Glyph — compact canvas-placed glyph that morphs to fullscreen workspace
+ * Subcanvas Element — compact canvas-placed glyph that morphs to fullscreen workspace
  *
  * When compact: shows a small purple glyph with grid preview on the parent canvas.
  * On dblclick: morphs to fullscreen workspace with full spawn/drag/meld/pan support.
@@ -12,22 +12,22 @@
  * its inner workspace becomes the shared context for the melded neighbours.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { log, SEG } from '../../logger';
-import { canvasPlaced } from '@qntx/glyphs';
+import { canvasPlaced } from '@teranos/elements';
 import { morphCanvasPlacedToCanvasExpanded } from './manifestations/canvas-expanded';
 import { uiState } from '../../state/ui';
 
 /**
  * Create a compact subcanvas glyph for the canvas workspace
  */
-export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
+export function createSubcanvasGlyph(glyph: Element): HTMLElement {
     // glyph.symbol renders as its own span in the title bar — the label is name only
     const label = glyph.content || 'subcanvas';
 
     const { element, titleBar } = canvasPlaced({
-        glyph,
-        className: 'canvas-subcanvas-glyph',
+        item: glyph,
+        className: 'canvas-subcanvas-element',
         defaults: { x: 100, y: 100, width: 180, height: 120 },
         titleBar: { label },
         resizable: { minWidth: 120, minHeight: 80 },
@@ -83,8 +83,8 @@ export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
  * Wire inline editing on the title bar label <span>.
  * dblclick → contentEditable, blur → persist, Enter → commit.
  */
-function wireEditableLabel(titleBar: HTMLElement, glyph: Glyph): void {
-    const labelSpan = titleBar.querySelector<HTMLElement>('span:not(.glyph-symbol)');
+function wireEditableLabel(titleBar: HTMLElement, glyph: Element): void {
+    const labelSpan = titleBar.querySelector<HTMLElement>('span:not(.symbol)');
     if (!labelSpan) return;
 
     labelSpan.addEventListener('dblclick', (e) => {
@@ -148,7 +148,7 @@ function wireEditableLabel(titleBar: HTMLElement, glyph: Glyph): void {
  */
 function restoreToCanvas(
     element: HTMLElement,
-    glyph: Glyph,
+    glyph: Element,
     contentLayer: HTMLElement | null,
     ghost: HTMLElement | null,
     composition: HTMLElement | null
@@ -167,8 +167,8 @@ function restoreToCanvas(
     element.innerHTML = '';
 
     const { titleBar } = canvasPlaced({
-        glyph,
-        className: 'canvas-subcanvas-glyph',
+        item: glyph,
+        className: 'canvas-subcanvas-element',
         defaults: { x: 100, y: 100, width: 180, height: 120 },
         titleBar: { label: name },
         resizable: { minWidth: 120, minHeight: 80 },

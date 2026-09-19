@@ -157,7 +157,7 @@
 }
 
 /* Cursor glyph — follows mouse during placement carrying phase */
-.glyph-cursor {
+.cursor {
     position: fixed;
     pointer-events: none;
     z-index: 10003;
@@ -185,7 +185,7 @@
     cursor: none;
 }
 
-.thread-building-active .glyph-symbol {
+.thread-building-active .symbol {
     text-shadow: 0 0 6px currentColor, 0 0 12px currentColor;
     cursor: none;
     transition: text-shadow 150ms ease, transform 150ms ease;
@@ -318,12 +318,12 @@
 /* Python editor glyphs on canvas — brand colors applied inline in py-glyph.ts */
 
 /* Interaction states for glyphs */
-.canvas-py-glyph.is-dragging {
+.canvas-py-element.is-dragging {
     opacity: 0.8;
     z-index: 1000;
 }
 
-.canvas-py-glyph.is-resizing {
+.canvas-py-element.is-resizing {
     opacity: 0.9;
 }
 
@@ -344,7 +344,7 @@
 }
 
 /* Base glyph - applies saturation and hue shift based on connectivity mode */
-.canvas-glyph:not(.canvas-error-glyph) {
+.canvas-element:not(.canvas-error-element) {
     filter: saturate(var(--mode-glyph-saturation)) hue-rotate(var(--mode-glyph-hue));
     transition: filter var(--mode-transition-duration) var(--mode-transition-timing),
                 outline-color var(--mode-transition-duration) var(--mode-transition-timing);
@@ -352,21 +352,21 @@
 }
 
 /* Totally monochrome while dragging offline (indicates unsaved local change) */
-.canvas-glyph.is-dragging[data-connectivity-mode="offline"]:not([data-local-active]) {
+.canvas-element.is-dragging[data-connectivity-mode="offline"]:not([data-local-active]) {
     filter: grayscale(100%);
     outline-color: rgba(220, 222, 221, 0.15) !important;
 }
 
 /* Ghostly appearance for unsynced/failed glyphs while offline (persists after drag) */
 /* Local-active glyphs (ts-glyph, ax-glyph querying IndexedDB) stay orange */
-.canvas-glyph[data-connectivity-mode="offline"][data-sync-state="unsynced"]:not([data-local-active]),
-.canvas-glyph[data-connectivity-mode="offline"][data-sync-state="failed"]:not([data-local-active]) {
+.canvas-element[data-connectivity-mode="offline"][data-sync-state="unsynced"]:not([data-local-active]),
+.canvas-element[data-connectivity-mode="offline"][data-sync-state="failed"]:not([data-local-active]) {
     filter: grayscale(100%);
     outline-color: rgba(220, 222, 221, 0.15) !important;
 }
 
 /* Local-active glyphs: orange tint when offline (still functional via WASM/IndexedDB) */
-.canvas-glyph[data-connectivity-mode="offline"][data-local-active] {
+.canvas-element[data-connectivity-mode="offline"][data-local-active] {
     filter: saturate(90%) hue-rotate(-10deg);
     outline-color: rgba(200, 160, 80, 0.5);
 }
@@ -390,11 +390,11 @@
 }
 
 /* Thread glyph selected — no border, glow the symbol in thread color */
-.canvas-thread-glyph.canvas-glyph-selected {
+.canvas-thread-element.canvas-glyph-selected {
     outline: none;
 }
 
-.canvas-thread-glyph.canvas-glyph-selected .glyph-symbol {
+.canvas-thread-element.canvas-glyph-selected .symbol {
     text-shadow: 0 0 8px currentColor, 0 0 16px currentColor, 0 0 24px currentColor;
     transform: scale(1.2);
     transition: text-shadow 150ms ease, transform 150ms ease;
@@ -447,7 +447,7 @@
  * Attestation Glyph (+)
  * ============================================================================ */
 
-.canvas-attestation-glyph {
+.canvas-attestation-element {
     display: flex;
     flex-direction: column;
     background: var(--bg-almost-black);
@@ -480,8 +480,8 @@
     z-index: 10;
 }
 
-.canvas-attestation-glyph:hover .as-meta-pill,
-.canvas-triplet-glyph:hover .as-meta-pill {
+.canvas-attestation-element:hover .as-meta-pill,
+.canvas-triplet-element:hover .as-meta-pill {
     opacity: 1;
 }
 
@@ -521,22 +521,22 @@
 }
 
 /* Triplet glyph container — overflow visible so meta popover is not clipped */
-.canvas-triplet-glyph {
+.canvas-triplet-element {
     overflow: visible;
 }
 
 /* Triplet meta pill — larger hitbox, slower dismiss for multi-level navigation */
-.canvas-triplet-glyph .as-meta-pill {
+.canvas-triplet-element .as-meta-pill {
     width: 36px;
     height: 12px;
     bottom: -6px;
 }
 
-.canvas-triplet-glyph .glyph-title-bar {
+.canvas-triplet-element .title-bar {
     overflow: visible;
 }
 
-.canvas-triplet-glyph .as-meta-pill .meta-popover {
+.canvas-triplet-element .as-meta-pill .meta-popover {
     transition: opacity 0.3s ease 0.15s, visibility 0.3s ease 0.15s;
     z-index: 100;
 }
@@ -545,7 +545,7 @@
  * Document Glyph (PDF viewer)
  * ============================================================================ */
 
-.canvas-doc-glyph {
+.canvas-doc-element {
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border);
@@ -589,7 +589,7 @@
  * ============================================================================ */
 
 /* Compact subcanvas title bar — purple accent */
-.canvas-subcanvas-glyph .glyph-title-bar {
+.canvas-subcanvas-element .title-bar {
     background: #3a2d5a;
     color: #c0a0e8;
 }
@@ -698,7 +698,7 @@
     z-index: 10;
 }
 
-.canvas-glyph:hover .glyph-meta-pill {
+.canvas-element:hover .glyph-meta-pill {
     opacity: 1;
 }
 

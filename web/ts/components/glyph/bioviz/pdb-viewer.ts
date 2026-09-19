@@ -3,7 +3,7 @@
  * Detects ATOM/HETATM records in attribute values and shows a 3D card.
  */
 
-import { preventDrag } from '@qntx/glyphs';
+import { preventDrag } from '@teranos/elements';
 import { createMolstarViewer } from './molstar-loader';
 
 /**

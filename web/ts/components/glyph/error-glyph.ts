@@ -1,5 +1,5 @@
 /**
- * Error Glyph - Diagnostic panel for failed glyph rendering
+ * Error Element - Diagnostic panel for failed glyph rendering
  *
  * Error glyphs are ephemeral - they exist only in the DOM to show
  * diagnostic information and are never persisted to state.
@@ -8,11 +8,11 @@
  * an error glyph is spawned in its place with diagnostic context.
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { SO } from '../../sym';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { applyCanvasGlyphLayout, storeCleanup, setupGlyphResizeObserver, runCleanup } from '@qntx/glyphs';
+import { applyCanvasElementLayout, storeCleanup, setupElementResizeObserver, runCleanup } from '@teranos/elements';
 import { createPromptGlyph } from './prompt-glyph';
 
 /**
@@ -45,16 +45,16 @@ export function createErrorGlyph(
     error: ErrorContext
 ): HTMLElement {
     const element = document.createElement('div');
-    element.className = 'canvas-error-glyph canvas-glyph';
+    element.className = 'canvas-error-element canvas-element';
     const errorId = `error-${crypto.randomUUID()}`;
-    element.dataset.glyphId = errorId;
-    element.dataset.glyphSymbol = 'error';
+    element.dataset.elementId = errorId;
+    element.dataset.symbol = 'error';
 
     const width = 420;
     const minHeight = 150;
 
     // Apply canvas layout with minHeight for auto-sizing
-    applyCanvasGlyphLayout(element, { x: position.x, y: position.y, width, height: minHeight, useMinHeight: true });
+    applyCanvasElementLayout(element, { x: position.x, y: position.y, width, height: minHeight, useMinHeight: true });
 
     // Error styling - darker red like erroring AX glyphs
     // No background on parent - let header and content provide backgrounds
@@ -95,7 +95,7 @@ export function createErrorGlyph(
     title.style.fontWeight = 'bold';
     title.style.fontSize = '12px';
     title.style.color = '#ff6060'; // More pure red than default error text
-    title.textContent = 'Glyph Rendering Error';
+    title.textContent = 'Element Rendering Error';
     leftSection.appendChild(title);
 
     header.appendChild(leftSection);
@@ -147,7 +147,7 @@ export function createErrorGlyph(
     dismissBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         // Remove the broken glyph from state
-        uiState.removeCanvasGlyph(failedGlyphId);
+        uiState.removeCanvasElement(failedGlyphId);
         // Clean up event listeners before removing from DOM
         runCleanup(element);
         element.remove();
@@ -160,7 +160,7 @@ export function createErrorGlyph(
 
     // Content area - auto-sizing
     const content = document.createElement('div');
-    content.className = 'error-glyph-content glyph-content-area';
+    content.className = 'error-glyph-content content-area';
     content.style.padding = '12px';
     content.style.whiteSpace = 'pre-wrap';
     content.style.lineHeight = '1.5';
@@ -169,7 +169,7 @@ export function createErrorGlyph(
     content.style.fontSize = '11px';
 
     const lines = [
-        `Failed Glyph: ${failedSymbol}`,
+        `Failed Element: ${failedSymbol}`,
         `ID: ${failedGlyphId}`,
         `Position: (${position.x}, ${position.y})`,
         '',
@@ -188,7 +188,7 @@ export function createErrorGlyph(
     element.appendChild(content);
 
     // Set up ResizeObserver for auto-sizing to content
-    setupGlyphResizeObserver(element, content, `Error ${errorId}`);
+    setupElementResizeObserver(element, content, `Error ${errorId}`);
 
     // Make draggable via header (manual implementation - no uiState persistence)
     let isDragging = false;
@@ -275,8 +275,8 @@ async function convertErrorToPrompt(
         '',
         '# Debug Error',
         '',
-        `## Failed Glyph: ${failedSymbol}`,
-        `Glyph ID: ${failedGlyphId}`,
+        `## Failed Element: ${failedSymbol}`,
+        `Element ID: ${failedGlyphId}`,
         '',
         `## Error Type: ${error.type}`,
         `Message: ${error.message}`,
@@ -291,7 +291,7 @@ async function convertErrorToPrompt(
 
     try {
         // Create new prompt glyph
-        const promptGlyph: Glyph = {
+        const promptGlyph: Element = {
             id: `prompt-${crypto.randomUUID()}`,
             title: 'Debug Prompt',
             symbol: SO,
@@ -315,7 +315,7 @@ async function convertErrorToPrompt(
         const promptElement = await createPromptGlyph(promptGlyph);
 
         // Only remove error glyph after successful prompt creation
-        uiState.removeCanvasGlyph(failedGlyphId);
+        uiState.removeCanvasElement(failedGlyphId);
         runCleanup(errorElement);
         errorElement.remove();
 

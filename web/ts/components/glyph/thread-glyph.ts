@@ -1,9 +1,9 @@
 /**
- * Thread Glyph (〽) — the needle of a navigational thread.
+ * Thread Element (〽) — the needle of a navigational thread.
  *
  * The needle is a cursor manifestation that gets pinned to the canvas at
  * drop, then unpinned at pickup, then pinned again at next drop. ONE DOM
- * element across the entire lifecycle (Glyph Axiom — web/CLAUDE.md).
+ * element across the entire lifecycle (Element Axiom — web/CLAUDE.md).
  *
  * - Build mode creates the cursor (createCursorElement) → first drop pins it.
  * - Pickup unpins the placed element → it becomes the cursor again.
@@ -17,8 +17,8 @@
  * on cursor proximity (signals pick-up affordance).
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { applyCanvasGlyphLayout, commitCursorPlacement, storeCleanup, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { applyCanvasElementLayout, commitCursorPlacement, storeCleanup, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
 import { log, SEG } from '../../logger';
 
 /** Pixel radius around 〽 within which it reveals on cursor approach */
@@ -71,16 +71,16 @@ function wireProximityReveal(element: HTMLElement): void {
  * same DOM node now represents a pinned 〽 instead of a cursor (or freshly
  * created div).
  */
-function applyPlacedState(element: HTMLElement, glyph: Glyph): void {
+function applyPlacedState(element: HTMLElement, glyph: Element): void {
     const color = glyph.color ?? THREAD_COLORS[0];
 
     // Strip cursor-mode styles if this element was previously a cursor
     commitCursorPlacement(element);
 
-    element.className = 'canvas-thread-glyph canvas-glyph';
-    element.dataset.glyphId = glyph.id;
-    if (glyph.symbol) element.dataset.glyphSymbol = glyph.symbol;
-    applyCanvasGlyphLayout(element, {
+    element.className = 'canvas-thread-element canvas-element';
+    element.dataset.elementId = glyph.id;
+    if (glyph.symbol) element.dataset.symbol = glyph.symbol;
+    applyCanvasElementLayout(element, {
         x: glyph.x ?? 200,
         y: glyph.y ?? 200,
         width: glyph.width ?? 28,
@@ -97,13 +97,13 @@ function applyPlacedState(element: HTMLElement, glyph: Glyph): void {
     element.style.opacity = '0';
     element.style.transition = 'opacity 150ms ease';
 
-    // Reuse existing symbol span (whether '.glyph-cursor-symbol' from cursor
-    // mode or '.glyph-symbol' from prior placed state); otherwise the package
+    // Reuse existing symbol span (whether '.cursor-symbol' from cursor
+    // mode or '.symbol' from prior placed state); otherwise the package
     // creates the one span glyph.symbol becomes.
     const carried: HTMLElement | null =
         glyph.symbolElement
-        ?? element.querySelector('.glyph-cursor-symbol')
-        ?? element.querySelector('.glyph-symbol');
+        ?? element.querySelector('.cursor-symbol')
+        ?? element.querySelector('.symbol');
     const sym = carried ? settleSymbolSpan(carried) : createSymbolSpan('〽');
     if (sym.parentElement !== element) element.appendChild(sym);
     sym.style.fontSize = '20px';
@@ -126,16 +126,16 @@ export function pinThreadGlyph(element: HTMLElement, canvas: HTMLElement, x: num
  */
 export function unpinThreadGlyph(element: HTMLElement): void {
     if (element.parentElement !== document.body) document.body.appendChild(element);
-    element.className = 'glyph-cursor';
+    element.className = 'cursor';
     element.style.position = 'fixed';
     element.style.pointerEvents = 'none';
     element.style.zIndex = CURSOR_Z_INDEX;
     element.style.opacity = '';
     element.style.transition = '';
-    const sym = element.querySelector('.glyph-symbol') as HTMLElement | null;
+    const sym = element.querySelector('.symbol') as HTMLElement | null;
     if (sym) {
-        sym.classList.remove('glyph-symbol');
-        sym.classList.add('glyph-cursor-symbol');
+        sym.classList.remove('symbol');
+        sym.classList.add('cursor-symbol');
     }
 }
 
@@ -146,7 +146,7 @@ export function unpinThreadGlyph(element: HTMLElement): void {
  * mode), it is reused — preserving DOM identity. Otherwise a new div is
  * created (e.g., during canvas restore from persistence).
  */
-export function createThreadGlyph(glyph: Glyph): HTMLElement {
+export function createThreadGlyph(glyph: Element): HTMLElement {
     const element = glyph.cursorElement ?? document.createElement('div');
     applyPlacedState(element, glyph);
     wireProximityReveal(element);

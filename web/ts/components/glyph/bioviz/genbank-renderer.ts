@@ -5,7 +5,7 @@
  * renders an SVG linear map with colored feature blocks and labels.
  */
 
-import { preventDrag } from '@qntx/glyphs';
+import { preventDrag } from '@teranos/elements';
 import { AZURE_KEYWORD, AZURE_VALUE } from '../attestation-attrs';
 
 interface Feature {

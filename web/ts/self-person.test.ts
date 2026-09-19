@@ -75,7 +75,7 @@ test('nobody logged in is the refusal in the node\'s own words', () => {
     const html = personSection(null, 'this route is not yours');
 
     expect(html).toContain('this route is not yours');
-    expect(html).not.toContain('glyph-label');
+    expect(html).not.toContain('label');
 });
 
 // Nothing asked yet is not nobody logged in.

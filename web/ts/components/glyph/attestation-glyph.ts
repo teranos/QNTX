@@ -1,5 +1,5 @@
 /**
- * Attestation Glyph (+) — view a single attestation on canvas
+ * Attestation Element (+) — view a single attestation on canvas
  *
  * Opened via double-click on attestation result items in AX or SE glyphs.
  * Title bar IS the triple (subjects is predicates of contexts).
@@ -9,15 +9,15 @@
  * revealed via hover pill at bottom center of title bar.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, getManifestation, setManifestation, glyphRun, createSymbolSpan, settleSymbolSpan } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, getForm, setForm, tray, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Attestation as AttestationSym } from '../../sym';
 import { renderTriple } from './attestation-triple';
 import { stripHtml } from '../../html-utils';
 import { log, SEG } from '../../logger';
-import { canvasPlaced } from '@qntx/glyphs';
-import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
+import { canvasPlaced } from '@teranos/elements';
+import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@teranos/elements';
 import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';
 import { spawnOnCanvasDragging } from './spawn-on-canvas';
@@ -63,7 +63,7 @@ function buildMetaLines(attestation: Attestation): string[] {
  * Create an Attestation glyph.
  * Title bar = triple. Attributes below if present. Metadata behind hover pill.
  */
-export function createAttestationGlyph(glyph: Glyph): HTMLElement {
+export function createAttestationGlyph(glyph: Element): HTMLElement {
     let attestation: Attestation | null = null;
     try {
         if (glyph.content) {
@@ -77,7 +77,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
 
     // Title bar: + symbol + triple + expand button + metadata pill
     const titleBar = document.createElement('div');
-    titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
+    titleBar.className = 'title-bar title-bar--auto';
     titleBar.style.position = 'relative';
 
     // Settle a carried cursor span or render the symbol through the package —
@@ -125,8 +125,8 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
     const hasContent = !!attrs;
 
     const { element } = canvasPlaced({
-        glyph,
-        className: 'canvas-attestation-glyph',
+        item: glyph,
+        className: 'canvas-attestation-element',
         defaults: { x: 200, y: 200, width: 420, height: hasContent ? 200 : 28 },
         resizable: hasContent,
         useMinHeight: true,
@@ -139,7 +139,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
     // Attributes content — only when there are attributes to show
     if (attestation && attrs) {
         const content = document.createElement('div');
-        content.className = 'glyph-content-area';
+        content.className = 'content-area';
         content.style.padding = '4px 8px';
         content.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
         content.style.borderTop = '1px solid var(--border)';
@@ -156,7 +156,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
     wireExpandToWindow({
         element,
         expandBtn,
-        glyphId: glyph.id,
+        elementId: glyph.id,
         title,
         symbol: AttestationSym,
         renderContent: () => buildAttestationContent(attestation, attrs),
@@ -184,7 +184,7 @@ export function spawnAttestationGlyph(attestation: Attestation, mouseX?: number,
 }
 
 /**
- * Spawn an attestation directly as a window via glyphRun (tray→window path).
+ * Spawn an attestation directly as a window via tray (tray→window path).
  * No canvas detour — the element starts as a tray dot and immediately morphs to window.
  * The window includes a "place on canvas" button for the window→canvas transition.
  */
@@ -192,9 +192,9 @@ export function spawnAttestationAsWindow(attestation: Attestation): void {
     const glyphId = `as-${attestation.id || crypto.randomUUID()}`;
 
     // Dedup: check if this attestation already exists in any state
-    const existing = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    const existing = document.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
     if (existing) {
-        const manifestation = getManifestation(existing);
+        const manifestation = getForm(existing);
         if (manifestation === 'window' || manifestation === 'canvasExpanded') {
             // Already off the canvas — bring to front
             existing.style.zIndex = '1001';
@@ -206,34 +206,34 @@ export function spawnAttestationAsWindow(attestation: Attestation): void {
         log.debug(SEG.GLYPH, `[AsGlyph] Attestation ${glyphId} already exists, highlighting`);
         return;
     }
-    if (glyphRun.has(glyphId)) {
+    if (tray.has(glyphId)) {
         // In tray (minimized) — open as window
-        glyphRun.openGlyph(glyphId);
+        tray.open(glyphId);
         return;
     }
 
     const attrs = parseAttributes(attestation);
     const subjects = attestation.subjects?.join(', ') || '?';
     const predicates = attestation.predicates?.join(', ') || '?';
-    // Glyph.title is plain text — this is the one title built from stored
+    // Element.title is plain text — this is the one title built from stored
     // content, so strip at the boundary (the package no longer strips)
     const title = stripHtml(`${subjects} is ${predicates}`);
 
-    glyphRun.add({
+    tray.add({
         id: glyphId,
         title,
         symbol: AttestationSym,
         initialWidth: '420px',
         initialHeight: attrs ? '300px' : '200px',
         onClose: () => {
-            glyphRun.remove(glyphId);
+            tray.remove(glyphId);
             log.debug(SEG.GLYPH, `[AsGlyph] Closed window ${glyphId}`);
         },
         renderTitleBar: () => buildAttestationTitleBar(attestation, glyphId),
         renderContent: () => buildAttestationContent(attestation, attrs),
     });
 
-    glyphRun.openGlyph(glyphId);
+    tray.open(glyphId);
     log.debug(SEG.GLYPH, `[AsGlyph] Spawned attestation ${glyphId} as window`);
 }
 
@@ -243,7 +243,7 @@ export function spawnAttestationAsWindow(attestation: Attestation): void {
  */
 function buildAttestationTitleBar(attestation: Attestation, glyphId: string): HTMLElement {
     const titleBar = document.createElement('div');
-    titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
+    titleBar.className = 'title-bar title-bar--auto';
     titleBar.style.position = 'relative';
 
     const symbol = createSymbolSpan(AttestationSym);
@@ -268,10 +268,10 @@ function buildAttestationTitleBar(attestation: Attestation, glyphId: string): HT
     titleBar.appendChild(placeBtn);
 
     placeBtn.addEventListener('click', (e) => {
-        // Stop propagation — glyphRun has a click handler on the element that would
+        // Stop propagation — tray has a click handler on the element that would
         // re-trigger morphCanvasPlacedToWindow if the click bubbles up
         e.stopPropagation();
-        const element = placeBtn.closest('[data-glyph-id]') as HTMLElement | null;
+        const element = placeBtn.closest('[data-element-id]') as HTMLElement | null;
         if (!element) return;
         placeAttestationWindowOnCanvas(element, attestation, glyphId, placeBtn);
     });
@@ -303,7 +303,7 @@ function placeAttestationWindowOnCanvas(
     glyphId: string,
     placeBtn: HTMLElement,
 ): void {
-    const manifestation = getManifestation(element);
+    const manifestation = getForm(element);
     if (manifestation !== 'window' && manifestation !== 'canvasExpanded') return;
 
     const canvasEl = document.querySelector('.canvas-workspace') as HTMLElement | null;
@@ -334,7 +334,7 @@ function placeAttestationWindowOnCanvas(
         resizeObserver.disconnect();
         delete (element as any).__resizeObserver;
     }
-    const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement | null;
+    const titleBar = element.querySelector('.title-bar') as HTMLElement | null;
     if (titleBar) removeWindowControls(titleBar);
 
     // Unwrap .canvas-window-content if morphCanvasPlacedToWindow wrapped children
@@ -347,17 +347,17 @@ function placeAttestationWindowOnCanvas(
     }
 
     // On the canvas now, and the element says so
-    setManifestation(element, 'canvasPlaced');
+    setForm(element, 'canvasPlaced');
 
     // Remove from body, clear all inline styles
     element.remove();
     element.style.cssText = '';
 
-    // Untrack from glyphRun — element is leaving tray management for canvas.
-    // Called while detached so glyphRun.remove()'s element.remove() is a no-op.
-    // If the user later minimizes to tray, glyphRun.adopt() will re-add it.
-    if (glyphRun.has(glyphId)) {
-        glyphRun.remove(glyphId);
+    // Untrack from tray — element is leaving tray management for canvas.
+    // Called while detached so tray.remove()'s element.remove() is a no-op.
+    // If the user later minimizes to tray, tray.adopt() will re-add it.
+    if (tray.has(glyphId)) {
+        tray.remove(glyphId);
     }
 
     // Set canvas-placed positioning
@@ -370,14 +370,14 @@ function placeAttestationWindowOnCanvas(
     element.style.width = `${width}px`;
     element.style.height = `${height}px`;
     element.style.minWidth = '200px';
-    element.classList.add('canvas-glyph', 'canvas-attestation-glyph');
+    element.classList.add('canvas-element', 'canvas-attestation-element');
 
     // Reparent to canvas
     contentLayer.appendChild(element);
 
     // Build glyph object for drag/resize handlers
     const title = `${attestation.subjects?.join(', ') || '?'} is ${attestation.predicates?.join(', ') || '?'}`;
-    const glyph: Glyph = {
+    const glyph: Element = {
         id: glyphId,
         title,
         symbol: AttestationSym,
@@ -394,7 +394,7 @@ function placeAttestationWindowOnCanvas(
     }
     if (attrs) {
         const resizeHandle = document.createElement('div');
-        resizeHandle.className = 'glyph-resize-handle';
+        resizeHandle.className = 'resize-handle';
         element.appendChild(resizeHandle);
         const cleanupResize = makeResizable(element, resizeHandle, glyph, { logLabel: 'AsGlyph' });
         storeCleanup(element, cleanupResize);
@@ -423,7 +423,7 @@ function placeAttestationWindowOnCanvas(
     wireExpandToWindow({
         element,
         expandBtn: newBtn,
-        glyphId,
+        elementId: glyphId,
         title,
         symbol: AttestationSym,
         renderContent: () => buildAttestationContent(attestation, attrs),
@@ -440,7 +440,7 @@ function placeAttestationWindowOnCanvas(
  */
 function revealGlyphOnCanvas(glyphElement: HTMLElement): void {
     // Fade any open panel to reveal the canvas behind it
-    const panel = document.querySelector('[data-glyph-id="embeddings-glyph"]') as HTMLElement | null;
+    const panel = document.querySelector('[data-element-id="embeddings-glyph"]') as HTMLElement | null;
     if (panel) {
         panel.style.transition = 'opacity 200ms ease-out';
         panel.style.opacity = '0.1';

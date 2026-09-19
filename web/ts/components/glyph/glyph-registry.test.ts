@@ -12,7 +12,7 @@ import {
     getGlyphTypeBySymbol,
     getAllGlyphTypes,
 } from './glyph-registry';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 const said = (what: string) => () => {
     const el = document.createElement('div');
@@ -23,11 +23,11 @@ const said = (what: string) => () => {
 function entry(symbol: string, plugin: string | undefined, what: string) {
     return {
         symbol,
-        className: `canvas-plugin-glyph plugin-${plugin ?? 'none'}`,
+        className: `canvas-plugin-element plugin-${plugin ?? 'none'}`,
         title: 'Chart',
         label: 'chart',
         pluginName: plugin,
-        render: said(what) as unknown as (glyph: Glyph) => HTMLElement,
+        render: said(what) as unknown as (glyph: Element) => HTMLElement,
     };
 }
 
@@ -41,7 +41,7 @@ describe('replacePluginGlyphType', () => {
         expect(replaced).toBe(true);
         const now = getGlyphTypeBySymbol(symbol);
         expect(now).toBeDefined();
-        expect((now!.render({} as Glyph) as HTMLElement).textContent).toBe('second');
+        expect((now!.render({} as Element) as HTMLElement).textContent).toBe('second');
     });
 
     test('replacing does not leave a second entry behind', () => {

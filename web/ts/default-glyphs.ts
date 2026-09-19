@@ -5,7 +5,7 @@
  * tray, fully — the symbol row that sat beside it is gone.
  */
 
-import { glyphRun } from '@qntx/glyphs';
+import { tray } from '@teranos/elements';
 import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
 import { createDbGlyph } from './db-glyph';
@@ -32,35 +32,35 @@ export { updateAmVersion as updateSelfVersion, updateAmCapabilities as updateSel
 
 // Register default system glyphs
 export function registerDefaultGlyphs(): void {
-    // Canvas Glyph - Fractal container with spatial grid
-    glyphRun.add(createCanvasGlyph());
+    // Canvas Element - Fractal container with spatial grid
+    tray.add(createCanvasGlyph());
 
-    // Database Statistics Glyph
-    glyphRun.add(createDbGlyph());
+    // Database Statistics Element
+    tray.add(createDbGlyph());
 
     // Sigma Overview Panel
-    glyphRun.add(createSigmaPanel());
+    tray.add(createSigmaPanel());
 
-    // Embeddings Glyph
-    glyphRun.add(createEmbeddingsGlyph());
+    // Embeddings Element
+    tray.add(createEmbeddingsGlyph());
 
     // ⍟ — who is looking
-    glyphRun.add(createIGlyph());
+    tray.add(createIGlyph());
 
     // ≡ — what the node is, and what it was told to be
-    glyphRun.add(createAmGlyph());
+    tray.add(createAmGlyph());
 
-    // Access Tokens Glyph — opened from ⍟ (ADR-025)
-    glyphRun.add(createTokensGlyph());
-    glyphRun.add(createUsersGlyph());
+    // Access Tokens Element — opened from ⍟ (ADR-025)
+    tray.add(createTokensGlyph());
+    tray.add(createUsersGlyph());
 
-    // Roles Glyph — every role the lines name, opened from ⍟ (ADR-034)
-    glyphRun.add(createRolesGlyph());
+    // Roles Element — every role the lines name, opened from ⍟ (ADR-034)
+    tray.add(createRolesGlyph());
 
-    // Stands Glyph — every stand across markets (ADR-035)
-    glyphRun.add(createMarketGlyph());
+    // Stands Element — every stand across markets (ADR-035)
+    tray.add(createMarketGlyph());
 
-    // Usage & Cost Chart Glyph
+    // Usage & Cost Chart Element
     // TODO(future): Budget alerting with notifications
     // Implement cost threshold monitoring with user notifications:
     // - Config: User-defined budget limits (daily/weekly/monthly)
@@ -68,7 +68,7 @@ export function registerDefaultGlyphs(): void {
     // - Notification: Toast alert when threshold crossed
     // - Persistence: Store alert state to avoid repeat notifications
     // - UX: Clear visual indication of budget status in chart
-    glyphRun.add(createChartGlyph(
+    tray.add(createChartGlyph(
         'usage-chart',
         'Usage & Costs',
         '/api/timeseries/usage',
@@ -86,17 +86,17 @@ export function registerDefaultGlyphs(): void {
         '$'
     ));
 
-    // Pulse Panel Glyph — scheduled jobs dashboard
-    glyphRun.add(createPulseGlyph());
+    // Pulse Panel Element — scheduled jobs dashboard
+    tray.add(createPulseGlyph());
 
-    // Plugin Panel Glyph — panel manifestation
-    glyphRun.add(createPluginGlyph());
+    // Plugin Panel Element — panel manifestation
+    tray.add(createPluginGlyph());
 
-    // Handlers Panel Glyph — handler attestation management
-    glyphRun.add(createHandlersGlyph());
+    // Handlers Panel Element — handler attestation management
+    tray.add(createHandlersGlyph());
 
-    // LLM Provider Glyph — provider selection (replaces ai-provider-window)
-    glyphRun.add(createLlmProviderGlyph());
+    // LLM Provider Element — provider selection (replaces ai-provider-window)
+    tray.add(createLlmProviderGlyph());
 
     log.debug(SEG.UI, 'Default glyphs registered:', {
         canvas: 'Spatial canvas grid',

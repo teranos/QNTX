@@ -10,9 +10,9 @@ import { uiState, type CompositionState } from './ui';
 import { log, SEG } from '../logger';
 import { upsertComposition as apiUpsertComposition, deleteComposition as apiDeleteComposition } from '../api/canvas';
 
-// Pure functions — canonical in @qntx/glyphs, re-exported here
-export { buildEdgesFromChain, extractGlyphIds } from '@qntx/glyphs';
-import { extractGlyphIds } from '@qntx/glyphs';
+// Pure functions — canonical in @teranos/elements, re-exported here
+export { buildEdgesFromChain, extractElementIds } from '@teranos/elements';
+import { extractElementIds } from '@teranos/elements';
 
 /**
  * Add a new composition to storage
@@ -34,7 +34,7 @@ export function addComposition(composition: CompositionState): void {
         log.debug(SEG.GLYPH, '[Compositions] Added composition', {
             id: composition.id,
             edges: composition.edges.length,
-            glyphs: extractGlyphIds(composition.edges)
+            glyphs: extractElementIds(composition.edges)
         });
     }
 

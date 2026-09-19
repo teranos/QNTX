@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  *
- * Subject Glyph — the subject as a thing in its own right.
+ * Subject Element — the subject as a thing in its own right.
  *
  * What it is for is knowing which predicates a subject carries, so that is the
  * section it leads with and the one most of these are about.

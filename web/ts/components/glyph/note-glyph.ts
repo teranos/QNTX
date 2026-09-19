@@ -1,5 +1,5 @@
 /**
- * Note Glyph - Lightweight markdown notes on canvas
+ * Note Element - Lightweight markdown notes on canvas
  *
  * Post-it style notes with basic markdown support:
  * - Bold, italic, code (marks)
@@ -9,15 +9,15 @@
  * Visual style: Light beige/yellow background with dark text (post-it aesthetic)
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { setupGlyphResizeObserver } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { setupElementResizeObserver } from '@teranos/elements';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
-import { storeCleanup, preventDrag } from '@qntx/glyphs';
+import { storeCleanup, preventDrag } from '@teranos/elements';
 import { tooltip } from '../tooltip';
-import { canvasPlaced } from '@qntx/glyphs';
-import { wireExpandToWindow } from '@qntx/glyphs';
+import { canvasPlaced } from '@teranos/elements';
+import { wireExpandToWindow } from '@teranos/elements';
 import { Prose } from '../../sym';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
@@ -38,7 +38,7 @@ const tearClipPath = (() => {
     return `polygon(${points.join(', ')}, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%)`;
 })();
 
-function applyPostItStyle(element: HTMLElement, glyph: Glyph): void {
+function applyPostItStyle(element: HTMLElement, glyph: Element): void {
     element.style.backgroundColor = glyph.color ?? '#f5edb8';
     element.style.color = glyph.textColor ?? '#2a2a2a';
     element.style.backdropFilter = 'blur(2px)';
@@ -52,7 +52,7 @@ function applyPostItStyle(element: HTMLElement, glyph: Glyph): void {
 /**
  * Create a note glyph element and populate it
  */
-export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
+export async function createNoteGlyph(glyph: Element): Promise<HTMLElement> {
     const element = document.createElement('div');
     await setupNoteGlyph(element, glyph);
     return element;
@@ -63,7 +63,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
  * Can be called on a fresh element (createNoteGlyph) or an existing one (conversion).
  * Caller must runCleanup() and clear children before calling on an existing element.
  */
-export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
+export async function setupNoteGlyph(element: HTMLElement, glyph: Element): Promise<void> {
     // The post-it border is visual identity on the datum — like color, the
     // window and the tray dot wear it too
     glyph.border ??= '1px solid #d4c59a';
@@ -78,7 +78,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     const contentToUse = savedContent ?? defaultContent;
     if (!savedContent && existingGlyph) {
         uiState.addCanvasGlyph({ ...existingGlyph, content: defaultContent });
-        log.debug(SEG.GLYPH, `[Note Glyph] Saved initial content for new glyph ${glyph.id}`);
+        log.debug(SEG.GLYPH, `[Note Element] Saved initial content for new glyph ${glyph.id}`);
     }
 
     // Reset inline styles (important when repopulating after conversion)
@@ -90,11 +90,11 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
 
     canvasPlaced({
         element,
-        glyph,
-        className: 'canvas-note-glyph',
+        item: glyph,
+        className: 'canvas-note-element',
         defaults: { x: 300, y: 200, width: 320, height: 280 },
         resizable: { minWidth: 120, minHeight: 100 },
-        resizeHandleClass: 'glyph-resize-handle--small',
+        resizeHandleClass: 'resize-handle--small',
         logLabel: 'NoteGlyph',
     });
 
@@ -102,7 +102,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
 
     // Fold-mark title bar — looks like a crease in the paper, buttons appear on hover
     const foldBar = document.createElement('div');
-    foldBar.className = 'glyph-title-bar note-fold-bar';
+    foldBar.className = 'title-bar note-fold-bar';
     foldBar.style.height = '24px';
     foldBar.style.minHeight = '24px';
     foldBar.style.padding = '0 4px';
@@ -133,13 +133,13 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     foldBar.addEventListener('mouseenter', () => {
         expandBtn.style.opacity = '1';
         closeBtn.style.opacity = '1';
-        const windowControls = foldBar.querySelector('.glyph-window-controls') as HTMLElement | null;
+        const windowControls = foldBar.querySelector('.window-controls') as HTMLElement | null;
         if (windowControls) windowControls.style.opacity = '1';
     });
     foldBar.addEventListener('mouseleave', () => {
         expandBtn.style.opacity = '0';
         closeBtn.style.opacity = '0';
-        const windowControls = foldBar.querySelector('.glyph-window-controls') as HTMLElement | null;
+        const windowControls = foldBar.querySelector('.window-controls') as HTMLElement | null;
         if (windowControls) windowControls.style.opacity = '0';
     });
 
@@ -147,7 +147,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     wireExpandToWindow({
         element,
         expandBtn,
-        glyphId: glyph.id,
+        elementId: glyph.id,
         title: 'Note',
         symbol: Prose,
         color: glyph.color,
@@ -167,7 +167,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     closeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         element.remove();
-        uiState.removeCanvasGlyph(glyph.id);
+        uiState.removeCanvasElement(glyph.id);
         log.debug(SEG.GLYPH, `[NoteGlyph] Closed ${glyph.id}`);
     });
 
@@ -251,7 +251,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
         const contentSnippet = contentToUse.length > 100
             ? contentToUse.substring(0, 100) + '...'
             : contentToUse;
-        log.error(SEG.GLYPH, `[Note Glyph] Failed to parse markdown for ${glyph.id}`, {
+        log.error(SEG.GLYPH, `[Note Element] Failed to parse markdown for ${glyph.id}`, {
             error,
             contentLength: contentToUse.length,
             contentSnippet
@@ -280,7 +280,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     });
 
     // Create editor view with auto-save
-    const { save, cancel: cancelAutoSave } = createAutoSave(glyph.id, () => noteMarkdownSerializer.serialize(editorView.state.doc), 'Note Glyph');
+    const { save, cancel: cancelAutoSave } = createAutoSave(glyph.id, () => noteMarkdownSerializer.serialize(editorView.state.doc), 'Note Element');
 
     const editorView = new EditorView(editorContainer, {
         state,
@@ -312,7 +312,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     // Note glyphs have no title bar — use 8px padding offset; observe ProseMirror child
     const proseMirror = editorContainer.querySelector('.ProseMirror');
     if (proseMirror) {
-        setupGlyphResizeObserver(element, proseMirror as HTMLElement, `Note ${glyph.id}`, 8);
+        setupElementResizeObserver(element, proseMirror as HTMLElement, `Note ${glyph.id}`, 8);
     } else {
         log.warn(SEG.GLYPH, `[Note ${glyph.id}] ProseMirror element not found for ResizeObserver`);
     }

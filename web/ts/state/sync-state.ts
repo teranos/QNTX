@@ -43,7 +43,7 @@ class SyncStateManagerImpl implements SyncStateManager {
         }
 
         this.states.set(glyphId, state);
-        log.debug(SEG.GLYPH, `[SyncState] Glyph ${glyphId}: ${oldState || 'unsynced'} → ${state}`);
+        log.debug(SEG.GLYPH, `[SyncState] Element ${glyphId}: ${oldState || 'unsynced'} → ${state}`);
 
         // Notify all callbacks for this glyph
         const glyphCallbacks = this.callbacks.get(glyphId);

@@ -1,19 +1,19 @@
 /**
- * GlyphUI — host-side factory that creates GlyphUI instances.
- * Types are canonical in @qntx/glyphs; this file owns the QNTX-specific factory.
+ * ElementUI — host-side factory that creates ElementUI instances.
+ * Types are canonical in @teranos/elements; this file owns the QNTX-specific factory.
  */
 
-import type { Glyph, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail, AttestationQuery, Attestation } from '@qntx/glyphs';
-import { canvasPlaced } from '@qntx/glyphs';
-import type { CanvasPlacedConfig } from '@qntx/glyphs';
-import { preventDrag, storeCleanup, createInput, createButton, createStatusLine, wireExpandToWindow } from '@qntx/glyphs';
+import type { Element, ElementUI, ElementOpts, FetchOpts, MeldEvent, SpawnResultDetail, AttestationQuery, Attestation } from '@teranos/elements';
+import { canvasPlaced } from '@teranos/elements';
+import type { CanvasPlacedConfig } from '@teranos/elements';
+import { preventDrag, storeCleanup, createInput, createButton, createStatusLine, wireExpandToWindow } from '@teranos/elements';
 import { apiFetch, apiJson, backendWsUrl, backendUrl } from '../../client';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 
 // Re-export types so existing consumers don't break
-export type { RenderFn, GlyphModule, GlyphDef, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail, AttestationQuery, Attestation } from '@qntx/glyphs';
+export type { RenderFn, ElementModule, ElementDef, ElementUI, ElementOpts, FetchOpts, MeldEvent, SpawnResultDetail, AttestationQuery, Attestation } from '@teranos/elements';
 
 // The node's query keys, in its own spelling — nothing else on the query reaches it.
 const ATTESTATION_QUERY_KEYS = ['subject', 'predicate', 'context', 'actor', 'source', 'limit'] as const;
@@ -31,11 +31,11 @@ function liftButton(): HTMLButtonElement {
 // ── Factory ─────────────────────────────────────────────────────────
 
 /**
- * Create a GlyphUI instance scoped to a specific glyph.
+ * Create a ElementUI instance scoped to a specific glyph.
  * `root` is for a glyph whose element the host already owns (a tray panel's
  * content): cleanups are stored on it at once, and whoever discards it runs them.
  */
-export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): GlyphUI {
+export function createGlyphUI(glyph: Element, name: string, root?: HTMLElement): ElementUI {
     // Element reference — set when container() is called
     let rootElement: HTMLElement | null = root ?? null;
     // Cleanups registered before container() — flushed when container is created
@@ -48,8 +48,8 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
 
     const prefix = `[${name}]`;
 
-    const ui: GlyphUI = {
-        glyph(opts: GlyphOpts) {
+    const ui: ElementUI = {
+        element(opts: ElementOpts) {
             // The lift off the canvas: the button that makes a placed glyph a
             // window and puts it back. It belongs to the canvas rather than to
             // each glyph, and a module that builds its own frame was the one
@@ -60,8 +60,8 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
                 : opts.titleBar;
 
             const config: CanvasPlacedConfig = {
-                glyph,
-                className: opts.className ?? `canvas-glyph glyph-${name}`,
+                item: glyph,
+                className: opts.className ?? `canvas-element glyph-${name}`,
                 defaults: opts.defaults,
                 titleBar,
                 dragHandle: opts.dragHandle,
@@ -79,7 +79,7 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
             }
             if (opts.titleBar?.labelColor && result.titleBar) {
                 // The title bar holds a symbol span and a label span; color the label
-                const label = result.titleBar.querySelector('span:not(.glyph-symbol)') as HTMLElement | null;
+                const label = result.titleBar.querySelector('span:not(.symbol)') as HTMLElement | null;
                 if (label) label.style.color = opts.titleBar.labelColor;
             }
 
@@ -91,7 +91,7 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
 
             // Create the content area — scrollable body below the title bar
             const content = document.createElement('div');
-            content.className = 'glyph-content-area';
+            content.className = 'content-area';
             rootElement.appendChild(content);
 
             if (lift) {
@@ -100,7 +100,7 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
                 wireExpandToWindow({
                     element: rootElement,
                     expandBtn: lift,
-                    glyphId: glyph.id,
+                    elementId: glyph.id,
                     title: opts.titleBar?.label ?? name,
                     symbol: glyph.symbol ?? '',
                     renderContent: () => content,
@@ -108,7 +108,7 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
                     // No colours handed along: the window is this element
                     // morphed and the tray reparents the same one, so what it
                     // was painted stays painted (Element Axioma).
-                    adoptExtras: { manifestationType: 'window' as const },
+                    adoptExtras: { opensAs: 'window' as const },
                 });
             }
 
@@ -219,7 +219,7 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
                         const melded = canvasGlyphs.find(g => g.id === edge.from);
 
                         callback({
-                            glyphId: edge.from,
+                            elementId: edge.from,
                             symbol: melded?.symbol ?? '',
                             direction: edge.direction,
                             content: melded?.content ?? '',
@@ -267,7 +267,7 @@ export function createGlyphUI(glyph: Glyph, name: string, root?: HTMLElement): G
                 log.error(SEG.GLYPH, `${prefix} spawnResult called before glyph() — no root element`);
                 return;
             }
-            const detail: SpawnResultDetail = { glyphId: glyph.id, name, result };
+            const detail: SpawnResultDetail = { elementId: glyph.id, name, result };
             const CE = rootElement.ownerDocument.defaultView?.CustomEvent ?? CustomEvent;
             rootElement.dispatchEvent(new CE('glyph:spawn-result', {
                 bubbles: true,

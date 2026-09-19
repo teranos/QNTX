@@ -31,7 +31,7 @@
     background: var(--panel-hover-bg, #ffffff0a);
 }
 
-.glyph-label {
+.label {
     flex: 0 0 auto;
     font-weight: normal;
     color: var(--text-on-dark-secondary, #a9abaa);
@@ -43,24 +43,21 @@
  * Created by ui.glyph() and returned as `content` in the result.
  * Fills remaining space, scrolls vertically, standard padding.
  */
-.glyph-content-area {
+.content-area {
     flex: 1;
     overflow: auto;
     padding: 8px;
     background: transparent;
 }
 
-/* How a glyph holds what it is given is the glyph package's own affair, and it
-   carries those rules with it: packages/glyphs/containment.ts. */
-
 /* GlyphUI form primitives — dark-mode first */
-.glyph-form-group {
+.field {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.glyph-input {
+.input {
     flex: 1;
     min-width: 0;
     padding: 6px 8px;
@@ -72,16 +69,16 @@
     color: var(--text-on-dark, #dfe1e0);
 }
 
-.glyph-input:focus {
+.input:focus {
     outline: none;
     border-color: var(--accent-on-dark, #7dba8a);
 }
 
-.glyph-input::placeholder {
+.input::placeholder {
     color: var(--text-on-dark-tertiary, #878988);
 }
 
-.glyph-btn {
+.btn {
     padding: 5px 12px;
     font-size: var(--font-size-sm);
     font-weight: 500;
@@ -93,18 +90,18 @@
     cursor: pointer;
 }
 
-.glyph-btn:hover {
+.btn:hover {
     background: var(--bg-dark-hover, #2a2b2a);
     border-color: var(--accent-on-dark, #7dba8a);
 }
 
-.glyph-btn--primary {
+.btn--primary {
     background: var(--accent-color, #5a9a6a);
     border-color: var(--accent-color, #5a9a6a);
     color: #fff;
 }
 
-.glyph-btn--primary:hover {
+.btn--primary:hover {
     background: var(--accent-hover, #4a8559);
     border-color: var(--accent-hover, #4a8559);
 }
@@ -197,7 +194,7 @@
     margin: 8px 0;
 }
 
-.llm-provider-row--in-use .glyph-label {
+.llm-provider-row--in-use .label {
     font-weight: 600;
 }
 

@@ -1,5 +1,5 @@
 /**
- * Prompt Glyph - LLM prompt template editor on canvas
+ * Prompt Element - LLM prompt template editor on canvas
  *
  * Simple prompt editor with:
  * - Template textarea with YAML frontmatter for model/temperature/max_tokens config
@@ -11,21 +11,21 @@
  * - Watchers keep executing prompts as matching attestations arrive
  * - For now: simple one-shot execution for testing
  *
- * TODO: Migrate to GlyphUI SDK (like py-glyph and ts-glyph).
+ * TODO: Migrate to ElementUI SDK (like py-glyph and ts-glyph).
  */
 
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import { SO, Doc, Prose } from '../../sym';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../client';
 import { jsonBody } from '../../http-utils';
-import { preventDrag, storeCleanup } from '@qntx/glyphs';
-import { canvasPlaced } from '@qntx/glyphs';
+import { preventDrag, storeCleanup } from '@teranos/elements';
+import { canvasPlaced } from '@teranos/elements';
 import { autoMeldResultBelow } from './meld/auto-meld-result';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 import { tooltip } from '../tooltip';
-import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
+import { findCompositionByGlyph, extractElementIds } from '../../state/compositions';
 import { createResultGlyph, getResponseTokenCount, unsubscribeStream, populateStaticContent } from './result-glyph';
 
 /**
@@ -67,7 +67,7 @@ export const PROMPT_DEFAULT_TEMPLATE = '---\nmodel: "anthropic/claude-haiku-4.5"
 /**
  * Create a prompt glyph with template editor on canvas
  */
-export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
+export async function createPromptGlyph(glyph: Element): Promise<HTMLElement> {
     const element = document.createElement('div');
     await setupPromptGlyph(element, glyph);
     return element;
@@ -78,7 +78,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
  * Can be called on a fresh element (createPromptGlyph) or an existing one (conversion).
  * Caller must runCleanup() and clear children before calling on an existing element.
  */
-export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
+export async function setupPromptGlyph(element: HTMLElement, glyph: Element): Promise<void> {
     // Load saved template from canvas state
     const existingGlyph = uiState.getCanvasGlyph(glyph.id);
     const savedTemplate = existingGlyph?.content ?? PROMPT_DEFAULT_TEMPLATE;
@@ -104,7 +104,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     textarea.style.resize = 'none';
 
     // Auto-save template with debouncing
-    const { save, cancel: cancelAutoSave } = createAutoSave(glyph.id, () => textarea.value, 'Prompt Glyph');
+    const { save, cancel: cancelAutoSave } = createAutoSave(glyph.id, () => textarea.value, 'Prompt Element');
     textarea.addEventListener('input', () => save());
 
     // Cmd/Ctrl+Enter to execute prompt
@@ -167,7 +167,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         }
 
         savePromptStatus(glyph.id, status);
-        log.debug(SEG.GLYPH, `[Prompt Glyph] Updated status for ${glyph.id}:`, status);
+        log.debug(SEG.GLYPH, `[Prompt Element] Updated status for ${glyph.id}:`, status);
     }
 
     // Apply saved status on load
@@ -219,7 +219,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             const noteTexts: string[] = [];
             const comp = findCompositionByGlyph(glyph.id);
             if (comp) {
-                const memberIds = extractGlyphIds(comp.edges);
+                const memberIds = extractElementIds(comp.edges);
                 for (const mid of memberIds) {
                     if (mid === glyph.id) continue; // skip self
                     const g = uiState.getCanvasGlyph(mid);
@@ -300,8 +300,8 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
     canvasPlaced({
         element,
-        glyph,
-        className: 'canvas-prompt-glyph',
+        item: glyph,
+        className: 'canvas-prompt-element',
         defaults: { x: 200, y: 200, width: 420, height: 340 },
         titleBar: { label: `${SO} Prompt`, actions: [playBtn] },
         resizable: { minWidth: 280, minHeight: 200 },
@@ -309,7 +309,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     });
 
     // Style the label span created by canvasPlaced
-    const labelSpan = element.querySelector('.glyph-title-bar > span:first-child') as HTMLElement;
+    const labelSpan = element.querySelector('.title-bar > span:first-child') as HTMLElement;
     if (labelSpan) {
         labelSpan.style.fontSize = '16px';
         labelSpan.style.color = 'var(--accent-lavender)';
@@ -366,7 +366,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         const ry = promptRect.bottom - canvasRect.top;
 
         const responseGlyphId = `result-${crypto.randomUUID()}`;
-        const responseGlyph: Glyph = {
+        const responseGlyph: Element = {
             id: responseGlyphId,
             title: 'Result',
             symbol: 'result',

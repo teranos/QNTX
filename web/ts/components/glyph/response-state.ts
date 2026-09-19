@@ -2,7 +2,7 @@
  * The glyph's background answers for its last response: error red, warning
  * yellow, or its own identity color when the answer stood.
  *
- * Identity color is an inline style (packages/glyphs run.ts), so the tint is
+ * Identity color is an inline style (@teranos/elements tray/tray.ts), so the tint is
  * inline too — the identity is saved on first tint and restored on clear.
  * The data-response-state attribute is the queryable record of the tint.
  */
@@ -10,7 +10,7 @@
 export type ResponseState = 'error' | 'warning';
 
 export function setResponseState(element: HTMLElement, state: ResponseState | null): void {
-    const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement | null;
+    const titleBar = element.querySelector('.title-bar') as HTMLElement | null;
 
     if (state === null) {
         if (element.dataset.responseState === undefined) return;

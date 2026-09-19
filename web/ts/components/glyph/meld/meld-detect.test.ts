@@ -6,7 +6,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { findMeldTarget, PROXIMITY_THRESHOLD } from '@qntx/glyphs';
+import { findMeldTarget, PROXIMITY_THRESHOLD } from '@teranos/elements';
 import { uiState } from '../../../state/ui';
 
 /** Helper: mock getBoundingClientRect on an element */
@@ -26,13 +26,13 @@ describe('Reverse Meld Detection - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const axElement = document.createElement('div');
-        axElement.className = 'canvas-ax-glyph';
-        axElement.setAttribute('data-glyph-id', 'ax1');
+        axElement.className = 'canvas-ax-element';
+        axElement.setAttribute('data-element-id', 'ax1');
         canvas.appendChild(axElement);
 
         const promptElement = document.createElement('div');
-        promptElement.className = 'canvas-prompt-glyph';
-        promptElement.setAttribute('data-glyph-id', 'prompt1');
+        promptElement.className = 'canvas-prompt-element';
+        promptElement.setAttribute('data-element-id', 'prompt1');
         canvas.appendChild(promptElement);
 
         // ax on the left, prompt approaching from the right (gap < threshold)
@@ -55,13 +55,13 @@ describe('Reverse Meld Detection - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const axElement = document.createElement('div');
-        axElement.className = 'canvas-ax-glyph';
-        axElement.setAttribute('data-glyph-id', 'ax1');
+        axElement.className = 'canvas-ax-element';
+        axElement.setAttribute('data-element-id', 'ax1');
         canvas.appendChild(axElement);
 
         const promptElement = document.createElement('div');
-        promptElement.className = 'canvas-prompt-glyph';
-        promptElement.setAttribute('data-glyph-id', 'prompt1');
+        promptElement.className = 'canvas-prompt-element';
+        promptElement.setAttribute('data-element-id', 'prompt1');
         canvas.appendChild(promptElement);
 
         // ax on the left, prompt on the right — prompt has no right→ax port
@@ -83,13 +83,13 @@ describe('Reverse Meld Detection - Tim (Happy Path)', () => {
         document.body.appendChild(canvas);
 
         const axElement = document.createElement('div');
-        axElement.className = 'canvas-ax-glyph';
-        axElement.setAttribute('data-glyph-id', 'ax1');
+        axElement.className = 'canvas-ax-element';
+        axElement.setAttribute('data-element-id', 'ax1');
         canvas.appendChild(axElement);
 
         const promptElement = document.createElement('div');
-        promptElement.className = 'canvas-prompt-glyph';
-        promptElement.setAttribute('data-glyph-id', 'prompt1');
+        promptElement.className = 'canvas-prompt-element';
+        promptElement.setAttribute('data-element-id', 'prompt1');
         canvas.appendChild(promptElement);
 
         // ax on the left approaching prompt on the right
@@ -115,13 +115,13 @@ describe('Subcanvas top/bottom disambiguation', () => {
         document.body.appendChild(canvas);
 
         const bbb = document.createElement('div');
-        bbb.className = 'canvas-subcanvas-glyph';
-        bbb.setAttribute('data-glyph-id', 'bbb');
+        bbb.className = 'canvas-subcanvas-element';
+        bbb.setAttribute('data-element-id', 'bbb');
         canvas.appendChild(bbb);
 
         const aaa = document.createElement('div');
-        aaa.className = 'canvas-subcanvas-glyph';
-        aaa.setAttribute('data-glyph-id', 'aaa');
+        aaa.className = 'canvas-subcanvas-element';
+        aaa.setAttribute('data-element-id', 'aaa');
         canvas.appendChild(aaa);
 
         // BBB on top, AAA directly below
@@ -145,15 +145,15 @@ describe('Subcanvas top/bottom disambiguation', () => {
         document.body.appendChild(canvas);
 
         const ccc = document.createElement('div');
-        ccc.className = 'canvas-subcanvas-glyph';
-        ccc.setAttribute('data-glyph-id', 'ccc');
+        ccc.className = 'canvas-subcanvas-element';
+        ccc.setAttribute('data-element-id', 'ccc');
         const bbb = document.createElement('div');
-        bbb.className = 'canvas-subcanvas-glyph';
-        bbb.setAttribute('data-glyph-id', 'bbb');
+        bbb.className = 'canvas-subcanvas-element';
+        bbb.setAttribute('data-element-id', 'bbb');
 
         const comp = document.createElement('div');
         comp.className = 'melded-composition';
-        comp.setAttribute('data-glyph-id', 'melded-ccc-bbb');
+        comp.setAttribute('data-element-id', 'melded-ccc-bbb');
         comp.appendChild(ccc);
         comp.appendChild(bbb);
         canvas.appendChild(comp);
@@ -165,8 +165,8 @@ describe('Subcanvas top/bottom disambiguation', () => {
         }]);
 
         const aaa = document.createElement('div');
-        aaa.className = 'canvas-subcanvas-glyph';
-        aaa.setAttribute('data-glyph-id', 'aaa');
+        aaa.className = 'canvas-subcanvas-element';
+        aaa.setAttribute('data-element-id', 'aaa');
         canvas.appendChild(aaa);
 
         mockRect(ccc, { left: 100, top: 100, width: 200, height: 150 });
@@ -193,23 +193,23 @@ describe('findMeldTarget detects composition targets', () => {
 
         // ax|py composition
         const ax = document.createElement('div');
-        ax.className = 'canvas-ax-glyph';
-        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.className = 'canvas-ax-element';
+        ax.setAttribute('data-element-id', 'ax1');
         const py = document.createElement('div');
-        py.className = 'canvas-py-glyph';
-        py.setAttribute('data-glyph-id', 'py1');
+        py.className = 'canvas-py-element';
+        py.setAttribute('data-element-id', 'py1');
 
         const comp = document.createElement('div');
         comp.className = 'melded-composition';
-        comp.setAttribute('data-glyph-id', 'melded-ax1-py1');
+        comp.setAttribute('data-element-id', 'melded-ax1-py1');
         comp.appendChild(ax);
         comp.appendChild(py);
         canvas.appendChild(comp);
 
         // Standalone prompt approaching from the right
         const prompt = document.createElement('div');
-        prompt.className = 'canvas-prompt-glyph';
-        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.className = 'canvas-prompt-element';
+        prompt.setAttribute('data-element-id', 'prompt1');
         canvas.appendChild(prompt);
 
         // py (inside comp) is to the left, prompt is approaching

@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  *
- * Predicate Glyph — the predicate as a thing in its own right.
+ * Predicate Element — the predicate as a thing in its own right.
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';

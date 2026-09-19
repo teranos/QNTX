@@ -9,8 +9,8 @@
  * right edge and took their tails with them.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { glyphRun } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { tray } from '@teranos/elements';
 import { renderPager } from './components/pager.ts';
 import { renderTally } from './components/tally.ts';
 import { openPageGlyph } from './page-glyph.ts';
@@ -274,16 +274,16 @@ export function renderStandActivity(container: HTMLElement, s: StaandInfo): void
  */
 export function openStandActivity(s: StaandInfo): void {
     const glyphId = standGlyphId(s.market, s.slug);
-    if (glyphRun.has(glyphId)) {
-        glyphRun.openGlyph(glyphId);
+    if (tray.has(glyphId)) {
+        tray.open(glyphId);
         return;
     }
 
-    glyphRun.add({
+    tray.add({
         id: glyphId,
         title: s.market + ' / ' + s.slug,
         symbol: '⛬',
-        onClose: () => { glyphRun.remove(glyphId); },
+        onClose: () => { tray.remove(glyphId); },
         renderContent: () => {
             const content = document.createElement('div');
             content.className = 'stand-activity-content';
@@ -298,7 +298,7 @@ export function openStandActivity(s: StaandInfo): void {
         // pages the node will send (server/staand.go, topCounts).
         initialWidth: '720px',
         initialHeight: '560px',
-    } satisfies Glyph);
+    } satisfies Element);
 
-    glyphRun.openGlyph(glyphId);
+    tray.open(glyphId);
 }

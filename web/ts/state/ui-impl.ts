@@ -21,7 +21,7 @@
  */
 
 import type { PanelState } from '../../types/core';
-import type { CompositionState } from '@qntx/glyphs';
+import type { CompositionState } from '@teranos/elements';
 import type { CanvasGlyph } from '../generated/proto/glyph/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
@@ -62,10 +62,10 @@ export interface GraphSessionState {
 }
 
 /**
- * Composition types — canonical, owned by @qntx/glyphs.
+ * Composition types — canonical, owned by @teranos/elements.
  * Re-exported here for backward compatibility with web/ consumers.
  */
-export type { CompositionEdge, CompositionState } from '@qntx/glyphs';
+export type { CompositionEdge, CompositionState } from '@teranos/elements';
 
 // ============================================================================
 // Embeddings State Types
@@ -527,7 +527,7 @@ export class UIState {
     /**
      * Remove a glyph from canvas
      */
-    removeCanvasGlyph(id: string): void {
+    removeCanvasElement(id: string): void {
         const updated = this.state.canvasGlyphs.filter(g => g.id !== id);
         this.update('canvasGlyphs', updated);
 

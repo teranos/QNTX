@@ -11,34 +11,34 @@
 }
 
 /* Visual feedback during approach */
-.canvas-ax-glyph.meld-ready,
-.canvas-py-glyph.meld-ready {
+.canvas-ax-element.meld-ready,
+.canvas-py-element.meld-ready {
     transition: box-shadow 0.2s ease-out;
 }
 
-.canvas-prompt-glyph.meld-target,
-.canvas-py-glyph.meld-target {
+.canvas-prompt-element.meld-target,
+.canvas-py-element.meld-target {
     transition: box-shadow 0.2s ease-out;
 }
 
 /* Glyphs within melded composition */
-.melded-composition .canvas-ax-glyph,
-.melded-composition .canvas-py-glyph,
-.melded-composition .canvas-prompt-glyph {
+.melded-composition .canvas-ax-element,
+.melded-composition .canvas-py-element,
+.melded-composition .canvas-prompt-element {
     margin: 0;
     /* Remove any spacing - they should be directly adjacent */
 }
 
 /* Initiator glyphs (left side of composition) */
-.melded-composition .canvas-ax-glyph,
-.melded-composition .canvas-py-glyph {
+.melded-composition .canvas-ax-element,
+.melded-composition .canvas-py-element {
     border-right: 1px dashed rgba(255, 140, 0, 0.3);
     padding-right: 8px;
 }
 
 /* Target glyphs (right side of composition) */
-.melded-composition .canvas-py-glyph:not(:first-child),
-.melded-composition .canvas-prompt-glyph {
+.melded-composition .canvas-py-element:not(:first-child),
+.melded-composition .canvas-prompt-element {
     padding-left: 8px;
 }
 
@@ -49,8 +49,8 @@
 }
 
 /* When dragging a melded composition, elevate individual glyphs */
-.melded-composition.is-dragging .canvas-ax-glyph,
-.melded-composition.is-dragging .canvas-py-glyph,
-.melded-composition.is-dragging .canvas-prompt-glyph {
+.melded-composition.is-dragging .canvas-ax-element,
+.melded-composition.is-dragging .canvas-py-element,
+.melded-composition.is-dragging .canvas-prompt-element {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
 }

@@ -395,11 +395,11 @@ export function panToGlyph(container: HTMLElement, canvasId: string, glyphEl: HT
     const vw = container.clientWidth;
     const vh = container.clientHeight;
 
-    // Glyph position in canvas coords (from CSS left/top)
+    // Element position in canvas coords (from CSS left/top)
     const gx = glyphEl.offsetLeft + glyphEl.offsetWidth / 2;
     const gy = glyphEl.offsetTop + glyphEl.offsetHeight / 2;
 
-    // Glyph center in screen coords
+    // Element center in screen coords
     const screenX = gx * state.scale + state.panX;
     const screenY = gy * state.scale + state.panY;
 
@@ -457,7 +457,7 @@ export function centerOnGlyphSymbol(container: HTMLElement, canvasId: string, gl
     }
 
     // Vertical target: symbol center, accumulated through offsetParent chain
-    const symbolEl = (glyphEl.querySelector('.glyph-symbol') as HTMLElement | null) ?? glyphEl;
+    const symbolEl = (glyphEl.querySelector('.symbol') as HTMLElement | null) ?? glyphEl;
     let symbolCy = symbolEl.offsetHeight / 2;
     let sEl: HTMLElement | null = symbolEl;
     while (sEl && sEl !== contentLayer) {

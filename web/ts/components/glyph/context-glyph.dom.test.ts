@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  *
- * Context Glyph — the context as a thing in its own right.
+ * Context Element — the context as a thing in its own right.
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';

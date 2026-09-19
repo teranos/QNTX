@@ -7,7 +7,7 @@
  * properties as needed (e.g. note overrides background for its post-it
  * aesthetic).
  */
-.canvas-glyph {
+.canvas-element {
     position: absolute;
     display: flex;
     flex-direction: column;

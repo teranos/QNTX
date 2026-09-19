@@ -11,7 +11,7 @@
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { AX, Watcher } from '../../sym';
 import { getWatchersByPredicate, eyeStyle } from '../../watcher-predicates';
-import { preventDrag } from '@qntx/glyphs';
+import { preventDrag } from '@teranos/elements';
 import { el } from '../../html-utils';
 import { openSegment } from './segment-press';
 

@@ -10,17 +10,17 @@
 
 /* --- Border color --- */
 
-.canvas-glyph[data-execution-state="running"]:not(.canvas-error-glyph) {
+.canvas-element[data-execution-state="running"]:not(.canvas-error-element) {
     outline-color: var(--glyph-status-running-text);
     transition: outline-color 0.2s ease;
 }
 
-.canvas-glyph[data-execution-state="completed"]:not(.canvas-error-glyph) {
+.canvas-element[data-execution-state="completed"]:not(.canvas-error-element) {
     outline-color: var(--glyph-status-success-text);
     transition: outline-color 0.2s ease;
 }
 
-.canvas-glyph[data-execution-state="failed"]:not(.canvas-error-glyph) {
+.canvas-element[data-execution-state="failed"]:not(.canvas-error-element) {
     outline-color: var(--glyph-status-error-text);
     transition: outline-color 0.2s ease;
 }
@@ -28,7 +28,7 @@
 /* --- Sweep overlay --- */
 
 .auth-fingerprint[data-execution-state]::after,
-.canvas-glyph[data-execution-state]::after {
+.canvas-element[data-execution-state]::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -38,7 +38,7 @@
 
 /* Running: repeating blue sweep left→right */
 .auth-fingerprint[data-execution-state="running"]::after,
-.canvas-glyph[data-execution-state="running"]::after {
+.canvas-element[data-execution-state="running"]::after {
     background: linear-gradient(
         90deg,
         transparent 0%,
@@ -53,7 +53,7 @@
 
 /* Completed: green band sweeps out to the right, fades */
 .auth-fingerprint[data-execution-state="completed"]::after,
-.canvas-glyph[data-execution-state="completed"]::after {
+.canvas-element[data-execution-state="completed"]::after {
     background: linear-gradient(
         90deg,
         transparent 0%,
@@ -68,7 +68,7 @@
 
 /* Failed: red band halts mid-glyph, fades */
 .auth-fingerprint[data-execution-state="failed"]::after,
-.canvas-glyph[data-execution-state="failed"]::after {
+.canvas-element[data-execution-state="failed"]::after {
     background: linear-gradient(
         90deg,
         transparent 0%,

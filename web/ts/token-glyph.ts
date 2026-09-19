@@ -1,11 +1,11 @@
 /**
- * Token Glyph — one access token, on its own (ADR-025, TOKATTEST).
+ * Token Element — one access token, on its own (ADR-025, TOKATTEST).
  * Reached by pressing a row in the Access Tokens list, and by finishing a mint.
  * The raw value exists only on the second of those, and only once.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { glyphRun } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { createButton, createDangerButton, createGhostButton } from './components/button';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
@@ -223,7 +223,7 @@ function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
             throw new Error(roles.length === 0 ? 'no line names a role yet' : `${t.label} holds every role the lines name`);
         }
         const pick = document.createElement('select');
-        pick.className = 'glyph-input';
+        pick.className = 'input';
         const first = document.createElement('option');
         first.value = '';
         first.textContent = 'pick a role';
@@ -401,16 +401,16 @@ function glyphIdFor(id: string): string {
  */
 export function openTokenGlyph(id: string, label: string, raw?: string): void {
     const glyphId = glyphIdFor(id);
-    if (glyphRun.has(glyphId)) {
-        glyphRun.openGlyph(glyphId);
+    if (tray.has(glyphId)) {
+        tray.open(glyphId);
         return;
     }
 
-    glyphRun.add({
+    tray.add({
         id: glyphId,
         title: label || id,
         symbol: '⚿',
-        onClose: () => { glyphRun.remove(glyphId); },
+        onClose: () => { tray.remove(glyphId); },
         renderContent: () => {
             const content = document.createElement('div');
             content.className = 'token-glyph-content';
@@ -426,7 +426,7 @@ export function openTokenGlyph(id: string, label: string, raw?: string): void {
 
             return content;
         },
-    } satisfies Glyph);
+    } satisfies Element);
 
-    glyphRun.openGlyph(glyphId);
+    tray.open(glyphId);
 }

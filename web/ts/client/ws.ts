@@ -65,7 +65,7 @@ const RECONNECT_MAX_MS = 60000;
 function findResultGlyphBelow(parentElement: HTMLElement): HTMLElement | null {
     const composition = parentElement.closest('.melded-composition');
     if (!composition) return null;
-    return composition.querySelector('[data-glyph-symbol="result"]') as HTMLElement | null;
+    return composition.querySelector('[data-symbol="result"]') as HTMLElement | null;
 }
 
 /**
@@ -229,10 +229,10 @@ const MESSAGE_HANDLERS = {
     },
 
     glyph_fired: (data: GlyphFiredMessage) => {
-        log.debug(SEG.WS, 'Glyph fired:', data.glyph_id, data.status, data.error || '');
+        log.debug(SEG.WS, 'Element fired:', data.glyph_id, data.status, data.error || '');
 
         // Apply execution state to target glyph element for CSS-driven visual feedback
-        const el = document.querySelector(`[data-glyph-id="${CSS.escape(data.glyph_id)}"]`) as HTMLElement | null;
+        const el = document.querySelector(`[data-element-id="${CSS.escape(data.glyph_id)}"]`) as HTMLElement | null;
         if (el) {
             const stateMap: Record<string, string> = { started: 'running', success: 'completed', error: 'failed' };
             const state = stateMap[data.status] || data.status;
@@ -281,7 +281,7 @@ const MESSAGE_HANDLERS = {
                 }
             }
         } else {
-            log.debug(SEG.WS, 'Glyph fired: no DOM element found for', data.glyph_id);
+            log.debug(SEG.WS, 'Element fired: no DOM element found for', data.glyph_id);
         }
 
         // Invoke registered handler

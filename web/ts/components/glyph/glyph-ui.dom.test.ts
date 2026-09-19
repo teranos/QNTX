@@ -1,5 +1,5 @@
 /**
- * Tests for GlyphUI SDK — spawnResult event dispatch, titleBar options
+ * Tests for ElementUI SDK — spawnResult event dispatch, titleBar options
  *
  * Personas:
  * - Tim: Happy path plugin author using the SDK
@@ -7,7 +7,7 @@
  */
 
 import { describe, test, expect, mock } from 'bun:test';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 import type { SpawnResultDetail } from './glyph-ui';
 
 // Only run under JSDOM (CI) — CustomEvent dispatch requires consistent DOM
@@ -43,7 +43,7 @@ mock.module('../../state/sync-state', () => ({
 
 const { createGlyphUI } = await import('./glyph-ui');
 
-function makeGlyph(id: string): Glyph {
+function makeGlyph(id: string): Element {
     return {
         id,
         title: 'Test',
@@ -53,7 +53,7 @@ function makeGlyph(id: string): Glyph {
     };
 }
 
-describe('GlyphUI SDK - Tim (Happy Path)', () => {
+describe('ElementUI SDK - Tim (Happy Path)', () => {
     if (!USE_JSDOM) {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
         return;
@@ -62,7 +62,7 @@ describe('GlyphUI SDK - Tim (Happy Path)', () => {
     test('Tim calls spawnResult and the correct DOM event fires', () => {
         const glyph = makeGlyph('test-spawn-1');
         const ui = createGlyphUI(glyph, 'myPlugin');
-        const { element } = ui.glyph({
+        const { element } = ui.element({
             defaults: { x: 0, y: 0, width: 300, height: 200 },
             titleBar: { label: 'test' },
         });
@@ -82,7 +82,7 @@ describe('GlyphUI SDK - Tim (Happy Path)', () => {
         });
 
         expect(received).not.toBeNull();
-        expect(received!.glyphId).toBe('test-spawn-1');
+        expect(received!.elementId).toBe('test-spawn-1');
         expect(received!.name).toBe('myPlugin');
         expect(received!.result.success).toBe(true);
         expect(received!.result.stdout).toBe('hello world');
@@ -92,7 +92,7 @@ describe('GlyphUI SDK - Tim (Happy Path)', () => {
     test('Tim calls spawnResult with error result', () => {
         const glyph = makeGlyph('test-spawn-2');
         const ui = createGlyphUI(glyph, 'failPlugin');
-        const { element } = ui.glyph({
+        const { element } = ui.element({
             defaults: { x: 0, y: 0, width: 300, height: 200 },
             titleBar: { label: 'test' },
         });
@@ -119,20 +119,20 @@ describe('GlyphUI SDK - Tim (Happy Path)', () => {
     test('Tim sets titleBar color and labelColor via SDK', () => {
         const glyph = makeGlyph('test-color-1');
         const ui = createGlyphUI(glyph, 'colorPlugin');
-        const { element } = ui.glyph({
+        const { element } = ui.element({
             defaults: { x: 0, y: 0, width: 300, height: 200 },
             titleBar: { label: 'colored', color: '#2a5578', labelColor: '#FFD43B' },
         });
 
-        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.title-bar') as HTMLElement;
         expect(titleBar.style.backgroundColor).toMatch(/#2a5578|rgb\(42, 85, 120\)/);
 
-        const label = titleBar.querySelector('span:not(.glyph-symbol)') as HTMLElement;
+        const label = titleBar.querySelector('span:not(.symbol)') as HTMLElement;
         expect(label.style.color).toMatch(/#FFD43B|rgb\(255, 212, 59\)/);
     });
 });
 
-describe('GlyphUI SDK - Spike (Edge Cases)', () => {
+describe('ElementUI SDK - Spike (Edge Cases)', () => {
     if (!USE_JSDOM) {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
         return;

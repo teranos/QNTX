@@ -9,7 +9,7 @@
 
 import { describe, test, expect } from 'bun:test';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
-import type { Glyph } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
 
 // Mock ResizeObserver for tests
 globalThis.ResizeObserver = class ResizeObserver {
@@ -18,7 +18,7 @@ globalThis.ResizeObserver = class ResizeObserver {
     disconnect() {}
 } as any;
 
-describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
+describe('Result Element Drag Persistence - Tim (Happy Path)', () => {
     test('Tim creates result glyph with execution data', () => {
         const container = document.createElement('div');
         container.className = 'canvas-workspace';
@@ -32,7 +32,7 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
             duration_ms: 42
         };
 
-        const glyph: Glyph = {
+        const glyph: Element = {
             id: 'result-123',
             title: 'Result',
             symbol: 'result',
@@ -45,8 +45,8 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
         container.appendChild(element);
 
         // Result glyph is created
-        expect(element.classList.contains('canvas-result-glyph')).toBe(true);
-        expect(element.dataset.glyphId).toBe('result-123');
+        expect(element.classList.contains('canvas-result-element')).toBe(true);
+        expect(element.dataset.elementId).toBe('result-123');
 
         // Execution data is attached to glyph object as ResultGlyphContent JSON
         expect((glyph as any).content).toBeDefined();
@@ -68,7 +68,7 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
             duration_ms: 150
         };
 
-        const glyph: Glyph = {
+        const glyph: Element = {
             id: 'result-456',
             title: 'Result',
             symbol: 'result',
@@ -104,7 +104,7 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
             duration_ms: 5
         };
 
-        const glyph: Glyph = {
+        const glyph: Element = {
             id: 'result-789',
             title: 'Result',
             symbol: 'result',
@@ -123,7 +123,7 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
     });
 });
 
-describe('Result Glyph Drag Persistence - Spike (Edge Cases)', () => {
+describe('Result Element Drag Persistence - Spike (Edge Cases)', () => {
     test('Spike creates result with extremely long output', () => {
         const container = document.createElement('div');
         container.className = 'canvas-workspace';
@@ -139,7 +139,7 @@ describe('Result Glyph Drag Persistence - Spike (Edge Cases)', () => {
             duration_ms: 5000
         };
 
-        const glyph: Glyph = {
+        const glyph: Element = {
             id: 'result-long',
             title: 'Result',
             symbol: 'result',
@@ -152,7 +152,7 @@ describe('Result Glyph Drag Persistence - Spike (Edge Cases)', () => {
         container.appendChild(element);
 
         // Result glyph handles large output
-        expect(element.classList.contains('canvas-result-glyph')).toBe(true);
+        expect(element.classList.contains('canvas-result-element')).toBe(true);
         const parsed = JSON.parse((glyph as any).content);
         expect(parsed.result.stdout.length).toBe(longOutput.length);
     });

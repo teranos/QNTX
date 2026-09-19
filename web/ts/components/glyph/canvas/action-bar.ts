@@ -8,7 +8,7 @@
  * No global singleton — supports multiple simultaneous workspaces.
  */
 
-import { getMinimizeDuration } from '@qntx/glyphs';
+import { getRestDuration } from '@teranos/elements';
 
 import { Prose } from '../../../sym';
 
@@ -37,13 +37,13 @@ export function showActionBar(
     const bar = document.createElement('div');
     bar.className = 'canvas-action-bar';
     bar.setAttribute('role', 'toolbar');
-    bar.setAttribute('aria-label', 'Glyph actions');
+    bar.setAttribute('aria-label', 'Element actions');
 
     // Check if any selected glyphs are in a meld
     // Uses .closest() to handle glyphs inside sub-containers within compositions
     let meldedComposition: HTMLElement | null = null;
     for (const glyphId of selectedGlyphIds) {
-        const glyphEl = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        const glyphEl = container.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
         const comp = glyphEl?.closest('.melded-composition') as HTMLElement | null;
         if (comp) {
             meldedComposition = comp;
@@ -54,8 +54,8 @@ export function showActionBar(
     // Check single-glyph selection type for conversion buttons
     let selectedSymbol: string | undefined;
     if (selectedGlyphIds.length === 1) {
-        const glyphEl = container.querySelector(`[data-glyph-id="${selectedGlyphIds[0]}"]`) as HTMLElement | null;
-        selectedSymbol = glyphEl?.dataset.glyphSymbol;
+        const glyphEl = container.querySelector(`[data-element-id="${selectedGlyphIds[0]}"]`) as HTMLElement | null;
+        selectedSymbol = glyphEl?.dataset.symbol;
     }
 
     // Add convert-to-prompt button if single note selected
@@ -114,7 +114,7 @@ export function showActionBar(
     positionActionBar(bar);
 
     // Slide in from top
-    const duration = getMinimizeDuration() * ACTION_BAR_ANIMATION_SPEED;
+    const duration = getRestDuration() * ACTION_BAR_ANIMATION_SPEED;
     if (duration > 0) {
         bar.animate([
             { transform: 'translate(-50%, -100%)', opacity: 0 },
@@ -149,7 +149,7 @@ export function hideActionBar(container: HTMLElement): void {
         bar.getAnimations().forEach(anim => anim.cancel());
     }
 
-    const duration = getMinimizeDuration() * 0.5;
+    const duration = getRestDuration() * 0.5;
     if (duration === 0) {
         bar.remove();
         return;

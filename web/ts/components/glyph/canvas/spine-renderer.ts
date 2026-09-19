@@ -20,7 +20,7 @@ const LINE_WIDTH = 2.5;
 export interface Spine {
     id: string;
     color: string;
-    /** Glyph IDs in thread order */
+    /** Element IDs in thread order */
     nodes: string[];
 }
 
@@ -71,12 +71,12 @@ function buildSpinePath(points: { x: number; y: number }[]): string {
     return segments.join(' ');
 }
 
-/** Find the .glyph-symbol center within a canvas glyph, in content-layer coordinates */
+/** Find the .symbol center within a canvas glyph, in content-layer coordinates */
 function getSymbolCenter(canvas: HTMLElement, glyphId: string): { x: number; y: number } | null {
-    const glyphEl = canvas.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    const glyphEl = canvas.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
     if (!glyphEl) return null;
 
-    const symbolEl = glyphEl.querySelector('.glyph-symbol') as HTMLElement | null;
+    const symbolEl = glyphEl.querySelector('.symbol') as HTMLElement | null;
     const target = symbolEl ?? glyphEl;
 
     // Use offsetLeft/offsetTop to get content-layer coordinates (pre-transform)

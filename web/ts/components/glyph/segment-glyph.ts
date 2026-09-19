@@ -15,8 +15,8 @@
  * Segment says.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { glyphRun } from '@qntx/glyphs';
+import type { Element } from '@teranos/elements';
+import { tray } from '@teranos/elements';
 import { apiJson } from '../../client';
 import { log, SEG } from '../../logger';
 import { el } from '../../html-utils';
@@ -161,16 +161,16 @@ async function attestationsOf(segment: Segment, value: string): Promise<Attestat
  */
 export function openSegmentGlyph(segment: Segment, value: string): void {
     const glyphId = segmentGlyphId(segment, value);
-    if (glyphRun.has(glyphId)) {
-        glyphRun.openGlyph(glyphId);
+    if (tray.has(glyphId)) {
+        tray.open(glyphId);
         return;
     }
 
-    glyphRun.add({
+    tray.add({
         id: glyphId,
         title: value,
         symbol: segment.symbol,
-        onClose: () => { glyphRun.remove(glyphId); },
+        onClose: () => { tray.remove(glyphId); },
         renderContent: () => {
             const content = el('div', {
                 class: `${segment.kind}-glyph-content`,
@@ -196,7 +196,7 @@ export function openSegmentGlyph(segment: Segment, value: string): void {
         },
         initialWidth: '560px',
         initialHeight: '460px',
-    } satisfies Glyph);
+    } satisfies Element);
 
-    glyphRun.openGlyph(glyphId);
+    tray.open(glyphId);
 }
