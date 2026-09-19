@@ -47,9 +47,9 @@ describe('Tim: apiFetch prepends backendUrl', () => {
             return Promise.resolve(new Response('ok', { status: 200 }));
         }) as any;
 
-        await apiFetch('/api/canvas/glyphs');
+        await apiFetch('/api/canvas/elements');
 
-        expect(capturedUrl).toBe('http://backend:8771/api/canvas/glyphs');
+        expect(capturedUrl).toBe('http://backend:8771/api/canvas/elements');
     });
 
     test('includes credentials: include', async () => {

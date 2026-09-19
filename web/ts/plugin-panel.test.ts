@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { formatBuildTime, createPluginGlyph } from './plugin-panel';
+import { formatBuildTime, createPluginElement } from './plugin-panel';
 
 // Mock function to format Unix epoch timestamps (plugin binary_built)
 function formatUnixTimestamp(timestampStr: string): string | null {
@@ -221,13 +221,13 @@ describe('Plugin Panel Build Time Display', () => {
     });
 });
 
-describe('Plugin glyph creation', () => {
-    test('createPluginGlyph returns valid glyph', () => {
-        const glyph = createPluginGlyph();
+describe('Plugin element creation', () => {
+    test('createPluginElement returns valid element', () => {
+        const item = createPluginElement();
 
-        expect(glyph.id).toBe('plugin-glyph');
-        expect(glyph.opensAs).toBe('panel');
-        expect(glyph.title).toContain('Domain Plugins');
-        expect(typeof glyph.renderContent).toBe('function');
+        expect(item.id).toBe('plugin-element');
+        expect(item.opensAs).toBe('panel');
+        expect(item.title).toContain('Domain Plugins');
+        expect(typeof item.renderContent).toBe('function');
     });
 });

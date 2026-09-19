@@ -131,7 +131,7 @@ type heldBinding struct {
 	signedAt time.Time
 }
 
-// describedProvider is what the glyph needs to draw a provider's form without
+// describedProvider is what the element needs to draw a provider's form without
 // knowing which providers exist.
 type describedProvider struct {
 	ID               string `json:"id"`
@@ -145,7 +145,7 @@ type describedProvider struct {
 }
 
 // handleBindingProviders lists what can be linked at the door this request
-// reached. The glyph renders from this, so a provider appears in the UI by
+// reached. The element renders from this, so a provider appears in the UI by
 // existing here — and a door with its own client is what puts it there.
 func (h *Handler) handleBindingProviders(w http.ResponseWriter, r *http.Request) {
 	offered := h.offeredAt(h.doorNamespace(r))
@@ -622,7 +622,7 @@ func (h *Handler) publicOrigin() string {
 	return h.loopbackOrigin
 }
 
-// renderCeremonyPage is the whole of the redirect landing page. The glyph is
+// renderCeremonyPage is the whole of the redirect landing page. The element is
 // already polling for the result, so this window's only job is to stop being
 // the thing the person is looking at.
 func (h *Handler) renderCeremonyPage(w http.ResponseWriter, status int, ok bool, message string) {
@@ -639,7 +639,7 @@ func (h *Handler) renderCeremonyPage(w http.ResponseWriter, status int, ok bool,
 		html.EscapeString(message) +
 		`<p style="color:#e6e4ef;opacity:.6">You can close this window.</p>`
 	if _, err := w.Write([]byte(page)); err != nil {
-		// The binding is already signed and stored, so the glyph still collects
+		// The binding is already signed and stored, so the element still collects
 		// it. What is lost is the person being told, and only that.
 		h.logger.Infow("ceremony page not delivered", "status", status, "error", err)
 	}

@@ -12,7 +12,7 @@ service PythonService {
 
 message PythonExecuteRequest {
   string code = 1;
-  string glyph_id = 2;
+  string element_id = 2;
   bytes upstream_attestation = 3;  // JSON-encoded attestation
 }
 

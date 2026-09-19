@@ -10,7 +10,7 @@ export const protobufPackage = "protocol";
 
 export interface PythonExecuteRequest {
   code: string;
-  glyph_id: string;
+  element_id: string;
   /** JSON-encoded attestation */
   upstream_attestation: Uint8Array;
 }

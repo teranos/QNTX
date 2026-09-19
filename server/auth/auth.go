@@ -407,7 +407,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// signature over a challenge it issued.
 	mux.answer("/auth/laye/challenge", h.handleLayeChallenge)
 	mux.answer("/auth/laye/verify", h.handleLayeVerify)
-	// The ceremony: the glyph asks what can be linked, starts one, and collects
+	// The ceremony: the element asks what can be linked, starts one, and collects
 	// the result. Everything the provider requires happens on this side of the
 	// wire, so no page holds a secret and no page holds logic.
 	mux.answer("/auth/binding/providers", h.handleBindingProviders)
@@ -439,7 +439,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// Who the node thinks is asking (ADR-031): the User the admission resolved,
 	// the accounts joined to it, the door it came in by, and the namespace it
 	// acts in. Whoever is logged in reaches it, and reaches nobody else.
-	// ⍟'s own path: a glyph's things are asked for on the glyph's own path,
+	// ⍟'s own path: an element's things are asked for on the element's own path,
 	// rather than beside the ceremony that admitted the person.
 	mux.answer("/i/", h.HandleTheUser)
 	// Arriving: a User an admission created has said nothing about itself,
@@ -621,9 +621,9 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, level
 	h.writeError(w, http.StatusForbidden, "this route is not yours")
 }
 
-// A glyph's own paths are asked for and never navigated to, so they answer a
+// An element's own paths are asked for and never navigated to, so they answer a
 // refusal in the caller's own terms like /api/ does. Without this a fetch of
-// /i/ is sent to the login page and the glyph draws that instead of what the
+// /i/ is sent to the login page and the element draws that instead of what the
 // node said.
 //
 // /mcp is here because a client reads the refusal rather than looking at it:

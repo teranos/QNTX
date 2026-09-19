@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	pb "github.com/teranos/QNTX/glyph/proto"
+	pb "github.com/teranos/QNTX/element/proto"
 	"github.com/teranos/errors"
 )
 

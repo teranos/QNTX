@@ -484,9 +484,9 @@ func TestPresentingABearerRecordsItsUse(t *testing.T) {
 	assert.Len(t, store.touchedHashes(), 1)
 }
 
-// A token's glyph shows what the token may do, and that is one reading: the
+// A token's element shows what the token may do, and that is one reading: the
 // node's, the same one the gate makes for every request the token sends.
-// The glyph asks here rather than working it out from the lines itself.
+// The element asks here rather than working it out from the lines itself.
 func TestGetTokenAnswersTheRolesAndWordsItHolds(t *testing.T) {
 	store := newMemTokenStore()
 	_, id, err := store.Create(NewToken{Label: "pond-sensor", MintedBy: mastodonAccount, Level: LevelAttestor, Namespaces: []string{"clean"}})

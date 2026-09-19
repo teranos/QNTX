@@ -1,7 +1,7 @@
 /**
  * Composition State Management
  *
- * High-level helpers for managing melded glyph compositions.
+ * High-level helpers for managing melded element compositions.
  * Compositions are persisted in UIState but managed through this module
  * to keep composition-specific logic separate.
  */
@@ -27,14 +27,14 @@ export function addComposition(composition: CompositionState): void {
             c.id === composition.id ? composition : c
         );
         uiState.setCanvasCompositions(updated);
-        log.debug(SEG.GLYPH, '[Compositions] Updated composition', { id: composition.id });
+        log.debug(SEG.ELEMENT, '[Compositions] Updated composition', { id: composition.id });
     } else {
         // Add new
         uiState.setCanvasCompositions([...compositions, composition]);
-        log.debug(SEG.GLYPH, '[Compositions] Added composition', {
+        log.debug(SEG.ELEMENT, '[Compositions] Added composition', {
             id: composition.id,
             edges: composition.edges.length,
-            glyphs: extractElementIds(composition.edges)
+            elements: extractElementIds(composition.edges)
         });
     }
 
@@ -49,31 +49,31 @@ export function removeComposition(id: string): void {
     const compositions = uiState.getCanvasCompositions();
     const updated = compositions.filter(c => c.id !== id);
     uiState.setCanvasCompositions(updated);
-    log.debug(SEG.GLYPH, '[Compositions] Removed composition', { id });
+    log.debug(SEG.ELEMENT, '[Compositions] Removed composition', { id });
 
     // Enqueue for server sync (never throws)
     apiDeleteComposition(id);
 }
 
 /**
- * Check if a glyph is part of any composition (DAG-native)
- * Traverses edges to find if glyph appears in any from/to
+ * Check if an element is part of any composition (DAG-native)
+ * Traverses edges to find if element appears in any from/to
  */
-export function isGlyphInComposition(glyphId: string): boolean {
+export function isElementInComposition(elementId: string): boolean {
     const compositions = uiState.getCanvasCompositions();
     return compositions.some(c =>
-        c.edges.some(edge => edge.from === glyphId || edge.to === glyphId)
+        c.edges.some(edge => edge.from === elementId || edge.to === elementId)
     );
 }
 
 /**
- * Find composition containing a specific glyph (DAG-native)
- * Traverses edges to find composition where glyph appears
+ * Find composition containing a specific element (DAG-native)
+ * Traverses edges to find composition where element appears
  */
-export function findCompositionByGlyph(glyphId: string): CompositionState | null {
+export function findCompositionByElement(elementId: string): CompositionState | null {
     const compositions = uiState.getCanvasCompositions();
     return compositions.find(c =>
-        c.edges.some(edge => edge.from === glyphId || edge.to === glyphId)
+        c.edges.some(edge => edge.from === elementId || edge.to === elementId)
     ) || null;
 }
 

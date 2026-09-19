@@ -11,7 +11,7 @@ import type { DaemonStatusMessage } from '../types/websocket';
 import { DB, Sigma } from './sym';
 import { openDoor, signedIn, standAtTheDoor } from './signin';
 import { log, SEG } from './logger';
-import { spawnConnectivityGlyph } from './components/glyph/connectivity-glyph';
+import { spawnConnectivityElement } from './components/element/connectivity-element';
 import { tray } from '@teranos/elements';
 import { connectingLabel } from './reconnect';
 
@@ -61,10 +61,10 @@ class StatusIndicatorManager {
         this.addDatabaseIndicator();
         this.addSigmaIndicator();
 
-        // Auth: spawn auth glyph when unauthenticated, add logout to connection context menu
+        // Auth: spawn auth element when unauthenticated, add logout to connection context menu
         this.setupAuthIntegration();
 
-        // Connectivity: auto-open diagnostic glyph on the first failure
+        // Connectivity: auto-open diagnostic element on the first failure
         this.setupConnectivityDiagnostic();
 
         // Subscribe to connectivity state for connection indicator
@@ -238,12 +238,12 @@ class StatusIndicatorManager {
     }
 
     /**
-     * Auto-open the connectivity glyph on the first failure. Subsequent failures
-     * update the glyph in place via its own subscribeFailures wiring.
+     * Auto-open the connectivity element on the first failure. Subsequent failures
+     * update the element in place via its own subscribeFailures wiring.
      */
     private setupConnectivityDiagnostic(): void {
         connectivity.subscribeFailures(() => {
-            spawnConnectivityGlyph();
+            spawnConnectivityElement();
         });
     }
 
@@ -312,7 +312,7 @@ class StatusIndicatorManager {
      * Show database information modal
      */
     private showDatabaseInfo(): void {
-        tray.open('database-glyph');
+        tray.open('database-element');
     }
 
     /**

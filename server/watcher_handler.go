@@ -245,7 +245,7 @@ func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Requ
 			writeRichError(w, h.logger, errors.New("action_data is required for python/webhook watchers"), http.StatusBadRequest)
 			return
 		}
-	case "plugin_execute", "glyph_execute":
+	case "plugin_execute", "element_execute":
 		if req.ActionData == "" {
 			writeRichError(w, h.logger, errors.Newf("action_data is required for %s watchers", req.ActionType), http.StatusBadRequest)
 			return

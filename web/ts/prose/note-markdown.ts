@@ -1,5 +1,5 @@
 /**
- * Markdown parser and serializer for note glyphs
+ * Markdown parser and serializer for note elements
  *
  * Lightweight version without frontmatter or custom code blocks
  */

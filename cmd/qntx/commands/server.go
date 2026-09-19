@@ -15,7 +15,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
-	glyphstorage "github.com/teranos/QNTX/glyph/storage"
+	elementstorage "github.com/teranos/QNTX/element/storage"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -126,7 +126,7 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		// an attestation.
 		Watchers:    storage.NewWatcherStore(database),
 		Schedules:   schedule.NewStore(database),
-		Canvas:      glyphstorage.NewCanvasStore(database),
+		Canvas:      elementstorage.NewCanvasStore(database),
 		Embeddings:  storage.NewEmbeddingStore(database, logger.Logger.Desugar()),
 		Rich:        storage.NewBoundedStore(database, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(database),

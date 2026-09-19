@@ -69,6 +69,17 @@
       ],
       "x-qntx-prefix": true
     },
+    "/api/canvas/elements": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/canvas/elements/": {
+      "x-qntx-reach": [
+        "ROOT"
+      ],
+      "x-qntx-prefix": true
+    },
     "/api/canvas/export": {
       "x-qntx-reach": [
         "ROOT"
@@ -78,17 +89,6 @@
       "x-qntx-reach": [
         "ROOT"
       ]
-    },
-    "/api/canvas/glyphs": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/canvas/glyphs/": {
-      "x-qntx-reach": [
-        "ROOT"
-      ],
-      "x-qntx-prefix": true
     },
     "/api/canvas/minimized-windows": {
       "x-qntx-reach": [
@@ -114,6 +114,11 @@
       ]
     },
     "/api/dev": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/element-config": {
       "x-qntx-reach": [
         "ROOT"
       ]
@@ -194,11 +199,6 @@
       ],
       "x-qntx-prefix": true
     },
-    "/api/glyph-config": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
     "/api/namespaces": {
       "x-qntx-reach": [
         "ROOT",
@@ -230,7 +230,7 @@
       ],
       "x-qntx-prefix": true
     },
-    "/api/plugins/glyphs": {
+    "/api/plugins/elements": {
       "x-qntx-reach": [
         "ROOT"
       ]

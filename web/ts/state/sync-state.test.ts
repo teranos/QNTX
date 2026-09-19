@@ -1,19 +1,19 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { syncStateManager, type GlyphSyncState } from './sync-state';
+import { syncStateManager, type ElementSyncState } from './sync-state';
 
 describe('SyncStateManager', () => {
-    const testGlyphId = 'test-glyph-123';
+    const testElementId = 'test-element-123';
 
     beforeEach(() => {
         // Clear state before each test
-        syncStateManager.clearState(testGlyphId);
+        syncStateManager.clearState(testElementId);
     });
 
-    test('tracks glyph sync state transitions', () => {
+    test('tracks element sync state transitions', () => {
         // Track all state changes
-        const stateChanges: GlyphSyncState[] = [];
+        const stateChanges: ElementSyncState[] = [];
 
-        syncStateManager.subscribe(testGlyphId, (state) => {
+        syncStateManager.subscribe(testElementId, (state) => {
             stateChanges.push(state);
         });
 
@@ -21,8 +21,8 @@ describe('SyncStateManager', () => {
         expect(stateChanges[0]).toBe('unsynced');
 
         // Simulate API call lifecycle: unsynced → syncing → synced
-        syncStateManager.setState(testGlyphId, 'syncing');
-        syncStateManager.setState(testGlyphId, 'synced');
+        syncStateManager.setState(testElementId, 'syncing');
+        syncStateManager.setState(testElementId, 'synced');
 
         // Verify all transitions were tracked
         expect(stateChanges).toEqual([
@@ -32,19 +32,19 @@ describe('SyncStateManager', () => {
         ]);
 
         // Verify final state
-        expect(syncStateManager.getState(testGlyphId)).toBe('synced');
+        expect(syncStateManager.getState(testElementId)).toBe('synced');
     });
 
     test('handles sync failure correctly', () => {
-        const stateChanges: GlyphSyncState[] = [];
+        const stateChanges: ElementSyncState[] = [];
 
-        syncStateManager.subscribe(testGlyphId, (state) => {
+        syncStateManager.subscribe(testElementId, (state) => {
             stateChanges.push(state);
         });
 
         // Simulate failed sync: unsynced → syncing → failed
-        syncStateManager.setState(testGlyphId, 'syncing');
-        syncStateManager.setState(testGlyphId, 'failed');
+        syncStateManager.setState(testElementId, 'syncing');
+        syncStateManager.setState(testElementId, 'failed');
 
         expect(stateChanges).toEqual([
             'unsynced',
@@ -52,22 +52,22 @@ describe('SyncStateManager', () => {
             'failed'
         ]);
 
-        expect(syncStateManager.getState(testGlyphId)).toBe('failed');
+        expect(syncStateManager.getState(testElementId)).toBe('failed');
     });
 
     test('multiple subscribers receive state updates', () => {
-        const subscriber1States: GlyphSyncState[] = [];
-        const subscriber2States: GlyphSyncState[] = [];
+        const subscriber1States: ElementSyncState[] = [];
+        const subscriber2States: ElementSyncState[] = [];
 
-        syncStateManager.subscribe(testGlyphId, (state) => {
+        syncStateManager.subscribe(testElementId, (state) => {
             subscriber1States.push(state);
         });
 
-        syncStateManager.subscribe(testGlyphId, (state) => {
+        syncStateManager.subscribe(testElementId, (state) => {
             subscriber2States.push(state);
         });
 
-        syncStateManager.setState(testGlyphId, 'syncing');
+        syncStateManager.setState(testElementId, 'syncing');
 
         // Both subscribers should receive the update
         expect(subscriber1States).toContain('syncing');
@@ -75,18 +75,18 @@ describe('SyncStateManager', () => {
     });
 
     test('unsubscribe prevents future updates', () => {
-        const stateChanges: GlyphSyncState[] = [];
+        const stateChanges: ElementSyncState[] = [];
 
-        const unsubscribe = syncStateManager.subscribe(testGlyphId, (state) => {
+        const unsubscribe = syncStateManager.subscribe(testElementId, (state) => {
             stateChanges.push(state);
         });
 
-        syncStateManager.setState(testGlyphId, 'syncing');
+        syncStateManager.setState(testElementId, 'syncing');
         expect(stateChanges).toContain('syncing');
 
         // Unsubscribe and make another change
         unsubscribe();
-        syncStateManager.setState(testGlyphId, 'synced');
+        syncStateManager.setState(testElementId, 'synced');
 
         // Should not receive 'synced' update after unsubscribing
         expect(stateChanges).not.toContain('synced');

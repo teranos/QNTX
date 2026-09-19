@@ -233,9 +233,9 @@ async function startServer(pluginPath: string, port: number) {
             callback(null, { fields: {} });
         },
 
-        RegisterGlyphs: (call: any, callback: any) => {
-            const glyphs = plugin.registerGlyphs ? plugin.registerGlyphs() : [];
-            callback(null, { glyphs });
+        RegisterElements: (call: any, callback: any) => {
+            const items = plugin.registerElements ? plugin.registerElements() : [];
+            callback(null, { elements: items });
         },
 
         ExecuteJob: async (call: any, callback: any) => {

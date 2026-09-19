@@ -69,7 +69,7 @@ const (
 
 	// StaandArrivals is one per arrival a stand recorded (ADR-035), sliced by the
 	// stand. The event and the page are caller-controlled and unbounded, so they
-	// are not dimensions here — they live in the stand glyph's live fold instead.
+	// are not dimensions here — they live in the stand element's live fold instead.
 	StaandArrivals = "qntx.staand.arrivals"
 
 	// OpenedRefused is one per request a caller sent past the floor on a plugin

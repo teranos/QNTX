@@ -445,24 +445,24 @@ func (s *PluginServer) ConfigSchema(ctx context.Context, _ *protocol.Empty) (*pr
 	}, nil
 }
 
-// RegisterGlyphs returns custom glyph type definitions from the plugin.
-// If the plugin implements UIPlugin, returns its glyph definitions; otherwise empty.
-func (s *PluginServer) RegisterGlyphs(ctx context.Context, _ *protocol.Empty) (*protocol.GlyphDefResponse, error) {
+// RegisterElements returns custom element type definitions from the plugin.
+// If the plugin implements UIPlugin, returns its element definitions; otherwise empty.
+func (s *PluginServer) RegisterElements(ctx context.Context, _ *protocol.Empty) (*protocol.ElementDefResponse, error) {
 	// Check if plugin implements UIPlugin
 	uiPlugin, ok := s.plugin.(plugin.UIPlugin)
 	if !ok {
-		// Plugin doesn't provide custom glyphs - return empty
-		return &protocol.GlyphDefResponse{
-			Glyphs: []*protocol.GlyphDef{},
+		// Plugin doesn't provide custom elements - return empty
+		return &protocol.ElementDefResponse{
+			Elements: []*protocol.ElementDef{},
 		}, nil
 	}
 
-	// Get glyph definitions from plugin and convert to protocol format
-	glyphDefs := uiPlugin.RegisterGlyphs()
-	protoGlyphs := make([]*protocol.GlyphDef, len(glyphDefs))
+	// Get element definitions from plugin and convert to protocol format
+	elementDefs := uiPlugin.RegisterElements()
+	protoElements := make([]*protocol.ElementDef, len(elementDefs))
 
-	for i, def := range glyphDefs {
-		protoGlyphs[i] = &protocol.GlyphDef{
+	for i, def := range elementDefs {
+		protoElements[i] = &protocol.ElementDef{
 			Symbol:        def.Symbol,
 			Title:         def.Title,
 			Label:         def.Label,
@@ -474,8 +474,8 @@ func (s *PluginServer) RegisterGlyphs(ctx context.Context, _ *protocol.Empty) (*
 		}
 	}
 
-	return &protocol.GlyphDefResponse{
-		Glyphs: protoGlyphs,
+	return &protocol.ElementDefResponse{
+		Elements: protoElements,
 	}, nil
 }
 

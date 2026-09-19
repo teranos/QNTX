@@ -1,5 +1,5 @@
 /**
- * Plugin Panel Styling - Dark-mode glyph panel context
+ * Plugin Panel Styling - Dark-mode element panel context
  *
  * The plugin panel renders inside a .panel (dark background).
  * All styles assume dark context — no light-mode fallbacks needed.

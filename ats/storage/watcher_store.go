@@ -18,14 +18,14 @@ const (
 	ActionTypePython        ActionType = "python"
 	ActionTypeWebhook       ActionType = "webhook"
 	ActionTypeLLMPrompt     ActionType = "llm_prompt"
-	ActionTypeGlyphExecute  ActionType = "glyph_execute"
+	ActionTypeElementExecute  ActionType = "element_execute"
 	ActionTypePluginExecute ActionType = "plugin_execute" // Added 2026-03-11, no active consumers yet (loom uses UDP instead)
 	ActionTypeSemanticMatch ActionType = "semantic_match"
 
 	// ActionTypeTell runs nothing. It tells the browsers watching that an
 	// attestation matched, and what to do about it is the page's.
 	//
-	// Every other type reaches somebody's code — a webhook, a Python glyph, a
+	// Every other type reaches somebody's code — a webhook, a Python element, a
 	// plugin job — which is why a watcher is something a person makes and can
 	// take away. This one cannot run anything, so it is what a node is allowed
 	// to be born with (see ats/watcher's standing table).
@@ -36,7 +36,7 @@ const (
 // Path uses dot-separated keys to navigate nested objects (e.g., "tool_input.command").
 // Op is "equals" or "contains" — no regex per QNTX LAW.
 // Added 2026-03-11, no active consumers yet. First consumer should remove this notice.
-// TODO(#672): Expose in AX glyph UI as attribute filter conditions.
+// TODO(#672): Expose in AX element UI as attribute filter conditions.
 type AttributeFilter struct {
 	Path  string `json:"path"`  // Dot-separated JSON path (e.g., "tool_name", "tool_input.command")
 	Op    string `json:"op"`    // "equals" or "contains"
@@ -52,7 +52,7 @@ type Watcher struct {
 	Filter  types.AxFilter `json:"filter"`
 	AxQuery string         `json:"ax_query,omitempty"` // Raw AX query string (alternative to Filter fields)
 
-	// Semantic matching — used by ⊨ glyphs for meaning-based search
+	// Semantic matching — used by ⊨ elements for meaning-based search
 	SemanticQuery     string  `json:"semantic_query,omitempty"`      // Natural language query for embedding comparison
 	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`  // Minimum similarity score (0-1) to fire
 	SemanticClusterID *int    `json:"semantic_cluster_id,omitempty"` // Cluster scope (nil = all clusters)
@@ -116,7 +116,7 @@ type Watchers interface {
 	// RecentFires answers what a count cannot: which attestations set this
 	// watcher off, and when. Newest first.
 	RecentFires(ctx context.Context, id string, limit int) ([]Fire, error)
-	FindCompoundWatchersForTarget(ctx context.Context, targetGlyphID string) ([]*Watcher, error)
+	FindCompoundWatchersForTarget(ctx context.Context, targetElementID string) ([]*Watcher, error)
 }
 
 // WatcherStore handles CRUD operations for watchers
@@ -706,11 +706,11 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 }
 
 // FindCompoundWatchersForTarget finds SE→SE compound meld-edge watchers
-// that target a specific glyph ID. Returns watchers with UpstreamSemanticQuery
-// set whose action_data references the target glyph. Used to detect when a
+// that target a specific element ID. Returns watchers with UpstreamSemanticQuery
+// set whose action_data references the target element. Used to detect when a
 // standalone SE watcher should stay suppressed because a compound watcher
 // replaces it.
-func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targetGlyphID string) (_ []*Watcher, err error) {
+func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targetElementID string) (_ []*Watcher, err error) {
 	rows, err := ws.db.QueryContext(ctx, `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
@@ -723,9 +723,9 @@ func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targe
 		FROM watchers
 		WHERE id LIKE 'meld-edge-%'
 		AND upstream_semantic_query IS NOT NULL
-		AND json_extract(action_data, '$.target_glyph_id') = ?`, targetGlyphID)
+		AND json_extract(action_data, '$.target_element_id') = ?`, targetElementID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to find compound watchers for target %s", targetGlyphID)
+		return nil, errors.Wrapf(err, "failed to find compound watchers for target %s", targetElementID)
 	}
 	defer func() { err = sqlclose.With(err, rows.Close(), "rows for FindCompoundWatchersForTarget") }()
 

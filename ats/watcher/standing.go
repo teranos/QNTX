@@ -15,24 +15,24 @@ package watcher
 import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/glyph"
+	"github.com/teranos/QNTX/element"
 )
 
-// StandingGlyphPublished is the id of the row below. Named because the engine
-// reports by id and a log line saying `standing-glyph-published` should be
+// StandingElementPublished is the id of the row below. Named because the engine
+// reports by id and a log line saying `standing-element-published` should be
 // findable in the source.
-const StandingGlyphPublished = "standing-glyph-published"
+const StandingElementPublished = "standing-element-published"
 
 // standing is the table. Unexported and copied on the way out: a caller that
 // could reach the rows could edit what every node is born with.
 var standing = []storage.Watcher{
 	{
-		ID:   StandingGlyphPublished,
-		Name: "a glyph module was published",
-		// A glyph's module is an attestation, and a page holds the module it
-		// imported. Without this the page shows the glyph that was published
+		ID:   StandingElementPublished,
+		Name: "an element module was published",
+		// An element's module is an attestation, and a page holds the module it
+		// imported. Without this the page shows the element that was published
 		// before it loaded, until somebody reloads it by hand.
-		Filter:            types.AxFilter{Predicates: []string{glyph.ModulePredicate}},
+		Filter:            types.AxFilter{Predicates: []string{element.ModulePredicate}},
 		ActionType:        storage.ActionTypeTell,
 		MaxFiresPerSecond: 0,
 		Enabled:           true,

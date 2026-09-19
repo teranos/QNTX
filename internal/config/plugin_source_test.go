@@ -34,9 +34,9 @@ func TestParseEnabledEntry(t *testing.T) {
 		},
 		{
 			name:     "hyphenated name survives",
-			entry:    "https://github.com/teranos/pty-glyph",
-			wantName: "pty-glyph",
-			wantRepo: "https://github.com/teranos/pty-glyph",
+			entry:    "https://github.com/teranos/pty-element",
+			wantName: "pty-element",
+			wantRepo: "https://github.com/teranos/pty-element",
 		},
 		{
 			name:     "surrounding space is not part of the name",

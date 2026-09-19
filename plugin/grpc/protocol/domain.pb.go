@@ -920,7 +920,7 @@ type InitializeResponse struct {
 	// via GET /api/plugins/routes.
 	HttpRoutes []*RouteInfo `protobuf:"bytes,8,rep,name=http_routes,json=httpRoutes,proto3" json:"http_routes,omitempty"`
 	// python_provider indicates this plugin can execute Python code.
-	// Core registers "py" glyph type when any loaded plugin declares this.
+	// Core registers "py" element type when any loaded plugin declares this.
 	PythonProvider bool `protobuf:"varint,9,opt,name=python_provider,json=pythonProvider,proto3" json:"python_provider,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -1426,28 +1426,28 @@ func (x *JobLogEntry) GetMetadata() string {
 	return ""
 }
 
-// GlyphDefResponse contains custom glyph type definitions from a plugin
-type GlyphDefResponse struct {
+// ElementDefResponse contains custom element type definitions from a plugin
+type ElementDefResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Glyphs        []*GlyphDef            `protobuf:"bytes,1,rep,name=glyphs,proto3" json:"glyphs,omitempty"`
+	Elements      []*ElementDef          `protobuf:"bytes,1,rep,name=elements,proto3" json:"elements,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GlyphDefResponse) Reset() {
-	*x = GlyphDefResponse{}
+func (x *ElementDefResponse) Reset() {
+	*x = ElementDefResponse{}
 	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GlyphDefResponse) String() string {
+func (x *ElementDefResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GlyphDefResponse) ProtoMessage() {}
+func (*ElementDefResponse) ProtoMessage() {}
 
-func (x *GlyphDefResponse) ProtoReflect() protoreflect.Message {
+func (x *ElementDefResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1459,31 +1459,31 @@ func (x *GlyphDefResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GlyphDefResponse.ProtoReflect.Descriptor instead.
-func (*GlyphDefResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ElementDefResponse.ProtoReflect.Descriptor instead.
+func (*ElementDefResponse) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{17}
 }
 
-func (x *GlyphDefResponse) GetGlyphs() []*GlyphDef {
+func (x *ElementDefResponse) GetElements() []*ElementDef {
 	if x != nil {
-		return x.Glyphs
+		return x.Elements
 	}
 	return nil
 }
 
-// GlyphDef defines a custom glyph type provided by a plugin
-type GlyphDef struct {
+// ElementDef defines a custom element type provided by a plugin
+type ElementDef struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Symbol is the glyph identifier (e.g., "⚗" for a chemistry plugin)
+	// Symbol is the element identifier (e.g., "⚗" for a chemistry plugin)
 	Symbol string `protobuf:"bytes,1,opt,name=symbol,proto3" json:"symbol,omitempty"`
 	// Title is the human-readable name shown in the title bar
 	Title string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	// Label is a short identifier for logs and the spawn menu
 	Label string `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`
 	// ContentPath is the HTTP path (relative to /api/{plugin}/) that
-	// returns the HTML fragment for this glyph's content area
+	// returns the HTML fragment for this element's content area
 	ContentPath string `protobuf:"bytes,4,opt,name=content_path,json=contentPath,proto3" json:"content_path,omitempty"`
-	// CSSPath is an optional HTTP path to a stylesheet for this glyph type
+	// CSSPath is an optional HTTP path to a stylesheet for this element type
 	CssPath string `protobuf:"bytes,5,opt,name=css_path,json=cssPath,proto3" json:"css_path,omitempty"`
 	// DefaultWidth and DefaultHeight in pixels (0 = use system default)
 	DefaultWidth  int32 `protobuf:"varint,6,opt,name=default_width,json=defaultWidth,proto3" json:"default_width,omitempty"`
@@ -1496,20 +1496,20 @@ type GlyphDef struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GlyphDef) Reset() {
-	*x = GlyphDef{}
+func (x *ElementDef) Reset() {
+	*x = ElementDef{}
 	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GlyphDef) String() string {
+func (x *ElementDef) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GlyphDef) ProtoMessage() {}
+func (*ElementDef) ProtoMessage() {}
 
-func (x *GlyphDef) ProtoReflect() protoreflect.Message {
+func (x *ElementDef) ProtoReflect() protoreflect.Message {
 	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1521,61 +1521,61 @@ func (x *GlyphDef) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GlyphDef.ProtoReflect.Descriptor instead.
-func (*GlyphDef) Descriptor() ([]byte, []int) {
+// Deprecated: Use ElementDef.ProtoReflect.Descriptor instead.
+func (*ElementDef) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{18}
 }
 
-func (x *GlyphDef) GetSymbol() string {
+func (x *ElementDef) GetSymbol() string {
 	if x != nil {
 		return x.Symbol
 	}
 	return ""
 }
 
-func (x *GlyphDef) GetTitle() string {
+func (x *ElementDef) GetTitle() string {
 	if x != nil {
 		return x.Title
 	}
 	return ""
 }
 
-func (x *GlyphDef) GetLabel() string {
+func (x *ElementDef) GetLabel() string {
 	if x != nil {
 		return x.Label
 	}
 	return ""
 }
 
-func (x *GlyphDef) GetContentPath() string {
+func (x *ElementDef) GetContentPath() string {
 	if x != nil {
 		return x.ContentPath
 	}
 	return ""
 }
 
-func (x *GlyphDef) GetCssPath() string {
+func (x *ElementDef) GetCssPath() string {
 	if x != nil {
 		return x.CssPath
 	}
 	return ""
 }
 
-func (x *GlyphDef) GetDefaultWidth() int32 {
+func (x *ElementDef) GetDefaultWidth() int32 {
 	if x != nil {
 		return x.DefaultWidth
 	}
 	return 0
 }
 
-func (x *GlyphDef) GetDefaultHeight() int32 {
+func (x *ElementDef) GetDefaultHeight() int32 {
 	if x != nil {
 		return x.DefaultHeight
 	}
 	return 0
 }
 
-func (x *GlyphDef) GetModulePath() string {
+func (x *ElementDef) GetModulePath() string {
 	if x != nil {
 		return x.ModulePath
 	}
@@ -1813,10 +1813,11 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x05level\x18\x02 \x01(\tR\x05level\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x12\x14\n" +
 	"\x05stage\x18\x04 \x01(\tR\x05stage\x12\x1a\n" +
-	"\bmetadata\x18\x05 \x01(\tR\bmetadata\">\n" +
-	"\x10GlyphDefResponse\x12*\n" +
-	"\x06glyphs\x18\x01 \x03(\v2\x12.protocol.GlyphDefR\x06glyphs\"\xf9\x01\n" +
-	"\bGlyphDef\x12\x16\n" +
+	"\bmetadata\x18\x05 \x01(\tR\bmetadata\"F\n" +
+	"\x12ElementDefResponse\x120\n" +
+	"\belements\x18\x01 \x03(\v2\x14.protocol.ElementDefR\belements\"\xfb\x01\n" +
+	"\n" +
+	"ElementDef\x12\x16\n" +
 	"\x06symbol\x18\x01 \x01(\tR\x06symbol\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x14\n" +
 	"\x05label\x18\x03 \x01(\tR\x05label\x12!\n" +
@@ -1830,7 +1831,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x05query\x18\x01 \x01(\tR\x05query\"D\n" +
 	"\x14ParseAxQueryResponse\x12\x16\n" +
 	"\x06result\x18\x01 \x01(\fR\x06result\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error2\x9e\x05\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error2\xa2\x05\n" +
 	"\x13DomainPluginService\x127\n" +
 	"\bMetadata\x12\x0f.protocol.Empty\x1a\x1a.protocol.MetadataResponse\x12G\n" +
 	"\n" +
@@ -1840,8 +1841,8 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"HandleHTTP\x12\x15.protocol.HTTPRequest\x1a\x16.protocol.HTTPResponse\x12M\n" +
 	"\x0fHandleWebSocket\x12\x1a.protocol.WebSocketMessage\x1a\x1a.protocol.WebSocketMessage(\x010\x01\x123\n" +
 	"\x06Health\x12\x0f.protocol.Empty\x1a\x18.protocol.HealthResponse\x12?\n" +
-	"\fConfigSchema\x12\x0f.protocol.Empty\x1a\x1e.protocol.ConfigSchemaResponse\x12=\n" +
-	"\x0eRegisterGlyphs\x12\x0f.protocol.Empty\x1a\x1a.protocol.GlyphDefResponse\x12G\n" +
+	"\fConfigSchema\x12\x0f.protocol.Empty\x1a\x1e.protocol.ConfigSchemaResponse\x12A\n" +
+	"\x10RegisterElements\x12\x0f.protocol.Empty\x1a\x1c.protocol.ElementDefResponse\x12G\n" +
 	"\n" +
 	"ExecuteJob\x12\x1b.protocol.ExecuteJobRequest\x1a\x1c.protocol.ExecuteJobResponse\x12M\n" +
 	"\fParseAxQuery\x12\x1d.protocol.ParseAxQueryRequest\x1a\x1e.protocol.ParseAxQueryResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
@@ -1879,8 +1880,8 @@ var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(*ExecuteJobRequest)(nil),    // 15: protocol.ExecuteJobRequest
 	(*ExecuteJobResponse)(nil),   // 16: protocol.ExecuteJobResponse
 	(*JobLogEntry)(nil),          // 17: protocol.JobLogEntry
-	(*GlyphDefResponse)(nil),     // 18: protocol.GlyphDefResponse
-	(*GlyphDef)(nil),             // 19: protocol.GlyphDef
+	(*ElementDefResponse)(nil),   // 18: protocol.ElementDefResponse
+	(*ElementDef)(nil),           // 19: protocol.ElementDef
 	(*ParseAxQueryRequest)(nil),  // 20: protocol.ParseAxQueryRequest
 	(*ParseAxQueryResponse)(nil), // 21: protocol.ParseAxQueryResponse
 	nil,                          // 22: protocol.InitializeRequest.ConfigEntry
@@ -1900,7 +1901,7 @@ var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
 	14, // 8: protocol.InitializeResponse.watchers:type_name -> protocol.WatcherRegistration
 	13, // 9: protocol.InitializeResponse.http_routes:type_name -> protocol.RouteInfo
 	17, // 10: protocol.ExecuteJobResponse.log_entries:type_name -> protocol.JobLogEntry
-	19, // 11: protocol.GlyphDefResponse.glyphs:type_name -> protocol.GlyphDef
+	19, // 11: protocol.ElementDefResponse.elements:type_name -> protocol.ElementDef
 	10, // 12: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
 	1,  // 13: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
 	3,  // 14: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
@@ -1909,7 +1910,7 @@ var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
 	7,  // 17: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
 	1,  // 18: protocol.DomainPluginService.Health:input_type -> protocol.Empty
 	1,  // 19: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
-	1,  // 20: protocol.DomainPluginService.RegisterGlyphs:input_type -> protocol.Empty
+	1,  // 20: protocol.DomainPluginService.RegisterElements:input_type -> protocol.Empty
 	15, // 21: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
 	20, // 22: protocol.DomainPluginService.ParseAxQuery:input_type -> protocol.ParseAxQueryRequest
 	2,  // 23: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
@@ -1919,7 +1920,7 @@ var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
 	7,  // 27: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
 	8,  // 28: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
 	9,  // 29: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
-	18, // 30: protocol.DomainPluginService.RegisterGlyphs:output_type -> protocol.GlyphDefResponse
+	18, // 30: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
 	16, // 31: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
 	21, // 32: protocol.DomainPluginService.ParseAxQuery:output_type -> protocol.ParseAxQueryResponse
 	23, // [23:33] is the sub-list for method output_type

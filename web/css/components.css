@@ -284,7 +284,7 @@
 }
 
 /* The failure reason, beside the button. Selectable, and a press copies it —
- * matching the copy-on-click boxes elsewhere (tokens-glyph.ts didCell()). */
+ * matching the copy-on-click boxes elsewhere (tokens-element.ts didCell()). */
 .qntx-btn-error-box {
     margin-top: 4px;
     padding: 4px 8px;

@@ -68,7 +68,7 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 
 		// Execute async with a deep copy to prevent race conditions.
 		//
-		// Through sacred because an action is a webhook, a Python glyph or a
+		// Through sacred because an action is a webhook, a Python element or a
 		// plugin job — somebody else's code, reached because an attestation
 		// happened to match. A panic in there was the end of the node, which
 		// made every watcher a way for a third party to stop the whole thing.

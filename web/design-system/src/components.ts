@@ -4,13 +4,13 @@
  * Split into SDK Primitives (what plugins get through ui.*)
  * and Internal Systems (used by QNTX core).
  *
- * The gallery itself is built from glyph primitives — title bars
- * as section headers, glyph containers as specimen wrappers.
- * Mini glyphs use the real ElementUI SDK — actual ui.element(), ui.input(),
+ * The gallery itself is built from element primitives — title bars
+ * as section headers, element containers as specimen wrappers.
+ * Mini elements use the real ElementUI SDK — actual ui.element(), ui.input(),
  * ui.button(), ui.statusLine() calls on a mini canvas.
  */
 
-import { createGlyphUI } from '../../ts/components/glyph/glyph-ui'
+import { createElementUI } from '../../ts/components/element/element-ui'
 import type { Element } from '@teranos/elements'
 
 interface ButtonSpec {
@@ -33,10 +33,10 @@ export function renderComponentGallery(root: HTMLElement) {
   section.appendChild(h2)
 
   // ── SDK Primitives ──
-  section.appendChild(sectionGlyph('SDK Primitives', 'What plugins get through ui.* — the canonical components for plugin-authored glyphs'))
+  section.appendChild(sectionElement('SDK Primitives', 'What plugins get through ui.* — the canonical components for plugin-authored elements'))
 
   // btn (SDK: ui.button())
-  const glyphBtnMatrix = buttonMatrix('ui.button()', 'btn — default and primary variants', ['default', 'primary'], [
+  const elementBtnMatrix = buttonMatrix('ui.button()', 'btn — default and primary variants', ['default', 'primary'], [
     {
       rowLabel: '',
       cells: [
@@ -45,9 +45,9 @@ export function renderComponentGallery(root: HTMLElement) {
       ]
     },
   ])
-  section.appendChild(glyphBtnMatrix)
+  section.appendChild(elementBtnMatrix)
 
-  // Three mini glyphs on a mini canvas — real SDK calls
+  // Three mini elements on a mini canvas — real SDK calls
   const canvas = document.createElement('div')
   canvas.className = 'canvas-workspace'
   canvas.style.position = 'relative'
@@ -58,9 +58,9 @@ export function renderComponentGallery(root: HTMLElement) {
   canvas.style.overflow = 'hidden'
 
   // ix-json: default title bar + SDK primitives
-  const ixJsonGlyph: Element = { id: 'demo-ix-json', title: 'ix-json', symbol: 'ix-json', x: 10, y: 10, renderContent: () => document.createElement('div') }
-  const ixJsonUI = createGlyphUI(ixJsonGlyph, 'ix-json')
-  const ixJson = ixJsonUI.glyph({
+  const ixJsonElement: Element = { id: 'demo-ix-json', title: 'ix-json', symbol: 'ix-json', x: 10, y: 10, renderContent: () => document.createElement('div') }
+  const ixJsonUI = createElementUI(ixJsonElement, 'ix-json')
+  const ixJson = ixJsonUI.element({
     defaults: { x: 10, y: 10, width: 280, height: 190 },
     titleBar: { label: 'ix-json' },
   })
@@ -91,12 +91,12 @@ export function renderComponentGallery(root: HTMLElement) {
   ixJson.content.appendChild(status.element)
   canvas.appendChild(ixJson.element)
 
-  // py-glyph: Python blue title bar
-  const pyGlyphData: Element = { id: 'demo-py', title: 'py-glyph', symbol: 'py', x: 300, y: 10, renderContent: () => document.createElement('div') }
-  const pyUI = createGlyphUI(pyGlyphData, 'py')
-  const py = pyUI.glyph({
+  // py-element: Python blue title bar
+  const pyElementData: Element = { id: 'demo-py', title: 'py-element', symbol: 'py', x: 300, y: 10, renderContent: () => document.createElement('div') }
+  const pyUI = createElementUI(pyElementData, 'py')
+  const py = pyUI.element({
     defaults: { x: 300, y: 10, width: 280, height: 190 },
-    titleBar: { label: 'py-glyph', color: '#2a5578', labelColor: '#FFD43B', actions: [runBtn()] },
+    titleBar: { label: 'py-element', color: '#2a5578', labelColor: '#FFD43B', actions: [runBtn()] },
   })
   const pyCode = document.createElement('pre')
   pyCode.style.fontFamily = 'monospace'
@@ -108,12 +108,12 @@ export function renderComponentGallery(root: HTMLElement) {
   py.content.appendChild(pyCode)
   canvas.appendChild(py.element)
 
-  // ts-glyph: TypeScript amber title bar
-  const tsGlyphData: Element = { id: 'demo-ts', title: 'ts-glyph', symbol: 'ts', x: 590, y: 10, renderContent: () => document.createElement('div') }
-  const tsUI = createGlyphUI(tsGlyphData, 'ts')
-  const ts = tsUI.glyph({
+  // ts-element: TypeScript amber title bar
+  const tsElementData: Element = { id: 'demo-ts', title: 'ts-element', symbol: 'ts', x: 590, y: 10, renderContent: () => document.createElement('div') }
+  const tsUI = createElementUI(tsElementData, 'ts')
+  const ts = tsUI.element({
     defaults: { x: 590, y: 10, width: 280, height: 190 },
-    titleBar: { label: 'ts-glyph', color: '#5c3d1a', labelColor: '#f0c878', actions: [runBtn()] },
+    titleBar: { label: 'ts-element', color: '#5c3d1a', labelColor: '#f0c878', actions: [runBtn()] },
   })
   const tsCode = document.createElement('pre')
   tsCode.style.fontFamily = 'monospace'
@@ -128,7 +128,7 @@ export function renderComponentGallery(root: HTMLElement) {
   section.appendChild(canvas)
 
   // ── Internal Systems ──
-  section.appendChild(sectionGlyph('Internal Systems', 'Used by QNTX core — not exposed to plugins'))
+  section.appendChild(sectionElement('Internal Systems', 'Used by QNTX core — not exposed to plugins'))
 
   // qntx-btn: one matrix — variants + states as rows, sizes as columns
   const variants = ['default', 'primary', 'secondary', 'danger', 'warning', 'ghost']
@@ -178,7 +178,7 @@ export function renderComponentGallery(root: HTMLElement) {
   section.appendChild(qntxMatrix)
 
   // Interactive two-stage confirmation demo
-  section.appendChild(glyphSection('Two-stage confirmation', 'First click enters confirming state, second click executes. Auto-reverts after 3s.', (body) => {
+  section.appendChild(elementSection('Two-stage confirmation', 'First click enters confirming state, second click executes. Auto-reverts after 3s.', (body) => {
     const confirmRow = document.createElement('div')
     confirmRow.className = 'sdk-specimen-row'
 
@@ -239,7 +239,7 @@ export function renderComponentGallery(root: HTMLElement) {
   }))
 
   // titlebar specimens
-  section.appendChild(glyphSection('title-bar', 'Unified title bar for all glyph manifestations', (body) => {
+  section.appendChild(elementSection('title-bar', 'Unified title bar for all element manifestations', (body) => {
     const tbRow = document.createElement('div')
     tbRow.className = 'titlebar-row'
 
@@ -248,7 +248,7 @@ export function renderComponentGallery(root: HTMLElement) {
       { label: '\u2715', cls: 'titlebar-btn' },
     ]))
 
-    tbRow.appendChild(titleBarStrip('Generic buttons', 'title-bar', 'result-glyph', [
+    tbRow.appendChild(titleBarStrip('Generic buttons', 'title-bar', 'result-element', [
       { label: '\u229E', cls: '' },
       { label: '\u2715', cls: '' },
     ]))
@@ -286,8 +286,8 @@ export function renderComponentGallery(root: HTMLElement) {
 
 // ── Helpers ──
 
-/** Section header rendered as a glyph title bar */
-function sectionGlyph(title: string, description: string): HTMLElement {
+/** Section header rendered as an element title bar */
+function sectionElement(title: string, description: string): HTMLElement {
   const wrapper = document.createElement('div')
   wrapper.style.marginTop = '10px'
   wrapper.style.marginBottom = '6px'
@@ -314,8 +314,8 @@ function sectionGlyph(title: string, description: string): HTMLElement {
   return wrapper
 }
 
-/** Component section wrapped in a glyph-like container with title bar */
-function glyphSection(title: string, description: string, buildContent: (body: HTMLElement) => void): HTMLElement {
+/** Component section wrapped in an element-like container with title bar */
+function elementSection(title: string, description: string, buildContent: (body: HTMLElement) => void): HTMLElement {
   const container = document.createElement('div')
   container.style.border = '1px solid var(--border-on-dark)'
   container.style.borderRadius = 'var(--border-radius)'
@@ -348,7 +348,7 @@ function glyphSection(title: string, description: string, buildContent: (body: H
 
 
 function buttonMatrix(name: string, description: string, columnLabels: string[], rows: MatrixRow[]): HTMLElement {
-  const container = glyphSection(name, description, (body) => {
+  const container = elementSection(name, description, (body) => {
     const table = document.createElement('div')
     table.className = 'button-matrix'
     const hasRowLabels = rows.some(r => r.rowLabel)

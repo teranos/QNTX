@@ -43,7 +43,7 @@ type EmbeddingSearcher interface {
 // PythonExecutor runs Python code via gRPC PythonService.
 // Optional — nil when no python_provider plugin is loaded.
 type PythonExecutor interface {
-	Execute(ctx context.Context, code string, glyphID string, upstreamAttestation []byte) ([]byte, error)
+	Execute(ctx context.Context, code string, elementID string, upstreamAttestation []byte) ([]byte, error)
 }
 
 // PluginExecutor dispatches job execution to a named plugin.
@@ -83,9 +83,9 @@ type Engine struct {
 	// score is 0 for structural-only matches, >0 for semantic matches.
 	broadcastMatch func(watcherID string, attestation *types.As, score float32)
 
-	// Broadcast callback for glyph execution events (optional)
-	// Called when a glyph_execute action fires, with status updates and execution result
-	broadcastGlyphFired func(glyphID string, attestationID string, status string, err error, result []byte)
+	// Broadcast callback for element execution events (optional)
+	// Called when an element_execute action fires, with status updates and execution result
+	broadcastElementFired func(elementID string, attestationID string, status string, err error, result []byte)
 
 	// Plugin executor for plugin_execute action type (optional)
 	pluginExecutor PluginExecutor
@@ -104,9 +104,9 @@ type Engine struct {
 	// Persistent execution queue (replaces in-memory retry)
 	queueStore *QueueStore
 
-	// Glyph types that can actually execute (e.g. "prompt", "py", "se").
+	// Element types that can actually execute (e.g. "prompt", "py", "se").
 	// Set by the server after plugin discovery. If nil, all types are allowed.
-	availableGlyphTypes map[string]bool
+	availableElementTypes map[string]bool
 
 	// pythonExecutor runs Python code via gRPC PythonService (optional, nil when unavailable)
 	pythonExecutor PythonExecutor
@@ -151,26 +151,26 @@ func NewEngine(db *sql.DB, reader AttestationReader, apiBaseURL string, logger *
 	}
 }
 
-// SetAvailableGlyphTypes configures which glyph types can execute.
+// SetAvailableElementTypes configures which element types can execute.
 // Watchers targeting unavailable types are skipped during loadWatchers.
 // Call before Start() or before ReloadWatchers().
-func (e *Engine) SetAvailableGlyphTypes(types []string) {
-	e.availableGlyphTypes = make(map[string]bool, len(types))
+func (e *Engine) SetAvailableElementTypes(types []string) {
+	e.availableElementTypes = make(map[string]bool, len(types))
 	for _, t := range types {
-		e.availableGlyphTypes[t] = true
+		e.availableElementTypes[t] = true
 	}
 }
 
-// AddGlyphType registers a glyph type as available for execution.
+// AddElementType registers an element type as available for execution.
 // Safe to call after Start() — takes effect on next watcher evaluation.
-func (e *Engine) AddGlyphType(glyphType string) {
-	if e.availableGlyphTypes == nil {
-		e.availableGlyphTypes = make(map[string]bool)
+func (e *Engine) AddElementType(elementType string) {
+	if e.availableElementTypes == nil {
+		e.availableElementTypes = make(map[string]bool)
 	}
-	e.availableGlyphTypes[glyphType] = true
+	e.availableElementTypes[elementType] = true
 }
 
-// SetPythonExecutor sets the gRPC PythonService executor for "py" glyph execution.
+// SetPythonExecutor sets the gRPC PythonService executor for "py" element execution.
 func (e *Engine) SetPythonExecutor(executor PythonExecutor) {
 	e.pythonExecutor = executor
 }
@@ -343,18 +343,18 @@ func (e *Engine) loadWatchers() error {
 		}
 
 		// Apply edge cursor for meld-edge watchers: skip attestations already processed
-		if w.ActionType == storage.ActionTypeGlyphExecute {
+		if w.ActionType == storage.ActionTypeElementExecute {
 			e.applyEdgeCursor(w)
 
-			// Skip watchers whose target glyph type requires a plugin that isn't enabled.
-			// Prevents 404 spam when e.g. python plugin is disabled but py glyphs exist in DB.
-			if e.availableGlyphTypes != nil {
-				var glyphAction GlyphExecuteAction
-				if err := json.Unmarshal([]byte(w.ActionData), &glyphAction); err == nil {
-					if glyphAction.TargetGlyphType != "" && !e.availableGlyphTypes[glyphAction.TargetGlyphType] {
-						e.logger.Infow("Skipping watcher: target glyph type not available (plugin disabled?)",
+			// Skip watchers whose target element type requires a plugin that isn't enabled.
+			// Prevents 404 spam when e.g. python plugin is disabled but py elements exist in DB.
+			if e.availableElementTypes != nil {
+				var elementAction ElementExecuteAction
+				if err := json.Unmarshal([]byte(w.ActionData), &elementAction); err == nil {
+					if elementAction.TargetElementType != "" && !e.availableElementTypes[elementAction.TargetElementType] {
+						e.logger.Infow("Skipping watcher: target element type not available (plugin disabled?)",
 							"watcher_id", w.ID,
-							"glyph_type", glyphAction.TargetGlyphType)
+							"element_type", elementAction.TargetElementType)
 						continue
 					}
 				}
@@ -374,7 +374,7 @@ func (e *Engine) loadWatchers() error {
 			continue
 		}
 		var ad struct {
-			TargetGlyphID string `json:"target_glyph_id"`
+			TargetElementID string `json:"target_element_id"`
 		}
 		if err := json.Unmarshal([]byte(w.ActionData), &ad); err != nil {
 			e.logger.Debugw("Failed to unmarshal action data during SE suppression",
@@ -382,10 +382,10 @@ func (e *Engine) loadWatchers() error {
 				"error", err)
 			continue
 		}
-		if ad.TargetGlyphID == "" {
+		if ad.TargetElementID == "" {
 			continue
 		}
-		seID := "se-glyph-" + ad.TargetGlyphID
+		seID := "se-element-" + ad.TargetElementID
 		se, exists := e.watchers[seID]
 		if !exists {
 			continue
@@ -434,9 +434,9 @@ func (e *Engine) SetEmbeddingSearcher(searcher EmbeddingSearcher) {
 	e.embeddingSearcher = searcher
 }
 
-// SetGlyphFiredCallback sets the callback for glyph execution notifications
-func (e *Engine) SetGlyphFiredCallback(callback func(glyphID string, attestationID string, status string, err error, result []byte)) {
-	e.broadcastGlyphFired = callback
+// SetElementFiredCallback sets the callback for element execution notifications
+func (e *Engine) SetElementFiredCallback(callback func(elementID string, attestationID string, status string, err error, result []byte)) {
+	e.broadcastElementFired = callback
 }
 
 // SetPluginExecutor sets the plugin executor for plugin_execute action type.
@@ -859,8 +859,8 @@ func (e *Engine) drainOnce() {
 			execErr = e.executePython(watcher, &as)
 		case storage.ActionTypeWebhook:
 			execErr = e.executeWebhook(watcher, &as)
-		case storage.ActionTypeGlyphExecute:
-			execErr = e.executeGlyph(watcher, &as)
+		case storage.ActionTypeElementExecute:
+			execErr = e.executeElement(watcher, &as)
 		case storage.ActionTypePluginExecute:
 			execErr = e.executePlugin(watcher, &as)
 		case storage.ActionTypeSemanticMatch:
@@ -886,7 +886,7 @@ func (e *Engine) drainOnce() {
 			e.recordFire(watcher.ID, as.ID)
 			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 
-			if watcher.ActionType == storage.ActionTypeGlyphExecute {
+			if watcher.ActionType == storage.ActionTypeElementExecute {
 				e.updateEdgeCursor(watcher, &as)
 			}
 		}

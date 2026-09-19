@@ -1092,7 +1092,7 @@ func TestRegisterWebSocket_PathFormat(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	// Use a dummy address — we only need Metadata(), not a live connection
 	proxy := &ExternalDomainProxy{
-		metadata: pluginpkg.Metadata{Name: "pty-glyph"},
+		metadata: pluginpkg.Metadata{Name: "pty-element"},
 		logger:   logger,
 	}
 
@@ -1100,11 +1100,11 @@ func TestRegisterWebSocket_PathFormat(t *testing.T) {
 	require.NoError(t, err)
 
 	// Must use /ws/<name> convention (not /<name>-ws)
-	_, ok := handlers["/ws/pty-glyph"]
+	_, ok := handlers["/ws/pty-element"]
 	assert.True(t, ok, "RegisterWebSocket must register at /ws/<name>, got keys: %v", mapKeys(handlers))
 
 	// Must NOT use the old format
-	_, old := handlers["/pty-glyph-ws"]
+	_, old := handlers["/pty-element-ws"]
 	assert.False(t, old, "RegisterWebSocket must not use old /<name>-ws format")
 }
 

@@ -2,7 +2,7 @@
  * Watcher Queue Status Handler
  *
  * Two visual layers driven by watcher_queue_status broadcasts:
- * 1. Animated dot particles drifting along glyph borders (queue activity)
+ * 1. Animated dot particles drifting along element borders (queue activity)
  * 2. Metadata pill on title bar hover (queue + execution stats popover)
  */
 
@@ -19,12 +19,12 @@ const FADE_OUT_MS = 500;
 const MAX_PARTICLES = 8;
 
 // Cached execution stats survive across broadcasts so pills remain visible
-// after a glyph's queue drains. Only queueCount resets to 0.
-const statsCache = new Map<string, GlyphQueueData>();
+// after an element's queue drains. Only queueCount resets to 0.
+const statsCache = new Map<string, ElementQueueData>();
 
-// ── Aggregated per-glyph data ────────────────────────────────────────
+// ── Aggregated per-element data ────────────────────────────────────────
 
-interface GlyphQueueData {
+interface ElementQueueData {
     queueCount: number;
     fireCount: number;
     errorCount: number;
@@ -34,34 +34,34 @@ interface GlyphQueueData {
 
 // ── Element ID resolution ─────────────────────────────────────────────
 
-function resolveGlyphId(
+function resolveElementId(
     watcherId: string,
-    targetGlyphs: Record<string, string> | undefined,
+    targetElements: Record<string, string> | undefined,
 ): string | null {
-    if (watcherId.startsWith('ax-glyph-')) {
-        return watcherId.substring('ax-glyph-'.length);
+    if (watcherId.startsWith('ax-element-')) {
+        return watcherId.substring('ax-element-'.length);
     }
-    if (watcherId.startsWith('se-glyph-')) {
-        return watcherId.substring('se-glyph-'.length);
+    if (watcherId.startsWith('se-element-')) {
+        return watcherId.substring('se-element-'.length);
     }
-    if (watcherId.startsWith('meld-edge-') && targetGlyphs) {
-        return targetGlyphs[watcherId] || null;
+    if (watcherId.startsWith('meld-edge-') && targetElements) {
+        return targetElements[watcherId] || null;
     }
     return null;
 }
 
 /**
- * Aggregate per-watcher data into per-glyph data.
- * Multiple watchers can target the same glyph (e.g. two meld edges → same py glyph).
+ * Aggregate per-watcher data into per-element data.
+ * Multiple watchers can target the same element (e.g. two meld edges → same py element).
  */
-function aggregatePerGlyph(data: WatcherQueueStatusMessage): Map<string, GlyphQueueData> {
-    const perGlyph = new Map<string, GlyphQueueData>();
+function aggregatePerElement(data: WatcherQueueStatusMessage): Map<string, ElementQueueData> {
+    const perElement = new Map<string, ElementQueueData>();
 
     for (const [watcherId, count] of Object.entries(data.per_watcher)) {
-        const glyphId = resolveGlyphId(watcherId, data.target_glyphs);
-        if (!glyphId) continue;
+        const itemId = resolveElementId(watcherId, data.target_elements);
+        if (!itemId) continue;
 
-        const existing = perGlyph.get(glyphId);
+        const existing = perElement.get(itemId);
         const stats: WatcherBroadcastStats | undefined = data.watcher_stats?.[watcherId];
 
         if (existing) {
@@ -78,7 +78,7 @@ function aggregatePerGlyph(data: WatcherQueueStatusMessage): Map<string, GlyphQu
                 existing.lastError = stats.last_error;
             }
         } else {
-            perGlyph.set(glyphId, {
+            perElement.set(itemId, {
                 queueCount: count,
                 fireCount: stats?.fire_count ?? 0,
                 errorCount: stats?.error_count ?? 0,
@@ -88,17 +88,17 @@ function aggregatePerGlyph(data: WatcherQueueStatusMessage): Map<string, GlyphQu
         }
     }
 
-    return perGlyph;
+    return perElement;
 }
 
 // ── Particles ────────────────────────────────────────────────────────
 
-function ensureParticleContainer(glyphEl: HTMLElement): HTMLElement {
-    let container = glyphEl.querySelector('.queue-particles') as HTMLElement | null;
+function ensureParticleContainer(elementEl: HTMLElement): HTMLElement {
+    let container = elementEl.querySelector('.queue-particles') as HTMLElement | null;
     if (!container) {
         container = document.createElement('div');
         container.className = 'queue-particles';
-        glyphEl.appendChild(container);
+        elementEl.appendChild(container);
     }
     return container;
 }
@@ -119,8 +119,8 @@ function fadeOutElement(el: HTMLElement, removeDelay = FADE_OUT_MS): void {
     setTimeout(() => el.remove(), removeDelay);
 }
 
-function updateParticles(glyphEl: HTMLElement, queueCount: number): void {
-    const container = ensureParticleContainer(glyphEl);
+function updateParticles(elementEl: HTMLElement, queueCount: number): void {
+    const container = ensureParticleContainer(elementEl);
     const targetCount = Math.min(Math.ceil(queueCount / 2), MAX_PARTICLES);
     const current = container.querySelectorAll('.queue-particle:not(.fading)');
 
@@ -144,7 +144,7 @@ function clearParticles(container: Element): void {
 
 // ── Metadata pill ────────────────────────────────────────────────────
 
-function buildPopoverContent(d: GlyphQueueData): string {
+function buildPopoverContent(d: ElementQueueData): string {
     const lines: string[] = [];
     lines.push(`queued: ${d.queueCount}`);
     lines.push(`fired: ${d.fireCount}`);
@@ -167,39 +167,39 @@ function buildPopoverContent(d: GlyphQueueData): string {
     return lines.join('\n');
 }
 
-function ensureMetaPill(glyphEl: HTMLElement): HTMLElement | null {
-    // Skip attestation glyphs — they have their own .as-meta-pill
-    if (glyphEl.querySelector('.as-meta-pill')) return null;
+function ensureMetaPill(elementEl: HTMLElement): HTMLElement | null {
+    // Skip attestation elements — they have their own .as-meta-pill
+    if (elementEl.querySelector('.as-meta-pill')) return null;
 
-    let pill = glyphEl.querySelector('.glyph-meta-pill') as HTMLElement | null;
+    let pill = elementEl.querySelector('.element-meta-pill') as HTMLElement | null;
     if (pill) return pill;
 
     // Find the title bar — pill is positioned relative to it
-    const titleBar = glyphEl.querySelector('.title-bar') as HTMLElement | null;
+    const titleBar = elementEl.querySelector('.title-bar') as HTMLElement | null;
     if (!titleBar) return null;
 
-    // Title bar becomes the positioning context (matches attestation glyph's wrapper pattern)
+    // Title bar becomes the positioning context (matches attestation element's wrapper pattern)
     if (getComputedStyle(titleBar).position === 'static') {
         titleBar.style.position = 'relative';
     }
 
     pill = document.createElement('div');
-    pill.className = 'glyph-meta-pill';
+    pill.className = 'element-meta-pill';
 
     const popover = document.createElement('div');
-    popover.className = 'meta-popover glyph-meta-popover';
+    popover.className = 'meta-popover element-meta-popover';
     pill.appendChild(popover);
 
-    // Append inside title bar so bottom: -4px hangs off the title bar, not the whole glyph
+    // Append inside title bar so bottom: -4px hangs off the title bar, not the whole element
     titleBar.appendChild(pill);
     return pill;
 }
 
-function updateMetaPill(glyphEl: HTMLElement, d: GlyphQueueData): void {
-    const pill = ensureMetaPill(glyphEl);
+function updateMetaPill(elementEl: HTMLElement, d: ElementQueueData): void {
+    const pill = ensureMetaPill(elementEl);
     if (!pill) return;
 
-    const popover = pill.querySelector('.glyph-meta-popover') as HTMLElement | null;
+    const popover = pill.querySelector('.element-meta-popover') as HTMLElement | null;
     if (popover) {
         popover.innerHTML = buildPopoverContent(d);
     }
@@ -210,48 +210,48 @@ function updateMetaPill(glyphEl: HTMLElement, d: GlyphQueueData): void {
 export function handleWatcherQueueStatus(data: WatcherQueueStatusMessage): void {
     log.debug(SEG.WS, 'Watcher queue status:', data.total_queued, 'queued');
 
-    const perGlyph = aggregatePerGlyph(data);
+    const perElement = aggregatePerElement(data);
 
     // Merge current broadcast into cache
-    for (const [glyphId, glyphData] of perGlyph) {
-        statsCache.set(glyphId, glyphData);
+    for (const [itemId, elementData] of perElement) {
+        statsCache.set(itemId, elementData);
     }
 
-    // Zero out queueCount for cached glyphs absent from this broadcast
-    for (const [glyphId, cached] of statsCache) {
-        if (!perGlyph.has(glyphId)) {
+    // Zero out queueCount for cached elements absent from this broadcast
+    for (const [itemId, cached] of statsCache) {
+        if (!perElement.has(itemId)) {
             cached.queueCount = 0;
         }
     }
 
     // Update visuals from cache
-    for (const [glyphId, cached] of statsCache) {
-        const glyphEl = document.querySelector(`[data-element-id="${CSS.escape(glyphId)}"]`) as HTMLElement | null;
-        if (!glyphEl) {
+    for (const [itemId, cached] of statsCache) {
+        const elementEl = document.querySelector(`[data-element-id="${CSS.escape(itemId)}"]`) as HTMLElement | null;
+        if (!elementEl) {
             // Element removed from DOM — drop from cache
-            statsCache.delete(glyphId);
+            statsCache.delete(itemId);
             continue;
         }
 
         // Particles only while items are queued
         if (cached.queueCount > 0) {
-            updateParticles(glyphEl, cached.queueCount);
+            updateParticles(elementEl, cached.queueCount);
         }
 
         // Pill always shows cached stats
-        updateMetaPill(glyphEl, cached);
+        updateMetaPill(elementEl, cached);
     }
 
-    // Clear particles for glyphs whose queue has drained
+    // Clear particles for elements whose queue has drained
     for (const container of document.querySelectorAll('.queue-particles')) {
-        const glyphEl = container.closest('[data-element-id]') as HTMLElement | null;
-        if (!glyphEl) {
+        const elementEl = container.closest('[data-element-id]') as HTMLElement | null;
+        if (!elementEl) {
             container.remove();
             continue;
         }
-        const glyphId = glyphEl.dataset.elementId;
-        if (glyphId) {
-            const cached = statsCache.get(glyphId);
+        const itemId = elementEl.dataset.elementId;
+        if (itemId) {
+            const cached = statsCache.get(itemId);
             if (!cached || cached.queueCount === 0) {
                 clearParticles(container);
             }

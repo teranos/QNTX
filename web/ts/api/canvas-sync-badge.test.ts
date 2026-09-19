@@ -26,7 +26,7 @@ mock.module('../client', () => ({
 
 // Mock UIState — process-global, must be superset-complete (see test/mock-ui-state.ts)
 import { createMockUiState } from '../test/mock-ui-state';
-const { uiState, glyphs: mockGlyphs } = createMockUiState();
+const { uiState, elements: mockElements } = createMockUiState();
 mock.module('../state/ui', () => ({ uiState }));
 
 const { canvasSyncQueue } = await import('./canvas-sync');
@@ -36,8 +36,8 @@ describe('Canvas Sync Queue - size and onChange', () => {
         localStorage.clear();
         mockConnectivity = 'offline';
         mockApiFetch = async () => new Response(null, { status: 200 });
-        mockGlyphs.length = 0;
-        mockGlyphs.push(
+        mockElements.length = 0;
+        mockElements.push(
             { id: 'g-1', symbol: 'ax', x: 100, y: 200 },
             { id: 'g-2', symbol: 'py', x: 300, y: 400 },
         );
@@ -48,16 +48,16 @@ describe('Canvas Sync Queue - size and onChange', () => {
     });
 
     test('Tim: size reflects queued items', () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
         expect(canvasSyncQueue.size).toBe(1);
 
-        canvasSyncQueue.add({ id: 'g-2', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-2', op: 'element_upsert' });
         expect(canvasSyncQueue.size).toBe(2);
     });
 
     test('Tim: size decreases after flush', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
-        canvasSyncQueue.add({ id: 'g-2', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
+        canvasSyncQueue.add({ id: 'g-2', op: 'element_upsert' });
         expect(canvasSyncQueue.size).toBe(2);
 
         await canvasSyncQueue.flush();
@@ -65,8 +65,8 @@ describe('Canvas Sync Queue - size and onChange', () => {
     });
 
     test('Tim: duplicate add does not increase size', () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
         expect(canvasSyncQueue.size).toBe(1);
     });
 
@@ -74,12 +74,12 @@ describe('Canvas Sync Queue - size and onChange', () => {
         let callCount = 0;
         canvasSyncQueue.onChange(() => { callCount++; });
 
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
         expect(callCount).toBe(1);
     });
 
     test('Tim: onChange fires on flush', async () => {
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
 
         let callCount = 0;
         canvasSyncQueue.onChange(() => { callCount++; });
@@ -92,12 +92,12 @@ describe('Canvas Sync Queue - size and onChange', () => {
         let callCount = 0;
         const unsub = canvasSyncQueue.onChange(() => { callCount++; });
 
-        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-1', op: 'element_upsert' });
         expect(callCount).toBe(1);
 
         unsub();
 
-        canvasSyncQueue.add({ id: 'g-2', op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: 'g-2', op: 'element_upsert' });
         expect(callCount).toBe(1); // No additional call
     });
 });

@@ -385,10 +385,10 @@ func (p *BookPlugin) RegisterHTTP(mux *http.ServeMux) error {
 	// GET /api/book-plugin/authors - List all authors
 	mux.HandleFunc("GET /api/book-plugin/authors", p.handleListAuthors)
 
-	// GET /api/book-plugin/auction - Book auction glyph content
-	mux.HandleFunc("GET /api/book-plugin/auction", p.handleAuctionGlyph)
+	// GET /api/book-plugin/auction - Book auction element content
+	mux.HandleFunc("GET /api/book-plugin/auction", p.handleAuctionElement)
 
-	// GET /api/book-plugin/auction.css - Book auction glyph styles
+	// GET /api/book-plugin/auction.css - Book auction element styles
 	mux.HandleFunc("GET /api/book-plugin/auction.css", p.handleAuctionCSS)
 
 	return nil
@@ -422,9 +422,9 @@ func (p *BookPlugin) handleListAuthors(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(authors)
 }
 
-// handleAuctionGlyph renders the book auction glyph HTML content.
-func (p *BookPlugin) handleAuctionGlyph(w http.ResponseWriter, r *http.Request) {
-	glyphID := r.URL.Query().Get("glyph_id")
+// handleAuctionElement renders the book auction element HTML content.
+func (p *BookPlugin) handleAuctionElement(w http.ResponseWriter, r *http.Request) {
+	elementID := r.URL.Query().Get("element_id")
 	content := r.URL.Query().Get("content")
 
 	// Parse content for current state (optional)
@@ -459,7 +459,7 @@ func (p *BookPlugin) handleAuctionGlyph(w http.ResponseWriter, r *http.Request) 
 		<button onclick="alert('View book details')">View Details</button>
 	</div>
 </div>
-`, glyphID, p.renderBookOptions(state.SelectedBook), glyphID, state.StrikePrice)
+`, elementID, p.renderBookOptions(state.SelectedBook), elementID, state.StrikePrice)
 	w.Write([]byte(html))
 }
 
@@ -476,7 +476,7 @@ func (p *BookPlugin) renderBookOptions(selected string) string {
 	return options
 }
 
-// handleAuctionCSS returns the CSS styles for the book auction glyph.
+// handleAuctionCSS returns the CSS styles for the book auction element.
 func (p *BookPlugin) handleAuctionCSS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/css")
 	css := `
@@ -542,10 +542,10 @@ func (p *BookPlugin) Health(ctx context.Context) plugin.HealthStatus {
 	}
 }
 
-// RegisterGlyphs returns custom glyph type definitions provided by this plugin.
+// RegisterElements returns custom element type definitions provided by this plugin.
 // Implements the UIPlugin interface.
-func (p *BookPlugin) RegisterGlyphs() []plugin.GlyphDef {
-	return []plugin.GlyphDef{
+func (p *BookPlugin) RegisterElements() []plugin.ElementDef {
+	return []plugin.ElementDef{
 		{
 			Symbol:        "📚",
 			Title:         "Book Auction",

@@ -6,7 +6,7 @@ types/generated/rust/** linguist-generated=true
 
 # Generated WASM glue and bundled plugin modules
 web/wasm/ats_wasm.js linguist-generated=true
-qntx-plugins/pty-glyph/web/pty-glyph-module.js linguist-generated=true
+qntx-plugins/pty-element/web/pty-element-module.js linguist-generated=true
 
 # Generated OCaml protobuf bindings
 plugin/grpc/ocaml/proto/** linguist-generated=true

@@ -1,7 +1,7 @@
 use crate::handlers::{HandlerContext, ReduceState};
 use crate::proto::{
     domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
-    ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse, HealthResponse, HttpRequest,
+    ExecuteJobRequest, ExecuteJobResponse, ElementDefResponse, HealthResponse, HttpRequest,
     HttpResponse, InitializeRequest, InitializeResponse, MetadataResponse, ParseAxQueryRequest,
     ParseAxQueryResponse, WebSocketMessage,
 };
@@ -80,11 +80,11 @@ impl DomainPluginService for ReducePluginService {
         }))
     }
 
-    async fn register_glyphs(
+    async fn register_elements(
         &self,
         _request: Request<Empty>,
-    ) -> Result<Response<GlyphDefResponse>, Status> {
-        Ok(Response::new(GlyphDefResponse { glyphs: vec![] }))
+    ) -> Result<Response<ElementDefResponse>, Status> {
+        Ok(Response::new(ElementDefResponse { elements: vec![] }))
     }
 
     async fn shutdown(&self, _request: Request<Empty>) -> Result<Response<Empty>, Status> {

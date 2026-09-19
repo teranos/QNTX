@@ -63,7 +63,7 @@ func watcherFailureItemsFor(fires []storage.WatcherErrorFire) []StatusItem {
 		items = append(items, StatusItem{
 			Name:  name,
 			Note:  shortAgo(time.Since(time.UnixMilli(f.AtMs))),
-			Glyph: GlyphUnwell,
+			Mark: MarkUnwell,
 		})
 	}
 	return items

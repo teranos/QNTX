@@ -321,9 +321,9 @@ grpc::Status GazePlugin::ConfigSchema(grpc::ServerContext* ctx,
     return grpc::Status::OK;
 }
 
-grpc::Status GazePlugin::RegisterGlyphs(grpc::ServerContext* ctx,
+grpc::Status GazePlugin::RegisterElements(grpc::ServerContext* ctx,
                                           const protocol::Empty* req,
-                                          protocol::GlyphDefResponse* resp) {
+                                          protocol::ElementDefResponse* resp) {
     return grpc::Status::OK;
 }
 

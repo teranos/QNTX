@@ -14,17 +14,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// The glyph is the whole of what crosses; each surface maps it to its own colour.
+// The mark is the whole of what crosses; each surface maps it to its own colour.
 const (
-	GlyphWell   = "+"
-	GlyphUnwell = "!"
+	MarkWell   = "+"
+	MarkUnwell = "!"
 )
 
 // StatusItem is one thing worth naming, with what it is at and how it is.
 type StatusItem struct {
 	Name  string `json:"name"`
 	Note  string `json:"note,omitempty"`
-	Glyph string `json:"glyph"`
+	Mark string `json:"mark"`
 }
 
 // StatusLineResponse carries the items in the order they should be read.
@@ -41,7 +41,7 @@ const (
 	FormatTmux = "tmux"
 )
 
-// Escapes for one surface. The glyph stays the whole of what crosses; this is
+// Escapes for one surface. The mark stays the whole of what crosses; this is
 // only how it is spelled.
 type palette struct {
 	well   string
@@ -65,7 +65,7 @@ func renderLine(items []StatusItem, p palette, clickable bool) string {
 			out += "  "
 		}
 		colour := p.unwell
-		if it.Glyph == GlyphWell {
+		if it.Mark == MarkWell {
 			colour = p.well
 		}
 
@@ -205,10 +205,10 @@ type carouselFrame struct {
 var carouselFrames = []carouselFrame{
 	{produce: func(StatusLineNode) StatusItem {
 		build := version.Get()
-		return StatusItem{Name: build.Version, Note: build.Short(), Glyph: GlyphWell}
+		return StatusItem{Name: build.Version, Note: build.Short(), Mark: MarkWell}
 	}},
 	{produce: func(n StatusLineNode) StatusItem {
-		return StatusItem{Name: "up", Note: shortDuration(n.Uptime()), Glyph: GlyphWell}
+		return StatusItem{Name: "up", Note: shortDuration(n.Uptime()), Mark: MarkWell}
 	}},
 	{produce: func(n StatusLineNode) StatusItem {
 		return countItem("ats", n.ParserVersion())
@@ -224,7 +224,7 @@ var carouselFrames = []carouselFrame{
 	{produce: func(n StatusLineNode) StatusItem {
 		held, ok := n.Attestations()
 		if !ok {
-			return StatusItem{Name: "attestations", Note: "uncounted", Glyph: GlyphUnwell}
+			return StatusItem{Name: "attestations", Note: "uncounted", Mark: MarkUnwell}
 		}
 		return countItem("attestations", strconv.Itoa(held))
 	}},
@@ -272,10 +272,10 @@ func answeredItem(refused, broke int64) StatusItem {
 		return StatusItem{
 			Name:  "5xx",
 			Note:  strconv.FormatInt(broke, 10) + ", " + strconv.FormatInt(refused, 10) + " 4xx",
-			Glyph: GlyphUnwell,
+			Mark: MarkUnwell,
 		}
 	}
-	return StatusItem{Name: "4xx", Note: strconv.FormatInt(refused, 10), Glyph: GlyphWell}
+	return StatusItem{Name: "4xx", Note: strconv.FormatInt(refused, 10), Mark: MarkWell}
 }
 
 // Two significant figures and a unit. A row has no room for a byte count.
@@ -300,26 +300,26 @@ func refusedItem(turnedAway, stale int64) StatusItem {
 		return StatusItem{
 			Name:  "refused",
 			Note:  strconv.FormatInt(turnedAway, 10) + ", " + strconv.FormatInt(stale, 10) + " holding a token",
-			Glyph: GlyphUnwell,
+			Mark: MarkUnwell,
 		}
 	}
-	return StatusItem{Name: "refused", Note: strconv.FormatInt(turnedAway, 10), Glyph: GlyphWell}
+	return StatusItem{Name: "refused", Note: strconv.FormatInt(turnedAway, 10), Mark: MarkWell}
 }
 
 // A named thing and what it is at. Empty is unwell: a value the node could not
 // produce says so rather than drawing a blank where a number belongs.
 func countItem(name, note string) StatusItem {
 	if note == "" {
-		return StatusItem{Name: name, Note: "unknown", Glyph: GlyphUnwell}
+		return StatusItem{Name: name, Note: "unknown", Mark: MarkUnwell}
 	}
-	return StatusItem{Name: name, Note: note, Glyph: GlyphWell}
+	return StatusItem{Name: name, Note: note, Mark: MarkWell}
 }
 
 func pctItem(name string, pct float64, ok bool) StatusItem {
 	if !ok {
-		return StatusItem{Name: name, Note: "unsampled", Glyph: GlyphUnwell}
+		return StatusItem{Name: name, Note: "unsampled", Mark: MarkUnwell}
 	}
-	return StatusItem{Name: name, Note: strconv.Itoa(int(pct)) + "%", Glyph: GlyphWell}
+	return StatusItem{Name: name, Note: strconv.Itoa(int(pct)) + "%", Mark: MarkWell}
 }
 
 // Days and hours, or hours and minutes, or minutes. A status line has room for
@@ -372,7 +372,7 @@ func callerItem(a auth.Admission) StatusItem {
 	if name == "" {
 		name = "QNTX"
 	}
-	return StatusItem{Name: name, Note: a.LevelName(), Glyph: GlyphWell}
+	return StatusItem{Name: name, Note: a.LevelName(), Mark: MarkWell}
 }
 
 // Running and reporting healthy. Healthy while stopped is not doing anything.
@@ -402,7 +402,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	// ran outside Middleware.
 	admitted, ok := auth.AdmissionFrom(r.Context())
 	if !ok {
-		h.noteWriteFailure(writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Glyph: GlyphWell}}))
+		h.noteWriteFailure(writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Mark: MarkWell}}))
 		return
 	}
 
@@ -459,7 +459,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 			continue
 		}
 		entries = append(entries, entry{
-			item: StatusItem{Name: name, Glyph: GlyphUnwell},
+			item: StatusItem{Name: name, Mark: MarkUnwell},
 			well: false,
 		})
 	}

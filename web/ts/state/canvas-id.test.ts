@@ -1,7 +1,7 @@
 /**
- * Tests for per-canvas glyph isolation via canvas_id
+ * Tests for per-canvas element isolation via canvas_id
  *
- * Located in ts/state/ to avoid mock.module leaks from glyph test files
+ * Located in ts/state/ to avoid mock.module leaks from element test files
  * that mock ../../state/ui (mock.module is process-global in bun).
  *
  * Personas:
@@ -16,38 +16,38 @@ import { UIState } from './ui-impl';
 const uiState = new UIState();
 
 beforeEach(() => {
-    uiState.setCanvasGlyphs([]);
+    uiState.setCanvasElements([]);
 });
 
 describe('canvas_id Isolation - Tim (Happy Path)', () => {
-    test('Tim spawns glyphs in a subcanvas and they stay isolated from root', () => {
-        uiState.addCanvasGlyph({
+    test('Tim spawns elements in a subcanvas and they stay isolated from root', () => {
+        uiState.addCanvasElement({
             id: 'root-note-1', symbol: 'note', x: 50, y: 50, canvas_id: '',
         });
-        uiState.addCanvasGlyph({
+        uiState.addCanvasElement({
             id: 'inner-note-1', symbol: 'note', x: 100, y: 100, canvas_id: 'subcanvas-test-1',
         });
 
-        // Root canvas should only see root glyphs
-        const rootGlyphs = uiState.getCanvasGlyphs('canvas-workspace');
-        expect(rootGlyphs.length).toBe(1);
-        expect(rootGlyphs[0].id).toBe('root-note-1');
+        // Root canvas should only see root elements
+        const rootElements = uiState.getCanvasElements('canvas-workspace');
+        expect(rootElements.length).toBe(1);
+        expect(rootElements[0].id).toBe('root-note-1');
 
-        // Subcanvas should only see its inner glyphs
-        const innerGlyphs = uiState.getCanvasGlyphs('subcanvas-test-1');
-        expect(innerGlyphs.length).toBe(1);
-        expect(innerGlyphs[0].id).toBe('inner-note-1');
+        // Subcanvas should only see its inner elements
+        const innerElements = uiState.getCanvasElements('subcanvas-test-1');
+        expect(innerElements.length).toBe(1);
+        expect(innerElements[0].id).toBe('inner-note-1');
     });
 
-    test('Tim drags a glyph in a subcanvas and canvas_id is preserved', () => {
-        uiState.addCanvasGlyph({
+    test('Tim drags an element in a subcanvas and canvas_id is preserved', () => {
+        uiState.addCanvasElement({
             id: 'inner-note-1', symbol: 'note', x: 100, y: 100,
             canvas_id: 'subcanvas-test-1', content: 'my note',
         });
 
         // Simulate what drag handler does: spread existing + override position
-        const existing = uiState.getCanvasGlyphs().find(g => g.id === 'inner-note-1');
-        uiState.addCanvasGlyph({
+        const existing = uiState.getCanvasElements().find(g => g.id === 'inner-note-1');
+        uiState.addCanvasElement({
             ...existing!,
             id: 'inner-note-1',
             symbol: 'note',
@@ -56,22 +56,22 @@ describe('canvas_id Isolation - Tim (Happy Path)', () => {
         });
 
         // canvas_id and content must survive the drag
-        const updated = uiState.getCanvasGlyphs().find(g => g.id === 'inner-note-1');
+        const updated = uiState.getCanvasElements().find(g => g.id === 'inner-note-1');
         expect(updated?.canvas_id).toBe('subcanvas-test-1');
         expect(updated?.content).toBe('my note');
         expect(updated?.x).toBe(200);
         expect(updated?.y).toBe(250);
     });
 
-    test('Tim resizes a glyph in a subcanvas and canvas_id is preserved', () => {
-        uiState.addCanvasGlyph({
+    test('Tim resizes an element in a subcanvas and canvas_id is preserved', () => {
+        uiState.addCanvasElement({
             id: 'inner-note-2', symbol: 'note', x: 50, y: 50,
             canvas_id: 'subcanvas-test-1', content: 'resize me',
         });
 
         // Simulate what resize handler does: spread existing + override size
-        const existing = uiState.getCanvasGlyphs().find(g => g.id === 'inner-note-2');
-        uiState.addCanvasGlyph({
+        const existing = uiState.getCanvasElements().find(g => g.id === 'inner-note-2');
+        uiState.addCanvasElement({
             ...existing!,
             id: 'inner-note-2',
             symbol: 'note',
@@ -81,7 +81,7 @@ describe('canvas_id Isolation - Tim (Happy Path)', () => {
             height: 200,
         });
 
-        const updated = uiState.getCanvasGlyphs().find(g => g.id === 'inner-note-2');
+        const updated = uiState.getCanvasElements().find(g => g.id === 'inner-note-2');
         expect(updated?.canvas_id).toBe('subcanvas-test-1');
         expect(updated?.content).toBe('resize me');
         expect(updated?.width).toBe(300);

@@ -114,9 +114,9 @@ func (c *watcherReloadCoalescer) postReload(p pendingUpsert) {
 	reloadedWatcher, exists := s.watcherEngine.GetWatcher(p.watcherID)
 	if !exists || reloadedWatcher == nil {
 		// SE watchers absent from engine may be compound-suppressed (SE→SE meld)
-		if strings.HasPrefix(p.watcherID, "se-glyph-") {
-			glyphID := strings.TrimPrefix(p.watcherID, "se-glyph-")
-			compoundWatchers, err := s.watcherEngine.GetStore().FindCompoundWatchersForTarget(s.ctx, glyphID)
+		if strings.HasPrefix(p.watcherID, "se-element-") {
+			elementID := strings.TrimPrefix(p.watcherID, "se-element-")
+			compoundWatchers, err := s.watcherEngine.GetStore().FindCompoundWatchersForTarget(s.ctx, elementID)
 			if err == nil && len(compoundWatchers) > 0 {
 				s.logger.Infow("SE watcher suppressed by engine (compound target)",
 					"watcher_id", p.watcherID,

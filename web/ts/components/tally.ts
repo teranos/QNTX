@@ -7,7 +7,7 @@
  *
  * The caller decides what a name is — text, or something you can press. The
  * tally does not know and must not: it is what makes it usable from both the
- * stand panel, where a page opens, and the page glyph, where it is already open.
+ * stand panel, where a page opens, and the page element, where it is already open.
  */
 
 const MUTE = 'var(--text-on-dark-tertiary)';

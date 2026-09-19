@@ -18,7 +18,7 @@ import type {
     DatabaseStatsMessage,
     WatcherMatchMessage,
     WatcherErrorMessage,
-    GlyphFiredMessage,
+    ElementFiredMessage,
     WatcherQueueStatusMessage,
 } from '../../types/websocket';
 import type { RichSearchResultsMessage } from '../generated/proto/plugin/grpc/protocol/server.ts';
@@ -26,12 +26,12 @@ import { handleJobNotification, handleDaemonStatusNotification } from '../tauri-
 import { handlePluginHealth } from '../websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from '../websocket-handlers/system-capabilities';
 import { handleWatcherQueueStatus } from '../websocket-handlers/watcher-queue-status';
-import { STANDING_GLYPH_PUBLISHED } from '../components/glyph/plugin-provided-glyphs';
+import { STANDING_ELEMENT_PUBLISHED } from '../components/element/plugin-provided-elements';
 import { log, SEG } from '../logger';
 import { heldSession } from './session';
 import { stripProtocol } from '../http-utils';
-import { updateResultGlyphContent, type ExecutionResult } from '../components/glyph/result-glyph';
-import { setResponseState } from '../components/glyph/response-state';
+import { updateResultElementContent, type ExecutionResult } from '../components/element/result-element';
+import { setResponseState } from '../components/element/response-state';
 import { backendUrl } from './url';
 import { connectivity, type Admission } from './connectivity';
 import { apiFetch } from './http';
@@ -59,10 +59,10 @@ const RECONNECT_BASE_MS = 3000;
 const RECONNECT_MAX_MS = 60000;
 
 /**
- * Find a result glyph melded below a parent glyph element.
- * Looks inside the parent's melded composition for a result glyph sibling.
+ * Find a result element melded below a parent element element.
+ * Looks inside the parent's melded composition for a result element sibling.
  */
-function findResultGlyphBelow(parentElement: HTMLElement): HTMLElement | null {
+function findResultElementBelow(parentElement: HTMLElement): HTMLElement | null {
     const composition = parentElement.closest('.melded-composition');
     if (!composition) return null;
     return composition.querySelector('[data-symbol="result"]') as HTMLElement | null;
@@ -170,8 +170,8 @@ const MESSAGE_HANDLERS = {
             path: data.path
         });
 
-        // Update database stats glyph + sigma panel
-        dispatch('database_stats', () => import('../default-glyphs.js').then(({ updateDatabaseStats, updateSigmaPanel }) => {
+        // Update database stats element + sigma panel
+        dispatch('database_stats', () => import('../default-elements.js').then(({ updateDatabaseStats, updateSigmaPanel }) => {
             updateDatabaseStats(data);
             updateSigmaPanel(data);
         }));
@@ -196,29 +196,29 @@ const MESSAGE_HANDLERS = {
     watcher_match: (data: WatcherMatchMessage) => {
         log.debug(SEG.WS, 'Watcher match:', data.watcher_id, data.attestation?.id);
 
-        // Route match to the correct glyph type by watcher ID prefix
-        if (data.watcher_id?.startsWith('ax-glyph-')) {
-            const glyphId = data.watcher_id.substring('ax-glyph-'.length);
-            dispatch('watcher_match', () => import('../components/glyph/ax-glyph.js').then(({ updateAxGlyphResults }) => {
-                updateAxGlyphResults(glyphId, data.attestation);
+        // Route match to the correct element type by watcher ID prefix
+        if (data.watcher_id?.startsWith('ax-element-')) {
+            const elementId = data.watcher_id.substring('ax-element-'.length);
+            dispatch('watcher_match', () => import('../components/element/ax-element.js').then(({ updateAxElementResults }) => {
+                updateAxElementResults(elementId, data.attestation);
             }));
-        } else if (data.watcher_id?.startsWith('se-glyph-')) {
-            const glyphId = data.watcher_id.substring('se-glyph-'.length);
-            dispatch('watcher_match', () => import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
-                updateSemanticGlyphResults(glyphId, data.attestation, data.score);
+        } else if (data.watcher_id?.startsWith('se-element-')) {
+            const elementId = data.watcher_id.substring('se-element-'.length);
+            dispatch('watcher_match', () => import('../components/element/semantic-element.js').then(({ updateSemanticElementResults }) => {
+                updateSemanticElementResults(elementId, data.attestation, data.score);
             }));
-        } else if (data.watcher_id?.startsWith('meld-edge-') && data.target_glyph_id) {
-            // Meld-edge match with target glyph routing (e.g. SE→SE intersection)
-            dispatch('watcher_match', () => import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
-                updateSemanticGlyphResults(data.target_glyph_id!, data.attestation, data.score);
+        } else if (data.watcher_id?.startsWith('meld-edge-') && data.target_element_id) {
+            // Meld-edge match with target element routing (e.g. SE→SE intersection)
+            dispatch('watcher_match', () => import('../components/element/semantic-element.js').then(({ updateSemanticElementResults }) => {
+                updateSemanticElementResults(data.target_element_id!, data.attestation, data.score);
             }));
-        } else if (data.watcher_id === STANDING_GLYPH_PUBLISHED) {
-            // A glyph module was published. The page holds the module it
+        } else if (data.watcher_id === STANDING_ELEMENT_PUBLISHED) {
+            // An element module was published. The page holds the module it
             // imported, so it asks /g/ what is standing now and swaps what
             // moved — the attestation on this message is not read, because
             // what to draw is the module and not the row announcing it.
-            dispatch('watcher_match', () => import('../components/glyph/plugin-provided-glyphs.js').then(({ discoverPublishedGlyphs }) => {
-                return discoverPublishedGlyphs();
+            dispatch('watcher_match', () => import('../components/element/plugin-provided-elements.js').then(({ discoverPublishedElements }) => {
+                return discoverPublishedElements();
             }));
         } else {
             log.warn(SEG.WS, 'Received watcher_match with unexpected watcher_id format:', data.watcher_id);
@@ -228,17 +228,17 @@ const MESSAGE_HANDLERS = {
         dispatch('watcher_match', () => messageHandlers['watcher_match']?.(data));
     },
 
-    glyph_fired: (data: GlyphFiredMessage) => {
-        log.debug(SEG.WS, 'Element fired:', data.glyph_id, data.status, data.error || '');
+    element_fired: (data: ElementFiredMessage) => {
+        log.debug(SEG.WS, 'Element fired:', data.element_id, data.status, data.error || '');
 
-        // Apply execution state to target glyph element for CSS-driven visual feedback
-        const el = document.querySelector(`[data-element-id="${CSS.escape(data.glyph_id)}"]`) as HTMLElement | null;
+        // Apply execution state to target element element for CSS-driven visual feedback
+        const el = document.querySelector(`[data-element-id="${CSS.escape(data.element_id)}"]`) as HTMLElement | null;
         if (el) {
             const stateMap: Record<string, string> = { started: 'running', success: 'completed', error: 'failed' };
             const state = stateMap[data.status] || data.status;
             el.dataset.executionState = state;
 
-            // The fired glyph's background answers for the outcome: a failed
+            // The fired element's background answers for the outcome: a failed
             // run tints it until the next run replaces the answer.
             if (data.status === 'error') setResponseState(el, 'error');
             else setResponseState(el, null);
@@ -252,40 +252,40 @@ const MESSAGE_HANDLERS = {
                 }, 3000);
             }
 
-            // Update existing result glyph melded below (if one exists)
+            // Update existing result element melded below (if one exists)
             if (data.result && (data.status === 'success' || data.status === 'error')) {
-                const resultEl = findResultGlyphBelow(el);
+                const resultEl = findResultElementBelow(el);
                 if (resultEl) {
                     try {
                         const result = JSON.parse(data.result) as ExecutionResult;
-                        updateResultGlyphContent(resultEl, result);
-                        log.debug(SEG.WS, 'Updated result glyph for', data.glyph_id);
+                        updateResultElementContent(resultEl, result);
+                        log.debug(SEG.WS, 'Updated result element for', data.element_id);
                     } catch (e) {
-                        log.error(SEG.WS, 'Failed to parse glyph_fired result:', e);
+                        log.error(SEG.WS, 'Failed to parse element_fired result:', e);
                     }
                 } else {
-                    log.debug(SEG.WS, `Result glyph for ${data.glyph_id} gone — closed before update arrived`);
+                    log.debug(SEG.WS, `Result element for ${data.element_id} gone — closed before update arrived`);
                 }
             } else if (data.status === 'error' && data.error) {
-                // Error without result payload — surface error text in existing result glyph
-                const resultEl = findResultGlyphBelow(el);
+                // Error without result payload — surface error text in existing result element
+                const resultEl = findResultElementBelow(el);
                 if (resultEl) {
                     const errorResult: ExecutionResult = {
                         success: false, stdout: '', stderr: '',
                         result: null, error: data.error, duration_ms: 0,
                     };
-                    updateResultGlyphContent(resultEl, errorResult);
-                    log.debug(SEG.WS, 'Updated result glyph with error for', data.glyph_id);
+                    updateResultElementContent(resultEl, errorResult);
+                    log.debug(SEG.WS, 'Updated result element with error for', data.element_id);
                 } else {
-                    log.debug(SEG.WS, `Result glyph for ${data.glyph_id} gone — closed before error arrived`);
+                    log.debug(SEG.WS, `Result element for ${data.element_id} gone — closed before error arrived`);
                 }
             }
         } else {
-            log.debug(SEG.WS, 'Element fired: no DOM element found for', data.glyph_id);
+            log.debug(SEG.WS, 'Element fired: no DOM element found for', data.element_id);
         }
 
         // Invoke registered handler
-        dispatch('glyph_fired', () => messageHandlers['glyph_fired']?.(data));
+        dispatch('element_fired', () => messageHandlers['element_fired']?.(data));
     },
 
     watcher_error: (data: WatcherErrorMessage) => {
@@ -294,16 +294,16 @@ const MESSAGE_HANDLERS = {
             log.warn(SEG.WS, 'Watcher error details:', ...data.details);
         }
 
-        // Route error to the correct glyph type by watcher ID prefix
-        if (data.watcher_id?.startsWith('ax-glyph-')) {
-            const glyphId = data.watcher_id.substring('ax-glyph-'.length);
-            dispatch('watcher_error', () => import('../components/glyph/ax-glyph.js').then(({ updateAxGlyphError }) => {
-                updateAxGlyphError(glyphId, data.error, data.severity, data.details);
+        // Route error to the correct element type by watcher ID prefix
+        if (data.watcher_id?.startsWith('ax-element-')) {
+            const elementId = data.watcher_id.substring('ax-element-'.length);
+            dispatch('watcher_error', () => import('../components/element/ax-element.js').then(({ updateAxElementError }) => {
+                updateAxElementError(elementId, data.error, data.severity, data.details);
             }));
-        } else if (data.watcher_id?.startsWith('se-glyph-')) {
-            const glyphId = data.watcher_id.substring('se-glyph-'.length);
-            dispatch('watcher_error', () => import('../components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphError }) => {
-                updateSemanticGlyphError(glyphId, data.error, data.severity, data.details);
+        } else if (data.watcher_id?.startsWith('se-element-')) {
+            const elementId = data.watcher_id.substring('se-element-'.length);
+            dispatch('watcher_error', () => import('../components/element/semantic-element.js').then(({ updateSemanticElementError }) => {
+                updateSemanticElementError(elementId, data.error, data.severity, data.details);
             }));
         } else {
             log.warn(SEG.WS, 'Received watcher_error with unexpected watcher_id format:', data.watcher_id);

@@ -1,14 +1,14 @@
 /**
  * London Tube Journey: Mobile Gene Network Analysis with Intermittent Connectivity
  *
- * Tests glyph persistence and visual sync during realistic mobile usage scenario.
+ * Tests element persistence and visual sync during realistic mobile usage scenario.
  *
  * SCENARIO:
  * Jenny, a biology researcher, on morning commute (Morden → Old Street, Northern Line)
  * analyzing overnight metagenomic pipeline results on mobile device.
  * Network connectivity drops in tunnels, returns at each station.
  * Jenny continues productive work despite adversarial connectivity —
- * including querying local attestations via AX glyphs in tunnels (orange tint,
+ * including querying local attestations via AX elements in tunnels (orange tint,
  * not ghostly grayscale) — then seamlessly continues on desktop upon arrival.
  *
  * ROUTE: 08:31-09:06 (35 minutes, 17 stations)
@@ -23,8 +23,8 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { syncStateManager, type GlyphSyncState } from './sync-state';
-import { uiState, type CanvasGlyphState, type CompositionState } from './ui';
+import { syncStateManager, type ElementSyncState } from './sync-state';
+import { uiState, type CanvasElementState, type CompositionState } from './ui';
 
 // Mock connectivity — offline by default (tunnel)
 let mockConnectivity: 'online' | 'degraded' | 'offline' = 'offline';
@@ -47,7 +47,7 @@ mock.module('../client', () => ({
 
 // NOTE: Do NOT mock ./ui — mock.module is process-global and would break
 // compositions.test.ts and ui.test.ts. Instead, populate the real uiState
-// with test data via setCanvasGlyphs()/setCanvasCompositions().
+// with test data via setCanvasElements()/setCanvasCompositions().
 
 // Dynamic imports AFTER mocks
 const { mergeCanvasState } = await import('../api/canvas');
@@ -61,7 +61,7 @@ const SYNC_QUEUE_KEY = 'qntx-canvas-sync-queue';
  */
 interface VisualState {
     rootAttribute: 'online' | 'degraded' | 'offline';
-    glyphAttribute: GlyphSyncState;
+    elementAttribute: ElementSyncState;
     expectedFilter: string;
     expectedBorderOpacity: string;
     description: string;
@@ -69,7 +69,7 @@ interface VisualState {
 
 function getExpectedVisualState(
     connectivity: 'online' | 'degraded' | 'offline',
-    syncState: GlyphSyncState,
+    syncState: ElementSyncState,
     localActive = false
 ): VisualState {
     // Determine root data-connectivity-mode attribute
@@ -82,7 +82,7 @@ function getExpectedVisualState(
 
     if (connectivity === 'offline') {
         if (localActive) {
-            // Local-active: AX/TS glyphs that work offline via IndexedDB/WASM
+            // Local-active: AX/TS elements that work offline via IndexedDB/WASM
             // Exempt from grayscale, orange tint applied via inline backgroundColor
             expectedFilter = 'none';
             expectedBorderOpacity = '1.0';
@@ -101,7 +101,7 @@ function getExpectedVisualState(
     } else {
         // Online mode
         if (syncState === 'synced') {
-            // Color boost for synced glyphs
+            // Color boost for synced elements
             expectedFilter = 'saturate(110%)';
             expectedBorderOpacity = '1.0';
             description = 'Enhanced color (synced)';
@@ -115,7 +115,7 @@ function getExpectedVisualState(
 
     return {
         rootAttribute,
-        glyphAttribute: syncState,
+        elementAttribute: syncState,
         expectedFilter,
         expectedBorderOpacity,
         description
@@ -128,7 +128,7 @@ function getExpectedVisualState(
 // on startup. Local wins on ID conflict. This is the mechanism that delivers
 // overnight work to a new client.
 
-function glyph(id: string, overrides: Partial<CanvasGlyphState> = {}): CanvasGlyphState {
+function item(id: string, overrides: Partial<CanvasElementState> = {}): CanvasElementState {
     return { id, symbol: 'ax', x: 0, y: 0, ...overrides };
 }
 
@@ -136,61 +136,61 @@ function composition(id: string, overrides: Partial<CompositionState> = {}): Com
     return { id, edges: [], x: 0, y: 0, ...overrides };
 }
 
-const emptyCanvas = { glyphs: [] as CanvasGlyphState[], compositions: [] as CompositionState[], minimizedWindows: [] as string[] };
+const emptyCanvas = { elements: [] as CanvasElementState[], compositions: [] as CompositionState[], minimizedWindows: [] as string[] };
 
 describe('mergeCanvasState', () => {
     test('backend-only items appended to local state', () => {
-        const local = { ...emptyCanvas, glyphs: [glyph('a')] };
-        const backend = { ...emptyCanvas, glyphs: [glyph('a'), glyph('b')] };
+        const local = { ...emptyCanvas, elements: [item('a')] };
+        const backend = { ...emptyCanvas, elements: [item('a'), item('b')] };
         const result = mergeCanvasState(local, backend);
 
-        expect(result.glyphs.map(g => g.id)).toEqual(['a', 'b']);
-        expect(result.mergedGlyphs).toBe(1);
+        expect(result.elements.map(g => g.id)).toEqual(['a', 'b']);
+        expect(result.mergedElements).toBe(1);
     });
 
     test('local wins on ID conflict', () => {
-        const local = { ...emptyCanvas, glyphs: [glyph('a', { x: 50, y: 50 })] };
-        const backend = { ...emptyCanvas, glyphs: [glyph('a', { x: 0, y: 0 })] };
+        const local = { ...emptyCanvas, elements: [item('a', { x: 50, y: 50 })] };
+        const backend = { ...emptyCanvas, elements: [item('a', { x: 0, y: 0 })] };
         const result = mergeCanvasState(local, backend);
 
-        expect(result.glyphs).toHaveLength(1);
-        expect(result.glyphs[0].x).toBe(50);
-        expect(result.mergedGlyphs).toBe(0);
+        expect(result.elements).toHaveLength(1);
+        expect(result.elements[0].x).toBe(50);
+        expect(result.mergedElements).toBe(0);
     });
 
     test('empty backend returns same reference (no copy)', () => {
-        const local = { ...emptyCanvas, glyphs: [glyph('a')] };
+        const local = { ...emptyCanvas, elements: [item('a')] };
         const result = mergeCanvasState(local, emptyCanvas);
 
-        expect(result.glyphs).toBe(local.glyphs);
-        expect(result.mergedGlyphs).toBe(0);
+        expect(result.elements).toBe(local.elements);
+        expect(result.mergedElements).toBe(0);
     });
 
     test('empty local receives all backend items', () => {
-        const backend = { ...emptyCanvas, glyphs: [glyph('a'), glyph('b')] };
+        const backend = { ...emptyCanvas, elements: [item('a'), item('b')] };
         const result = mergeCanvasState(emptyCanvas, backend);
 
-        expect(result.glyphs.map(g => g.id)).toEqual(['a', 'b']);
-        expect(result.mergedGlyphs).toBe(2);
+        expect(result.elements.map(g => g.id)).toEqual(['a', 'b']);
+        expect(result.mergedElements).toBe(2);
     });
 
-    test('glyphs and compositions merge independently', () => {
-        const local = { glyphs: [glyph('g1')], compositions: [composition('c1')], minimizedWindows: [] as string[] };
+    test('elements and compositions merge independently', () => {
+        const local = { elements: [item('g1')], compositions: [composition('c1')], minimizedWindows: [] as string[] };
         const backend = {
-            glyphs: [glyph('g1'), glyph('g2')],
+            elements: [item('g1'), item('g2')],
             compositions: [composition('c1'), composition('c2'), composition('c3')],
             minimizedWindows: [] as string[],
         };
         const result = mergeCanvasState(local, backend);
 
-        expect(result.mergedGlyphs).toBe(1);
+        expect(result.mergedElements).toBe(1);
         expect(result.mergedComps).toBe(2);
         expect(result.compositions.map(c => c.id)).toEqual(['c1', 'c2', 'c3']);
     });
 
     test('both empty', () => {
         const result = mergeCanvasState(emptyCanvas, emptyCanvas);
-        expect(result.glyphs).toHaveLength(0);
+        expect(result.elements).toHaveLength(0);
         expect(result.compositions).toHaveLength(0);
     });
 });
@@ -200,21 +200,21 @@ describe('mergeCanvasState', () => {
 // Jenny gets off her bike at Morden, 08:29. Parbattie, a field researcher in Guyana (UTC-4),
 // worked through the evening (London night = Guyana evening) documenting rare flora/fauna inventory.
 // Jenny opens the app on her phone before boarding. Her local IndexedDB has only
-// the AX glyph she left there yesterday. The backend has everything Parbattie documented
+// the AX element she left there yesterday. The backend has everything Parbattie documented
 // overnight. mergeCanvasState delivers the field notes to her screen.
 
 describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight field notes', () => {
     const jennyLocal = {
-        glyphs: [glyph('ax-jenny', { symbol: 'ax', x: 120, y: 80 })],
+        elements: [item('ax-jenny', { symbol: 'ax', x: 120, y: 80 })],
         compositions: [],
         minimizedWindows: [] as string[],
     };
 
     const backendAfterParbattie = {
-        glyphs: [
-            glyph('ax-jenny', { symbol: 'ax', x: 0, y: 0 }),              // same glyph, Parbattie may have moved it
-            glyph('note-inventory', { symbol: 'note', x: 200, y: 0 }),    // Parbattie's field inventory notes
-            glyph('note-priority', { symbol: 'note', x: 400, y: 0 }),     // Parbattie's sequencing priorities
+        elements: [
+            item('ax-jenny', { symbol: 'ax', x: 0, y: 0 }),              // same element, Parbattie may have moved it
+            item('note-inventory', { symbol: 'note', x: 200, y: 0 }),    // Parbattie's field inventory notes
+            item('note-priority', { symbol: 'note', x: 400, y: 0 }),     // Parbattie's sequencing priorities
         ],
         compositions: [
             composition('field-notes', {
@@ -227,19 +227,19 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
         minimizedWindows: [] as string[],
     };
 
-    test('Jenny sees her glyph plus Parbattie\'s overnight field notes', () => {
+    test('Jenny sees her element plus Parbattie\'s overnight field notes', () => {
         const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
 
-        expect(merged.glyphs).toHaveLength(3);
-        expect(merged.glyphs.map(g => g.id)).toEqual(['ax-jenny', 'note-inventory', 'note-priority']);
+        expect(merged.elements).toHaveLength(3);
+        expect(merged.elements.map(g => g.id)).toEqual(['ax-jenny', 'note-inventory', 'note-priority']);
     });
 
     test('Jenny\'s local position preserved, not overwritten by Parbattie\'s edits', () => {
         const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
-        const jennyGlyph = merged.glyphs.find(g => g.id === 'ax-jenny')!;
+        const jennyElement = merged.elements.find(g => g.id === 'ax-jenny')!;
 
-        expect(jennyGlyph.x).toBe(120);
-        expect(jennyGlyph.y).toBe(80);
+        expect(jennyElement.x).toBe(120);
+        expect(jennyElement.y).toBe(80);
     });
 
     test('Parbattie\'s field notes composition arrives intact', () => {
@@ -253,7 +253,7 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
     test('merge counts reflect what was new to Jenny', () => {
         const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
 
-        expect(merged.mergedGlyphs).toBe(2);  // note-inventory + note-priority
+        expect(merged.mergedElements).toBe(2);  // note-inventory + note-priority
         expect(merged.mergedComps).toBe(1);    // field-notes
     });
 
@@ -261,8 +261,8 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
         // Parbattie documented rare species overnight (Guyana evening = London night)
         // 23:00 GYT (11pm Guyana) = 03:00 GMT (3am London next day)
         const backendWithCode = {
-            glyphs: [
-                glyph('note-parbattie', {
+            elements: [
+                item('note-parbattie', {
                     symbol: 'note',
                     x: 200,
                     y: 0,
@@ -278,17 +278,17 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
         };
 
         // Jenny's local has no field notes yet
-        const jennyEmpty = { glyphs: [], compositions: [], minimizedWindows: [] as string[] };
+        const jennyEmpty = { elements: [], compositions: [], minimizedWindows: [] as string[] };
 
         const merged = mergeCanvasState(jennyEmpty, backendWithCode);
 
         // Jenny receives the note with Parbattie's field inventory intact
-        expect(merged.glyphs).toHaveLength(1);
-        const noteGlyph = merged.glyphs[0];
-        expect(noteGlyph.id).toBe('note-parbattie');
-        expect(noteGlyph.content).toContain('Heliamphora chimantensis');
-        expect(noteGlyph.content).toContain('Kaieteur Falls');
-        expect(noteGlyph.content).toContain('Georgetown');
+        expect(merged.elements).toHaveLength(1);
+        const noteElement = merged.elements[0];
+        expect(noteElement.id).toBe('note-parbattie');
+        expect(noteElement.content).toContain('Heliamphora chimantensis');
+        expect(noteElement.content).toContain('Kaieteur Falls');
+        expect(noteElement.content).toContain('Georgetown');
     });
 
     // TODO: Test conflict resolution for Jenny's own stale offline edits
@@ -304,12 +304,12 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
 
     // TODO(#canvas-live-sync): Jenny won't see changes Parbattie makes AFTER she opens
     // the app. That requires WebSocket `canvas_update` broadcast -- backend emits
-    // glyph/composition mutations to all connected clients for live merge.
+    // element/composition mutations to all connected clients for live merge.
 });
 
 describe('London Tube Journey: Gene Network Analysis', () => {
-    // Gene glyphs created during journey
-    const glyphs = {
+    // Gene elements created during journey
+    const items = {
         // Segment 1: Morden → Balham (initial discovery)
         novelCluster: 'gene-cluster-nov-001',
         candidateGene: 'gene-prot-xyz-447',
@@ -317,7 +317,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // Segment 2: Balham → Old Street (hypothesis formation)
         hypothesis: 'hypothesis-protein-function-001',
         validationNote: 'validation-regulatory-network-001',
-        // AX query glyph: works offline via IndexedDB (local-active, orange tint)
+        // AX query element: works offline via IndexedDB (local-active, orange tint)
         localAxQuery: 'ax-query-gene-cluster-001'
     };
 
@@ -325,17 +325,17 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         localStorage.clear();
         mockConnectivity = 'offline';
         mockApiFetch = async () => new Response(null, { status: 200 });
-        // Populate real uiState with glyph data for sync queue to resolve during flush
-        uiState.setCanvasGlyphs([
-            { id: glyphs.novelCluster, symbol: 'ax', x: 100, y: 200 },
-            { id: glyphs.candidateGene, symbol: 'gene', x: 200, y: 300 },
-            { id: glyphs.homologA, symbol: 'gene', x: 300, y: 400 },
-            { id: glyphs.hypothesis, symbol: 'note', x: 400, y: 500 },
-            { id: glyphs.validationNote, symbol: 'note', x: 500, y: 600 },
-            { id: glyphs.localAxQuery, symbol: 'ax', x: 600, y: 700 },
+        // Populate real uiState with element data for sync queue to resolve during flush
+        uiState.setCanvasElements([
+            { id: items.novelCluster, symbol: 'ax', x: 100, y: 200 },
+            { id: items.candidateGene, symbol: 'gene', x: 200, y: 300 },
+            { id: items.homologA, symbol: 'gene', x: 300, y: 400 },
+            { id: items.hypothesis, symbol: 'note', x: 400, y: 500 },
+            { id: items.validationNote, symbol: 'note', x: 500, y: 600 },
+            { id: items.localAxQuery, symbol: 'ax', x: 600, y: 700 },
         ]);
         uiState.setCanvasCompositions([]);
-        Object.values(glyphs).forEach(id => {
+        Object.values(items).forEach(id => {
             syncStateManager.clearState(id);
         });
     });
@@ -344,13 +344,13 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // STATION: Morden (WiFi available)
 
         // Researcher opens QNTX, sees overnight pipeline results
-        // Taps novel cluster glyph — enqueued for sync
-        canvasSyncQueue.add({ id: glyphs.novelCluster, op: 'glyph_upsert' });
-        expect(syncStateManager.getState(glyphs.novelCluster)).toBe('unsynced');
+        // Taps novel cluster element — enqueued for sync
+        canvasSyncQueue.add({ id: items.novelCluster, op: 'element_upsert' });
+        expect(syncStateManager.getState(items.novelCluster)).toBe('unsynced');
 
         // Station WiFi: queue flushes, backend confirms
         await canvasSyncQueue.flush();
-        expect(syncStateManager.getState(glyphs.novelCluster)).toBe('synced');
+        expect(syncStateManager.getState(items.novelCluster)).toBe('synced');
 
         // Queue drained — nothing pending when train departs
         const stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
@@ -359,7 +359,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
 
     test('Morden → South Wimbledon tunnel: First offline experience', () => {
         // Pre-condition: Cluster already synced from Morden station
-        syncStateManager.setState(glyphs.novelCluster, 'synced');
+        syncStateManager.setState(items.novelCluster, 'synced');
 
         // TUNNEL: Train departs Morden at 08:31
         // After 300ms debounce, connectivity detected as offline
@@ -367,30 +367,30 @@ describe('London Tube Journey: Gene Network Analysis', () => {
 
         // Researcher identifies candidate gene and drags to canvas
         // Enqueued offline — sits in localStorage, won't flush
-        canvasSyncQueue.add({ id: glyphs.candidateGene, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.candidateGene, op: 'element_upsert' });
 
-        expect(syncStateManager.getState(glyphs.candidateGene)).toBe('unsynced');
-        expect(syncStateManager.getState(glyphs.novelCluster)).toBe('synced');
+        expect(syncStateManager.getState(items.candidateGene)).toBe('unsynced');
+        expect(syncStateManager.getState(items.novelCluster)).toBe('synced');
 
         // One item waiting in the sync queue
         const stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
         expect(stored).toHaveLength(1);
-        expect(stored[0].op).toBe('glyph_upsert');
+        expect(stored[0].op).toBe('element_upsert');
 
         // Validate expected visual states
         const unsyncedVisual = getExpectedVisualState(connectivity, 'unsynced');
         const syncedVisual = getExpectedVisualState(connectivity, 'synced');
 
-        // Unsynced glyph should be ghostly (grayscale)
+        // Unsynced element should be ghostly (grayscale)
         expect(unsyncedVisual.rootAttribute).toBe('offline');
-        expect(unsyncedVisual.glyphAttribute).toBe('unsynced');
+        expect(unsyncedVisual.elementAttribute).toBe('unsynced');
         expect(unsyncedVisual.expectedFilter).toBe('grayscale(100%)');
         expect(unsyncedVisual.expectedBorderOpacity).toBe('0.15');
         expect(unsyncedVisual.description).toContain('Ghostly');
 
-        // Synced glyph should have azure tint (offline but previously synced)
+        // Synced element should have azure tint (offline but previously synced)
         expect(syncedVisual.rootAttribute).toBe('offline');
-        expect(syncedVisual.glyphAttribute).toBe('synced');
+        expect(syncedVisual.elementAttribute).toBe('synced');
         expect(syncedVisual.expectedFilter).toBe('saturate(65%) hue-rotate(10deg)');
         expect(syncedVisual.expectedBorderOpacity).toBe('0.35');
         expect(syncedVisual.description).toContain('Azure tint');
@@ -398,12 +398,12 @@ describe('London Tube Journey: Gene Network Analysis', () => {
 
     test('08:34 South Wimbledon: First auto-sync at station', async () => {
         // Pre-condition: Candidate gene created offline in tunnel
-        syncStateManager.setState(glyphs.novelCluster, 'synced');
-        canvasSyncQueue.add({ id: glyphs.candidateGene, op: 'glyph_upsert' });
+        syncStateManager.setState(items.novelCluster, 'synced');
+        canvasSyncQueue.add({ id: items.candidateGene, op: 'element_upsert' });
 
         // Track state transitions
-        const transitions: GlyphSyncState[] = [];
-        syncStateManager.subscribe(glyphs.candidateGene, (state) => {
+        const transitions: ElementSyncState[] = [];
+        syncStateManager.subscribe(items.candidateGene, (state) => {
             transitions.push(state);
         });
 
@@ -418,7 +418,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
             'synced'     // Backend confirms persistence
         ]);
 
-        expect(syncStateManager.getState(glyphs.candidateGene)).toBe('synced');
+        expect(syncStateManager.getState(items.candidateGene)).toBe('synced');
 
         // Queue drained
         const stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
@@ -444,7 +444,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // Test all combinations of connectivity and sync state
         const testCases: Array<{
             connectivity: 'online' | 'degraded' | 'offline';
-            syncState: GlyphSyncState;
+            syncState: ElementSyncState;
             localActive?: boolean;
             expectedFilter: string;
             expectedBorderOpacity: string;
@@ -459,7 +459,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
             { connectivity: 'offline', syncState: 'syncing', expectedFilter: 'saturate(65%) hue-rotate(10deg)', expectedBorderOpacity: '0.35' },
             { connectivity: 'offline', syncState: 'unsynced', expectedFilter: 'grayscale(100%)', expectedBorderOpacity: '0.15' },
             { connectivity: 'offline', syncState: 'failed', expectedFilter: 'grayscale(100%)', expectedBorderOpacity: '0.15' },
-            // Local-active states (AX/TS glyphs that work offline via IndexedDB/WASM)
+            // Local-active states (AX/TS elements that work offline via IndexedDB/WASM)
             { connectivity: 'offline', syncState: 'unsynced', localActive: true, expectedFilter: 'none', expectedBorderOpacity: '1.0' },
             { connectivity: 'offline', syncState: 'synced', localActive: true, expectedFilter: 'none', expectedBorderOpacity: '1.0' }
         ];
@@ -468,7 +468,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
             const visual = getExpectedVisualState(connectivity, syncState, localActive);
 
             expect(visual.rootAttribute).toBe(connectivity);
-            expect(visual.glyphAttribute).toBe(syncState);
+            expect(visual.elementAttribute).toBe(syncState);
             expect(visual.expectedFilter).toBe(expectedFilter);
             expect(visual.expectedBorderOpacity).toBe(expectedBorderOpacity);
         });
@@ -483,12 +483,12 @@ describe('London Tube Journey: Gene Network Analysis', () => {
 
         // 08:31 STATION: Morden
         journey.push({ time: '08:31', location: 'Morden', connectivity: 'online', action: 'Board train, identify novel cluster' });
-        canvasSyncQueue.add({ id: glyphs.novelCluster, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.novelCluster, op: 'element_upsert' });
         await canvasSyncQueue.flush();
 
         // 08:31-08:34 TUNNEL: Morden → South Wimbledon
         journey.push({ time: '08:32', location: 'Tunnel', connectivity: 'offline', action: 'Add candidate gene (offline)' });
-        canvasSyncQueue.add({ id: glyphs.candidateGene, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.candidateGene, op: 'element_upsert' });
 
         // 08:34 STATION: South Wimbledon
         journey.push({ time: '08:34', location: 'South Wimbledon', connectivity: 'online', action: 'Auto-sync candidate gene' });
@@ -496,14 +496,14 @@ describe('London Tube Journey: Gene Network Analysis', () => {
 
         // 08:34-08:36 TUNNEL: South Wimbledon → Colliers Wood
         journey.push({ time: '08:35', location: 'Tunnel', connectivity: 'offline', action: 'Add homolog relationship (offline)' });
-        canvasSyncQueue.add({ id: glyphs.homologA, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.homologA, op: 'element_upsert' });
 
         // 08:36 STATION: Colliers Wood
         journey.push({ time: '08:36', location: 'Colliers Wood', connectivity: 'online', action: 'Auto-sync homolog' });
         await canvasSyncQueue.flush();
 
         // 08:36-08:38 TUNNEL: Colliers Wood → Tooting Broadway
-        journey.push({ time: '08:37', location: 'Tunnel', connectivity: 'offline', action: 'Review gene network (all glyphs azure tint)' });
+        journey.push({ time: '08:37', location: 'Tunnel', connectivity: 'offline', action: 'Review gene network (all elements azure tint)' });
 
         // 08:38 STATION: Tooting Broadway
         journey.push({ time: '08:38', location: 'Tooting Broadway', connectivity: 'online', action: 'No pending syncs' });
@@ -520,10 +520,10 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // 08:41 STATION: Balham (segment 1 end)
         journey.push({ time: '08:41', location: 'Balham', connectivity: 'online', action: 'Segment 1 complete' });
 
-        // Verify all segment 1 glyphs synced
-        expect(syncStateManager.getState(glyphs.novelCluster)).toBe('synced');
-        expect(syncStateManager.getState(glyphs.candidateGene)).toBe('synced');
-        expect(syncStateManager.getState(glyphs.homologA)).toBe('synced');
+        // Verify all segment 1 elements synced
+        expect(syncStateManager.getState(items.novelCluster)).toBe('synced');
+        expect(syncStateManager.getState(items.candidateGene)).toBe('synced');
+        expect(syncStateManager.getState(items.homologA)).toBe('synced');
 
         // Queue empty at segment end
         const stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
@@ -534,33 +534,33 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         expect(journey[10].location).toBe('Balham');
     });
 
-    test('08:48 Tunnel: Jenny queries local attestations, AX glyph stays orange', () => {
-        // Pre-condition: Hypothesis formed, all discovery glyphs synced
-        syncStateManager.setState(glyphs.novelCluster, 'synced');
-        syncStateManager.setState(glyphs.candidateGene, 'synced');
-        syncStateManager.setState(glyphs.homologA, 'synced');
-        syncStateManager.setState(glyphs.hypothesis, 'synced');
+    test('08:48 Tunnel: Jenny queries local attestations, AX element stays orange', () => {
+        // Pre-condition: Hypothesis formed, all discovery elements synced
+        syncStateManager.setState(items.novelCluster, 'synced');
+        syncStateManager.setState(items.candidateGene, 'synced');
+        syncStateManager.setState(items.homologA, 'synced');
+        syncStateManager.setState(items.hypothesis, 'synced');
 
         // TUNNEL: Clapham North → Stockwell (08:48)
         // Jenny wants to cross-reference her gene cluster hypothesis
-        // against existing attestations. She spawns an AX glyph and types
+        // against existing attestations. She spawns an AX element and types
         // "of QNTX" — IndexedDB has locally-cached attestation data.
         const connectivity = 'offline';
 
-        // AX glyph spawned offline — enqueued, won't flush until station
-        canvasSyncQueue.add({ id: glyphs.localAxQuery, op: 'glyph_upsert' });
+        // AX element spawned offline — enqueued, won't flush until station
+        canvasSyncQueue.add({ id: items.localAxQuery, op: 'element_upsert' });
 
-        // Queue has 1 pending item (the AX query glyph)
+        // Queue has 1 pending item (the AX query element)
         const queued = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
         expect(queued).toHaveLength(1);
 
-        // Regular unsynced glyph in offline mode → ghostly (grayscale, unreachable)
+        // Regular unsynced element in offline mode → ghostly (grayscale, unreachable)
         const ghostlyVisual = getExpectedVisualState(connectivity, 'unsynced');
         expect(ghostlyVisual.expectedFilter).toBe('grayscale(100%)');
         expect(ghostlyVisual.expectedBorderOpacity).toBe('0.15');
         expect(ghostlyVisual.description).toContain('Ghostly');
 
-        // Local-active AX glyph in offline mode → orange (exempt from grayscale)
+        // Local-active AX element in offline mode → orange (exempt from grayscale)
         // data-local-active="true" on the element bypasses CSS grayscale filter,
         // inline backgroundColor set to rgba(61, 45, 20, 0.92) by setColorState('orange')
         const localActiveVisual = getExpectedVisualState(connectivity, 'unsynced', true);
@@ -572,36 +572,36 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // Ghostly = can't do anything offline. Orange = locally functional.
         expect(ghostlyVisual.expectedFilter).not.toBe(localActiveVisual.expectedFilter);
 
-        // Previously-synced glyphs still get azure tint (they're fine, just dormant)
+        // Previously-synced elements still get azure tint (they're fine, just dormant)
         const azureVisual = getExpectedVisualState(connectivity, 'synced');
         expect(azureVisual.expectedFilter).toBe('saturate(65%) hue-rotate(10deg)');
 
         // Three distinct offline visual states on Jenny's screen:
-        // 1. Orange (AX glyph) — actively querying local data
-        // 2. Azure (synced glyphs) — safe, dormant
+        // 1. Orange (AX element) — actively querying local data
+        // 2. Azure (synced elements) — safe, dormant
         // 3. Ghostly (if any unsynced) — unreachable
     });
 
     test('Oval → Kennington: Sync failure with exponential backoff retry', async () => {
-        // Pre-condition: Segment 1 glyphs synced, now in middle of segment 2
-        syncStateManager.setState(glyphs.novelCluster, 'synced');
-        syncStateManager.setState(glyphs.candidateGene, 'synced');
-        syncStateManager.setState(glyphs.homologA, 'synced');
-        syncStateManager.setState(glyphs.hypothesis, 'synced');
+        // Pre-condition: Segment 1 elements synced, now in middle of segment 2
+        syncStateManager.setState(items.novelCluster, 'synced');
+        syncStateManager.setState(items.candidateGene, 'synced');
+        syncStateManager.setState(items.homologA, 'synced');
+        syncStateManager.setState(items.hypothesis, 'synced');
 
         // Track state transitions for validation note
-        const transitions: GlyphSyncState[] = [];
-        syncStateManager.subscribe(glyphs.validationNote, (state) => {
+        const transitions: ElementSyncState[] = [];
+        syncStateManager.subscribe(items.validationNote, (state) => {
             transitions.push(state);
         });
 
         // 08:51 STATION: Oval — Jenny creates validation note
-        canvasSyncQueue.add({ id: glyphs.validationNote, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.validationNote, op: 'element_upsert' });
 
         // 08:51 Server flaky — first sync attempt fails
         mockApiFetch = async () => new Response(null, { status: 500 });
         await canvasSyncQueue.flush();
-        expect(syncStateManager.getState(glyphs.validationNote)).toBe('failed');
+        expect(syncStateManager.getState(items.validationNote)).toBe('failed');
 
         // Backoff: entry stays in queue with retryCount=1
         let stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
@@ -624,7 +624,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         mockApiFetch = async () => new Response(null, { status: 200 });
 
         await canvasSyncQueue.flush();
-        expect(syncStateManager.getState(glyphs.validationNote)).toBe('synced');
+        expect(syncStateManager.getState(items.validationNote)).toBe('synced');
 
         // Queue drained after successful retry
         stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
@@ -647,17 +647,17 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // === SEGMENT 1: Morden → Balham ===
 
         journey.push({ time: '08:31', location: 'Morden', connectivity: 'online', event: 'Board train, identify cluster' });
-        canvasSyncQueue.add({ id: glyphs.novelCluster, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.novelCluster, op: 'element_upsert' });
         await canvasSyncQueue.flush();
 
         journey.push({ time: '08:32', location: 'Tunnel', connectivity: 'offline', event: 'Add candidate gene' });
-        canvasSyncQueue.add({ id: glyphs.candidateGene, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.candidateGene, op: 'element_upsert' });
 
         journey.push({ time: '08:34', location: 'South Wimbledon', connectivity: 'online', event: 'Sync candidate' });
         await canvasSyncQueue.flush();
 
         journey.push({ time: '08:35', location: 'Tunnel', connectivity: 'offline', event: 'Add homolog' });
-        canvasSyncQueue.add({ id: glyphs.homologA, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.homologA, op: 'element_upsert' });
 
         journey.push({ time: '08:36', location: 'Colliers Wood', connectivity: 'online', event: 'Sync homolog' });
         await canvasSyncQueue.flush();
@@ -672,7 +672,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // === SEGMENT 2: Balham → Old Street ===
 
         journey.push({ time: '08:42', location: 'Tunnel', connectivity: 'offline', event: 'Form hypothesis' });
-        canvasSyncQueue.add({ id: glyphs.hypothesis, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.hypothesis, op: 'element_upsert' });
 
         journey.push({ time: '08:43', location: 'Clapham South', connectivity: 'online', event: 'Sync hypothesis' });
         await canvasSyncQueue.flush();
@@ -682,14 +682,14 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         journey.push({ time: '08:46', location: 'Tunnel', connectivity: 'offline', event: 'Refine hypothesis' });
         journey.push({ time: '08:47', location: 'Clapham North', connectivity: 'online', event: 'All synced' });
         journey.push({ time: '08:48', location: 'Tunnel', connectivity: 'offline', event: 'AX query: local attestations (orange, not ghostly)' });
-        canvasSyncQueue.add({ id: glyphs.localAxQuery, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.localAxQuery, op: 'element_upsert' });
 
         journey.push({ time: '08:49', location: 'Stockwell', connectivity: 'online', event: 'Sync AX query results' });
         await canvasSyncQueue.flush();
 
         journey.push({ time: '08:50', location: 'Tunnel', connectivity: 'offline', event: 'Begin validation' });
         journey.push({ time: '08:51', location: 'Oval', connectivity: 'online', event: 'Create validation note' });
-        canvasSyncQueue.add({ id: glyphs.validationNote, op: 'glyph_upsert' });
+        canvasSyncQueue.add({ id: items.validationNote, op: 'element_upsert' });
         await canvasSyncQueue.flush();
 
         journey.push({ time: '08:52', location: 'Tunnel', connectivity: 'offline', event: 'Long tunnel (3 min)' });
@@ -709,13 +709,13 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         journey.push({ time: '09:05', location: 'Tunnel', connectivity: 'offline', event: 'Brief tunnel (1 min)' });
         journey.push({ time: '09:06', location: 'Old Street', connectivity: 'online', event: 'ARRIVAL' });
 
-        // Verify all glyphs synced by arrival
-        expect(syncStateManager.getState(glyphs.novelCluster)).toBe('synced');
-        expect(syncStateManager.getState(glyphs.candidateGene)).toBe('synced');
-        expect(syncStateManager.getState(glyphs.homologA)).toBe('synced');
-        expect(syncStateManager.getState(glyphs.hypothesis)).toBe('synced');
-        expect(syncStateManager.getState(glyphs.localAxQuery)).toBe('synced');
-        expect(syncStateManager.getState(glyphs.validationNote)).toBe('synced');
+        // Verify all elements synced by arrival
+        expect(syncStateManager.getState(items.novelCluster)).toBe('synced');
+        expect(syncStateManager.getState(items.candidateGene)).toBe('synced');
+        expect(syncStateManager.getState(items.homologA)).toBe('synced');
+        expect(syncStateManager.getState(items.hypothesis)).toBe('synced');
+        expect(syncStateManager.getState(items.localAxQuery)).toBe('synced');
+        expect(syncStateManager.getState(items.validationNote)).toBe('synced');
 
         // Queue empty at arrival — everything synced
         const stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
@@ -738,8 +738,8 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // SCENARIO: Researcher arrives at Old Street (09:06)
         // Opens desktop workstation, canvas already has all mobile work
 
-        // Simulate all mobile glyphs synced
-        Object.values(glyphs).forEach(id => {
+        // Simulate all mobile elements synced
+        Object.values(items).forEach(id => {
             syncStateManager.setState(id, 'synced');
         });
 
@@ -748,7 +748,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         const mobileQueue = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
         expect(mobileQueue).toHaveLength(0);
 
-        const desktopSession = Object.entries(glyphs).map(([name, id]) => ({
+        const desktopSession = Object.entries(items).map(([name, id]) => ({
             name,
             id,
             state: syncStateManager.getState(id)
@@ -760,14 +760,14 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         });
 
         // Researcher immediately continues with deep analysis on larger screen
-        const deepAnalysisGlyph = 'desktop-deep-analysis-001';
-        const currentGlyphs = uiState.getCanvasGlyphs();
-        uiState.setCanvasGlyphs([...currentGlyphs, { id: deepAnalysisGlyph, symbol: 'note', x: 800, y: 100 }]);
-        canvasSyncQueue.add({ id: deepAnalysisGlyph, op: 'glyph_upsert' });
+        const deepAnalysisElement = 'desktop-deep-analysis-001';
+        const currentElements = uiState.getCanvasElements();
+        uiState.setCanvasElements([...currentElements, { id: deepAnalysisElement, symbol: 'note', x: 800, y: 100 }]);
+        canvasSyncQueue.add({ id: deepAnalysisElement, op: 'element_upsert' });
         await canvasSyncQueue.flush();
 
-        expect(syncStateManager.getState(deepAnalysisGlyph)).toBe('synced');
-        expect(desktopSession.length).toBe(6); // All 6 mobile glyphs present (including AX query)
+        expect(syncStateManager.getState(deepAnalysisElement)).toBe('synced');
+        expect(desktopSession.length).toBe(6); // All 6 mobile elements present (including AX query)
 
         // Queue empty after desktop sync
         const desktopQueue = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');

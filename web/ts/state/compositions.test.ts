@@ -2,7 +2,7 @@
  * Composition State Management Tests
  *
  * Tests for composition persistence across page refresh.
- * Ensures melded glyphs survive browser reload.
+ * Ensures melded elements survive browser reload.
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
@@ -10,8 +10,8 @@ import { uiState, type CompositionState } from './ui';
 import {
     addComposition,
     removeComposition,
-    isGlyphInComposition,
-    findCompositionByGlyph,
+    isElementInComposition,
+    findCompositionByElement,
     getAllCompositions
 } from './compositions';
 
@@ -80,8 +80,8 @@ describe('Composition State Management', () => {
         });
     });
 
-    describe('isGlyphInComposition', () => {
-        test('returns true when glyph is initiator', () => {
+    describe('isElementInComposition', () => {
+        test('returns true when element is initiator', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
@@ -90,10 +90,10 @@ describe('Composition State Management', () => {
             };
 
             addComposition(comp);
-            expect(isGlyphInComposition('ax1')).toBe(true);
+            expect(isElementInComposition('ax1')).toBe(true);
         });
 
-        test('returns true when glyph is target', () => {
+        test('returns true when element is target', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
@@ -102,10 +102,10 @@ describe('Composition State Management', () => {
             };
 
             addComposition(comp);
-            expect(isGlyphInComposition('prompt1')).toBe(true);
+            expect(isElementInComposition('prompt1')).toBe(true);
         });
 
-        test('returns false when glyph is not in any composition', () => {
+        test('returns false when element is not in any composition', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
@@ -114,11 +114,11 @@ describe('Composition State Management', () => {
             };
 
             addComposition(comp);
-            expect(isGlyphInComposition('ax2')).toBe(false);
+            expect(isElementInComposition('ax2')).toBe(false);
         });
     });
 
-    describe('findCompositionByGlyph', () => {
+    describe('findCompositionByElement', () => {
         test('finds composition by initiator id', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
@@ -128,7 +128,7 @@ describe('Composition State Management', () => {
             };
 
             addComposition(comp);
-            const found = findCompositionByGlyph('ax1');
+            const found = findCompositionByElement('ax1');
             expect(found).toEqual(comp);
         });
 
@@ -141,11 +141,11 @@ describe('Composition State Management', () => {
             };
 
             addComposition(comp);
-            const found = findCompositionByGlyph('prompt1');
+            const found = findCompositionByElement('prompt1');
             expect(found).toEqual(comp);
         });
 
-        test('returns null when glyph not in any composition', () => {
+        test('returns null when element not in any composition', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
@@ -154,7 +154,7 @@ describe('Composition State Management', () => {
             };
 
             addComposition(comp);
-            const found = findCompositionByGlyph('ax2');
+            const found = findCompositionByElement('ax2');
             expect(found).toBe(null);
         });
     });
@@ -185,9 +185,9 @@ describe('Composition State Management', () => {
         });
     });
 
-    // Phase 2: Multi-glyph chain state management
-    describe('Multi-glyph chains', () => {
-        test('3-glyph composition stores correctly', () => {
+    // Phase 2: Multi-element chain state management
+    describe('Multi-element chains', () => {
+        test('3-element composition stores correctly', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-py1-prompt1',
                 edges: [
@@ -205,7 +205,7 @@ describe('Composition State Management', () => {
             expect(compositions[0].edges).toHaveLength(2);
         });
 
-        test('isGlyphInComposition works with 3-glyph chains', () => {
+        test('isElementInComposition works with 3-element chains', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-py1-prompt1',
                 edges: [
@@ -218,13 +218,13 @@ describe('Composition State Management', () => {
 
             addComposition(comp);
 
-            expect(isGlyphInComposition('ax1')).toBe(true);
-            expect(isGlyphInComposition('py1')).toBe(true);
-            expect(isGlyphInComposition('prompt1')).toBe(true);
-            expect(isGlyphInComposition('ax2')).toBe(false);
+            expect(isElementInComposition('ax1')).toBe(true);
+            expect(isElementInComposition('py1')).toBe(true);
+            expect(isElementInComposition('prompt1')).toBe(true);
+            expect(isElementInComposition('ax2')).toBe(false);
         });
 
-        test('findCompositionByGlyph finds 3-glyph chains', () => {
+        test('findCompositionByElement finds 3-element chains', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-py1-prompt1',
                 edges: [
@@ -237,13 +237,13 @@ describe('Composition State Management', () => {
 
             addComposition(comp);
 
-            expect(findCompositionByGlyph('ax1')).toEqual(comp);
-            expect(findCompositionByGlyph('py1')).toEqual(comp);
-            expect(findCompositionByGlyph('prompt1')).toEqual(comp);
+            expect(findCompositionByElement('ax1')).toEqual(comp);
+            expect(findCompositionByElement('py1')).toEqual(comp);
+            expect(findCompositionByElement('prompt1')).toEqual(comp);
         });
 
         test('extending composition adds edge to graph', () => {
-            // Start with 2-glyph composition
+            // Start with 2-element composition
             const comp: CompositionState = {
                 id: 'melded-ax1-py1',
                 edges: [{ from: 'ax1', to: 'py1', direction: 'right', position: 0 }],
@@ -253,7 +253,7 @@ describe('Composition State Management', () => {
 
             addComposition(comp);
 
-            // Extend to 3 glyphs (this functionality needs implementation in Phase 3)
+            // Extend to 3 elements (this functionality needs implementation in Phase 3)
             const extended: CompositionState = {
                 ...comp,
                 edges: [
@@ -264,7 +264,7 @@ describe('Composition State Management', () => {
 
             addComposition(extended);
 
-            const result = findCompositionByGlyph('prompt1');
+            const result = findCompositionByElement('prompt1');
             expect(result?.edges).toHaveLength(2);
         });
     });

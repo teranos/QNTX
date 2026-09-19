@@ -714,7 +714,7 @@ via GET /api/plugins/routes.</p>
       (**
 {%html:
 <p>python_provider indicates this plugin can execute Python code.
-Core registers &quot;py&quot; glyph type when any loaded plugin declares this.</p>
+Core registers &quot;py&quot; element type when any loaded plugin declares this.</p>
 %}
       *)
 
@@ -1102,12 +1102,12 @@ to the plugin via ExecuteJob.</p>
 
   (**
 {%html:
-<p>GlyphDefResponse contains custom glyph type definitions from a plugin</p>
+<p>ElementDefResponse contains custom element type definitions from a plugin</p>
 %}
   *)
-  and GlyphDefResponse : sig
-    type t = (GlyphDef.t list)
-    val make: ?glyphs:GlyphDef.t list -> unit -> t
+  and ElementDefResponse : sig
+    type t = (ElementDef.t list)
+    val make: ?elements:ElementDef.t list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -1126,7 +1126,7 @@ to the plugin via ExecuteJob.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?glyphs:GlyphDef.t list -> unit -> t
+    type make_t = ?elements:ElementDef.t list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -1137,15 +1137,15 @@ to the plugin via ExecuteJob.</p>
 
   (**
 {%html:
-<p>GlyphDef defines a custom glyph type provided by a plugin</p>
+<p>ElementDef defines a custom element type provided by a plugin</p>
 %}
   *)
-  and GlyphDef : sig
+  and ElementDef : sig
     type t = {
       symbol:string;
       (**
 {%html:
-<p>Symbol is the glyph identifier (e.g., &quot;⚗&quot; for a chemistry plugin)</p>
+<p>Symbol is the element identifier (e.g., &quot;⚗&quot; for a chemistry plugin)</p>
 %}
       *)
 
@@ -1167,14 +1167,14 @@ to the plugin via ExecuteJob.</p>
       (**
 {%html:
 <p>ContentPath is the HTTP path (relative to /api/{plugin}/) that
-returns the HTML fragment for this glyph's content area</p>
+returns the HTML fragment for this element's content area</p>
 %}
       *)
 
       css_path:string;
       (**
 {%html:
-<p>CSSPath is an optional HTTP path to a stylesheet for this glyph type</p>
+<p>CSSPath is an optional HTTP path to a stylesheet for this element type</p>
 %}
       *)
 
@@ -1386,17 +1386,17 @@ bypassing the server-rendered HTML pipeline.</p>
     end
 
     val configSchema : (module Runtime'.Spec.Message with type t = Empty.t) * (module Runtime'.Spec.Message with type t = ConfigSchemaResponse.t)
-    module RegisterGlyphs : sig
-      include Runtime'.Service.Rpc with type Request.t = Empty.t and type Response.t = GlyphDefResponse.t
+    module RegisterElements : sig
+      include Runtime'.Service.Rpc with type Request.t = Empty.t and type Response.t = ElementDefResponse.t
       module Request : Runtime'.Spec.Message with type t = Empty.t and type make_t = Empty.make_t
       (** Module alias for the request message for this method call *)
 
-      module Response : Runtime'.Spec.Message with type t = GlyphDefResponse.t and type make_t = GlyphDefResponse.make_t
+      module Response : Runtime'.Spec.Message with type t = ElementDefResponse.t and type make_t = ElementDefResponse.make_t
       (** Module alias for the response message for this method call *)
 
     end
 
-    val registerGlyphs : (module Runtime'.Spec.Message with type t = Empty.t) * (module Runtime'.Spec.Message with type t = GlyphDefResponse.t)
+    val registerElements : (module Runtime'.Spec.Message with type t = Empty.t) * (module Runtime'.Spec.Message with type t = ElementDefResponse.t)
     module ExecuteJob : sig
       include Runtime'.Service.Rpc with type Request.t = ExecuteJobRequest.t and type Response.t = ExecuteJobResponse.t
       module Request : Runtime'.Spec.Message with type t = ExecuteJobRequest.t and type make_t = ExecuteJobRequest.make_t
@@ -2617,7 +2617,7 @@ via GET /api/plugins/routes.</p>
       (**
 {%html:
 <p>python_provider indicates this plugin can execute Python code.
-Core registers &quot;py&quot; glyph type when any loaded plugin declares this.</p>
+Core registers &quot;py&quot; element type when any loaded plugin declares this.</p>
 %}
       *)
 
@@ -3240,9 +3240,9 @@ Core registers &quot;py&quot; glyph type when any loaded plugin declares this.</
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and GlyphDefResponse : sig
-    type t = (GlyphDef.t list)
-    val make: ?glyphs:GlyphDef.t list -> unit -> t
+  and ElementDefResponse : sig
+    type t = (ElementDef.t list)
+    val make: ?elements:ElementDef.t list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -3261,46 +3261,46 @@ Core registers &quot;py&quot; glyph type when any loaded plugin declares this.</
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?glyphs:GlyphDef.t list -> unit -> t
+    type make_t = ?elements:ElementDef.t list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = GlyphDefResponse
-    let name () = ".protocol.GlyphDefResponse"
-    type t = (GlyphDef.t list)
-    type make_t = ?glyphs:GlyphDef.t list -> unit -> t
-    let make ?(glyphs = []) () = (glyphs)
+    module This'_ = ElementDefResponse
+    let name () = ".protocol.ElementDefResponse"
+    type t = (ElementDef.t list)
+    type make_t = ?elements:ElementDef.t list -> unit -> t
+    let make ?(elements = []) () = (elements)
     let merge =
-    let merge_glyphs = Runtime'.Merge.merge Runtime'.Spec.( repeated ((1, "glyphs", "glyphs"), (message (module GlyphDef)), not_packed) ) in
-    fun (t1_glyphs) (t2_glyphs) -> merge_glyphs t1_glyphs t2_glyphs
-    let spec () = Runtime'.Spec.( repeated ((1, "glyphs", "glyphs"), (message (module GlyphDef)), not_packed) ^:: nil )
+    let merge_elements = Runtime'.Merge.merge Runtime'.Spec.( repeated ((1, "elements", "elements"), (message (module ElementDef)), not_packed) ) in
+    fun (t1_elements) (t2_elements) -> merge_elements t1_elements t2_elements
+    let spec () = Runtime'.Spec.( repeated ((1, "elements", "elements"), (message (module ElementDef)), not_packed) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer (glyphs) -> serialize writer glyphs
+      fun writer (elements) -> serialize writer elements
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor glyphs = (glyphs) in
+      let constructor elements = (elements) in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun (glyphs) -> serialize glyphs
+      fun (elements) -> serialize elements
     let from_json_exn =
-      let constructor glyphs = (glyphs) in
+      let constructor elements = (elements) in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and GlyphDef : sig
+  and ElementDef : sig
     type t = {
       symbol:string;
       (**
 {%html:
-<p>Symbol is the glyph identifier (e.g., &quot;⚗&quot; for a chemistry plugin)</p>
+<p>Symbol is the element identifier (e.g., &quot;⚗&quot; for a chemistry plugin)</p>
 %}
       *)
 
@@ -3322,14 +3322,14 @@ Core registers &quot;py&quot; glyph type when any loaded plugin declares this.</
       (**
 {%html:
 <p>ContentPath is the HTTP path (relative to /api/{plugin}/) that
-returns the HTML fragment for this glyph's content area</p>
+returns the HTML fragment for this element's content area</p>
 %}
       *)
 
       css_path:string;
       (**
 {%html:
-<p>CSSPath is an optional HTTP path to a stylesheet for this glyph type</p>
+<p>CSSPath is an optional HTTP path to a stylesheet for this element type</p>
 %}
       *)
 
@@ -3377,8 +3377,8 @@ bypassing the server-rendered HTML pipeline.</p>
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = GlyphDef
-    let name () = ".protocol.GlyphDef"
+    module This'_ = ElementDef
+    let name () = ".protocol.ElementDef"
     type t = {
       symbol:string;
       title:string;
@@ -3653,18 +3653,18 @@ bypassing the server-rendered HTML pipeline.</p>
       (module Empty : Runtime'.Spec.Message with type t = Empty.t ),
       (module ConfigSchemaResponse : Runtime'.Spec.Message with type t = ConfigSchemaResponse.t )
 
-    module RegisterGlyphs = struct
+    module RegisterElements = struct
       let package_name = Some "protocol"
       let service_name = "DomainPluginService"
-      let method_name = "RegisterGlyphs"
-      let name = "/protocol.DomainPluginService/RegisterGlyphs"
+      let method_name = "RegisterElements"
+      let name = "/protocol.DomainPluginService/RegisterElements"
       module Request = Empty
-      module Response = GlyphDefResponse
+      module Response = ElementDefResponse
     end
 
-    let registerGlyphs =
+    let registerElements =
       (module Empty : Runtime'.Spec.Message with type t = Empty.t ),
-      (module GlyphDefResponse : Runtime'.Spec.Message with type t = GlyphDefResponse.t )
+      (module ElementDefResponse : Runtime'.Spec.Message with type t = ElementDefResponse.t )
 
     module ExecuteJob = struct
       let package_name = Some "protocol"

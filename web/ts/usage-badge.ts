@@ -1,5 +1,5 @@
 // Usage badge component for real-time cost tracking
-// Clicking the badge opens the usage-chart glyph
+// Clicking the badge opens the usage-chart element
 
 import type { UsageUpdateMessage } from '../types/websocket';
 
@@ -21,11 +21,11 @@ export function createUsageBadge(): HTMLDivElement {
     badge.textContent = '$0.00';
     badge.title = 'Click for cost chart';
 
-    // Open usage-chart glyph on click
+    // Open usage-chart element on click
     badge.addEventListener('click', () => {
-        const usageGlyph = document.querySelector('[data-element-id="usage-chart"]') as HTMLElement;
-        if (usageGlyph) {
-            usageGlyph.click();
+        const usageElement = document.querySelector('[data-element-id="usage-chart"]') as HTMLElement;
+        if (usageElement) {
+            usageElement.click();
         }
     });
 

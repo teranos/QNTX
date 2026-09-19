@@ -232,7 +232,7 @@ message WatcherResponse {
   optional string time_end = 8;             // RFC3339
 
   // What it does when something matches.
-  string action_type = 9;                   // python, webhook, glyph_execute, semantic_match, tell
+  string action_type = 9;                   // python, webhook, element_execute, semantic_match, tell
   string action_data = 10;
   optional string semantic_query = 11;
   optional float semantic_threshold = 12;
@@ -310,13 +310,13 @@ message WatcherBroadcastStats {
 
 // WatcherQueueStatusMessage is the execution queue as the browser sees it.
 //
-// A map field cannot be marked optional in proto3; target_glyphs and
+// A map field cannot be marked optional in proto3; target_elements and
 // watcher_stats are omitempty in Go, so the wire carries no key when empty.
 message WatcherQueueStatusMessage {
   string type = 1;                   // "watcher_queue_status"
   int32 total_queued = 2;
   map<string, int32> per_watcher = 3;
-  map<string, string> target_glyphs = 4;               // meld-edge watcher → target glyph
+  map<string, string> target_elements = 4;               // meld-edge watcher → target element
   map<string, WatcherBroadcastStats> watcher_stats = 5;
   double oldest_age_seconds = 6;
   int64 timestamp = 7;

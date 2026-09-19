@@ -1,5 +1,5 @@
 /**
- * The Self glyph draws the node. This is the section that draws the person
+ * The Self element draws the node. This is the section that draws the person
  * looking at it.
  */
 
@@ -22,7 +22,7 @@ function tim(over: Partial<Person> = {}): Person {
     };
 }
 
-// Tim opens the Self glyph and finds himself on it: what he is called, how he
+// Tim opens the Self element and finds himself on it: what he is called, how he
 // got in, and which of his accounts the node joined to him.
 test('the person is drawn from what the node said', () => {
     const html = personSection(tim(), '');
@@ -45,7 +45,7 @@ test('a User that came in by no door says so rather than showing a blank', () =>
 });
 
 // A registration belongs to the door it arrived at, and that door is where it
-// acts (ADR-032). Both are the person's, so both are on the glyph.
+// acts (ADR-032). Both are the person's, so both are on the element.
 test('a public registration is drawn with its door and its namespace', () => {
     const html = personSection(tim({
         display_name: undefined,
@@ -60,7 +60,7 @@ test('a public registration is drawn with its door and its namespace', () => {
     expect(html).not.toContain('no door');
 });
 
-// A token speaks for whoever minted it, and the glyph says which it is rather
+// A token speaks for whoever minted it, and the element says which it is rather
 // than drawing a machine as a person at a keyboard.
 test('a bearer token says it came in on a token', () => {
     const html = personSection(tim({ via: 'token', level: 'ATTESTOR', namespaces: ['pond'] }), '');

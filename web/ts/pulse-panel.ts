@@ -1,7 +1,7 @@
 /**
  * Pulse Panel - Scheduled Jobs Dashboard
  *
- * Manifests as a glyph with 'panel' opensAs — slides in from
+ * Manifests as an element with 'panel' opensAs — slides in from
  * the opposite edge of the system drawer.
  *
  * Displays all scheduled Pulse jobs:
@@ -236,9 +236,9 @@ function handleDaemonStatusUpdate(e: Event): void {
 /**
  * Create a Element definition for the pulse panel
  */
-export function createPulseGlyph(): Element {
+export function createPulseElement(): Element {
     return {
-        id: 'pulse-glyph',
+        id: 'pulse-element',
         title: 'Pulse',
         symbol: Pulse,
         opensAs: 'panel',

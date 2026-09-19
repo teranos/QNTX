@@ -1,6 +1,6 @@
 //go:build qntxwasm
 
-// A prompt glyph's 200 body is its result. A short read used to be discarded,
+// A prompt element's 200 body is its result. A short read used to be discarded,
 // which handed the caller half an answer as if it were the whole one.
 package watcher
 
@@ -34,7 +34,7 @@ func shortBody(t *testing.T, w http.ResponseWriter) {
 	conn.Close()
 }
 
-func TestPromptGlyphShortReadIsAnError(t *testing.T) {
+func TestPromptElementShortReadIsAnError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		shortBody(t, w)
 	}))
@@ -42,11 +42,11 @@ func TestPromptGlyphShortReadIsAnError(t *testing.T) {
 
 	engine := NewEngine(nil, nil, server.URL, zap.NewNop().Sugar())
 
-	body, err := engine.executeGlyphPrompt("GLYPH-1", "template", []byte(`{"id":"AS-1"}`))
+	body, err := engine.executeElementPrompt("ELEMENT-1", "template", []byte(`{"id":"AS-1"}`))
 	if err == nil {
 		t.Fatalf("short read reported as success, body %q", string(body))
 	}
-	if !strings.Contains(err.Error(), "GLYPH-1") {
-		t.Fatalf("error does not name the glyph: %v", err)
+	if !strings.Contains(err.Error(), "ELEMENT-1") {
+		t.Fatalf("error does not name the element: %v", err)
 	}
 }

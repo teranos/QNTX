@@ -1,6 +1,6 @@
 /// ix-bin plugin implementation.
 ///
-/// Metadata, lifecycle, HTTP handlers, glyph definition, and job execution
+/// Metadata, lifecycle, HTTP handlers, element definition, and job execution
 /// for binary/structured data ingestion.
 module ixbin.plugin;
 
@@ -99,19 +99,19 @@ HealthResponse health() {
 }
 
 // ---------------------------------------------------------------------------
-// Glyph definition
+// Element definition
 // ---------------------------------------------------------------------------
 
-GlyphDefResponse registerGlyphs() {
-    GlyphDefResponse resp;
-    GlyphDef hexGlyph;
-    hexGlyph.symbol       = "\u2B22"; // hexagon: ⬢
-    hexGlyph.title        = "Binary Inspector";
-    hexGlyph.label        = "ix-bin";
-    hexGlyph.modulePath   = "/hex-viewer-module.js";
-    hexGlyph.defaultWidth = 700;
-    hexGlyph.defaultHeight = 500;
-    resp.glyphs = [hexGlyph];
+ElementDefResponse registerElements() {
+    ElementDefResponse resp;
+    ElementDef hexElement;
+    hexElement.symbol       = "\u2B22"; // hexagon: ⬢
+    hexElement.title        = "Binary Inspector";
+    hexElement.label        = "ix-bin";
+    hexElement.modulePath   = "/hex-viewer-module.js";
+    hexElement.defaultWidth = 700;
+    hexElement.defaultHeight = 500;
+    resp.elements = [hexElement];
     return resp;
 }
 
@@ -129,7 +129,7 @@ HTTPResponse handleHTTP(ref const HTTPRequest req) {
     } else if (method == "POST" && path == "/ingest") {
         return handleIngest(req);
     } else if (method == "GET" && path == "/hex-viewer-module.js") {
-        return serveGlyphModule();
+        return serveElementModule();
     } else if (method == "GET" && startsWith(path, "/hex-view")) {
         return handleHexView(req);
     } else if (method == "GET" && path == "/status") {
@@ -255,11 +255,11 @@ private HTTPResponse handleSetMode(ref const HTTPRequest req) {
     return jsonResponse(400, `{"error":"mode must be 'paused' or 'active'"}`);
 }
 
-/// GET /hex-viewer-module.js — serve the glyph UI module.
-private HTTPResponse serveGlyphModule() {
+/// GET /hex-viewer-module.js — serve the element UI module.
+private HTTPResponse serveElementModule() {
     HTTPResponse resp;
     resp.statusCode = 200;
-    resp.body_ = cast(ubyte[])glyphModuleSource;
+    resp.body_ = cast(ubyte[])elementModuleSource;
     resp.headers = [
         httpHeader("Content-Type", "application/javascript"),
         httpHeader("Cache-Control", "no-cache"),
@@ -347,13 +347,13 @@ void registerHandlers(ref GrpcServer server) {
     });
 
     server.registerHandler("/protocol.DomainPluginService/ConfigSchema", (const ubyte[] _) {
-        // Empty config schema — this plugin uses per-glyph attestation config
+        // Empty config schema — this plugin uses per-element attestation config
         ConfigSchemaResponse resp;
         return encode(resp);
     });
 
-    server.registerHandler("/protocol.DomainPluginService/RegisterGlyphs", (const ubyte[] _) {
-        auto resp = registerGlyphs();
+    server.registerHandler("/protocol.DomainPluginService/RegisterElements", (const ubyte[] _) {
+        auto resp = registerElements();
         return encode(resp);
     });
 
@@ -416,7 +416,7 @@ private bool startsWith(string s, string prefix) {
 }
 
 // ---------------------------------------------------------------------------
-// Embedded glyph module source
+// Embedded element module source
 // ---------------------------------------------------------------------------
 
-private enum glyphModuleSource = import("hex-viewer-module.js");
+private enum elementModuleSource = import("hex-viewer-module.js");

@@ -1,0 +1,15 @@
+/**
+ * Element Window State - Full application window
+ *
+ * When an element morphs to window state, it becomes a draggable
+ * application window with title bar and content area.
+ *
+ * Title bar styles are now unified in /css/element/title-bar.css.
+ */
+
+/* Window content area - styled by individual elements */
+.element-window-content {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+}

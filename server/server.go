@@ -14,7 +14,7 @@ import (
 	"github.com/teranos/QNTX/internal/config"
 
 	"github.com/teranos/QNTX/ats/watcher"
-	"github.com/teranos/QNTX/glyph/handlers"
+	"github.com/teranos/QNTX/element/handlers"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
@@ -130,7 +130,7 @@ type QNTXServer struct {
 	// Canvas state handlers
 	canvasHandler *handlers.CanvasHandler
 
-	// Plugin info handlers (list, routes, glyphs)
+	// Plugin info handlers (list, routes, elements)
 	pluginHandler *PluginHandler
 
 	// What the status line, the phone and the log all draw
@@ -157,7 +157,7 @@ type QNTXServer struct {
 	onReady                     func()             // Called once when server is fully ready (routes, DB, listeners)
 
 	// Cached database stats — refreshed every 30s in the background.
-	// Glyph opens return instantly from cache instead of blocking on 4+ queries.
+	// Element opens return instantly from cache instead of blocking on 4+ queries.
 	dbStatsCache atomic.Pointer[cachedDBStats]
 
 	// Probed on a ticker rather than per request, and stamped with when.
@@ -356,11 +356,11 @@ func (s *QNTXServer) ReloadWatchers() error {
 	return s.watcherEngine.ReloadWatchers()
 }
 
-// AddPythonProvider registers "py" glyph type and wires the gRPC PythonService executor.
+// AddPythonProvider registers "py" element type and wires the gRPC PythonService executor.
 func (s *QNTXServer) AddPythonProvider(client protocol.PythonServiceClient) {
 	s.pythonClient = client
 	if s.watcherEngine != nil {
-		s.watcherEngine.AddGlyphType("py")
+		s.watcherEngine.AddElementType("py")
 		s.watcherEngine.SetPythonExecutor(&grpcPythonExecutor{client: client})
 	}
 }

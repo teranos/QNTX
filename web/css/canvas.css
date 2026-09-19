@@ -1,5 +1,5 @@
 /**
- * Canvas Workspace - Fractal glyph container with spatial grid layout
+ * Canvas Workspace - Fractal element container with spatial grid layout
  */
 
 /* Canvas workspace - full-screen, no padding, always dark with fixed grid background */
@@ -47,7 +47,7 @@
         );
 }
 
-/* Right-click spawn nebula — 3D cloud of cursor glyphs */
+/* Right-click spawn nebula — 3D cloud of cursor elements */
 .canvas-spawn-menu {
     position: fixed;
     background: none;
@@ -57,7 +57,7 @@
     transform-style: preserve-3d;
 }
 
-/* Nebula glyph — borderless symbol floating in 3D */
+/* Nebula element — borderless symbol floating in 3D */
 .canvas-spawn-button {
     position: absolute;
     width: auto;
@@ -75,7 +75,7 @@
     padding: 8px;
 }
 
-/* Hovered glyph — comes forward, flattens, grows */
+/* Hovered element — comes forward, flattens, grows */
 .canvas-spawn-button:hover {
     color: rgba(255, 255, 255, 1);
     font-size: 36px;
@@ -156,7 +156,7 @@
     background-color: rgba(0, 0, 0, 0.3);
 }
 
-/* Cursor glyph — follows mouse during placement carrying phase */
+/* Cursor element — follows mouse during placement carrying phase */
 .cursor {
     position: fixed;
     pointer-events: none;
@@ -180,7 +180,7 @@
     transition: text-shadow 150ms ease;
 }
 
-/* Thread building — hide system cursor, glyph symbols glow as targets */
+/* Thread building — hide system cursor, element symbols glow as targets */
 .thread-building-active {
     cursor: none;
 }
@@ -315,9 +315,9 @@
     }
 }
 
-/* Python editor glyphs on canvas — brand colors applied inline in py-glyph.ts */
+/* Python editor elements on canvas — brand colors applied inline in py-element.ts */
 
-/* Interaction states for glyphs */
+/* Interaction states for elements */
 .canvas-py-element.is-dragging {
     opacity: 0.8;
     z-index: 1000;
@@ -328,7 +328,7 @@
 }
 
 /* ============================================================================
- * Glyph Sync State Visual Feedback
+ * Element Sync State Visual Feedback
  * ============================================================================ */
 
 /* Canvas is a spatial workspace, not a document — suppress text selection.
@@ -343,12 +343,12 @@
     user-select: text;
 }
 
-/* Base glyph - applies saturation and hue shift based on connectivity mode */
+/* Base element - applies saturation and hue shift based on connectivity mode */
 .canvas-element:not(.canvas-error-element) {
-    filter: saturate(var(--mode-glyph-saturation)) hue-rotate(var(--mode-glyph-hue));
+    filter: saturate(var(--mode-element-saturation)) hue-rotate(var(--mode-element-hue));
     transition: filter var(--mode-transition-duration) var(--mode-transition-timing),
                 outline-color var(--mode-transition-duration) var(--mode-transition-timing);
-    outline-color: rgba(220, 222, 221, calc(var(--mode-glyph-border-opacity) * var(--glyph-border-opacity, 0.4)));
+    outline-color: rgba(220, 222, 221, calc(var(--mode-element-border-opacity) * var(--element-border-opacity, 0.4)));
 }
 
 /* Totally monochrome while dragging offline (indicates unsaved local change) */
@@ -357,50 +357,50 @@
     outline-color: rgba(220, 222, 221, 0.15) !important;
 }
 
-/* Ghostly appearance for unsynced/failed glyphs while offline (persists after drag) */
-/* Local-active glyphs (ts-glyph, ax-glyph querying IndexedDB) stay orange */
+/* Ghostly appearance for unsynced/failed elements while offline (persists after drag) */
+/* Local-active elements (ts-element, ax-element querying IndexedDB) stay orange */
 .canvas-element[data-connectivity-mode="offline"][data-sync-state="unsynced"]:not([data-local-active]),
 .canvas-element[data-connectivity-mode="offline"][data-sync-state="failed"]:not([data-local-active]) {
     filter: grayscale(100%);
     outline-color: rgba(220, 222, 221, 0.15) !important;
 }
 
-/* Local-active glyphs: orange tint when offline (still functional via WASM/IndexedDB) */
+/* Local-active elements: orange tint when offline (still functional via WASM/IndexedDB) */
 .canvas-element[data-connectivity-mode="offline"][data-local-active] {
     filter: saturate(90%) hue-rotate(-10deg);
     outline-color: rgba(200, 160, 80, 0.5);
 }
 
 /* Server-side results: grayscale when offline (indicates stale/cached data) */
-/* Local results inside AX glyph stay colored */
-.ax-glyph-results[data-connectivity-mode="offline"]:not([data-local-active]),
-.se-glyph-results[data-connectivity-mode="offline"]:not([data-local-active]) {
+/* Local results inside AX element stay colored */
+.ax-element-results[data-connectivity-mode="offline"]:not([data-local-active]),
+.se-element-results[data-connectivity-mode="offline"]:not([data-local-active]) {
     filter: grayscale(100%);
     transition: filter var(--mode-transition-duration) var(--mode-transition-timing);
 }
 
 /* ============================================================================
- * Glyph Selection
+ * Element Selection
  * ============================================================================ */
 
-/* Selected state - highlighted border on any glyph type */
-.canvas-glyph-selected {
+/* Selected state - highlighted border on any element type */
+.canvas-element-selected {
     outline: 2px solid rgba(122, 202, 122, 0.4);
     outline-offset: 2px;
 }
 
-/* Thread glyph selected — no border, glow the symbol in thread color */
-.canvas-thread-element.canvas-glyph-selected {
+/* Thread element selected — no border, glow the symbol in thread color */
+.canvas-thread-element.canvas-element-selected {
     outline: none;
 }
 
-.canvas-thread-element.canvas-glyph-selected .symbol {
+.canvas-thread-element.canvas-element-selected .symbol {
     text-shadow: 0 0 8px currentColor, 0 0 16px currentColor, 0 0 24px currentColor;
     transform: scale(1.2);
     transition: text-shadow 150ms ease, transform 150ms ease;
 }
 
-/* Action bar - floating toolbar above selected glyph */
+/* Action bar - floating toolbar above selected element */
 .canvas-action-bar {
     display: flex;
     gap: 3px;
@@ -444,7 +444,7 @@
 }
 
 /* ============================================================================
- * Attestation Glyph (+)
+ * Attestation Element (+)
  * ============================================================================ */
 
 .canvas-attestation-element {
@@ -520,7 +520,7 @@
     visibility: visible;
 }
 
-/* Triplet glyph container — overflow visible so meta popover is not clipped */
+/* Triplet element container — overflow visible so meta popover is not clipped */
 .canvas-triplet-element {
     overflow: visible;
 }
@@ -542,7 +542,7 @@
 }
 
 /* ============================================================================
- * Document Glyph (PDF viewer)
+ * Document Element (PDF viewer)
  * ============================================================================ */
 
 .canvas-doc-element {
@@ -585,7 +585,7 @@
 }
 
 /* ============================================================================
- * Subcanvas Glyph
+ * Subcanvas Element
  * ============================================================================ */
 
 /* Compact subcanvas title bar — purple accent */
@@ -625,13 +625,13 @@
 }
 
 /* Expanded subcanvas fullscreen state */
-.canvas-subcanvas-glyph-expanded {
+.canvas-subcanvas-element-expanded {
     background: var(--bg-primary);
 }
 
 /* ============================================================================
  * Watcher Queue Particles
- * Animated dots drifting along glyph borders to visualize queued executions.
+ * Animated dots drifting along element borders to visualize queued executions.
  * ============================================================================ */
 
 .queue-particles {
@@ -659,7 +659,7 @@
 }
 
 @keyframes queue-orbit {
-    /* Drift along glyph border: top-left → top-right → bottom-right → bottom-left */
+    /* Drift along element border: top-left → top-right → bottom-right → bottom-left */
     0%   { top: -2px; left: 0; }
     25%  { top: -2px; left: calc(100% - 2px); }
     50%  { top: calc(100% - 2px); left: calc(100% - 2px); }
@@ -673,11 +673,11 @@
 }
 
 /* ============================================================================
- * Glyph Metadata Pill — queue + execution stats popover on title bar hover
- * Same visual language as .as-meta-pill (attestation glyph) with generic classes.
+ * Element Metadata Pill — queue + execution stats popover on title bar hover
+ * Same visual language as .as-meta-pill (attestation element) with generic classes.
  * ============================================================================ */
 
-.glyph-meta-pill {
+.element-meta-pill {
     position: absolute;
     bottom: -4px;
     left: 50%;
@@ -698,12 +698,12 @@
     z-index: 10;
 }
 
-.canvas-element:hover .glyph-meta-pill {
+.canvas-element:hover .element-meta-pill {
     opacity: 1;
 }
 
 /* Watcher queue stats popover */
-.glyph-meta-popover {
+.element-meta-popover {
     white-space: pre-wrap;
     word-break: break-word;
     overflow-wrap: break-word;
@@ -711,12 +711,12 @@
     max-width: 320px;
 }
 
-.glyph-meta-pill:hover .meta-popover {
+.element-meta-pill:hover .meta-popover {
     opacity: 1;
     visibility: visible;
 }
 
-.glyph-meta-pill.fading {
+.element-meta-pill.fading {
     transition: opacity 0.3s ease-out;
     opacity: 0 !important;
 }

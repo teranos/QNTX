@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package element;
+
+option go_package = "github.com/teranos/QNTX/element/proto";
+
+// ElementFired is sent over WebSocket when a meld-edge subscription triggers element execution.
+// Status progression: started → success | error
+message ElementFired {
+  string element_id = 1;                // Target element that was executed
+  string attestation_id = 2;          // Triggering attestation ASID
+  string status = 3;                  // "started", "success", "error"
+  string error = 4;                   // Error message when status is "error"
+  int64 timestamp = 5;                // Unix timestamp
+  string result = 6;                  // JSON-encoded execution result (on success or error with output)
+}

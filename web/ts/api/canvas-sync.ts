@@ -1,7 +1,7 @@
 /**
  * Canvas Sync Queue
  *
- * Queues canvas glyph and composition mutations for reliable server sync.
+ * Queues canvas element and composition mutations for reliable server sync.
  * Local state (UIState/IndexedDB) is always written first — this queue
  * ensures the server eventually receives the same data.
  */
@@ -12,7 +12,7 @@ import { jsonBody } from '../http-utils';
 import { syncStateManager } from '../state/sync-state';
 import { uiState } from '../state/ui';
 
-export type CanvasSyncOp = 'glyph_upsert' | 'glyph_delete' | 'composition_upsert' | 'composition_delete' | 'minimized_add' | 'minimized_delete';
+export type CanvasSyncOp = 'element_upsert' | 'element_delete' | 'composition_upsert' | 'composition_delete' | 'minimized_add' | 'minimized_delete';
 
 export interface CanvasSyncEntry {
     id: string;
@@ -27,7 +27,7 @@ const BASE_BACKOFF_MS = 1000;
 
 /** Classify sync op into entity type for dedup (same ID + same type → collapse) */
 function entityTypeOf(op: string): string {
-    if (op.startsWith('glyph')) return 'glyph';
+    if (op.startsWith('element')) return 'element';
     if (op.startsWith('composition')) return 'composition';
     return 'minimized';
 }
@@ -52,9 +52,9 @@ class CanvasSyncQueueImpl {
             // mutation. Move the payload aside so it stays recoverable.
             try {
                 globalThis.localStorage?.setItem(STORAGE_KEY + '-corrupt', stored);
-                log.error(SEG.GLYPH, `[CanvasSync] Corrupt queue in ${STORAGE_KEY}, preserved at ${STORAGE_KEY}-corrupt:`, err);
+                log.error(SEG.ELEMENT, `[CanvasSync] Corrupt queue in ${STORAGE_KEY}, preserved at ${STORAGE_KEY}-corrupt:`, err);
             } catch (preserveErr) {
-                log.error(SEG.GLYPH, `[CanvasSync] Corrupt queue in ${STORAGE_KEY} and preserving it failed. Raw value: ${stored}`, err, preserveErr);
+                log.error(SEG.ELEMENT, `[CanvasSync] Corrupt queue in ${STORAGE_KEY} and preserving it failed. Raw value: ${stored}`, err, preserveErr);
             }
             return [];
         }
@@ -64,7 +64,7 @@ class CanvasSyncQueueImpl {
         try {
             globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(entries));
         } catch (err) {
-            log.error(SEG.GLYPH, `[CanvasSync] Failed to persist queue (${entries.length} entries) to ${STORAGE_KEY}; pending canvas mutations will not survive reload:`, err);
+            log.error(SEG.ELEMENT, `[CanvasSync] Failed to persist queue (${entries.length} entries) to ${STORAGE_KEY}; pending canvas mutations will not survive reload:`, err);
         }
     }
 
@@ -111,11 +111,11 @@ class CanvasSyncQueueImpl {
             this.flushAdditions.push({ id: entry.id, op: entry.op });
         }
 
-        log.debug(SEG.GLYPH, `[CanvasSync] Enqueued ${entry.op} ${entry.id} (queue: ${filtered.length})`);
+        log.debug(SEG.ELEMENT, `[CanvasSync] Enqueued ${entry.op} ${entry.id} (queue: ${filtered.length})`);
         this.notify();
 
         if (connectivity.state === 'online') {
-            this.flush().catch((err: unknown) => log.error(SEG.GLYPH, '[CanvasSync] flush failed:', err));
+            this.flush().catch((err: unknown) => log.error(SEG.ELEMENT, '[CanvasSync] flush failed:', err));
         }
     }
 
@@ -128,7 +128,7 @@ class CanvasSyncQueueImpl {
             const q = this.queue;
             if (q.length === 0) return;
 
-            log.debug(SEG.GLYPH, `[CanvasSync] Flushing ${q.length} operations`);
+            log.debug(SEG.ELEMENT, `[CanvasSync] Flushing ${q.length} operations`);
 
             const remaining: CanvasSyncEntry[] = [];
             const now = Date.now();
@@ -147,7 +147,7 @@ class CanvasSyncQueueImpl {
                 } catch (err) {
                     syncStateManager.setState(entry.id, 'failed');
                     remaining.push(this.applyBackoff(entry));
-                    log.warn(SEG.GLYPH, `[CanvasSync] Error syncing ${entry.op} ${entry.id}:`, err);
+                    log.warn(SEG.ELEMENT, `[CanvasSync] Error syncing ${entry.op} ${entry.id}:`, err);
                 }
             }
 
@@ -155,7 +155,7 @@ class CanvasSyncQueueImpl {
             const survived = remaining.filter(e => {
                 if (e.retryCount && e.retryCount >= MAX_RETRIES) {
                     syncStateManager.setState(e.id, 'failed');
-                    log.warn(SEG.GLYPH, `[CanvasSync] Permanently failed ${e.op} ${e.id} after ${MAX_RETRIES} retries`);
+                    log.warn(SEG.ELEMENT, `[CanvasSync] Permanently failed ${e.op} ${e.id} after ${MAX_RETRIES} retries`);
                     return false;
                 }
                 return true;
@@ -190,10 +190,10 @@ class CanvasSyncQueueImpl {
     /** Process a single queue entry. Returns true if synced (remove from queue). */
     private async processEntry(entry: CanvasSyncEntry): Promise<boolean> {
         switch (entry.op) {
-            case 'glyph_upsert':
-                return this.syncGlyphUpsert(entry.id);
-            case 'glyph_delete':
-                return this.syncGlyphDelete(entry.id);
+            case 'element_upsert':
+                return this.syncElementUpsert(entry.id);
+            case 'element_delete':
+                return this.syncElementDelete(entry.id);
             case 'composition_upsert':
                 return this.syncCompositionUpsert(entry.id);
             case 'composition_delete':
@@ -205,51 +205,51 @@ class CanvasSyncQueueImpl {
         }
     }
 
-    private async syncGlyphUpsert(id: string): Promise<boolean> {
-        const glyph = uiState.getCanvasGlyph(id);
-        if (!glyph) {
-            log.warn(SEG.GLYPH, `[CanvasSync] Element ${id} not found in UIState, dropping`);
+    private async syncElementUpsert(id: string): Promise<boolean> {
+        const item = uiState.getCanvasElement(id);
+        if (!item) {
+            log.warn(SEG.ELEMENT, `[CanvasSync] Element ${id} not found in UIState, dropping`);
             return true;
         }
 
         syncStateManager.setState(id, 'syncing');
-        const response = await apiFetch('/api/canvas/glyphs', jsonBody('POST', {
-            ...glyph,
-            x: Math.round(glyph.x),
-            y: Math.round(glyph.y),
-            width: glyph.width != null ? Math.round(glyph.width) : undefined,
-            height: glyph.height != null ? Math.round(glyph.height) : undefined,
+        const response = await apiFetch('/api/canvas/elements', jsonBody('POST', {
+            ...item,
+            x: Math.round(item.x),
+            y: Math.round(item.y),
+            width: item.width != null ? Math.round(item.width) : undefined,
+            height: item.height != null ? Math.round(item.height) : undefined,
         }));
 
         if (response.ok) {
             syncStateManager.setState(id, 'synced');
-            log.debug(SEG.GLYPH, `[CanvasSync] Synced glyph ${id}`);
+            log.debug(SEG.ELEMENT, `[CanvasSync] Synced element ${id}`);
             return true;
         }
 
         syncStateManager.setState(id, 'failed');
-        log.warn(SEG.GLYPH, `[CanvasSync] Failed to sync glyph ${id}: ${response.status}`);
+        log.warn(SEG.ELEMENT, `[CanvasSync] Failed to sync element ${id}: ${response.status}`);
         return false;
     }
 
-    private async syncGlyphDelete(id: string): Promise<boolean> {
-        const response = await apiFetch(`/api/canvas/glyphs/${id}`, { method: 'DELETE' });
+    private async syncElementDelete(id: string): Promise<boolean> {
+        const response = await apiFetch(`/api/canvas/elements/${id}`, { method: 'DELETE' });
 
         if (response.ok || response.status === 404) {
             syncStateManager.clearState(id);
-            log.debug(SEG.GLYPH, `[CanvasSync] Deleted glyph ${id}`);
+            log.debug(SEG.ELEMENT, `[CanvasSync] Deleted element ${id}`);
             return true;
         }
 
         syncStateManager.setState(id, 'failed');
-        log.warn(SEG.GLYPH, `[CanvasSync] Failed to delete glyph ${id}: ${response.status}`);
+        log.warn(SEG.ELEMENT, `[CanvasSync] Failed to delete element ${id}: ${response.status}`);
         return false;
     }
 
     private async syncCompositionUpsert(id: string): Promise<boolean> {
         const composition = uiState.getCanvasCompositions().find(c => c.id === id);
         if (!composition) {
-            log.warn(SEG.GLYPH, `[CanvasSync] Composition ${id} not found in UIState, dropping`);
+            log.warn(SEG.ELEMENT, `[CanvasSync] Composition ${id} not found in UIState, dropping`);
             return true;
         }
 
@@ -263,12 +263,12 @@ class CanvasSyncQueueImpl {
 
         if (response.ok) {
             syncStateManager.setState(id, 'synced');
-            log.debug(SEG.GLYPH, `[CanvasSync] Synced composition ${id}`);
+            log.debug(SEG.ELEMENT, `[CanvasSync] Synced composition ${id}`);
             return true;
         }
 
         syncStateManager.setState(id, 'failed');
-        log.warn(SEG.GLYPH, `[CanvasSync] Failed to sync composition ${id}: ${response.status}`);
+        log.warn(SEG.ELEMENT, `[CanvasSync] Failed to sync composition ${id}: ${response.status}`);
         return false;
     }
 
@@ -277,24 +277,24 @@ class CanvasSyncQueueImpl {
 
         if (response.ok || response.status === 404) {
             syncStateManager.clearState(id);
-            log.debug(SEG.GLYPH, `[CanvasSync] Deleted composition ${id}`);
+            log.debug(SEG.ELEMENT, `[CanvasSync] Deleted composition ${id}`);
             return true;
         }
 
         syncStateManager.setState(id, 'failed');
-        log.warn(SEG.GLYPH, `[CanvasSync] Failed to delete composition ${id}: ${response.status}`);
+        log.warn(SEG.ELEMENT, `[CanvasSync] Failed to delete composition ${id}: ${response.status}`);
         return false;
     }
 
     private async syncMinimizedAdd(id: string): Promise<boolean> {
-        const response = await apiFetch('/api/canvas/minimized-windows', jsonBody('POST', { glyph_id: id }));
+        const response = await apiFetch('/api/canvas/minimized-windows', jsonBody('POST', { element_id: id }));
 
         if (response.ok) {
-            log.debug(SEG.GLYPH, `[CanvasSync] Synced minimized window ${id}`);
+            log.debug(SEG.ELEMENT, `[CanvasSync] Synced minimized window ${id}`);
             return true;
         }
 
-        log.warn(SEG.GLYPH, `[CanvasSync] Failed to sync minimized window ${id}: ${response.status}`);
+        log.warn(SEG.ELEMENT, `[CanvasSync] Failed to sync minimized window ${id}: ${response.status}`);
         return false;
     }
 
@@ -302,11 +302,11 @@ class CanvasSyncQueueImpl {
         const response = await apiFetch(`/api/canvas/minimized-windows/${id}`, { method: 'DELETE' });
 
         if (response.ok || response.status === 404) {
-            log.debug(SEG.GLYPH, `[CanvasSync] Deleted minimized window ${id}`);
+            log.debug(SEG.ELEMENT, `[CanvasSync] Deleted minimized window ${id}`);
             return true;
         }
 
-        log.warn(SEG.GLYPH, `[CanvasSync] Failed to delete minimized window ${id}: ${response.status}`);
+        log.warn(SEG.ELEMENT, `[CanvasSync] Failed to delete minimized window ${id}: ${response.status}`);
         return false;
     }
 }
@@ -316,6 +316,6 @@ export const canvasSyncQueue = new CanvasSyncQueueImpl();
 // Auto-flush when connectivity returns
 connectivity.subscribe((state) => {
     if (state === 'online') {
-        canvasSyncQueue.flush().catch((err: unknown) => log.error(SEG.GLYPH, '[CanvasSync] flush on reconnect failed:', err));
+        canvasSyncQueue.flush().catch((err: unknown) => log.error(SEG.ELEMENT, '[CanvasSync] flush on reconnect failed:', err));
     }
 });

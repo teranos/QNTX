@@ -15,7 +15,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.37.9"
+#define PLUGIN_VERSION "0.37.10"
 
 // Forward declarations
 struct llama_model;
@@ -238,9 +238,9 @@ public:
                               const protocol::Empty* req,
                               protocol::ConfigSchemaResponse* resp) override;
 
-    grpc::Status RegisterGlyphs(grpc::ServerContext* ctx,
+    grpc::Status RegisterElements(grpc::ServerContext* ctx,
                                 const protocol::Empty* req,
-                                protocol::GlyphDefResponse* resp) override;
+                                protocol::ElementDefResponse* resp) override;
 
     grpc::Status HandleHTTP(grpc::ServerContext* ctx,
                             const protocol::HTTPRequest* req,

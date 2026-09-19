@@ -11,7 +11,7 @@ import { join, dirname } from 'path';
 
 export default {
     name: 'canvas-renderer',
-    version: '1.0.1',
+    version: '1.0.2',
     qntx_version: '>= 0.1.0',
     description: 'Server-side canvas HTML renderer',
     author: 'QNTX Team',
@@ -26,19 +26,19 @@ export default {
         // POST /render - Render canvas to HTML
         mux.handle('POST', '/render', async (req: any, res: any) => {
             try {
-                const { canvas_id, glyphs } = await req.json();
+                const { canvas_id, elements: items } = await req.json();
 
                 if (!canvas_id) {
                     res.status(400).json({ error: 'canvas_id is required' });
                     return;
                 }
 
-                if (!Array.isArray(glyphs)) {
-                    res.status(400).json({ error: 'glyphs must be an array' });
+                if (!Array.isArray(items)) {
+                    res.status(400).json({ error: 'elements must be an array' });
                     return;
                 }
 
-                console.log(`[CanvasRenderer] Rendering canvas ${canvas_id} with ${glyphs.length} glyphs`);
+                console.log(`[CanvasRenderer] Rendering canvas ${canvas_id} with ${items.length} elements`);
 
                 // Create server-side DOM environment
                 const window = new Window({
@@ -49,7 +49,7 @@ export default {
                 const document = window.document;
 
                 // Build canvas HTML structure
-                const workspace = buildCanvasHTML(document, canvas_id, glyphs);
+                const workspace = buildCanvasHTML(document, canvas_id, items);
 
                 // Load CSS
                 const css = loadCanvasCSS();
@@ -86,7 +86,7 @@ ${workspace.outerHTML}
 /**
  * Build canvas HTML structure (server-side, no interactivity)
  */
-function buildCanvasHTML(document: Document, canvasId: string, glyphs: any[]): HTMLElement {
+function buildCanvasHTML(document: Document, canvasId: string, items: any[]): HTMLElement {
     // Create workspace container
     const workspace = document.createElement('div');
     workspace.className = 'canvas-workspace';
@@ -110,10 +110,10 @@ function buildCanvasHTML(document: Document, canvasId: string, glyphs: any[]): H
         height: 100%;
     `;
 
-    // Render each glyph
-    for (const glyph of glyphs) {
-        const glyphElement = renderGlyphSimple(document, glyph);
-        contentLayer.appendChild(glyphElement);
+    // Render each element
+    for (const item of items) {
+        const elementElement = renderElementSimple(document, item);
+        contentLayer.appendChild(elementElement);
     }
 
     workspace.appendChild(contentLayer);
@@ -121,18 +121,18 @@ function buildCanvasHTML(document: Document, canvasId: string, glyphs: any[]): H
 }
 
 /**
- * Render a single glyph (simplified for server-side)
+ * Render a single element (simplified for server-side)
  */
-function renderGlyphSimple(document: Document, glyph: any): HTMLElement {
+function renderElementSimple(document: Document, item: any): HTMLElement {
     const container = document.createElement('div');
     container.className = 'canvas-element';
-    container.setAttribute('data-element-id', glyph.id);
+    container.setAttribute('data-element-id', item.id);
     container.style.cssText = `
         position: absolute;
-        left: ${glyph.x || 0}px;
-        top: ${glyph.y || 0}px;
-        width: ${glyph.width || 200}px;
-        height: ${glyph.height || 150}px;
+        left: ${item.x || 0}px;
+        top: ${item.y || 0}px;
+        width: ${item.width || 200}px;
+        height: ${item.height || 150}px;
         background: #252625;
         border: 1px solid rgba(220, 222, 221, 0.35);
         border-radius: 4px;
@@ -142,11 +142,11 @@ function renderGlyphSimple(document: Document, glyph: any): HTMLElement {
     `;
 
     // Simple content rendering based on symbol
-    if (glyph.symbol === '▣' || glyph.symbol === 'note') {
-        // Note glyph - render text content
+    if (item.symbol === '▣' || item.symbol === 'note') {
+        // Note element - render text content
         const noteContent = document.createElement('div');
         noteContent.className = 'note-content';
-        noteContent.textContent = glyph.content || '(empty note)';
+        noteContent.textContent = item.content || '(empty note)';
         noteContent.style.cssText = `
             color: rgba(255, 255, 255, 0.85);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -157,14 +157,14 @@ function renderGlyphSimple(document: Document, glyph: any): HTMLElement {
         `;
         container.appendChild(noteContent);
     } else {
-        // Generic glyph - just show symbol and id
+        // Generic element - just show symbol and id
         const placeholder = document.createElement('div');
         placeholder.style.cssText = `
             color: rgba(255, 255, 255, 0.55);
             font-family: monospace;
             font-size: 12px;
         `;
-        placeholder.textContent = `${glyph.symbol || 'glyph'}: ${glyph.id}`;
+        placeholder.textContent = `${item.symbol || 'element'}: ${item.id}`;
         container.appendChild(placeholder);
     }
 
@@ -218,23 +218,23 @@ function loadCanvasCSS(): string {
         }
     }
 
-    // Load all CSS files from glyph directory
+    // Load all CSS files from element directory
     try {
-        const glyphDir = join(root, 'web/css/glyph');
-        const glyphFiles = readdirSync(glyphDir)
+        const elementDir = join(root, 'web/css/element');
+        const elementFiles = readdirSync(elementDir)
             .filter(f => f.endsWith('.css'))
-            .map(f => join(glyphDir, f));
+            .map(f => join(elementDir, f));
 
-        for (const file of glyphFiles) {
+        for (const file of elementFiles) {
             try {
                 cssFiles.push(readFileSync(file, 'utf-8'));
             } catch (error) {
-                console.warn(`[CanvasRenderer] Failed to load glyph CSS: ${file}`, error);
+                console.warn(`[CanvasRenderer] Failed to load element CSS: ${file}`, error);
             }
         }
     } catch (error) {
-        console.warn(`[CanvasRenderer] Failed to read glyph CSS directory`, error);
-        cssFiles.push('/* Failed to load glyph CSS directory */');
+        console.warn(`[CanvasRenderer] Failed to read element CSS directory`, error);
+        cssFiles.push('/* Failed to load element CSS directory */');
     }
 
     return cssFiles.join('\n\n');

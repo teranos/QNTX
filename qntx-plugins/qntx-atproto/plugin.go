@@ -50,7 +50,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "atproto",
-			Version:     "0.4.2",
+			Version:     "0.4.3",
 			QNTXVersion: ">= 0.1.0",
 			Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 			Author:      "QNTX Team",
@@ -320,16 +320,16 @@ func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID strin
 	}
 }
 
-// RegisterGlyphs returns custom glyph type definitions provided by this plugin.
+// RegisterElements returns custom element type definitions provided by this plugin.
 // Implements the UIPlugin interface.
-func (p *Plugin) RegisterGlyphs() []plugin.GlyphDef {
-	return []plugin.GlyphDef{
+func (p *Plugin) RegisterElements() []plugin.ElementDef {
+	return []plugin.ElementDef{
 		{
 			Symbol:        "🦋",
 			Title:         "AT Protocol Feed",
 			Label:         "atproto-feed",
-			ContentPath:   "/feed-glyph",
-			CSSPath:       "/feed-glyph.css",
+			ContentPath:   "/feed-element",
+			CSSPath:       "/feed-element.css",
 			DefaultWidth:  500,
 			DefaultHeight: 600,
 		},

@@ -18,7 +18,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage/duckdbcgo"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/db/rustdriver"
-	glyphstorage "github.com/teranos/QNTX/glyph/storage"
+	elementstorage "github.com/teranos/QNTX/element/storage"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
@@ -303,7 +303,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 		Store:       storage.NewAtsStore(storage.LandsFirst(landing, duck), logger.Logger, name),
 		Watchers:    duckdbcgo.NewWatchers(watchers),
 		Schedules:   schedule.NewStore(h.operational),
-		Canvas:      glyphstorage.NewCanvasStore(h.operational),
+		Canvas:      elementstorage.NewCanvasStore(h.operational),
 		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
 		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),
@@ -418,7 +418,7 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 		Store:       dflt,
 		Watchers:    h.watchers,
 		Schedules:   schedule.NewStore(h.operational),
-		Canvas:      glyphstorage.NewCanvasStore(h.operational),
+		Canvas:      elementstorage.NewCanvasStore(h.operational),
 		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
 		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),

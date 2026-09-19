@@ -1,0 +1,164 @@
+/**
+ * Tests for Python element component
+ */
+
+import { describe, test, expect, beforeEach, mock } from 'bun:test';
+import { createPyElement, PY_DEFAULT_CODE } from './py-element';
+import type { Element } from '@teranos/elements';
+
+// Mock uiState — process-global, must be superset-complete (see test/mock-ui-state.ts)
+import { createMockUiState } from '../../test/mock-ui-state';
+const { uiState, elements: mockCanvasElements, compositions: mockCanvasCompositions } = createMockUiState();
+mock.module('../../state/ui', () => ({ uiState }));
+
+// Mock CodeMirror — we test our code's logic, not CodeMirror's DOM mounting
+class MockEditorView {
+    state: { doc: { toString: () => string } };
+    static updateListener = { of: () => ({}) };
+    static lineWrapping = {};
+    constructor(config: any) {
+        this.state = { doc: { toString: () => config.state?.doc || '' } };
+        if (config.parent) config.parent.textContent = 'editor-mounted';
+    }
+    destroy() {}
+}
+class MockEditorState {
+    doc: string;
+    static create(config: any) { return { doc: config.doc || '' }; }
+    constructor() { this.doc = ''; }
+}
+mock.module('@codemirror/view', () => ({
+    EditorView: MockEditorView,
+    keymap: { of: () => ({}) },
+}));
+mock.module('@codemirror/state', () => ({
+    EditorState: MockEditorState,
+}));
+mock.module('@codemirror/commands', () => ({
+    defaultKeymap: [],
+}));
+mock.module('@codemirror/theme-one-dark', () => ({
+    oneDark: {},
+}));
+mock.module('@codemirror/lang-python', () => ({
+    python: () => ({}),
+}));
+
+// Only run these tests when USE_JSDOM=1 (CI environment)
+const USE_JSDOM = process.env.USE_JSDOM === '1';
+
+// crypto.randomUUID override for deterministic test IDs
+if (USE_JSDOM) {
+    globalThis.crypto = {
+        ...globalThis.crypto,
+        randomUUID: () => 'test-uuid-' + Math.random(),
+    } as any;
+}
+
+describe('PyElement', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
+
+    let item: Element;
+
+    beforeEach(() => {
+        localStorage.clear();
+        mockCanvasElements.length = 0;
+        mockCanvasCompositions.length = 0;
+        item = {
+            id: 'py-test-123',
+            title: 'Python',
+            symbol: 'py',
+            gridX: 5,
+            gridY: 5,
+            renderContent: () => document.createElement('div')
+        };
+    });
+
+    describe('initialization', () => {
+        test('sets data-element-id attribute', async () => {
+            const element = await createPyElement(item);
+            expect(element.dataset.elementId).toBe('py-test-123');
+        });
+
+        test('has title bar with py label', async () => {
+            const element = await createPyElement(item);
+            const titleBar = element.querySelector('.title-bar');
+            expect(titleBar).not.toBeNull();
+            expect(titleBar?.textContent).toContain('py');
+        });
+
+        test('has run button', async () => {
+            const element = await createPyElement(item);
+            const runButton = element.querySelector('button');
+            expect(runButton).not.toBeNull();
+            expect(runButton?.title).toBe('Run Python code');
+        });
+    });
+
+    describe('code persistence', () => {
+        test('loads default code for new element', async () => {
+            // Pre-populate uiState with element (simulates canvas spawn)
+            mockCanvasElements.push({
+                id: 'py-test-123',
+                symbol: 'py',
+                x: 0,
+                y: 0,
+            });
+
+            const element = await createPyElement(item);
+            // Wait for CodeMirror to initialize and save
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Check that default code was saved to uiState
+            const saved = mockCanvasElements.find(g => g.id === 'py-test-123');
+            expect(saved?.content).toBe(PY_DEFAULT_CODE);
+        });
+
+        test('loads saved code for existing element', async () => {
+            // Pre-populate uiState with saved code
+            mockCanvasElements.push({
+                id: 'py-test-123',
+                symbol: 'py',
+                content: 'print("saved code")',
+                x: 0,
+                y: 0,
+            });
+
+            const element = await createPyElement(item);
+            // Wait a tick for CodeMirror to initialize
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Verify the saved code was loaded
+            const saved = mockCanvasElements.find(g => g.id === 'py-test-123');
+            expect(saved?.content).toBe('print("saved code")');
+        });
+    });
+
+    describe('editor', () => {
+        test('stores editor reference on element', async () => {
+            const element = await createPyElement(item) as any;
+            expect(element.editor).toBeDefined();
+        });
+
+        test('has resize handle', async () => {
+            const element = await createPyElement(item);
+            const resizeHandle = element.querySelector('.resize-handle');
+            expect(resizeHandle).not.toBeNull();
+        });
+    });
+
+    describe('execution', () => {
+        test('run button exists and is clickable', async () => {
+            const element = await createPyElement(item);
+            const runButton = element.querySelector('button');
+            expect(runButton).not.toBeNull();
+            expect(runButton?.textContent).toBe('▶');
+        });
+
+        // Note: Full execution tests require mocking fetch and would be integration tests
+        // This would test the UI structure, not the full execution flow
+    });
+});

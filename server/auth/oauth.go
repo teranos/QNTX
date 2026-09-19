@@ -295,7 +295,7 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
 	}
 	// A token outlives the code that issued it, so its minting is a record
-	// rather than a log line, the same as one minted in the glyph.
+	// rather than a log line, the same as one minted in the element.
 	s.h.attest(PredicateMinted, session.MintedBy, map[string]any{
 		"token": id, "label": client.Label, "level": string(level), "namespaces": namespaces,
 		"client": client.DID, "did": session.DID,

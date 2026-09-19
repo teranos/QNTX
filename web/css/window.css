@@ -1,12 +1,12 @@
 /**
- * Glyph content — how a glyph draws what it holds.
+ * Element content — how an element draws what it holds.
  *
  * Named for the window the old Window component drew; that component is gone
- * and the rules that dressed it went with it. What is left is what glyphs use.
+ * and the rules that dressed it went with it. What is left is what elements use.
  */
 
-/* Glyph Content Styles - Used by database, self, and other glyphs */
-.glyph-content {
+/* Element Content Styles - Used by database, self, and other elements */
+.element-content {
     padding: 4px;
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
@@ -14,7 +14,7 @@
     overflow-y: auto;
 }
 
-.glyph-row {
+.element-row {
     display: flex;
     flex-wrap: wrap;
     gap: 2px 10px;
@@ -23,7 +23,7 @@
     border-bottom: 1px solid var(--panel-border-color, #e0e0e0);
 }
 
-.glyph-row:last-child {
+.element-row:last-child {
     border-bottom: none;
 }
 
@@ -39,8 +39,8 @@
 }
 
 /**
- * Glyph content area — the scrollable body below the title bar.
- * Created by ui.glyph() and returned as `content` in the result.
+ * Element content area — the scrollable body below the title bar.
+ * Created by ui.element() and returned as `content` in the result.
  * Fills remaining space, scrolls vertically, standard padding.
  */
 .content-area {
@@ -50,7 +50,7 @@
     background: transparent;
 }
 
-/* GlyphUI form primitives — dark-mode first */
+/* ElementUI form primitives — dark-mode first */
 .field {
     display: flex;
     align-items: center;
@@ -106,7 +106,7 @@
     border-color: var(--accent-hover, #4a8559);
 }
 
-.glyph-value {
+.element-value {
     min-width: 0;
     overflow-wrap: break-word;
     word-break: break-word;
@@ -115,13 +115,13 @@
     color: #e8e8e8;
 }
 
-.glyph-section {
+.element-section {
     margin-bottom: 16px;
 }
 
-.glyph-section-title {
-    /* The same 8px the rows under it carry (.glyph-row). Without it a heading
-       is the one thing in a glyph sitting on the window's own edge, and the
+.element-section-title {
+    /* The same 8px the rows under it carry (.element-row). Without it a heading
+       is the one thing in an element sitting on the window's own edge, and the
        edge takes the left of its first letter. */
     margin: 0 0 8px 0;
     padding: 0 8px;
@@ -130,21 +130,21 @@
     color: #e8e8e8;
 }
 
-.glyph-loading {
+.element-loading {
     padding: 20px;
     text-align: center;
     color: #c0c0c0;
 }
 
-.glyph-empty {
+.element-empty {
     padding: 20px;
     text-align: center;
     color: var(--panel-text-tertiary, #c0c0c0);
 }
 
-/* A failure a glyph shows. Red ground and light text, so it is never read as
-   content. Eight glyphs name this class and nothing had dressed it. */
-.glyph-error {
+/* A failure an element shows. Red ground and light text, so it is never read as
+   content. Eight elements name this class and nothing had dressed it. */
+.element-error {
     padding: 8px 10px;
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
@@ -156,27 +156,27 @@
     user-select: text;
 }
 
-/* Whether a thing a glyph draws is well or is not. These carry the colour so
-   the glyph does not: a section that says ✓ or ⚠ used to write the hex inline,
+/* Whether a thing an element draws is well or is not. These carry the colour so
+   the element does not: a section that says ✓ or ⚠ used to write the hex inline,
    which is a colour no theme can reach. */
-.glyph-well {
+.status-well {
     color: var(--color-success);
 }
 
-.glyph-unwell {
+.status-unwell {
     color: var(--color-warning);
 }
 
 /* A key is read across, not down, and it is long. No ellipsis: what a node
    signs with is verified character by character or not at all. */
-.glyph-did {
+.element-did {
     font-family: var(--font-mono);
     word-break: break-all;
     overflow-wrap: break-word;
 }
 
-/* The row a status line draws, on the glyph whose subject it is. */
-.glyph-status-row {
+/* The row a status line draws, on the element whose subject it is. */
+.element-status-row {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -184,7 +184,7 @@
     font-size: var(--font-size-sm);
 }
 
-.glyph-note {
+.element-note {
     color: var(--panel-text-tertiary, #c0c0c0);
 }
 
@@ -204,17 +204,17 @@
     font-size: var(--font-size-sm);
 }
 
-.glyph-content .panel-btn {
+.element-content .panel-btn {
     color: #e8e8e8;
     border-color: #4b5563;
     background: #1e293b;
 }
 
-.glyph-content .panel-btn:hover:not(:disabled) {
+.element-content .panel-btn:hover:not(:disabled) {
     background: #334155;
 }
 
-.glyph-content .panel-btn:disabled {
+.element-content .panel-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }

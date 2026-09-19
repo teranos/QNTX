@@ -563,11 +563,11 @@ HTTPResponse handleHTTP(ref const HTTPRequest req) {
 }
 
 // ---------------------------------------------------------------------------
-// Glyph definition (none — faal is headless)
+// Element definition (none — faal is headless)
 // ---------------------------------------------------------------------------
 
-GlyphDefResponse registerGlyphs() {
-    GlyphDefResponse resp;
+ElementDefResponse registerElements() {
+    ElementDefResponse resp;
     return resp;
 }
 
@@ -611,8 +611,8 @@ void registerHandlers(ref GrpcServer server) {
         return encode(resp);
     });
 
-    server.registerHandler("/protocol.DomainPluginService/RegisterGlyphs", (const ubyte[] _) {
-        auto resp = registerGlyphs();
+    server.registerHandler("/protocol.DomainPluginService/RegisterElements", (const ubyte[] _) {
+        auto resp = registerElements();
         return encode(resp);
     });
 

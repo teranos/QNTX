@@ -171,7 +171,7 @@ func handlerFailureItemsFor(runs []handlerFailureRun) []StatusItem {
 		if r.Count > 1 {
 			note = strconv.Itoa(r.Count) + "x " + note
 		}
-		items = append(items, StatusItem{Name: r.Handler, Note: note, Glyph: GlyphUnwell})
+		items = append(items, StatusItem{Name: r.Handler, Note: note, Mark: MarkUnwell})
 	}
 	return items
 }

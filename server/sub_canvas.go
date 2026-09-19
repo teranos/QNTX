@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/teranos/QNTX/glyph/handlers"
+	"github.com/teranos/QNTX/element/handlers"
 	appcfg "github.com/teranos/QNTX/internal/config"
 )
 

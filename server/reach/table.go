@@ -72,7 +72,7 @@ REACH is '/setup' '/setup/claim'                                          of ANY
 # A staand is a market's public receive point (ADR-035).
 REACH is '/s/'                                                            of ANYONE
 
-# A glyph module is UI, and a page importing it carries no session. Every
+# An element module is UI, and a page importing it carries no session. Every
 # call the module goes on to make is gated on its own line above.
 REACH is '/g/'                                                            of ANYONE
 
@@ -122,7 +122,7 @@ REACH is '/api/pulse/schedules' '/api/pulse/schedules/'                   of ROO
 REACH is '/api/pulse/jobs' '/api/pulse/jobs/'                             of ROOT SUPER
 REACH is '/api/prompt/'                                                   of ROOT
 REACH is '/api/plugins' '/api/plugins/'                                   of ROOT SUPER
-REACH is '/api/plugins/glyphs' '/api/plugins/routes'                      of ROOT
+REACH is '/api/plugins/elements' '/api/plugins/routes'                      of ROOT
 REACH is '/api/plugins/{name}/logs'                                       of ROOT
 REACH is '/api/plugins/{name}/config'                                     of ROOT
 REACH is '/am/statusline' '/am/statusline/'                               of ROOT SUPER
@@ -131,8 +131,8 @@ REACH is '/api/types' '/api/types/'                                       of ROO
 # too. A watcher nobody may read is one that fires unseen.
 REACH is '/api/watchers' '/api/watchers/'                                 of ROOT SUPER
 REACH is '/api/watchers/queue/stats'                                      of ROOT SUPER
-REACH is '/api/glyph-config'                                              of ROOT
-REACH is '/api/canvas/glyphs' '/api/canvas/glyphs/'                       of ROOT
+REACH is '/api/element-config'                                              of ROOT
+REACH is '/api/canvas/elements' '/api/canvas/elements/'                       of ROOT
 REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT
 REACH is '/api/canvas/minimized-windows'                                  of ROOT SUPER
 REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER

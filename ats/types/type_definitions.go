@@ -11,7 +11,7 @@ import (
 )
 
 // PromptResult is the type for LLM prompt execution results.
-// Created by Prompt glyphs after successful execution, making responses
+// Created by Prompt elements after successful execution, making responses
 // discoverable in the attestation graph.
 var PromptResult = TypeDef{
 	Name:             "prompt-result",

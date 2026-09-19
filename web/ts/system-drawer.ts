@@ -5,7 +5,7 @@ import { getStorageItem, setStorageItem } from './indexeddb-storage.ts';
 import { sendMessage, connectivity } from './client';
 import { SearchView, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
 import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
-import { spawnGlyphByCommand, getMatchingCommands, getCommandLabel } from './components/glyph/canvas/spawn-menu.ts';
+import { spawnElementByCommand, getMatchingCommands, getCommandLabel } from './components/element/canvas/spawn-menu.ts';
 import { uiState } from './state/ui.ts';
 import { Subcanvas } from './sym';
 
@@ -79,17 +79,17 @@ function computeLocalResults(query: string): SearchMatch[] {
 
     // Subcanvas matches (name contains query)
     const q = query.toLowerCase();
-    const allGlyphs = uiState.getCanvasGlyphs();
-    for (const glyph of allGlyphs) {
-        if (glyph.symbol !== Subcanvas) continue;
-        const name = glyph.content || '';
+    const allElements = uiState.getCanvasElements();
+    for (const item of allElements) {
+        if (item.symbol !== Subcanvas) continue;
+        const name = item.content || '';
         if (!name.toLowerCase().includes(q)) continue;
         results.push({
-            node_id: glyph.id,
+            node_id: item.id,
             type_name: TYPE_SUBCANVAS,
             type_label: '⌗',
             field_name: 'navigate',
-            field_value: glyph.id,
+            field_value: item.id,
             excerpt: name || 'Untitled',
             score: 1,
             strategy: 'local',
@@ -124,8 +124,8 @@ function dispatchSearch(text: string): void {
 
 // --- Subcanvas navigation ---
 
-function navigateToSubcanvas(glyphId: string): void {
-    const el = document.querySelector(`[data-element-id="${glyphId}"]`) as HTMLElement | null;
+function navigateToSubcanvas(elementId: string): void {
+    const el = document.querySelector(`[data-element-id="${elementId}"]`) as HTMLElement | null;
     if (!el) return;
     el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 }
@@ -134,7 +134,7 @@ function navigateToSubcanvas(glyphId: string): void {
 
 function actOnSelectedResult(match: SearchMatch): void {
     if (match.type_name === TYPE_COMMAND) {
-        spawnGlyphByCommand(match.field_value);
+        spawnElementByCommand(match.field_value);
     } else if (match.type_name === TYPE_SUBCANVAS) {
         navigateToSubcanvas(match.node_id);
     } else {
@@ -237,8 +237,8 @@ export function initSystemDrawer(): void {
                     return;
                 }
 
-                // No selection — try exact glyph command, then submit search
-                if (spawnGlyphByCommand(text)) {
+                // No selection — try exact element command, then submit search
+                if (spawnElementByCommand(text)) {
                     searchInput!.value = '';
                     if (searchView) searchView.clear();
                     collapseDrawer();

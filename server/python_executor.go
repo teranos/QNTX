@@ -12,10 +12,10 @@ type grpcPythonExecutor struct {
 	client protocol.PythonServiceClient
 }
 
-func (g *grpcPythonExecutor) Execute(ctx context.Context, code string, glyphID string, upstreamAttestation []byte) ([]byte, error) {
+func (g *grpcPythonExecutor) Execute(ctx context.Context, code string, elementID string, upstreamAttestation []byte) ([]byte, error) {
 	resp, err := g.client.Execute(ctx, &protocol.PythonExecuteRequest{
 		Code:                code,
-		GlyphId:             glyphID,
+		ElementId:             elementID,
 		UpstreamAttestation: upstreamAttestation,
 	})
 	if err != nil {

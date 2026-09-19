@@ -3,7 +3,7 @@
  *
  * Button error display — a rejected onClick must not turn the label into the
  * word "Error" or hide the reason in a hover tooltip. The reason sits beside
- * the button, selectable, and a press copies it (tokens-glyph.ts didCell()).
+ * the button, selectable, and a press copies it (tokens-element.ts didCell()).
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';

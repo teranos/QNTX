@@ -1159,7 +1159,7 @@ type CreateScheduleRequest struct {
 	HandlerName     string                 `protobuf:"bytes,2,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`                                                  // Handler to invoke on each tick
 	IntervalSeconds int32                  `protobuf:"varint,3,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`                                     // Execution interval
 	Payload         []byte                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`                                                                             // Handler-specific data (JSON)
-	Metadata        map[string]string      `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Optional metadata (glyph_id, plugin, etc.)
+	Metadata        map[string]string      `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Optional metadata (element_id, plugin, etc.)
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }

@@ -11,8 +11,8 @@ import (
 // A watcher is normally a thing a person makes and can take away. A row here
 // cannot be taken away, so adding one is a claim somebody makes here first.
 var whyStanding = map[string]string{
-	StandingGlyphPublished: "a glyph's module is an attestation, and a page holds the " +
-		"module it imported. Without this the page shows the glyph that was published " +
+	StandingElementPublished: "an element's module is an attestation, and a page holds the " +
+		"module it imported. Without this the page shows the element that was published " +
 		"before it loaded until somebody reloads by hand, which is the failure the " +
 		"whole of /g/ exists to remove",
 }
@@ -32,7 +32,7 @@ func TestEveryStandingWatcherSaysWhy(t *testing.T) {
 }
 
 // A row here is permanent, so it must not be able to run anything. Every other
-// action type reaches somebody's code — a webhook, a Python glyph, a plugin.
+// action type reaches somebody's code — a webhook, a Python element, a plugin.
 func TestAStandingWatcherRunsNothing(t *testing.T) {
 	for _, w := range standing {
 		if w.ActionType != storage.ActionTypeTell {

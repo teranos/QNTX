@@ -182,7 +182,7 @@ func (s *QNTXServer) startJobUpdateBroadcaster() {
 				s.broadcastJobUpdate(job)
 
 				// NEW: Update pulse_execution and broadcast Pulse-specific events (Issue #356)
-				// This ensures IX glyphs receive execution status updates via pulse:execution:* events
+				// This ensures IX elements receive execution status updates via pulse:execution:* events
 				if job.Status == "completed" || job.Status == "failed" {
 					s.handlePulseExecutionUpdate(job, executionStore, scheduleStore)
 				}
@@ -713,21 +713,21 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 				wasNonEmpty = stats.TotalQueued > 0
 
 				// Collect execution stats from ALL watchers (not just those with queue entries),
-				// and resolve target glyphs for meld-edge watchers.
+				// and resolve target elements for meld-edge watchers.
 				allWatchers := s.watcherEngine.GetAllWatchers()
-				var targetGlyphs map[string]string
+				var targetElements map[string]string
 				var watcherStats map[string]WatcherBroadcastStats
 				for watcherID, w := range allWatchers {
-					// Meld-edge: resolve target glyph ID from action data
+					// Meld-edge: resolve target element ID from action data
 					if strings.HasPrefix(watcherID, "meld-edge-") {
 						var actionData struct {
-							TargetGlyphID string `json:"target_glyph_id"`
+							TargetElementID string `json:"target_element_id"`
 						}
-						if json.Unmarshal([]byte(w.ActionData), &actionData) == nil && actionData.TargetGlyphID != "" {
-							if targetGlyphs == nil {
-								targetGlyphs = make(map[string]string)
+						if json.Unmarshal([]byte(w.ActionData), &actionData) == nil && actionData.TargetElementID != "" {
+							if targetElements == nil {
+								targetElements = make(map[string]string)
 							}
-							targetGlyphs[watcherID] = actionData.TargetGlyphID
+							targetElements[watcherID] = actionData.TargetElementID
 						}
 					}
 
@@ -755,12 +755,12 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 					Type:             "watcher_queue_status",
 					TotalQueued:      stats.TotalQueued,
 					PerWatcher:       stats.PerWatcher,
-					TargetGlyphs:     targetGlyphs,
+					TargetElements:     targetElements,
 					WatcherStats:     watcherStats,
 					OldestAgeSeconds: stats.OldestAgeSeconds,
 					Timestamp:        time.Now().Unix(),
 				}
-				// Queued watchers, their fire counts and the glyphs they target
+				// Queued watchers, their fire counts and the elements they target
 				// are one namespace's, the same as the matches they produce.
 				s.broadcastIn(s.watchedNamespace(), msg)
 			}
@@ -799,7 +799,7 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
 	case "watcher_error":
 		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
-	case "glyph_fired":
+	case "element_fired":
 		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
 	default:
 		s.logger.Warnw("Unknown broadcast request type", "type", req.reqType)

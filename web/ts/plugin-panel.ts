@@ -1,7 +1,7 @@
 /**
  * Plugin Panel - Shows installed domain plugins and their status
  *
- * Manifests as a glyph with 'panel' opensAs — slides in from
+ * Manifests as an element with 'panel' opensAs — slides in from
  * the opposite edge of the system drawer.
  *
  * Displays plugin information:
@@ -132,7 +132,7 @@ function render(): void {
         // Server unreachable — both fetches failed
         if (serverHealth === null) {
             contentElement.innerHTML = `
-                <div class="glyph-content plugin-offline">
+                <div class="element-content plugin-offline">
                     <div class="plugin-offline-message">
                         <div class="plugin-offline-title">Server offline</div>
                         <p>gRPC plugins require a running QNTX server</p>
@@ -144,7 +144,7 @@ function render(): void {
         }
 
         contentElement.innerHTML = `
-            <div class="glyph-content">
+            <div class="element-content">
                 <div class="plugin-search-container" style="padding: 8px 0;">
                     <input type="text" class="plugin-search-input plugin-mono" placeholder="Filter plugins..." style="width: 100%; padding: 6px 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-on-dark, #555); border-radius: 4px; color: var(--text-on-dark); font-size: 13px;">
                 </div>
@@ -161,7 +161,7 @@ function render(): void {
     const serverBuildTime = formatBuildTime(serverHealth?.build_time);
 
     contentElement.innerHTML = `
-        <div class="glyph-content">
+        <div class="element-content">
             <div class="plugin-search-container" style="padding: 8px 0;">
                 <input type="text" class="plugin-search-input plugin-mono" placeholder="Filter plugins..." style="width: 100%; padding: 6px 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-on-dark, #555); border-radius: 4px; color: var(--text-on-dark); font-size: 13px;">
             </div>
@@ -910,9 +910,9 @@ function filterPlugins(searchText: string): void {
 /**
  * Create a Element definition for the plugin panel
  */
-export function createPluginGlyph(): Element {
+export function createPluginElement(): Element {
     return {
-        id: 'plugin-glyph',
+        id: 'plugin-element',
         title: 'Domain Plugins',
         symbol: '\u2699',
         opensAs: 'panel',
@@ -940,7 +940,7 @@ export function createPluginGlyph(): Element {
             }, 10_000);
 
             // Show loading, then fetch data
-            content.innerHTML = '<div class="glyph-loading">Loading plugins...</div>';
+            content.innerHTML = '<div class="element-loading">Loading plugins...</div>';
 
             Promise.all([
                 fetchPlugins(),

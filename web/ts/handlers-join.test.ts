@@ -50,7 +50,7 @@ describe('what fires a handler', () => {
     it('ignores watchers that are not plugin executions', () => {
         const all: Watcher[] = [{
             id: 'w-4',
-            action_type: 'glyph_execute',
+            action_type: 'element_execute',
             action_data: JSON.stringify({ plugin_name: 'capy', handler_name: 'render' }),
             fire_count: 3,
             error_count: 0,

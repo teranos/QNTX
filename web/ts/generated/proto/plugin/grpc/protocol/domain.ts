@@ -245,7 +245,7 @@ export interface InitializeResponse {
   http_routes: RouteInfo[];
   /**
    * python_provider indicates this plugin can execute Python code.
-   * Core registers "py" glyph type when any loaded plugin declares this.
+   * Core registers "py" element type when any loaded plugin declares this.
    */
   python_provider: boolean;
 }
@@ -325,14 +325,14 @@ export interface JobLogEntry {
   metadata: string;
 }
 
-/** GlyphDefResponse contains custom glyph type definitions from a plugin */
-export interface GlyphDefResponse {
-  glyphs: GlyphDef[];
+/** ElementDefResponse contains custom element type definitions from a plugin */
+export interface ElementDefResponse {
+  elements: ElementDef[];
 }
 
-/** GlyphDef defines a custom glyph type provided by a plugin */
-export interface GlyphDef {
-  /** Symbol is the glyph identifier (e.g., "⚗" for a chemistry plugin) */
+/** ElementDef defines a custom element type provided by a plugin */
+export interface ElementDef {
+  /** Symbol is the element identifier (e.g., "⚗" for a chemistry plugin) */
   symbol: string;
   /** Title is the human-readable name shown in the title bar */
   title: string;
@@ -340,10 +340,10 @@ export interface GlyphDef {
   label: string;
   /**
    * ContentPath is the HTTP path (relative to /api/{plugin}/) that
-   * returns the HTML fragment for this glyph's content area
+   * returns the HTML fragment for this element's content area
    */
   content_path: string;
-  /** CSSPath is an optional HTTP path to a stylesheet for this glyph type */
+  /** CSSPath is an optional HTTP path to a stylesheet for this element type */
   css_path: string;
   /** DefaultWidth and DefaultHeight in pixels (0 = use system default) */
   default_width: number;

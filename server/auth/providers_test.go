@@ -27,7 +27,7 @@ func TestNormalizeHostRejectsWhatIsNotAHost(t *testing.T) {
 	}
 }
 
-// The glyph draws from this list, so a provider that exists must describe
+// The element draws from this list, so a provider that exists must describe
 // itself well enough to be filled in.
 func TestEveryProviderDescribesItsForm(t *testing.T) {
 	require.NotEmpty(t, providers)

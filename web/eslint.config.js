@@ -134,7 +134,7 @@ export default [
         // line for new stand code.
         // TODO: propagate the tooltip infra beyond the stand UI.
         // "i want tooltip to be propagated more"
-        files: ['ts/market-glyph.ts'],
+        files: ['ts/market-element.ts'],
         rules: {
             'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE],
         },

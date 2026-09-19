@@ -706,7 +706,7 @@ Storage holds the two above; this is what a caller is handed.</p>
       metadata:(string * string) list;
       (**
 {%html:
-<p>Optional metadata (glyph_id, plugin, etc.)</p>
+<p>Optional metadata (element_id, plugin, etc.)</p>
 %}
       *)
 
@@ -2657,7 +2657,7 @@ end = struct
       metadata:(string * string) list;
       (**
 {%html:
-<p>Optional metadata (glyph_id, plugin, etc.)</p>
+<p>Optional metadata (element_id, plugin, etc.)</p>
 %}
       *)
 

@@ -1,0 +1,423 @@
+/**
+ * Ax Element - Ax query editor on canvas grid
+ *
+ * Text editor for writing ax queries like "is git", "has certification", etc.
+ * Similar to ATS editor or prompt editor - just the query text itself.
+ *
+ * ARCHITECTURE:
+ * Canvas ax elements are lightweight references/thumbnails that show the query text.
+ * They serve as visual markers on the spatial canvas to show active ax queries.
+ *
+ * Uses canvasPlaced() for shared infrastructure (positioning, drag, resize, cleanup,
+ * CSS state) with a custom title bar.
+ *
+ * TODO: Future enhancements
+ * - TODO(#672): Attribute filters — expose watcher attribute_filters as UI conditions
+ * - Add result count badge (e.g., "42 attestations")
+ * - Show mini type distribution (tiny bar chart or colored dots for node types)
+ * - Click handler to spawn full ax manifestation (attestation explorer window)
+ * - Integration with graph explorer (may reuse existing graph component)
+ * - Persist query results to avoid re-execution on reload
+ * - Support query templates/snippets
+ */
+
+import type { Element } from '@teranos/elements';
+import { AX } from '../../sym';
+import { log, SEG } from '../../logger';
+import { preventDrag, storeCleanup, setupElementResizeObserver } from '@teranos/elements';
+import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
+import { sendMessage, connectivity } from '../../client';
+import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
+import { queryAttestations, parseQuery } from '../../ats-wasm';
+import { tooltip } from '../tooltip';
+import { isSigmaAttestation, renderSigmaResultLine } from './sigma-element';
+import { isTypeAttestation, groupTypeAttestations, renderTypeResultLine } from './type-result-line';
+import { tripletKey, groupByTriplet, renderTripletResultLine } from './triplet-element';
+import { renderTriple } from './attestation-triple';
+import { attestationResultRow, RESULT_ROW_PALETTE } from './attestation-result-row';
+import { uiState } from '../../state/ui';
+import { syncStateManager } from '../../state/sync-state';
+import {
+    createColorStateSetter,
+    appendEmptyState,
+    showQueryError,
+} from './query-element-states';
+
+/**
+ * Create an AX element using canvasPlaced() with custom title bar.
+ *
+ * @param element - Element model with id, position, and size
+ * @returns The canvas-placed HTMLElement
+ */
+export function createAxElement(item: Element): HTMLElement {
+    const elementId = item.id;
+
+    // Load persisted query from canvas state (or element argument on restore)
+    const existingElement = uiState.getCanvasElement(elementId);
+    let currentQuery = existingElement?.content ?? item.content ?? '';
+
+    // Symbol (draggable area) — the package settles a carried cursor span or
+    // creates the one span element.symbol becomes
+    const symbol = item.symbolElement ? settleSymbolSpan(item.symbolElement) : createSymbolSpan(AX);
+    symbol.style.cursor = 'move';
+    symbol.style.fontWeight = 'bold';
+    symbol.style.color = 'var(--element-status-running-text)';
+
+    const { element } = canvasPlaced({
+        item: item,
+        className: 'canvas-ax-element',
+        defaults: { x: 200, y: 200, width: 400, height: 200 },
+        dragHandle: symbol,
+        resizable: true,
+        logLabel: 'AxElement',
+    });
+    element.style.minWidth = '200px';
+    element.style.minHeight = '120px';
+
+    // Single-line query input (takes remaining space)
+    const editor = document.createElement('input');
+    editor.type = 'text';
+    editor.className = 'ax-query-input';
+    editor.value = currentQuery;
+    editor.placeholder = 'Enter ax query (e.g., ALICE, is git)';
+    editor.style.flex = '1';
+    editor.style.padding = '4px 8px';
+    editor.style.fontSize = '13px';
+    editor.style.fontFamily = 'monospace';
+    editor.style.border = 'none';
+    editor.style.outline = 'none';
+    editor.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
+    editor.style.color = '#d4f0d4'; // 20% greener and whiter
+    editor.style.borderRadius = '2px';
+
+    preventDrag(editor);
+
+    // Title bar (custom layout: symbol + query input) — shared CSS class for state styling
+    const titleBar = document.createElement('div');
+    titleBar.className = 'title-bar';
+    titleBar.style.padding = '4px 4px 4px 8px'; // Compact: reduced top/bottom/right, keep left for symbol
+
+    titleBar.appendChild(symbol);
+    titleBar.appendChild(editor);
+
+    element.appendChild(titleBar);
+
+    // Title bar background must track container state (opaque bg blocks parent tint)
+    const setColorState = createColorStateSetter(element, titleBar);
+    setColorState('idle');
+
+    // Results container - scrollable list of matched attestations (gets all remaining space)
+    const resultsContainer = document.createElement('div');
+    resultsContainer.className = 'ax-element-results content-area';
+    resultsContainer.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
+    resultsContainer.style.borderTop = '1px solid var(--border)';
+    resultsContainer.style.fontSize = '12px';
+    resultsContainer.style.fontFamily = 'monospace';
+
+    appendEmptyState(resultsContainer, 'ax-element-empty-state');
+
+    element.appendChild(resultsContainer);
+
+    // Attach tooltip support for attestation results
+    tooltip.attach(resultsContainer, '.ax-element-result-item');
+
+    // Shared: run local IndexedDB query, populate results, update color state
+    async function runLocalQuery(): Promise<void> {
+        const query = currentQuery.trim();
+        if (!query) return;
+
+        // Clear and show searching indicator
+        resultsContainer.innerHTML = '';
+        const searchingEl = document.createElement('div');
+        searchingEl.style.padding = '8px';
+        searchingEl.style.fontSize = '11px';
+        searchingEl.style.color = 'var(--text-secondary)';
+        searchingEl.style.fontFamily = 'monospace';
+        searchingEl.textContent = 'searching...';
+        resultsContainer.appendChild(searchingEl);
+
+        try {
+            const parsed = parseQuery(query);
+            if (parsed.ok) {
+                const localResults = await queryAttestations(parsed.query);
+                searchingEl.remove();
+                const displayedIds = new Set<string>();
+                // Separate type attestations for subject grouping
+                const typeAtts: Attestation[] = [];
+                const otherAtts: Attestation[] = [];
+                for (const att of localResults) {
+                    if (att.id) displayedIds.add(att.id);
+                    if (isTypeAttestation(att)) {
+                        typeAtts.push(att);
+                    } else {
+                        otherAtts.push(att);
+                    }
+                }
+                // Render grouped type attestations first
+                for (const group of groupTypeAttestations(typeAtts)) {
+                    resultsContainer.appendChild(renderTypeResultLine(group));
+                }
+                // Separate sigmas from regular attestations
+                const sigmaAtts: Attestation[] = [];
+                const regularAtts: Attestation[] = [];
+                for (const att of otherAtts) {
+                    if (isSigmaAttestation(att)) {
+                        sigmaAtts.push(att);
+                    } else {
+                        regularAtts.push(att);
+                    }
+                }
+                // Group regular attestations by triplet
+                for (const [key, group] of groupByTriplet(regularAtts)) {
+                    let row: HTMLElement;
+                    if (group.length === 1) {
+                        row = renderAttestation(group[0]);
+                    } else {
+                        row = renderTripletResultLine(group);
+                    }
+                    // Tag for streaming merge
+                    row.dataset.tripletKey = key;
+                    row.dataset.tripletAttestations = JSON.stringify(group);
+                    resultsContainer.appendChild(row);
+                }
+                // Render sigmas after triplet groups
+                for (const att of sigmaAtts) {
+                    resultsContainer.appendChild(renderSigmaResultLine(att));
+                }
+                (element as any)._localIds = displayedIds;
+
+                if (localResults.length === 0) {
+                    appendEmptyState(resultsContainer, 'ax-element-empty-state');
+                }
+
+                log.debug(SEG.ELEMENT, `[AxElement] Local query: ${localResults.length} results for ${elementId}`);
+            } else {
+                searchingEl.remove();
+            }
+        } catch (err) {
+            log.debug(SEG.ELEMENT, `[AxElement] Local query failed for ${elementId}:`, err);
+            appendEmptyState(resultsContainer, 'ax-element-empty-state');
+        }
+
+        // Update color + data attributes
+        element.dataset.localActive = 'true';
+        resultsContainer.dataset.localActive = 'true';
+
+        if (connectivity.state === 'online') {
+            sendMessage({
+                type: 'watcher_upsert',
+                watcher_id: `ax-element-${elementId}`,
+                watcher_query: query,
+                watcher_name: `AX Element: ${query.substring(0, 30)}${query.length > 30 ? '...' : ''}`,
+                enabled: true
+            });
+            setColorState('teal');
+        } else {
+            setColorState('orange');
+        }
+    }
+
+    // Auto-save and watcher update with debouncing (500ms delay)
+    let saveTimeout: number | undefined;
+    editor.addEventListener('input', () => {
+        currentQuery = editor.value;
+
+        // Clear existing timeout
+        if (saveTimeout !== undefined) {
+            clearTimeout(saveTimeout);
+        }
+
+        // Update background to indicate pending state
+        setColorState('pending');
+
+        // Clear results immediately when query changes
+        resultsContainer.innerHTML = '';
+        appendEmptyState(resultsContainer, 'ax-element-empty-state');
+
+        // Debounce save and watcher update for 500ms
+        saveTimeout = window.setTimeout(async () => {
+            const existing = uiState.getCanvasElement(elementId);
+            if (existing) {
+                uiState.addCanvasElement({ ...existing, content: currentQuery });
+            }
+
+            if (!currentQuery.trim()) {
+                setColorState('idle');
+                return;
+            }
+
+            await runLocalQuery();
+            log.debug(SEG.ELEMENT, `[AxElement] Query updated for ${elementId}: "${currentQuery}"`);
+        }, 500);
+    });
+
+    // Set up ResizeObserver for auto-sizing element to content
+    setupElementResizeObserver(element, resultsContainer, `AX ${elementId}`);
+
+    // Disable server-side watcher on cleanup (element deletion)
+    storeCleanup(element, () => {
+        if (connectivity.state === 'online') {
+            sendMessage({
+                type: 'watcher_upsert',
+                watcher_id: `ax-element-${elementId}`,
+                watcher_query: currentQuery,
+                watcher_name: `AX Element: ${currentQuery.substring(0, 30)}`,
+                enabled: false
+            });
+        }
+    });
+
+    // Subscribe to sync state changes for visual feedback
+    const syncUnsub = syncStateManager.subscribe(elementId, (state) => {
+        element.dataset.syncState = state;
+    });
+    storeCleanup(element, syncUnsub);
+
+    // Subscribe to connectivity state changes — re-fire local query on transition
+    const connectUnsub = connectivity.subscribe((state) => {
+        element.dataset.connectivityMode = state;
+        resultsContainer.dataset.connectivityMode = state;
+
+        // Re-query IndexedDB on connectivity change (picks up new local attestations + updates color)
+        if (currentQuery.trim()) {
+            void runLocalQuery();
+        }
+    });
+    storeCleanup(element, connectUnsub);
+
+    // Auto-execute if spawned with a pre-filled query (e.g. from triplet segment click)
+    if (currentQuery.trim()) {
+        void runLocalQuery();
+    }
+
+    return element;
+}
+
+/**
+ * Render a single attestation result in the results list.
+ */
+function renderAttestation(attestation: Attestation): HTMLElement {
+    return attestationResultRow(attestation, {
+        className: 'ax-element-result-item',
+        body: renderTriple(attestation, {
+            tag: 'div',
+            fontSize: '11px',
+            palette: RESULT_ROW_PALETTE,
+        }),
+    });
+}
+
+/**
+ * Update the results display with new attestations
+ */
+export function updateAxElementResults(elementId: string, attestation: Attestation): void {
+    const item = document.querySelector(`[data-element-id="${elementId}"]`);
+    if (!item) {
+        log.debug(SEG.ELEMENT, `[AxElement] Cannot update results: element ${elementId} not found in DOM`);
+        return;
+    }
+
+    const resultsContainer = item.querySelector('.ax-element-results') as HTMLElement;
+    if (!resultsContainer) {
+        log.debug(SEG.ELEMENT, `[AxElement] Cannot update results: results container not found for ${elementId}`);
+        return;
+    }
+
+    // Remove empty state if present
+    const emptyState = resultsContainer.querySelector('.ax-element-empty-state');
+    if (emptyState) {
+        emptyState.remove();
+    }
+
+    // Remove error display if present (successful match clears error)
+    const errorDisplay = resultsContainer.querySelector('.ax-element-error');
+    if (errorDisplay) {
+        errorDisplay.remove();
+    }
+
+    // Dedup: skip if already shown from local IndexedDB query
+    if (attestation.id) {
+        const localIds = (item as any)._localIds as Set<string> | undefined;
+        if (localIds?.has(attestation.id)) {
+            log.debug(SEG.ELEMENT, `[AxElement] Skipped duplicate ${attestation.id} (already from local)`);
+            return;
+        }
+    }
+
+    // Type attestations: group by subject into a single line
+    if (isTypeAttestation(attestation)) {
+        const subject = attestation.subjects?.[0] || '';
+        const existing = resultsContainer.querySelector(`[data-type-subject="${subject}"]`) as HTMLElement | null;
+        if (existing) {
+            // Merge: update attestation count in the existing group line
+            const stored = JSON.parse(existing.dataset.typeAttestations || '[]') as Attestation[];
+            stored.push(attestation);
+            existing.dataset.typeAttestations = JSON.stringify(stored);
+            const group = groupTypeAttestations(stored);
+            if (group.length > 0) {
+                const replacement = renderTypeResultLine(group[0]);
+                replacement.dataset.typeSubject = subject;
+                replacement.dataset.typeAttestations = JSON.stringify(stored);
+                existing.replaceWith(replacement);
+            }
+        } else {
+            const group = groupTypeAttestations([attestation]);
+            if (group.length > 0) {
+                const line = renderTypeResultLine(group[0]);
+                line.dataset.typeSubject = subject;
+                line.dataset.typeAttestations = JSON.stringify([attestation]);
+                resultsContainer.insertBefore(line, resultsContainer.firstChild);
+            }
+        }
+        log.debug(SEG.ELEMENT, `[AxElement] Added type result to ${elementId}: ${subject}`);
+        return;
+    }
+
+    // Sigma attestations render directly
+    if (isSigmaAttestation(attestation)) {
+        resultsContainer.insertBefore(renderSigmaResultLine(attestation), resultsContainer.firstChild);
+        log.debug(SEG.ELEMENT, `[AxElement] Added sigma result to ${elementId}:`, attestation.id);
+        return;
+    }
+
+    // Regular attestation: check if a triplet group for this key already exists
+    const key = tripletKey(attestation);
+    const existingTriplet = resultsContainer.querySelector(`[data-triplet-key="${key}"]`) as HTMLElement | null;
+    if (existingTriplet) {
+        // Merge into existing triplet group
+        const stored = JSON.parse(existingTriplet.dataset.tripletAttestations || '[]') as Attestation[];
+        stored.push(attestation);
+        const replacement = renderTripletResultLine(stored);
+        replacement.dataset.tripletKey = key;
+        replacement.dataset.tripletAttestations = JSON.stringify(stored);
+        existingTriplet.replaceWith(replacement);
+    } else {
+        // First attestation with this key — render as single row, tag with triplet key for future merging
+        const resultItem = renderAttestation(attestation);
+        resultItem.dataset.tripletKey = key;
+        resultItem.dataset.tripletAttestations = JSON.stringify([attestation]);
+        resultsContainer.insertBefore(resultItem, resultsContainer.firstChild);
+    }
+
+    log.debug(SEG.ELEMENT, `[AxElement] Added result to ${elementId}:`, attestation.id);
+}
+
+/**
+ * Update AX element with error message and optional structured details
+ * Called by WebSocket handler when watcher_error message arrives
+ */
+export function updateAxElementError(elementId: string, errorMsg: string, severity: string, details?: string[]): void {
+    const item = document.querySelector(`[data-element-id="${elementId}"]`) as HTMLElement;
+    if (!item) {
+        log.warn(SEG.ELEMENT, `[AxElement] Cannot update error: element ${elementId} not found in DOM`);
+        return;
+    }
+
+    const resultsContainer = item.querySelector('.ax-element-results') as HTMLElement;
+    if (!resultsContainer) {
+        log.warn(SEG.ELEMENT, `[AxElement] Cannot update error: results container not found for ${elementId}`);
+        return;
+    }
+
+    showQueryError(item, resultsContainer, 'ax-element-empty-state', 'ax-element-error', severity, errorMsg, 'AxElement', elementId, details);
+}

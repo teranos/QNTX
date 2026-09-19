@@ -1,7 +1,7 @@
 import { sendMessage } from './client';
 import { log, SEG } from './logger';
 import { Sigma, Watcher } from './sym';
-import { spawnSigmaAsWindow } from './components/glyph/sigma-glyph';
+import { spawnSigmaAsWindow } from './components/element/sigma-element';
 import { getWatchersByPredicate, refresh as refreshWatcherPredicates, onWatcherPredicatesChanged, eyeStyle } from './watcher-predicates';
 import type { Element } from '@teranos/elements';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';

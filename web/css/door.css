@@ -47,7 +47,7 @@
 #system-drawer.door-held {
     height: var(--door-height);
     transition: height 620ms cubic-bezier(.65, 0, .2, 1);
-    /* Above the glyph tray and the toast. A tray floating over a door nobody
+    /* Above the element tray and the toast. A tray floating over a door nobody
        has opened offers the app before the app is reachable. */
     z-index: 100003;
 }
@@ -285,15 +285,15 @@
 
 /* A mark keeps its own colours, but it does not spend them on someone who is
    only looking. Reaching for one is what pays for it. */
-.door-provider .door-mark-glyph {
+.door-provider .door-mark-element {
     filter: saturate(0);
     opacity: .7;
     transition: filter 200ms ease, opacity 200ms ease;
 }
 
-.door-provider:hover .door-mark-glyph,
-.door-provider:focus-visible .door-mark-glyph,
-.door-provider.door-provider-picked .door-mark-glyph {
+.door-provider:hover .door-mark-element,
+.door-provider:focus-visible .door-mark-element,
+.door-provider.door-provider-picked .door-mark-element {
     filter: saturate(1);
     opacity: 1;
 }

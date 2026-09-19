@@ -140,16 +140,16 @@ type ConfigField struct {
 	ElementType  string // For arrays: element type
 }
 
-// UIPlugin is an optional interface for plugins that provide custom glyph types.
+// UIPlugin is an optional interface for plugins that provide custom element types.
 // Plugins implementing this interface can extend the QNTX frontend with custom
-// UI components rendered as glyphs on the canvas.
+// UI components rendered as elements on the canvas.
 type UIPlugin interface {
 	DomainPlugin
 
-	// RegisterGlyphs returns glyph type definitions this plugin provides.
+	// RegisterElements returns element type definitions this plugin provides.
 	// Each definition includes symbol, title, label, and the HTTP path
-	// that renders the glyph's HTML content.
-	RegisterGlyphs() []GlyphDef
+	// that renders the element's HTML content.
+	RegisterElements() []ElementDef
 }
 
 // LLMProvider is an optional interface for plugins that provide LLM services.
@@ -189,9 +189,9 @@ type EmbeddingProvider interface {
 	DomainPlugin
 }
 
-// GlyphDef defines a custom glyph type provided by a plugin.
-type GlyphDef struct {
-	// Symbol is the glyph identifier (e.g., "⚗" for a chemistry plugin).
+// ElementDef defines a custom element type provided by a plugin.
+type ElementDef struct {
+	// Symbol is the element identifier (e.g., "⚗" for a chemistry plugin).
 	// Must not collide with built-in symbols from sym package.
 	Symbol string
 
@@ -202,21 +202,21 @@ type GlyphDef struct {
 	Label string
 
 	// ContentPath is the HTTP path (relative to /api/{plugin}/) that
-	// returns the HTML fragment for this glyph's content area.
-	// The frontend GETs this path with ?glyph_id={id}&content={encoded}
-	// and mounts the response HTML into the glyph element.
-	// Used for server-rendered HTML glyphs. Ignored when ModulePath is set.
+	// returns the HTML fragment for this element's content area.
+	// The frontend GETs this path with ?element_id={id}&content={encoded}
+	// and mounts the response HTML into the element element.
+	// Used for server-rendered HTML elements. Ignored when ModulePath is set.
 	ContentPath string
 
-	// CSSPath is an optional HTTP path to a stylesheet for this glyph type.
-	// Loaded once when the first glyph of this type is created.
+	// CSSPath is an optional HTTP path to a stylesheet for this element type.
+	// Loaded once when the first element of this type is created.
 	CSSPath string
 
 	// ModulePath is the HTTP path (relative to /api/{plugin}/) to a
 	// TypeScript/JavaScript module that exports a render function.
 	// When set, the frontend dynamically imports this module and injects
-	// a GlyphUI instance, bypassing the server-rendered HTML pipeline.
-	// The module must export: render(glyph, ui) => HTMLElement
+	// an ElementUI instance, bypassing the server-rendered HTML pipeline.
+	// The module must export: render(element, ui) => HTMLElement
 	ModulePath string
 
 	// DefaultWidth and DefaultHeight in pixels. 0 = use system default.

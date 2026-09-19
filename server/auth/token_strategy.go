@@ -35,7 +35,7 @@ type TokenSession struct {
 	// DID is the did:key the token's seed names. Set by GenerateAccessToken.
 	DID string `json:"did"`
 	// Who said yes at the door, carried to the mint (ADR-025): the token
-	// speaks for them, the way a token minted in the glyph speaks for the
+	// speaks for them, the way a token minted in the element speaks for the
 	// session that minted it.
 	MintedBy            string `json:"minted_by"`
 	MintedByUser        string `json:"minted_by_user"`
@@ -69,7 +69,7 @@ func (s *TokenSession) Clone() fosite.Session {
 }
 
 // TokenStrategy is fosite's access token strategy issuing a QNTX token: 32
-// random bytes, hex-encoded, `qntx_`-prefixed, the same form the mint glyph
+// random bytes, hex-encoded, `qntx_`-prefixed, the same form the mint element
 // gets from Create. Its signature is the SHA-256 the store keeps, so a token
 // fosite issued and a token a session minted are found by the same lookup.
 type TokenStrategy struct{}
@@ -85,7 +85,7 @@ func (TokenStrategy) AccessTokenSignature(_ context.Context, token string) strin
 // hex-encoded, `qntx_` prefixed (ADR-025:16). The bytes are an ed25519 seed,
 // so the token has a public half worth naming and its holder can sign as it.
 //
-// The one place a token is drawn, whether the mint glyph asks the store or
+// The one place a token is drawn, whether the mint element asks the store or
 // fosite asks the strategy.
 func MintToken() (raw, did string, err error) {
 	seed := make([]byte, tokenSeedBytes)

@@ -1003,7 +1003,7 @@ func TestPortAutoIncrement_MaxAttempts(t *testing.T) {
 	cancel()
 }
 
-func TestUIPlugin_RegisterGlyphs(t *testing.T) {
+func TestUIPlugin_RegisterElements(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	ctx := context.Background()
 
@@ -1033,26 +1033,26 @@ func TestUIPlugin_RegisterGlyphs(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	// Test RegisterGlyphs RPC
-	resp, err := proxy.RegisterGlyphs(ctx)
+	// Test RegisterElements RPC
+	resp, err := proxy.RegisterElements(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
-	// Verify glyph definition
-	assert.Len(t, resp.Glyphs, 1)
-	glyph := resp.Glyphs[0]
-	assert.Equal(t, "📚", glyph.Symbol)
-	assert.Equal(t, "Book Auction", glyph.Title)
-	assert.Equal(t, "book-auction", glyph.Label)
-	assert.Equal(t, "/auction", glyph.ContentPath)
-	assert.Equal(t, "/auction.css", glyph.CssPath)
-	assert.Equal(t, int32(600), glyph.DefaultWidth)
-	assert.Equal(t, int32(400), glyph.DefaultHeight)
+	// Verify element definition
+	assert.Len(t, resp.Items, 1)
+	item := resp.Items[0]
+	assert.Equal(t, "📚", item.Symbol)
+	assert.Equal(t, "Book Auction", item.Title)
+	assert.Equal(t, "book-auction", item.Label)
+	assert.Equal(t, "/auction", item.ContentPath)
+	assert.Equal(t, "/auction.css", item.CssPath)
+	assert.Equal(t, int32(600), item.DefaultWidth)
+	assert.Equal(t, int32(400), item.DefaultHeight)
 
-	t.Log("✓ RegisterGlyphs RPC returned correct glyph definition")
+	t.Log("✓ RegisterElements RPC returned correct element definition")
 }
 
-func TestUIPlugin_AuctionGlyphContent(t *testing.T) {
+func TestUIPlugin_AuctionElementContent(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 
 	// Create and initialize book plugin
@@ -1068,7 +1068,7 @@ func TestUIPlugin_AuctionGlyphContent(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test HTML rendering
-	req := httptest.NewRequest("GET", "/api/book-plugin/auction?glyph_id=test-123", nil)
+	req := httptest.NewRequest("GET", "/api/book-plugin/auction?element_id=test-123", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -1077,9 +1077,9 @@ func TestUIPlugin_AuctionGlyphContent(t *testing.T) {
 	assert.Contains(t, html, "book-auction-content")
 	assert.Contains(t, html, "Select Book")
 	assert.Contains(t, html, "Strike Price")
-	assert.Contains(t, html, "test-123") // glyph_id appears in element IDs
+	assert.Contains(t, html, "test-123") // element_id appears in element IDs
 
-	t.Log("✓ Auction glyph renders HTML correctly")
+	t.Log("✓ Auction element renders HTML correctly")
 
 	// Test CSS rendering
 	cssReq := httptest.NewRequest("GET", "/api/book-plugin/auction.css", nil)
@@ -1092,5 +1092,5 @@ func TestUIPlugin_AuctionGlyphContent(t *testing.T) {
 	assert.Contains(t, css, ".auction-field")
 	assert.Contains(t, css, ".auction-actions")
 
-	t.Log("✓ Auction glyph CSS renders correctly")
+	t.Log("✓ Auction element CSS renders correctly")
 }

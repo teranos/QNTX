@@ -241,11 +241,11 @@ grpc::Status ScryPlugin::ConfigSchema(grpc::ServerContext* ctx,
     return grpc::Status::OK;
 }
 
-grpc::Status ScryPlugin::RegisterGlyphs(grpc::ServerContext* ctx,
+grpc::Status ScryPlugin::RegisterElements(grpc::ServerContext* ctx,
                                               const protocol::Empty* req,
-                                              protocol::GlyphDefResponse* resp) {
-    // Nebula view is now part of the response glyph — no separate glyph needed.
-    // The response glyph connects directly to this plugin's WebSocket for frames.
+                                              protocol::ElementDefResponse* resp) {
+    // Nebula view is now part of the response element — no separate element needed.
+    // The response element connects directly to this plugin's WebSocket for frames.
     return grpc::Status::OK;
 }
 

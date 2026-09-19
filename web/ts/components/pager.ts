@@ -1,7 +1,7 @@
 /**
  * A pager: one of many, with a way to the next one.
  *
- * Written twice before this existed — the triplet glyph paging the attestations
+ * Written twice before this existed — the triplet element paging the attestations
  * that share a subject, predicate and context, and the stand panel paging the
  * walks past one stand. Both wanted the same four things and got them by hand:
  * arrows that dim at the ends, a counter saying which of how many, the left and

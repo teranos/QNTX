@@ -27,7 +27,7 @@ module rec Protocol : sig
   module rec PythonExecuteRequest : sig
     type t = {
       code:string;
-      glyph_id:string;
+      element_id:string;
       upstream_attestation:bytes;
       (**
 {%html:
@@ -36,7 +36,7 @@ module rec Protocol : sig
       *)
 
     }
-    val make: ?code:string -> ?glyph_id:string -> ?upstream_attestation:bytes -> unit -> t
+    val make: ?code:string -> ?element_id:string -> ?upstream_attestation:bytes -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -55,7 +55,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?code:string -> ?glyph_id:string -> ?upstream_attestation:bytes -> unit -> t
+    type make_t = ?code:string -> ?element_id:string -> ?upstream_attestation:bytes -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -121,7 +121,7 @@ end = struct
   module rec PythonExecuteRequest : sig
     type t = {
       code:string;
-      glyph_id:string;
+      element_id:string;
       upstream_attestation:bytes;
       (**
 {%html:
@@ -130,7 +130,7 @@ end = struct
       *)
 
     }
-    val make: ?code:string -> ?glyph_id:string -> ?upstream_attestation:bytes -> unit -> t
+    val make: ?code:string -> ?element_id:string -> ?upstream_attestation:bytes -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -149,7 +149,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?code:string -> ?glyph_id:string -> ?upstream_attestation:bytes -> unit -> t
+    type make_t = ?code:string -> ?element_id:string -> ?upstream_attestation:bytes -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -160,35 +160,35 @@ end = struct
     let name () = ".protocol.PythonExecuteRequest"
     type t = {
       code:string;
-      glyph_id:string;
+      element_id:string;
       upstream_attestation:bytes;
     }
-    type make_t = ?code:string -> ?glyph_id:string -> ?upstream_attestation:bytes -> unit -> t
-    let make ?(code = {||}) ?(glyph_id = {||}) ?(upstream_attestation = (Bytes.of_string {||})) () = { code; glyph_id; upstream_attestation }
+    type make_t = ?code:string -> ?element_id:string -> ?upstream_attestation:bytes -> unit -> t
+    let make ?(code = {||}) ?(element_id = {||}) ?(upstream_attestation = (Bytes.of_string {||})) () = { code; element_id; upstream_attestation }
     let merge =
     let merge_code = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "code", "code"), string, ({||})) ) in
-    let merge_glyph_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "glyph_id", "glyphId"), string, ({||})) ) in
+    let merge_element_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "element_id", "elementId"), string, ({||})) ) in
     let merge_upstream_attestation = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "upstream_attestation", "upstreamAttestation"), bytes, ((Bytes.of_string {||}))) ) in
     fun t1 t2 -> {
     	code = (merge_code t1.code t2.code);
-    	glyph_id = (merge_glyph_id t1.glyph_id t2.glyph_id);
+    	element_id = (merge_element_id t1.element_id t2.element_id);
     	upstream_attestation = (merge_upstream_attestation t1.upstream_attestation t2.upstream_attestation);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "code", "code"), string, ({||})) ^:: basic ((2, "glyph_id", "glyphId"), string, ({||})) ^:: basic ((3, "upstream_attestation", "upstreamAttestation"), bytes, ((Bytes.of_string {||}))) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "code", "code"), string, ({||})) ^:: basic ((2, "element_id", "elementId"), string, ({||})) ^:: basic ((3, "upstream_attestation", "upstreamAttestation"), bytes, ((Bytes.of_string {||}))) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { code; glyph_id; upstream_attestation } -> serialize writer code glyph_id upstream_attestation
+      fun writer { code; element_id; upstream_attestation } -> serialize writer code element_id upstream_attestation
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor code glyph_id upstream_attestation = { code; glyph_id; upstream_attestation } in
+      let constructor code element_id upstream_attestation = { code; element_id; upstream_attestation } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { code; glyph_id; upstream_attestation } -> serialize code glyph_id upstream_attestation
+      fun { code; element_id; upstream_attestation } -> serialize code element_id upstream_attestation
     let from_json_exn =
-      let constructor code glyph_id upstream_attestation = { code; glyph_id; upstream_attestation } in
+      let constructor code element_id upstream_attestation = { code; element_id; upstream_attestation } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

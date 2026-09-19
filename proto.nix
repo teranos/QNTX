@@ -17,13 +17,13 @@
 
       echo "✓ Plugin proto files generated in plugin/grpc/protocol/"
 
-      # Generate glyph proto (canvas compositions + events)
+      # Generate element proto (canvas compositions + events)
       ${pkgs.protobuf}/bin/protoc \
         --plugin=${pkgs.protoc-gen-go}/bin/protoc-gen-go \
         --go_out=. --go_opt=paths=source_relative \
-        glyph/proto/*.proto
+        element/proto/*.proto
 
-      echo "✓ Glyph proto files generated in glyph/proto/"
+      echo "✓ Element proto files generated in element/proto/"
 
       # Rust proto types are generated at build time via prost (see crates/qntx-proto/build.rs)
     '');
@@ -68,7 +68,7 @@
 
       echo "✓ Plugin proto files generated in web/ts/generated/proto/"
 
-      # Generate TypeScript for glyph proto (canvas compositions + events)
+      # Generate TypeScript for element proto (canvas compositions + events)
       # useDate=string: google.protobuf.Timestamp → string (ISO 8601, matches Go JSON output)
       ${pkgs.protobuf}/bin/protoc \
         --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
@@ -81,9 +81,9 @@
         --ts_proto_opt=snakeToCamel=false \
         --ts_proto_opt=useDate=string \
         --ts_proto_out=web/ts/generated/proto \
-        glyph/proto/*.proto
+        element/proto/*.proto
 
-      echo "✓ Glyph proto TypeScript files generated in web/ts/generated/proto/"
+      echo "✓ Element proto TypeScript files generated in web/ts/generated/proto/"
     '');
   };
 

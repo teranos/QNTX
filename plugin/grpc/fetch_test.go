@@ -33,7 +33,7 @@ func TestGithubRepoPath(t *testing.T) {
 	}{
 		{repo: "https://github.com/sbvh-nl/duif", wantOwner: "sbvh-nl", wantRepo: "duif"},
 		{repo: "https://github.com/sbvh-nl/duif.git", wantOwner: "sbvh-nl", wantRepo: "duif"},
-		{repo: "https://github.com/teranos/pty-glyph", wantOwner: "teranos", wantRepo: "pty-glyph"},
+		{repo: "https://github.com/teranos/pty-element", wantOwner: "teranos", wantRepo: "pty-element"},
 		{repo: "https://github.com/teranos/pyre", wantOwner: "teranos", wantRepo: "pyre"},
 
 		// GitHub's own shape for a path inside a repo. The source is still the

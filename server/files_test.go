@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	pb "github.com/teranos/QNTX/glyph/proto"
+	pb "github.com/teranos/QNTX/element/proto"
 )
 
 // createFileTestServer creates a QNTXServer with a temp directory for file storage.
