@@ -36,6 +36,27 @@ func TestAWorkerWritesWhatItsWriteLineSays(t *testing.T) {
 	assert.Equal(t, googleAccount, a.ActsAs(), "a person holding a role signs as the route they came in by")
 }
 
+// "I just want this attestor to have more fuller write rights with better ease"
+// "in this particular instance i dont need the write granularity set to per predicate"
+// `*` is the word that means every predicate, the way `all` on a READ line
+// means every writer: widening is still a word somebody wrote down, and it
+// is revoked the way any word is.
+func TestAStarIsEveryPredicate(t *testing.T) {
+	every := WordLine{Write: true, Words: []string{Every}, Roles: []string{roleWorker}, Actor: mastodonAccount, At: at(1)}
+	a := wordsFor(t, []WordLine{every}, roleWorker)
+
+	assert.True(t, a.MayWrite("visit:done"))
+	assert.True(t, a.MayWrite("PostToolUse"))
+	assert.True(t, a.MayWrite("duif:routes"))
+	assert.False(t, a.MayRead("visit:done"), "a WRITE line says nothing about reading")
+
+	revoke := WordLine{Write: true, Words: []string{Every}, Roles: []string{roleWorker}, Revoked: true, Actor: mastodonAccount, At: at(2)}
+	assert.False(t, wordsFor(t, []WordLine{every, revoke}, roleWorker).MayWrite("visit:done"))
+
+	assert.True(t, Permits([]string{Every}, "anything"))
+	assert.True(t, Names([]string{Every}), "a read narrowed by * is filtered after the store answers, like a namespace")
+}
+
 // A role with a REACH line and no WRITE line reaches the store and writes
 // nothing. Not defined is no access, at both layers.
 func TestARoleWithNoWriteLineWritesNothing(t *testing.T) {
