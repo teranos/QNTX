@@ -37,6 +37,13 @@ type Closer interface {
 	CloseNamespace(name string)
 }
 
+// AllCloser closes every namespace the node holds, the two it always has
+// included, as the process ends. An Opener whose namespaces keep nothing
+// unwritten does not have to be one.
+type AllCloser interface {
+	CloseAll()
+}
+
 // Ender removes what a namespace kept on this node once the store has ended
 // it. An Opener that keeps nothing per namespace on disk does not have to be one.
 type Ender interface {
@@ -153,6 +160,22 @@ func (h *Held) Forget(namespace string) {
 	// namespace, the same reason starting one is done with the lock released.
 	if wasOpen && closes && u != nil {
 		closer.CloseNamespace(u.Name())
+	}
+}
+
+// CloseAll closes every namespace as the process ends, so what each one holds
+// unsent reaches the record before the process is gone (ADR-037). Nothing is
+// served after it: no namespace stays open to serve from.
+func (h *Held) CloseAll() {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	h.open = map[string]*Universe{}
+	closer, closes := h.opener.(AllCloser)
+	h.mu.Unlock()
+	if closes {
+		closer.CloseAll()
 	}
 }
 

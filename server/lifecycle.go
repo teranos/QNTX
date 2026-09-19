@@ -301,6 +301,12 @@ func (s *QNTXServer) Stop() error {
 		)
 	}
 
+	// Every namespace sends what its landing file holds before the process
+	// ends. Nothing serves now, so nothing lands after its last send.
+	s.logger.Infow("Closing namespaces; each sends what it holds first")
+	s.held.CloseAll()
+	s.logger.Infow("Namespaces closed")
+
 	// Stop config watcher
 	if s.configWatcher != nil {
 		if err := s.configWatcher.Stop(); err != nil {

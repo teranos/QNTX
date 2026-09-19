@@ -136,14 +136,22 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open watchers at %s", location)
 	}
 
-	// default and system send for the life of the process. What they hold
-	// unsent when it ends is sent when they next open.
-	sacred.Go("parquet.send."+duckdbcgo.NamespaceDefault, func() {
-		sendEvery(context.Background(), defaultLanding, duckStore, duckdbcgo.NamespaceDefault, nil)
-	})
-	sacred.Go("parquet.send."+duckdbcgo.NamespaceSystem, func() {
-		sendEvery(context.Background(), systemLanding, systemDuck, duckdbcgo.NamespaceSystem, nil)
-	})
+	// default and system send for the life of the process, and once more as
+	// it ends (CloseAll).
+	boot := make([]sending, 0, 2)
+	for _, ns := range []struct {
+		name    string
+		landing *landed
+		record  *duckdbcgo.DuckdbStore
+	}{
+		{duckdbcgo.NamespaceDefault, defaultLanding, duckStore},
+		{duckdbcgo.NamespaceSystem, systemLanding, systemDuck},
+	} {
+		ctx, stop := context.WithCancel(context.Background())
+		sent := make(chan struct{})
+		boot = append(boot, sending{stop: stop, sent: sent})
+		sacred.Go("parquet.send."+ns.name, func() { sendEvery(ctx, ns.landing, ns.record, ns.name, sent) })
+	}
 	// Watcher fires have no landing file; their buffer is still in memory.
 	sacred.Go("parquet.periodicFlush", func() {
 		flushWatcherFires(watcherStore, 5*time.Second)
@@ -171,6 +179,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 			duckdbcgo.NamespaceDefault: defaultLanding.RustStore,
 			duckdbcgo.NamespaceSystem:  systemLanding.RustStore,
 		},
+		boot: boot,
 	}
 	// dbPath, not location: the caller hands this to NewQNTXServer as s.dbPath,
 	// and everything reading it stats a file beside it. An s3:// URI there makes
@@ -201,6 +210,33 @@ type parquetHandles struct {
 	// landings is every open landing file by namespace, the two opened at boot
 	// included, so the checkpoint pulse reaches each one's WAL.
 	landings map[string]*sqlitecgo.RustStore
+	// boot is the send loops of default and system, which run until CloseAll.
+	boot []sending
+}
+
+// sending is a send loop: how to stop it, and what closes once its last send
+// is done.
+type sending struct {
+	stop context.CancelFunc
+	sent <-chan struct{}
+}
+
+// CloseAll closes every namespace this node opened, each after its last send,
+// then stops default's and system's loops after theirs. The process is
+// ending; a write it accepted is in the record once this returns.
+func (h *parquetHandles) CloseAll() {
+	h.mu.Lock()
+	names := slices.Sorted(maps.Keys(h.closing))
+	boot := h.boot
+	h.boot = nil
+	h.mu.Unlock()
+	for _, name := range names {
+		h.CloseNamespace(name)
+	}
+	for _, loop := range boot {
+		loop.stop()
+		<-loop.sent
+	}
 }
 
 // opened is what closing a namespace has to reach: the flusher, and once its
