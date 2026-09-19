@@ -581,7 +581,7 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 	// Create a compound SE→SE meld-edge watcher targeting the same element
 	actionData, _ := json.Marshal(map[string]string{
 		"target_element_id": "se-target-123",
-		"composition_id":  "comp-1",
+		"composition_id":    "comp-1",
 		"source_element_id": "se-source-456",
 	})
 	compound := &storage.Watcher{
@@ -604,7 +604,7 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 	otherActionData, _ := json.Marshal(map[string]string{
 		"target_element_id":   "py-element-789",
 		"target_element_type": "py",
-		"composition_id":    "comp-2",
+		"composition_id":      "comp-2",
 		"source_element_id":   "se-source-456",
 	})
 	nonCompound := &storage.Watcher{

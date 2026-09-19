@@ -43,8 +43,8 @@ type PromptDirectRequest struct {
 	SystemPrompt        string    `json:"system_prompt,omitempty"`
 	Provider            string    `json:"provider,omitempty"` // "openrouter" or "local"
 	Model               string    `json:"model,omitempty"`
-	ElementID             string    `json:"element_id,omitempty"`             // Element that initiated execution; used as actor for the result attestation
-	ParentElementID       string    `json:"parent_element_id,omitempty"`      // Parent element ID for conversation history assembly (stream elements send their parent)
+	ElementID           string    `json:"element_id,omitempty"`           // Element that initiated execution; used as actor for the result attestation
+	ParentElementID     string    `json:"parent_element_id,omitempty"`    // Parent element ID for conversation history assembly (stream elements send their parent)
 	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
 	FileIDs             []string  `json:"file_ids,omitempty"`             // Attached document/image file IDs for multimodal prompts
 }

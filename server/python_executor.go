@@ -15,7 +15,7 @@ type grpcPythonExecutor struct {
 func (g *grpcPythonExecutor) Execute(ctx context.Context, code string, elementID string, upstreamAttestation []byte) ([]byte, error) {
 	resp, err := g.client.Execute(ctx, &protocol.PythonExecuteRequest{
 		Code:                code,
-		ElementId:             elementID,
+		ElementId:           elementID,
 		UpstreamAttestation: upstreamAttestation,
 	})
 	if err != nil {

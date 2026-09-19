@@ -36,7 +36,7 @@ func TestEdgeCursor_AppliedOnReload(t *testing.T) {
 	actionData, _ := json.Marshal(map[string]string{
 		"target_element_id":   "py-target",
 		"target_element_type": "py",
-		"composition_id":    "comp-1",
+		"composition_id":      "comp-1",
 		"source_element_id":   "ax-source",
 	})
 

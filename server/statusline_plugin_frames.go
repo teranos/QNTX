@@ -84,8 +84,8 @@ func pluginFrames(plugin, version string, handlers []string, failures []handlerF
 			continue
 		}
 		frames = append(frames, StatusItem{
-			Name:  plugin,
-			Note:  shortHandler(handler),
+			Name: plugin,
+			Note: shortHandler(handler),
 			Mark: MarkWell,
 		})
 	}

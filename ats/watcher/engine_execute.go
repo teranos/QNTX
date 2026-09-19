@@ -188,7 +188,7 @@ attestation = json.loads(_attestation_json)
 type ElementExecuteAction struct {
 	TargetElementID   string `json:"target_element_id"`
 	TargetElementType string `json:"target_element_type"`
-	CompositionID   string `json:"composition_id"`
+	CompositionID     string `json:"composition_id"`
 	SourceElementID   string `json:"source_element_id"`
 }
 
@@ -257,7 +257,7 @@ func (e *Engine) executeElementPython(elementID string, content string, attestat
 func (e *Engine) executeElementPrompt(elementID string, template string, attestationJSON []byte) (_ []byte, err error) {
 	reqBody, err := json.Marshal(map[string]interface{}{
 		"template":             template,
-		"element_id":             elementID,
+		"element_id":           elementID,
 		"upstream_attestation": json.RawMessage(attestationJSON),
 	})
 	if err != nil {

@@ -71,9 +71,9 @@ func (s *QNTXServer) handleGetElementConfig(w http.ResponseWriter, r *http.Reque
 
 func (s *QNTXServer) handleSetElementConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Plugin  string         `json:"plugin"`
+		Plugin    string         `json:"plugin"`
 		ElementID string         `json:"element_id"`
-		Config  map[string]any `json:"config"`
+		Config    map[string]any `json:"config"`
 	}
 
 	if err := readJSON(w, r, &req); err != nil {

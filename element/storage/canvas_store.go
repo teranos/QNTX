@@ -441,7 +441,7 @@ func (s *CanvasStore) DeleteComposition(ctx context.Context, id string) error {
 
 // MinimizedWindow represents an element minimized to the tray
 type MinimizedWindow struct {
-	ElementID   string    `json:"element_id"`
+	ElementID string    `json:"element_id"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

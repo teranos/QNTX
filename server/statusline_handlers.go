@@ -22,8 +22,8 @@ const (
 
 // StatusItem is one thing worth naming, with what it is at and how it is.
 type StatusItem struct {
-	Name  string `json:"name"`
-	Note  string `json:"note,omitempty"`
+	Name string `json:"name"`
+	Note string `json:"note,omitempty"`
 	Mark string `json:"mark"`
 }
 
@@ -270,8 +270,8 @@ var carouselFrames = []carouselFrame{
 func answeredItem(refused, broke int64) StatusItem {
 	if broke > 0 {
 		return StatusItem{
-			Name:  "5xx",
-			Note:  strconv.FormatInt(broke, 10) + ", " + strconv.FormatInt(refused, 10) + " 4xx",
+			Name: "5xx",
+			Note: strconv.FormatInt(broke, 10) + ", " + strconv.FormatInt(refused, 10) + " 4xx",
 			Mark: MarkUnwell,
 		}
 	}
@@ -298,8 +298,8 @@ func shortBytes(n uint64) string {
 func refusedItem(turnedAway, stale int64) StatusItem {
 	if stale > 0 {
 		return StatusItem{
-			Name:  "refused",
-			Note:  strconv.FormatInt(turnedAway, 10) + ", " + strconv.FormatInt(stale, 10) + " holding a token",
+			Name: "refused",
+			Note: strconv.FormatInt(turnedAway, 10) + ", " + strconv.FormatInt(stale, 10) + " holding a token",
 			Mark: MarkUnwell,
 		}
 	}

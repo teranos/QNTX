@@ -1,8 +1,8 @@
 use crate::handlers::{HandlerContext, ReduceState};
 use crate::proto::{
-    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
-    ExecuteJobRequest, ExecuteJobResponse, ElementDefResponse, HealthResponse, HttpRequest,
-    HttpResponse, InitializeRequest, InitializeResponse, MetadataResponse, ParseAxQueryRequest,
+    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, ElementDefResponse,
+    Empty, ExecuteJobRequest, ExecuteJobResponse, HealthResponse, HttpRequest, HttpResponse,
+    InitializeRequest, InitializeResponse, MetadataResponse, ParseAxQueryRequest,
     ParseAxQueryResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;

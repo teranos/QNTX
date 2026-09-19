@@ -642,7 +642,7 @@ func sentryOptions(cfg *config.Config) logger.SentryOptions {
 		Environment: cfg.Sentry.Environment,
 		// The tag describes the build whole — the release, how far past it,
 		// and the commit — so appending the hash would say the commit twice.
-		Release:       version.VersionTag,
+		Release:          version.VersionTag,
 		ServerName:       cfg.Sentry.ServerName,
 		MinLevel:         level,
 		CaptureErrors:    cfg.Sentry.CaptureErrors,

@@ -755,7 +755,7 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 					Type:             "watcher_queue_status",
 					TotalQueued:      stats.TotalQueued,
 					PerWatcher:       stats.PerWatcher,
-					TargetElements:     targetElements,
+					TargetElements:   targetElements,
 					WatcherStats:     watcherStats,
 					OldestAgeSeconds: stats.OldestAgeSeconds,
 					Timestamp:        time.Now().Unix(),

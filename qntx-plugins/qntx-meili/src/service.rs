@@ -1,7 +1,7 @@
 use crate::search::MeiliSearchService;
 use qntx_grpc::plugin::proto::domain_plugin_service_server::DomainPluginService;
 use qntx_grpc::plugin::proto::{
-    ConfigSchemaResponse, Empty, ExecuteJobRequest, ExecuteJobResponse, ElementDefResponse,
+    ConfigSchemaResponse, ElementDefResponse, Empty, ExecuteJobRequest, ExecuteJobResponse,
     HealthResponse, HttpRequest, HttpResponse, InitializeRequest, InitializeResponse,
     MetadataResponse, ParseAxQueryRequest, ParseAxQueryResponse, WebSocketMessage,
 };

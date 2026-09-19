@@ -217,7 +217,7 @@ func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, se
 func (s *QNTXServer) broadcastElementFired(elementID string, attestationID string, status string, execErr error, result []byte) {
 	msg := ElementFiredMessage{
 		Type:          "element_fired",
-		ElementID:       elementID,
+		ElementID:     elementID,
 		AttestationID: attestationID,
 		Status:        status,
 		Timestamp:     time.Now().Unix(),

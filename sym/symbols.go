@@ -28,8 +28,8 @@ const (
 	// them.
 	Attestation = "⎔" // attestation - one claim whole, slots and attributes together
 	Triplet     = "⫶" // triplet - grouped attestations sharing the same subject+predicate+context
-	Type    = "⊢" // type - an actor's judgment that a pattern deserves a name
-	Sigma   = "Σ" // sigma - distilled/summarized attestation (sum of many observations)
+	Type        = "⊢" // type - an actor's judgment that a pattern deserves a name
+	Sigma       = "Σ" // sigma - distilled/summarized attestation (sum of many observations)
 
 	// System infrastructure symbols
 	Watcher    = "⏿" // Watcher: observer/monitor for attestation patterns

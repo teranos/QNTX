@@ -81,7 +81,10 @@ impl PTYManager {
     pub fn create_session(&mut self, element_id: &str) -> Result<String, PTYError> {
         let session_id = Uuid::new_v4().to_string();
 
-        info!("Creating PTY session {} for element {}", session_id, element_id);
+        info!(
+            "Creating PTY session {} for element {}",
+            session_id, element_id
+        );
 
         // Get PTY system
         let pty_system = native_pty_system();

@@ -109,7 +109,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/prompt/", s.HandlePrompt)                                           // Prompt operations (preview/execute/list/save/get/versions)
 	s.answer("/api/plugins/{name}/logs", s.HandlePluginLogs)                           // Plugin log stream (SSE)
 	s.answer("/api/plugins/{name}/config", s.HandlePluginConfig)                       // Plugin configuration (GET/PUT)
-	s.answer("/api/plugins/elements", s.pluginHandler.HandlePluginElements)                // List custom plugin elements (GET)
+	s.answer("/api/plugins/elements", s.pluginHandler.HandlePluginElements)            // List custom plugin elements (GET)
 	s.answer("/api/plugins/routes", s.pluginHandler.HandlePluginRoutes)                // List plugin routes and capabilities (GET)
 	s.answer("/api/plugins/", s.HandlePluginAction)                                    // Plugin actions: pause/resume (POST)
 	s.answer("/api/plugins", s.pluginHandler.HandlePlugins)                            // List installed plugins (GET)
@@ -124,9 +124,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/namespaces/", s.HandleNamespaceByName)                              // Switch one on or off, or end it
 	s.answer("/api/namespaces/default/nuke", s.HandleNukeDefault)                      // Empty default without ending it
 	s.answer("/api/attestations", s.HandleAttestations)                                // Query (GET) / create (POST) attestations
-	s.answer("/api/element-config", s.HandleElementConfig)                                 // Plugin element config via attestations (GET/POST)
-	s.answer("/api/canvas/elements/", s.canvasHandler.HandleElements)                      // Element CRUD (GET/POST/DELETE /api/canvas/elements/{id})
-	s.answer("/api/canvas/elements", s.canvasHandler.HandleElements)                       // List/create elements (GET/POST)
+	s.answer("/api/element-config", s.HandleElementConfig)                             // Plugin element config via attestations (GET/POST)
+	s.answer("/api/canvas/elements/", s.canvasHandler.HandleElements)                  // Element CRUD (GET/POST/DELETE /api/canvas/elements/{id})
+	s.answer("/api/canvas/elements", s.canvasHandler.HandleElements)                   // List/create elements (GET/POST)
 	s.answer("/api/canvas/compositions/", s.canvasHandler.HandleCompositions)          // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})
 	s.answer("/api/canvas/compositions", s.canvasHandler.HandleCompositions)           // List/create compositions (GET/POST)
 	s.answer("/api/canvas/minimized-windows/", s.canvasHandler.HandleMinimizedWindows) // Minimized window CRUD (DELETE /api/canvas/minimized-windows/{id})

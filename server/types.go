@@ -245,18 +245,18 @@ type PluginHealthMessage struct {
 // WatcherMatchMessage represents a watcher match event
 // Sent when an attestation matches a watcher's filter
 type WatcherMatchMessage struct {
-	Type          string      `json:"type"`                      // "watcher_match"
-	WatcherID     string      `json:"watcher_id"`                // ID of watcher that matched
-	Attestation   interface{} `json:"attestation"`               // The matching attestation (types.As)
-	Score         float32     `json:"score,omitempty"`           // Semantic similarity score (0-1), 0 for structural matches
+	Type            string      `json:"type"`                        // "watcher_match"
+	WatcherID       string      `json:"watcher_id"`                  // ID of watcher that matched
+	Attestation     interface{} `json:"attestation"`                 // The matching attestation (types.As)
+	Score           float32     `json:"score,omitempty"`             // Semantic similarity score (0-1), 0 for structural matches
 	TargetElementID string      `json:"target_element_id,omitempty"` // Target element for meld-edge routed matches
-	Timestamp     int64       `json:"timestamp"`                 // Unix timestamp
+	Timestamp       int64       `json:"timestamp"`                   // Unix timestamp
 }
 
 // ElementFiredMessage wraps proto.ElementFired with WebSocket type discriminator
 type ElementFiredMessage struct {
 	Type          string `json:"type"`             // "element_fired"
-	ElementID       string `json:"element_id"`         // Target element that was executed
+	ElementID     string `json:"element_id"`       // Target element that was executed
 	AttestationID string `json:"attestation_id"`   // Triggering attestation ASID
 	Status        string `json:"status"`           // "started", "success", "error"
 	Error         string `json:"error,omitempty"`  // Error message when status is "error"
@@ -288,8 +288,8 @@ type WatcherQueueStatusMessage struct {
 	Type             string                           `json:"type"` // "watcher_queue_status"
 	TotalQueued      int                              `json:"total_queued"`
 	PerWatcher       map[string]int                   `json:"per_watcher"`
-	TargetElements     map[string]string                `json:"target_elements,omitempty"` // meld-edge watcher ID → target element ID
-	WatcherStats     map[string]WatcherBroadcastStats `json:"watcher_stats,omitempty"` // per-watcher execution stats
+	TargetElements   map[string]string                `json:"target_elements,omitempty"` // meld-edge watcher ID → target element ID
+	WatcherStats     map[string]WatcherBroadcastStats `json:"watcher_stats,omitempty"`   // per-watcher execution stats
 	OldestAgeSeconds float64                          `json:"oldest_age_seconds"`
 	Timestamp        int64                            `json:"timestamp"`
 }

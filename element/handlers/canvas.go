@@ -409,7 +409,7 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *elements
 
 			actionData, err := json.Marshal(map[string]string{
 				"target_element_id": edge.To,
-				"composition_id":  comp.ID,
+				"composition_id":    comp.ID,
 				"source_element_id": edge.From,
 			})
 			if err != nil {
@@ -450,7 +450,7 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *elements
 		actionData, err := json.Marshal(map[string]string{
 			"target_element_id":   edge.To,
 			"target_element_type": targetType,
-			"composition_id":    comp.ID,
+			"composition_id":      comp.ID,
 			"source_element_id":   edge.From,
 		})
 		if err != nil {
@@ -694,7 +694,7 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 	// Build request payload for canvas-renderer plugin
 	pluginReq := map[string]any{
 		"canvas_id": canvasID,
-		"elements":    items,
+		"elements":  items,
 	}
 	reqBody, err := json.Marshal(pluginReq)
 	if err != nil {

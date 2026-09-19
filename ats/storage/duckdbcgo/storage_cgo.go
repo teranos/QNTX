@@ -95,7 +95,7 @@ func (s *DuckdbStore) CreateAttestation(as *types.As) error {
 	defer C.duckdb_storage_result_free(result)
 
 	if !result.success {
-		return failed(result.error_msg, "duckdb put failed for %s",as.ID)
+		return failed(result.error_msg, "duckdb put failed for %s", as.ID)
 	}
 	return nil
 }
@@ -112,7 +112,7 @@ func (s *DuckdbStore) GetAttestation(id string) (*types.As, error) {
 	defer C.duckdb_attestation_result_free(result)
 
 	if !result.success {
-		return nil, failed(result.error_msg, "duckdb get failed for %s",id)
+		return nil, failed(result.error_msg, "duckdb get failed for %s", id)
 	}
 	if result.attestation_json == nil {
 		// An admitted exemption, not an oversight. Every caller of this method
@@ -157,7 +157,7 @@ func (s *DuckdbStore) GetAttestationsByIDs(ids []string) ([]*types.As, error) {
 	defer C.duckdb_attestation_result_free(result)
 
 	if !result.success {
-		return nil, failed(result.error_msg, "duckdb get_many failed for %d ids",len(ids))
+		return nil, failed(result.error_msg, "duckdb get_many failed for %d ids", len(ids))
 	}
 	if result.attestation_json == nil {
 		return []*types.As{}, nil
@@ -210,7 +210,7 @@ func (s *DuckdbStore) DeleteAttestation(id string) error {
 		if result.error_msg != nil && C.GoString(result.error_msg) == "not found" {
 			return nil
 		}
-		return failed(result.error_msg, "duckdb delete failed for %s",id)
+		return failed(result.error_msg, "duckdb delete failed for %s", id)
 	}
 	return nil
 }
