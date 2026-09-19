@@ -1039,8 +1039,8 @@ func TestUIPlugin_RegisterElements(t *testing.T) {
 	require.NotNil(t, resp)
 
 	// Verify element definition
-	assert.Len(t, resp.Items, 1)
-	item := resp.Items[0]
+	assert.Len(t, resp.Elements, 1)
+	item := resp.Elements[0]
 	assert.Equal(t, "📚", item.Symbol)
 	assert.Equal(t, "Book Auction", item.Title)
 	assert.Equal(t, "book-auction", item.Label)
