@@ -48,9 +48,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// What a signum holds is answered from its sigils (ADR-039): a path per
 	// endpoint a sigil is bound to, the method picking the sigil. Staands
 	// (ADR-035, ADR-036) is the first.
-	for path, answered := range s.answeredFromSigils() {
-		s.answerFromSigils(path, answered)
-	}
+	s.answerSigils()
 
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously
@@ -166,6 +164,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 // open builds what the node serves. A line granting reach to a path nothing
 // answers stops the node, and a handler no line names is ROOT's and nobody else's.
 func (s *QNTXServer) open() error {
+	s.opening.Lock()
+	defer s.opening.Unlock()
 	runtime := s.runtime()
 	s.answerLinedPluginPaths(runtime)
 	served, unnamed, err := reach.Open(s.answering, s.wrapping(), runtime)

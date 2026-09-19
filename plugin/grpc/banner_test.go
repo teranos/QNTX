@@ -232,8 +232,8 @@ func TestFormatBanner_NoRoutesAdvertised(t *testing.T) {
 		Version: "1.0",
 	}
 	plain := stripANSI(FormatBanner(info))
-	if !strings.Contains(plain, "no routes advertised") {
-		t.Errorf("empty routes with no error and non-disabled reason should emit fallback, got:\n%s", plain)
+	if !strings.Contains(plain, "no sigils handed") {
+		t.Errorf("no sigils with no error and non-disabled reason should emit fallback, got:\n%s", plain)
 	}
 }
 
@@ -244,8 +244,8 @@ func TestFormatBanner_NoRoutesAdvertised_SkipOnDisabled(t *testing.T) {
 		Reason:  BannerDisabled,
 	}
 	plain := stripANSI(FormatBanner(info))
-	if strings.Contains(plain, "no routes advertised") {
-		t.Errorf("disabled reason must suppress no-routes fallback, got:\n%s", plain)
+	if strings.Contains(plain, "no sigils handed") {
+		t.Errorf("disabled reason must suppress no-sigils fallback, got:\n%s", plain)
 	}
 }
 
@@ -256,8 +256,8 @@ func TestFormatBanner_NoRoutesAdvertised_SkipOnError(t *testing.T) {
 		Error:   "broken",
 	}
 	plain := stripANSI(FormatBanner(info))
-	if strings.Contains(plain, "no routes advertised") {
-		t.Errorf("error path must not reach no-routes fallback, got:\n%s", plain)
+	if strings.Contains(plain, "no sigils handed") {
+		t.Errorf("error path must not reach no-sigils fallback, got:\n%s", plain)
 	}
 }
 

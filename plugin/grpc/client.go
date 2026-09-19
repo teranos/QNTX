@@ -59,8 +59,9 @@ type ExternalDomainProxy struct {
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
 
-	// httpRoutes lists HTTP endpoints this plugin handles (populated during Initialize, optional)
-	httpRoutes []*protocol.RouteInfo
+	// signa is what this plugin does, as signa (ADR-039), populated during
+	// Initialize. The node serves each sigil and hands it to HandleHTTP.
+	signa []*protocol.Signum
 
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
@@ -234,9 +235,39 @@ func (c *ExternalDomainProxy) PythonServiceClient() protocol.PythonServiceClient
 	return protocol.NewPythonServiceClient(c.conn)
 }
 
-// GetHTTPRoutes returns the HTTP routes this plugin advertised during Initialize.
-func (c *ExternalDomainProxy) GetHTTPRoutes() []*protocol.RouteInfo {
-	return c.httpRoutes
+// GetSigna returns the signa this plugin handed the node during Initialize.
+func (c *ExternalDomainProxy) GetSigna() []*protocol.Signum {
+	return c.signa
+}
+
+// SigilRoutes is each endpoint the plugin's signa bind, as "METHOD /path", for
+// the banner and the lifecycle event. Whether the node serves them is the
+// node's to say (server.pluginSignaOf).
+func (c *ExternalDomainProxy) SigilRoutes() []string {
+	var routes []string
+	for _, signum := range c.signa {
+		for _, held := range signum.GetSigils() {
+			routes = append(routes, held.GetHttp().GetMethod()+" "+held.GetHttp().GetPath())
+		}
+	}
+	return routes
+}
+
+// AnswerHTTP hands the plugin one request the node built, as a sigil asked of
+// it: the path below /api/{plugin}, and only the headers the node set.
+func (c *ExternalDomainProxy) AnswerHTTP(ctx context.Context, req *protocol.HTTPRequest) (*protocol.HTTPResponse, error) {
+	resp, err := c.client.HandleHTTP(ctx, req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "plugin %s at %s did not answer %s %s", c.metadata.Name, c.addr, req.GetMethod(), req.GetPath())
+	}
+	return resp, nil
+}
+
+// askerHeaders are who is asking, set by the node when a sigil hands a plugin
+// a request (server.HeaderAsker). A caller sending them is not believed.
+var askerHeaders = map[string]bool{
+	"X-Qntx-Asker":     true,
+	"X-Qntx-Asker-Did": true,
 }
 
 // Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
@@ -432,8 +463,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store embedding provider capability
 	c.embeddingProvider = resp.GetEmbeddingProvider()
 
-	// Store HTTP routes (optional, for discovery)
-	c.httpRoutes = resp.GetHttpRoutes()
+	c.signa = resp.GetSigna()
 
 	// Store Python provider capability
 	c.pythonProvider = resp.GetPythonProvider()
@@ -540,6 +570,9 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 	// Convert HTTP headers to protocol format
 	headers := make([]*protocol.HTTPHeader, 0, len(r.Header))
 	for name, values := range r.Header {
+		if askerHeaders[http.CanonicalHeaderKey(name)] {
+			continue
+		}
 		headers = append(headers, &protocol.HTTPHeader{
 			Name:   name,
 			Values: values,

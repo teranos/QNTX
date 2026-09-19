@@ -464,6 +464,9 @@ func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *gr
 	if acc != nil {
 		acc.SetRoles(meta.Name, roles)
 	}
+
+	// Its sigils arrived with Initialize, after the node opened.
+	srv.ServePluginSigils()
 }
 
 // registerPluginHandlers registers Pulse async handlers/schedules and emits the plugin banner.
@@ -489,13 +492,7 @@ func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handler
 			"plugin", meta.Name, "error", err)
 	}
 
-	var routeStrs []string
-	if routes := externalPlugin.GetHTTPRoutes(); len(routes) > 0 {
-		routeStrs = make([]string, len(routes))
-		for i, r := range routes {
-			routeStrs[i] = r.GetMethod() + " " + r.GetPath()
-		}
-	}
+	routeStrs := externalPlugin.SigilRoutes()
 
 	if acc != nil {
 		acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), grpc.ScheduleNames(externalPlugin.GetSchedules()), grpc.WatcherNames(externalPlugin.GetWatchers()), grpc.UnfilteredWatcherNames(externalPlugin.GetWatchers()))

@@ -580,6 +580,101 @@
     white-space: pre-wrap;
 }
 
+/* Sigils (ADR-039): what the plugin does, and who reaches it */
+.plugin-sigil-count {
+    color: #9ca3af;
+}
+
+.plugin-sigil-refused {
+    color: #f87171;
+}
+
+.plugin-sigils {
+    margin-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 10px;
+}
+
+.plugin-sigil-row {
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 4px;
+    font-size: var(--font-size-sm);
+}
+
+.plugin-sigil-head {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+}
+
+.plugin-sigil-tool {
+    color: var(--text-on-dark);
+    font-weight: 600;
+}
+
+.plugin-sigil-endpoint,
+.plugin-sigil-reach {
+    color: #9ca3af;
+}
+
+.plugin-sigil-does {
+    margin-top: 4px;
+    color: var(--text-on-dark);
+}
+
+.plugin-sigil-takes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.plugin-sigil-param {
+    padding: 1px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    color: #9ca3af;
+    cursor: help;
+}
+
+.plugin-sigil-param-required {
+    color: var(--text-on-dark);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.plugin-sigil-reach {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.plugin-sigil-grant {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.plugin-sigil-grant-role {
+    flex: 1;
+    padding: 3px 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-on-dark, #555);
+    border-radius: 4px;
+    color: var(--text-on-dark);
+}
+
+.plugin-sigil-said {
+    margin-top: 6px;
+    color: #4ade80;
+}
+
+.plugin-sigil-said-error {
+    color: #f87171;
+    white-space: pre-wrap;
+}
+
 /* Log Viewer */
 .plugin-log-viewer {
     margin-top: 10px;

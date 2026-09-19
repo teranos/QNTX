@@ -4,24 +4,29 @@
 #   nix eval --json --file ci/scry.nix | jq . > .github/workflows/scry.yml
 #
 # JSON is YAML, so GitHub reads the emitted file as it is.
-let
-  scryPaths = [
-    "qntx-plugins/scry/**"
-    "plugin/grpc/protocol/domain.proto"
-    "plugin/grpc/protocol/llm.proto"
-    "plugin/grpc/protocol/proto.cmake"
-  ];
-in
+#
+# Scry is scheduled to be moved into its own repository, teranos/scry. Its
+# triggers are commented out until then.
+#
+# let
+#   scryPaths = [
+#     "qntx-plugins/scry/**"
+#     "plugin/grpc/protocol/domain.proto"
+#     "plugin/grpc/protocol/llm.proto"
+#     "plugin/grpc/protocol/proto.cmake"
+#   ];
+# in
 {
   name = "scry";
 
-  on = {
-    pull_request.paths = scryPaths ++ [ ".github/workflows/scry.yml" ];
-    push = {
-      branches = [ "main" ];
-      paths = scryPaths;
-    };
-  };
+  # on = {
+  #   pull_request.paths = scryPaths ++ [ ".github/workflows/scry.yml" ];
+  #   push = {
+  #     branches = [ "main" ];
+  #     paths = scryPaths;
+  #   };
+  # };
+  on.workflow_dispatch = null;
 
   jobs.build = {
     strategy.matrix.os = [ "ubuntu-latest" "macos-latest" ];
