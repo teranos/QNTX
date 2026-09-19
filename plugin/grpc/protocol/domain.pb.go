@@ -915,10 +915,6 @@ type InitializeResponse struct {
 	// embedding_provider indicates this plugin implements EmbeddingService (Embed, BatchEmbed, Cluster, ModelInfo RPCs).
 	// Core routes embedding calls to it instead of using the builtin CGO/FFI path.
 	EmbeddingProvider bool `protobuf:"varint,7,opt,name=embedding_provider,json=embeddingProvider,proto3" json:"embedding_provider,omitempty"`
-	// http_routes lists the HTTP endpoints this plugin handles via HandleHTTP.
-	// Core exposes these under /api/{plugin}/ and makes them discoverable
-	// via GET /api/plugins/routes.
-	HttpRoutes []*RouteInfo `protobuf:"bytes,8,rep,name=http_routes,json=httpRoutes,proto3" json:"http_routes,omitempty"`
 	// python_provider indicates this plugin can execute Python code.
 	// Core registers "py" element type when any loaded plugin declares this.
 	PythonProvider bool `protobuf:"varint,9,opt,name=python_provider,json=pythonProvider,proto3" json:"python_provider,omitempty"`
@@ -1009,13 +1005,6 @@ func (x *InitializeResponse) GetEmbeddingProvider() bool {
 	return false
 }
 
-func (x *InitializeResponse) GetHttpRoutes() []*RouteInfo {
-	if x != nil {
-		return x.HttpRoutes
-	}
-	return nil
-}
-
 func (x *InitializeResponse) GetPythonProvider() bool {
 	if x != nil {
 		return x.PythonProvider
@@ -1028,67 +1017,6 @@ func (x *InitializeResponse) GetSigna() []*Signum {
 		return x.Signa
 	}
 	return nil
-}
-
-// RouteInfo describes an HTTP endpoint a plugin handles
-type RouteInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`           // HTTP method: GET, POST, PUT, DELETE
-	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`               // Path relative to plugin root (e.g., "/status")
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"` // Human-readable description for LLM discovery
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RouteInfo) Reset() {
-	*x = RouteInfo{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RouteInfo) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RouteInfo) ProtoMessage() {}
-
-func (x *RouteInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RouteInfo.ProtoReflect.Descriptor instead.
-func (*RouteInfo) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *RouteInfo) GetMethod() string {
-	if x != nil {
-		return x.Method
-	}
-	return ""
-}
-
-func (x *RouteInfo) GetPath() string {
-	if x != nil {
-		return x.Path
-	}
-	return ""
-}
-
-func (x *RouteInfo) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
 }
 
 // WatcherRegistration declares a watcher a plugin wants core to manage.
@@ -1109,7 +1037,7 @@ type WatcherRegistration struct {
 
 func (x *WatcherRegistration) Reset() {
 	*x = WatcherRegistration{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[13]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1121,7 +1049,7 @@ func (x *WatcherRegistration) String() string {
 func (*WatcherRegistration) ProtoMessage() {}
 
 func (x *WatcherRegistration) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[13]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1134,7 +1062,7 @@ func (x *WatcherRegistration) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatcherRegistration.ProtoReflect.Descriptor instead.
 func (*WatcherRegistration) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{13}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *WatcherRegistration) GetId() string {
@@ -1199,7 +1127,7 @@ type ExecuteJobRequest struct {
 
 func (x *ExecuteJobRequest) Reset() {
 	*x = ExecuteJobRequest{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[14]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1211,7 +1139,7 @@ func (x *ExecuteJobRequest) String() string {
 func (*ExecuteJobRequest) ProtoMessage() {}
 
 func (x *ExecuteJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[14]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1224,7 +1152,7 @@ func (x *ExecuteJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteJobRequest.ProtoReflect.Descriptor instead.
 func (*ExecuteJobRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{14}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ExecuteJobRequest) GetJobId() string {
@@ -1276,7 +1204,7 @@ type ExecuteJobResponse struct {
 
 func (x *ExecuteJobResponse) Reset() {
 	*x = ExecuteJobResponse{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[15]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1288,7 +1216,7 @@ func (x *ExecuteJobResponse) String() string {
 func (*ExecuteJobResponse) ProtoMessage() {}
 
 func (x *ExecuteJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[15]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1301,7 +1229,7 @@ func (x *ExecuteJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteJobResponse.ProtoReflect.Descriptor instead.
 func (*ExecuteJobResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{15}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ExecuteJobResponse) GetSuccess() bool {
@@ -1374,7 +1302,7 @@ type JobLogEntry struct {
 
 func (x *JobLogEntry) Reset() {
 	*x = JobLogEntry{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[16]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1386,7 +1314,7 @@ func (x *JobLogEntry) String() string {
 func (*JobLogEntry) ProtoMessage() {}
 
 func (x *JobLogEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[16]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1399,7 +1327,7 @@ func (x *JobLogEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobLogEntry.ProtoReflect.Descriptor instead.
 func (*JobLogEntry) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{16}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *JobLogEntry) GetTimestamp() string {
@@ -1447,7 +1375,7 @@ type ElementDefResponse struct {
 
 func (x *ElementDefResponse) Reset() {
 	*x = ElementDefResponse{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[17]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1459,7 +1387,7 @@ func (x *ElementDefResponse) String() string {
 func (*ElementDefResponse) ProtoMessage() {}
 
 func (x *ElementDefResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[17]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1472,7 +1400,7 @@ func (x *ElementDefResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementDefResponse.ProtoReflect.Descriptor instead.
 func (*ElementDefResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{17}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ElementDefResponse) GetElements() []*ElementDef {
@@ -1509,7 +1437,7 @@ type ElementDef struct {
 
 func (x *ElementDef) Reset() {
 	*x = ElementDef{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[18]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1521,7 +1449,7 @@ func (x *ElementDef) String() string {
 func (*ElementDef) ProtoMessage() {}
 
 func (x *ElementDef) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[18]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1534,7 +1462,7 @@ func (x *ElementDef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementDef.ProtoReflect.Descriptor instead.
 func (*ElementDef) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{18}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ElementDef) GetSymbol() string {
@@ -1603,7 +1531,7 @@ type ParseAxQueryRequest struct {
 
 func (x *ParseAxQueryRequest) Reset() {
 	*x = ParseAxQueryRequest{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[19]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1615,7 +1543,7 @@ func (x *ParseAxQueryRequest) String() string {
 func (*ParseAxQueryRequest) ProtoMessage() {}
 
 func (x *ParseAxQueryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[19]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1628,7 +1556,7 @@ func (x *ParseAxQueryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParseAxQueryRequest.ProtoReflect.Descriptor instead.
 func (*ParseAxQueryRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{19}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ParseAxQueryRequest) GetQuery() string {
@@ -1649,7 +1577,7 @@ type ParseAxQueryResponse struct {
 
 func (x *ParseAxQueryResponse) Reset() {
 	*x = ParseAxQueryResponse{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[20]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1661,7 +1589,7 @@ func (x *ParseAxQueryResponse) String() string {
 func (*ParseAxQueryResponse) ProtoMessage() {}
 
 func (x *ParseAxQueryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[20]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1674,7 +1602,7 @@ func (x *ParseAxQueryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParseAxQueryResponse.ProtoReflect.Descriptor instead.
 func (*ParseAxQueryResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{20}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ParseAxQueryResponse) GetResult() []byte {
@@ -1776,7 +1704,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fhandler_name\x18\x01 \x01(\tR\vhandlerName\x12)\n" +
 	"\x10interval_seconds\x18\x02 \x01(\x05R\x0fintervalSeconds\x12,\n" +
 	"\x12enabled_by_default\x18\x03 \x01(\bR\x10enabledByDefault\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescriptionJ\x04\b\x05\x10\x06R\bats_code\"\xe2\x03\n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescriptionJ\x04\b\x05\x10\x06R\bats_code\"\xbf\x03\n" +
 	"\x12InitializeResponse\x12#\n" +
 	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\x124\n" +
 	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\x12!\n" +
@@ -1784,16 +1712,10 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\bwatchers\x18\x04 \x03(\v2\x1d.protocol.WatcherRegistrationR\bwatchers\x124\n" +
 	"\x16vector_search_provider\x18\x05 \x01(\bR\x14vectorSearchProvider\x12'\n" +
 	"\x0fsearch_provider\x18\x06 \x01(\bR\x0esearchProvider\x12-\n" +
-	"\x12embedding_provider\x18\a \x01(\bR\x11embeddingProvider\x124\n" +
-	"\vhttp_routes\x18\b \x03(\v2\x13.protocol.RouteInfoR\n" +
-	"httpRoutes\x12'\n" +
+	"\x12embedding_provider\x18\a \x01(\bR\x11embeddingProvider\x12'\n" +
 	"\x0fpython_provider\x18\t \x01(\bR\x0epythonProvider\x12&\n" +
 	"\x05signa\x18\n" +
-	" \x03(\v2\x10.protocol.SignumR\x05signa\"Y\n" +
-	"\tRouteInfo\x12\x16\n" +
-	"\x06method\x18\x01 \x01(\tR\x06method\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xe9\x01\n" +
+	" \x03(\v2\x10.protocol.SignumR\x05signaJ\x04\b\b\x10\tR\vhttp_routes\"\xe9\x01\n" +
 	"\x13WatcherRegistration\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x1a\n" +
@@ -1873,7 +1795,7 @@ func file_plugin_grpc_protocol_domain_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_domain_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(WebSocketMessage_Type)(0),   // 0: protocol.WebSocketMessage.Type
 	(*Empty)(nil),                // 1: protocol.Empty
@@ -1888,61 +1810,59 @@ var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(*ConfigFieldSchema)(nil),    // 10: protocol.ConfigFieldSchema
 	(*ScheduleInfo)(nil),         // 11: protocol.ScheduleInfo
 	(*InitializeResponse)(nil),   // 12: protocol.InitializeResponse
-	(*RouteInfo)(nil),            // 13: protocol.RouteInfo
-	(*WatcherRegistration)(nil),  // 14: protocol.WatcherRegistration
-	(*ExecuteJobRequest)(nil),    // 15: protocol.ExecuteJobRequest
-	(*ExecuteJobResponse)(nil),   // 16: protocol.ExecuteJobResponse
-	(*JobLogEntry)(nil),          // 17: protocol.JobLogEntry
-	(*ElementDefResponse)(nil),   // 18: protocol.ElementDefResponse
-	(*ElementDef)(nil),           // 19: protocol.ElementDef
-	(*ParseAxQueryRequest)(nil),  // 20: protocol.ParseAxQueryRequest
-	(*ParseAxQueryResponse)(nil), // 21: protocol.ParseAxQueryResponse
-	nil,                          // 22: protocol.InitializeRequest.ConfigEntry
-	nil,                          // 23: protocol.WebSocketMessage.HeadersEntry
-	nil,                          // 24: protocol.HealthResponse.DetailsEntry
-	nil,                          // 25: protocol.ConfigSchemaResponse.FieldsEntry
-	(*Signum)(nil),               // 26: protocol.Signum
+	(*WatcherRegistration)(nil),  // 13: protocol.WatcherRegistration
+	(*ExecuteJobRequest)(nil),    // 14: protocol.ExecuteJobRequest
+	(*ExecuteJobResponse)(nil),   // 15: protocol.ExecuteJobResponse
+	(*JobLogEntry)(nil),          // 16: protocol.JobLogEntry
+	(*ElementDefResponse)(nil),   // 17: protocol.ElementDefResponse
+	(*ElementDef)(nil),           // 18: protocol.ElementDef
+	(*ParseAxQueryRequest)(nil),  // 19: protocol.ParseAxQueryRequest
+	(*ParseAxQueryResponse)(nil), // 20: protocol.ParseAxQueryResponse
+	nil,                          // 21: protocol.InitializeRequest.ConfigEntry
+	nil,                          // 22: protocol.WebSocketMessage.HeadersEntry
+	nil,                          // 23: protocol.HealthResponse.DetailsEntry
+	nil,                          // 24: protocol.ConfigSchemaResponse.FieldsEntry
+	(*Signum)(nil),               // 25: protocol.Signum
 }
 var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
-	22, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
+	21, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
 	6,  // 1: protocol.HTTPRequest.headers:type_name -> protocol.HTTPHeader
 	6,  // 2: protocol.HTTPResponse.headers:type_name -> protocol.HTTPHeader
 	0,  // 3: protocol.WebSocketMessage.type:type_name -> protocol.WebSocketMessage.Type
-	23, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
-	24, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
-	25, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
+	22, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
+	23, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
+	24, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
 	11, // 7: protocol.InitializeResponse.schedules:type_name -> protocol.ScheduleInfo
-	14, // 8: protocol.InitializeResponse.watchers:type_name -> protocol.WatcherRegistration
-	13, // 9: protocol.InitializeResponse.http_routes:type_name -> protocol.RouteInfo
-	26, // 10: protocol.InitializeResponse.signa:type_name -> protocol.Signum
-	17, // 11: protocol.ExecuteJobResponse.log_entries:type_name -> protocol.JobLogEntry
-	19, // 12: protocol.ElementDefResponse.elements:type_name -> protocol.ElementDef
-	10, // 13: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
-	1,  // 14: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
-	3,  // 15: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
-	1,  // 16: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
-	4,  // 17: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
-	7,  // 18: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
-	1,  // 19: protocol.DomainPluginService.Health:input_type -> protocol.Empty
-	1,  // 20: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
-	1,  // 21: protocol.DomainPluginService.RegisterElements:input_type -> protocol.Empty
-	15, // 22: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
-	20, // 23: protocol.DomainPluginService.ParseAxQuery:input_type -> protocol.ParseAxQueryRequest
-	2,  // 24: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
-	12, // 25: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
-	1,  // 26: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
-	5,  // 27: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
-	7,  // 28: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
-	8,  // 29: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
-	9,  // 30: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
-	18, // 31: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
-	16, // 32: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
-	21, // 33: protocol.DomainPluginService.ParseAxQuery:output_type -> protocol.ParseAxQueryResponse
-	24, // [24:34] is the sub-list for method output_type
-	14, // [14:24] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	13, // 8: protocol.InitializeResponse.watchers:type_name -> protocol.WatcherRegistration
+	25, // 9: protocol.InitializeResponse.signa:type_name -> protocol.Signum
+	16, // 10: protocol.ExecuteJobResponse.log_entries:type_name -> protocol.JobLogEntry
+	18, // 11: protocol.ElementDefResponse.elements:type_name -> protocol.ElementDef
+	10, // 12: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
+	1,  // 13: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
+	3,  // 14: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
+	1,  // 15: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
+	4,  // 16: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
+	7,  // 17: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
+	1,  // 18: protocol.DomainPluginService.Health:input_type -> protocol.Empty
+	1,  // 19: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
+	1,  // 20: protocol.DomainPluginService.RegisterElements:input_type -> protocol.Empty
+	14, // 21: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
+	19, // 22: protocol.DomainPluginService.ParseAxQuery:input_type -> protocol.ParseAxQueryRequest
+	2,  // 23: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
+	12, // 24: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
+	1,  // 25: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
+	5,  // 26: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
+	7,  // 27: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
+	8,  // 28: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
+	9,  // 29: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
+	17, // 30: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
+	15, // 31: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
+	20, // 32: protocol.DomainPluginService.ParseAxQuery:output_type -> protocol.ParseAxQueryResponse
+	23, // [23:33] is the sub-list for method output_type
+	13, // [13:23] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_domain_proto_init() }
@@ -1951,14 +1871,14 @@ func file_plugin_grpc_protocol_domain_proto_init() {
 		return
 	}
 	file_plugin_grpc_protocol_sigil_proto_init()
-	file_plugin_grpc_protocol_domain_proto_msgTypes[14].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_domain_proto_msgTypes[13].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_domain_proto_rawDesc), len(file_plugin_grpc_protocol_domain_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   25,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -210,12 +210,14 @@ func (h *PluginHandler) HandlePluginRoutes(w http.ResponseWriter, r *http.Reques
 			route.Handlers = proxy.GetHandlerNames()
 			route.Schedules = len(proxy.GetSchedules())
 			route.Watchers = len(proxy.GetWatchers())
-			for _, rt := range proxy.GetHTTPRoutes() {
-				route.Endpoints = append(route.Endpoints, RouteEndpoint{
-					Method:      rt.GetMethod(),
-					Path:        "/api/" + name + rt.GetPath(),
-					Description: rt.GetDescription(),
-				})
+			for _, signum := range proxy.GetSigna() {
+				for _, held := range signum.GetSigils() {
+					route.Endpoints = append(route.Endpoints, RouteEndpoint{
+						Method:      held.GetHttp().GetMethod(),
+						Path:        held.GetHttp().GetPath(),
+						Description: held.GetDoes(),
+					})
+				}
 			}
 		}
 
