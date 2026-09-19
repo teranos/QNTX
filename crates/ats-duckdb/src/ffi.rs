@@ -115,6 +115,38 @@ impl FfiResult for CountResultC {
     }
 }
 
+/// What one merge did: the files it replaced and the bytes of the file it wrote.
+#[repr(C)]
+pub struct MergedResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub files: usize,
+    pub bytes: u64,
+}
+
+impl MergedResultC {
+    fn ok(merged: crate::Merged) -> Self {
+        Self {
+            success: true,
+            error_msg: ptr::null_mut(),
+            files: merged.files,
+            bytes: merged.bytes,
+        }
+    }
+}
+
+impl FfiResult for MergedResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            files: 0,
+            bytes: 0,
+        }
+    }
+}
+
 // ============================================================================
 // Store lifecycle
 // ============================================================================
@@ -536,20 +568,76 @@ pub extern "C" fn duckdb_storage_flush(store: *const DuckdbStore) -> CountResult
     })
 }
 
-/// Compaction as ADR-024 declares it, for one namespace's attestations.
+/// The largest batch `duckdb_storage_write_file` takes. A batch is many
+/// attestations, each of which may be as large as one `put` takes.
+const MAX_BATCH_JSON_LENGTH: usize = 256_000_000;
+
+/// Write a JSON array of attestations as one new Parquet file under
+/// `<location>/attestations/`. The landing file handed them over and already
+/// refused duplicates (ADR-037), so no id is looked up here.
 ///
-/// The count is the files merged.
+/// The count is the rows written.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn duckdb_storage_compact(store: *const DuckdbStore) -> CountResultC {
+pub extern "C" fn duckdb_storage_write_file(
+    store: *const DuckdbStore,
+    attestations_json: *const c_char,
+) -> CountResultC {
+    qntx_ffi_common::guarded_result("duckdb_storage_write_file", || {
+        if store.is_null() {
+            return CountResultC::error("null store pointer");
+        }
+        let json_str = match unsafe { cstr_to_str(attestations_json) } {
+            Ok(s) => s,
+            Err(e) => return CountResultC::error(e),
+        };
+        if json_str.len() > MAX_BATCH_JSON_LENGTH {
+            return CountResultC::error("attestation batch JSON exceeds maximum length");
+        }
+        let protos: Vec<qntx_proto::Attestation> = match serde_json::from_str(json_str) {
+            Ok(p) => p,
+            Err(e) => return CountResultC::error(e.crosses("duckdb_storage_write_file")),
+        };
+        let attestations: Vec<_> = protos.into_iter().map(proto_convert::from_proto).collect();
+        let store = unsafe { &*store };
+        match store.write_file(&attestations) {
+            Ok(rows) => CountResultC::ok(rows),
+            Err(e) => CountResultC::error(e.crosses("duckdb_storage_write_file")),
+        }
+    })
+}
+
+/// Compaction as ADR-024 declares it, for one namespace's attestations.
+///
+/// Answers the files merged and the bytes of the file the merge wrote; zero
+/// of each when the namespace was not crowded.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_storage_compact(store: *const DuckdbStore) -> MergedResultC {
     qntx_ffi_common::guarded_result("duckdb_storage_compact", || {
+        if store.is_null() {
+            return MergedResultC::error("null store pointer");
+        }
+        let store = unsafe { &*store };
+        match store.compact_when_crowded() {
+            Ok(merged) => MergedResultC::ok(merged),
+            Err(e) => MergedResultC::error(e.crosses("duckdb_storage_compact")),
+        }
+    })
+}
+
+/// How many Parquet files the namespace holds. Against S3, one listing.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_storage_file_count(store: *const DuckdbStore) -> CountResultC {
+    qntx_ffi_common::guarded_result("duckdb_storage_file_count", || {
         if store.is_null() {
             return CountResultC::error("null store pointer");
         }
         let store = unsafe { &*store };
-        match store.compact_when_crowded() {
-            Ok(merged) => CountResultC::ok(merged),
-            Err(e) => CountResultC::error(e.crosses("duckdb_storage_compact")),
+        match store.file_count() {
+            Ok(files) => CountResultC::ok(files),
+            Err(e) => CountResultC::error(e.crosses("duckdb_storage_file_count")),
         }
     })
 }
@@ -1914,6 +2002,17 @@ pub extern "C" fn duckdb_attestation_result_free(result: AttestationResultC) {
 pub extern "C" fn duckdb_count_result_free(result: CountResultC) {
     qntx_ffi_common::guarded(
         "duckdb_count_result_free",
+        || {
+            unsafe { free_cstring(result.error_msg) };
+        },
+        |_| (),
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn duckdb_merged_result_free(result: MergedResultC) {
+    qntx_ffi_common::guarded(
+        "duckdb_merged_result_free",
         || {
             unsafe { free_cstring(result.error_msg) };
         },

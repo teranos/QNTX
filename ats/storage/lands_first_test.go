@@ -1,6 +1,9 @@
 package storage
 
 import (
+	"fmt"
+	"os"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -60,70 +63,198 @@ func at(id string, second int) *types.As {
 	return &types.As{ID: id, Timestamp: time.Date(2026, 9, 15, 0, 0, second, 0, time.UTC)}
 }
 
-func TestAWriteLandsInTheFirstStoreThenTheRecord(t *testing.T) {
-	var order []string
-	first := newRawInOrder("operational db", &order)
-	record := newRawInOrder("S3", &order)
-	pair := LandsFirst(first, record)
-
-	require.NoError(t, pair.CreateAttestation(at("AS-1", 1)))
-	assert.Equal(t, []string{"operational db:AS-1", "S3:AS-1"}, order)
-	assert.True(t, first.AttestationExists("AS-1"))
-	assert.True(t, record.AttestationExists("AS-1"))
+// landedInOrder is a landing file that keeps the order its rows landed in,
+// and answers the three statements a send asks the way SQLite does.
+type landedInOrder struct {
+	*rawInOrder
+	landed []string
 }
 
-func TestARecordThatWillNotTakeTheWriteIsSaidAndTheFirstStoreKeepsIt(t *testing.T) {
+func newLanded(ids ...string) *landedInOrder {
 	var order []string
-	first := newRawInOrder("operational db", &order)
-	record := newRawInOrder("S3", &order)
-	record.refuses = errors.New("S3 said no")
-	pair := LandsFirst(first, record)
+	l := &landedInOrder{rawInOrder: newRawInOrder("landing file", &order)}
+	for i, id := range ids {
+		l.land(at(id, i))
+	}
+	return l
+}
 
-	err := pair.CreateAttestation(at("AS-1", 1))
+func (l *landedInOrder) land(as *types.As) {
+	l.held[as.ID] = as
+	l.landed = append(l.landed, as.ID)
+}
+
+func (l *landedInOrder) QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error) {
+	from, limit := 0, 0
+	switch sql {
+	case pastTheMark:
+		from = slices.Index(l.landed, params[0].(string)) + 1
+		limit = params[1].(int)
+	case fromTheStart:
+		limit = params[0].(int)
+	case lastLanded:
+		if len(l.landed) == 0 {
+			return nil, nil
+		}
+		return []*types.As{l.held[l.landed[len(l.landed)-1]]}, nil
+	default:
+		return nil, errors.Newf("a statement a send does not ask: %s", sql)
+	}
+	var out []*types.As
+	for _, id := range l.landed[from:] {
+		if len(out) == limit {
+			break
+		}
+		out = append(out, l.held[id])
+	}
+	return out, nil
+}
+
+// filesWritten is the record, as the files it was handed.
+type filesWritten struct {
+	files   [][]string
+	refuses error
+}
+
+func (f *filesWritten) WriteFile(batch []*types.As) (int, error) {
+	if f.refuses != nil {
+		return 0, f.refuses
+	}
+	ids := make([]string, 0, len(batch))
+	for _, as := range batch {
+		ids = append(ids, as.ID)
+	}
+	f.files = append(f.files, ids)
+	return len(batch), nil
+}
+
+// memSentMark is a SentMark held in memory.
+type memSentMark struct {
+	id     string
+	marked bool
+}
+
+func (m *memSentMark) Read() (string, bool, error) { return m.id, m.marked, nil }
+func (m *memSentMark) Write(id string) error       { m.id, m.marked = id, true; return nil }
+
+func TestASendCarriesWhatLandedPastTheMarkInLandingOrder(t *testing.T) {
+	// AS-late landed last with the oldest timestamp; landing order is what counts.
+	first := newLanded("AS-a", "AS-b")
+	first.land(at("AS-c", 9))
+	first.land(at("AS-late", 0))
+	record := &filesWritten{}
+	mark := &memSentMark{id: "AS-a", marked: true}
+
+	sent, err := SendOut(first, record, mark)
+	require.NoError(t, err)
+	assert.Equal(t, 3, sent)
+	assert.Equal(t, [][]string{{"AS-b", "AS-c", "AS-late"}}, record.files)
+	assert.Equal(t, "AS-late", mark.id)
+}
+
+func TestAFileThatNeverSentSendsFromItsFirstRow(t *testing.T) {
+	first := newLanded("AS-a", "AS-b")
+	record := &filesWritten{}
+	mark := &memSentMark{}
+
+	sent, err := SendOut(first, record, mark)
+	require.NoError(t, err)
+	assert.Equal(t, 2, sent)
+	assert.Equal(t, [][]string{{"AS-a", "AS-b"}}, record.files)
+	assert.Equal(t, "AS-b", mark.id)
+}
+
+func TestNothingPastTheMarkWritesNoFile(t *testing.T) {
+	first := newLanded("AS-a")
+	record := &filesWritten{}
+	mark := &memSentMark{id: "AS-a", marked: true}
+
+	sent, err := SendOut(first, record, mark)
+	require.NoError(t, err)
+	assert.Equal(t, 0, sent)
+	assert.Empty(t, record.files)
+}
+
+// The rows stay past the mark, so the next send carries them.
+func TestARecordThatWillNotTakeTheFileLeavesTheMarkWhereItWas(t *testing.T) {
+	first := newLanded("AS-a", "AS-b")
+	record := &filesWritten{refuses: errors.New("S3 said no")}
+	mark := &memSentMark{id: "AS-a", marked: true}
+
+	_, err := SendOut(first, record, mark)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "AS-1 is in the operational db but its record was not written")
 	assert.Contains(t, err.Error(), "S3 said no")
-	assert.True(t, first.AttestationExists("AS-1"))
-	assert.False(t, record.AttestationExists("AS-1"))
+	assert.Equal(t, "AS-a", mark.id)
+
+	record.refuses = nil
+	sent, err := SendOut(first, record, mark)
+	require.NoError(t, err)
+	assert.Equal(t, 1, sent)
+	assert.Equal(t, [][]string{{"AS-b"}}, record.files)
 }
 
-func TestAFirstStoreThatWillNotTakeTheWriteWritesNoRecord(t *testing.T) {
-	var order []string
-	first := newRawInOrder("operational db", &order)
-	first.refuses = errors.New("disk full")
-	record := newRawInOrder("S3", &order)
-	pair := LandsFirst(first, record)
+// Sending from the start would write the whole namespace to the record again.
+func TestAMarkNamingARowTheFileDoesNotHoldIsRefused(t *testing.T) {
+	first := newLanded("AS-a")
+	record := &filesWritten{}
+	mark := &memSentMark{id: "AS-gone", marked: true}
 
-	err := pair.CreateAttestation(at("AS-1", 1))
+	_, err := SendOut(first, record, mark)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "AS-1 did not land in the operational db")
-	assert.Empty(t, order)
-	assert.False(t, record.AttestationExists("AS-1"))
+	assert.Contains(t, err.Error(), "the send mark names AS-gone, which the landing file does not hold")
+	assert.Empty(t, record.files)
 }
 
-func TestReadsAreAnsweredByTheOperationalDbAndNeverTheRecord(t *testing.T) {
-	var order []string
-	first := newRawInOrder("operational db", &order)
-	first.held["AS-mine"] = at("AS-mine", 1)
-	record := newRawInOrder("S3", &order)
-	record.held["AS-theirs"] = at("AS-theirs", 2)
-	pair := LandsFirst(first, record)
+func TestMoreThanABatchIsSentAsSeveralFilesMarkingEach(t *testing.T) {
+	first := newLanded()
+	for i := 0; i <= sendBatch; i++ {
+		first.land(at(fmt.Sprintf("AS-%05d", i), 0))
+	}
+	record := &filesWritten{}
+	mark := &memSentMark{}
 
-	assert.True(t, pair.AttestationExists("AS-mine"))
-	assert.False(t, pair.AttestationExists("AS-theirs"), "a read reached the record")
-	got, err := pair.GetAttestation("AS-mine")
+	sent, err := SendOut(first, record, mark)
 	require.NoError(t, err)
-	assert.Equal(t, "AS-mine", got.ID)
-	n, err := pair.CountAttestations()
+	assert.Equal(t, sendBatch+1, sent)
+	require.Len(t, record.files, 2)
+	assert.Len(t, record.files[0], sendBatch)
+	assert.Equal(t, []string{fmt.Sprintf("AS-%05d", sendBatch)}, record.files[1])
+	assert.Equal(t, fmt.Sprintf("AS-%05d", sendBatch), mark.id)
+}
+
+func TestMarkAllSentMarksTheNewestLandedRow(t *testing.T) {
+	first := newLanded("AS-a", "AS-b")
+	mark := &memSentMark{}
+	require.NoError(t, MarkAllSent(first, mark))
+	assert.Equal(t, "AS-b", mark.id)
+}
+
+func TestMarkAllSentOnAnEmptyFileMarksNothing(t *testing.T) {
+	mark := &memSentMark{}
+	require.NoError(t, MarkAllSent(newLanded(), mark))
+	assert.False(t, mark.marked)
+}
+
+func TestAFileSentMarkRoundTripsAndIsAbsentUntilWritten(t *testing.T) {
+	mark := FileSentMark{Path: t.TempDir() + "/pond.db.sent"}
+	_, marked, err := mark.Read()
 	require.NoError(t, err)
-	assert.Equal(t, 1, n)
-	held, err := pair.(QueryableStore).GetAttestations(ats.AttestationFilter{})
+	assert.False(t, marked)
+
+	require.NoError(t, mark.Write("AS-a"))
+	require.NoError(t, mark.Write("AS-b"))
+	got, marked, err := mark.Read()
 	require.NoError(t, err)
-	assert.Len(t, held, 1)
-	many, err := pair.(BatchGetStore).GetAttestationsByIDs([]string{"AS-mine", "AS-theirs"})
-	require.NoError(t, err)
-	assert.Len(t, many, 1)
-	assert.Equal(t, 0, record.queries, "a read reached the record")
+	assert.True(t, marked)
+	assert.Equal(t, "AS-b", got)
+}
+
+func TestAnEmptySendMarkFileIsAnError(t *testing.T) {
+	path := t.TempDir() + "/pond.db.sent"
+	require.NoError(t, os.WriteFile(path, []byte("\n"), 0o640))
+	_, _, err := FileSentMark{Path: path}.Read()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "names no attestation")
 }
 
 // memMark is a Mark held in memory, so a test can say what was remembered.

@@ -58,6 +58,21 @@ its attestations table carries no namespace, so the write lands in a file of the
 namespace's own, `namespaces/<slug>.db` beside `qntx-operational.db`, opened when the
 namespace is.
 
+"then in S3" is a send, not the write. The write lands in the landing file and nowhere
+else, and the landing file is the buffer: every six hours it sends what it holds past
+its send mark to S3, in the order the rows landed, one Parquet file per 5000 rows. The
+send mark is the id of the last attestation sent, kept beside the file in
+`<slug>.db.sent`, moved after each file is written. Opening a namespace sends what the
+mark says is left before it takes in, and moves the mark past what it took in, since
+the record already holds those. A file with no mark counts everything it holds as sent.
+
+"let's go for 6h"
+
+Before this the write went to an in-memory DuckDB buffer as well, flushed every five
+seconds: at a gigabyte a month that was 127,913 Parquet files and a whole-namespace
+merge every five minutes, and a crash between two flushes left rows in the landing
+file that S3 never received.
+
 "and i would like sentence 2 to be true as well"
 
 Every read is answered from that file, and none from S3. For that to hold, opening a
