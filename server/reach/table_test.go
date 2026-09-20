@@ -116,18 +116,18 @@ func TestWhoeverIsLoggedInReachesTheirOwnUser(t *testing.T) {
 		"ROOT reaches everything; every other rung that logs in has to be named")
 }
 
-// A connector's token is the person, and ROOT is the only person the MCP
-// surface is named for yet.
-func TestOnlyRootReachesMCP(t *testing.T) {
+// A plugin's sigils are ROOT's until a line names them. The line names the
+// signum rather than a path, so it is about its sigils over every surface and
+// goes on no mux (ReachingSigil, routesIn).
+func TestASignumIsNamedForSuper(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/mcp", "/mcp/"} {
-		row, said := granted[path]
-		require.True(t, said, path+" is granted to nobody at all")
-		assert.False(t, row.anyone, path+" is served without asking who is calling")
-		assert.Empty(t, row.reach.Beyond(), path+" lets in a level beside ROOT")
-	}
+	row, said := granted["datapunt"]
+	require.True(t, said, "no line names the datapunt signum")
+	assert.False(t, row.anyone, "datapunt is served without asking who is calling")
+	assert.ElementsMatch(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond())
+	assert.NotContains(t, sorted(routesIn(granted)), "datapunt", "a signum was read as a route")
 }
 
 // A line that does not read is a lie about what the node serves.

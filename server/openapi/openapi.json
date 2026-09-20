@@ -574,12 +574,14 @@
     },
     "/mcp": {
       "x-qntx-reach": [
-        "ROOT"
+        "ROOT",
+        "SUPER"
       ]
     },
     "/mcp/": {
       "x-qntx-reach": [
-        "ROOT"
+        "ROOT",
+        "SUPER"
       ],
       "x-qntx-prefix": true
     },

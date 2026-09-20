@@ -41,9 +41,9 @@ func headerOf(req *protocol.HTTPRequest, name string) []string {
 	return nil
 }
 
-// datapunt's own shape: a read that takes a kind out of a few, and an observe
+// stub's own shape: a read that takes a kind out of a few, and an observe
 // that takes a body.
-func datapuntSignum(name string) *protocol.Signum {
+func stubSignum(name string) *protocol.Signum {
 	return &protocol.Signum{
 		Name: name,
 		Sigils: []*protocol.Sigil{
@@ -88,14 +88,14 @@ func sigilServingServer(t *testing.T, p *sigilPlugin) (*QNTXServer, map[auth.Lev
 // path below /api/{plugin}, and what it answers is held to what the sigil gives.
 func TestAPluginsSigilIsServedOnItsPath(t *testing.T) {
 	p := &sigilPlugin{
-		fakePlugin: fakePlugin{name: "datapunt"},
-		signa:      []*protocol.Signum{datapuntSignum("datapunt")},
+		fakePlugin: fakePlugin{name: "stub"},
+		signa:      []*protocol.Signum{stubSignum("stub")},
 		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
 	}
 	srv, tokens := sigilServingServer(t, p)
 
 	w := httptest.NewRecorder()
-	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/datapunt/read?kind=competitor&name=acme", tokens[auth.LevelRoot]))
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/stub/read?kind=competitor&name=acme", tokens[auth.LevelRoot]))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.JSONEq(t, `{"observed":true}`, w.Body.String())
 	require.Len(t, p.handed, 1)
@@ -104,7 +104,7 @@ func TestAPluginsSigilIsServedOnItsPath(t *testing.T) {
 
 	// A body rides as a JSON object of what the sigil takes, and nothing else.
 	w = httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/datapunt/observe",
+	req := httptest.NewRequest(http.MethodPost, "/api/stub/observe",
 		strings.NewReader(`{"kind":"competitor","value":"true","extra":"dropped"}`))
 	req.Header.Set("Authorization", "Bearer "+tokens[auth.LevelRoot])
 	srv.served.ServeHTTP(w, req)
@@ -115,7 +115,7 @@ func TestAPluginsSigilIsServedOnItsPath(t *testing.T) {
 
 	// Refused by the sigil, the plugin is never asked.
 	w = httptest.NewRecorder()
-	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/datapunt/read?kind=supplier", tokens[auth.LevelRoot]))
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/stub/read?kind=supplier", tokens[auth.LevelRoot]))
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "read takes kind as one of competitor")
 	assert.Len(t, p.handed, 2, "the plugin was asked something its sigil refuses")
@@ -124,7 +124,7 @@ func TestAPluginsSigilIsServedOnItsPath(t *testing.T) {
 	// failing, and the caller is told only that it did.
 	p.answer = &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true,"secret":"x"}`)}
 	w = httptest.NewRecorder()
-	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/datapunt/read?kind=competitor", tokens[auth.LevelRoot]))
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/stub/read?kind=competitor", tokens[auth.LevelRoot]))
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.NotContains(t, w.Body.String(), "secret")
 
@@ -133,13 +133,13 @@ func TestAPluginsSigilIsServedOnItsPath(t *testing.T) {
 	p.answer = &protocol.HTTPResponse{StatusCode: http.StatusBadRequest,
 		Body: []byte(`{"why":"not one of","param":"name","says":"acme is not a subject of competitor"}`)}
 	w = httptest.NewRecorder()
-	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/datapunt/read?kind=competitor&name=acme", tokens[auth.LevelRoot]))
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/stub/read?kind=competitor&name=acme", tokens[auth.LevelRoot]))
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "acme is not a subject of competitor")
 
 	// A plugin sigil is ROOT's until a line opens it, as any plugin path is.
 	w = httptest.NewRecorder()
-	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/datapunt/read?kind=competitor", tokens[auth.LevelSuper]))
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/stub/read?kind=competitor", tokens[auth.LevelSuper]))
 	assert.Equal(t, http.StatusForbidden, w.Code)
 }
 
@@ -147,13 +147,13 @@ func TestAPluginsSigilIsServedOnItsPath(t *testing.T) {
 // saying otherwise is not what arrives.
 func TestAPluginIsToldWhoIsAsking(t *testing.T) {
 	p := &sigilPlugin{
-		fakePlugin: fakePlugin{name: "datapunt"},
-		signa:      []*protocol.Signum{datapuntSignum("datapunt")},
+		fakePlugin: fakePlugin{name: "stub"},
+		signa:      []*protocol.Signum{stubSignum("stub")},
 		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
 	}
 	srv, tokens := sigilServingServer(t, p)
 
-	req := asBearer(http.MethodGet, "/api/datapunt/read?kind=competitor", tokens[auth.LevelRoot])
+	req := asBearer(http.MethodGet, "/api/stub/read?kind=competitor", tokens[auth.LevelRoot])
 	req.Header.Set(HeaderAsker, "did:key:somebody-else")
 	srv.served.ServeHTTP(httptest.NewRecorder(), req)
 
@@ -165,8 +165,8 @@ func TestAPluginIsToldWhoIsAsking(t *testing.T) {
 // the plugin that answers.
 func TestAPluginsSigilIsATool(t *testing.T) {
 	p := &sigilPlugin{
-		fakePlugin: fakePlugin{name: "datapunt"},
-		signa:      []*protocol.Signum{datapuntSignum("datapunt")},
+		fakePlugin: fakePlugin{name: "stub"},
+		signa:      []*protocol.Signum{stubSignum("stub")},
 		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":false}`)},
 	}
 	srv, _ := sigilServingServer(t, p)
@@ -175,19 +175,19 @@ func TestAPluginsSigilIsATool(t *testing.T) {
 	for _, tool := range toolsOffered(t, srv) {
 		named[tool.Name] = tool
 	}
-	require.Contains(t, named, "datapunt_read")
-	require.Contains(t, named, "datapunt_observe")
-	assert.Equal(t, "What is observed of a kind.", named["datapunt_read"].Description)
+	require.Contains(t, named, "stub_read")
+	require.Contains(t, named, "stub_observe")
+	assert.Equal(t, "What is observed of a kind.", named["stub_read"].Description)
 
-	raw, err := json.Marshal(named["datapunt_read"].InputSchema)
+	raw, err := json.Marshal(named["stub_read"].InputSchema)
 	require.NoError(t, err)
 	assert.Contains(t, string(raw), `"enum":["competitor"]`)
 
 	var read heldBy
 	for _, signum := range srv.checkedSigna() {
 		for _, held := range signum.GetSigils() {
-			if signum.GetName() == "datapunt" && held.GetName() == "read" {
-				read = heldBy{signum: "datapunt", sigil: held, answer: signum.Answers["read"]}
+			if signum.GetName() == "stub" && held.GetName() == "read" {
+				read = heldBy{signum: "stub", sigil: held, answer: signum.Answers["read"]}
 			}
 		}
 	}
@@ -205,16 +205,16 @@ func TestAPluginsSigilIsATool(t *testing.T) {
 // would otherwise reach it on another's behalf.
 func TestAPluginsSignumThatIsNotItsOwnIsNotServed(t *testing.T) {
 	for name, handed := range map[string]*protocol.Signum{
-		"named after another": datapuntSignum("staands"),
-		"bound outside its paths": {Name: "datapunt", Sigils: []*protocol.Sigil{{
+		"named after another": stubSignum("staands"),
+		"bound outside its paths": {Name: "stub", Sigils: []*protocol.Sigil{{
 			Name: "list", Does: "Lists.", Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/everything"},
 		}}},
-		"bound to its root": {Name: "datapunt", Sigils: []*protocol.Sigil{{
-			Name: "list", Does: "Lists.", Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/datapunt/"},
+		"bound to its root": {Name: "stub", Sigils: []*protocol.Sigil{{
+			Name: "list", Does: "Lists.", Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/stub/"},
 		}}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			p := &sigilPlugin{fakePlugin: fakePlugin{name: "datapunt"}, signa: []*protocol.Signum{handed}}
+			p := &sigilPlugin{fakePlugin: fakePlugin{name: "stub"}, signa: []*protocol.Signum{handed}}
 			srv, _ := sigilServingServer(t, p)
 			for _, signum := range srv.checkedSigna() {
 				assert.NotSame(t, handed, signum.Signum, "a signum that is not the plugin's own was served")
@@ -228,28 +228,28 @@ func TestAPluginsSignumThatIsNotItsOwnIsNotServed(t *testing.T) {
 // given, and a refused signum is told why rather than only logged.
 func TestThePanelIsToldEachSigilAndWhoReachesIt(t *testing.T) {
 	p := &sigilPlugin{
-		fakePlugin: fakePlugin{name: "datapunt"},
-		signa:      []*protocol.Signum{datapuntSignum("datapunt")},
+		fakePlugin: fakePlugin{name: "stub"},
+		signa:      []*protocol.Signum{stubSignum("stub")},
 	}
 	srv, _ := sigilServingServer(t, p)
 
-	rows, refused := srv.pluginSigilRows("datapunt")
+	rows, refused := srv.pluginSigilRows("stub")
 	assert.Empty(t, refused)
 	require.Len(t, rows, 2)
 	read := rows[0]
-	assert.Equal(t, "datapunt", read.Signum)
+	assert.Equal(t, "stub", read.Signum)
 	assert.Equal(t, "read", read.Sigil)
-	assert.Equal(t, "datapunt_read", read.Tool)
+	assert.Equal(t, "stub_read", read.Tool)
 	assert.Equal(t, http.MethodGet, read.Method)
-	assert.Equal(t, "/api/datapunt/read", read.Path)
+	assert.Equal(t, "/api/stub/read", read.Path)
 	assert.Equal(t, []string{"competitor"}, read.Takes[0].GetOneOf())
 	for _, surface := range []string{"http", "mcp"} {
 		assert.Equal(t, reached{Levels: []string{}, Roles: []string{}}, read.Reach[surface],
 			"a plugin sigil no line opens is ROOT's only, over "+surface)
 	}
 
-	p.signa = []*protocol.Signum{datapuntSignum("staands")}
-	rows, refused = srv.pluginSigilRows("datapunt")
+	p.signa = []*protocol.Signum{stubSignum("staands")}
+	rows, refused = srv.pluginSigilRows("stub")
 	assert.Empty(t, rows)
 	require.Len(t, refused, 1)
 	assert.Contains(t, refused[0], "handed a signum named staands")
@@ -259,14 +259,37 @@ func TestThePanelIsToldEachSigilAndWhoReachesIt(t *testing.T) {
 // bound to any more is not answered as one.
 func TestASigilAPluginNoLongerHandsIsNotServed(t *testing.T) {
 	p := &sigilPlugin{
-		fakePlugin: fakePlugin{name: "datapunt"},
-		signa:      []*protocol.Signum{datapuntSignum("datapunt")},
+		fakePlugin: fakePlugin{name: "stub"},
+		signa:      []*protocol.Signum{stubSignum("stub")},
 	}
 	srv, _ := sigilServingServer(t, p)
-	require.True(t, srv.answering["/api/datapunt/read"].Gates)
+	require.True(t, srv.answering["/api/stub/read"].Gates)
 
 	p.signa = nil
 	srv.ServePluginSigils()
-	_, answered := srv.answering["/api/datapunt/read"]
+	_, answered := srv.answering["/api/stub/read"]
 	assert.False(t, answered, "a sigil the plugin no longer hands is still answered")
+}
+
+// A line naming a signum reaches its sigils wherever the plugin bound them,
+// over both surfaces. datapunt's line is the one in the table (ADR-039).
+func TestASignumTheTableNamesIsReachedBySuper(t *testing.T) {
+	p := &sigilPlugin{
+		fakePlugin: fakePlugin{name: "datapunt"},
+		signa:      []*protocol.Signum{stubSignum("datapunt")},
+		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
+	}
+	srv, tokens := sigilServingServer(t, p)
+
+	rows, refused := srv.pluginSigilRows("datapunt")
+	require.Empty(t, refused)
+	require.Len(t, rows, 2)
+	for _, surface := range []string{"http", "mcp"} {
+		assert.Equal(t, []string{"SUPER"}, rows[0].Reach[surface].Levels, "over "+surface)
+	}
+
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/datapunt/read?kind=competitor", tokens[auth.LevelSuper]))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.JSONEq(t, `{"observed":true}`, w.Body.String())
 }

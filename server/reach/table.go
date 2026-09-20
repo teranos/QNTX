@@ -94,7 +94,11 @@ REACH is '/api/reach'                                                     of ROO
 
 # What the node serves, as MCP tools (ADR-038). A connector's token is the
 # person who said yes, and every tool call is gated on its own path's line.
-REACH is '/mcp' '/mcp/'                                                   of ROOT
+REACH is '/mcp' '/mcp/'                                                   of ROOT SUPER
+
+# A line that names a signum is about its sigils, over every surface, whatever
+# path the plugin bound them to (ReachingSigil).
+REACH is 'datapunt'                                                       of ROOT SUPER
 
 # A longer path wins over the prefix above, so widening that line does not
 # widen this one.
