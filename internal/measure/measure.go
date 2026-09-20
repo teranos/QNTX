@@ -116,6 +116,18 @@ const (
 	// was handed (ADR-037).
 	StoreSent     = "qntx.store.sent"
 	StoreSentRows = "qntx.store.sent.rows"
+
+	// HostCPU, HostMemory and HostDisk are the machine under the node, each as
+	// a percentage of what it has. Dilation reads the first two and throws
+	// them away; nothing read the disk at all.
+	HostCPU    = "qntx.host.cpu"
+	HostMemory = "qntx.host.memory"
+	HostDisk   = "qntx.host.disk"
+
+	// HostNetIn and HostNetOut are bytes a second across every interface. The
+	// kernel counts from boot, and a total since boot answers nothing.
+	HostNetIn  = "qntx.host.net.in"
+	HostNetOut = "qntx.host.net.out"
 )
 
 // The dimensions.
