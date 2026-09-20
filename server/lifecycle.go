@@ -101,6 +101,7 @@ func (s *QNTXServer) startBackgroundServices() {
 	// Start database stats cache refresher
 	s.startDBStatsRefresher()
 	s.startPluginHealthRefresher()
+	s.startHostGauges()
 }
 
 // Start starts the server on the specified port
