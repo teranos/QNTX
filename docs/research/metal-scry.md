@@ -14,7 +14,7 @@ Originally prototyped as a separate Swift plugin, since deleted. Moved into scry
 
 ## Vision
 
-This plugin exists to visualise what is happening inside the model as it's happening. The scry plugin already captures pre-sampler logit signals per token — confidence, entropy, top-gap, top-k candidates — and streams them over gRPC. The stream glyph renders this as a DOM-based confidence heatmap. metal-scry replaces that with GPU-accelerated rendering that can keep up with token generation speed and, critically, support stepping back through tokens and selecting different paths in possibility space.
+This plugin exists to visualise what is happening inside the model as it's happening. The scry plugin already captures pre-sampler logit signals per token — confidence, entropy, top-gap, top-k candidates — and streams them over gRPC. The stream element renders this as a DOM-based confidence heatmap. metal-scry replaces that with GPU-accelerated rendering that can keep up with token generation speed and, critically, support stepping back through tokens and selecting different paths in possibility space.
 
 The token stream is not just a sequence to watch — it's a tree. At each token position, the model considered alternatives. metal-scry should make that tree navigable: see where the model was confident, where it hesitated, branch into the roads not taken.
 
@@ -101,16 +101,16 @@ C++ work: keep the full `probs` vector in `capture_signal()` instead of discardi
 
 ### Q3: What can metal-scry show that the DOM never could?
 
-The stream glyph is text. It renders tokens as `<span>` elements with colored backgrounds — a reading experience with signal overlays. metal-scry is not a companion to this and not a replacement for it. It is a parallel system that the stream glyph's existence inspired but that operates in a space the DOM cannot enter.
+The stream element is text. It renders tokens as `<span>` elements with colored backgrounds — a reading experience with signal overlays. metal-scry is not a companion to this and not a replacement for it. It is a parallel system that the stream element's existence inspired but that operates in a space the DOM cannot enter.
 
-The stream glyph proves that per-token signal data is valuable in real time. metal-scry takes the same `TokenSignal` data path — bidirectional, scry ↔ metal-scry via `StreamChat` gRPC and the `llama_sampler_i` vtable — and renders what text-in-a-browser fundamentally cannot:
+The stream element proves that per-token signal data is valuable in real time. metal-scry takes the same `TokenSignal` data path — bidirectional, scry ↔ metal-scry via `StreamChat` gRPC and the `llama_sampler_i` vtable — and renders what text-in-a-browser fundamentally cannot:
 
 - **Spatial structure.** A token tree is not a list. The DOM can show a sequence of colored spans; Metal can render a branching graph where depth, angle, and thickness encode probability, and you navigate it by moving through 3D space.
 - **Continuous animation.** The softmax distribution shifting frame-by-frame as the model considers the next token — not a snapshot after the fact, but the probability mass flowing in real time at GPU framerate.
 - **Density.** 32k vocabulary entries as a probability landscape. The DOM chokes on 32k elements; a Metal compute shader processes them in one dispatch.
 - **Interaction at inference speed.** Clicking a branch in the token tree and seeing the model re-infer from that fork within the same render frame. The DOM round-trip (JS event → fetch → re-render) is too slow for this to feel like direct manipulation.
 
-The stream glyph keeps doing what it does — text with heatmap coloring, readable output, follow-up input. metal-scry exists because some things about inference are not text and never will be.
+The stream element keeps doing what it does — text with heatmap coloring, readable output, follow-up input. metal-scry exists because some things about inference are not text and never will be.
 
 What is the first thing you'd want to see in this space that you currently cannot? The token tree? The probability landscape? The semantic trajectory? Or something that hasn't been named yet?
 
@@ -157,13 +157,13 @@ Chosen token recorded per step. Line strip connects chosen-token positions — t
 **Done when:** running a prompt shows the nebula updating in real time.
 
 - [x] WebSocket frame push (`HandleWebSocket` + `wait_for_frame`)
-- [x] Nebula glyph (plugin-provided, conditional on Metal)
+- [x] Nebula element (plugin-provided, conditional on Metal)
 - [x] Keyframe interpolation at 60fps
 - [x] Generation trail (line strip of chosen tokens)
 
 ### Step 5: Timeline scrub *(done)*
 
-Hover a token in the stream glyph to scrub the nebula to that token's distribution. The text IS the timeline — no separate scrubber UI. Stream glyph dispatches `nebula-scrub` CustomEvent with token index, nebula module sends `scrub:N` over WebSocket, C++ renders the stored keyframe. Trail shader splits at the scrub point: warm path up to the hovered token, cool blue for the future path beyond it. mouseleave resumes live mode.
+Hover a token in the stream element to scrub the nebula to that token's distribution. The text IS the timeline — no separate scrubber UI. Stream element dispatches `nebula-scrub` CustomEvent with token index, nebula module sends `scrub:N` over WebSocket, C++ renders the stored keyframe. Trail shader splits at the scrub point: warm path up to the hovered token, cool blue for the future path beyond it. mouseleave resumes live mode.
 
 Per-token keyframe history stored CPU-side (capped at 512 entries). Each `store_keyframe` in `StreamChat` captures the full distribution alongside `submit_distribution` and `add_trail_point`.
 
@@ -199,7 +199,7 @@ These require small C++ additions to `capture_signal()` or the sampler chain. Da
 | **TMP** | Temperature sensitivity (softmax at 5 temps) | How much temperature reshapes the distribution | `capture_signal()` |
 | **CPX** | Cumulative perplexity (running scalar) | Fluency score for comparing prompt strategies | `capture_signal()` |
 | **SCO** | Sampler chain observations (distribution before/after each stage) | Why specific tokens were rejected | `stream_chat()` sampler chain |
-| **ECM** | Factor entropy + top_gap into stream glyph color mapping | Richer heatmap, currently confidence-only | `stream-glyph.ts` |
+| **ECM** | Factor entropy + top_gap into stream element color mapping | Richer heatmap, currently confidence-only | `result-element.ts` |
 
 ## Moderate-cost opportunities
 
@@ -249,8 +249,8 @@ All codes used across the codebase (README limitations, research docs, source TO
 | ATS | Attestation storage | Tier 2 opportunity |
 | VDF | Vocabulary dump to frontend | Checklist item |
 | LTR | Logit trajectories | Checklist item |
-| BIG | Bias glyph integration | Blocked on #718 |
+| BIG | Bias element integration | Blocked on #718 |
 | HSC | Hidden state cluster comparison | Blocked on HSE |
 | ESD | Entropy spike detection | Checklist item |
-| CPY | Copy button for stream glyph | Missing feature |
+| CPY | Copy button for stream element | Missing feature |
 | WMS | Window morph support | Missing feature |

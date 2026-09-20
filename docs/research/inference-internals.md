@@ -16,7 +16,7 @@ Signal extraction (entropy, confidence, top-gap), streaming transport, confidenc
 | `llama_token_get_score(vocab, id)` | Token score/frequency from the tokenizer |
 | `llama_vocab_is_eog/bos/eos(vocab, id)` | Special token identification |
 
-Full vocab enumeration is a loop from 0 to n_tokens. Enables: fuzzy search over the vocabulary (for the bias glyph, #718), token frequency analysis, special token inventories.
+Full vocab enumeration is a loop from 0 to n_tokens. Enables: fuzzy search over the vocabulary (for the bias element, #718), token frequency analysis, special token inventories.
 
 ### Embeddings
 
@@ -91,7 +91,7 @@ The C++ ecosystem around llama.cpp is thin because llama.cpp itself absorbed mos
 
 **Logit trajectories.** Track how specific tokens' probabilities evolve across generation steps. A token might start at 0.001, rise as context builds, and eventually get selected. Multi-line chart, selected token bolded at the step it was chosen. Requires storing top-100 per step (~115KB for 512 tokens).
 
-**Token tree branching.** The confidence heatmap already marks hesitation points — brown tokens are where the runner-up was close. The top-K popup shows what the alternatives were. Click a candidate to fork: the plugin generates forward from that token position with the alternative token injected. Each fork spawns a new stream glyph on the canvas, spatially rooted at the fork point. The original path is preserved — branches are additive, no undo needed. On-demand, not pre-computed: each branch is a full generation from the fork point.
+**Token tree branching.** The confidence heatmap already marks hesitation points — brown tokens are where the runner-up was close. The top-K popup shows what the alternatives were. Click a candidate to fork: the plugin generates forward from that token position with the alternative token injected. Each fork spawns a new stream element on the canvas, spatially rooted at the fork point. The original path is preserved — branches are additive, no undo needed. On-demand, not pre-computed: each branch is a full generation from the fork point.
 
 **Cumulative perplexity.** Single running number: exp(average negative log-likelihood). Updates with each token. Low = fluent, high = struggled. Useful for comparing prompt strategies — same question with different system prompts yields different perplexity, indicating which framing the model handles better.
 
@@ -105,7 +105,7 @@ The C++ ecosystem around llama.cpp is thin because llama.cpp itself absorbed mos
 
 ## Open Questions
 
-**Sampling chain in the UI.** Yes — if the user is creating bias glyphs (#718), they're already touching sampling. Expose top-k, top-p, penalties as controls alongside the bias interface.
+**Sampling chain in the UI.** Yes — if the user is creating bias elements (#718), they're already touching sampling. Expose top-k, top-p, penalties as controls alongside the bias interface.
 
 **Vocab search.** Moving away from fuzzy search (deprecated pattern). Semantic search over the vocabulary instead. Dump the full vocab (32k-128k tokens) to the frontend at model load, use QNTX's existing semantic search infrastructure to navigate it.
 
@@ -125,18 +125,18 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 
 ## Checklist
 
-- [ ] **VDF** — Dump full vocabulary to frontend at model load. Loop `llama_vocab_n_tokens`, extract text + attributes + score per token. Serve via HTTP endpoint or model metadata broadcast. Foundation for bias glyph (#718) and semantic vocab search.
+- [ ] **VDF** — Dump full vocabulary to frontend at model load. Loop `llama_vocab_n_tokens`, extract text + attributes + score per token. Serve via HTTP endpoint or model metadata broadcast. Foundation for bias element (#718) and semantic vocab search.
 - [ ] **LTR** — Logit trajectories. Track how specific tokens' probabilities evolve across generation steps. Multi-line chart, selected token bolded at the step it was chosen. Frontend work, data already flows.
-- [ ] **TTB** — Token tree branching. Fork from heatmap token via top-K popup, spawn new stream glyphs per alternative path. Requires KV cache snapshot/restore in C++. Highest-effort item.
+- [ ] **TTB** — Token tree branching. Fork from heatmap token via top-K popup, spawn new stream elements per alternative path. Requires KV cache snapshot/restore in C++. Highest-effort item.
 - [ ] **CPX** — Cumulative perplexity. Running `exp(mean(-log(confidence)))` across all tokens. Emit as scalar per chunk. Small C++ addition.
 - [ ] **SUI** — Expose top-k, top-p, min-p, repetition penalty in the UI. Proto + C++ + Go + TS. Only temperature is wired today.
 - [ ] **SCW** — Wire sampler chain configuration through to `llama_sampler_chain_add` calls. Depends on SUI for proto fields.
-- [ ] **BIG** — Integrate with bias glyph (#718). Blocked on bias glyph implementation.
+- [ ] **BIG** — Integrate with bias element (#718). Blocked on bias element implementation.
 - [ ] **HSE** — Investigate LLM embeddings via `llama_get_embeddings` for inference-specific clustering. Pointer dereference, 4096 floats per token.
 - [ ] **HSC** — Evaluate whether LLM embedding clusters differ meaningfully from MiniLM clusters. Blocked on HSE.
 - [ ] **ESD** — Port D prototype signal computation (entropy spikes, low-confidence spans) to C++. Sliding-window analysis, emit flags.
 - [x] **ATS** — Write per-generation attestations to ATS from C++ plugin. One `["Weave"]` attestation per generation with embedded per-token signals. Loom renders as confidence-colored token spans. Done in `loom-llama-integration` branch.
 
-## Future Direction: Token-as-Glyph
+## Future Direction: Token-as-Element
 
-Each LLM token carries signal data (confidence, entropy, top-gap, top-k candidates). The stream glyph currently renders tokens as `<span>` elements with signal data stored in `data-*` attributes. The signal data structure already supports treating every token as its own glyph entity — a token-glyph carrying its full decision context as content, positioned in a text flow rather than on the canvas grid. This isn't for now: the `<span>` representation is sufficient for heatmap visualization and hover popups. But the data contract (per-token signal in `LLMStreamMessage`) is designed so that the transition from span-per-token to glyph-per-token requires no backend changes.
+Each LLM token carries signal data (confidence, entropy, top-gap, top-k candidates). The stream element currently renders tokens as `<span>` elements with signal data stored in `data-*` attributes. The signal data structure already supports treating every token as its own element entity — a token-element carrying its full decision context as content, positioned in a text flow rather than on the canvas grid. This isn't for now: the `<span>` representation is sufficient for heatmap visualization and hover popups. But the data contract (per-token signal in `LLMStreamMessage`) is designed so that the transition from span-per-token to element-per-token requires no backend changes.

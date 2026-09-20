@@ -108,7 +108,7 @@ Not in git. See the embeddings README for download instructions.
 - **Auto-embedding pipeline**: `EmbeddingObserver` embeds attestations with rich text on creation (#482)
 - **Rich text integration**: Uses `rich_string_fields` from type definitions (#479). Additionally, `message` and `msg` are always treated as embeddable text (builtin rich fields in `observer.go`).
 - **Unified search**: Text + semantic results merged and deduplicated (#485)
-- **Semantic Search Glyph (⊨)**: Live canvas glyph with historical + live matching (#496, #499)
+- **Semantic Search Element (⊨)**: Live canvas element with historical + live matching (#496, #499)
 - **Scheduled re-clustering**: HDBSCAN runs on a Pulse schedule so cluster topology stays current as data grows (#506)
 - **Cluster labeling**: LLM labels unlabeled clusters on a Pulse schedule, attested by `qntx@embeddings`
 - **Multi-model support**: Each attestation is embedded by all models configured in `[cyrnel] models`. Per-model vec0 tables (`vec_embeddings_{slug}`) are created dynamically. Search, storage, clustering, and projection are all model-scoped. Pulse scheduled jobs loop over each model independently. See [ADR-019](adr/ADR-019-per-embedding-multi-model.md).

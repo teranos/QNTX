@@ -19,7 +19,7 @@ Building blocks: `+` (as), `=` (is), `∈` (of), `⌬` (by), `✦` (at).
 Current subsystems:
 
 - **꩜ Pulse** — provides async execution with resource-aware scheduling
-- **Glyphs ⧉** — persistent interactive UI primitive
+- **Elements ⧉** — persistent interactive UI primitive
 - **Plugins** — domain logic via gRPC, isolated from core (e.g. local AI via llama.cpp)
 
 ### Quality Goals
@@ -51,8 +51,8 @@ The intent is public good. Governance is centralized now, with decentralized sta
 
 Constraints are expressed as axioms — invariants that throw at runtime if violated.
 
-- **Element Axiom** — a glyph is exactly one DOM element for its entire lifetime; reparented, never cloned
-- **One-Per-Side Axiom** — each side of a glyph accepts at most one meld connection
+- **Element Axiom** — an element is exactly one DOM element for its entire lifetime; reparented, never cloned
+- **One-Per-Side Axiom** — each side of an element accepts at most one meld connection
 - **DAG Axiom** — compositions are DAGs; cycles cannot form
 - **One attestation, one execution** — downstream fires once per incoming attestation, not batched
 - **Everything is an attestation** — the unit of flow through the DAG is always an attestation
@@ -165,13 +165,13 @@ Type system: the [.proto files](https://github.com/teranos/QNTX/blob/main/plugin
 Key runtime flows:
 
 **Attestation lifecycle:**
-assert → store → index → notify watchers → trigger downstream glyphs
+assert → store → index → notify watchers → trigger downstream elements
 
 **꩜ Pulse execution:**
 schedule tick → resource check → job dispatch → worker execution → result → budget tracking
 
-**Glyph meld DAG:**
-meld detection → edge creation → subscription activates → attestation arrives → downstream glyph fires
+**Element meld DAG:**
+meld detection → edge creation → subscription activates → attestation arrives → downstream element fires
 
 **Node-to-node sync:**
 hello (root hash) → group hashes → need → attestations → done
@@ -182,7 +182,7 @@ REST: CRUD, sync triggers, status.
 
 Detailed flows:
 
-- [Glyph Attestation Flow](development/glyph-attestation-flow.md)
+- [Element Attestation Flow](development/element-attestation-flow.md)
 - [GRACE](adr/ADR-036-GRACE.md) (❀ PulseClose)
 - What the node serves: [openapi.json](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json), written by `make openapi`
 - What plugins speak: the [.proto files](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/)
@@ -215,13 +215,13 @@ See [Installation](installation.md), [Nix Development](nix-development.md), [Rel
 
 ## 8. Cross-cutting Concepts
 
-### SEG / Sym / Glyph
+### SEG / Sym / Element
 
 Every operator has three layers:
 
 - **seg** — the grammatical unit (what it IS)
 - **sym** — the visual expression (how it LOOKS)
-- **glyph** — the interactive manifestation (how you INTERACT with it)
+- **element** — the interactive manifestation (how you INTERACT with it)
 
 This is the conceptual framework that runs through everything — backend, frontend, documentation, UI.
 
@@ -239,9 +239,9 @@ Attestations are append-only. Sync is set union — commutative, idempotent, con
 
 ### Vision Documents
 
-- [Glyphs](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md) — persistent interactive UI primitive
+- [Elements](https://github.com/teranos/elements/blob/main/VISION.md) — persistent interactive UI primitive
 - [Fractal Workspace](vision/fractal-workspace.md) — nested canvas navigation
-- [Glyph Melding](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md#melding) — composition through adjacency
+- [Element Melding](https://github.com/teranos/elements/blob/main/VISION.md#melding) — composition through adjacency
 - [Time-Travel](vision/time-travel.md) — attestation state across time
 - [Clusters](vision/clusters.md) — spatial organization
 - [Mobile](https://github.com/teranos/QNTX-App/blob/main/VISION.md) — mobile-native experience, kept with the App
@@ -264,7 +264,7 @@ Attestations are append-only. Sync is set union — commutative, idempotent, con
 | [006](adr/ADR-006-proto-as-source-of-truth.md) | Protobuf as single source of truth for types |
 | [007](adr/ADR-007-typescript-proto-interfaces-only.md) | TypeScript gets interfaces only from proto |
 | [008](adr/ADR-008-rust-proto-separation.md) | Separate prost (types) from tonic (transport) in Rust |
-| [009](adr/ADR-009-edge-based-composition-dag.md) | Edge-based DAG for multi-directional glyph melding |
+| [009](adr/ADR-009-edge-based-composition-dag.md) | Edge-based DAG for multi-directional element melding |
 
 ---
 
@@ -292,7 +292,7 @@ Semantic clarity
 
 Extensibility
 ├── Plugin architecture via gRPC
-├── Attestable glyphs — plugins attest new UI elements
+├── Attestable elements — plugins attest new UI elements
 └── WASM for cross-platform core logic
 ```
 
@@ -306,7 +306,7 @@ See [Design Philosophy](design-philosophy.md).
 |------|--------|------------|
 | Abstraction barrier — "attestations" may be too abstract | Adoption friction | Good ingestion (⨳ ix), gradual onboarding |
 | Cold start — empty store = no value | Poor first-run experience | Prioritize connectors: git, files, APIs |
-| Complexity budget — ATS + Pulse + Glyphs + Sync each carry weight | Layers compound instead of compose | Each layer independently useful, clear contracts |
+| Complexity budget — ATS + Pulse + Elements + Sync each carry weight | Layers compound instead of compose | Each layer independently useful, clear contracts |
 | Single steward — bus factor of one | Project continuity | Community formation, honest docs, public good model |
 | Parser migration — ATS parser moving Go → Rust/WASM | Temporary dual implementations | ADR-005; WASM already serving browser |
 

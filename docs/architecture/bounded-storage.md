@@ -41,9 +41,9 @@ Zero or negative values fallback to defaults (16/64/64).
 
 ## Observability
 
-### Database Glyph
+### Database Element
 
-The database glyph shows:
+The database element shows:
 - Storage statistics (total attestations, unique actors/subjects/contexts)
 - Recent eviction events with timestamps and details
 

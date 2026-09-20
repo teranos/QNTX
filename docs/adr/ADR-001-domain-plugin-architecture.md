@@ -15,7 +15,7 @@ QNTX initially had software development functionality (git ingestion, GitHub int
 
 ## Decision
 
-We adopt a **plugin architecture** where all non-core functionality is implemented as plugins. Every plugin implements the same interface and follows the same lifecycle. A plugin decides how much it implements — it can provide HTTP endpoints, WebSocket handlers, gRPC services, custom glyph types, or any combination. Improvements to QNTX core services benefit all plugins automatically.
+We adopt a **plugin architecture** where all non-core functionality is implemented as plugins. Every plugin implements the same interface and follows the same lifecycle. A plugin decides how much it implements — it can provide HTTP endpoints, WebSocket handlers, gRPC services, custom element, or any combination. Improvements to QNTX core services benefit all plugins automatically.
 
 ### Minimal Core Philosophy
 
@@ -73,7 +73,7 @@ Optional interfaces extend the base — a plugin opts in by implementing them:
 
 - `PausablePlugin` — pause/resume without full restart
 - `ConfigurablePlugin` — exposes a config schema for UI-rendered settings
-- `UIPlugin` — registers custom glyph types rendered on the canvas (see [`packages/glyphs`](https://github.com/teranos/QNTX/tree/main/packages/glyphs), [`hello-world plugin`](https://github.com/teranos/QNTX/tree/main/qntx-plugins/hello-world) for a minimal example)
+- `UIPlugin` — registers custom elements rendered on the canvas (see [`teranos/elements`](https://github.com/teranos/elements), [`hello-world plugin`](https://github.com/teranos/QNTX/tree/main/qntx-plugins/hello-world) for a minimal example)
 - `LLMProvider` — LLM inference ([ADR-014](./ADR-014-llm-as-plugin-provided-service.md))
 - `SearchProvider` — full-text search ([ADR-015](./ADR-015-search-as-plugin-provided-service.md))
 - `EmbeddingProvider` — embedding and clustering ([ADR-017](./ADR-017-embedding-as-plugin-provided-service.md))

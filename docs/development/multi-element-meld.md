@@ -1,7 +1,7 @@
-# Multi-Glyph Chain Melding Implementation
+# Multi-Element Chain Melding Implementation
 
 **Issue:** [#411](https://github.com/teranos/QNTX/issues/411)
-**Goal:** Support linear chains of 3+ glyphs: `[ax|py|prompt]`
+**Goal:** Support linear chains of 3+ elements: `[ax|py|prompt]`
 
 ## Current State
 
@@ -10,17 +10,17 @@
 - ✅ Frontend uses proto `Composition` directly, no derived fields
 
 **Phase 2 Complete:** Port-aware meldability + multi-directional melding
-- ✅ MELDABILITY registry encodes spatial ports (right/bottom/top per glyph class)
+- ✅ MELDABILITY registry encodes spatial ports (right/bottom/top per element class)
 - ✅ Multi-directional proximity detection and layout
-- ✅ Result glyphs auto-meld below py on execution
+- ✅ Result elements auto-meld below py on execution
 - ✅ py → py chaining enabled
 
 **Phase 3 Complete:** Composition extension, consolidation, CSS Grid layout
-- ✅ Drag-to-extend: standalone glyph melds into existing composition (append/prepend)
-- ✅ 3+ glyph chains in browser (ax|py|prompt, etc.)
+- ✅ Drag-to-extend: standalone element melds into existing composition (append/prepend)
+- ✅ 3+ element chains in browser (ax|py|prompt, etc.)
 - ✅ Auto-meld result when py is already inside a composition
 - ✅ Meld system split into focused modules (detect/feedback/composition)
-- ✅ Glyph system consolidation: canvas-placed wrapper, registry dispatch
+- ✅ Element system consolidation: canvas-placed wrapper, registry dispatch
 - ✅ CSS Grid layout replaces flex+sub-containers (single applyGridLayout function)
 
 ## Architecture Decision
@@ -38,8 +38,8 @@ Flat arrays cannot represent DAG structures. Phase 1b migrates to edge-based com
 
 ```typescript
 interface CompositionEdge {
-  from: string;           // source glyph ID
-  to: string;             // target glyph ID
+  from: string;           // source element ID
+  to: string;             // target element ID
   direction: 'right' | 'top' | 'bottom';
   position: number;       // ordering for multiple edges same direction
 }
@@ -52,11 +52,11 @@ interface CompositionState {
 }
 ```
 
-**Key principle:** No `glyph_ids` field. Traverse edges to find glyphs (DAG-native thinking).
+**Key principle:** No `glyph_ids` field. Traverse edges to find elements (DAG-native thinking).
 
 **Rationale:**
 - Supports arbitrary DAG topologies
-- **DAG-native:** No derived `glyph_ids` field - traverse edges to find glyphs
+- **DAG-native:** No derived `glyph_ids` field - traverse edges to find elements
 - Phase 2 creates both `'right'` and `'bottom'` edges (multi-directional)
 - Structure ready for `'top'` direction (reserved)
 - Proto field 3 reserved (formerly `glyph_ids`) to prevent accidental reuse
@@ -79,39 +79,39 @@ interface CompositionState {
 - ✅ Create migration `020_multi_glyph_compositions.sql`
   - ✅ Create junction table `composition_glyphs(composition_id, glyph_id, position)`
   - ✅ Recreate `canvas_compositions` without `initiator_id`/`target_id` (breaking change)
-  - ✅ Foreign key constraints: composition → glyphs cascade delete
+  - ✅ Foreign key constraints: composition → elements cascade delete
   - ⚠️ No data migration (breaking change: existing compositions dropped)
 
 - ✅ Update `glyph/storage/canvas_store.go`
   - ✅ `GetComposition()` returns `GlyphIDs []string` (queries junction table)
-  - ✅ `UpsertComposition()` accepts glyph ID array (transaction-based with junction table)
+  - ✅ `UpsertComposition()` accepts element ID array (transaction-based with junction table)
   - ✅ `ListCompositions()` fixed nested query issue (two-pass approach)
-  - ✅ Orphan validation: compositions with zero glyphs return error
+  - ✅ Orphan validation: compositions with zero elements return error
 
 - ✅ Update `glyph/handlers/canvas.go`
   - ✅ API payload accepts `glyph_ids: string[]`
-  - ✅ Returns composition with full glyph array
+  - ✅ Returns composition with full element array
 
 #### Storage Tests ✅
 - ✅ Update `glyph/storage/canvas_store_test.go`
   - ✅ All tests updated for `GlyphIDs` array format
-  - ✅ Test cascade delete behavior (orphaning when all glyphs deleted)
-  - ✅ Test composition upsert and retrieval with N glyphs
+  - ✅ Test cascade delete behavior (orphaning when all elements deleted)
+  - ✅ Test composition upsert and retrieval with N elements
   - ✅ Fixed `ForeignKeyConstraints` test for new junction table behavior
 
 #### Frontend Tests ✅
 - ✅ Update `web/ts/state/compositions.test.ts` for `glyphIds` array
 - ✅ Update the meld composition tests for new unmeld return format
 - ✅ Add skipped TDD tests in `web/ts/state/compositions.test.ts`:
-  - ✅ 3-glyph composition stores correctly
-  - ✅ `isGlyphInComposition` works with 3-glyph chains
-  - ✅ `findCompositionByGlyph` finds 3-glyph chains
-  - ✅ Extending composition adds glyph to array
+  - ✅ 3-element composition stores correctly
+  - ✅ `isGlyphInComposition` works with 3-element chains
+  - ✅ `findCompositionByGlyph` finds 3-element chains
+  - ✅ Extending composition adds element to array
 - ✅ Add skipped TDD tests in the meld composition tests:
-  - ✅ Tim creates 3-glyph chain (ax|py|prompt) by dragging onto composition
-  - ✅ Tim sees proximity feedback when dragging glyph toward composition
+  - ✅ Tim creates 3-element chain (ax|py|prompt) by dragging onto composition
+  - ✅ Tim sees proximity feedback when dragging element toward composition
   - ✅ Tim extends ax|py composition by dragging prompt onto it
-  - ✅ Tim extends 3-glyph chain into 4-glyph chain
+  - ✅ Tim extends 3-element chain into 4-element chain
 - ✅ All active tests passing: 352 pass, 0 fail (8 skipped)
 
 ### Phase 1b Prerequisites: Proto Definitions ✅ **COMPLETE**
@@ -132,13 +132,13 @@ interface CompositionState {
   // CompositionEdge represents a directed edge in the composition DAG
   // Supports multi-directional melding: horizontal (right), vertical (top/bottom)
   message CompositionEdge {
-    string from = 1;           // source glyph ID
-    string to = 2;             // target glyph ID
+    string from = 1;           // source element ID
+    string to = 2;             // target element ID
     string direction = 3;      // 'right', 'top', 'bottom'
     int32 position = 4;        // ordering for multiple edges in same direction
   }
 
-  // Composition represents a DAG of melded glyphs
+  // Composition represents a DAG of melded elements
   // Edges define the graph structure - no derived fields
   message Composition {
     string id = 1;
@@ -189,7 +189,7 @@ interface CompositionState {
 #### Database Schema
 
 - ✅ Create migration `021_dag_composition_edges.sql`
-  - ✅ Create `composition_edges` table with foreign keys to compositions and glyphs
+  - ✅ Create `composition_edges` table with foreign keys to compositions and elements
   - ✅ Drop `composition_glyphs` table (breaking change)
   - ✅ Recreate `canvas_compositions` without `type` column
 
@@ -266,8 +266,8 @@ interface CompositionState {
   - ✅ Remove all `type` field references
   - ✅ Remove `getCompositionType()` tests (function removed)
   - ✅ Update tests to create edges directly (not via helper)
-  - ✅ 2-glyph tests: `edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }]`
-  - ✅ 3-glyph tests: Two edges with position 0 and 1
+  - ✅ 2-element tests: `edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }]`
+  - ✅ 3-element tests: Two edges with position 0 and 1
   - ✅ Run `bun test` - all TypeScript tests passing (376 tests)
 
 - ✅ Update the meld composition tests
@@ -288,12 +288,12 @@ interface CompositionState {
     - ✅ Removed `compositionType` parameter (no longer needed)
     - ✅ Takes glyphElements directly, DOM restoration doesn't need edges
 
-- ✅ Update the canvas glyph
+- ✅ Update the canvas element
   - ✅ Import `extractGlyphIds` from compositions module
-  - ✅ Use `extractGlyphIds(comp.edges)` to find glyph IDs from edges
+  - ✅ Use `extractGlyphIds(comp.edges)` to find element IDs from edges
   - ✅ Updated migration guard to check for `edges` instead of `glyphIds`
   - ✅ Removed `comp.type` from reconstructMeld call
-  - ✅ Updated log statements to use edge/glyph counts instead of type
+  - ✅ Updated log statements to use edge/element counts instead of type
 
 #### Integration Testing
 
@@ -302,16 +302,16 @@ interface CompositionState {
   - ✅ All TypeScript tests pass (376 tests)
   - ✅ No regressions
 
-- ✅ Manual browser test: Create 2-glyph composition
+- ✅ Manual browser test: Create 2-element composition
   - ✅ Drag ax near prompt → meld
   - ✅ Verify composition saved with edges to backend
   - ✅ Refresh page → verify composition restored correctly
-  - ✅ Unmeld → verify both glyphs restore independently
-  - ✅ Note: Rectangle selection feature added to enable selecting glyphs within compositions
+  - ✅ Unmeld → verify both elements restore independently
+  - ✅ Note: Rectangle selection feature added to enable selecting elements within compositions
 
 ### Phase 2: Port-Aware Meldability ✅ **COMPLETE**
 
-**Goal:** Spatial ports on glyphs defining valid directional connections, multi-directional proximity detection and layout.
+**Goal:** Spatial ports on elements defining valid directional connections, multi-directional proximity detection and layout.
 
 #### Port-aware registry ✅
 - ✅ `meldability.ts`: Restructured from flat `class → class[]` to `class → PortRule[]`
@@ -356,7 +356,7 @@ interface CompositionState {
 
 ### Phase 3: Composition Extension ✅ **COMPLETE**
 
-**Goal:** Meld a standalone glyph into an existing composition (edges-only: append to leaf / prepend to root). Also fix auto-meld when py is already inside a composition.
+**Goal:** Meld a standalone element into an existing composition (edges-only: append to leaf / prepend to root). Also fix auto-meld when py is already inside a composition.
 
 **Composition ID strategy:** Regenerate ID on extend (`melded-{from}-{to}` with the new edge's endpoints).
 
@@ -369,7 +369,7 @@ interface CompositionState {
 - ✅ Split tests into `meld-detect.test.ts` and `meld-composition.test.ts`
 
 #### Drag-to-extend ✅
-- ✅ `findMeldTarget()` recognizes glyphs inside compositions as meld targets
+- ✅ `findMeldTarget()` recognizes elements inside compositions as meld targets
   - ✅ Relaxed guards: only skip elements in the SAME composition
   - ✅ Uses `.closest('.melded-composition')` for sub-container awareness
   - ✅ Both forward and reverse detection work with composition targets
@@ -384,10 +384,10 @@ interface CompositionState {
 - ✅ DOM structure for mixed-direction compositions:
   ```
   .melded-composition (flex-direction: row)
-    ├── ax-glyph
+    ├── ax-element
     └── .meld-sub-container (flex-direction: column)
-        ├── py-glyph
-        └── result-glyph
+        ├── py-element
+        └── result-element
   ```
 - ✅ `reconstructMeld()` rebuilds sub-containers from stored mixed-direction edges on page reload
 - ✅ All guards use `.closest('.melded-composition')` instead of `parentElement?.classList.contains()`
@@ -404,20 +404,20 @@ interface CompositionState {
 
 #### Manual Testing ✅
 - ✅ Drag prompt near ax|py composition → extends to ax|py|prompt
-- ✅ Refresh → 3-glyph composition persists
-- ✅ Unmeld → all 3 glyphs separate
+- ✅ Refresh → 3-element composition persists
+- ✅ Unmeld → all 3 elements separate
 - ✅ Run py in ax|py composition → result appears below py (cross-axis sub-container)
 - ✅ Drag note above prompt inside composition → extends composition
 
-### Phase 3b: Glyph System Consolidation ✅ **COMPLETE**
+### Phase 3b: Element System Consolidation ✅ **COMPLETE**
 
 **PR:** #446
 
 - ✅ Meld correctness: each-side-one-connection axiom enforced at detection, extension, and mouseup layers
-- ✅ Glyph system consolidation: canvas-placed wrapper extracts shared boilerplate from 5 factories
-- ✅ Glyph registry replaces parallel if/else chains for type dispatch
-- ✅ Result glyph removed from registry (always created programmatically with execution data)
-- ✅ Prompt glyph results participate in composition system (no more orphaning on refresh)
+- ✅ Element system consolidation: canvas-placed wrapper extracts shared boilerplate from 5 factories
+- ✅ Element registry replaces parallel if/else chains for type dispatch
+- ✅ Result element removed from registry (always created programmatically with execution data)
+- ✅ Prompt element results participate in composition system (no more orphaning on refresh)
 
 ### Phase 3c: CSS Grid Layout ✅ **COMPLETE**
 
@@ -430,7 +430,7 @@ interface CompositionState {
 - ✅ `performMeld`, `extendComposition`, `reconstructMeld` simplified (net code reduction)
 - ✅ `unmeldComposition` clears grid styles on restore
 - ✅ CSS: `.melded-composition` uses `display: grid` instead of `display: flex`
-- ✅ Sub-containers eliminated — all glyphs are direct children with `grid-row`/`grid-column`
+- ✅ Sub-containers eliminated — all elements are direct children with `grid-row`/`grid-column`
 - ✅ 9 tests for `computeGridPositions` (base cases + edge cases: fan-out, multi-root, top direction)
 - ✅ All 413 tests passing, 0 fail
 
@@ -456,7 +456,7 @@ interface CompositionState {
 
 ## Open Questions
 
-1. **Unmeld granularity?** Should pulling a middle glyph split the composition in two, or always unmeld everything?
+1. **Unmeld granularity?** Should pulling a middle element split the composition in two, or always unmeld everything?
 2. **Maximum composition size?** No hard limit yet — monitor UX as chains grow.
 
 ## Design Decisions
@@ -472,7 +472,7 @@ interface CompositionState {
 
 **Cross-axis layout (superseded in Phase 3c):**
 - **Phase 3a:** Nested `meld-sub-container` divs with flex layout. Three parallel code paths independently managed sub-containers — fragile and blocked composition-to-composition melding.
-- **Phase 3c:** Replaced with CSS Grid. Each glyph is a direct child with `grid-row`/`grid-column` derived from the edge DAG by `computeGridPositions()`. Single `applyGridLayout()` function used by all composition operations.
+- **Phase 3c:** Replaced with CSS Grid. Each element is a direct child with `grid-row`/`grid-column` derived from the edge DAG by `computeGridPositions()`. Single `applyGridLayout()` function used by all composition operations.
 
 **Meld system module split:**
 - **Decision:** Split monolith `meld-system.ts` into `meld-detect.ts`, `meld-feedback.ts`, `meld-composition.ts` with barrel re-export

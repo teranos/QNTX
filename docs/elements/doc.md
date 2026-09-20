@@ -1,6 +1,6 @@
-# Doc Glyph (▤)
+# Doc Element (▤)
 
-Inline document viewer on canvas. Drag a file onto the canvas to upload it and spawn a Doc glyph.
+Inline document viewer on canvas. Drag a file onto the canvas to upload it and spawn a Doc element.
 
 ## Supported formats
 
@@ -8,7 +8,7 @@ PDF, PNG, JPG, GIF, WebP, SVG, TXT — validated server-side by both file extens
 
 ## Storage
 
-Files stored on disk at `{db_directory}/files/{uuid}{ext}`, served via `GET /api/files/{id}`. The glyph's `content` field stores a JSON reference:
+Files stored on disk at `{db_directory}/files/{uuid}{ext}`, served via `GET /api/files/{id}`. The element's `content` field stores a JSON reference:
 
 ```json
 { "fileId": "uuid", "filename": "original.pdf", "ext": ".pdf" }

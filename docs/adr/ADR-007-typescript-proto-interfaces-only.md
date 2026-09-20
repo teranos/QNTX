@@ -72,7 +72,7 @@ export interface Attestation {
 
 ### Usage in Application
 ```typescript
-// web/ts/components/glyph/ax-glyph.ts
+// web/ts/components/element/ax-element.ts
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 
 // Before: const matchedAttestations: any[] = [];
@@ -82,18 +82,6 @@ function renderAttestation(attestation: Attestation): HTMLElement {
   // Full IDE autocomplete and type checking
 }
 ```
-
-## Metrics
-
-### Type Safety
-- Eliminated all `any` types in ax-glyph.ts
-- Full TypeScript compiler checking
-- IDE autocomplete for all Attestation fields
-
-### Build Performance
-- Proto generation: ~1 second
-- TypeScript compilation: No measurable change
-- No runtime overhead (types erased at compile time)
 
 ## Alternatives Considered
 

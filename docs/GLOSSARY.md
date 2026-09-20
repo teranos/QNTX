@@ -23,7 +23,7 @@ A distilled attestation — the compressed aggregate of many attestations folded
 
 Sigmas are normal attestations — they participate in enforcement and can be recursively meta-distilled (sigma of sigmas). Each generation grows heavier: first-gen sigmas average ~5k observations, meta-distilled sigmas reach 100k+. The `_version` and `_rust_version` attributes track which code produced each generation.
 
-Identified by `_distill: true` in attributes, `source: "distill"`, and predicates prefixed with `distill:`. Rendered in the UI as the sigma glyph (Σ) with histogram bar charts, numeric range bars, and pie charts for string frequency distributions. See [ADR-020](adr/ADR-020-attestation-distillation.md) and [Bounded Storage](architecture/bounded-storage.md).
+Identified by `_distill: true` in attributes, `source: "distill"`, and predicates prefixed with `distill:`. Rendered in the UI as the sigma element (Σ) with histogram bar charts, numeric range bars, and pie charts for string frequency distributions. See [ADR-020](adr/ADR-020-attestation-distillation.md) and [Bounded Storage](architecture/bounded-storage.md).
 
 ## Symbols
 
@@ -122,27 +122,27 @@ Versioned with migrations using the migration system in `db/sqlite/migrations/`
 ## Canvas Execution Model
 
 ### `upstream` (Python global)
-When a meld edge triggers a py glyph, the triggering attestation is injected as a Python dict named `upstream`. The glyph code doesn't fetch or subscribe — it is *invoked* with the attestation already present. Each matching attestation triggers a fresh execution.
+When a meld edge triggers a py element, the triggering attestation is injected as a Python dict named `upstream`. The element code doesn't fetch or subscribe — it is *invoked* with the attestation already present. Each matching attestation triggers a fresh execution.
 
 - **Present** (meld-triggered): `upstream = {"id": "...", "subjects": [...], "predicates": [...], ...}`
 - **Absent** (standalone, user clicks play): `upstream = None`
 
-The name `upstream` reflects that the attestation comes from the upstream glyph in the meld DAG. Injected by the Rust runtime (see [teranos/pyre](https://github.com/teranos/pyre)) alongside `attest()`. See [development/glyph-attestation-flow.md](development/glyph-attestation-flow.md) for the full model.
+The name `upstream` reflects that the attestation comes from the upstream element in the meld DAG. Injected by the Rust runtime (see [teranos/pyre](https://github.com/teranos/pyre)) alongside `attest()`. See [development/element-attestation-flow.md](development/element-attestation-flow.md) for the full model.
 
 ### `attest()` (Python builtin)
-Creates an attestation from within a py glyph. Injected into the Python execution context by the Rust runtime (see [teranos/pyre](https://github.com/teranos/pyre)) — not a library import, just available as a global function.
+Creates an attestation from within a py element. Injected into the Python execution context by the Rust runtime (see [teranos/pyre](https://github.com/teranos/pyre)) — not a library import, just available as a global function.
 
 ```python
 attest(
     subjects=["alice"],
     predicates=["enriched"],
     contexts=["pipeline"],
-    actors=None,        # defaults to ["glyph:{glyph_id}"] when running in a glyph
+    actors=None,        # defaults to ["element:{element_id}"] when running in an element
     attributes={"key": "value"}  # optional, arbitrary JSON
 )
 ```
 
-Returns a dict with the created attestation's fields (`id`, `subjects`, `predicates`, etc.). When called inside a meld-triggered execution, the output attestation can trigger further downstream glyphs if the DAG continues.
+Returns a dict with the created attestation's fields (`id`, `subjects`, `predicates`, etc.). When called inside a meld-triggered execution, the output attestation can trigger further downstream elements if the DAG continues.
 
 ## Common Patterns
 

@@ -39,4 +39,4 @@ Same as ADR-015: engine-agnostic proto, plugin owns all engine mechanics, consum
 
 ## Not in scope
 
-Graph visualization. The UI renders glyphs on a canvas — layout is a frontend concern, not a database concern.
+Graph visualization. The UI renders elements on a canvas — layout is a frontend concern, not a database concern.

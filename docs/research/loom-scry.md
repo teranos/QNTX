@@ -31,11 +31,11 @@ The scry plugin streams tokens over WebSocket as `LLMStreamMessage` (`server/typ
 - `content`: the token text
 - `signal`: optional `LLMTokenSignal` with `confidence` (P(chosen)), `entropy` (Shannon entropy in bits), `top_gap` (P(top1) - P(top2)), `top_k` (candidate tokens with probabilities)
 
-**Stream glyph** (`web/ts/components/glyph/stream-glyph.ts`). Renders tokens as `<span>` elements with confidence-to-color mapping: high confidence (>0.9) is transparent, low confidence glows amber/orange. Signal data stored in `data-*` attributes on each span. Tokens persist to canvas state for page refresh survival.
+**Stream element** (`web/ts/components/element/result-element.ts`). Renders tokens as `<span>` elements with confidence-to-color mapping: high confidence (>0.9) is transparent, low confidence glows amber/orange. Signal data stored in `data-*` attributes on each span. Tokens persist to canvas state for page refresh survival.
 
-**Token popup** (`web/ts/components/glyph/token-popup.ts`). Hover overlay shows P (confidence), H (entropy), delta (top_gap), and a bar chart of top-K candidates with the chosen token highlighted.
+**Token popup** (`web/ts/components/element/token-popup.ts`). Hover overlay shows P (confidence), H (entropy), delta (top_gap), and a bar chart of top-K candidates with the chosen token highlighted.
 
-**Multiplexer pattern.** One WebSocket handler routes `llm_stream` messages to stream glyph instances by `job_id`. Each stream glyph subscribes with its prompt glyph's ID as key.
+**Multiplexer pattern.** One WebSocket handler routes `llm_stream` messages to stream element instances by `job_id`. Each stream element subscribes with its prompt element's ID as key.
 
 The inference-internals checklist (`docs/research/inference-internals.md`) includes: "Write per-generation attestations with signal attributes to ATS." This is the bridge item -- once generations become attestations, they become consumable by loom.
 
@@ -52,7 +52,7 @@ Today loom consumes attestations with predicates like UserPromptSubmit, Stop, Pr
 {
   "subjects": ["model:qwen-2.5-7b"],
   "predicates": ["Weave"],
-  "contexts": ["glyph:stream-abc-123"],
+  "contexts": ["element:stream-abc-123"],
   "attributes": {
     "prompt": "...",
     "model": "qwen-2.5-7b",
@@ -69,7 +69,7 @@ Today loom consumes attestations with predicates like UserPromptSubmit, Stop, Pr
 {
   "subjects": ["model:qwen-2.5-7b"],
   "predicates": ["Token"],
-  "contexts": ["glyph:stream-abc-123"],
+  "contexts": ["element:stream-abc-123"],
   "attributes": {
     "text": " key",
     "position": 14,
@@ -102,11 +102,11 @@ Confidence-driven weave boundaries (splitting a generation at entropy spikes or 
 
 ### 3D. Frontend visualization: confidence in the timeline
 
-The loom frontend today renders turns as colored-by-speaker text blocks. For generation weaves, the same vertical timeline could show tokens colored-by-confidence, reusing the stream glyph's `confidenceToColor` mapping (amber for low confidence, transparent for high).
+The loom frontend today renders turns as colored-by-speaker text blocks. For generation weaves, the same vertical timeline could show tokens colored-by-confidence, reusing the stream element's `signalToColor` mapping (amber for low confidence, transparent for high).
 
 **Concrete UI changes:**
 
-- **WGIT** — Generation weaves in the timeline. A new visual treatment for weaves that contain token signal data. Instead of `[speaker] text` turns, render a token flow with confidence heatmap coloring. This is the stream glyph's rendering (`renderToken` in `stream-glyph.ts`) transplanted into loom's `Weave.svelte`.
+- **WGIT** — Generation weaves in the timeline. A new visual treatment for weaves that contain token signal data. Instead of `[speaker] text` turns, render a token flow with confidence heatmap coloring. This is the stream element's rendering (`renderToken` in `result-element.ts`) transplanted into loom's `Weave.svelte`.
 
 - **TPIL** — Token popup in loom. The `createTokenPopup` from `token-popup.ts` shows P, H, delta, and top-K candidates. The same popup works in loom -- hover a token in a generation weave to see its signal data. The popup code is standalone (no QNTX-specific dependencies beyond types), extractable to a shared component.
 
@@ -124,4 +124,4 @@ The C++ plugin writes directly to ATS after a generation completes — it has th
 
 **Token-level granularity vs. weave-level.** Resolved. Each token is its own attestation, not a turn in the stitcher sense. The stitcher is not involved. One generation = one weave, no splitting. Token attestations are linked to the weave by shared context.
 
-**Model-specific confidence baselines.** Different models have different confidence distributions. A 0.4 confidence from a 7B model means something different than 0.4 from a 70B model. Should loom normalize confidence per model before visualization, or show raw values and let the user learn each model's baseline? The stream glyph currently shows raw values.
+**Model-specific confidence baselines.** Different models have different confidence distributions. A 0.4 confidence from a 7B model means something different than 0.4 from a 70B model. Should loom normalize confidence per model before visualization, or show raw values and let the user learn each model's baseline? The stream element currently shows raw values.

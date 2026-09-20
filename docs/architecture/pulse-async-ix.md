@@ -305,7 +305,7 @@ func (wp *WorkerPool) processNextJob() error {
 **Current Behavior**:
 - Jobs created successfully regardless of handler availability
 - Error feedback provided through pulse_execution table and WebSocket events
-- IX glyphs show red background with "no handler registered" error message
+- IX elements show red background with "no handler registered" error message
 - Users see full error context in UI (Issue #356)
 
 **Future Improvements** (separate issue):
@@ -324,8 +324,8 @@ func (wp *WorkerPool) processNextJob() error {
 
 **References**:
 - `TODO(plugin-pulse-integration)` in `server/ats_parser.go`
-- Issue #356: Wire IX glyphs to Pulse execution
-- PR #357: Add visual status feedback to IX glyphs
+- Issue #356: Wire IX elements to Pulse execution
+- PR #357: Add visual status feedback to IX elements
 
 ## Implementation Status
 

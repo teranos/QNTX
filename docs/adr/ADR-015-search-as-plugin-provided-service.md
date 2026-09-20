@@ -45,9 +45,9 @@ Same pattern as LLMService: `SearchServer` in core holds a reference to the prov
 
 If a plugin calls `services.Search()` before `qntx-meili` has initialized, the call fails. Consumer plugins should defer configuration (e.g. `ConfigureIndex`) and retry lazily rather than failing initialization — the search provider may register seconds after the consumer starts.
 
-## Meili Panel Glyph
+## Meili Panel Element
 
-`qntx-meili` registers a panel glyph for index management visibility. Shows indexes, document counts, indexing status. Without this, the search infrastructure is a black box.
+`qntx-meili` registers a panel element for index management visibility. Shows indexes, document counts, indexing status. Without this, the search infrastructure is a black box.
 
 ## Consequences
 

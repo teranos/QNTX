@@ -48,7 +48,7 @@ Every signum the node holds or will hold, a table each, a row per sigil (ADR-039
 | sigil | mark |
 | --- | --- |
 | list | |
-| glyphs | |
+| elements | |
 | routes | |
 | read config | |
 | update config | |
@@ -61,14 +61,14 @@ Every signum the node holds or will hold, a table each, a row per sigil (ADR-039
 
 ## canvas
 
-By subject this is one signum; by handler it is four (glyphs, compositions, minimized windows, export). Undecided.
+By subject this is one signum; by handler it is four (elements, compositions, minimized windows, export). Undecided.
 
 | sigil | mark |
 | --- | --- |
-| glyphs list | |
-| glyphs create | |
-| glyphs read | |
-| glyphs delete | |
+| elements list | |
+| elements create | |
+| elements read | |
+| elements delete | |
 | compositions list | |
 | compositions create | |
 | compositions read | |
@@ -228,7 +228,7 @@ Seen as a prefix path only.
 | --- | --- |
 | prompt | |
 
-## glyph-config
+## element-config
 
 | sigil | mark |
 | --- | --- |

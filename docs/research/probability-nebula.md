@@ -36,4 +36,4 @@ The renderer lives inside scry (Metal-cpp). The full distribution is a `float*` 
 
 Token positions are computed once at model load via PCA of the embedding matrix (Accelerate BLAS) and cached in memory.
 
-Frames reach the browser as PNG via WebSocket. `HandleWebSocket` pushes each frame; the nebula glyph (plugin-provided, only registered when Metal is available) receives and draws them on a canvas.
+Frames reach the browser as PNG via WebSocket. `HandleWebSocket` pushes each frame; the nebula element (plugin-provided, only registered when Metal is available) receives and draws them on a canvas.

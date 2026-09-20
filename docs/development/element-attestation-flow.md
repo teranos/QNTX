@@ -1,6 +1,6 @@
-# Glyph Attestation Flow
+# Element Attestation Flow
 
-How attestations flow through meld compositions. The meld edge is both spatial grouping and reactive data pipeline: dragging glyphs together declares the subscription.
+How attestations flow through meld compositions. The meld edge is both spatial grouping and reactive data pipeline: dragging elements together declares the subscription.
 
 See [AXIOMS.md](../AXIOMS.md) for the attestation flow axioms.
 
@@ -14,17 +14,17 @@ See [AXIOMS.md](../AXIOMS.md) for the attestation flow axioms.
 [se: raw] → [se: filtered] → [py: process]
 ```
 
-When the user melds these three glyphs, two subscriptions compile eagerly:
+When the user melds these three elements, two subscriptions compile eagerly:
 
 1. `ax→py` / `se→py`: AX and SE are filters, always live. Their query becomes the subscription filter. Any new attestation matching that filter triggers py.
-2. `py→prompt`: Py is a producer. The subscription filter is `actor == glyph:{py_glyph_id}`. When py calls `attest()`, the resulting attestation triggers prompt.
+2. `py→prompt`: Py is a producer. The subscription filter is `actor == element:{py_element_id}`. When py calls `attest()`, the resulting attestation triggers prompt.
 
 ### Two edge types
 
-| Source glyph | Subscription filter | Why |
+| Source element | Subscription filter | Why |
 |-------------|-------------------|-----|
-| **ax** (filter) | The AX glyph's query filter directly | AX is a pure filter — it doesn't create attestations, it selects them. The filter definition IS the subscription. |
-| **py / prompt** (producer) | `actor == glyph:{upstream_id}` | Producers create new attestations tagged with their glyph ID. The edge watches for attestations from that specific glyph. |
+| **ax** (filter) | The AX element's query filter directly | AX is a pure filter — it doesn't create attestations, it selects them. The filter definition IS the subscription. |
+| **py / prompt** (producer) | `actor == element:{upstream_id}` | Producers create new attestations tagged with their element ID. The edge watches for attestations from that specific element. |
 
 ### Execution flow
 
@@ -32,19 +32,19 @@ When the user melds these three glyphs, two subscriptions compile eagerly:
 1. User melds [ax: contact] → [py: enrich] → [prompt: summarize]
    Subscriptions compile immediately:
      - ax→py: filter = {subjects: ["contact"]}
-     - py→prompt: filter = {actor: "glyph:{py_id}"}
+     - py→prompt: filter = {actor: "element:{py_id}"}
 
 2. Attestation enters the system matching "contact"
-   (via CLI, another glyph, API — any source)
+   (via CLI, another element, API — any source)
 3. ax→py subscription fires
-4. py glyph executes with that ONE attestation as `upstream`
+4. py element executes with that ONE attestation as `upstream`
 5. py code runs, calls attest() with enriched data
-   actor: glyph:{py_glyph_id}
+   actor: element:{py_element_id}
 6. py→prompt subscription fires
-7. prompt glyph executes with that ONE attestation
+7. prompt element executes with that ONE attestation
 8. {{subject}}, {{predicate}}, etc. resolve from the attestation
 9. LLM runs, result attestation created
-10. Attestation glyph appears below prompt
+10. Attestation element appears below prompt
 ```
 
 Each step is one attestation in, one execution, zero or more attestations out.
@@ -55,7 +55,7 @@ AX has no play button. It is always running — this is the current state. When 
 
 Existing attestations from before the meld are not retroactively delivered. The subscription is forward-looking from the moment of assembly. The edge cursor marks the boundary.
 
-### What the python glyph receives
+### What the python element receives
 
 No `pending()`. No `query()`. The attestation is injected as a variable into the execution context, like `attest()` is today:
 
@@ -80,11 +80,11 @@ attest(
 )
 ```
 
-When the py glyph is NOT in a meld (standalone), `upstream` is `None`. The glyph works as it does today — user writes code, clicks play, it runs.
+When the py element is NOT in a meld (standalone), `upstream` is `None`. The element works as it does today — user writes code, clicks play, it runs.
 
-### What the prompt glyph receives
+### What the prompt element receives
 
-The prompt glyph has no user code. Variable resolution is automatic. The incoming attestation's fields map to `{{template}}` placeholders per the existing template syntax in `ats/so/actions/prompt/doc.go`:
+The prompt element has no user code. Variable resolution is automatic. The incoming attestation's fields map to `{{template}}` placeholders per the existing template syntax in `ats/so/actions/prompt/doc.go`:
 
 - `{{subject}}` / `{{subjects}}`
 - `{{predicate}}` / `{{predicates}}`
@@ -110,11 +110,11 @@ AX doesn't create attestations. It queries existing ones. When AX is the root of
 This means:
 
 - No "ax-result" intermediate attestations cluttering the store
-- The downstream glyph receives the real attestation with its original subjects, predicates, contexts, actors
+- The downstream element receives the real attestation with its original subjects, predicates, contexts, actors
 - AX is stateless: it defines *what to watch for*, not *what to produce*
 - Standalone AX behavior is unchanged: query, display results in UI
 
 ## Open
 
-- [#544](https://github.com/teranos/QNTX/issues/544) — Prompt glyph `{{variable}}` resolution from upstream attestation
+- [#544](https://github.com/teranos/QNTX/issues/544) — Prompt element `{{variable}}` resolution from upstream attestation
 - [#543](https://github.com/teranos/QNTX/issues/543) — py→py reactive meld chaining

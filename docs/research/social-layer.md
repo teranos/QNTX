@@ -12,6 +12,6 @@ AT Protocol plugin implemented. Posts, follows, likes, timeline, notifications a
 
 **How do multiple protocols work together?** AT Protocol + ActivityPub. Unified timeline? Cross-protocol identity mapping?
 
-**What's the UX for social actions in the graph?** Click a handle to see their posts? Follow button on attestation glyphs?
+**What's the UX for social actions in the graph?** Click a handle to see their posts? Follow button on attestation elements?
 
 **Feed vs sync distinction?** `/timeline` returns JSON. Sync creates attestations. When do you want each?

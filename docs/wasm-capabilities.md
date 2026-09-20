@@ -2,15 +2,15 @@
 
 What runs in the shared Rust WASM core, and how far each capability is wired.
 
-The shared crate is `ats` / `ats-id`. From there a capability travels three more steps to reach a user: **browser.rs** (`#[wasm_bindgen]` exports) → **TS wrapper** (`web/ts/ats-wasm.ts`) → **UI wired** (used by a glyph or component).
+The shared crate is `ats` / `ats-id`. From there a capability travels three more steps to reach a user: **browser.rs** (`#[wasm_bindgen]` exports) → **TS wrapper** (`web/ts/ats-wasm.ts`) → **UI wired** (used by an element or component).
 
 ## Fully wired (browser + server)
 
 All four steps done:
 
 - Query parsing
-- Attestation CRUD — persists client-side via IndexedDB; used by ax-glyph, ts-glyph
-- Identity (ASUID) — used by ts-glyph
+- Attestation CRUD — persists client-side via IndexedDB; used by ax-element, ts-element
+- Identity (ASUID) — used by ts-element
 - Cosine similarity
 
 ## In Rust, partially wired
@@ -33,7 +33,7 @@ These are currently implemented in Go. Moving them to Rust would let the browser
 | Alias resolution | `ats/alias/` | none | Expand queries locally without server |
 | Conflict detection | `ats/ax/conflicts.go` | none | Preview conflicts before submitting |
 | SO action dispatch | `ats/so/` | none | Recognize "so prompt" / "so csv" before submitting |
-| Attribute schema | `ats/attrs/` | `reflect` — Rust has no runtime reflection, so struct-tag schemas need a redesign, not a translation | Schema validation for glyph rendering |
+| Attribute schema | `ats/attrs/` | `reflect` — Rust has no runtime reflection, so struct-tag schemas need a redesign, not a translation | Schema validation for element rendering |
 
 ## Server-only (not moving)
 

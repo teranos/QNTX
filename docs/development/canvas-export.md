@@ -36,7 +36,7 @@ This requires **server-side rendering** because the server is creating the post.
 **Branch:** `claude/canvas-static-export-hjzI5` (PR #600)
 
 **Approach:**
-- Server queries glyphs from database
+- Server queries elements from database
 - Go code reconstructs canvas HTML
 - Duplicates rendering logic from TypeScript
 - Publishes to IPFS and git
@@ -63,8 +63,8 @@ This requires **server-side rendering** because the server is creating the post.
 
 **Files:**
 - `web/ts/api/canvas-export.ts` - DOM capture + CSS extraction
-- `web/ts/components/glyph/manifestations/canvas-expanded.ts` - Export button
-- `glyph/handlers/canvas.go` - HandleExportDOM endpoint
+- `web/ts/components/element/manifestations/canvas-expanded.ts` - Export button
+- `element/handlers/canvas.go` - HandleExportDOM endpoint
 - `docs/demo/index.html` - Generated demo file
 
 **Why it works:**
@@ -104,16 +104,16 @@ React components render both server-side (Node) and client-side (browser):
 
 ```jsx
 // This same component runs in both places
-function Canvas({ glyphs }) {
+function Canvas({ elements }) {
     return (
         <div className="canvas-workspace">
-            {glyphs.map(g => <Glyph key={g.id} {...g} />)}
+            {elements.map(e => <Element key={e.id} {...e} />)}
         </div>
     );
 }
 
-// Server: const html = renderToString(<Canvas glyphs={data} />)
-// Client: ReactDOM.render(<Canvas glyphs={data} />, root)
+// Server: const html = renderToString(<Canvas elements={data} />)
+// Client: ReactDOM.render(<Canvas elements={data} />, root)
 ```
 
 ### QNTX Equivalent
@@ -124,7 +124,7 @@ Canvas-building code runs both in browser and in TypeScript plugin:
 // Shared code - works in both environments
 export function buildCanvasWorkspace(
     canvasId: string,
-    glyphs: Glyph[],
+    elements: Element[],
     document: Document // Injected: browser or jsdom
 ): HTMLElement {
     const workspace = document.createElement('div');
@@ -134,11 +134,11 @@ export function buildCanvasWorkspace(
 }
 
 // Browser usage
-const workspace = buildCanvasWorkspace(id, glyphs, window.document);
+const workspace = buildCanvasWorkspace(id, elements, window.document);
 
 // Server plugin usage (jsdom)
 const dom = new JSDOM('<!DOCTYPE html>');
-const workspace = buildCanvasWorkspace(id, glyphs, dom.window.document);
+const workspace = buildCanvasWorkspace(id, elements, dom.window.document);
 const html = workspace.outerHTML;
 ```
 
@@ -218,7 +218,7 @@ Post to Bluesky with IPFS link
 
 **Site builder:**
 ```
-User arranges glyphs as website layout
+User arranges elements as website layout
   ↓
 Exports multiple canvases (pages)
   ↓
@@ -282,7 +282,7 @@ Builds versioned documentation site
 ┌─────────────────────┐
 │ TS Plugin           │
 │                     │
-│ 1. Load glyphs      │
+│ 1. Load elements    │
 │ 2. Build canvas     │
 │    (shared TS code) │
 │ 3. Render to HTML   │
@@ -317,24 +317,24 @@ Same HTML output from both paths.
 **Unexpected discovery:** The canvas export primitives naturally support static site generation.
 
 **What we built:**
-- Glyphs (visual primitives)
+- Elements (visual primitives)
 - Canvas (spatial arrangement)
 - Export (DOM → static HTML)
 - Pan/zoom (navigation)
 
 **What it became:**
-A site builder where canvases are pages and glyphs are content.
+A site builder where canvases are pages and elements are content.
 
 **Example:**
 ```
 Canvas 1 (home.qntx):
-  - Note glyph: "Welcome to my site"
-  - Image glyph: hero.png
+  - Note element: "Welcome to my site"
+  - Image element: hero.png
   - Link to Canvas 2
 
 Canvas 2 (about.qntx):
-  - Note glyph: "About me"
-  - Code glyph: GitHub embed
+  - Note element: "About me"
+  - Code element: GitHub embed
 
 Export → Static site:
   - home.html (Canvas 1)
@@ -444,7 +444,7 @@ interface SiteExport {
 </head>
 ```
 
-Source: Glyph attributes or canvas metadata.
+Source: Element attributes or canvas metadata.
 
 ### Template System
 
@@ -456,7 +456,7 @@ Templates:
 - **Documentation** - Sidebar navigation, content area
 - **Landing page** - Hero, features, CTA
 
-Each template is a pre-configured canvas with placeholder glyphs.
+Each template is a pre-configured canvas with placeholder elements.
 
 ### Responsive Layouts
 
@@ -464,7 +464,7 @@ Each template is a pre-configured canvas with placeholder glyphs.
 
 Options:
 1. **Fixed aspect ratio** - Canvas scales but maintains layout
-2. **Breakpoints** - Different glyph positions for mobile/desktop
+2. **Breakpoints** - Different element positions for mobile/desktop
 3. **Flex/grid** - Convert absolute positioning to flexbox
 
 ### Custom Domains
@@ -483,7 +483,7 @@ Integration with deployment platforms (Vercel, Netlify, GitHub Pages).
 ## Related Documents
 
 - [ts-plugin.md](./ts-plugin.md) - TypeScript plugin implementation plan
-- [packages/glyphs/VISION.md](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md) - Glyph architecture vision
+- [teranos/elements VISION.md](https://github.com/teranos/elements/blob/main/VISION.md) - Element architecture vision
 - [GLOSSARY.md](../GLOSSARY.md) - Symbol definitions
 
 ---
@@ -499,7 +499,7 @@ Integration with deployment platforms (Vercel, Netlify, GitHub Pages).
 
 ## Key Takeaways
 
-1. **Primitives over frameworks** - Build composable primitives (glyphs, canvas), discover applications (site builder)
+1. **Primitives over frameworks** - Build composable primitives (elements, canvas), discover applications (site builder)
 2. **Code reuse > duplication** - Run same TS code client and server via plugin system
 3. **Emergent design** - Site builder wasn't the goal, but primitives naturally support it
 4. **Both/and thinking** - Client-side for speed, server-side for automation - keep both

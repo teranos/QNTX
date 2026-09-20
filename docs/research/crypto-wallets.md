@@ -43,9 +43,9 @@ A `qntx-evm` / `qntx-solana` plugin ingests the way `qntx-atproto` does — Puls
 
 **Solana:** JSON-RPC + websocket subscriptions. SPL Token first; Anchor programs after. An Anchor IDL is a machine-readable type vocabulary — the natural bridge to attested types (⊢): a program's types become real in QNTX because the plugin attested them from the IDL, not because a schema was hand-declared.
 
-**Transaction submission is a ceremony.** ADR-030's binding ceremony inverts cleanly: there, "the browser proposes no part of the answer it is going to be judged on"; for a transaction, the node proposes (builds, simulates, prices the tx) and the *user* judges — a glyph draws calldata decoded against the ABI, the wallet signs, the node broadcasts and attests the outcome. Simulation-before-signature is the chain analogue of the consent screen. Pulse budgets extend to gas: a spending cap per namespace is the same shape as an API budget.
+**Transaction submission is a ceremony.** ADR-030's binding ceremony inverts cleanly: there, "the browser proposes no part of the answer it is going to be judged on"; for a transaction, the node proposes (builds, simulates, prices the tx) and the *user* judges — an element draws calldata decoded against the ABI, the wallet signs, the node broadcasts and attests the outcome. Simulation-before-signature is the chain analogue of the consent screen. Pulse budgets extend to gas: a spending cap per namespace is the same shape as an API budget.
 
-**Glyphs:** wallet glyph (balances across chains, one triplet per holding), transaction-ceremony glyph, contract glyph (ABI/IDL-derived read/write surface), portfolio composition on the canvas melding chain data with everything else QNTX knows.
+**Elements:** wallet element (balances across chains, one triplet per holding), transaction-ceremony element, contract element (ABI/IDL-derived read/write surface), portfolio composition on the canvas melding chain data with everything else QNTX knows.
 
 ## Open questions
 

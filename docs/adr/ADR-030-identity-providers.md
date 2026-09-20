@@ -81,7 +81,7 @@ operator's and lives where the rest of their deployment does:
 The secret is a reference, never a literal: am.toml ships as a world-readable
 SSM parameter, so a secret written into it is disclosed rather than configured.
 
-The glyph draws it. `/auth/binding/providers` describes what each provider
+The element draws it. `/auth/binding/providers` describes what each provider
 asks for, so a provider appears in the UI by existing on the node — and Google
 exists on a node only once it has been given a client, so a button that could
 only fail is never drawn. The one window that still opens is the provider's own

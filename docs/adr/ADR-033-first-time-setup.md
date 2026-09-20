@@ -46,9 +46,9 @@ how it is entered.
 
 ## It is a door
 
-A glyph persists. It lives in the tray, is reopened, melds, and has a life after the
+An element persists. It lives in the tray, is reopened, melds, and has a life after the
 moment it was made for. First-time setup happens once per deployment, so there is nothing
-to return to, and it is not a glyph.
+to return to, and it is not an element.
 
 Not being authenticated feels cold and distant, mechanical. So the door is brushed metal,
 machined rather than designed, and the one living thing on it is the fingerprint: green

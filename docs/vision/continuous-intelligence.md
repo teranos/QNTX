@@ -47,6 +47,6 @@ The difference: attestations capture relationships and context. Pulse schedules 
 
 ## Related Vision
 
-- [Glyphs](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md) - Universal UI primitive for manifesting intelligence
-- [Fractal Workspace](./fractal-workspace.md) - Visualize continuous intelligence through always-visible glyph surfaces
+- [Elements](https://github.com/teranos/elements/blob/main/VISION.md) - Universal UI primitive for manifesting intelligence
+- [Fractal Workspace](./fractal-workspace.md) - Visualize continuous intelligence through always-visible element surfaces
 - [Time-Travel](./time-travel.md) - Navigate the evolution of intelligence across time

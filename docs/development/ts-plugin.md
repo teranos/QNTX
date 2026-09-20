@@ -244,12 +244,12 @@ Make canvas-building code importable by both client and plugin.
  */
 export interface CanvasBuilderOptions {
     canvasId: string;
-    glyphs: Glyph[];
+    elements: Element[];
     document: Document; // Injected - browser or jsdom
 }
 
 export function buildCanvasWorkspace(options: CanvasBuilderOptions): HTMLElement {
-    const { canvasId, glyphs, document } = options;
+    const { canvasId, elements, document } = options;
 
     // Create workspace container
     const workspace = document.createElement('div');
@@ -261,32 +261,32 @@ export function buildCanvasWorkspace(options: CanvasBuilderOptions): HTMLElement
     const contentLayer = document.createElement('div');
     contentLayer.className = 'canvas-content-layer';
 
-    // Render glyphs
-    for (const glyph of glyphs) {
-        const element = createGlyphElement(glyph, document);
-        contentLayer.appendChild(element);
+    // Render elements
+    for (const element of elements) {
+        const el = createElementElement(element, document);
+        contentLayer.appendChild(el);
     }
 
     workspace.appendChild(contentLayer);
     return workspace;
 }
 
-function createGlyphElement(glyph: Glyph, document: Document): HTMLElement {
-    // Glyph rendering logic (no browser globals)
+function createElementElement(item: Element, document: Document): HTMLElement {
+    // Element rendering logic (no browser globals)
     // ...
 }
 ```
 
-**Modify:** `web/ts/components/glyph/canvas/canvas-workspace-builder.ts`
+**Modify:** `web/ts/components/element/canvas/canvas-workspace-builder.ts`
 
 ```typescript
 // Use shared builder
 import { buildCanvasWorkspace } from '../../../shared/canvas-builder';
 
-export function buildCanvasWorkspaceInBrowser(canvasId: string, glyphs: Glyph[]): HTMLElement {
+export function buildCanvasWorkspaceInBrowser(canvasId: string, elements: Element[]): HTMLElement {
     return buildCanvasWorkspace({
         canvasId,
-        glyphs,
+        elements,
         document: window.document // Browser document
     });
 }
@@ -349,7 +349,7 @@ export default {
     registerHTTP: (mux) => {
         // POST /render - Render canvas to HTML
         mux.handle('POST', '/render', async (req, res) => {
-            const { canvasId, glyphs } = await req.json();
+            const { canvasId, elements } = await req.json();
 
             // Create server-side DOM
             const { document } = createDOMEnvironment();
@@ -357,7 +357,7 @@ export default {
             // Build canvas using shared code
             const workspace = buildCanvasWorkspace({
                 canvasId,
-                glyphs,
+                elements,
                 document
             });
 
@@ -419,8 +419,8 @@ export function loadCanvasCSS(): string {
 ```typescript
 import { test, expect } from 'bun:test';
 
-test('renders canvas with note glyph', async () => {
-    const glyphs = [{
+test('renders canvas with note element', async () => {
+    const elements = [{
         id: 'note-1',
         symbol: '▣',
         x: 100,
@@ -433,7 +433,7 @@ test('renders canvas with note glyph', async () => {
     const response = await fetch('http://localhost:8770/api/canvas-renderer/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ canvasId: 'test', glyphs })
+        body: JSON.stringify({ canvasId: 'test', elements })
     });
 
     const { html } = await response.json();
@@ -444,9 +444,9 @@ test('renders canvas with note glyph', async () => {
     expect(html).toContain('data-canvas-id="test"');
     expect(html).toContain('canvas-content-layer');
 
-    // Verify glyph content
+    // Verify element content
     expect(html).toContain('Test note');
-    expect(html).toContain('data-glyph-id="note-1"');
+    expect(html).toContain('data-element-id="note-1"');
 
     // Verify CSS included
     expect(html).toContain('.canvas-workspace');
@@ -461,10 +461,10 @@ test('output matches client-rendered HTML', async () => {
 ### Phase 2 Success Criteria
 
 - [ ] Canvas renderer plugin starts successfully
-- [ ] Can call `/api/canvas-renderer/render` with glyphs
+- [ ] Can call `/api/canvas-renderer/render` with elements
 - [ ] Returns HTML that matches client-rendered output
 - [ ] Includes all necessary CSS
-- [ ] DOM structure is correct (workspace, content-layer, glyphs)
+- [ ] DOM structure is correct (workspace, content-layer, elements)
 - [ ] Tests pass
 
 ---
@@ -495,18 +495,18 @@ func (s *QNTXServer) HandleCanvasSnapshot(w http.ResponseWriter, r *http.Request
         return
     }
 
-    // Get glyphs from storage
-    glyphs, err := s.canvasHandler.store.ListGlyphs(r.Context())
+    // Get elements from storage
+    elements, err := s.canvasHandler.store.ListElements(r.Context())
     if err != nil {
-        s.writeError(w, errors.Wrap(err, "failed to list glyphs"), http.StatusInternalServerError)
+        s.writeError(w, errors.Wrap(err, "failed to list elements"), http.StatusInternalServerError)
         return
     }
 
-    // Filter glyphs for this canvas
-    var canvasGlyphs []interface{}
-    for _, g := range glyphs {
+    // Filter elements for this canvas
+    var canvasElements []interface{}
+    for _, g := range elements {
         if g.CanvasID == canvasID {
-            canvasGlyphs = append(canvasGlyphs, map[string]interface{}{
+            canvasElements = append(canvasElements, map[string]interface{}{
                 "id": g.ID,
                 "symbol": g.Symbol,
                 "x": g.X,
@@ -527,7 +527,7 @@ func (s *QNTXServer) HandleCanvasSnapshot(w http.ResponseWriter, r *http.Request
 
     resp, err := plugin.CallHTTP("/render", map[string]interface{}{
         "canvasId": canvasID,
-        "glyphs": canvasGlyphs,
+        "elements": canvasElements,
     })
     if err != nil {
         s.writeError(w, errors.Wrap(err, "plugin render failed"), http.StatusInternalServerError)
@@ -654,7 +654,7 @@ demo: web cli canvas-renderer-plugin ## Start QNTX in demo mode with TS plugins
 ### Manual Testing
 
 1. `make demo` - Start server with TS plugins
-2. Create canvas with glyphs (note, code, prompt)
+2. Create canvas with elements (note, code, prompt)
 3. Export via client button (existing feature)
 4. Call `/api/canvas/snapshot` (new feature)
 5. Compare HTML output (should match)
@@ -705,7 +705,7 @@ Once TypeScript plugin infrastructure exists:
 
 1. **Data processing plugins** - CSV transforms, JSON manipulation
 2. **API integration plugins** - GitHub, Linear, Notion connectors
-3. **Custom glyph renderers** - Specialized visualizations
+3. **Custom element renderers** - Specialized visualizations
 4. **Template engines** - Mustache, Handlebars for content generation
 5. **Site builder plugins** - Multi-page site generation from canvas
 

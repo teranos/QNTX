@@ -6,7 +6,7 @@ Implemented
 
 ## Context
 
-Python execution was hardcoded to a single plugin named "python". The watcher engine checked `if p == "python"` at boot to register the "py" glyph type, then executed Python code via HTTP POST to `/api/python/execute`. This coupled the execution path to a specific plugin name and used HTTP instead of gRPC — unlike every other plugin-provided service (LLM, search, embedding).
+Python execution was hardcoded to a single plugin named "python". The watcher engine checked `if p == "python"` at boot to register the "py" element type, then executed Python code via HTTP POST to `/api/python/execute`. This coupled the execution path to a specific plugin name and used HTTP instead of gRPC — unlike every other plugin-provided service (LLM, search, embedding).
 
 The real value of Python integration is the ecosystem — the libraries available in the runtime, not the language itself. A single monolithic Python plugin that bundles all packages is the wrong abstraction. Different domains need different Python environments: bioinformatics needs biopython/dnachisel/numpy, data analysis needs pandas/scipy, ML needs torch/transformers. These are separate concerns that belong in separate plugins.
 
@@ -14,7 +14,7 @@ The real value of Python integration is the ecosystem — the libraries availabl
 
 ### PythonService gRPC
 
-Add `PythonService` following the established provider pattern (ADR-014, ADR-015, ADR-017). A plugin declares `python_provider = true` in `InitializeResponse` and implements `PythonService.Execute` via gRPC. QNTX discovers the capability dynamically and routes "py" glyph execution to the provider — no name checks.
+Add `PythonService` following the established provider pattern (ADR-014, ADR-015, ADR-017). A plugin declares `python_provider = true` in `InitializeResponse` and implements `PythonService.Execute` via gRPC. QNTX discovers the capability dynamically and routes "py" element execution to the provider — no name checks.
 
 ### Protocol
 
@@ -27,7 +27,7 @@ service PythonService {
 
 message PythonExecuteRequest {
   string code = 1;
-  string glyph_id = 2;
+  string element_id = 2;
   bytes upstream_attestation = 3;
 }
 
@@ -44,7 +44,7 @@ message PythonExecuteResponse {
 ### Core side
 
 - `PythonExecutor` interface on the watcher engine, satisfied by `grpcPythonExecutor` (gRPC client wrapper)
-- `AddPythonProvider(client)` stores the `PythonServiceClient` on the server, registers the "py" glyph type, and sets the watcher executor
+- `AddPythonProvider(client)` stores the `PythonServiceClient` on the server, registers the "py" element type, and sets the watcher executor
 - `onPythonProviderReady` callback in plugin discovery, same pattern as embedding/search
 - Server-side `/api/python/execute` handler bridges the frontend's HTTP POST to the provider's gRPC `PythonService.Execute` — decouples the frontend from the plugin name
 - Plugin HTTP handlers (`/api/{name}/execute`, `/api/{name}/pip/*`, etc.) remain available for direct plugin access
@@ -93,16 +93,16 @@ Same Rust binary, same gRPC protocol, different Python environments. Each runs a
 - Multiple Python plugins can coexist with different library sets
 - New Python environments are defined entirely in Nix — no Rust changes needed
 - Same hot-reload semantics as all other plugins: edit am.toml, plugin restarts
-- Interactive execution (py glyph run button) goes through server-side handler → gRPC; watcher execution goes through `PythonExecutor` → gRPC. Both paths are plugin-name-agnostic
+- Interactive execution (py element run button) goes through server-side handler → gRPC; watcher execution goes through `PythonExecutor` → gRPC. Both paths are plugin-name-agnostic
 - PyO3 pins Python to 3.13 (nix-provided); system Python version is irrelevant
 
 ## Open question: multiple python providers
 
-`AddPythonProvider` is last-writer-wins — a single `pythonClient` on the server, a single `PythonExecutor` on the watcher engine. The Nix specialization pattern enables multiple Python plugins with different library sets, but the "py" glyph can only route to one provider at a time. If multiple plugins declare `python_provider = true`, which one handles execution?
+`AddPythonProvider` is last-writer-wins — a single `pythonClient` on the server, a single `PythonExecutor` on the watcher engine. The Nix specialization pattern enables multiple Python plugins with different library sets, but the "py" element can only route to one provider at a time. If multiple plugins declare `python_provider = true`, which one handles execution?
 
 Options not yet decided:
-- **Typed glyph variants** (`py:bio`, `py:data`) — each variant routes to a specific provider
-- **Per-glyph provider selection** — the glyph stores which provider it targets
+- **Typed element variants** (`py:bio`, `py:data`) — each variant routes to a specific provider
+- **Per-element provider selection** — the element stores which provider it targets
 - **Priority/ordering** — first or last registered wins, configured in am.toml
 - **Single provider constraint** — enforce exactly one python provider, reject duplicates
 

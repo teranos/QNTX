@@ -1,29 +1,29 @@
 # Fractal Workspace - Vision
 
-**Status:** Active - Nested canvas glyphs implemented in [#461](https://github.com/teranos/QNTX/pull/461), ongoing refinement
+**Status:** Active - Nested canvas elements implemented in [#461](https://github.com/teranos/QNTX/pull/461), ongoing refinement
 
-**Implementation Path:** Workspaces are composed of [glyphs](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md) with [persistence and sync](../plans/glyph-persistence-visual-sync.md). Nested canvas glyphs (⧉) create fractal workspaces - canvases within canvases. Users navigate by entering nested canvases.
+**Implementation Path:** Workspaces are composed of [elements](https://github.com/teranos/elements/blob/main/VISION.md) with [persistence and sync](../plans/element-persistence-visual-sync.md). Nested canvas elements (⧉) create fractal workspaces - canvases within canvases. Users navigate by entering nested canvases.
 
 ## Concepts
 
-Transform workspace navigation from **flat graph** to **fractal canvases** - a paradigm shift where the main canvas contains nested canvas glyphs that users enter to access deeper workspaces. Glyphs are **persistent information surfaces** displaying contextual data without interaction, embodying the [continuous intelligence](./continuous-intelligence.md) paradigm.
+Transform workspace navigation from **flat graph** to **fractal canvases** - a paradigm shift where the main canvas contains nested canvas elements that users enter to access deeper workspaces. Elements are **persistent information surfaces** displaying contextual data without interaction, embodying the [continuous intelligence](./continuous-intelligence.md) paradigm.
 
 ### 1. Navigation Modes
 
-**Zoom-based glyph manifestations:**
-- Glyphs progressively reveal detail as you zoom in
-- Each glyph type defines its own manifestations (e.g., chart-glyph: mini → zoomed → fullscreen)
+**Zoom-based element manifestations:**
+- Elements progressively reveal detail as you zoom in
+- Each element type defines its own manifestations (e.g., chart-element: mini → zoomed → fullscreen)
 - Figma-like zoom/pan for spatial navigation
 - Especially important on mobile with pinch-to-zoom
 
 **Meld composition navigation (mobile):**
-- When in fullscreen glyph manifestation, drag down from top to navigate to connected glyph above
+- When in fullscreen element manifestation, drag down from top to navigate to connected element above
 - Navigate through melded compositions fluidly
-- Access related glyphs without exiting to canvas view
+- Access related elements without exiting to canvas view
 
 **Hierarchical canvas navigation:**
-- Tap/click nested canvas glyph to enter that workspace
-- Glyphs and compositions exist within canvases
+- Tap/click nested canvas element to enter that workspace
+- Elements and compositions exist within canvases
 - Nested canvases create fractal workspace hierarchy
 - Exit to return to parent canvas
 
@@ -31,15 +31,15 @@ Transform workspace navigation from **flat graph** to **fractal canvases** - a p
 
 ### 2. Compositional Computing
 
-Inspired by Smalltalk/Pharo's pane model - glyphs are **compositional surfaces** that can be:
+Inspired by Smalltalk/Pharo's pane model - elements are **compositional surfaces** that can be:
 - Arranged on canvases (grid layout)
-- Organized hierarchically (nested canvas glyphs)
+- Organized hierarchically (nested canvas elements)
 - Connected through time ([time-travel](./time-travel.md))
-- Melded into compositions ([melding](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md#melding))
+- Melded into compositions ([melding](https://github.com/teranos/elements/blob/main/VISION.md#melding))
 
 ### 3. Rich Data Display
 
-Glyphs show contextual data on their surface. Each glyph type determines what information to display based on the entity it represents. Plugins that attest new glyph types define how those glyphs render their data.
+Elements show contextual data on their surface. Each element type determines what information to display based on the entity it represents. Plugins that attest new element types define how those elements render their data.
 
 ## Design Goals
 
@@ -59,37 +59,37 @@ Glyphs show contextual data on their surface. Each glyph type determines what in
 ### Always-On Data
 - Most important fields visible without interaction
 - Hover/click for supplementary actions, not primary data
-- Glyph surface = **first-class information display**
+- Element surface = **first-class information display**
 
 ## Implementation
 
-Glyphs are the universal primitive ([VISION.md](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md)):
+Elements are the universal primitive ([VISION.md](https://github.com/teranos/elements/blob/main/VISION.md)):
 
-- Glyphs manifest differently at different zoom levels
-- Glyphs are attestable (plugins attest new glyph types)
-- Glyph state is attested (positions, sizes, manifestations persist)
-- Nested canvas glyphs create fractal workspaces
-- Meld compositions connect glyphs
+- Elements manifest differently at different zoom levels
+- Elements are attestable (plugins attest new element types)
+- Element state is attested (positions, sizes, manifestations persist)
+- Nested canvas elements create fractal workspaces
+- Meld compositions connect elements
 
 ### Implementation Considerations
 
 - Responsive to different screen sizes
-- Smooth transitions between zoom levels (glyph morphing)
-- Glyph size adapts to content
+- Smooth transitions between zoom levels (element morphing)
+- Element size adapts to content
 
 ## Mobile-First Considerations
 
 See the [App's vision](https://github.com/teranos/QNTX-App/blob/main/VISION.md) for detailed mobile UX vision and implementation status.
 
 **Deep Exploratory Analysis** (30+ min sessions on mobile):
-- **Pinch-to-zoom:** Glyphs reveal progressive detail as you zoom in
-- **Glyph manifestations:** Mini → zoomed → fullscreen based on zoom level
-- **Meld navigation:** Drag down from top when in fullscreen glyph to navigate to connected glyph above
-- **Canvas navigation:** Tap nested canvas glyph to enter, back gesture to exit
-- **Landscape enhancement:** Wider glyphs show more detail when horizontal
+- **Pinch-to-zoom:** Elements reveal progressive detail as you zoom in
+- **Element manifestations:** Mini → zoomed → fullscreen based on zoom level
+- **Meld navigation:** Drag down from top when in fullscreen element to navigate to connected element above
+- **Canvas navigation:** Tap nested canvas element to enter, back gesture to exit
+- **Landscape enhancement:** Wider elements show more detail when horizontal
 
 **Gesture Mapping:**
-- Pinch in/out → Zoom reveals glyph manifestations
+- Pinch in/out → Zoom reveals element manifestations
 - Tap nested canvas → Enter that workspace
 - Drag from top (fullscreen) → Navigate meld composition
 - Back gesture → Exit nested canvas

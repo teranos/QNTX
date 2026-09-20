@@ -97,7 +97,7 @@ so a delete drains what that flush wrote.
 
 Opening a namespace is one open per name, and none of it holds the node: a take-in copies a
 namespace's history, and default and system are served while it does.
-The db glyph's numbers are
+The db element's numbers are
 not back yet: its stats read `qntx-operational.db` through the one registered driver,
 and the attestations now sit in the namespace's own file.
 
@@ -117,7 +117,7 @@ One file per namespace is what makes a namespace destroyable. Today `OpenNamespa
 
 - `muWrite` in `ats/storage/sqlitecgo/storage_cgo.go` is per-`RustStore`, and every write takes it. One store means one lock for the node, so a namespace holding it stalls every other namespace.
 - Migrations run once against one file, so a schema that will not apply takes the node's boot rather than one namespace's.
-- `canvas_glyphs` has `canvas_id` for subcanvas nesting and no namespace column at all, so one canvas is every namespace's canvas.
+- `canvas_elements` has `canvas_id` for subcanvas nesting and no namespace column at all, so one canvas is every namespace's canvas.
 - Deleting a namespace becomes removing its file and its prefix, rather than a `DELETE` across a dozen tables that has to be right every time.
 
 Canvas following the rectangle is three changes, not one. Splitting the db gives
@@ -125,7 +125,7 @@ each namespace its own canvas tables, and that is the only part this ADR does.
 `CanvasHandler` holds a single `*CanvasStore` captured at construction
 (`server/sub_canvas.go:24`) and never resolves one per request — it never sees
 the admission, so it cannot ask which namespace — and it has to start asking the
-way `storeFor` does. Then the reach lines change — glyphs, compositions,
+way `storeFor` does. Then the reach lines change — elements, compositions,
 minimized windows and the two exports are five lines and eight paths, all of
 them ROOT's today:
 
@@ -134,4 +134,4 @@ them ROOT's today:
 Which makes a canvas the namespace's rather than ROOT's, and which one a caller
 gets is the namespace they are standing in.
 
-The db glyph gets its numbers back. `dimensionsDescribeTheCount` in `server/db_stats_cache.go` is set only when the count falls through to the operational tables, which on parquet it does not, so `unique_actors`, `unique_subjects`, `unique_contexts`, `distillation` and `predicate_histograms` are left out of the response rather than sent as zero. Attestations in the operational db set that flag, and the five return with no frontend change: `web/ts/db-glyph.ts` already reads an absent key as a backend that does not answer, and a zero as an answer of none.
+The db element gets its numbers back. `dimensionsDescribeTheCount` in `server/db_stats_cache.go` is set only when the count falls through to the operational tables, which on parquet it does not, so `unique_actors`, `unique_subjects`, `unique_contexts`, `distillation` and `predicate_histograms` are left out of the response rather than sent as zero. Attestations in the operational db set that flag, and the five return with no frontend change: `web/ts/db-element.ts` already reads an absent key as a backend that does not answer, and a zero as an answer of none.

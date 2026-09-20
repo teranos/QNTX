@@ -87,7 +87,7 @@ those.
 Clicking a namespace highlights a tile in the namespaces bar. A session acts in
 the default namespace, whatever is highlighted.
 
-Watchers, schedules, the canvas and the glyph handlers are stored once, so a
+Watchers, schedules, the canvas and the element handlers are stored once, so a
 namespace other than the default has none of its own — nor its own search index
 or embeddings. Attestations and observers are per namespace.
 

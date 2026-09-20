@@ -23,7 +23,7 @@ The atomic unit of QNTX. A signed, immutable claim.
 
 ## The Triplet (⫶)
 
-Subject + predicate + context. The *content* of the claim, stripped of provenance. This is what users see and interact with. The [triplet glyph](glyphs/triplet.md) groups all attestations sharing a triplet.
+Subject + predicate + context. The *content* of the claim, stripped of provenance. This is what users see and interact with. The [triplet element](elements/triplet.md) groups all attestations sharing a triplet.
 
 ## The Sigma (Σ)
 

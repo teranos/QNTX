@@ -8,7 +8,7 @@ An atomic unit of the attestation grammar. The segments (`i`, `am`, `ix`, `ax`, 
 
 - **seg** — the grammatical unit (what it IS)
 - **sym** — the visual expression (how it LOOKS: `⋈`, `⨳`, `+`, `=`, `∈`, `⌬`, `✦`)
-- **glyph** — the interactive form (how you INTERACT with it) — not all symbols have a glyph. A glyph's forms beyond the GlyphRun — window, panel, canvas — are its manifestations: [packages/glyphs/VISION.md](https://github.com/teranos/QNTX/blob/main/packages/glyphs/VISION.md)
+- **element** — the interactive form (how you INTERACT with it) — not all symbols have an element. An element's forms beyond the tray — window, panel, canvas — are its manifestations: [teranos/elements VISION.md](https://github.com/teranos/elements/blob/main/VISION.md)
 
 ## Primary Segments
 
@@ -46,7 +46,7 @@ Fundamental components of attestations (not UI elements):
 | `⊢` | Type | An actor's judgment that a pattern deserves a name |
 | `Σ` | Sigma | Distilled/summarized attestation (sum of many observations) |
 
-*The attestation glyph drew `+` until `+` went back to being the subject it
+*The attestation element drew `+` until `+` went back to being the subject it
 marks. A canvas saved before that still says `+`, and is read by what the
 record holds rather than by the mark alone.*
 

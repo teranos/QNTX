@@ -20,7 +20,7 @@ QNTX needs to render canvas snapshots server-side for:
 
 **Current State:**
 - Client-side DOM export exists (`/api/canvas/export-dom`)
-- Canvas-building code is in `web/ts/components/glyph/canvas/`
+- Canvas-building code is in `web/ts/components/element/canvas/`
 - No TypeScript plugin runtime exists yet
 
 **Goal:** Run the same browser TypeScript code server-side using Bun subprocess as a gRPC plugin.
@@ -233,7 +233,7 @@ Expected: `{"message": "Hello from TypeScript!"}`
 
 **Files to create/modify:**
 ```
-web/ts/components/glyph/canvas/
+web/ts/components/element/canvas/
 ├── canvas-workspace-builder.ts  # Modify to accept document param
 └── canvas-builder-shared.ts     # New: environment-agnostic wrapper
 ```
@@ -241,7 +241,7 @@ web/ts/components/glyph/canvas/
 **Key change:**
 ```typescript
 // Before (browser-only)
-export function buildCanvasWorkspace(canvasId: string, glyphs: Glyph[]): HTMLElement {
+export function buildCanvasWorkspace(canvasId: string, elements: Element[]): HTMLElement {
     const workspace = document.createElement('div');  // ❌ Assumes global
     // ...
 }
@@ -249,7 +249,7 @@ export function buildCanvasWorkspace(canvasId: string, glyphs: Glyph[]): HTMLEle
 // After (environment-agnostic)
 export function buildCanvasWorkspace(
     canvasId: string,
-    glyphs: Glyph[],
+    elements: Element[],
     document: Document  // ✅ Injected
 ): HTMLElement {
     const workspace = document.createElement('div');
@@ -305,7 +305,7 @@ export function setupBrowserStubs(globalThis: any) {
 **plugin.ts core logic:**
 ```typescript
 import { Window } from 'happy-dom';
-import { buildCanvasWorkspace } from '../../../web/ts/components/glyph/canvas/canvas-workspace-builder';
+import { buildCanvasWorkspace } from '../../../web/ts/components/element/canvas/canvas-workspace-builder';
 
 export default {
     name: 'canvas-renderer',
@@ -318,14 +318,14 @@ export default {
 
     registerHTTP(mux: any) {
         mux.handle('POST', '/render', async (req: any, res: any) => {
-            const { canvas_id, glyphs } = await req.json();
+            const { canvas_id, elements } = await req.json();
 
             // Create server-side DOM
             const window = new Window();
             const document = window.document;
 
             // Build canvas using shared code
-            const workspace = buildCanvasWorkspace(canvas_id, glyphs, document);
+            const workspace = buildCanvasWorkspace(canvas_id, elements, document);
 
             // Load CSS
             const css = loadCanvasCSS();
@@ -392,7 +392,7 @@ curl -X POST http://localhost:8772/api/canvas-renderer/render \
   -H 'Content-Type: application/json' \
   -d '{
     "canvas_id": "test",
-    "glyphs": [{
+    "elements": [{
       "id": "note-1",
       "symbol": "▣",
       "x": 100,
@@ -459,8 +459,8 @@ func (h *CanvasHandler) HandleExport(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Get glyphs from storage
-    glyphs, err := h.store.ListGlyphsByCanvas(r.Context(), canvasID)
+    // Get elements from storage
+    elements, err := h.store.ListElementsByCanvas(r.Context(), canvasID)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
@@ -505,13 +505,13 @@ export async function exportCanvas(canvasId: string): Promise<void> {
     }
 
     const result = await response.json();
-    log.info(SEG.GLYPH, `Canvas exported to ${result.path}`);
+    log.info(SEG.ELEMENT, `Canvas exported to ${result.path}`);
 }
 ```
 
 ### 3.3 Update Export Button
 
-**File:** `web/ts/components/glyph/manifestations/canvas-expanded.ts`
+**File:** `web/ts/components/element/manifestations/canvas-expanded.ts`
 
 Find the export button (currently calls `exportCanvasDOM`):
 ```typescript
@@ -522,8 +522,8 @@ const exportBtn = new Button({
     label: 'Export',
     icon: '↓',
     onClick: async () => {
-        await exportCanvas(glyph.id);  // Pass canvas ID, not workspace element
-        log.info(SEG.GLYPH, '[Canvas] Export complete (server-side)');
+        await exportCanvas(item.id);  // Pass canvas ID, not workspace element
+        log.info(SEG.ELEMENT, '[Canvas] Export complete (server-side)');
     }
 });
 ```
@@ -535,7 +535,7 @@ const exportBtn = new Button({
 make demo
 # 1. Create a subcanvas
 # 2. Double-click to expand fullscreen
-# 3. Add some glyphs (note, code, etc.)
+# 3. Add some elements (note, code, etc.)
 # 4. Click Export button
 # 5. Check docs/demo/index.html exists
 ```
@@ -545,7 +545,7 @@ make demo
 # Open docs/demo/index.html in browser
 # Verify:
 # - Canvas renders correctly
-# - All glyphs visible
+# - All elements visible
 # - CSS applied
 # - No console errors
 ```
@@ -558,7 +558,7 @@ make demo
 ### Phase 3 Success Criteria
 
 - [ ] Export button in canvas-expanded calls server endpoint
-- [ ] Server fetches glyphs from database
+- [ ] Server fetches elements from database
 - [ ] Server calls canvas-renderer plugin via gRPC
 - [ ] HTML written to docs/demo/index.html
 - [ ] Opening HTML file shows correct canvas
@@ -606,7 +606,7 @@ make demo
 
 **Phase 2:**
 - [ ] Plugin renders simple canvas
-- [ ] Multiple glyph types work
+- [ ] Multiple element types work
 - [ ] CSS applies correctly
 - [ ] HTML validates
 
@@ -663,7 +663,7 @@ If any phase fails and cannot be fixed quickly:
 
 **Phase 2:**
 - Canvas HTML output matches client rendering
-- All glyph types render correctly
+- All element types render correctly
 - CSS applies properly
 
 **Phase 3:**
@@ -704,7 +704,7 @@ If any phase fails and cannot be fixed quickly:
 - ✅ Frontend API (`exportCanvasStatic` in canvas.ts)
 - ✅ Export button integration (canvas-expanded.ts)
 - ✅ DEMO flag gating (export only available with `make demo`)
-- ✅ canvas_id scoping (filters glyphs by subcanvas)
+- ✅ canvas_id scoping (filters elements by subcanvas)
 - ✅ Error display via Button component (no alert/confirm/prompt)
 - ✅ Process improvements: ESLint rules, web/CLAUDE.md documentation, PreToolUse hooks
 - ✅ Sync fix: canvas-sync.ts uses spread operator (all proto fields auto-sync)
@@ -712,11 +712,11 @@ If any phase fails and cannot be fixed quickly:
 - ✅ Tests pass: 666 pass, 0 fail
 
 **Known Limitations (documented in canvas.go):**
-- Old glyphs (created before 2026-02-26) have empty canvas_id and won't export
+- Old elements (created before 2026-02-26) have empty canvas_id and won't export
 - Export quality issues: static HTML output differs from live canvas (root cause TBD)
 
 **Won't Do:**
-- Migration script to backfill old glyphs (not worth the effort, new glyphs work)
+- Migration script to backfill old elements (not worth the effort, new elements work)
 
 **Out of Scope (future work):**
 - Publish endpoint scoping (similar to export)

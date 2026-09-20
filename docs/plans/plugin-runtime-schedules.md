@@ -1,15 +1,15 @@
 # Plugin Runtime Schedule Management
 
 **Status:** Implemented
-**Context:** ix-json plugin needs per-glyph polling schedules created at runtime, not just at init
+**Context:** ix-json plugin needs per-element polling schedules created at runtime, not just at init
 
 ## Problem
 
 Plugins can only announce Pulse schedules during `Initialize` via `GetSchedules()`. This works for static schedules known at startup, but fails when schedules are user-driven:
 
-- A user opens an ix-json glyph, configures an API URL, and clicks Activate
-- That glyph needs its own Pulse schedule with its own interval
-- Other glyphs of the same plugin type may have different URLs and intervals
+- A user opens an ix-json element, configures an API URL, and clicks Activate
+- That element needs its own Pulse schedule with its own interval
+- Other elements of the same plugin type may have different URLs and intervals
 - Schedules must be created/paused/deleted at runtime, not predicted at init
 
 Currently the ix-json plugin works around this with internal goroutine tickers that enqueue one-shot Pulse jobs. This works but bypasses Pulse's schedule infrastructure — no visibility in the Pulse panel, no persistence across restarts, no state management.
@@ -56,7 +56,7 @@ type ScheduleService interface {
 Activate clicks:
 ```go
 id, err := p.services.Schedule().Create("ix-json.poll", intervalSecs, payload, metadata)
-// Store schedule ID in glyph's attestation for later pause/delete
+// Store schedule ID in element's attestation for later pause/delete
 ```
 
 Pause clicks:

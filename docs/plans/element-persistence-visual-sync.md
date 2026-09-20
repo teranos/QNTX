@@ -1,4 +1,4 @@
-# Glyph Persistence: Visual Sync State System
+# Element Persistence: Visual Sync State System
 
 **Status:** Planning
 **Priority:** Critical for mobile/offline usage
@@ -6,14 +6,14 @@
 
 ## Problem Statement
 
-Users working with glyphs on mobile devices with spotty network connectivity need real-time visual feedback about:
+Users working with elements on mobile devices with spotty network connectivity need real-time visual feedback about:
 
 1. Current connectivity state (online/offline)
-2. Which glyphs are synced to backend vs local-only
+2. Which elements are synced to backend vs local-only
 3. What's happening during drag/modification operations
 4. Whether data is at risk of loss
 
-Current implementation syncs glyphs to backend but provides no visual feedback. This creates uncertainty, especially on mobile where network state is unpredictable.
+Current implementation syncs elements to backend but provides no visual feedback. This creates uncertainty, especially on mobile where network state is unpredictable.
 
 ## Design Philosophy Alignment
 
@@ -43,11 +43,11 @@ This proposal aligns with QNTX design philosophy:
 - Overall: full color saturation with sync-based enhancement
 - Purpose: signals live connection, enhanced visual richness for synced content
 
-### Glyph Visual States
+### Element Visual States
 
 #### Offline Mode States
 
-1. **Unmodified offline glyph**
+1. **Unmodified offline element**
    - Azure-ish/mid-gray monochrome
    - Base level of desaturation
 
@@ -62,27 +62,27 @@ This proposal aligns with QNTX design philosophy:
 
 #### Online Mode States
 
-1. **Unsynced glyph** (online but not yet synced)
+1. **Unsynced element** (online but not yet synced)
    - Normal color palette (no enhancement)
 
-2. **Syncing glyph**
+2. **Syncing element**
    - Transitioning from monochrome/desaturated to enhanced colors
    - Smooth CSS transition (animation follows natural easing)
 
-3. **Synced glyph** (successfully persisted to backend)
+3. **Synced element** (successfully persisted to backend)
    - Enhanced color vibrancy (sync reward)
-   - Only synced glyphs receive color boost
+   - Only synced elements receive color boost
 
 ### Transition Behavior
 
 When connectivity changes offline → online:
-- Glyphs that were modified offline gradually fade from monochrome to full color
+- Elements that were modified offline gradually fade from monochrome to full color
 - Transition duration: ~1-2 seconds (feels natural, not instant)
-- Synced glyphs receive enhanced color boost progressively
+- Synced elements receive enhanced color boost progressively
 - Server-side results (watcher matches) transition from grayscale to full color
 
 When connectivity changes online → offline:
-- All glyphs desaturate to azure-ish monochrome
+- All elements desaturate to azure-ish monochrome
 - Server-side results (watcher matches) desaturate to grayscale (stale data indicator)
 - Instant feedback that mode changed
 
@@ -116,23 +116,23 @@ export interface ConnectivityManager {
 **File:** `web/ts/state/sync-state.ts` (new)
 
 ```typescript
-export type GlyphSyncState =
+export type ElementSyncState =
     | 'unsynced'    // Never sent to backend
     | 'syncing'     // Request in flight
     | 'synced'      // Confirmed by backend
     | 'failed';     // Sync attempt failed
 
 export interface SyncStateManager {
-    getState(glyphId: string): GlyphSyncState;
-    setState(glyphId: string, state: GlyphSyncState): void;
-    subscribe(glyphId: string, callback: (state: GlyphSyncState) => void): () => void;
+    getState(elementId: string): ElementSyncState;
+    setState(elementId: string, state: ElementSyncState): void;
+    subscribe(elementId: string, callback: (state: ElementSyncState) => void): () => void;
 }
 ```
 
 **Integration points:**
 - `web/ts/api/canvas.ts`: Update sync state before/after API calls
 - `web/ts/state/ui.ts`: Trigger callbacks when state changes
-- `web/ts/components/glyph/`: Visual components subscribe to state changes
+- `web/ts/components/element/`: Visual components subscribe to state changes
 
 ### 3. Visual Mode System
 
@@ -146,8 +146,8 @@ Manages CSS custom property updates for mode switching.
 :root {
     /* Online mode (default) */
     --mode-bg-lightness: 15%;
-    --mode-glyph-saturation: 100%;
-    --mode-glyph-boost: 1.0;
+    --mode-element-saturation: 100%;
+    --mode-element-boost: 1.0;
 
     /* Transition timing */
     --mode-transition-duration: 1.5s;
@@ -156,40 +156,40 @@ Manages CSS custom property updates for mode switching.
 
 :root[data-connectivity-mode="offline"] {
     --mode-bg-lightness: 25%;
-    --mode-glyph-saturation: 20%;
-    --mode-glyph-boost: 0.8;
+    --mode-element-saturation: 20%;
+    --mode-element-boost: 0.8;
 }
 ```
 
-**Glyph state classes:**
+**Element state classes:**
 
 ```css
-.canvas-glyph {
-    filter: saturate(var(--mode-glyph-saturation));
+.canvas-element {
+    filter: saturate(var(--mode-element-saturation));
     transition: filter var(--mode-transition-duration) var(--mode-transition-timing);
 }
 
-.canvas-glyph[data-sync-state="synced"] {
-    filter: saturate(calc(var(--mode-glyph-saturation) * var(--mode-glyph-boost)));
+.canvas-element[data-sync-state="synced"] {
+    filter: saturate(calc(var(--mode-element-saturation) * var(--mode-element-boost)));
 }
 
-.canvas-glyph.is-dragging[data-connectivity-mode="offline"] {
+.canvas-element.is-dragging[data-connectivity-mode="offline"] {
     filter: saturate(10%); /* Extra desaturated while dragging offline */
 }
 ```
 
-### 4. Glyph Component Integration
+### 4. Element Component Integration
 
 **Files to modify:**
-- Glyph interaction
-- Canvas glyph
-- `web/ts/components/glyph/py-glyph.ts`
-- `web/ts/components/glyph/ax-glyph.ts`
+- Element interaction
+- Canvas element
+- `web/ts/components/element/py-element.ts`
+- `web/ts/components/element/ax-element.ts`
 
 **Changes needed:**
 
 1. Subscribe to connectivity state
-2. Apply `data-connectivity-mode` attribute to glyph elements
+2. Apply `data-connectivity-mode` attribute to element elements
 3. Apply `data-sync-state` attribute based on sync state
 4. Add/remove `.is-dragging` class during drag operations
 5. Update sync state after successful/failed API calls
@@ -201,7 +201,7 @@ Manages CSS custom property updates for mode switching.
 ```typescript
 export interface QueuedOperation {
     id: string;
-    type: 'upsert_glyph' | 'delete_glyph' | 'upsert_composition' | 'delete_composition';
+    type: 'upsert_element' | 'delete_element' | 'upsert_composition' | 'delete_composition';
     payload: any;
     timestamp: number;
     retryCount: number;
@@ -223,7 +223,7 @@ export interface OfflineQueue {
 ### 6. Server-Side Result Visibility
 
 **Files to modify:**
-- `web/ts/components/glyph/ax-glyph.ts` (handle stale watcher match results when offline)
+- `web/ts/components/element/ax-element.ts` (handle stale watcher match results when offline)
 - Any other components that display server-pushed data
 
 **Behavior:**
@@ -244,7 +244,7 @@ export interface OfflineQueue {
 ### Phase 2: Visual System
 - [x] CSS custom properties for mode switching
 - [x] Visual mode manager
-- [x] Glyph component integration (apply classes)
+- [x] Element component integration (apply classes)
 - [x] Server-side result hiding (offline mode)
 - [x] Transition animations
 
@@ -283,10 +283,10 @@ For the 300ms debounce on connectivity state changes:
 - **Option C**: Different timing for each direction (e.g., 300ms for online→offline, 500ms for offline→online)
 
 ### Question 3: Failed Sync Visual Treatment
-When a glyph fails to sync (after retries exhausted):
+When an element fails to sync (after retries exhausted):
 - **Option A**: Return to "unsynced" state visually, silently log error
 - **Option B**: Show distinct "failed" visual state (e.g., slight red tint to monochrome)
-- **Option C**: Add glyph to a "needs attention" list, show global indicator
+- **Option C**: Add element to a "needs attention" list, show global indicator
 
 ## Technical Constraints
 
@@ -298,6 +298,6 @@ When a glyph fails to sync (after retries exhausted):
 ## References
 
 - Design Philosophy: `docs/design-philosophy.md`
-- Existing Glyph System: `packages/glyphs/VISION.md`
+- Existing Element System: [`teranos/elements` VISION.md](https://github.com/teranos/elements/blob/main/VISION.md)
 - Canvas State Management: `web/ts/state/ui.ts`
-- Glyph Interaction
+- Element Interaction

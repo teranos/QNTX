@@ -82,7 +82,7 @@ person typed, so one number is one string however it was spaced.
 
 `POST /auth/user/disable` and `POST /auth/user/enable` are the switch, reached
 by the person's own session. Off, `disabled_by` names them, every gate refuses
-them as switched off, and the Self glyph offers to reawaken. Set by anyone else,
+them as switched off, and the Self element offers to reawaken. Set by anyone else,
 enable is refused naming who, and the person stays off. The act is attested as
 `identity:disabled` and `identity:enabled`.
 
@@ -101,7 +101,7 @@ written down — `node:claimed` names it — but on the attestation rather than 
 the User, so the provenance is a record to go and find instead of a field to
 read.
 
-root Glyph for User management and overview
+root Element for User management and overview
 
 GDPR delete, PR 911
 

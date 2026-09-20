@@ -25,7 +25,7 @@ Plugins are separate processes that register capabilities. Core services — LLM
 
 The server adds persistence, plugin lifecycle management, and plugin-provided services.
 
-The canvas (glyphs ⧉) is the primary interaction surface. A glyph is a composable unit of interaction — it can manifest as an editor, a chart, a search panel, a plugin control. Glyphs compose into compositions.
+The canvas (elements ⧉) is the primary interaction surface. An element is a composable unit of interaction — it can manifest as an editor, a chart, a search panel, a plugin control. Elements compose into compositions.
 
 For visual and interface design principles, see [Design Philosophy](design-philosophy.md).
 

@@ -10,7 +10,7 @@ Opt-in via `[auth] enabled = true`. Access gate — proves identity before the s
 
 Two auth paths: WebAuthn biometric sessions (in-memory, `HttpOnly` cookie, expire after 24h configurable) for browser access, and persistent revocable bearer tokens (`Authorization: Bearer …`) for machine access — see [ADR-025](adr/ADR-025-access-tokens.md). Bearer tokens cannot mint or revoke other tokens; token management is gated on a passkey session.
 
-To manage tokens in the UI, open the **⍟ Self** glyph and click **⚿ Access Tokens** — there is no URL route.
+To manage tokens in the UI, open the **⍟ Self** element and click **⚿ Access Tokens** — there is no URL route.
 
 ## Shortcomings
 
