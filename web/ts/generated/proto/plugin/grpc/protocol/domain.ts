@@ -5,6 +5,7 @@
 // source: plugin/grpc/protocol/domain.proto
 
 /* eslint-disable */
+import type { Signum } from "./sigil";
 
 export const protobufPackage = "protocol";
 
@@ -238,26 +239,16 @@ export interface InitializeResponse {
    */
   embedding_provider: boolean;
   /**
-   * http_routes lists the HTTP endpoints this plugin handles via HandleHTTP.
-   * Core exposes these under /api/{plugin}/ and makes them discoverable
-   * via GET /api/plugins/routes.
-   */
-  http_routes: RouteInfo[];
-  /**
    * python_provider indicates this plugin can execute Python code.
    * Core registers "py" element type when any loaded plugin declares this.
    */
   python_provider: boolean;
-}
-
-/** RouteInfo describes an HTTP endpoint a plugin handles */
-export interface RouteInfo {
-  /** HTTP method: GET, POST, PUT, DELETE */
-  method: string;
-  /** Path relative to plugin root (e.g., "/status") */
-  path: string;
-  /** Human-readable description for LLM discovery */
-  description: string;
+  /**
+   * What this plugin does, as signa (ADR-039). Each sigil is bound to a path
+   * under /api/{plugin}/ and answered by HandleHTTP there; the node serves it as
+   * an endpoint and an MCP tool, behind the same gate as its own.
+   */
+  signa: Signum[];
 }
 
 /**

@@ -4,6 +4,8 @@ package protocol;
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
+import "plugin/grpc/protocol/sigil.proto";
+
 // DomainPluginService is the gRPC service for external domain plugins
 service DomainPluginService {
   // Metadata returns plugin metadata
@@ -228,21 +230,19 @@ message InitializeResponse {
   // Core routes embedding calls to it instead of using the builtin CGO/FFI path.
   bool embedding_provider = 7;
 
-  // http_routes lists the HTTP endpoints this plugin handles via HandleHTTP.
-  // Core exposes these under /api/{plugin}/ and makes them discoverable
-  // via GET /api/plugins/routes.
-  repeated RouteInfo http_routes = 8;
+  // http_routes said what signa say, and nothing served it: a signum is the one
+  // place an endpoint of a plugin is defined.
+  reserved 8;
+  reserved "http_routes";
 
   // python_provider indicates this plugin can execute Python code.
   // Core registers "py" element type when any loaded plugin declares this.
   bool python_provider = 9;
-}
 
-// RouteInfo describes an HTTP endpoint a plugin handles
-message RouteInfo {
-  string method = 1;       // HTTP method: GET, POST, PUT, DELETE
-  string path = 2;         // Path relative to plugin root (e.g., "/status")
-  string description = 3;  // Human-readable description for LLM discovery
+  // What this plugin does, as signa (ADR-039). Each sigil is bound to a path
+  // under /api/{plugin}/ and answered by HandleHTTP there; the node serves it as
+  // an endpoint and an MCP tool, behind the same gate as its own.
+  repeated Signum signa = 10;
 }
 
 // WatcherRegistration declares a watcher a plugin wants core to manage.

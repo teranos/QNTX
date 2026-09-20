@@ -33,6 +33,28 @@ interface PluginInfo {
     details?: Record<string, unknown>;
     state: 'running' | 'paused' | 'stopped';
     pausable: boolean;
+    sigils?: SigilRow[];
+    signa_refused?: string[];
+}
+
+/** One sigil a plugin handed the node (ADR-039), as server/plugin_sigils.go sends it. */
+interface SigilRow {
+    signum: string;
+    sigil: string;
+    tool: string;
+    method: string;
+    path: string;
+    does: string;
+    takes: { name: string; says: string; required?: boolean; one_of?: string[] }[];
+    gives: { name: string; says: string }[];
+    reach: Record<'http' | 'mcp', Reached>;
+}
+
+/** Who the lines say reaches a sigil over one surface. ROOT is never listed. */
+interface Reached {
+    anyone: boolean;
+    levels: string[];
+    roles: string[];
 }
 
 interface PluginsResponse {
@@ -97,6 +119,10 @@ let tooltipCleanup: (() => void) | null = null;
 
 // Log stream state
 let activeLogStream: EventSource | null = null;
+
+// What the node said to the last grant from a sigil row, by signum:sigil, so the
+// answer lands on the row it was asked from.
+const grantSaid: Record<string, { ok: boolean; text: string }> = {};
 
 async function fetchServerHealth(): Promise<void> {
     try {
@@ -206,6 +232,16 @@ function attachEventDelegation(): void {
     // Click delegation — attached once, works with dynamic content via .closest()
     contentElement.addEventListener('click', async (e: Event) => {
         const target = e.target as HTMLElement;
+
+        // Grant a sigil to the role typed beside it
+        const grantBtn = target.closest('.plugin-sigil-grant-btn') as HTMLElement | null;
+        if (grantBtn) {
+            e.stopPropagation();
+            const key = grantBtn.dataset.sigil ?? '';
+            const input = grantBtn.parentElement?.querySelector<HTMLInputElement>('.plugin-sigil-grant-role');
+            await grantSigil(key, input?.value.trim() ?? '');
+            return;
+        }
 
         // Save config button
         if (target.closest('.plugin-config-save-btn')) {
@@ -437,6 +473,7 @@ function renderPlugin(plugin: PluginInfo): string {
                         <span class="plugin-status-icon">${statusIcon}</span>
                         <span class="plugin-status-text">${statusText}</span>
                     </div>
+                    ${renderSigilBadges(plugin)}
                     ${restartBtn}
                 </div>
             </div>
@@ -583,8 +620,101 @@ async function fetchPluginConfig(pluginName: string): Promise<void> {
     }
 }
 
+/** How many sigils the plugin serves, and whether it handed one the node refused. */
+export function renderSigilBadges(plugin: PluginInfo): string {
+    const sigils = plugin.sigils ?? [];
+    const refused = plugin.signa_refused ?? [];
+    let badges = '';
+    if (sigils.length > 0) {
+        badges += `<span class="plugin-sigil-count plugin-mono">${sigils.length} sigil${sigils.length !== 1 ? 's' : ''}</span>`;
+    }
+    if (refused.length > 0) {
+        badges += `<span class="plugin-sigil-refused has-tooltip" data-tooltip="${escapeHtml(refused.join('\n'))}">signum refused</span>`;
+    }
+    return badges;
+}
+
+/** Who reaches a sigil over one surface, in words. ROOT reaches everything. */
+export function reachedInWords(who: Reached): string {
+    if (who.anyone) return 'anyone';
+    const named = [...who.levels, ...who.roles];
+    return named.length === 0 ? 'ROOT only' : `ROOT, ${named.join(', ')}`;
+}
+
+/** What the plugin does, a row per sigil, each with who reaches it and a way to grant it. */
+export function renderSigils(plugin: PluginInfo): string {
+    const sigils = plugin.sigils ?? [];
+    const refused = plugin.signa_refused ?? [];
+    if (sigils.length === 0 && refused.length === 0) return '';
+
+    const rows = sigils.map(row => {
+        const key = `${row.signum}:${row.sigil}`;
+        const takes = row.takes.map(param => {
+            const says = param.one_of && param.one_of.length > 0
+                ? `${param.says}\nOne of: ${param.one_of.join(', ')}`
+                : param.says;
+            return `<span class="plugin-sigil-param has-tooltip ${param.required ? 'plugin-sigil-param-required' : ''}" data-tooltip="${escapeHtml(says)}">${escapeHtml(param.name)}${param.required ? '*' : ''}</span>`;
+        }).join('');
+        const said = grantSaid[key];
+        return `
+            <div class="plugin-sigil-row" data-sigil="${escapeHtml(key)}">
+                <div class="plugin-sigil-head">
+                    <span class="plugin-sigil-tool plugin-mono">${escapeHtml(row.tool)}</span>
+                    <span class="plugin-sigil-endpoint plugin-mono">${escapeHtml(row.method)} ${escapeHtml(row.path)}</span>
+                </div>
+                <div class="plugin-sigil-does">${escapeHtml(row.does)}</div>
+                ${takes ? `<div class="plugin-sigil-takes">${takes}</div>` : ''}
+                <div class="plugin-sigil-reach plugin-mono">
+                    <span>http: ${escapeHtml(reachedInWords(row.reach.http))}</span>
+                    <span>mcp: ${escapeHtml(reachedInWords(row.reach.mcp))}</span>
+                </div>
+                <div class="plugin-sigil-grant">
+                    <input type="text" class="plugin-sigil-grant-role plugin-mono" data-sigil="${escapeHtml(key)}" placeholder="role">
+                    <button class="plugin-sigil-grant-btn" data-sigil="${escapeHtml(key)}">Grant</button>
+                </div>
+                ${said ? `<div class="plugin-sigil-said ${said.ok ? '' : 'plugin-sigil-said-error'}">${escapeHtml(said.text)}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="plugin-sigils">
+            <div class="plugin-log-header">Sigils</div>
+            ${refused.map(why => `<div class="plugin-message plugin-message-error">${escapeHtml(why)}</div>`).join('')}
+            ${rows}
+        </div>
+    `;
+}
+
+/**
+ * Grant one sigil to a role by writing a reach line (the reach signum's grant).
+ * What the node answered is shown on the row, whatever it was.
+ */
+async function grantSigil(key: string, role: string): Promise<void> {
+    if (!role) {
+        grantSaid[key] = { ok: false, text: 'Name the role to grant it to' };
+        render();
+        return;
+    }
+    try {
+        const response = await apiFetch('/api/reach', jsonBody('POST', { path: key, to: role }));
+        if (!response.ok) {
+            const body = await response.text();
+            grantSaid[key] = { ok: false, text: `${response.status}: ${body}` };
+        } else {
+            grantSaid[key] = { ok: true, text: `Granted to ${role}` };
+            await fetchPlugins();
+        }
+    } catch (error: unknown) {
+        handleError(error, `Failed to grant ${key}`, { context: SEG.UI, silent: true });
+        grantSaid[key] = { ok: false, text: `The grant did not reach the node: ${error}` };
+    }
+    render();
+}
+
 function renderExpandedContent(plugin: PluginInfo): string {
     return `
+        ${renderSigils(plugin)}
         <div class="plugin-log-viewer">
             <div class="plugin-log-header">Activity Log</div>
             <div class="plugin-log-container" data-plugin="${escapeHtml(plugin.name)}"></div>

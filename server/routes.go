@@ -36,6 +36,20 @@ func (s *QNTXServer) answerFromSigils(path string, handler http.HandlerFunc) {
 	s.answering[path] = reach.Answering{Handler: handler, Gates: true}
 }
 
+// answerSigils answers every path a sigil is bound to now, and no longer the
+// ones a sigil was bound to before and is not: a plugin that restarts may
+// hand different signa.
+func (s *QNTXServer) answerSigils() {
+	for path := range s.sigilPaths {
+		delete(s.answering, path)
+	}
+	s.sigilPaths = map[string]bool{}
+	for path, answered := range s.answeredFromSigils() {
+		s.answerFromSigils(path, answered)
+		s.sigilPaths[path] = true
+	}
+}
+
 // wrapping is everything a request passes on the way in besides the gate.
 func (s *QNTXServer) wrapping() reach.Wrapping {
 	return reach.Wrapping{
@@ -136,6 +150,14 @@ func (s *QNTXServer) boundedPluginRequest(w http.ResponseWriter, r *http.Request
 // reopen serves again from the table and the store's lines, whole: every
 // runtime reach line and every plugin coming or going arrives here.
 func (s *QNTXServer) reopen() ([]string, error) {
+	s.opening.Lock()
+	defer s.opening.Unlock()
+	return s.reopenHeld()
+}
+
+// reopenHeld is reopen for a caller already holding s.opening, because it
+// changed what the node answers first.
+func (s *QNTXServer) reopenHeld() ([]string, error) {
 	runtime := s.runtime()
 	s.answerLinedPluginPaths(runtime)
 	return s.served.Reopen(s.answering, s.wrapping(), runtime)

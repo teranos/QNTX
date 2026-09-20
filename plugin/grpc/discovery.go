@@ -1208,12 +1208,8 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		m.accumulator.SetLoading(name, meta.Version)
 		m.accumulator.SetRoles(name, roles)
 		m.accumulator.SetHandlers(name, proxy.GetHandlerNames(), ScheduleNames(proxy.GetSchedules()), WatcherNames(proxy.GetWatchers()), UnfilteredWatcherNames(proxy.GetWatchers()))
-		var routeStrs []string
-		if routes := proxy.GetHTTPRoutes(); len(routes) > 0 {
-			routeStrs = make([]string, len(routes))
-			for i, r := range routes {
-				routeStrs[i] = r.GetMethod() + " " + r.GetPath()
-			}
+		routeStrs := proxy.SigilRoutes()
+		if len(routeStrs) > 0 {
 			m.accumulator.SetHTTPRoutes(name, routeStrs)
 		}
 		// Collect health asynchronously — synchronous Health() blocks plugin restart

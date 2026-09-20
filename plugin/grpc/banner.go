@@ -37,7 +37,7 @@ type BannerInfo struct {
 	Details            map[string]string // from Health().Details
 	Error              string            // non-empty = failed
 	ConfigDiff         []string          // "url changed: old → new"
-	HTTPRoutes         []string          // "GET /version", "GET /status", etc.
+	HTTPRoutes         []string          // what its signa bind: "GET /api/datapunt/read", etc.
 
 }
 
@@ -224,7 +224,7 @@ func FormatBanner(info BannerInfo) string {
 	} else if info.Error == "" && info.Reason != BannerDisabled {
 		b.WriteString("   ")
 		b.WriteString(ansiDim)
-		b.WriteString("no routes advertised (set http_routes in InitializeResponse)")
+		b.WriteString("no sigils handed (set signa in InitializeResponse)")
 		b.WriteString(ansiReset)
 		b.WriteByte('\n')
 	}
@@ -353,7 +353,7 @@ func (a *PluginAccumulator) SetHandlers(name string, handlers, scheduleNames, wa
 	info.UnfilteredWatchers = unfilteredWatcherNames
 }
 
-// SetHTTPRoutes records the HTTP routes a plugin advertised.
+// SetHTTPRoutes records the endpoints a plugin's signa bind.
 func (a *PluginAccumulator) SetHTTPRoutes(name string, routes []string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
