@@ -392,42 +392,35 @@ impl DuckdbStore {
         Ok(store)
     }
 
-    /// The glob every flushed attestation lands under.
-    fn parquet_glob(&self) -> String {
-        format!("{}/*.parquet", self.prefix)
-    }
-
-    /// How many Parquet files the location holds. `glob` answers zero for an
-    /// empty prefix instead of erroring, which is what lets a caller tell
-    /// "nothing written yet" apart from "could not look".
-    /// Against S3 the glob is a live ListObjectsV2, so a throttle, a timeout or
-    /// an expired credential arrives here. Answering zero for those sends
-    /// `query` to the buffer alone, which `flush` empties every five seconds.
-    fn parquet_file_count(&self) -> Result<i64> {
-        let glob = self.parquet_glob();
-        let sql = format!("SELECT count(*) FROM glob('{}')", glob);
-        let first = match self.conn.query_row(&sql, [], |row| row.get(0)) {
-            Ok(count) => return Ok(count),
-            Err(e) => e,
-        };
-
-        if let Err(source) = resolve_credentials_again(&self.conn, &self.location) {
-            return Err(DuckdbError::ReadThenNoCredentials {
-                what: Object::ParquetFiles,
-                under: glob,
-                first: Box::new(first),
-                source: Box::new(source),
-            });
+    /// The source a read unions the buffer with: the buffer alone when the
+    /// location holds no file, and the buffer beside the files named one by
+    /// one when it does.
+    ///
+    /// Naming them is the listing `parquet_files` already takes, and it stands
+    /// in for two — the count that asked whether any file exists, and the glob
+    /// `read_parquet` expands against the location itself. Compaction names
+    /// the files it merges this way already.
+    ///
+    /// The credentials the `read_parquet` runs under are resolved here, the
+    /// same call compaction makes before its own statement.
+    fn read_source(&self, columns: &str) -> Result<String> {
+        let files = self.parquet_files()?;
+        if files.is_empty() {
+            return Ok("attestations".to_string());
         }
-
-        self.conn
-            .query_row(&sql, [], |row| row.get(0))
-            .map_err(|source| DuckdbError::ReadTwice {
-                what: Object::ParquetFiles,
-                under: glob,
-                first: Box::new(first),
-                source: Box::new(source),
-            })
+        for path in &files {
+            refuse_quoted(path)?;
+        }
+        resolve_credentials_again(&self.conn, &self.location)?;
+        let held = files
+            .iter()
+            .map(|path| format!("'{path}'"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        Ok(format!(
+            "(SELECT {columns} FROM attestations \
+             UNION ALL SELECT {columns} FROM read_parquet([{held}]))"
+        ))
     }
 
     /// Flush the in-memory `attestations` table to a new Parquet file at
@@ -702,15 +695,7 @@ impl DuckdbStore {
         // writes since the last flush — every attestation older than five
         // seconds would be invisible, which is every attestation.
 
-        let source = if self.parquet_file_count()? > 0 {
-            format!(
-                "(SELECT {c} FROM attestations UNION ALL SELECT {c} FROM read_parquet('{g}'))",
-                c = COLUMNS,
-                g = self.parquet_glob()
-            )
-        } else {
-            "attestations".to_string()
-        };
+        let source = self.read_source(COLUMNS)?;
 
         let mut sql = format!("SELECT {} FROM {}", COLUMNS, source);
         let mut conds: Vec<&'static str> = Vec::new();
@@ -788,15 +773,7 @@ impl DuckdbStore {
             return Ok(Vec::new());
         }
 
-        let source = if self.parquet_file_count()? > 0 {
-            format!(
-                "(SELECT {c} FROM attestations UNION ALL SELECT {c} FROM read_parquet('{g}'))",
-                c = COLUMNS,
-                g = self.parquet_glob()
-            )
-        } else {
-            "attestations".to_string()
-        };
+        let source = self.read_source(COLUMNS)?;
 
         // One placeholder per id, so ids stay bound rather than inlined.
         let placeholders = vec!["?"; ids.len()].join(", ");
@@ -876,19 +853,10 @@ impl AttestationStore for DuckdbStore {
     fn get(&self, id: &str) -> StoreResult<Option<Attestation>> {
         // Buffer and files, for the reason query gives: a flushed attestation
         // is not in the buffer, and "not in the buffer" is not "does not exist".
-        let files = self
-            .parquet_file_count()
+        let source = self
+            .read_source(COLUMNS)
             .map_err(|e| StoreError::Backend(e.sacred_json("")))?;
-        let sql = if files > 0 {
-            format!(
-                "SELECT {c} FROM (SELECT {c} FROM attestations \
-                 UNION ALL SELECT {c} FROM read_parquet('{g}')) WHERE id = ? LIMIT 1",
-                c = COLUMNS,
-                g = self.parquet_glob()
-            )
-        } else {
-            format!("SELECT {} FROM attestations WHERE id = ?", COLUMNS)
-        };
+        let sql = format!("SELECT {COLUMNS} FROM {source} WHERE id = ? LIMIT 1");
 
         let mut stmt = self
             .conn
@@ -980,20 +948,12 @@ impl AttestationStore for DuckdbStore {
     /// length of `ids`, which reads the buffer alone, and flush empties the
     /// buffer every few seconds.
     fn count(&self) -> StoreResult<usize> {
-        let files = self
-            .parquet_file_count()
-            .map_err(|e| StoreError::Backend(e.sacred_json("")))?;
         // flush copies the buffer into a file and empties it in one
         // transaction, so no row is in both and UNION ALL does not double.
-        let sql = if files > 0 {
-            format!(
-                "SELECT count(*) FROM (SELECT id FROM attestations \
-                 UNION ALL SELECT id FROM read_parquet('{g}'))",
-                g = self.parquet_glob()
-            )
-        } else {
-            "SELECT count(*) FROM attestations".to_string()
-        };
+        let source = self
+            .read_source("id")
+            .map_err(|e| StoreError::Backend(e.sacred_json("")))?;
+        let sql = format!("SELECT count(*) FROM {source}");
         let total: i64 = self
             .conn
             .query_row(&sql, [], |row| row.get(0))
