@@ -3,10 +3,12 @@ package logger
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/cockroachdb/errors/report"
 	"github.com/getsentry/sentry-go"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -261,7 +263,11 @@ func (c *sentryCore) captureIssue(ent zapcore.Entry, attrs map[string]interface{
 		scope.SetContext("log", payload)
 
 		if err := firstError(c.fields, fields); err != nil {
-			hub.CaptureException(err)
+			// CaptureException titles from reflect.TypeOf(err) alone, always
+			// *withstack.withStack once errors.Wrap/Wrapf has run.
+			event, extras := report.BuildSentryReport(err)
+			maps.Copy(event.Extra, extras)
+			hub.CaptureEvent(event)
 			return
 		}
 		// A message groups on the stack of the capture site — the log

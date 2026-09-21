@@ -270,8 +270,12 @@ func TestCaptureIssueRaisesAnEvent(t *testing.T) {
 	if len(event.Exception) == 0 {
 		t.Fatal("the event carries no exception, so it groups on the message instead of the error")
 	}
-	if event.Exception[0].Value != failure.Error() {
-		t.Errorf("exception value = %q, want %q", event.Exception[0].Value, failure.Error())
+	// BuildSentryReport titles the exception from the leaf error's real type
+	// plus its message, not the bare *withstack.withStack wrapper every
+	// errors.New/Wrap call produces.
+	wantValue := "*errutil.leafError: " + failure.Error() + "\nvia *withstack.withStack"
+	if event.Exception[0].Value != wantValue {
+		t.Errorf("exception value = %q, want %q", event.Exception[0].Value, wantValue)
 	}
 }
 

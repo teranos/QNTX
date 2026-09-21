@@ -34,6 +34,7 @@ require (
 )
 
 require (
+	github.com/cockroachdb/errors v1.12.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/ory/fosite v0.49.0
 )
@@ -41,7 +42,6 @@ require (
 require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
-	github.com/cockroachdb/errors v1.12.0 // indirect
 	github.com/cristalhq/jwt/v4 v4.0.2 // indirect
 	github.com/dgraph-io/ristretto v1.0.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
