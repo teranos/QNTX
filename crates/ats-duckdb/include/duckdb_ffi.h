@@ -50,6 +50,17 @@ typedef struct {
     uint64_t bytes;
 } MergedResultC;
 
+/* What one store asked its location for, a count per kind of request. */
+typedef struct {
+    bool success;
+    char *error_msg;
+    uint64_t puts;
+    uint64_t gets;
+    uint64_t heads;
+    uint64_t lists;
+    uint64_t deletes;
+} AskedResultC;
+
 /* Store lifecycle */
 
 /**
@@ -111,6 +122,16 @@ MergedResultC      duckdb_storage_compact(const DuckdbStore *store);
  * How many Parquet files the namespace holds. Against S3, one listing.
  */
 CountResultC       duckdb_storage_file_count(const DuckdbStore *store);
+
+/**
+ * The requests the store has made of its location since it opened. A running
+ * total, not a delta: this number has more than one reader, and a counter
+ * that emptied on being read would answer the second with what the first
+ * already took. A caller wanting an interval subtracts. The read_parquet
+ * DuckDB runs holds its own client and is not counted; everything the crate
+ * asks for is.
+ */
+AskedResultC       duckdb_storage_requests(const DuckdbStore *store);
 
 /* Access tokens (ADR-025)
  *
@@ -371,6 +392,7 @@ void duckdb_storage_result_free(StorageResultC result);
 void duckdb_attestation_result_free(AttestationResultC result);
 void duckdb_count_result_free(CountResultC result);
 void duckdb_merged_result_free(MergedResultC result);
+void duckdb_asked_result_free(AskedResultC result);
 void duckdb_tokens_result_free(TokensResultC result);
 void duckdb_users_result_free(UsersResultC result);
 void duckdb_namespaces_result_free(NamespacesResultC result);

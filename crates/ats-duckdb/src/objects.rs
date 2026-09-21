@@ -8,6 +8,7 @@
 // "WE DONT MAKE UP REASONS"
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
@@ -33,6 +34,65 @@ pub(crate) struct Bucket {
     runtime: tokio::runtime::Runtime,
     client: aws_sdk_s3::Client,
     name: String,
+    tally: Tally,
+}
+
+/// What the bucket was asked, counted. S3 prices a request and not a
+/// statement, and the two are not the same number: a listing is one request
+/// per page it answers with, and one compaction is a listing, a write, and a
+/// delete for every file it replaced. A node that cannot say how many it made
+/// cannot say what it costs.
+///
+/// Counted when the request goes out rather than when it comes back. S3
+/// charges for the ones it refuses too.
+#[derive(Default)]
+pub(crate) struct Tally {
+    put: AtomicU64,
+    get: AtomicU64,
+    head: AtomicU64,
+    list: AtomicU64,
+    delete: AtomicU64,
+}
+
+impl Tally {
+    fn note(&self, request: Request) {
+        let counter = match request {
+            Request::Put => &self.put,
+            Request::Get => &self.get,
+            Request::Head => &self.head,
+            Request::List => &self.list,
+            Request::Delete => &self.delete,
+        };
+        counter.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// What has accumulated since the store opened.
+    ///
+    /// Reading leaves it standing. A counter that emptied on being read would
+    /// answer a second reader with what the first one already took, and this
+    /// number has two: what goes out as a metric, and what a screen shows.
+    /// The difference between two reads is whoever wants a difference's to
+    /// work out.
+    fn asked(&self) -> Asked {
+        Asked {
+            puts: self.put.load(Ordering::Relaxed),
+            gets: self.get.load(Ordering::Relaxed),
+            heads: self.head.load(Ordering::Relaxed),
+            lists: self.list.load(Ordering::Relaxed),
+            deletes: self.delete.load(Ordering::Relaxed),
+        }
+    }
+}
+
+/// The requests one store made of its location since the last time it was
+/// asked.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Asked {
+    pub puts: u64,
+    pub gets: u64,
+    pub heads: u64,
+    pub lists: u64,
+    pub deletes: u64,
 }
 
 /// What S3 answered, or what stopped the request reaching it. The SDK's own
@@ -219,7 +279,18 @@ impl Objects {
             runtime,
             client,
             name,
+            tally: Tally::default(),
         }))
+    }
+
+    /// The requests this location has been asked for since the store opened.
+    /// A filesystem is asked for none: nothing there crosses a network and
+    /// nothing there is priced.
+    pub(crate) fn asked(&self) -> Asked {
+        match self {
+            Objects::Local => Asked::default(),
+            Objects::S3(bucket) => bucket.tally.asked(),
+        }
     }
 
     /// Write the object at `path`, replacing what was there. The parent is
@@ -243,6 +314,7 @@ impl Objects {
             }
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
+                bucket.tally.note(Request::Put);
                 let sent = bucket.runtime.block_on(
                     bucket
                         .client
@@ -277,6 +349,7 @@ impl Objects {
             },
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
+                bucket.tally.note(Request::Get);
                 let got = bucket.runtime.block_on(
                     bucket
                         .client
@@ -328,6 +401,7 @@ impl Objects {
                 }),
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
+                bucket.tally.note(Request::Head);
                 let head = bucket.runtime.block_on(
                     bucket
                         .client
@@ -398,7 +472,10 @@ impl Objects {
                     .send();
                 loop {
                     let page = bucket.runtime.block_on(pages.next());
+                    // Per page, not per call: the paginator asks again for
+                    // every thousand keys, and each asking is its own request.
                     let Some(page) = page else { break };
+                    bucket.tally.note(Request::List);
                     let page = page.map_err(|e| DuckdbError::S3 {
                         request: Request::List,
                         what: what.clone(),
@@ -432,6 +509,7 @@ impl Objects {
             },
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
+                bucket.tally.note(Request::Delete);
                 let sent = bucket.runtime.block_on(
                     bucket
                         .client
@@ -491,6 +569,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_local_location_is_asked_for_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = format!("file://{}", dir.path().display());
+        let objects = Objects::open(&base).unwrap();
+        objects
+            .put(Object::Token, &format!("{base}/x.json"), b"{}".to_vec())
+            .unwrap();
+        assert_eq!(objects.asked(), Asked::default());
+    }
+
+    #[test]
+    fn a_tally_answers_the_same_thing_twice() {
+        let tally = Tally::default();
+        tally.note(Request::List);
+        tally.note(Request::List);
+        tally.note(Request::Put);
+        let expected = Asked {
+            puts: 1,
+            lists: 2,
+            ..Asked::default()
+        };
+        assert_eq!(tally.asked(), expected);
+        // Reading leaves it standing, because this number has more than one
+        // reader and the first would otherwise take it from the second.
+        assert_eq!(tally.asked(), expected);
+
+        tally.note(Request::List);
+        assert_eq!(tally.asked().lists, 3);
+    }
+
+    #[test]
     fn a_local_prefix_holding_nothing_lists_nothing() {
         let dir = tempfile::tempdir().unwrap();
         let objects = Objects::open(&format!("file://{}", dir.path().display())).unwrap();
@@ -547,6 +656,7 @@ mod tests {
                     .build(),
             ),
             name: "park".to_string(),
+            tally: Tally::default(),
         };
         assert_eq!(bucket.key("s3://park/a/b.json").unwrap(), "a/b.json");
         assert!(bucket.key("s3://other/a/b.json").is_err());

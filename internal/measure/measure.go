@@ -97,6 +97,12 @@ const (
 	// after each send. ADR-024 names it as what a read of the record costs.
 	StoreFiles = "qntx.store.files"
 
+	// StoreRequests is what a namespace's record asked its location for,
+	// sliced by namespace and by which request it was. ADR-024 prices a read
+	// in files; S3 prices one in requests, and the node could say the first
+	// number and not the second. A location on this filesystem asks for none.
+	StoreRequests = "qntx.store.requests"
+
 	// StoreUnsent is how many attestations a landing file holds that the
 	// record does not yet have: what losing the host right now would lose
 	// (ADR-037). It climbs between sends and falls when one lands.
@@ -168,6 +174,11 @@ const (
 	// AttrStore is which namespace's store: system, default, and the ones ROOT
 	// creates. Bounded because a namespace is created, not arrived at.
 	AttrStore = "store"
+
+	// AttrRequest is which request a store made of its location: PUT, GET,
+	// HEAD, LIST or DELETE. Bounded: the five an S3 client makes, named in
+	// crates/ats-duckdb/src/objects.rs.
+	AttrRequest = "request"
 
 	// AttrMethod is the request's HTTP verb. Bounded: a handful of methods,
 	// never a caller-chosen string.

@@ -479,6 +479,30 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 		measure.Gauge(measure.StoreUnsent, float64(landing.unsent.Load()),
 			measure.String(measure.AttrStore, name))
 	}
+	// The store counts from when it opened and the metric takes a delta, so
+	// what was said last time is subtracted here rather than taken from the
+	// store: the store's total has another reader, and draining it would hand
+	// that one what this one already took. A restart is a gap and not a spike,
+	// because said starts empty beside a store that starts at zero.
+	said := map[string]int64{}
+	sayRequests := func() {
+		asked, err := record.Requests()
+		if err != nil {
+			logger.Logger.Errorw("The record did not say what it asked its location for",
+				"store", name, "error", err)
+			return
+		}
+		for _, one := range asked {
+			since := one.Count - said[one.Request]
+			said[one.Request] = one.Count
+			if since <= 0 {
+				continue
+			}
+			measure.Count(measure.StoreRequests, since,
+				measure.String(measure.AttrStore, name),
+				measure.String(measure.AttrRequest, one.Request))
+		}
+	}
 	sendOnce := func() {
 		defer sacred.Said("parquet.send." + name)
 		if err := sendAndCompact(landing, record); err != nil {
@@ -486,6 +510,7 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 				"store", name, "error", err)
 		}
 		sayUnsent()
+		sayRequests()
 	}
 	for {
 		select {
@@ -496,6 +521,7 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 			sendOnce()
 		case <-unsent.C:
 			sayUnsent()
+			sayRequests()
 		}
 	}
 }

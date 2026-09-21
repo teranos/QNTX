@@ -36,7 +36,7 @@ use ats::storage::{AttestationStore, StoreError};
 use duckdb::types::Value;
 use serde::{Deserialize, Serialize};
 
-use crate::objects::Objects;
+use crate::objects::{Asked, Objects};
 
 // ats's storage::error module isn't public, but AttestationStore's trait
 // methods return StoreResult<T>. Alias it here to match ats-sqlite's pattern
@@ -535,6 +535,16 @@ impl DuckdbStore {
     /// How many Parquet files this namespace holds. Against S3, one listing.
     pub fn file_count(&self) -> Result<usize> {
         Ok(self.parquet_files()?.len())
+    }
+
+    /// The requests this namespace has made of its location since it opened.
+    ///
+    /// What the record costs is a count of requests and not of statements
+    /// (ADR-024, Consequences), and nothing before this could say the first
+    /// number. The `read_parquet` DuckDB runs is its own client and is not
+    /// counted here; everything this crate asks for is.
+    pub fn asked(&self) -> Asked {
+        self.objects.asked()
     }
 
     /// The record is written first and removed last, so every state a crash

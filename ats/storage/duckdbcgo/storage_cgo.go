@@ -388,6 +388,41 @@ func (s *DuckdbStore) Compact() (files int, bytes uint64, err error) {
 	return int(result.files), uint64(result.bytes), nil
 }
 
+// Asked is one kind of request and how many of them a store made of its
+// location.
+type Asked struct {
+	Request string
+	Count   int64
+}
+
+// Requests answers what the store has asked its location for since it opened.
+// A running total: this number has more than one reader, and a caller wanting
+// an interval subtracts what it saw last.
+//
+// S3 prices a request and not a statement (ADR-024, Consequences), and the
+// two are not the same number: a listing is one request per page it answers
+// with, and one compaction is a listing, a write, and a delete per file it
+// replaced. The read_parquet DuckDB runs holds its own client and is not
+// counted here.
+func (s *DuckdbStore) Requests() ([]Asked, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := C.duckdb_storage_requests((*C.DuckdbStore)(s.ptr))
+	defer C.duckdb_asked_result_free(result)
+
+	if !result.success {
+		return nil, failed(result.error_msg, "duckdb requests failed")
+	}
+	return []Asked{
+		{Request: "PUT", Count: int64(result.puts)},
+		{Request: "GET", Count: int64(result.gets)},
+		{Request: "HEAD", Count: int64(result.heads)},
+		{Request: "LIST", Count: int64(result.lists)},
+		{Request: "DELETE", Count: int64(result.deletes)},
+	}, nil
+}
+
 // FileCount is how many Parquet files the namespace holds: what a read of
 // the record costs (ADR-024). Against S3, one listing.
 func (s *DuckdbStore) FileCount() (int, error) {
