@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/errors"
@@ -107,7 +108,7 @@ func (s *QNTXServer) dbSeries(ctx context.Context, sent sigil.Sent) (any, *proto
 }
 
 // linesFrom asks and reads the answer into the shape a chart takes.
-func linesFrom(ctx context.Context, asking, token string) ([]Line, error) {
+func linesFrom(ctx context.Context, asking, token string) (lines []Line, err error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, asking, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "the question could not be built for %s", asking)
@@ -118,7 +119,7 @@ func linesFrom(ctx context.Context, asking, token string) ([]Line, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "the question went out and nothing came back")
 	}
-	defer func() { _ = said.Body.Close() }()
+	defer func() { err = sqlclose.With(err, said.Body.Close(), "the body of the answer") }()
 
 	body, err := io.ReadAll(said.Body)
 	if err != nil {
@@ -149,7 +150,7 @@ func linesFrom(ctx context.Context, asking, token string) ([]Line, error) {
 		return nil, errors.Wrapf(err, "the answer is %d bytes and none of it is the shape this reads", len(body))
 	}
 
-	lines := make([]Line, 0, len(answered.TimeSeries))
+	lines = make([]Line, 0, len(answered.TimeSeries))
 	for _, one := range answered.TimeSeries {
 		of := make(map[string]string, len(one.GroupBy))
 		for _, pair := range one.GroupBy {
