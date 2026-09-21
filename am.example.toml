@@ -141,6 +141,31 @@ entity_actors_limit = 64
 # Default: 0
 # traces_sample_rate = 1.0
 
+# Reading the numbers back.
+#
+# The dsn above writes and cannot read, and this node keeps nothing it
+# sent — a gauge is a number in flight and not a table. So /api/db/series
+# asks Sentry for a week of the record's own numbers, and these three are
+# what it asks with. All three, or the route says which one is missing
+# and draws nothing.
+#
+# read_token wants org:read. An organisation token (sntrys_) cannot
+# carry it — its scopes are fixed for CI — so this is a personal token
+# or an internal integration's. It is a credential and belongs wherever
+# the deployment keeps those, never in this file on a real node.
+# Default: "" (the route answers 503 and names the key)
+# read_token = "sntryu_…"
+
+# The organisation slug the metrics landed under.
+# Default: ""
+# org = "acme"
+
+# The region the organisation lives in. Sentry answers the API on the
+# region host and not on sentry.io, and a token carries its own region
+# in the metadata it is built from.
+# Default: ""
+# region_url = "https://de.sentry.io"
+
 # ════════════════════════════════════════════════════════════════
 # Server Configuration (Web UI)
 # ════════════════════════════════════════════════════════════════

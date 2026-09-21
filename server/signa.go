@@ -24,7 +24,7 @@ import (
 
 // signa is every signum the node holds: its own, and every ready plugin's.
 func (s *QNTXServer) signa() []sigil.Signum {
-	return append([]sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum()}, s.pluginSigna()...)
+	return append([]sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.dbSignum()}, s.pluginSigna()...)
 }
 
 // checkedSigna is the signa that say what they hold. One that does not is said
