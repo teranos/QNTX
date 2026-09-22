@@ -103,6 +103,48 @@ function renderStatsError(err: any): string {
     return rows.join('');
 }
 
+interface Landing {
+    namespace: string;
+    path: string;
+    bytes: number;
+    wal_bytes: number;
+    attestations: number;
+}
+
+// A read is answered from the database of its namespace and never from the
+// record (ADR-037), so there is one of these per namespace and the single
+// path this panel used to print was hiding all but one of them.
+function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: string): string {
+    if (failed) {
+        return renderStatsError(failed);
+    }
+    if (!landings || landings.length === 0) {
+        return `<div style="padding: 6px 0; font-size: 11px;">
+            <span class="label">Path:</span> <span class="element-value">${escapeHtml(onePath)}</span>
+        </div>`;
+    }
+
+    const held = landings.reduce((sum, one) => sum + one.attestations, 0);
+    const rows = landings.map(one => `
+        <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0;">
+            <span style="color: #e2e8f0;">${escapeHtml(one.namespace)}</span>
+            <span style="color: #475569; flex: 1; margin: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(one.path)}</span>
+            <span style="white-space: nowrap;">
+                <span style="color: #64748b; margin-right: 8px;">db ${formatBytes(one.bytes)}</span>
+                <span style="color: ${one.wal_bytes > 8 * 1024 * 1024 ? '#f59e0b' : '#64748b'}; margin-right: 8px;">wal ${formatBytes(one.wal_bytes)}</span>
+                <span style="color: #94a3b8;">${one.attestations.toLocaleString()}</span>
+            </span>
+        </div>`).join('');
+
+    return `
+        <div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
+            <span class="label">Answering reads from ${landings.length} ${landings.length === 1 ? 'database' : 'databases'}:</span>
+            <span class="element-value">${held.toLocaleString()} attestations</span>
+            <div style="margin-top: 4px;">${rows}</div>
+        </div>
+    `;
+}
+
 interface Spend {
     of: string;
     request: string;
@@ -184,13 +226,13 @@ function renderDbStats(): void {
 
     sectionOverview.innerHTML = `
         <div style="display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border-color, #333); font-size: 11px;">
-            <span><span class="label">Path:</span> <span class="element-value">${escapeHtml(String(dbStats.path ?? ''))}</span></span>
             <span><span class="label">Backend:</span> <span class="element-value">${storageBackend}</span></span>
             ${countSpan('Attestations', dbStats.total_attestations)}
             ${countSpan('Actors', dbStats.unique_actors)}
             ${countSpan('Subjects', dbStats.unique_subjects)}
             ${countSpan('Contexts', dbStats.unique_contexts)}
         </div>
+        ${landingsHTML(dbStats.landings, dbStats.landings_error, String(dbStats.path ?? ''))}
     `;
 
     // -- Predicates: what the record cost, then types + distillation --

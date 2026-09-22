@@ -161,6 +161,7 @@ type QNTXServer struct {
 	ageDistiller                AgeDistiller       // Rust-side age distillation (fold old attestations into sigmas)
 	writeLockInspector          WriteLockInspector // Rust-side write lock holder tracking
 	recordReporter              RecordReporter     // What reading the record off-node has cost, per reader
+	landingReporter             LandingReporter    // The database per namespace a read is answered from (ADR-037)
 	onReady                     func()             // Called once when server is fully ready (routes, DB, listeners)
 
 	// Cached database stats — refreshed every 30s in the background.
@@ -195,6 +196,12 @@ func (s *QNTXServer) SetWriteLockInspector(w WriteLockInspector) {
 // backend holding its record on the node does not set one.
 func (s *QNTXServer) SetRecordReporter(r RecordReporter) {
 	s.recordReporter = r
+}
+
+// SetLandingReporter sets what can name the database behind each namespace.
+// A backend keeping one file for all of them does not set one.
+func (s *QNTXServer) SetLandingReporter(r LandingReporter) {
+	s.landingReporter = r
 }
 
 // handleClientRegister handles a new client connection

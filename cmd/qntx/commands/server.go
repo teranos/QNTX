@@ -178,6 +178,12 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		srv.SetRecordReporter(rr)
 	}
 
+	// The database behind each namespace. A backend keeping one file for all
+	// of them is not one, and the panel then draws the single path it has.
+	if lr, ok := rustStore.(server.LandingReporter); ok {
+		srv.SetLandingReporter(lr)
+	}
+
 	// Wire deferred plugin initialization — fires when server is fully ready
 	// (migrations done, HTTP listening), not before.
 	if DeferredPluginInit != nil {

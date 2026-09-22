@@ -39,6 +39,23 @@ type RecordReporter interface {
 	RecordSpend() ([]Spend, error)
 }
 
+// LandingReporter is a backend that answers reads from a database per
+// namespace rather than from one (ADR-037). A backend keeping a single file
+// does not implement it, and the panel then has one database to draw.
+type LandingReporter interface {
+	Landings() ([]Landing, error)
+}
+
+// A Landing is one namespace's database: where it is, how big it and its
+// write-ahead log have grown, and how many attestations it answers from.
+type Landing struct {
+	Namespace    string `json:"namespace"`
+	Path         string `json:"path"`
+	Bytes        int64  `json:"bytes"`
+	WalBytes     int64  `json:"wal_bytes"`
+	Attestations int    `json:"attestations"`
+}
+
 // Spend is one reader and what it has cost against the record: the name make
 // parity gives it, the request, and how many. A row here that parity calls
 // record-only is a read that never has to leave the node.
@@ -208,6 +225,15 @@ func (s *QNTXServer) refreshDBStats() {
 		recordSpend, recordSpendErr = s.recordReporter.RecordSpend()
 	}
 
+	// The database behind each namespace. A read is answered from one of these
+	// and never from the record (ADR-037), so this is what a reader is looking
+	// at when they ask what this node holds.
+	var landings []Landing
+	var landingsErr error
+	if s.landingReporter != nil {
+		landings, landingsErr = s.landingReporter.Landings()
+	}
+
 	response := map[string]interface{}{
 		"type":               "database_stats",
 		"path":               s.dbPath,
@@ -220,6 +246,16 @@ func (s *QNTXServer) refreshDBStats() {
 		"performance":        perfData,
 		"live":               liveStatus,
 	}
+	switch {
+	case landingsErr != nil:
+		envelope := newErrorEnvelope("landing files", landingsErr)
+		s.logger.Warnw("Landing files unavailable",
+			"error", landingsErr, "error_id", envelope.ID)
+		response["landings_error"] = envelope
+	case landings != nil:
+		response["landings"] = landings
+	}
+
 	switch {
 	case recordSpendErr != nil:
 		envelope := newErrorEnvelope("record spend", recordSpendErr)

@@ -608,6 +608,47 @@ func (h *parquetHandles) RecordSpend() ([]server.Spend, error) {
 	return spend, nil
 }
 
+// Landings is the database behind each namespace: where it is, how big it and
+// its write-ahead log have grown, and how many attestations it answers from.
+//
+// One per namespace and never one for all of them (ADR-037), which is the
+// shape a panel drawing a single path was hiding.
+func (h *parquetHandles) Landings() ([]server.Landing, error) {
+	h.mu.Lock()
+	names := slices.Sorted(maps.Keys(h.landings))
+	files := maps.Clone(h.landings)
+	h.mu.Unlock()
+
+	landings := make([]server.Landing, 0, len(names))
+	for _, name := range names {
+		path := landingPath(h.dbPath, name)
+
+		held, err := files[name].CountAttestations()
+		if err != nil {
+			return nil, errors.Wrapf(err, "the landing file of %s at %s did not count", name, path)
+		}
+
+		landings = append(landings, server.Landing{
+			Namespace:    name,
+			Path:         path,
+			Bytes:        sizeOf(path),
+			WalBytes:     sizeOf(path + "-wal"),
+			Attestations: held,
+		})
+	}
+	return landings, nil
+}
+
+// sizeOf is how many bytes a file holds, and nought for one that is not there
+// — a WAL that has been checkpointed away is absent rather than empty.
+func sizeOf(path string) int64 {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return stat.Size()
+}
+
 // Namespaces is the capability namespace routes assert for.
 func (h *parquetHandles) Namespaces() storage.Namespaces {
 	return h.namespaces
