@@ -51,6 +51,10 @@ func SetDefaults(v *viper.Viper) {
 		"http://127.0.0.1",
 		"https://127.0.0.1",
 		"tauri://localhost", // Allow Tauri desktop app
+		// Android and Windows serve the app from tauri.localhost instead,
+		// and a phone is refused by CORS without these two.
+		"http://tauri.localhost",
+		"https://tauri.localhost",
 	})
 	v.SetDefault("server.log_theme", "everforest")
 
@@ -264,6 +268,8 @@ func (c *Config) GetServerAllowedOrigins() []string {
 		"https://127.0.0.1",
 		"https://127.0.0.1:*",
 		"tauri://localhost",
+		"http://tauri.localhost",
+		"https://tauri.localhost",
 	}
 
 	// If no custom origins configured, return defaults
