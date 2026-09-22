@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
+	"sort"
 	"time"
 
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/db/rustdriver"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/errors"
@@ -185,6 +187,60 @@ type Spend struct {
 	Count      int64  `json:"count"`
 }
 
+// spentAcross folds every reporter's tally into one row per reader and
+// request, most spent first — the top row is where to look.
+//
+// A reporter that fails takes the whole answer down rather than being skipped:
+// a total quietly missing one of its readers is worse than no total, because
+// it reads as that reader spending nothing.
+func spentAcross(reporters []RecordReporter) ([]Spend, error) {
+	summed := map[Spend]int64{}
+	for _, reporter := range reporters {
+		spent, err := reporter.RecordSpend()
+		if err != nil {
+			return nil, err
+		}
+		for _, one := range spent {
+			summed[Spend{Of: one.Of, Request: one.Request, HeldOnNode: one.HeldOnNode}] += one.Count
+		}
+	}
+
+	spend := make([]Spend, 0, len(summed))
+	for what, count := range summed {
+		what.Count = count
+		spend = append(spend, what)
+	}
+	sort.Slice(spend, func(i, j int) bool { return spend[i].Count > spend[j].Count })
+	return spend, nil
+}
+
+// saySpend emits what each reader has cost since the last refresh.
+//
+// The stores count from when they opened and the metric takes a delta, so what
+// was said last time is subtracted here rather than drained from the stores:
+// each total has another reader in the panel, and draining would hand that one
+// what this took. A restart is a gap and not a spike, because saidSpend starts
+// empty beside stores that start at zero.
+//
+// Only refreshDBStats calls this, and only from the one goroutine
+// startDBStatsRefresher runs, so saidSpend needs no lock.
+func (s *QNTXServer) saySpend(spend []Spend) {
+	if s.saidSpend == nil {
+		s.saidSpend = map[Spend]int64{}
+	}
+	for _, one := range spend {
+		seen := Spend{Of: one.Of, Request: one.Request, HeldOnNode: one.HeldOnNode}
+		since := one.Count - s.saidSpend[seen]
+		s.saidSpend[seen] = one.Count
+		if since <= 0 {
+			continue
+		}
+		measure.Count(measure.StoreRequests, since,
+			measure.String(measure.AttrOf, one.Of),
+			measure.String(measure.AttrRequest, one.Request))
+	}
+}
+
 // rawUnwrapper is AtsStore's escape hatch to the concrete backend.
 type rawUnwrapper interface {
 	Raw() storage.RawAttestationStore
@@ -338,10 +394,15 @@ func (s *QNTXServer) refreshDBStats() {
 
 	// What the record has cost, per reader. A backend that keeps everything
 	// on the node reports none, because then no read leaves it.
+	//
+	// Summed across every reporter: the stores that reach the location are
+	// opened in more than one place, and a reader missing from this list is a
+	// reader nobody can see spending (ADR-037).
 	var recordSpend []Spend
 	var recordSpendErr error
-	if s.recordReporter != nil {
-		recordSpend, recordSpendErr = s.recordReporter.RecordSpend()
+	if len(s.recordReporters) > 0 {
+		recordSpend, recordSpendErr = spentAcross(s.recordReporters)
+		s.saySpend(recordSpend)
 	}
 
 	// The database behind each namespace. A read is answered from one of these

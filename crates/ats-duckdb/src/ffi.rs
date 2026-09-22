@@ -778,6 +778,21 @@ pub extern "C" fn duckdb_namespaces_free(store: *mut NamespaceStore) {
     )
 }
 
+/// The requests the namespace store has made of its location since it opened.
+/// One listing spans every namespace, so this is the node's spend and not a
+/// namespace's. A running total; a caller wanting an interval subtracts.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_requests(store: *const NamespaceStore) -> AskedResultC {
+    qntx_ffi_common::guarded_result("duckdb_namespaces_requests", || {
+        if store.is_null() {
+            return AskedResultC::error("null namespace store pointer");
+        }
+        let store = unsafe { &*store };
+        AskedResultC::ok(store.asked())
+    })
+}
+
 /// Every namespace as JSON. Caller frees with `duckdb_namespaces_result_free`.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -987,6 +1002,21 @@ pub extern "C" fn duckdb_users_free(store: *mut UserStore) {
     )
 }
 
+/// The requests the User store has made of its location since it opened.
+/// A User is held on the node (ADR-037), so these are the take-in at open and
+/// the write-back of one the table changed. A running total.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_users_requests(store: *const UserStore) -> AskedResultC {
+    qntx_ffi_common::guarded_result("duckdb_users_requests", || {
+        if store.is_null() {
+            return AskedResultC::error("null user store pointer");
+        }
+        let store = unsafe { &*store };
+        AskedResultC::ok(store.asked())
+    })
+}
+
 /// Write a User whole, so its keys and accounts can never disagree.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -1101,6 +1131,23 @@ pub extern "C" fn duckdb_tokens_free(store: *mut TokenStore) {
         },
         |_| (),
     )
+}
+
+/// The requests the token store has made of its location since it opened.
+///
+/// `make parity` reports `access_tokens` as held nowhere on the node, so every
+/// one of these is a request a node with the table would not have made. The
+/// `touch` behind the bearer path is one PUT per authenticated request.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_requests(store: *const TokenStore) -> AskedResultC {
+    qntx_ffi_common::guarded_result("duckdb_tokens_requests", || {
+        if store.is_null() {
+            return AskedResultC::error("null token store pointer");
+        }
+        let store = unsafe { &*store };
+        AskedResultC::ok(store.asked())
+    })
 }
 
 /// Store a token. `record_json` is a `TokenRecord` — Go mints the raw token
@@ -2129,6 +2176,21 @@ pub extern "C" fn duckdb_identity_free(store: *mut IdentityStore) {
         },
         |_| (),
     )
+}
+
+/// The requests the identity store has made of its location since it opened.
+/// One record read once, so this is the smallest of the readers and is here so
+/// that no store holding an `Objects` is missing from the picture.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_identity_requests(store: *const IdentityStore) -> AskedResultC {
+    qntx_ffi_common::guarded_result("duckdb_identity_requests", || {
+        if store.is_null() {
+            return AskedResultC::error("null identity store pointer");
+        }
+        let store = unsafe { &*store };
+        AskedResultC::ok(store.asked())
+    })
 }
 
 /// The identity as JSON, empty when there is none — first boot, not an error.

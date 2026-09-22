@@ -160,7 +160,8 @@ type QNTXServer struct {
 	walCheckpointer             WALCheckpointer    // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
 	ageDistiller                AgeDistiller       // Rust-side age distillation (fold old attestations into sigmas)
 	writeLockInspector          WriteLockInspector // Rust-side write lock holder tracking
-	recordReporter              RecordReporter     // What reading the record off-node has cost, per reader
+	recordReporters             []RecordReporter   // What reading the record off-node has cost, per reader
+	saidSpend                   map[Spend]int64    // What of that was already said as a metric, so the next say is a delta
 	landingReporter             LandingReporter    // The database per namespace a read is answered from (ADR-037)
 	onReady                     func()             // Called once when server is fully ready (routes, DB, listeners)
 
@@ -192,10 +193,16 @@ func (s *QNTXServer) SetWriteLockInspector(w WriteLockInspector) {
 	s.writeLockInspector = w
 }
 
-// SetRecordReporter sets what can say the cost of reading the record. A
-// backend holding its record on the node does not set one.
+// SetRecordReporter adds something that can say the cost of reading the
+// record. A backend holding its record on the node adds none.
+//
+// More than one, because the stores that reach the location are opened in
+// more than one place: the attestation stores and the namespaces come from the
+// backend, and the access tokens are opened where the auth routes are. A panel
+// fed by one of them shows the reader that was already moved onto the node and
+// not the ones that were not (ADR-037).
 func (s *QNTXServer) SetRecordReporter(r RecordReporter) {
-	s.recordReporter = r
+	s.recordReporters = append(s.recordReporters, r)
 }
 
 // SetLandingReporter sets what can name the database behind each namespace.

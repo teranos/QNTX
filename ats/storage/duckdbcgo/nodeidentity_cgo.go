@@ -59,6 +59,16 @@ func (s *IdentityStore) Close() {
 	}
 }
 
+// Requests is what this store has asked its location for since it opened. One
+// record read once, here so that no store holding an Objects is missing from
+// the picture.
+func (s *IdentityStore) Requests() ([]Asked, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return askedFrom(C.duckdb_identity_requests((*C.IdentityStore)(s.ptr)), "duckdb identity requests failed")
+}
+
 // Load returns the stored identity, or nodedid.ErrNoIdentity when the node
 // has never generated one — the named answer NewWithStore mints a key on.
 func (s *IdentityStore) Load() (*nodedid.Identity, error) {

@@ -349,6 +349,27 @@ func TestRevokeHitsOnlyItsOwnToken(t *testing.T) {
 	}
 }
 
+// The token store asks its location for things nothing else counts: a token
+// is rewritten on every use (ADR-037), and that PUT is invisible while
+// Requests reaches only the attestation store's tally. A file:// location
+// asks for nothing, so what this proves is the seam, not a number.
+func TestTheTokenStoreSaysWhatItAskedFor(t *testing.T) {
+	store := newStore(t)
+	if _, _, err := store.Create(auth.NewToken{Label: "counted", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	asked, err := store.Requests()
+	if err != nil {
+		t.Fatalf("Requests: %v", err)
+	}
+	for _, one := range asked {
+		if one.HeldOnNode {
+			t.Errorf("the token store counted %s as held on the node; make parity says access_tokens is NO on the node", one.Of)
+		}
+	}
+}
+
 // lookupOK is the yes-or-no a caller asks when all it needs is whether the
 // credential is good.
 func (s *TokenStore) lookupOK(hash string) bool {

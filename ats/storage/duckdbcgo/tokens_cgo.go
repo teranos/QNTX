@@ -118,6 +118,22 @@ func (s *TokenStore) Close() {
 	}
 }
 
+// Requests is what this store has asked its location for since it opened.
+//
+// make parity reports access_tokens as held nowhere on the node, so every one
+// of these is a request a node holding the table would not have made. Touch is
+// the one that runs per authenticated request: a token's record is rewritten
+// on every use (ADR-037).
+//
+// A running total, as DuckdbStore.Requests is — a caller wanting an interval
+// subtracts what it saw last.
+func (s *TokenStore) Requests() ([]Asked, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return askedFrom(C.duckdb_tokens_requests((*C.TokenStore)(s.ptr)), "duckdb token requests failed")
+}
+
 // Create issues a token. The raw value is returned once and never stored —
 // only its hash reaches the backend, so a leaked store yields nothing usable.
 func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {

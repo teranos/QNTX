@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Name, Object, Refusal, Result};
 use crate::namespace;
-use crate::objects::Objects;
+use crate::objects::{Asked, Objects};
 
 /// What `ns.toml` says. The owner is an identity inside QNTX; the DID you show
 /// to prove you reach that identity is outside QNTX and is not written here.
@@ -57,6 +57,13 @@ impl NamespaceStore {
             objects: Objects::open(&location)?,
             location,
         })
+    }
+
+    /// The requests this store has made of its location since it opened.
+    /// One listing spans every namespace, so this is the node's, not a
+    /// namespace's.
+    pub fn asked(&self) -> Vec<Asked> {
+        self.objects.asked()
     }
 
     /// Every namespace at this location: the ones defined by an `ns.toml`, and

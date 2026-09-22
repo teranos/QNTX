@@ -411,11 +411,19 @@ func (s *DuckdbStore) Requests() ([]Asked, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	result := C.duckdb_storage_requests((*C.DuckdbStore)(s.ptr))
+	return askedFrom(C.duckdb_storage_requests((*C.DuckdbStore)(s.ptr)), "duckdb requests failed")
+}
+
+// askedFrom reads one store's tally off the FFI and frees it.
+//
+// Every store holding an Objects answers the same shape, and each of them is a
+// reader the bill counts separately (ADR-037): the attestation store is the
+// one whose reads were moved onto the node, and the others are what is left.
+func askedFrom(result C.AskedResultC, whenFailed string) ([]Asked, error) {
 	defer C.duckdb_asked_result_free(result)
 
 	if !result.success {
-		return nil, failed(result.error_msg, "duckdb requests failed")
+		return nil, failed(result.error_msg, whenFailed)
 	}
 	if result.asked_json == nil {
 		return nil, nil

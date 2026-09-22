@@ -51,6 +51,16 @@ func (s *UserStore) Close() {
 	}
 }
 
+// Requests is what this store has asked its location for since it opened. A
+// User is held on the node (ADR-037), so these are the take-in at open and the
+// write-back of one the table changed, not per-request spend.
+func (s *UserStore) Requests() ([]Asked, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return askedFrom(C.duckdb_users_requests((*C.UserStore)(s.ptr)), "duckdb user requests failed")
+}
+
 // ByRoute resolves an auth.root_identities entry to the User it reaches. False
 // is nothing minted for it, which is not a failure.
 func (s *UserStore) ByRoute(route string) (auth.User, bool, error) {
