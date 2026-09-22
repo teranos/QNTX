@@ -8,8 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -271,8 +273,47 @@ func sessionOf(contexts []string) string {
 	return ""
 }
 
+// ciWatchRearmWindow is how far back the store is read at boot. A restart
+// loses the goroutine that was waiting on a run and the news log with it, and
+// every push to QNTX itself restarts this node before its own CI concludes —
+// so without the read-back no push to QNTX would ever be reported. Three
+// hours is past the ceiling, so nothing a live process would still be
+// waiting on is left behind.
+const ciWatchRearmWindow = 3 * time.Hour
+
+// ciStatusSince is every push attested since the moment given, oldest first.
+func ciStatusSince(store ats.AttestationStore, since time.Time) []*types.As {
+	if store == nil {
+		return nil
+	}
+	found, err := store.GetAttestations(ats.AttestationFilter{
+		Predicates: []string{watcher.CIPushedPredicate},
+		TimeStart:  &since,
+		Limit:      100,
+	})
+	if err != nil {
+		return nil
+	}
+	// The window is checked here as well: not every backend honours
+	// TimeStart, and a push is dated by push_time, ground's own stamp, before
+	// the row's timestamp.
+	recent := make([]*types.As, 0, len(found))
+	for _, as := range found {
+		at := as.Timestamp
+		if v, ok := as.Attributes["push_time"].(float64); ok && v > 0 {
+			at = time.Unix(int64(v), 0)
+		}
+		if at.Before(since) {
+			continue
+		}
+		recent = append(recent, as)
+	}
+	return recent
+}
+
 // setupCIWatch registers the built-in. No schedule: the standing watcher
-// reaches it on arrival.
+// reaches it on arrival. The pushes of the last hours are waited on again,
+// because whatever was waiting on them before this process is gone.
 func (s *QNTXServer) setupCIWatch() {
 	if s.daemon == nil {
 		return
@@ -280,11 +321,36 @@ func (s *QNTXServer) setupCIWatch() {
 	if s.news == nil {
 		s.news = newNewsLog()
 	}
-	s.daemon.Registry().Register(&ciWatchHandler{
+	h := &ciWatchHandler{
 		run:    ghRun,
 		sleep:  sleepUnder,
 		news:   s.news,
 		logger: s.logger.Named("ci.watch"),
-	})
+	}
+	s.daemon.Registry().Register(h)
 	s.logger.Infow("Registered ci.watch built-in")
+
+	var store ats.AttestationStore
+	if s.held != nil {
+		store = s.held.Served()
+	}
+	recent := ciStatusSince(store, time.Now().Add(-ciWatchRearmWindow))
+	for _, as := range recent {
+		as := as
+		payload, err := json.Marshal(as)
+		if err != nil {
+			s.logger.Warnw("ci.watch could not re-arm a push", "id", as.ID, "error", err)
+			continue
+		}
+		sacred.Go("ci.watch rearm "+as.ID, func() {
+			job := &async.Job{ID: "rearm:" + as.ID, HandlerName: watcher.CIWatchHandlerName, Payload: payload, Source: "boot"}
+			if err := h.Execute(s.ctx, job); err != nil {
+				s.noteHandlerFailure(HandlerFailure{Handler: watcher.CIWatchHandlerName, ExecutionID: job.ID,
+					Error: err.Error(), Details: errors.GetAllDetails(err)})
+			}
+		})
+	}
+	if len(recent) > 0 {
+		s.logger.Infow("ci.watch re-armed on the pushes of the last hours", "pushes", len(recent))
+	}
 }
