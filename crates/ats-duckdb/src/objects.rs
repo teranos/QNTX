@@ -56,7 +56,9 @@ impl Tally {
             // is not worth failing a read that was going to work.
             Err(poisoned) => poisoned.into_inner(),
         };
-        *spent.entry((what.counted_as(), request.named())).or_insert(0) += 1;
+        *spent
+            .entry((what.counted_as(), request.named()))
+            .or_insert(0) += 1;
     }
 
     /// Reading leaves it standing: this number has more than one reader, and
