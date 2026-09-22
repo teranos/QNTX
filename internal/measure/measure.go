@@ -134,6 +134,13 @@ const (
 	// kernel counts from boot, and a total since boot answers nothing.
 	HostNetIn  = "qntx.host.net.in"
 	HostNetOut = "qntx.host.net.out"
+
+	// HostSwap is how much of swap is in use, HostSwapIn and HostSwapOut the
+	// bytes a second through it. Swap full and still costs nothing; swap read
+	// back is the machine out of memory.
+	HostSwap    = "qntx.host.swap"
+	HostSwapIn  = "qntx.host.swap.in"
+	HostSwapOut = "qntx.host.swap.out"
 )
 
 // The dimensions.

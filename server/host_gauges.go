@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
 
 	"github.com/teranos/QNTX/internal/measure"
@@ -26,8 +27,9 @@ func (s *QNTXServer) startHostGauges() {
 		defer ticker.Stop()
 
 		// The first reading has nothing to subtract from, so it sets the
-		// baseline and says nothing about the network.
+		// baseline and says nothing about the network or swap.
 		lastIn, lastOut, lastAt := s.hostNetCounters()
+		_, swapIn, swapOut, swapAt := s.hostSwapCounters()
 
 		for {
 			select {
@@ -37,6 +39,7 @@ func (s *QNTXServer) startHostGauges() {
 				s.gaugeHostPressure()
 				s.gaugeHostDisk()
 				lastIn, lastOut, lastAt = s.gaugeHostNet(lastIn, lastOut, lastAt, at)
+				swapIn, swapOut, swapAt = s.gaugeHostSwap(swapIn, swapOut, swapAt)
 			}
 		}
 	})
@@ -107,5 +110,41 @@ func (s *QNTXServer) gaugeHostNet(lastIn, lastOut uint64, lastAt, at time.Time) 
 
 	measure.Gauge(measure.HostNetIn, float64(in-lastIn)/seconds)
 	measure.Gauge(measure.HostNetOut, float64(out-lastOut)/seconds)
+	return in, out, now
+}
+
+// hostSwapCounters reads how full swap is and what the kernel has moved
+// through it since boot. A machine with no swap answers zeroes, which is the
+// truth about it.
+func (s *QNTXServer) hostSwapCounters() (used float64, in, out uint64, at time.Time) {
+	swap, err := mem.SwapMemory()
+	if err != nil {
+		s.logger.Warnw("Swap did not answer", "error", err)
+		return 0, 0, 0, time.Time{}
+	}
+	return swap.UsedPercent, swap.Sin, swap.Sout, time.Now()
+}
+
+// gaugeHostSwap records how full swap is and how fast pages move through it.
+// Swap that is full and still costs nothing; swap being read back is the
+// machine out of memory, and only the rate tells the two apart.
+func (s *QNTXServer) gaugeHostSwap(lastIn, lastOut uint64, lastAt time.Time) (uint64, uint64, time.Time) {
+	used, in, out, now := s.hostSwapCounters()
+	if now.IsZero() {
+		return lastIn, lastOut, lastAt
+	}
+	measure.Gauge(measure.HostSwap, used)
+
+	if lastAt.IsZero() || in < lastIn || out < lastOut {
+		return in, out, now
+	}
+
+	seconds := now.Sub(lastAt).Seconds()
+	if seconds <= 0 {
+		return in, out, now
+	}
+
+	measure.Gauge(measure.HostSwapIn, float64(in-lastIn)/seconds)
+	measure.Gauge(measure.HostSwapOut, float64(out-lastOut)/seconds)
 	return in, out, now
 }
