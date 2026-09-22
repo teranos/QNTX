@@ -48,12 +48,131 @@ type LandingReporter interface {
 
 // A Landing is one namespace's database: where it is, how big it and its
 // write-ahead log have grown, and how many attestations it answers from.
+//
+// The dimensions are filled by the server rather than the backend, because
+// they are read with the same driver the stats connection already uses.
 type Landing struct {
 	Namespace    string `json:"namespace"`
 	Path         string `json:"path"`
 	Bytes        int64  `json:"bytes"`
 	WalBytes     int64  `json:"wal_bytes"`
 	Attestations int    `json:"attestations"`
+	Actors       int    `json:"actors"`
+	Subjects     int    `json:"subjects"`
+	Contexts     int    `json:"contexts"`
+
+	TopPredicates []Common `json:"top_predicates"`
+	TopContexts   []Common `json:"top_contexts"`
+
+	// Over is when this namespace's attestations landed, by the hour, which is
+	// the line the chart draws for it.
+	Over map[string]int64 `json:"over"`
+}
+
+// A Common is one value a namespace uses often, and how often. What a panel
+// shows to say what a namespace is about without reading any of it.
+type Common struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+// commonTo is the values one column uses most, most first.
+func commonTo(db *sql.DB, query string, most int) ([]Common, error) {
+	rows, err := db.Query(query, most)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var common []Common
+	for rows.Next() {
+		var one Common
+		if err := rows.Scan(&one.Name, &one.Count); err != nil {
+			return nil, err
+		}
+		common = append(common, one)
+	}
+	return common, rows.Err()
+}
+
+// dimensionsOf counts the distinct actors, subjects and contexts one landing
+// file holds. These are its own tables (ADR-037): the file answers every read
+// of that namespace, so it is the file that describes it.
+func (s *QNTXServer) dimensionsOf(landing *Landing) error {
+	db, err := sql.Open("rustsqlite", landing.Path)
+	if err != nil {
+		return errors.Wrapf(err, "the landing file of %s at %s did not open", landing.Namespace, landing.Path)
+	}
+	defer func() { sqlclose.Log(db.Close(), s.logger, "the landing file of "+landing.Namespace) }()
+
+	for _, counting := range []struct {
+		query string
+		into  *int
+	}{
+		{"SELECT COUNT(DISTINCT actor) FROM attestation_actors", &landing.Actors},
+		{"SELECT COUNT(DISTINCT subject) FROM attestation_subjects", &landing.Subjects},
+		{"SELECT COUNT(DISTINCT context) FROM attestation_contexts", &landing.Contexts},
+	} {
+		if err := db.QueryRow(counting.query).Scan(counting.into); err != nil {
+			return errors.Wrapf(err, "%s did not answer for %s", counting.query, landing.Namespace)
+		}
+	}
+
+	landing.TopPredicates, err = commonTo(db,
+		"SELECT predicate, COUNT(*) AS held FROM attestation_predicates "+
+			"GROUP BY predicate ORDER BY held DESC LIMIT ?", commonAtMost)
+	if err != nil {
+		return errors.Wrapf(err, "the predicates of %s did not answer", landing.Namespace)
+	}
+
+	landing.TopContexts, err = commonTo(db,
+		"SELECT context, COUNT(*) AS held FROM attestation_contexts "+
+			"GROUP BY context ORDER BY held DESC LIMIT ?", commonAtMost)
+	if err != nil {
+		return errors.Wrapf(err, "the contexts of %s did not answer", landing.Namespace)
+	}
+
+	landing.Over, err = overTime(db)
+	if err != nil {
+		return errors.Wrapf(err, "when the attestations of %s landed did not answer", landing.Namespace)
+	}
+	return nil
+}
+
+// commonAtMost is how many of each a row shows. Enough to say what a namespace
+// is about; more is a list nobody reads.
+const commonAtMost = 8
+
+// overAtMost is how many buckets one namespace's line is drawn from. Hours,
+// so a fortnight fits and the chart still has a shape.
+const overAtMost = 336
+
+// overTime is when a namespace's attestations landed, by the hour. The old
+// chart read distillation output, which a node that persists cheaply to the
+// record does not produce; this reads the attestations themselves.
+func overTime(db *sql.DB) (map[string]int64, error) {
+	rows, err := db.Query(`
+		SELECT strftime('%Y-%m-%dT%H', timestamp) AS bucket, COUNT(*) AS held
+		FROM attestations
+		WHERE bucket IS NOT NULL
+		GROUP BY bucket
+		ORDER BY bucket DESC
+		LIMIT ?`, overAtMost)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	over := map[string]int64{}
+	for rows.Next() {
+		var bucket string
+		var held int64
+		if err := rows.Scan(&bucket, &held); err != nil {
+			return nil, err
+		}
+		over[bucket] = held
+	}
+	return over, rows.Err()
 }
 
 // Spend is one reader and what it has cost against the record: the name make
@@ -232,6 +351,14 @@ func (s *QNTXServer) refreshDBStats() {
 	var landingsErr error
 	if s.landingReporter != nil {
 		landings, landingsErr = s.landingReporter.Landings()
+		for at := range landings {
+			// One that will not say its dimensions still says its size and its
+			// count, so the row is drawn with what it did answer.
+			if err := s.dimensionsOf(&landings[at]); err != nil {
+				s.logger.Warnw("A landing file did not say what it holds",
+					"namespace", landings[at].Namespace, "error", err)
+			}
+		}
 	}
 
 	response := map[string]interface{}{

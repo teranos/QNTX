@@ -109,6 +109,48 @@ interface Landing {
     bytes: number;
     wal_bytes: number;
     attestations: number;
+    actors: number;
+    subjects: number;
+    contexts: number;
+    top_predicates: Common[] | null;
+    top_contexts: Common[] | null;
+    over: Record<string, number> | null;
+}
+
+// One line per namespace, of when its attestations landed. The chart below
+// was written for distillation's histograms and drew nothing once a node
+// stopped distilling; this is the same chart reading what the node holds.
+function landedOverTime(landings: Landing[] | undefined): Record<string, Record<string, number>> | null {
+    if (!landings || landings.length === 0) {
+        return null;
+    }
+    const lines: Record<string, Record<string, number>> = {};
+    for (const one of landings) {
+        if (one.over && Object.keys(one.over).length > 0) {
+            lines[one.namespace] = one.over;
+        }
+    }
+    return Object.keys(lines).length > 0 ? lines : null;
+}
+
+interface Common {
+    name: string;
+    count: number;
+}
+
+// What a namespace is mostly about, clickable the way a type is: the same
+// class and data-type the wiring below already listens for.
+function commonHTML(label: string, common: Common[] | null): string {
+    if (!common || common.length === 0) {
+        return '';
+    }
+    const items = common.map(one =>
+        `<span class="element-type-link" data-type="${escapeHtml(one.name)}" style="cursor: pointer; margin-right: 8px;">${escapeHtml(one.name)} <span style="color: #475569;">${one.count.toLocaleString()}</span></span>`
+    ).join('');
+    return `<div style="display: flex; gap: 6px; padding: 1px 0 3px 12px; font-size: 11px;">
+        <span style="color: #475569; white-space: nowrap;">${label}</span>
+        <span style="display: flex; flex-wrap: wrap; gap: 2px; color: #94a3b8;">${items}</span>
+    </div>`;
 }
 
 // A read is answered from the database of its namespace and never from the
@@ -132,9 +174,12 @@ function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: str
             <span style="white-space: nowrap;">
                 <span style="color: #64748b; margin-right: 8px;">db ${formatBytes(one.bytes)}</span>
                 <span style="color: ${one.wal_bytes > 8 * 1024 * 1024 ? '#f59e0b' : '#64748b'}; margin-right: 8px;">wal ${formatBytes(one.wal_bytes)}</span>
+                <span style="color: #475569; margin-right: 8px;">${one.actors.toLocaleString()}a ${one.subjects.toLocaleString()}s ${one.contexts.toLocaleString()}c</span>
                 <span style="color: #94a3b8;">${one.attestations.toLocaleString()}</span>
             </span>
-        </div>`).join('');
+        </div>
+        ${commonHTML('predicates', one.top_predicates)}
+        ${commonHTML('contexts', one.top_contexts)}`).join('');
 
     return `
         <div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
@@ -209,7 +254,10 @@ function renderDbStats(): void {
     if ('predicate_histograms' in dbStats) {
         renderChartWithControls(sectionChart, dbStats.predicate_histograms);
     } else {
-        sectionChart.innerHTML = '';
+        // A node that persists to the record rather than distilling has no
+        // histograms and drew nothing here. What it does have is when its
+        // attestations landed, per namespace.
+        renderChartWithControls(sectionChart, landedOverTime(dbStats.landings));
     }
 
     // -- Overview: compact stats row --
@@ -292,17 +340,21 @@ function renderDbStats(): void {
 
     sectionPredicates.innerHTML = predicatesHTML ? `<div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">${predicatesHTML}</div>` : '';
 
-    // Wire type links
-    sectionPredicates.querySelectorAll('.element-type-link').forEach(el => {
-        el.addEventListener('click', () => {
-            const typeName = (el as HTMLElement).dataset.type;
-            if (typeName) {
-                import('./type-definition-window.js')
-                    .then(({ openTypeDefinition }) => openTypeDefinition(typeName))
-                    .catch((err: unknown) => log.error(SEG.ELEMENT, `Type definition for ${typeName} failed to open:`, err));
-            }
+    // Wire type links. Both sections, because a namespace's own predicates and
+    // contexts are drawn beside its database in the overview and they open the
+    // same way a type does.
+    for (const section of [sectionPredicates, sectionOverview]) {
+        section.querySelectorAll('.element-type-link').forEach(el => {
+            el.addEventListener('click', () => {
+                const typeName = (el as HTMLElement).dataset.type;
+                if (typeName) {
+                    import('./type-definition-window.js')
+                        .then(({ openTypeDefinition }) => openTypeDefinition(typeName))
+                        .catch((err: unknown) => log.error(SEG.ELEMENT, `Type definition for ${typeName} failed to open:`, err));
+                }
+            });
         });
-    });
+    }
 
     // -- Evictions --
     if (hasEvictions()) {
