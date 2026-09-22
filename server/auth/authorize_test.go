@@ -33,6 +33,9 @@ func authorizingHandler(t *testing.T) (*Handler, *memTokenStore, string) {
 	t.Helper()
 	h := handlerWithDoors(t)
 	h.configuredOrigin = nodeOrigin
+	// Codes and refresh tokens are signed with a secret derived from the node
+	// DID key, so a node without one serves no authorize request.
+	h.nodeKey = testNodeKey(t)
 	store := newMemTokenStore()
 	h.tokens = store
 	_, _, err := store.Create(NewToken{

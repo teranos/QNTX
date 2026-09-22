@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
+	"crypto/ed25519"
+	"crypto/hkdf"
+	"crypto/sha256"
 	"net/http"
 	"sync"
 	"time"
@@ -60,11 +62,10 @@ type authorizing struct {
 // then refused rather than signed with nothing.
 func (h *Handler) oauth() fosite.OAuth2Provider {
 	h.oauthOnce.Do(func() {
-		// Codes are HMAC-signed with a secret drawn here and held in memory,
-		// like the codes themselves: a restart forgets both together.
-		secret := make([]byte, 32)
-		if _, err := rand.Read(secret); err != nil {
-			h.logger.Errorw("could not draw the secret codes are signed with; no authorize request will be served", "error", err)
+		// A refresh token outlives the process, so what signs it does too.
+		secret, err := oauthSecret(h.nodeKey)
+		if err != nil {
+			h.logger.Errorw("no secret to sign codes and refresh tokens with; no authorize request will be served", "error", err)
 			return
 		}
 		config := &fosite.Config{
@@ -95,6 +96,17 @@ func (h *Handler) oauth() fosite.OAuth2Provider {
 		)
 	})
 	return h.oauthProvider
+}
+
+// oauthSecretInfo keeps this derivation apart from anything else the key signs.
+const oauthSecretInfo = "qntx oauth: codes and refresh tokens"
+
+// oauthSecret is the node DID key's seed, run through HKDF under oauthSecretInfo.
+func oauthSecret(nodeKey ed25519.PrivateKey) ([]byte, error) {
+	if len(nodeKey) != ed25519.PrivateKeySize {
+		return nil, errors.Newf("the node DID key is %d bytes, not %d", len(nodeKey), ed25519.PrivateKeySize)
+	}
+	return hkdf.Key(sha256.New, nodeKey.Seed(), nil, oauthSecretInfo, 32)
 }
 
 // Strategy is fosite's core strategy: access tokens are QNTX tokens

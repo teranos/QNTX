@@ -363,6 +363,74 @@ func TestARefreshTokenIsNotABearer(t *testing.T) {
 	assert.False(t, admitted, "a refresh token was admitted as a bearer")
 }
 
+// restarted is the same node coming back: same DID key, same token store.
+func restarted(t *testing.T, before *Handler, store *memTokenStore, key ed25519.PrivateKey) *Handler {
+	t.Helper()
+	after := handlerWithDoors(t)
+	after.configuredOrigin = before.configuredOrigin
+	after.tokens = store
+	after.nodeKey = key
+	return after
+}
+
+// A refresh token is written down, and the node that comes back is the same node.
+func TestARefreshTokenOutlivesARestart(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	code, verifier := codeFor(t, h, did)
+	secret := clientSecret(t, store, did)
+
+	first := httptest.NewRecorder()
+	h.handleToken(first, exchangeRequest(did, secret, code, verifier))
+	require.Equal(t, http.StatusOK, first.Code, first.Body.String())
+	var was struct {
+		Refresh string `json:"refresh_token"`
+	}
+	require.NoError(t, json.Unmarshal(first.Body.Bytes(), &was))
+	require.NotEmpty(t, was.Refresh)
+
+	after := restarted(t, h, store, h.nodeKey)
+	again := httptest.NewRecorder()
+	after.handleToken(again, refreshRequest(did, secret, was.Refresh))
+	require.Equal(t, http.StatusOK, again.Code, again.Body.String())
+	var now struct {
+		AccessToken string `json:"access_token"`
+	}
+	require.NoError(t, json.Unmarshal(again.Body.Bytes(), &now))
+	grant, live := store.Lookup(sha256Hex(now.AccessToken))
+	require.True(t, live, "the token refreshed after the restart does not authenticate")
+	assert.Equal(t, mastodonAccount, grant.MintedBy)
+}
+
+// Another node holding the same rows is not the node that signed them.
+func TestARefreshTokenIsNotAnotherNodesToHonour(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	code, verifier := codeFor(t, h, did)
+	secret := clientSecret(t, store, did)
+
+	first := httptest.NewRecorder()
+	h.handleToken(first, exchangeRequest(did, secret, code, verifier))
+	require.Equal(t, http.StatusOK, first.Code, first.Body.String())
+	var was struct {
+		Refresh string `json:"refresh_token"`
+	}
+	require.NoError(t, json.Unmarshal(first.Body.Bytes(), &was))
+
+	other := restarted(t, h, store, testNodeKey(t))
+	again := httptest.NewRecorder()
+	other.handleToken(again, refreshRequest(did, secret, was.Refresh))
+	assert.Equal(t, http.StatusBadRequest, again.Code, again.Body.String())
+}
+
+// No DID key is no secret, and no authorize request is served on nothing.
+func TestANodeWithoutAKeyServesNoAuthorizeRequest(t *testing.T) {
+	h, _, did := authorizingHandler(t)
+	h.nodeKey = nil
+	_, challenge := pkcePair()
+	w := httptest.NewRecorder()
+	h.handleAuthorize(w, authorizeRequest(did, appReturn, challenge))
+	assert.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
+}
+
 // The token endpoint answers a form, and nothing else.
 func TestTheTokenEndpointAnswersOnlyAPost(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
