@@ -138,6 +138,13 @@ interface Common {
     count: number;
 }
 
+// A panel is as wide as the canvas lets it be, and a row laid out across all
+// of that puts its last column an arm's length from its first. These are
+// tables: fixed columns, and a width a row is read across rather than scanned.
+const LANDING_WIDTH = '860px';
+const LANDING_COLUMNS = '110px minmax(0, 1fr) 84px 84px 132px 72px';
+const SPEND_COLUMNS = '132px 92px 60px 64px';
+
 // What a namespace is mostly about, clickable the way a type is: the same
 // class and data-type the wiring below already listens for.
 function commonHTML(label: string, common: Common[] | null): string {
@@ -147,8 +154,8 @@ function commonHTML(label: string, common: Common[] | null): string {
     const items = common.map(one =>
         `<span class="element-type-link" data-type="${escapeHtml(one.name)}" style="cursor: pointer; margin-right: 8px;">${escapeHtml(one.name)} <span style="color: #475569;">${one.count.toLocaleString()}</span></span>`
     ).join('');
-    return `<div style="display: flex; gap: 6px; padding: 1px 0 3px 12px; font-size: 11px;">
-        <span style="color: #475569; white-space: nowrap;">${label}</span>
+    return `<div style="display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 6px; padding: 1px 0 3px 12px; font-size: 11px; max-width: ${LANDING_WIDTH};">
+        <span style="color: #475569;">${label}</span>
         <span style="display: flex; flex-wrap: wrap; gap: 2px; color: #94a3b8;">${items}</span>
     </div>`;
 }
@@ -168,15 +175,13 @@ function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: str
 
     const held = landings.reduce((sum, one) => sum + one.attestations, 0);
     const rows = landings.map(one => `
-        <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0;">
-            <span style="color: #e2e8f0;">${escapeHtml(one.namespace)}</span>
-            <span style="color: #475569; flex: 1; margin: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(one.path)}</span>
-            <span style="white-space: nowrap;">
-                <span style="color: #64748b; margin-right: 8px;">db ${formatBytes(one.bytes)}</span>
-                <span style="color: ${one.wal_bytes > 8 * 1024 * 1024 ? '#f59e0b' : '#64748b'}; margin-right: 8px;">wal ${formatBytes(one.wal_bytes)}</span>
-                <span style="color: #475569; margin-right: 8px;">${one.actors.toLocaleString()}a ${one.subjects.toLocaleString()}s ${one.contexts.toLocaleString()}c</span>
-                <span style="color: #94a3b8;">${one.attestations.toLocaleString()}</span>
-            </span>
+        <div style="display: grid; grid-template-columns: ${LANDING_COLUMNS}; gap: 8px; font-size: 11px; padding: 2px 0; max-width: ${LANDING_WIDTH};">
+            <span style="color: #e2e8f0; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(one.namespace)}</span>
+            <span style="color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left;">${escapeHtml(one.path)}</span>
+            <span style="color: #64748b; text-align: right;">db ${formatBytes(one.bytes)}</span>
+            <span style="color: ${one.wal_bytes > 8 * 1024 * 1024 ? '#f59e0b' : '#64748b'}; text-align: right;">wal ${formatBytes(one.wal_bytes)}</span>
+            <span style="color: #475569; text-align: right;">${one.actors.toLocaleString()}a ${one.subjects.toLocaleString()}s ${one.contexts.toLocaleString()}c</span>
+            <span style="color: #94a3b8; text-align: right;">${one.attestations.toLocaleString()}</span>
         </div>
         ${commonHTML('predicates', one.top_predicates)}
         ${commonHTML('contexts', one.top_contexts)}`).join('');
@@ -212,13 +217,11 @@ function recordSpendHTML(spend: Spend[] | undefined, failed: any): string {
     // (ADR-037). Said on the row, because a large number there is a defect
     // and the same number beside "on the node" is the record doing its job.
     const rows = spend.map(one => `
-        <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0;">
-            <span style="color: ${one.held_on_node ? '#e2e8f0' : '#f59e0b'};">${escapeHtml(one.of)}</span>
-            <span style="white-space: nowrap; margin-left: 8px;">
-                <span style="color: ${one.held_on_node ? '#475569' : '#f59e0b'}; margin-right: 6px;">${one.held_on_node ? 'on the node' : 'record only'}</span>
-                <span style="color: #64748b; margin-right: 6px;">${escapeHtml(one.request)}</span>
-                <span style="color: #94a3b8;">${one.count.toLocaleString()}</span>
-            </span>
+        <div style="display: grid; grid-template-columns: ${SPEND_COLUMNS}; gap: 8px; font-size: 11px; padding: 2px 0;">
+            <span style="color: ${one.held_on_node ? '#e2e8f0' : '#f59e0b'}; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(one.of)}</span>
+            <span style="color: ${one.held_on_node ? '#475569' : '#f59e0b'};">${one.held_on_node ? 'on the node' : 'record only'}</span>
+            <span style="color: #64748b;">${escapeHtml(one.request)}</span>
+            <span style="color: #94a3b8; text-align: right;">${one.count.toLocaleString()}</span>
         </div>`).join('');
 
     const total = spend.reduce((sum, one) => sum + one.count, 0);

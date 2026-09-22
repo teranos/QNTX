@@ -361,6 +361,16 @@ func (s *QNTXServer) refreshDBStats() {
 		}
 	}
 
+	// What the node holds is every database it answers from and not the one it
+	// was opened with. The status line reads this same number, so a count of
+	// one namespace was the node under-reporting itself everywhere it appears.
+	if len(landings) > 0 {
+		totalAttestations = 0
+		for _, one := range landings {
+			totalAttestations += one.Attestations
+		}
+	}
+
 	response := map[string]interface{}{
 		"type":               "database_stats",
 		"path":               s.dbPath,
