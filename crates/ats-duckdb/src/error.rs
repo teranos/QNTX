@@ -34,6 +34,26 @@ pub enum Object {
     NamespaceDefinition,
 }
 
+impl Object {
+    /// What this is counted under, in the words `make parity` uses for its
+    /// rows. Bounded on purpose: the fires of one watcher fold in with the
+    /// rest, because a watcher id would grow the set without end.
+    pub fn counted_as(&self) -> &'static str {
+        match self {
+            Object::Attestations | Object::ParquetFiles => "attestations",
+            Object::Compaction => "compaction",
+            Object::Token | Object::Tokens => "access_tokens",
+            Object::User | Object::Users => "users",
+            Object::Watcher | Object::Watchers => "watchers",
+            Object::FireEvent | Object::FireEvents | Object::FiresOf(_) => "watcher_fires",
+            Object::Schedule | Object::Schedules => "schedules",
+            Object::Tick | Object::Ticks => "schedule_ticks",
+            Object::NodeIdentity => "node_identity",
+            Object::Namespace | Object::Namespaces | Object::NamespaceDefinition => "namespaces",
+        }
+    }
+}
+
 impl std::fmt::Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Object::FiresOf(watcher) = self {

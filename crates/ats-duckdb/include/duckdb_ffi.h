@@ -50,15 +50,12 @@ typedef struct {
     uint64_t bytes;
 } MergedResultC;
 
-/* What one store asked its location for, a count per kind of request. */
+/* What one store asked its location for: a JSON array, one row per reader
+   per kind of request — {"of","request","count"}. */
 typedef struct {
     bool success;
     char *error_msg;
-    uint64_t puts;
-    uint64_t gets;
-    uint64_t heads;
-    uint64_t lists;
-    uint64_t deletes;
+    char *asked_json;
 } AskedResultC;
 
 /* Store lifecycle */

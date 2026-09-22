@@ -32,6 +32,22 @@ type attestationCounter interface {
 	CountAttestations() (int, error)
 }
 
+// RecordReporter is a backend whose record is somewhere the node has to ask,
+// and which can say what the asking has cost. A backend holding everything on
+// the node has nothing to report and does not implement this.
+type RecordReporter interface {
+	RecordSpend() ([]Spend, error)
+}
+
+// Spend is one reader and what it has cost against the record: the name make
+// parity gives it, the request, and how many. A row here that parity calls
+// record-only is a read that never has to leave the node.
+type Spend struct {
+	Of      string `json:"of"`
+	Request string `json:"request"`
+	Count   int64  `json:"count"`
+}
+
 // rawUnwrapper is AtsStore's escape hatch to the concrete backend.
 type rawUnwrapper interface {
 	Raw() storage.RawAttestationStore
@@ -183,6 +199,14 @@ func (s *QNTXServer) refreshDBStats() {
 	// Live system status: write lock, WAL, dilation
 	liveStatus := buildLiveStatus(s)
 
+	// What the record has cost, per reader. A backend that keeps everything
+	// on the node reports none, because then no read leaves it.
+	var recordSpend []Spend
+	var recordSpendErr error
+	if s.recordReporter != nil {
+		recordSpend, recordSpendErr = s.recordReporter.RecordSpend()
+	}
+
 	response := map[string]interface{}{
 		"type":               "database_stats",
 		"path":               s.dbPath,
@@ -195,6 +219,16 @@ func (s *QNTXServer) refreshDBStats() {
 		"performance":        perfData,
 		"live":               liveStatus,
 	}
+	switch {
+	case recordSpendErr != nil:
+		envelope := newErrorEnvelope("record spend", recordSpendErr)
+		s.logger.Warnw("Record spend unavailable",
+			"error", recordSpendErr, "error_id", envelope.ID)
+		response["record_spend_error"] = envelope
+	case recordSpend != nil:
+		response["record_spend"] = recordSpend
+	}
+
 	if evictionsErr != nil {
 		envelope := newErrorEnvelope("recent evictions", evictionsErr)
 		s.logger.Warnw("Recent evictions unavailable",

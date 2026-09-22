@@ -543,7 +543,7 @@ impl DuckdbStore {
     /// (ADR-024, Consequences), and nothing before this could say the first
     /// number. The `read_parquet` DuckDB runs is its own client and is not
     /// counted here; everything this crate asks for is.
-    pub fn asked(&self) -> Asked {
+    pub fn asked(&self) -> Vec<Asked> {
         self.objects.asked()
     }
 

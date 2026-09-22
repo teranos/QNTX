@@ -172,6 +172,12 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		srv.SetWriteLockInspector(wl)
 	}
 
+	// What reading the record has cost, per reader. A backend keeping its
+	// record on the node is not one, and the panel shows no rows for it.
+	if rr, ok := rustStore.(server.RecordReporter); ok {
+		srv.SetRecordReporter(rr)
+	}
+
 	// Wire deferred plugin initialization — fires when server is fully ready
 	// (migrations done, HTTP listening), not before.
 	if DeferredPluginInit != nil {

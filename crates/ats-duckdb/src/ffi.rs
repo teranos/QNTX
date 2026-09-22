@@ -147,28 +147,23 @@ impl FfiResult for MergedResultC {
     }
 }
 
-/// What one store asked its location for: a count per kind of request.
+/// What one store asked its location for: a row per reader per request.
 #[repr(C)]
 pub struct AskedResultC {
     pub success: bool,
     pub error_msg: *mut c_char,
-    pub puts: u64,
-    pub gets: u64,
-    pub heads: u64,
-    pub lists: u64,
-    pub deletes: u64,
+    pub asked_json: *mut c_char,
 }
 
 impl AskedResultC {
-    fn ok(asked: crate::objects::Asked) -> Self {
-        Self {
-            success: true,
-            error_msg: ptr::null_mut(),
-            puts: asked.puts,
-            gets: asked.gets,
-            heads: asked.heads,
-            lists: asked.lists,
-            deletes: asked.deletes,
+    fn ok(asked: Vec<crate::objects::Asked>) -> Self {
+        match serde_json::to_string(&asked) {
+            Ok(json) => Self {
+                success: true,
+                error_msg: ptr::null_mut(),
+                asked_json: cstring_new_or_empty(&json),
+            },
+            Err(e) => Self::error(e.crosses("duckdb_storage_requests")),
         }
     }
 }
@@ -179,11 +174,7 @@ impl FfiResult for AskedResultC {
         Self {
             success: false,
             error_msg,
-            puts: 0,
-            gets: 0,
-            heads: 0,
-            lists: 0,
-            deletes: 0,
+            asked_json: ptr::null_mut(),
         }
     }
 }

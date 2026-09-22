@@ -119,10 +119,6 @@ REACH is '/am/syscap'                                                     of ROO
 REACH is '/openapi.json'                                                  of ROOT SUPER
 REACH is '/logs/download'                                                 of ROOT
 REACH is '/api/timeseries/usage'                                          of ROOT SUPER
-# What the record cost, read back from where the numbers were sent. The node
-# signs the question with a credential that reads the whole organisation, so
-# this is not a line to open wider than the two who already see the box.
-REACH is '/api/db/series'                                                 of ROOT SUPER
 REACH is '/api/dev' '/api/debug' '/api/crash-test'                        of ROOT
 REACH is '/api/prose' '/api/prose/'                                       of ROOT
 REACH is '/api/pulse/executions/'                                         of ROOT SUPER

@@ -7,8 +7,9 @@
 // "WE DONT DROP IT" / "WE DONT TRUNCATE" / "WE DONT HIDE ERRORS"
 // "WE DONT MAKE UP REASONS"
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
@@ -37,62 +38,52 @@ pub(crate) struct Bucket {
     tally: Tally,
 }
 
-/// What the bucket was asked, counted. S3 prices a request and not a
-/// statement, and the two are not the same number: a listing is one request
-/// per page it answers with, and one compaction is a listing, a write, and a
-/// delete for every file it replaced. A node that cannot say how many it made
-/// cannot say what it costs.
-///
-/// Counted when the request goes out rather than when it comes back. S3
-/// charges for the ones it refuses too.
+/// What the bucket was asked for, counted by who asked and what was asked.
+/// A count that cannot say which reader spent it names no path to go and fix,
+/// and S3 prices a request rather than a statement.
 #[derive(Default)]
 pub(crate) struct Tally {
-    put: AtomicU64,
-    get: AtomicU64,
-    head: AtomicU64,
-    list: AtomicU64,
-    delete: AtomicU64,
+    spent: Mutex<BTreeMap<(&'static str, &'static str), u64>>,
 }
 
 impl Tally {
-    fn note(&self, request: Request) {
-        let counter = match request {
-            Request::Put => &self.put,
-            Request::Get => &self.get,
-            Request::Head => &self.head,
-            Request::List => &self.list,
-            Request::Delete => &self.delete,
+    /// Counted as the request goes out, not as it comes back: S3 charges for
+    /// the ones it refuses too.
+    fn note(&self, what: &Object, request: Request) {
+        let mut spent = match self.spent.lock() {
+            Ok(spent) => spent,
+            // A poisoned tally is a counter, not the store. Losing a number
+            // is not worth failing a read that was going to work.
+            Err(poisoned) => poisoned.into_inner(),
         };
-        counter.fetch_add(1, Ordering::Relaxed);
+        *spent.entry((what.counted_as(), request.named())).or_insert(0) += 1;
     }
 
-    /// What has accumulated since the store opened.
-    ///
-    /// Reading leaves it standing. A counter that emptied on being read would
-    /// answer a second reader with what the first one already took, and this
-    /// number has two: what goes out as a metric, and what a screen shows.
-    /// The difference between two reads is whoever wants a difference's to
-    /// work out.
-    fn asked(&self) -> Asked {
-        Asked {
-            puts: self.put.load(Ordering::Relaxed),
-            gets: self.get.load(Ordering::Relaxed),
-            heads: self.head.load(Ordering::Relaxed),
-            lists: self.list.load(Ordering::Relaxed),
-            deletes: self.delete.load(Ordering::Relaxed),
-        }
+    /// Reading leaves it standing: this number has more than one reader, and
+    /// a count that emptied would answer the second with what the first took.
+    fn asked(&self) -> Vec<Asked> {
+        let spent = match self.spent.lock() {
+            Ok(spent) => spent,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        spent
+            .iter()
+            .map(|((of, request), count)| Asked {
+                of: (*of).to_string(),
+                request: (*request).to_string(),
+                count: *count,
+            })
+            .collect()
     }
 }
 
-/// The requests one store made of its location since the last time it was
-/// asked.
-#[derive(Debug, Default, PartialEq, Eq)]
+/// One reader, one kind of request, and what it has spent since the store
+/// opened. `of` is the name `make parity` gives the same thing.
+#[derive(Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct Asked {
-    pub puts: u64,
-    pub gets: u64,
-    pub heads: u64,
-    pub lists: u64,
-    pub deletes: u64,
+    pub of: String,
+    pub request: String,
+    pub count: u64,
 }
 
 /// What S3 answered, or what stopped the request reaching it. The SDK's own
@@ -230,15 +221,22 @@ pub enum Request {
     Delete,
 }
 
-impl std::fmt::Display for Request {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
+impl Request {
+    /// The word this is counted and displayed under.
+    pub fn named(&self) -> &'static str {
+        match self {
             Request::Put => "PUT",
             Request::Get => "GET",
             Request::Head => "HEAD",
             Request::List => "LIST",
             Request::Delete => "DELETE",
-        })
+        }
+    }
+}
+
+impl std::fmt::Display for Request {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.named())
     }
 }
 
@@ -286,9 +284,9 @@ impl Objects {
     /// The requests this location has been asked for since the store opened.
     /// A filesystem is asked for none: nothing there crosses a network and
     /// nothing there is priced.
-    pub(crate) fn asked(&self) -> Asked {
+    pub(crate) fn asked(&self) -> Vec<Asked> {
         match self {
-            Objects::Local => Asked::default(),
+            Objects::Local => Vec::new(),
             Objects::S3(bucket) => bucket.tally.asked(),
         }
     }
@@ -314,7 +312,7 @@ impl Objects {
             }
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
-                bucket.tally.note(Request::Put);
+                bucket.tally.note(&what, Request::Put);
                 let sent = bucket.runtime.block_on(
                     bucket
                         .client
@@ -349,7 +347,7 @@ impl Objects {
             },
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
-                bucket.tally.note(Request::Get);
+                bucket.tally.note(&what, Request::Get);
                 let got = bucket.runtime.block_on(
                     bucket
                         .client
@@ -401,7 +399,7 @@ impl Objects {
                 }),
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
-                bucket.tally.note(Request::Head);
+                bucket.tally.note(&what, Request::Head);
                 let head = bucket.runtime.block_on(
                     bucket
                         .client
@@ -475,7 +473,7 @@ impl Objects {
                     // Per page, not per call: the paginator asks again for
                     // every thousand keys, and each asking is its own request.
                     let Some(page) = page else { break };
-                    bucket.tally.note(Request::List);
+                    bucket.tally.note(&what, Request::List);
                     let page = page.map_err(|e| DuckdbError::S3 {
                         request: Request::List,
                         what: what.clone(),
@@ -509,7 +507,7 @@ impl Objects {
             },
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
-                bucket.tally.note(Request::Delete);
+                bucket.tally.note(&what, Request::Delete);
                 let sent = bucket.runtime.block_on(
                     bucket
                         .client
@@ -576,27 +574,31 @@ mod tests {
         objects
             .put(Object::Token, &format!("{base}/x.json"), b"{}".to_vec())
             .unwrap();
-        assert_eq!(objects.asked(), Asked::default());
+        assert!(objects.asked().is_empty());
     }
 
     #[test]
-    fn a_tally_answers_the_same_thing_twice() {
+    fn a_tally_keeps_one_reader_apart_from_another() {
         let tally = Tally::default();
-        tally.note(Request::List);
-        tally.note(Request::List);
-        tally.note(Request::Put);
-        let expected = Asked {
-            puts: 1,
-            lists: 2,
-            ..Asked::default()
-        };
-        assert_eq!(tally.asked(), expected);
-        // Reading leaves it standing, because this number has more than one
-        // reader and the first would otherwise take it from the second.
-        assert_eq!(tally.asked(), expected);
+        tally.note(&Object::Tokens, Request::List);
+        tally.note(&Object::Tokens, Request::List);
+        tally.note(&Object::ParquetFiles, Request::List);
 
-        tally.note(Request::List);
-        assert_eq!(tally.asked().lists, 3);
+        let asked = tally.asked();
+        let spent = |of: &str| asked.iter().find(|one| one.of == of).map(|one| one.count);
+        assert_eq!(spent("access_tokens"), Some(2));
+        assert_eq!(spent("attestations"), Some(1));
+
+        // Reading leaves it standing: this number has more than one reader.
+        assert_eq!(tally.asked(), asked);
+    }
+
+    #[test]
+    fn the_fires_of_a_watcher_do_not_grow_the_set() {
+        let tally = Tally::default();
+        tally.note(&Object::FiresOf("one".into()), Request::Get);
+        tally.note(&Object::FiresOf("another".into()), Request::Get);
+        assert_eq!(tally.asked().len(), 1);
     }
 
     #[test]

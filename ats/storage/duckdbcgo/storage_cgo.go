@@ -388,11 +388,13 @@ func (s *DuckdbStore) Compact() (files int, bytes uint64, err error) {
 	return int(result.files), uint64(result.bytes), nil
 }
 
-// Asked is one kind of request and how many of them a store made of its
-// location.
+// Asked is one reader, one kind of request, and how many of them the store
+// has made of its location. Of is the name make parity gives the same thing,
+// so a row here and a row there are about one subject.
 type Asked struct {
-	Request string
-	Count   int64
+	Of      string `json:"of"`
+	Request string `json:"request"`
+	Count   int64  `json:"count"`
 }
 
 // Requests answers what the store has asked its location for since it opened.
@@ -414,13 +416,16 @@ func (s *DuckdbStore) Requests() ([]Asked, error) {
 	if !result.success {
 		return nil, failed(result.error_msg, "duckdb requests failed")
 	}
-	return []Asked{
-		{Request: "PUT", Count: int64(result.puts)},
-		{Request: "GET", Count: int64(result.gets)},
-		{Request: "HEAD", Count: int64(result.heads)},
-		{Request: "LIST", Count: int64(result.lists)},
-		{Request: "DELETE", Count: int64(result.deletes)},
-	}, nil
+	if result.asked_json == nil {
+		return nil, nil
+	}
+
+	raw := C.GoString(result.asked_json)
+	var asked []Asked
+	if err := json.Unmarshal([]byte(raw), &asked); err != nil {
+		return nil, errors.Wrapf(err, "the store's request counts are %d bytes and did not parse", len(raw))
+	}
+	return asked, nil
 }
 
 // FileCount is how many Parquet files the namespace holds: what a read of

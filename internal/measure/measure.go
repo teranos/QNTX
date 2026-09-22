@@ -180,6 +180,11 @@ const (
 	// crates/ats-duckdb/src/objects.rs.
 	AttrRequest = "request"
 
+	// AttrOf is what the request was for, in the words make parity uses for
+	// its rows: access_tokens, attestations, schedule_ticks, watchers. What a
+	// count without it cannot say is which reader to go and fix.
+	AttrOf = "of"
+
 	// AttrMethod is the request's HTTP verb. Bounded: a handful of methods,
 	// never a caller-chosen string.
 	AttrMethod = "method"

@@ -101,12 +101,6 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("sentry.flush_seconds", 2)
 	v.SetDefault("sentry.debug", false)
 
-	// Reading the numbers back. A DSN writes and cannot read, so these three
-	// are a second credential and not that one — off until all three are set.
-	v.SetDefault("sentry.read_token", "")
-	v.SetDefault("sentry.org", "")
-	v.SetDefault("sentry.region_url", "")
-
 	// Fetch service defaults
 	v.SetDefault("fetch.max_requests_per_window", 100) // 100 requests per window
 	v.SetDefault("fetch.window_seconds", 300)          // 5 minute rolling window

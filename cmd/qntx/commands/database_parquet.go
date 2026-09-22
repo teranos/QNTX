@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -28,6 +29,7 @@ import (
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
 )
@@ -493,13 +495,15 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 			return
 		}
 		for _, one := range asked {
-			since := one.Count - said[one.Request]
-			said[one.Request] = one.Count
+			seen := one.Of + " " + one.Request
+			since := one.Count - said[seen]
+			said[seen] = one.Count
 			if since <= 0 {
 				continue
 			}
 			measure.Count(measure.StoreRequests, since,
 				measure.String(measure.AttrStore, name),
+				measure.String(measure.AttrOf, one.Of),
 				measure.String(measure.AttrRequest, one.Request))
 		}
 	}
@@ -568,6 +572,40 @@ func sendAndCompact(landing *landed, record *duckdbcgo.DuckdbStore) error {
 	}
 	measure.Gauge(measure.StoreFiles, float64(count), store)
 	return nil
+}
+
+// RecordSpend is what reading the record has cost, per reader, across every
+// namespace this node has open.
+//
+// Summed rather than sliced by namespace: what a reader costs is a fact about
+// the reader, and which namespace it was in names nothing to go and fix.
+func (h *parquetHandles) RecordSpend() ([]server.Spend, error) {
+	h.mu.Lock()
+	ducks := make([]*duckdbcgo.DuckdbStore, 0, len(h.closing))
+	for _, open := range h.closing {
+		ducks = append(ducks, open.duck)
+	}
+	h.mu.Unlock()
+
+	summed := map[server.Spend]int64{}
+	for _, duck := range ducks {
+		asked, err := duck.Requests()
+		if err != nil {
+			return nil, errors.Wrap(err, "a namespace did not say what it asked its location for")
+		}
+		for _, one := range asked {
+			summed[server.Spend{Of: one.Of, Request: one.Request}] += one.Count
+		}
+	}
+
+	spend := make([]server.Spend, 0, len(summed))
+	for what, count := range summed {
+		what.Count = count
+		spend = append(spend, what)
+	}
+	// Most spent first: the top row is where to look.
+	sort.Slice(spend, func(i, j int) bool { return spend[i].Count > spend[j].Count })
+	return spend, nil
 }
 
 // Namespaces is the capability namespace routes assert for.

@@ -103,6 +103,42 @@ function renderStatsError(err: any): string {
     return rows.join('');
 }
 
+interface Spend {
+    of: string;
+    request: string;
+    count: number;
+}
+
+// What reading the record has cost, per reader, most spent first. A backend
+// holding its record on the node sends none of this and the section is absent
+// — nothing left the node, so nothing was spent reading it.
+function recordSpendHTML(spend: Spend[] | undefined, failed: any): string {
+    if (failed) {
+        return renderStatsError(failed);
+    }
+    if (!spend || spend.length === 0) {
+        return '';
+    }
+
+    const rows = spend.map(one => `
+        <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0;">
+            <span style="color: #e2e8f0;">${escapeHtml(one.of)}</span>
+            <span style="white-space: nowrap; margin-left: 8px;">
+                <span style="color: #64748b; margin-right: 6px;">${escapeHtml(one.request)}</span>
+                <span style="color: #94a3b8;">${one.count.toLocaleString()}</span>
+            </span>
+        </div>`).join('');
+
+    const total = spend.reduce((sum, one) => sum + one.count, 0);
+    return `
+        <div style="margin-bottom: 8px;">
+            <span class="label">Reading the record has cost:</span>
+            <span class="element-value">${total.toLocaleString()} requests</span>
+            <div style="margin-top: 4px;">${rows}</div>
+        </div>
+    `;
+}
+
 function renderDbStats(): void {
     if (!dbStatsElement || !sectionChart || !sectionOverview || !sectionPredicates || !sectionEvictions || !sectionPerformance) return;
 
@@ -147,8 +183,8 @@ function renderDbStats(): void {
         </div>
     `;
 
-    // -- Predicates: types + distillation --
-    let predicatesHTML = '';
+    // -- Predicates: what the record cost, then types + distillation --
+    let predicatesHTML = recordSpendHTML(dbStats.record_spend, dbStats.record_spend_error);
 
     // Rich fields / types
     const richFields = dbStats.rich_fields;
