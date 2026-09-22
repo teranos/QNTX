@@ -87,8 +87,8 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 		t.Fatalf("news for alice: %d items, want 1: %+v", len(got), got)
 	}
 	n := got[0]
-	if n.ID != "ground:ci-status:sess-1" {
-		t.Errorf("id %q; want the attestation's own", n.ID)
+	if n.ID != "ground:ci-status:sess-1:abc123" {
+		t.Errorf("id %q; want the attestation's own and the commit, since the row is per session", n.ID)
 	}
 	if n.Item.Symbol != SymbolWell {
 		t.Errorf("a success drew %q", n.Item.Symbol)

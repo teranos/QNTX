@@ -187,8 +187,12 @@ func (h *ciWatchHandler) leave(as types.As, caller, repo, branch, sha string, ru
 		shortSha = shortSha[:7]
 	}
 	now := time.Now()
+	// The row's id is per session — ground writes one ci-status row per
+	// session and replaces it on every push — so the id here carries the
+	// commit as well, or the laptop would take a second push's result for the
+	// first's and write nothing.
 	h.news.leave(News{
-		ID:  as.ID,
+		ID:  as.ID + ":" + shortSha,
 		For: caller,
 		Item: StatusItem{
 			Name:   "ci",
