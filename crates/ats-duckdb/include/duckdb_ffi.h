@@ -157,6 +157,12 @@ void        duckdb_tokens_free(TokenStore *store);
  *  this boundary in either direction. */
 StorageResultC duckdb_tokens_put(TokenStore *store, const char *record_json);
 
+/** Every token whole, hashes included, in tokens_json. duckdb_tokens_list
+ *  strips the hash, which is right for an API answer and wrong for the
+ *  operational db, which is keyed by it and rebuilt from this after host loss
+ *  (ADR-037). Free with duckdb_tokens_result_free. */
+TokensResultC  duckdb_tokens_records(const TokenStore *store);
+
 /** What this store has asked its location for since it opened. make parity
  *  reports access_tokens as held nowhere on the node, so every one of these is
  *  a request a node with the table would not have made; the touch behind the

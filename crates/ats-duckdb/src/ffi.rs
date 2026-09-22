@@ -1133,6 +1133,31 @@ pub extern "C" fn duckdb_tokens_free(store: *mut TokenStore) {
     )
 }
 
+/// Every token whole, hashes included. Caller frees with
+/// `duckdb_tokens_result_free`.
+///
+/// `duckdb_tokens_list` strips the hash, which is right for an API answer and
+/// wrong for the one caller that has to key by it: the operational db is
+/// rebuilt from this after host loss, and a token without its hash cannot be
+/// looked up by a presented bearer (ADR-037).
+///
+/// The hash is not the token. The raw is an ed25519 seed the holder keeps, and
+/// the caller already computes this hash from every bearer it is presented.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_records(store: *const TokenStore) -> TokensResultC {
+    qntx_ffi_common::guarded_result("duckdb_tokens_records", || {
+        if store.is_null() {
+            return TokensResultC::error("null token store pointer");
+        }
+        let store = unsafe { &*store };
+        match serde_json::to_string(&store.list()) {
+            Ok(json) => TokensResultC::ok(json),
+            Err(e) => TokensResultC::error(e.crosses("duckdb_tokens_records")),
+        }
+    })
+}
+
 /// The requests the token store has made of its location since it opened.
 ///
 /// `make parity` reports `access_tokens` as held nowhere on the node, so every

@@ -43,26 +43,10 @@ type TokenStore struct {
 
 // tokenRecord is the wire shape of crates/ats-duckdb/src/tokens.rs.
 // Timestamps are Unix milliseconds, matching the attestation path.
-type tokenRecord struct {
-	ID                  string   `json:"id"`
-	Hash                string   `json:"hash"`
-	Label               string   `json:"label"`
-	DID                 string   `json:"did"`
-	MintedBy            string   `json:"minted_by"`
-	MintedByUser        string   `json:"minted_by_user"`
-	MintedByDisplayName string   `json:"minted_by_display_name"`
-	Level               string   `json:"level"`
-	Namespaces          []string `json:"namespaces"`
-	ReturnAddress       string   `json:"return_address"`
-	ClientDID           string   `json:"client_did"`
-	RequestID           string   `json:"request_id"`
-	ScopeRead           []string `json:"scope_read"`
-	ScopeWrite          []string `json:"scope_write"`
-	CreatedAt           int64    `json:"created_at"`
-	ExpiresAt           *int64   `json:"expires_at,omitempty"`
-	LastUsedAt          *int64   `json:"last_used_at,omitempty"`
-	RevokedAt           *int64   `json:"revoked_at,omitempty"`
-}
+//
+// One shape rather than two: the operational db holds the same token this
+// writes (ADR-037), and a take-in compares them field by field.
+type tokenRecord = auth.TokenRecord
 
 // tokenSummary is what comes back from a list: the same record without the
 // hash. Mirrors TokenSummary in the crate.
@@ -116,6 +100,46 @@ func (s *TokenStore) Close() {
 		C.duckdb_tokens_free((*C.TokenStore)(s.ptr))
 		s.ptr = nil
 	}
+}
+
+// Records is every token whole, hashes included — what the operational db is
+// rebuilt from after host loss (ADR-037). List strips the hash, which is right
+// for an API answer and wrong for a table keyed by it.
+func (s *TokenStore) Records() ([]auth.TokenRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := C.duckdb_tokens_records((*C.TokenStore)(s.ptr))
+	defer C.duckdb_tokens_result_free(result)
+	if !bool(result.success) {
+		return nil, failed(result.error_msg, "duckdb token records failed")
+	}
+	if result.tokens_json == nil {
+		return nil, nil
+	}
+
+	var held []auth.TokenRecord
+	if err := readBack([]byte(C.GoString(result.tokens_json)), &held); err != nil {
+		return nil, errors.Wrap(err, "the token records did not parse")
+	}
+	return held, nil
+}
+
+// PutRecord writes one token whole, replacing what was there. The table writes
+// first and this second, so a token is in the operational db before it is in
+// the record.
+func (s *TokenStore) PutRecord(held auth.TokenRecord) error {
+	body, err := json.Marshal(held)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize access token %s (%s)", held.ID, held.Label)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cBody := C.CString(string(body))
+	defer C.free(unsafe.Pointer(cBody))
+
+	return storageResultErr(C.duckdb_tokens_put((*C.TokenStore)(s.ptr), cBody), "write access token "+held.Label)
 }
 
 // Requests is what this store has asked its location for since it opened.

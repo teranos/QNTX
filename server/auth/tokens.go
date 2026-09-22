@@ -170,6 +170,111 @@ type TokenStore interface {
 	Touch(hash string) error
 }
 
+// TokenRecord is a token whole, hash included — what the operational db holds
+// and what the record holds, in one shape so the two can be compared.
+//
+// The hash is not the token. The raw is an ed25519 seed the holder keeps and
+// this node never stores; the hash is what a presented raw is reduced to by
+// sha256Hex on the way in, and what every lookup is keyed by.
+type TokenRecord struct {
+	ID                  string   `json:"id"`
+	Hash                string   `json:"hash"`
+	Label               string   `json:"label"`
+	DID                 string   `json:"did"`
+	MintedBy            string   `json:"minted_by"`
+	MintedByUser        string   `json:"minted_by_user"`
+	MintedByDisplayName string   `json:"minted_by_display_name"`
+	Level               string   `json:"level"`
+	Namespaces          []string `json:"namespaces"`
+	ReturnAddress       string   `json:"return_address"`
+	ClientDID           string   `json:"client_did"`
+	RequestID           string   `json:"request_id"`
+	ScopeRead           []string `json:"scope_read"`
+	ScopeWrite          []string `json:"scope_write"`
+	CreatedAt           int64    `json:"created_at"`
+	ExpiresAt           *int64   `json:"expires_at,omitempty"`
+	LastUsedAt          *int64   `json:"last_used_at,omitempty"`
+	RevokedAt           *int64   `json:"revoked_at,omitempty"`
+}
+
+// Usable reports whether this token authorizes a request at nowMS. Revoked is
+// never usable; an expiry in the past is not either. No expiry does not expire.
+func (t TokenRecord) Usable(nowMS int64) bool {
+	if t.RevokedAt != nil {
+		return false
+	}
+	if t.ExpiresAt == nil {
+		return true
+	}
+	return *t.ExpiresAt > nowMS
+}
+
+// Grant is what this token authorizes, for a caller that has already decided
+// the token is live.
+func (t TokenRecord) Grant() Grant {
+	return Grant{
+		ID:                  t.ID,
+		Label:               t.Label,
+		DID:                 t.DID,
+		MintedBy:            t.MintedBy,
+		MintedByUser:        t.MintedByUser,
+		MintedByDisplayName: t.MintedByDisplayName,
+		Level:               Level(t.Level),
+		Namespaces:          t.Namespaces,
+		ReturnAddress:       t.ReturnAddress,
+		ClientDID:           t.ClientDID,
+		RequestID:           t.RequestID,
+	}
+}
+
+// Info is this token without its hash — the safe-to-return shape.
+func (t TokenRecord) Info() TokenInfo {
+	return TokenInfo{
+		ID:                  t.ID,
+		Label:               t.Label,
+		DID:                 t.DID,
+		MintedBy:            t.MintedBy,
+		MintedByUser:        t.MintedByUser,
+		MintedByDisplayName: t.MintedByDisplayName,
+		Level:               Level(t.Level),
+		Namespaces:          t.Namespaces,
+		ReturnAddress:       t.ReturnAddress,
+		ClientDID:           t.ClientDID,
+		RequestID:           t.RequestID,
+		CreatedAt:           whenMS(&t.CreatedAt),
+		ExpiresAt:           whenMSOrNil(t.ExpiresAt),
+		LastUsedAt:          whenMSOrNil(t.LastUsedAt),
+		RevokedAt:           whenMSOrNil(t.RevokedAt),
+	}
+}
+
+// whenMS is epoch milliseconds as the instant an API answers with.
+func whenMS(ms *int64) string {
+	if ms == nil {
+		return ""
+	}
+	return time.UnixMilli(*ms).UTC().Format(time.RFC3339Nano)
+}
+
+func whenMSOrNil(ms *int64) *string {
+	if ms == nil {
+		return nil
+	}
+	when := whenMS(ms)
+	return &when
+}
+
+// TokenRecordStore is the record behind the table: on parquet, one object per
+// token under system/access_tokens/. It is what the table is rebuilt from
+// after host loss, and nothing a request touches.
+type TokenRecordStore interface {
+	// Records returns every token the record holds, hashes included, which is
+	// what a take-in needs and what List deliberately strips.
+	Records() ([]TokenRecord, error)
+	// PutRecord writes one token whole, replacing what was there.
+	PutRecord(TokenRecord) error
+}
+
 // TokenInfo is the safe-to-return shape for GET /auth/tokens.
 type TokenInfo struct {
 	ID    string `json:"id"`
