@@ -52,6 +52,19 @@ impl Object {
             Object::Namespace | Object::Namespaces | Object::NamespaceDefinition => "namespaces",
         }
     }
+
+    /// Whether the node keeps a copy of this, so a read of it can be answered
+    /// without going to the record ([ADR-037]). What `make parity` prints as
+    /// its ON THE NODE column, said here so a cost can be read beside it.
+    ///
+    /// False is the finding: every read of it leaves the box, however small
+    /// the thing is and however little traffic there is.
+    pub fn held_on_node(&self) -> bool {
+        !matches!(
+            self,
+            Object::Token | Object::Tokens | Object::Tick | Object::Ticks
+        )
+    }
 }
 
 impl std::fmt::Display for Object {

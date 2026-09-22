@@ -43,12 +43,22 @@ pub(crate) struct Bucket {
 /// and S3 prices a request rather than a statement.
 #[derive(Default)]
 pub(crate) struct Tally {
-    spent: Mutex<BTreeMap<(&'static str, &'static str), u64>>,
+    spent: Mutex<BTreeMap<(&'static str, &'static str, bool), u64>>,
 }
 
 impl Tally {
     /// Counted as the request goes out, not as it comes back: S3 charges for
     /// the ones it refuses too.
+    fn note_many(&self, what: &Object, request: Request, times: u64) {
+        let mut spent = match self.spent.lock() {
+            Ok(spent) => spent,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        *spent
+            .entry((what.counted_as(), request.named(), what.held_on_node()))
+            .or_insert(0) += times;
+    }
+
     fn note(&self, what: &Object, request: Request) {
         let mut spent = match self.spent.lock() {
             Ok(spent) => spent,
@@ -57,7 +67,7 @@ impl Tally {
             Err(poisoned) => poisoned.into_inner(),
         };
         *spent
-            .entry((what.counted_as(), request.named()))
+            .entry((what.counted_as(), request.named(), what.held_on_node()))
             .or_insert(0) += 1;
     }
 
@@ -70,9 +80,10 @@ impl Tally {
         };
         spent
             .iter()
-            .map(|((of, request), count)| Asked {
+            .map(|((of, request, held), count)| Asked {
                 of: (*of).to_string(),
                 request: (*request).to_string(),
+                held_on_node: *held,
                 count: *count,
             })
             .collect()
@@ -85,6 +96,7 @@ impl Tally {
 pub struct Asked {
     pub of: String,
     pub request: String,
+    pub held_on_node: bool,
     pub count: u64,
 }
 
@@ -290,6 +302,19 @@ impl Objects {
         match self {
             Objects::Local => Vec::new(),
             Objects::S3(bucket) => bucket.tally.asked(),
+        }
+    }
+
+    /// Note requests this crate does not make itself.
+    ///
+    /// DuckDB reads the files it is handed through its own client, one round
+    /// trip per file (ADR-024, Consequences), and none of those reach the
+    /// methods above. The number is known anyway: it is the length of the
+    /// list we named for it. Counted here so the reader that spent them is
+    /// the one they are counted against.
+    pub(crate) fn noted(&self, what: &Object, request: Request, times: u64) {
+        if let Objects::S3(bucket) = self {
+            bucket.tally.note_many(what, request, times);
         }
     }
 
@@ -593,6 +618,25 @@ mod tests {
 
         // Reading leaves it standing: this number has more than one reader.
         assert_eq!(tally.asked(), asked);
+    }
+
+    #[test]
+    fn a_reader_the_node_keeps_nothing_of_says_so_beside_its_cost() {
+        let tally = Tally::default();
+        tally.note(&Object::Tokens, Request::List);
+        tally.note(&Object::ParquetFiles, Request::List);
+
+        let asked = tally.asked();
+        let held = |of: &str| {
+            asked
+                .iter()
+                .find(|one| one.of == of)
+                .map(|one| one.held_on_node)
+        };
+        // Every read of an access token leaves the box (ADR-037), and a count
+        // that did not say so would read the same as one that was just busy.
+        assert_eq!(held("access_tokens"), Some(false));
+        assert_eq!(held("attestations"), Some(true));
     }
 
     #[test]

@@ -43,9 +43,10 @@ type RecordReporter interface {
 // parity gives it, the request, and how many. A row here that parity calls
 // record-only is a read that never has to leave the node.
 type Spend struct {
-	Of      string `json:"of"`
-	Request string `json:"request"`
-	Count   int64  `json:"count"`
+	Of         string `json:"of"`
+	Request    string `json:"request"`
+	HeldOnNode bool   `json:"held_on_node"`
+	Count      int64  `json:"count"`
 }
 
 // rawUnwrapper is AtsStore's escape hatch to the concrete backend.

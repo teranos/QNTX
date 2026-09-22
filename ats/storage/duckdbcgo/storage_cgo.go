@@ -392,9 +392,10 @@ func (s *DuckdbStore) Compact() (files int, bytes uint64, err error) {
 // has made of its location. Of is the name make parity gives the same thing,
 // so a row here and a row there are about one subject.
 type Asked struct {
-	Of      string `json:"of"`
-	Request string `json:"request"`
-	Count   int64  `json:"count"`
+	Of         string `json:"of"`
+	Request    string `json:"request"`
+	HeldOnNode bool   `json:"held_on_node"`
+	Count      int64  `json:"count"`
 }
 
 // Requests answers what the store has asked its location for since it opened.

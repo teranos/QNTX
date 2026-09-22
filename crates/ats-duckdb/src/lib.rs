@@ -36,7 +36,7 @@ use ats::storage::{AttestationStore, StoreError};
 use duckdb::types::Value;
 use serde::{Deserialize, Serialize};
 
-use crate::objects::{Asked, Objects};
+use crate::objects::{Asked, Objects, Request};
 
 // ats's storage::error module isn't public, but AttestationStore's trait
 // methods return StoreResult<T>. Alias it here to match ats-sqlite's pattern
@@ -412,6 +412,11 @@ impl DuckdbStore {
             refuse_quoted(path)?;
         }
         resolve_credentials_again(&self.conn, &self.location)?;
+        // What this read is about to cost inside DuckDB: a round trip per file
+        // it is handed (ADR-024, Consequences). Counted from the list we name
+        // for it, because httpfs holds its own client and reaches nothing here.
+        self.objects
+            .noted(&Object::Attestations, Request::Get, files.len() as u64);
         let held = files
             .iter()
             .map(|path| format!("'{path}'"))
@@ -579,6 +584,12 @@ impl DuckdbStore {
                 sources: sources.clone(),
             })?,
         )?;
+
+        // A merge reads every source through DuckDB, one round trip each, the
+        // same as a read does. Counted against compaction rather than the
+        // reads, because it is compaction that chose to open them.
+        self.objects
+            .noted(&Object::Compaction, Request::Get, sources.len() as u64);
 
         // The files this run named, so a file written since the listing stays
         // where it is.

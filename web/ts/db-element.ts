@@ -106,6 +106,7 @@ function renderStatsError(err: any): string {
 interface Spend {
     of: string;
     request: string;
+    held_on_node: boolean;
     count: number;
 }
 
@@ -120,20 +121,29 @@ function recordSpendHTML(spend: Spend[] | undefined, failed: any): string {
         return '';
     }
 
+    // A reader the node keeps nothing of pays S3 for every read of it
+    // (ADR-037). Said on the row, because a large number there is a defect
+    // and the same number beside "on the node" is the record doing its job.
     const rows = spend.map(one => `
         <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0;">
-            <span style="color: #e2e8f0;">${escapeHtml(one.of)}</span>
+            <span style="color: ${one.held_on_node ? '#e2e8f0' : '#f59e0b'};">${escapeHtml(one.of)}</span>
             <span style="white-space: nowrap; margin-left: 8px;">
+                <span style="color: ${one.held_on_node ? '#475569' : '#f59e0b'}; margin-right: 6px;">${one.held_on_node ? 'on the node' : 'record only'}</span>
                 <span style="color: #64748b; margin-right: 6px;">${escapeHtml(one.request)}</span>
                 <span style="color: #94a3b8;">${one.count.toLocaleString()}</span>
             </span>
         </div>`).join('');
 
     const total = spend.reduce((sum, one) => sum + one.count, 0);
+    const offNode = spend.filter(one => !one.held_on_node).reduce((sum, one) => sum + one.count, 0);
+    const leaving = offNode > 0
+        ? ` <span style="color: #f59e0b;">${offNode.toLocaleString()} of them for things the node keeps no copy of</span>`
+        : '';
+
     return `
         <div style="margin-bottom: 8px;">
             <span class="label">Reading the record has cost:</span>
-            <span class="element-value">${total.toLocaleString()} requests</span>
+            <span class="element-value">${total.toLocaleString()} requests</span>${leaving}
             <div style="margin-top: 4px;">${rows}</div>
         </div>
     `;

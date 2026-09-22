@@ -594,7 +594,7 @@ func (h *parquetHandles) RecordSpend() ([]server.Spend, error) {
 			return nil, errors.Wrap(err, "a namespace did not say what it asked its location for")
 		}
 		for _, one := range asked {
-			summed[server.Spend{Of: one.Of, Request: one.Request}] += one.Count
+			summed[server.Spend{Of: one.Of, Request: one.Request, HeldOnNode: one.HeldOnNode}] += one.Count
 		}
 	}
 
