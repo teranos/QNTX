@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Name, Object, Refusal, Result};
-use crate::objects::Objects;
+use crate::objects::{Asked, Objects};
 
 /// A node's signer identity, mirroring `nodedid.Identity` in Go.
 /// Keys are hex because the object is JSON, and hex round-trips exactly.
@@ -52,6 +52,11 @@ impl IdentityStore {
     /// The location URL this store was opened with.
     pub fn location(&self) -> &str {
         &self.location
+    }
+
+    /// The requests this store has made of its location since it opened.
+    pub fn asked(&self) -> Vec<Asked> {
+        self.objects.asked()
     }
 
     /// The stored identity, or `None` when the node has never generated one.

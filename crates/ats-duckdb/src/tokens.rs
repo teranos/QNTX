@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DuckdbError, Name, Object, Refusal, Result};
-use crate::objects::Objects;
+use crate::objects::{Asked, Objects};
 
 /// Where a token may act.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -327,6 +327,15 @@ impl TokenStore {
     /// The location URL this store was opened with.
     pub fn location(&self) -> &str {
         &self.location
+    }
+
+    /// The requests this store has made of its location since it opened.
+    ///
+    /// A token is not held on the node (ADR-037), so every one of these is a
+    /// request a node with the table would not have made. `touch` is the one
+    /// that runs per authenticated request.
+    pub fn asked(&self) -> Vec<Asked> {
+        self.objects.asked()
     }
 
     /// Store a token, replacing any record under the same hash.

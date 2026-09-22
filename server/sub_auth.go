@@ -219,6 +219,12 @@ func (authSubsystem) Init(s *QNTXServer) error {
 			"location", s.deps.cfg.Storage.Parquet.Location,
 		)
 	}
+	// A token is held nowhere on the node (ADR-037) and its record is rewritten
+	// on every use, so this store spends per authenticated request. The backend
+	// never opened it and so cannot report it.
+	if reporter, ok := recordSpendOf(tokenStore); ok {
+		s.SetRecordReporter(reporter)
+	}
 	// Who the routes in root_identities reach (ADR-031). A User lives in the
 	// operational db on every backend (ADR-037); the record behind the table
 	// is parquet's, read once here and never on a request.
@@ -236,6 +242,11 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		"written_back", reconciled.WrittenBack,
 		"record", record != nil,
 	)
+	// The take-in above is the record's whole cost for Users, and it is worth
+	// seeing beside the readers that were not moved.
+	if reporter, ok := recordSpendOf(record); ok {
+		s.SetRecordReporter(reporter)
+	}
 
 	// Secure cookie when a browser reaches this deployment over https. Loopback
 	// dev over plain http keeps Secure off so browsers accept the cookie.

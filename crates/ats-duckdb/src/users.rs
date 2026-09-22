@@ -9,7 +9,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::error::{DuckdbError, Name, Object, Refusal, Result};
-use crate::objects::Objects;
+use crate::objects::{Asked, Objects};
 
 /// Reads an explicit null as the default. Go marshals an empty slice as null,
 /// and serde's own default covers an absent field only.
@@ -148,6 +148,13 @@ impl UserStore {
     /// The location URL this store was opened with.
     pub fn location(&self) -> &str {
         &self.location
+    }
+
+    /// The requests this store has made of its location since it opened.
+    /// A User is held on the node (ADR-037), so these are the record's, made
+    /// at the open that takes it in and when one is written back.
+    pub fn asked(&self) -> Vec<Asked> {
+        self.objects.asked()
     }
 
     /// Every User. An empty prefix is an empty list; a prefix that cannot be

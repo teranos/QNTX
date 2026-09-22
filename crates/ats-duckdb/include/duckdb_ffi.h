@@ -157,6 +157,13 @@ void        duckdb_tokens_free(TokenStore *store);
  *  this boundary in either direction. */
 StorageResultC duckdb_tokens_put(TokenStore *store, const char *record_json);
 
+/** What this store has asked its location for since it opened. make parity
+ *  reports access_tokens as held nowhere on the node, so every one of these is
+ *  a request a node with the table would not have made; the touch behind the
+ *  bearer path is one PUT per authenticated request. Running total; free with
+ *  duckdb_asked_result_free. */
+AskedResultC   duckdb_tokens_requests(const TokenStore *store);
+
 /** Whether the token with this hash authorizes a request at now_ms.
  *  success carries the answer; a false one with error_msg == NULL means
  *  "not usable", not "the store broke". The caller must tell those apart. */
@@ -216,6 +223,11 @@ void       duckdb_users_free(UserStore *store);
  *  keys and accounts included, and the object is replaced whole. */
 StorageResultC duckdb_users_put(UserStore *store, const char *record_json);
 
+/** What this store has asked its location for since it opened. A User is held
+ *  on the node (ADR-037), so these are the take-in at open and the write-back
+ *  of one the table changed. Free with duckdb_asked_result_free. */
+AskedResultC   duckdb_users_requests(const UserStore *store);
+
 /** The User an auth.root_identities entry reaches, as one UserRecord object in
  *  users_json, or the JSON literal null when none was minted for it.
  *  Free with duckdb_users_result_free. */
@@ -246,6 +258,11 @@ void            duckdb_namespaces_free(NamespaceStore *store);
  *  and the kinds it holds. Free with duckdb_namespaces_result_free. */
 NamespacesResultC duckdb_namespaces_list(const NamespaceStore *store);
 
+/** What this store has asked its location for since it opened. One listing
+ *  spans every namespace, so this is the node's spend and not a namespace's.
+ *  Free with duckdb_asked_result_free. */
+AskedResultC   duckdb_namespaces_requests(const NamespaceStore *store);
+
 /** Create name by recording who owns it. owner_json is an Owner. A name that
  *  already carries one is an error. */
 StorageResultC duckdb_namespaces_create(const NamespaceStore *store, const char *name,
@@ -275,6 +292,11 @@ void           duckdb_identity_free(IdentityStore *store);
 /** Identity JSON in tokens_json, empty when there is none — first boot, not an
  *  error. Free with duckdb_tokens_result_free. */
 TokensResultC  duckdb_identity_load(const IdentityStore *store);
+
+/** What this store has asked its location for since it opened. One record read
+ *  once, here so that no store holding an Objects is missing from the picture.
+ *  Free with duckdb_asked_result_free. */
+AskedResultC   duckdb_identity_requests(const IdentityStore *store);
 
 StorageResultC duckdb_identity_save(IdentityStore *store, const char *record_json);
 

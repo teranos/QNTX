@@ -181,6 +181,10 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 			duckdbcgo.NamespaceDefault: defaultLanding.RustStore,
 			duckdbcgo.NamespaceSystem:  systemLanding.RustStore,
 		},
+		records: map[string]*duckdbcgo.DuckdbStore{
+			duckdbcgo.NamespaceDefault: duckStore,
+			duckdbcgo.NamespaceSystem:  systemDuck,
+		},
 		boot: boot,
 	}
 	// dbPath, not location: the caller hands this to NewQNTXServer as s.dbPath,
@@ -212,6 +216,11 @@ type parquetHandles struct {
 	// landings is every open landing file by namespace, the two opened at boot
 	// included, so the checkpoint pulse reaches each one's WAL.
 	landings map[string]*sqlitecgo.RustStore
+	// records is every open record store by namespace, the two opened at boot
+	// included. closing holds only what OpenNamespace opened, so a spend read
+	// off it left default and system — the two that run for the life of the
+	// process — out of the total.
+	records map[string]*duckdbcgo.DuckdbStore
 	// boot is the send loops of default and system, which run until CloseAll.
 	boot []sending
 }
@@ -407,6 +416,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	}
 	h.closing[name] = opened{stop: stop, flushed: flushed, duck: duck, watchers: watchers, landing: landing.RustStore}
 	h.landings[name] = landing.RustStore
+	h.records[name] = duck
 	h.mu.Unlock()
 	sacred.Go("parquet.send."+name, func() { sendEvery(ctx, landing, duck, name, flushed) })
 
@@ -438,6 +448,7 @@ func (h *parquetHandles) CloseNamespace(name string) {
 	was, open := h.closing[name]
 	delete(h.closing, name)
 	delete(h.landings, name)
+	delete(h.records, name)
 	h.mu.Unlock()
 	if !open {
 		return
@@ -481,32 +492,11 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 		measure.Gauge(measure.StoreUnsent, float64(landing.unsent.Load()),
 			measure.String(measure.AttrStore, name))
 	}
-	// The store counts from when it opened and the metric takes a delta, so
-	// what was said last time is subtracted here rather than taken from the
-	// store: the store's total has another reader, and draining it would hand
-	// that one what this one already took. A restart is a gap and not a spike,
-	// because said starts empty beside a store that starts at zero.
-	said := map[string]int64{}
-	sayRequests := func() {
-		asked, err := record.Requests()
-		if err != nil {
-			logger.Logger.Errorw("The record did not say what it asked its location for",
-				"store", name, "error", err)
-			return
-		}
-		for _, one := range asked {
-			seen := one.Of + " " + one.Request
-			since := one.Count - said[seen]
-			said[seen] = one.Count
-			if since <= 0 {
-				continue
-			}
-			measure.Count(measure.StoreRequests, since,
-				measure.String(measure.AttrStore, name),
-				measure.String(measure.AttrOf, one.Of),
-				measure.String(measure.AttrRequest, one.Request))
-		}
-	}
+	// What each reader has asked the location for is said where every store
+	// that reaches it can be reached: server.saySpend, off the db stats
+	// refresher. Said per namespace here, it covered the record stores and
+	// none of the others — and access_tokens, held nowhere on the node
+	// (ADR-037), is the one that spends per request.
 	sendOnce := func() {
 		defer sacred.Said("parquet.send." + name)
 		if err := sendAndCompact(landing, record); err != nil {
@@ -514,7 +504,6 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 				"store", name, "error", err)
 		}
 		sayUnsent()
-		sayRequests()
 	}
 	for {
 		select {
@@ -525,7 +514,6 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 			sendOnce()
 		case <-unsent.C:
 			sayUnsent()
-			sayRequests()
 		}
 	}
 }
@@ -575,23 +563,31 @@ func sendAndCompact(landing *landed, record *duckdbcgo.DuckdbStore) error {
 }
 
 // RecordSpend is what reading the record has cost, per reader, across every
-// namespace this node has open.
+// store this node has open at its location.
 //
 // Summed rather than sliced by namespace: what a reader costs is a fact about
 // the reader, and which namespace it was in names nothing to go and fix.
+//
+// Every record store answers, default and system included — they run for the
+// life of the process, and a total taken off the namespaces OpenNamespace
+// opened left both of them out. The namespace store answers too: its listing
+// spans the location and belongs to no namespace.
 func (h *parquetHandles) RecordSpend() ([]server.Spend, error) {
 	h.mu.Lock()
-	ducks := make([]*duckdbcgo.DuckdbStore, 0, len(h.closing))
-	for _, open := range h.closing {
-		ducks = append(ducks, open.duck)
+	asks := make([]asksItsLocation, 0, len(h.records)+1)
+	for _, duck := range h.records {
+		asks = append(asks, duck)
 	}
 	h.mu.Unlock()
+	if store, ok := h.namespaces.(asksItsLocation); ok {
+		asks = append(asks, store)
+	}
 
 	summed := map[server.Spend]int64{}
-	for _, duck := range ducks {
-		asked, err := duck.Requests()
+	for _, store := range asks {
+		asked, err := store.Requests()
 		if err != nil {
-			return nil, errors.Wrap(err, "a namespace did not say what it asked its location for")
+			return nil, errors.Wrap(err, "a store did not say what it asked its location for")
 		}
 		for _, one := range asked {
 			summed[server.Spend{Of: one.Of, Request: one.Request, HeldOnNode: one.HeldOnNode}] += one.Count
@@ -606,6 +602,14 @@ func (h *parquetHandles) RecordSpend() ([]server.Spend, error) {
 	// Most spent first: the top row is where to look.
 	sort.Slice(spend, func(i, j int) bool { return spend[i].Count > spend[j].Count })
 	return spend, nil
+}
+
+// asksItsLocation is a store that keeps a tally of what it has asked its
+// location for. Every store holding an Objects answers this; the ones reaching
+// S3 through DuckDB's own client do not, and are counted where their file
+// lists are known instead.
+type asksItsLocation interface {
+	Requests() ([]duckdbcgo.Asked, error)
 }
 
 // Landings is the database behind each namespace: where it is, how big it and

@@ -53,6 +53,16 @@ func (s *NamespaceStore) Close() {
 	}
 }
 
+// Requests is what this store has asked its location for since it opened. One
+// listing spans every namespace, so this is the node's spend and not a
+// namespace's.
+func (s *NamespaceStore) Requests() ([]Asked, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return askedFrom(C.duckdb_namespaces_requests((*C.NamespaceStore)(s.ptr)), "duckdb namespace requests failed")
+}
+
 // List returns every namespace at the location, sorted by name.
 func (s *NamespaceStore) List() ([]storage.Namespace, error) {
 	s.mu.Lock()
