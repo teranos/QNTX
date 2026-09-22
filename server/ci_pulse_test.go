@@ -66,8 +66,10 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 	gh := &scriptedGh{
 		percentiles: "40 90\n",
 		states: []string{
-			`[{"status":"in_progress","conclusion":"","name":"test","url":"https://github.com/teranos/ground/actions/runs/1"}]`,
-			`[{"status":"completed","conclusion":"success","name":"test","url":"https://github.com/teranos/ground/actions/runs/1"}]`,
+			`[{"status":"completed","conclusion":"success","name":"Go","url":"https://github.com/teranos/ground/actions/runs/1"},` +
+				`{"status":"in_progress","conclusion":"","name":"Nix","url":"https://github.com/teranos/ground/actions/runs/2"}]`,
+			`[{"status":"completed","conclusion":"success","name":"Go","url":"https://github.com/teranos/ground/actions/runs/1"},` +
+				`{"status":"completed","conclusion":"success","name":"Nix","url":"https://github.com/teranos/ground/actions/runs/2"}]`,
 		},
 	}
 	news := newNewsLog()
@@ -107,11 +109,15 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 	}
 }
 
-// A failed run is news the same way. There is no branch on green versus red.
-func TestCIWatchLeavesAFailureUnwell(t *testing.T) {
+// A red beside a green is red. Reading one run read whichever finished first,
+// and the row said green four times over a failing lint.
+func TestCIWatchARedBesideAGreenIsRed(t *testing.T) {
 	gh := &scriptedGh{
 		percentiles: "0 0\n",
-		states:      []string{`[{"status":"completed","conclusion":"failure","name":"test","url":"u"}]`},
+		states: []string{
+			`[{"status":"completed","conclusion":"success","name":"deploy","url":"g"},` +
+				`{"status":"completed","conclusion":"failure","name":"lint","url":"r"}]`,
+		},
 	}
 	news := newNewsLog()
 	h := &ciWatchHandler{run: gh.run, news: news, sleep: func(context.Context, time.Duration) error { return nil }, logger: zap.NewNop().Sugar()}
@@ -120,7 +126,36 @@ func TestCIWatchLeavesAFailureUnwell(t *testing.T) {
 	}
 	got := news.since("did:key:alice", time.Now().UnixMilli())
 	if len(got) != 1 || got[0].Item.Symbol != SymbolUnwell {
-		t.Fatalf("a failure drew %+v", got)
+		t.Fatalf("a red beside a green drew %+v", got)
+	}
+	if !strings.Contains(got[0].Item.Note, "failure") || !strings.Contains(got[0].Item.Note, "1/2") {
+		t.Errorf("note %q does not say failure, or how many", got[0].Item.Note)
+	}
+	if got[0].Detail["url"] != "r" {
+		t.Errorf("the run to open is %v; wanted the red one", got[0].Detail["url"])
+	}
+}
+
+// Nothing is said while any workflow of the push is still running.
+func TestCIWatchWaitsForEveryWorkflow(t *testing.T) {
+	gh := &scriptedGh{
+		percentiles: "0 0\n",
+		states: []string{
+			`[{"status":"completed","conclusion":"success","name":"Go","url":"g"},{"status":"queued","conclusion":"","name":"Nix","url":"n"}]`,
+			`[{"status":"completed","conclusion":"success","name":"Go","url":"g"},{"status":"completed","conclusion":"success","name":"Nix","url":"n"}]`,
+		},
+	}
+	news := newNewsLog()
+	slept := 0
+	h := &ciWatchHandler{run: gh.run, news: news, sleep: func(context.Context, time.Duration) error { slept++; return nil }, logger: zap.NewNop().Sugar()}
+	if err := h.Execute(context.Background(), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if slept != 1 {
+		t.Errorf("slept %d times; wanted once, for the queued workflow", slept)
+	}
+	if got := news.since("did:key:alice", time.Now().UnixMilli()); len(got) != 1 || got[0].Item.Symbol != SymbolWell {
+		t.Fatalf("all green drew %+v", got)
 	}
 }
 

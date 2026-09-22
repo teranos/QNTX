@@ -117,12 +117,12 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 
 	deadline := time.Now().Add(ciWatchCeiling)
 	for {
-		run, found, err := h.runFor(ctx, repo, branch, sha)
+		runs, err := h.runsFor(ctx, repo, branch, sha)
 		if err != nil {
 			return err
 		}
-		if found && run.Status == "completed" {
-			h.leave(as, caller, repo, branch, sha, run, pushedAt)
+		if len(runs) > 0 && allConcluded(runs) {
+			h.leave(as, caller, repo, branch, sha, runs, pushedAt)
 			return nil
 		}
 		if time.Now().After(deadline) {
@@ -158,33 +158,76 @@ func (h *ciWatchHandler) percentiles(ctx context.Context, repo, branch string) (
 	return p50, p90
 }
 
-// runFor is the run github has for this commit on this branch, if it has one yet.
-func (h *ciWatchHandler) runFor(ctx context.Context, repo, branch, sha string) (ciRun, bool, error) {
+// A push starts one run per workflow file. Thirty covers a dozen workflows.
+const ciRunsPage = "30"
+
+// runsFor is every run github has for this commit, none yet included.
+func (h *ciWatchHandler) runsFor(ctx context.Context, repo, branch, sha string) ([]ciRun, error) {
 	out, err := h.run(ctx, "gh", "-R", repo, "run", "list", "--branch", branch, "--commit", sha,
-		"--limit", "1", "--json", "status,conclusion,name,url")
+		"--limit", ciRunsPage, "--json", "status,conclusion,name,url")
 	if err != nil {
-		return ciRun{}, false, errors.Wrapf(err, "ci.watch: asking github for %s@%s", branch, sha)
+		return nil, errors.Wrapf(err, "ci.watch: asking github for %s@%s", branch, sha)
 	}
 	var runs []ciRun
 	if err := json.Unmarshal(out, &runs); err != nil {
-		return ciRun{}, false, errors.Wrapf(err, "ci.watch: gh answered for %s@%s with something other than runs: %q", branch, sha, string(out))
+		return nil, errors.Wrapf(err, "ci.watch: gh answered for %s@%s with something other than runs: %q", branch, sha, string(out))
 	}
-	if len(runs) == 0 {
-		return ciRun{}, false, nil
+	return runs, nil
+}
+
+// The push is concluded when every workflow it started has. Reading one run
+// read whichever finished first, so a red lint beside a green deploy was
+// never seen and the row said green.
+func allConcluded(runs []ciRun) bool {
+	for _, r := range runs {
+		if r.Status != "completed" {
+			return false
+		}
 	}
-	return runs[0], true, nil
+	return true
+}
+
+// verdict is the worst conclusion among the runs and every run that did not
+// succeed, by name. Naming only the first would keep the rest hidden.
+func verdict(runs []ciRun) (conclusion string, failed []ciRun) {
+	conclusion = "success"
+	for _, r := range runs {
+		if r.Conclusion == "success" || r.Conclusion == "skipped" {
+			continue
+		}
+		failed = append(failed, r)
+		if conclusion == "success" || r.Conclusion == "failure" {
+			conclusion = r.Conclusion
+		}
+	}
+	return conclusion, failed
 }
 
 // leave puts the conclusion on the row for the caller. There is no branch on
 // green versus red: the result is the event.
-func (h *ciWatchHandler) leave(as types.As, caller, repo, branch, sha string, run ciRun, pushedAt time.Time) {
+func (h *ciWatchHandler) leave(as types.As, caller, repo, branch, sha string, runs []ciRun, pushedAt time.Time) {
+	conclusion, failed := verdict(runs)
 	symbol := SymbolUnwell
-	if run.Conclusion == "success" {
+	if conclusion == "success" {
 		symbol = SymbolWell
 	}
 	shortSha := sha
 	if len(shortSha) > 7 {
 		shortSha = shortSha[:7]
+	}
+	note := conclusion + " " + branch + " " + shortSha
+	if len(failed) > 0 {
+		note += " " + strconv.Itoa(len(failed)) + "/" + strconv.Itoa(len(runs))
+	}
+	workflows := make([]map[string]string, 0, len(runs))
+	for _, r := range runs {
+		workflows = append(workflows, map[string]string{"name": r.Name, "conclusion": r.Conclusion, "url": r.URL})
+	}
+	url := ""
+	if len(failed) > 0 {
+		url = failed[0].URL
+	} else if len(runs) > 0 {
+		url = runs[0].URL
 	}
 	now := time.Now()
 	// The row's id is per session — ground writes one ci-status row per
@@ -196,16 +239,16 @@ func (h *ciWatchHandler) leave(as types.As, caller, repo, branch, sha string, ru
 		For: caller,
 		Item: StatusItem{
 			Name:   "ci",
-			Note:   run.Conclusion + " " + branch + " " + shortSha,
+			Note:   note,
 			Symbol: symbol,
 		},
 		Detail: map[string]any{
 			"repo":       repo,
 			"branch":     branch,
 			"sha":        sha,
-			"conclusion": run.Conclusion,
-			"run":        run.Name,
-			"url":        run.URL,
+			"conclusion": conclusion,
+			"workflows":  workflows,
+			"url":        url,
 			"pushed_at":  pushedAt.UTC().Format(time.RFC3339),
 			"took_s":     int64(now.Sub(pushedAt).Seconds()),
 			"session":    sessionOf(as.Contexts),
@@ -213,7 +256,8 @@ func (h *ciWatchHandler) leave(as types.As, caller, repo, branch, sha string, ru
 		UntilMs: now.Add(newsHold).UnixMilli(),
 	})
 	h.logger.Infow("ci.watch left news on the row",
-		"repo", repo, "branch", branch, "sha", shortSha, "conclusion", run.Conclusion, "for", caller)
+		"repo", repo, "branch", branch, "sha", shortSha, "conclusion", conclusion,
+		"workflows", len(runs), "failed", len(failed), "for", caller)
 }
 
 // sessionOf is the session context ground wrote, so the laptop can hand the
