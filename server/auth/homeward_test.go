@@ -160,7 +160,7 @@ func TestAnAppCollectsItsHeldSessionByNamingItsDoor(t *testing.T) {
 
 // An app that already proved a route carries its half-admission home, so home
 // asks for the passkey and not for the provider a second time. The way home
-// hands Safari the same cookie the app could not hold. A ticket this node
+// hands the browser the same cookie the app could not hold. A ticket this node
 // never opened hands it nothing.
 func TestTheWayHomeCarriesTheAppsHalfAdmission(t *testing.T) {
 	h := handlerWithDoors(t, gardenWithAnApp())

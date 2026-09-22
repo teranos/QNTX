@@ -1,9 +1,9 @@
 /**
- * The app is a door. Its page lives at a scheme, and a scheme has no Safari
+ * The app is a door. Its page lives at a scheme, and a scheme has no browser
  * session, no autofill and no passkey, so a provider's page opened inside it
- * asks for a password nobody types on that phone. The ceremony runs in Safari
- * instead, where the person's accounts already are, and Safari hands the
- * ticket back through qntx://, which am.toml names as this door.
+ * asks for a password nobody types on that phone. The ceremony runs in the
+ * browser instead, where the person's accounts already are, and the browser
+ * hands the ticket back through qntx://, which am.toml names as this door.
  *
  * "security is a server concern"
  */
@@ -36,8 +36,12 @@ export function ticketIn(urls: string[]): string | null {
     return null;
 }
 
-/** Opens the URL in Safari. The opener plugin is what the app allows for it. */
-export async function openInSafari(url: string): Promise<void> {
+/**
+ * Opens the URL in whatever browser the system hands it to: Safari on iOS,
+ * the default browser on Android. The opener plugin is what the app allows
+ * for it, and it does not name a browser, so neither does this.
+ */
+export async function openInBrowser(url: string): Promise<void> {
     await invoke('plugin:opener|open_url', { url });
 }
 
@@ -48,7 +52,7 @@ const NO_SHEET = 'not on this platform';
  * The ceremony in the sheet iOS gives a web sign-in, backed by Safari's
  * cookies and passkeys, back without leaving the app. Resolves with the
  * ticket the node sent the sheet back with. Null where the app has no sheet,
- * which is the one case the Safari round trip above is still for.
+ * which is the one case the browser round trip above is still for.
  *
  * "Can we please for iPhone just do the most standard boring native thing?"
  */
@@ -98,7 +102,7 @@ async function sheet(url: string): Promise<string | null> {
 
 /**
  * The ticket a deep link already delivered. An app launched by the link,
- * because the person closed it while Safari had the ceremony, finds it here
+ * because the person closed it while the browser had the ceremony, finds it here
  * rather than in an event that fired before anyone listened.
  */
 export async function ticketWaiting(): Promise<string | null> {
@@ -114,7 +118,7 @@ export function nextTicket(signal: AbortSignal): Promise<string> {
     return new Promise((resolve, reject) => {
         let release: (() => void) | null = null;
         const stop = () => { release?.(); release = null; };
-        signal.addEventListener('abort', () => { stop(); reject(new Error('the ceremony was abandoned before Safari came back')); });
+        signal.addEventListener('abort', () => { stop(); reject(new Error('the ceremony was abandoned before the browser came back')); });
         listen<string[]>('deep-link://new-url', (event) => {
             const ticket = ticketIn(event.payload);
             if (!ticket) {

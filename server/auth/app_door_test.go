@@ -10,7 +10,7 @@ import (
 )
 
 // An app is a door. Its scheme stands in the door's origins beside the site,
-// and a ceremony run in Safari is sent back through it. No browser presents a
+// and a ceremony run in the browser is sent back through it. No browser presents a
 // passkey for a scheme, so the relying party never hears of it.
 //
 // "security is a server concern"
