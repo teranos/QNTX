@@ -77,12 +77,12 @@ type Common struct {
 }
 
 // commonTo is the values one column uses most, most first.
-func commonTo(db *sql.DB, query string, most int) ([]Common, error) {
+func commonTo(db *sql.DB, query string, most int) (_ []Common, err error) {
 	rows, err := db.Query(query, most)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for commonTo") }()
 
 	var common []Common
 	for rows.Next() {
@@ -150,7 +150,7 @@ const overAtMost = 336
 // overTime is when a namespace's attestations landed, by the hour. The old
 // chart read distillation output, which a node that persists cheaply to the
 // record does not produce; this reads the attestations themselves.
-func overTime(db *sql.DB) (map[string]int64, error) {
+func overTime(db *sql.DB) (_ map[string]int64, err error) {
 	rows, err := db.Query(`
 		SELECT strftime('%Y-%m-%dT%H', timestamp) AS bucket, COUNT(*) AS held
 		FROM attestations
@@ -161,7 +161,7 @@ func overTime(db *sql.DB) (map[string]int64, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for overTime") }()
 
 	over := map[string]int64{}
 	for rows.Next() {
