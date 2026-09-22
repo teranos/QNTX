@@ -7,10 +7,12 @@ package watcher
 // back on an empty database, and no route takes a row away. A stored watcher
 // naming one of these ids does not shadow it.
 //
-// A row here runs nothing — every one is `tell`, which reaches the browsers in
-// its namespace and no code anywhere. That is what makes it safe to be
-// permanent. A watcher that could execute is a thing a person makes, holds and
-// deletes, and it belongs in a store where it can be taken away.
+// A row here runs this build's own code or nothing. `tell` reaches the browsers
+// in its namespace and no code anywhere; `builtin_execute` reaches a handler
+// compiled into this node. Neither is somebody else's code, which is what makes
+// a row safe to be permanent: a webhook, a Python element, a plugin is a thing
+// a person makes, holds and deletes, and it belongs in a store where it can be
+// taken away.
 
 import (
 	"github.com/teranos/QNTX/ats/storage"
@@ -22,6 +24,18 @@ import (
 // reports by id and a log line saying `standing-element-published` should be
 // findable in the source.
 const StandingElementPublished = "standing-element-published"
+
+// StandingCIPushed watches for ground attesting a push to a branch with CI.
+// The handler it names does the waiting on the run, here on the node, where
+// the socket and the clock belong.
+const StandingCIPushed = "standing-ci-pushed"
+
+// CIPushedPredicate is what ground's hook writes when a push lands on a branch
+// with CI and what sky streams here. One spelling, shared with the handler.
+const CIPushedPredicate = "immediate:ci-status"
+
+// CIWatchHandlerName is the built-in the row above reaches.
+const CIWatchHandlerName = "ci.watch"
 
 // standing is the table. Unexported and copied on the way out: a caller that
 // could reach the rows could edit what every node is born with.
@@ -35,6 +49,17 @@ var standing = []storage.Watcher{
 		Filter:            types.AxFilter{Predicates: []string{element.ModulePredicate}},
 		ActionType:        storage.ActionTypeTell,
 		MaxFiresPerSecond: 0,
+		Enabled:           true,
+	},
+	{
+		ID:   StandingCIPushed,
+		Name: "a push landed on a branch with CI",
+		// The laptop cannot be reached from here, so the run is waited on here
+		// and the result goes back on the status line the laptop already polls.
+		Filter:            types.AxFilter{Predicates: []string{CIPushedPredicate}},
+		ActionType:        storage.ActionTypeBuiltinExecute,
+		ActionData:        `{"handler_name":"` + CIWatchHandlerName + `"}`,
+		MaxFiresPerSecond: 10,
 		Enabled:           true,
 	},
 }

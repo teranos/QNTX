@@ -15,6 +15,10 @@ var whyStanding = map[string]string{
 		"module it imported. Without this the page shows the element that was published " +
 		"before it loaded until somebody reloads by hand, which is the failure the " +
 		"whole of /g/ exists to remove",
+	StandingCIPushed: "ground's hook attests a push to a branch with CI and sky streams it " +
+		"here. The laptop cannot be reached from this node, so the waiting on the run and " +
+		"the asking of github happen here, on arrival, and the result goes back on the " +
+		"status line the laptop already polls",
 }
 
 func TestEveryStandingWatcherSaysWhy(t *testing.T) {
@@ -31,17 +35,28 @@ func TestEveryStandingWatcherSaysWhy(t *testing.T) {
 	}
 }
 
-// A row here is permanent, so it must not be able to run anything. Every other
-// action type reaches somebody's code — a webhook, a Python element, a plugin.
-func TestAStandingWatcherRunsNothing(t *testing.T) {
+// A row here is permanent, so what it runs is this build's own or nothing. A
+// webhook, a Python element, a plugin — somebody else's code — is a thing a
+// person makes and can take away, and it does not belong in a table nobody can.
+func TestAStandingWatcherRunsOnlyWhatThisBuildShips(t *testing.T) {
 	for _, w := range standing {
-		if w.ActionType != storage.ActionTypeTell {
-			t.Errorf("%s is standing with action %q; a permanent watcher tells and runs nothing",
+		switch w.ActionType {
+		case storage.ActionTypeTell:
+			if w.MaxFiresPerSecond != 0 {
+				t.Errorf("%s is standing with a fire rate of %d; it executes nothing, so the rate is a lie",
+					w.ID, w.MaxFiresPerSecond)
+			}
+		case storage.ActionTypeBuiltinExecute:
+			if w.MaxFiresPerSecond == 0 {
+				t.Errorf("%s is standing to run a built-in with a fire rate of 0, which is never",
+					w.ID)
+			}
+			if w.ActionData == "" {
+				t.Errorf("%s is standing to run a built-in and names none", w.ID)
+			}
+		default:
+			t.Errorf("%s is standing with action %q; a permanent watcher tells, or runs a built-in",
 				w.ID, w.ActionType)
-		}
-		if w.MaxFiresPerSecond != 0 {
-			t.Errorf("%s is standing with a fire rate of %d; it executes nothing, so the rate is a lie",
-				w.ID, w.MaxFiresPerSecond)
 		}
 	}
 }

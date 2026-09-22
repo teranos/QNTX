@@ -56,6 +56,8 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 		err = e.executeElement(watcher, as)
 	case storage.ActionTypePluginExecute:
 		err = e.executePlugin(watcher, as)
+	case storage.ActionTypeBuiltinExecute:
+		err = e.executeBuiltin(watcher, as)
 	case storage.ActionTypeSemanticMatch:
 		// Semantic match watchers only broadcast — no separate action to execute.
 		// The match was already broadcast in OnAttestationCreated.
@@ -323,6 +325,31 @@ func (e *Engine) executePlugin(watcher *storage.Watcher, as *types.As) error {
 		return errors.Wrapf(err, "plugin %s handler %s failed for watcher %s", action.PluginName, action.HandlerName, watcher.ID)
 	}
 
+	return nil
+}
+
+// BuiltinExecuteAction is the JSON structure stored in ActionData for builtin_execute watchers
+type BuiltinExecuteAction struct {
+	HandlerName string `json:"handler_name"`
+}
+
+// executeBuiltin hands the attestation to a handler this build ships.
+func (e *Engine) executeBuiltin(watcher *storage.Watcher, as *types.As) error {
+	if e.builtinExecutor == nil {
+		return errors.Newf("watcher %s names a built-in and this node wired none", watcher.ID)
+	}
+
+	var action BuiltinExecuteAction
+	if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
+		return errors.Wrapf(err, "failed to parse builtin_execute action data for watcher %s", watcher.ID)
+	}
+	if action.HandlerName == "" {
+		return errors.Newf("builtin_execute action for watcher %s has empty handler_name", watcher.ID)
+	}
+
+	if err := e.builtinExecutor.ExecuteBuiltin(e.ctx, action.HandlerName, as); err != nil {
+		return errors.Wrapf(err, "built-in %s failed for watcher %s", action.HandlerName, watcher.ID)
+	}
 	return nil
 }
 

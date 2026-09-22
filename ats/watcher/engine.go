@@ -53,6 +53,13 @@ type PluginExecutor interface {
 	IsPluginLoaded(pluginName string) bool
 }
 
+// BuiltinExecutor runs a handler this build ships, by name, with the
+// attestation that matched. There is no loading to wait on: a built-in is
+// there or the name is wrong, and the wrong name is the watcher's error.
+type BuiltinExecutor interface {
+	ExecuteBuiltin(ctx context.Context, handlerName string, as *types.As) error
+}
+
 // AttestationReader provides read access to attestations. The contract is a
 // filter, not SQL: a watcher already holds one, every backend can answer one,
 // and SQL here would be a seam only SQLite fits.
@@ -89,6 +96,10 @@ type Engine struct {
 
 	// Plugin executor for plugin_execute action type (optional)
 	pluginExecutor PluginExecutor
+
+	// What runs a builtin_execute action. Nil is a node with no built-ins wired,
+	// and a watcher naming one then fails on the row rather than in silence.
+	builtinExecutor BuiltinExecutor
 
 	// In-memory state
 	mu              sync.RWMutex
@@ -442,6 +453,11 @@ func (e *Engine) SetElementFiredCallback(callback func(elementID string, attesta
 // SetPluginExecutor sets the plugin executor for plugin_execute action type.
 func (e *Engine) SetPluginExecutor(executor PluginExecutor) {
 	e.pluginExecutor = executor
+}
+
+// SetBuiltinExecutor sets what runs a builtin_execute action.
+func (e *Engine) SetBuiltinExecutor(executor BuiltinExecutor) {
+	e.builtinExecutor = executor
 }
 
 // GetWatcher returns a watcher from the in-memory map if it exists
@@ -863,6 +879,8 @@ func (e *Engine) drainOnce() {
 			execErr = e.executeElement(watcher, &as)
 		case storage.ActionTypePluginExecute:
 			execErr = e.executePlugin(watcher, &as)
+		case storage.ActionTypeBuiltinExecute:
+			execErr = e.executeBuiltin(watcher, &as)
 		case storage.ActionTypeSemanticMatch:
 			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 			continue

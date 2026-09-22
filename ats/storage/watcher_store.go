@@ -25,11 +25,17 @@ const (
 	// ActionTypeTell runs nothing. It tells the browsers watching that an
 	// attestation matched, and what to do about it is the page's.
 	//
-	// Every other type reaches somebody's code — a webhook, a Python element, a
-	// plugin job — which is why a watcher is something a person makes and can
-	// take away. This one cannot run anything, so it is what a node is allowed
-	// to be born with (see ats/watcher's standing table).
+	// Every other type but the next reaches somebody's code — a webhook, a
+	// Python element, a plugin job — which is why a watcher is something a
+	// person makes and can take away. This one cannot run anything, so it is
+	// what a node is allowed to be born with (see ats/watcher's standing table).
 	ActionTypeTell ActionType = "tell"
+
+	// ActionTypeBuiltinExecute runs a handler this build of QNTX ships, named
+	// in ActionData as {"handler_name": "..."}. The code is the node's own, not
+	// a person's, so a standing row may carry it: what it runs cannot be taken
+	// away from under the row any more than the row can.
+	ActionTypeBuiltinExecute ActionType = "builtin_execute"
 )
 
 // AttributeFilter matches against values inside an attestation's Attributes JSON.
