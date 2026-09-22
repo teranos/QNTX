@@ -291,6 +291,15 @@ func (s *QNTXServer) initWatcherEngine() error {
 	// Wire plugin executor for plugin_execute action type
 	s.watcherEngine.SetPluginExecutor(&watcherPluginAdapter{server: s})
 
+	// What a builtin_execute action reaches: the daemon's registry, and the
+	// same failure log a scheduled handler reports to.
+	if s.daemon != nil {
+		s.watcherEngine.SetBuiltinExecutor(&builtinExecutor{
+			registry:    s.daemon.Registry(),
+			noteFailure: s.noteHandlerFailure,
+		})
+	}
+
 	// Wire embedding service for semantic matching (optional — nil when embeddings unavailable)
 	// Note: embeddingService may be nil here if SetupEmbeddingService() hasn't run yet.
 	// In that case, init.go reconnects after embedding init.

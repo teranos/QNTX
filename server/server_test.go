@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/watcher"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
@@ -632,7 +633,7 @@ func TestGetDaemon(t *testing.T) {
 	// Verify registry has only built-in handlers (e.g. distill if configured)
 	handlers := registry.Names()
 	for _, h := range handlers {
-		if h != "distill" && h != "wal-checkpoint" {
+		if h != "distill" && h != "wal-checkpoint" && h != watcher.CIWatchHandlerName {
 			t.Errorf("Unexpected handler registered: %s", h)
 		}
 	}

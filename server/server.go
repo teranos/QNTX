@@ -58,6 +58,7 @@ type QNTXServer struct {
 	configWatcher       *config.ConfigWatcher // Config watcher for auto-reload on config changes
 	storageEventsPoller *StorageEventsPoller  // Poller for storage events (warnings/evictions)
 	handlerFailures     *handlerFailureLog    // Recent failed handler executions, for the status row
+	news                *newsLog              // What built-ins left on the status row, per caller
 	clients             map[*Client]bool
 	broadcastReq        chan *broadcastRequest // Requests to broadcast worker (thread-safe sends)
 	register            chan *Client

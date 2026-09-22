@@ -19,10 +19,10 @@ import (
 // A built-in is reached by name with the attestation that matched, and nothing
 // about a plugin's loading stands between them.
 type mockBuiltinExecutor struct {
-	mu      sync.Mutex
-	calls   []string
-	lastAs  *types.As
-	refuse  string
+	mu     sync.Mutex
+	calls  []string
+	lastAs *types.As
+	refuse string
 }
 
 func (m *mockBuiltinExecutor) ExecuteBuiltin(_ context.Context, handlerName string, as *types.As) error {

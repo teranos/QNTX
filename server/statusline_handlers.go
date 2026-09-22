@@ -22,6 +22,9 @@ const (
 
 // StatusItem is one thing worth naming, with what it is at and how it is.
 type StatusItem struct {
+	// ID is set on news only. A poll that writes items down writes each once
+	// by it, and a click asks for it by it.
+	ID     string `json:"id,omitempty"`
 	Name   string `json:"name"`
 	Note   string `json:"note,omitempty"`
 	Symbol string `json:"symbol"`
@@ -70,9 +73,14 @@ func renderLine(items []StatusItem, p palette, clickable bool) string {
 		}
 
 		// tmux hands the name of the clicked span back in mouse_status_range,
-		// so the row is what says which span is which.
+		// so the row is what says which span is which. News is asked for by
+		// its id, so that is what its span carries.
 		if clickable {
-			out += "#[range=user|" + rangeName(it.Name) + "]"
+			span := it.Name
+			if it.ID != "" {
+				span = it.ID
+			}
+			out += "#[range=user|" + rangeName(span) + "]"
 		}
 
 		out += colour + it.Name + p.reset
@@ -120,6 +128,8 @@ type StatusLineHandler struct {
 	pluginCarousel *carousel
 	// What the rotating slot asks about. Nil draws no rotating slot at all.
 	node StatusLineNode
+	// What built-ins left for the caller. Nil draws none.
+	news func() *newsLog
 }
 
 // NewStatusLineHandler builds the handler behind /statusline.
@@ -406,9 +416,10 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Who is looking is pinned leftmost and the plugins are pinned right; the
-	// rotating slot sits between them.
-	items := append([]StatusItem{callerItem(admitted)}, h.carouselItem()...)
+	// Who is looking is pinned leftmost, what was left for them comes next, the
+	// plugins are pinned right; the rotating slot sits between.
+	items := append([]StatusItem{callerItem(admitted)}, h.newsFor(admitted)...)
+	items = append(items, h.carouselItem()...)
 
 	// A failing handler is a fix-now kind of event, and it is drawn inside its
 	// own plugin's slot below rather than as a separate item. Watchers belong to
@@ -513,8 +524,15 @@ func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if _, ok := auth.AdmissionFrom(r.Context()); !ok {
+	admitted, ok := auth.AdmissionFrom(r.Context())
+	if !ok {
 		respond(w, h.log(), http.StatusNotFound, map[string]any{"error": "no such item"})
+		return
+	}
+
+	// News first: it is the caller's, by id, and nothing else on the row is.
+	if detail, ok := h.newsDetail(admitted, name); ok {
+		h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
 		return
 	}
 

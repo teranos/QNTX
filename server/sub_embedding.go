@@ -28,6 +28,7 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 	}
 	s.setupDistillSchedule(s.deps.cfg)
 	s.setupCheckpointSchedule()
+	s.setupCIWatch()
 	s.setupEmbeddingReclusterSchedule(s.deps.cfg)
 	s.setupEmbeddingReprojectSchedule(s.deps.cfg)
 	s.setupClusterLabelSchedule(s.deps.cfg)
