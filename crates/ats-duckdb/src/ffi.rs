@@ -147,6 +147,38 @@ impl FfiResult for MergedResultC {
     }
 }
 
+/// What one store asked its location for: a row per reader per request.
+#[repr(C)]
+pub struct AskedResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub asked_json: *mut c_char,
+}
+
+impl AskedResultC {
+    fn ok(asked: Vec<crate::objects::Asked>) -> Self {
+        match serde_json::to_string(&asked) {
+            Ok(json) => Self {
+                success: true,
+                error_msg: ptr::null_mut(),
+                asked_json: cstring_new_or_empty(&json),
+            },
+            Err(e) => Self::error(e.crosses("duckdb_storage_requests")),
+        }
+    }
+}
+
+impl FfiResult for AskedResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            asked_json: ptr::null_mut(),
+        }
+    }
+}
+
 // ============================================================================
 // Store lifecycle
 // ============================================================================
@@ -623,6 +655,26 @@ pub extern "C" fn duckdb_storage_compact(store: *const DuckdbStore) -> MergedRes
             Ok(merged) => MergedResultC::ok(merged),
             Err(e) => MergedResultC::error(e.crosses("duckdb_storage_compact")),
         }
+    })
+}
+
+/// The requests the store has made of its location since it opened.
+///
+/// A running total, not a delta: this number has more than one reader, and a
+/// counter that emptied on being read would answer the second with what the
+/// first already took. A caller wanting an interval subtracts.
+///
+/// The `read_parquet` DuckDB runs holds its own client and is not counted;
+/// everything the crate asks for is.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_storage_requests(store: *const DuckdbStore) -> AskedResultC {
+    qntx_ffi_common::guarded_result("duckdb_storage_requests", || {
+        if store.is_null() {
+            return AskedResultC::error("null store pointer");
+        }
+        let store = unsafe { &*store };
+        AskedResultC::ok(store.asked())
     })
 }
 
@@ -2013,6 +2065,17 @@ pub extern "C" fn duckdb_count_result_free(result: CountResultC) {
 pub extern "C" fn duckdb_merged_result_free(result: MergedResultC) {
     qntx_ffi_common::guarded(
         "duckdb_merged_result_free",
+        || {
+            unsafe { free_cstring(result.error_msg) };
+        },
+        |_| (),
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn duckdb_asked_result_free(result: AskedResultC) {
+    qntx_ffi_common::guarded(
+        "duckdb_asked_result_free",
         || {
             unsafe { free_cstring(result.error_msg) };
         },

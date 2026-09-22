@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -28,6 +29,7 @@ import (
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
 )
@@ -479,6 +481,32 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 		measure.Gauge(measure.StoreUnsent, float64(landing.unsent.Load()),
 			measure.String(measure.AttrStore, name))
 	}
+	// The store counts from when it opened and the metric takes a delta, so
+	// what was said last time is subtracted here rather than taken from the
+	// store: the store's total has another reader, and draining it would hand
+	// that one what this one already took. A restart is a gap and not a spike,
+	// because said starts empty beside a store that starts at zero.
+	said := map[string]int64{}
+	sayRequests := func() {
+		asked, err := record.Requests()
+		if err != nil {
+			logger.Logger.Errorw("The record did not say what it asked its location for",
+				"store", name, "error", err)
+			return
+		}
+		for _, one := range asked {
+			seen := one.Of + " " + one.Request
+			since := one.Count - said[seen]
+			said[seen] = one.Count
+			if since <= 0 {
+				continue
+			}
+			measure.Count(measure.StoreRequests, since,
+				measure.String(measure.AttrStore, name),
+				measure.String(measure.AttrOf, one.Of),
+				measure.String(measure.AttrRequest, one.Request))
+		}
+	}
 	sendOnce := func() {
 		defer sacred.Said("parquet.send." + name)
 		if err := sendAndCompact(landing, record); err != nil {
@@ -486,6 +514,7 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 				"store", name, "error", err)
 		}
 		sayUnsent()
+		sayRequests()
 	}
 	for {
 		select {
@@ -496,6 +525,7 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 			sendOnce()
 		case <-unsent.C:
 			sayUnsent()
+			sayRequests()
 		}
 	}
 }
@@ -542,6 +572,81 @@ func sendAndCompact(landing *landed, record *duckdbcgo.DuckdbStore) error {
 	}
 	measure.Gauge(measure.StoreFiles, float64(count), store)
 	return nil
+}
+
+// RecordSpend is what reading the record has cost, per reader, across every
+// namespace this node has open.
+//
+// Summed rather than sliced by namespace: what a reader costs is a fact about
+// the reader, and which namespace it was in names nothing to go and fix.
+func (h *parquetHandles) RecordSpend() ([]server.Spend, error) {
+	h.mu.Lock()
+	ducks := make([]*duckdbcgo.DuckdbStore, 0, len(h.closing))
+	for _, open := range h.closing {
+		ducks = append(ducks, open.duck)
+	}
+	h.mu.Unlock()
+
+	summed := map[server.Spend]int64{}
+	for _, duck := range ducks {
+		asked, err := duck.Requests()
+		if err != nil {
+			return nil, errors.Wrap(err, "a namespace did not say what it asked its location for")
+		}
+		for _, one := range asked {
+			summed[server.Spend{Of: one.Of, Request: one.Request, HeldOnNode: one.HeldOnNode}] += one.Count
+		}
+	}
+
+	spend := make([]server.Spend, 0, len(summed))
+	for what, count := range summed {
+		what.Count = count
+		spend = append(spend, what)
+	}
+	// Most spent first: the top row is where to look.
+	sort.Slice(spend, func(i, j int) bool { return spend[i].Count > spend[j].Count })
+	return spend, nil
+}
+
+// Landings is the database behind each namespace: where it is, how big it and
+// its write-ahead log have grown, and how many attestations it answers from.
+//
+// One per namespace and never one for all of them (ADR-037), which is the
+// shape a panel drawing a single path was hiding.
+func (h *parquetHandles) Landings() ([]server.Landing, error) {
+	h.mu.Lock()
+	names := slices.Sorted(maps.Keys(h.landings))
+	files := maps.Clone(h.landings)
+	h.mu.Unlock()
+
+	landings := make([]server.Landing, 0, len(names))
+	for _, name := range names {
+		path := landingPath(h.dbPath, name)
+
+		held, err := files[name].CountAttestations()
+		if err != nil {
+			return nil, errors.Wrapf(err, "the landing file of %s at %s did not count", name, path)
+		}
+
+		landings = append(landings, server.Landing{
+			Namespace:    name,
+			Path:         path,
+			Bytes:        sizeOf(path),
+			WalBytes:     sizeOf(path + "-wal"),
+			Attestations: held,
+		})
+	}
+	return landings, nil
+}
+
+// sizeOf is how many bytes a file holds, and nought for one that is not there
+// — a WAL that has been checkpointed away is absent rather than empty.
+func sizeOf(path string) int64 {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return stat.Size()
 }
 
 // Namespaces is the capability namespace routes assert for.

@@ -448,6 +448,41 @@ func TestGetServerAllowedOrigins_IncludesWildcardPorts(t *testing.T) {
 	}
 }
 
+// The App is one origin per platform and the node must answer all of them.
+// Tauri serves it from tauri://localhost on iOS and desktop, and from
+// tauri.localhost on Android and Windows. With the Android pair missing the
+// phone reached the node, got a 200, and was refused it by CORS: the App
+// showed only that api.q.sbvh.nl did not respond.
+func TestGetServerAllowedOrigins_IncludesEveryAppOrigin(t *testing.T) {
+	v := viper.New()
+	SetDefaults(v)
+
+	cfg, err := LoadWithViper(v)
+	if err != nil {
+		t.Fatalf("LoadWithViper() failed: %v", err)
+	}
+
+	origins := cfg.GetServerAllowedOrigins()
+
+	required := []string{
+		"tauri://localhost",
+		"http://tauri.localhost",
+		"https://tauri.localhost",
+	}
+	for _, want := range required {
+		found := false
+		for _, got := range origins {
+			if got == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("GetServerAllowedOrigins() missing %q, got %v", want, origins)
+		}
+	}
+}
+
 // TestValidate_ParquetLocation verifies ADR-024: when backend = "parquet",
 // storage.parquet.location must be non-empty and use a supported URL scheme.
 func TestValidate_ParquetLocation(t *testing.T) {

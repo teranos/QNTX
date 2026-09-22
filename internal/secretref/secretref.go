@@ -1,10 +1,6 @@
 // Package secretref resolves references to secrets without ever storing one.
-//
-// am.toml is delivered as an SSM parameter of type String and is world-readable
-// in tofu state. A secret written there is disclosed, not configured. So config
-// carries only a reference — a place to go look — and the value is fetched at
-// the moment it is used. A literal is rejected rather than accepted with a
-// warning, because a warning does not un-publish a token.
+// A secret in config is a secret everywhere config goes, and where that is is
+// not this package's to know. A literal is refused, never taken with a warning.
 package secretref
 
 import (
@@ -61,7 +57,7 @@ func Validate(ref string) error {
 	// Deliberately does not echo ref — it may be the secret itself, and this
 	// error reaches logs.
 	err := errors.Newf("value is a literal, not a %s or %s reference", SchemeSSM, SchemeEnv)
-	return errors.WithHint(err, "am.toml is world-readable; store the secret in SSM and reference it as ssm:///path or env:VAR")
+	return errors.WithHint(err, "keep the secret where secrets are kept and name it here as ssm:///path or env:VAR")
 }
 
 // Resolve fetches the secret a reference points at.

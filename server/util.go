@@ -38,7 +38,9 @@ func checkOrigin(r *http.Request) bool {
 		// If config fails to load, use secure defaults (localhost only + Tauri)
 		return matchOrigin(origin, "http://localhost") ||
 			matchOrigin(origin, "https://localhost") ||
-			matchOrigin(origin, "tauri://localhost")
+			matchOrigin(origin, "tauri://localhost") ||
+			matchOrigin(origin, "http://tauri.localhost") ||
+			matchOrigin(origin, "https://tauri.localhost")
 	}
 
 	// Get allowed origins (includes defaults if not configured)

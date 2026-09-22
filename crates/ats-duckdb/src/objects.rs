@@ -7,7 +7,9 @@
 // "WE DONT DROP IT" / "WE DONT TRUNCATE" / "WE DONT HIDE ERRORS"
 // "WE DONT MAKE UP REASONS"
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
@@ -33,6 +35,69 @@ pub(crate) struct Bucket {
     runtime: tokio::runtime::Runtime,
     client: aws_sdk_s3::Client,
     name: String,
+    tally: Tally,
+}
+
+/// What the bucket was asked for, counted by who asked and what was asked.
+/// A count that cannot say which reader spent it names no path to go and fix,
+/// and S3 prices a request rather than a statement.
+#[derive(Default)]
+pub(crate) struct Tally {
+    spent: Mutex<BTreeMap<(&'static str, &'static str, bool), u64>>,
+}
+
+impl Tally {
+    /// Counted as the request goes out, not as it comes back: S3 charges for
+    /// the ones it refuses too.
+    fn note_many(&self, what: &Object, request: Request, times: u64) {
+        let mut spent = match self.spent.lock() {
+            Ok(spent) => spent,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        *spent
+            .entry((what.counted_as(), request.named(), what.held_on_node()))
+            .or_insert(0) += times;
+    }
+
+    fn note(&self, what: &Object, request: Request) {
+        let mut spent = match self.spent.lock() {
+            Ok(spent) => spent,
+            // A poisoned tally is a counter, not the store. Losing a number
+            // is not worth failing a read that was going to work.
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        *spent
+            .entry((what.counted_as(), request.named(), what.held_on_node()))
+            .or_insert(0) += 1;
+    }
+
+    /// Reading leaves it standing: this number has more than one reader, and
+    /// a count that emptied would answer the second with what the first took.
+    fn asked(&self) -> Vec<Asked> {
+        let spent = match self.spent.lock() {
+            Ok(spent) => spent,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        spent
+            .iter()
+            .map(|((of, request, held), count)| Asked {
+                of: (*of).to_string(),
+                request: (*request).to_string(),
+                held_on_node: *held,
+                count: *count,
+            })
+            .collect()
+    }
+}
+
+/// One reader, one kind of request, and what it has spent since the store
+/// opened. `of` is the name `make parity` gives the same thing.
+#[derive(Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub struct Asked {
+    pub of: String,
+    pub request: String,
+    pub held_on_node: bool,
+    pub count: u64,
 }
 
 /// What S3 answered, or what stopped the request reaching it. The SDK's own
@@ -170,15 +235,22 @@ pub enum Request {
     Delete,
 }
 
-impl std::fmt::Display for Request {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
+impl Request {
+    /// The word this is counted and displayed under.
+    pub fn named(&self) -> &'static str {
+        match self {
             Request::Put => "PUT",
             Request::Get => "GET",
             Request::Head => "HEAD",
             Request::List => "LIST",
             Request::Delete => "DELETE",
-        })
+        }
+    }
+}
+
+impl std::fmt::Display for Request {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.named())
     }
 }
 
@@ -219,7 +291,31 @@ impl Objects {
             runtime,
             client,
             name,
+            tally: Tally::default(),
         }))
+    }
+
+    /// The requests this location has been asked for since the store opened.
+    /// A filesystem is asked for none: nothing there crosses a network and
+    /// nothing there is priced.
+    pub(crate) fn asked(&self) -> Vec<Asked> {
+        match self {
+            Objects::Local => Vec::new(),
+            Objects::S3(bucket) => bucket.tally.asked(),
+        }
+    }
+
+    /// Note requests this crate does not make itself.
+    ///
+    /// DuckDB reads the files it is handed through its own client, one round
+    /// trip per file (ADR-024, Consequences), and none of those reach the
+    /// methods above. The number is known anyway: it is the length of the
+    /// list we named for it. Counted here so the reader that spent them is
+    /// the one they are counted against.
+    pub(crate) fn noted(&self, what: &Object, request: Request, times: u64) {
+        if let Objects::S3(bucket) = self {
+            bucket.tally.note_many(what, request, times);
+        }
     }
 
     /// Write the object at `path`, replacing what was there. The parent is
@@ -243,6 +339,7 @@ impl Objects {
             }
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
+                bucket.tally.note(&what, Request::Put);
                 let sent = bucket.runtime.block_on(
                     bucket
                         .client
@@ -277,6 +374,7 @@ impl Objects {
             },
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
+                bucket.tally.note(&what, Request::Get);
                 let got = bucket.runtime.block_on(
                     bucket
                         .client
@@ -328,6 +426,7 @@ impl Objects {
                 }),
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
+                bucket.tally.note(&what, Request::Head);
                 let head = bucket.runtime.block_on(
                     bucket
                         .client
@@ -398,7 +497,10 @@ impl Objects {
                     .send();
                 loop {
                     let page = bucket.runtime.block_on(pages.next());
+                    // Per page, not per call: the paginator asks again for
+                    // every thousand keys, and each asking is its own request.
                     let Some(page) = page else { break };
+                    bucket.tally.note(&what, Request::List);
                     let page = page.map_err(|e| DuckdbError::S3 {
                         request: Request::List,
                         what: what.clone(),
@@ -432,6 +534,7 @@ impl Objects {
             },
             Objects::S3(bucket) => {
                 let key = bucket.key(path)?;
+                bucket.tally.note(&what, Request::Delete);
                 let sent = bucket.runtime.block_on(
                     bucket
                         .client
@@ -491,6 +594,60 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_local_location_is_asked_for_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = format!("file://{}", dir.path().display());
+        let objects = Objects::open(&base).unwrap();
+        objects
+            .put(Object::Token, &format!("{base}/x.json"), b"{}".to_vec())
+            .unwrap();
+        assert!(objects.asked().is_empty());
+    }
+
+    #[test]
+    fn a_tally_keeps_one_reader_apart_from_another() {
+        let tally = Tally::default();
+        tally.note(&Object::Tokens, Request::List);
+        tally.note(&Object::Tokens, Request::List);
+        tally.note(&Object::ParquetFiles, Request::List);
+
+        let asked = tally.asked();
+        let spent = |of: &str| asked.iter().find(|one| one.of == of).map(|one| one.count);
+        assert_eq!(spent("access_tokens"), Some(2));
+        assert_eq!(spent("attestations"), Some(1));
+
+        // Reading leaves it standing: this number has more than one reader.
+        assert_eq!(tally.asked(), asked);
+    }
+
+    #[test]
+    fn a_reader_the_node_keeps_nothing_of_says_so_beside_its_cost() {
+        let tally = Tally::default();
+        tally.note(&Object::Tokens, Request::List);
+        tally.note(&Object::ParquetFiles, Request::List);
+
+        let asked = tally.asked();
+        let held = |of: &str| {
+            asked
+                .iter()
+                .find(|one| one.of == of)
+                .map(|one| one.held_on_node)
+        };
+        // Every read of an access token leaves the box (ADR-037), and a count
+        // that did not say so would read the same as one that was just busy.
+        assert_eq!(held("access_tokens"), Some(false));
+        assert_eq!(held("attestations"), Some(true));
+    }
+
+    #[test]
+    fn the_fires_of_a_watcher_do_not_grow_the_set() {
+        let tally = Tally::default();
+        tally.note(&Object::FiresOf("one".into()), Request::Get);
+        tally.note(&Object::FiresOf("another".into()), Request::Get);
+        assert_eq!(tally.asked().len(), 1);
+    }
+
+    #[test]
     fn a_local_prefix_holding_nothing_lists_nothing() {
         let dir = tempfile::tempdir().unwrap();
         let objects = Objects::open(&format!("file://{}", dir.path().display())).unwrap();
@@ -547,6 +704,7 @@ mod tests {
                     .build(),
             ),
             name: "park".to_string(),
+            tally: Tally::default(),
         };
         assert_eq!(bucket.key("s3://park/a/b.json").unwrap(), "a/b.json");
         assert!(bucket.key("s3://other/a/b.json").is_err());

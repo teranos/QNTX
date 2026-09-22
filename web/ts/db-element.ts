@@ -103,6 +103,142 @@ function renderStatsError(err: any): string {
     return rows.join('');
 }
 
+interface Landing {
+    namespace: string;
+    path: string;
+    bytes: number;
+    wal_bytes: number;
+    attestations: number;
+    actors: number;
+    subjects: number;
+    contexts: number;
+    top_predicates: Common[] | null;
+    top_contexts: Common[] | null;
+    over: Record<string, number> | null;
+}
+
+// One line per namespace, of when its attestations landed. The chart below
+// was written for distillation's histograms and drew nothing once a node
+// stopped distilling; this is the same chart reading what the node holds.
+function landedOverTime(landings: Landing[] | undefined): Record<string, Record<string, number>> | null {
+    if (!landings || landings.length === 0) {
+        return null;
+    }
+    const lines: Record<string, Record<string, number>> = {};
+    for (const one of landings) {
+        if (one.over && Object.keys(one.over).length > 0) {
+            lines[one.namespace] = one.over;
+        }
+    }
+    return Object.keys(lines).length > 0 ? lines : null;
+}
+
+interface Common {
+    name: string;
+    count: number;
+}
+
+// A panel is as wide as the canvas lets it be, and a row laid out across all
+// of that puts its last column an arm's length from its first. These are
+// tables: fixed columns, and a width a row is read across rather than scanned.
+const LANDING_WIDTH = '860px';
+const LANDING_COLUMNS = '110px minmax(0, 1fr) 84px 84px 132px 72px';
+const SPEND_COLUMNS = '132px 92px 60px 64px';
+
+// What a namespace is mostly about, clickable the way a type is: the same
+// class and data-type the wiring below already listens for.
+function commonHTML(label: string, common: Common[] | null): string {
+    if (!common || common.length === 0) {
+        return '';
+    }
+    const items = common.map(one =>
+        `<span class="element-type-link" data-type="${escapeHtml(one.name)}" style="cursor: pointer; margin-right: 8px;">${escapeHtml(one.name)} <span style="color: #475569;">${one.count.toLocaleString()}</span></span>`
+    ).join('');
+    return `<div style="display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 6px; padding: 1px 0 3px 12px; font-size: 11px; max-width: ${LANDING_WIDTH};">
+        <span style="color: #475569;">${label}</span>
+        <span style="display: flex; flex-wrap: wrap; gap: 2px; color: #94a3b8;">${items}</span>
+    </div>`;
+}
+
+// A read is answered from the database of its namespace and never from the
+// record (ADR-037), so there is one of these per namespace and the single
+// path this panel used to print was hiding all but one of them.
+function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: string): string {
+    if (failed) {
+        return renderStatsError(failed);
+    }
+    if (!landings || landings.length === 0) {
+        return `<div style="padding: 6px 0; font-size: 11px;">
+            <span class="label">Path:</span> <span class="element-value">${escapeHtml(onePath)}</span>
+        </div>`;
+    }
+
+    const held = landings.reduce((sum, one) => sum + one.attestations, 0);
+    const rows = landings.map(one => `
+        <div style="display: grid; grid-template-columns: ${LANDING_COLUMNS}; gap: 8px; font-size: 11px; padding: 2px 0; max-width: ${LANDING_WIDTH};">
+            <span style="color: #e2e8f0; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(one.namespace)}</span>
+            <span style="color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left;">${escapeHtml(one.path)}</span>
+            <span style="color: #64748b; text-align: right;">db ${formatBytes(one.bytes)}</span>
+            <span style="color: ${one.wal_bytes > 8 * 1024 * 1024 ? '#f59e0b' : '#64748b'}; text-align: right;">wal ${formatBytes(one.wal_bytes)}</span>
+            <span style="color: #475569; text-align: right;">${one.actors.toLocaleString()}a ${one.subjects.toLocaleString()}s ${one.contexts.toLocaleString()}c</span>
+            <span style="color: #94a3b8; text-align: right;">${one.attestations.toLocaleString()}</span>
+        </div>
+        ${commonHTML('predicates', one.top_predicates)}
+        ${commonHTML('contexts', one.top_contexts)}`).join('');
+
+    return `
+        <div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
+            <span class="label">Answering reads from ${landings.length} ${landings.length === 1 ? 'database' : 'databases'}:</span>
+            <span class="element-value">${held.toLocaleString()} attestations</span>
+            <div style="margin-top: 4px;">${rows}</div>
+        </div>
+    `;
+}
+
+interface Spend {
+    of: string;
+    request: string;
+    held_on_node: boolean;
+    count: number;
+}
+
+// What reading the record has cost, per reader, most spent first. A backend
+// holding its record on the node sends none of this and the section is absent
+// — nothing left the node, so nothing was spent reading it.
+function recordSpendHTML(spend: Spend[] | undefined, failed: any): string {
+    if (failed) {
+        return renderStatsError(failed);
+    }
+    if (!spend || spend.length === 0) {
+        return '';
+    }
+
+    // A reader the node keeps nothing of pays S3 for every read of it
+    // (ADR-037). Said on the row, because a large number there is a defect
+    // and the same number beside "on the node" is the record doing its job.
+    const rows = spend.map(one => `
+        <div style="display: grid; grid-template-columns: ${SPEND_COLUMNS}; gap: 8px; font-size: 11px; padding: 2px 0;">
+            <span style="color: ${one.held_on_node ? '#e2e8f0' : '#f59e0b'}; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(one.of)}</span>
+            <span style="color: ${one.held_on_node ? '#475569' : '#f59e0b'};">${one.held_on_node ? 'on the node' : 'record only'}</span>
+            <span style="color: #64748b;">${escapeHtml(one.request)}</span>
+            <span style="color: #94a3b8; text-align: right;">${one.count.toLocaleString()}</span>
+        </div>`).join('');
+
+    const total = spend.reduce((sum, one) => sum + one.count, 0);
+    const offNode = spend.filter(one => !one.held_on_node).reduce((sum, one) => sum + one.count, 0);
+    const leaving = offNode > 0
+        ? ` <span style="color: #f59e0b;">${offNode.toLocaleString()} of them for things the node keeps no copy of</span>`
+        : '';
+
+    return `
+        <div style="margin-bottom: 8px;">
+            <span class="label">Reading the record has cost:</span>
+            <span class="element-value">${total.toLocaleString()} requests</span>${leaving}
+            <div style="margin-top: 4px;">${rows}</div>
+        </div>
+    `;
+}
+
 function renderDbStats(): void {
     if (!dbStatsElement || !sectionChart || !sectionOverview || !sectionPredicates || !sectionEvictions || !sectionPerformance) return;
 
@@ -121,7 +257,10 @@ function renderDbStats(): void {
     if ('predicate_histograms' in dbStats) {
         renderChartWithControls(sectionChart, dbStats.predicate_histograms);
     } else {
-        sectionChart.innerHTML = '';
+        // A node that persists to the record rather than distilling has no
+        // histograms and drew nothing here. What it does have is when its
+        // attestations landed, per namespace.
+        renderChartWithControls(sectionChart, landedOverTime(dbStats.landings));
     }
 
     // -- Overview: compact stats row --
@@ -138,17 +277,17 @@ function renderDbStats(): void {
 
     sectionOverview.innerHTML = `
         <div style="display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border-color, #333); font-size: 11px;">
-            <span><span class="label">Path:</span> <span class="element-value">${escapeHtml(String(dbStats.path ?? ''))}</span></span>
             <span><span class="label">Backend:</span> <span class="element-value">${storageBackend}</span></span>
             ${countSpan('Attestations', dbStats.total_attestations)}
             ${countSpan('Actors', dbStats.unique_actors)}
             ${countSpan('Subjects', dbStats.unique_subjects)}
             ${countSpan('Contexts', dbStats.unique_contexts)}
         </div>
+        ${landingsHTML(dbStats.landings, dbStats.landings_error, String(dbStats.path ?? ''))}
     `;
 
-    // -- Predicates: types + distillation --
-    let predicatesHTML = '';
+    // -- Predicates: what the record cost, then types + distillation --
+    let predicatesHTML = recordSpendHTML(dbStats.record_spend, dbStats.record_spend_error);
 
     // Rich fields / types
     const richFields = dbStats.rich_fields;
@@ -204,17 +343,21 @@ function renderDbStats(): void {
 
     sectionPredicates.innerHTML = predicatesHTML ? `<div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">${predicatesHTML}</div>` : '';
 
-    // Wire type links
-    sectionPredicates.querySelectorAll('.element-type-link').forEach(el => {
-        el.addEventListener('click', () => {
-            const typeName = (el as HTMLElement).dataset.type;
-            if (typeName) {
-                import('./type-definition-window.js')
-                    .then(({ openTypeDefinition }) => openTypeDefinition(typeName))
-                    .catch((err: unknown) => log.error(SEG.ELEMENT, `Type definition for ${typeName} failed to open:`, err));
-            }
+    // Wire type links. Both sections, because a namespace's own predicates and
+    // contexts are drawn beside its database in the overview and they open the
+    // same way a type does.
+    for (const section of [sectionPredicates, sectionOverview]) {
+        section.querySelectorAll('.element-type-link').forEach(el => {
+            el.addEventListener('click', () => {
+                const typeName = (el as HTMLElement).dataset.type;
+                if (typeName) {
+                    import('./type-definition-window.js')
+                        .then(({ openTypeDefinition }) => openTypeDefinition(typeName))
+                        .catch((err: unknown) => log.error(SEG.ELEMENT, `Type definition for ${typeName} failed to open:`, err));
+                }
+            });
         });
-    });
+    }
 
     // -- Evictions --
     if (hasEvictions()) {
