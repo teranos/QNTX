@@ -43,11 +43,12 @@ const (
 
 // openCall is a token for one call a plugin answers, reaching the store of the
 // namespace its caller acts in, and what closes it once the plugin has answered.
+// A caller who reaches no store is refused, and the refusal carries why.
 func (s *QNTXServer) openCall(ctx context.Context) (string, func(), *protocol.Refusal, error) {
 	admitted, gated := auth.AdmissionFrom(ctx)
 	universe, err := s.universeFor(admitted, gated)
 	if err != nil {
-		return "", nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: err.Error()}, nil
+		return "", nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: err.Error()}, err
 	}
 	store := universe.Store()
 	if store == nil {
