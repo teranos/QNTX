@@ -12,7 +12,7 @@ import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstor
 import { spawnAttestationAsWindow } from './components/element/attestation-element';
 import { jsonBody } from './http-utils';
 import { log, SEG } from './logger';
-import { ordered, type Namespace } from './namespaces-view';
+import { kindOf, ordered, type Namespace } from './namespaces-view';
 import { knownFrom } from './roles-compose';
 import type { Line } from './roles-element';
 
@@ -285,174 +285,158 @@ async function takeOut(id: string, namespace: string): Promise<void> {
     );
 }
 
-function chipStyle(chip: HTMLElement): void {
-    chip.style.display = 'inline-flex';
-    chip.style.alignItems = 'center';
-    chip.style.gap = '4px';
-    chip.style.padding = '1px 6px';
-    chip.style.border = '1px solid var(--border-on-dark)';
-    chip.style.borderRadius = 'var(--border-radius)';
-    chip.style.fontSize = '11px';
-    chip.style.lineHeight = '1.4';
-    chip.style.background = 'transparent';
-    chip.style.color = 'var(--text-on-dark)';
-    chip.style.font = 'inherit';
-    chip.style.fontSize = '11px';
+/** A namespace-bar tile: the same rectangle, size and kind colour. */
+function nsTile(name: string): HTMLDivElement {
+    const tile = document.createElement('div');
+    tile.className = 'namespace-tile';
+    tile.dataset.kind = kindOf(name);
+    tile.dataset.name = name;
+    tile.textContent = name;
+    return tile;
 }
 
-/** The first press arms a removal and the chip's colours invert; the second
- *  takes the client out. Either X, hover or right-click, arms the same chip. */
-function removing(chip: HTMLElement, remove: () => Promise<void>): () => void {
-    return () => {
-        if (!chip.classList.contains('token-ns-armed')) {
-            chip.classList.add('token-ns-armed');
-            chip.style.background = 'var(--text-on-dark)';
-            chip.style.color = 'var(--bg-dark, #1e1e1e)';
-            return;
-        }
-        void remove();
-    };
+function part(which: string, text: string): HTMLSpanElement {
+    const span = document.createElement('span');
+    span.className = 'namespace-part';
+    span.dataset.part = which;
+    span.textContent = text;
+    return span;
 }
 
-function removeButton(onPress: () => void, className: string): HTMLButtonElement {
-    const x = document.createElement('button');
-    x.type = 'button';
-    x.className = className;
-    x.textContent = '×';
-    x.title = 'press once to arm, again to take it out of this namespace';
-    x.style.cursor = 'pointer';
-    x.style.background = 'none';
-    x.style.border = 'none';
-    x.style.color = 'var(--color-error)';
-    x.style.font = 'inherit';
-    x.style.padding = '0 2px';
-    x.addEventListener('click', (e) => { e.stopPropagation(); onPress(); });
-    return x;
+/** The rectangle over the tile the client is active in, moved rather than
+ *  remade, so making another active carries it across the row. */
+function place(row: HTMLElement, rectangle: HTMLElement, here: HTMLElement | null): void {
+    if (!here) {
+        rectangle.hidden = true;
+        return;
+    }
+    rectangle.hidden = false;
+    rectangle.style.width = `${here.offsetWidth}px`;
+    rectangle.style.height = `${here.offsetHeight}px`;
+    rectangle.style.transform = `translate(${here.offsetLeft}px, ${here.offsetTop}px)`;
 }
 
-/** Namespaces: [Clean] [default] [+] — one line. The active one is marked.
- *  For a live client, a press on another makes it active, [+] puts the client
- *  into one more, and hover or right-click offers an X that takes it out.
+/** The namespaces as the namespace bar draws them, below the title bar: one
+ *  tile each, the rectangle over the one a client is active in. For a live
+ *  client, ROOT presses a tile to make it active, right-clicks one to split it
+ *  into [<] name [X] and take the client out, and [+] puts it into another.
  *  "A TOKEN CAN ONLY BE ACTIVE IN ONE NAMESPACE AT A TIME" */
 export function namespacesField(container: HTMLElement, t: TokenInfo): HTMLElement {
     const row = document.createElement('div');
     row.className = 'token-namespaces';
-    row.style.display = 'flex';
-    row.style.flexWrap = 'wrap';
-    row.style.alignItems = 'center';
-    row.style.gap = '4px';
 
-    const caption = document.createElement('span');
-    caption.style.color = 'var(--text-on-dark-tertiary)';
-    caption.style.fontSize = '11px';
-    caption.textContent = 'Namespaces:';
-    row.appendChild(caption);
+    const tiles = document.createElement('div');
+    tiles.className = 'namespaces-tiles';
+    row.appendChild(tiles);
 
     const held = t.namespaces || [];
-    const editable = t.level === 'OAUTH' && !t.revoked_at;
+    const client = t.level === 'OAUTH';
+    const editable = client && !t.revoked_at;
+    const active = client ? held[0] : undefined;
     const failed = (err: unknown) => {
-        row.parentElement?.querySelector('.element-error')?.remove();
-        row.after(errorBox(err instanceof Error ? err.message : String(err)));
+        row.querySelector('.namespaces-failure')?.remove();
+        const said = document.createElement('div');
+        said.className = 'namespaces-failure';
+        said.textContent = err instanceof Error ? err.message : String(err);
+        row.appendChild(said);
     };
 
-    if (held.length === 0) {
+    const rectangle = document.createElement('div');
+    rectangle.className = 'namespaces-rectangle';
+    rectangle.hidden = true;
+
+    const shown = ordered(held.map(name => ({ name, definition: null, kinds: [] })));
+    if (shown.length === 0) {
         const none = document.createElement('span');
         none.textContent = '—';
-        row.appendChild(none);
+        tiles.appendChild(none);
     }
 
-    held.forEach((namespace, at) => {
-        const active = at === 0;
-        const chip = document.createElement('span');
-        chip.className = active ? 'token-ns-chip token-ns-active' : 'token-ns-chip';
-        chip.textContent = namespace;
-        chipStyle(chip);
-        if (active) {
-            chip.style.borderColor = 'var(--color-success, #22c55e)';
-            chip.style.color = 'var(--color-success, #22c55e)';
-            chip.title = editable ? 'active: every connector through this client acts here' : 'active';
+    for (const ns of shown) {
+        const tile = nsTile(ns.name);
+        if (ns.name === active) {
+            tile.classList.add('standing');
+            tile.title = 'active: every connector through this client acts here';
         }
-        row.appendChild(chip);
-        if (!editable) return;
+        tiles.appendChild(tile);
+        if (!editable || ns.name === active) continue;
 
-        if (!active) {
-            chip.style.cursor = 'pointer';
-            chip.title = 'press to make it active here';
-            chip.addEventListener('click', () => {
-                makeActive(t.id, namespace).then(() => redraw(container, t.id)).catch(failed);
+        tile.title = 'press to make it active here; right-click to take it out';
+        tile.addEventListener('click', () => {
+            if (tile.classList.contains('open')) return;
+            makeActive(t.id, ns.name)
+                .then(() => {
+                    // The rectangle goes where the node says it went, and the
+                    // element is drawn again once it has arrived.
+                    tiles.querySelector('.namespace-tile.standing')?.classList.remove('standing');
+                    tile.classList.add('standing');
+                    place(row, rectangle, tile);
+                    setTimeout(() => { void redraw(container, t.id); }, 200);
+                })
+                .catch(failed);
+        });
+
+        tile.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (tile.classList.contains('open')) return;
+            tile.classList.add('open');
+            tile.textContent = '';
+            const back = part('back', '<');
+            const name = part('toggle', ns.name);
+            const end = part('end', 'X');
+            end.dataset.end = 'active';
+            tile.append(back, name, end);
+            back.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                tile.classList.remove('open');
+                tile.textContent = ns.name;
             });
-
-            const press = removing(chip, () => takeOut(t.id, namespace).then(() => redraw(container, t.id)).catch(failed));
-
-            // Hover: a tip under the chip carrying the X.
-            const tip = document.createElement('span');
-            tip.className = 'token-ns-tip';
-            tip.style.position = 'absolute';
-            tip.style.display = 'none';
-            tip.style.padding = '2px 4px';
-            tip.style.background = 'var(--bg-dark-light)';
-            tip.style.border = '1px solid var(--border-on-dark)';
-            tip.style.borderRadius = 'var(--border-radius)';
-            tip.style.zIndex = '10';
-            tip.appendChild(removeButton(press, 'token-ns-x'));
-            chip.style.position = 'relative';
-            chip.appendChild(tip);
-            tip.style.top = '100%';
-            tip.style.left = '0';
-            let hide: ReturnType<typeof setTimeout> | undefined;
-            chip.addEventListener('mouseenter', () => { clearTimeout(hide); tip.style.display = 'inline-flex'; });
-            chip.addEventListener('mouseleave', () => { hide = setTimeout(() => { tip.style.display = 'none'; }, 400); });
-
-            // Right-click: an X beside the chip.
-            chip.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                if (chip.nextElementSibling?.classList.contains('token-ns-side-x')) return;
-                chip.after(removeButton(press, 'token-ns-side-x'));
+            // Once arms it, and a second press takes the client out.
+            end.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                if (end.dataset.end !== 'sure') {
+                    end.dataset.end = 'sure';
+                    return;
+                }
+                takeOut(t.id, ns.name).then(() => redraw(container, t.id)).catch(failed);
             });
-        }
-    });
+        });
+    }
 
     if (editable) {
-        const add = document.createElement('button');
-        add.type = 'button';
-        add.className = 'token-ns-add';
+        const add = document.createElement('div');
+        add.className = 'namespace-tile namespace-add';
         add.textContent = '+';
         add.title = 'put this client into another namespace';
-        chipStyle(add);
-        add.style.cursor = 'pointer';
         add.addEventListener('click', () => {
-            const open = row.querySelector('.token-ns-offer');
-            if (open) { open.remove(); return; }
-            const offer = document.createElement('span');
-            offer.className = 'token-ns-offer';
-            offer.style.display = 'inline-flex';
-            offer.style.flexWrap = 'wrap';
-            offer.style.gap = '4px';
-            row.appendChild(offer);
+            const offered = tiles.querySelectorAll('.token-ns-offer');
+            if (offered.length > 0) {
+                offered.forEach(o => o.remove());
+                return;
+            }
             apiJson<{ namespaces: Namespace[] }>('/api/namespaces')
                 .then(listed => {
-                    const offered = ordered(listed.namespaces || []).filter(ns => !held.includes(ns.name));
-                    if (offered.length === 0) {
-                        offer.textContent = 'in every namespace already';
-                        return;
-                    }
-                    for (const ns of offered) {
-                        const pick = document.createElement('span');
-                        pick.className = 'token-ns-pick';
-                        pick.textContent = ns.name;
-                        chipStyle(pick);
-                        pick.style.cursor = 'pointer';
-                        pick.style.borderStyle = 'dashed';
-                        pick.title = `put this client into ${ns.name}`;
-                        pick.addEventListener('click', () => {
+                    for (const ns of ordered(listed.namespaces || []).filter(ns => !held.includes(ns.name))) {
+                        const offer = nsTile(ns.name);
+                        offer.classList.add('token-ns-offer');
+                        offer.style.borderStyle = 'dashed';
+                        offer.title = `put this client into ${ns.name}`;
+                        offer.addEventListener('click', () => {
                             putIn(t.id, ns.name).then(() => redraw(container, t.id)).catch(failed);
                         });
-                        offer.appendChild(pick);
+                        tiles.appendChild(offer);
                     }
                 })
                 .catch(failed);
         });
-        row.appendChild(add);
+        tiles.appendChild(add);
+    }
+
+    if (active !== undefined) {
+        row.appendChild(rectangle);
+        requestAnimationFrame(() => {
+            place(row, rectangle, tiles.querySelector<HTMLElement>('.namespace-tile.standing'));
+        });
     }
     return row;
 }
@@ -513,6 +497,10 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     container.style.padding = '12px';
     container.style.fontFamily = 'var(--font-mono)';
 
+    // The namespaces first, directly below the title bar, the way the
+    // namespace bar sits below the system bar.
+    container.appendChild(namespacesField(container, t));
+
     if (raw) {
         const shown = document.createElement('div');
         reveal(shown, raw);
@@ -527,7 +515,6 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     // Tokens are owned by someone: the name, and on the hover the identity it
     // was minted under.
     container.appendChild(field('Owner', t.minted_by_display_name || t.minted_by || '—', false, t.minted_by || ''));
-    container.appendChild(namespacesField(container, t));
     if (t.return_address) {
         container.appendChild(field('Return address', t.return_address, true));
     }

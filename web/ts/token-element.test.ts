@@ -43,63 +43,70 @@ test('an attestation reads as X is Y of Z, a DID by its last eight', () => {
     expect(saidLine({ subjects: ['visit-1'], predicates: ['visit:done'], contexts: [] })).toBe('visit-1 is visit:done');
 });
 
-// "namespaces: [Clean] [Default] [+]"
-function chips(t: TokenInfo): HTMLElement {
+// The namespaces as the namespace bar draws them, below the title bar.
+function strip(t: TokenInfo): HTMLElement {
     const container = document.createElement('div');
     const row = namespacesField(container, t);
     container.appendChild(row);
     return row;
 }
 
-test('the namespaces are one line of chips, the active one marked, and a + for a live client', () => {
-    const row = chips({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+function tileNames(row: HTMLElement): string[] {
+    return [...row.querySelectorAll<HTMLElement>('.namespace-tile[data-name]')].map(t => t.dataset.name ?? '');
+}
+
+test('the namespaces are the bar\'s tiles, no caption, the active one under the rectangle, and a + for a live client', () => {
+    const row = strip({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+    expect(row.textContent).not.toContain('Namespaces');
     expect(row.querySelector('select')).toBeNull();
-    const names = [...row.querySelectorAll<HTMLElement>('.token-ns-chip')].map(c => c.firstChild?.textContent);
-    expect(names).toEqual(['Clean', 'default']);
-    expect(row.querySelector('.token-ns-active')?.firstChild?.textContent).toBe('Clean');
-    expect(row.querySelector('.token-ns-add')?.textContent).toBe('+');
-    expect(row.firstChild?.textContent).toBe('Namespaces:');
+    // The bar's order, whatever order the client names them in.
+    expect(tileNames(row)).toEqual(['default', 'Clean']);
+    expect(row.querySelector<HTMLElement>('.namespace-tile.standing')?.dataset.name).toBe('Clean');
+    expect(row.querySelector('.namespaces-rectangle')).not.toBeNull();
+    expect(row.querySelector('.namespace-add')?.textContent).toBe('+');
+    expect(row.querySelector<HTMLElement>('.namespace-tile[data-name="default"]')?.dataset.kind).toBe('default');
 });
 
-// No fallback: the namespace a client is active in is not offered for removal.
-test('the active chip offers no X, the others do', () => {
-    const row = chips({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
-    const [active, other] = [...row.querySelectorAll<HTMLElement>('.token-ns-chip')];
-    expect(active.querySelector('.token-ns-x')).toBeNull();
-    expect(other.querySelector('.token-ns-x')).not.toBeNull();
-});
-
-// "hover over it, see the X button in the tooltip, press X once, its color inverts"
-test('the first press of the X inverts the chip, and does not yet take it out', () => {
-    const row = chips({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
-    const other = [...row.querySelectorAll<HTMLElement>('.token-ns-chip')][1];
-    other.querySelector<HTMLButtonElement>('.token-ns-x')!.click();
-    expect(other.classList.contains('token-ns-armed')).toBe(true);
-    expect([...row.querySelectorAll('.token-ns-chip')]).toHaveLength(2);
-});
-
-// "another route is right click, see the X next to it, press it once invert"
-test('a right-click puts an X beside the chip, and its first press inverts the chip', () => {
-    const row = chips({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
-    const other = [...row.querySelectorAll<HTMLElement>('.token-ns-chip')][1];
+// "another route is right click, see the X next to it, press it once invert, again, reoved"
+test('a right-click splits a tile into [<] name [X], and the first press of X arms it', () => {
+    const row = strip({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+    const other = row.querySelector<HTMLElement>('.namespace-tile[data-name="default"]')!;
     other.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    const side = other.nextElementSibling as HTMLButtonElement;
-    expect(side.classList.contains('token-ns-side-x')).toBe(true);
-    side.click();
-    expect(other.classList.contains('token-ns-armed')).toBe(true);
+    expect(other.classList.contains('open')).toBe(true);
+    expect([...other.querySelectorAll<HTMLElement>('.namespace-part')].map(p => p.textContent)).toEqual(['<', 'default', 'X']);
+
+    const end = other.querySelector<HTMLElement>('[data-part="end"]')!;
+    expect(end.dataset.end).toBe('active');
+    end.click();
+    expect(end.dataset.end).toBe('sure');
+    expect(tileNames(row)).toEqual(['default', 'Clean']);
+
+    other.querySelector<HTMLElement>('[data-part="back"]')!.click();
+    expect(other.classList.contains('open')).toBe(false);
+    expect(other.textContent).toBe('default');
+});
+
+// No fallback: the tile a client is active in does not split.
+test('the active tile does not split', () => {
+    const row = strip({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+    const active = row.querySelector<HTMLElement>('.namespace-tile.standing')!;
+    active.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    expect(active.classList.contains('open')).toBe(false);
 });
 
 // Only ROOT changes where a client is, and only a live client issues anything.
-test('a token of another kind, or a revoked client, shows its namespaces and nothing to press', () => {
+test('a token of another kind, or a revoked client, shows plain tiles and nothing to press', () => {
     for (const t of [
         { ...token(), level: 'ATTESTOR' },
         { ...token(), level: 'REFRESH' },
         { ...token(), level: 'OAUTH', revoked_at: '2026-09-15T00:00:00Z' },
     ]) {
-        const row = chips(t);
-        expect(row.querySelector('.token-ns-add')).toBeNull();
-        expect(row.querySelector('.token-ns-x')).toBeNull();
-        expect(row.querySelector('.token-ns-chip')?.textContent).toBe('clean');
+        const row = strip(t);
+        expect(row.querySelector('.namespace-add')).toBeNull();
+        expect(tileNames(row)).toEqual(['clean']);
+        const tile = row.querySelector<HTMLElement>('.namespace-tile')!;
+        tile.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+        expect(tile.classList.contains('open')).toBe(false);
     }
 });
 
