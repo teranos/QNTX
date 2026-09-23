@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -189,6 +190,55 @@ func TestCIWatchWaitsForEveryWorkflow(t *testing.T) {
 	}
 	if got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli()); len(got) != 1 || got[0].Item.Symbol != SymbolWell {
 		t.Fatalf("all green drew %+v", got)
+	}
+}
+
+// A spent quota is waited out, not failed. The first hour on the node spent
+// the person's whole 5000, and every push in flight then failed on the row.
+func TestCIWatchWaitsOutASpentQuota(t *testing.T) {
+	reset := time.Now().Add(90 * time.Second)
+	gh := &scriptedGitHub{history: noHistory(), commits: []string{runsJSON(aRun("Go", "completed", "success", "g"))}}
+	refusals := 1
+	get := func(ctx context.Context, token, url string) ([]byte, error) {
+		if strings.Contains(url, "head_sha=") && refusals > 0 {
+			refusals--
+			return nil, rateLimited{reset: reset}
+		}
+		return gh.get(ctx, token, url)
+	}
+	news := newNewsLog()
+	var slept []time.Duration
+	h := handlerOver(gh, news)
+	h.get = get
+	h.sleep = func(_ context.Context, d time.Duration) error { slept = append(slept, d); return nil }
+	if err := h.Execute(context.Background(), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+		t.Fatalf("a spent quota failed the push: %v", err)
+	}
+	if len(slept) != 1 || slept[0] < 85*time.Second || slept[0] > 95*time.Second {
+		t.Fatalf("slept %v; wanted once, until the reset", slept)
+	}
+	if got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli()); len(got) != 1 {
+		t.Fatalf("news after the quota came back: %+v", got)
+	}
+}
+
+// GitHub's headers say when a spent quota comes back; a 403 that is not about
+// the quota is not read as one.
+func TestRateLimitResetReadsGitHubsHeaders(t *testing.T) {
+	h := http.Header{}
+	h.Set("X-RateLimit-Remaining", "0")
+	h.Set("X-RateLimit-Reset", "1790201685")
+	reset, ok := rateLimitReset(h)
+	if !ok || reset.Unix() != 1790201685 {
+		t.Fatalf("primary reset read as %v %v", reset, ok)
+	}
+	if _, ok := rateLimitReset(http.Header{}); ok {
+		t.Fatal("a refusal with no quota headers read as the quota")
+	}
+	r := http.Header{}
+	r.Set("Retry-After", "30")
+	if reset, ok := rateLimitReset(r); !ok || time.Until(reset) < 25*time.Second {
+		t.Fatalf("secondary Retry-After read as %v %v", reset, ok)
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 // ci.watch is the built-in the standing CI watcher reaches. ground's hook
@@ -60,9 +61,31 @@ func githubToken(ctx context.Context) (string, error) {
 	return token, nil
 }
 
-// githubGet is one GET of the API, the body whole. A status other than 200
-// is GitHub's own answer and is returned in its words.
+// rateLimited is GitHub refusing until a moment: the hour's quota is spent.
+// The quota is the user's, shared with every tool of theirs, so the ask is
+// not failed — it waits.
+type rateLimited struct {
+	reset time.Time
+}
+
+func (r rateLimited) Error() string {
+	return "github's rate limit is spent until " + r.reset.UTC().Format(time.RFC3339)
+}
+
+// githubPace is how often this process asks GitHub, all pushes together. The
+// quota is 5000 an hour for the user and the laptop spends it too; the first
+// hour ci.watch ran on the node it spent all of it, ten pushes each asking
+// every two seconds. Twenty a minute across every push leaves most of the
+// hour to the person.
+var githubPace = rate.NewLimiter(rate.Every(3*time.Second), 1)
+
+// githubGet is one GET of the API, the body whole, at the shared pace. A
+// status other than 200 is GitHub's own answer and is returned in its words;
+// a spent quota is returned as the moment it comes back.
 func githubGet(ctx context.Context, token, url string) ([]byte, error) {
+	if err := githubPace.Wait(ctx); err != nil {
+		return nil, errors.Wrap(err, "waiting for a turn to ask github")
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "building the request for %s", url)
@@ -81,10 +104,30 @@ func githubGet(ctx context.Context, token, url string) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "reading github's answer for %s", url)
 	}
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+		if reset, ok := rateLimitReset(resp.Header); ok {
+			return nil, rateLimited{reset: reset}
+		}
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Newf("github answered %d for %s: %s", resp.StatusCode, url, strings.TrimSpace(string(body)))
 	}
 	return body, nil
+}
+
+// rateLimitReset is when a spent quota comes back, from GitHub's headers: the
+// primary limit's reset when remaining is zero, or a Retry-After for the
+// secondary one. False is a refusal that is not about the quota.
+func rateLimitReset(h http.Header) (time.Time, bool) {
+	if h.Get("X-RateLimit-Remaining") == "0" {
+		if unix, err := strconv.ParseInt(h.Get("X-RateLimit-Reset"), 10, 64); err == nil {
+			return time.Unix(unix, 0), true
+		}
+	}
+	if secs, err := strconv.Atoi(h.Get("Retry-After")); err == nil && secs > 0 {
+		return time.Now().Add(time.Duration(secs) * time.Second), true
+	}
+	return time.Time{}, false
 }
 
 // pickAdaptiveSleep is ground's, ported as-is: quiet before the median,
@@ -178,6 +221,21 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 	deadline := time.Now().Add(ciWatchCeiling)
 	for {
 		runs, err := h.runsFor(ctx, token, repo, sha)
+		var spent rateLimited
+		if errors.As(err, &spent) {
+			// The quota is the person's, and it comes back. A push is not
+			// unreported because the hour's asks were used up.
+			wait := time.Until(spent.reset) + time.Second
+			if wait < time.Second {
+				wait = time.Second
+			}
+			h.logger.Warnw("ci.watch waits for github's rate limit to reset",
+				"repo", repo, "sha", sha, "reset", spent.reset.UTC().Format(time.RFC3339))
+			if err := h.sleep(ctx, wait); err != nil {
+				return errors.Wrapf(err, "ci.watch: stopped waiting on %s@%s", branch, sha)
+			}
+			continue
+		}
 		if err != nil {
 			return err
 		}
