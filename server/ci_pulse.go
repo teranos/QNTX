@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -49,11 +51,53 @@ func pickAdaptiveSleep(elapsed, p50, p90 int64) int64 {
 	return 2
 }
 
+// errNotOnPath stands in for exec.LookPath's answer in a test.
+var errNotOnPath = errors.New("not on PATH")
+
+// ghCandidates is where a nix box keeps gh when the service's PATH does not
+// say: the default profile the bootstrap names, root's own, then the usual
+// places. "exec: \"gh\": executable file not found in $PATH" was the first
+// thing ci.watch ever said on the row, three seconds after the first push it
+// watched.
+var ghCandidates = []string{
+	"/nix/var/nix/profiles/default/bin/gh",
+	"/run/current-system/sw/bin/gh",
+	"/root/.nix-profile/bin/gh",
+	"/usr/local/bin/gh",
+	"/usr/bin/gh",
+}
+
+// ghPathAmong is gh as PATH resolves it, else the first candidate that is
+// there, else the bare name so the failure keeps naming what was asked for.
+func ghPathAmong(lookPath func(string) (string, error), present func(string) bool) string {
+	if p, err := lookPath("gh"); err == nil && p != "" {
+		return p
+	}
+	for _, c := range ghCandidates {
+		if present(c) {
+			return c
+		}
+	}
+	return "gh"
+}
+
+// ghPath is resolved once per process. A service's PATH does not change
+// while it runs, and a shell's is not the service's.
+var ghPath = sync.OnceValue(func() string {
+	return ghPathAmong(exec.LookPath, func(p string) bool {
+		info, err := os.Stat(p)
+		return err == nil && !info.IsDir() && info.Mode()&0o111 != 0
+	})
+})
+
 // ghRun runs gh with the arguments given, argv[0] included. gh is installed on
 // the node and carries its own auth, so nothing here holds a GitHub token.
 func ghRun(ctx context.Context, args ...string) ([]byte, error) {
 	if len(args) == 0 {
 		return nil, errors.New("nothing to run")
+	}
+	if args[0] == "gh" {
+		args = append([]string{ghPath()}, args[1:]...)
 	}
 	out, err := exec.CommandContext(ctx, args[0], args[1:]...).Output()
 	if err != nil {
