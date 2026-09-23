@@ -13,6 +13,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/server/auth"
 )
 
 // "a new thing is a new handler is a new mcp tool is a new api endpoint"
@@ -164,6 +165,48 @@ func TestAnMCPCallWithoutTheSlashIsAnswered(t *testing.T) {
 	assert.NotEqual(t, http.StatusMovedPermanently, w.Code, "redirected to %s", w.Header().Get("Location"))
 }
 
+// "the conenctor, to the connector, the namespace should be invisible"
+func TestAConnectorIsOfferedNoNamespaceTool(t *testing.T) {
+	srv := servedForTest(t)
+	person := auth.Admitted(auth.LevelRoot)
+	connector := auth.Admitted(auth.LevelRoot, auth.NamespaceDefault)
+	connector.ClientDID = "did:key:zconnector"
+
+	offered := func(admitted auth.Admission) map[string]bool {
+		asked := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+		asked = asked.WithContext(auth.WithAdmission(asked.Context(), admitted))
+		named := map[string]bool{}
+		for _, tool := range toolsOfferedFor(t, srv, asked) {
+			named[tool.Name] = true
+		}
+		return named
+	}
+	toPerson, toConnector := offered(person), offered(connector)
+
+	for _, namespaced := range []string{"i_standing", "i_step", "http_i_", "http_api_namespaces", "http_api_namespaces_"} {
+		assert.True(t, toPerson[namespaced], namespaced+" is not offered to the person")
+		assert.False(t, toConnector[namespaced], namespaced+" is offered to a connector")
+	}
+	assert.True(t, toConnector["http_api_attestations"], "a connector cannot ask or attest")
+}
+
+// A route that names a segment answers any path, so a path it would carry to a
+// namespace is refused to a connector too.
+func TestAConnectorCannotReachANamespacePathThroughAnotherTool(t *testing.T) {
+	asked := false
+	served := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { asked = true })
+	connector := auth.Admitted(auth.LevelRoot, auth.NamespaceDefault)
+	connector.ClientDID = "did:key:zconnector"
+	caller := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	caller = caller.WithContext(auth.WithAdmission(caller.Context(), connector))
+
+	result := callThrough(context.Background(), served, caller,
+		operation{Path: "/api/plugins/{name}/config", Method: http.MethodGet}, calledThrough{Path: "/api/namespaces"})
+
+	assert.True(t, result.IsError)
+	assert.False(t, asked, "a connector reached a namespace path")
+}
+
 func textOf(t *testing.T, result *mcp.CallToolResult) string {
 	t.Helper()
 	require.Len(t, result.Content, 1)
@@ -177,9 +220,15 @@ func textOf(t *testing.T, result *mcp.CallToolResult) string {
 // finds.
 func toolsOffered(t *testing.T, s *QNTXServer) []*mcp.Tool {
 	t.Helper()
+	return toolsOfferedFor(t, s, httptest.NewRequest(http.MethodPost, "/mcp/", nil))
+}
+
+// toolsOfferedFor is toolsOffered for one request, carrying whoever it carries.
+func toolsOfferedFor(t *testing.T, s *QNTXServer, asked *http.Request) []*mcp.Tool {
+	t.Helper()
 	ctx := context.Background()
 
-	server := s.mcpServerFor(httptest.NewRequest(http.MethodPost, "/mcp/", nil))
+	server := s.mcpServerFor(asked)
 	clientSide, serverSide := mcp.NewInMemoryTransports()
 
 	serving, err := server.Connect(ctx, serverSide, nil)

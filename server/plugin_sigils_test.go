@@ -11,6 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 )
@@ -22,12 +23,17 @@ type sigilPlugin struct {
 	signa  []*protocol.Signum
 	answer *protocol.HTTPResponse
 	handed []*protocol.HTTPRequest
+	// during is what the plugin does while the call is open, before answering.
+	during func(*protocol.HTTPRequest)
 }
 
 func (p *sigilPlugin) GetSigna() []*protocol.Signum { return p.signa }
 
 func (p *sigilPlugin) AnswerHTTP(_ context.Context, req *protocol.HTTPRequest) (*protocol.HTTPResponse, error) {
 	p.handed = append(p.handed, req)
+	if p.during != nil {
+		p.during(req)
+	}
 	return p.answer, nil
 }
 
@@ -159,6 +165,34 @@ func TestAPluginIsToldWhoIsAsking(t *testing.T) {
 
 	require.Len(t, p.handed, 1)
 	assert.Equal(t, []string{rootAccount}, headerOf(p.handed[0], HeaderAsker))
+}
+
+// A plugin answering a sigil reads and writes where its caller acts, through
+// the token the node hands it for that call, and the token ends with the call.
+func TestAPluginIsHandedTheStoreOfItsCallersNamespace(t *testing.T) {
+	p := &sigilPlugin{
+		fakePlugin: fakePlugin{name: "stub"},
+		signa:      []*protocol.Signum{stubSignum("stub")},
+		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
+	}
+	srv, tokens := sigilServingServer(t, p)
+	var reached ats.AttestationStore
+	var open bool
+	p.during = func(req *protocol.HTTPRequest) {
+		token := headerOf(req, HeaderStoreToken)
+		require.Len(t, token, 1)
+		reached, open = srv.storeOfCall(token[0])
+	}
+
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/stub/read?kind=competitor", tokens[auth.LevelRoot]))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	require.Len(t, p.handed, 1)
+	assert.True(t, open, "the token handed for the call reached no store while the call was open")
+	assert.Same(t, srv.held.Served(), reached, "the call reached another store than the one its caller acts in")
+	_, still := srv.storeOfCall(headerOf(p.handed[0], HeaderStoreToken)[0])
+	assert.False(t, still, "the call's token outlived the call")
 }
 
 // A plugin's sigil is one tool, as the node's are, and asked over MCP it is

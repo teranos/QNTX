@@ -449,6 +449,14 @@ func (m *ServicesManager) SetVersionResolver(resolver services.VersionResolver) 
 	}
 }
 
+// SetCallStores hands the ATS store service the stores of the calls plugins are
+// answering, so a plugin reads and writes where its caller acts.
+func (m *ServicesManager) SetCallStores(calls services.CallStores) {
+	if m.atsStore != nil {
+		m.atsStore.SetCallStores(calls)
+	}
+}
+
 // GetSearchRouter returns the search router for provider registration.
 // Returns nil if the search service is not running.
 func (m *ServicesManager) GetSearchRouter() *services.SearchServer {

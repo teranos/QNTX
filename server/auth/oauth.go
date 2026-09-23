@@ -489,8 +489,8 @@ func namespaceOf(grant Grant) string {
 	return ""
 }
 
-// namespacesOf is where a token issued under this session acts: the one the
-// person's passkey named, or none, which is every namespace they reach.
+// namespacesOf is where a token issued under this session acts: the client's
+// door, or none, which is every namespace the person reaches.
 func namespacesOf(session *TokenSession) []string {
 	if session.Namespace == "" {
 		return nil
@@ -661,13 +661,14 @@ func (h *Handler) handleAuthorizeDone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Who said yes, carried to the mint: the token is them. The passkey was
-	// done at home, which names no namespace, so neither does the token.
+	// Who said yes, carried to the mint: the token is them. Where it acts is
+	// the client's: the door it was minted at, not where the person stands.
 	session := &TokenSession{
 		DefaultSession:      fosite.DefaultSession{Subject: held.identity},
 		MintedBy:            held.identity,
 		MintedByUser:        held.userID,
 		MintedByDisplayName: held.name,
+		Namespace:           client.Namespace,
 	}
 	response, err := provider.NewAuthorizeResponse(ctx, parked.request, session)
 	if err != nil {

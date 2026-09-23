@@ -233,13 +233,13 @@ export function renderMint(content: HTMLElement): void {
     returnAddress.size = 28;
 
     // A SUPER token is not narrowed, so the field that narrows one is
-    // not asked for when that is what is being minted. A client is
-    // bound to the door it is minted at, so it is not asked either;
-    // it is asked where its codes go.
+    // not asked for when that is what is being minted. A client's
+    // connector acts in the namespace picked here and nowhere else
+    // (ADR-038), and a client is also asked where its codes go.
     const narrowing: HTMLElement[] = [];
     const returning: HTMLElement[] = [];
     const showNarrowing = () => {
-        const narrowed = kind.value === ATTESTOR;
+        const narrowed = kind.value === ATTESTOR || kind.value === OAUTH;
         for (const row of narrowing) row.hidden = !narrowed;
         const client = kind.value === OAUTH;
         for (const row of returning) row.hidden = !client;
@@ -273,7 +273,7 @@ export function renderMint(content: HTMLElement): void {
             if (!kind.value) {
                 throw new Error('no kind');
             }
-            const narrowed = kind.value === ATTESTOR;
+            const narrowed = kind.value === ATTESTOR || kind.value === OAUTH;
             if (narrowed && namespace.value === '') {
                 throw new Error('no namespace picked');
             }

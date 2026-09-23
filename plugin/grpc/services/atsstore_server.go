@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -20,6 +21,10 @@ import (
 // Returns "" if the source is unknown.
 type VersionResolver func(source string) string
 
+// CallStores is the store of the caller a plugin is answering, by the token the
+// node handed the plugin for that one call. False is no call open under it.
+type CallStores func(token string) (ats.AttestationStore, bool)
+
 // ATSStoreServer implements the ATSStoreService gRPC server
 type ATSStoreServer struct {
 	protocol.UnimplementedATSStoreServiceServer
@@ -27,6 +32,8 @@ type ATSStoreServer struct {
 	authToken       string
 	logger          *zap.SugaredLogger
 	versionResolver VersionResolver
+	// Set after the service is serving, while plugins may already be calling.
+	calls atomic.Pointer[CallStores]
 
 	// streamMu protects streamCtx/streamCancel
 	streamMu     sync.Mutex
@@ -51,6 +58,25 @@ func (s *ATSStoreServer) SetVersionResolver(resolver VersionResolver) {
 	s.versionResolver = resolver
 }
 
+// SetCallStores hands the server the stores of the calls plugins are answering.
+func (s *ATSStoreServer) SetCallStores(calls CallStores) {
+	s.calls.Store(&calls)
+}
+
+// storeFor is the store a token reaches: the served one for the shared token,
+// the caller's for a call's token, and none for anything else.
+func (s *ATSStoreServer) storeFor(token string) (ats.AttestationStore, error) {
+	if ValidateToken(token, s.authToken) == nil {
+		return s.store, nil
+	}
+	if calls := s.calls.Load(); calls != nil {
+		if store, open := (*calls)(token); open {
+			return store, nil
+		}
+	}
+	return nil, errors.New("invalid authentication token")
+}
+
 // CancelStreams cancels all active streams and resets the context for new ones.
 // Called during plugin restart to free the database mutex before launching the new process.
 func (s *ATSStoreServer) CancelStreams() {
@@ -70,7 +96,8 @@ func (s *ATSStoreServer) getStreamCtx() context.Context {
 
 // CreateAttestation creates a new attestation
 func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.CreateAttestationRequest) (*protocol.CreateAttestationResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	store, err := s.storeFor(req.AuthToken)
+	if err != nil {
 		return &protocol.CreateAttestationResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
@@ -79,7 +106,7 @@ func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.Cr
 
 	as := req.Attestation.ToTypes()
 
-	if err := s.store.CreateAttestation(as); err != nil {
+	if err := store.CreateAttestation(as); err != nil {
 		return &protocol.CreateAttestationResponse{
 			Success: false,
 			Error:   fmt.Sprintf("failed to create attestation: %v", err),
@@ -95,11 +122,12 @@ func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.Cr
 func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.AttestationExistsRequest) (*protocol.AttestationExistsResponse, error) {
 	// This response has no error field, so the transport error is the only
 	// honest channel — Exists: false would be indistinguishable from truth.
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	store, err := s.storeFor(req.AuthToken)
+	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "attestation exists check refused: %v", err)
 	}
 
-	exists := s.store.AttestationExists(req.Id)
+	exists := store.AttestationExists(req.Id)
 
 	return &protocol.AttestationExistsResponse{
 		Exists: exists,
@@ -108,7 +136,8 @@ func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.At
 
 // GenerateAndCreateAttestation generates an ID and creates an attestation
 func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *protocol.GenerateAttestationRequest) (*protocol.GenerateAttestationResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	store, err := s.storeFor(req.AuthToken)
+	if err != nil {
 		return &protocol.GenerateAttestationResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
@@ -132,7 +161,7 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 	}
 
 	// Generate and create the attestation
-	as, err := s.store.GenerateAndCreateAttestation(ctx, cmd)
+	as, err := store.GenerateAndCreateAttestation(ctx, cmd)
 	if err != nil {
 		s.logger.Errorw("GenerateAndCreateAttestation failed", "source", req.Command.Source, "error", err)
 		return &protocol.GenerateAttestationResponse{
@@ -157,7 +186,8 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 
 // BatchGenerateAndCreateAttestations generates IDs and creates multiple attestations in one write transaction
 func (s *ATSStoreServer) BatchGenerateAndCreateAttestations(ctx context.Context, req *protocol.BatchGenerateAttestationRequest) (*protocol.BatchGenerateAttestationResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	store, err := s.storeFor(req.AuthToken)
+	if err != nil {
 		return &protocol.BatchGenerateAttestationResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
@@ -187,7 +217,7 @@ func (s *ATSStoreServer) BatchGenerateAndCreateAttestations(ctx context.Context,
 	type batchCreator interface {
 		BatchGenerateAndCreateAttestations(ctx context.Context, cmds []*types.AsCommand) (int, error)
 	}
-	if bs, ok := s.store.(batchCreator); ok {
+	if bs, ok := store.(batchCreator); ok {
 		created, err := bs.BatchGenerateAndCreateAttestations(ctx, cmds)
 		if err != nil {
 			s.logger.Errorw("BatchGenerateAndCreateAttestations failed", "count", len(cmds), "created", created, "error", err)
@@ -206,7 +236,7 @@ func (s *ATSStoreServer) BatchGenerateAndCreateAttestations(ctx context.Context,
 	// Fallback: individual writes
 	var created int32
 	for _, cmd := range cmds {
-		if _, err := s.store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
+		if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			s.logger.Errorw("BatchGenerateAndCreateAttestations fallback failed", "created", created, "total", len(cmds), "error", err)
 			return &protocol.BatchGenerateAttestationResponse{
 				Success: false,
@@ -224,7 +254,8 @@ func (s *ATSStoreServer) BatchGenerateAndCreateAttestations(ctx context.Context,
 
 // GetAttestations queries attestations with filters
 func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetAttestationsRequest) (*protocol.GetAttestationsResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	store, err := s.storeFor(req.AuthToken)
+	if err != nil {
 		return &protocol.GetAttestationsResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
@@ -235,7 +266,7 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 	filter := protoToFilter(req.Filter)
 
 	// Query attestations
-	attestations, err := s.store.GetAttestations(filter)
+	attestations, err := store.GetAttestations(filter)
 	if err != nil {
 		return &protocol.GetAttestationsResponse{
 			Success: false,
@@ -274,7 +305,8 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 
 // GetAttestationsStream queries attestations and streams them individually.
 func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequest, stream protocol.ATSStoreService_GetAttestationsStreamServer) error {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	store, err := s.storeFor(req.AuthToken)
+	if err != nil {
 		return err
 	}
 
@@ -286,7 +318,7 @@ func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequ
 
 	filter := protoToFilter(req.Filter)
 
-	attestations, err := s.store.GetAttestations(filter)
+	attestations, err := store.GetAttestations(filter)
 	if err != nil {
 		return errors.Wrapf(err, "failed to query attestations")
 	}

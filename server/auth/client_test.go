@@ -12,7 +12,7 @@ import (
 
 // A client is a door (ADR-025): both ends are the same hand. ROOT mints it
 // with the return address its codes go to, the way ROOT writes a door's
-// origin in am.toml.
+// origin in am.toml, and the one namespace its connector acts in (ADR-038).
 
 func mintClient(t *testing.T, h *Handler, body string) *httptest.ResponseRecorder {
 	t.Helper()
@@ -26,7 +26,7 @@ func mintClient(t *testing.T, h *Handler, body string) *httptest.ResponseRecorde
 func TestAClientIsMintedWithAReturnAddress(t *testing.T) {
 	h, store := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","return_address":"https://app.example/callback"}`)
+	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","namespaces":["default"],"return_address":"https://app.example/callback"}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	var resp struct {
@@ -45,24 +45,39 @@ func TestAClientIsMintedWithAReturnAddress(t *testing.T) {
 	assert.Equal(t, mastodonAccount, grant.MintedBy)
 }
 
-// A client is bound to the door it was minted at. A session at the node's own
-// door is in default (ADR-032).
-func TestAClientIsBoundToTheDoorItWasMintedAt(t *testing.T) {
+// "i want to set the namespace there and there only"
+func TestAClientActsInTheNamespacePickedAtMinting(t *testing.T) {
 	h, store := grantHandler(t)
+	// Naming a namespace other than default is ROOT's (ADR-027).
+	h.SetIdentities([]string{mastodonAccount}, nil)
 
-	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","return_address":"https://app.example/callback"}`)
+	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","namespaces":["pond"],"return_address":"https://app.example/callback"}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	listed, err := store.List()
 	require.NoError(t, err)
 	require.Len(t, listed, 1)
-	assert.Equal(t, []string{NamespaceDefault}, listed[0].Namespaces)
+	assert.Equal(t, []string{"pond"}, listed[0].Namespaces)
 }
 
-func TestAClientNamesNoNamespace(t *testing.T) {
+// Nothing else picks it: not the door the session came in by, not where the
+// person stands.
+func TestAClientWithoutANamespaceIsRefused(t *testing.T) {
+	h, store := grantHandler(t)
+
+	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","return_address":"https://app.example/callback"}`)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Empty(t, listed, "a client was minted with no namespace picked")
+}
+
+// A connector stays in one namespace, so its client names one.
+func TestAClientNamingTwoNamespacesIsRefused(t *testing.T) {
 	h, _ := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","return_address":"https://app.example/callback","namespaces":["pond"]}`)
+	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","namespaces":["pond","default"],"return_address":"https://app.example/callback"}`)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
@@ -70,7 +85,7 @@ func TestAClientNamesNoNamespace(t *testing.T) {
 func TestAClientWithoutAReturnAddressIsRefused(t *testing.T) {
 	h, _ := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"OAUTH"}`)
+	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","namespaces":["default"]}`)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
@@ -87,7 +102,7 @@ func TestAReturnAddressHasToBeReachable(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			h, _ := grantHandler(t)
-			rec := mintClient(t, h, `{"label":"app","level":"OAUTH","return_address":"`+address+`"}`)
+			rec := mintClient(t, h, `{"label":"app","level":"OAUTH","namespaces":["default"],"return_address":"`+address+`"}`)
 			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 		})
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -113,13 +114,12 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	returnAddress := strings.TrimSpace(req.ReturnAddress)
 	namespaces := req.Namespaces
 	if level == LevelOAuth {
-		// A client is a door (ADR-025): both ends are the same hand. ROOT
-		// writes the return address here the way it writes a door's origin
-		// in am.toml, and the client is bound to the door it was minted at
-		// rather than to a namespace it names.
-		if len(namespaces) > 0 {
+		// A client is a door (ADR-025): ROOT writes its return address here the
+		// way it writes a door's origin in am.toml. Its connector acts in the one
+		// namespace picked here (ADR-038).
+		if len(namespaces) != 1 {
 			h.writeError(w, http.StatusBadRequest,
-				"a client is bound to the door it was minted at and names no namespace")
+				"a client acts in one namespace, picked at minting, and this named "+strconv.Itoa(len(namespaces)))
 			return
 		}
 		if returnAddress == "" {
@@ -130,7 +130,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			h.writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		namespaces = []string{doorNamespaceOf(p)}
 	} else if returnAddress != "" {
 		h.writeError(w, http.StatusBadRequest, "only a client has a return address")
 		return
@@ -206,16 +205,6 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		resp["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
 	}
 	h.writeJSON(w, http.StatusOK, resp)
-}
-
-// doorNamespaceOf is the namespace of the door the session walked up to: the
-// one on the session (ADR-032), and default for a session that came to the
-// node's own door, which names none.
-func doorNamespaceOf(p Presented) string {
-	if p.Namespace != "" {
-		return p.Namespace
-	}
-	return NamespaceDefault
 }
 
 // handleListTokens returns all tokens minus raw values and hashes.

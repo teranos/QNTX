@@ -73,6 +73,9 @@ type QNTXServer struct {
 	pluginManager       *grpcplugin.PluginManager   // Plugin process manager
 	services            plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+	// The calls plugins are answering: the token handed for each, and the store
+	// of the caller it was handed for (plugin_sigils.go).
+	callStores sync.Map
 
 	// Plugin HTTP routing (lazy initialization for async plugin loading)
 	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux

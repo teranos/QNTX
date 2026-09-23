@@ -50,6 +50,15 @@ func routeTool(route reach.Route) bool {
 	return !route.Socket && !route.Gates && route.Path != "/mcp" && route.Path != "/mcp/"
 }
 
+// namespaced is a path that says or moves where its caller acts. To a
+// connector the namespace does not exist (ADR-038), so none is offered to one.
+func namespaced(admitted auth.Admission, path string) bool {
+	if admitted.ClientDID == "" {
+		return false
+	}
+	return path == "/i/" || path == "/i/standing" || strings.HasPrefix(path, "/api/namespaces")
+}
+
 // toolName is the route in the characters a tool name allows, after the
 // surface it is called over: /api/attestations is http_api_attestations.
 func toolName(path string) string {
@@ -131,6 +140,9 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			if reaching, anyone := s.reachingOver(reach.OverMCP, held); !offeredTo(admitted, known, reaching, anyone) {
 				continue
 			}
+			if namespaced(admitted, sigil.GetHttp().GetPath()) {
+				continue
+			}
 			server.AddTool(&mcp.Tool{
 				Name:        toolNameOf(held.signum, held.sigil),
 				Description: sigil.GetDoes(),
@@ -163,6 +175,9 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 		}
 		// The same cut for a route's tool: who reaches its path.
 		if reaching, anyone := s.served.Reaching(route.Path); !offeredTo(admitted, known, reaching, anyone) {
+			continue
+		}
+		if namespaced(admitted, route.Path) {
 			continue
 		}
 		path := route.Path
@@ -205,6 +220,10 @@ func callThrough(ctx context.Context, served http.Handler, asked *http.Request, 
 		path = in.Path
 	}
 	if !answersOn(op, path) {
+		return refused("%s is not a path %s %s answers", path, op.Method, op.Path)
+	}
+	// A route naming a segment answers any path, so the one asked is checked too.
+	if admitted, _ := auth.AdmissionFrom(asked.Context()); namespaced(admitted, path) {
 		return refused("%s is not a path %s %s answers", path, op.Method, op.Path)
 	}
 

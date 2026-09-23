@@ -2,11 +2,14 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
@@ -33,7 +36,41 @@ const (
 	HeaderAsker = "X-Qntx-Asker"
 	// HeaderAskerDID is the token's own did:key, when a token made the request.
 	HeaderAskerDID = "X-Qntx-Asker-Did"
+	// HeaderStoreToken is what the plugin presents to the ATS store for this one
+	// call, and it reaches the store of the namespace the caller acts in.
+	HeaderStoreToken = "X-Qntx-Store-Token"
 )
+
+// openCall is a token for one call a plugin answers, reaching the store of the
+// namespace its caller acts in, and what closes it once the plugin has answered.
+func (s *QNTXServer) openCall(ctx context.Context) (string, func(), *protocol.Refusal, error) {
+	admitted, gated := auth.AdmissionFrom(ctx)
+	universe, err := s.universeFor(admitted, gated)
+	if err != nil {
+		return "", nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: err.Error()}, nil
+	}
+	store := universe.Store()
+	if store == nil {
+		return "", nil, nil, errors.New("the caller's namespace holds no store")
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", nil, nil, errors.Wrap(err, "no token could be drawn for the call")
+	}
+	token := hex.EncodeToString(raw)
+	s.callStores.Store(token, store)
+	return token, func() { s.callStores.Delete(token) }, nil, nil
+}
+
+// storeOfCall is the store an open call's token reaches.
+func (s *QNTXServer) storeOfCall(token string) (ats.AttestationStore, bool) {
+	held, open := s.callStores.Load(token)
+	if !open {
+		return nil, false
+	}
+	store, ok := held.(ats.AttestationStore)
+	return store, ok
+}
 
 // pluginSigna is the signa every ready plugin handed the node. A plugin's
 // signum is named after the plugin and binds only paths under /api/{plugin}/,
@@ -187,7 +224,16 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil) sigil.Ans
 			return failed(errors.Newf("%s cannot be asked a sigil", plugin))
 		}
 
-		req, err := forwarded(plugin, held, sent, ctx)
+		token, done, notYours, err := s.openCall(ctx)
+		if notYours != nil {
+			return nil, notYours
+		}
+		if err != nil {
+			return failed(err)
+		}
+		defer done()
+
+		req, err := forwarded(plugin, held, sent, ctx, token)
 		if err != nil {
 			return failed(err)
 		}
@@ -211,7 +257,7 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil) sigil.Ans
 }
 
 // forwarded is the request a plugin is handed for one asking.
-func forwarded(plugin string, held *protocol.Sigil, sent sigil.Sent, ctx context.Context) (*protocol.HTTPRequest, error) {
+func forwarded(plugin string, held *protocol.Sigil, sent sigil.Sent, ctx context.Context, storeToken string) (*protocol.HTTPRequest, error) {
 	method := held.GetHttp().GetMethod()
 	req := &protocol.HTTPRequest{
 		Method: method,
@@ -241,6 +287,7 @@ func forwarded(plugin string, held *protocol.Sigil, sent sigil.Sent, ctx context
 			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerDID, Values: []string{admitted.Grant.DID}})
 		}
 	}
+	req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderStoreToken, Values: []string{storeToken}})
 	return req, nil
 }
 
