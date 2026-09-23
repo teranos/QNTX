@@ -25,6 +25,9 @@ interface TokenInfo {
     level?: string;
     namespaces?: string[];
     return_address?: string;
+    /** The client a token was issued through. Such a token is listed in its
+     *  client's element, not here. */
+    client_did?: string;
     created_at: string;
     expires_at?: string;
     last_used_at?: string;
@@ -217,6 +220,9 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[], now = ne
 
     const tbody = document.createElement('tbody');
     for (const t of tokens) {
+        // What a client issued, an access token each hour and a refresh token
+        // beside it, is listed in the client's element.
+        if (t.client_did) continue;
         if (liveOnly && ended(t, now)) continue;
         const tr = document.createElement('tr');
 

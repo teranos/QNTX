@@ -29,6 +29,8 @@ export interface TokenInfo {
     namespaces: string[];
     /** Where a client's codes go. A client's, and only a client's. */
     return_address?: string;
+    /** The client this token was issued through, when it was. */
+    client_did?: string;
     created_at: string;
     expires_at?: string;
     last_used_at?: string;
@@ -326,6 +328,42 @@ function status(t: TokenInfo): string {
     return 'active';
 }
 
+/** What a client issued, newest first: an access token and a refresh token
+ *  per sign-in and per refresh. */
+export function issuedBy(client: TokenInfo, all: TokenInfo[]): TokenInfo[] {
+    return all
+        .filter(t => t.id !== client.id && !!t.client_did && t.client_did === client.did)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+function stateOf(t: TokenInfo, now: Date): string {
+    if (t.revoked_at) return 'revoked';
+    if (t.expires_at && new Date(t.expires_at) < now) return 'expired';
+    return 'active';
+}
+
+/** The issued list, one line each: kind, day and state, the time on the hover,
+ *  and a press opens the one line's token. */
+export function renderIssued(container: HTMLElement, issued: TokenInfo[], now: Date): void {
+    container.innerHTML = '';
+    const caption = document.createElement('span');
+    caption.style.color = 'var(--text-on-dark-tertiary)';
+    const live = issued.filter(t => stateOf(t, now) === 'active').length;
+    caption.textContent = issued.length === 0 ? 'Issued nothing yet' : `Issued ${issued.length}, ${live} live`;
+    container.appendChild(caption);
+
+    for (const t of issued) {
+        const line = document.createElement('div');
+        line.className = 'token-issued-line';
+        line.style.cursor = 'pointer';
+        line.style.whiteSpace = 'nowrap';
+        line.textContent = `${t.level || '—'} ${fmt(t.created_at).slice(0, 10)} ${stateOf(t, now)}`;
+        line.title = `created ${fmt(t.created_at)}`;
+        line.addEventListener('click', () => { openTokenElement(t.id, `${t.label} ${t.level ?? ''}`.trim()); });
+        container.appendChild(line);
+    }
+}
+
 /** Exported for tests: what the element draws for one token, given the token. */
 export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string): void {
     container.innerHTML = '';
@@ -386,6 +424,23 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     }
 
     container.appendChild(actions);
+
+    // "can't we move all the refresh tokens into a compact list in the element
+    // of the token it belongs to?"
+    if (t.level === 'OAUTH') {
+        const issued = document.createElement('div');
+        issued.style.display = 'flex';
+        issued.style.flexDirection = 'column';
+        issued.style.gap = '2px';
+        issued.innerHTML = '<div class="element-loading">Reading what it issued…</div>';
+        container.appendChild(issued);
+        apiJson<TokenInfo[]>('/auth/tokens')
+            .then(all => { renderIssued(issued, issuedBy(t, all), new Date()); })
+            .catch((err: unknown) => {
+                issued.innerHTML = '';
+                issued.appendChild(errorBox(err instanceof Error ? err.message : String(err)));
+            });
+    }
 
     const wrote = document.createElement('div');
     wrote.style.display = 'flex';

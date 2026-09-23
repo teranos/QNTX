@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { linesFor, namespacesField, rolesText, saidLine, type TokenInfo } from './token-element';
+import { issuedBy, linesFor, namespacesField, renderIssued, rolesText, saidLine, type TokenInfo } from './token-element';
 
 function token(): TokenInfo {
     return {
@@ -61,6 +61,42 @@ test('only a live client is offered a move', () => {
     ]) {
         expect(namespacesField(document.createElement('div'), t).querySelector('select')).toBeNull();
     }
+});
+
+// "can't we move all the refresh tokens into a compact list in the element of the token it belongs to?"
+test('a client lists what it issued, newest first, and nothing it did not', () => {
+    const client = { ...token(), level: 'OAUTH', did: 'did:key:zClient' };
+    const issued = issuedBy(client, [
+        client,
+        { ...token(), id: 'R1', level: 'REFRESH', client_did: 'did:key:zClient', created_at: '2026-09-20T10:00:00Z' },
+        { ...token(), id: 'A2', level: 'ROOT', client_did: 'did:key:zClient', created_at: '2026-09-22T10:00:00Z' },
+        { ...token(), id: 'X', level: 'REFRESH', client_did: 'did:key:zOther', created_at: '2026-09-23T10:00:00Z' },
+    ]);
+    expect(issued.map(t => t.id)).toEqual(['A2', 'R1']);
+});
+
+test('the issued list is one line each: kind, day and state, the time on the hover', () => {
+    const now = new Date('2026-09-23T12:00:00Z');
+    const container = document.createElement('div');
+    renderIssued(container, [
+        { ...token(), id: 'A2', level: 'ROOT', created_at: '2026-09-23T11:00:00Z', expires_at: '2026-09-23T12:30:00Z' },
+        { ...token(), id: 'R1', level: 'REFRESH', created_at: '2026-09-20T10:00:00Z', revoked_at: '2026-09-20T11:00:00Z' },
+        { ...token(), id: 'A1', level: 'ROOT', created_at: '2026-09-20T10:00:00Z', expires_at: '2026-09-20T11:00:00Z' },
+    ], now);
+    const lines = [...container.querySelectorAll<HTMLElement>('.token-issued-line')];
+    expect(lines.map(l => l.textContent)).toEqual([
+        'ROOT 2026-09-23 active',
+        'REFRESH 2026-09-20 revoked',
+        'ROOT 2026-09-20 expired',
+    ]);
+    expect(lines[0].title).toBe('created 2026-09-23 11:00:00');
+    expect(container.textContent).toContain('Issued 3, 1 live');
+});
+
+test('a client that issued nothing says so', () => {
+    const container = document.createElement('div');
+    renderIssued(container, [], new Date());
+    expect(container.textContent).toBe('Issued nothing yet');
 });
 
 test('the roles read per namespace, and a dash for none', () => {

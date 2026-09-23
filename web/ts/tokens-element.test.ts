@@ -166,6 +166,19 @@ describe('what a row says', () => {
     });
 });
 
+// "can't we move all the refresh tokens into a compact list in the element of the token it belongs to?"
+test('a token a client issued is listed under its client, not here', () => {
+    const container = document.createElement('div');
+    renderList(container, [
+        token({ id: 'AT_1', label: 'claude.ai-default', level: 'OAUTH', did: 'did:key:zClient' }),
+        token({ id: 'AT_2', label: 'claude.ai-default', level: 'REFRESH', client_did: 'did:key:zClient' }),
+        token({ id: 'AT_3', label: 'claude.ai-default', level: 'ROOT', client_did: 'did:key:zClient' }),
+        token({ id: 'AT_4', label: 'cron', level: 'ATTESTOR' }),
+    ], NOW);
+    const kinds = [...container.querySelectorAll('tbody tr')].map(tr => tr.children[1].textContent);
+    expect(kinds).toEqual(['OAUTH', 'ATTESTOR']);
+});
+
 // "I wish the status col would give me a way to filter out everything revoked and expired."
 test('the switch in the Status header hides what no longer works, and shows it again', () => {
     const container = document.createElement('div');
