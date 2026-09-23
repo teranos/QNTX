@@ -23,11 +23,17 @@ type scriptedGitHub struct {
 	tokens  []string
 }
 
+const wholeSha = "abc123def4567890abc123def4567890abc123de"
+
 func (g *scriptedGitHub) get(_ context.Context, token, url string) ([]byte, error) {
 	g.asked = append(g.asked, url)
 	g.tokens = append(g.tokens, token)
 	if strings.Contains(url, "branch=") {
 		return []byte(g.history), nil
+	}
+	// The commits endpoint answers a prefix with the whole sha.
+	if strings.Contains(url, "/commits/abc123") {
+		return []byte(`{"sha":"` + wholeSha + `"}`), nil
 	}
 	if len(g.commits) == 0 {
 		return []byte(`{"workflow_runs":[]}`), nil
@@ -132,7 +138,7 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 	if n.UntilMs <= time.Now().UnixMilli() {
 		t.Errorf("news left already expired: until=%d", n.UntilMs)
 	}
-	if len(gh.asked) != 3 {
+	if len(gh.asked) != 4 {
 		t.Errorf("github was asked %d times: %v", len(gh.asked), gh.asked)
 	}
 	for _, tok := range gh.tokens {
@@ -140,8 +146,14 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 			t.Fatalf("an ask went without the token: %v", gh.tokens)
 		}
 	}
-	if !strings.Contains(gh.asked[1], "/repos/teranos/ground/actions/runs?head_sha=abc123") {
-		t.Errorf("the commit's runs were asked for as %q", gh.asked[1])
+	// ground's row names the commit as git's push line printed it, short.
+	// The runs endpoint filters on the whole sha and a short one matches no
+	// run at all, so the commit is resolved first and asked for whole.
+	if !strings.Contains(gh.asked[1], "/repos/teranos/ground/commits/abc123") {
+		t.Errorf("the short sha was not resolved first: %q", gh.asked[1])
+	}
+	if !strings.Contains(gh.asked[2], "/repos/teranos/ground/actions/runs?head_sha="+wholeSha) {
+		t.Errorf("the commit's runs were asked for as %q; wanted the whole sha", gh.asked[2])
 	}
 }
 

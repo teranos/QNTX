@@ -230,9 +230,17 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 
 	p50, p90 := h.percentiles(ctx, token, repo, branch)
 
+	// ground's row carries the sha as git's push line printed it, short. The
+	// runs endpoint filters on the whole sha and a short one matches nothing:
+	// "watching main 162d82f 0 runs", on every push, until the ceiling.
+	fullSha, err := h.fullSha(ctx, token, repo, sha)
+	if err != nil {
+		return err
+	}
+
 	deadline := time.Now().Add(ciWatchCeiling)
 	for {
-		runs, err := h.runsFor(ctx, token, repo, sha)
+		runs, err := h.runsFor(ctx, token, repo, fullSha)
 		var spent rateLimited
 		if errors.As(err, &spent) {
 			// The quota is the person's, and it comes back. A push is not
@@ -326,6 +334,25 @@ func percentilesOf(runs []ciRun) (int64, int64) {
 	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
 	n := len(durations)
 	return durations[n*5/10], durations[n*9/10]
+}
+
+// fullSha is the whole sha of a commit named by a prefix, from the commits
+// endpoint, which takes either. A whole sha is handed back as it is.
+func (h *ciWatchHandler) fullSha(ctx context.Context, token, repo, sha string) (string, error) {
+	if len(sha) >= 40 {
+		return sha, nil
+	}
+	out, err := h.get(ctx, token, githubAPI+"/repos/"+repo+"/commits/"+sha)
+	if err != nil {
+		return "", errors.Wrapf(err, "ci.watch: resolving %s on %s to a whole sha", sha, repo)
+	}
+	var commit struct {
+		SHA string `json:"sha"`
+	}
+	if err := json.Unmarshal(out, &commit); err != nil || commit.SHA == "" {
+		return "", errors.Newf("ci.watch: github answered for %s on %s with no sha: %q", sha, repo, firstN(string(out), 200))
+	}
+	return commit.SHA, nil
 }
 
 // A push starts one run per workflow file. Thirty covers a dozen workflows.
