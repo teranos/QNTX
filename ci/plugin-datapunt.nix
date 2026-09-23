@@ -10,6 +10,10 @@
 let
   version = "\${{ steps.version.outputs.version }}";
   artifact = "\${{ steps.package.outputs.artifact }}";
+
+  # A self-hosted runner's PATH has no gh; the core's flake.lock pins a
+  # nixpkgs that has one.
+  gh = ''gh() { nix shell --inputs-from "$GITHUB_WORKSPACE/core" nixpkgs#gh -c gh "$@"; }'';
 in
 {
   name = "plugin-datapunt";
@@ -89,7 +93,7 @@ in
         '';
       }
 
-      # Nix brings cue to wind, from the core's pin.
+      # Nix brings cue to wind, and gh to the release, from the core's pin.
       { uses = "cachix/install-nix-action@v31.11.1"; }
 
       {
@@ -120,6 +124,7 @@ in
         env.GH_REPO = "\${{ github.repository }}";
         working-directory = "core";
         run = ''
+          ${gh}
           VERSION=$(./bin/qntx-datapunt-plugin --version | cut -d' ' -f2)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           TAGS=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')
@@ -179,6 +184,7 @@ in
         env.GH_REPO = "\${{ github.repository }}";
         working-directory = "core";
         run = ''
+          ${gh}
           TAG="datapunt-v${version}"
           gh release create "$TAG" \
             "${artifact}" \

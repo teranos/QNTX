@@ -57,7 +57,7 @@
           },
           "id": "version",
           "name": "Resolve version",
-          "run": "VERSION=$(./bin/qntx-datapunt-plugin --version | cut -d' ' -f2)\necho \"version=$VERSION\" >> \"$GITHUB_OUTPUT\"\nTAGS=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')\nFRESH=yes\nfor TAG in $TAGS; do\n  if [ \"$TAG\" = \"datapunt-v$VERSION\" ]; then FRESH=no; fi\ndone\nif [ \"$FRESH\" = no ]; then\n  echo \"datapunt-v$VERSION is already released — change a schema or bump PLUGIN_VERSION in the core to ship again\" >&2\nfi\necho \"fresh=$FRESH\" >> \"$GITHUB_OUTPUT\"\n",
+          "run": "gh() { nix shell --inputs-from \"$GITHUB_WORKSPACE/core\" nixpkgs#gh -c gh \"$@\"; }\nVERSION=$(./bin/qntx-datapunt-plugin --version | cut -d' ' -f2)\necho \"version=$VERSION\" >> \"$GITHUB_OUTPUT\"\nTAGS=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')\nFRESH=yes\nfor TAG in $TAGS; do\n  if [ \"$TAG\" = \"datapunt-v$VERSION\" ]; then FRESH=no; fi\ndone\nif [ \"$FRESH\" = no ]; then\n  echo \"datapunt-v$VERSION is already released — change a schema or bump PLUGIN_VERSION in the core to ship again\" >&2\nfi\necho \"fresh=$FRESH\" >> \"$GITHUB_OUTPUT\"\n",
           "working-directory": "core"
         },
         {
@@ -87,7 +87,7 @@
           },
           "if": "steps.version.outputs.fresh == 'yes'",
           "name": "Publish release",
-          "run": "TAG=\"datapunt-v${{ steps.version.outputs.version }}\"\ngh release create \"$TAG\" \\\n  \"${{ steps.package.outputs.artifact }}\" \\\n  \"${{ steps.package.outputs.artifact }}.sha256\" \\\n  --target \"$GITHUB_SHA\" --title \"$TAG\" \\\n  --notes \"teranos/datapunt at ${{ inputs.core_ref }}, with ${{ inputs.schemas }}\"\n",
+          "run": "gh() { nix shell --inputs-from \"$GITHUB_WORKSPACE/core\" nixpkgs#gh -c gh \"$@\"; }\nTAG=\"datapunt-v${{ steps.version.outputs.version }}\"\ngh release create \"$TAG\" \\\n  \"${{ steps.package.outputs.artifact }}\" \\\n  \"${{ steps.package.outputs.artifact }}.sha256\" \\\n  --target \"$GITHUB_SHA\" --title \"$TAG\" \\\n  --notes \"teranos/datapunt at ${{ inputs.core_ref }}, with ${{ inputs.schemas }}\"\n",
           "working-directory": "core"
         }
       ],
