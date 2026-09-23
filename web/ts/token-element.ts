@@ -85,10 +85,6 @@ async function enableToken(id: string): Promise<void> {
     });
 }
 
-/** Moves a client, and every connector through it at its next refresh. */
-async function moveClient(id: string, namespace: string): Promise<void> {
-    await apiJson(`/auth/tokens/${encodeURIComponent(id)}/namespace`, jsonBody('POST', { namespace }));
-}
 
 /** What this token wrote. A token is its own actor (TOKATTEST). */
 async function whatItWrote(did: string): Promise<Attestation[]> {
@@ -271,55 +267,194 @@ function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
     return wrap;
 }
 
-function option(value: string, text: string, chosen = false): HTMLOptionElement {
-    const made = document.createElement('option');
-    made.value = value;
-    made.textContent = text;
-    made.selected = chosen;
-    return made;
+/** Makes the client active in a namespace; every connector follows at its next refresh. */
+async function makeActive(id: string, namespace: string): Promise<void> {
+    await apiJson(`/auth/tokens/${encodeURIComponent(id)}/namespace`, jsonBody('POST', { namespace }));
 }
 
-/** Where a client's connectors act, and for a live client a pick that moves it.
- *  "I wish i could as ROOT, change the namespace where an OAUTH token is active in." */
+/** Puts the client into a namespace without making it active there. */
+async function putIn(id: string, namespace: string): Promise<void> {
+    await apiJson(`/auth/tokens/${encodeURIComponent(id)}/namespaces`, jsonBody('POST', { namespace }));
+}
+
+/** Takes the client out of a namespace it is not active in. */
+async function takeOut(id: string, namespace: string): Promise<void> {
+    await apiJson(
+        `/auth/tokens/${encodeURIComponent(id)}/namespaces/${encodeURIComponent(namespace)}`,
+        { method: 'DELETE' },
+    );
+}
+
+function chipStyle(chip: HTMLElement): void {
+    chip.style.display = 'inline-flex';
+    chip.style.alignItems = 'center';
+    chip.style.gap = '4px';
+    chip.style.padding = '1px 6px';
+    chip.style.border = '1px solid var(--border-on-dark)';
+    chip.style.borderRadius = 'var(--border-radius)';
+    chip.style.fontSize = '11px';
+    chip.style.lineHeight = '1.4';
+    chip.style.background = 'transparent';
+    chip.style.color = 'var(--text-on-dark)';
+    chip.style.font = 'inherit';
+    chip.style.fontSize = '11px';
+}
+
+/** The first press arms a removal and the chip's colours invert; the second
+ *  takes the client out. Either X, hover or right-click, arms the same chip. */
+function removing(chip: HTMLElement, remove: () => Promise<void>): () => void {
+    return () => {
+        if (!chip.classList.contains('token-ns-armed')) {
+            chip.classList.add('token-ns-armed');
+            chip.style.background = 'var(--text-on-dark)';
+            chip.style.color = 'var(--bg-dark, #1e1e1e)';
+            return;
+        }
+        void remove();
+    };
+}
+
+function removeButton(onPress: () => void, className: string): HTMLButtonElement {
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = className;
+    x.textContent = '×';
+    x.title = 'press once to arm, again to take it out of this namespace';
+    x.style.cursor = 'pointer';
+    x.style.background = 'none';
+    x.style.border = 'none';
+    x.style.color = 'var(--color-error)';
+    x.style.font = 'inherit';
+    x.style.padding = '0 2px';
+    x.addEventListener('click', (e) => { e.stopPropagation(); onPress(); });
+    return x;
+}
+
+/** Namespaces: [Clean] [default] [+] — one line. The active one is marked.
+ *  For a live client, a press on another makes it active, [+] puts the client
+ *  into one more, and hover or right-click offers an X that takes it out.
+ *  "A TOKEN CAN ONLY BE ACTIVE IN ONE NAMESPACE AT A TIME" */
 export function namespacesField(container: HTMLElement, t: TokenInfo): HTMLElement {
-    const shown = t.namespaces?.length ? t.namespaces.join(', ') : '—';
-    if (t.level !== 'OAUTH' || t.revoked_at) return field('Namespaces', shown);
+    const row = document.createElement('div');
+    row.className = 'token-namespaces';
+    row.style.display = 'flex';
+    row.style.flexWrap = 'wrap';
+    row.style.alignItems = 'center';
+    row.style.gap = '4px';
 
-    const wrap = field('Namespaces', shown);
-    const pick = document.createElement('select');
-    pick.className = 'input';
-    pick.title = 'move this client, and every connector through it at its next refresh';
-    pick.appendChild(option('', 'reading namespaces…'));
-    pick.disabled = true;
-    wrap.appendChild(pick);
+    const caption = document.createElement('span');
+    caption.style.color = 'var(--text-on-dark-tertiary)';
+    caption.style.fontSize = '11px';
+    caption.textContent = 'Namespaces:';
+    row.appendChild(caption);
 
-    const current = t.namespaces?.[0] ?? '';
-    apiJson<{ namespaces: Namespace[] }>('/api/namespaces')
-        .then(listed => {
-            pick.innerHTML = '';
-            for (const ns of ordered(listed.namespaces || [])) {
-                pick.appendChild(option(ns.name, ns.name, ns.name === current));
-            }
-            pick.disabled = false;
-        })
-        .catch((err: unknown) => {
-            pick.innerHTML = '';
-            pick.appendChild(option('', err instanceof Error ? err.message : String(err)));
-        });
+    const held = t.namespaces || [];
+    const editable = t.level === 'OAUTH' && !t.revoked_at;
+    const failed = (err: unknown) => {
+        row.parentElement?.querySelector('.element-error')?.remove();
+        row.after(errorBox(err instanceof Error ? err.message : String(err)));
+    };
 
-    pick.addEventListener('change', () => {
-        const to = pick.value;
-        if (to === '' || to === current) return;
-        pick.disabled = true;
-        moveClient(t.id, to)
-            .then(() => redraw(container, t.id))
-            .catch((err: unknown) => {
-                pick.disabled = false;
-                wrap.querySelector('.element-error')?.remove();
-                wrap.appendChild(errorBox(err instanceof Error ? err.message : String(err)));
+    if (held.length === 0) {
+        const none = document.createElement('span');
+        none.textContent = '—';
+        row.appendChild(none);
+    }
+
+    held.forEach((namespace, at) => {
+        const active = at === 0;
+        const chip = document.createElement('span');
+        chip.className = active ? 'token-ns-chip token-ns-active' : 'token-ns-chip';
+        chip.textContent = namespace;
+        chipStyle(chip);
+        if (active) {
+            chip.style.borderColor = 'var(--color-success, #22c55e)';
+            chip.style.color = 'var(--color-success, #22c55e)';
+            chip.title = editable ? 'active: every connector through this client acts here' : 'active';
+        }
+        row.appendChild(chip);
+        if (!editable) return;
+
+        if (!active) {
+            chip.style.cursor = 'pointer';
+            chip.title = 'press to make it active here';
+            chip.addEventListener('click', () => {
+                makeActive(t.id, namespace).then(() => redraw(container, t.id)).catch(failed);
             });
+
+            const press = removing(chip, () => takeOut(t.id, namespace).then(() => redraw(container, t.id)).catch(failed));
+
+            // Hover: a tip under the chip carrying the X.
+            const tip = document.createElement('span');
+            tip.className = 'token-ns-tip';
+            tip.style.position = 'absolute';
+            tip.style.display = 'none';
+            tip.style.padding = '2px 4px';
+            tip.style.background = 'var(--bg-dark-light)';
+            tip.style.border = '1px solid var(--border-on-dark)';
+            tip.style.borderRadius = 'var(--border-radius)';
+            tip.style.zIndex = '10';
+            tip.appendChild(removeButton(press, 'token-ns-x'));
+            chip.style.position = 'relative';
+            chip.appendChild(tip);
+            tip.style.top = '100%';
+            tip.style.left = '0';
+            let hide: ReturnType<typeof setTimeout> | undefined;
+            chip.addEventListener('mouseenter', () => { clearTimeout(hide); tip.style.display = 'inline-flex'; });
+            chip.addEventListener('mouseleave', () => { hide = setTimeout(() => { tip.style.display = 'none'; }, 400); });
+
+            // Right-click: an X beside the chip.
+            chip.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (chip.nextElementSibling?.classList.contains('token-ns-side-x')) return;
+                chip.after(removeButton(press, 'token-ns-side-x'));
+            });
+        }
     });
-    return wrap;
+
+    if (editable) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'token-ns-add';
+        add.textContent = '+';
+        add.title = 'put this client into another namespace';
+        chipStyle(add);
+        add.style.cursor = 'pointer';
+        add.addEventListener('click', () => {
+            const open = row.querySelector('.token-ns-offer');
+            if (open) { open.remove(); return; }
+            const offer = document.createElement('span');
+            offer.className = 'token-ns-offer';
+            offer.style.display = 'inline-flex';
+            offer.style.flexWrap = 'wrap';
+            offer.style.gap = '4px';
+            row.appendChild(offer);
+            apiJson<{ namespaces: Namespace[] }>('/api/namespaces')
+                .then(listed => {
+                    const offered = ordered(listed.namespaces || []).filter(ns => !held.includes(ns.name));
+                    if (offered.length === 0) {
+                        offer.textContent = 'in every namespace already';
+                        return;
+                    }
+                    for (const ns of offered) {
+                        const pick = document.createElement('span');
+                        pick.className = 'token-ns-pick';
+                        pick.textContent = ns.name;
+                        chipStyle(pick);
+                        pick.style.cursor = 'pointer';
+                        pick.style.borderStyle = 'dashed';
+                        pick.title = `put this client into ${ns.name}`;
+                        pick.addEventListener('click', () => {
+                            putIn(t.id, ns.name).then(() => redraw(container, t.id)).catch(failed);
+                        });
+                        offer.appendChild(pick);
+                    }
+                })
+                .catch(failed);
+        });
+        row.appendChild(add);
+    }
+    return row;
 }
 
 function status(t: TokenInfo): string {
@@ -346,6 +481,10 @@ function stateOf(t: TokenInfo, now: Date): string {
  *  and a press opens the one line's token. */
 export function renderIssued(container: HTMLElement, issued: TokenInfo[], now: Date): void {
     container.innerHTML = '';
+    // Smaller than the list it stands in for, not larger.
+    container.style.fontSize = '11px';
+    container.style.lineHeight = '1.4';
+    container.style.gap = '0';
     const caption = document.createElement('span');
     caption.style.color = 'var(--text-on-dark-tertiary)';
     const live = issued.filter(t => stateOf(t, now) === 'active').length;
@@ -359,6 +498,7 @@ export function renderIssued(container: HTMLElement, issued: TokenInfo[], now: D
         line.style.whiteSpace = 'nowrap';
         line.textContent = `${t.level || '—'} ${fmt(t.created_at).slice(0, 10)} ${stateOf(t, now)}`;
         line.title = `created ${fmt(t.created_at)}`;
+        if (stateOf(t, now) !== 'active') line.style.color = 'var(--text-on-dark-tertiary)';
         line.addEventListener('click', () => { openTokenElement(t.id, `${t.label} ${t.level ?? ''}`.trim()); });
         container.appendChild(line);
     }

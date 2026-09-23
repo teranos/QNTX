@@ -117,6 +117,103 @@ func TestOnlyRootMovesAClient(t *testing.T) {
 	assert.Equal(t, NamespaceDefault, client.Namespace)
 }
 
+// "A TOKEN CAN BE PUT INTO SOME NAMESPACE / A TOKEN CAN BE TAKEN OUT OF IT /
+// ROOT CAN DO THIS / A TOKEN CAN ONLY BE ACTIVE IN ONE NAMESPACE AT A TIME"
+func placeRequest(method, id, namespace, session string) *http.Request {
+	var req *http.Request
+	if method == http.MethodPost {
+		req = httptest.NewRequest(method, "/auth/tokens/"+id+"/namespaces", strings.NewReader(`{"namespace":"`+namespace+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		req = httptest.NewRequest(method, "/auth/tokens/"+id+"/namespaces/"+namespace, nil)
+	}
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+	return req
+}
+
+func namespacesOfClient(t *testing.T, store *memTokenStore, id string) []string {
+	t.Helper()
+	listed, err := store.List()
+	require.NoError(t, err)
+	for _, info := range listed {
+		if info.ID == id {
+			return info.Namespaces
+		}
+	}
+	t.Fatal("no such token")
+	return nil
+}
+
+func TestAClientIsPutIntoANamespaceWithoutBeingMovedThere(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	session, err := h.sessions.create(mastodonAccount, User{})
+	require.NoError(t, err)
+	id := clientID(t, store, did)
+
+	rec := httptest.NewRecorder()
+	byID(h, rec, placeRequest(http.MethodPost, id, "pond", session))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	assert.Equal(t, []string{NamespaceDefault, "pond"}, namespacesOfClient(t, store, id))
+	client, ok := h.clientByDID(did)
+	require.True(t, ok)
+	assert.Equal(t, NamespaceDefault, client.Namespace, "putting it in pond made it active there")
+}
+
+func TestMakingANamespaceActiveKeepsTheOthers(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	session, err := h.sessions.create(mastodonAccount, User{})
+	require.NoError(t, err)
+	id := clientID(t, store, did)
+	put := httptest.NewRecorder()
+	byID(h, put, placeRequest(http.MethodPost, id, "pond", session))
+	require.Equal(t, http.StatusOK, put.Code, put.Body.String())
+
+	rec := httptest.NewRecorder()
+	byID(h, rec, moveRequest(id, `{"namespace":"pond"}`, session))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	assert.Equal(t, []string{"pond", NamespaceDefault}, namespacesOfClient(t, store, id))
+	client, ok := h.clientByDID(did)
+	require.True(t, ok)
+	assert.Equal(t, "pond", client.Namespace)
+}
+
+func TestAClientIsTakenOutOfANamespaceItIsNotActiveIn(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	session, err := h.sessions.create(mastodonAccount, User{})
+	require.NoError(t, err)
+	id := clientID(t, store, did)
+	put := httptest.NewRecorder()
+	byID(h, put, placeRequest(http.MethodPost, id, "pond", session))
+	require.Equal(t, http.StatusOK, put.Code, put.Body.String())
+
+	rec := httptest.NewRecorder()
+	byID(h, rec, placeRequest(http.MethodDelete, id, "pond", session))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	assert.Equal(t, []string{NamespaceDefault}, namespacesOfClient(t, store, id))
+}
+
+// No fallback: a token taken out of where it is active would be active
+// nowhere, so the namespace it is active in stays until another is.
+func TestTheNamespaceAClientIsActiveInIsNotTakenAway(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	session, err := h.sessions.create(mastodonAccount, User{})
+	require.NoError(t, err)
+	id := clientID(t, store, did)
+
+	rec := httptest.NewRecorder()
+	byID(h, rec, placeRequest(http.MethodDelete, id, NamespaceDefault, session))
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Equal(t, []string{NamespaceDefault}, namespacesOfClient(t, store, id))
+}
+
 func TestAClientIsMovedToOneNamespace(t *testing.T) {
 	h, store, did := authorizingHandler(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)

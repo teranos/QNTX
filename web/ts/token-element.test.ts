@@ -43,23 +43,63 @@ test('an attestation reads as X is Y of Z, a DID by its last eight', () => {
     expect(saidLine({ subjects: ['visit-1'], predicates: ['visit:done'], contexts: [] })).toBe('visit-1 is visit:done');
 });
 
-// "I wish i could as ROOT, change the namespace where an OAUTH token is active in."
-test('a live client is offered a pick of the namespace it moves to', () => {
-    const client = { ...token(), level: 'OAUTH', namespaces: ['default'] };
-    const shown = namespacesField(document.createElement('div'), client);
-    expect(shown.querySelector('select')).not.toBeNull();
-    expect(shown.textContent).toContain('default');
+// "namespaces: [Clean] [Default] [+]"
+function chips(t: TokenInfo): HTMLElement {
+    const container = document.createElement('div');
+    const row = namespacesField(container, t);
+    container.appendChild(row);
+    return row;
+}
+
+test('the namespaces are one line of chips, the active one marked, and a + for a live client', () => {
+    const row = chips({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+    expect(row.querySelector('select')).toBeNull();
+    const names = [...row.querySelectorAll<HTMLElement>('.token-ns-chip')].map(c => c.firstChild?.textContent);
+    expect(names).toEqual(['Clean', 'default']);
+    expect(row.querySelector('.token-ns-active')?.firstChild?.textContent).toBe('Clean');
+    expect(row.querySelector('.token-ns-add')?.textContent).toBe('+');
+    expect(row.firstChild?.textContent).toBe('Namespaces:');
 });
 
-// Every other kind names where it acts at minting and keeps it; a revoked
-// client issues nothing, so moving it moves nothing.
-test('only a live client is offered a move', () => {
+// No fallback: the namespace a client is active in is not offered for removal.
+test('the active chip offers no X, the others do', () => {
+    const row = chips({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+    const [active, other] = [...row.querySelectorAll<HTMLElement>('.token-ns-chip')];
+    expect(active.querySelector('.token-ns-x')).toBeNull();
+    expect(other.querySelector('.token-ns-x')).not.toBeNull();
+});
+
+// "hover over it, see the X button in the tooltip, press X once, its color inverts"
+test('the first press of the X inverts the chip, and does not yet take it out', () => {
+    const row = chips({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+    const other = [...row.querySelectorAll<HTMLElement>('.token-ns-chip')][1];
+    other.querySelector<HTMLButtonElement>('.token-ns-x')!.click();
+    expect(other.classList.contains('token-ns-armed')).toBe(true);
+    expect([...row.querySelectorAll('.token-ns-chip')]).toHaveLength(2);
+});
+
+// "another route is right click, see the X next to it, press it once invert"
+test('a right-click puts an X beside the chip, and its first press inverts the chip', () => {
+    const row = chips({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+    const other = [...row.querySelectorAll<HTMLElement>('.token-ns-chip')][1];
+    other.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    const side = other.nextElementSibling as HTMLButtonElement;
+    expect(side.classList.contains('token-ns-side-x')).toBe(true);
+    side.click();
+    expect(other.classList.contains('token-ns-armed')).toBe(true);
+});
+
+// Only ROOT changes where a client is, and only a live client issues anything.
+test('a token of another kind, or a revoked client, shows its namespaces and nothing to press', () => {
     for (const t of [
         { ...token(), level: 'ATTESTOR' },
         { ...token(), level: 'REFRESH' },
         { ...token(), level: 'OAUTH', revoked_at: '2026-09-15T00:00:00Z' },
     ]) {
-        expect(namespacesField(document.createElement('div'), t).querySelector('select')).toBeNull();
+        const row = chips(t);
+        expect(row.querySelector('.token-ns-add')).toBeNull();
+        expect(row.querySelector('.token-ns-x')).toBeNull();
+        expect(row.querySelector('.token-ns-chip')?.textContent).toBe('clean');
     }
 });
 

@@ -255,7 +255,37 @@ func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Pres
 		return
 	}
 	if id, ok := strings.CutSuffix(rest, "/namespace"); ok {
-		h.handleMoveClient(w, r, p, id)
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		namespace, why := namespaceFromBody(w, r)
+		if why != "" {
+			h.writeError(w, http.StatusBadRequest, why)
+			return
+		}
+		h.handleClientNamespaces(w, r, p, id, namespace, madeActive, "made active")
+		return
+	}
+	if id, ok := strings.CutSuffix(rest, "/namespaces"); ok {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		namespace, why := namespaceFromBody(w, r)
+		if why != "" {
+			h.writeError(w, http.StatusBadRequest, why)
+			return
+		}
+		h.handleClientNamespaces(w, r, p, id, namespace, putIn, "put in")
+		return
+	}
+	if id, namespace, ok := strings.Cut(rest, "/namespaces/"); ok {
+		if r.Method != http.MethodDelete {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		h.handleClientNamespaces(w, r, p, id, strings.TrimSpace(namespace), takenOut, "taken out")
 		return
 	}
 	if r.Method == http.MethodGet {
@@ -385,36 +415,80 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, p Pr
 	h.writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
 }
 
-// handleEnableToken lifts a revocation. POST /auth/tokens/{id}/enable
+// A client is in one namespace or several, and active in exactly one: the first
+// it names, which is the one the lookup, the token it issues and every refresh
+// read. ROOT puts it into a namespace, takes it out, and makes one active.
 //
-// It does not extend an expiry — a token past its expiry stays dead whatever
-// this returns.
-// handleMoveClient moves a client to another namespace.
-// POST /auth/tokens/{id}/namespace   {"namespace": "<name>"}
+// "A TOKEN CAN BE PUT INTO SOME NAMESPACE / A TOKEN CAN BE TAKEN OUT OF IT /
+// ROOT CAN DO THIS / A TOKEN CAN ONLY BE ACTIVE IN ONE NAMESPACE AT A TIME"
 //
-// "I wish i could as ROOT, change the namespace where an OAUTH token is active in."
-// A connector acts in its client's namespace, and a refresh reads the client,
-// so every connector through it follows at its next refresh.
-func (h *Handler) handleMoveClient(w http.ResponseWriter, r *http.Request, p Presented, id string) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
+//	POST   /auth/tokens/{id}/namespace          {"namespace": "<name>"}   make it active there
+//	POST   /auth/tokens/{id}/namespaces         {"namespace": "<name>"}   put it in
+//	DELETE /auth/tokens/{id}/namespaces/{name}                            take it out
+//
+// A refresh reads the client as it is, so every connector through it acts in
+// the active namespace from its next refresh.
+
+// namespaceChange is one of the three, given what the client is in now: what it
+// is in afterwards, or why not.
+type namespaceChange func(current []string, namespace string) ([]string, string)
+
+// madeActive puts the namespace first, in it already or not, keeping the rest.
+func madeActive(current []string, namespace string) ([]string, string) {
+	out := []string{namespace}
+	for _, held := range current {
+		if held != namespace {
+			out = append(out, held)
+		}
 	}
-	mover, moves := h.tokens.(NamespaceMover)
-	if !moves {
-		h.writeError(w, http.StatusServiceUnavailable, "this node's token store cannot move a token")
-		return
+	return out, ""
+}
+
+// putIn adds the namespace after the others, so the active one stays active.
+func putIn(current []string, namespace string) ([]string, string) {
+	for _, held := range current {
+		if held == namespace {
+			return current, ""
+		}
 	}
+	return append(append([]string{}, current...), namespace), ""
+}
+
+// takenOut removes a namespace the client is not active in. No fallback: taken
+// out of where it is active, it would be active nowhere.
+func takenOut(current []string, namespace string) ([]string, string) {
+	if len(current) > 0 && current[0] == namespace {
+		return nil, namespace + " is where it is active; make another namespace active first"
+	}
+	out := []string{}
+	for _, held := range current {
+		if held != namespace {
+			out = append(out, held)
+		}
+	}
+	return out, ""
+}
+
+// namespaceFromBody is the namespace a POST names.
+func namespaceFromBody(w http.ResponseWriter, r *http.Request) (string, string) {
 	var req struct {
 		Namespace string `json:"namespace"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
-		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON: "+err.Error())
+		return "", "the body did not parse as JSON: " + err.Error()
+	}
+	return strings.TrimSpace(req.Namespace), ""
+}
+
+// handleClientNamespaces answers the three routes above.
+func (h *Handler) handleClientNamespaces(w http.ResponseWriter, r *http.Request, p Presented, id, namespace string, change namespaceChange, did string) {
+	mover, moves := h.tokens.(NamespaceMover)
+	if !moves {
+		h.writeError(w, http.StatusServiceUnavailable, "this node's token store cannot change where a token is")
 		return
 	}
-	namespace := strings.TrimSpace(req.Namespace)
 	if namespace == "" {
-		h.writeError(w, http.StatusBadRequest, "a client acts in one namespace, and this named none")
+		h.writeError(w, http.StatusBadRequest, "no namespace was named")
 		return
 	}
 	by, _ := p.Admitted()
@@ -436,7 +510,7 @@ func (h *Handler) handleMoveClient(w http.ResponseWriter, r *http.Request, p Pre
 			continue
 		}
 		if info.Level != LevelOAuth {
-			h.writeError(w, http.StatusBadRequest, "only a client is moved, and "+id+" is a "+string(info.Level)+" token")
+			h.writeError(w, http.StatusBadRequest, "only a client is put into namespaces, and "+id+" is a "+string(info.Level)+" token")
 			return
 		}
 		from, found = info.Namespaces, true
@@ -445,17 +519,26 @@ func (h *Handler) handleMoveClient(w http.ResponseWriter, r *http.Request, p Pre
 		h.writeError(w, http.StatusNotFound, "the node does not list token "+id)
 		return
 	}
-	if err := mover.SetNamespaces(id, []string{namespace}); err != nil {
+	to, why := change(from, namespace)
+	if why != "" {
+		h.writeError(w, http.StatusBadRequest, why)
+		return
+	}
+	if err := mover.SetNamespaces(id, to); err != nil {
 		h.attest(PredicateUnanswered, by, map[string]any{
-			"asked": "token store", "doing": "move", "token": id, "error": err.Error(),
+			"asked": "token store", "doing": did, "token": id, "error": err.Error(),
 		})
 		h.writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
 		return
 	}
-	h.attest(PredicateMoved, by, map[string]any{"token": id, "from": from, "to": namespace})
-	h.writeJSON(w, http.StatusOK, map[string]string{"status": "moved", "id": id, "namespace": namespace})
+	h.attest(PredicateMoved, by, map[string]any{"token": id, "did": did, "namespace": namespace, "from": from, "to": to})
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": did, "id": id, "namespaces": to})
 }
 
+// handleEnableToken lifts a revocation. POST /auth/tokens/{id}/enable
+//
+// It does not extend an expiry — a token past its expiry stays dead whatever
+// this returns.
 func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, p Presented, id string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
