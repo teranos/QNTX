@@ -292,12 +292,14 @@ func (s *QNTXServer) initWatcherEngine() error {
 	s.watcherEngine.SetPluginExecutor(&watcherPluginAdapter{server: s})
 
 	// What a builtin_execute action reaches: the daemon's registry, and the
-	// same failure log a scheduled handler reports to.
+	// same failure log a scheduled handler reports to. Held on the server as
+	// well, because the standing observer of every namespace reaches it too.
 	if s.daemon != nil {
-		s.watcherEngine.SetBuiltinExecutor(&builtinExecutor{
+		s.builtin = &builtinExecutor{
 			registry:    s.daemon.Registry(),
 			noteFailure: s.noteHandlerFailure,
-		})
+		}
+		s.watcherEngine.SetBuiltinExecutor(s.builtin)
 	}
 
 	// Wire embedding service for semantic matching (optional — nil when embeddings unavailable)

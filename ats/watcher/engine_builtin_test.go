@@ -84,9 +84,11 @@ func TestEngine_ExecuteBuiltin(t *testing.T) {
 	}
 }
 
-// The node is born watching for ground's push. No stored watcher, one
-// ci-status attestation, and ci.watch is reached with it.
-func TestStandingCIPushedReachesCIWatch(t *testing.T) {
+// A standing row is every namespace's, and this engine is one namespace's.
+// The standing observer (server/standing_observer.go) runs standing built-ins
+// for whichever namespace the row landed in; the engine runs none of them, or
+// a push into the namespace it serves would reach ci.watch twice.
+func TestEngineRunsNoStandingBuiltIn(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
 	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
@@ -107,11 +109,20 @@ func TestStandingCIPushedReachesCIWatch(t *testing.T) {
 
 	exec.mu.Lock()
 	defer exec.mu.Unlock()
-	if len(exec.calls) != 1 || exec.calls[0] != watcher.CIWatchHandlerName {
-		t.Fatalf("standing row reached %v; wanted one call to %s", exec.calls, watcher.CIWatchHandlerName)
+	if len(exec.calls) != 0 {
+		t.Fatalf("the engine ran a standing built-in %v; that is the standing observer's, for every namespace", exec.calls)
 	}
-	if exec.lastAs == nil || exec.lastAs.ID != "ci-status-1" {
-		t.Fatalf("standing row handed over %+v", exec.lastAs)
+}
+
+// The match a standing row makes is the engine's own, exported for the
+// observer, so the two cannot drift.
+func TestStandingMatchesIsTheEnginesFilter(t *testing.T) {
+	row := watcher.Standing()[1]
+	if !watcher.StandingMatches(&types.As{Predicates: []string{watcher.CIPushedPredicate}}, row) {
+		t.Fatal("the standing CI row does not match a ci-status attestation")
+	}
+	if watcher.StandingMatches(&types.As{Predicates: []string{"other"}}, row) {
+		t.Fatal("the standing CI row matched something else")
 	}
 }
 

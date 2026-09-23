@@ -75,6 +75,18 @@ func Standing() []*storage.Watcher {
 	return held
 }
 
+// StandingMatches reports whether an attestation is one a standing row
+// watches, by the engine's own structural filter. A standing row is every
+// namespace's and the engine is one namespace's, so what runs a standing
+// built-in (server/standing_observer.go) asks here rather than keeping a
+// second filter that could drift from the engine's.
+func StandingMatches(as *types.As, w *storage.Watcher) bool {
+	if as == nil || w == nil || !w.Enabled {
+		return false
+	}
+	return matchesFilterStandalone(as, w)
+}
+
 // IsStanding reports whether an id belongs to the table. The routes that write
 // watchers ask this: a standing row is not a person's to edit or delete.
 func IsStanding(id string) bool {

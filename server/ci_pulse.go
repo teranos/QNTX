@@ -13,6 +13,8 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -293,7 +295,7 @@ func sessionOf(contexts []string) string {
 const ciWatchRearmWindow = 3 * time.Hour
 
 // ciStatusSince is every push attested since the moment given, oldest first.
-func ciStatusSince(store ats.AttestationStore, since time.Time) []*types.As {
+func ciStatusSince(store namespaces.Reading, since time.Time) []*types.As {
 	if store == nil {
 		return nil
 	}
@@ -342,11 +344,30 @@ func (s *QNTXServer) setupCIWatch() {
 	s.daemon.Registry().Register(h)
 	s.logger.Infow("Registered ci.watch built-in")
 
-	var store ats.AttestationStore
+	// Every namespace the node knows, not the one it serves by default: the
+	// ground token attests in its own, and a push is wherever its token acts.
+	since := time.Now().Add(-ciWatchRearmWindow)
+	var recent []*types.As
 	if s.held != nil {
-		store = s.held.Served()
+		recent = append(recent, ciStatusSince(s.held.Served(), since)...)
+		if known := s.held.Known(); known != nil {
+			listed, err := known.List()
+			if err != nil {
+				s.logger.Warnw("ci.watch could not list the namespaces to re-arm on", "error", err)
+			}
+			for _, ns := range listed {
+				if ns.Name == auth.NamespaceDefault || ns.Name == auth.NamespaceSystem {
+					continue
+				}
+				store, err := s.held.Read(ns.Name)
+				if err != nil {
+					s.logger.Warnw("ci.watch could not read a namespace to re-arm on", "namespace", ns.Name, "error", err)
+					continue
+				}
+				recent = append(recent, ciStatusSince(store, since)...)
+			}
+		}
 	}
-	recent := ciStatusSince(store, time.Now().Add(-ciWatchRearmWindow))
 	for _, as := range recent {
 		as := as
 		payload, err := json.Marshal(as)

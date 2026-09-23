@@ -55,6 +55,14 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 			continue
 		}
 
+		// A standing built-in is every namespace's and runs from the standing
+		// observer of whichever namespace the row landed in. This engine is one
+		// namespace's; running it here too would reach the built-in twice for
+		// a row in the namespace it serves.
+		if IsStanding(watcher.ID) {
+			continue
+		}
+
 		// Check rate limit for action execution
 		// Per QNTX LAW: "Zero means zero" - if MaxFiresPerSecond is 0, never execute
 		if watcher.MaxFiresPerSecond == 0 {

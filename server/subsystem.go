@@ -75,4 +75,9 @@ var namespaceSubsystems = []struct {
 	policy SubsystemPolicy
 }{
 	{sub: typeRegistrationSubsystem{}, policy: SubsystemWarn},
+	// What every namespace watches before anybody makes a watcher, registered
+	// for this one. Fatal: a namespace nothing standing watches is a namespace
+	// a push into which reaches no built-in, and that is the failure that
+	// took a day to find.
+	{sub: standingSubsystem{}, policy: SubsystemFatal},
 }
