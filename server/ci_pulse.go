@@ -3,17 +3,19 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"os/exec"
+	"io"
+	"net/http"
+	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
+	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/sacred"
+	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
@@ -31,10 +33,59 @@ import (
 // that never came. A run that long is its own failure.
 const ciWatchCeiling = 2 * time.Hour
 
-// The two gh asks, as ground made them. The first is the median and ninetieth
-// percentile of the branch's last twenty runs, in seconds, "p50 p90"; the
-// second is the run for one commit.
-const ciPercentilesJQ = `[.[] | ((.updatedAt | fromdateiso8601) - (.startedAt | fromdateiso8601))] | sort | length as $n | if $n == 0 then "0 0" else "\(.[($n*5/10|floor)]) \(.[($n*9/10|floor)])" end`
+// GitHub is asked directly. "eliminate gh dependency": the box runs no gh,
+// its service has no PATH to find one on, and the node already holds a token
+// for github.com — the one that fetches private plugin repos.
+const githubAPI = "https://api.github.com"
+
+// githubHost is the forge the plugin access token is configured for, and the
+// one CI runs are asked of.
+const githubHost = "github.com"
+
+// githubToken is the credential configured for github.com under
+// [[plugin.access_token]], resolved the way a plugin fetch resolves it. None
+// configured is no token: a public repository answers without one.
+func githubToken(ctx context.Context) (string, error) {
+	ref, err := config.PluginAccessToken(githubHost)
+	if err != nil {
+		return "", errors.Wrapf(err, "reading the access token configured for %s", githubHost)
+	}
+	if ref == "" {
+		return "", nil
+	}
+	token, err := secretref.Resolve(ctx, ref)
+	if err != nil {
+		return "", errors.Wrapf(err, "resolving the access token configured for %s", githubHost)
+	}
+	return token, nil
+}
+
+// githubGet is one GET of the API, the body whole. A status other than 200
+// is GitHub's own answer and is returned in its words.
+func githubGet(ctx context.Context, token, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "building the request for %s", url)
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "asking %s", url)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return nil, errors.Wrapf(err, "reading github's answer for %s", url)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Newf("github answered %d for %s: %s", resp.StatusCode, url, strings.TrimSpace(string(body)))
+	}
+	return body, nil
+}
 
 // pickAdaptiveSleep is ground's, ported as-is: quiet before the median,
 // looking in the likely window, urgent past the ninetieth.
@@ -51,65 +102,6 @@ func pickAdaptiveSleep(elapsed, p50, p90 int64) int64 {
 	return 2
 }
 
-// errNotOnPath stands in for exec.LookPath's answer in a test.
-var errNotOnPath = errors.New("not on PATH")
-
-// ghCandidates is where a nix box keeps gh when the service's PATH does not
-// say: the default profile the bootstrap names, root's own, then the usual
-// places. "exec: \"gh\": executable file not found in $PATH" was the first
-// thing ci.watch ever said on the row, three seconds after the first push it
-// watched.
-var ghCandidates = []string{
-	"/nix/var/nix/profiles/default/bin/gh",
-	"/run/current-system/sw/bin/gh",
-	"/root/.nix-profile/bin/gh",
-	"/usr/local/bin/gh",
-	"/usr/bin/gh",
-}
-
-// ghPathAmong is gh as PATH resolves it, else the first candidate that is
-// there, else the bare name so the failure keeps naming what was asked for.
-func ghPathAmong(lookPath func(string) (string, error), present func(string) bool) string {
-	if p, err := lookPath("gh"); err == nil && p != "" {
-		return p
-	}
-	for _, c := range ghCandidates {
-		if present(c) {
-			return c
-		}
-	}
-	return "gh"
-}
-
-// ghPath is resolved once per process. A service's PATH does not change
-// while it runs, and a shell's is not the service's.
-var ghPath = sync.OnceValue(func() string {
-	return ghPathAmong(exec.LookPath, func(p string) bool {
-		info, err := os.Stat(p)
-		return err == nil && !info.IsDir() && info.Mode()&0o111 != 0
-	})
-})
-
-// ghRun runs gh with the arguments given, argv[0] included. gh is installed on
-// the node and carries its own auth, so nothing here holds a GitHub token.
-func ghRun(ctx context.Context, args ...string) ([]byte, error) {
-	if len(args) == 0 {
-		return nil, errors.New("nothing to run")
-	}
-	if args[0] == "gh" {
-		args = append([]string{ghPath()}, args[1:]...)
-	}
-	out, err := exec.CommandContext(ctx, args[0], args[1:]...).Output()
-	if err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			return nil, errors.Wrapf(err, "%s: %s", strings.Join(args, " "), strings.TrimSpace(string(exit.Stderr)))
-		}
-		return nil, errors.Wrapf(err, "%s", strings.Join(args, " "))
-	}
-	return out, nil
-}
-
 // sleepUnder waits, or stops when the context does.
 func sleepUnder(ctx context.Context, d time.Duration) error {
 	t := time.NewTimer(d)
@@ -123,7 +115,10 @@ func sleepUnder(ctx context.Context, d time.Duration) error {
 }
 
 type ciWatchHandler struct {
-	run   func(ctx context.Context, args ...string) ([]byte, error)
+	// get is one GET of GitHub's API with the token given; token is the
+	// credential for github.com, resolved once per push.
+	get   func(ctx context.Context, token, url string) ([]byte, error)
+	token func(ctx context.Context) (string, error)
 	sleep func(ctx context.Context, d time.Duration) error
 	news  *newsLog
 	// Who the token that attested the push speaks for. The row is asked as a
@@ -136,12 +131,19 @@ type ciWatchHandler struct {
 
 func (h *ciWatchHandler) Name() string { return watcher.CIWatchHandlerName }
 
-// ciRun is the one field set gh is asked for about a run.
+// ciRun is what is read of a workflow run, in GitHub's own field names.
 type ciRun struct {
-	Status     string `json:"status"`
-	Conclusion string `json:"conclusion"`
-	Name       string `json:"name"`
-	URL        string `json:"url"`
+	Status       string    `json:"status"`
+	Conclusion   string    `json:"conclusion"`
+	Name         string    `json:"name"`
+	URL          string    `json:"html_url"`
+	RunStartedAt time.Time `json:"run_started_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// ciRuns is the shape GitHub lists runs in.
+type ciRuns struct {
+	WorkflowRuns []ciRun `json:"workflow_runs"`
 }
 
 func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
@@ -166,11 +168,16 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 		pushedAt = time.Now()
 	}
 
-	p50, p90 := h.percentiles(ctx, repo, branch)
+	token, err := h.token(ctx)
+	if err != nil {
+		return errors.Wrap(err, "ci.watch")
+	}
+
+	p50, p90 := h.percentiles(ctx, token, repo, branch)
 
 	deadline := time.Now().Add(ciWatchCeiling)
 	for {
-		runs, err := h.runsFor(ctx, repo, branch, sha)
+		runs, err := h.runsFor(ctx, token, repo, sha)
 		if err != nil {
 			return err
 		}
@@ -189,43 +196,57 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 	}
 }
 
-// percentiles is how long this branch's runs have been taking. Unknown is
-// 0 0, which pickAdaptiveSleep reads as no history.
-func (h *ciWatchHandler) percentiles(ctx context.Context, repo, branch string) (int64, int64) {
-	out, err := h.run(ctx, "gh", "-R", repo, "run", "list", "--branch", branch,
-		"--limit", "20", "--json", "startedAt,updatedAt", "--jq", ciPercentilesJQ)
+// percentiles is how long this branch's runs have been taking: the median and
+// ninetieth percentile of the last twenty completed, in seconds, as ground
+// computed them. Unknown is 0 0, which pickAdaptiveSleep reads as no history.
+func (h *ciWatchHandler) percentiles(ctx context.Context, token, repo, branch string) (int64, int64) {
+	url := githubAPI + "/repos/" + repo + "/actions/runs?branch=" + branch + "&status=completed&per_page=20"
+	out, err := h.get(ctx, token, url)
 	if err != nil {
 		h.logger.Warnw("ci.watch could not read the branch's run history; waiting without it",
 			"repo", repo, "branch", branch, "error", err)
 		return 0, 0
 	}
-	fields := strings.Fields(string(out))
-	if len(fields) != 2 {
+	var listed ciRuns
+	if err := json.Unmarshal(out, &listed); err != nil {
 		return 0, 0
 	}
-	p50, err1 := strconv.ParseInt(fields[0], 10, 64)
-	p90, err2 := strconv.ParseInt(fields[1], 10, 64)
-	if err1 != nil || err2 != nil {
+	return percentilesOf(listed.WorkflowRuns)
+}
+
+// percentilesOf is ground's arithmetic over the durations: sorted, the
+// element at half and the element at nine tenths.
+func percentilesOf(runs []ciRun) (int64, int64) {
+	durations := make([]int64, 0, len(runs))
+	for _, r := range runs {
+		if r.RunStartedAt.IsZero() || r.UpdatedAt.Before(r.RunStartedAt) {
+			continue
+		}
+		durations = append(durations, int64(r.UpdatedAt.Sub(r.RunStartedAt).Seconds()))
+	}
+	if len(durations) == 0 {
 		return 0, 0
 	}
-	return p50, p90
+	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
+	n := len(durations)
+	return durations[n*5/10], durations[n*9/10]
 }
 
 // A push starts one run per workflow file. Thirty covers a dozen workflows.
 const ciRunsPage = "30"
 
 // runsFor is every run github has for this commit, none yet included.
-func (h *ciWatchHandler) runsFor(ctx context.Context, repo, branch, sha string) ([]ciRun, error) {
-	out, err := h.run(ctx, "gh", "-R", repo, "run", "list", "--branch", branch, "--commit", sha,
-		"--limit", ciRunsPage, "--json", "status,conclusion,name,url")
+func (h *ciWatchHandler) runsFor(ctx context.Context, token, repo, sha string) ([]ciRun, error) {
+	url := githubAPI + "/repos/" + repo + "/actions/runs?head_sha=" + sha + "&per_page=" + ciRunsPage
+	out, err := h.get(ctx, token, url)
 	if err != nil {
-		return nil, errors.Wrapf(err, "ci.watch: asking github for %s@%s", branch, sha)
+		return nil, errors.Wrapf(err, "ci.watch: asking github for %s@%s", repo, sha)
 	}
-	var runs []ciRun
-	if err := json.Unmarshal(out, &runs); err != nil {
-		return nil, errors.Wrapf(err, "ci.watch: gh answered for %s@%s with something other than runs: %q", branch, sha, string(out))
+	var listed ciRuns
+	if err := json.Unmarshal(out, &listed); err != nil {
+		return nil, errors.Wrapf(err, "ci.watch: github answered for %s@%s with something other than runs: %q", repo, sha, firstN(string(out), 200))
 	}
-	return runs, nil
+	return listed.WorkflowRuns, nil
 }
 
 // The push is concluded when every workflow it started has. Reading one run
@@ -394,7 +415,8 @@ func (s *QNTXServer) setupCIWatch() {
 		s.news = newNewsLog()
 	}
 	h := &ciWatchHandler{
-		run:      ghRun,
+		get:      githubGet,
+		token:    githubToken,
 		sleep:    sleepUnder,
 		news:     s.news,
 		mintedBy: s.authHandler.MintedBy,

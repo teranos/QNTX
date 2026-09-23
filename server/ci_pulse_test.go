@@ -13,26 +13,35 @@ import (
 	"go.uber.org/zap"
 )
 
-// A gh that answers from a script: the percentiles once, then the run's state
-// for each ask until it concludes.
-type scriptedGh struct {
-	percentiles string
-	states      []string
-	asked       []string
+// A GitHub that answers from a script: the branch's history once, then the
+// commit's runs for each ask until they conclude. Every ask is remembered.
+type scriptedGitHub struct {
+	history string
+	commits []string
+	asked   []string
+	tokens  []string
 }
 
-func (g *scriptedGh) run(_ context.Context, args ...string) ([]byte, error) {
-	joined := strings.Join(args, " ")
-	g.asked = append(g.asked, joined)
-	if strings.Contains(joined, "startedAt,updatedAt") {
-		return []byte(g.percentiles), nil
+func (g *scriptedGitHub) get(_ context.Context, token, url string) ([]byte, error) {
+	g.asked = append(g.asked, url)
+	g.tokens = append(g.tokens, token)
+	if strings.Contains(url, "branch=") {
+		return []byte(g.history), nil
 	}
-	if len(g.states) == 0 {
-		return []byte(`[]`), nil
+	if len(g.commits) == 0 {
+		return []byte(`{"workflow_runs":[]}`), nil
 	}
-	next := g.states[0]
-	g.states = g.states[1:]
+	next := g.commits[0]
+	g.commits = g.commits[1:]
 	return []byte(next), nil
+}
+
+func noHistory() string { return `{"workflow_runs":[]}` }
+
+func runsJSON(runs ...string) string { return `{"workflow_runs":[` + strings.Join(runs, ",") + `]}` }
+
+func aRun(name, status, conclusion, url string) string {
+	return `{"name":"` + name + `","status":"` + status + `","conclusion":"` + conclusion + `","html_url":"` + url + `"}`
 }
 
 func ciStatusAs(actor string) *types.As {
@@ -60,23 +69,12 @@ func jobFor(t *testing.T, as *types.As) *async.Job {
 	return &async.Job{ID: "JB-test", HandlerName: watcher.CIWatchHandlerName, Payload: payload}
 }
 
-// The run concludes; one item is left on the row, for the token that attested
-// the push, under the attestation's own id.
-func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
-	gh := &scriptedGh{
-		percentiles: "40 90\n",
-		states: []string{
-			`[{"status":"completed","conclusion":"success","name":"Go","url":"https://github.com/teranos/ground/actions/runs/1"},` +
-				`{"status":"in_progress","conclusion":"","name":"Nix","url":"https://github.com/teranos/ground/actions/runs/2"}]`,
-			`[{"status":"completed","conclusion":"success","name":"Go","url":"https://github.com/teranos/ground/actions/runs/1"},` +
-				`{"status":"completed","conclusion":"success","name":"Nix","url":"https://github.com/teranos/ground/actions/runs/2"}]`,
-		},
-	}
-	news := newNewsLog()
-	h := &ciWatchHandler{
-		run:   gh.run,
-		news:  news,
+func handlerOver(gh *scriptedGitHub, news *newsLog) *ciWatchHandler {
+	return &ciWatchHandler{
+		get:   gh.get,
+		token: func(context.Context) (string, error) { return "tok-1", nil },
 		sleep: func(context.Context, time.Duration) error { return nil },
+		news:  news,
 		// The push was attested by alice's ground token; the news is hers.
 		mintedBy: func(did string) (string, bool) {
 			if did == "did:key:alice" {
@@ -86,6 +84,25 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 		},
 		logger: zap.NewNop().Sugar(),
 	}
+}
+
+// The run concludes; one item is left on the row, for the person whose token
+// attested the push, under the attestation's own id and the commit.
+func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
+	gh := &scriptedGitHub{
+		history: runsJSON(
+			`{"run_started_at":"2026-09-22T10:00:00Z","updated_at":"2026-09-22T10:00:40Z","status":"completed","conclusion":"success"}`,
+			`{"run_started_at":"2026-09-22T11:00:00Z","updated_at":"2026-09-22T11:01:30Z","status":"completed","conclusion":"success"}`,
+		),
+		commits: []string{
+			runsJSON(aRun("Go", "completed", "success", "https://github.com/teranos/ground/actions/runs/1"),
+				aRun("Nix", "in_progress", "", "https://github.com/teranos/ground/actions/runs/2")),
+			runsJSON(aRun("Go", "completed", "success", "https://github.com/teranos/ground/actions/runs/1"),
+				aRun("Nix", "completed", "success", "https://github.com/teranos/ground/actions/runs/2")),
+		},
+	}
+	news := newNewsLog()
+	h := handlerOver(gh, news)
 
 	if err := h.Execute(context.Background(), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -115,26 +132,31 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 		t.Errorf("news left already expired: until=%d", n.UntilMs)
 	}
 	if len(gh.asked) != 3 {
-		t.Errorf("gh was asked %d times: %v", len(gh.asked), gh.asked)
+		t.Errorf("github was asked %d times: %v", len(gh.asked), gh.asked)
+	}
+	for _, tok := range gh.tokens {
+		if tok != "tok-1" {
+			t.Fatalf("an ask went without the token: %v", gh.tokens)
+		}
+	}
+	if !strings.Contains(gh.asked[1], "/repos/teranos/ground/actions/runs?head_sha=abc123") {
+		t.Errorf("the commit's runs were asked for as %q", gh.asked[1])
 	}
 }
 
 // A red beside a green is red. Reading one run read whichever finished first,
 // and the row said green four times over a failing lint.
 func TestCIWatchARedBesideAGreenIsRed(t *testing.T) {
-	gh := &scriptedGh{
-		percentiles: "0 0\n",
-		states: []string{
-			`[{"status":"completed","conclusion":"success","name":"deploy","url":"g"},` +
-				`{"status":"completed","conclusion":"failure","name":"lint","url":"r"}]`,
-		},
+	gh := &scriptedGitHub{
+		history: noHistory(),
+		commits: []string{runsJSON(aRun("deploy", "completed", "success", "g"), aRun("lint", "completed", "failure", "r"))},
 	}
 	news := newNewsLog()
-	h := &ciWatchHandler{run: gh.run, news: news, sleep: func(context.Context, time.Duration) error { return nil }, logger: zap.NewNop().Sugar()}
+	h := handlerOver(gh, news)
 	if err := h.Execute(context.Background(), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	got := news.since("did:key:alice", time.Now().UnixMilli())
+	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
 	if len(got) != 1 || got[0].Item.Symbol != SymbolUnwell {
 		t.Fatalf("a red beside a green drew %+v", got)
 	}
@@ -148,23 +170,24 @@ func TestCIWatchARedBesideAGreenIsRed(t *testing.T) {
 
 // Nothing is said while any workflow of the push is still running.
 func TestCIWatchWaitsForEveryWorkflow(t *testing.T) {
-	gh := &scriptedGh{
-		percentiles: "0 0\n",
-		states: []string{
-			`[{"status":"completed","conclusion":"success","name":"Go","url":"g"},{"status":"queued","conclusion":"","name":"Nix","url":"n"}]`,
-			`[{"status":"completed","conclusion":"success","name":"Go","url":"g"},{"status":"completed","conclusion":"success","name":"Nix","url":"n"}]`,
+	gh := &scriptedGitHub{
+		history: noHistory(),
+		commits: []string{
+			runsJSON(aRun("Go", "completed", "success", "g"), aRun("Nix", "queued", "", "n")),
+			runsJSON(aRun("Go", "completed", "success", "g"), aRun("Nix", "completed", "success", "n")),
 		},
 	}
 	news := newNewsLog()
 	slept := 0
-	h := &ciWatchHandler{run: gh.run, news: news, sleep: func(context.Context, time.Duration) error { slept++; return nil }, logger: zap.NewNop().Sugar()}
+	h := handlerOver(gh, news)
+	h.sleep = func(context.Context, time.Duration) error { slept++; return nil }
 	if err := h.Execute(context.Background(), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
 	if slept != 1 {
 		t.Errorf("slept %d times; wanted once, for the queued workflow", slept)
 	}
-	if got := news.since("did:key:alice", time.Now().UnixMilli()); len(got) != 1 || got[0].Item.Symbol != SymbolWell {
+	if got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli()); len(got) != 1 || got[0].Item.Symbol != SymbolWell {
 		t.Fatalf("all green drew %+v", got)
 	}
 }
@@ -185,12 +208,31 @@ func TestPickAdaptiveSleepIsGroundsThreeComparisons(t *testing.T) {
 	}
 }
 
+// The percentiles are ground's arithmetic over GitHub's timestamps: sorted
+// durations, the element at half and at nine tenths.
+func TestPercentilesOfIsGroundsArithmetic(t *testing.T) {
+	at := func(s int) time.Time { return time.Date(2026, 9, 22, 10, 0, s, 0, time.UTC) }
+	runs := []ciRun{
+		{RunStartedAt: at(0), UpdatedAt: at(90)},
+		{RunStartedAt: at(0), UpdatedAt: at(30)},
+		{RunStartedAt: at(0), UpdatedAt: at(60)},
+		{RunStartedAt: at(0), UpdatedAt: at(120)},
+	}
+	p50, p90 := percentilesOf(runs)
+	if p50 != 90 || p90 != 120 {
+		t.Errorf("p50=%d p90=%d; want 90 120 for [30 60 90 120]", p50, p90)
+	}
+	if p50, p90 := percentilesOf(nil); p50 != 0 || p90 != 0 {
+		t.Errorf("no history is 0 0, got %d %d", p50, p90)
+	}
+}
+
 // A row with no repo is not a push; the handler says so rather than asking
 // github about nothing.
 func TestCIWatchRefusesARowWithNoRepo(t *testing.T) {
 	as := ciStatusAs("did:key:alice")
 	delete(as.Attributes, "repo")
-	h := &ciWatchHandler{run: (&scriptedGh{}).run, news: newNewsLog(), sleep: func(context.Context, time.Duration) error { return nil }, logger: zap.NewNop().Sugar()}
+	h := handlerOver(&scriptedGitHub{history: noHistory()}, newNewsLog())
 	if err := h.Execute(context.Background(), jobFor(t, as)); err == nil {
 		t.Fatal("a row naming no repo was accepted")
 	}
