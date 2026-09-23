@@ -1,0 +1,131 @@
+{
+  "jobs": {
+    "build": {
+      "permissions": {
+        "contents": "write"
+      },
+      "runs-on": "${{ fromJSON(inputs.runs_on) }}",
+      "steps": [
+        {
+          "name": "Checkout the core",
+          "uses": "actions/checkout@v5",
+          "with": {
+            "path": "core",
+            "ref": "${{ inputs.core_ref }}",
+            "repository": "teranos/datapunt",
+            "token": "${{ secrets.schemas_token }}"
+          }
+        },
+        {
+          "env": {
+            "SCHEMAS": "${{ inputs.schemas }}",
+            "TOKEN": "${{ secrets.schemas_token }}"
+          },
+          "id": "schemas",
+          "name": "Fetch the company files",
+          "run": "mkdir -p schemas\nFILES=\"\"\nfor row in $(printf '%s' \"$SCHEMAS\" | jq -r '.[] | @base64'); do\n  repo=$(printf '%s' \"$row\" | base64 -d | jq -r .repo)\n  ref=$(printf '%s' \"$row\" | base64 -d | jq -r .ref)\n  path=$(printf '%s' \"$row\" | base64 -d | jq -r .path)\n  out=\"schemas/$(printf '%s' \"$repo\" | tr / -)-$(basename \"$path\")\"\n  curl --fail --silent --show-error \\\n    -H \"Authorization: Bearer $TOKEN\" \\\n    -H \"Accept: application/vnd.github.raw\" \\\n    \"https://api.github.com/repos/$repo/contents/$path?ref=$ref\" -o \"$out\"\n  FILES=\"$FILES $GITHUB_WORKSPACE/$out\"\ndone\necho \"files=$FILES\" >> \"$GITHUB_OUTPUT\"\nls -la schemas\n"
+        },
+        {
+          "uses": "cachix/install-nix-action@v31.11.1"
+        },
+        {
+          "uses": "dlang-community/setup-dlang@v2.0.0",
+          "with": {
+            "compiler": "${{ inputs.ldc }}"
+          }
+        },
+        {
+          "env": {
+            "DATAPUNT_SCHEMAS": "${{ steps.schemas.outputs.files }}"
+          },
+          "name": "Test",
+          "run": "dub test --config=plugin --compiler=ldc2",
+          "working-directory": "core"
+        },
+        {
+          "env": {
+            "DATAPUNT_SCHEMAS": "${{ steps.schemas.outputs.files }}"
+          },
+          "name": "Build plugin",
+          "run": "dub build --config=plugin --compiler=ldc2 --build=release",
+          "working-directory": "core"
+        },
+        {
+          "env": {
+            "GH_REPO": "${{ github.repository }}",
+            "GH_TOKEN": "${{ github.token }}"
+          },
+          "id": "version",
+          "name": "Resolve version",
+          "run": "VERSION=$(./bin/qntx-datapunt-plugin --version | cut -d' ' -f2)\necho \"version=$VERSION\" >> \"$GITHUB_OUTPUT\"\nTAGS=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')\nFRESH=yes\nfor TAG in $TAGS; do\n  if [ \"$TAG\" = \"datapunt-v$VERSION\" ]; then FRESH=no; fi\ndone\nif [ \"$FRESH\" = no ]; then\n  echo \"datapunt-v$VERSION is already released — change a schema or bump PLUGIN_VERSION in the core to ship again\" >&2\nfi\necho \"fresh=$FRESH\" >> \"$GITHUB_OUTPUT\"\n",
+          "working-directory": "core"
+        },
+        {
+          "id": "package",
+          "name": "Package",
+          "run": "ARTIFACT=\"qntx-datapunt-plugin-${{ steps.version.outputs.version }}-linux-amd64.tar.gz\"\ntar -czf \"$ARTIFACT\" -C bin qntx-datapunt-plugin\nsha256sum \"$ARTIFACT\" > \"$ARTIFACT.sha256\"\necho \"artifact=$ARTIFACT\" >> \"$GITHUB_OUTPUT\"\n",
+          "working-directory": "core"
+        },
+        {
+          "name": "Verify the artifact runs",
+          "run": "VERIFY=\"$RUNNER_TEMP/verify-datapunt\"\nrm -rf \"$VERIFY\" && mkdir -p \"$VERIFY\"\ntar -xzf \"${{ steps.package.outputs.artifact }}\" -C \"$VERIFY\"\n\"$VERIFY/qntx-datapunt-plugin\" --version\n",
+          "working-directory": "core"
+        },
+        {
+          "if": "steps.version.outputs.fresh != 'yes'",
+          "name": "Upload artifact",
+          "uses": "actions/upload-artifact@v4",
+          "with": {
+            "name": "${{ steps.package.outputs.artifact }}",
+            "path": "core/${{ steps.package.outputs.artifact }}\ncore/${{ steps.package.outputs.artifact }}.sha256\n"
+          }
+        },
+        {
+          "env": {
+            "GH_REPO": "${{ github.repository }}",
+            "GH_TOKEN": "${{ github.token }}"
+          },
+          "if": "steps.version.outputs.fresh == 'yes'",
+          "name": "Publish release",
+          "run": "TAG=\"datapunt-v${{ steps.version.outputs.version }}\"\ngh release create \"$TAG\" \\\n  \"${{ steps.package.outputs.artifact }}\" \\\n  \"${{ steps.package.outputs.artifact }}.sha256\" \\\n  --target \"$GITHUB_SHA\" --title \"$TAG\" \\\n  --notes \"teranos/datapunt at ${{ inputs.core_ref }}, with ${{ inputs.schemas }}\"\n",
+          "working-directory": "core"
+        }
+      ],
+      "timeout-minutes": 30
+    }
+  },
+  "name": "plugin-datapunt",
+  "on": {
+    "workflow_call": {
+      "inputs": {
+        "core_ref": {
+          "description": "The rev of teranos/datapunt to build",
+          "required": true,
+          "type": "string"
+        },
+        "ldc": {
+          "default": "ldc-1.41.0",
+          "description": "The D compiler setup-dlang installs",
+          "type": "string"
+        },
+        "runs_on": {
+          "default": "\"ubuntu-latest\"",
+          "description": "Runner labels as JSON, e.g. [\"self-hosted\",\"q-box\"]",
+          "required": false,
+          "type": "string"
+        },
+        "schemas": {
+          "description": "JSON list of {repo, ref, path}: one company CUE file each",
+          "required": true,
+          "type": "string"
+        }
+      },
+      "secrets": {
+        "schemas_token": {
+          "description": "Reads the core and the company repos; the caller's, never this repo's",
+          "required": true
+        }
+      }
+    }
+  }
+}
