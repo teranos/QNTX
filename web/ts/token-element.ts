@@ -305,7 +305,7 @@ function part(which: string, text: string): HTMLSpanElement {
 
 /** The rectangle over the tile the client is active in, moved rather than
  *  remade, so making another active carries it across the row. */
-function place(row: HTMLElement, rectangle: HTMLElement, here: HTMLElement | null): void {
+function place(rectangle: HTMLElement, here: HTMLElement | null): void {
     if (!here) {
         rectangle.hidden = true;
         return;
@@ -370,7 +370,7 @@ export function namespacesField(container: HTMLElement, t: TokenInfo): HTMLEleme
                     // element is drawn again once it has arrived.
                     tiles.querySelector('.namespace-tile.standing')?.classList.remove('standing');
                     tile.classList.add('standing');
-                    place(row, rectangle, tile);
+                    place(rectangle, tile);
                     setTimeout(() => { void redraw(container, t.id); }, 200);
                 })
                 .catch(failed);
@@ -435,7 +435,7 @@ export function namespacesField(container: HTMLElement, t: TokenInfo): HTMLEleme
     if (active !== undefined) {
         row.appendChild(rectangle);
         requestAnimationFrame(() => {
-            place(row, rectangle, tiles.querySelector<HTMLElement>('.namespace-tile.standing'));
+            place(rectangle, tiles.querySelector<HTMLElement>('.namespace-tile.standing'));
         });
     }
     return row;
