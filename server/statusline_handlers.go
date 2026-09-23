@@ -423,9 +423,11 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 	// A failing handler is a fix-now kind of event, and it is drawn inside its
 	// own plugin's slot below rather than as a separate item. Watchers belong to
-	// no plugin, so theirs still lead the row.
+	// no plugin, so theirs still lead the row; nor does a built-in, so its
+	// failure draws its own item here or it is invisible.
 	failures := h.recentHandlerFailures()
 	items = append(items, watcherFailureItemsFor(h.recentWatcherFailures(r.Context()))...)
+	items = append(items, handlerFailureItemsFor(builtinRuns(failures))...)
 
 	if h == nil || h.registry == nil {
 		h.noteWriteFailure(writeStatusLine(w, format, items))

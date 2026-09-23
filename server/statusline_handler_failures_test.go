@@ -50,6 +50,35 @@ func TestAHandlerFailureDrawsNoItemOfItsOwn(t *testing.T) {
 	}
 }
 
+// A built-in has no plugin slot to be shown inside. Its failure draws its own
+// item, or it is invisible: ci.watch refused a row for an hour and the row
+// said nothing.
+func TestABuiltInFailureDrawsItsOwnItem(t *testing.T) {
+	h := handlerRow(logWith(HandlerFailure{
+		Handler: "ci.watch",
+		Error:   "ci.watch: attestation x names no push: repo=\"teranos/QNTX\" branch=\"main\" sha=\"\"",
+		AtMs:    time.Now().Add(-2 * time.Minute).UnixMilli(),
+	}))
+
+	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline?format=json", nil))
+	rec := httptest.NewRecorder()
+	h.HandleStatusLine(rec, req)
+
+	var body StatusLineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("row is not json: %v", err)
+	}
+	for _, item := range body.Items {
+		if item.Name == "ci.watch" {
+			if item.Symbol != SymbolUnwell {
+				t.Fatalf("the failure drew well: %+v", item)
+			}
+			return
+		}
+	}
+	t.Fatalf("a built-in's failure drew nothing: %+v", body.Items)
+}
+
 // One item per handler, carrying how many times. Forty failures are one thing
 // to fix, and the count is what says it keeps happening.
 func TestRepeatedHandlerFailuresCollapseWithACount(t *testing.T) {

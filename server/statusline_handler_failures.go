@@ -115,6 +115,19 @@ func (h *StatusLineHandler) recentHandlerFailures() []handlerFailureRun {
 	return groupHandlerFailures(h.handlerFailures().since(handlerFailureWindow), handlerFailureItems)
 }
 
+// builtinRuns is the failing handlers that no plugin declared. A plugin's
+// handlers carry its name as their namespace; a built-in's name has none.
+func builtinRuns(runs []handlerFailureRun) []handlerFailureRun {
+	out := make([]handlerFailureRun, 0, len(runs))
+	for _, r := range runs {
+		if strings.Contains(r.Handler, "/") {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
 // How much of a reason the row can carry. Past this the line stops being one
 // line, and the whole of it is a click away.
 const handlerReasonLimit = 28
