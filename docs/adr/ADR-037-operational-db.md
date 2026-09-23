@@ -109,32 +109,10 @@ recent, and after a certain point a row lives in S3 alone. What the point is, an
 a count, is open, and nothing enforces one yet: the whole record today is 75 objects and
 4.4 MB.
 
-## What is still only in the record
+## What is on the node
 
-`make parity` reports two rows the node holds nothing of:
-
-```
-  access_tokens                     NO            YES
-  schedule_ticks                    NO            YES
-```
-
-Reading a token is free — `TokenStore::resolve` answers from a `HashMap` the
-open filled. Writing one is not, and a token is written on every use: the bearer
-path records last-used through `TokenStore::touch`, which rewrites the whole
-object. One S3 PUT per authenticated request.
-
-Nothing measures that. `duckdb_storage_requests` takes a `DuckdbStore`, and the
-tally it reads is that store's. `TokenStore`, `UserStore`, `NamespaceStore` and
-`NodeIdentityStore` each hold an `Objects` with a tally of its own, and no FFI
-reaches any of them; `ScheduleStore` and `WatcherStore` hold no `Objects` at
-all and ask through DuckDB's own client, the way `read_parquet` does. So the
-one store whose reads were moved off S3 is the one store whose requests are
-counted, and the two things that were never moved report nothing.
-
-Every store that asks the location for something says what it asked for. Which
-reader spends is then a number rather than a reading of the source, and moving
-`access_tokens` onto the node the way Users moved is a change whose effect is
-visible in the same panel that showed the need for it.
+`make parity` reads the source and says. It is the answer, so this does not
+carry a copy of one.
 
 ## Consequences
 

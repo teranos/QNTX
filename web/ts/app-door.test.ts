@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { APP_DOOR, ticketIn, homeTicketIn } from './app-door';
 
-// Safari finishes the ceremony and hands the ticket back through qntx://.
+// The browser finishes the ceremony and hands the ticket back through qntx://.
 // The node only ever sends somebody to a door am.toml named, and the app's
 // door is one origin: what arrives at any other is not a ticket.
 

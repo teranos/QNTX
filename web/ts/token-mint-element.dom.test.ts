@@ -73,9 +73,23 @@ describe('Mint Token kind rows', () => {
         expect(labelOf('Namespace').hidden).toBe(false);
         expect(labelOf('Return address').hidden).toBe(true);
 
+        // "i want to set the namespace there and there only"
         rows().find(r => r.dataset.kind === OAUTH)!.click();
-        expect(labelOf('Namespace').hidden).toBe(true);
+        expect(labelOf('Namespace').hidden).toBe(false);
         expect(labelOf('Return address').hidden).toBe(false);
+    });
+
+    test('a client with no namespace picked is refused before it reaches the node', async () => {
+        renderMint(container);
+        const label = container.querySelector<HTMLInputElement>('input')!;
+        label.value = 'grok';
+        rows().find(r => r.dataset.kind === OAUTH)!.click();
+
+        const mint = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('Mint token'))!;
+        mint.click();
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(container.querySelector('.tokens-refusal')?.textContent).toBe('no namespace picked');
     });
 
     test('a mint with no kind pressed is refused before it reaches the node', async () => {

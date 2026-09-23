@@ -70,6 +70,9 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 		return ""
 	})
 
+	// A plugin answering a sigil reads and writes where its caller acts.
+	servicesManager.SetCallStores(s.storeOfCall)
+
 	s.servicesManager = servicesManager
 	s.services = services
 

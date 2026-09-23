@@ -82,6 +82,10 @@ type Admission struct {
 	// own DID and the predicates it may touch, and nil means unrestricted —
 	// which is what a passkey session is.
 	Grant *Grant
+	// ClientDID is the OAuth client a connector's token was issued through, and
+	// empty for every other caller. To a connector the namespace does not exist
+	// (ADR-038), and this is how a surface knows the caller is one.
+	ClientDID string
 }
 
 // Admitted builds one. What a request holds is what Middleware resolved for

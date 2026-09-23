@@ -50,6 +50,8 @@ const (
 	PredicateMinted  = "token:minted"
 	PredicateRevoked = "token:revoked"
 	PredicateEnabled = "token:enabled"
+	// A client moved to another namespace, and every connector with it.
+	PredicateMoved = "token:moved"
 )
 
 // Predicates for what happens to the node itself rather than to whoever is

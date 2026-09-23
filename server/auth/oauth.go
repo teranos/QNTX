@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
+	"crypto/ed25519"
+	"crypto/hkdf"
+	"crypto/sha256"
 	"net/http"
 	"sync"
 	"time"
@@ -60,11 +62,10 @@ type authorizing struct {
 // then refused rather than signed with nothing.
 func (h *Handler) oauth() fosite.OAuth2Provider {
 	h.oauthOnce.Do(func() {
-		// Codes are HMAC-signed with a secret drawn here and held in memory,
-		// like the codes themselves: a restart forgets both together.
-		secret := make([]byte, 32)
-		if _, err := rand.Read(secret); err != nil {
-			h.logger.Errorw("could not draw the secret codes are signed with; no authorize request will be served", "error", err)
+		// A refresh token outlives the process, so what signs it does too.
+		secret, err := oauthSecret(h.nodeKey)
+		if err != nil {
+			h.logger.Errorw("no secret to sign codes and refresh tokens with; no authorize request will be served", "error", err)
 			return
 		}
 		config := &fosite.Config{
@@ -95,6 +96,17 @@ func (h *Handler) oauth() fosite.OAuth2Provider {
 		)
 	})
 	return h.oauthProvider
+}
+
+// oauthSecretInfo keeps this derivation apart from anything else the key signs.
+const oauthSecretInfo = "qntx oauth: codes and refresh tokens"
+
+// oauthSecret is the node DID key's seed, run through HKDF under oauthSecretInfo.
+func oauthSecret(nodeKey ed25519.PrivateKey) ([]byte, error) {
+	if len(nodeKey) != ed25519.PrivateKeySize {
+		return nil, errors.Newf("the node DID key is %d bytes, not %d", len(nodeKey), ed25519.PrivateKeySize)
+	}
+	return hkdf.Key(sha256.New, nodeKey.Seed(), nil, oauthSecretInfo, 32)
 }
 
 // Strategy is fosite's core strategy: access tokens are QNTX tokens
@@ -434,7 +446,9 @@ func (s *oauthStore) GetRefreshTokenSession(_ context.Context, signature string,
 		MintedBy:            grant.MintedBy,
 		MintedByUser:        grant.MintedByUser,
 		MintedByDisplayName: grant.MintedByDisplayName,
-		Namespace:           namespaceOf(grant),
+		// The client's, as it is now: a client moved since is where the
+		// connector acts from this refresh on.
+		Namespace: client.Namespace,
 	}
 	session.SetExpiresAt(fosite.RefreshToken, until)
 	request := fosite.NewRequest()
@@ -477,8 +491,8 @@ func namespaceOf(grant Grant) string {
 	return ""
 }
 
-// namespacesOf is where a token issued under this session acts: the one the
-// person's passkey named, or none, which is every namespace they reach.
+// namespacesOf is where a token issued under this session acts: the client's
+// door, or none, which is every namespace the person reaches.
 func namespacesOf(session *TokenSession) []string {
 	if session.Namespace == "" {
 		return nil
@@ -649,13 +663,14 @@ func (h *Handler) handleAuthorizeDone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Who said yes, carried to the mint: the token is them. The passkey was
-	// done at home, which names no namespace, so neither does the token.
+	// Who said yes, carried to the mint: the token is them. Where it acts is
+	// the client's: the door it was minted at, not where the person stands.
 	session := &TokenSession{
 		DefaultSession:      fosite.DefaultSession{Subject: held.identity},
 		MintedBy:            held.identity,
 		MintedByUser:        held.userID,
 		MintedByDisplayName: held.name,
+		Namespace:           client.Namespace,
 	}
 	response, err := provider.NewAuthorizeResponse(ctx, parked.request, session)
 	if err != nil {

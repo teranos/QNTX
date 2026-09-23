@@ -65,6 +65,8 @@ func pluginServingServer(t *testing.T, name string) (*QNTXServer, map[auth.Level
 		rlWrite:        newRateLimitGroup(100, 100),
 		rlRead:         newRateLimitGroup(100, 100),
 		rlPublic:       newRateLimitGroup(100, 100),
+		// A plugin answering a sigil is handed its caller's store.
+		held: servingStub(&stubStore{}),
 	}
 	srv.setupHTTPRoutes()
 	require.NoError(t, srv.open())

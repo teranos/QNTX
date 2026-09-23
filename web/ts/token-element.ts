@@ -12,6 +12,7 @@ import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstor
 import { spawnAttestationAsWindow } from './components/element/attestation-element';
 import { jsonBody } from './http-utils';
 import { log, SEG } from './logger';
+import { kindOf, ordered, type Namespace } from './namespaces-view';
 import { knownFrom } from './roles-compose';
 import type { Line } from './roles-element';
 
@@ -21,11 +22,15 @@ export interface TokenInfo {
     label: string;
     did: string;
     minted_by: string;
+    /** The name of the person who minted it, recorded at minting. */
+    minted_by_display_name?: string;
     /** Which kind: SUPER, ATTESTOR or OAUTH. Absent on a token minted before there were kinds. */
     level?: string;
     namespaces: string[];
     /** Where a client's codes go. A client's, and only a client's. */
     return_address?: string;
+    /** The client this token was issued through, when it was. */
+    client_did?: string;
     created_at: string;
     expires_at?: string;
     last_used_at?: string;
@@ -80,6 +85,7 @@ async function enableToken(id: string): Promise<void> {
     });
 }
 
+
 /** What this token wrote. A token is its own actor (TOKATTEST). */
 async function whatItWrote(did: string): Promise<Attestation[]> {
     if (!did) return [];
@@ -95,7 +101,7 @@ function fmt(dt: string | undefined): string {
 }
 
 /** A dim caption above its value, the way the attestation element reads. */
-function field(name: string, value: string, copyable = false): HTMLElement {
+function field(name: string, value: string, copyable = false, hover = ''): HTMLElement {
     const wrap = document.createElement('div');
     wrap.style.display = 'flex';
     wrap.style.flexDirection = 'column';
@@ -110,6 +116,7 @@ function field(name: string, value: string, copyable = false): HTMLElement {
     held.style.wordBreak = 'break-word';
     held.style.overflowWrap = 'break-word';
     held.textContent = value;
+    if (hover) held.title = hover;
 
     if (copyable) {
         held.style.cursor = 'pointer';
@@ -260,10 +267,225 @@ function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
     return wrap;
 }
 
+/** Makes the client active in a namespace; every connector follows at its next refresh. */
+async function makeActive(id: string, namespace: string): Promise<void> {
+    await apiJson(`/auth/tokens/${encodeURIComponent(id)}/namespace`, jsonBody('POST', { namespace }));
+}
+
+/** Puts the client into a namespace without making it active there. */
+async function putIn(id: string, namespace: string): Promise<void> {
+    await apiJson(`/auth/tokens/${encodeURIComponent(id)}/namespaces`, jsonBody('POST', { namespace }));
+}
+
+/** Takes the client out of a namespace it is not active in. */
+async function takeOut(id: string, namespace: string): Promise<void> {
+    await apiJson(
+        `/auth/tokens/${encodeURIComponent(id)}/namespaces/${encodeURIComponent(namespace)}`,
+        { method: 'DELETE' },
+    );
+}
+
+/** A namespace-bar tile: the same rectangle, size and kind colour. */
+function nsTile(name: string): HTMLDivElement {
+    const tile = document.createElement('div');
+    tile.className = 'namespace-tile';
+    tile.dataset.kind = kindOf(name);
+    tile.dataset.name = name;
+    tile.textContent = name;
+    return tile;
+}
+
+function part(which: string, text: string): HTMLSpanElement {
+    const span = document.createElement('span');
+    span.className = 'namespace-part';
+    span.dataset.part = which;
+    span.textContent = text;
+    return span;
+}
+
+/** The rectangle over the tile the client is active in, moved rather than
+ *  remade, so making another active carries it across the row. */
+function place(rectangle: HTMLElement, here: HTMLElement | null): void {
+    if (!here) {
+        rectangle.hidden = true;
+        return;
+    }
+    rectangle.hidden = false;
+    rectangle.style.width = `${here.offsetWidth}px`;
+    rectangle.style.height = `${here.offsetHeight}px`;
+    rectangle.style.transform = `translate(${here.offsetLeft}px, ${here.offsetTop}px)`;
+}
+
+/** The namespaces as the namespace bar draws them, below the title bar: one
+ *  tile each, the rectangle over the one a client is active in. For a live
+ *  client, ROOT presses a tile to make it active, right-clicks one to split it
+ *  into [<] name [X] and take the client out, and [+] puts it into another.
+ *  "A TOKEN CAN ONLY BE ACTIVE IN ONE NAMESPACE AT A TIME" */
+export function namespacesField(container: HTMLElement, t: TokenInfo): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'token-namespaces';
+
+    const tiles = document.createElement('div');
+    tiles.className = 'namespaces-tiles';
+    row.appendChild(tiles);
+
+    const held = t.namespaces || [];
+    const client = t.level === 'OAUTH';
+    const editable = client && !t.revoked_at;
+    const active = client ? held[0] : undefined;
+    const failed = (err: unknown) => {
+        row.querySelector('.namespaces-failure')?.remove();
+        const said = document.createElement('div');
+        said.className = 'namespaces-failure';
+        said.textContent = err instanceof Error ? err.message : String(err);
+        row.appendChild(said);
+    };
+
+    const rectangle = document.createElement('div');
+    rectangle.className = 'namespaces-rectangle';
+    rectangle.hidden = true;
+
+    const shown = ordered(held.map(name => ({ name, definition: null, kinds: [] })));
+    if (shown.length === 0) {
+        const none = document.createElement('span');
+        none.textContent = '—';
+        tiles.appendChild(none);
+    }
+
+    for (const ns of shown) {
+        const tile = nsTile(ns.name);
+        if (ns.name === active) {
+            tile.classList.add('standing');
+            tile.title = 'active: every connector through this client acts here';
+        }
+        tiles.appendChild(tile);
+        if (!editable || ns.name === active) continue;
+
+        tile.title = 'press to make it active here; right-click to take it out';
+        tile.addEventListener('click', () => {
+            if (tile.classList.contains('open')) return;
+            makeActive(t.id, ns.name)
+                .then(() => {
+                    // The rectangle goes where the node says it went, and the
+                    // element is drawn again once it has arrived.
+                    tiles.querySelector('.namespace-tile.standing')?.classList.remove('standing');
+                    tile.classList.add('standing');
+                    place(rectangle, tile);
+                    setTimeout(() => { void redraw(container, t.id); }, 200);
+                })
+                .catch(failed);
+        });
+
+        tile.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (tile.classList.contains('open')) return;
+            tile.classList.add('open');
+            tile.textContent = '';
+            const back = part('back', '<');
+            const name = part('toggle', ns.name);
+            const end = part('end', 'X');
+            end.dataset.end = 'active';
+            tile.append(back, name, end);
+            back.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                tile.classList.remove('open');
+                tile.textContent = ns.name;
+            });
+            // Once arms it, and a second press takes the client out.
+            end.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                if (end.dataset.end !== 'sure') {
+                    end.dataset.end = 'sure';
+                    return;
+                }
+                takeOut(t.id, ns.name).then(() => redraw(container, t.id)).catch(failed);
+            });
+        });
+    }
+
+    if (editable) {
+        const add = document.createElement('div');
+        add.className = 'namespace-tile namespace-add';
+        add.textContent = '+';
+        add.title = 'put this client into another namespace';
+        add.addEventListener('click', () => {
+            const offered = tiles.querySelectorAll('.token-ns-offer');
+            if (offered.length > 0) {
+                offered.forEach(o => o.remove());
+                return;
+            }
+            apiJson<{ namespaces: Namespace[] }>('/api/namespaces')
+                .then(listed => {
+                    for (const ns of ordered(listed.namespaces || []).filter(ns => !held.includes(ns.name))) {
+                        const offer = nsTile(ns.name);
+                        offer.classList.add('token-ns-offer');
+                        offer.style.borderStyle = 'dashed';
+                        offer.title = `put this client into ${ns.name}`;
+                        offer.addEventListener('click', () => {
+                            putIn(t.id, ns.name).then(() => redraw(container, t.id)).catch(failed);
+                        });
+                        tiles.appendChild(offer);
+                    }
+                })
+                .catch(failed);
+        });
+        tiles.appendChild(add);
+    }
+
+    if (active !== undefined) {
+        row.appendChild(rectangle);
+        requestAnimationFrame(() => {
+            place(rectangle, tiles.querySelector<HTMLElement>('.namespace-tile.standing'));
+        });
+    }
+    return row;
+}
+
 function status(t: TokenInfo): string {
     if (t.revoked_at) return `revoked ${fmt(t.revoked_at)}`;
     if (t.expires_at && new Date(t.expires_at) < new Date()) return `expired ${fmt(t.expires_at)}`;
     return 'active';
+}
+
+/** What a client issued, newest first: an access token and a refresh token
+ *  per sign-in and per refresh. */
+export function issuedBy(client: TokenInfo, all: TokenInfo[]): TokenInfo[] {
+    return all
+        .filter(t => t.id !== client.id && !!t.client_did && t.client_did === client.did)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+function stateOf(t: TokenInfo, now: Date): string {
+    if (t.revoked_at) return 'revoked';
+    if (t.expires_at && new Date(t.expires_at) < now) return 'expired';
+    return 'active';
+}
+
+/** The issued list, one line each: kind, day and state, the time on the hover,
+ *  and a press opens the one line's token. */
+export function renderIssued(container: HTMLElement, issued: TokenInfo[], now: Date): void {
+    container.innerHTML = '';
+    // Smaller than the list it stands in for, not larger.
+    container.style.fontSize = '11px';
+    container.style.lineHeight = '1.4';
+    container.style.gap = '0';
+    const caption = document.createElement('span');
+    caption.style.color = 'var(--text-on-dark-tertiary)';
+    const live = issued.filter(t => stateOf(t, now) === 'active').length;
+    caption.textContent = issued.length === 0 ? 'Issued nothing yet' : `Issued ${issued.length}, ${live} live`;
+    container.appendChild(caption);
+
+    for (const t of issued) {
+        const line = document.createElement('div');
+        line.className = 'token-issued-line';
+        line.style.cursor = 'pointer';
+        line.style.whiteSpace = 'nowrap';
+        line.textContent = `${t.level || '—'} ${fmt(t.created_at).slice(0, 10)} ${stateOf(t, now)}`;
+        line.title = `created ${fmt(t.created_at)}`;
+        if (stateOf(t, now) !== 'active') line.style.color = 'var(--text-on-dark-tertiary)';
+        line.addEventListener('click', () => { openTokenElement(t.id, `${t.label} ${t.level ?? ''}`.trim()); });
+        container.appendChild(line);
+    }
 }
 
 /** Exported for tests: what the element draws for one token, given the token. */
@@ -274,6 +496,10 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     container.style.gap = '10px';
     container.style.padding = '12px';
     container.style.fontFamily = 'var(--font-mono)';
+
+    // The namespaces first, directly below the title bar, the way the
+    // namespace bar sits below the system bar.
+    container.appendChild(namespacesField(container, t));
 
     if (raw) {
         const shown = document.createElement('div');
@@ -286,8 +512,9 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     // The DID is how this token's own attestations are found: ?actor=<did>.
     // For a client it is the client id, and the raw value above is the secret.
     container.appendChild(field('DID', t.did || '—', true));
-    container.appendChild(field('Speaks for', t.minted_by || '—'));
-    container.appendChild(field('Namespaces', t.namespaces?.length ? t.namespaces.join(', ') : '—'));
+    // Tokens are owned by someone: the name, and on the hover the identity it
+    // was minted under.
+    container.appendChild(field('Owner', t.minted_by_display_name || t.minted_by || '—', false, t.minted_by || ''));
     if (t.return_address) {
         container.appendChild(field('Return address', t.return_address, true));
     }
@@ -324,6 +551,23 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     }
 
     container.appendChild(actions);
+
+    // "can't we move all the refresh tokens into a compact list in the element
+    // of the token it belongs to?"
+    if (t.level === 'OAUTH') {
+        const issued = document.createElement('div');
+        issued.style.display = 'flex';
+        issued.style.flexDirection = 'column';
+        issued.style.gap = '2px';
+        issued.innerHTML = '<div class="element-loading">Reading what it issued…</div>';
+        container.appendChild(issued);
+        apiJson<TokenInfo[]>('/auth/tokens')
+            .then(all => { renderIssued(issued, issuedBy(t, all), new Date()); })
+            .catch((err: unknown) => {
+                issued.innerHTML = '';
+                issued.appendChild(errorBox(err instanceof Error ? err.message : String(err)));
+            });
+    }
 
     const wrote = document.createElement('div');
     wrote.style.display = 'flex';

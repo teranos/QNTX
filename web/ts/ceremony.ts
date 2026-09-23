@@ -12,7 +12,7 @@ import { providerMark } from './provider-marks';
 import { peerPubkeyHex, acceptBinding, collectedBinding, whenReady as layeWhenReady } from './laye';
 import type { SignedBinding } from './laye';
 import { log, SEG } from './logger';
-import { APP_DOOR, inApp, openInSafari, nextTicket, ceremonyInSheet } from './app-door';
+import { APP_DOOR, inApp, openInBrowser, nextTicket, ceremonyInSheet } from './app-door';
 import { arrivedWith } from './ticket';
 
 export interface ProviderDescription {
@@ -319,25 +319,25 @@ export function renderCeremony(
                     + '?provider=' + encodeURIComponent(picked.id)
                     + '&peer_pubkey_hex=' + encodeURIComponent(peerPubkeyHex())
                     + (typedHost ? '&host=' + encodeURIComponent(typedHost) : '');
-                // The app's page is at a scheme: no Safari session to consent
+                // The app's page is at a scheme: no browser session to consent
                 // with, and no Referer for the node to send anyone back by. So
                 // the door is named and the ceremony runs in the sheet iOS
                 // gives a web sign-in, which comes back with the ticket. Where
-                // the app has no sheet, Safari runs it and the ticket comes
+                // the app has no sheet, the browser runs it and the ticket comes
                 // back through qntx:// as a deep link.
                 if (inApp()) {
                     const named = going + '&door=' + encodeURIComponent(APP_DOOR);
                     say(`Going to ${picked.label}...`);
                     let ticket = await ceremonyInSheet(named);
                     if (ticket === null) {
-                        say(`Going to ${picked.label} in Safari...`);
-                        await openInSafari(named);
+                        say(`Going to ${picked.label} in the browser...`);
+                        await openInBrowser(named);
                         ticket = await nextTicket(gone.signal);
                     }
                     say(`Back from ${picked.label}...`);
                     const binding = await collectedBinding(ticket);
                     if (!binding) {
-                        throw new Error('Safari came back with a ticket this node had no binding for');
+                        throw new Error('the browser came back with a ticket this node had no binding for');
                     }
                     land(binding);
                     return;

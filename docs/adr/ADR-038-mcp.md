@@ -41,10 +41,14 @@ A tool call is a request on the served API carrying the caller's own credential,
 
 Every tool takes the path, the query and the JSON body until a handler declares its own shape where it is offered on the mux.
 
-Switching namespaces is a tool because a handler switches namespaces, and a connector reaches the namespaces its person reaches.
+A connector acts in the one namespace its client was minted in, chosen in the mint element and nowhere else.
 
-"switching namespaces would be a tool"
+"i want to set the namespace there and there only"
 
-"you would have access to lll the namespaces you already have access to"
+"no, the connector should not follow the person, the connector should stay where i selected the namespace to and only stay there"
+
+To a connector the namespace does not exist: it is offered no namespace tool, and no answer names one.
+
+"the conenctor, to the connector, the namespace should be invisible"
 
 The server is stateless, so a tool is served under the context of the request that carried it and acts as the caller in front of it rather than as whoever opened the session.

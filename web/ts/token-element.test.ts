@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { linesFor, rolesText, saidLine, type TokenInfo } from './token-element';
+import { issuedBy, linesFor, namespacesField, renderIssued, rolesText, saidLine, type TokenInfo } from './token-element';
 
 function token(): TokenInfo {
     return {
@@ -41,6 +41,109 @@ test('an attestation reads as X is Y of Z, a DID by its last eight', () => {
         contexts: ['TEST1'],
     })).toBe('CSCn1XDK is role:granted WORKER of TEST1');
     expect(saidLine({ subjects: ['visit-1'], predicates: ['visit:done'], contexts: [] })).toBe('visit-1 is visit:done');
+});
+
+// The namespaces as the namespace bar draws them, below the title bar.
+function strip(t: TokenInfo): HTMLElement {
+    const container = document.createElement('div');
+    const row = namespacesField(container, t);
+    container.appendChild(row);
+    return row;
+}
+
+function tileNames(row: HTMLElement): string[] {
+    return [...row.querySelectorAll<HTMLElement>('.namespace-tile[data-name]')].map(t => t.dataset.name ?? '');
+}
+
+test('the namespaces are the bar\'s tiles, no caption, the active one under the rectangle, and a + for a live client', () => {
+    const row = strip({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+    expect(row.textContent).not.toContain('Namespaces');
+    expect(row.querySelector('select')).toBeNull();
+    // The bar's order, whatever order the client names them in.
+    expect(tileNames(row)).toEqual(['default', 'Clean']);
+    expect(row.querySelector<HTMLElement>('.namespace-tile.standing')?.dataset.name).toBe('Clean');
+    expect(row.querySelector('.namespaces-rectangle')).not.toBeNull();
+    expect(row.querySelector('.namespace-add')?.textContent).toBe('+');
+    expect(row.querySelector<HTMLElement>('.namespace-tile[data-name="default"]')?.dataset.kind).toBe('default');
+});
+
+// "another route is right click, see the X next to it, press it once invert, again, reoved"
+test('a right-click splits a tile into [<] name [X], and the first press of X arms it', () => {
+    const row = strip({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+    const other = row.querySelector<HTMLElement>('.namespace-tile[data-name="default"]')!;
+    other.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    expect(other.classList.contains('open')).toBe(true);
+    expect([...other.querySelectorAll<HTMLElement>('.namespace-part')].map(p => p.textContent)).toEqual(['<', 'default', 'X']);
+
+    const end = other.querySelector<HTMLElement>('[data-part="end"]')!;
+    expect(end.dataset.end).toBe('active');
+    end.click();
+    expect(end.dataset.end).toBe('sure');
+    expect(tileNames(row)).toEqual(['default', 'Clean']);
+
+    other.querySelector<HTMLElement>('[data-part="back"]')!.click();
+    expect(other.classList.contains('open')).toBe(false);
+    expect(other.textContent).toBe('default');
+});
+
+// No fallback: the tile a client is active in does not split.
+test('the active tile does not split', () => {
+    const row = strip({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+    const active = row.querySelector<HTMLElement>('.namespace-tile.standing')!;
+    active.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    expect(active.classList.contains('open')).toBe(false);
+});
+
+// Only ROOT changes where a client is, and only a live client issues anything.
+test('a token of another kind, or a revoked client, shows plain tiles and nothing to press', () => {
+    for (const t of [
+        { ...token(), level: 'ATTESTOR' },
+        { ...token(), level: 'REFRESH' },
+        { ...token(), level: 'OAUTH', revoked_at: '2026-09-15T00:00:00Z' },
+    ]) {
+        const row = strip(t);
+        expect(row.querySelector('.namespace-add')).toBeNull();
+        expect(tileNames(row)).toEqual(['clean']);
+        const tile = row.querySelector<HTMLElement>('.namespace-tile')!;
+        tile.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+        expect(tile.classList.contains('open')).toBe(false);
+    }
+});
+
+// "can't we move all the refresh tokens into a compact list in the element of the token it belongs to?"
+test('a client lists what it issued, newest first, and nothing it did not', () => {
+    const client = { ...token(), level: 'OAUTH', did: 'did:key:zClient' };
+    const issued = issuedBy(client, [
+        client,
+        { ...token(), id: 'R1', level: 'REFRESH', client_did: 'did:key:zClient', created_at: '2026-09-20T10:00:00Z' },
+        { ...token(), id: 'A2', level: 'ROOT', client_did: 'did:key:zClient', created_at: '2026-09-22T10:00:00Z' },
+        { ...token(), id: 'X', level: 'REFRESH', client_did: 'did:key:zOther', created_at: '2026-09-23T10:00:00Z' },
+    ]);
+    expect(issued.map(t => t.id)).toEqual(['A2', 'R1']);
+});
+
+test('the issued list is one line each: kind, day and state, the time on the hover', () => {
+    const now = new Date('2026-09-23T12:00:00Z');
+    const container = document.createElement('div');
+    renderIssued(container, [
+        { ...token(), id: 'A2', level: 'ROOT', created_at: '2026-09-23T11:00:00Z', expires_at: '2026-09-23T12:30:00Z' },
+        { ...token(), id: 'R1', level: 'REFRESH', created_at: '2026-09-20T10:00:00Z', revoked_at: '2026-09-20T11:00:00Z' },
+        { ...token(), id: 'A1', level: 'ROOT', created_at: '2026-09-20T10:00:00Z', expires_at: '2026-09-20T11:00:00Z' },
+    ], now);
+    const lines = [...container.querySelectorAll<HTMLElement>('.token-issued-line')];
+    expect(lines.map(l => l.textContent)).toEqual([
+        'ROOT 2026-09-23 active',
+        'REFRESH 2026-09-20 revoked',
+        'ROOT 2026-09-20 expired',
+    ]);
+    expect(lines[0].title).toBe('created 2026-09-23 11:00:00');
+    expect(container.textContent).toContain('Issued 3, 1 live');
+});
+
+test('a client that issued nothing says so', () => {
+    const container = document.createElement('div');
+    renderIssued(container, [], new Date());
+    expect(container.textContent).toBe('Issued nothing yet');
 });
 
 test('the roles read per namespace, and a dash for none', () => {

@@ -33,6 +33,9 @@ func authorizingHandler(t *testing.T) (*Handler, *memTokenStore, string) {
 	t.Helper()
 	h := handlerWithDoors(t)
 	h.configuredOrigin = nodeOrigin
+	// Codes and refresh tokens are signed with a secret derived from the node
+	// DID key, so a node without one serves no authorize request.
+	h.nodeKey = testNodeKey(t)
 	store := newMemTokenStore()
 	h.tokens = store
 	_, _, err := store.Create(NewToken{
@@ -96,7 +99,7 @@ func TestAClientSendsSomebodyHomeAndTheCodeGoesBack(t *testing.T) {
 }
 
 // The code carries who said yes, so the token endpoint can mint a token that
-// is them. The passkey was done at home, which names no namespace.
+// is them, and the client's door, which is where that token acts.
 func TestTheCodeCarriesWhoSaidYes(t *testing.T) {
 	h, _, did := authorizingHandler(t)
 	_, challenge := pkcePair()
@@ -122,7 +125,7 @@ func TestTheCodeCarriesWhoSaidYes(t *testing.T) {
 		carried, ok := parked.request.GetSession().(*TokenSession)
 		require.True(t, ok, "the code's session is %T", parked.request.GetSession())
 		assert.Equal(t, mastodonAccount, carried.MintedBy)
-		assert.Empty(t, carried.Namespace)
+		assert.Equal(t, NamespaceDefault, carried.Namespace)
 		assert.Equal(t, did, parked.request.GetClient().GetID())
 		assert.False(t, parked.spent)
 	}

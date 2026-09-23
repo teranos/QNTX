@@ -9,6 +9,10 @@ body {
        emoji font unless told otherwise: the ⬆ that lifts an element became a blue
        square, the absent element's sym a trophy. This is the telling. */
     font-variant-emoji: text;
+    /* The base every element's text starts from. Unset, it was the browser's
+       16px: a value drawn larger than the 11px caption naming it, in every
+       element that sized its captions and nothing else. */
+    font-size: var(--font-size-sm);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     margin: 0;

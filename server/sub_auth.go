@@ -209,20 +209,30 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// A sqlite deployment has no token store (ADR-025: parquet ships first),
 	// and the bool says so by name. The nil store makes Middleware skip the
 	// bearer path and /auth/tokens answer 503.
-	tokenStore, hasTokenStore, err := newTokenStore(s.deps.cfg)
+	tokenRecord, hasTokenStore, err := newTokenRecord(s.deps.cfg)
 	if err != nil {
-		return errors.Wrap(err, "failed to open the access token store")
+		return errors.Wrap(err, "failed to open the access token record")
 	}
+	// An access token lives in the operational db (ADR-037). The record behind
+	// it is read once here and never on a request; recording a use writes the
+	// table alone, which is what stopped a PUT per authenticated request.
+	var tokenStore auth.TokenStore
 	if hasTokenStore {
-		s.logger.Infow("Access tokens enabled",
+		table, tookIn, err := auth.OpenTokenTable(s.nodeDB, tokenRecord)
+		if err != nil {
+			return errors.Wrap(err, "failed to open the access_tokens table")
+		}
+		tokenStore = table
+		s.logger.Infow("Access tokens held in the operational db",
 			"backend", s.deps.cfg.Storage.Backend,
-			"location", s.deps.cfg.Storage.Parquet.Location,
+			"held", tookIn.Held,
+			"taken_in", tookIn.TakenIn,
+			"written_back", tookIn.WrittenBack,
 		)
 	}
-	// A token is held nowhere on the node (ADR-037) and its record is rewritten
-	// on every use, so this store spends per authenticated request. The backend
-	// never opened it and so cannot report it.
-	if reporter, ok := recordSpendOf(tokenStore); ok {
+	// The take-in above is the record's whole cost for tokens now. It is worth
+	// seeing beside the readers that have not moved.
+	if reporter, ok := recordSpendOf(tokenRecord); ok {
 		s.SetRecordReporter(reporter)
 	}
 	// Who the routes in root_identities reach (ADR-031). A User lives in the
