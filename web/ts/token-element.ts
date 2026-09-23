@@ -12,6 +12,7 @@ import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstor
 import { spawnAttestationAsWindow } from './components/element/attestation-element';
 import { jsonBody } from './http-utils';
 import { log, SEG } from './logger';
+import { ordered, type Namespace } from './namespaces-view';
 import { knownFrom } from './roles-compose';
 import type { Line } from './roles-element';
 
@@ -21,6 +22,8 @@ export interface TokenInfo {
     label: string;
     did: string;
     minted_by: string;
+    /** The name of the person who minted it, recorded at minting. */
+    minted_by_display_name?: string;
     /** Which kind: SUPER, ATTESTOR or OAUTH. Absent on a token minted before there were kinds. */
     level?: string;
     namespaces: string[];
@@ -80,6 +83,11 @@ async function enableToken(id: string): Promise<void> {
     });
 }
 
+/** Moves a client, and every connector through it at its next refresh. */
+async function moveClient(id: string, namespace: string): Promise<void> {
+    await apiJson(`/auth/tokens/${encodeURIComponent(id)}/namespace`, jsonBody('POST', { namespace }));
+}
+
 /** What this token wrote. A token is its own actor (TOKATTEST). */
 async function whatItWrote(did: string): Promise<Attestation[]> {
     if (!did) return [];
@@ -95,7 +103,7 @@ function fmt(dt: string | undefined): string {
 }
 
 /** A dim caption above its value, the way the attestation element reads. */
-function field(name: string, value: string, copyable = false): HTMLElement {
+function field(name: string, value: string, copyable = false, hover = ''): HTMLElement {
     const wrap = document.createElement('div');
     wrap.style.display = 'flex';
     wrap.style.flexDirection = 'column';
@@ -110,6 +118,7 @@ function field(name: string, value: string, copyable = false): HTMLElement {
     held.style.wordBreak = 'break-word';
     held.style.overflowWrap = 'break-word';
     held.textContent = value;
+    if (hover) held.title = hover;
 
     if (copyable) {
         held.style.cursor = 'pointer';
@@ -260,6 +269,57 @@ function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
     return wrap;
 }
 
+function option(value: string, text: string, chosen = false): HTMLOptionElement {
+    const made = document.createElement('option');
+    made.value = value;
+    made.textContent = text;
+    made.selected = chosen;
+    return made;
+}
+
+/** Where a client's connectors act, and for a live client a pick that moves it.
+ *  "I wish i could as ROOT, change the namespace where an OAUTH token is active in." */
+export function namespacesField(container: HTMLElement, t: TokenInfo): HTMLElement {
+    const shown = t.namespaces?.length ? t.namespaces.join(', ') : '—';
+    if (t.level !== 'OAUTH' || t.revoked_at) return field('Namespaces', shown);
+
+    const wrap = field('Namespaces', shown);
+    const pick = document.createElement('select');
+    pick.className = 'input';
+    pick.title = 'move this client, and every connector through it at its next refresh';
+    pick.appendChild(option('', 'reading namespaces…'));
+    pick.disabled = true;
+    wrap.appendChild(pick);
+
+    const current = t.namespaces?.[0] ?? '';
+    apiJson<{ namespaces: Namespace[] }>('/api/namespaces')
+        .then(listed => {
+            pick.innerHTML = '';
+            for (const ns of ordered(listed.namespaces || [])) {
+                pick.appendChild(option(ns.name, ns.name, ns.name === current));
+            }
+            pick.disabled = false;
+        })
+        .catch((err: unknown) => {
+            pick.innerHTML = '';
+            pick.appendChild(option('', err instanceof Error ? err.message : String(err)));
+        });
+
+    pick.addEventListener('change', () => {
+        const to = pick.value;
+        if (to === '' || to === current) return;
+        pick.disabled = true;
+        moveClient(t.id, to)
+            .then(() => redraw(container, t.id))
+            .catch((err: unknown) => {
+                pick.disabled = false;
+                wrap.querySelector('.element-error')?.remove();
+                wrap.appendChild(errorBox(err instanceof Error ? err.message : String(err)));
+            });
+    });
+    return wrap;
+}
+
 function status(t: TokenInfo): string {
     if (t.revoked_at) return `revoked ${fmt(t.revoked_at)}`;
     if (t.expires_at && new Date(t.expires_at) < new Date()) return `expired ${fmt(t.expires_at)}`;
@@ -286,8 +346,10 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     // The DID is how this token's own attestations are found: ?actor=<did>.
     // For a client it is the client id, and the raw value above is the secret.
     container.appendChild(field('DID', t.did || '—', true));
-    container.appendChild(field('Speaks for', t.minted_by || '—'));
-    container.appendChild(field('Namespaces', t.namespaces?.length ? t.namespaces.join(', ') : '—'));
+    // Tokens are owned by someone: the name, and on the hover the identity it
+    // was minted under.
+    container.appendChild(field('Owner', t.minted_by_display_name || t.minted_by || '—', false, t.minted_by || ''));
+    container.appendChild(namespacesField(container, t));
     if (t.return_address) {
         container.appendChild(field('Return address', t.return_address, true));
     }

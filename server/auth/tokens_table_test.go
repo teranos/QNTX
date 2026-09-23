@@ -99,6 +99,27 @@ func TestTheTokenRecordIsReadOnceOnOpenAndNeverOnARequest(t *testing.T) {
 	assert.Equal(t, 1, record.records, "a request read the record")
 }
 
+// Moving a client is a change to what it is, so the record carries it too, and
+// a table rebuilt from the record after host loss holds the client where it was
+// moved to.
+func TestAMoveReachesTheTableAndTheRecord(t *testing.T) {
+	record := &countingTokens{}
+	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), record)
+	require.NoError(t, err)
+	client := aToken("abc", "grok")
+	client.Level = LevelOAuth
+	id, err := table.Issue(client)
+	require.NoError(t, err)
+
+	require.NoError(t, table.SetNamespaces(id, []string{"vakconnectie"}))
+
+	held, live := table.Lookup("abc")
+	require.True(t, live)
+	assert.Equal(t, []string{"vakconnectie"}, held.Namespaces)
+	require.Len(t, record.held, 1)
+	assert.Equal(t, []string{"vakconnectie"}, record.held[0].Namespaces, "the record kept the namespace the client was moved away from")
+}
+
 // A token the record holds and the table lacks is what rebuilds the table
 // after host loss.
 func TestOpeningTakesInTheTokensTheRecordHoldsAndTheTableLacks(t *testing.T) {

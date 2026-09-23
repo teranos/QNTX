@@ -189,6 +189,11 @@ func (t *TokenTable) Enable(id string) error {
 	return t.change(id, func(held *TokenRecord) { held.RevokedAt = nil })
 }
 
+// SetNamespaces changes where a token acts, in the table and then the record.
+func (t *TokenTable) SetNamespaces(id string, namespaces []string) error {
+	return t.change(id, func(held *TokenRecord) { held.Namespaces = namespaces })
+}
+
 // Touch records that this token was presented now.
 //
 // The table and nothing else. Last-used is a watch — it is what revoking a

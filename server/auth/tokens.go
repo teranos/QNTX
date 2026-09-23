@@ -170,6 +170,12 @@ type TokenStore interface {
 	Touch(hash string) error
 }
 
+// NamespaceMover is a TokenStore that can change where a token acts. The
+// operational table is one; a store that is not answers a move as unavailable.
+type NamespaceMover interface {
+	SetNamespaces(id string, namespaces []string) error
+}
+
 // TokenRecord is a token whole, hash included — what the operational db holds
 // and what the record holds, in one shape so the two can be compared.
 //

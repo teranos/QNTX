@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { ago, renderList } from './tokens-element';
+import { ago, ended, owner, renderList } from './tokens-element';
 
 const NOW = new Date('2026-09-15T12:00:00Z');
 
@@ -18,7 +18,7 @@ function token(extra: Record<string, string> = {}) {
 /** The status cell of one row, as a token sees it: no switches, so it is the last cell. */
 function status(extra: Record<string, string> = {}): HTMLElement {
     const container = document.createElement('div');
-    renderList(container, [token(extra)], false, NOW);
+    renderList(container, [token(extra)], NOW);
     const cell = container.querySelector<HTMLElement>('tbody td:last-child');
     if (!cell) throw new Error('no status cell rendered');
     return cell;
@@ -32,21 +32,21 @@ const MINUTE = 60 * 1000;
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * 60 * 60 * 1000;
 
-// A token lists and reads and revokes nothing, so a row does not offer it
-// Revoke or Enable.
-test('a token is not offered revoke or enable', () => {
+// Revoking and enabling are the token element's, and a row is a way in to it.
+test('a row offers no revoke or enable', () => {
     const container = document.createElement('div');
-    renderList(container, [token()], false, NOW);
-    expect(container.querySelector('button')).toBeNull();
+    renderList(container, [token(), token({ id: 'AT_2', revoked_at: before(DAY) })], NOW);
+    expect(container.textContent).not.toContain('Revoke');
+    expect(container.textContent).not.toContain('Enable');
 });
 
 describe('one column says whether a token is on and when it was last used', () => {
     describe('tim', () => {
         test('Last used is no longer a column of its own', () => {
             const container = document.createElement('div');
-            renderList(container, [token()], false, NOW);
-            const headers = [...container.querySelectorAll('th')].map(th => th.textContent);
-            expect(headers).toEqual(['Label', 'For', 'DID', 'Namespace', 'Created', 'Status']);
+            renderList(container, [token()], NOW);
+            const headers = [...container.querySelectorAll('th')].map(th => th.firstChild?.textContent?.trim());
+            expect(headers).toEqual(['Label', 'Kind', 'Owner', 'DID', 'Namespace', 'Created', 'Status']);
         });
 
         test('an active token nobody has used reads active, never used', () => {
@@ -103,4 +103,83 @@ describe('one column says whether a token is on and when it was last used', () =
             }
         });
     });
+});
+
+/** The cells of one row, by header. */
+function row(extra: Record<string, string> = {}): Record<string, HTMLElement> {
+    const container = document.createElement('div');
+    renderList(container, [token(extra)], NOW);
+    const names = [...container.querySelectorAll('th')].map(th => th.firstChild?.textContent?.trim() ?? '');
+    const cells = [...container.querySelectorAll<HTMLElement>('tbody td')];
+    return Object.fromEntries(names.map((name, i) => [name, cells[i]]));
+}
+
+describe('what a row says', () => {
+    describe('tim', () => {
+        // "it should just say Owner, tokens are Owned by someone."
+        test('the owner is the name of whoever minted it, and the identity is on the hover', () => {
+            const cells = row({ minted_by_display_name: 'root' });
+            expect(cells.Owner.textContent).toBe('root');
+            expect(cells.Owner.title).toBe('apple:001750');
+        });
+
+        test('the kind is a column of its own', () => {
+            expect(row({ level: 'REFRESH' }).Kind.textContent).toBe('REFRESH');
+        });
+
+        // "Created date should not also have to include time, unless hover"
+        test('created is the day, and the time is on the hover', () => {
+            const cells = row();
+            expect(cells.Created.textContent).toBe('2026-09-14');
+            expect(cells.Created.title).toBe('2026-09-14 00:43:56');
+        });
+
+        // "same for expired date, does not need to show immediately, unless hover"
+        test('an expired token reads expired, and when is on the hover', () => {
+            const pill = status({ expires_at: before(2 * HOUR) }).querySelector<HTMLElement>('.element-pill-past');
+            expect(pill?.textContent).toBe('expired');
+            expect(pill?.parentElement?.textContent).toBe('expired');
+            expect(pill?.title).toBe(`expired ${new Date(NOW.getTime() - 2 * HOUR).toISOString().slice(0, 19).replace('T', ' ')}`);
+        });
+
+        // A refresh token is spent at the token endpoint and is never a bearer,
+        // so "never used" said nothing about it.
+        test('a live refresh token reads active and nothing about use', () => {
+            const cell = status({ level: 'REFRESH' });
+            expect(cell.querySelector('.token-pill-active')?.textContent).toBe('active');
+            expect(cell.querySelector('.token-pill-never')).toBeNull();
+        });
+    });
+
+    describe('spike', () => {
+        test('the owner falls back to the identity when no name was recorded', () => {
+            expect(owner({ minted_by: 'apple:001750' })).toBe('apple:001750');
+            expect(owner({})).toBe('—');
+        });
+
+        test('a token has ended when it is revoked or past its expiry, and not before', () => {
+            expect(ended({}, NOW)).toBe(false);
+            expect(ended({ expires_at: new Date(NOW.getTime() + HOUR).toISOString() }, NOW)).toBe(false);
+            expect(ended({ expires_at: before(HOUR) }, NOW)).toBe(true);
+            expect(ended({ revoked_at: before(HOUR) }, NOW)).toBe(true);
+        });
+    });
+});
+
+// "I wish the status col would give me a way to filter out everything revoked and expired."
+test('the switch in the Status header hides what no longer works, and shows it again', () => {
+    const container = document.createElement('div');
+    renderList(container, [
+        token({ id: 'AT_1', label: 'live' }),
+        token({ id: 'AT_2', label: 'revoked', revoked_at: before(DAY) }),
+        token({ id: 'AT_3', label: 'expired', expires_at: before(HOUR) }),
+    ], NOW);
+    const labels = () => [...container.querySelectorAll('tbody tr td:first-child')].map(td => td.textContent);
+    expect(labels()).toEqual(['live', 'revoked', 'expired']);
+
+    container.querySelector<HTMLButtonElement>('.tokens-live-only')!.click();
+    expect(labels()).toEqual(['live']);
+
+    container.querySelector<HTMLButtonElement>('.tokens-live-only')!.click();
+    expect(labels()).toEqual(['live', 'revoked', 'expired']);
 });

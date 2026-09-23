@@ -254,6 +254,10 @@ func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Pres
 		h.handleEnableToken(w, r, p, id)
 		return
 	}
+	if id, ok := strings.CutSuffix(rest, "/namespace"); ok {
+		h.handleMoveClient(w, r, p, id)
+		return
+	}
 	if r.Method == http.MethodGet {
 		h.handleGetToken(w, rest)
 		return
@@ -385,6 +389,73 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request, p Pr
 //
 // It does not extend an expiry — a token past its expiry stays dead whatever
 // this returns.
+// handleMoveClient moves a client to another namespace.
+// POST /auth/tokens/{id}/namespace   {"namespace": "<name>"}
+//
+// "I wish i could as ROOT, change the namespace where an OAUTH token is active in."
+// A connector acts in its client's namespace, and a refresh reads the client,
+// so every connector through it follows at its next refresh.
+func (h *Handler) handleMoveClient(w http.ResponseWriter, r *http.Request, p Presented, id string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	mover, moves := h.tokens.(NamespaceMover)
+	if !moves {
+		h.writeError(w, http.StatusServiceUnavailable, "this node's token store cannot move a token")
+		return
+	}
+	var req struct {
+		Namespace string `json:"namespace"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON: "+err.Error())
+		return
+	}
+	namespace := strings.TrimSpace(req.Namespace)
+	if namespace == "" {
+		h.writeError(w, http.StatusBadRequest, "a client acts in one namespace, and this named none")
+		return
+	}
+	by, _ := p.Admitted()
+	// Naming a namespace is crossing into one, which ADR-027 puts at SUPER, the
+	// same as at minting.
+	if namespace != NamespaceDefault && !h.stillAdmitted(by) {
+		h.writeError(w, http.StatusForbidden, errRefused.Error())
+		return
+	}
+	infos, err := h.tokens.List()
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "the token store did not answer: "+err.Error())
+		return
+	}
+	var from []string
+	found := false
+	for _, info := range infos {
+		if info.ID != id {
+			continue
+		}
+		if info.Level != LevelOAuth {
+			h.writeError(w, http.StatusBadRequest, "only a client is moved, and "+id+" is a "+string(info.Level)+" token")
+			return
+		}
+		from, found = info.Namespaces, true
+	}
+	if !found {
+		h.writeError(w, http.StatusNotFound, "the node does not list token "+id)
+		return
+	}
+	if err := mover.SetNamespaces(id, []string{namespace}); err != nil {
+		h.attest(PredicateUnanswered, by, map[string]any{
+			"asked": "token store", "doing": "move", "token": id, "error": err.Error(),
+		})
+		h.writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
+		return
+	}
+	h.attest(PredicateMoved, by, map[string]any{"token": id, "from": from, "to": namespace})
+	h.writeJSON(w, http.StatusOK, map[string]string{"status": "moved", "id": id, "namespace": namespace})
+}
+
 func (h *Handler) handleEnableToken(w http.ResponseWriter, r *http.Request, p Presented, id string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

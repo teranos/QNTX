@@ -408,6 +408,17 @@ func (m *memTokenStore) Enable(id string) error {
 	return m.setRevoked(id, false)
 }
 
+func (m *memTokenStore) SetNamespaces(id string, namespaces []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, tok := range m.tokens {
+		if tok.id == id {
+			tok.grant.Namespaces = namespaces
+		}
+	}
+	return nil
+}
+
 func (m *memTokenStore) Touch(hash string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

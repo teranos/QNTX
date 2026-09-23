@@ -9,7 +9,7 @@
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createDangerButton, createGhostButton, createPrimaryButton } from './components/button';
+import { createGhostButton } from './components/button';
 import { openTokenMintElement } from './token-mint-element';
 import { openTokenElement } from './token-element';
 import { log, SEG } from './logger';
@@ -18,10 +18,12 @@ import { person } from './self-person';
 interface TokenInfo {
     id: string;
     label: string;
-    did: string;
-    minted_by: string;
+    did?: string;
+    minted_by?: string;
+    /** The name of the person who minted it, recorded at minting. */
+    minted_by_display_name?: string;
     level?: string;
-    namespaces: string[];
+    namespaces?: string[];
     return_address?: string;
     created_at: string;
     expires_at?: string;
@@ -31,31 +33,34 @@ interface TokenInfo {
 
 const ELEMENT_ID = 'tokens-element';
 
+/** A refresh token is spent at the token endpoint and never presented as a
+ *  bearer, so it is never "used" in the sense the pill counts. */
+const REFRESH = 'REFRESH';
+
 async function fetchTokens(): Promise<TokenInfo[]> {
     return await apiJson<TokenInfo[]>('/auth/tokens');
-}
-
-
-async function revokeToken(id: string): Promise<void> {
-    await apiJson<{ status: string }>(`/auth/tokens/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-    });
-}
-
-/**
- * Lift a revocation (ADR-025). Revocation is a switch: kill the token, watch
- * whether anything is still presenting it, turn it back on if that was you.
- */
-async function enableToken(id: string): Promise<void> {
-    await apiJson<{ status: string }>(`/auth/tokens/${encodeURIComponent(id)}/enable`, {
-        method: 'POST',
-    });
 }
 
 function fmt(dt: string | undefined): string {
     if (!dt) return '—';
     const d = new Date(dt);
     return isNaN(d.getTime()) ? dt : d.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+/** The day alone. The time is on the hover. */
+function day(dt: string | undefined): string {
+    return fmt(dt).slice(0, 10);
+}
+
+/** Whether a token no longer works: revoked, or past its expiry. */
+export function ended(t: Pick<TokenInfo, 'revoked_at' | 'expires_at'>, now: Date): boolean {
+    return !!t.revoked_at || (!!t.expires_at && new Date(t.expires_at) < now);
+}
+
+/** Who owns the token: the name they gave, or the identity it was minted
+ *  under when no name was recorded. */
+export function owner(t: Pick<TokenInfo, 'minted_by' | 'minted_by_display_name'>): string {
+    return t.minted_by_display_name || t.minted_by || '—';
 }
 
 /**
@@ -69,9 +74,9 @@ export function shortDID(did: string): string {
 }
 
 /** A cell holding a DID short, with the whole of it a press away. */
-function didCell(did: string): HTMLTableCellElement {
+function didCell(did: string | undefined): HTMLTableCellElement {
     const td = document.createElement('td');
-    td.textContent = shortDID(did);
+    td.textContent = shortDID(did ?? '');
     if (!did) return td;
 
     // Nothing is hidden: the value is on the element and one press takes it.
@@ -129,26 +134,55 @@ function statusPill(t: TokenInfo, now: Date): HTMLTableCellElement {
         return td;
     }
 
+    // When it expired is on the hover.
     if (t.expires_at && new Date(t.expires_at) < now) {
-        td.append(segment('expired', 'element-pill element-pill-past'), segment(fmt(t.expires_at), 'element-pill-when'));
+        const pill = segment('expired', 'element-pill element-pill-past');
+        pill.title = `expired ${fmt(t.expires_at)}`;
+        td.appendChild(pill);
         return td;
     }
 
     const pill = document.createElement('span');
     pill.className = 'token-pill';
-    pill.append(
-        segment('active', 'token-pill-active'),
-        used ? segment(used.text, `token-age-${used.age}`) : segment('never used', 'token-pill-never'),
-    );
+    pill.appendChild(segment('active', 'token-pill-active'));
+    if (t.level !== REFRESH) {
+        pill.appendChild(used ? segment(used.text, `token-age-${used.age}`) : segment('never used', 'token-pill-never'));
+    }
     td.appendChild(pill);
     return td;
 }
 
-/** Exported for tests: which control a row offers is the whole point of the
- *  revoked state, and it is not reachable through the async element mount.
- *  `switches` is whether the viewer may revoke or enable: a session may, a
- *  token may not, and a row does not offer a token what a token cannot do. */
-export function renderList(container: HTMLElement, tokens: TokenInfo[], switches = true, now = new Date()): void {
+/** Whether the list shows only the tokens that still work. */
+let liveOnly = false;
+
+/** The Status header, and the switch in it that hides what no longer works. */
+function statusHeader(onToggle: () => void): HTMLTableCellElement {
+    const th = document.createElement('th');
+    th.append('Status ');
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'tokens-live-only';
+    toggle.setAttribute('aria-pressed', liveOnly ? 'true' : 'false');
+    toggle.textContent = liveOnly ? 'live only' : 'all';
+    toggle.title = liveOnly ? 'press to show revoked and expired tokens too' : 'press to hide revoked and expired tokens';
+    toggle.style.cursor = 'pointer';
+    toggle.style.background = 'none';
+    toggle.style.border = '1px solid var(--border-on-dark)';
+    toggle.style.borderRadius = 'var(--border-radius)';
+    toggle.style.color = 'inherit';
+    toggle.style.font = 'inherit';
+    toggle.style.padding = '0 6px';
+    toggle.addEventListener('click', () => {
+        liveOnly = !liveOnly;
+        onToggle();
+    });
+    th.appendChild(toggle);
+    return th;
+}
+
+/** Exported for tests. Revoking and enabling are the token element's: a row is
+ *  a way in to it and nothing else. */
+export function renderList(container: HTMLElement, tokens: TokenInfo[], now = new Date()): void {
     container.innerHTML = '';
 
     if (tokens.length === 0) {
@@ -163,67 +197,50 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[], switches
     table.className = 'element-table tokens-table';
 
     const thead = document.createElement('thead');
-    thead.innerHTML = `<tr>
-        <th>Label</th>
-        <th>For</th>
-        <th>DID</th>
-        <th>Namespace</th>
-        <th>Created</th>
-        <th>Status</th>
-        ${switches ? '<th></th>' : ''}
-    </tr>`;
+    const headings = document.createElement('tr');
+    for (const name of ['Label', 'Kind', 'Owner', 'DID', 'Namespace', 'Created']) {
+        const th = document.createElement('th');
+        th.textContent = name;
+        headings.appendChild(th);
+    }
+    headings.appendChild(statusHeader(() => { renderList(container, tokens, now); }));
+    thead.appendChild(headings);
     table.appendChild(thead);
+
+    function cell(text: string, className = '', title = ''): HTMLTableCellElement {
+        const td = document.createElement('td');
+        td.className = className;
+        td.textContent = text;
+        if (title) td.title = title;
+        return td;
+    }
 
     const tbody = document.createElement('tbody');
     for (const t of tokens) {
+        if (liveOnly && ended(t, now)) continue;
         const tr = document.createElement('tr');
 
         const label = document.createElement('td');
         label.textContent = t.label;
-        // The label is the way in to the token's own element. The row keeps its
-        // revoke and enable controls, which are not a way in.
+        // The label is the way in to the token's own element, where it is
+        // revoked and enabled.
         label.style.cursor = 'pointer';
         label.title = 'press to open this token';
         label.addEventListener('click', () => { openTokenElement(t.id, t.label); });
         tr.appendChild(label);
 
-        function cell(text: string, className = ''): HTMLTableCellElement {
-            const td = document.createElement('td');
-            td.className = className;
-            td.textContent = text;
-            return td;
-        }
-
-        tr.appendChild(cell(t.minted_by || '—'));
+        tr.appendChild(cell(t.level || '—'));
+        // Tokens are owned by someone: the name, and on the hover the identity
+        // it was minted under.
+        tr.appendChild(cell(owner(t), '', t.minted_by || ''));
 
         // The DID is how a token's own attestations are found (?actor=).
         tr.appendChild(didCell(t.did));
         tr.appendChild(cell(t.namespaces?.length ? t.namespaces.join(', ') : '—'));
         // What a token may read and write is not on the token: the roles its
         // name holds say, through their lines (ADR-034).
-        tr.appendChild(cell(fmt(t.created_at), 'element-time'));
+        tr.appendChild(cell(day(t.created_at), 'element-time', fmt(t.created_at)));
         tr.appendChild(statusPill(t, now));
-
-        if (switches) {
-            const action = document.createElement('td');
-            action.className = 'element-actions';
-            if (t.revoked_at) {
-                // Revoked is a state you can leave. Without this the only way
-                // back is minting a new token and redistributing it.
-                const enable = createPrimaryButton('Enable', async () => {
-                    await enableToken(t.id);
-                    await refreshList(container);
-                });
-                action.appendChild(enable.element);
-            } else {
-                const revoke = createDangerButton('Revoke', 'Confirm revoke', async () => {
-                    await revokeToken(t.id);
-                    await refreshList(container);
-                });
-                action.appendChild(revoke.element);
-            }
-            tr.appendChild(action);
-        }
 
         tbody.appendChild(tr);
     }
@@ -231,11 +248,8 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[], switches
     container.appendChild(table);
 }
 
-// Who is looking decides what the rows offer: a session revokes and enables,
-// a token only reads.
 async function refreshList(container: HTMLElement): Promise<void> {
-    const [tokens, who] = await Promise.all([fetchTokens(), person()]);
-    renderList(container, tokens, who.via !== 'token');
+    renderList(container, await fetchTokens());
 }
 
 /** The way to the mint element. Creating one token is not surveying them all. */

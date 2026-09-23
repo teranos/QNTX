@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { linesFor, rolesText, saidLine, type TokenInfo } from './token-element';
+import { linesFor, namespacesField, rolesText, saidLine, type TokenInfo } from './token-element';
 
 function token(): TokenInfo {
     return {
@@ -41,6 +41,26 @@ test('an attestation reads as X is Y of Z, a DID by its last eight', () => {
         contexts: ['TEST1'],
     })).toBe('CSCn1XDK is role:granted WORKER of TEST1');
     expect(saidLine({ subjects: ['visit-1'], predicates: ['visit:done'], contexts: [] })).toBe('visit-1 is visit:done');
+});
+
+// "I wish i could as ROOT, change the namespace where an OAUTH token is active in."
+test('a live client is offered a pick of the namespace it moves to', () => {
+    const client = { ...token(), level: 'OAUTH', namespaces: ['default'] };
+    const shown = namespacesField(document.createElement('div'), client);
+    expect(shown.querySelector('select')).not.toBeNull();
+    expect(shown.textContent).toContain('default');
+});
+
+// Every other kind names where it acts at minting and keeps it; a revoked
+// client issues nothing, so moving it moves nothing.
+test('only a live client is offered a move', () => {
+    for (const t of [
+        { ...token(), level: 'ATTESTOR' },
+        { ...token(), level: 'REFRESH' },
+        { ...token(), level: 'OAUTH', revoked_at: '2026-09-15T00:00:00Z' },
+    ]) {
+        expect(namespacesField(document.createElement('div'), t).querySelector('select')).toBeNull();
+    }
 });
 
 test('the roles read per namespace, and a dash for none', () => {

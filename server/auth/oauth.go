@@ -446,7 +446,9 @@ func (s *oauthStore) GetRefreshTokenSession(_ context.Context, signature string,
 		MintedBy:            grant.MintedBy,
 		MintedByUser:        grant.MintedByUser,
 		MintedByDisplayName: grant.MintedByDisplayName,
-		Namespace:           namespaceOf(grant),
+		// The client's, as it is now: a client moved since is where the
+		// connector acts from this refresh on.
+		Namespace: client.Namespace,
 	}
 	session.SetExpiresAt(fosite.RefreshToken, until)
 	request := fosite.NewRequest()
