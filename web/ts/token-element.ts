@@ -434,9 +434,16 @@ export function namespacesField(container: HTMLElement, t: TokenInfo): HTMLEleme
 
     if (active !== undefined) {
         row.appendChild(rectangle);
-        requestAnimationFrame(() => {
-            place(rectangle, tiles.querySelector<HTMLElement>('.namespace-tile.standing'));
-        });
+        // The strip is drawn before the window holds it — measured off-screen and
+        // detached, then attached after the window's opening — so at first no
+        // tile has a size. The rectangle is placed whenever the tiles are laid
+        // out: when they first get a size, and whenever the window changes it.
+        const onTheTile = () => place(rectangle, tiles.querySelector<HTMLElement>('.namespace-tile.standing'));
+        if (typeof ResizeObserver !== 'undefined') {
+            new ResizeObserver(onTheTile).observe(tiles);
+        } else {
+            requestAnimationFrame(onTheTile);
+        }
     }
     return row;
 }

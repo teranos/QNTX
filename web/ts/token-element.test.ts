@@ -67,6 +67,37 @@ test('the namespaces are the bar\'s tiles, no caption, the active one under the 
     expect(row.querySelector<HTMLElement>('.namespace-tile[data-name="default"]')?.dataset.kind).toBe('default');
 });
 
+// "small ui bug, why does it not say that clean is where the rectangle is around ?"
+// The strip is drawn before the window holds it, when nothing has a size, so
+// the rectangle is placed again once the tiles are laid out.
+test('the rectangle lands on the active tile once the tiles have their size', () => {
+    const observed: Array<() => void> = [];
+    const had = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+        constructor(callback: () => void) { observed.push(callback); }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    try {
+        const row = strip({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
+        const active = row.querySelector<HTMLElement>('.namespace-tile.standing')!;
+        for (const [key, value] of Object.entries({ offsetWidth: 120, offsetHeight: 24, offsetLeft: 132, offsetTop: 6 })) {
+            Object.defineProperty(active, key, { configurable: true, value });
+        }
+        expect(observed.length).toBeGreaterThan(0);
+        observed.forEach(laidOut => laidOut());
+
+        const rectangle = row.querySelector<HTMLElement>('.namespaces-rectangle')!;
+        expect(rectangle.hidden).toBe(false);
+        expect(rectangle.style.width).toBe('120px');
+        expect(rectangle.style.height).toBe('24px');
+        expect(rectangle.style.transform).toBe('translate(132px, 6px)');
+    } finally {
+        globalThis.ResizeObserver = had;
+    }
+});
+
 // "another route is right click, see the X next to it, press it once invert, again, reoved"
 test('a right-click splits a tile into [<] name [X], and the first press of X arms it', () => {
     const row = strip({ ...token(), level: 'OAUTH', namespaces: ['Clean', 'default'] });
