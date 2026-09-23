@@ -77,10 +77,15 @@ func sleepUnder(ctx context.Context, d time.Duration) error {
 }
 
 type ciWatchHandler struct {
-	run    func(ctx context.Context, args ...string) ([]byte, error)
-	sleep  func(ctx context.Context, d time.Duration) error
-	news   *newsLog
-	logger *zap.SugaredLogger
+	run   func(ctx context.Context, args ...string) ([]byte, error)
+	sleep func(ctx context.Context, d time.Duration) error
+	news  *newsLog
+	// Who the token that attested the push speaks for. The row is asked as a
+	// person — their session or their own token — and the ground token that
+	// streamed the push cannot read the row at all; the news is filed under
+	// the person so it is found. Nil files it under the DID.
+	mintedBy func(did string) (string, bool)
+	logger   *zap.SugaredLogger
 }
 
 func (h *ciWatchHandler) Name() string { return watcher.CIWatchHandlerName }
@@ -232,13 +237,19 @@ func (h *ciWatchHandler) leave(as types.As, caller, repo, branch, sha string, ru
 		url = runs[0].URL
 	}
 	now := time.Now()
+	addressee := caller
+	if h.mintedBy != nil {
+		if who, ok := h.mintedBy(caller); ok {
+			addressee = who
+		}
+	}
 	// The row's id is per session — ground writes one ci-status row per
 	// session and replaces it on every push — so the id here carries the
 	// commit as well, or the laptop would take a second push's result for the
 	// first's and write nothing.
 	h.news.leave(News{
 		ID:  as.ID + ":" + shortSha,
-		For: caller,
+		For: addressee,
 		Item: StatusItem{
 			Name:   "ci",
 			Note:   note,
@@ -259,7 +270,7 @@ func (h *ciWatchHandler) leave(as types.As, caller, repo, branch, sha string, ru
 	})
 	h.logger.Infow("ci.watch left news on the row",
 		"repo", repo, "branch", branch, "sha", shortSha, "conclusion", conclusion,
-		"workflows", len(runs), "failed", len(failed), "for", caller)
+		"workflows", len(runs), "failed", len(failed), "for", addressee, "attested_by", caller)
 }
 
 // sessionOf is the session context ground wrote, so the laptop can hand the
@@ -322,10 +333,11 @@ func (s *QNTXServer) setupCIWatch() {
 		s.news = newNewsLog()
 	}
 	h := &ciWatchHandler{
-		run:    ghRun,
-		sleep:  sleepUnder,
-		news:   s.news,
-		logger: s.logger.Named("ci.watch"),
+		run:      ghRun,
+		sleep:    sleepUnder,
+		news:     s.news,
+		mintedBy: s.authHandler.MintedBy,
+		logger:   s.logger.Named("ci.watch"),
 	}
 	s.daemon.Registry().Register(h)
 	s.logger.Infow("Registered ci.watch built-in")

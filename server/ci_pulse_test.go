@@ -74,9 +74,16 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 	}
 	news := newNewsLog()
 	h := &ciWatchHandler{
-		run:    gh.run,
-		news:   news,
-		sleep:  func(context.Context, time.Duration) error { return nil },
+		run:   gh.run,
+		news:  news,
+		sleep: func(context.Context, time.Duration) error { return nil },
+		// The push was attested by alice's ground token; the news is hers.
+		mintedBy: func(did string) (string, bool) {
+			if did == "did:key:alice" {
+				return "https://mastodon.example/@alice", true
+			}
+			return "", false
+		},
 		logger: zap.NewNop().Sugar(),
 	}
 
@@ -84,9 +91,12 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 		t.Fatalf("Execute: %v", err)
 	}
 
-	got := news.since("did:key:alice", time.Now().UnixMilli())
+	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
 	if len(got) != 1 {
 		t.Fatalf("news for alice: %d items, want 1: %+v", len(got), got)
+	}
+	if left := news.since("did:key:alice", time.Now().UnixMilli()); len(left) != 0 {
+		t.Fatalf("news was filed under the token's DID, which cannot read the row: %+v", left)
 	}
 	n := got[0]
 	if n.ID != "ground:ci-status:sess-1:abc123" {

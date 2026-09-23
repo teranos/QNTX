@@ -391,6 +391,25 @@ func (h *Handler) holdingsOf(identity, namespace string) ([]string, bool) {
 // It hands them back rather than registering them. A package that could put a
 // route on the mux itself would be a second way onto it, and there is one way
 // and it is a line in server/reach.
+// MintedBy is who a token speaks for, by its DID (ADR-025). What a token
+// wrote is filed under its DID; what is left for it on the row is filed
+// under the person, so the person's other tokens and their session see it.
+func (h *Handler) MintedBy(did string) (string, bool) {
+	if h == nil || h.tokens == nil || did == "" {
+		return "", false
+	}
+	held, err := h.tokens.List()
+	if err != nil {
+		return "", false
+	}
+	for _, t := range held {
+		if t.DID == did && t.MintedBy != "" {
+			return t.MintedBy, true
+		}
+	}
+	return "", false
+}
+
 func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux := answering{h: h, on: map[string]http.HandlerFunc{}}
 	mux.answer("/auth/login", h.handleLogin)

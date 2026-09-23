@@ -92,14 +92,16 @@ func (l *newsLog) byID(caller, id string) (News, bool) {
 	return News{}, false
 }
 
-// newsKey is the name a caller's news is filed under. A token acts as its DID,
-// and that DID is what led the actors of the attestation it wrote; a person
-// holding a role acts as the route they came in by.
+// newsKey is the name a caller's news is filed under: the person. A token
+// speaks for whoever minted it (ADR-025) and carries that as Identity, and
+// so does their session, so news left for a push one token attested is found
+// by another of theirs, or by them at the browser. The DID is the key only
+// for a caller that is nobody's.
 func newsKey(a auth.Admission) string {
-	if acts := a.ActsAs(); acts != "" {
-		return acts
+	if a.Identity != "" {
+		return a.Identity
 	}
-	return a.Identity
+	return a.ActsAs()
 }
 
 // newsFor is the caller's items as the row draws them.
