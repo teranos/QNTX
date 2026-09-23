@@ -358,11 +358,7 @@ impl TokenStore {
     }
 
     /// The token this hash names whether or not it still works, with whether
-    /// it does.
-    ///
-    /// `resolve` drops a revoked token entirely, which cannot tell a refresh
-    /// token spent twice from one nobody ever issued. The first revokes
-    /// everything it led to (RFC 6819 §5.2.2.3); the second is a stranger.
+    /// it does. Why `resolve` is not enough: ADR-040.
     pub fn standing(&self, hash: &str, now_ms: i64) -> Option<(&TokenRecord, bool)> {
         self.by_hash
             .get(hash)

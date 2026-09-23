@@ -146,9 +146,7 @@ type TokenStore interface {
 	Lookup(hash string) (Grant, bool)
 	// LookupSpent answers for a token this hash names whether or not it still
 	// works: the grant, whether it is live, and whether the store holds it at
-	// all. A refresh token spent twice has to be told apart from one that was
-	// never issued — the first revokes everything it led to, the second is a
-	// stranger — and Lookup cannot say which, because both answer false.
+	// all. Why Lookup is not enough: ADR-040.
 	LookupSpent(hash string) (grant Grant, live bool, held bool)
 	// Create issues a new token. The raw token is returned once — never stored.
 	Create(spec NewToken) (raw, id string, err error)
