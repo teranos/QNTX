@@ -295,9 +295,11 @@ func sessionOf(contexts []string) string {
 const ciWatchRearmWindow = 3 * time.Hour
 
 // ciStatusSince is every push attested since the moment given, oldest first.
-func ciStatusSince(store namespaces.Reading, since time.Time) []*types.As {
+// A store that will not answer is an error, not an empty namespace: the two
+// read the same, and one of them is a push nobody will ever be told about.
+func ciStatusSince(store namespaces.Reading, since time.Time) ([]*types.As, error) {
 	if store == nil {
-		return nil
+		return nil, errors.New("no store to read pushes from")
 	}
 	found, err := store.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{watcher.CIPushedPredicate},
@@ -305,7 +307,7 @@ func ciStatusSince(store namespaces.Reading, since time.Time) []*types.As {
 		Limit:      100,
 	})
 	if err != nil {
-		return nil
+		return nil, errors.Wrap(err, "reading the pushes to re-arm on")
 	}
 	// The window is checked here as well: not every backend honours
 	// TimeStart, and a push is dated by push_time, ground's own stamp, before
@@ -321,7 +323,20 @@ func ciStatusSince(store namespaces.Reading, since time.Time) []*types.As {
 		}
 		recent = append(recent, as)
 	}
-	return recent
+	return recent, nil
+}
+
+// rearmFailed puts a re-arm that could not read on the row, where a failing
+// handler goes. A log line is not enough: the log is ROOT's, and the row is
+// what the person whose push went unreported is looking at.
+func (s *QNTXServer) rearmFailed(namespace string, err error) {
+	s.logger.Errorw("ci.watch could not re-arm", "namespace", namespace, "error", err)
+	s.noteHandlerFailure(HandlerFailure{
+		Handler:     watcher.CIWatchHandlerName,
+		ExecutionID: "rearm:" + namespace,
+		Error:       "re-arm in " + namespace + ": " + err.Error(),
+		Details:     errors.GetAllDetails(err),
+	})
 }
 
 // setupCIWatch registers the built-in. No schedule: the standing watcher
@@ -349,11 +364,15 @@ func (s *QNTXServer) setupCIWatch() {
 	since := time.Now().Add(-ciWatchRearmWindow)
 	var recent []*types.As
 	if s.held != nil {
-		recent = append(recent, ciStatusSince(s.held.Served(), since)...)
+		found, err := ciStatusSince(s.held.Served(), since)
+		if err != nil {
+			s.rearmFailed(auth.NamespaceDefault, err)
+		}
+		recent = append(recent, found...)
 		if known := s.held.Known(); known != nil {
 			listed, err := known.List()
 			if err != nil {
-				s.logger.Warnw("ci.watch could not list the namespaces to re-arm on", "error", err)
+				s.rearmFailed("*", errors.Wrap(err, "listing the namespaces"))
 			}
 			for _, ns := range listed {
 				if ns.Name == auth.NamespaceDefault || ns.Name == auth.NamespaceSystem {
@@ -361,11 +380,18 @@ func (s *QNTXServer) setupCIWatch() {
 				}
 				store, err := s.held.Read(ns.Name)
 				if err != nil {
-					s.logger.Warnw("ci.watch could not read a namespace to re-arm on", "namespace", ns.Name, "error", err)
+					s.rearmFailed(ns.Name, err)
 					continue
 				}
-				recent = append(recent, ciStatusSince(store, since)...)
+				found, err := ciStatusSince(store, since)
+				if err != nil {
+					s.rearmFailed(ns.Name, err)
+					continue
+				}
+				recent = append(recent, found...)
 			}
+		} else {
+			s.logger.Infow("ci.watch re-arms on the served namespace only; this backend keeps one")
 		}
 	}
 	for _, as := range recent {

@@ -29,7 +29,17 @@ type standingObserver struct {
 	// Looked up at fire time: a namespace starts before the daemon is wired,
 	// and the executor it will need does not exist yet when it registers.
 	builtins func() watcher.BuiltinExecutor
-	logger   *zap.SugaredLogger
+	// Where a row that matched and could not be run is put: the status row,
+	// not only the log, which is ROOT's to read.
+	noteFailure func(HandlerFailure)
+	logger      *zap.SugaredLogger
+}
+
+func (o *standingObserver) failed(handler, why string, as *types.As) {
+	if o.noteFailure == nil {
+		return
+	}
+	o.noteFailure(HandlerFailure{Handler: handler, ExecutionID: "standing:" + as.ID, Error: why})
 }
 
 // OnAttestationCreated runs every standing built-in whose filter names the
@@ -55,6 +65,7 @@ func (o *standingObserver) OnAttestationCreated(as *types.As) {
 		if exec == nil {
 			o.logger.Errorw("A standing row matched and nothing is wired to run its built-in",
 				"watcher_id", w.ID, "attestation_id", as.ID, "handler", action.HandlerName)
+			o.failed(action.HandlerName, "a push matched the standing row and no executor was wired to run it", as)
 			continue
 		}
 		if err := exec.ExecuteBuiltin(o.ctx, action.HandlerName, as); err != nil {
@@ -85,7 +96,8 @@ func (standingSubsystem) Start(u *namespaces.Universe) error {
 				}
 				return s.builtin
 			},
-			logger: s.logger.Named("standing"),
+			noteFailure: s.noteHandlerFailure,
+			logger:      s.logger.Named("standing"),
 		}
 	}
 	storage.RegisterObserver(u.Name(), s.standing)

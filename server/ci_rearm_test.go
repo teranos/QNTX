@@ -33,7 +33,10 @@ func TestCIStatusSinceReadsTheRecentPushesBack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := ciStatusSince(store, time.Now().Add(-ciWatchRearmWindow))
+	got, err := ciStatusSince(store, time.Now().Add(-ciWatchRearmWindow))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || got[0].ID != "ground:ci-status:recent" {
 		ids := make([]string, 0, len(got))
 		for _, as := range got {
@@ -43,5 +46,14 @@ func TestCIStatusSinceReadsTheRecentPushesBack(t *testing.T) {
 	}
 	if got[0].Predicates[0] != watcher.CIPushedPredicate {
 		t.Errorf("predicate %q", got[0].Predicates[0])
+	}
+}
+
+// A store that is not there is not an empty one. The re-arm read a namespace
+// that would not answer and reported nothing to re-arm on, which reads exactly
+// like a namespace with no pushes in it.
+func TestCIStatusSinceSaysWhenItCannotRead(t *testing.T) {
+	if _, err := ciStatusSince(nil, time.Now()); err == nil {
+		t.Fatal("no store read as no pushes")
 	}
 }
