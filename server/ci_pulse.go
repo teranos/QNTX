@@ -205,11 +205,23 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Newf("ci.watch: attestation %s has no actor to address the result to", as.ID)
 	}
 	caller := as.Actors[0]
+	addressee := h.addressee(caller)
+	shortSha := sha
+	if len(shortSha) > 7 {
+		shortSha = shortSha[:7]
+	}
+	watchingID := as.ID + ":" + shortSha + ":watching"
 
 	pushedAt := as.Timestamp
 	if pushedAt.IsZero() {
 		pushedAt = time.Now()
 	}
+
+	// On the row from the first moment, so a wait and a push nobody watched
+	// do not look the same from the laptop. Quiet: nothing is written down
+	// for it and no session is woken by it.
+	h.watching(watchingID, addressee, "watching "+branch+" "+shortSha)
+	defer h.news.drop(watchingID)
 
 	token, err := h.token(ctx)
 	if err != nil {
@@ -231,6 +243,7 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 			}
 			h.logger.Warnw("ci.watch waits for github's rate limit to reset",
 				"repo", repo, "sha", sha, "reset", spent.reset.UTC().Format(time.RFC3339))
+			h.watching(watchingID, addressee, "quota until "+spent.reset.UTC().Format("15:04")+" "+branch+" "+shortSha)
 			if err := h.sleep(ctx, wait); err != nil {
 				return errors.Wrapf(err, "ci.watch: stopped waiting on %s@%s", branch, sha)
 			}
@@ -240,7 +253,7 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 			return err
 		}
 		if len(runs) > 0 && allConcluded(runs) {
-			h.leave(as, caller, repo, branch, sha, runs, pushedAt)
+			h.leave(as, addressee, caller, repo, branch, sha, runs, pushedAt)
 			return nil
 		}
 		if time.Now().After(deadline) {
@@ -248,10 +261,35 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 		}
 		elapsed := int64(time.Since(pushedAt).Seconds())
 		wait := time.Duration(pickAdaptiveSleep(elapsed, p50, p90)) * time.Second
+		h.watching(watchingID, addressee, "watching "+branch+" "+shortSha+" "+strconv.Itoa(len(runs))+" runs")
 		if err := h.sleep(ctx, wait); err != nil {
 			return errors.Wrapf(err, "ci.watch: stopped waiting on %s@%s", branch, sha)
 		}
 	}
+}
+
+// addressee is who the news is for: the person the attesting token speaks
+// for, or the DID itself when nothing says.
+func (h *ciWatchHandler) addressee(caller string) string {
+	if h.mintedBy != nil {
+		if who, ok := h.mintedBy(caller); ok {
+			return who
+		}
+	}
+	return caller
+}
+
+// watching puts what this push is at on the row, quietly, held for as long
+// as one poll interval can be plus the hold — refreshed on every turn of the
+// loop, so a wait that ended without a verdict expires off the row on its own.
+func (h *ciWatchHandler) watching(id, addressee, note string) {
+	h.news.leave(News{
+		ID:      id,
+		For:     addressee,
+		Item:    StatusItem{Name: "ci", Note: note, Symbol: SymbolWell},
+		UntilMs: time.Now().Add(ciWatchCeiling + newsHold).UnixMilli(),
+		Quiet:   true,
+	})
 }
 
 // percentiles is how long this branch's runs have been taking: the median and
@@ -337,7 +375,7 @@ func verdict(runs []ciRun) (conclusion string, failed []ciRun) {
 
 // leave puts the conclusion on the row for the caller. There is no branch on
 // green versus red: the result is the event.
-func (h *ciWatchHandler) leave(as types.As, caller, repo, branch, sha string, runs []ciRun, pushedAt time.Time) {
+func (h *ciWatchHandler) leave(as types.As, addressee, caller, repo, branch, sha string, runs []ciRun, pushedAt time.Time) {
 	conclusion, failed := verdict(runs)
 	symbol := SymbolUnwell
 	if conclusion == "success" {
@@ -362,12 +400,6 @@ func (h *ciWatchHandler) leave(as types.As, caller, repo, branch, sha string, ru
 		url = runs[0].URL
 	}
 	now := time.Now()
-	addressee := caller
-	if h.mintedBy != nil {
-		if who, ok := h.mintedBy(caller); ok {
-			addressee = who
-		}
-	}
 	// The row's id is per session — ground writes one ci-status row per
 	// session and replaces it on every push — so the id here carries the
 	// commit as well, or the laptop would take a second push's result for the

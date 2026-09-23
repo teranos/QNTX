@@ -31,6 +31,11 @@ type News struct {
 	// Detail is the whole of it, answered on a click.
 	Detail  map[string]any
 	UntilMs int64
+	// Quiet is on the row and nowhere else: drawn without its id, so the
+	// laptop that writes items down by id never writes this one and no
+	// session is woken for it. What a built-in is doing, as against what it
+	// concluded.
+	Quiet bool
 }
 
 // newsLog holds recent news in memory. A restart empties it, which is correct:
@@ -58,6 +63,21 @@ func (l *newsLog) leave(n News) {
 	l.items = append(l.items, n)
 	if len(l.items) > newsLogSize {
 		l.items = l.items[len(l.items)-newsLogSize:]
+	}
+}
+
+// drop takes an item off the row before its hold: what it said is over.
+func (l *newsLog) drop(id string) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for i := range l.items {
+		if l.items[i].ID == id {
+			l.items = append(l.items[:i], l.items[i+1:]...)
+			return
+		}
 	}
 }
 
@@ -113,7 +133,9 @@ func (h *StatusLineHandler) newsFor(a auth.Admission) []StatusItem {
 	items := make([]StatusItem, 0, len(held))
 	for _, n := range held {
 		it := n.Item
-		it.ID = n.ID
+		if !n.Quiet {
+			it.ID = n.ID
+		}
 		items = append(items, it)
 	}
 	return items

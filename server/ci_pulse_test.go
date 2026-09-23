@@ -193,6 +193,40 @@ func TestCIWatchWaitsForEveryWorkflow(t *testing.T) {
 	}
 }
 
+// While the run is watched the row says so, quietly: an item with no id, so
+// the laptop writes nothing down and wakes nobody, gone when the verdict is
+// in. From the laptop a wait and a push nobody watched looked the same.
+func TestCIWatchShowsTheWaitOnTheRowWithoutAnID(t *testing.T) {
+	gh := &scriptedGitHub{
+		history: noHistory(),
+		commits: []string{
+			runsJSON(aRun("Go", "in_progress", "", "g")),
+			runsJSON(aRun("Go", "completed", "success", "g")),
+		},
+	}
+	news := newNewsLog()
+	h := handlerOver(gh, news)
+	rowDuringWait := func() []StatusItem {
+		a := tokenCaller("did:key:alice")
+		return (&StatusLineHandler{news: func() *newsLog { return news }}).newsFor(a)
+	}
+	var seen []StatusItem
+	h.sleep = func(context.Context, time.Duration) error { seen = rowDuringWait(); return nil }
+	if err := h.Execute(context.Background(), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if len(seen) != 1 || !strings.Contains(seen[0].Note, "watching sky-whisper abc123") {
+		t.Fatalf("during the wait the row showed %+v", seen)
+	}
+	if seen[0].ID != "" {
+		t.Fatalf("the wait carried an id %q; the laptop would write it down and wake a session", seen[0].ID)
+	}
+	after := rowDuringWait()
+	if len(after) != 1 || after[0].ID == "" || !strings.Contains(after[0].Note, "success") {
+		t.Fatalf("after the verdict the row showed %+v; wanted the verdict alone, with its id", after)
+	}
+}
+
 // A spent quota is waited out, not failed. The first hour on the node spent
 // the person's whole 5000, and every push in flight then failed on the row.
 func TestCIWatchWaitsOutASpentQuota(t *testing.T) {
