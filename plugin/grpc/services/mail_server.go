@@ -327,8 +327,10 @@ func NewestMailTemplate(store ats.AttestationStore, plugin, name string) (*proto
 // TemplateOf reads a template back out of the attestation it was kept as.
 func TemplateOf(as *types.As) *protocol.MailTemplate {
 	part := func(key string) string {
-		v, _ := as.Attributes[key].(string)
-		return v
+		if v, ok := as.Attributes[key].(string); ok {
+			return v
+		}
+		return ""
 	}
 	return &protocol.MailTemplate{Subject: part("subject"), Html: part("html"), Text: part("text")}
 }

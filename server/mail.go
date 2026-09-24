@@ -298,6 +298,8 @@ func (s *QNTXServer) mailAccount(ctx context.Context, _ sigil.Sent) (any, *proto
 
 // attr is one string attribute of an attestation, or empty.
 func attr(as *types.As, key string) string {
-	v, _ := as.Attributes[key].(string)
-	return v
+	if v, ok := as.Attributes[key].(string); ok {
+		return v
+	}
+	return ""
 }
