@@ -25,14 +25,20 @@ Status: Proposed
 
 "goes to their primary email address if there are multiple."
 
+The primary is the first address a User supplied.
+
 ## Template
 
 "the plugin owns the template but qntx does provide a neutral template and code for how to set it"
 
 "that is a ROOT question about governance and controls and monitoring that belongs in its own window element in the tray like others"
 
+The window holds the templates, the mail sent, and the SES account.
+
+## Transport
+
+"ses being enabled for use with email service can be enabled in the am.toml"
+
 ## Not done
 
-- The User record marks none of its emails primary: `EmailAddresses` is a list
-  ([`server/auth/users.go`](https://github.com/teranos/QNTX/blob/main/server/auth/users.go)).
 - Bounces, complaints and replies coming back.

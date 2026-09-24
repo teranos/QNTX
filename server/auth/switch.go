@@ -38,6 +38,15 @@ func (h *Handler) StandingOf(userID string) string {
 	return u.Standing
 }
 
+// UserByID is the User an id names, for the node's own services: mail goes to a
+// User by id (ADR-041). A node without login keeps no Users, and says so.
+func (h *Handler) UserByID(id string) (User, bool, error) {
+	if h == nil || h.users == nil {
+		return User{}, false, errors.New("this node keeps no Users")
+	}
+	return h.userByID(id)
+}
+
 func (h *Handler) userByID(id string) (User, bool, error) {
 	held, err := h.users.List()
 	if err != nil {

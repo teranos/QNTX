@@ -54,6 +54,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 			"llm", endpoints.LLMAddress,
 			"embedding", endpoints.EmbeddingAddress,
 			"search", endpoints.SearchAddress,
+			"mail", endpoints.MailAddress,
 		)
 	}
 
@@ -72,6 +73,10 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 
 	// A plugin answering a sigil reads and writes where its caller acts.
 	servicesManager.SetCallStores(s.storeOfCall)
+
+	// Mail to a User on a plugin's behalf (ADR-041): the Users exist once auth
+	// has run, and the node's DID once nodedid has.
+	servicesManager.SetMail(s.mailWiring())
 
 	s.servicesManager = servicesManager
 	s.services = services

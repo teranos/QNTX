@@ -29,6 +29,7 @@ func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 		VectorSearchAddress: "localhost:9007",
 		GroundAddress:       "localhost:9008",
 		SearchAddress:       "localhost:9009",
+		MailAddress:         "localhost:9010",
 		AuthToken:           "test-token-123",
 	}
 
@@ -48,6 +49,7 @@ func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 		{"_vector_search_endpoint", "localhost:9007"},
 		{"_ground_endpoint", "localhost:9008"},
 		{"_search_endpoint", "localhost:9009"},
+		{"_mail_endpoint", "localhost:9010"},
 		{"_auth_token", "test-token-123"},
 	}
 

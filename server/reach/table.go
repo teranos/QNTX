@@ -92,6 +92,11 @@ REACH is '/api/roles'                                                     of ROO
 # Who reaches what at runtime, granted and revoked (the reach signum).
 REACH is '/api/reach'                                                     of ROOT
 
+# What the node mails on plugins' behalf, the templates it fills and the
+# account it sends through (the mail signum, ADR-041). ROOT alone governs
+# what plugins call.
+REACH is '/api/mail' '/api/mail/templates' '/api/mail/account'            of ROOT
+
 # What the node serves, as MCP tools (ADR-038). A connector's token is the
 # person who said yes, and every tool call is gated on its own path's line.
 REACH is '/mcp' '/mcp/'                                                   of ROOT SUPER

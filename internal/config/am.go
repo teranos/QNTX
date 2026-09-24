@@ -13,6 +13,7 @@ type Config struct {
 	Embeddings   EmbeddingsConfig `mapstructure:"embeddings"`
 	Watcher      WatcherConfig    `mapstructure:"watcher"`
 	Fetch        FetchConfig      `mapstructure:"fetch"`
+	Mail         MailConfig       `mapstructure:"mail"`
 	Distill      DistillConfig    `mapstructure:"distill"`
 	Sentry       SentryConfig     `mapstructure:"sentry"`
 	GroundDBPath string           `mapstructure:"ground_db_path"` // Path to Ground's database for deferred news delivery
@@ -64,6 +65,19 @@ type FetchConfig struct {
 	MaxRequestsPerWindow int `mapstructure:"max_requests_per_window"` // Max requests per window (default: 100)
 	WindowSeconds        int `mapstructure:"window_seconds"`          // Rolling window duration in seconds (default: 300 = 5 min)
 	PulseIntervalSeconds int `mapstructure:"pulse_interval_seconds"`  // Stats logging interval in seconds (default: 30)
+}
+
+// MailConfig configures the MailService: mail to a User on a plugin's behalf (ADR-041).
+type MailConfig struct {
+	From string        `mapstructure:"from"` // The address every mail is sent from (e.g. "Garden <mail@garden.test>"). Empty = no mail is sent, and a send says why.
+	SES  MailSESConfig `mapstructure:"ses"`
+}
+
+// MailSESConfig is Amazon SES as the mail service's transport. Credentials come
+// from the AWS default chain, as they do for SSM and S3.
+type MailSESConfig struct {
+	Enabled bool   `mapstructure:"enabled"` // Send through SES (default: false). Off, no mail is sent, and a send says why.
+	Region  string `mapstructure:"region"`  // The region the SES account sends from. Empty = the AWS default chain's region.
 }
 
 // WatcherConfig configures the watcher engine

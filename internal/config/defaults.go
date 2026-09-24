@@ -110,6 +110,9 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("fetch.window_seconds", 300)          // 5 minute rolling window
 	v.SetDefault("fetch.pulse_interval_seconds", 30)   // stats log every 30s
 
+	// Mail service defaults (ADR-041) — no transport until am.toml enables one
+	v.SetDefault("mail.ses.enabled", false)
+
 	// Watcher defaults
 	v.SetDefault("watcher.max_fires_per_second", 3)
 

@@ -75,6 +75,9 @@ type QNTXServer struct {
 	pluginManager       *grpcplugin.PluginManager   // Plugin process manager
 	services            plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+	// What the mail service was wired with (ADR-041), read back by the mail
+	// signum so ROOT sees what sends and not what am.toml says since.
+	mailConfig config.MailConfig
 	// The calls plugins are answering: the token handed for each, and the store
 	// of the caller it was handed for (plugin_sigils.go).
 	callStores sync.Map

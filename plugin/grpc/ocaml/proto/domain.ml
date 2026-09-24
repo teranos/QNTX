@@ -199,8 +199,16 @@ Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay p
 %}
       *)
 
+      mail_endpoint:string;
+      (**
+{%html:
+<p>mail_endpoint: gRPC endpoint for MailService (plugin/grpc/protocol/mail.proto, ADR-041)
+Provides: mail to a User, from the plugin's template — QNTX sends and attests</p>
+%}
+      *)
+
     }
-    val make: ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> ?fetch_endpoint:string -> unit -> t
+    val make: ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> ?fetch_endpoint:string -> ?mail_endpoint:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -219,7 +227,7 @@ Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay p
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> ?fetch_endpoint:string -> unit -> t
+    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> ?fetch_endpoint:string -> ?mail_endpoint:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -1602,8 +1610,16 @@ Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay p
 %}
       *)
 
+      mail_endpoint:string;
+      (**
+{%html:
+<p>mail_endpoint: gRPC endpoint for MailService (plugin/grpc/protocol/mail.proto, ADR-041)
+Provides: mail to a User, from the plugin's template — QNTX sends and attests</p>
+%}
+      *)
+
     }
-    val make: ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> ?fetch_endpoint:string -> unit -> t
+    val make: ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> ?fetch_endpoint:string -> ?mail_endpoint:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -1622,7 +1638,7 @@ Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay p
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> ?fetch_endpoint:string -> unit -> t
+    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> ?fetch_endpoint:string -> ?mail_endpoint:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -1644,9 +1660,10 @@ Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay p
       ground_endpoint:string;
       search_endpoint:string;
       fetch_endpoint:string;
+      mail_endpoint:string;
     }
-    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> ?fetch_endpoint:string -> unit -> t
-    let make ?(ats_store_endpoint = {||}) ?(queue_endpoint = {||}) ?(auth_token = {||}) ?(config = []) ?(schedule_endpoint = {||}) ?(file_service_endpoint = {||}) ?(llm_endpoint = {||}) ?(embedding_endpoint = {||}) ?(vector_search_endpoint = {||}) ?(ground_endpoint = {||}) ?(search_endpoint = {||}) ?(fetch_endpoint = {||}) () = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint; fetch_endpoint }
+    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> ?fetch_endpoint:string -> ?mail_endpoint:string -> unit -> t
+    let make ?(ats_store_endpoint = {||}) ?(queue_endpoint = {||}) ?(auth_token = {||}) ?(config = []) ?(schedule_endpoint = {||}) ?(file_service_endpoint = {||}) ?(llm_endpoint = {||}) ?(embedding_endpoint = {||}) ?(vector_search_endpoint = {||}) ?(ground_endpoint = {||}) ?(search_endpoint = {||}) ?(fetch_endpoint = {||}) ?(mail_endpoint = {||}) () = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint; fetch_endpoint; mail_endpoint }
     let merge =
     let merge_ats_store_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "ats_store_endpoint", "atsStoreEndpoint"), string, ({||})) ) in
     let merge_queue_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "queue_endpoint", "queueEndpoint"), string, ({||})) ) in
@@ -1660,6 +1677,7 @@ Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay p
     let merge_ground_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((10, "ground_endpoint", "groundEndpoint"), string, ({||})) ) in
     let merge_search_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((11, "search_endpoint", "searchEndpoint"), string, ({||})) ) in
     let merge_fetch_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((12, "fetch_endpoint", "fetchEndpoint"), string, ({||})) ) in
+    let merge_mail_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((13, "mail_endpoint", "mailEndpoint"), string, ({||})) ) in
     fun t1 t2 -> {
     	ats_store_endpoint = (merge_ats_store_endpoint t1.ats_store_endpoint t2.ats_store_endpoint);
     	queue_endpoint = (merge_queue_endpoint t1.queue_endpoint t2.queue_endpoint);
@@ -1673,22 +1691,23 @@ Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay p
     	ground_endpoint = (merge_ground_endpoint t1.ground_endpoint t2.ground_endpoint);
     	search_endpoint = (merge_search_endpoint t1.search_endpoint t2.search_endpoint);
     	fetch_endpoint = (merge_fetch_endpoint t1.fetch_endpoint t2.fetch_endpoint);
+    	mail_endpoint = (merge_mail_endpoint t1.mail_endpoint t2.mail_endpoint);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "ats_store_endpoint", "atsStoreEndpoint"), string, ({||})) ^:: basic ((2, "queue_endpoint", "queueEndpoint"), string, ({||})) ^:: basic ((3, "auth_token", "authToken"), string, ({||})) ^:: map ((4, "config", "config"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: basic ((5, "schedule_endpoint", "scheduleEndpoint"), string, ({||})) ^:: basic ((6, "file_service_endpoint", "fileServiceEndpoint"), string, ({||})) ^:: basic ((7, "llm_endpoint", "llmEndpoint"), string, ({||})) ^:: basic ((8, "embedding_endpoint", "embeddingEndpoint"), string, ({||})) ^:: basic ((9, "vector_search_endpoint", "vectorSearchEndpoint"), string, ({||})) ^:: basic ((10, "ground_endpoint", "groundEndpoint"), string, ({||})) ^:: basic ((11, "search_endpoint", "searchEndpoint"), string, ({||})) ^:: basic ((12, "fetch_endpoint", "fetchEndpoint"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "ats_store_endpoint", "atsStoreEndpoint"), string, ({||})) ^:: basic ((2, "queue_endpoint", "queueEndpoint"), string, ({||})) ^:: basic ((3, "auth_token", "authToken"), string, ({||})) ^:: map ((4, "config", "config"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: basic ((5, "schedule_endpoint", "scheduleEndpoint"), string, ({||})) ^:: basic ((6, "file_service_endpoint", "fileServiceEndpoint"), string, ({||})) ^:: basic ((7, "llm_endpoint", "llmEndpoint"), string, ({||})) ^:: basic ((8, "embedding_endpoint", "embeddingEndpoint"), string, ({||})) ^:: basic ((9, "vector_search_endpoint", "vectorSearchEndpoint"), string, ({||})) ^:: basic ((10, "ground_endpoint", "groundEndpoint"), string, ({||})) ^:: basic ((11, "search_endpoint", "searchEndpoint"), string, ({||})) ^:: basic ((12, "fetch_endpoint", "fetchEndpoint"), string, ({||})) ^:: basic ((13, "mail_endpoint", "mailEndpoint"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint; fetch_endpoint } -> serialize writer ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint fetch_endpoint
+      fun writer { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint; fetch_endpoint; mail_endpoint } -> serialize writer ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint fetch_endpoint mail_endpoint
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint fetch_endpoint = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint; fetch_endpoint } in
+      let constructor ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint fetch_endpoint mail_endpoint = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint; fetch_endpoint; mail_endpoint } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint; fetch_endpoint } -> serialize ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint fetch_endpoint
+      fun { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint; fetch_endpoint; mail_endpoint } -> serialize ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint fetch_endpoint mail_endpoint
     let from_json_exn =
-      let constructor ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint fetch_endpoint = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint; fetch_endpoint } in
+      let constructor ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint fetch_endpoint mail_endpoint = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint; fetch_endpoint; mail_endpoint } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

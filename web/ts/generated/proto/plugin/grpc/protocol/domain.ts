@@ -91,6 +91,11 @@ export interface InitializeRequest {
    * Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay pure orchestration
    */
   fetch_endpoint: string;
+  /**
+   * mail_endpoint: gRPC endpoint for MailService (plugin/grpc/protocol/mail.proto, ADR-041)
+   * Provides: mail to a User, from the plugin's template — QNTX sends and attests
+   */
+  mail_endpoint: string;
 }
 
 export interface InitializeRequest_ConfigEntry {
