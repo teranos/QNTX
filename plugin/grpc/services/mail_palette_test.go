@@ -2,140 +2,86 @@ package services
 
 import (
 	"image/color"
-	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// "but i do still want the dark themed qntx tokens css email template"
+// "why not just use the real source"
 //
-// A mail client reads no CSS variables, so the palette is written out as
-// values. This holds each one to the token it is copied from, so the two
-// cannot drift apart.
-func TestTheDarkPaletteIsQNTXsTokens(t *testing.T) {
-	css, err := os.ReadFile("../../../web/css/tokens.css")
+// Every value a mail is drawn in is read out of web/css. A rule or token the
+// mail reads that web/css stops setting fails here, naming it.
+func TestAMailIsDrawnFromWebCSS(t *testing.T) {
+	l, err := readLook()
 	require.NoError(t, err)
-
-	tokens := map[string]string{}
-	for _, line := range strings.Split(string(css), "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "--") {
-			continue
-		}
-		name, value, ok := strings.Cut(line, ":")
-		if !ok {
-			continue
-		}
-		value, _, _ = strings.Cut(value, ";")
-		tokens[name] = strings.TrimSpace(value)
-	}
-
-	for token, value := range map[string]string{
-		"--bg-canvas":                  Canvas.Background,
-		"--bg-tertiary":                Canvas.TitleBar,
-		"--border-on-dark":             Canvas.Border,
-		"--accent-on-dark":             Canvas.Ax.Title,
-		"--element-status-error-text":  Canvas.Alert.Value,
-		"--text-on-dark-secondary":     Canvas.Alert.Keyword,
-		"--element-status-error-bg":    AlertTitleBar,
-	} {
-		assert.Equal(t, tokens[token], value, token)
-	}
-
-	for token, value := range map[string]string{
-		"--bg-almost-black":            Dark.Background,
-		"--bg-secondary":               Dark.Surface,
-		"--bg-tertiary":                Dark.Raised,
-		"--border-on-dark":             Dark.Border,
-		"--text-on-dark":               Dark.Text,
-		"--text-on-dark-secondary":     Dark.Secondary,
-		"--text-on-dark-emphasis":      Dark.Emphasis,
-		"--accent-on-dark":             Dark.Accent,
-		"--element-status-success-bg":  Dark.AccentDim,
-		"--element-status-error-text":  Dark.Error,
-		"--font-mono":                  Dark.Mono,
-	} {
-		assert.Equal(t, tokens[token], value, token)
-	}
+	assert.Equal(t, "#2d2e36", l.canvas, "--bg-canvas, through .canvas-workspace")
+	assert.Contains(t, l.grid, "repeating-linear-gradient", ".canvas-workspace's grid")
+	assert.Equal(t, "1px solid #dcdedd", l.barBorder, ".title-bar, through --border")
+	assert.Equal(t, "#e8e8e8", l.headingColor, ".element-section-title")
+	assert.Equal(t, "1px solid #e0e0e0", l.rowBorder, ".element-row, through the fallback --panel-border-color names")
+	assert.Equal(t, "none", l.lastRowBorder, ".element-row:last-child")
+	assert.Equal(t, "#a9abaa", l.labelColor, ".label, through --text-on-dark-secondary")
+	assert.Contains(t, l.mono, "JetBrains Mono", "--font-mono")
 }
 
-// constsIn reads the one-line string constants of a TypeScript file:
-// const NAME = '#abcdef';
-func constsIn(t *testing.T, path string) map[string]string {
-	t.Helper()
-	src, err := os.ReadFile(path)
+func TestASheetReadsRulesTokensAndFallbacks(t *testing.T) {
+	fsys := fstest.MapFS{"a.css": {Data: []byte(`
+:root { --ink: #111111; --line: 1px solid var(--ink); }
+/* a comment { with a brace } */
+.row, .other { color: var(--ink); border-bottom: var(--line); gap: var(--unset, 8px); }
+@media (pointer: coarse) { .row { color: #999999; } }
+`)}}
+	s, err := readSheet(fsys, "a.css")
 	require.NoError(t, err)
-	consts := map[string]string{}
-	for _, line := range strings.Split(string(src), "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "const ") {
-			continue
-		}
-		name, value, ok := strings.Cut(strings.TrimPrefix(line, "const "), "=")
-		if !ok {
-			continue
-		}
-		value = strings.Trim(strings.TrimSpace(value), "';")
-		consts[strings.TrimSpace(name)] = value
+
+	for property, want := range map[string]string{"color": "#111111", "border-bottom": "1px solid #111111", "gap": "8px"} {
+		got, err := s.prop(".row", property)
+		require.NoError(t, err)
+		assert.Equal(t, want, got, property)
 	}
-	return consts
+	other, err := s.prop(".other", "color")
+	require.NoError(t, err)
+	assert.Equal(t, "#111111", other)
+
+	_, err = s.prop(".row", "padding")
+	assert.ErrorContains(t, err, "no rule")
+	_, err = s.resolve("var(--unset)")
+	assert.ErrorContains(t, err, "names no fallback")
 }
 
-func fileHolds(t *testing.T, path, text string) {
-	t.Helper()
-	src, err := os.ReadFile(path)
+// A window's rgba is written as the one colour the eye sees on the canvas,
+// for a client that reads no rgba.
+func TestTheWindowIsOneColourOnTheCanvas(t *testing.T) {
+	window, err := ColorOf(windowColour)
 	require.NoError(t, err)
-	assert.Contains(t, string(src), text, path)
+	canvas, err := ColorOf("#2d2e36")
+	require.NoError(t, err)
+	assert.Equal(t, "#242427", hexOf(composite(window, canvas)))
 }
 
-// "what is the bg color of the canvas, what pattern does it use, what are the colors of the ax element, and the type element, and the sigma element, and the attestation element, and the triplet."
-//
-// Each colour a mail is drawn in is held to the element it is taken from, so a
-// mail keeps looking like QNTX when QNTX changes.
-func TestTheCanvasInkIsQNTXsElements(t *testing.T) {
-	const web = "../../../web/"
-
-	triplet := constsIn(t, web+"ts/components/element/triplet-element.ts")
-	assert.Equal(t, triplet["TRIPLET_VALUE"], Canvas.Triplet.Value)
-	assert.Equal(t, triplet["TRIPLET_KEYWORD"], Canvas.Triplet.Keyword)
-	assert.Equal(t, triplet["TRIPLET"], Canvas.Triplet.Title)
-
-	sigma := constsIn(t, web+"ts/components/element/sigma-element.ts")
-	assert.Equal(t, sigma["AMBER_VALUE"], Canvas.Sigma.Value)
-	assert.Equal(t, sigma["AMBER_DIM"], Canvas.Sigma.Keyword)
-	assert.Equal(t, sigma["AMBER"], Canvas.Sigma.Title)
-	assert.Equal(t, sigma["AMBER_BAR"], Canvas.SigmaBar)
-	assert.Equal(t, sigma["AMBER_BAR_BG"], Canvas.SigmaBarShade)
-
-	azure := constsIn(t, web+"ts/components/element/bioviz/fasta-renderer.ts")
-	assert.Equal(t, azure["AZURE_VALUE"], Canvas.Attestation.Value)
-	assert.Equal(t, azure["AZURE_KEYWORD"], Canvas.Attestation.Keyword)
-	fileHolds(t, web+"ts/components/element/attestation-element.ts", "color: "+Canvas.Attestation.Title)
-
-	fileHolds(t, web+"ts/components/element/attestation-result-row.ts",
-		"{ value: '"+Canvas.Ax.Value+"', keyword: '"+Canvas.Ax.Keyword+"' }")
-	fileHolds(t, web+"ts/components/element/ax-element.ts", "rgba(25, 25, 30, 0.95)")
-	assert.Equal(t, "#19191e", Canvas.Window, "rgb(25, 25, 30)")
-
-	fileHolds(t, web+"css/type-definition-window.css", "color: "+Canvas.Type.Value)
-	fileHolds(t, web+"css/type-definition-window.css", "color: "+Canvas.Type.Title)
-	fileHolds(t, web+"ts/type-definition-window.ts", "'"+Canvas.Type.Keyword+"'")
-
-	fileHolds(t, web+"css/canvas.css", Canvas.Grid+" 23px")
+func TestAMailIsTablesAndInlineStyles(t *testing.T) {
+	html, err := DrawMail(MailWindow{Symbol: "≡", Title: "week", Sections: []MailSection{
+		{Title: "Node", Rows: []MailRow{{Label: "Restarts:", Value: "3"}, {Value: "None.", State: RowNote}}},
+	}})
+	require.NoError(t, err)
+	assert.NotContains(t, html, "display:flex", "a mail client lays flex out its own way")
+	assert.NotContains(t, html, "<style", "a mail client may drop a style block")
+	assert.NotContains(t, html, "var(", "a mail client reads no CSS variables")
+	assert.Contains(t, html, "Restarts:")
+	assert.Equal(t, 1, strings.Count(html, "border-bottom:none"), "the last row has no rule under it")
 }
 
-// A graph is pixels, so it reads the palette's colours as values.
-func TestTheGraphReadsThePalettesColours(t *testing.T) {
-	bar, err := ColorOf(Canvas.SigmaBar)
+func TestColourReadsHexAndRGBA(t *testing.T) {
+	c, err := ColorOf("#c49a6c")
 	require.NoError(t, err)
-	assert.Equal(t, color.NRGBA{R: 0xc4, G: 0x9a, B: 0x6c, A: 0xff}, bar)
+	assert.Equal(t, color.NRGBA{R: 0xc4, G: 0x9a, B: 0x6c, A: 0xff}, c)
 
-	shade, err := ColorOf(Canvas.SigmaBarShade)
+	c, err = ColorOf("rgba(140, 110, 80, 0.25)")
 	require.NoError(t, err)
-	assert.Equal(t, color.NRGBA{R: 140, G: 110, B: 80, A: 64}, shade)
+	assert.Equal(t, color.NRGBA{R: 140, G: 110, B: 80, A: 64}, c)
 
 	for _, notOne := range []string{"#c49a6", "c49a6c", "#zz9a6c", "rgba(140, 110, 80)", "rgba(140, 110, 80, 2)", "rgb(1, 2, 3)"} {
 		_, err := ColorOf(notOne)

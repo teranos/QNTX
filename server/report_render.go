@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"fmt"
-	"html"
 	"image"
 	"image/color"
 	"image/draw"
@@ -57,11 +56,15 @@ func renderReport(r Report) (services.NodeMail, error) {
 		drawn[g.id] = true
 	}
 
+	html, err := services.DrawMail(reportWindow(r, drawn))
+	if err != nil {
+		return services.NodeMail{}, err
+	}
 	start, end := r.Window.Start.UTC().Format("2006-01-02"), r.Window.End.UTC().Format("2006-01-02")
 	return services.NodeMail{
 		Name:    reportHandlerName,
 		Subject: "QNTX week " + start + " to " + end,
-		HTML:    renderReportHTML(r, drawn),
+		HTML:    html,
 		Text:    renderReportText(r),
 		Inline:  images,
 	}, nil
@@ -71,220 +74,165 @@ func renderReport(r Report) (services.NodeMail, error) {
 // html
 // ---------------------------------------------------------------------------
 
-// "what is the bg color of the canvas, what pattern does it use, what are the colors of the ax element, and the type element, and the sigma element, and the attestation element, and the triplet."
+// "it just needs to fit with the rest of qntx"
 //
-// The report is drawn the way QNTX is: on its canvas, each part a window in
-// the ink of the element closest to what it holds.
+// The report is one window, drawn the way ≡ am draws the node: a section per
+// part, labelled rows in each.
 
-// win is one window's body, written in its ink.
-type win struct {
-	b       strings.Builder
-	ink     services.Ink
-	written bool
+func said(err string) services.MailRow {
+	return services.MailRow{Value: err, State: services.RowUnwell}
 }
 
-func (w *win) raw(s string) { w.b.WriteString(s); w.written = true }
+func none() services.MailRow {
+	return services.MailRow{Value: "None.", State: services.RowNote}
+}
 
-func (w *win) text(s string) { w.raw(html.EscapeString(s)) }
-
-// heading is a part within a window, in the ink's keyword colour.
-func (w *win) heading(s string) {
-	top := "0"
-	if w.written {
-		top = "16px"
+func reportWindow(r Report, drawn map[string]bool) services.MailWindow {
+	node := services.MailSection{Title: "Node", Rows: []services.MailRow{{Label: "DID:", Value: r.Node, Key: true}}}
+	if r.RestartsErr != "" {
+		node.Rows = append(node.Rows, services.MailRow{Label: "Restarts:", Value: r.RestartsErr, State: services.RowUnwell})
+	} else {
+		node.Rows = append(node.Rows, services.MailRow{Label: "Restarts:", Value: fmt.Sprintf("%d", r.Restarts)})
 	}
-	w.raw(`<div style="color:` + w.ink.Keyword + `;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin:` + top + ` 0 6px">`)
-	w.text(s)
-	w.raw(`</div>`)
-}
-
-func (w *win) said(s string) {
-	w.raw(`<p style="margin:0 0 8px;color:` + services.Canvas.Alert.Value + `">`)
-	w.text(s)
-	w.raw(`</p>`)
-}
-
-func (w *win) line(s string) {
-	w.raw(`<p style="margin:0 0 8px">`)
-	w.text(s)
-	w.raw(`</p>`)
-}
-
-func (w *win) quiet(s string) {
-	w.raw(`<p style="margin:0 0 8px;color:` + w.ink.Keyword + `">`)
-	w.text(s)
-	w.raw(`</p>`)
-}
-
-// table is labelled columns: the labels in the ink's keyword colour, the cells
-// in colour, or in the ink's value colour when colour is empty.
-func (w *win) table(head []string, rows [][]string, colour string) {
-	if colour == "" {
-		colour = w.ink.Value
-	}
-	w.raw(`<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:13px">`)
-	w.raw(`<tr>`)
-	for _, h := range head {
-		w.raw(`<td style="color:` + w.ink.Keyword + `;padding:2px 16px 4px 0;border-bottom:1px solid ` + services.Canvas.Border + `">`)
-		w.text(h)
-		w.raw(`</td>`)
-	}
-	w.raw(`</tr>`)
-	for _, row := range rows {
-		w.raw(`<tr>`)
-		for _, cell := range row {
-			w.raw(`<td style="color:` + colour + `;padding:3px 16px 0 0;vertical-align:top">`)
-			w.text(cell)
-			w.raw(`</td>`)
-		}
-		w.raw(`</tr>`)
-	}
-	w.raw(`</table>`)
-}
-
-// canvas is the windows standing on the report's canvas, in order.
-type canvas struct{ b strings.Builder }
-
-// window stands one window on the canvas. symbol is one of web/ts/sym.ts.
-func (c *canvas) window(symbol, title string, ink services.Ink, titleBar string, fill func(w *win)) {
-	w := &win{ink: ink}
-	fill(w)
-	c.b.WriteString(services.CanvasWindow(symbol, html.EscapeString(title), ink, titleBar, w.b.String()))
-}
-
-func renderReportHTML(r Report, drawn map[string]bool) string {
-	ink, bar := services.Canvas, services.Canvas.TitleBar
-	var c canvas
-
-	c.window("≡", "QNTX week "+r.Window.Start.UTC().Format("2006-01-02 15:04")+" to "+r.Window.End.UTC().Format("2006-01-02 15:04")+" UTC", ink.Ax, bar, func(w *win) {
-		w.quiet(r.Node)
-		w.heading("Node restarts")
-		if r.RestartsErr != "" {
-			w.said(r.RestartsErr)
+	if r.SentryErr == "" {
+		if r.Downtime.Err != "" {
+			node.Rows = append(node.Rows, services.MailRow{Label: "Downtime:", Value: r.Downtime.Err, State: services.RowUnwell})
 		} else {
-			w.line(fmt.Sprintf("%d", r.Restarts))
+			node.Rows = append(node.Rows,
+				services.MailRow{Label: "Downtime last week:", Value: minutesIn(r.Downtime.WeekMinutes)},
+				services.MailRow{Label: "Downtime last 3 weeks:", Value: minutesIn(r.Downtime.ThreeWeeksMinutes)})
+			if !r.Downtime.Since.IsZero() {
+				node.Rows = append(node.Rows, services.MailRow{Label: "Counted from:", Value: r.Downtime.Since.UTC().Format("2006-01-02 15:04") + " UTC", State: services.RowNote})
+			}
 		}
-	})
+	}
 
-	c.window("⎔", "Namespaces", ink.Attestation, bar, func(w *win) {
-		w.heading("Attestations created per namespace")
-		if r.AttestationsErr != "" {
-			w.said(r.AttestationsErr)
-		} else {
-			w.table([]string{"Namespace", "Created"}, namespaceRows(r.Attestations), "")
-		}
-		w.heading("Users registered per namespace")
-		switch {
-		case r.RegistrationsErr != "":
-			w.said(r.RegistrationsErr)
-		case len(r.Registrations) == 0:
-			w.line("None.")
-		default:
-			w.table([]string{"Namespace", "Registered"}, namespaceRows(r.Registrations), "")
-		}
-	})
+	sections := []services.MailSection{
+		node,
+		countSection("Attestations created per namespace", r.Attestations, r.AttestationsErr),
+		countSection("Users registered per namespace", r.Registrations, r.RegistrationsErr),
+	}
 
 	// What Sentry holds is said once when Sentry was not asked, not under every
 	// section it would have filled.
 	if r.SentryErr != "" {
-		c.window("Σ", "From Sentry: downtime, CPU, memory, swap, network, boot, queries, 4xx and 5xx", ink.Sigma, bar, func(w *win) {
-			w.said(r.SentryErr)
+		sections = append(sections, services.MailSection{
+			Title: "From Sentry: downtime, CPU, memory, swap, network, boot, queries, 4xx and 5xx",
+			Rows:  []services.MailRow{said(r.SentryErr)},
 		})
 	} else {
-		renderSentryHTML(&c, r, drawn)
+		sections = append(sections, sentrySections(r, drawn)...)
 	}
 
-	// A failing handler takes the alert's window; a week without one does not.
-	failures, failuresBar := ink.Ax, bar
-	if len(r.Failures) > 0 || r.FailuresErr != "" {
-		failures, failuresBar = ink.Alert, services.AlertTitleBar
-	}
-	c.window("꩜", "Top 3 handler failures", failures, failuresBar, func(w *win) {
-		switch {
-		case r.FailuresErr != "":
-			w.said(r.FailuresErr)
-		case len(r.Failures) == 0:
-			w.line("None.")
-		default:
-			rows := make([][]string, 0, len(r.Failures))
-			for _, f := range r.Failures {
-				rows = append(rows, []string{f.Handler, fmt.Sprintf("%d", f.Failures), f.LastError})
-			}
-			w.table([]string{"Handler", "Failures", "Last error"}, rows, "")
+	failures := services.MailSection{Title: "Top 3 handler failures"}
+	switch {
+	case r.FailuresErr != "":
+		failures.Rows = []services.MailRow{said(r.FailuresErr)}
+	case len(r.Failures) == 0:
+		failures.Rows = []services.MailRow{none()}
+	default:
+		for _, f := range r.Failures {
+			failures.Rows = append(failures.Rows, services.MailRow{Label: f.Handler, Value: f.Error, State: services.RowUnwell})
 		}
-	})
+	}
+	sections = append(sections, failures)
 
-	return services.CanvasPage(c.b.String())
+	return services.MailWindow{
+		Symbol:   "≡",
+		Title:    "QNTX week " + r.Window.Start.UTC().Format("2006-01-02 15:04") + " to " + r.Window.End.UTC().Format("2006-01-02 15:04") + " UTC",
+		Sections: sections,
+	}
 }
 
-// renderSentryHTML is the windows Sentry filled.
-func renderSentryHTML(c *canvas, r Report, drawn map[string]bool) {
-	ink, bar := services.Canvas, services.Canvas.TitleBar
-
-	// The sigma element is the sum of many observations; so is every number
-	// Sentry answers with.
-	c.window("Σ", "The host over 7 days", ink.Sigma, bar, func(w *win) {
-		w.heading("Downtime")
-		if r.Downtime.Err != "" {
-			w.said(r.Downtime.Err)
-		} else {
-			w.line(downtimeLine(r.Downtime))
+func countSection(title string, counts []namespaceCount, err string) services.MailSection {
+	s := services.MailSection{Title: title}
+	switch {
+	case err != "":
+		s.Rows = []services.MailRow{said(err)}
+	case len(counts) == 0:
+		s.Rows = []services.MailRow{none()}
+	default:
+		for _, row := range namespaceRows(counts) {
+			s.Rows = append(s.Rows, services.MailRow{Label: row[0] + ":", Value: row[1]})
 		}
-		for _, g := range r.graphs() {
-			w.heading(g.title + " over 7 days")
-			switch {
-			case g.s.Err != "":
-				w.said(g.s.Err)
-			case !drawn[g.id]:
-				w.line("No samples.")
-			default:
-				w.raw(`<img src="cid:` + g.id + `" width="` + fmt.Sprint(graphWidth) + `" height="` + fmt.Sprint(graphHeight) + `" alt="` + g.title + ` over 7 days" style="display:block;max-width:100%;height:auto;border:1px solid ` + ink.Border + `;border-radius:3px;margin:0 0 6px">`)
-				w.line(seriesLine(g.s.Points))
+	}
+	return s
+}
+
+// sentrySections is the sections Sentry filled.
+func sentrySections(r Report, drawn map[string]bool) []services.MailSection {
+	var sections []services.MailSection
+	for _, g := range r.graphs() {
+		s := services.MailSection{Title: g.title + " over 7 days"}
+		switch {
+		case g.s.Err != "":
+			s.Rows = []services.MailRow{said(g.s.Err)}
+		case !drawn[g.id]:
+			s.Rows = []services.MailRow{{Value: "No samples.", State: services.RowNote}}
+		default:
+			s.HTML = `<img src="cid:` + g.id + `" width="` + fmt.Sprint(graphWidth) + `" height="` + fmt.Sprint(graphHeight) + `" alt="` + g.title + ` over 7 days" style="display:block;width:100%;max-width:` + fmt.Sprint(graphWidth) + `px;height:auto;margin:0 0 4px">`
+			mean, lo, hi, n := seriesStats(g.s.Points)
+			if n == 0 {
+				s.Rows = []services.MailRow{{Value: "No samples.", State: services.RowNote}}
+			} else {
+				s.Rows = []services.MailRow{
+					{Label: "Mean:", Value: fmt.Sprintf("%.1f%%", mean)},
+					{Label: "Lowest hour:", Value: fmt.Sprintf("%.1f%%", lo)},
+					{Label: "Highest hour:", Value: fmt.Sprintf("%.1f%%", hi)},
+				}
 			}
 		}
-		w.heading("Network over 7 days")
-		w.table([]string{"", "Total"}, [][]string{
-			{"host.net.in", totalCell(r.NetIn)},
-			{"host.net.out", totalCell(r.NetOut)},
-		}, "")
-	})
+		sections = append(sections, s)
+	}
 
-	c.window("✿", "boot.subsystem.took over 7 days", ink.Type, bar, func(w *win) {
-		if r.BootErr != "" {
-			w.said(r.BootErr)
-			return
+	sections = append(sections, services.MailSection{Title: "Network over 7 days", Rows: []services.MailRow{
+		{Label: "host.net.in:", Value: totalCell(r.NetIn)},
+		{Label: "host.net.out:", Value: totalCell(r.NetOut)},
+	}})
+
+	boot := services.MailSection{Title: "boot.subsystem.took over 7 days"}
+	if r.BootErr != "" {
+		boot.Rows = []services.MailRow{said(r.BootErr)}
+	} else {
+		for _, b := range r.Boot {
+			boot.Rows = append(boot.Rows, services.MailRow{Label: b.Subsystem + ":", Value: fmt.Sprintf("mean %.0f ms, max %.0f ms", b.AvgMs, b.MaxMs)})
 		}
-		w.table([]string{"Subsystem", "Mean", "Max", "Samples"}, bootRows(r.Boot), "")
-	})
+	}
+	sections = append(sections, boot)
 
-	c.window("⋈", "Query took over 7 days", ink.Ax, bar, func(w *win) {
-		if r.QueryErr != "" {
-			w.said(r.QueryErr)
-			return
+	query := services.MailSection{Title: "Query took over 7 days"}
+	if r.QueryErr != "" {
+		query.Rows = []services.MailRow{said(r.QueryErr)}
+	} else {
+		query.Rows = []services.MailRow{
+			{Label: "p50:", Value: fmt.Sprintf("%.0f ms", r.Query.P50Ms)},
+			{Label: "p95:", Value: fmt.Sprintf("%.0f ms", r.Query.P95Ms)},
+			{Label: "Max:", Value: fmt.Sprintf("%.0f ms", r.Query.MaxMs)},
+			{Value: "Which queries were slowest is not known: no query's text is recorded.", State: services.RowNote},
 		}
-		w.line(queryLine(r.Query))
-		w.quiet("Which queries were slowest is not known: no query's text is recorded.")
-	})
+	}
+	sections = append(sections, query)
 
-	// Responses grouped by path and status, the way the triplet element groups
-	// attestations. A 5xx is written in the alert's colour.
-	c.window("⫶", "Top 3 4xx and 5xx", ink.Triplet, bar, func(w *win) {
-		for _, ranked := range []struct {
-			title  string
-			ranks  statusRanks
-			colour string
-		}{{"Top 3 4xx", r.Status4xx, ""}, {"Top 3 5xx", r.Status5xx, ink.Alert.Value}} {
-			w.heading(ranked.title)
-			switch {
-			case ranked.ranks.Err != "":
-				w.said(ranked.ranks.Err)
-			case len(ranked.ranks.Ranks) == 0:
-				w.line("None.")
-			default:
-				w.table([]string{"Path", "Status", "Count"}, statusRows(ranked.ranks.Ranks), ranked.colour)
+	// "I WANT TO SEE WHAT WAS TRIED TO ACCESS INSTEAD"
+	for _, ranked := range []struct {
+		title string
+		ranks statusRanks
+		state services.RowState
+	}{{"Top 3 4xx", r.Status4xx, services.RowPlain}, {"Top 3 5xx", r.Status5xx, services.RowUnwell}} {
+		s := services.MailSection{Title: ranked.title}
+		switch {
+		case ranked.ranks.Err != "":
+			s.Rows = []services.MailRow{said(ranked.ranks.Err)}
+		case len(ranked.ranks.Ranks) == 0:
+			s.Rows = []services.MailRow{none()}
+		default:
+			for _, rank := range ranked.ranks.Ranks {
+				s.Rows = append(s.Rows, services.MailRow{Label: fmt.Sprintf("%d", rank.Status), Value: rank.Path, State: ranked.state})
 			}
 		}
-	})
+		sections = append(sections, s)
+	}
+	return sections
 }
 
 // ---------------------------------------------------------------------------
@@ -344,8 +292,8 @@ func renderReportText(r Report) string {
 		w("  host.net.out: %s", totalCell(r.NetOut))
 	})
 	sentry("boot.subsystem.took over 7 days", r.BootErr, func() {
-		for _, row := range bootRows(r.Boot) {
-			w("  %s: mean %s, max %s, %s samples", row[0], row[1], row[2], row[3])
+		for _, b := range r.Boot {
+			w("  %s: mean %.0f ms, max %.0f ms", b.Subsystem, b.AvgMs, b.MaxMs)
 		}
 	})
 	sentry("Query took over 7 days", r.QueryErr, func() {
@@ -353,13 +301,13 @@ func renderReportText(r Report) string {
 		w("  Which queries were slowest is not known: no query's text is recorded.")
 	})
 	sentry("Top 3 4xx", r.Status4xx.Err, func() {
-		for _, row := range statusRows(r.Status4xx.Ranks) {
-			w("  %s %s: %s", row[1], row[0], row[2])
+		for _, rank := range r.Status4xx.Ranks {
+			w("  %d %s", rank.Status, rank.Path)
 		}
 	})
 	sentry("Top 3 5xx", r.Status5xx.Err, func() {
-		for _, row := range statusRows(r.Status5xx.Ranks) {
-			w("  %s %s: %s", row[1], row[0], row[2])
+		for _, rank := range r.Status5xx.Ranks {
+			w("  %d %s", rank.Status, rank.Path)
 		}
 	})
 	w("\nTop 3 handler failures")
@@ -368,7 +316,7 @@ func renderReportText(r Report) string {
 			w("  None.")
 		}
 		for _, f := range r.Failures {
-			w("  %s: %d, last: %s", f.Handler, f.Failures, f.LastError)
+			w("  %s: %s", f.Handler, f.Error)
 		}
 	})
 	return b.String()
@@ -390,22 +338,6 @@ func namespaceRows(counts []namespaceCount) [][]string {
 			value = "not read: " + c.Err
 		}
 		rows = append(rows, []string{name, value})
-	}
-	return rows
-}
-
-func bootRows(steps []bootStep) [][]string {
-	rows := make([][]string, 0, len(steps))
-	for _, s := range steps {
-		rows = append(rows, []string{s.Subsystem, fmt.Sprintf("%.0f ms", s.AvgMs), fmt.Sprintf("%.0f ms", s.MaxMs), fmt.Sprintf("%d", s.Samples)})
-	}
-	return rows
-}
-
-func statusRows(ranks []statusRank) [][]string {
-	rows := make([][]string, 0, len(ranks))
-	for _, r := range ranks {
-		rows = append(rows, []string{r.Path, fmt.Sprintf("%d", r.Status), fmt.Sprintf("%d", r.Count)})
 	}
 	return rows
 }
@@ -450,9 +382,10 @@ func minutesIn(m int) string {
 	return fmt.Sprintf("%dh %dm", m/60, m%60)
 }
 
-// seriesLine is what a graph shows, in words: the hours that had samples.
-func seriesLine(points []sentryread.Point) string {
-	lo, hi, sum, n := math.Inf(1), math.Inf(-1), 0.0, 0
+// seriesStats is the hours that had samples: their mean, lowest and highest.
+func seriesStats(points []sentryread.Point) (mean, lo, hi float64, n int) {
+	lo, hi = math.Inf(1), math.Inf(-1)
+	sum := 0.0
 	for _, p := range points {
 		if p.Value <= 0 {
 			continue
@@ -462,67 +395,38 @@ func seriesLine(points []sentryread.Point) string {
 		n++
 	}
 	if n == 0 {
+		return 0, 0, 0, 0
+	}
+	return sum / float64(n), lo, hi, n
+}
+
+// seriesLine is what a graph shows, in words.
+func seriesLine(points []sentryread.Point) string {
+	mean, lo, hi, n := seriesStats(points)
+	if n == 0 {
 		return "No samples."
 	}
-	return fmt.Sprintf("mean %.1f%%, lowest hour %.1f%%, highest hour %.1f%%", sum/float64(n), lo, hi)
+	return fmt.Sprintf("mean %.1f%%, lowest hour %.1f%%, highest hour %.1f%%", mean, lo, hi)
 }
 
 // ---------------------------------------------------------------------------
 // graphs
 // ---------------------------------------------------------------------------
 
-// graphInk is what a graph is drawn in: the canvas and its 24px grid, rules in
-// the windows' border, and the sigma element's bar over its shade.
-type graphInk struct {
-	background, grid, rule, shade, line color.NRGBA
-}
-
-func graphInkOf() (graphInk, error) {
-	var g graphInk
-	for _, c := range []struct {
-		into *color.NRGBA
-		css  string
-	}{
-		{&g.background, services.Canvas.Background},
-		{&g.grid, services.Canvas.Grid},
-		{&g.rule, services.Canvas.Border},
-		{&g.shade, services.Canvas.SigmaBarShade},
-		{&g.line, services.Canvas.SigmaBar},
-	} {
-		v, err := services.ColorOf(c.css)
-		if err != nil {
-			return graphInk{}, errors.Wrap(err, "the graph cannot be drawn in the palette")
-		}
-		*c.into = v
-	}
-	return g, nil
-}
-
-// canvasCell is canvas.css's grid: a line on the last pixel of every 24.
-const canvasCell = 24
-
-// drawPercentGraph draws hourly percentages on 0 to 100 over QNTX's canvas: a
-// line with the area under it shaded, a rule at every quarter, and one at every
-// UTC midnight. An hour with no sample is a gap, not a fall to zero.
+// drawPercentGraph draws hourly percentages on 0 to 100 in the window the
+// report stands in: QNTX's accent over its fill, a rule at every quarter and
+// at every UTC midnight. An hour with no sample is a gap, not a fall to zero.
 func drawPercentGraph(points []sentryread.Point) ([]byte, error) {
-	ink, err := graphInkOf()
+	ink, err := services.MailGraphColours()
 	if err != nil {
 		return nil, err
 	}
 	img := image.NewRGBA(image.Rect(0, 0, graphWidth, graphHeight))
-	for y := 0; y < graphHeight; y++ {
-		for x := 0; x < graphWidth; x++ {
-			c := ink.background
-			if x%canvasCell == canvasCell-1 || y%canvasCell == canvasCell-1 {
-				c = ink.grid
-			}
-			img.Set(x, y, c)
-		}
-	}
+	draw.Draw(img, img.Bounds(), &image.Uniform{C: ink.Background}, image.Point{}, draw.Src)
 	for _, q := range []float64{25, 50, 75} {
 		y := yOf(q)
-		for x := 0; x < graphWidth; x++ {
-			img.Set(x, y, ink.rule)
+		for x := range graphWidth {
+			img.Set(x, y, ink.Rule)
 		}
 	}
 
@@ -536,33 +440,29 @@ func drawPercentGraph(points []sentryread.Point) ([]byte, error) {
 	for i, p := range points {
 		if p.At.UTC().Hour() == 0 && p.At.Minute() == 0 {
 			x := xOf(i)
-			for y := 0; y < graphHeight; y++ {
-				img.Set(x, y, ink.rule)
+			for y := range graphHeight {
+				img.Set(x, y, ink.Rule)
 			}
 		}
 	}
 
-	// The shade is translucent, as the sigma element's is: the grid shows
-	// through it. A column two hours share is shaded once, or it would be
-	// darker than its neighbours.
-	shade := &image.Uniform{C: ink.shade}
-	shaded := -1
 	for i := 0; i+1 < n; i++ {
 		a, b := points[i], points[i+1]
 		if a.Value <= 0 || b.Value <= 0 {
 			continue
 		}
 		x0, x1 := xOf(i), xOf(i+1)
-		for x := max(x0, shaded+1); x <= x1; x++ {
+		for x := x0; x <= x1; x++ {
 			t := 0.0
 			if x1 > x0 {
 				t = float64(x-x0) / float64(x1-x0)
 			}
 			v := a.Value + (b.Value-a.Value)*t
-			draw.Draw(img, image.Rect(x, yOf(v)+1, x+1, graphHeight), shade, image.Point{}, draw.Over)
-			shaded = x
+			for y := yOf(v) + 1; y < graphHeight; y++ {
+				img.Set(x, y, ink.Fill)
+			}
 		}
-		drawLine(img, x0, yOf(a.Value), x1, yOf(b.Value), ink.line)
+		drawLine(img, x0, yOf(a.Value), x1, yOf(b.Value), ink.Line)
 	}
 
 	var buf bytes.Buffer

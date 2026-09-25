@@ -37,6 +37,17 @@ Status: Proposed
 
 "can you do it please to the degree that is feasible given sentry access?"
 
+"I WANT TO SEE THE THREE MOST FREQUENTLY OCCURING ONES"
+
+"AND FOR HANDLER THE SAME"
+
+"I WANT TO SEE WHAT WAS TRIED TO ACCESS INSTEAD"
+
+- The 4xx and 5xx are the three paths asked for most, with their status.
+- The handler failures are the three errors handlers failed with most, with
+  the handler.
+- Neither shows how often.
+
 ## Where each part is read from
 
 - The node's own records: attestations per namespace, Users registered per

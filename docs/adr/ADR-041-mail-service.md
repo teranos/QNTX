@@ -51,12 +51,16 @@ A Send carries images inline; the html shows each by `cid:<content_id>`.
 
 "but i do still want the dark themed qntx tokens css email template"
 
-QNTX keeps a second template, dark, drawn from web/css/tokens.css.
+QNTX keeps a second template, dark.
 
-"what is the bg color of the canvas, what pattern does it use, what are the colors of the ax element, and the type element, and the sigma element, and the attestation element, and the triplet."
+"why not just use the real source"
 
-A mail QNTX draws stands on its canvas, grid and all, as windows, each in
-the ink of one of QNTX's elements. The weekly report is drawn the same way.
+"it just needs to fit with the rest of qntx"
+
+A mail QNTX draws is an element window on its canvas, as ≡ am is: a title
+bar, then sections of labelled rows. Its values are read from web/css, which
+the binary embeds. Tables and inline styles carry it, because every mail
+client lays those out the same way. The weekly report is drawn the same way.
 
 ## Not done
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image/color"
 	"image/png"
 	"net/http"
 	"strings"
@@ -174,35 +175,37 @@ func TestTheReportRendersEverySectionWithItsGraphs(t *testing.T) {
 		require.NoError(t, err, img.ContentID)
 	}
 	for _, section := range []string{
-		"Attestations created per namespace", "Users registered per namespace", "Node restarts",
+		"Attestations created per namespace", "Users registered per namespace",
 		"Downtime", "CPU over 7 days", "Memory over 7 days", "Swap over 7 days", "Network over 7 days",
 		"boot.subsystem.took over 7 days", "Query took over 7 days", "Top 3 4xx", "Top 3 5xx", "Top 3 handler failures",
 	} {
 		assert.Contains(t, mail.HTML, section)
 		assert.Contains(t, mail.Text, section)
 	}
+	assert.Contains(t, mail.HTML, "Restarts:")
+	assert.Contains(t, mail.Text, "Node restarts")
 	assert.Contains(t, mail.Text, "no query's text is recorded")
 }
 
-// "what is the bg color of the canvas, what pattern does it use, what are the colors of the ax element, and the type element, and the sigma element, and the attestation element, and the triplet."
+// "I DONT VARE ABOUT X 4XX'S"
+// "I WANT TO SEE WHAT WAS TRIED TO ACCESS INSTEAD"
 //
-// The report is drawn on QNTX's canvas, its windows in the elements' inks, and
-// its graphs on the canvas's grid in the sigma element's bar.
-func TestTheReportIsDrawnOnQNTXsCanvas(t *testing.T) {
+// A ranked status is the path that was asked for, not how often.
+func TestAStatusIsThePathThatWasAskedFor(t *testing.T) {
 	s := rootKnowingServer(t)
 	mail, err := renderReport(s.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil))
 	require.NoError(t, err)
+	assert.Contains(t, mail.HTML, "/api/attestations")
+	assert.Contains(t, mail.Text, "  404 /api/attestations\n")
+}
 
-	canvas := services.Canvas
-	assert.Contains(t, mail.HTML, `content="dark"`)
-	assert.Contains(t, mail.HTML, `bgcolor="`+canvas.Background+`"`)
-	assert.Contains(t, mail.HTML, `bgcolor="`+canvas.Window+`"`)
-	assert.Contains(t, mail.HTML, services.Dark.Mono)
-	for name, ink := range map[string]services.Ink{
-		"ax": canvas.Ax, "attestation": canvas.Attestation, "triplet": canvas.Triplet, "sigma": canvas.Sigma, "type": canvas.Type,
-	} {
-		assert.Contains(t, mail.HTML, "color:"+ink.Title, name)
-	}
+// The graph stands in the report's window, drawn in QNTX's own colours.
+func TestTheGraphStandsInTheWindow(t *testing.T) {
+	s := rootKnowingServer(t)
+	mail, err := renderReport(s.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil))
+	require.NoError(t, err)
+	ink, err := services.MailGraphColours()
+	require.NoError(t, err)
 
 	require.NotEmpty(t, mail.Inline)
 	img, err := png.Decode(bytes.NewReader(mail.Inline[0].Data))
@@ -211,9 +214,9 @@ func TestTheReportIsDrawnOnQNTXsCanvas(t *testing.T) {
 		r, g, b, _ := img.At(x, y).RGBA()
 		return fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
 	}
-	assert.Equal(t, canvas.Background, at(0, 0))
-	assert.Equal(t, canvas.Grid, at(23, 0), "the canvas's grid, on the last pixel of every 24")
-	assert.Equal(t, canvas.SigmaBar, at(0, yOf(40)), "a steady 40%")
+	hex := func(c color.NRGBA) string { return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B) }
+	assert.Equal(t, hex(ink.Background), at(0, 0))
+	assert.Equal(t, hex(ink.Line), at(0, yOf(40)), "a steady 40%")
 }
 
 // "can you do it please to the degree that is feasible given sentry access?"

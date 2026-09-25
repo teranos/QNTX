@@ -353,11 +353,12 @@ func TestAPluginMailsFromQNTXsDarkTemplateByName(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, resp.Success, resp.Error)
 	require.Len(t, box.sent, 1)
-	// On the canvas, in a window, carried by bgcolor where a client drops styles.
-	assert.Contains(t, box.sent[0].HTML, `bgcolor="`+Canvas.Background+`"`)
-	assert.Contains(t, box.sent[0].HTML, `bgcolor="`+Canvas.Window+`"`)
-	assert.Contains(t, box.sent[0].HTML, "color:"+Canvas.Attestation.Value)
-	assert.Contains(t, box.sent[0].HTML, "&nbsp;Welkom</td>", "the subject titles the window")
+	// A QNTX window on the canvas, carried by bgcolor where a client drops styles.
+	l, err := readLook()
+	require.NoError(t, err)
+	assert.Contains(t, box.sent[0].HTML, `bgcolor="`+l.canvas+`"`)
+	assert.Contains(t, box.sent[0].HTML, `bgcolor="`+l.window+`"`)
+	assert.Contains(t, box.sent[0].HTML, "Welkom</td>", "the subject titles the window")
 	assert.Contains(t, box.sent[0].HTML, "Hallo.")
 	assert.Contains(t, box.sent[0].HTML, `href="https://garden.test/app"`)
 

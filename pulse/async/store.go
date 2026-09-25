@@ -327,29 +327,25 @@ func (s *Store) ListTasksByParent(parentJobID string) (_ []*Job, err error) {
 	return scanJobs(rows, "tasks")
 }
 
-// HandlerFailures is how often one handler failed, and the last thing it said.
+// HandlerFailures is one error a handler failed with, and how often.
 type HandlerFailures struct {
-	Handler   string
-	Failures  int
-	LastError string
+	Handler  string
+	Failures int
+	Error    string
 }
 
-// FailedHandlersSince is the handlers whose jobs failed since a time, most
-// failures first, at most limit of them. A job a restart cut off is left out:
-// the restart failed it, not its handler.
+// FailedHandlersSince is the errors handlers failed with since a time, the
+// most frequent first, at most limit of them. A job a restart cut off is left
+// out: the restart failed it, not its handler.
 func (s *Store) FailedHandlersSince(since time.Time, limit int) (_ []HandlerFailures, err error) {
 	rows, err := s.db.Query(`
-		SELECT handler_name, COUNT(*),
-		       (SELECT last.error FROM async_ix_jobs AS last
-		        WHERE last.handler_name = failed.handler_name
-		          AND last.status = 'failed' AND last.updated_at >= ? AND last.error != ?
-		        ORDER BY last.updated_at DESC LIMIT 1)
-		FROM async_ix_jobs AS failed
+		SELECT handler_name, COUNT(*), error
+		FROM async_ix_jobs
 		WHERE status = 'failed' AND updated_at >= ? AND error != ?
-		GROUP BY handler_name
-		ORDER BY COUNT(*) DESC, handler_name
+		GROUP BY handler_name, error
+		ORDER BY COUNT(*) DESC, handler_name, error
 		LIMIT ?`,
-		since, OrphanedError, since, OrphanedError, limit)
+		since, OrphanedError, limit)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to count the failed handlers since %s", since.Format(time.RFC3339))
 	}
@@ -358,11 +354,11 @@ func (s *Store) FailedHandlersSince(since time.Time, limit int) (_ []HandlerFail
 	var failed []HandlerFailures
 	for rows.Next() {
 		var f HandlerFailures
-		var last sql.NullString
-		if err := rows.Scan(&f.Handler, &f.Failures, &last); err != nil {
+		var said sql.NullString
+		if err := rows.Scan(&f.Handler, &f.Failures, &said); err != nil {
 			return nil, errors.Wrap(err, "failed to read a failed handler")
 		}
-		f.LastError = last.String
+		f.Error = said.String
 		failed = append(failed, f)
 	}
 	if err := rows.Err(); err != nil {
