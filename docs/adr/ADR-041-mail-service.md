@@ -45,6 +45,11 @@ The window holds the templates, the mail sent, and the SES account.
 
 QNTX keeps a second template, dark, drawn from web/css/tokens.css.
 
+"what is the bg color of the canvas, what pattern does it use, what are the colors of the ax element, and the type element, and the sigma element, and the attestation element, and the triplet."
+
+A mail QNTX draws stands on its canvas, grid and all, as windows, each in
+the ink of one of QNTX's elements. The weekly report is drawn the same way.
+
 ## Not done
 
 - Bounces, complaints and replies coming back.

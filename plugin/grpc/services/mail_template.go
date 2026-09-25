@@ -44,23 +44,16 @@ func NeutralTemplate() *protocol.MailTemplate {
 // DarkTemplateName is QNTX's dark template, for a Send that names it.
 const DarkTemplateName = "dark"
 
-// DarkTemplate is the neutral template in QNTX's own dark palette: the same
-// values, drawn in the colours and the typeface of web/css/tokens.css.
+// DarkTemplate is the neutral template drawn the way QNTX is: one window on
+// its canvas, titled with the subject, written in the attestation element's
+// ink. The same values as the neutral template.
 func DarkTemplate() *protocol.MailTemplate {
+	body := `<p style="margin:0 0 12px;white-space:pre-line">{{.body}}</p>` +
+		`{{with index . "link"}}<p style="margin:0"><a href="{{.}}" style="color:` + Canvas.Ax.Title + `">{{or (index $ "link_label") .}}</a></p>{{end}}`
 	return &protocol.MailTemplate{
 		Subject: NeutralTemplate().Subject,
 		Text:    NeutralTemplate().Text,
-		Html: `<!DOCTYPE html>
-<html>
-<head><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"></head>
-<body style="margin:0;padding:24px;background:` + Dark.Background + `;color:` + Dark.Text + `;font-family:` + Dark.Mono + `;font-size:14px;line-height:1.6">
-<div style="max-width:560px;margin:0 auto;padding:20px;background:` + Dark.Surface + `;border:1px solid ` + Dark.Border + `;border-radius:7px">
-<p style="margin:0 0 16px;white-space:pre-line">{{.body}}</p>
-{{with index . "link"}}<p style="margin:0"><a href="{{.}}" style="color:` + Dark.Accent + `">{{or (index $ "link_label") .}}</a></p>{{end}}
-</div>
-</body>
-</html>
-`,
+		Html:    CanvasPage(CanvasWindow("✉", "{{.subject}}", Canvas.Attestation, Canvas.TitleBar, body)),
 	}
 }
 

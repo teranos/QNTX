@@ -6,6 +6,7 @@ import (
 	"html"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"math"
 	"strings"
@@ -70,166 +71,220 @@ func renderReport(r Report) (services.NodeMail, error) {
 // html
 // ---------------------------------------------------------------------------
 
-type htmlDoc struct{ b strings.Builder }
+// "what is the bg color of the canvas, what pattern does it use, what are the colors of the ax element, and the type element, and the sigma element, and the attestation element, and the triplet."
+//
+// The report is drawn the way QNTX is: on its canvas, each part a window in
+// the ink of the element closest to what it holds.
 
-func (d *htmlDoc) raw(s string) { d.b.WriteString(s) }
-
-func (d *htmlDoc) text(s string) { d.b.WriteString(html.EscapeString(s)) }
-
-func (d *htmlDoc) heading(s string) {
-	d.raw(`<h2 style="font-size:15px;margin:24px 0 8px">`)
-	d.text(s)
-	d.raw(`</h2>`)
+// win is one window's body, written in its ink.
+type win struct {
+	b       strings.Builder
+	ink     services.Ink
+	written bool
 }
 
-func (d *htmlDoc) said(s string) {
-	d.raw(`<p style="margin:0 0 8px;color:#8a1c1c">`)
-	d.text(s)
-	d.raw(`</p>`)
+func (w *win) raw(s string) { w.b.WriteString(s); w.written = true }
+
+func (w *win) text(s string) { w.raw(html.EscapeString(s)) }
+
+// heading is a part within a window, in the ink's keyword colour.
+func (w *win) heading(s string) {
+	top := "0"
+	if w.written {
+		top = "16px"
+	}
+	w.raw(`<div style="color:` + w.ink.Keyword + `;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin:` + top + ` 0 6px">`)
+	w.text(s)
+	w.raw(`</div>`)
 }
 
-func (d *htmlDoc) line(s string) {
-	d.raw(`<p style="margin:0 0 8px">`)
-	d.text(s)
-	d.raw(`</p>`)
+func (w *win) said(s string) {
+	w.raw(`<p style="margin:0 0 8px;color:` + services.Canvas.Alert.Value + `">`)
+	w.text(s)
+	w.raw(`</p>`)
 }
 
-func (d *htmlDoc) table(head []string, rows [][]string) {
-	d.raw(`<table style="border-collapse:collapse;font-size:13px">`)
-	d.raw(`<tr>`)
+func (w *win) line(s string) {
+	w.raw(`<p style="margin:0 0 8px">`)
+	w.text(s)
+	w.raw(`</p>`)
+}
+
+func (w *win) quiet(s string) {
+	w.raw(`<p style="margin:0 0 8px;color:` + w.ink.Keyword + `">`)
+	w.text(s)
+	w.raw(`</p>`)
+}
+
+// table is labelled columns: the labels in the ink's keyword colour, the cells
+// in colour, or in the ink's value colour when colour is empty.
+func (w *win) table(head []string, rows [][]string, colour string) {
+	if colour == "" {
+		colour = w.ink.Value
+	}
+	w.raw(`<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:13px">`)
+	w.raw(`<tr>`)
 	for _, h := range head {
-		d.raw(`<th style="text-align:left;padding:2px 12px 2px 0;border-bottom:1px solid #ccc">`)
-		d.text(h)
-		d.raw(`</th>`)
+		w.raw(`<td style="color:` + w.ink.Keyword + `;padding:2px 16px 4px 0;border-bottom:1px solid ` + services.Canvas.Border + `">`)
+		w.text(h)
+		w.raw(`</td>`)
 	}
-	d.raw(`</tr>`)
+	w.raw(`</tr>`)
 	for _, row := range rows {
-		d.raw(`<tr>`)
+		w.raw(`<tr>`)
 		for _, cell := range row {
-			d.raw(`<td style="padding:2px 12px 2px 0;vertical-align:top">`)
-			d.text(cell)
-			d.raw(`</td>`)
+			w.raw(`<td style="color:` + colour + `;padding:3px 16px 0 0;vertical-align:top">`)
+			w.text(cell)
+			w.raw(`</td>`)
 		}
-		d.raw(`</tr>`)
+		w.raw(`</tr>`)
 	}
-	d.raw(`</table>`)
+	w.raw(`</table>`)
+}
+
+// canvas is the windows standing on the report's canvas, in order.
+type canvas struct{ b strings.Builder }
+
+// window stands one window on the canvas. symbol is one of web/ts/sym.ts.
+func (c *canvas) window(symbol, title string, ink services.Ink, titleBar string, fill func(w *win)) {
+	w := &win{ink: ink}
+	fill(w)
+	c.b.WriteString(services.CanvasWindow(symbol, html.EscapeString(title), ink, titleBar, w.b.String()))
 }
 
 func renderReportHTML(r Report, drawn map[string]bool) string {
-	var d htmlDoc
-	d.raw(`<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#ffffff;color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5"><div style="max-width:640px;margin:0 auto">`)
-	d.raw(`<h1 style="font-size:18px;margin:0 0 4px">`)
-	d.text("QNTX week " + r.Window.Start.UTC().Format("2006-01-02 15:04") + " to " + r.Window.End.UTC().Format("2006-01-02 15:04") + " UTC")
-	d.raw(`</h1>`)
-	d.line(r.Node)
+	ink, bar := services.Canvas, services.Canvas.TitleBar
+	var c canvas
 
-	d.heading("Attestations created per namespace")
-	if r.AttestationsErr != "" {
-		d.said(r.AttestationsErr)
-	} else {
-		d.table([]string{"Namespace", "Created"}, namespaceRows(r.Attestations))
-	}
+	c.window("≡", "QNTX week "+r.Window.Start.UTC().Format("2006-01-02 15:04")+" to "+r.Window.End.UTC().Format("2006-01-02 15:04")+" UTC", ink.Ax, bar, func(w *win) {
+		w.quiet(r.Node)
+		w.heading("Node restarts")
+		if r.RestartsErr != "" {
+			w.said(r.RestartsErr)
+		} else {
+			w.line(fmt.Sprintf("%d", r.Restarts))
+		}
+	})
 
-	d.heading("Users registered per namespace")
-	if r.RegistrationsErr != "" {
-		d.said(r.RegistrationsErr)
-	} else if len(r.Registrations) == 0 {
-		d.line("None.")
-	} else {
-		d.table([]string{"Namespace", "Registered"}, namespaceRows(r.Registrations))
-	}
-
-	d.heading("Node restarts")
-	if r.RestartsErr != "" {
-		d.said(r.RestartsErr)
-	} else {
-		d.line(fmt.Sprintf("%d", r.Restarts))
-	}
+	c.window("⎔", "Namespaces", ink.Attestation, bar, func(w *win) {
+		w.heading("Attestations created per namespace")
+		if r.AttestationsErr != "" {
+			w.said(r.AttestationsErr)
+		} else {
+			w.table([]string{"Namespace", "Created"}, namespaceRows(r.Attestations), "")
+		}
+		w.heading("Users registered per namespace")
+		switch {
+		case r.RegistrationsErr != "":
+			w.said(r.RegistrationsErr)
+		case len(r.Registrations) == 0:
+			w.line("None.")
+		default:
+			w.table([]string{"Namespace", "Registered"}, namespaceRows(r.Registrations), "")
+		}
+	})
 
 	// What Sentry holds is said once when Sentry was not asked, not under every
 	// section it would have filled.
 	if r.SentryErr != "" {
-		d.heading("From Sentry: downtime, CPU, memory, swap, network, boot, queries, 4xx and 5xx")
-		d.said(r.SentryErr)
+		c.window("Σ", "From Sentry: downtime, CPU, memory, swap, network, boot, queries, 4xx and 5xx", ink.Sigma, bar, func(w *win) {
+			w.said(r.SentryErr)
+		})
 	} else {
-		renderSentryHTML(&d, r, drawn)
+		renderSentryHTML(&c, r, drawn)
 	}
 
-	d.heading("Top 3 handler failures")
-	switch {
-	case r.FailuresErr != "":
-		d.said(r.FailuresErr)
-	case len(r.Failures) == 0:
-		d.line("None.")
-	default:
-		rows := make([][]string, 0, len(r.Failures))
-		for _, f := range r.Failures {
-			rows = append(rows, []string{f.Handler, fmt.Sprintf("%d", f.Failures), f.LastError})
-		}
-		d.table([]string{"Handler", "Failures", "Last error"}, rows)
+	// A failing handler takes the alert's window; a week without one does not.
+	failures, failuresBar := ink.Ax, bar
+	if len(r.Failures) > 0 || r.FailuresErr != "" {
+		failures, failuresBar = ink.Alert, services.AlertTitleBar
 	}
-
-	d.raw(`</div></body></html>`)
-	return d.b.String()
-}
-
-// renderSentryHTML is the sections Sentry filled.
-func renderSentryHTML(d *htmlDoc, r Report, drawn map[string]bool) {
-	d.heading("Downtime")
-	if r.Downtime.Err != "" {
-		d.said(r.Downtime.Err)
-	} else {
-		d.line(downtimeLine(r.Downtime))
-	}
-
-	for _, g := range r.graphs() {
-		d.heading(g.title + " over 7 days")
+	c.window("꩜", "Top 3 handler failures", failures, failuresBar, func(w *win) {
 		switch {
-		case g.s.Err != "":
-			d.said(g.s.Err)
-		case !drawn[g.id]:
-			d.line("No samples.")
+		case r.FailuresErr != "":
+			w.said(r.FailuresErr)
+		case len(r.Failures) == 0:
+			w.line("None.")
 		default:
-			d.raw(`<img src="cid:` + g.id + `" width="` + fmt.Sprint(graphWidth) + `" height="` + fmt.Sprint(graphHeight) + `" alt="` + g.title + ` over 7 days" style="display:block;max-width:100%;border:1px solid #ddd">`)
-			d.line(seriesLine(g.s.Points))
+			rows := make([][]string, 0, len(r.Failures))
+			for _, f := range r.Failures {
+				rows = append(rows, []string{f.Handler, fmt.Sprintf("%d", f.Failures), f.LastError})
+			}
+			w.table([]string{"Handler", "Failures", "Last error"}, rows, "")
 		}
-	}
-
-	d.heading("Network over 7 days")
-	d.table([]string{"", "Total"}, [][]string{
-		{"host.net.in", totalCell(r.NetIn)},
-		{"host.net.out", totalCell(r.NetOut)},
 	})
 
-	d.heading("boot.subsystem.took over 7 days")
-	if r.BootErr != "" {
-		d.said(r.BootErr)
-	} else {
-		d.table([]string{"Subsystem", "Mean", "Max", "Samples"}, bootRows(r.Boot))
-	}
+	return services.CanvasPage(c.b.String())
+}
 
-	d.heading("Query took over 7 days")
-	if r.QueryErr != "" {
-		d.said(r.QueryErr)
-	} else {
-		d.line(queryLine(r.Query))
-		d.line("Which queries were slowest is not known: no query's text is recorded.")
-	}
+// renderSentryHTML is the windows Sentry filled.
+func renderSentryHTML(c *canvas, r Report, drawn map[string]bool) {
+	ink, bar := services.Canvas, services.Canvas.TitleBar
 
-	for _, ranked := range []struct {
-		title string
-		ranks statusRanks
-	}{{"Top 3 4xx", r.Status4xx}, {"Top 3 5xx", r.Status5xx}} {
-		d.heading(ranked.title)
-		switch {
-		case ranked.ranks.Err != "":
-			d.said(ranked.ranks.Err)
-		case len(ranked.ranks.Ranks) == 0:
-			d.line("None.")
-		default:
-			d.table([]string{"Path", "Status", "Count"}, statusRows(ranked.ranks.Ranks))
+	// The sigma element is the sum of many observations; so is every number
+	// Sentry answers with.
+	c.window("Σ", "The host over 7 days", ink.Sigma, bar, func(w *win) {
+		w.heading("Downtime")
+		if r.Downtime.Err != "" {
+			w.said(r.Downtime.Err)
+		} else {
+			w.line(downtimeLine(r.Downtime))
 		}
-	}
+		for _, g := range r.graphs() {
+			w.heading(g.title + " over 7 days")
+			switch {
+			case g.s.Err != "":
+				w.said(g.s.Err)
+			case !drawn[g.id]:
+				w.line("No samples.")
+			default:
+				w.raw(`<img src="cid:` + g.id + `" width="` + fmt.Sprint(graphWidth) + `" height="` + fmt.Sprint(graphHeight) + `" alt="` + g.title + ` over 7 days" style="display:block;max-width:100%;height:auto;border:1px solid ` + ink.Border + `;border-radius:3px;margin:0 0 6px">`)
+				w.line(seriesLine(g.s.Points))
+			}
+		}
+		w.heading("Network over 7 days")
+		w.table([]string{"", "Total"}, [][]string{
+			{"host.net.in", totalCell(r.NetIn)},
+			{"host.net.out", totalCell(r.NetOut)},
+		}, "")
+	})
+
+	c.window("✿", "boot.subsystem.took over 7 days", ink.Type, bar, func(w *win) {
+		if r.BootErr != "" {
+			w.said(r.BootErr)
+			return
+		}
+		w.table([]string{"Subsystem", "Mean", "Max", "Samples"}, bootRows(r.Boot), "")
+	})
+
+	c.window("⋈", "Query took over 7 days", ink.Ax, bar, func(w *win) {
+		if r.QueryErr != "" {
+			w.said(r.QueryErr)
+			return
+		}
+		w.line(queryLine(r.Query))
+		w.quiet("Which queries were slowest is not known: no query's text is recorded.")
+	})
+
+	// Responses grouped by path and status, the way the triplet element groups
+	// attestations. A 5xx is written in the alert's colour.
+	c.window("⫶", "Top 3 4xx and 5xx", ink.Triplet, bar, func(w *win) {
+		for _, ranked := range []struct {
+			title  string
+			ranks  statusRanks
+			colour string
+		}{{"Top 3 4xx", r.Status4xx, ""}, {"Top 3 5xx", r.Status5xx, ink.Alert.Value}} {
+			w.heading(ranked.title)
+			switch {
+			case ranked.ranks.Err != "":
+				w.said(ranked.ranks.Err)
+			case len(ranked.ranks.Ranks) == 0:
+				w.line("None.")
+			default:
+				w.table([]string{"Path", "Status", "Count"}, statusRows(ranked.ranks.Ranks), ranked.colour)
+			}
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -416,28 +471,58 @@ func seriesLine(points []sentryread.Point) string {
 // graphs
 // ---------------------------------------------------------------------------
 
-var (
-	graphBackground = color.RGBA{0xff, 0xff, 0xff, 0xff}
-	graphGrid       = color.RGBA{0xee, 0xee, 0xee, 0xff}
-	graphDay        = color.RGBA{0xdd, 0xdd, 0xdd, 0xff}
-	graphFill       = color.RGBA{0xc8, 0xdc, 0xf0, 0xff}
-	graphLine       = color.RGBA{0x1f, 0x5f, 0x9f, 0xff}
-)
+// graphInk is what a graph is drawn in: the canvas and its 24px grid, rules in
+// the windows' border, and the sigma element's bar over its shade.
+type graphInk struct {
+	background, grid, rule, shade, line color.NRGBA
+}
 
-// drawPercentGraph draws hourly percentages on 0 to 100: a line with the area
-// under it filled, a faint rule at every quarter, and one at every UTC
-// midnight. An hour with no sample is a gap, not a fall to zero.
+func graphInkOf() (graphInk, error) {
+	var g graphInk
+	for _, c := range []struct {
+		into *color.NRGBA
+		css  string
+	}{
+		{&g.background, services.Canvas.Background},
+		{&g.grid, services.Canvas.Grid},
+		{&g.rule, services.Canvas.Border},
+		{&g.shade, services.Canvas.SigmaBarShade},
+		{&g.line, services.Canvas.SigmaBar},
+	} {
+		v, err := services.ColorOf(c.css)
+		if err != nil {
+			return graphInk{}, errors.Wrap(err, "the graph cannot be drawn in the palette")
+		}
+		*c.into = v
+	}
+	return g, nil
+}
+
+// canvasCell is canvas.css's grid: a line on the last pixel of every 24.
+const canvasCell = 24
+
+// drawPercentGraph draws hourly percentages on 0 to 100 over QNTX's canvas: a
+// line with the area under it shaded, a rule at every quarter, and one at every
+// UTC midnight. An hour with no sample is a gap, not a fall to zero.
 func drawPercentGraph(points []sentryread.Point) ([]byte, error) {
+	ink, err := graphInkOf()
+	if err != nil {
+		return nil, err
+	}
 	img := image.NewRGBA(image.Rect(0, 0, graphWidth, graphHeight))
 	for y := 0; y < graphHeight; y++ {
 		for x := 0; x < graphWidth; x++ {
-			img.Set(x, y, graphBackground)
+			c := ink.background
+			if x%canvasCell == canvasCell-1 || y%canvasCell == canvasCell-1 {
+				c = ink.grid
+			}
+			img.Set(x, y, c)
 		}
 	}
 	for _, q := range []float64{25, 50, 75} {
 		y := yOf(q)
 		for x := 0; x < graphWidth; x++ {
-			img.Set(x, y, graphGrid)
+			img.Set(x, y, ink.rule)
 		}
 	}
 
@@ -452,29 +537,32 @@ func drawPercentGraph(points []sentryread.Point) ([]byte, error) {
 		if p.At.UTC().Hour() == 0 && p.At.Minute() == 0 {
 			x := xOf(i)
 			for y := 0; y < graphHeight; y++ {
-				img.Set(x, y, graphDay)
+				img.Set(x, y, ink.rule)
 			}
 		}
 	}
 
+	// The shade is translucent, as the sigma element's is: the grid shows
+	// through it. A column two hours share is shaded once, or it would be
+	// darker than its neighbours.
+	shade := &image.Uniform{C: ink.shade}
+	shaded := -1
 	for i := 0; i+1 < n; i++ {
 		a, b := points[i], points[i+1]
 		if a.Value <= 0 || b.Value <= 0 {
 			continue
 		}
 		x0, x1 := xOf(i), xOf(i+1)
-		for x := x0; x <= x1; x++ {
+		for x := max(x0, shaded+1); x <= x1; x++ {
 			t := 0.0
 			if x1 > x0 {
 				t = float64(x-x0) / float64(x1-x0)
 			}
 			v := a.Value + (b.Value-a.Value)*t
-			top := yOf(v)
-			for y := top + 1; y < graphHeight; y++ {
-				img.Set(x, y, graphFill)
-			}
+			draw.Draw(img, image.Rect(x, yOf(v)+1, x+1, graphHeight), shade, image.Point{}, draw.Over)
+			shaded = x
 		}
-		drawLine(img, x0, yOf(a.Value), x1, yOf(b.Value), graphLine)
+		drawLine(img, x0, yOf(a.Value), x1, yOf(b.Value), ink.line)
 	}
 
 	var buf bytes.Buffer
