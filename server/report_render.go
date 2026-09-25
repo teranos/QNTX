@@ -146,78 +146,13 @@ func renderReportHTML(r Report, drawn map[string]bool) string {
 		d.line(fmt.Sprintf("%d", r.Restarts))
 	}
 
-	d.heading("Downtime")
-	switch {
-	case r.SentryErr != "":
+	// What Sentry holds is said once when Sentry was not asked, not under every
+	// section it would have filled.
+	if r.SentryErr != "" {
+		d.heading("From Sentry: downtime, CPU, memory, swap, network, boot, queries, 4xx and 5xx")
 		d.said(r.SentryErr)
-	case r.Downtime.Err != "":
-		d.said(r.Downtime.Err)
-	default:
-		d.line(downtimeLine(r.Downtime))
-	}
-
-	for _, g := range r.graphs() {
-		d.heading(g.title + " over 7 days")
-		switch {
-		case r.SentryErr != "":
-			d.said(r.SentryErr)
-		case g.s.Err != "":
-			d.said(g.s.Err)
-		case !drawn[g.id]:
-			d.line("No samples.")
-		default:
-			d.raw(`<img src="cid:` + g.id + `" width="` + fmt.Sprint(graphWidth) + `" height="` + fmt.Sprint(graphHeight) + `" alt="` + g.title + ` over 7 days" style="display:block;max-width:100%;border:1px solid #ddd">`)
-			d.line(seriesLine(g.s.Points))
-		}
-	}
-
-	d.heading("Network over 7 days")
-	switch {
-	case r.SentryErr != "":
-		d.said(r.SentryErr)
-	default:
-		d.table([]string{"", "Total"}, [][]string{
-			{"host.net.in", totalCell(r.NetIn)},
-			{"host.net.out", totalCell(r.NetOut)},
-		})
-	}
-
-	d.heading("boot.subsystem.took over 7 days")
-	switch {
-	case r.SentryErr != "":
-		d.said(r.SentryErr)
-	case r.BootErr != "":
-		d.said(r.BootErr)
-	default:
-		d.table([]string{"Subsystem", "Mean", "Max", "Samples"}, bootRows(r.Boot))
-	}
-
-	d.heading("Query took over 7 days")
-	switch {
-	case r.SentryErr != "":
-		d.said(r.SentryErr)
-	case r.QueryErr != "":
-		d.said(r.QueryErr)
-	default:
-		d.line(queryLine(r.Query))
-		d.line("Which queries were slowest is not known: no query's text is recorded.")
-	}
-
-	for _, ranked := range []struct {
-		title string
-		ranks statusRanks
-	}{{"Top 3 4xx", r.Status4xx}, {"Top 3 5xx", r.Status5xx}} {
-		d.heading(ranked.title)
-		switch {
-		case r.SentryErr != "":
-			d.said(r.SentryErr)
-		case ranked.ranks.Err != "":
-			d.said(ranked.ranks.Err)
-		case len(ranked.ranks.Ranks) == 0:
-			d.line("None.")
-		default:
-			d.table([]string{"Path", "Status", "Count"}, statusRows(ranked.ranks.Ranks))
-		}
+	} else {
+		renderSentryHTML(&d, r, drawn)
 	}
 
 	d.heading("Top 3 handler failures")
@@ -236,6 +171,65 @@ func renderReportHTML(r Report, drawn map[string]bool) string {
 
 	d.raw(`</div></body></html>`)
 	return d.b.String()
+}
+
+// renderSentryHTML is the sections Sentry filled.
+func renderSentryHTML(d *htmlDoc, r Report, drawn map[string]bool) {
+	d.heading("Downtime")
+	if r.Downtime.Err != "" {
+		d.said(r.Downtime.Err)
+	} else {
+		d.line(downtimeLine(r.Downtime))
+	}
+
+	for _, g := range r.graphs() {
+		d.heading(g.title + " over 7 days")
+		switch {
+		case g.s.Err != "":
+			d.said(g.s.Err)
+		case !drawn[g.id]:
+			d.line("No samples.")
+		default:
+			d.raw(`<img src="cid:` + g.id + `" width="` + fmt.Sprint(graphWidth) + `" height="` + fmt.Sprint(graphHeight) + `" alt="` + g.title + ` over 7 days" style="display:block;max-width:100%;border:1px solid #ddd">`)
+			d.line(seriesLine(g.s.Points))
+		}
+	}
+
+	d.heading("Network over 7 days")
+	d.table([]string{"", "Total"}, [][]string{
+		{"host.net.in", totalCell(r.NetIn)},
+		{"host.net.out", totalCell(r.NetOut)},
+	})
+
+	d.heading("boot.subsystem.took over 7 days")
+	if r.BootErr != "" {
+		d.said(r.BootErr)
+	} else {
+		d.table([]string{"Subsystem", "Mean", "Max", "Samples"}, bootRows(r.Boot))
+	}
+
+	d.heading("Query took over 7 days")
+	if r.QueryErr != "" {
+		d.said(r.QueryErr)
+	} else {
+		d.line(queryLine(r.Query))
+		d.line("Which queries were slowest is not known: no query's text is recorded.")
+	}
+
+	for _, ranked := range []struct {
+		title string
+		ranks statusRanks
+	}{{"Top 3 4xx", r.Status4xx}, {"Top 3 5xx", r.Status5xx}} {
+		d.heading(ranked.title)
+		switch {
+		case ranked.ranks.Err != "":
+			d.said(ranked.ranks.Err)
+		case len(ranked.ranks.Ranks) == 0:
+			d.line("None.")
+		default:
+			d.table([]string{"Path", "Status", "Count"}, statusRows(ranked.ranks.Ranks))
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -274,12 +268,16 @@ func renderReportText(r Report) string {
 	w("\nNode restarts")
 	orSaid(r.RestartsErr, func() { w("  %d", r.Restarts) })
 
+	// What Sentry holds is said once when Sentry was not asked.
+	if r.SentryErr != "" {
+		w("\nFrom Sentry: downtime, CPU, memory, swap, network, boot, queries, 4xx and 5xx")
+		w("  %s", r.SentryErr)
+	}
 	sentry := func(title, err string, fn func()) {
-		w("\n%s", title)
 		if r.SentryErr != "" {
-			w("  %s", r.SentryErr)
 			return
 		}
+		w("\n%s", title)
 		orSaid(err, fn)
 	}
 	sentry("Downtime", r.Downtime.Err, func() { w("  %s", downtimeLine(r.Downtime)) })

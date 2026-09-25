@@ -196,8 +196,30 @@ func TestAReportWithoutSentrySaysWhy(t *testing.T) {
 	mail, err := renderReport(r)
 	require.NoError(t, err)
 	assert.Empty(t, mail.Inline)
-	assert.Contains(t, mail.Text, "sentry.read_token")
 	assert.Contains(t, mail.Text, "Node restarts")
+
+	// Why Sentry was not asked is said once, not under every section it
+	// would have filled.
+	assert.Equal(t, 1, strings.Count(mail.Text, "sentry.read_token"), mail.Text)
+	assert.Equal(t, 1, strings.Count(mail.HTML, "sentry.read_token"))
+	assert.NotContains(t, mail.Text, "CPU over 7 days")
+}
+
+// A token created after the node started is read by the next report: Sentry's
+// settings are resolved when the report is written, not once at boot.
+func TestSentryIsResolvedWhenTheReportIsWritten(t *testing.T) {
+	s := rootKnowingServer(t)
+	s.sentryConfig = appcfg.SentryConfig{API: "https://sentry.example", Organization: "garden", Project: "1234"}
+
+	t.Setenv("QNTX_TEST_SENTRY_TOKEN", "")
+	s.sentryConfig.ReadTokenRef = "env:QNTX_TEST_SENTRY_TOKEN"
+	_, why := s.sentryReader(context.Background())
+	require.Error(t, why)
+
+	t.Setenv("QNTX_TEST_SENTRY_TOKEN", "sntryu_read")
+	reader, why := s.sentryReader(context.Background())
+	require.NoError(t, why)
+	assert.Equal(t, "sntryu_read", reader.Token)
 }
 
 // The report goes to the ROOT User's primary address, as the node's own mail.
@@ -216,10 +238,9 @@ func TestTheReportIsMailedToTheRootUser(t *testing.T) {
 	mail.Wire(services.MailWiring{From: "Garden <mail@garden.test>", Transport: box,
 		Recipients: s.mailRecipient, Records: s.mailRecords, Actor: "did:key:z6Mkgardennode"})
 	s.nodeMailer = mail
-	s.sentryReader, s.sentryReaderErr = sentryread.Client{}, nil
 
-	// Sentry is set up to answer nothing here; the report says so and goes.
-	s.sentryReaderErr = sentryread.Client{}.Configured()
+	// Sentry is not set up here; the report says so and goes.
+	s.sentryConfig = appcfg.SentryConfig{}
 	sent, err := s.sendReport(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "root@garden.test", sent.To)
@@ -244,7 +265,7 @@ func TestNoReportGoesToARootUserWithoutAnAddress(t *testing.T) {
 	mail.Wire(services.MailWiring{From: "Garden <mail@garden.test>", Transport: box,
 		Recipients: s.mailRecipient, Records: s.mailRecords, Actor: "did:key:z6Mkgardennode"})
 	s.nodeMailer = mail
-	s.sentryReaderErr = sentryread.Client{}.Configured()
+	s.sentryConfig = appcfg.SentryConfig{}
 
 	_, err = s.sendReport(context.Background())
 	require.Error(t, err)

@@ -57,7 +57,8 @@ func (s *QNTXServer) sendReport(ctx context.Context) (reportSent, error) {
 		return reportSent{}, errors.New("nobody has claimed this node, so there is no ROOT User to report to")
 	}
 
-	r := s.gatherReport(ctx, time.Now().UTC(), s.sentryReader, s.sentryReaderErr)
+	reader, why := s.sentryReader(ctx)
+	r := s.gatherReport(ctx, time.Now().UTC(), reader, why)
 	mail, err := renderReport(r)
 	if err != nil {
 		return reportSent{}, errors.Wrap(err, "the report could not be rendered")
@@ -76,9 +77,9 @@ func (s *QNTXServer) sendReport(ctx context.Context) (reportSent, error) {
 // first report on its first tick.
 func (s *QNTXServer) setupWeeklyReport(cfg *appcfg.Config) {
 	s.sentryEnvironment = cfg.Sentry.Environment
-	s.sentryReader, s.sentryReaderErr = sentryReaderFrom(s.ctx, cfg.Sentry)
-	if s.sentryReaderErr != nil {
-		s.logger.Infow("The weekly report leaves Sentry out", "reason", s.sentryReaderErr)
+	s.sentryConfig = cfg.Sentry
+	if _, why := s.sentryReader(s.ctx); why != nil {
+		s.logger.Infow("The weekly report leaves Sentry out until this is so", "reason", why)
 	}
 	if s.servicesManager != nil {
 		if mail := s.servicesManager.MailServer(); mail != nil {
@@ -131,6 +132,12 @@ func (s *QNTXServer) setupWeeklyReport(cfg *appcfg.Config) {
 		return
 	}
 	s.logger.Infow("Scheduled the weekly report", "job_id", job.Id, "interval_seconds", interval)
+}
+
+// sentryReader is Sentry as am.toml names it, resolved now: a token created
+// after the node started is read by the next report.
+func (s *QNTXServer) sentryReader(ctx context.Context) (sentryread.Client, error) {
+	return sentryReaderFrom(ctx, s.sentryConfig)
 }
 
 // sentryReaderFrom is a Sentry client from am.toml, or why there is none.
