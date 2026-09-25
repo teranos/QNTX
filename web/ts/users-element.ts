@@ -15,6 +15,7 @@ import { apiJson } from './client/http';
 import { createDangerButton, createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
+import { openUserElement } from './user-element';
 
 /** One User, as the record holds them. Nothing here is a secret: a key is a
  *  DID and an account is what a provider calls it. */
@@ -149,6 +150,9 @@ export function renderList(container: HTMLElement, users: UserRecord[], switches
         // The id is the one thing about a User that never changes, and it is
         // on the row rather than in a hover.
         name.title = u.id;
+        // Pressing a name opens that User whole.
+        name.style.cursor = 'pointer';
+        name.addEventListener('click', () => { openUserElement(u); });
         tr.appendChild(name);
         tr.appendChild(cell(u.level));
         tr.appendChild(cell(u.namespace || '—'));
