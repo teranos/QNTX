@@ -1028,6 +1028,8 @@ type ScheduledJob struct {
 	CreatedAt       string                 `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // RFC3339 timestamp
 	UpdatedAt       string                 `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // RFC3339 timestamp
 	CreatedFromDoc  string                 `protobuf:"bytes,14,opt,name=created_from_doc,json=createdFromDoc,proto3" json:"created_from_doc,omitempty"`
+	UserId          string                 `protobuf:"bytes,15,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // The User whose sigil call created it; empty is none
+	Namespace       string                 `protobuf:"bytes,16,opt,name=namespace,proto3" json:"namespace,omitempty"`         // The namespace that caller acted in; empty is none
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1153,6 +1155,20 @@ func (x *ScheduledJob) GetCreatedFromDoc() string {
 	return ""
 }
 
+func (x *ScheduledJob) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ScheduledJob) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
 type CreateScheduleRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	AuthToken       string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
@@ -1160,6 +1176,7 @@ type CreateScheduleRequest struct {
 	IntervalSeconds int32                  `protobuf:"varint,3,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`                                     // Execution interval
 	Payload         []byte                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`                                                                             // Handler-specific data (JSON)
 	Metadata        map[string]string      `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Optional metadata (element_id, plugin, etc.)
+	StoreToken      string                 `protobuf:"bytes,6,opt,name=store_token,json=storeToken,proto3" json:"store_token,omitempty"`                                                     // The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule. Empty is a schedule no caller made.
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1227,6 +1244,13 @@ func (x *CreateScheduleRequest) GetMetadata() map[string]string {
 		return x.Metadata
 	}
 	return nil
+}
+
+func (x *CreateScheduleRequest) GetStoreToken() string {
+	if x != nil {
+		return x.StoreToken
+	}
+	return ""
 }
 
 type CreateScheduleResponse struct {
@@ -2339,7 +2363,7 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\trun_count\x18\x01 \x01(\x03R\brunCount\x12#\n" +
 	"\x0elast_run_at_ms\x18\x02 \x01(\x03R\vlastRunAtMs\x12*\n" +
 	"\x11last_execution_id\x18\x03 \x01(\tR\x0flastExecutionId\x12#\n" +
-	"\x0enext_run_at_ms\x18\x04 \x01(\x03R\vnextRunAtMs\"\xbb\x03\n" +
+	"\x0enext_run_at_ms\x18\x04 \x01(\x03R\vnextRunAtMs\"\xf2\x03\n" +
 	"\fScheduledJob\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x03 \x01(\tR\vhandlerName\x12\x18\n" +
@@ -2357,14 +2381,18 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"created_at\x18\f \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
 	"updated_at\x18\r \x01(\tR\tupdatedAt\x12(\n" +
-	"\x10created_from_doc\x18\x0e \x01(\tR\x0ecreatedFromDocJ\x04\b\x02\x10\x03R\bats_code\"\xa6\x02\n" +
+	"\x10created_from_doc\x18\x0e \x01(\tR\x0ecreatedFromDoc\x12\x17\n" +
+	"\auser_id\x18\x0f \x01(\tR\x06userId\x12\x1c\n" +
+	"\tnamespace\x18\x10 \x01(\tR\tnamespaceJ\x04\b\x02\x10\x03R\bats_code\"\xc7\x02\n" +
 	"\x15CreateScheduleRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12)\n" +
 	"\x10interval_seconds\x18\x03 \x01(\x05R\x0fintervalSeconds\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x12I\n" +
-	"\bmetadata\x18\x05 \x03(\v2-.protocol.CreateScheduleRequest.MetadataEntryR\bmetadata\x1a;\n" +
+	"\bmetadata\x18\x05 \x03(\v2-.protocol.CreateScheduleRequest.MetadataEntryR\bmetadata\x12\x1f\n" +
+	"\vstore_token\x18\x06 \x01(\tR\n" +
+	"storeToken\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"i\n" +

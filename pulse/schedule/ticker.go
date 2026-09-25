@@ -519,7 +519,7 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 
 	// Check for existing active job with same source URL (deduplication).
 	// No active job is the common answer, not a failure of the check.
-	existingJob, err := t.queue.FindActiveJobBySourceAndHandler(sourceURL, handlerName)
+	existingJob, err := t.queue.FindActiveJobBySourceAndHandler(sourceURL, handlerName, scheduled.UserId, scheduled.Namespace)
 	if err != nil && !errors.Is(err, async.ErrJobNotFound) {
 		err = errors.Wrap(err, "failed to check for duplicate job")
 		err = errors.WithDetail(err, fmt.Sprintf("Source URL: %s", sourceURL))
@@ -553,6 +553,9 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 		err = errors.WithDetail(err, fmt.Sprintf("Scheduled job ID: %s", scheduled.Id))
 		return "", err
 	}
+	// The run goes where the schedule's creator acted, as them.
+	job.UserID = scheduled.UserId
+	job.Namespace = scheduled.Namespace
 
 	// Enqueue the job
 	if err := t.queue.Enqueue(job); err != nil {

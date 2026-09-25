@@ -365,7 +365,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 							"plugin", meta.Name, "version", meta.Version)
 						registry.MarkReady(meta.Name)
 						registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc)
-						registerPluginHandlers(p, meta, handlerRegistry, db, pluginLogger, acc)
+						registerPluginHandlers(p, meta, handlerRegistry, db, sm, pluginLogger, acc)
 						if err := defaultServer.ReloadWatchers(); err != nil {
 							pluginLogger.Warnw("Failed to reload watchers after background init",
 								"plugin", meta.Name, "error", err)
@@ -388,7 +388,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 				registry.MarkReady(meta.Name)
 				pluginLogger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
 				registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc)
-				registerPluginHandlers(p, meta, handlerRegistry, db, pluginLogger, acc)
+				registerPluginHandlers(p, meta, handlerRegistry, db, sm, pluginLogger, acc)
 			})
 		}
 		initWg.Wait()
@@ -470,7 +470,7 @@ func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *gr
 }
 
 // registerPluginHandlers registers Pulse async handlers/schedules and emits the plugin banner.
-func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handlerRegistry *async.HandlerRegistry, db *sql.DB, logger *zap.SugaredLogger, acc *grpc.PluginAccumulator) {
+func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handlerRegistry *async.HandlerRegistry, db *sql.DB, sm *grpc.ServicesManager, logger *zap.SugaredLogger, acc *grpc.PluginAccumulator) {
 	externalPlugin, ok := p.(*grpc.ExternalDomainProxy)
 	if !ok {
 		return
@@ -480,7 +480,7 @@ func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handler
 			logger.Debugw("Registering plugin async handler",
 				"plugin", meta.Name, "handler", handlerName,
 				"registry_key", grpc.PluginHandlerName(meta.Name, handlerName))
-			proxyHandler := grpc.NewPluginProxyHandler(meta.Name, handlerName, externalPlugin, db, logger)
+			proxyHandler := grpc.NewPluginProxyHandler(meta.Name, handlerName, externalPlugin, db, logger, sm.OpenRunFor)
 			handlerRegistry.Register(proxyHandler)
 		}
 	}
@@ -569,7 +569,7 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 				pluginRegistry.MarkReady(meta.Name)
 				logger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
 				registerPluginProviders(p, meta, sm, defaultServer, logger, acc)
-				registerPluginHandlers(p, meta, handlerRegistry, db, logger, acc)
+				registerPluginHandlers(p, meta, handlerRegistry, db, sm, logger, acc)
 			})
 		}
 		retryWg.Wait()

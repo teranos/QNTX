@@ -48,8 +48,9 @@ func (s *Store) CreateJob(job *Job) error {
 			parent_job_id, retry_count,
 			plugin_version,
 			trace_context, trace_baggage,
+			user_id, namespace,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	// exec_trace_* is absent on purpose: it is written when the job runs, by
 	// SetExecutionTrace, and a job being created has not run.
@@ -77,6 +78,8 @@ func (s *Store) CreateJob(job *Job) error {
 		job.PluginVersion,
 		job.TraceContext,
 		job.TraceBaggage,
+		job.UserID,
+		job.Namespace,
 		job.CreatedAt,
 		job.UpdatedAt,
 	)
@@ -395,13 +398,15 @@ func (s *Store) CleanupOldJobs(olderThan time.Duration) (int, error) {
 // query can never be confused, and no caller carries a nil it forgot to check.
 var ErrJobNotFound = errors.New("job not found")
 
-// FindActiveJobBySourceAndHandler finds an active (queued, running, or paused) job by source URL and handler name.
+// FindActiveJobBySourceAndHandler finds an active (queued, running, or paused) job by source URL and handler name, made for the same caller in the same namespace.
 // Returns nil if no active job found for this source.
-func (s *Store) FindActiveJobBySourceAndHandler(source string, handlerName string) (*Job, error) {
+func (s *Store) FindActiveJobBySourceAndHandler(source, handlerName, userID, namespace string) (*Job, error) {
 	query := `SELECT ` + StandardJobSelectColumns() + `
 		FROM async_ix_jobs
 		WHERE source = ?
 		  AND handler_name = ?
+		  AND user_id = ?
+		  AND namespace = ?
 		  AND status IN ('queued', 'running', 'paused')
 		ORDER BY created_at DESC
 		LIMIT 1`
@@ -410,7 +415,7 @@ func (s *Store) FindActiveJobBySourceAndHandler(source string, handlerName strin
 	args := GetJobScanArgs()
 	targets := GetJobScanTargets(&job, args)
 
-	err := s.db.QueryRow(query, source, handlerName).Scan(targets...)
+	err := s.db.QueryRow(query, source, handlerName, userID, namespace).Scan(targets...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, errors.Wrapf(ErrJobNotFound, "no active job for %s/%s", source, handlerName)
 	}

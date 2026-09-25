@@ -89,7 +89,8 @@ the default namespace, whatever is highlighted.
 
 Watchers, schedules, the canvas and the element handlers are stored once, so a
 namespace other than the default has none of its own — nor its own search index
-or embeddings. Attestations and observers are per namespace.
+or embeddings. A schedule created during a sigil call runs in its creator's
+namespace. Attestations and observers are per namespace.
 
 Reach is a granted relation (ADR-031). What grants and strikes it is unbuilt;
 disabling a namespace refuses reads, and a login stands.

@@ -28,7 +28,7 @@ const (
 const jobColumns = `id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
 		       last_execution_id, state, created_from_doc_id, metadata,
-		       created_at, updated_at`
+		       created_at, updated_at, user_id, namespace`
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows.
 type rowScanner interface {
@@ -64,6 +64,8 @@ func scanJob(row rowScanner) (*Job, error) {
 		&metadata,
 		&job.CreatedAt,
 		&job.UpdatedAt,
+		&job.UserId,
+		&job.Namespace,
 	); err != nil {
 		return nil, err
 	}
@@ -99,8 +101,8 @@ func (s *Store) CreateJob(job *Job) error {
 			id, handler_name, payload, source_url,
 			interval_seconds, next_run_at, last_run_at,
 			last_execution_id, state, created_from_doc_id, metadata,
-			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			created_at, updated_at, user_id, namespace
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// An empty string is a column that was never set, and NULL is how this
@@ -121,6 +123,8 @@ func (s *Store) CreateJob(job *Job) error {
 		nullIfEmpty(job.Metadata),
 		now,
 		now,
+		job.UserId,
+		job.Namespace,
 	)
 
 	if err != nil {
@@ -135,15 +139,17 @@ func (s *Store) CreateJob(job *Job) error {
 	return nil
 }
 
-// GetActiveByHandlerName returns the first active schedule for a handler, or nil if none exists.
-func (s *Store) GetActiveByHandlerName(handlerName string) (*Job, error) {
+// GetActiveByHandlerName returns the first active schedule for a handler that
+// the same caller created in the same namespace, or nil if none exists. Empty
+// userID and namespace are schedules no caller made.
+func (s *Store) GetActiveByHandlerName(handlerName, userID, namespace string) (*Job, error) {
 	query := `
 		SELECT id FROM scheduled_pulse_jobs
-		WHERE handler_name = ? AND state = ?
+		WHERE handler_name = ? AND state = ? AND user_id = ? AND namespace = ?
 		LIMIT 1
 	`
 	var id string
-	err := s.db.QueryRow(query, handlerName, StateActive).Scan(&id)
+	err := s.db.QueryRow(query, handlerName, StateActive, userID, namespace).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
@@ -153,10 +159,7 @@ func (s *Store) GetActiveByHandlerName(handlerName string) (*Job, error) {
 // GetJob retrieves a scheduled job by ID
 func (s *Store) GetJob(id string) (*Job, error) {
 	query := `
-		SELECT id, handler_name, payload, source_url,
-		       interval_seconds, next_run_at, last_run_at,
-		       last_execution_id, state, created_from_doc_id, metadata,
-		       created_at, updated_at
+		SELECT ` + jobColumns + `
 		FROM scheduled_pulse_jobs
 		WHERE id = ?
 	`
@@ -181,10 +184,7 @@ func (s *Store) GetJob(id string) (*Job, error) {
 // Limited to 100 jobs per batch to prevent overwhelming the worker pool.
 func (s *Store) ListJobsDue(now time.Time) (_ []*Job, err error) {
 	query := `
-		SELECT id, handler_name, payload, source_url,
-		       interval_seconds, next_run_at, last_run_at,
-		       last_execution_id, state, created_from_doc_id, metadata,
-		       created_at, updated_at
+		SELECT ` + jobColumns + `
 		FROM scheduled_pulse_jobs
 		WHERE state = ? AND next_run_at <= ?
 		ORDER BY next_run_at ASC
@@ -221,10 +221,7 @@ func (s *Store) ListJobsDue(now time.Time) (_ []*Job, err error) {
 // Limited to 100 jobs per batch to prevent overwhelming the worker pool.
 func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) (_ []*Job, err error) {
 	query := `
-		SELECT id, handler_name, payload, source_url,
-		       interval_seconds, next_run_at, last_run_at,
-		       last_execution_id, state, created_from_doc_id, metadata,
-		       created_at, updated_at
+		SELECT ` + jobColumns + `
 		FROM scheduled_pulse_jobs
 		WHERE state = ? AND next_run_at <= ?
 		ORDER BY next_run_at ASC
@@ -261,10 +258,7 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) (_ []*Job
 // Used by the Pulse panel to show all jobs (active, paused, stopping, inactive).
 func (s *Store) ListAllScheduledJobs() (_ []*Job, err error) {
 	query := `
-		SELECT id, handler_name, payload, source_url,
-		       interval_seconds, next_run_at, last_run_at,
-		       last_execution_id, state, created_from_doc_id, metadata,
-		       created_at, updated_at
+		SELECT ` + jobColumns + `
 		FROM scheduled_pulse_jobs
 		WHERE state != ?
 		ORDER BY created_at DESC
@@ -442,10 +436,7 @@ func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executi
 // one such row would otherwise be returned ahead of every real job.
 func (s *Store) GetNextScheduledJob() (*Job, error) {
 	query := `
-		SELECT id, handler_name, payload, source_url,
-		       interval_seconds, next_run_at, last_run_at,
-		       last_execution_id, state, created_from_doc_id, metadata,
-		       created_at, updated_at
+		SELECT ` + jobColumns + `
 		FROM scheduled_pulse_jobs
 		WHERE state = ? AND next_run_at IS NOT NULL
 		ORDER BY next_run_at ASC

@@ -45,6 +45,16 @@ message SendMailRequest {
   string user_id = 3;              // The User it goes to. Their primary address is the one used.
   string template = 4;             // A name the plugin set. Empty is QNTX's neutral template.
   map<string, string> values = 5;  // What the template is filled with.
+  repeated MailImage inline = 6;   // Images the html shows by cid:<content_id>.
+}
+
+// MailImage is an image a mail carries inline. Only image/png is accepted, and
+// all of a mail's images together are held under a size cap.
+message MailImage {
+  string content_id = 1;    // The html shows it by cid:<content_id>. Unique within a mail.
+  string content_type = 2;  // image/png.
+  string file_name = 3;     // Empty is <content_id>.png.
+  bytes data = 4;
 }
 
 message SendMailResponse {

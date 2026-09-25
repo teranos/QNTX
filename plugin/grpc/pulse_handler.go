@@ -31,18 +31,20 @@ type PluginProxyHandler struct {
 	plugin      *ExternalDomainProxy
 	db          *sql.DB
 	logger      *zap.SugaredLogger
+	openRun     OpenRun // mints a run's store token for a job a caller's schedule started
 }
 
 // NewPluginProxyHandler creates a handler that forwards execution to a plugin.
 // The registry key is automatically namespaced as "pluginName/handlerName"
 // so multiple plugins can declare the same raw handler name without collision.
-func NewPluginProxyHandler(pluginName, handlerName string, plugin *ExternalDomainProxy, db *sql.DB, logger *zap.SugaredLogger) *PluginProxyHandler {
+func NewPluginProxyHandler(pluginName, handlerName string, plugin *ExternalDomainProxy, db *sql.DB, logger *zap.SugaredLogger, openRun OpenRun) *PluginProxyHandler {
 	return &PluginProxyHandler{
 		pluginName:  pluginName,
 		handlerName: handlerName,
 		plugin:      plugin,
 		db:          db,
 		logger:      logger,
+		openRun:     openRun,
 	}
 }
 
@@ -59,6 +61,20 @@ func (h *PluginProxyHandler) Execute(ctx context.Context, job *async.Job) error 
 		HandlerName: h.handlerName, // raw name — the plugin doesn't know about namespacing
 		Payload:     job.Payload,
 		TimeoutSecs: &timeout,
+	}
+
+	// A job a caller's schedule started runs where that caller acted, as them.
+	if job.Namespace != "" {
+		if h.openRun == nil {
+			return errors.Newf("job %s runs in namespace %s and nothing can mint its store token", job.ID, job.Namespace)
+		}
+		token, done, err := h.openRun(job.UserID, job.Namespace)
+		if err != nil {
+			return errors.Wrapf(err, "no store token for job %s in namespace %s", job.ID, job.Namespace)
+		}
+		defer done()
+		req.StoreToken = token
+		req.UserId = job.UserID
 	}
 
 	client := h.plugin.Client()

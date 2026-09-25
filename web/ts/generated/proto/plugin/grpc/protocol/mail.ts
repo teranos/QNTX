@@ -46,11 +46,27 @@ export interface SendMailRequest {
   template: string;
   /** What the template is filled with. */
   values: { [key: string]: string };
+  /** Images the html shows by cid:<content_id>. */
+  inline: MailImage[];
 }
 
 export interface SendMailRequest_ValuesEntry {
   key: string;
   value: string;
+}
+
+/**
+ * MailImage is an image a mail carries inline. Only image/png is accepted, and
+ * all of a mail's images together are held under a size cap.
+ */
+export interface MailImage {
+  /** The html shows it by cid:<content_id>. Unique within a mail. */
+  content_id: string;
+  /** image/png. */
+  content_type: string;
+  /** Empty is <content_id>.png. */
+  file_name: string;
+  data: Uint8Array;
 }
 
 export interface SendMailResponse {

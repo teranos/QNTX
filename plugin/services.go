@@ -32,6 +32,11 @@ type ScheduleService interface {
 	// Create creates a new recurring schedule and returns its ID
 	Create(handlerName string, intervalSecs int, payload []byte, metadata map[string]string) (scheduleID string, err error)
 
+	// CreateInCall creates it during a sigil call, naming the call by the store
+	// token the node handed for it: the schedule remembers who created it and
+	// where, and each run goes there.
+	CreateInCall(storeToken, handlerName string, intervalSecs int, payload []byte, metadata map[string]string) (scheduleID string, err error)
+
 	// Pause pauses an active schedule
 	Pause(scheduleID string) error
 
