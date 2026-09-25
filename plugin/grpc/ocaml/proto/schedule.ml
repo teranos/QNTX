@@ -651,8 +651,22 @@ Storage holds the two above; this is what a caller is handed.</p>
       *)
 
       created_from_doc:string;
+      user_id:string;
+      (**
+{%html:
+<p>The User whose sigil call created it; empty is none</p>
+%}
+      *)
+
+      namespace:string;
+      (**
+{%html:
+<p>The namespace that caller acted in; empty is none</p>
+%}
+      *)
+
     }
-    val make: ?id:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> unit -> t
+    val make: ?id:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> ?user_id:string -> ?namespace:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -671,7 +685,7 @@ Storage holds the two above; this is what a caller is handed.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?id:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> unit -> t
+    type make_t = ?id:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> ?user_id:string -> ?namespace:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -710,8 +724,15 @@ Storage holds the two above; this is what a caller is handed.</p>
 %}
       *)
 
+      store_token:string;
+      (**
+{%html:
+<p>The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule. Empty is a schedule no caller made.</p>
+%}
+      *)
+
     }
-    val make: ?auth_token:string -> ?handler_name:string -> ?interval_seconds:int -> ?payload:bytes -> ?metadata:(string * string) list -> unit -> t
+    val make: ?auth_token:string -> ?handler_name:string -> ?interval_seconds:int -> ?payload:bytes -> ?metadata:(string * string) list -> ?store_token:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -730,7 +751,7 @@ Storage holds the two above; this is what a caller is handed.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?handler_name:string -> ?interval_seconds:int -> ?payload:bytes -> ?metadata:(string * string) list -> unit -> t
+    type make_t = ?auth_token:string -> ?handler_name:string -> ?interval_seconds:int -> ?payload:bytes -> ?metadata:(string * string) list -> ?store_token:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2536,8 +2557,22 @@ end = struct
       *)
 
       created_from_doc:string;
+      user_id:string;
+      (**
+{%html:
+<p>The User whose sigil call created it; empty is none</p>
+%}
+      *)
+
+      namespace:string;
+      (**
+{%html:
+<p>The namespace that caller acted in; empty is none</p>
+%}
+      *)
+
     }
-    val make: ?id:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> unit -> t
+    val make: ?id:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> ?user_id:string -> ?namespace:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -2556,7 +2591,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?id:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> unit -> t
+    type make_t = ?id:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> ?user_id:string -> ?namespace:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2579,9 +2614,11 @@ end = struct
       created_at:string;
       updated_at:string;
       created_from_doc:string;
+      user_id:string;
+      namespace:string;
     }
-    type make_t = ?id:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> unit -> t
-    let make ?(id = {||}) ?(handler_name = {||}) ?(payload = (Bytes.of_string {||})) ?(source_url = {||}) ?(interval_seconds = 0) ?(next_run_at = {||}) ?(last_run_at = {||}) ?(last_execution_id = {||}) ?(state = {||}) ?(metadata = {||}) ?(created_at = {||}) ?(updated_at = {||}) ?(created_from_doc = {||}) () = { id; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc }
+    type make_t = ?id:string -> ?handler_name:string -> ?payload:bytes -> ?source_url:string -> ?interval_seconds:int -> ?next_run_at:string -> ?last_run_at:string -> ?last_execution_id:string -> ?state:string -> ?metadata:string -> ?created_at:string -> ?updated_at:string -> ?created_from_doc:string -> ?user_id:string -> ?namespace:string -> unit -> t
+    let make ?(id = {||}) ?(handler_name = {||}) ?(payload = (Bytes.of_string {||})) ?(source_url = {||}) ?(interval_seconds = 0) ?(next_run_at = {||}) ?(last_run_at = {||}) ?(last_execution_id = {||}) ?(state = {||}) ?(metadata = {||}) ?(created_at = {||}) ?(updated_at = {||}) ?(created_from_doc = {||}) ?(user_id = {||}) ?(namespace = {||}) () = { id; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc; user_id; namespace }
     let merge =
     let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
     let merge_handler_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "handler_name", "handlerName"), string, ({||})) ) in
@@ -2596,6 +2633,8 @@ end = struct
     let merge_created_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((12, "created_at", "createdAt"), string, ({||})) ) in
     let merge_updated_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((13, "updated_at", "updatedAt"), string, ({||})) ) in
     let merge_created_from_doc = Runtime'.Merge.merge Runtime'.Spec.( basic ((14, "created_from_doc", "createdFromDoc"), string, ({||})) ) in
+    let merge_user_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((15, "user_id", "userId"), string, ({||})) ) in
+    let merge_namespace = Runtime'.Merge.merge Runtime'.Spec.( basic ((16, "namespace", "namespace"), string, ({||})) ) in
     fun t1 t2 -> {
     	id = (merge_id t1.id t2.id);
     	handler_name = (merge_handler_name t1.handler_name t2.handler_name);
@@ -2610,22 +2649,24 @@ end = struct
     	created_at = (merge_created_at t1.created_at t2.created_at);
     	updated_at = (merge_updated_at t1.updated_at t2.updated_at);
     	created_from_doc = (merge_created_from_doc t1.created_from_doc t2.created_from_doc);
+    	user_id = (merge_user_id t1.user_id t2.user_id);
+    	namespace = (merge_namespace t1.namespace t2.namespace);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((3, "handler_name", "handlerName"), string, ({||})) ^:: basic ((4, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ^:: basic ((5, "source_url", "sourceUrl"), string, ({||})) ^:: basic ((6, "interval_seconds", "intervalSeconds"), int32_int, (0)) ^:: basic ((7, "next_run_at", "nextRunAt"), string, ({||})) ^:: basic ((8, "last_run_at", "lastRunAt"), string, ({||})) ^:: basic ((9, "last_execution_id", "lastExecutionId"), string, ({||})) ^:: basic ((10, "state", "state"), string, ({||})) ^:: basic ((11, "metadata", "metadata"), string, ({||})) ^:: basic ((12, "created_at", "createdAt"), string, ({||})) ^:: basic ((13, "updated_at", "updatedAt"), string, ({||})) ^:: basic ((14, "created_from_doc", "createdFromDoc"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((3, "handler_name", "handlerName"), string, ({||})) ^:: basic ((4, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ^:: basic ((5, "source_url", "sourceUrl"), string, ({||})) ^:: basic ((6, "interval_seconds", "intervalSeconds"), int32_int, (0)) ^:: basic ((7, "next_run_at", "nextRunAt"), string, ({||})) ^:: basic ((8, "last_run_at", "lastRunAt"), string, ({||})) ^:: basic ((9, "last_execution_id", "lastExecutionId"), string, ({||})) ^:: basic ((10, "state", "state"), string, ({||})) ^:: basic ((11, "metadata", "metadata"), string, ({||})) ^:: basic ((12, "created_at", "createdAt"), string, ({||})) ^:: basic ((13, "updated_at", "updatedAt"), string, ({||})) ^:: basic ((14, "created_from_doc", "createdFromDoc"), string, ({||})) ^:: basic ((15, "user_id", "userId"), string, ({||})) ^:: basic ((16, "namespace", "namespace"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { id; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc } -> serialize writer id handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc
+      fun writer { id; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc; user_id; namespace } -> serialize writer id handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc user_id namespace
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor id handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc = { id; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc } in
+      let constructor id handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc user_id namespace = { id; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc; user_id; namespace } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { id; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc } -> serialize id handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc
+      fun { id; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc; user_id; namespace } -> serialize id handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc user_id namespace
     let from_json_exn =
-      let constructor id handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc = { id; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc } in
+      let constructor id handler_name payload source_url interval_seconds next_run_at last_run_at last_execution_id state metadata created_at updated_at created_from_doc user_id namespace = { id; handler_name; payload; source_url; interval_seconds; next_run_at; last_run_at; last_execution_id; state; metadata; created_at; updated_at; created_from_doc; user_id; namespace } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
@@ -2661,8 +2702,15 @@ end = struct
 %}
       *)
 
+      store_token:string;
+      (**
+{%html:
+<p>The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule. Empty is a schedule no caller made.</p>
+%}
+      *)
+
     }
-    val make: ?auth_token:string -> ?handler_name:string -> ?interval_seconds:int -> ?payload:bytes -> ?metadata:(string * string) list -> unit -> t
+    val make: ?auth_token:string -> ?handler_name:string -> ?interval_seconds:int -> ?payload:bytes -> ?metadata:(string * string) list -> ?store_token:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -2681,7 +2729,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?handler_name:string -> ?interval_seconds:int -> ?payload:bytes -> ?metadata:(string * string) list -> unit -> t
+    type make_t = ?auth_token:string -> ?handler_name:string -> ?interval_seconds:int -> ?payload:bytes -> ?metadata:(string * string) list -> ?store_token:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2696,37 +2744,40 @@ end = struct
       interval_seconds:int;
       payload:bytes;
       metadata:(string * string) list;
+      store_token:string;
     }
-    type make_t = ?auth_token:string -> ?handler_name:string -> ?interval_seconds:int -> ?payload:bytes -> ?metadata:(string * string) list -> unit -> t
-    let make ?(auth_token = {||}) ?(handler_name = {||}) ?(interval_seconds = 0) ?(payload = (Bytes.of_string {||})) ?(metadata = []) () = { auth_token; handler_name; interval_seconds; payload; metadata }
+    type make_t = ?auth_token:string -> ?handler_name:string -> ?interval_seconds:int -> ?payload:bytes -> ?metadata:(string * string) list -> ?store_token:string -> unit -> t
+    let make ?(auth_token = {||}) ?(handler_name = {||}) ?(interval_seconds = 0) ?(payload = (Bytes.of_string {||})) ?(metadata = []) ?(store_token = {||}) () = { auth_token; handler_name; interval_seconds; payload; metadata; store_token }
     let merge =
     let merge_auth_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ) in
     let merge_handler_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "handler_name", "handlerName"), string, ({||})) ) in
     let merge_interval_seconds = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "interval_seconds", "intervalSeconds"), int32_int, (0)) ) in
     let merge_payload = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ) in
     let merge_metadata = Runtime'.Merge.merge Runtime'.Spec.( map ((5, "metadata", "metadata"), (string, basic ((2, "value", "value"), string, ({||})))) ) in
+    let merge_store_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((6, "store_token", "storeToken"), string, ({||})) ) in
     fun t1 t2 -> {
     	auth_token = (merge_auth_token t1.auth_token t2.auth_token);
     	handler_name = (merge_handler_name t1.handler_name t2.handler_name);
     	interval_seconds = (merge_interval_seconds t1.interval_seconds t2.interval_seconds);
     	payload = (merge_payload t1.payload t2.payload);
     	metadata = (merge_metadata t1.metadata t2.metadata);
+    	store_token = (merge_store_token t1.store_token t2.store_token);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: basic ((2, "handler_name", "handlerName"), string, ({||})) ^:: basic ((3, "interval_seconds", "intervalSeconds"), int32_int, (0)) ^:: basic ((4, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ^:: map ((5, "metadata", "metadata"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: basic ((2, "handler_name", "handlerName"), string, ({||})) ^:: basic ((3, "interval_seconds", "intervalSeconds"), int32_int, (0)) ^:: basic ((4, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ^:: map ((5, "metadata", "metadata"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: basic ((6, "store_token", "storeToken"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { auth_token; handler_name; interval_seconds; payload; metadata } -> serialize writer auth_token handler_name interval_seconds payload metadata
+      fun writer { auth_token; handler_name; interval_seconds; payload; metadata; store_token } -> serialize writer auth_token handler_name interval_seconds payload metadata store_token
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor auth_token handler_name interval_seconds payload metadata = { auth_token; handler_name; interval_seconds; payload; metadata } in
+      let constructor auth_token handler_name interval_seconds payload metadata store_token = { auth_token; handler_name; interval_seconds; payload; metadata; store_token } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { auth_token; handler_name; interval_seconds; payload; metadata } -> serialize auth_token handler_name interval_seconds payload metadata
+      fun { auth_token; handler_name; interval_seconds; payload; metadata; store_token } -> serialize auth_token handler_name interval_seconds payload metadata store_token
     let from_json_exn =
-      let constructor auth_token handler_name interval_seconds payload metadata = { auth_token; handler_name; interval_seconds; payload; metadata } in
+      let constructor auth_token handler_name interval_seconds payload metadata store_token = { auth_token; handler_name; interval_seconds; payload; metadata; store_token } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

@@ -182,8 +182,15 @@ never an empty space in a mail that went out.</p>
 %}
       *)
 
+      inline:MailImage.t list;
+      (**
+{%html:
+<p>Images the html shows by cid:&lt;content_id&gt;.</p>
+%}
+      *)
+
     }
-    val make: ?auth_token:string -> ?source:string -> ?user_id:string -> ?template:string -> ?values:(string * string) list -> unit -> t
+    val make: ?auth_token:string -> ?source:string -> ?user_id:string -> ?template:string -> ?values:(string * string) list -> ?inline:MailImage.t list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -202,7 +209,66 @@ never an empty space in a mail that went out.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?source:string -> ?user_id:string -> ?template:string -> ?values:(string * string) list -> unit -> t
+    type make_t = ?auth_token:string -> ?source:string -> ?user_id:string -> ?template:string -> ?values:(string * string) list -> ?inline:MailImage.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>MailImage is an image a mail carries inline. Only image/png is accepted, and
+all of a mail's images together are held under a size cap.</p>
+%}
+  *)
+  and MailImage : sig
+    type t = {
+      content_id:string;
+      (**
+{%html:
+<p>The html shows it by cid:&lt;content_id&gt;. Unique within a mail.</p>
+%}
+      *)
+
+      content_type:string;
+      (**
+{%html:
+<p>image/png.</p>
+%}
+      *)
+
+      file_name:string;
+      (**
+{%html:
+<p>Empty is &lt;content_id&gt;.png.</p>
+%}
+      *)
+
+      data:bytes;
+    }
+    val make: ?content_id:string -> ?content_type:string -> ?file_name:string -> ?data:bytes -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?content_id:string -> ?content_type:string -> ?file_name:string -> ?data:bytes -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -542,8 +608,15 @@ end = struct
 %}
       *)
 
+      inline:MailImage.t list;
+      (**
+{%html:
+<p>Images the html shows by cid:&lt;content_id&gt;.</p>
+%}
+      *)
+
     }
-    val make: ?auth_token:string -> ?source:string -> ?user_id:string -> ?template:string -> ?values:(string * string) list -> unit -> t
+    val make: ?auth_token:string -> ?source:string -> ?user_id:string -> ?template:string -> ?values:(string * string) list -> ?inline:MailImage.t list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -562,7 +635,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?source:string -> ?user_id:string -> ?template:string -> ?values:(string * string) list -> unit -> t
+    type make_t = ?auth_token:string -> ?source:string -> ?user_id:string -> ?template:string -> ?values:(string * string) list -> ?inline:MailImage.t list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -577,37 +650,131 @@ end = struct
       user_id:string;
       template:string;
       values:(string * string) list;
+      inline:MailImage.t list;
     }
-    type make_t = ?auth_token:string -> ?source:string -> ?user_id:string -> ?template:string -> ?values:(string * string) list -> unit -> t
-    let make ?(auth_token = {||}) ?(source = {||}) ?(user_id = {||}) ?(template = {||}) ?(values = []) () = { auth_token; source; user_id; template; values }
+    type make_t = ?auth_token:string -> ?source:string -> ?user_id:string -> ?template:string -> ?values:(string * string) list -> ?inline:MailImage.t list -> unit -> t
+    let make ?(auth_token = {||}) ?(source = {||}) ?(user_id = {||}) ?(template = {||}) ?(values = []) ?(inline = []) () = { auth_token; source; user_id; template; values; inline }
     let merge =
     let merge_auth_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ) in
     let merge_source = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "source", "source"), string, ({||})) ) in
     let merge_user_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "user_id", "userId"), string, ({||})) ) in
     let merge_template = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "template", "template"), string, ({||})) ) in
     let merge_values = Runtime'.Merge.merge Runtime'.Spec.( map ((5, "values", "values"), (string, basic ((2, "value", "value"), string, ({||})))) ) in
+    let merge_inline = Runtime'.Merge.merge Runtime'.Spec.( repeated ((6, "inline", "inline"), (message (module MailImage)), not_packed) ) in
     fun t1 t2 -> {
     	auth_token = (merge_auth_token t1.auth_token t2.auth_token);
     	source = (merge_source t1.source t2.source);
     	user_id = (merge_user_id t1.user_id t2.user_id);
     	template = (merge_template t1.template t2.template);
     	values = (merge_values t1.values t2.values);
+    	inline = (merge_inline t1.inline t2.inline);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: basic ((2, "source", "source"), string, ({||})) ^:: basic ((3, "user_id", "userId"), string, ({||})) ^:: basic ((4, "template", "template"), string, ({||})) ^:: map ((5, "values", "values"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: basic ((2, "source", "source"), string, ({||})) ^:: basic ((3, "user_id", "userId"), string, ({||})) ^:: basic ((4, "template", "template"), string, ({||})) ^:: map ((5, "values", "values"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: repeated ((6, "inline", "inline"), (message (module MailImage)), not_packed) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { auth_token; source; user_id; template; values } -> serialize writer auth_token source user_id template values
+      fun writer { auth_token; source; user_id; template; values; inline } -> serialize writer auth_token source user_id template values inline
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor auth_token source user_id template values = { auth_token; source; user_id; template; values } in
+      let constructor auth_token source user_id template values inline = { auth_token; source; user_id; template; values; inline } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { auth_token; source; user_id; template; values } -> serialize auth_token source user_id template values
+      fun { auth_token; source; user_id; template; values; inline } -> serialize auth_token source user_id template values inline
     let from_json_exn =
-      let constructor auth_token source user_id template values = { auth_token; source; user_id; template; values } in
+      let constructor auth_token source user_id template values inline = { auth_token; source; user_id; template; values; inline } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and MailImage : sig
+    type t = {
+      content_id:string;
+      (**
+{%html:
+<p>The html shows it by cid:&lt;content_id&gt;. Unique within a mail.</p>
+%}
+      *)
+
+      content_type:string;
+      (**
+{%html:
+<p>image/png.</p>
+%}
+      *)
+
+      file_name:string;
+      (**
+{%html:
+<p>Empty is &lt;content_id&gt;.png.</p>
+%}
+      *)
+
+      data:bytes;
+    }
+    val make: ?content_id:string -> ?content_type:string -> ?file_name:string -> ?data:bytes -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?content_id:string -> ?content_type:string -> ?file_name:string -> ?data:bytes -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = MailImage
+    let name () = ".protocol.MailImage"
+    type t = {
+      content_id:string;
+      content_type:string;
+      file_name:string;
+      data:bytes;
+    }
+    type make_t = ?content_id:string -> ?content_type:string -> ?file_name:string -> ?data:bytes -> unit -> t
+    let make ?(content_id = {||}) ?(content_type = {||}) ?(file_name = {||}) ?(data = (Bytes.of_string {||})) () = { content_id; content_type; file_name; data }
+    let merge =
+    let merge_content_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "content_id", "contentId"), string, ({||})) ) in
+    let merge_content_type = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "content_type", "contentType"), string, ({||})) ) in
+    let merge_file_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "file_name", "fileName"), string, ({||})) ) in
+    let merge_data = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "data", "data"), bytes, ((Bytes.of_string {||}))) ) in
+    fun t1 t2 -> {
+    	content_id = (merge_content_id t1.content_id t2.content_id);
+    	content_type = (merge_content_type t1.content_type t2.content_type);
+    	file_name = (merge_file_name t1.file_name t2.file_name);
+    	data = (merge_data t1.data t2.data);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "content_id", "contentId"), string, ({||})) ^:: basic ((2, "content_type", "contentType"), string, ({||})) ^:: basic ((3, "file_name", "fileName"), string, ({||})) ^:: basic ((4, "data", "data"), bytes, ((Bytes.of_string {||}))) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { content_id; content_type; file_name; data } -> serialize writer content_id content_type file_name data
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor content_id content_type file_name data = { content_id; content_type; file_name; data } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { content_id; content_type; file_name; data } -> serialize content_id content_type file_name data
+    let from_json_exn =
+      let constructor content_id content_type file_name data = { content_id; content_type; file_name; data } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

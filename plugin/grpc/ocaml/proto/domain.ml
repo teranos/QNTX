@@ -878,8 +878,22 @@ to the plugin via ExecuteJob.</p>
 %}
       *)
 
+      store_token:string;
+      (**
+{%html:
+<p>Reaches the store of the namespace the schedule's creator acted in, for this run. Empty is a job no caller made.</p>
+%}
+      *)
+
+      user_id:string;
+      (**
+{%html:
+<p>The User whose sigil call created the schedule</p>
+%}
+      *)
+
     }
-    val make: ?job_id:string -> ?handler_name:string -> ?payload:bytes -> ?timeout_secs:int -> unit -> t
+    val make: ?job_id:string -> ?handler_name:string -> ?payload:bytes -> ?timeout_secs:int -> ?store_token:string -> ?user_id:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -898,7 +912,7 @@ to the plugin via ExecuteJob.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?job_id:string -> ?handler_name:string -> ?payload:bytes -> ?timeout_secs:int -> unit -> t
+    type make_t = ?job_id:string -> ?handler_name:string -> ?payload:bytes -> ?timeout_secs:int -> ?store_token:string -> ?user_id:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2823,8 +2837,22 @@ an endpoint and an MCP tool, behind the same gate as its own.</p>
 %}
       *)
 
+      store_token:string;
+      (**
+{%html:
+<p>Reaches the store of the namespace the schedule's creator acted in, for this run. Empty is a job no caller made.</p>
+%}
+      *)
+
+      user_id:string;
+      (**
+{%html:
+<p>The User whose sigil call created the schedule</p>
+%}
+      *)
+
     }
-    val make: ?job_id:string -> ?handler_name:string -> ?payload:bytes -> ?timeout_secs:int -> unit -> t
+    val make: ?job_id:string -> ?handler_name:string -> ?payload:bytes -> ?timeout_secs:int -> ?store_token:string -> ?user_id:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -2843,7 +2871,7 @@ an endpoint and an MCP tool, behind the same gate as its own.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?job_id:string -> ?handler_name:string -> ?payload:bytes -> ?timeout_secs:int -> unit -> t
+    type make_t = ?job_id:string -> ?handler_name:string -> ?payload:bytes -> ?timeout_secs:int -> ?store_token:string -> ?user_id:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2857,35 +2885,41 @@ an endpoint and an MCP tool, behind the same gate as its own.</p>
       handler_name:string;
       payload:bytes;
       timeout_secs:int option;
+      store_token:string;
+      user_id:string;
     }
-    type make_t = ?job_id:string -> ?handler_name:string -> ?payload:bytes -> ?timeout_secs:int -> unit -> t
-    let make ?(job_id = {||}) ?(handler_name = {||}) ?(payload = (Bytes.of_string {||})) ?timeout_secs () = { job_id; handler_name; payload; timeout_secs }
+    type make_t = ?job_id:string -> ?handler_name:string -> ?payload:bytes -> ?timeout_secs:int -> ?store_token:string -> ?user_id:string -> unit -> t
+    let make ?(job_id = {||}) ?(handler_name = {||}) ?(payload = (Bytes.of_string {||})) ?timeout_secs ?(store_token = {||}) ?(user_id = {||}) () = { job_id; handler_name; payload; timeout_secs; store_token; user_id }
     let merge =
     let merge_job_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "job_id", "jobId"), string, ({||})) ) in
     let merge_handler_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "handler_name", "handlerName"), string, ({||})) ) in
     let merge_payload = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ) in
     let merge_timeout_secs = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((4, "timeout_secs", "timeoutSecs"), int64_int) ) in
+    let merge_store_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "store_token", "storeToken"), string, ({||})) ) in
+    let merge_user_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((6, "user_id", "userId"), string, ({||})) ) in
     fun t1 t2 -> {
     	job_id = (merge_job_id t1.job_id t2.job_id);
     	handler_name = (merge_handler_name t1.handler_name t2.handler_name);
     	payload = (merge_payload t1.payload t2.payload);
     	timeout_secs = (merge_timeout_secs t1.timeout_secs t2.timeout_secs);
+    	store_token = (merge_store_token t1.store_token t2.store_token);
+    	user_id = (merge_user_id t1.user_id t2.user_id);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "job_id", "jobId"), string, ({||})) ^:: basic ((2, "handler_name", "handlerName"), string, ({||})) ^:: basic ((3, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ^:: basic_opt ((4, "timeout_secs", "timeoutSecs"), int64_int) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "job_id", "jobId"), string, ({||})) ^:: basic ((2, "handler_name", "handlerName"), string, ({||})) ^:: basic ((3, "payload", "payload"), bytes, ((Bytes.of_string {||}))) ^:: basic_opt ((4, "timeout_secs", "timeoutSecs"), int64_int) ^:: basic ((5, "store_token", "storeToken"), string, ({||})) ^:: basic ((6, "user_id", "userId"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { job_id; handler_name; payload; timeout_secs } -> serialize writer job_id handler_name payload timeout_secs
+      fun writer { job_id; handler_name; payload; timeout_secs; store_token; user_id } -> serialize writer job_id handler_name payload timeout_secs store_token user_id
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor job_id handler_name payload timeout_secs = { job_id; handler_name; payload; timeout_secs } in
+      let constructor job_id handler_name payload timeout_secs store_token user_id = { job_id; handler_name; payload; timeout_secs; store_token; user_id } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { job_id; handler_name; payload; timeout_secs } -> serialize job_id handler_name payload timeout_secs
+      fun { job_id; handler_name; payload; timeout_secs; store_token; user_id } -> serialize job_id handler_name payload timeout_secs store_token user_id
     let from_json_exn =
-      let constructor job_id handler_name payload timeout_secs = { job_id; handler_name; payload; timeout_secs } in
+      let constructor job_id handler_name payload timeout_secs store_token user_id = { job_id; handler_name; payload; timeout_secs; store_token; user_id } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
