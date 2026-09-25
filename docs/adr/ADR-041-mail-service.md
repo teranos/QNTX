@@ -39,6 +39,12 @@ The window holds the templates, the mail sent, and the SES account.
 
 "ses being enabled for use with email service can be enabled in the am.toml"
 
+## Dark
+
+"but i do still want the dark themed qntx tokens css email template"
+
+QNTX keeps a second template, dark, drawn from web/css/tokens.css.
+
 ## Not done
 
 - Bounces, complaints and replies coming back.

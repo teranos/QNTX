@@ -341,6 +341,31 @@ func TestTheNodeDoesNotMailAUserWithoutAnAddress(t *testing.T) {
 	assert.Empty(t, attested(t, store, PredicateMailSent))
 }
 
+// "but i do still want the dark themed qntx tokens css email template"
+func TestAPluginMailsFromQNTXsDarkTemplateByName(t *testing.T) {
+	box := &sentBox{}
+	s, _ := wiredMail(t, box, tim)
+
+	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
+		AuthToken: mailToken, Source: "garden", UserId: "UStim", Template: DarkTemplateName,
+		Values: map[string]string{"subject": "Welkom", "body": "Hallo.", "link": "https://garden.test/app"},
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Success, resp.Error)
+	require.Len(t, box.sent, 1)
+	assert.Contains(t, box.sent[0].HTML, Dark.Background)
+	assert.Contains(t, box.sent[0].HTML, Dark.Accent)
+	assert.Contains(t, box.sent[0].HTML, "Hallo.")
+	assert.Contains(t, box.sent[0].HTML, `href="https://garden.test/app"`)
+
+	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
+		AuthToken: mailToken, Source: "garden", Name: DarkTemplateName,
+		Template: &protocol.MailTemplate{Subject: "x", Text: "y"},
+	})
+	require.NoError(t, err)
+	assert.False(t, set.Success, "QNTX's own template names are QNTX's")
+}
+
 // Plugins can call before the node has handed the service what it needs.
 func TestAMailServiceNotYetWiredSaysSo(t *testing.T) {
 	s := NewMailServer(mailToken, zap.NewNop().Sugar())

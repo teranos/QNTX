@@ -135,8 +135,8 @@ func (s *MailServer) SetTemplate(_ context.Context, req *protocol.SetMailTemplat
 	if req.Name == "" {
 		return refuse(errors.New("name is required"))
 	}
-	if req.Name == NeutralTemplateName {
-		return refuse(errors.Newf("%s is QNTX's own template, and a Send naming no template gets it", NeutralTemplateName))
+	if _, qntx := qntxTemplates()[req.Name]; qntx {
+		return refuse(errors.Newf("%s is one of QNTX's own templates, which a Send names without setting it", req.Name))
 	}
 	if err := checkMailTemplate(req.Template); err != nil {
 		return refuse(errors.Wrapf(err, "template %s of %s", req.Name, req.Source))
@@ -355,8 +355,11 @@ func (s *MailServer) recipient(w *MailWiring, userID string) (string, error) {
 // template is what a Send is filled from: QNTX's neutral template when it names
 // none, else the newest the plugin set under that name.
 func (s *MailServer) template(w *MailWiring, plugin, name string) (*protocol.MailTemplate, string, error) {
-	if name == "" || name == NeutralTemplateName {
+	if name == "" {
 		return NeutralTemplate(), NeutralTemplateName, nil
+	}
+	if own, qntx := qntxTemplates()[name]; qntx {
+		return own, name, nil
 	}
 	ref := templateRef(plugin, name)
 	kept, found, err := NewestMailTemplate(w.Records(), plugin, name)
