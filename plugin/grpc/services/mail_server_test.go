@@ -341,6 +341,35 @@ func TestTheNodeDoesNotMailAUserWithoutAnAddress(t *testing.T) {
 	assert.Empty(t, attested(t, store, PredicateMailSent))
 }
 
+// "but i do still want the dark themed qntx tokens css email template"
+func TestAPluginMailsFromQNTXsDarkTemplateByName(t *testing.T) {
+	box := &sentBox{}
+	s, _ := wiredMail(t, box, tim)
+
+	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
+		AuthToken: mailToken, Source: "garden", UserId: "UStim", Template: DarkTemplateName,
+		Values: map[string]string{"subject": "Welkom", "body": "Hallo.", "link": "https://garden.test/app"},
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Success, resp.Error)
+	require.Len(t, box.sent, 1)
+	// A QNTX window on the canvas, carried by bgcolor where a client drops styles.
+	l, err := readLook()
+	require.NoError(t, err)
+	assert.Contains(t, box.sent[0].HTML, `bgcolor="`+l.canvas+`"`)
+	assert.Contains(t, box.sent[0].HTML, `bgcolor="`+l.window+`"`)
+	assert.Contains(t, box.sent[0].HTML, "Welkom</td>", "the subject titles the window")
+	assert.Contains(t, box.sent[0].HTML, "Hallo.")
+	assert.Contains(t, box.sent[0].HTML, `href="https://garden.test/app"`)
+
+	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
+		AuthToken: mailToken, Source: "garden", Name: DarkTemplateName,
+		Template: &protocol.MailTemplate{Subject: "x", Text: "y"},
+	})
+	require.NoError(t, err)
+	assert.False(t, set.Success, "QNTX's own template names are QNTX's")
+}
+
 // Plugins can call before the node has handed the service what it needs.
 func TestAMailServiceNotYetWiredSaysSo(t *testing.T) {
 	s := NewMailServer(mailToken, zap.NewNop().Sugar())
@@ -349,4 +378,95 @@ func TestAMailServiceNotYetWiredSaysSo(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, resp.Success)
 	assert.NotEmpty(t, resp.Error)
+}
+
+// A PNG as far as the mail service looks: the signature, then anything.
+var tinyPNG = append(append([]byte{}, pngSignature...), 'I', 'H', 'D', 'R')
+
+// "plugins can send images"
+func TestAPluginMailsAnImageItsHTMLShows(t *testing.T) {
+	box := &sentBox{}
+	s, store := wiredMail(t, box, tim)
+
+	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
+		AuthToken: mailToken, Source: "garden", Name: "bed",
+		Template: &protocol.MailTemplate{
+			Subject: "Je bed", Text: "Je bed.", Html: `<p>Je bed.</p><img src="cid:bed">`,
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, set.Success, set.Error)
+
+	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
+		AuthToken: mailToken, Source: "garden", UserId: "UStim", Template: "bed",
+		Inline: []*protocol.MailImage{{ContentId: "bed", ContentType: "image/png", Data: tinyPNG}},
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Success, resp.Error)
+
+	require.Len(t, box.sent, 1)
+	assert.Contains(t, box.sent[0].HTML, `src="cid:bed"`)
+	require.Len(t, box.sent[0].Inline, 1)
+	assert.Equal(t, InlineImage{ContentID: "bed", ContentType: "image/png", FileName: "bed.png", Data: tinyPNG}, box.sent[0].Inline[0])
+
+	sent := attested(t, store, PredicateMailSent)
+	require.Len(t, sent, 1)
+	images, ok := sent[0].Attributes["images"].([]any)
+	require.True(t, ok, "the images are kept: %#v", sent[0].Attributes["images"])
+	require.Len(t, images, 1)
+	assert.Equal(t, "bed", images[0].(map[string]any)["content_id"])
+}
+
+// "Add a size cap and accept image/png only."
+func TestAPluginMailWithAnImageItMayNotSendIsNotSent(t *testing.T) {
+	over := append(append([]byte{}, pngSignature...), make([]byte, MaxMailImageBytes)...)
+	for name, tc := range map[string]struct {
+		images []*protocol.MailImage
+		says   string
+	}{
+		"a jpeg": {
+			[]*protocol.MailImage{{ContentId: "bed", ContentType: "image/jpeg", Data: []byte{0xff, 0xd8, 0xff}}},
+			"only image/png",
+		},
+		"png in name only": {
+			[]*protocol.MailImage{{ContentId: "bed", ContentType: "image/png", Data: []byte("<svg/>")}},
+			"not a PNG",
+		},
+		"over the cap": {
+			[]*protocol.MailImage{{ContentId: "bed", ContentType: "image/png", Data: over}},
+			"more than",
+		},
+		"over the cap together": {
+			[]*protocol.MailImage{
+				{ContentId: "a", ContentType: "image/png", Data: over[:MaxMailImageBytes/2+1]},
+				{ContentId: "b", ContentType: "image/png", Data: over[:MaxMailImageBytes/2+1]},
+			},
+			"more than",
+		},
+		"no content_id": {
+			[]*protocol.MailImage{{ContentType: "image/png", Data: tinyPNG}},
+			"no content_id",
+		},
+		"one content_id twice": {
+			[]*protocol.MailImage{
+				{ContentId: "bed", ContentType: "image/png", Data: tinyPNG},
+				{ContentId: "bed", ContentType: "image/png", Data: tinyPNG},
+			},
+			"repeats content_id bed",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			box := &sentBox{}
+			s, store := wiredMail(t, box, tim)
+
+			req := neutralSend("UStim", map[string]string{"subject": "Welkom", "body": "Hallo."})
+			req.Inline = tc.images
+			resp, err := s.Send(context.Background(), req)
+			require.NoError(t, err)
+			assert.False(t, resp.Success)
+			assert.Contains(t, resp.Error, tc.says)
+			assert.Empty(t, box.sent)
+			assert.Empty(t, attested(t, store, PredicateMailSent))
+		})
+	}
 }

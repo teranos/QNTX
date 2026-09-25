@@ -176,6 +176,10 @@ export interface ScheduledJob {
   /** RFC3339 timestamp */
   updated_at: string;
   created_from_doc: string;
+  /** The User whose sigil call created it; empty is none */
+  user_id: string;
+  /** The namespace that caller acted in; empty is none */
+  namespace: string;
 }
 
 export interface CreateScheduleRequest {
@@ -188,6 +192,8 @@ export interface CreateScheduleRequest {
   payload: Uint8Array;
   /** Optional metadata (element_id, plugin, etc.) */
   metadata: { [key: string]: string };
+  /** The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule. Empty is a schedule no caller made. */
+  store_token: string;
 }
 
 export interface CreateScheduleRequest_MetadataEntry {

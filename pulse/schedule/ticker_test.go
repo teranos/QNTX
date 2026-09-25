@@ -279,3 +279,26 @@ func TestTickerWithContext_Cancellation(t *testing.T) {
 	stats := ticker.GetStats()
 	assert.NotNil(t, stats)
 }
+
+// "a schedule remembers who created it and where", and each run it starts
+// carries both.
+func TestEnqueueAsyncJob_CarriesTheSchedulesCaller(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewStore(db)
+	queue := async.NewQueue(db)
+	ticker := NewTicker(store, queue, nil, &mockBroadcaster{}, DefaultTickerConfig(), logger.Logger)
+
+	tims := &Job{Id: "SPJ_tim", HandlerName: "datapunt/observe", IntervalSeconds: 3600, State: StateActive, UserId: "UStim", Namespace: "defacile"}
+	anns := &Job{Id: "SPJ_ann", HandlerName: "datapunt/observe", IntervalSeconds: 3600, State: StateActive, UserId: "USann", Namespace: "garden"}
+
+	timsRun, err := ticker.enqueueAsyncJob(tims)
+	require.NoError(t, err)
+	annsRun, err := ticker.enqueueAsyncJob(anns)
+	require.NoError(t, err)
+	assert.NotEqual(t, timsRun, annsRun, "one caller's active run stood in for another's")
+
+	run, err := queue.GetJob(timsRun)
+	require.NoError(t, err)
+	assert.Equal(t, "UStim", run.UserID)
+	assert.Equal(t, "defacile", run.Namespace)
+}

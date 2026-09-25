@@ -493,13 +493,13 @@ func (q *Queue) GetJobCounts() (queued int, running int, err error) {
 	return counts[JobStatusQueued], counts[JobStatusRunning], nil
 }
 
-// FindActiveJobBySourceAndHandler finds an active (queued, running, or paused) job by source URL and handler name.
+// FindActiveJobBySourceAndHandler finds an active (queued, running, or paused) job by source URL and handler name, made for the same caller in the same namespace.
 // Returns nil if no active job found for this source.
-func (q *Queue) FindActiveJobBySourceAndHandler(source string, handlerName string) (*Job, error) {
+func (q *Queue) FindActiveJobBySourceAndHandler(source, handlerName, userID, namespace string) (*Job, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
-	return q.store.FindActiveJobBySourceAndHandler(source, handlerName)
+	return q.store.FindActiveJobBySourceAndHandler(source, handlerName, userID, namespace)
 }
 
 // FindRecentJobBySourceAndHandler finds a recently completed/failed job by source URL and handler name.

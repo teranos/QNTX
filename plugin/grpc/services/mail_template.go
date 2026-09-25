@@ -41,6 +41,39 @@ func NeutralTemplate() *protocol.MailTemplate {
 	}
 }
 
+// DarkTemplateName is QNTX's dark template, for a Send that names it.
+const DarkTemplateName = "dark"
+
+// DarkTemplate is the neutral template drawn as a QNTX window (DrawMail),
+// titled with the subject. The same values as the neutral template.
+func DarkTemplate() (*protocol.MailTemplate, error) {
+	body := `<div style="padding:0 8px;white-space:pre-line">{{.body}}</div>` +
+		`{{with index . "link"}}<div style="padding:12px 8px 0"><a href="{{.}}" style="color:inherit">{{or (index $ "link_label") .}}</a></div>{{end}}`
+	html, err := DrawMail(MailWindow{Title: "{{.subject}}", Sections: []MailSection{{HTML: body}}})
+	if err != nil {
+		return nil, err
+	}
+	return &protocol.MailTemplate{
+		Subject: NeutralTemplate().Subject,
+		Text:    NeutralTemplate().Text,
+		Html:    html,
+	}, nil
+}
+
+// isQNTXTemplate is whether a name is one of QNTX's own templates, which a Send
+// names without setting it, and a plugin cannot set.
+func isQNTXTemplate(name string) bool {
+	return name == NeutralTemplateName || name == DarkTemplateName
+}
+
+// qntxTemplate is one of QNTX's own templates by name.
+func qntxTemplate(name string) (*protocol.MailTemplate, error) {
+	if name == DarkTemplateName {
+		return DarkTemplate()
+	}
+	return NeutralTemplate(), nil
+}
+
 // FilledMail is a template filled with a send's values.
 type FilledMail struct {
 	Subject string

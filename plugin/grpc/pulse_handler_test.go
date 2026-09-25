@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -9,7 +10,10 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/errors"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+	"google.golang.org/grpc"
 )
 
 func TestWriteLogs(t *testing.T) {
@@ -28,7 +32,7 @@ func TestWriteLogs(t *testing.T) {
 	}
 	require.NoError(t, store.CreateJob(job))
 
-	handler := NewPluginProxyHandler("test", "handler", nil, db, logger)
+	handler := NewPluginProxyHandler("test", "handler", nil, db, logger, nil)
 
 	entries := []*protocol.JobLogEntry{
 		{
@@ -87,10 +91,10 @@ func TestTwoPluginsSameHandlerName(t *testing.T) {
 
 	rawName := "data-sync"
 
-	gazeHandler := NewPluginProxyHandler("gaze", rawName, nil, db, logger)
+	gazeHandler := NewPluginProxyHandler("gaze", rawName, nil, db, logger, nil)
 	registry.Register(gazeHandler)
 
-	scryHandler := NewPluginProxyHandler("scry", rawName, nil, db, logger)
+	scryHandler := NewPluginProxyHandler("scry", rawName, nil, db, logger, nil)
 	registry.Register(scryHandler) // must not panic
 
 	assert.True(t, registry.Has("gaze/data-sync"))
@@ -103,7 +107,7 @@ func TestWriteLogsEmpty(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zaptest.NewLogger(t).Sugar()
 
-	handler := NewPluginProxyHandler("test", "handler", nil, db, logger)
+	handler := NewPluginProxyHandler("test", "handler", nil, db, logger, nil)
 
 	// Empty entries should be a no-op (no panic, no DB writes)
 	handler.writeLogs("JOB_nonexistent", nil)
@@ -112,4 +116,70 @@ func TestWriteLogsEmpty(t *testing.T) {
 	var count int
 	require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM task_logs`).Scan(&count))
 	assert.Equal(t, 0, count)
+}
+
+// runPlugin is a plugin that keeps the job requests it is handed.
+type runPlugin struct {
+	protocol.DomainPluginServiceClient
+	handed []*protocol.ExecuteJobRequest
+	during func(*protocol.ExecuteJobRequest)
+}
+
+func (p *runPlugin) ExecuteJob(_ context.Context, req *protocol.ExecuteJobRequest, _ ...grpc.CallOption) (*protocol.ExecuteJobResponse, error) {
+	p.handed = append(p.handed, req)
+	if p.during != nil {
+		p.during(req)
+	}
+	return &protocol.ExecuteJobResponse{Success: true}, nil
+}
+
+// A run of a caller's schedule is handed a store token for the namespace that
+// caller acted in, and their User, and the token ends with the run.
+func TestARunOfACallersScheduleCarriesTheirStoreTokenAndUser(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	open := map[string]string{}
+	openRun := func(userID, namespace string) (string, func(), error) {
+		open["run-token"] = userID + "@" + namespace
+		return "run-token", func() { delete(open, "run-token") }, nil
+	}
+	p := &runPlugin{}
+	var openDuring bool
+	p.during = func(req *protocol.ExecuteJobRequest) { _, openDuring = open[req.StoreToken] }
+	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), openRun)
+
+	err := h.Execute(context.Background(), &async.Job{ID: "JBtim", UserID: "UStim", Namespace: "defacile"})
+	require.NoError(t, err)
+
+	require.Len(t, p.handed, 1)
+	assert.Equal(t, "run-token", p.handed[0].StoreToken)
+	assert.Equal(t, "UStim", p.handed[0].UserId)
+	assert.True(t, openDuring, "the run's token was not open while the plugin ran")
+	assert.Empty(t, open, "the run's token outlived the run")
+}
+
+// A job no caller made is handed no store token.
+func TestARunNoCallerMadeCarriesNoStoreToken(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	p := &runPlugin{}
+	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), nil)
+
+	require.NoError(t, h.Execute(context.Background(), &async.Job{ID: "JBnobody"}))
+	require.Len(t, p.handed, 1)
+	assert.Empty(t, p.handed[0].StoreToken)
+	assert.Empty(t, p.handed[0].UserId)
+}
+
+// A run whose namespace the node no longer serves does not run elsewhere.
+func TestARunWhoseNamespaceIsNotServedDoesNotRun(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	p := &runPlugin{}
+	openRun := func(_, namespace string) (string, func(), error) {
+		return "", nil, errors.Newf("namespace %s is not served", namespace)
+	}
+	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), openRun)
+
+	err := h.Execute(context.Background(), &async.Job{ID: "JBgone", UserID: "UStim", Namespace: "gone"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "gone")
+	assert.Empty(t, p.handed)
 }

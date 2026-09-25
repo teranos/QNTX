@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
@@ -12,12 +13,25 @@ import (
 	"go.uber.org/zap"
 )
 
+// Caller is who made a sigil call a plugin is answering, and the namespace
+// they act in.
+type Caller struct {
+	UserID    string
+	Namespace string
+}
+
+// Callers is the caller of an open call, by the token the node handed the
+// plugin for it. False is no call open under it.
+type Callers func(token string) (Caller, bool)
+
 // ScheduleServer implements the ScheduleService gRPC server
 type ScheduleServer struct {
 	protocol.UnimplementedScheduleServiceServer
 	store     *schedule.Store
 	authToken string
 	logger    *zap.SugaredLogger
+	// Set after the service is serving, while plugins may already be calling.
+	callers atomic.Pointer[Callers]
 }
 
 // NewScheduleServer creates a new schedule gRPC server
@@ -29,6 +43,19 @@ func NewScheduleServer(store *schedule.Store, authToken string, logger *zap.Suga
 	}
 }
 
+// SetCallers hands the server the callers of the calls plugins are answering.
+func (s *ScheduleServer) SetCallers(callers Callers) {
+	s.callers.Store(&callers)
+}
+
+// callerOf is the caller of the open call a store token names.
+func (s *ScheduleServer) callerOf(token string) (Caller, bool) {
+	if callers := s.callers.Load(); callers != nil {
+		return (*callers)(token)
+	}
+	return Caller{}, false
+}
+
 // CreateSchedule creates a new recurring schedule in Pulse
 func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.CreateScheduleRequest) (*protocol.CreateScheduleResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
@@ -38,8 +65,22 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		}, nil
 	}
 
-	// Idempotent: if an active schedule for this handler already exists, return it
-	existing, err := s.store.GetActiveByHandlerName(req.HandlerName)
+	// "a schedule remembers who created it and where"
+	var caller Caller
+	if req.StoreToken != "" {
+		var open bool
+		caller, open = s.callerOf(req.StoreToken)
+		if !open {
+			return &protocol.CreateScheduleResponse{
+				Success: false,
+				Error:   fmt.Sprintf("store_token names no open sigil call, so schedule %s has no caller to remember", req.HandlerName),
+			}, nil
+		}
+	}
+
+	// Idempotent: if an active schedule for this handler, made by the same
+	// caller in the same namespace, already exists, return it
+	existing, err := s.store.GetActiveByHandlerName(req.HandlerName, caller.UserID, caller.Namespace)
 	if err == nil && existing != nil {
 		s.logger.Debugw("Schedule already exists for handler, returning existing",
 			"schedule_id", existing.Id,
@@ -84,6 +125,8 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		State:           schedule.StateActive,
 		NextRunAt:       nextRun.Format(time.RFC3339),
 		Metadata:        metadata,
+		UserId:          caller.UserID,
+		Namespace:       caller.Namespace,
 	}
 
 	if err := s.store.CreateJob(job); err != nil {
@@ -97,6 +140,8 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		"schedule_id", scheduleID,
 		"handler", req.HandlerName,
 		"interval_seconds", req.IntervalSeconds,
+		"user", caller.UserID,
+		"namespace", caller.Namespace,
 	)
 
 	return &protocol.CreateScheduleResponse{

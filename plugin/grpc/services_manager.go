@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/internal/config"
@@ -41,6 +42,8 @@ type ServicesManager struct {
 	atsStore           *services.ATSStoreServer // for stream cancellation on plugin restart
 	queueServer        *grpc.Server
 	scheduleServer     *grpc.Server
+	scheduleSrv        *services.ScheduleServer // handed the callers of open sigil calls
+	openRun            atomic.Pointer[OpenRun]
 	fileServiceServer  *grpc.Server
 	llmServer          *grpc.Server
 	llmRouter          *services.LLMServer // Exposed for provider registration after plugin init
@@ -302,8 +305,8 @@ func (m *ServicesManager) startScheduleService(ctx context.Context, store *sched
 
 	// Create gRPC server
 	m.scheduleServer = grpc.NewServer()
-	schedServer := services.NewScheduleServer(store, authToken, m.logger)
-	protocol.RegisterScheduleServiceServer(m.scheduleServer, schedServer)
+	m.scheduleSrv = services.NewScheduleServer(store, authToken, m.logger)
+	protocol.RegisterScheduleServiceServer(m.scheduleServer, m.scheduleSrv)
 
 	m.serve(ctx, "Schedule", m.scheduleServer, listener)
 
@@ -501,6 +504,37 @@ func (m *ServicesManager) SetCallStores(calls services.CallStores) {
 	if m.atsStore != nil {
 		m.atsStore.SetCallStores(calls)
 	}
+}
+
+// SetCallers hands the schedule service the callers of the calls plugins are
+// answering, so a schedule created during one remembers who created it and
+// where.
+func (m *ServicesManager) SetCallers(callers services.Callers) {
+	if m.scheduleSrv != nil {
+		m.scheduleSrv.SetCallers(callers)
+	}
+}
+
+// OpenRun mints a store token for one run of a job, reaching the store of the
+// namespace the schedule's creator acted in, and what closes it once the run
+// is done.
+type OpenRun func(userID, namespace string) (token string, done func(), err error)
+
+// SetOpenRun hands the manager how the node mints a run's store token.
+func (m *ServicesManager) SetOpenRun(open OpenRun) {
+	m.openRun.Store(&open)
+}
+
+// OpenRunFor mints a run's store token, or says why none can be.
+func (m *ServicesManager) OpenRunFor(userID, namespace string) (string, func(), error) {
+	if m == nil {
+		return "", nil, errors.Newf("no services manager to mint a store token for namespace %s", namespace)
+	}
+	open := m.openRun.Load()
+	if open == nil {
+		return "", nil, errors.Newf("the node has not handed over how to mint a store token for namespace %s yet", namespace)
+	}
+	return (*open)(userID, namespace)
 }
 
 // GetSearchRouter returns the search router for provider registration.

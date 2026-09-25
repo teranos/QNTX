@@ -172,6 +172,8 @@ message ScheduledJob {
   string created_at = 12;    // RFC3339 timestamp
   string updated_at = 13;    // RFC3339 timestamp
   string created_from_doc = 14;
+  string user_id = 15;       // The User whose sigil call created it; empty is none
+  string namespace = 16;     // The namespace that caller acted in; empty is none
 }
 
 message CreateScheduleRequest {
@@ -180,6 +182,7 @@ message CreateScheduleRequest {
   int32 interval_seconds = 3;   // Execution interval
   bytes payload = 4;            // Handler-specific data (JSON)
   map<string, string> metadata = 5;  // Optional metadata (element_id, plugin, etc.)
+  string store_token = 6;       // The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule. Empty is a schedule no caller made.
 }
 
 message CreateScheduleResponse {

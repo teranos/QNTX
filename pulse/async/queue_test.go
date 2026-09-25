@@ -564,7 +564,7 @@ func TestYugiFindsDuplicateCard(t *testing.T) {
 	}
 
 	// Try to find active job with same source and handler
-	foundJob, err := queue.FindActiveJobBySourceAndHandler(job1.Source, job1.HandlerName)
+	foundJob, err := queue.FindActiveJobBySourceAndHandler(job1.Source, job1.HandlerName, "", "")
 	if err != nil {
 		t.Fatalf("Failed to find active job: %v", err)
 	}
@@ -576,7 +576,7 @@ func TestYugiFindsDuplicateCard(t *testing.T) {
 	}
 
 	// A different source is a named miss, not a nil answer.
-	notFound, err := queue.FindActiveJobBySourceAndHandler("https://different.com", job1.HandlerName)
+	notFound, err := queue.FindActiveJobBySourceAndHandler("https://different.com", job1.HandlerName, "", "")
 	if !errors.Is(err, ErrJobNotFound) {
 		t.Fatalf("Expected ErrJobNotFound for non-existent source, got: %v", err)
 	}
@@ -593,7 +593,7 @@ func TestYugiFindsDuplicateCard(t *testing.T) {
 	}
 
 	// Should not find completed jobs (only active)
-	notFoundCompleted, err := queue.FindActiveJobBySourceAndHandler(job1.Source, job1.HandlerName)
+	notFoundCompleted, err := queue.FindActiveJobBySourceAndHandler(job1.Source, job1.HandlerName, "", "")
 	if !errors.Is(err, ErrJobNotFound) {
 		t.Fatalf("Expected ErrJobNotFound for completed-only jobs, got: %v", err)
 	}

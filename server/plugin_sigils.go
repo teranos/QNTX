@@ -11,6 +11,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
@@ -41,6 +42,14 @@ const (
 	HeaderStoreToken = "X-Qntx-Store-Token"
 )
 
+// openedCall is what a call's token holds: the store it reaches, and who made
+// the call and the namespace they act in.
+type openedCall struct {
+	store     ats.AttestationStore
+	userID    string
+	namespace string
+}
+
 // openCall is a token for one call a plugin answers, reaching the store of the
 // namespace its caller acts in, and what closes it once the plugin has answered.
 // A caller who reaches no store is refused, and the refusal carries why.
@@ -54,13 +63,34 @@ func (s *QNTXServer) openCall(ctx context.Context) (string, func(), *protocol.Re
 	if store == nil {
 		return "", nil, nil, errors.New("the caller's namespace holds no store")
 	}
+	token, done, err := s.mintCall(openedCall{store: store, userID: admitted.UserID, namespace: universe.Name()})
+	return token, done, nil, err
+}
+
+// openRun is a token for one run of a job a caller's schedule started, reaching
+// the store of the namespace that caller acted in, minted the way openCall
+// mints one, and what closes it once the run is done.
+func (s *QNTXServer) openRun(userID, namespace string) (string, func(), error) {
+	universe, err := s.held.ScheduledRun(namespace)
+	if err != nil {
+		return "", nil, errors.Wrapf(err, "namespace %s of User %s is not served", namespace, userID)
+	}
+	store := universe.Store()
+	if store == nil {
+		return "", nil, errors.Newf("namespace %s holds no store", namespace)
+	}
+	return s.mintCall(openedCall{store: store, userID: userID, namespace: namespace})
+}
+
+// mintCall draws a token for an opened call, and what closes it.
+func (s *QNTXServer) mintCall(call openedCall) (string, func(), error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
-		return "", nil, nil, errors.Wrap(err, "no token could be drawn for the call")
+		return "", nil, errors.Wrap(err, "no token could be drawn for the call")
 	}
 	token := hex.EncodeToString(raw)
-	s.callStores.Store(token, store)
-	return token, func() { s.callStores.Delete(token) }, nil, nil
+	s.callStores.Store(token, call)
+	return token, func() { s.callStores.Delete(token) }, nil
 }
 
 // storeOfCall is the store an open call's token reaches.
@@ -69,8 +99,18 @@ func (s *QNTXServer) storeOfCall(token string) (ats.AttestationStore, bool) {
 	if !open {
 		return nil, false
 	}
-	store, ok := held.(ats.AttestationStore)
-	return store, ok
+	call, ok := held.(openedCall)
+	return call.store, ok
+}
+
+// callerOf is who made an open call, and the namespace they act in.
+func (s *QNTXServer) callerOf(token string) (services.Caller, bool) {
+	held, open := s.callStores.Load(token)
+	if !open {
+		return services.Caller{}, false
+	}
+	call, ok := held.(openedCall)
+	return services.Caller{UserID: call.userID, Namespace: call.namespace}, ok
 }
 
 // pluginSigna is the signa every ready plugin handed the node. A plugin's

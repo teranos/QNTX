@@ -35,9 +35,32 @@ The primary is the first address a User supplied.
 
 The window holds the templates, the mail sent, and the SES account.
 
+## Images
+
+"plugins can send images"
+
+"Add a size cap and accept image/png only."
+
+A Send carries images inline; the html shows each by `cid:<content_id>`.
+
 ## Transport
 
 "ses being enabled for use with email service can be enabled in the am.toml"
+
+## Dark
+
+"but i do still want the dark themed qntx tokens css email template"
+
+QNTX keeps a second template, dark.
+
+"why not just use the real source"
+
+"it just needs to fit with the rest of qntx"
+
+A mail QNTX draws is an element window on its canvas, as ≡ am is: a title
+bar, then sections of labelled rows. Its values are read from web/css, which
+the binary embeds. Tables and inline styles carry it, because every mail
+client lays those out the same way. The weekly report is drawn the same way.
 
 ## Not done
 

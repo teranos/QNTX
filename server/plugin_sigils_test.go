@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 )
 
@@ -326,4 +327,38 @@ func TestASignumTheTableNamesIsReachedBySuper(t *testing.T) {
 	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/datapunt/read?kind=competitor", tokens[auth.LevelSuper]))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.JSONEq(t, `{"observed":true}`, w.Body.String())
+}
+
+// "a schedule remembers who created it and where": the call's token names who
+// made the call and the namespace they act in, and a run of what they
+// scheduled is handed a token minted the same way, reaching that namespace.
+func TestACallsTokenNamesItsCallerAndARunReachesTheirNamespace(t *testing.T) {
+	p := &sigilPlugin{
+		fakePlugin: fakePlugin{name: "stub"},
+		signa:      []*protocol.Signum{stubSignum("stub")},
+		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
+	}
+	srv, tokens := sigilServingServer(t, p)
+	var caller services.Caller
+	var open bool
+	p.during = func(req *protocol.HTTPRequest) {
+		caller, open = srv.callerOf(headerOf(req, HeaderStoreToken)[0])
+	}
+
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/stub/read?kind=competitor", tokens[auth.LevelRoot]))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.True(t, open, "the call's token named no caller while the call was open")
+	assert.Equal(t, srv.held.ServedUniverse().Name(), caller.Namespace)
+
+	token, done, err := srv.openRun(caller.UserID, caller.Namespace)
+	require.NoError(t, err)
+	reached, open := srv.storeOfCall(token)
+	require.True(t, open)
+	assert.Same(t, srv.held.Served(), reached, "the run reached another store than the one its caller acted in")
+	ran, _ := srv.callerOf(token)
+	assert.Equal(t, caller, ran)
+	done()
+	_, still := srv.storeOfCall(token)
+	assert.False(t, still, "the run's token outlived the run")
 }

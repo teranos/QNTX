@@ -3,6 +3,8 @@ package server
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"image/color"
 	"image/png"
 	"net/http"
 	"strings"
@@ -173,14 +175,48 @@ func TestTheReportRendersEverySectionWithItsGraphs(t *testing.T) {
 		require.NoError(t, err, img.ContentID)
 	}
 	for _, section := range []string{
-		"Attestations created per namespace", "Users registered per namespace", "Node restarts",
+		"Attestations created per namespace", "Users registered per namespace",
 		"Downtime", "CPU over 7 days", "Memory over 7 days", "Swap over 7 days", "Network over 7 days",
 		"boot.subsystem.took over 7 days", "Query took over 7 days", "Top 3 4xx", "Top 3 5xx", "Top 3 handler failures",
 	} {
 		assert.Contains(t, mail.HTML, section)
 		assert.Contains(t, mail.Text, section)
 	}
+	assert.Contains(t, mail.HTML, "Restarts:")
+	assert.Contains(t, mail.Text, "Node restarts")
 	assert.Contains(t, mail.Text, "no query's text is recorded")
+}
+
+// "I DONT VARE ABOUT X 4XX'S"
+// "I WANT TO SEE WHAT WAS TRIED TO ACCESS INSTEAD"
+//
+// A ranked status is the path that was asked for, not how often.
+func TestAStatusIsThePathThatWasAskedFor(t *testing.T) {
+	s := rootKnowingServer(t)
+	mail, err := renderReport(s.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil))
+	require.NoError(t, err)
+	assert.Contains(t, mail.HTML, "/api/attestations")
+	assert.Contains(t, mail.Text, "  404 /api/attestations\n")
+}
+
+// The graph stands in the report's window, drawn in QNTX's own colours.
+func TestTheGraphStandsInTheWindow(t *testing.T) {
+	s := rootKnowingServer(t)
+	mail, err := renderReport(s.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil))
+	require.NoError(t, err)
+	ink, err := services.MailGraphColours()
+	require.NoError(t, err)
+
+	require.NotEmpty(t, mail.Inline)
+	img, err := png.Decode(bytes.NewReader(mail.Inline[0].Data))
+	require.NoError(t, err)
+	at := func(x, y int) string {
+		r, g, b, _ := img.At(x, y).RGBA()
+		return fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
+	}
+	hex := func(c color.NRGBA) string { return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B) }
+	assert.Equal(t, hex(ink.Background), at(0, 0))
+	assert.Equal(t, hex(ink.Line), at(0, yOf(40)), "a steady 40%")
 }
 
 // "can you do it please to the degree that is feasible given sentry access?"

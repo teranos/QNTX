@@ -48,8 +48,9 @@ func (s *Store) CreateJob(job *Job) error {
 			parent_job_id, retry_count,
 			plugin_version,
 			trace_context, trace_baggage,
+			user_id, namespace,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	// exec_trace_* is absent on purpose: it is written when the job runs, by
 	// SetExecutionTrace, and a job being created has not run.
@@ -77,6 +78,8 @@ func (s *Store) CreateJob(job *Job) error {
 		job.PluginVersion,
 		job.TraceContext,
 		job.TraceBaggage,
+		job.UserID,
+		job.Namespace,
 		job.CreatedAt,
 		job.UpdatedAt,
 	)
@@ -324,29 +327,25 @@ func (s *Store) ListTasksByParent(parentJobID string) (_ []*Job, err error) {
 	return scanJobs(rows, "tasks")
 }
 
-// HandlerFailures is how often one handler failed, and the last thing it said.
+// HandlerFailures is one error a handler failed with, and how often.
 type HandlerFailures struct {
-	Handler   string
-	Failures  int
-	LastError string
+	Handler  string
+	Failures int
+	Error    string
 }
 
-// FailedHandlersSince is the handlers whose jobs failed since a time, most
-// failures first, at most limit of them. A job a restart cut off is left out:
-// the restart failed it, not its handler.
+// FailedHandlersSince is the errors handlers failed with since a time, the
+// most frequent first, at most limit of them. A job a restart cut off is left
+// out: the restart failed it, not its handler.
 func (s *Store) FailedHandlersSince(since time.Time, limit int) (_ []HandlerFailures, err error) {
 	rows, err := s.db.Query(`
-		SELECT handler_name, COUNT(*),
-		       (SELECT last.error FROM async_ix_jobs AS last
-		        WHERE last.handler_name = failed.handler_name
-		          AND last.status = 'failed' AND last.updated_at >= ? AND last.error != ?
-		        ORDER BY last.updated_at DESC LIMIT 1)
-		FROM async_ix_jobs AS failed
+		SELECT handler_name, COUNT(*), error
+		FROM async_ix_jobs
 		WHERE status = 'failed' AND updated_at >= ? AND error != ?
-		GROUP BY handler_name
-		ORDER BY COUNT(*) DESC, handler_name
+		GROUP BY handler_name, error
+		ORDER BY COUNT(*) DESC, handler_name, error
 		LIMIT ?`,
-		since, OrphanedError, since, OrphanedError, limit)
+		since, OrphanedError, limit)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to count the failed handlers since %s", since.Format(time.RFC3339))
 	}
@@ -355,11 +354,11 @@ func (s *Store) FailedHandlersSince(since time.Time, limit int) (_ []HandlerFail
 	var failed []HandlerFailures
 	for rows.Next() {
 		var f HandlerFailures
-		var last sql.NullString
-		if err := rows.Scan(&f.Handler, &f.Failures, &last); err != nil {
+		var said sql.NullString
+		if err := rows.Scan(&f.Handler, &f.Failures, &said); err != nil {
 			return nil, errors.Wrap(err, "failed to read a failed handler")
 		}
-		f.LastError = last.String
+		f.Error = said.String
 		failed = append(failed, f)
 	}
 	if err := rows.Err(); err != nil {
@@ -395,13 +394,15 @@ func (s *Store) CleanupOldJobs(olderThan time.Duration) (int, error) {
 // query can never be confused, and no caller carries a nil it forgot to check.
 var ErrJobNotFound = errors.New("job not found")
 
-// FindActiveJobBySourceAndHandler finds an active (queued, running, or paused) job by source URL and handler name.
+// FindActiveJobBySourceAndHandler finds an active (queued, running, or paused) job by source URL and handler name, made for the same caller in the same namespace.
 // Returns nil if no active job found for this source.
-func (s *Store) FindActiveJobBySourceAndHandler(source string, handlerName string) (*Job, error) {
+func (s *Store) FindActiveJobBySourceAndHandler(source, handlerName, userID, namespace string) (*Job, error) {
 	query := `SELECT ` + StandardJobSelectColumns() + `
 		FROM async_ix_jobs
 		WHERE source = ?
 		  AND handler_name = ?
+		  AND user_id = ?
+		  AND namespace = ?
 		  AND status IN ('queued', 'running', 'paused')
 		ORDER BY created_at DESC
 		LIMIT 1`
@@ -410,7 +411,7 @@ func (s *Store) FindActiveJobBySourceAndHandler(source string, handlerName strin
 	args := GetJobScanArgs()
 	targets := GetJobScanTargets(&job, args)
 
-	err := s.db.QueryRow(query, source, handlerName).Scan(targets...)
+	err := s.db.QueryRow(query, source, handlerName, userID, namespace).Scan(targets...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, errors.Wrapf(ErrJobNotFound, "no active job for %s/%s", source, handlerName)
 	}

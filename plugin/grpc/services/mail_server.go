@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -135,8 +136,8 @@ func (s *MailServer) SetTemplate(_ context.Context, req *protocol.SetMailTemplat
 	if req.Name == "" {
 		return refuse(errors.New("name is required"))
 	}
-	if req.Name == NeutralTemplateName {
-		return refuse(errors.Newf("%s is QNTX's own template, and a Send naming no template gets it", NeutralTemplateName))
+	if isQNTXTemplate(req.Name) {
+		return refuse(errors.Newf("%s is one of QNTX's own templates, which a Send names without setting it", req.Name))
 	}
 	if err := checkMailTemplate(req.Template); err != nil {
 		return refuse(errors.Wrapf(err, "template %s of %s", req.Name, req.Source))
@@ -226,12 +227,58 @@ func (s *MailServer) Send(ctx context.Context, req *protocol.SendMailRequest) (*
 		return refuse(errors.Wrapf(err, "template %s", ref))
 	}
 
-	mail := OutgoingMail{From: w.From, To: to, Subject: filled.Subject, HTML: filled.HTML, Text: filled.Text}
+	inline, err := inlineImages(req.Inline)
+	if err != nil {
+		return refuse(err)
+	}
+
+	mail := OutgoingMail{From: w.From, To: to, Subject: filled.Subject, HTML: filled.HTML, Text: filled.Text, Inline: inline}
 	messageID, attestationID, sendErr := s.deliver(ctx, w, req.UserId, req.Source, ref, mail)
 	if sendErr != nil {
 		return &protocol.SendMailResponse{Success: false, Error: sendErr.Error(), AttestationId: attestationID}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 	}
 	return &protocol.SendMailResponse{Success: true, MessageId: messageID, AttestationId: attestationID}, nil
+}
+
+// MaxMailImageBytes caps what a plugin's mail carries in images, all of them
+// together. The mail service's gRPC server takes the default 4 MiB a message,
+// and the rest of the request has to fit beside the images.
+const MaxMailImageBytes = 3 << 20
+
+// pngSignature is the eight bytes every PNG begins with.
+var pngSignature = []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
+
+// inlineImages is what a plugin's mail carries inline, or why it carries none:
+// image/png only, each under a cid of its own, all of them under the cap.
+func inlineImages(images []*protocol.MailImage) ([]InlineImage, error) {
+	var inline []InlineImage
+	seen := map[string]bool{}
+	total := 0
+	for i, img := range images {
+		if img.ContentId == "" {
+			return nil, errors.Newf("inline image %d has no content_id: the html shows it by cid:<content_id>", i)
+		}
+		if seen[img.ContentId] {
+			return nil, errors.Newf("inline image %d repeats content_id %s", i, img.ContentId)
+		}
+		seen[img.ContentId] = true
+		if img.ContentType != "image/png" {
+			return nil, errors.Newf("inline image %s is %q: only image/png is accepted", img.ContentId, img.ContentType)
+		}
+		if !bytes.HasPrefix(img.Data, pngSignature) {
+			return nil, errors.Newf("inline image %s is not a PNG: its %d bytes do not begin with the PNG signature", img.ContentId, len(img.Data))
+		}
+		total += len(img.Data)
+		if total > MaxMailImageBytes {
+			return nil, errors.Newf("inline images come to more than %d bytes by image %s", MaxMailImageBytes, img.ContentId)
+		}
+		fileName := img.FileName
+		if fileName == "" {
+			fileName = img.ContentId + ".png"
+		}
+		inline = append(inline, InlineImage{ContentID: img.ContentId, ContentType: img.ContentType, FileName: fileName, Data: img.Data})
+	}
+	return inline, nil
 }
 
 // SendAsNode mails a User something the node wrote itself (ADR-042). It is
@@ -355,8 +402,12 @@ func (s *MailServer) recipient(w *MailWiring, userID string) (string, error) {
 // template is what a Send is filled from: QNTX's neutral template when it names
 // none, else the newest the plugin set under that name.
 func (s *MailServer) template(w *MailWiring, plugin, name string) (*protocol.MailTemplate, string, error) {
-	if name == "" || name == NeutralTemplateName {
+	if name == "" {
 		return NeutralTemplate(), NeutralTemplateName, nil
+	}
+	if isQNTXTemplate(name) {
+		own, err := qntxTemplate(name)
+		return own, name, err
 	}
 	ref := templateRef(plugin, name)
 	kept, found, err := NewestMailTemplate(w.Records(), plugin, name)
