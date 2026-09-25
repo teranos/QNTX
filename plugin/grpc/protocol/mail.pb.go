@@ -220,6 +220,7 @@ type SendMailRequest struct {
 	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`                                                             // The User it goes to. Their primary address is the one used.
 	Template      string                 `protobuf:"bytes,4,opt,name=template,proto3" json:"template,omitempty"`                                                                       // A name the plugin set. Empty is QNTX's neutral template.
 	Values        map[string]string      `protobuf:"bytes,5,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // What the template is filled with.
+	Inline        []*MailImage           `protobuf:"bytes,6,rep,name=inline,proto3" json:"inline,omitempty"`                                                                           // Images the html shows by cid:<content_id>.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -289,6 +290,83 @@ func (x *SendMailRequest) GetValues() map[string]string {
 	return nil
 }
 
+func (x *SendMailRequest) GetInline() []*MailImage {
+	if x != nil {
+		return x.Inline
+	}
+	return nil
+}
+
+// MailImage is an image a mail carries inline. Only image/png is accepted, and
+// all of a mail's images together are held under a size cap.
+type MailImage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ContentId     string                 `protobuf:"bytes,1,opt,name=content_id,json=contentId,proto3" json:"content_id,omitempty"`       // The html shows it by cid:<content_id>. Unique within a mail.
+	ContentType   string                 `protobuf:"bytes,2,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"` // image/png.
+	FileName      string                 `protobuf:"bytes,3,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`          // Empty is <content_id>.png.
+	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MailImage) Reset() {
+	*x = MailImage{}
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MailImage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MailImage) ProtoMessage() {}
+
+func (x *MailImage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MailImage.ProtoReflect.Descriptor instead.
+func (*MailImage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *MailImage) GetContentId() string {
+	if x != nil {
+		return x.ContentId
+	}
+	return ""
+}
+
+func (x *MailImage) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *MailImage) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
+}
+
+func (x *MailImage) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 type SendMailResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
@@ -301,7 +379,7 @@ type SendMailResponse struct {
 
 func (x *SendMailResponse) Reset() {
 	*x = SendMailResponse{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -313,7 +391,7 @@ func (x *SendMailResponse) String() string {
 func (*SendMailResponse) ProtoMessage() {}
 
 func (x *SendMailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -326,7 +404,7 @@ func (x *SendMailResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMailResponse.ProtoReflect.Descriptor instead.
 func (*SendMailResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SendMailResponse) GetSuccess() bool {
@@ -375,17 +453,24 @@ const file_plugin_grpc_protocol_mail_proto_rawDesc = "" +
 	"\x17SetMailTemplateResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12%\n" +
-	"\x0eattestation_id\x18\x03 \x01(\tR\rattestationId\"\xf7\x01\n" +
+	"\x0eattestation_id\x18\x03 \x01(\tR\rattestationId\"\xa4\x02\n" +
 	"\x0fSendMailRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x16\n" +
 	"\x06source\x18\x02 \x01(\tR\x06source\x12\x17\n" +
 	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x1a\n" +
 	"\btemplate\x18\x04 \x01(\tR\btemplate\x12=\n" +
-	"\x06values\x18\x05 \x03(\v2%.protocol.SendMailRequest.ValuesEntryR\x06values\x1a9\n" +
+	"\x06values\x18\x05 \x03(\v2%.protocol.SendMailRequest.ValuesEntryR\x06values\x12+\n" +
+	"\x06inline\x18\x06 \x03(\v2\x13.protocol.MailImageR\x06inline\x1a9\n" +
 	"\vValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x88\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"~\n" +
+	"\tMailImage\x12\x1d\n" +
+	"\n" +
+	"content_id\x18\x01 \x01(\tR\tcontentId\x12!\n" +
+	"\fcontent_type\x18\x02 \x01(\tR\vcontentType\x12\x1b\n" +
+	"\tfile_name\x18\x03 \x01(\tR\bfileName\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\"\x88\x01\n" +
 	"\x10SendMailResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x1d\n" +
@@ -408,27 +493,29 @@ func file_plugin_grpc_protocol_mail_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_mail_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_plugin_grpc_protocol_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_plugin_grpc_protocol_mail_proto_goTypes = []any{
 	(*MailTemplate)(nil),            // 0: protocol.MailTemplate
 	(*SetMailTemplateRequest)(nil),  // 1: protocol.SetMailTemplateRequest
 	(*SetMailTemplateResponse)(nil), // 2: protocol.SetMailTemplateResponse
 	(*SendMailRequest)(nil),         // 3: protocol.SendMailRequest
-	(*SendMailResponse)(nil),        // 4: protocol.SendMailResponse
-	nil,                             // 5: protocol.SendMailRequest.ValuesEntry
+	(*MailImage)(nil),               // 4: protocol.MailImage
+	(*SendMailResponse)(nil),        // 5: protocol.SendMailResponse
+	nil,                             // 6: protocol.SendMailRequest.ValuesEntry
 }
 var file_plugin_grpc_protocol_mail_proto_depIdxs = []int32{
 	0, // 0: protocol.SetMailTemplateRequest.template:type_name -> protocol.MailTemplate
-	5, // 1: protocol.SendMailRequest.values:type_name -> protocol.SendMailRequest.ValuesEntry
-	1, // 2: protocol.MailService.SetTemplate:input_type -> protocol.SetMailTemplateRequest
-	3, // 3: protocol.MailService.Send:input_type -> protocol.SendMailRequest
-	2, // 4: protocol.MailService.SetTemplate:output_type -> protocol.SetMailTemplateResponse
-	4, // 5: protocol.MailService.Send:output_type -> protocol.SendMailResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	6, // 1: protocol.SendMailRequest.values:type_name -> protocol.SendMailRequest.ValuesEntry
+	4, // 2: protocol.SendMailRequest.inline:type_name -> protocol.MailImage
+	1, // 3: protocol.MailService.SetTemplate:input_type -> protocol.SetMailTemplateRequest
+	3, // 4: protocol.MailService.Send:input_type -> protocol.SendMailRequest
+	2, // 5: protocol.MailService.SetTemplate:output_type -> protocol.SetMailTemplateResponse
+	5, // 6: protocol.MailService.Send:output_type -> protocol.SendMailResponse
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_mail_proto_init() }
@@ -442,7 +529,7 @@ func file_plugin_grpc_protocol_mail_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_mail_proto_rawDesc), len(file_plugin_grpc_protocol_mail_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
