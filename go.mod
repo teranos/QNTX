@@ -20,7 +20,7 @@ require (
 	github.com/hashicorp/go-getter v1.8.4
 	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/mr-tron/base58 v1.2.0
-	github.com/pelletier/go-toml/v2 v2.2.4
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/pterm/pterm v0.12.82
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/spf13/cobra v1.10.2
