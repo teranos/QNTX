@@ -74,6 +74,10 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	// A plugin answering a sigil reads and writes where its caller acts.
 	servicesManager.SetCallStores(s.storeOfCall)
 
+	// "a schedule remembers who created it and where", and each run goes there.
+	servicesManager.SetCallers(s.callerOf)
+	servicesManager.SetOpenRun(s.openRun)
+
 	// Mail to a User on a plugin's behalf (ADR-041): the Users exist once auth
 	// has run, and the node's DID once nodedid has.
 	servicesManager.SetMail(s.mailWiring())

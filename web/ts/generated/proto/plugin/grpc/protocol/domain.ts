@@ -287,7 +287,13 @@ export interface ExecuteJobRequest {
   /** Job-specific data (JSON) */
   payload: Uint8Array;
   /** Execution timeout. If not set, no timeout. */
-  timeout_secs?: number | undefined;
+  timeout_secs?:
+    | number
+    | undefined;
+  /** Reaches the store of the namespace the schedule's creator acted in, for this run. Empty is a job no caller made. */
+  store_token: string;
+  /** The User whose sigil call created the schedule */
+  user_id: string;
 }
 
 /** ExecuteJobResponse is returned after job execution */

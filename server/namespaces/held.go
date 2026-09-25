@@ -279,6 +279,12 @@ func (h *Held) Universe(admitted auth.Admission, namespace string) (*Universe, e
 	return h.universeIn(namespace)
 }
 
+// ScheduledRun hands back the universe a schedule's run acts in: the namespace
+// its creator acted in, as the sigil call that created it was admitted.
+func (h *Held) ScheduledRun(namespace string) (*Universe, error) {
+	return h.universeIn(namespace)
+}
+
 // WriteWhatTheNodeKnowsOfItself hands back the system store for a line about
 // the node rather than about the world: a role grant, a reach line, a word
 // line, a stand's definition. These land in system whatever namespace their

@@ -48,12 +48,18 @@ func (r *RemoteSchedule) Close() error {
 
 // Create creates a new recurring schedule and returns its ID.
 func (r *RemoteSchedule) Create(handlerName string, intervalSecs int, payload []byte, metadata map[string]string) (string, error) {
+	return r.CreateInCall("", handlerName, intervalSecs, payload, metadata)
+}
+
+// CreateInCall creates a schedule during the sigil call its store token names.
+func (r *RemoteSchedule) CreateInCall(storeToken, handlerName string, intervalSecs int, payload []byte, metadata map[string]string) (string, error) {
 	req := &protocol.CreateScheduleRequest{
 		AuthToken:       r.authToken,
 		HandlerName:     handlerName,
 		IntervalSeconds: int32(intervalSecs),
 		Payload:         payload,
 		Metadata:        metadata,
+		StoreToken:      storeToken,
 	}
 
 	resp, err := r.client.CreateSchedule(r.ctx, req)

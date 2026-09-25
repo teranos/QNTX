@@ -268,6 +268,8 @@ message ExecuteJobRequest {
   string handler_name = 2;     // Which handler to invoke
   bytes payload = 3;           // Job-specific data (JSON)
   optional int64 timeout_secs = 4;  // Execution timeout. If not set, no timeout.
+  string store_token = 5;      // Reaches the store of the namespace the schedule's creator acted in, for this run. Empty is a job no caller made.
+  string user_id = 6;          // The User whose sigil call created the schedule
 }
 
 // ExecuteJobResponse is returned after job execution

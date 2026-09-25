@@ -97,6 +97,11 @@ type Job struct {
 	ExecTraceContext string `json:"exec_trace_context,omitempty"`
 	ExecTraceBaggage string `json:"exec_trace_baggage,omitempty"`
 
+	// UserID and Namespace are the caller of the sigil call that created the
+	// schedule this job runs for. Empty is a job no caller made.
+	UserID    string `json:"user_id,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+
 	CreatedAt     time.Time       `json:"created_at"`
 	StartedAt     *time.Time      `json:"started_at,omitempty"`
 	CompletedAt   *time.Time      `json:"completed_at,omitempty"`

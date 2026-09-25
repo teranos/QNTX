@@ -1131,6 +1131,8 @@ type ExecuteJobRequest struct {
 	HandlerName   string                 `protobuf:"bytes,2,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`        // Which handler to invoke
 	Payload       []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`                                   // Job-specific data (JSON)
 	TimeoutSecs   *int64                 `protobuf:"varint,4,opt,name=timeout_secs,json=timeoutSecs,proto3,oneof" json:"timeout_secs,omitempty"` // Execution timeout. If not set, no timeout.
+	StoreToken    string                 `protobuf:"bytes,5,opt,name=store_token,json=storeToken,proto3" json:"store_token,omitempty"`           // Reaches the store of the namespace the schedule's creator acted in, for this run. Empty is a job no caller made.
+	UserId        string                 `protobuf:"bytes,6,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`                       // The User whose sigil call created the schedule
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1191,6 +1193,20 @@ func (x *ExecuteJobRequest) GetTimeoutSecs() int64 {
 		return *x.TimeoutSecs
 	}
 	return 0
+}
+
+func (x *ExecuteJobRequest) GetStoreToken() string {
+	if x != nil {
+		return x.StoreToken
+	}
+	return ""
+}
+
+func (x *ExecuteJobRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
 }
 
 // ExecuteJobResponse is returned after job execution
@@ -1736,12 +1752,15 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"predicates\x12\x1a\n" +
 	"\bcontexts\x18\x05 \x03(\tR\bcontexts\x12\x16\n" +
 	"\x06actors\x18\x06 \x03(\tR\x06actors\x12/\n" +
-	"\x14max_fires_per_second\x18\a \x01(\x05R\x11maxFiresPerSecond\"\xa0\x01\n" +
+	"\x14max_fires_per_second\x18\a \x01(\x05R\x11maxFiresPerSecond\"\xda\x01\n" +
 	"\x11ExecuteJobRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x18\n" +
 	"\apayload\x18\x03 \x01(\fR\apayload\x12&\n" +
-	"\ftimeout_secs\x18\x04 \x01(\x03H\x00R\vtimeoutSecs\x88\x01\x01B\x0f\n" +
+	"\ftimeout_secs\x18\x04 \x01(\x03H\x00R\vtimeoutSecs\x88\x01\x01\x12\x1f\n" +
+	"\vstore_token\x18\x05 \x01(\tR\n" +
+	"storeToken\x12\x17\n" +
+	"\auser_id\x18\x06 \x01(\tR\x06userIdB\x0f\n" +
 	"\r_timeout_secs\"\xae\x02\n" +
 	"\x12ExecuteJobResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
