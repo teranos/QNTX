@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { fmt, renderAccount, renderSent, renderTemplates, reportSentLine, type MailRow, type MailTemplates } from './mail-element';
+import { fmt, inlineImages, renderAccount, renderMessage, renderSent, renderTemplates, reportSentLine, type MailRow, type MailTemplates } from './mail-element';
 
 function mail(overrides: Partial<MailRow> = {}): MailRow {
     return {
@@ -86,6 +86,7 @@ test('the neutral template and each plugin template are shown as source, never r
             name: 'booking-accepted', subject: 'Boeking bevestigd voor {{.date}}',
             html: '<p>Tot {{.date}}.</p>', text: 'Tot {{.date}}.', values: [],
         }],
+        node: [{ name: 'report.weekly', says: 'The weekly report to the ROOT User, written whole by the node.' }],
     };
     const container = document.createElement('div');
     renderTemplates(container, templates);
@@ -94,6 +95,32 @@ test('the neutral template and each plugin template are shown as source, never r
     expect(container.textContent).toContain('booking-accepted');
     expect(container.textContent).toContain('<p>Tot {{.date}}.</p>');
     expect(container.querySelector('p')).toBeNull();
+    // "its saying no plugin has set a template, but what about the system one?"
+    expect(container.textContent).toContain('report.weekly');
+});
+
+// "i would have expected to be able to click the main and see exactly what was sent."
+test('a mail is shown with the images it was sent with', () => {
+    expect(inlineImages('<img src="cid:cpu"><img src="cid:swap">', [{ content_id: 'cpu', content_type: 'image/png', data: 'iVBORw==' }]))
+        .toBe('<img src="data:image/png;base64,iVBORw=="><img src="cid:swap">');
+
+    const container = document.createElement('div');
+    renderMessage(container, {
+        ...mail(), from: 'system@q.garden.test', html: '<p>The week.</p><img src="cid:cpu">', text: 'The week.',
+        images: [{ content_id: 'cpu', content_type: 'image/png', data: 'iVBORw==' }],
+    });
+    const frame = container.querySelector('iframe');
+    expect(frame).not.toBeNull();
+    expect(frame?.getAttribute('sandbox')).toBe('');
+    expect(frame?.getAttribute('srcdoc')).toContain('data:image/png;base64,iVBORw==');
+    expect(container.textContent).toContain('system@q.garden.test');
+    expect(container.textContent).not.toContain('were not kept');
+});
+
+test('a mail whose images were not kept says so', () => {
+    const container = document.createElement('div');
+    renderMessage(container, { ...mail(), from: 'system@q.garden.test', html: '<img src="cid:cpu">', text: '', images: [] });
+    expect(container.textContent).toContain('were not kept');
 });
 
 // "for a user that is one of the root identities, i want to receive a weekly report."

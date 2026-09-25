@@ -316,7 +316,17 @@ func TestTheNodeMailsAUserInItsOwnName(t *testing.T) {
 	assert.Equal(t, NodeSource, sent[0].Source)
 	assert.Equal(t, "report.weekly", sent[0].Attributes["template"])
 	assert.Equal(t, NodeSource, sent[0].Attributes["plugin"])
-	assert.Contains(t, sent[0].Attributes["inline"], "cpu")
+
+	// "i would have expected to be able to click the main and see exactly what was sent."
+	//
+	// The images are kept whole, so the mail can be shown again as it went out.
+	images, ok := sent[0].Attributes["images"].([]any)
+	require.True(t, ok, "the images are kept: %#v", sent[0].Attributes["images"])
+	require.Len(t, images, 1)
+	cpu := images[0].(map[string]any)
+	assert.Equal(t, "cpu", cpu["content_id"])
+	assert.Equal(t, "image/png", cpu["content_type"])
+	assert.Equal(t, "iVBORw==", cpu["data"])
 }
 
 // The node is held to what a plugin is held to: no address, no mail.

@@ -165,6 +165,49 @@ func TestTheMailWindowShowsTheNeutralTemplateAndEachPluginsNewest(t *testing.T) 
 	assert.Equal(t, "Tweede", templates[0].Subject)
 }
 
+// "i would have expected to be able to click the main and see exactly what was sent."
+func TestOneMailIsReadBackWholeAsItWasSent(t *testing.T) {
+	s, mail := mailingNode(t, &kept{})
+
+	_, attestationID, err := mail.SendAsNode(context.Background(), "UStim", services.NodeMail{
+		Name: "report.weekly", Subject: "Week 39", Text: "The week.",
+		HTML:   `<p>The week.</p><img src="cid:cpu">`,
+		Inline: []services.InlineImage{{ContentID: "cpu", ContentType: "image/png", FileName: "cpu.png", Data: []byte{0x89, 'P', 'N', 'G'}}},
+	})
+	require.NoError(t, err)
+
+	answer, refusal := s.mailMessage(asRoot(), sigil.Sent{"id": attestationID, "user": "UStim"})
+	require.Nil(t, refusal, refusal.GetSays())
+	holds(t, s.mailSignum(), "message", answer)
+
+	m := answer.(map[string]any)["mail"].(mailMessage)
+	assert.Equal(t, attestationID, m.ID)
+	assert.Equal(t, "Garden <mail@garden.test>", m.From)
+	assert.Equal(t, "tim@defacile.nl", m.To)
+	assert.Equal(t, "Week 39", m.Subject)
+	assert.Equal(t, `<p>The week.</p><img src="cid:cpu">`, m.HTML)
+	assert.Equal(t, "The week.", m.Text)
+	assert.True(t, m.Sent)
+	require.Len(t, m.Images, 1)
+	assert.Equal(t, mailImage{ContentID: "cpu", ContentType: "image/png", Data: "iVBORw=="}, m.Images[0])
+
+	_, refusal = s.mailMessage(asRoot(), sigil.Sent{"id": "AS-NOBODY", "user": "UStim"})
+	require.NotNil(t, refusal)
+	assert.Equal(t, sigil.NotFound, refusal.GetWhy())
+}
+
+// The node's own mail is not filled from a template, and the window says what
+// it is instead of leaving it out.
+func TestTheTemplatesNameTheNodesOwnMail(t *testing.T) {
+	s := rootKnowingServer(t)
+	answer, refusal := s.mailTemplates(asRoot(), sigil.Sent{})
+	require.Nil(t, refusal, refusal.GetSays())
+	holds(t, s.mailSignum(), "templates", answer)
+	own := answer.(map[string]any)["node"].([]nodeMailRow)
+	require.Len(t, own, 1)
+	assert.Equal(t, reportHandlerName, own[0].Name)
+}
+
 // "ses being enabled for use with email service can be enabled in the am.toml"
 //
 // Off, the window says so and SES is not asked.

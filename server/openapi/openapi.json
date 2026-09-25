@@ -209,6 +209,11 @@
         "ROOT"
       ]
     },
+    "/api/mail/message": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/mail/report": {
       "x-qntx-reach": [
         "ROOT"

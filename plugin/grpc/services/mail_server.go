@@ -3,10 +3,9 @@ package services
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
-	"fmt"
 	"slices"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -288,16 +287,23 @@ func (s *MailServer) deliver(ctx context.Context, w *MailWiring, userID, source,
 		"html":     mail.HTML,
 		"text":     mail.Text,
 	}
-	// The images are named, sized and hashed rather than kept: the html that
-	// shows them is kept whole, and a week of graphs is not an attestation.
+	// "i would have expected to be able to click the main and see exactly what was sent."
+	//
+	// The images are kept whole beside the html that shows them, so the mail
+	// can be shown again as it went out, graphs and all.
 	if len(mail.Inline) > 0 {
-		var inline []string
+		images := make([]any, 0, len(mail.Inline))
 		for _, img := range mail.Inline {
 			sum := sha256.Sum256(img.Data)
-			inline = append(inline, fmt.Sprintf("%s %s %d bytes sha256:%s",
-				img.ContentID, img.ContentType, len(img.Data), hex.EncodeToString(sum[:])))
+			images = append(images, map[string]any{
+				"content_id":   img.ContentID,
+				"content_type": img.ContentType,
+				"file_name":    img.FileName,
+				"sha256":       hex.EncodeToString(sum[:]),
+				"data":         base64.StdEncoding.EncodeToString(img.Data),
+			})
 		}
-		attrs["inline"] = strings.Join(inline, "\n")
+		attrs["images"] = images
 	}
 	predicate := PredicateMailSent
 	if sendErr != nil {

@@ -25,6 +25,7 @@ const (
 	mailTemplatesPath = "/api/mail/templates"
 	mailAccountPath   = "/api/mail/account"
 	mailReportPath    = "/api/mail/report"
+	mailMessagePath   = "/api/mail/message"
 
 	// mailSentByDefault is how many mails the window is handed when it names
 	// no limit.
@@ -99,6 +100,7 @@ func (s *QNTXServer) mailSignum() sigil.Signum {
 					Gives: []*protocol.Field{
 						{Name: "neutral", Says: "QNTX's own template, filled when a plugin names none: its subject, html and text, and the values it takes."},
 						{Name: "templates", Says: "One row per plugin and name: its attestation, when it was set, the plugin, its version, the name, and the subject, html and text."},
+						{Name: "node", Says: "The mail the node writes itself, whole: not filled from any template, and named here so it is not missing."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: mailTemplatesPath},
 				},
@@ -123,6 +125,16 @@ func (s *QNTXServer) mailSignum() sigil.Signum {
 					},
 					Http: &protocol.Endpoint{Method: http.MethodPost, Path: mailReportPath},
 				},
+				{
+					Name: "message",
+					Does: "One mail whole, as it was sent: who it went to and from, its subject, its html and text, and the images the html shows.",
+					Takes: []*protocol.Param{
+						{Name: "id", Required: true, Says: "The mail's attestation, as the sent list names it."},
+						{Name: "user", Required: true, Says: "The User it went to, as the sent list names it."},
+					},
+					Gives: []*protocol.Field{{Name: "mail", Says: "The mail: its row in the sent list, the address it was sent from, its html and text, and each image the html shows by cid, whole, as base64. A mail attested before its images were kept names none."}},
+					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: mailMessagePath},
+				},
 			},
 		},
 		Answers: map[string]sigil.Answer{
@@ -130,6 +142,7 @@ func (s *QNTXServer) mailSignum() sigil.Signum {
 			"templates": s.mailTemplates,
 			"account":   s.mailAccount,
 			"report":    s.mailReport,
+			"message":   s.mailMessage,
 		},
 	}
 }
@@ -225,6 +238,10 @@ func (s *QNTXServer) mailTemplates(_ context.Context, _ sigil.Sent) (any, *proto
 			Values: []string{"subject", "body", "link (not required)", "link_label (not required)"},
 		},
 		"templates": []mailTemplateRow{},
+		"node": []nodeMailRow{{
+			Name: reportHandlerName,
+			Says: "The weekly report to the ROOT User (ADR-042), written whole by the node. What it looked like is the mail itself, under Sent.",
+		}},
 	}
 
 	store := s.mailRecords()
@@ -306,6 +323,90 @@ func (s *QNTXServer) mailAccount(ctx context.Context, _ sigil.Sent) (any, *proto
 	}
 	answer["account"] = account
 	return answer, nil
+}
+
+// nodeMailRow is one mail the node writes itself, whole.
+type nodeMailRow struct {
+	Name string `json:"name"`
+	Says string `json:"says"`
+}
+
+// mailImage is one image a mail's html shows by cid, whole.
+type mailImage struct {
+	ContentID   string `json:"content_id"`
+	ContentType string `json:"content_type"`
+	Data        string `json:"data"`
+}
+
+// mailMessage is one mail whole, as it was sent.
+type mailMessage struct {
+	mailRow
+	From   string      `json:"from"`
+	HTML   string      `json:"html"`
+	Text   string      `json:"text"`
+	Images []mailImage `json:"images"`
+}
+
+// "i would have expected to be able to click the main and see exactly what was sent."
+func (s *QNTXServer) mailMessage(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	store := s.mailRecords()
+	if store == nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no store the mail service attests into"}
+	}
+	id, user := sent["id"], sent["user"]
+	for _, predicate := range []string{services.PredicateMailSent, services.PredicateMailFailed} {
+		found, err := store.GetAttestations(ats.AttestationFilter{
+			Predicates: []string{predicate},
+			Subjects:   []string{user},
+			Limit:      storage.MaxAttestationLimit,
+		})
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the mail to " + user + " could not be read: " + err.Error()}
+		}
+		for _, as := range found {
+			if as.ID != id || !slices.Contains(as.Predicates, predicate) {
+				continue
+			}
+			m := mailMessage{
+				mailRow: mailRowOf(as, predicate == services.PredicateMailSent),
+				From:    attr(as, "from"),
+				HTML:    attr(as, "html"),
+				Text:    attr(as, "text"),
+				Images:  imagesOf(as),
+			}
+			return map[string]any{"mail": m}, nil
+		}
+	}
+	return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "id", Says: "no mail " + id + " to " + user}
+}
+
+// imagesOf reads back the images a mail was sent with. None is a mail that had
+// none, or one attested before they were kept.
+func imagesOf(as *types.As) []mailImage {
+	images := []mailImage{}
+	kept, ok := as.Attributes["images"].([]any)
+	if !ok {
+		return images
+	}
+	for _, entry := range kept {
+		img, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		images = append(images, mailImage{
+			ContentID:   attrOf(img, "content_id"),
+			ContentType: attrOf(img, "content_type"),
+			Data:        attrOf(img, "data"),
+		})
+	}
+	return images
+}
+
+func attrOf(m map[string]any, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
 }
 
 func (s *QNTXServer) mailReport(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {

@@ -44,6 +44,23 @@ export interface MailTemplateRow {
 export interface MailTemplates {
     neutral: MailTemplateRow;
     templates: MailTemplateRow[];
+    /** The mail the node writes itself, whole: not filled from a template. */
+    node: { name: string; says: string }[];
+}
+
+/** One image a mail's html shows by cid, whole. */
+export interface MailImage {
+    content_id: string;
+    content_type: string;
+    data: string;
+}
+
+/** One mail whole, as /api/mail/message gives it. */
+export interface MailMessage extends MailRow {
+    from: string;
+    html: string;
+    text: string;
+    images: MailImage[];
 }
 
 /** What SES says of the account, as /api/mail/account gives it. */
@@ -169,6 +186,12 @@ export function renderTemplates(container: HTMLElement, t: MailTemplates): void 
     neutral.appendChild(templateParts(t.neutral));
     s.appendChild(neutral);
 
+    // The node's own mail is written whole, so it has no template to show;
+    // it is named, and what it looked like is the mail itself under Sent.
+    for (const own of t.node ?? []) {
+        s.appendChild(row(`${own.name}:`, own.says));
+    }
+
     if (t.templates.length === 0) {
         s.appendChild(said('No plugin has set a template.'));
         container.appendChild(s);
@@ -242,6 +265,9 @@ export function renderSent(container: HTMLElement, mails: MailRow[]): void {
     const tbody = document.createElement('tbody');
     for (const m of mails) {
         const tr = document.createElement('tr');
+        // Pressing a mail opens it as it was sent.
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', () => { openMailMessage(m); });
         const when = cell(fmt(m.at), 'element-time');
         // The attestation is the mail's record, and its id is on the row.
         when.title = m.id;
@@ -257,6 +283,84 @@ export function renderSent(container: HTMLElement, mails: MailRow[]): void {
     table.appendChild(tbody);
     s.appendChild(table);
     container.appendChild(s);
+}
+
+// "i would have expected to be able to click the main and see exactly what was sent."
+
+/** Exported for tests: the html as sent, with each cid: it shows swapped for
+ *  the image it was sent with. A cid with no kept image is left as it is. */
+export function inlineImages(html: string, images: MailImage[]): string {
+    let shown = html;
+    for (const img of images) {
+        shown = shown.split(`cid:${img.content_id}`).join(`data:${img.content_type};base64,${img.data}`);
+    }
+    return shown;
+}
+
+/** Exported for tests: one mail, drawn as it went out. The html is shown in a
+ *  sandboxed frame, where no script runs and none of its styles reach QNTX. */
+export function renderMessage(container: HTMLElement, m: MailMessage): void {
+    container.innerHTML = '';
+    const head = section(m.subject || '(no subject)');
+    head.appendChild(row('When:', fmt(m.at)));
+    head.appendChild(row('From:', m.from));
+    head.appendChild(row('To:', `${m.to} (${m.user})`));
+    head.appendChild(row('Sent by:', m.plugin));
+    head.appendChild(row('Template:', m.template));
+    head.appendChild(row('Outcome:', m.sent ? `sent — ${m.message_id}` : `refused — ${m.error}`));
+    head.appendChild(row('Attestation:', m.id));
+    container.appendChild(head);
+
+    const shown = inlineImages(m.html, m.images);
+    if (shown.includes('cid:')) {
+        container.appendChild(said('Some images of this mail were not kept: it was sent before they were.'));
+    }
+    if (m.html) {
+        const frame = document.createElement('iframe');
+        frame.className = 'mail-message-html';
+        frame.setAttribute('sandbox', '');
+        frame.srcdoc = shown;
+        frame.style.width = '100%';
+        frame.style.height = '480px';
+        frame.style.border = '1px solid var(--border-color, #ddd)';
+        frame.style.background = '#ffffff';
+        container.appendChild(frame);
+    }
+    if (m.text) {
+        const text = section('Text');
+        const pre = document.createElement('pre');
+        pre.textContent = m.text;
+        pre.style.whiteSpace = 'pre-wrap';
+        pre.style.overflowWrap = 'break-word';
+        text.appendChild(pre);
+        container.appendChild(text);
+    }
+}
+
+/** Opens one mail as its own element. */
+export function openMailMessage(m: MailRow): void {
+    const elementId = `mail-message-${m.id}`;
+    if (tray.has(elementId)) {
+        tray.open(elementId);
+        return;
+    }
+    tray.add({
+        id: elementId,
+        title: m.subject || m.id,
+        symbol: '✉',
+        onClose: () => { tray.remove(elementId); },
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.style.padding = '12px';
+            content.appendChild(said('Loading the mail…'));
+            const query = `id=${encodeURIComponent(m.id)}&user=${encodeURIComponent(m.user)}`;
+            apiJson<{ mail: MailMessage }>(`/api/mail/message?${query}`)
+                .then((r) => renderMessage(content, r.mail))
+                .catch((err: unknown) => refused(content, 'this mail', err));
+            return content;
+        },
+    } satisfies Element);
+    tray.open(elementId);
 }
 
 /** A section the node did not answer for says what it said instead, and the
