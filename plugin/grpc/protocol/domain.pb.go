@@ -239,6 +239,9 @@ type InitializeRequest struct {
 	// fetch_endpoint: gRPC endpoint for [FetchService](https://qntx.sbvh.nl/api/grpc-fetch.html)
 	// Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay pure orchestration
 	FetchEndpoint string `protobuf:"bytes,12,opt,name=fetch_endpoint,json=fetchEndpoint,proto3" json:"fetch_endpoint,omitempty"`
+	// mail_endpoint: gRPC endpoint for MailService (plugin/grpc/protocol/mail.proto, ADR-041)
+	// Provides: mail to a User, from the plugin's template — QNTX sends and attests
+	MailEndpoint  string `protobuf:"bytes,13,opt,name=mail_endpoint,json=mailEndpoint,proto3" json:"mail_endpoint,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -353,6 +356,13 @@ func (x *InitializeRequest) GetSearchEndpoint() string {
 func (x *InitializeRequest) GetFetchEndpoint() string {
 	if x != nil {
 		return x.FetchEndpoint
+	}
+	return ""
+}
+
+func (x *InitializeRequest) GetMailEndpoint() string {
+	if x != nil {
+		return x.MailEndpoint
 	}
 	return ""
 }
@@ -1631,7 +1641,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fqntx_version\x18\x03 \x01(\tR\vqntxVersion\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06author\x18\x05 \x01(\tR\x06author\x12\x18\n" +
-	"\alicense\x18\x06 \x01(\tR\alicense\"\xe5\x04\n" +
+	"\alicense\x18\x06 \x01(\tR\alicense\"\x8a\x05\n" +
 	"\x11InitializeRequest\x12,\n" +
 	"\x12ats_store_endpoint\x18\x01 \x01(\tR\x10atsStoreEndpoint\x12%\n" +
 	"\x0equeue_endpoint\x18\x02 \x01(\tR\rqueueEndpoint\x12\x1d\n" +
@@ -1646,7 +1656,8 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x0fground_endpoint\x18\n" +
 	" \x01(\tR\x0egroundEndpoint\x12'\n" +
 	"\x0fsearch_endpoint\x18\v \x01(\tR\x0esearchEndpoint\x12%\n" +
-	"\x0efetch_endpoint\x18\f \x01(\tR\rfetchEndpoint\x1a9\n" +
+	"\x0efetch_endpoint\x18\f \x01(\tR\rfetchEndpoint\x12#\n" +
+	"\rmail_endpoint\x18\r \x01(\tR\fmailEndpoint\x1a9\n" +
 	"\vConfigEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"}\n" +

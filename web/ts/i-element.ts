@@ -20,6 +20,7 @@ import { openTokensElement } from './tokens-element.ts';
 import { openRolesElement } from './roles-element.ts';
 import { openUsersElement } from './users-element.ts';
 import { openMarketElement } from './market-element.ts';
+import { openMailElement } from './mail-element.ts';
 
 // Who the node thinks is looking, and what it said instead when it would not
 // say. Both empty is nothing asked yet, which draws no section at all.
@@ -119,6 +120,11 @@ function renderI(): void {
             openMarketElement();
         });
         actions.appendChild(marketBtn.element);
+        // What the node mails on plugins' behalf is ROOT's to watch (ADR-041).
+        const mailBtn = createGhostButton('✉ Mail', async () => {
+            openMailElement();
+        });
+        actions.appendChild(mailBtn.element);
     }
 
     // The switch on the person (ADR-031), once the node has said who is looking.

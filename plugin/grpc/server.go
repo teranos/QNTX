@@ -194,6 +194,11 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		if req.EmbeddingEndpoint != "" {
 			pluginConfig["_embedding_endpoint"] = req.EmbeddingEndpoint
 		}
+		// A Go plugin reaches MailService by dialing this with the auth token
+		// (ADR-041), the way qntx-atproto dials the embedding endpoint.
+		if req.MailEndpoint != "" {
+			pluginConfig["_mail_endpoint"] = req.MailEndpoint
+		}
 		if req.AuthToken != "" {
 			pluginConfig["_auth_token"] = req.AuthToken
 		}

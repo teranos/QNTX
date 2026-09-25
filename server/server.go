@@ -75,6 +75,16 @@ type QNTXServer struct {
 	pluginManager       *grpcplugin.PluginManager   // Plugin process manager
 	services            plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+	// What the mail service was wired with (ADR-041), read back by the mail
+	// signum so ROOT sees what sends and not what am.toml says since.
+	mailConfig config.MailConfig
+	// Sentry as am.toml names it, read back for the weekly report (ADR-042).
+	// The token is resolved when a report is written, so one created after the
+	// node started is read by the next report.
+	sentryConfig      config.SentryConfig
+	sentryEnvironment string
+	// What sends the node's own mail; nil when the mail service did not start.
+	nodeMailer nodeMailer
 	// The calls plugins are answering: the token handed for each, and the store
 	// of the caller it was handed for (plugin_sigils.go).
 	callStores sync.Map

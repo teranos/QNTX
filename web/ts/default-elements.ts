@@ -19,6 +19,7 @@ import { createTokensElement } from './tokens-element.ts';
 import { createRolesElement } from './roles-element.ts';
 import { createUsersElement } from './users-element.ts';
 import { createMarketElement } from './market-element.ts';
+import { createMailElement } from './mail-element.ts';
 import { createIElement } from './i-element.ts';
 import { createAmElement } from './am-element.ts';
 import { log, SEG } from './logger.ts';
@@ -59,6 +60,9 @@ export function registerDefaultElements(): void {
 
     // Stands Element — every stand across markets (ADR-035)
     tray.add(createMarketElement());
+
+    // Mail Element — what the node mails on plugins' behalf, opened from ⍟ (ADR-041)
+    tray.add(createMailElement());
 
     // Usage & Cost Chart Element
     // TODO(future): Budget alerting with notifications

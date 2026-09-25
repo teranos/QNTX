@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// MailService sends mail to a User on a plugin's behalf (ADR-041).
+// QNTX finds the User's primary address, fills the template, sends the mail
+// and attests it — a plugin never holds an address or a credential to send with.
+service MailService {
+  // SetTemplate keeps one of the plugin's templates under a name, attested.
+  // The newest template under a name is the one a Send fills.
+  rpc SetTemplate(SetMailTemplateRequest) returns (SetMailTemplateResponse);
+
+  // Send mails one User from a template, and attests what was sent.
+  rpc Send(SendMailRequest) returns (SendMailResponse);
+}
+
+// MailTemplate is what a mail is filled from. Each part is a Go template over
+// the values a Send names: subject and text with text/template, html with
+// html/template. A value a template names and the Send does not is a refusal,
+// never an empty space in a mail that went out.
+message MailTemplate {
+  string subject = 1;
+  string html = 2;
+  string text = 3;
+}
+
+message SetMailTemplateRequest {
+  string auth_token = 1;
+  string source = 2;          // The plugin setting it. A plugin's templates are its own.
+  string name = 3;            // The template's name within the plugin.
+  MailTemplate template = 4;
+}
+
+message SetMailTemplateResponse {
+  bool success = 1;
+  string error = 2;
+  string attestation_id = 3;  // The attestation the template is kept as.
+}
+
+message SendMailRequest {
+  string auth_token = 1;
+  string source = 2;               // The plugin sending.
+  string user_id = 3;              // The User it goes to. Their primary address is the one used.
+  string template = 4;             // A name the plugin set. Empty is QNTX's neutral template.
+  map<string, string> values = 5;  // What the template is filled with.
+}
+
+message SendMailResponse {
+  bool success = 1;
+  string error = 2;
+  string message_id = 3;       // The id the transport gave the mail.
+  string attestation_id = 4;   // The attestation of the mail.
+}

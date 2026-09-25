@@ -77,6 +77,15 @@ func (u User) SwitchedOff() bool {
 	return u.DisabledBy != ""
 }
 
+// PrimaryEmail is the address mail to this User goes to (ADR-041): the first
+// one they supplied. Empty is a User who gave none.
+func (u User) PrimaryEmail() string {
+	if len(u.EmailAddresses) == 0 {
+		return ""
+	}
+	return u.EmailAddresses[0]
+}
+
 // Reaches reports whether an auth.root_identities entry reaches this User. A
 // route is a did:key or an account's canonical_id, so both are asked.
 func (u User) Reaches(route string) bool {

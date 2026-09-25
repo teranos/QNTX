@@ -371,6 +371,15 @@ func (q *Queue) ListJobs(status *JobStatus, limit int) ([]*Job, error) {
 	return q.store.ListJobs(status, limit)
 }
 
+// FailedHandlersSince is the handlers whose jobs failed since a time, most
+// failures first (Store.FailedHandlersSince).
+func (q *Queue) FailedHandlersSince(since time.Time, limit int) ([]HandlerFailures, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	return q.store.FailedHandlersSince(since, limit)
+}
+
 // ListActiveJobs returns all active (queued, running, paused) jobs
 func (q *Queue) ListActiveJobs(limit int) ([]*Job, error) {
 	q.mu.RLock()

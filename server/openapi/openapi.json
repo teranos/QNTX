@@ -199,6 +199,31 @@
       ],
       "x-qntx-prefix": true
     },
+    "/api/mail": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/mail/account": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/mail/message": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/mail/report": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/mail/templates": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/namespaces": {
       "x-qntx-reach": [
         "ROOT",

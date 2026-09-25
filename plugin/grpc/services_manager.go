@@ -31,6 +31,7 @@ type ServiceEndpoints struct {
 	GroundAddress       string
 	SearchAddress       string
 	FetchAddress        string
+	MailAddress         string
 	AuthToken           string
 }
 
@@ -55,6 +56,8 @@ type ServicesManager struct {
 	fetchServer        *grpc.Server
 	fetchSrv           *services.FetchServer // for version resolver injection
 	fetchCfg           config.FetchConfig
+	mailServer         *grpc.Server
+	mailSrv            *services.MailServer // wired once the node has Users and its DID
 	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
 
@@ -196,6 +199,13 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		fetchAddr = ""
 	}
 
+	// Start Mail service (sends nothing until the node wires it: ADR-041)
+	mailAddr, err := m.startMailService(ctx, authToken)
+	if err != nil {
+		m.noteDegraded("mail", err)
+		mailAddr = ""
+	}
+
 	m.endpoints = ServiceEndpoints{
 		ATSStoreAddress:     atsStoreAddr,
 		QueueAddress:        queueAddr,
@@ -207,6 +217,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		GroundAddress:       groundAddr,
 		SearchAddress:       searchAddr,
 		FetchAddress:        fetchAddr,
+		MailAddress:         mailAddr,
 		AuthToken:           authToken,
 	}
 
@@ -438,6 +449,38 @@ func (m *ServicesManager) startFetchService(ctx context.Context, store ats.Attes
 	return addr, nil
 }
 
+func (m *ServicesManager) startMailService(ctx context.Context, authToken string) (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to listen")
+	}
+
+	m.mailSrv = services.NewMailServer(authToken, m.logger)
+	m.mailServer = grpc.NewServer()
+	protocol.RegisterMailServiceServer(m.mailServer, m.mailSrv)
+
+	m.serve(ctx, "Mail", m.mailServer, listener)
+
+	addr := listener.Addr().String()
+	m.logger.Debugw("Mail service started", "address", addr)
+
+	return addr, nil
+}
+
+// MailServer is the mail service, for what the node mails in its own name
+// (ADR-042). Nil when it did not start.
+func (m *ServicesManager) MailServer() *services.MailServer {
+	return m.mailSrv
+}
+
+// SetMail hands the mail service what it sends with. Until then a plugin
+// asking to send is told the node has not finished starting.
+func (m *ServicesManager) SetMail(w services.MailWiring) {
+	if m.mailSrv != nil {
+		m.mailSrv.Wire(w)
+	}
+}
+
 // SetVersionResolver installs a source→version resolver on ATSStore and Fetch services.
 // Call after plugin registry is populated so attestations carry source_version automatically.
 func (m *ServicesManager) SetVersionResolver(resolver services.VersionResolver) {
@@ -446,6 +489,9 @@ func (m *ServicesManager) SetVersionResolver(resolver services.VersionResolver) 
 	}
 	if m.fetchSrv != nil {
 		m.fetchSrv.SetVersionResolver(resolver)
+	}
+	if m.mailSrv != nil {
+		m.mailSrv.SetVersionResolver(resolver)
 	}
 }
 
@@ -527,6 +573,10 @@ func (m *ServicesManager) Shutdown() {
 
 	if m.searchServer != nil {
 		m.searchServer.GracefulStop()
+	}
+
+	if m.mailServer != nil {
+		m.mailServer.GracefulStop()
 	}
 
 	m.logger.Info("Plugin services stopped")

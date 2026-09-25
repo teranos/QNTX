@@ -38,6 +38,42 @@ func (h *Handler) StandingOf(userID string) string {
 	return u.Standing
 }
 
+// UserByID is the User an id names, for the node's own services: mail goes to a
+// User by id (ADR-041). A node without login keeps no Users, and says so.
+func (h *Handler) UserByID(id string) (User, bool, error) {
+	if h == nil || h.users == nil {
+		return User{}, false, errors.New("this node keeps no Users")
+	}
+	return h.userByID(id)
+}
+
+// Users is every User the node keeps, for the node's own reports (ADR-042).
+func (h *Handler) Users() ([]User, error) {
+	if h == nil || h.users == nil {
+		return nil, errors.New("this node keeps no Users")
+	}
+	held, err := h.users.List()
+	if err != nil {
+		return nil, errors.Wrap(err, "the User store did not list its Users")
+	}
+	return held, nil
+}
+
+// RootUser is the one User the root identities reach (ADR-031). False is a
+// node nobody has claimed yet.
+func (h *Handler) RootUser() (User, bool, error) {
+	held, err := h.Users()
+	if err != nil {
+		return User{}, false, err
+	}
+	for _, u := range held {
+		if u.Level == LevelRoot {
+			return u, true, nil
+		}
+	}
+	return User{}, false, nil
+}
+
 func (h *Handler) userByID(id string) (User, bool, error) {
 	held, err := h.users.List()
 	if err != nil {

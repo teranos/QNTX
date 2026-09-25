@@ -53,6 +53,11 @@ var storeWriters = map[string]string{
 	"HandleStaand": "the one ANYONE route that writes: WriteAsPublic refuses system " +
 		"and default before a store exists to write to",
 
+	"mailRecords": "the mail the node sent on a plugin's behalf and the templates it fills. " +
+		"A mail names a User, and no User is visible below SUPER, so it lands with what the " +
+		"node knows of itself. Only a plugin holding the node's service token reaches the " +
+		"writer, and ROOT alone governs what plugins call (ADR-041)",
+
 	"systemAttestor": "what the node writes about itself at the door. The /auth/… routes " +
 		"are ANYONE because logging in cannot ask you to be logged in, so no admission " +
 		"stands behind this one. The closed predicate vocabulary in server/auth does",
