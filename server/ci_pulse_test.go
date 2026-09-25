@@ -17,10 +17,11 @@ import (
 // A GitHub that answers from a script: the branch's history once, then the
 // commit's runs for each ask until they conclude. Every ask is remembered.
 type scriptedGitHub struct {
-	history string
-	commits []string
-	asked   []string
-	tokens  []string
+	history    string
+	commits    []string
+	dispatched []string
+	asked      []string
+	tokens     []string
 }
 
 const wholeSha = "abc123def4567890abc123def4567890abc123de"
@@ -34,6 +35,15 @@ func (g *scriptedGitHub) get(_ context.Context, token, url string) ([]byte, erro
 	// The commits endpoint answers a prefix with the whole sha.
 	if strings.Contains(url, "/commits/abc123") {
 		return []byte(`{"sha":"` + wholeSha + `"}`), nil
+	}
+	// The dispatched listing answers a name, not a sha.
+	if strings.Contains(url, "event=workflow_dispatch") {
+		if len(g.dispatched) == 0 {
+			return []byte(`{"workflow_runs":[]}`), nil
+		}
+		next := g.dispatched[0]
+		g.dispatched = g.dispatched[1:]
+		return []byte(next), nil
 	}
 	if len(g.commits) == 0 {
 		return []byte(`{"workflow_runs":[]}`), nil
@@ -331,5 +341,95 @@ func TestCIWatchRefusesARowWithNoRepo(t *testing.T) {
 	h := handlerOver(&scriptedGitHub{history: noHistory()}, newNewsLog())
 	if err := h.Execute(context.Background(), jobFor(t, as)); err == nil {
 		t.Fatal("a row naming no repo was accepted")
+	}
+}
+
+// A rite dispatched a workflow and the walk moved on. The run lands on the
+// default branch with no sha to find it by, so it is found by the name ground
+// gave it, and the verdict goes back the way a push's does. Sky asked github
+// for this from the laptop every five seconds; the laptop asks nothing now.
+func dispatchAs(actor string) *types.As {
+	return &types.As{
+		ID:         "immediate:dispatch:sess-1:q-deploy-1790:TARGET",
+		Subjects:   []string{"dispatch"},
+		Predicates: []string{watcher.DispatchSentPredicate},
+		Contexts:   []string{"session:sess-1"},
+		Actors:     []string{actor, "ground"},
+		Timestamp:  time.Now().Add(-10 * time.Second),
+		Attributes: map[string]interface{}{
+			"repo":  "sbvh-nl/q.sbvh.nl",
+			"token": "q-deploy-1790:TARGET",
+		},
+	}
+}
+
+func TestCIWatchWatchesADispatchedRunByItsName(t *testing.T) {
+	ours := "https://github.com/sbvh-nl/q.sbvh.nl/actions/runs/9"
+	gh := &scriptedGitHub{
+		dispatched: []string{
+			// Not listed yet: a run does not appear the instant it is sent.
+			runsJSON(aRun("deploy other-1789:TARGET", "completed", "success", "u0")),
+			runsJSON(aRun("deploy q-deploy-1790:TARGET", "in_progress", "", ours),
+				aRun("deploy other-1789:TARGET", "completed", "success", "u0")),
+			runsJSON(aRun("deploy q-deploy-1790:TARGET", "completed", "success", ours),
+				aRun("deploy other-1789:TARGET", "completed", "success", "u0")),
+		},
+	}
+	news := newNewsLog()
+	h := handlerOver(gh, news)
+
+	if err := h.Execute(context.Background(), jobFor(t, dispatchAs("did:key:alice"))); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
+	if len(got) != 1 {
+		t.Fatalf("news for alice: %d items, want 1: %+v", len(got), got)
+	}
+	n := got[0]
+	if n.ID != "immediate:dispatch:sess-1:q-deploy-1790:TARGET" {
+		t.Errorf("id %q; want the row's own, one row per dispatch already", n.ID)
+	}
+	if !strings.Contains(n.Item.Note, "success") || !strings.Contains(n.Item.Note, "q-deploy-1790:TARGET") {
+		t.Errorf("note %q says neither the conclusion nor the run's name", n.Item.Note)
+	}
+	if n.Detail["url"] != ours || n.Detail["conclusion"] != "success" || n.Detail["token"] != "q-deploy-1790:TARGET" {
+		t.Errorf("detail %v", n.Detail)
+	}
+	for _, u := range gh.asked {
+		if strings.Contains(u, "head_sha") || strings.Contains(u, "/commits/") || strings.Contains(u, "branch=") {
+			t.Errorf("a dispatched run was looked for by a sha or branch it does not have: %q", u)
+		}
+		if !strings.Contains(u, "event=workflow_dispatch") {
+			t.Errorf("asked %q; a dispatched run is among the dispatched", u)
+		}
+	}
+	if len(gh.asked) != 3 {
+		t.Errorf("github was asked %d times: %v", len(gh.asked), gh.asked)
+	}
+}
+
+// A dispatched run that never appears is said so, not waited on for the
+// push ceiling: ground gave up at sixty seconds and said "no run carries the
+// name ground gave it", and that is what comes back.
+func TestCIWatchSaysWhenNoRunCarriesTheName(t *testing.T) {
+	gh := &scriptedGitHub{}
+	news := newNewsLog()
+	h := handlerOver(gh, news)
+	as := dispatchAs("did:key:alice")
+	as.Timestamp = time.Now().Add(-2 * dispatchAppear)
+
+	if err := h.Execute(context.Background(), jobFor(t, as)); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
+	if len(got) != 1 {
+		t.Fatalf("news for alice: %d items, want 1: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Item.Note, "no run carries the name") {
+		t.Errorf("note %q", got[0].Item.Note)
+	}
+	if got[0].Item.Symbol != SymbolUnwell {
+		t.Errorf("an absent run drew %q", got[0].Item.Symbol)
 	}
 }

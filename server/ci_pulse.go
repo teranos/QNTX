@@ -196,16 +196,25 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 	}
 
 	repo := attrString(as.Attributes, "repo")
-	branch := attrString(as.Attributes, "branch")
-	sha := attrString(as.Attributes, "sha")
-	if repo == "" || branch == "" || sha == "" {
-		return errors.Newf("ci.watch: attestation %s names no push: repo=%q branch=%q sha=%q", as.ID, repo, branch, sha)
-	}
 	if len(as.Actors) == 0 || as.Actors[0] == "" {
 		return errors.Newf("ci.watch: attestation %s has no actor to address the result to", as.ID)
 	}
 	caller := as.Actors[0]
 	addressee := h.addressee(caller)
+
+	// A rite's dispatch names its run and nothing else: no branch, no sha.
+	if token := attrString(as.Attributes, "token"); token != "" {
+		if repo == "" {
+			return errors.Newf("ci.watch: attestation %s names a dispatched run and no repo", as.ID)
+		}
+		return h.watchDispatch(ctx, as, addressee, caller, repo, token)
+	}
+
+	branch := attrString(as.Attributes, "branch")
+	sha := attrString(as.Attributes, "sha")
+	if repo == "" || branch == "" || sha == "" {
+		return errors.Newf("ci.watch: attestation %s names no push: repo=%q branch=%q sha=%q", as.ID, repo, branch, sha)
+	}
 	shortSha := sha
 	if len(shortSha) > 7 {
 		shortSha = shortSha[:7]
@@ -357,6 +366,142 @@ func (h *ciWatchHandler) fullSha(ctx context.Context, token, repo, sha string) (
 
 // A push starts one run per workflow file. Thirty covers a dozen workflows.
 const ciRunsPage = "30"
+
+// dispatchAppear is how long a dispatched run may take to be listed before
+// its absence is the answer. ground's number, kept.
+const dispatchAppear = 60 * time.Second
+
+// dispatchPoll is how long a listed run that is still going is left before it
+// is asked after again. One number: no history is read to pick it.
+const dispatchPoll = 5 * time.Second
+
+// watchDispatch waits on a run a rite sent. A workflow_dispatch run lands on
+// the default branch, not on any commit ground knows, so it is found among the
+// dispatched by the name ground gave it. The walk on the laptop moved on the
+// instant the dispatch was accepted; the row is the only record an outcome is
+// owed, and this is where it is answered.
+func (h *ciWatchHandler) watchDispatch(ctx context.Context, as types.As, addressee, caller, repo, token string) error {
+	sentAt := as.Timestamp
+	if sentAt.IsZero() {
+		sentAt = time.Now()
+	}
+	watchingID := as.ID + ":watching"
+	h.watching(watchingID, addressee, "watching "+token)
+	defer h.news.drop(watchingID)
+
+	ghToken, err := h.token(ctx)
+	if err != nil {
+		return errors.Wrap(err, "ci.watch")
+	}
+
+	deadline := time.Now().Add(ciWatchCeiling)
+	for {
+		runs, err := h.runsDispatched(ctx, ghToken, repo, token)
+		var spent rateLimited
+		if errors.As(err, &spent) {
+			wait := time.Until(spent.reset) + time.Second
+			if wait < time.Second {
+				wait = time.Second
+			}
+			h.watching(watchingID, addressee, "quota until "+spent.reset.UTC().Format("15:04")+" "+token)
+			if err := h.sleep(ctx, wait); err != nil {
+				return errors.Wrapf(err, "ci.watch: stopped waiting on %s", token)
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if len(runs) == 0 {
+			// Not there yet is not not coming, for a minute.
+			if time.Since(sentAt) < dispatchAppear {
+				if err := h.sleep(ctx, 2*time.Second); err != nil {
+					return errors.Wrapf(err, "ci.watch: stopped waiting on %s", token)
+				}
+				continue
+			}
+			h.leaveDispatch(as, addressee, caller, repo, token, nil)
+			return nil
+		}
+		if allConcluded(runs) {
+			h.leaveDispatch(as, addressee, caller, repo, token, runs)
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return errors.Newf("ci.watch: %s still running after %s", token, ciWatchCeiling)
+		}
+		if err := h.sleep(ctx, dispatchPoll); err != nil {
+			return errors.Wrapf(err, "ci.watch: stopped waiting on %s", token)
+		}
+	}
+}
+
+// runsDispatched is every dispatched run whose name ends with the name ground
+// gave it. The listing is the repo's recent dispatches; the match is ground's.
+func (h *ciWatchHandler) runsDispatched(ctx context.Context, ghToken, repo, name string) ([]ciRun, error) {
+	url := githubAPI + "/repos/" + repo + "/actions/runs?event=workflow_dispatch&per_page=40"
+	out, err := h.get(ctx, ghToken, url)
+	if err != nil {
+		return nil, errors.Wrapf(err, "ci.watch: asking github for the dispatched runs of %s", repo)
+	}
+	var listed ciRuns
+	if err := json.Unmarshal(out, &listed); err != nil {
+		return nil, errors.Wrapf(err, "ci.watch: github answered for %s with something other than runs: %q", repo, firstN(string(out), 200))
+	}
+	ours := make([]ciRun, 0, 1)
+	for _, r := range listed.WorkflowRuns {
+		if strings.HasSuffix(r.Name, name) {
+			ours = append(ours, r)
+		}
+	}
+	return ours, nil
+}
+
+// leaveDispatch puts the run's conclusion on the row, or the fact that no run
+// ever carried the name, in ground's own words for it.
+func (h *ciWatchHandler) leaveDispatch(as types.As, addressee, caller, repo, token string, runs []ciRun) {
+	note := "no run carries the name ground gave it: " + token
+	symbol := SymbolUnwell
+	conclusion := "absent"
+	url := ""
+	if len(runs) > 0 {
+		var failed []ciRun
+		conclusion, failed = verdict(runs)
+		if conclusion == "success" {
+			symbol = SymbolWell
+		}
+		note = conclusion + " " + token
+		url = runs[0].URL
+		if len(failed) > 0 {
+			url = failed[0].URL
+		}
+	}
+	session := ""
+	for _, c := range as.Contexts {
+		if strings.HasPrefix(c, "session:") {
+			session = strings.TrimPrefix(c, "session:")
+		}
+	}
+	h.news.leave(News{
+		// One row per dispatch already: the id carries the run's name.
+		ID:  as.ID,
+		For: addressee,
+		Item: StatusItem{
+			Name:   "run",
+			Note:   note,
+			Symbol: symbol,
+		},
+		Detail: map[string]any{
+			"repo":       repo,
+			"token":      token,
+			"conclusion": conclusion,
+			"url":        url,
+			"session":    session,
+			"caller":     caller,
+		},
+		UntilMs: time.Now().Add(newsHold).UnixMilli(),
+	})
+}
 
 // runsFor is every run github has for this commit, none yet included.
 func (h *ciWatchHandler) runsFor(ctx context.Context, token, repo, sha string) ([]ciRun, error) {

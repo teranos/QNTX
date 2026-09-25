@@ -19,6 +19,11 @@ var whyStanding = map[string]string{
 		"here. The laptop cannot be reached from this node, so the waiting on the run and " +
 		"the asking of github happen here, on arrival, and the result goes back on the " +
 		"status line the laptop already polls",
+	StandingDispatchSent: "a rite dispatched a workflow and the walk moved on; the row is the " +
+		"only record an outcome is owed. A dispatched run lands on the default branch with no " +
+		"sha to find it by, so it is found by the name ground gave it, here, where the socket " +
+		"is, and the verdict goes back the way a push's does. Sky asked github for this from the " +
+		"laptop every five seconds",
 }
 
 func TestEveryStandingWatcherSaysWhy(t *testing.T) {

@@ -37,6 +37,15 @@ const CIPushedPredicate = "immediate:ci-status"
 // CIWatchHandlerName is the built-in the row above reaches.
 const CIWatchHandlerName = "ci.watch"
 
+// StandingDispatchSent watches for ground attesting that a rite dispatched a
+// workflow. The run lands on the default branch with no sha to find it by, so
+// the same handler finds it by the name ground gave it.
+const StandingDispatchSent = "standing-dispatch-sent"
+
+// DispatchSentPredicate is what a rite writes the instant a dispatch is
+// accepted and what sky streams here. One spelling, shared with the handler.
+const DispatchSentPredicate = "immediate:dispatch"
+
 // standing is the table. Unexported and copied on the way out: a caller that
 // could reach the rows could edit what every node is born with.
 var standing = []storage.Watcher{
@@ -57,6 +66,18 @@ var standing = []storage.Watcher{
 		// The laptop cannot be reached from here, so the run is waited on here
 		// and the result goes back on the status line the laptop already polls.
 		Filter:            types.AxFilter{Predicates: []string{CIPushedPredicate}},
+		ActionType:        storage.ActionTypeBuiltinExecute,
+		ActionData:        `{"handler_name":"` + CIWatchHandlerName + `"}`,
+		MaxFiresPerSecond: 10,
+		Enabled:           true,
+	},
+	{
+		ID:   StandingDispatchSent,
+		Name: "a rite dispatched a workflow",
+		// The walk moved on and this row is the only record an outcome is
+		// owed. Waited on here by the run's name; the laptop asked github for
+		// it every five seconds before.
+		Filter:            types.AxFilter{Predicates: []string{DispatchSentPredicate}},
 		ActionType:        storage.ActionTypeBuiltinExecute,
 		ActionData:        `{"handler_name":"` + CIWatchHandlerName + `"}`,
 		MaxFiresPerSecond: 10,
