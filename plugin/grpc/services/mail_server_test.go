@@ -67,7 +67,7 @@ func attested(t *testing.T, store ats.AttestationStore, predicate string) []*typ
 }
 
 func neutralSend(user string, values map[string]string) *protocol.SendMailRequest {
-	return &protocol.SendMailRequest{AuthToken: mailToken, Source: "clean", UserId: user, Values: values}
+	return &protocol.SendMailRequest{AuthToken: mailToken, Source: "garden", UserId: user, Values: values}
 }
 
 // "goes to their primary email address if there are multiple."
@@ -100,7 +100,7 @@ func TestTimIsMailedAtHisPrimaryAddressFromTheNeutralTemplate(t *testing.T) {
 	assert.Equal(t, resp.AttestationId, sent[0].ID)
 	assert.Equal(t, []string{"UStim"}, sent[0].Subjects)
 	assert.Equal(t, []string{mailActor}, sent[0].Actors)
-	assert.Equal(t, "clean", sent[0].Source)
+	assert.Equal(t, "garden", sent[0].Source)
 	assert.Equal(t, "tim@defacile.nl", sent[0].Attributes["to"])
 	assert.Equal(t, "Welkom", sent[0].Attributes["subject"])
 	assert.Equal(t, "ses-0001", sent[0].Attributes["message_id"])
@@ -113,7 +113,7 @@ func TestAPluginSetsItsOwnTemplateAndMailsFromIt(t *testing.T) {
 	s, store := wiredMail(t, box, tim)
 
 	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
-		AuthToken: mailToken, Source: "clean", Name: "booking-accepted",
+		AuthToken: mailToken, Source: "garden", Name: "booking-accepted",
 		Template: &protocol.MailTemplate{
 			Subject: "Boeking bevestigd voor {{.date}}",
 			Text:    "Tot {{.date}}.",
@@ -126,11 +126,11 @@ func TestAPluginSetsItsOwnTemplateAndMailsFromIt(t *testing.T) {
 	kept := attested(t, store, PredicateMailTemplate)
 	require.Len(t, kept, 1)
 	assert.Equal(t, set.AttestationId, kept[0].ID)
-	assert.Equal(t, "clean", kept[0].Attributes["plugin"])
+	assert.Equal(t, "garden", kept[0].Attributes["plugin"])
 	assert.Equal(t, "booking-accepted", kept[0].Attributes["name"])
 
 	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
-		AuthToken: mailToken, Source: "clean", UserId: "UStim",
+		AuthToken: mailToken, Source: "garden", UserId: "UStim",
 		Template: "booking-accepted", Values: map[string]string{"date": "maandag 29 september"},
 	})
 	require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestAPluginSetsItsOwnTemplateAndMailsFromIt(t *testing.T) {
 	require.Len(t, box.sent, 1)
 	assert.Equal(t, "Boeking bevestigd voor maandag 29 september", box.sent[0].Subject)
 	assert.Equal(t, "<p>Tot maandag 29 september.</p>", box.sent[0].HTML)
-	assert.Equal(t, "clean/booking-accepted", attested(t, store, PredicateMailSent)[0].Attributes["template"])
+	assert.Equal(t, "garden/booking-accepted", attested(t, store, PredicateMailSent)[0].Attributes["template"])
 }
 
 // Setting a template again is changing it: the newest one under a name is the
@@ -149,7 +149,7 @@ func TestTheNewestTemplateUnderANameIsTheOneFilled(t *testing.T) {
 
 	for _, subject := range []string{"Eerste", "Tweede"} {
 		set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
-			AuthToken: mailToken, Source: "clean", Name: "reminder",
+			AuthToken: mailToken, Source: "garden", Name: "reminder",
 			Template: &protocol.MailTemplate{Subject: subject, Text: "Tot morgen."},
 		})
 		require.NoError(t, err)
@@ -157,7 +157,7 @@ func TestTheNewestTemplateUnderANameIsTheOneFilled(t *testing.T) {
 	}
 
 	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
-		AuthToken: mailToken, Source: "clean", UserId: "UStim", Template: "reminder",
+		AuthToken: mailToken, Source: "garden", UserId: "UStim", Template: "reminder",
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Success, resp.Error)
@@ -171,18 +171,18 @@ func TestAPluginMailsOnlyFromTemplatesItSet(t *testing.T) {
 	s, store := wiredMail(t, box, tim)
 
 	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
-		AuthToken: mailToken, Source: "clean", Name: "welcome",
+		AuthToken: mailToken, Source: "garden", Name: "welcome",
 		Template: &protocol.MailTemplate{Subject: "Welkom", Text: "Hallo."},
 	})
 	require.NoError(t, err)
 	require.True(t, set.Success, set.Error)
 
 	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
-		AuthToken: mailToken, Source: "datapunt", UserId: "UStim", Template: "welcome",
+		AuthToken: mailToken, Source: "orchard", UserId: "UStim", Template: "welcome",
 	})
 	require.NoError(t, err)
 	assert.False(t, resp.Success)
-	assert.Contains(t, resp.Error, "datapunt")
+	assert.Contains(t, resp.Error, "orchard")
 	assert.Contains(t, resp.Error, "welcome")
 	assert.Empty(t, box.sent)
 	assert.Empty(t, attested(t, store, PredicateMailSent))
@@ -221,7 +221,7 @@ func TestATemplateThatDoesNotParseIsNotKept(t *testing.T) {
 	s, store := wiredMail(t, &sentBox{}, tim)
 
 	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
-		AuthToken: mailToken, Source: "clean", Name: "broken",
+		AuthToken: mailToken, Source: "garden", Name: "broken",
 		Template: &protocol.MailTemplate{Subject: "Boeking {{.date", Text: "Hallo."},
 	})
 	require.NoError(t, err)
@@ -283,12 +283,52 @@ func TestAWrongTokenSendsNothing(t *testing.T) {
 	s, _ := wiredMail(t, box, tim)
 
 	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
-		AuthToken: "guessed", Source: "clean", UserId: "UStim",
+		AuthToken: "guessed", Source: "garden", UserId: "UStim",
 		Values: map[string]string{"subject": "Welkom", "body": "Hallo."},
 	})
 	require.NoError(t, err)
 	assert.False(t, resp.Success)
 	assert.Empty(t, box.sent)
+}
+
+// "let's say QNTX also has it's own built in messages it would like to send sometimes via email"
+func TestTheNodeMailsAUserInItsOwnName(t *testing.T) {
+	box := &sentBox{}
+	s, store := wiredMail(t, box, tim)
+
+	messageID, attestationID, err := s.SendAsNode(context.Background(), "UStim", NodeMail{
+		Name: "report.weekly", Subject: "Week 39", Text: "The week.",
+		HTML:   `<p>The week.</p><img src="cid:cpu">`,
+		Inline: []InlineImage{{ContentID: "cpu", ContentType: "image/png", FileName: "cpu.png", Data: []byte{0x89, 'P', 'N', 'G'}}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "ses-0001", messageID)
+
+	require.Len(t, box.sent, 1)
+	assert.Equal(t, "tim@defacile.nl", box.sent[0].To)
+	assert.Equal(t, mailFrom, box.sent[0].From)
+	require.Len(t, box.sent[0].Inline, 1)
+	assert.Equal(t, "cpu", box.sent[0].Inline[0].ContentID)
+
+	sent := attested(t, store, PredicateMailSent)
+	require.Len(t, sent, 1)
+	assert.Equal(t, attestationID, sent[0].ID)
+	assert.Equal(t, NodeSource, sent[0].Source)
+	assert.Equal(t, "report.weekly", sent[0].Attributes["template"])
+	assert.Equal(t, NodeSource, sent[0].Attributes["plugin"])
+	assert.Contains(t, sent[0].Attributes["inline"], "cpu")
+}
+
+// The node is held to what a plugin is held to: no address, no mail.
+func TestTheNodeDoesNotMailAUserWithoutAnAddress(t *testing.T) {
+	box := &sentBox{}
+	s, store := wiredMail(t, box, MailRecipient{ID: "USroot"})
+
+	_, _, err := s.SendAsNode(context.Background(), "USroot", NodeMail{Name: "report.weekly", Subject: "Week 39", Text: "The week."})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no email address")
+	assert.Empty(t, box.sent)
+	assert.Empty(t, attested(t, store, PredicateMailSent))
 }
 
 // Plugins can call before the node has handed the service what it needs.

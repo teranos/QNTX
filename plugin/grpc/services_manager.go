@@ -467,6 +467,12 @@ func (m *ServicesManager) startMailService(ctx context.Context, authToken string
 	return addr, nil
 }
 
+// MailServer is the mail service, for what the node mails in its own name
+// (ADR-042). Nil when it did not start.
+func (m *ServicesManager) MailServer() *services.MailServer {
+	return m.mailSrv
+}
+
 // SetMail hands the mail service what it sends with. Until then a plugin
 // asking to send is told the node has not finished starting.
 func (m *ServicesManager) SetMail(w services.MailWiring) {

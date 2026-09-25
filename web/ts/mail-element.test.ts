@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { fmt, renderAccount, renderSent, renderTemplates, type MailRow, type MailTemplates } from './mail-element';
+import { fmt, renderAccount, renderSent, renderTemplates, reportSentLine, type MailRow, type MailTemplates } from './mail-element';
 
 function mail(overrides: Partial<MailRow> = {}): MailRow {
     return {
@@ -7,7 +7,7 @@ function mail(overrides: Partial<MailRow> = {}): MailRow {
         at: '2026-09-24T14:03:11.123Z',
         user: 'UStim',
         to: 'tim@defacile.nl',
-        plugin: 'clean',
+        plugin: 'garden',
         template: 'neutral',
         subject: 'Welkom',
         sent: true,
@@ -82,7 +82,7 @@ test('the neutral template and each plugin template are shown as source, never r
             values: ['subject', 'body'],
         },
         templates: [{
-            id: 'AS-CLEAN-BOOKING', at: '2026-09-24T14:00:00Z', plugin: 'clean', version: '0.4.1',
+            id: 'AS-GARDEN-BOOKING', at: '2026-09-24T14:00:00Z', plugin: 'garden', version: '0.4.1',
             name: 'booking-accepted', subject: 'Boeking bevestigd voor {{.date}}',
             html: '<p>Tot {{.date}}.</p>', text: 'Tot {{.date}}.', values: [],
         }],
@@ -90,10 +90,16 @@ test('the neutral template and each plugin template are shown as source, never r
     const container = document.createElement('div');
     renderTemplates(container, templates);
     expect(container.textContent).toContain('takes subject, body');
-    expect(container.textContent).toContain('clean v0.4.1');
+    expect(container.textContent).toContain('garden v0.4.1');
     expect(container.textContent).toContain('booking-accepted');
     expect(container.textContent).toContain('<p>Tot {{.date}}.</p>');
     expect(container.querySelector('p')).toBeNull();
+});
+
+// "for a user that is one of the root identities, i want to receive a weekly report."
+test('the report control says where the report went and what SES called it', () => {
+    expect(reportSentLine({ to: 'root@garden.test', message_id: '0100019a-ses', attestation_id: 'AS-X' }))
+        .toBe('Sent to root@garden.test — 0100019a-ses');
 });
 
 test('an attestation time reads to the second', () => {

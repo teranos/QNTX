@@ -53,13 +53,27 @@ func (t SESTransport) Send(ctx context.Context, m OutgoingMail) (string, error) 
 		body.Text = &sestypes.Content{Data: aws.String(m.Text), Charset: aws.String("UTF-8")}
 	}
 
+	// An inline image is referenced from the html by cid:<ContentID>.
+	var inline []sestypes.Attachment
+	for _, img := range m.Inline {
+		inline = append(inline, sestypes.Attachment{
+			FileName:                aws.String(img.FileName),
+			RawContent:              img.Data,
+			ContentType:             aws.String(img.ContentType),
+			ContentId:               aws.String(img.ContentID),
+			ContentDisposition:      sestypes.AttachmentContentDispositionInline,
+			ContentTransferEncoding: sestypes.AttachmentContentTransferEncodingBase64,
+		})
+	}
+
 	out, err := client.SendEmail(ctx, &sesv2.SendEmailInput{
 		FromEmailAddress: aws.String(m.From),
 		Destination:      &sestypes.Destination{ToAddresses: []string{m.To}},
 		Content: &sestypes.EmailContent{
 			Simple: &sestypes.Message{
-				Subject: &sestypes.Content{Data: aws.String(m.Subject), Charset: aws.String("UTF-8")},
-				Body:    body,
+				Subject:     &sestypes.Content{Data: aws.String(m.Subject), Charset: aws.String("UTF-8")},
+				Body:        body,
+				Attachments: inline,
 			},
 		},
 	})

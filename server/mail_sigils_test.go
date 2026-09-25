@@ -84,7 +84,6 @@ func TestOnlyRootReachesTheMailWindow(t *testing.T) {
 	require.NoError(t, err)
 	for _, held := range rootKnowingServer(t).mailSignum().GetSigils() {
 		assert.Equal(t, []string{"ROOT"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
-		assert.Equal(t, http.MethodGet, held.GetHttp().GetMethod(), "the window watches; nothing in it sends")
 	}
 }
 
@@ -94,7 +93,7 @@ func TestTheMailWindowListsWhatWasSentAndWhatWasRefused(t *testing.T) {
 
 	for _, subject := range []string{"Welkom", "Tot morgen"} {
 		resp, err := mail.Send(context.Background(), &protocol.SendMailRequest{
-			AuthToken: "token", Source: "clean", UserId: "UStim",
+			AuthToken: "token", Source: "garden", UserId: "UStim",
 			Values: map[string]string{"subject": subject, "body": "Hallo."},
 		})
 		require.NoError(t, err)
@@ -110,7 +109,7 @@ func TestTheMailWindowListsWhatWasSentAndWhatWasRefused(t *testing.T) {
 		Records: s.mailRecords, Actor: "did:key:z6Mkgardennode",
 	})
 	resp, err := refused.Send(context.Background(), &protocol.SendMailRequest{
-		AuthToken: "token", Source: "clean", UserId: "UStim",
+		AuthToken: "token", Source: "garden", UserId: "UStim",
 		Values: map[string]string{"subject": "Geweigerd", "body": "Hallo."},
 	})
 	require.NoError(t, err)
@@ -130,7 +129,7 @@ func TestTheMailWindowListsWhatWasSentAndWhatWasRefused(t *testing.T) {
 	assert.Equal(t, "ses-Tot morgen", mails[1].MessageID)
 	assert.Equal(t, "UStim", mails[1].User)
 	assert.Equal(t, "tim@defacile.nl", mails[1].To)
-	assert.Equal(t, "clean", mails[1].Plugin)
+	assert.Equal(t, "garden", mails[1].Plugin)
 	assert.Equal(t, services.NeutralTemplateName, mails[1].Template)
 
 	limited, refusal := s.mailSent(asRoot(), sigil.Sent{"limit": "1"})
@@ -144,7 +143,7 @@ func TestTheMailWindowShowsTheNeutralTemplateAndEachPluginsNewest(t *testing.T) 
 
 	for _, subject := range []string{"Eerste", "Tweede"} {
 		set, err := mail.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
-			AuthToken: "token", Source: "clean", Name: "reminder",
+			AuthToken: "token", Source: "garden", Name: "reminder",
 			Template: &protocol.MailTemplate{Subject: subject, Text: "Tot morgen."},
 		})
 		require.NoError(t, err)
@@ -161,7 +160,7 @@ func TestTheMailWindowShowsTheNeutralTemplateAndEachPluginsNewest(t *testing.T) 
 
 	templates := answer.(map[string]any)["templates"].([]mailTemplateRow)
 	require.Len(t, templates, 1, "a template set twice is one template")
-	assert.Equal(t, "clean", templates[0].Plugin)
+	assert.Equal(t, "garden", templates[0].Plugin)
 	assert.Equal(t, "reminder", templates[0].Name)
 	assert.Equal(t, "Tweede", templates[0].Subject)
 }

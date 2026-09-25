@@ -269,12 +269,16 @@ func (wp *WorkerPool) recoverOrphanedJobs() error {
 	return nil
 }
 
+// OrphanedError is what a job a restart cut off is failed with. The restart
+// failed it, not its handler.
+const OrphanedError = "orphaned: server restart while running"
+
 // failOrphanedJob marks an orphaned running job as failed so the scheduler
 // can create a fresh one on its next tick. Re-queuing orphans is unsafe:
 // the job may have partially mutated state before the crash.
 func (wp *WorkerPool) failOrphanedJob(job *Job) error {
 	job.Status = JobStatusFailed
-	job.Error = "orphaned: server restart while running"
+	job.Error = OrphanedError
 	now := time.Now()
 	job.CompletedAt = &now
 

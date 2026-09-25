@@ -11,6 +11,7 @@
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
+import { createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
 
 /** One mail the node sent or tried to, as /api/mail gives it. */
@@ -270,6 +271,37 @@ function refused(container: HTMLElement, what: string, err: unknown): void {
     container.appendChild(box);
 }
 
+/** Where the report went, as /api/mail/report gives it. */
+export interface ReportSent {
+    to: string;
+    message_id: string;
+    attestation_id: string;
+}
+
+/** Exported for tests: what the report control says once the report went. */
+export function reportSentLine(r: ReportSent): string {
+    return `Sent to ${r.to} — ${r.message_id}`;
+}
+
+// "let's say QNTX also has it's own built in messages it would like to send sometimes via email"
+//
+// The weekly report, sent now rather than on its schedule. A refusal throws,
+// and the button slides it out where it was pressed.
+function reportControl(onSent: () => void): HTMLDivElement {
+    const control = document.createElement('div');
+    control.className = 'element-actions';
+    const said = document.createElement('span');
+    said.className = 'element-pill-when';
+    const button = createPrimaryButton('Send the weekly report now', async () => {
+        const r = await apiJson<ReportSent>('/api/mail/report', { method: 'POST' });
+        said.textContent = reportSentLine(r);
+        onSent();
+    });
+    control.appendChild(button.element);
+    control.appendChild(said);
+    return control;
+}
+
 function load(account: HTMLElement, templates: HTMLElement, sent: HTMLElement): void {
     apiJson<MailAccount>('/api/mail/account')
         .then((a) => renderAccount(account, a))
@@ -298,6 +330,11 @@ export function createMailElement(): Element {
             const account = document.createElement('div');
             const templates = document.createElement('div');
             const sent = document.createElement('div');
+            content.appendChild(reportControl(() => {
+                apiJson<{ mails: MailRow[] }>('/api/mail')
+                    .then((r) => renderSent(sent, r.mails))
+                    .catch((err: unknown) => refused(sent, 'what mail it sent', err));
+            }));
             for (const [part, what] of [[account, 'account'], [templates, 'templates'], [sent, 'sent mail']] as const) {
                 part.appendChild(said(`Loading ${what}…`));
                 content.appendChild(part);

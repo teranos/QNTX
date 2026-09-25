@@ -39,4 +39,33 @@ func TestANodeKeepingNoUsersSaysSo(t *testing.T) {
 	var h *Handler
 	_, _, err := h.UserByID("UStim")
 	assert.Error(t, err)
+	_, err = h.Users()
+	assert.Error(t, err)
+	_, _, err = h.RootUser()
+	assert.Error(t, err)
+}
+
+// "for a user that is one of the root identities, i want to receive a weekly report."
+func TestTheRootUserIsTheOneTheRootIdentitiesReach(t *testing.T) {
+	h := &Handler{users: &memUsers{held: []User{
+		{ID: "USspike", Level: LevelPublicRegistration, Namespace: "garden"},
+		{ID: "USroot", Level: LevelRoot, EmailAddresses: []string{"root@garden.test"}},
+	}}}
+
+	root, found, err := h.RootUser()
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "USroot", root.ID)
+
+	everyone, err := h.Users()
+	require.NoError(t, err)
+	assert.Len(t, everyone, 2)
+}
+
+// An unclaimed node has no ROOT User yet, and that is not an error.
+func TestAnUnclaimedNodeHasNoRootUser(t *testing.T) {
+	h := &Handler{users: &memUsers{}}
+	_, found, err := h.RootUser()
+	require.NoError(t, err)
+	assert.False(t, found)
 }

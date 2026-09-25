@@ -24,6 +24,7 @@ const (
 	mailPath          = "/api/mail"
 	mailTemplatesPath = "/api/mail/templates"
 	mailAccountPath   = "/api/mail/account"
+	mailReportPath    = "/api/mail/report"
 
 	// mailSentByDefault is how many mails the window is handed when it names
 	// no limit.
@@ -112,12 +113,23 @@ func (s *QNTXServer) mailSignum() sigil.Signum {
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: mailAccountPath},
 				},
+				{
+					Name: "report",
+					Does: "Send the weekly report to the ROOT User now: the one the node sends on its own schedule (ADR-042).",
+					Gives: []*protocol.Field{
+						{Name: "to", Says: "The address it went to: the ROOT User's primary one."},
+						{Name: "message_id", Says: "The id the transport gave the mail."},
+						{Name: "attestation_id", Says: "The attestation of the mail."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodPost, Path: mailReportPath},
+				},
 			},
 		},
 		Answers: map[string]sigil.Answer{
 			"sent":      s.mailSent,
 			"templates": s.mailTemplates,
 			"account":   s.mailAccount,
+			"report":    s.mailReport,
 		},
 	}
 }
@@ -294,6 +306,14 @@ func (s *QNTXServer) mailAccount(ctx context.Context, _ sigil.Sent) (any, *proto
 	}
 	answer["account"] = account
 	return answer, nil
+}
+
+func (s *QNTXServer) mailReport(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	sent, err := s.sendReport(ctx)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	return sent, nil
 }
 
 // attr is one string attribute of an attestation, or empty.

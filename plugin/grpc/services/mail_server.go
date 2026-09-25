@@ -2,7 +2,11 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -51,7 +55,30 @@ type OutgoingMail struct {
 	Subject string
 	HTML    string
 	Text    string
+	Inline  []InlineImage
 }
+
+// InlineImage is an image the html shows by cid:<ContentID>.
+type InlineImage struct {
+	ContentID   string
+	ContentType string
+	FileName    string
+	Data        []byte
+}
+
+// NodeMail is a mail the node writes itself, whole (ADR-042): no plugin, and
+// no template to fill. Name is what the node calls it, recorded where a
+// plugin's mail records its template.
+type NodeMail struct {
+	Name    string
+	Subject string
+	HTML    string
+	Text    string
+	Inline  []InlineImage
+}
+
+// NodeSource is the source of what the node mails in its own name.
+const NodeSource = "qntx"
 
 // MailTransport delivers a mail and names the id it was given.
 type MailTransport interface {
@@ -186,24 +213,7 @@ func (s *MailServer) Send(ctx context.Context, req *protocol.SendMailRequest) (*
 		return refuse(errors.New("user_id is required: mail goes to a User"))
 	}
 
-	w := s.wired.Load()
-	if w == nil {
-		return refuse(errors.New("the mail service is not wired yet: the node has not finished starting"))
-	}
-	if w.Transport == nil {
-		return refuse(errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml"))
-	}
-	if w.From == "" {
-		return refuse(errors.New("no address to send from: set mail.from in am.toml"))
-	}
-	if w.Recipients == nil {
-		return refuse(errors.New("this node keeps no Users, so there is nobody to mail"))
-	}
-	if w.Records == nil || w.Records() == nil {
-		return refuse(errors.New("the node holds no store to attest the mail in, so none is sent"))
-	}
-
-	to, err := s.recipient(w, req.UserId)
+	w, to, err := s.ready(req.UserId)
 	if err != nil {
 		return refuse(err)
 	}
@@ -218,16 +228,76 @@ func (s *MailServer) Send(ctx context.Context, req *protocol.SendMailRequest) (*
 	}
 
 	mail := OutgoingMail{From: w.From, To: to, Subject: filled.Subject, HTML: filled.HTML, Text: filled.Text}
+	messageID, attestationID, sendErr := s.deliver(ctx, w, req.UserId, req.Source, ref, mail)
+	if sendErr != nil {
+		return &protocol.SendMailResponse{Success: false, Error: sendErr.Error(), AttestationId: attestationID}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
+	}
+	return &protocol.SendMailResponse{Success: true, MessageId: messageID, AttestationId: attestationID}, nil
+}
+
+// SendAsNode mails a User something the node wrote itself (ADR-042). It is
+// held to what a plugin's mail is held to — a transport, an address to send
+// from, a User who is on and has an address — and attested the same way.
+func (s *MailServer) SendAsNode(ctx context.Context, userID string, m NodeMail) (messageID, attestationID string, err error) {
+	w, to, err := s.ready(userID)
+	if err != nil {
+		s.logger.Warnw("Node mail not sent", "mail", m.Name, "user", userID, "error", err)
+		return "", "", err
+	}
+	mail := OutgoingMail{From: w.From, To: to, Subject: m.Subject, HTML: m.HTML, Text: m.Text, Inline: m.Inline}
+	return s.deliver(ctx, w, userID, NodeSource, m.Name, mail)
+}
+
+// ready is the wiring a send needs and the address it goes to, or why there is
+// none.
+func (s *MailServer) ready(userID string) (*MailWiring, string, error) {
+	w := s.wired.Load()
+	if w == nil {
+		return nil, "", errors.New("the mail service is not wired yet: the node has not finished starting")
+	}
+	if w.Transport == nil {
+		return nil, "", errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml")
+	}
+	if w.From == "" {
+		return nil, "", errors.New("no address to send from: set mail.from in am.toml")
+	}
+	if w.Recipients == nil {
+		return nil, "", errors.New("this node keeps no Users, so there is nobody to mail")
+	}
+	if w.Records == nil || w.Records() == nil {
+		return nil, "", errors.New("the node holds no store to attest the mail in, so none is sent")
+	}
+	to, err := s.recipient(w, userID)
+	if err != nil {
+		return nil, "", err
+	}
+	return w, to, nil
+}
+
+// deliver hands a filled mail to the transport and attests what became of it:
+// mail:sent with the transport's id, or mail:failed with its refusal.
+func (s *MailServer) deliver(ctx context.Context, w *MailWiring, userID, source, ref string, mail OutgoingMail) (string, string, error) {
 	messageID, sendErr := w.Transport.Send(ctx, mail)
 
 	attrs := map[string]any{
-		"plugin":   req.Source,
+		"plugin":   source,
 		"template": ref,
 		"to":       mail.To,
 		"from":     mail.From,
 		"subject":  mail.Subject,
 		"html":     mail.HTML,
 		"text":     mail.Text,
+	}
+	// The images are named, sized and hashed rather than kept: the html that
+	// shows them is kept whole, and a week of graphs is not an attestation.
+	if len(mail.Inline) > 0 {
+		var inline []string
+		for _, img := range mail.Inline {
+			sum := sha256.Sum256(img.Data)
+			inline = append(inline, fmt.Sprintf("%s %s %d bytes sha256:%s",
+				img.ContentID, img.ContentType, len(img.Data), hex.EncodeToString(sum[:])))
+		}
+		attrs["inline"] = strings.Join(inline, "\n")
 	}
 	predicate := PredicateMailSent
 	if sendErr != nil {
@@ -237,29 +307,25 @@ func (s *MailServer) Send(ctx context.Context, req *protocol.SendMailRequest) (*
 		attrs["message_id"] = messageID
 	}
 
-	attestationID, attestErr := s.attest(w.Records(), w.Actor, req.UserId, predicate, ref, req.Source, attrs)
+	attestationID, attestErr := s.attest(w.Records(), w.Actor, userID, predicate, ref, source, attrs)
 	if attestErr != nil {
 		// The mail left or failed either way; what is lost is the record of it,
 		// and that is said with everything the record would have held.
 		s.logger.Errorw("Mail not attested: the store refused it",
-			"predicate", predicate, "user", req.UserId, "template", ref,
+			"predicate", predicate, "user", userID, "template", ref,
 			"message_id", messageID, "attributes", attrs, "error", attestErr)
 	}
 
 	if sendErr != nil {
 		s.logger.Warnw("Mail refused by the transport",
-			"plugin", req.Source, "user", req.UserId, "template", ref, "attestation", attestationID, "error", sendErr)
-		return &protocol.SendMailResponse{
-			Success:       false,
-			Error:         errors.Wrapf(sendErr, "mail to User %s was not sent", req.UserId).Error(),
-			AttestationId: attestationID,
-		}, nil
+			"source", source, "user", userID, "template", ref, "attestation", attestationID, "error", sendErr)
+		return "", attestationID, errors.Wrapf(sendErr, "mail to User %s was not sent", userID)
 	}
 
 	s.logger.Infow("Mail sent",
-		"plugin", req.Source, "user", req.UserId, "template", ref,
+		"source", source, "user", userID, "template", ref,
 		"message_id", messageID, "attestation", attestationID)
-	return &protocol.SendMailResponse{Success: true, MessageId: messageID, AttestationId: attestationID}, nil
+	return messageID, attestationID, nil
 }
 
 // recipient is the address a User's mail goes to, or why there is none.

@@ -96,6 +96,7 @@ REACH is '/api/reach'                                                     of ROO
 # account it sends through (the mail signum, ADR-041). ROOT alone governs
 # what plugins call.
 REACH is '/api/mail' '/api/mail/templates' '/api/mail/account'            of ROOT
+REACH is '/api/mail/report'                                               of ROOT
 
 # What the node serves, as MCP tools (ADR-038). A connector's token is the
 # person who said yes, and every tool call is gated on its own path's line.

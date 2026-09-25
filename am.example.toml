@@ -141,6 +141,36 @@ entity_actors_limit = 64
 # Default: 0
 # traces_sample_rate = 1.0
 
+# Reading back what was shipped, for the weekly report (ADR-042). All
+# four, or the report leaves Sentry out and says which is missing.
+# read_token is a token that may read events — never a literal.
+# read_token   = "ssm:///path/to/sentry/read-token"
+# api          = "https://<region>.sentry.io"
+# organization = "<org slug>"
+# project      = "<project id, the last segment of the DSN>"
+
+# ════════════════════════════════════════════════════════════════
+# Mail (ADR-041, ADR-042)
+# ════════════════════════════════════════════════════════════════
+
+[mail]
+# The address every mail is sent from. Empty sends nothing, and every
+# send says why.
+# from = "Garden <mail@garden.test>"
+
+[mail.ses]
+# Send through Amazon SES, with the node's AWS credentials.
+# Default: false
+# enabled = true
+# The region the SES account sends from.
+# Default: "" (the AWS default chain's region)
+# region = "eu-central-1"
+
+[mail.report]
+# How often the node's own report goes to the ROOT User.
+# Default: 604800 (weekly). 0 is never.
+# interval_seconds = 604800
+
 # ════════════════════════════════════════════════════════════════
 # Server Configuration (Web UI)
 # ════════════════════════════════════════════════════════════════

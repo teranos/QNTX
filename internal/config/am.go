@@ -40,6 +40,13 @@ type SentryConfig struct {
 	// handler getting slower" a question with an answer; a log line carries it
 	// as prose. 0 ships none. 1 ships all.
 	TracesSampleRate float64 `mapstructure:"traces_sample_rate"`
+
+	// Reading back what the node shipped, for the weekly report (ADR-042). All
+	// four or the report says which is missing and leaves Sentry out.
+	ReadTokenRef string `mapstructure:"read_token"`   // ssm:// or env: reference to a Sentry token that may read events — a literal is rejected
+	API          string `mapstructure:"api"`          // The API origin the organization lives in (e.g. "https://de.sentry.io")
+	Organization string `mapstructure:"organization"` // The organization's slug
+	Project      string `mapstructure:"project"`      // The project's id: the last segment of the DSN
 }
 
 // DistillConfig configures age-based attestation distillation.
@@ -69,8 +76,14 @@ type FetchConfig struct {
 
 // MailConfig configures the MailService: mail to a User on a plugin's behalf (ADR-041).
 type MailConfig struct {
-	From string        `mapstructure:"from"` // The address every mail is sent from (e.g. "Garden <mail@garden.test>"). Empty = no mail is sent, and a send says why.
-	SES  MailSESConfig `mapstructure:"ses"`
+	From   string           `mapstructure:"from"` // The address every mail is sent from (e.g. "Garden <mail@garden.test>"). Empty = no mail is sent, and a send says why.
+	SES    MailSESConfig    `mapstructure:"ses"`
+	Report MailReportConfig `mapstructure:"report"`
+}
+
+// MailReportConfig is the node's own report to the ROOT User (ADR-042).
+type MailReportConfig struct {
+	IntervalSeconds *int `mapstructure:"interval_seconds"` // How often it is sent. Omit = weekly (604800). 0 = never.
 }
 
 // MailSESConfig is Amazon SES as the mail service's transport. Credentials come
