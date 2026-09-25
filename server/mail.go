@@ -96,9 +96,10 @@ func (s *QNTXServer) mailSignum() sigil.Signum {
 				},
 				{
 					Name: "templates",
-					Does: "The templates mail is filled from: QNTX's neutral one, and the newest each plugin set under each name.",
+					Does: "The templates mail is filled from: QNTX's neutral and dark ones, and the newest each plugin set under each name.",
 					Gives: []*protocol.Field{
 						{Name: "neutral", Says: "QNTX's own template, filled when a plugin names none: its subject, html and text, and the values it takes."},
+						{Name: "dark", Says: "QNTX's own template drawn as a QNTX window, filled when a plugin names dark: its subject, html and text, and the values it takes."},
 						{Name: "templates", Says: "One row per plugin and name: its attestation, when it was set, the plugin, its version, the name, and the subject, html and text."},
 						{Name: "node", Says: "The mail the node writes itself, whole: not filled from any template, and named here so it is not missing."},
 					},
@@ -231,11 +232,22 @@ type mailTemplateRow struct {
 
 func (s *QNTXServer) mailTemplates(_ context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
 	neutral := services.NeutralTemplate()
+	dark, err := services.DarkTemplate()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the dark template could not be drawn: " + err.Error()}
+	}
+	// Both take what the neutral template takes: the dark one is it, drawn as a window.
+	values := []string{"subject", "body", "link (not required)", "link_label (not required)"}
 	answer := map[string]any{
 		"neutral": mailTemplateRow{
 			Plugin: "qntx", Name: services.NeutralTemplateName,
 			Subject: neutral.Subject, HTML: neutral.Html, Text: neutral.Text,
-			Values: []string{"subject", "body", "link (not required)", "link_label (not required)"},
+			Values: values,
+		},
+		"dark": mailTemplateRow{
+			Plugin: "qntx", Name: services.DarkTemplateName,
+			Subject: dark.Subject, HTML: dark.Html, Text: dark.Text,
+			Values: values,
 		},
 		"templates": []mailTemplateRow{},
 		"node": []nodeMailRow{{

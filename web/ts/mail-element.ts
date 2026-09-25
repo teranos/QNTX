@@ -43,6 +43,8 @@ export interface MailTemplateRow {
 
 export interface MailTemplates {
     neutral: MailTemplateRow;
+    /** QNTX's other template, filled when a plugin names it. */
+    dark: MailTemplateRow;
     templates: MailTemplateRow[];
     /** The mail the node writes itself, whole: not filled from a template. */
     node: { name: string; says: string }[];
@@ -175,16 +177,21 @@ function templateParts(t: MailTemplateRow): HTMLDetailsElement {
     return details;
 }
 
-/** Exported for tests: QNTX's neutral template, and the newest each plugin set. */
+/** Exported for tests: QNTX's own templates, and the newest each plugin set. */
 export function renderTemplates(container: HTMLElement, t: MailTemplates): void {
     container.innerHTML = '';
     const s = section('Templates');
 
-    const neutral = document.createElement('div');
-    neutral.className = 'mail-neutral';
-    neutral.appendChild(row('Neutral:', `filled when a plugin names none — takes ${t.neutral.values.join(', ')}`));
-    neutral.appendChild(templateParts(t.neutral));
-    s.appendChild(neutral);
+    for (const [label, own, when] of [
+        ['Neutral:', t.neutral, 'filled when a plugin names none'],
+        ['Dark:', t.dark, `filled when a plugin names ${t.dark.name}`],
+    ] as const) {
+        const div = document.createElement('div');
+        div.className = 'mail-neutral';
+        div.appendChild(row(label, `${when} — takes ${own.values.join(', ')}`));
+        div.appendChild(templateParts(own));
+        s.appendChild(div);
+    }
 
     // The node's own mail is written whole, so it has no template to show;
     // it is named, and what it looked like is the mail itself under Sent.

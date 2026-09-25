@@ -81,19 +81,27 @@ test('the neutral template and each plugin template are shown as source, never r
             subject: '{{.subject}}', html: '<p>{{.body}}</p>', text: '{{.body}}',
             values: ['subject', 'body'],
         },
+        dark: {
+            id: '', at: '', plugin: 'qntx', version: '', name: 'dark',
+            subject: '{{.subject}}', html: '<table><tr><td>{{.body}}</td></tr></table>', text: '{{.body}}',
+            values: ['subject', 'body'],
+        },
         templates: [{
-            id: 'AS-GARDEN-BOOKING', at: '2026-09-24T14:00:00Z', plugin: 'garden', version: '0.4.1',
-            name: 'booking-accepted', subject: 'Boeking bevestigd voor {{.date}}',
-            html: '<p>Tot {{.date}}.</p>', text: 'Tot {{.date}}.', values: [],
+            id: 'AS-GARDEN-HARVEST', at: '2026-09-24T14:00:00Z', plugin: 'garden', version: '0.4.1',
+            name: 'harvest-ready', subject: 'Harvest ready on {{.date}}',
+            html: '<p>Pick on {{.date}}.</p>', text: 'Pick on {{.date}}.', values: [],
         }],
         node: [{ name: 'report.weekly', says: 'The weekly report to the ROOT User, written whole by the node.' }],
     };
     const container = document.createElement('div');
     renderTemplates(container, templates);
     expect(container.textContent).toContain('takes subject, body');
+    // "why not? i want it to be listed there as well"
+    expect(container.textContent).toContain('filled when a plugin names dark');
+    expect(container.textContent).toContain('<table><tr><td>{{.body}}</td></tr></table>');
     expect(container.textContent).toContain('garden v0.4.1');
-    expect(container.textContent).toContain('booking-accepted');
-    expect(container.textContent).toContain('<p>Tot {{.date}}.</p>');
+    expect(container.textContent).toContain('harvest-ready');
+    expect(container.textContent).toContain('<p>Pick on {{.date}}.</p>');
     expect(container.querySelector('p')).toBeNull();
     // "its saying no plugin has set a template, but what about the system one?"
     expect(container.textContent).toContain('report.weekly');

@@ -113,11 +113,11 @@ func TestAPluginSetsItsOwnTemplateAndMailsFromIt(t *testing.T) {
 	s, store := wiredMail(t, box, tim)
 
 	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
-		AuthToken: mailToken, Source: "garden", Name: "booking-accepted",
+		AuthToken: mailToken, Source: "garden", Name: "harvest-ready",
 		Template: &protocol.MailTemplate{
-			Subject: "Boeking bevestigd voor {{.date}}",
-			Text:    "Tot {{.date}}.",
-			Html:    "<p>Tot {{.date}}.</p>",
+			Subject: "Harvest ready on {{.date}}",
+			Text:    "Pick on {{.date}}.",
+			Html:    "<p>Pick on {{.date}}.</p>",
 		},
 	})
 	require.NoError(t, err)
@@ -127,18 +127,18 @@ func TestAPluginSetsItsOwnTemplateAndMailsFromIt(t *testing.T) {
 	require.Len(t, kept, 1)
 	assert.Equal(t, set.AttestationId, kept[0].ID)
 	assert.Equal(t, "garden", kept[0].Attributes["plugin"])
-	assert.Equal(t, "booking-accepted", kept[0].Attributes["name"])
+	assert.Equal(t, "harvest-ready", kept[0].Attributes["name"])
 
 	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
 		AuthToken: mailToken, Source: "garden", UserId: "UStim",
-		Template: "booking-accepted", Values: map[string]string{"date": "maandag 29 september"},
+		Template: "harvest-ready", Values: map[string]string{"date": "Monday 29 September"},
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Success, resp.Error)
 	require.Len(t, box.sent, 1)
-	assert.Equal(t, "Boeking bevestigd voor maandag 29 september", box.sent[0].Subject)
-	assert.Equal(t, "<p>Tot maandag 29 september.</p>", box.sent[0].HTML)
-	assert.Equal(t, "garden/booking-accepted", attested(t, store, PredicateMailSent)[0].Attributes["template"])
+	assert.Equal(t, "Harvest ready on Monday 29 September", box.sent[0].Subject)
+	assert.Equal(t, "<p>Pick on Monday 29 September.</p>", box.sent[0].HTML)
+	assert.Equal(t, "garden/harvest-ready", attested(t, store, PredicateMailSent)[0].Attributes["template"])
 }
 
 // Setting a template again is changing it: the newest one under a name is the
@@ -222,7 +222,7 @@ func TestATemplateThatDoesNotParseIsNotKept(t *testing.T) {
 
 	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
 		AuthToken: mailToken, Source: "garden", Name: "broken",
-		Template: &protocol.MailTemplate{Subject: "Boeking {{.date", Text: "Hallo."},
+		Template: &protocol.MailTemplate{Subject: "Harvest {{.date", Text: "Hallo."},
 	})
 	require.NoError(t, err)
 	assert.False(t, set.Success)

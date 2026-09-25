@@ -158,6 +158,13 @@ func TestTheMailWindowShowsTheNeutralTemplateAndEachPluginsNewest(t *testing.T) 
 	assert.Equal(t, services.NeutralTemplateName, neutral.Name)
 	assert.Equal(t, services.NeutralTemplate().Html, neutral.HTML)
 
+	// "why not? i want it to be listed there as well"
+	dark := answer.(map[string]any)["dark"].(mailTemplateRow)
+	own, err := services.DarkTemplate()
+	require.NoError(t, err)
+	assert.Equal(t, services.DarkTemplateName, dark.Name)
+	assert.Equal(t, own.Html, dark.HTML)
+
 	templates := answer.(map[string]any)["templates"].([]mailTemplateRow)
 	require.Len(t, templates, 1, "a template set twice is one template")
 	assert.Equal(t, "garden", templates[0].Plugin)
