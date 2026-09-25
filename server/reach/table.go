@@ -142,6 +142,7 @@ REACH is '/api/types' '/api/types/'                                       of ROO
 REACH is '/api/watchers' '/api/watchers/'                                 of ROOT SUPER
 REACH is '/api/watchers/queue/stats'                                      of ROOT SUPER
 REACH is '/api/element-config'                                              of ROOT
+REACH is '/api/canvas'                                                    of ROOT
 REACH is '/api/canvas/elements' '/api/canvas/elements/'                       of ROOT
 REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT
 REACH is '/api/canvas/minimized-windows'                                  of ROOT SUPER

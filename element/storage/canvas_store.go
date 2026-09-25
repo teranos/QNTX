@@ -80,6 +80,43 @@ func NewCanvasStore(db *sql.DB) *CanvasStore {
 	return &CanvasStore{db: db}
 }
 
+// ErrNoCanvas is a namespace whose canvas was never created.
+var ErrNoCanvas = errors.New("this namespace has no canvas")
+
+// ErrCanvasExists is a create in a namespace that already has its canvas.
+var ErrCanvasExists = errors.New("this namespace already has a canvas")
+
+// Name is the name the canvas was created under.
+func (s *CanvasStore) Name(ctx context.Context) (string, error) {
+	var name string
+	err := s.db.QueryRowContext(ctx, `SELECT name FROM canvases WHERE id = 1`).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNoCanvas
+	}
+	if err != nil {
+		return "", errors.Wrap(err, "failed to read the canvas")
+	}
+	return name, nil
+}
+
+// Create makes the canvas under a name.
+func (s *CanvasStore) Create(ctx context.Context, name string) error {
+	if name == "" {
+		return errors.New("a canvas is named, and this one has no name")
+	}
+	if _, err := s.Name(ctx); err == nil {
+		return errors.Wrapf(ErrCanvasExists, "creating %s", name)
+	} else if !errors.Is(err, ErrNoCanvas) {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO canvases (id, name, created_at) VALUES (1, ?, ?)`,
+		name, time.Now().Format(time.RFC3339Nano))
+	if err != nil {
+		return errors.Wrapf(err, "failed to create the canvas %s", name)
+	}
+	return nil
+}
+
 // === Element operations ===
 
 // UpsertElement creates or updates an element

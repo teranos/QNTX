@@ -21,7 +21,10 @@ import (
 
 // CanvasHandler handles HTTP requests for canvas state
 type CanvasHandler struct {
-	store         *elementstorage.CanvasStore
+	store *elementstorage.CanvasStore
+	// canvasFor is the canvas store of the namespace a request acts in. Nil
+	// means store, for a node with one namespace.
+	canvasFor     func(*http.Request) (*elementstorage.CanvasStore, error)
 	watcherEngine *watcher.Engine
 	logger        *zap.SugaredLogger
 	serverPort    int // Server port for internal plugin calls
@@ -46,6 +49,105 @@ func WithWatcherEngine(engine *watcher.Engine, logger *zap.SugaredLogger) Canvas
 	return func(h *CanvasHandler) {
 		h.watcherEngine = engine
 		h.logger = logger
+	}
+}
+
+// WithCanvasFor resolves the canvas store per request, from the namespace the
+// request acts in. A canvas lives in one namespace and only that one (ADR-026).
+func WithCanvasFor(canvasFor func(*http.Request) (*elementstorage.CanvasStore, error)) CanvasHandlerOption {
+	return func(h *CanvasHandler) {
+		h.canvasFor = canvasFor
+	}
+}
+
+// storeOf is the store of a namespace that has a canvas. What it cannot give,
+// it has already answered on w.
+func (h *CanvasHandler) storeOf(w http.ResponseWriter, r *http.Request) (*elementstorage.CanvasStore, bool) {
+	store, ok := h.anyStoreOf(w, r)
+	if !ok {
+		return nil, false
+	}
+	// A node with one namespace serves default, and default has its canvas.
+	if h.canvasFor == nil {
+		return store, true
+	}
+	if _, err := store.Name(r.Context()); err != nil {
+		h.writeCanvasError(w, err)
+		return nil, false
+	}
+	return store, true
+}
+
+// anyStoreOf is the store of the namespace a request acts in, whether or not
+// its canvas was created.
+func (h *CanvasHandler) anyStoreOf(w http.ResponseWriter, r *http.Request) (*elementstorage.CanvasStore, bool) {
+	if h.canvasFor == nil {
+		return h.store, true
+	}
+	store, err := h.canvasFor(r)
+	if err != nil {
+		h.writeCanvasError(w, err)
+		return nil, false
+	}
+	return store, true
+}
+
+// writeCanvasError answers a namespace with no canvas with 404, and one the
+// caller cannot act in with 403.
+func (h *CanvasHandler) writeCanvasError(w http.ResponseWriter, err error) {
+	if errors.Is(err, elementstorage.ErrNoCanvas) {
+		h.writeError(w, err, http.StatusNotFound)
+		return
+	}
+	h.writeError(w, err, http.StatusForbidden)
+}
+
+// HandleCanvas answers what the canvas of this namespace is, and creates it.
+// Routes:
+//
+//	GET  /api/canvas  - {"name": ...}, or 404 when there is no canvas
+//	POST /api/canvas  - {"name": ...} creates it; 409 when there is one
+func (h *CanvasHandler) HandleCanvas(w http.ResponseWriter, r *http.Request) {
+	store, ok := h.anyStoreOf(w, r)
+	if !ok {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		name, err := store.Name(r.Context())
+		if err != nil {
+			if errors.Is(err, elementstorage.ErrNoCanvas) {
+				h.writeError(w, err, http.StatusNotFound)
+			} else {
+				h.writeError(w, err, http.StatusInternalServerError)
+			}
+			return
+		}
+		h.writeJSON(w, map[string]string{"name": name})
+	case http.MethodPost:
+		var body struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			h.writeError(w, errors.Wrap(err, "invalid request body"), http.StatusBadRequest)
+			return
+		}
+		if body.Name == "" {
+			h.writeError(w, errors.New("name is required"), http.StatusBadRequest)
+			return
+		}
+		if err := store.Create(r.Context(), body.Name); err != nil {
+			if errors.Is(err, elementstorage.ErrCanvasExists) {
+				h.writeError(w, err, http.StatusConflict)
+			} else {
+				h.writeError(w, err, http.StatusInternalServerError)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		h.writeJSON(w, map[string]string{"name": body.Name})
+	default:
+		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
 	}
 }
 
@@ -125,7 +227,11 @@ func (h *CanvasHandler) HandleCompositions(w http.ResponseWriter, r *http.Reques
 // === Element handlers ===
 
 func (h *CanvasHandler) handleListElements(w http.ResponseWriter, r *http.Request) {
-	items, err := h.store.ListElements(r.Context())
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
+	items, err := store.ListElements(r.Context())
 	if err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
@@ -138,7 +244,11 @@ func (h *CanvasHandler) handleListElements(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *CanvasHandler) handleGetElement(w http.ResponseWriter, r *http.Request, id string) {
-	item, err := h.store.GetElement(r.Context(), id)
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
+	item, err := store.GetElement(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, elementstorage.ErrNotFound) {
 			h.writeError(w, err, http.StatusNotFound)
@@ -152,13 +262,17 @@ func (h *CanvasHandler) handleGetElement(w http.ResponseWriter, r *http.Request,
 }
 
 func (h *CanvasHandler) handleUpsertElement(w http.ResponseWriter, r *http.Request) {
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
 	var item elementstorage.CanvasElement
 	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
 		h.writeError(w, errors.Wrap(err, "invalid request body"), http.StatusBadRequest)
 		return
 	}
 
-	if err := h.store.UpsertElement(r.Context(), &item); err != nil {
+	if err := store.UpsertElement(r.Context(), &item); err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -167,7 +281,11 @@ func (h *CanvasHandler) handleUpsertElement(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *CanvasHandler) handleDeleteElement(w http.ResponseWriter, r *http.Request, id string) {
-	if err := h.store.DeleteElement(r.Context(), id); err != nil {
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
+	if err := store.DeleteElement(r.Context(), id); err != nil {
 		if errors.Is(err, elementstorage.ErrNotFound) {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
@@ -182,7 +300,11 @@ func (h *CanvasHandler) handleDeleteElement(w http.ResponseWriter, r *http.Reque
 // === Composition handlers ===
 
 func (h *CanvasHandler) handleListCompositions(w http.ResponseWriter, r *http.Request) {
-	comps, err := h.store.ListCompositions(r.Context())
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
+	comps, err := store.ListCompositions(r.Context())
 	if err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
@@ -195,7 +317,11 @@ func (h *CanvasHandler) handleListCompositions(w http.ResponseWriter, r *http.Re
 }
 
 func (h *CanvasHandler) handleGetComposition(w http.ResponseWriter, r *http.Request, id string) {
-	comp, err := h.store.GetComposition(r.Context(), id)
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
+	comp, err := store.GetComposition(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, elementstorage.ErrNotFound) {
 			h.writeError(w, err, http.StatusNotFound)
@@ -209,20 +335,24 @@ func (h *CanvasHandler) handleGetComposition(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *CanvasHandler) handleUpsertComposition(w http.ResponseWriter, r *http.Request) {
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
 	var comp elementstorage.CanvasComposition
 	if err := json.NewDecoder(r.Body).Decode(&comp); err != nil {
 		h.writeError(w, errors.Wrap(err, "invalid request body"), http.StatusBadRequest)
 		return
 	}
 
-	if err := h.store.UpsertComposition(r.Context(), &comp); err != nil {
+	if err := store.UpsertComposition(r.Context(), &comp); err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	// Compile meld edges into watcher subscriptions
 	if h.watcherEngine != nil {
-		if err := h.compileSubscriptions(r.Context(), &comp); err != nil {
+		if err := h.compileSubscriptions(r.Context(), store, &comp); err != nil {
 			h.logWarn("Failed to compile subscriptions for composition %s: %v", comp.ID, err)
 			// Non-fatal: composition is stored, subscriptions can be retried
 		}
@@ -232,6 +362,10 @@ func (h *CanvasHandler) handleUpsertComposition(w http.ResponseWriter, r *http.R
 }
 
 func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.Request, id string) {
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
 	// Re-enable downstream SE watchers that were disabled by SE→SE meld edges
 	if h.watcherEngine != nil {
 		h.reEnableDownstreamSEWatchers(r.Context(), id)
@@ -258,7 +392,7 @@ func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	if err := h.store.DeleteComposition(r.Context(), id); err != nil {
+	if err := store.DeleteComposition(r.Context(), id); err != nil {
 		if errors.Is(err, elementstorage.ErrNotFound) {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
@@ -298,7 +432,11 @@ func (h *CanvasHandler) HandleMinimizedWindows(w http.ResponseWriter, r *http.Re
 }
 
 func (h *CanvasHandler) handleListMinimizedWindows(w http.ResponseWriter, r *http.Request) {
-	windows, err := h.store.ListMinimizedWindows(r.Context())
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
+	windows, err := store.ListMinimizedWindows(r.Context())
 	if err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
@@ -311,6 +449,10 @@ func (h *CanvasHandler) handleListMinimizedWindows(w http.ResponseWriter, r *htt
 }
 
 func (h *CanvasHandler) handleAddMinimizedWindow(w http.ResponseWriter, r *http.Request) {
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
 	var body struct {
 		ElementID string `json:"element_id"`
 	}
@@ -324,7 +466,7 @@ func (h *CanvasHandler) handleAddMinimizedWindow(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := h.store.AddMinimizedWindow(r.Context(), body.ElementID); err != nil {
+	if err := store.AddMinimizedWindow(r.Context(), body.ElementID); err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -333,7 +475,11 @@ func (h *CanvasHandler) handleAddMinimizedWindow(w http.ResponseWriter, r *http.
 }
 
 func (h *CanvasHandler) handleRemoveMinimizedWindow(w http.ResponseWriter, r *http.Request, elementID string) {
-	if err := h.store.RemoveMinimizedWindow(r.Context(), elementID); err != nil {
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
+	if err := store.RemoveMinimizedWindow(r.Context(), elementID); err != nil {
 		if errors.Is(err, elementstorage.ErrNotFound) {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
@@ -349,7 +495,7 @@ func (h *CanvasHandler) handleRemoveMinimizedWindow(w http.ResponseWriter, r *ht
 
 // compileSubscriptions converts a composition's right-direction edges into watcher subscriptions.
 // AX source edges use the AX element's query filter. Producer (py/prompt) source edges filter on actor.
-func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *elementstorage.CanvasComposition) error {
+func (h *CanvasHandler) compileSubscriptions(ctx context.Context, canvas *elementstorage.CanvasStore, comp *elementstorage.CanvasComposition) error {
 	store := h.watcherEngine.GetStore()
 
 	// Re-enable any SE watchers disabled by previous compilation,
@@ -370,14 +516,14 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *elements
 		}
 
 		// Resolve source element type
-		sourceElement, err := h.store.GetElement(ctx, edge.From)
+		sourceElement, err := canvas.GetElement(ctx, edge.From)
 		if err != nil {
 			h.logWarn("Skipping edge %s→%s: failed to resolve source element: %v", edge.From, edge.To, err)
 			continue
 		}
 
 		// Resolve target element type
-		targetElement, err := h.store.GetElement(ctx, edge.To)
+		targetElement, err := canvas.GetElement(ctx, edge.To)
 		if err != nil {
 			h.logWarn("Skipping edge %s→%s: failed to resolve target element: %v", edge.From, edge.To, err)
 			continue
@@ -655,8 +801,12 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	store, ok := h.storeOf(w, r)
+	if !ok {
+		return
+	}
 	// Fetch all elements and filter by canvas_id
-	allElements, err := h.store.ListElements(r.Context())
+	allElements, err := store.ListElements(r.Context())
 	if err != nil {
 		h.writeError(w, errors.Wrapf(err, "failed to fetch elements"), http.StatusInternalServerError)
 		return

@@ -182,6 +182,17 @@ func TestAUniverseHoldsItsOwnWatchers(t *testing.T) {
 	}
 }
 
+// "system namespace should have no canvas"
+func TestAUniverseMayHaveNoCanvas(t *testing.T) {
+	u, err := NewUniverse("system", Made{Store: nothing{}, Watchers: stubWatchers{}, Schedules: &schedule.Store{}, Embeddings: &storage.EmbeddingStore{}, Rich: &storage.BoundedStore{}, Executions: &schedule.ExecutionStore{}, Prompts: &prompt.PromptStore{}, Aliases: &storage.AliasStore{}, Queries: &storage.SQLQueryStore{}, Operational: &sql.DB{}})
+	if err != nil {
+		t.Fatalf("a universe with no canvas was refused: %v", err)
+	}
+	if u.Canvas() != nil {
+		t.Fatal("a universe made with no canvas answered with one")
+	}
+}
+
 // A namespace opened after the node booted has not run yet. Starting it is what
 // makes it the same universe as one the node booted with, so it happens as the
 // namespace is opened, and once however many callers reach it.

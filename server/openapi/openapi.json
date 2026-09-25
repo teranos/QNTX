@@ -58,6 +58,11 @@
         "ATTESTOR"
       ]
     },
+    "/api/canvas": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/canvas/compositions": {
       "x-qntx-reach": [
         "ROOT"

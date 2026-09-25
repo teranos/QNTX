@@ -12,7 +12,7 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
-// createTestWatchers inserts watcher rows so the FK constraint is satisfied.
+// createTestWatchers inserts watcher rows for the tests that read them back.
 func createTestWatchers(t *testing.T, db *sql.DB, ids ...string) {
 	t.Helper()
 	store := storage.NewWatcherStore(db)
@@ -29,6 +29,24 @@ func createTestWatchers(t *testing.T, db *sql.DB, ids ...string) {
 		if err != nil {
 			t.Fatalf("createTestWatchers(%s): %v", id, err)
 		}
+	}
+}
+
+// On parquet a watcher is an object at the storage location and no row here.
+// QNTX-GO-X: every such enqueue failed on FOREIGN KEY constraint failed.
+func TestQueueStore_EnqueuesForAWatcherThatIsNoRowHere(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := watcher.NewQueueStore(db)
+
+	err := store.Enqueue(&watcher.QueueEntry{
+		WatcherID:       "ax-element-held-at-the-location",
+		AttestationJSON: `{"id":"AS-1"}`,
+		Reason:          "paused",
+		Attempt:         1,
+		NotBefore:       time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("enqueue for a watcher held elsewhere: %v", err)
 	}
 }
 
