@@ -16,18 +16,17 @@ import (
 // GET: List all schedules
 // POST: Create a new schedule
 func (s *QNTXServer) HandlePulseSchedules(w http.ResponseWriter, r *http.Request) {
-	endpoint := "unknown"
-	switch r.Method {
-	case http.MethodGet:
-		endpoint = "list jobs"
-	case http.MethodPost:
-		endpoint = "create job"
+	// A list is noise unless it fails, and a failed one is the access log's.
+	if r.Method != http.MethodGet {
+		endpoint := "unknown"
+		if r.Method == http.MethodPost {
+			endpoint = "create job"
+		}
+		logger.AddPulseSymbol(s.logger).Infow("Pulse "+endpoint,
+			"method", r.Method,
+			"path", r.URL.Path,
+			"remote", r.RemoteAddr)
 	}
-
-	logger.AddPulseSymbol(s.logger).Infow("Pulse "+endpoint,
-		"method", r.Method,
-		"path", r.URL.Path,
-		"remote", r.RemoteAddr)
 
 	switch r.Method {
 	case http.MethodGet:

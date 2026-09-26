@@ -22,7 +22,6 @@ import (
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
-	"go.uber.org/zap"
 )
 
 // Opener opens one namespace: everything it holds, named at once. A backend
@@ -87,7 +86,6 @@ type Held struct {
 	// what a namespace then runs for itself is the server's, so it is handed in
 	// rather than known here.
 	starting func(*Universe)
-	logger   *zap.SugaredLogger
 }
 
 // SetDefault names the universe a caller who names none acts in.
@@ -128,13 +126,6 @@ func (h *Held) SetStarting(starting func(*Universe)) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.starting = starting
-}
-
-// SetLogger names where opening a namespace is said out loud.
-func (h *Held) SetLogger(logger *zap.SugaredLogger) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.logger = logger
 }
 
 // Forget drops an open namespace, so the next caller that names it opens it
@@ -390,7 +381,7 @@ func (h *Held) universeIn(namespace string) (*Universe, error) {
 		h.opening = map[string]*inFlight{}
 	}
 	h.opening[key] = in
-	known, opener, starting, logger := h.known, h.opener, h.starting, h.logger
+	known, opener, starting := h.known, h.opener, h.starting
 	h.mu.Unlock()
 
 	in.u, in.err = openOne(known, opener, namespace)
@@ -420,10 +411,6 @@ func (h *Held) universeIn(namespace string) (*Universe, error) {
 	if in.err != nil {
 		return nil, in.err
 	}
-	if logger != nil {
-		logger.Infow("Opened a namespace", "namespace", in.u.Name(), "reached_by", key)
-	}
-
 	// A namespace that has been opened has not yet run. Starting it is done
 	// once, and the map holds it first, so a caller reaching back gets it.
 	if starting != nil {
