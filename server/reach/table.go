@@ -143,11 +143,14 @@ REACH is '/api/types' '/api/types/'                                       of ROO
 REACH is '/api/watchers' '/api/watchers/'                                 of ROOT SUPER
 REACH is '/api/watchers/queue/stats'                                      of ROOT SUPER
 REACH is '/api/element-config'                                              of ROOT
-REACH is '/api/canvas'                                                    of ROOT
-REACH is '/api/canvas/elements' '/api/canvas/elements/'                       of ROOT
-REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT
-REACH is '/api/canvas/minimized-windows'                                  of ROOT SUPER
-REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER
+# "the canvas becomes reachable to whoever the namespace is for": which canvas
+# a caller may act on is the canvas's owners' to say (element/handlers).
+REACH is '/api/canvas'                                                    of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
+REACH is '/api/canvases' '/api/canvases/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
+REACH is '/api/canvas/elements' '/api/canvas/elements/'                   of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
+REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
+REACH is '/api/canvas/minimized-windows'                                  of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
+REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
 REACH is '/api/canvas/export' '/api/canvas/export-dom'                    of ROOT
 REACH is '/api/files' '/api/files/'                                       of ROOT
 REACH is '/api/python/execute'                                            of ROOT

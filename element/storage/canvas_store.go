@@ -73,6 +73,9 @@ func fromProtoEdge(e *pb.CompositionEdge) *compositionEdge {
 // CanvasStore provides storage operations for canvas state
 type CanvasStore struct {
 	db *sql.DB
+	// canvas is the one this store is scoped to (In), and empty is the
+	// namespace's own canvas.
+	canvas string
 }
 
 // NewCanvasStore creates a new canvas store
@@ -86,37 +89,6 @@ var ErrNoCanvas = errors.New("this namespace has no canvas")
 // ErrCanvasExists is a create in a namespace that already has its canvas.
 var ErrCanvasExists = errors.New("this namespace already has a canvas")
 
-// Name is the name the canvas was created under.
-func (s *CanvasStore) Name(ctx context.Context) (string, error) {
-	var name string
-	err := s.db.QueryRowContext(ctx, `SELECT name FROM canvases WHERE id = 1`).Scan(&name)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", ErrNoCanvas
-	}
-	if err != nil {
-		return "", errors.Wrap(err, "failed to read the canvas")
-	}
-	return name, nil
-}
-
-// Create makes the canvas under a name.
-func (s *CanvasStore) Create(ctx context.Context, name string) error {
-	if name == "" {
-		return errors.New("a canvas is named, and this one has no name")
-	}
-	if _, err := s.Name(ctx); err == nil {
-		return errors.Wrapf(ErrCanvasExists, "creating %s", name)
-	} else if !errors.Is(err, ErrNoCanvas) {
-		return err
-	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO canvases (id, name, created_at) VALUES (1, ?, ?)`,
-		name, time.Now().Format(time.RFC3339Nano))
-	if err != nil {
-		return errors.Wrapf(err, "failed to create the canvas %s", name)
-	}
-	return nil
-}
-
 // === Element operations ===
 
 // UpsertElement creates or updates an element
@@ -127,9 +99,13 @@ func (s *CanvasStore) UpsertElement(ctx context.Context, item *CanvasElement) er
 	}
 	item.UpdatedAt = now
 
+	in, err := s.scope(ctx)
+	if err != nil {
+		return err
+	}
 	query := `
-		INSERT INTO canvas_elements (id, canvas_id, symbol, x, y, width, height, content, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO canvas_elements (id, canvas_id, symbol, x, y, width, height, content, created_at, updated_at, in_canvas)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			canvas_id = excluded.canvas_id,
 			symbol = excluded.symbol,
@@ -138,14 +114,16 @@ func (s *CanvasStore) UpsertElement(ctx context.Context, item *CanvasElement) er
 			width = excluded.width,
 			height = excluded.height,
 			content = excluded.content,
-			updated_at = excluded.updated_at
+			updated_at = excluded.updated_at,
+			in_canvas = excluded.in_canvas
 	`
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err = s.db.ExecContext(ctx, query,
 		item.ID, item.CanvasID, item.Symbol, item.X, item.Y,
 		item.Width, item.Height, item.Content,
 		item.CreatedAt.Format(time.RFC3339Nano),
 		item.UpdatedAt.Format(time.RFC3339Nano),
+		in,
 	)
 	if err != nil {
 		return errors.Wrapf(err, "failed to upsert canvas element %s", item.ID)
@@ -156,13 +134,17 @@ func (s *CanvasStore) UpsertElement(ctx context.Context, item *CanvasElement) er
 
 // GetElement retrieves an element by ID
 func (s *CanvasStore) GetElement(ctx context.Context, id string) (*CanvasElement, error) {
+	in, err := s.scope(ctx)
+	if err != nil {
+		return nil, err
+	}
 	query := `SELECT id, canvas_id, symbol, x, y, width, height, content, created_at, updated_at
-	          FROM canvas_elements WHERE id = ?`
+	          FROM canvas_elements WHERE id = ? AND in_canvas = ?`
 
 	var item CanvasElement
 	var createdAt, updatedAt string
 
-	err := s.db.QueryRowContext(ctx, query, id).Scan(
+	err = s.db.QueryRowContext(ctx, query, id, in).Scan(
 		&item.ID, &item.CanvasID, &item.Symbol, &item.X, &item.Y,
 		&item.Width, &item.Height, &item.Content,
 		&createdAt, &updatedAt,
@@ -189,10 +171,14 @@ func (s *CanvasStore) GetElement(ctx context.Context, id string) (*CanvasElement
 
 // ListElements returns all elements
 func (s *CanvasStore) ListElements(ctx context.Context) (_ []*CanvasElement, err error) {
+	in, err := s.scope(ctx)
+	if err != nil {
+		return nil, err
+	}
 	query := `SELECT id, canvas_id, symbol, x, y, width, height, content, created_at, updated_at
-	          FROM canvas_elements ORDER BY created_at ASC`
+	          FROM canvas_elements WHERE in_canvas = ? ORDER BY created_at ASC`
 
-	rows, err := s.db.QueryContext(ctx, query)
+	rows, err := s.db.QueryContext(ctx, query, in)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list canvas elements")
 	}
@@ -233,9 +219,13 @@ func (s *CanvasStore) ListElements(ctx context.Context) (_ []*CanvasElement, err
 
 // DeleteElement removes an element
 func (s *CanvasStore) DeleteElement(ctx context.Context, id string) error {
-	query := `DELETE FROM canvas_elements WHERE id = ?`
+	in, err := s.scope(ctx)
+	if err != nil {
+		return err
+	}
+	query := `DELETE FROM canvas_elements WHERE id = ? AND in_canvas = ?`
 
-	result, err := s.db.ExecContext(ctx, query, id)
+	result, err := s.db.ExecContext(ctx, query, id, in)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete canvas element %s", id)
 	}
@@ -263,6 +253,11 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 	}
 	comp.UpdatedAt = now
 
+	in, err := s.scope(ctx)
+	if err != nil {
+		return err
+	}
+
 	// Start transaction for atomic composition + edges table updates
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -272,18 +267,20 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 
 	// Upsert composition record
 	query := `
-		INSERT INTO canvas_compositions (id, x, y, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO canvas_compositions (id, x, y, created_at, updated_at, in_canvas)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			x = excluded.x,
 			y = excluded.y,
-			updated_at = excluded.updated_at
+			updated_at = excluded.updated_at,
+			in_canvas = excluded.in_canvas
 	`
 
 	_, err = tx.ExecContext(ctx, query,
 		comp.ID, comp.X, comp.Y,
 		comp.CreatedAt.Format(time.RFC3339Nano),
 		comp.UpdatedAt.Format(time.RFC3339Nano),
+		in,
 	)
 	if err != nil {
 		return errors.Wrapf(err, "failed to upsert canvas composition %s", comp.ID)
@@ -316,13 +313,17 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 
 // GetComposition retrieves a composition by ID
 func (s *CanvasStore) GetComposition(ctx context.Context, id string) (_ *CanvasComposition, err error) {
+	in, err := s.scope(ctx)
+	if err != nil {
+		return nil, err
+	}
 	query := `SELECT id, x, y, created_at, updated_at
-	          FROM canvas_compositions WHERE id = ?`
+	          FROM canvas_compositions WHERE id = ? AND in_canvas = ?`
 
 	var comp CanvasComposition
 	var createdAt, updatedAt string
 
-	err = s.db.QueryRowContext(ctx, query, id).Scan(
+	err = s.db.QueryRowContext(ctx, query, id, in).Scan(
 		&comp.ID, &comp.X, &comp.Y,
 		&createdAt, &updatedAt,
 	)
@@ -377,10 +378,14 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (_ *CanvasC
 
 // ListCompositions returns all compositions
 func (s *CanvasStore) ListCompositions(ctx context.Context) (_ []*CanvasComposition, err error) {
+	in, err := s.scope(ctx)
+	if err != nil {
+		return nil, err
+	}
 	query := `SELECT id, x, y, created_at, updated_at
-	          FROM canvas_compositions ORDER BY created_at ASC`
+	          FROM canvas_compositions WHERE in_canvas = ? ORDER BY created_at ASC`
 
-	rows, err := s.db.QueryContext(ctx, query)
+	rows, err := s.db.QueryContext(ctx, query, in)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list canvas compositions")
 	}
@@ -456,9 +461,13 @@ func (s *CanvasStore) edgesForComposition(ctx context.Context, compID string) (_
 
 // DeleteComposition removes a composition
 func (s *CanvasStore) DeleteComposition(ctx context.Context, id string) error {
-	query := `DELETE FROM canvas_compositions WHERE id = ?`
+	in, err := s.scope(ctx)
+	if err != nil {
+		return err
+	}
+	query := `DELETE FROM canvas_compositions WHERE id = ? AND in_canvas = ?`
 
-	result, err := s.db.ExecContext(ctx, query, id)
+	result, err := s.db.ExecContext(ctx, query, id, in)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete canvas composition %s", id)
 	}
@@ -484,8 +493,12 @@ type MinimizedWindow struct {
 
 // AddMinimizedWindow records an element as minimized
 func (s *CanvasStore) AddMinimizedWindow(ctx context.Context, elementID string) error {
-	query := `INSERT OR IGNORE INTO minimized_windows (element_id) VALUES (?)`
-	_, err := s.db.ExecContext(ctx, query, elementID)
+	in, err := s.scope(ctx)
+	if err != nil {
+		return err
+	}
+	query := `INSERT OR IGNORE INTO minimized_windows (element_id, in_canvas) VALUES (?, ?)`
+	_, err = s.db.ExecContext(ctx, query, elementID, in)
 	if err != nil {
 		return errors.Wrapf(err, "failed to add minimized window %s", elementID)
 	}
@@ -494,8 +507,12 @@ func (s *CanvasStore) AddMinimizedWindow(ctx context.Context, elementID string) 
 
 // ListMinimizedWindows returns all minimized window element IDs
 func (s *CanvasStore) ListMinimizedWindows(ctx context.Context) (_ []*MinimizedWindow, err error) {
-	query := `SELECT element_id, created_at FROM minimized_windows ORDER BY created_at ASC`
-	rows, err := s.db.QueryContext(ctx, query)
+	in, err := s.scope(ctx)
+	if err != nil {
+		return nil, err
+	}
+	query := `SELECT element_id, created_at FROM minimized_windows WHERE in_canvas = ? ORDER BY created_at ASC`
+	rows, err := s.db.QueryContext(ctx, query, in)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list minimized windows")
 	}
@@ -529,8 +546,12 @@ func (s *CanvasStore) ListMinimizedWindows(ctx context.Context) (_ []*MinimizedW
 
 // RemoveMinimizedWindow removes a minimized window record
 func (s *CanvasStore) RemoveMinimizedWindow(ctx context.Context, elementID string) error {
-	query := `DELETE FROM minimized_windows WHERE element_id = ?`
-	result, err := s.db.ExecContext(ctx, query, elementID)
+	in, err := s.scope(ctx)
+	if err != nil {
+		return err
+	}
+	query := `DELETE FROM minimized_windows WHERE element_id = ? AND in_canvas = ?`
+	result, err := s.db.ExecContext(ctx, query, elementID, in)
 	if err != nil {
 		return errors.Wrapf(err, "failed to remove minimized window %s", elementID)
 	}

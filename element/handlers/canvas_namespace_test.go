@@ -80,7 +80,7 @@ func TestTwoNamespacesSeeTheirOwnCanvas(t *testing.T) {
 		"b": elementstorage.NewCanvasStore(qntxtest.CreateTestDB(t)),
 	}
 	for name, store := range stores {
-		if err := store.Create(t.Context(), name); err != nil {
+		if err := store.Create(t.Context(), name, ""); err != nil {
 			t.Fatal(err)
 		}
 	}

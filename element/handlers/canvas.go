@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/watcher"
 	elementstorage "github.com/teranos/QNTX/element/storage"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -25,6 +27,9 @@ type CanvasHandler struct {
 	// canvasFor is the canvas store of the namespace a request acts in. Nil
 	// means store, for a node with one namespace.
 	canvasFor     func(*http.Request) (*elementstorage.CanvasStore, error)
+	people        People
+	mailer        Mailer
+	inviteLink    func(token string) string
 	watcherEngine *watcher.Engine
 	logger        *zap.SugaredLogger
 	serverPort    int // Server port for internal plugin calls
@@ -60,8 +65,10 @@ func WithCanvasFor(canvasFor func(*http.Request) (*elementstorage.CanvasStore, e
 	}
 }
 
-// storeOf is the store of a namespace that has a canvas. What it cannot give,
-// it has already answered on w.
+// storeOf is the store of the canvas a request acts on: the one `canvas`
+// names, or the namespace's. The caller has to own it, or have been granted
+// it, or own every canvas (ROOT, and SUPER). What it cannot give, it has
+// already answered on w.
 func (h *CanvasHandler) storeOf(w http.ResponseWriter, r *http.Request) (*elementstorage.CanvasStore, bool) {
 	store, ok := h.anyStoreOf(w, r)
 	if !ok {
@@ -71,11 +78,45 @@ func (h *CanvasHandler) storeOf(w http.ResponseWriter, r *http.Request) (*elemen
 	if h.canvasFor == nil {
 		return store, true
 	}
-	if _, err := store.Name(r.Context()); err != nil {
+	canvas, err := h.canvasNamed(r, store)
+	if err != nil {
 		h.writeCanvasError(w, err)
 		return nil, false
 	}
-	return store, true
+	if !h.mayAct(r, canvas) {
+		h.writeError(w, errors.Newf("the canvas %s is not yours", canvas.ID), http.StatusForbidden)
+		return nil, false
+	}
+	return store.In(canvas.ID), true
+}
+
+// canvasNamed is the canvas a request names with `canvas`, or the
+// namespace's own when it names none.
+func (h *CanvasHandler) canvasNamed(r *http.Request, store *elementstorage.CanvasStore) (elementstorage.Canvas, error) {
+	if id := r.URL.Query().Get("canvas"); id != "" {
+		return store.Canvas(r.Context(), id)
+	}
+	canvases, err := store.Canvases(r.Context())
+	if err != nil {
+		return elementstorage.Canvas{}, err
+	}
+	for _, c := range canvases {
+		if c.Kind == elementstorage.CanvasOfTheNamespace {
+			return c, nil
+		}
+	}
+	return elementstorage.Canvas{}, elementstorage.ErrNoCanvas
+}
+
+// mayAct is whether the caller may act on a canvas: its owners may, those
+// granted the namespace's canvas may, and ROOT and SUPER own every one.
+func (h *CanvasHandler) mayAct(r *http.Request, canvas elementstorage.Canvas) bool {
+	admitted, gated := auth.AdmissionFrom(r.Context())
+	if !gated || admitted.OwnsEveryCanvas() {
+		return true
+	}
+	return slices.Contains(canvas.Owners, admitted.UserID) ||
+		(canvas.Kind == elementstorage.CanvasOfTheNamespace && slices.Contains(canvas.Access, admitted.UserID))
 }
 
 // anyStoreOf is the store of the namespace a request acts in, whether or not
@@ -136,7 +177,12 @@ func (h *CanvasHandler) HandleCanvas(w http.ResponseWriter, r *http.Request) {
 			h.writeError(w, errors.New("name is required"), http.StatusBadRequest)
 			return
 		}
-		if err := store.Create(r.Context(), body.Name); err != nil {
+		admitted, gated := auth.AdmissionFrom(r.Context())
+		if gated && !admitted.OwnsEveryCanvas() {
+			h.writeError(w, errors.New("only ROOT, or SUPER here, creates the namespace's canvas"), http.StatusForbidden)
+			return
+		}
+		if err := store.Create(r.Context(), body.Name, admitted.UserID); err != nil {
 			if errors.Is(err, elementstorage.ErrCanvasExists) {
 				h.writeError(w, err, http.StatusConflict)
 			} else {

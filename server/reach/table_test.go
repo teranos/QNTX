@@ -61,17 +61,25 @@ func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
 	}
 }
 
-// A SUPER session's browser saves which windows it minimized, and was refused.
-// "add it"
-func TestSuperReachesMinimizedWindows(t *testing.T) {
+// "the canvas becomes reachable to whoever the namespace is for": every canvas
+// path lets the namespace's people through the gate, and which canvas each
+// may act on is the canvas's owners' to say (element/handlers). A token is a
+// machine, and draws no canvas.
+func TestTheCanvasIsReachedByWhoeverTheNamespaceIsFor(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/api/canvas/minimized-windows", "/api/canvas/minimized-windows/"} {
+	for _, path := range []string{
+		"/api/canvas", "/api/canvases", "/api/canvases/",
+		"/api/canvas/elements", "/api/canvas/elements/",
+		"/api/canvas/compositions", "/api/canvas/compositions/",
+		"/api/canvas/minimized-windows", "/api/canvas/minimized-windows/",
+	} {
 		row, said := granted[path]
 		require.True(t, said, path+" is granted to nobody at all")
 		assert.False(t, row.anyone, path+" is served without asking who is calling")
-		assert.Equal(t, []auth.Level{auth.LevelSuper}, row.reach.Beyond(), path+" lets in the wrong levels besides ROOT")
+		assert.Equal(t, []auth.Level{auth.LevelSuper, auth.LevelAttestor, auth.LevelPublicRegistration}, row.reach.Beyond(),
+			path+" lets in the wrong levels besides ROOT")
 	}
 }
 

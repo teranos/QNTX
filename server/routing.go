@@ -123,7 +123,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/namespaces/default/nuke", s.HandleNukeDefault)                      // Empty default without ending it
 	s.answer("/api/attestations", s.HandleAttestations)                                // Query (GET) / create (POST) attestations
 	s.answer("/api/element-config", s.HandleElementConfig)                             // Plugin element config via attestations (GET/POST)
-	s.answer("/api/canvas", s.canvasHandler.HandleCanvas)                               // The canvas of this namespace (GET), created and named (POST)
+	s.answer("/api/canvases", s.canvasHandler.HandleCanvases)                            // The canvases of this namespace (GET), one created (POST)
+	s.answer("/api/canvases/", s.canvasHandler.HandleCanvases)                           // One canvas: disable, enable, owners, access, invite; accept
+	s.answer("/api/canvas", s.canvasHandler.HandleCanvas)                             // The canvas of this namespace (GET), created and named (POST)
 	s.answer("/api/canvas/elements/", s.canvasHandler.HandleElements)                 // Element CRUD (GET/POST/DELETE /api/canvas/elements/{id})
 	s.answer("/api/canvas/elements", s.canvasHandler.HandleElements)                   // List/create elements (GET/POST)
 	s.answer("/api/canvas/compositions/", s.canvasHandler.HandleCompositions)          // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})

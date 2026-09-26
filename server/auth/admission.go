@@ -128,6 +128,13 @@ func (a Admission) MaySeeSystem() bool {
 	return a.level == LevelRoot || a.level == LevelSuper || a.seesSystem
 }
 
+// OwnsEveryCanvas reports whether this admission owns every canvas where it
+// stands without a row saying so. "All canvasses are always implicitly owned
+// by ROOT" and "by SUPER's in that namespace".
+func (a Admission) OwnsEveryCanvas() bool {
+	return a.level == LevelRoot || a.level == LevelSuper
+}
+
 // MayEndNamespaces reports whether this admission may delete a namespace: ROOT
 // alone, the same as nuking default (ADR-027).
 func (a Admission) MayEndNamespaces() bool {
