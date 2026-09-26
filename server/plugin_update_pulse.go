@@ -32,7 +32,7 @@ func (s *QNTXServer) SetupPluginUpdateSchedule(manager *grpc.PluginManager, regi
 	}
 
 	s.daemon.Registry().Register(handler)
-	s.logger.Infow("Registered plugin update handler")
+	s.logger.Debugw("Registered plugin update handler")
 
 	ensureUpdateSchedule(
 		s.held.ServedUniverse().Schedules(),

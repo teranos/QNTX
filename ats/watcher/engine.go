@@ -258,7 +258,7 @@ func (e *Engine) Stop() {
 		e.logger.Infow("Reset in-flight queue entries for next startup", "count", orphans)
 	}
 
-	e.logger.Info("Watcher engine stopped")
+	e.logger.Debug("Watcher engine stopped")
 }
 
 // loadWatchers loads all enabled watchers from the database and parses AX queries

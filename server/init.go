@@ -248,7 +248,7 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		return
 	}
 
-	serverLogger.Infow(fmt.Sprintf("Using config file: %s", configPath))
+	serverLogger.Debugw(fmt.Sprintf("Using config file: %s", configPath))
 
 	configWatcher, err := appcfg.NewConfigWatcher(configPath)
 	if err != nil {
@@ -358,5 +358,5 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 	})
 
 	configWatcher.Start()
-	serverLogger.Infow("Config watcher started", "path", configPath)
+	serverLogger.Debugw("Config watcher started", "path", configPath)
 }

@@ -15,7 +15,6 @@ import (
 
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/element/handlers"
-	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -246,16 +245,14 @@ func (s *QNTXServer) handleClientRegister(client *Client) {
 	totalClients := len(s.clients)
 	s.mu.Unlock()
 
-	s.logger.Infow("Client connected",
+	// One line per socket, said where it is counted: which universe it is in
+	// was settled before it was registered (HandleWebSocket).
+	s.logger.Infow("WebSocket connected",
 		"client_id", client.id,
+		"namespace", client.in,
+		"level", client.admitted.LevelName(),
+		"gated", client.gated,
 		"total_clients", totalClients,
-	)
-
-	// Send connection message to UI logs panel
-	versionInfo := version.Get()
-	s.logger.Infow("WebSocket connection established",
-		"client_id", client.id,
-		"version", versionInfo.Short(),
 	)
 }
 
@@ -452,9 +449,9 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 	}
 
 	if ep, ok := p.(*grpcplugin.ExternalDomainProxy); ok {
-		s.logger.Infow("Registered HTTP proxy handlers", "plugin", name, "addr", ep.Addr())
+		s.logger.Debugw("Registered HTTP proxy handlers", "plugin", name, "addr", ep.Addr())
 	} else {
-		s.logger.Infow("Registered HTTP proxy handlers", "plugin", name)
+		s.logger.Debugw("Registered HTTP proxy handlers", "plugin", name)
 	}
 
 	// A restarted plugin is a new Initialize, and may hand different signa.

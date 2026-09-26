@@ -315,7 +315,9 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 	measure.Count(measure.StaandArrivals, 1,
 		measure.String(measure.AttrStand, key),
 		measure.String(measure.AttrEvent, s.staandEventDim(key, predicate)))
-	s.logger.Infow("Stand arrival recorded",
+	// The arrival is the attestation above and the count; the line is for
+	// whoever is at the machine.
+	s.logger.Debugw("Stand arrival recorded",
 		"market", market, "slug", slug, "subject", subject, "predicate", predicate)
 }
 

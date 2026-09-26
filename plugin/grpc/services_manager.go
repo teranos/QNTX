@@ -571,7 +571,7 @@ func (m *ServicesManager) GetVectorSearchRouter() *services.VectorSearchServer {
 
 // Shutdown gracefully stops all service servers
 func (m *ServicesManager) Shutdown() {
-	m.logger.Info("Shutting down plugin services")
+	m.logger.Debug("Shutting down plugin services")
 
 	if m.atsStoreServer != nil {
 		m.atsStoreServer.GracefulStop()
@@ -613,7 +613,7 @@ func (m *ServicesManager) Shutdown() {
 		m.mailServer.GracefulStop()
 	}
 
-	m.logger.Info("Plugin services stopped")
+	m.logger.Debug("Plugin services stopped")
 }
 
 // GetEndpoints returns the service endpoints

@@ -136,6 +136,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	url := fmt.Sprintf("http://localhost:%d", actualPort)
 	s.logger.Infow("Server ready",
 		"url", url,
+		"bind", s.bindAddress,
 		"port", actualPort,
 	)
 
@@ -172,7 +173,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill
 		// long-lived WebSocket connections (graph, sync).
 	}
-	s.logger.Infow(fmt.Sprintf("HTTP server listening on %s:%d", s.bindAddress, actualPort))
+	s.logger.Debugw(fmt.Sprintf("HTTP server listening on %s:%d", s.bindAddress, actualPort))
 	return s.httpServer.ListenAndServe()
 }
 
@@ -295,7 +296,7 @@ func (s *QNTXServer) Stop() error {
 
 	select {
 	case <-done:
-		s.logger.Infow("All goroutines stopped cleanly")
+		s.logger.Debugw("All goroutines stopped cleanly")
 	case <-time.After(ShutdownTimeout):
 		s.logger.Warnw("Goroutine shutdown timed out, forcing exit",
 			"timeout", ShutdownTimeout,
@@ -306,14 +307,14 @@ func (s *QNTXServer) Stop() error {
 	// ends. Nothing serves now, so nothing lands after its last send.
 	s.logger.Infow("Closing namespaces; each sends what it holds first")
 	s.held.CloseAll()
-	s.logger.Infow("Namespaces closed")
+	s.logger.Debugw("Namespaces closed")
 
 	// Stop config watcher
 	if s.configWatcher != nil {
 		if err := s.configWatcher.Stop(); err != nil {
 			s.logger.Errorw("Config watcher did not stop; it may still hold a file handle", "error", err)
 		} else {
-			s.logger.Infow("Config watcher stopped")
+			s.logger.Debugw("Config watcher stopped")
 		}
 	}
 

@@ -69,9 +69,6 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	client.in = u.Name()
-	s.logger.Infow("WebSocket connected",
-		"client_id", client.id, "namespace", client.in,
-		"level", admitted.LevelName(), "gated", gated)
 
 	// Send version info BEFORE starting writePump (avoid concurrent writes)
 	versionInfo := version.Get()
