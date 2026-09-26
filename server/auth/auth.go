@@ -463,6 +463,9 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// ⍟'s own path: an element's things are asked for on the element's own path,
 	// rather than beside the ceremony that admitted the person.
 	mux.answer("/i/", h.HandleTheUser)
+	// Their picture, as the node's own image: the page's CSP lets images come
+	// from the node alone.
+	mux.answer("/i/picture", h.HandlePicture)
 	// Arriving: a User an admission created has said nothing about itself,
 	// and every User has a display_name and an email (ADR-031).
 	mux.answer("/auth/user/arrival", h.HandleArrivalStatus)

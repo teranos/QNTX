@@ -3,6 +3,8 @@
 .canvas-birth {
     position: fixed;
     inset: 0;
+    /* Under the header, so who is looking and where stays in view. */
+    z-index: 0;
     display: flex;
     flex-direction: column;
     align-items: center;

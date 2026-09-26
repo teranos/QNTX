@@ -588,6 +588,15 @@
         "ANYONE"
       ]
     },
+    "/i/picture": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
+      ]
+    },
     "/i/standing": {
       "x-qntx-reach": [
         "ROOT",

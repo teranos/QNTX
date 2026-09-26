@@ -117,9 +117,55 @@ body.disconnected #container {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    /* Above the page a namespace with no canvas shows (canvas-birth.css). */
+    position: relative;
+    z-index: 1;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-primary);
+}
+
+/* Who is looking: the picture, round once the node answered one, the name,
+   and the namespace stood in. The QNTX mark holds the place otherwise. */
+.who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+#who-picture {
+    width: 24px;
+    height: 24px;
+    display: block;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+#who-picture.round {
+    border-radius: 50%;
+}
+
+.who-words {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 0;
+}
+
+#who-name {
+    font-size: 11px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#who-namespace {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 #header h1 {

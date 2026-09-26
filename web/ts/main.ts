@@ -23,8 +23,9 @@ import { signedIn, openDoor } from './signin.ts';
 import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
-import { person } from './self-person.ts';
+import { person, type Person } from './self-person.ts';
 import { setStanding } from './standing.ts';
+import { drawWho } from './who.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
 import { formatDateTime } from './html-utils.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -254,12 +255,15 @@ async function init(): Promise<void> {
     // Where this person stands decides which canvas the browser loads: one
     // per namespace (ADR-026). A node that will not say is nowhere, which is
     // the key the browser always used.
+    let who: Person | null = null;
     try {
-        setStanding((await person()).standing);
+        who = await person();
+        setStanding(who.standing);
     } catch (err: unknown) {
         log.debug(SEG.UI, '[Init] Standing nowhere:', err);
         setStanding('');
     }
+    drawWho(who).catch((err: unknown) => log.warn(SEG.UI, '[Init] Who was not drawn:', err));
 
     // Load persisted UI state from IndexedDB (must happen after initStorage())
     uiState.loadPersistedState();

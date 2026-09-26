@@ -65,6 +65,7 @@ REACH is '/i/disable' '/i/enable'                                         of ANY
 # ⍟'s own paths: who you are, and where you stand.
 REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
+REACH is '/i/picture'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 
 # First-time setup: the ways in this node offers, and claiming it.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
