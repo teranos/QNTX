@@ -120,7 +120,9 @@ func TestClientIP_RemoteAddr(t *testing.T) {
 }
 
 func TestClientIP_XForwardedForSingle(t *testing.T) {
+	// Through the proxy (loopback peer) with one hop: that hop is the client.
 	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "127.0.0.1:9999"
 	r.Header.Set("X-Forwarded-For", "203.0.113.50")
 
 	if ip := clientIP(r); ip != "203.0.113.50" {
@@ -129,11 +131,39 @@ func TestClientIP_XForwardedForSingle(t *testing.T) {
 }
 
 func TestClientIP_XForwardedForChain(t *testing.T) {
+	// Caddy appends the address it saw, so the real client is the last entry.
+	// The two to its left are what the caller sent and are not to be trusted.
 	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "127.0.0.1:9999"
 	r.Header.Set("X-Forwarded-For", "203.0.113.50, 70.41.3.18, 150.172.238.178")
 
-	if ip := clientIP(r); ip != "203.0.113.50" {
-		t.Fatalf("expected leftmost IP 203.0.113.50, got %s", ip)
+	if ip := clientIP(r); ip != "150.172.238.178" {
+		t.Fatalf("expected rightmost IP 150.172.238.178, got %s", ip)
+	}
+}
+
+// A caller cannot pin the blame on, or borrow the identity of, another address
+// by prefixing X-Forwarded-For: the forged entries are left of the one Caddy
+// appended, and only the appended one is read.
+func TestClientIP_ForgedPrefixThroughProxy(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "127.0.0.1:9999"
+	r.Header.Set("X-Forwarded-For", "1.2.3.4, 45.148.10.60")
+
+	if ip := clientIP(r); ip != "45.148.10.60" {
+		t.Fatalf("expected the appended IP 45.148.10.60, got %s", ip)
+	}
+}
+
+// A connection that did not come through Caddy (non-loopback peer) cannot speak
+// for any address but its own: its X-Forwarded-For is ignored whole.
+func TestClientIP_XForwardedForIgnoredFromUntrustedPeer(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "45.148.10.60:5555"
+	r.Header.Set("X-Forwarded-For", "10.0.0.9")
+
+	if ip := clientIP(r); ip != "45.148.10.60" {
+		t.Fatalf("expected the peer 45.148.10.60, got %s", ip)
 	}
 }
 

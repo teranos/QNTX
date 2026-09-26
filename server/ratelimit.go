@@ -70,25 +70,47 @@ func (g *rateLimitGroup) sweep(maxAge time.Duration) {
 	})
 }
 
-// clientIP extracts the client IP from the request. It checks
-// X-Forwarded-For (leftmost entry) first, then falls back to RemoteAddr.
+// clientIP is the address the node treats as the caller: the per-IP rate-limit
+// key and the ip field on the access log. It has to be the real remote client,
+// because a value the caller can forge lets them evade the per-IP limits or
+// wear another caller's address.
 //
-// Note: X-Forwarded-For is trivially spoofable by clients. Rate limiting
-// via XFF is only reliable behind a trusted reverse proxy that overwrites
-// the header. On loopback (the default bind), this is irrelevant since
-// RemoteAddr is always 127.0.0.1.
+// The node binds loopback and Caddy is the only thing in front of it
+// (infra/bootstrap/Caddyfile, which is frozen to a bare reverse_proxy). Caddy
+// appends the address it saw to whatever X-Forwarded-For the caller already
+// sent, so the trustworthy client is the last entry, never the first:
+// everything to its left is what the caller claimed and can lie about.
+//
+//   - The direct peer is the trusted proxy (loopback): the client is the
+//     rightmost X-Forwarded-For entry, or the peer when the header is absent.
+//   - The direct peer is anyone else — a connection that did not come through
+//     Caddy: the client is that peer, and X-Forwarded-For is ignored whole,
+//     because every hop in it was written by someone untrusted.
 func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Leftmost IP is the original client
-		if idx := strings.Index(xff, ","); idx != -1 {
-			return strings.TrimSpace(xff[:idx])
-		}
-		return strings.TrimSpace(xff)
-	}
-
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
+	}
+
+	// Only a request that reached the node through the trusted proxy may name a
+	// client other than its own connection. Caddy reaches it over loopback.
+	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
+		return host
+	}
+
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff == "" {
+		return host
+	}
+
+	// The last entry is the one Caddy appended from the connection it
+	// terminated. Split on the final comma, not the first.
+	last := xff
+	if idx := strings.LastIndex(xff, ","); idx != -1 {
+		last = xff[idx+1:]
+	}
+	if last = strings.TrimSpace(last); last != "" {
+		return last
 	}
 	return host
 }
