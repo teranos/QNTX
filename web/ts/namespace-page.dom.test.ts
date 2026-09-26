@@ -8,7 +8,7 @@
  * shimmers, 2nd click actually creates it."
  */
 
-import { describe, test, expect, beforeEach, mock } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
@@ -29,7 +29,15 @@ mock.module('./api/canvases', () => ({
 }));
 
 const { initNamespacePage, opening, enter } = await import('./namespace-page.ts');
-const { setStanding, openCanvasKey, openOnceKey } = await import('./standing.ts');
+const { setStanding, setOpenCanvas, openCanvasKey, openOnceKey } = await import('./standing.ts');
+
+// Standing is process-global, like a module mock: left set, every later test
+// file keys its storage under this namespace. Put back what was found.
+afterEach(() => {
+    setStanding('');
+    setOpenCanvas('');
+    localStorage.clear();
+});
 
 const namespaces = { id: 'CV-NS', name: 'garden', kind: 'namespace' as const, created_by: '', created_at: '', disabled_by: '', owners: [], access: [], owner_views: [], mine: false };
 const bobs = { id: 'CV-BOB', name: 'bob\'s', kind: 'user' as const, created_by: 'US-BOB', created_at: '', disabled_by: '', owners: ['US-BOB'], access: [], owner_views: [], mine: true };
