@@ -58,7 +58,7 @@ func setOperatorClient(logger *zap.SugaredLogger, label, clientID, secretRef str
 		return
 	}
 	hand(clientID, secret)
-	logger.Infow(label+" identity provider enabled", "client_id", clientID)
+	logger.Debugw(label+" identity provider enabled", "client_id", clientID)
 }
 
 // setDoors hands the auth handler every door am.toml names.
@@ -315,7 +315,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authHandler.SetFooting(s.footing)
 	s.authHandler = authHandler
 	s.authEnabled = true
-	s.logger.Infow("WebAuthn authentication enabled",
+	s.logger.Debugw("WebAuthn authentication enabled",
 		"session_expiry_hours", s.deps.cfg.Auth.SessionExpiryHours,
 		"rp_id", s.deps.cfg.Auth.RPID,
 		"rp_origins", s.deps.cfg.Auth.RPOrigins,

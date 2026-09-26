@@ -56,15 +56,13 @@ var heartbeatPaths = map[string]bool{
 	"/am/statusline": true,
 }
 
-// Past this a heartbeat has stopped being one, and is worth a line.
-const heartbeatQuiet = 50 * time.Millisecond
-
-// Whether this poll went well: it answered, and answered quickly.
+// Whether this poll went well: it answered. How long it took is not the
+// state; a quick endpoint crossing a latency line and back was a turn each way.
 
 // Any status short of 400, not 200 alone: /am/statusline answers 303 every time,
 // so pinning this to 200 quieted nothing and buried every other line.
-func heartbeatWell(status int, took time.Duration) bool {
-	return status < http.StatusBadRequest && took < heartbeatQuiet
+func heartbeatWell(status int) bool {
+	return status < http.StatusBadRequest
 }
 
 // How many lines one state is worth before it stops being news. Two and not
@@ -132,7 +130,7 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		// A polled path says something when its answer turns, and nothing while
 		// it stays the same.
 		if heartbeatPaths[r.URL.Path] {
-			if !s.heartbeats.worthSaying(r.URL.Path, heartbeatWell(recorder.status, took)) {
+			if !s.heartbeats.worthSaying(r.URL.Path, heartbeatWell(recorder.status)) {
 				return
 			}
 		} else if recorder.status < http.StatusBadRequest {

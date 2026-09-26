@@ -685,7 +685,7 @@ func (s *QNTXServer) setupCIWatch() {
 		logger:   s.logger.Named("ci.watch"),
 	}
 	s.daemon.Registry().Register(h)
-	s.logger.Infow("Registered ci.watch built-in")
+	s.logger.Debugw("Registered ci.watch built-in")
 
 	// Every namespace the node knows, not the one it serves by default: the
 	// ground token attests in its own, and a push is wherever its token acts.

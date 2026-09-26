@@ -120,7 +120,7 @@ func (t *Ticker) Start() {
 	// If this ends, nothing scheduled runs again. Through sacred so that is a
 	// logged error rather than a node that quietly stops keeping time.
 	sacred.GoTracked(&t.wg, "pulse.ticker", t.run)
-	t.pulseLog.Infow("Pulse ticker started", "interval", t.interval)
+	t.pulseLog.Debugw("Pulse ticker started", "interval", t.interval)
 }
 
 // Stop gracefully stops the ticker

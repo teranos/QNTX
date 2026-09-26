@@ -961,7 +961,7 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, searchPa
 	for n := range m.retryCancels {
 		retryNames = append(retryNames, n)
 	}
-	m.logger.Infow("RestartPlugin: map check",
+	m.logger.Debugw("RestartPlugin: map check",
 		"plugin", name,
 		"in_map", exists,
 		"all_plugins", pluginNames,
@@ -1124,7 +1124,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		p, exists := m.plugins[name]
 		m.mu.RUnlock()
 		if exists {
-			m.logger.Infow("registerRestarted: calling Initialize", "plugin", name)
+			m.logger.Debugw("registerRestarted: calling Initialize", "plugin", name)
 			initDone := make(chan error, 1)
 			go func() {
 				initCtx, initCancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -1136,7 +1136,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 				if err != nil {
 					m.logger.Errorf("Failed to initialize plugin '%s' after restart: %v", name, err)
 				}
-				m.logger.Infow("registerRestarted: Initialize returned", "plugin", name)
+				m.logger.Debugw("registerRestarted: Initialize returned", "plugin", name)
 			case <-time.After(30 * time.Second):
 				m.logger.Warnw("registerRestarted: Initialize timed out, continuing with banner", "plugin", name)
 			}
@@ -1215,13 +1215,13 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		// Collect health asynchronously — synchronous Health() blocks plugin restart
 		// while the plugin makes ATS calls back to QNTX.
 		// Emit the banner inside the goroutine so it shows actual health status.
-		m.logger.Infow("registerRestarted: launching banner goroutine", "plugin", name, "reason", reason)
+		m.logger.Debugw("registerRestarted: launching banner goroutine", "plugin", name, "reason", reason)
 		go func() {
-			m.logger.Infow("registerRestarted: calling Health()", "plugin", name)
+			m.logger.Debugw("registerRestarted: calling Health()", "plugin", name)
 			healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			health := proxy.Health(healthCtx)
 			hCancel()
-			m.logger.Infow("registerRestarted: Health() returned", "plugin", name, "healthy", health.Healthy, "message", health.Message)
+			m.logger.Debugw("registerRestarted: Health() returned", "plugin", name, "healthy", health.Healthy, "message", health.Message)
 			details := make(map[string]string)
 			for k, v := range health.Details {
 				if s, ok := v.(string); ok {
@@ -1230,13 +1230,13 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 			}
 			m.accumulator.SetHealth(name, health.Healthy, health.Message, details)
 			m.accumulator.Emit(name, reason)
-			m.logger.Infow("registerRestarted: banner emitted", "plugin", name, "reason", reason)
+			m.logger.Debugw("registerRestarted: banner emitted", "plugin", name, "reason", reason)
 			m.emitLifecycle(name, meta.Version, string(reason), routeStrs)
 		}()
 	} else {
 		m.logger.Warnw("registerRestarted: accumulator is nil, no banner will be emitted", "plugin", name)
 	}
-	m.logger.Infow("registerRestarted: completed", "plugin", name)
+	m.logger.Debugw("registerRestarted: completed", "plugin", name)
 }
 
 // EnablePlugin discovers, loads, registers, and initializes a plugin at runtime.

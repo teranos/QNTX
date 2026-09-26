@@ -5,7 +5,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
@@ -86,20 +85,17 @@ func TestAccessLogSinkIsEmptyWithoutAuth(t *testing.T) {
 // A poll that answers 303 every second went well. Pinning this to 200 meant
 // /am/statusline wrote a line a second and buried everything else.
 func TestAPollWentWellWhateverItAnswers(t *testing.T) {
-	if !heartbeatWell(http.StatusSeeOther, time.Millisecond) {
-		t.Fatal("a fast 303 went well")
+	if !heartbeatWell(http.StatusSeeOther) {
+		t.Fatal("a 303 went well")
 	}
-	if !heartbeatWell(http.StatusOK, time.Millisecond) {
-		t.Fatal("a fast 200 went well")
+	if !heartbeatWell(http.StatusOK) {
+		t.Fatal("a 200 went well")
 	}
-	if heartbeatWell(http.StatusUnauthorized, time.Millisecond) {
+	if heartbeatWell(http.StatusUnauthorized) {
 		t.Fatal("a refusal did not go well")
 	}
-	if heartbeatWell(http.StatusInternalServerError, time.Millisecond) {
+	if heartbeatWell(http.StatusInternalServerError) {
 		t.Fatal("a failure did not go well")
-	}
-	if heartbeatWell(http.StatusSeeOther, time.Second) {
-		t.Fatal("a slow answer did not go well")
 	}
 }
 
