@@ -316,7 +316,7 @@ async function init(): Promise<void> {
     initLaye().catch(err => log.error(SEG.WASM, '[Init] laye init failed:', err));
     installCopyable();
 
-    if (hasCanvas) (async () => {
+    const synced = !hasCanvas ? Promise.resolve() : (async () => {
         const { loadCanvasState, mergeCanvasState, upsertCanvasElement, upsertComposition, addMinimizedWindow } = await import('./api/canvas.ts');
 
         let backendReachable = false;
@@ -359,6 +359,14 @@ async function init(): Promise<void> {
             }
         }
     })().catch(err => log.warn(SEG.ELEMENT, '[Init] Canvas sync failed:', err));
+
+    // A canvas the browser holds nothing of is drawn from what the node holds
+    // of it, so a new canvas opens on its note rather than on nothing. What
+    // the browser already holds is drawn at once, and the node's merged in
+    // behind it, as before.
+    if (hasCanvas && uiState.getCanvasElements().length === 0) {
+        await synced;
+    }
 
     // Restore previous session if exists
     const graphSession = uiState.getGraphSession();
