@@ -11,7 +11,7 @@ import { apiFetch, connectivity } from '../client';
 import { jsonBody } from '../http-utils';
 import { syncStateManager } from '../state/sync-state';
 import { uiState } from '../state/ui';
-import { keyFor } from '../standing';
+import { canvasQuery, keyFor } from '../standing';
 
 export type CanvasSyncOp = 'element_upsert' | 'element_delete' | 'composition_upsert' | 'composition_delete' | 'minimized_add' | 'minimized_delete';
 
@@ -216,7 +216,7 @@ class CanvasSyncQueueImpl {
         }
 
         syncStateManager.setState(id, 'syncing');
-        const response = await apiFetch('/api/canvas/elements', jsonBody('POST', {
+        const response = await apiFetch('/api/canvas/elements' + canvasQuery(), jsonBody('POST', {
             ...item,
             x: Math.round(item.x),
             y: Math.round(item.y),
@@ -236,7 +236,7 @@ class CanvasSyncQueueImpl {
     }
 
     private async syncElementDelete(id: string): Promise<boolean> {
-        const response = await apiFetch(`/api/canvas/elements/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`/api/canvas/elements/${id}${canvasQuery()}`, { method: 'DELETE' });
 
         if (response.ok || response.status === 404) {
             syncStateManager.clearState(id);
@@ -257,7 +257,7 @@ class CanvasSyncQueueImpl {
         }
 
         syncStateManager.setState(id, 'syncing');
-        const response = await apiFetch('/api/canvas/compositions', jsonBody('POST', {
+        const response = await apiFetch('/api/canvas/compositions' + canvasQuery(), jsonBody('POST', {
             id: composition.id,
             edges: composition.edges,
             x: Math.round(composition.x),
@@ -276,7 +276,7 @@ class CanvasSyncQueueImpl {
     }
 
     private async syncCompositionDelete(id: string): Promise<boolean> {
-        const response = await apiFetch(`/api/canvas/compositions/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`/api/canvas/compositions/${id}${canvasQuery()}`, { method: 'DELETE' });
 
         if (response.ok || response.status === 404) {
             syncStateManager.clearState(id);
@@ -290,7 +290,7 @@ class CanvasSyncQueueImpl {
     }
 
     private async syncMinimizedAdd(id: string): Promise<boolean> {
-        const response = await apiFetch('/api/canvas/minimized-windows', jsonBody('POST', { element_id: id }));
+        const response = await apiFetch('/api/canvas/minimized-windows' + canvasQuery(), jsonBody('POST', { element_id: id }));
 
         if (response.ok) {
             log.debug(SEG.ELEMENT, `[CanvasSync] Synced minimized window ${id}`);
@@ -302,7 +302,7 @@ class CanvasSyncQueueImpl {
     }
 
     private async syncMinimizedDelete(id: string): Promise<boolean> {
-        const response = await apiFetch(`/api/canvas/minimized-windows/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`/api/canvas/minimized-windows/${id}${canvasQuery()}`, { method: 'DELETE' });
 
         if (response.ok || response.status === 404) {
             log.debug(SEG.ELEMENT, `[CanvasSync] Deleted minimized window ${id}`);

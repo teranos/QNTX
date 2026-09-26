@@ -12,6 +12,7 @@ import { apiFetch, apiJson } from '../client';
 import { assertOk, jsonBody } from '../http-utils';
 import { canvasSyncQueue } from './canvas-sync';
 import { refusal } from '../self-person';
+import { canvasQuery } from '../standing';
 
 /**
  * The canvas of the namespace this person stands in, by name. Null is a
@@ -56,7 +57,7 @@ export function deleteCanvasElement(id: string): void {
  */
 export async function listCanvasElements(): Promise<CanvasElement[]> {
     try {
-        const items = await apiJson<CanvasElement[]>('/api/canvas/elements');
+        const items = await apiJson<CanvasElement[]>('/api/canvas/elements' + canvasQuery());
         log.debug(SEG.ELEMENT, `[CanvasAPI] Listed ${items.length} elements`);
         return items;
     } catch (error) {
@@ -102,7 +103,7 @@ export function deleteMinimizedWindow(id: string): void {
  */
 export async function listMinimizedWindows(): Promise<MinimizedWindow[]> {
     try {
-        const windows = await apiJson<MinimizedWindow[]>('/api/canvas/minimized-windows');
+        const windows = await apiJson<MinimizedWindow[]>('/api/canvas/minimized-windows' + canvasQuery());
         log.debug(SEG.ELEMENT, `[CanvasAPI] Listed ${windows.length} minimized windows`);
         return windows;
     } catch (error) {
@@ -116,7 +117,7 @@ export async function listMinimizedWindows(): Promise<MinimizedWindow[]> {
  */
 export async function listCompositions(): Promise<Composition[]> {
     try {
-        const compositions = await apiJson<Composition[]>('/api/canvas/compositions') ?? [];
+        const compositions = await apiJson<Composition[]>('/api/canvas/compositions' + canvasQuery()) ?? [];
         log.debug(SEG.ELEMENT, `[CanvasAPI] Listed ${compositions.length} compositions`);
         return compositions;
     } catch (error) {

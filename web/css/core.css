@@ -117,7 +117,6 @@ body.disconnected #container {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    /* Above the page a namespace with no canvas shows (canvas-birth.css). */
     position: relative;
     z-index: 1;
     padding: 8px 12px;

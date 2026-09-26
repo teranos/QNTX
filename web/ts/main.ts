@@ -24,8 +24,9 @@ import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { person, type Person } from './self-person.ts';
-import { setStanding } from './standing.ts';
+import { setOpenCanvas, setStanding } from './standing.ts';
 import { drawWho } from './who.ts';
+import type { CanvasRow } from './api/canvases.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
 import { formatDateTime } from './html-utils.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -265,18 +266,43 @@ async function init(): Promise<void> {
     }
     drawWho(who).catch((err: unknown) => log.warn(SEG.UI, '[Init] Who was not drawn:', err));
 
-    // Load persisted UI state from IndexedDB (must happen after initStorage())
-    uiState.loadPersistedState();
-
-    // "i expect to not see any canvas if a namespace has none". Only the
-    // node's 404 is that; a node that would not answer has not said so.
-    let hasCanvas = true;
-    try {
-        const { theCanvas } = await import('./api/canvas.ts');
-        hasCanvas = (await theCanvas()) !== null;
-    } catch (err: unknown) {
-        log.warn(SEG.ELEMENT, '[Init] The node did not say whether this namespace has a canvas:', err);
+    // An invitation to own a canvas, accepted through the mail's link: said
+    // yes to here, and the link is spent, so the address is cleaned of it.
+    const invite = new URLSearchParams(location.search).get('canvas-invite');
+    if (invite && who) {
+        try {
+            const { acceptInvitation } = await import('./api/canvases.ts');
+            const owned = await acceptInvitation(invite);
+            log.info(SEG.UI, `[Init] Accepted the invitation to own ${owned.name}`);
+        } catch (err: unknown) {
+            log.error(SEG.UI, '[Init] The invitation was not accepted:', err);
+        }
+        const cleaned = new URL(location.href);
+        cleaned.searchParams.delete('canvas-invite');
+        history.replaceState(null, '', cleaned.toString());
     }
+
+    // The canvases this person may act on where they stand, and which one the
+    // page is built for: the one remembered, or the namespace's own, or none.
+    // "i expect to not see any canvas if a namespace has none"
+    let rows: CanvasRow[] = [];
+    let hasCanvas = true;
+    if (who) {
+        try {
+            const { listCanvases } = await import('./api/canvases.ts');
+            rows = await listCanvases();
+            const { rememberedCanvas } = await import('./namespace-page.ts');
+            const open = rememberedCanvas(rows);
+            setOpenCanvas(open);
+            hasCanvas = open !== '' || rows.some(c => c.kind === 'namespace');
+        } catch (err: unknown) {
+            log.warn(SEG.ELEMENT, '[Init] The node did not say which canvases are here:', err);
+        }
+    }
+
+    // Load persisted UI state from IndexedDB (must happen after initStorage(),
+    // and after the canvas is known: the key is the canvas's).
+    uiState.loadPersistedState();
     console.log('[TIMING] storage ready, state loaded:', (performance.now() - _t0).toFixed(0), 'ms');
 
     // WASM and canvas sync run in the background — neither is needed before the
@@ -435,16 +461,14 @@ async function init(): Promise<void> {
     // Plugin elements load in background; unknown types show placeholders that
     // auto-replace when the plugin becomes available (see renderElement retry).
     console.log('[TIMING] canvas opening:', (performance.now() - _t0).toFixed(0), 'ms');
+    // The namespace's page is behind whatever canvas opens: its canvases,
+    // their owners, ⌗ to create one, and the way out of the door.
+    if (who) {
+        const { initNamespacePage } = await import('./namespace-page.ts');
+        initNamespacePage(who, rows);
+    }
     if (hasCanvas) {
         tray.open('canvas-workspace');
-    } else {
-        // Nothing but ⌗ and a name. Created, the page is built again with it.
-        const { askForACanvas } = await import('./canvas-birth.ts');
-        const { createCanvas } = await import('./api/canvas.ts');
-        askForACanvas(document.body, async (name) => {
-            await createCanvas(name);
-            location.reload();
-        });
     }
 
     // Load plugin elements in background — non-blocking
