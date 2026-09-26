@@ -702,6 +702,14 @@
     opacity: 1;
 }
 
+/* No hover: metadata pills stay visible so they can be tapped */
+@media (hover: none) {
+    .as-meta-pill,
+    .element-meta-pill {
+        opacity: 1;
+    }
+}
+
 /* Watcher queue stats popover */
 .element-meta-popover {
     white-space: pre-wrap;

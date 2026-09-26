@@ -84,3 +84,21 @@
 
 /* The element-level error tint lives in ts/components/element/response-state.ts —
    inline like the identity color it overrides, no !important needed. */
+
+/* No hover: show the follow-up input without it. Focus-within still wins. */
+@media (hover: none) {
+    .canvas-result-element .result-followup-zone:not(.has-error):not(:focus-within),
+    .canvas-stream-element .result-followup-zone:not(.has-error):not(:focus-within) {
+        height: 42px;
+        opacity: 1;
+        padding: 4px 8px;
+        border-top: 1px solid var(--border);
+    }
+}
+
+/* Touch: iOS zooms the page into any focused input under 16px */
+@media (pointer: coarse) {
+    .result-followup-zone textarea {
+        font-size: 16px;
+    }
+}
