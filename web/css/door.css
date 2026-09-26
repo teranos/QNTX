@@ -663,3 +663,10 @@
         padding-top: 30px;
     }
 }
+
+/* Touch: iOS zooms the page into any focused input under 16px */
+@media (pointer: coarse) {
+    .door-field input {
+        font-size: 16px;
+    }
+}
