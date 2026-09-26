@@ -96,7 +96,9 @@ function handleVersion(data: VersionMessage): void {
 
         // Format build time if available
         let buildTimeText = '';
-        if (data.build_time) {
+        // A nix build stamps "nix-build" here, which is not a time: nothing is
+        // printed for it, rather than "Invalid Date".
+        if (data.build_time && !Number.isNaN(Date.parse(data.build_time))) {
             buildTimeText = ` · ${formatDateTime(data.build_time)}`;
         }
 

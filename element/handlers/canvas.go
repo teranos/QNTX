@@ -182,7 +182,11 @@ func (h *CanvasHandler) HandleCanvas(w http.ResponseWriter, r *http.Request) {
 			h.writeError(w, errors.New("only ROOT, or SUPER here, creates the namespace's canvas"), http.StatusForbidden)
 			return
 		}
-		if err := store.Create(r.Context(), body.Name, admitted.UserID); err != nil {
+		byName := admitted.DisplayName
+		if byName == "" {
+			byName = admitted.UserID
+		}
+		if err := store.Create(r.Context(), body.Name, admitted.UserID, byName); err != nil {
 			if errors.Is(err, elementstorage.ErrCanvasExists) {
 				h.writeError(w, err, http.StatusConflict)
 			} else {

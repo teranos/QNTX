@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"strings"
 	"testing"
 
 	elementstorage "github.com/teranos/QNTX/element/storage"
@@ -13,15 +14,27 @@ func TestANamespaceHoldsManyCanvasesAndEachKeepsItsOwnElements(t *testing.T) {
 	store := elementstorage.NewCanvasStore(qntxtest.CreateTestDB(t))
 	ctx := t.Context()
 
-	if err := store.Create(ctx, "garden", "US-ROOT"); err != nil {
+	if err := store.Create(ctx, "garden", "US-ROOT", "root"); err != nil {
 		t.Fatal(err)
 	}
-	alices, err := store.CreateCanvas(ctx, "alice's", elementstorage.CanvasOfAUser, "US-ALICE")
+	alices, err := store.CreateCanvas(ctx, "alice's", elementstorage.CanvasOfAUser, "US-ALICE", "Alice")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if alices.Owners[0] != "US-ALICE" {
 		t.Fatalf("alice does not own her canvas: %v", alices.Owners)
+	}
+
+	// "a new canvas, should always start with a prefilled Note element"
+	opened, err := store.In(alices.ID).ListElements(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(opened) != 1 || opened[0].Symbol != elementstorage.ProseSymbol || opened[0].Content == nil {
+		t.Fatalf("a new canvas did not open with its note: %+v", opened)
+	}
+	if !strings.Contains(*opened[0].Content, "alice's canvas element.") || !strings.Contains(*opened[0].Content, "Created by: Alice") {
+		t.Fatalf("the note does not say what it should: %q", *opened[0].Content)
 	}
 
 	if err := store.In(alices.ID).UpsertElement(ctx, &elementstorage.CanvasElement{ID: "only-alices", Symbol: "⋈"}); err != nil {
@@ -47,7 +60,7 @@ func TestANamespaceHoldsManyCanvasesAndEachKeepsItsOwnElements(t *testing.T) {
 func TestDeleteIsDisableAndTheCanvasStays(t *testing.T) {
 	store := elementstorage.NewCanvasStore(qntxtest.CreateTestDB(t))
 	ctx := t.Context()
-	c, err := store.CreateCanvas(ctx, "bob's", elementstorage.CanvasOfAUser, "US-BOB")
+	c, err := store.CreateCanvas(ctx, "bob's", elementstorage.CanvasOfAUser, "US-BOB", "Bob")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +87,7 @@ func TestDeleteIsDisableAndTheCanvasStays(t *testing.T) {
 func TestAnInvitationAcceptedMakesAnOwner(t *testing.T) {
 	store := elementstorage.NewCanvasStore(qntxtest.CreateTestDB(t))
 	ctx := t.Context()
-	c, err := store.CreateCanvas(ctx, "alice's", elementstorage.CanvasOfAUser, "US-ALICE")
+	c, err := store.CreateCanvas(ctx, "alice's", elementstorage.CanvasOfAUser, "US-ALICE", "Alice")
 	if err != nil {
 		t.Fatal(err)
 	}

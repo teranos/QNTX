@@ -23,7 +23,7 @@ func (canvasSubsystem) Init(s *QNTXServer) error {
 
 	// "default namespace has default canvas, whihc is the current canvas i am working with."
 	if _, err := canvasStore.Name(context.Background()); errors.Is(err, elementstorage.ErrNoCanvas) {
-		if err := canvasStore.Create(context.Background(), "default", ""); err != nil {
+		if err := canvasStore.Create(context.Background(), "default", "", "the node"); err != nil {
 			return errors.Wrap(err, "default could not be given its canvas")
 		}
 	} else if err != nil {

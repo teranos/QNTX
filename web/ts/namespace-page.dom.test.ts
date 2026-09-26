@@ -34,6 +34,8 @@ const root = {
     identity: 'x', via: 'session', accounts: [], keys: [],
 };
 
+const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+
 describe('the namespace page', () => {
     if (!USE_JSDOM) {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
@@ -41,52 +43,59 @@ describe('the namespace page', () => {
     }
 
     beforeEach(() => {
-        document.body.innerHTML = '<main id="container"></main>';
+        document.body.innerHTML = '<main id="container"><div id="left-panel"><header id="header"><div class="who"><img id="who-picture"><div class="who-words"><span id="who-name"></span><span id="who-namespace"></span></div></div></header></div></main>';
         created = [];
     });
 
     // jsdom has no page to build again, so entering a canvas builds nothing.
-    const built = (person: typeof root, rows: Parameters<typeof initNamespacePage>[1]) =>
-        initNamespacePage(person, rows, () => {});
+    const built = (rows: Parameters<typeof initNamespacePage>[1]) => initNamespacePage(root, rows, () => {});
 
-    test('names the namespace, lists no canvas, and shows ⌗ alone', () => {
-        built(root, []);
+    test('names the namespace, lists no canvas, shows one ⌗ and no field, and takes who to its top-left', () => {
+        built([]);
         expect(document.querySelector('.namespace-page-name')?.textContent).toBe('aws');
         expect(document.querySelector('.canvas-none')).not.toBeNull();
         expect(document.querySelector('input.canvas-birth-name')).toBeNull();
-        expect(document.querySelectorAll('button.canvas-birth-symbol').length).toBe(2);
+        const symbols = document.querySelectorAll('button.canvas-birth-symbol');
+        expect(symbols.length).toBe(1);
+        expect(document.querySelector('.namespace-page-top .who #who-picture')).not.toBeNull();
+        expect(document.getElementById('container')?.classList.contains('namespace-page-shown')).toBe(true);
     });
 
     test('⌗ reveals the name and a +; the + is pressed once to arm and once to create', async () => {
-        built(root, []);
-        const symbol = document.querySelector<HTMLButtonElement>('button.canvas-birth-symbol[data-kind="namespace"]')!;
-        symbol.click();
+        built([]);
+        document.querySelector<HTMLButtonElement>('button.canvas-birth-symbol')!.click();
+        await tick();
         const name = document.querySelector<HTMLInputElement>('input.canvas-birth-name')!;
         expect(name).not.toBeNull();
         name.value = 'garden';
 
         const plus = () => document.querySelector<HTMLButtonElement>('.canvas-birth-plus')!;
-        expect(plus().classList.contains('armed')).toBe(false);
+        expect(plus().classList.contains('qntx-btn-confirming')).toBe(false);
         plus().click();
-        expect(plus().classList.contains('armed')).toBe(true);
+        await tick();
+        expect(plus().classList.contains('qntx-btn-confirming')).toBe(true);
         expect(created).toEqual([]);
 
         plus().click();
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await tick();
+        await tick();
+        // ROOT with no namespace canvas makes the namespace's first.
         expect(created).toEqual([{ name: 'garden', kind: 'namespace' }]);
     });
 
-    test('Enter commits nothing', () => {
-        built(root, []);
+    test('Enter commits nothing', async () => {
+        built([]);
         document.querySelector<HTMLButtonElement>('button.canvas-birth-symbol')!.click();
+        await tick();
         const name = document.querySelector<HTMLInputElement>('input.canvas-birth-name')!;
         name.value = 'garden';
         name.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        await tick();
         expect(created).toEqual([]);
     });
 
     test('a disabled canvas is listed desaturated, and a User\'s canvas names its owners', () => {
-        built(root, [
+        built([
             { id: 'CV-1', name: 'garden', kind: 'namespace', created_by: '', created_at: '', disabled_by: '', owners: [], access: [], owner_views: [], mine: false },
             { id: 'CV-2', name: 'bob\'s', kind: 'user', created_by: 'US-BOB', created_at: '', disabled_by: 'US-ROOT', owners: ['US-BOB'], access: [], owner_views: [{ id: 'US-BOB', name: 'Bob', picture: '' }], mine: false },
         ]);
@@ -95,5 +104,7 @@ describe('the namespace page', () => {
         expect(rows[1].classList.contains('disabled')).toBe(true);
         expect(rows[1].querySelector('.canvas-row-owners')?.textContent).toContain('Bob');
         expect(rows[1].querySelector('.canvas-row-state')?.textContent).toContain('disabled by US-ROOT');
+        // The acts are the system's buttons.
+        expect(rows[1].querySelector('.canvas-act.qntx-btn')).not.toBeNull();
     });
 });

@@ -1,49 +1,73 @@
-/* The namespace's page, behind the canvas: its name, its canvases, and ⌗. */
+/* The namespace's page, behind the canvas: who is looking, the namespace's
+   name, its canvases, and ⌗. Drawn in the canvas's dark, from the tokens. */
 
-/* "I dont like how white it is": the page is the canvas's dark, not the panel's white. */
+/* The page is the whole of what is behind the canvas: the old left panel
+   stands aside while it shows. */
+#container.namespace-page-shown #left-panel {
+    display: none;
+}
+
 #namespace-page {
+    position: relative;
     flex: 1;
     min-width: 0;
-    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
     font-family: var(--font-mono);
     color: var(--text-on-dark);
     background: var(--bg-dark);
 }
 
-.namespace-page-head {
+/* Who is looking, top-left; the way out of the door, top-right. */
+.namespace-page-top {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-on-dark);
 }
 
-.namespace-page-out {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--text-on-dark);
-    background: transparent;
-    border: 1px solid var(--border-on-dark);
-    padding: 2px 6px;
-    cursor: pointer;
+.namespace-page-top .who {
+    gap: 10px;
+}
+
+.namespace-page-top #who-picture {
+    width: 32px;
+    height: 32px;
+    border-color: var(--border-on-dark);
+    background: var(--bg-dark-hover);
+}
+
+.namespace-page-top #who-name {
+    color: var(--text-on-dark-emphasis);
+}
+
+.namespace-page-top #who-namespace {
+    color: var(--text-on-dark-secondary);
+}
+
+.namespace-page-body {
+    padding: 20px 24px;
 }
 
 .namespace-page-name {
-    margin: 0;
-    font-size: 18px;
+    margin: 0 0 16px 0;
+    font-size: 16px;
     font-weight: 500;
+    color: var(--text-on-dark-emphasis);
 }
 
 .canvas-list {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .canvas-none {
     font-size: 12px;
-    color: var(--text-secondary);
+    color: var(--text-on-dark-tertiary);
 }
 
 .canvas-row {
@@ -55,7 +79,11 @@
     border: 1px solid var(--border-on-dark);
     cursor: pointer;
     font-size: 12px;
-    transition: filter 0.3s ease, opacity 0.3s ease;
+    transition: filter 0.3s ease, opacity 0.3s ease, border-color 0.2s ease;
+}
+
+.canvas-row:hover {
+    border-color: var(--text-on-dark-tertiary);
 }
 
 .canvas-row.open {
@@ -70,13 +98,13 @@
 
 .canvas-row-symbol {
     font-size: 14px;
-    opacity: 0.7;
+    color: var(--text-on-dark-secondary);
 }
 
 .canvas-row-kind,
 .canvas-row-state {
     font-size: 10px;
-    color: var(--text-secondary);
+    color: var(--text-on-dark-tertiary);
     white-space: nowrap;
 }
 
@@ -84,10 +112,11 @@
     display: flex;
     gap: 8px;
     font-size: 11px;
+    color: var(--text-on-dark-secondary);
 }
 
 .canvas-owner.unowned {
-    color: var(--text-secondary);
+    color: var(--text-on-dark-tertiary);
     font-style: italic;
 }
 
@@ -96,26 +125,20 @@
     gap: 4px;
 }
 
-.canvas-act {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--text-on-dark);
-    background: transparent;
-    border: 1px solid var(--border-on-dark);
-    padding: 1px 6px;
-    cursor: pointer;
-}
-
 .canvas-ask {
-    width: 320px;
-    margin-bottom: 12px;
+    width: 360px;
+    margin-bottom: 16px;
     padding: 4px 8px;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-on-dark);
     background: transparent;
     border: 1px solid var(--border-on-dark);
     outline: none;
+}
+
+.canvas-ask:focus {
+    border-color: var(--text-on-dark-tertiary);
 }
 
 /* The birth: ⌗ alone, then the name and a same-sized + beside it. */
@@ -125,20 +148,11 @@
     gap: 12px;
 }
 
-button.canvas-birth-symbol {
-    font-size: 32px;
-    line-height: 1;
-    color: var(--text-on-dark);
-    background: transparent;
-    border: 1px solid transparent;
-    padding: 6px 10px;
-    cursor: pointer;
-    opacity: 0.6;
-}
-
-button.canvas-birth-symbol:hover {
-    opacity: 1;
-    border-color: var(--border-on-dark);
+.canvas-birth-symbol.qntx-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 20px;
 }
 
 .canvas-birth-form {
@@ -148,16 +162,21 @@ button.canvas-birth-symbol:hover {
 }
 
 .canvas-birth-symbol.pressed {
-    font-size: 32px;
-    line-height: 1;
-    opacity: 1;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    border: 1px solid var(--border-on-dark);
+    color: var(--text-on-dark);
 }
 
 .canvas-birth-name {
     width: 240px;
-    height: 32px;
+    height: 40px;
     box-sizing: border-box;
-    padding: 0 8px;
+    padding: 0 10px;
     font-family: var(--font-mono);
     font-size: 13px;
     color: var(--text-on-dark);
@@ -167,25 +186,19 @@ button.canvas-birth-symbol:hover {
 }
 
 .canvas-birth-name:focus {
-    border-color: var(--text-on-dark);
+    border-color: var(--text-on-dark-tertiary);
 }
 
-.canvas-birth-plus {
-    width: 32px;
-    height: 32px;
-    box-sizing: border-box;
-    font-family: var(--font-mono);
+.canvas-birth-plus.qntx-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
     font-size: 18px;
-    line-height: 1;
-    color: var(--text-on-dark);
-    background: transparent;
-    border: 1px solid var(--border-on-dark);
-    cursor: pointer;
-    transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-/* "button becomes green and shimmers, 2nd click actually creates it" */
-.canvas-birth-plus.armed {
+/* "button becomes green and shimmers, 2nd click actually creates it": the
+   system button's confirming state, in success, with the shimmer. */
+.canvas-birth-plus.qntx-btn-confirming {
     color: #0b1a0f;
     border-color: #4ade80;
     background: linear-gradient(110deg, #4ade80 0%, #86efac 40%, #4ade80 60%, #86efac 100%);
@@ -199,7 +212,7 @@ button.canvas-birth-symbol:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .canvas-birth-plus.armed {
+    .canvas-birth-plus.qntx-btn-confirming {
         animation: none;
         background: #4ade80;
     }

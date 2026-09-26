@@ -118,19 +118,30 @@ func (s *CanvasStore) Name(ctx context.Context) (string, error) {
 }
 
 // Create makes the namespace's canvas under a name, by whoever asked.
-func (s *CanvasStore) Create(ctx context.Context, name, by string) error {
+func (s *CanvasStore) Create(ctx context.Context, name, by, byName string) error {
 	if _, err := s.namespaceCanvas(ctx); err == nil {
 		return errors.Wrapf(ErrCanvasExists, "creating %s", name)
 	} else if !errors.Is(err, ErrNoCanvas) {
 		return err
 	}
-	_, err := s.CreateCanvas(ctx, name, CanvasOfTheNamespace, by)
+	_, err := s.CreateCanvas(ctx, name, CanvasOfTheNamespace, by, byName)
 	return err
 }
 
-// CreateCanvas makes a canvas of a kind under a name. Its creator owns it,
-// when it is a User's; the namespace's canvas has no owner row.
-func (s *CanvasStore) CreateCanvas(ctx context.Context, name, kind, by string) (Canvas, error) {
+// ProseSymbol is the Note element's symbol (sym.Prose), as the browser saves it.
+const ProseSymbol = "▣"
+
+// firstNote is what a new canvas opens with.
+//
+// "a new canvas, should always start with a prefilled Note element"
+func firstNote(name, byName string) string {
+	return name + " canvas element.\nCreated by: " + byName + "\n\nright click to add elements to the canvas.\n"
+}
+
+// CreateCanvas makes a canvas of a kind under a name, holding its first
+// Note. Its creator owns it, when it is a User's; the namespace's canvas has
+// no owner row.
+func (s *CanvasStore) CreateCanvas(ctx context.Context, name, kind, by, byName string) (Canvas, error) {
 	if name == "" {
 		return Canvas{}, errors.New("a canvas is named, and this one has no name")
 	}
@@ -160,6 +171,16 @@ func (s *CanvasStore) CreateCanvas(ctx context.Context, name, kind, by string) (
 			return Canvas{}, errors.Wrapf(err, "failed to make %s the owner of %s", by, name)
 		}
 		c.Owners = []string{by}
+	}
+	if byName == "" {
+		byName = by
+	}
+	stamp := now.Format(time.RFC3339Nano)
+	if _, err = tx.ExecContext(ctx,
+		`INSERT INTO canvas_elements (id, canvas_id, symbol, x, y, width, height, content, created_at, updated_at, in_canvas)
+		 VALUES (?, '', ?, 80, 80, NULL, NULL, ?, ?, ?, ?)`,
+		"note-"+id, ProseSymbol, firstNote(name, byName), stamp, stamp, id); err != nil {
+		return Canvas{}, errors.Wrapf(err, "failed to write the first note of %s", name)
 	}
 	if err = tx.Commit(); err != nil {
 		return Canvas{}, errors.Wrap(err, "failed to commit creating a canvas")

@@ -141,8 +141,12 @@ func (h *CanvasHandler) createCanvas(w http.ResponseWriter, r *http.Request, sto
 		h.writeError(w, errors.New("only ROOT, or SUPER here, creates the namespace's canvas"), http.StatusForbidden)
 		return
 	}
+	byName := admitted.DisplayName
+	if byName == "" {
+		byName = admitted.UserID
+	}
 	if body.Kind == elementstorage.CanvasOfTheNamespace {
-		if err := store.Create(r.Context(), body.Name, admitted.UserID); err != nil {
+		if err := store.Create(r.Context(), body.Name, admitted.UserID, byName); err != nil {
 			h.writeCreateError(w, err)
 			return
 		}
@@ -160,7 +164,7 @@ func (h *CanvasHandler) createCanvas(w http.ResponseWriter, r *http.Request, sto
 		}
 		return
 	}
-	c, err := store.CreateCanvas(r.Context(), body.Name, body.Kind, admitted.UserID)
+	c, err := store.CreateCanvas(r.Context(), body.Name, body.Kind, admitted.UserID, byName)
 	if err != nil {
 		h.writeCreateError(w, err)
 		return
