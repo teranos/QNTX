@@ -266,8 +266,10 @@ func (c *ExternalDomainProxy) AnswerHTTP(ctx context.Context, req *protocol.HTTP
 // askerHeaders are who is asking, set by the node when a sigil hands a plugin
 // a request (server.HeaderAsker). A caller sending them is not believed.
 var askerHeaders = map[string]bool{
-	"X-Qntx-Asker":     true,
-	"X-Qntx-Asker-Did": true,
+	"X-Qntx-Asker":        true,
+	"X-Qntx-Asker-Did":    true,
+	"X-Qntx-Asker-Label":  true,
+	"X-Qntx-Asker-Client": true,
 }
 
 // Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.

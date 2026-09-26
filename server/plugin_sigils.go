@@ -35,8 +35,14 @@ const (
 	// HeaderAsker is the identity that admitted the caller: an account URL or a
 	// did:key. A token carries the identity that minted it.
 	HeaderAsker = "X-Qntx-Asker"
-	// HeaderAskerDID is the token's own did:key, when a token made the request.
+	// HeaderAskerDID is the token's own did:key, when a token made the request:
+	// a grant's, or the one a connector presented.
 	HeaderAskerDID = "X-Qntx-Asker-Did"
+	// HeaderAskerLabel is that token's name, what it was minted under.
+	HeaderAskerLabel = "X-Qntx-Asker-Label"
+	// HeaderAskerClient is the OAuth client a connector's token was issued
+	// through: the client's own did:key.
+	HeaderAskerClient = "X-Qntx-Asker-Client"
 	// HeaderStoreToken is what the plugin presents to the ATS store for this one
 	// call, and it reaches the store of the namespace the caller acts in.
 	HeaderStoreToken = "X-Qntx-Store-Token"
@@ -324,8 +330,23 @@ func forwarded(plugin string, held *protocol.Sigil, sent sigil.Sent, ctx context
 		if admitted.Identity != "" {
 			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAsker, Values: []string{admitted.Identity}})
 		}
-		if admitted.Grant != nil && admitted.Grant.DID != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerDID, Values: []string{admitted.Grant.DID}})
+		// "i know i minted the oauth specifically for Manus to use and the
+		// token even has a name"
+		//
+		// A connector's token acts as the person and carries no Grant, so which
+		// token asked, and through which client, is read off the admission.
+		did, label := admitted.TokenDID, admitted.TokenLabel
+		if admitted.Grant != nil {
+			did, label = admitted.Grant.DID, admitted.Grant.Label
+		}
+		if did != "" {
+			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerDID, Values: []string{did}})
+		}
+		if label != "" {
+			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerLabel, Values: []string{label}})
+		}
+		if admitted.ClientDID != "" {
+			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerClient, Values: []string{admitted.ClientDID}})
 		}
 	}
 	req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderStoreToken, Values: []string{storeToken}})

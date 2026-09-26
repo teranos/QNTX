@@ -354,6 +354,8 @@ func (h *Handler) admittedAsThePerson(grant Grant) Admission {
 		UserID:      grant.MintedByUser,
 		DisplayName: grant.MintedByDisplayName,
 		ClientDID:   grant.ClientDID,
+		TokenDID:    grant.DID,
+		TokenLabel:  grant.Label,
 	}
 	admitted.roles, admitted.seesSystem = h.holdingsOf(grant.MintedBy, namespaceOf(grant))
 	admitted.words = h.WordsOf(admitted.roles)
