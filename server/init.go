@@ -155,7 +155,6 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 	server.verbosity.Store(int32(verbosity))
 	server.state.Store(int32(ServerStateRunning))
 
-	server.held.SetLogger(serverLogger)
 	// A namespace runs its own steps when it starts, and a namespace opened
 	// after the node booted starts on being opened. Named before the default
 	// starts below, so every namespace runs the same list in the same order.

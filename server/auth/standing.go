@@ -91,7 +91,6 @@ func (h *Handler) Step(admitted Admission, namespace string) (string, int, error
 		})
 		return "", http.StatusInternalServerError, errors.Wrapf(err, "User %s was not written", u.ID)
 	}
-	h.logger.Infow("User moved", "user", u.ID, "standing", u.Standing)
 	// Where they now stand, not what they stepped to. A person whose admission
 	// reaches one namespace is still in that one, and the answer says so.
 	return StandingIn(admitted, u.Standing), http.StatusOK, nil

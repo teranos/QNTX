@@ -242,18 +242,7 @@ func (s *QNTXServer) handleClientRegister(client *Client) {
 	}
 
 	s.clients[client] = true
-	totalClients := len(s.clients)
 	s.mu.Unlock()
-
-	// One line per socket, said where it is counted: which universe it is in
-	// was settled before it was registered (HandleWebSocket).
-	s.logger.Infow("WebSocket connected",
-		"client_id", client.id,
-		"namespace", client.in,
-		"level", client.admitted.LevelName(),
-		"gated", client.gated,
-		"total_clients", totalClients,
-	)
 }
 
 // handleClientUnregister handles a client disconnection
@@ -261,7 +250,6 @@ func (s *QNTXServer) handleClientUnregister(client *Client) {
 	s.mu.Lock()
 	if _, ok := s.clients[client]; ok {
 		delete(s.clients, client)
-		totalClients := len(s.clients)
 		s.mu.Unlock()
 
 		// Signal broadcast worker to close channels (thread-safe)
@@ -276,11 +264,6 @@ func (s *QNTXServer) handleClientUnregister(client *Client) {
 			// Server shutting down, close directly
 			client.close()
 		}
-
-		s.logger.Infow("Client disconnected",
-			"client_id", client.id,
-			"total_clients", totalClients,
-		)
 	} else {
 		s.mu.Unlock()
 	}

@@ -169,16 +169,6 @@ func (c *Client) readPump() {
 // handleReadError logs unexpected WebSocket read errors.
 // Expected closure codes (going away, abnormal, no status) are silently ignored.
 func (c *Client) handleReadError(err error) {
-	// Always log close errors with full details for debugging
-	var closeErr *websocket.CloseError
-	if errors.As(err, &closeErr) {
-		c.server.logger.Infow("WebSocket closed",
-			"client_id", c.id,
-			"code", closeErr.Code,
-			"text", closeErr.Text,
-		)
-	}
-
 	if websocket.IsUnexpectedCloseError(err,
 		websocket.CloseGoingAway,
 		websocket.CloseAbnormalClosure,
