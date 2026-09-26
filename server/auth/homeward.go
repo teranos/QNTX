@@ -38,6 +38,7 @@ type heldSession struct {
 	identity string
 	userID   string
 	name     string
+	picture  string
 	door     string
 	heldAt   time.Time
 }
@@ -129,6 +130,7 @@ func (h *Handler) sentHome(w http.ResponseWriter, r *http.Request, token, identi
 		identity: identity,
 		userID:   user.ID,
 		name:     user.Name(),
+		picture:  user.Picture(),
 		door:     journey.door,
 		heldAt:   time.Now(),
 	})
@@ -176,6 +178,7 @@ func (h *Handler) handleHomewardResult(w http.ResponseWriter, r *http.Request) {
 		"admitted_as": held.identity,
 		"next":        "nothing",
 		"name":        held.name,
+		"picture":     held.picture,
 		"user":        held.userID,
 		"session":     held.token,
 	})

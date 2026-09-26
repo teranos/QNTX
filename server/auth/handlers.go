@@ -110,6 +110,9 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"level":           level,
 		"half_admitted":   halfAdmitted,
 		"next":            next,
+		// "qntx should keep the picture": a door that lost what the ceremony
+		// handed it draws the person again from here.
+		"picture": h.pictureOf(p),
 	})
 }
 

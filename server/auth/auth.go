@@ -60,6 +60,7 @@ type Handler struct {
 	// been given no public origin can reach here and nowhere else.
 	loopbackOrigin string
 	signedBindings sync.Map // ceremony ticket -> the binding this node signed under it
+	pictures       sync.Map // binding signature -> the picture the provider showed at that ceremony
 	// The way home from a door: ticket -> the door a passkey login began at,
 	// and ticket -> the session waiting for that door to collect it.
 	homewards    sync.Map
