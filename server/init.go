@@ -171,14 +171,14 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		"plugin_manager_is_nil", server.pluginManager == nil,
 		"services_is_nil", server.services == nil)
 
-	// Run subsystems in order. Each one says how long it took, so a slow boot
-	// names the step that was slow (ADR-024, The floor).
+	// Run subsystems in order. Each one's time is measured, so a slow boot
+	// names the step that was slow (ADR-024, The floor). One that completes is
+	// noise; only one that fails is said.
 	bootStart := time.Now()
 	for _, entry := range subsystems {
 		stepStart := time.Now()
 		err := entry.sub.Init(server)
 		took := time.Since(stepStart)
-		serverLogger.Infow("Subsystem complete", "subsystem", entry.sub.Name(), "took", took)
 		measure.Took(measure.BootSubsystemTook, took, measure.String(measure.AttrSubsystem, entry.sub.Name()))
 		if err != nil {
 			switch entry.policy {

@@ -49,9 +49,8 @@ func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
 
 	before := walBytes(h.server.dbPath)
 	start := time.Now()
-	busy, walPages, checkpointed, err := checkpointer.WALCheckpointTruncate()
+	busy, _, _, err := checkpointer.WALCheckpointTruncate()
 	dur := time.Since(start)
-	after := walBytes(h.server.dbPath)
 	if err != nil {
 		h.logger.Warnw("WAL checkpoint failed",
 			"error", err, "wal_bytes", before, "took_ms", dur.Milliseconds())
@@ -67,16 +66,7 @@ func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
 			fmt.Sprintf("busy: %d, wal_bytes: %d, took_ms: %d", busy, before, dur.Milliseconds()))
 	}
 
-	// TRUNCATE resets the WAL, so a run that worked reports log and checkpointed
-	// as zero. Reading those as "nothing moved" is what kept success silent, so
-	// the bytes reclaimed come from the file rather than from the counters.
-	h.logger.Infow("WAL checkpoint",
-		"wal_bytes_before", before,
-		"wal_bytes_after", after,
-		"reclaimed_bytes", before-after,
-		"wal_pages", walPages,
-		"checkpointed_pages", checkpointed,
-		"took_ms", dur.Milliseconds())
+	// A checkpoint that worked is noise; only one that fails or is blocked is said.
 	return nil
 }
 
