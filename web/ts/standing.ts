@@ -41,6 +41,14 @@ export function openCanvasKey(namespace: string = standing): string {
 }
 
 /**
+ * The key under which one deliberate opening of a disabled canvas waits: a
+ * disabled canvas is "seen by opening it", never opened on its own.
+ */
+export function openOnceKey(namespace: string = standing): string {
+    return keyForNamespace('qntx-open-canvas-once', namespace);
+}
+
+/**
  * The key a namespace's copy of some browser state is kept under. Default and
  * nowhere share the key the browser always used, so what it holds today is
  * default's, and a node with one namespace never sees the difference.

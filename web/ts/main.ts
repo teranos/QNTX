@@ -293,10 +293,12 @@ async function init(): Promise<void> {
         try {
             const { listCanvases } = await import('./api/canvases.ts');
             rows = await listCanvases();
-            const { rememberedCanvas } = await import('./namespace-page.ts');
-            const open = rememberedCanvas(rows);
-            setOpenCanvas(open);
-            hasCanvas = open !== '' || rows.some(c => c.kind === 'namespace');
+            const { opening } = await import('./namespace-page.ts');
+            const chosen = opening(rows);
+            setOpenCanvas(chosen.open);
+            hasCanvas = chosen.hasCanvas;
+            // "can either be seen by opening it (also desaturated view)"
+            document.body.classList.toggle('canvas-disabled', chosen.disabled);
         } catch (err: unknown) {
             log.warn(SEG.ELEMENT, '[Init] The node did not say which canvases are here:', err);
         }

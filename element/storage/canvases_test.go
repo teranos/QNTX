@@ -83,6 +83,35 @@ func TestDeleteIsDisableAndTheCanvasStays(t *testing.T) {
 	}
 }
 
+// "a canvas can be nuked when disabled, like we do with namespaces themselves."
+func TestOnlyADisabledCanvasIsNukedAndItsElementsGoWithIt(t *testing.T) {
+	store := elementstorage.NewCanvasStore(qntxtest.CreateTestDB(t))
+	ctx := t.Context()
+	c, err := store.CreateCanvas(ctx, "bob's", elementstorage.CanvasOfAUser, "US-BOB", "Bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Nuke(ctx, c.ID); !errors.Is(err, elementstorage.ErrNotDisabled) {
+		t.Fatalf("an enabled canvas was nuked: %v", err)
+	}
+	if err := store.Disable(ctx, c.ID, "US-ROOT"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Nuke(ctx, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Canvas(ctx, c.ID); !errors.Is(err, elementstorage.ErrNoSuchCanvas) {
+		t.Fatalf("the canvas is still there: %v", err)
+	}
+	left, err := store.In(c.ID).ListElements(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(left) != 0 {
+		t.Fatalf("elements outlived their canvas: %d", len(left))
+	}
+}
+
 // "A canvas can have multiple owners" — by invitation, accepted by the one invited.
 func TestAnInvitationAcceptedMakesAnOwner(t *testing.T) {
 	store := elementstorage.NewCanvasStore(qntxtest.CreateTestDB(t))

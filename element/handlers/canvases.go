@@ -81,6 +81,7 @@ func (h *CanvasHandler) view(c elementstorage.Canvas, admitted auth.Admission) c
 //	GET  /api/canvases                       - the canvases this caller may see
 //	POST /api/canvases {"name","kind"}       - creates one; "namespace" is ROOT's and SUPER's to create
 //	POST /api/canvases/{id}/disable|enable   - delete is disable
+//	POST /api/canvases/{id}/nuke             - ROOT and SUPER: a disabled canvas leaves, whole
 //	POST /api/canvases/{id}/owners {"user"}  - ROOT and SUPER make a User an owner
 //	DELETE /api/canvases/{id}/owners/{user}  - takes an owner off; none left is "made unowned"
 //	POST /api/canvases/{id}/access {"user"}  - grants a look at the namespace's canvas
@@ -207,6 +208,22 @@ func (h *CanvasHandler) oneCanvas(w http.ResponseWriter, r *http.Request, store 
 	privileged := admitted.OwnsEveryCanvas()
 
 	switch {
+	case action == "nuke" && r.Method == http.MethodPost:
+		// "ROOT and SUPER can nuke a canvas" — disabled first, then gone.
+		if !privileged {
+			h.writeError(w, errors.New("only ROOT and SUPER nuke a canvas"), http.StatusForbidden)
+			return
+		}
+		if err := store.Nuke(r.Context(), id); err != nil {
+			if errors.Is(err, elementstorage.ErrNotDisabled) {
+				h.writeError(w, err, http.StatusConflict)
+			} else {
+				h.writeError(w, err, http.StatusInternalServerError)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
 	case action == "disable" && r.Method == http.MethodPost:
 		err = store.Disable(r.Context(), id, admitted.UserID)
 	case action == "enable" && r.Method == http.MethodPost:

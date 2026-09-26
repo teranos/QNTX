@@ -52,6 +52,14 @@ export async function enableCanvas(id: string): Promise<CanvasRow> {
     return answered<CanvasRow>(await apiFetch(`/api/canvases/${encodeURIComponent(id)}/enable`, { method: 'POST' }));
 }
 
+/** ROOT and SUPER: a disabled canvas leaves, whole. */
+export async function nukeCanvas(id: string): Promise<void> {
+    const response = await apiFetch(`/api/canvases/${encodeURIComponent(id)}/nuke`, { method: 'POST' });
+    if (!response.ok) {
+        throw new Error(await refusal(response));
+    }
+}
+
 /** ROOT and SUPER make a User an owner outright. */
 export async function addOwner(id: string, user: string): Promise<CanvasRow> {
     return answered<CanvasRow>(await apiFetch(`/api/canvases/${encodeURIComponent(id)}/owners`, jsonBody('POST', { user })));

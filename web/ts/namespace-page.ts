@@ -14,11 +14,11 @@ import { standAtTheDoor } from './signin';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger';
 import { Subcanvas } from './sym';
-import { openCanvas, openCanvasKey } from './standing';
+import { openCanvas, openCanvasKey, openOnceKey } from './standing';
 import { Button, buttonPlaceholder, hydrateButtons, type HydrateConfig } from './components/button';
 import {
-    addOwner, createCanvas, disableCanvas, disownCanvas, enableCanvas, grantAccess, inviteOwner, listCanvases,
-    type CanvasRow,
+    createCanvas, disableCanvas, disownCanvas, enableCanvas, inviteOwner, listCanvases,
+    nukeCanvas, type CanvasRow,
 } from './api/canvases';
 
 let host: HTMLElement | null = null;
@@ -43,26 +43,58 @@ function hasOwnCanvas(): boolean {
     return canvases.some(c => c.kind === 'user' && c.mine);
 }
 
-/** Opens a canvas: remembered per namespace, and the page is built for it. */
+/**
+ * Opens a canvas: remembered per namespace, and the page is built for it.
+ * Opening it from the list is deliberate, so a disabled one opens this once.
+ */
 export function enter(id: string): void {
     try {
         localStorage.setItem(openCanvasKey(), id);
+        localStorage.setItem(openOnceKey(), '1');
     } catch (err: unknown) {
         log.error(SEG.UI, '[Namespace] The open canvas was not remembered:', err);
     }
     rebuild();
 }
 
-/** The canvas remembered as open where this person stands, if it is still theirs. */
-export function rememberedCanvas(rows: CanvasRow[]): string {
+/** What the page is built for where this person stands. */
+export interface Opening {
+    /** The canvas open: a User's id, or empty for the namespace's own. */
+    open: string;
+    /** Whether any canvas opens at all. */
+    hasCanvas: boolean;
+    /** Whether the one opening is disabled, and so drawn desaturated. */
+    disabled: boolean;
+}
+
+/**
+ * The canvas to open: the one remembered, if still here, else the
+ * namespace's own. "becomes desaturated in the view and can either be seen
+ * by opening it" — a disabled one opens only when it was just pressed, and
+ * never on its own.
+ */
+export function opening(rows: CanvasRow[]): Opening {
     let remembered = '';
+    let once = false;
     try {
         remembered = localStorage.getItem(openCanvasKey()) ?? '';
+        once = localStorage.getItem(openOnceKey()) === '1';
+        localStorage.removeItem(openOnceKey());
     } catch (err: unknown) {
         log.warn(SEG.UI, '[Namespace] The open canvas was not read:', err);
     }
-    if (remembered === '') return '';
-    return rows.some(c => c.id === remembered) ? remembered : '';
+    const row = remembered === ''
+        ? rows.find(c => c.kind === 'namespace')
+        : rows.find(c => c.id === remembered);
+    if (!row) {
+        const own = rows.find(c => c.kind === 'namespace');
+        if (!own) return { open: '', hasCanvas: false, disabled: false };
+        if (own.disabled_by !== '' && !once) return { open: '', hasCanvas: false, disabled: false };
+        return { open: '', hasCanvas: true, disabled: own.disabled_by !== '' };
+    }
+    const disabled = row.disabled_by !== '';
+    if (disabled && !once) return { open: '', hasCanvas: false, disabled: false };
+    return { open: row.kind === 'namespace' ? '' : row.id, hasCanvas: true, disabled };
 }
 
 // One ⌗. "so, yeah, the first need is to create a canvas right": where the
@@ -98,29 +130,30 @@ function rowActs(c: CanvasRow, buttons: HydrateConfig): string {
         place('enable', 'enable', { variant: 'default', onClick: () => act(() => enableCanvas(id)) });
         if (privileged()) {
             place('disown', 'unown', { variant: 'warning', confirmation: { label: 'unown?' }, onClick: () => act(() => disownCanvas(id)) });
-            place('give', 'give to…', { variant: 'default', onClick: () => withAsk('the User id to give it to', async user => { await disownCanvas(id); await addOwner(id, user); }) });
+            // "a canvas can be nuked when disabled, like we do with namespaces themselves."
+            place('nuke', 'nuke', { variant: 'danger', confirmation: { label: 'nuke, for good?' }, onClick: () => act(() => nukeCanvas(id)) });
         }
     }
     if (c.kind === 'user' && (c.mine || privileged())) {
         place('invite', 'invite…', { variant: 'default', onClick: () => withAsk('the e-mail of the User to invite', email => inviteOwner(id, email)) });
     }
-    if (c.kind === 'namespace' && privileged()) {
-        place('grant', 'grant…', { variant: 'default', onClick: () => withAsk('the User id to grant a look', user => grantAccess(id, user)) });
-    }
     return acts.join('');
 }
 
-function rowHtml(c: CanvasRow, buttons: HydrateConfig): string {
+// A canvas is a card: what it is called, whose it is, its state, its acts.
+function cardHtml(c: CanvasRow, buttons: HydrateConfig): string {
     const open = openCanvas() === c.id || (openCanvas() === '' && c.kind === 'namespace');
-    const state = c.disabled_by ? `disabled by ${escapeHtml(c.disabled_by)}` : '';
+    const state = c.disabled_by ? `disabled by ${escapeHtml(c.disabled_by)}` : (open ? 'open' : '');
     return `
-        <div class="canvas-row ${c.disabled_by ? 'disabled' : ''} ${open ? 'open' : ''}" data-id="${escapeHtml(c.id)}">
-            <span class="canvas-row-symbol">${Subcanvas}</span>
-            <span class="canvas-row-name">${escapeHtml(c.name)}</span>
-            <span class="canvas-row-kind">${c.kind === 'namespace' ? 'the namespace\'s' : 'a User\'s'}</span>
-            <span class="canvas-row-owners">${ownerHtml(c)}</span>
-            <span class="canvas-row-state">${state}</span>
-            <span class="canvas-row-actions">${rowActs(c, buttons)}</span>
+        <div class="canvas-card ${c.disabled_by ? 'disabled' : ''} ${open ? 'open' : ''}" data-id="${escapeHtml(c.id)}">
+            <div class="canvas-card-head">
+                <span class="canvas-card-symbol">${Subcanvas}</span>
+                <span class="canvas-card-name">${escapeHtml(c.name)}</span>
+            </div>
+            <div class="canvas-card-kind">${c.kind === 'namespace' ? 'the namespace\'s' : 'a User\'s'}</div>
+            <div class="canvas-card-owners">${ownerHtml(c)}</div>
+            <div class="canvas-card-state">${state}</div>
+            <div class="canvas-card-actions">${rowActs(c, buttons)}</div>
         </div>`;
 }
 
@@ -161,11 +194,11 @@ function render(): void {
     const said = failure === '' ? '' : `<div class="namespace-page-failure">${escapeHtml(failure)}</div>`;
     const rows = canvases.length === 0
         ? '<div class="canvas-none">no canvas here yet</div>'
-        : canvases.map(c => rowHtml(c, buttons)).join('');
+        : canvases.map(c => cardHtml(c, buttons)).join('');
     body.innerHTML = `
         <h2 class="namespace-page-name">${escapeHtml(who?.standing || 'default')}</h2>
         <div class="canvas-list">${rows}</div>
-        <input class="canvas-ask" type="text" placeholder="a User id or an e-mail, for the acts that ask one" autocomplete="off" spellcheck="false">
+        <input class="canvas-ask" type="text" placeholder="an e-mail, for invite…" autocomplete="off" spellcheck="false">
         <div class="canvas-birth">${birthHtml(buttons)}</div>
         ${said}`;
     hydrateButtons(body, buttons);
@@ -207,7 +240,7 @@ function attach(el: HTMLElement): void {
         const target = e.target as HTMLElement;
         // The system's buttons handle themselves.
         if (target.closest('button')) return;
-        const row = target.closest<HTMLElement>('.canvas-row');
+        const row = target.closest<HTMLElement>('.canvas-card');
         if (!row) return;
         const c = canvases.find(x => x.id === row.dataset.id);
         if (!c) return;

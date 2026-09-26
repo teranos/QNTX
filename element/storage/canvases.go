@@ -343,6 +343,45 @@ func (s *CanvasStore) setDisabled(ctx context.Context, canvasID, by string) erro
 	return nil
 }
 
+// ErrNotDisabled is a nuke of a canvas nobody disabled first.
+var ErrNotDisabled = errors.New("a canvas is disabled before it is nuked")
+
+// Nuke is the one place a canvas leaves: disabled first, then gone with
+// everything it held. "a canvas can be nuked when disabled, like we do with
+// namespaces themselves."
+func (s *CanvasStore) Nuke(ctx context.Context, canvasID string) (err error) {
+	c, err := s.Canvas(ctx, canvasID)
+	if err != nil {
+		return err
+	}
+	if !c.Disabled() {
+		return errors.Wrapf(ErrNotDisabled, "%s", canvasID)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to begin nuking a canvas")
+	}
+	defer func() { err = db.Undone(err, tx) }()
+	for _, q := range []string{
+		`DELETE FROM composition_edges WHERE composition_id IN (SELECT id FROM canvas_compositions WHERE in_canvas = ?)`,
+		`DELETE FROM canvas_compositions WHERE in_canvas = ?`,
+		`DELETE FROM minimized_windows WHERE in_canvas = ?`,
+		`DELETE FROM canvas_elements WHERE in_canvas = ?`,
+		`DELETE FROM canvas_invitations WHERE canvas_id = ?`,
+		`DELETE FROM canvas_access WHERE canvas_id = ?`,
+		`DELETE FROM canvas_owners WHERE canvas_id = ?`,
+		`DELETE FROM canvases WHERE id = ?`,
+	} {
+		if _, err = tx.ExecContext(ctx, q, canvasID); err != nil {
+			return errors.Wrapf(err, "failed to nuke %s", canvasID)
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit nuking a canvas")
+	}
+	return nil
+}
+
 // Invite asks a User to own a canvas. The token is what the mail carries,
 // and accepting spends it.
 func (s *CanvasStore) Invite(ctx context.Context, canvasID, inviter, invitee, email string) (Invitation, error) {

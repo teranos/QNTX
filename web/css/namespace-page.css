@@ -58,11 +58,12 @@
     color: var(--text-on-dark-emphasis);
 }
 
+/* "canvas cards should feel more like cards": a grid of them, each its own box. */
 .canvas-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 220px);
+    gap: 12px;
+    margin-bottom: 16px;
 }
 
 .canvas-none {
@@ -70,47 +71,67 @@
     color: var(--text-on-dark-tertiary);
 }
 
-.canvas-row {
-    display: grid;
-    grid-template-columns: 20px 1fr auto auto auto auto;
-    align-items: center;
-    gap: 12px;
-    padding: 6px 10px;
+.canvas-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 220px;
+    box-sizing: border-box;
+    padding: 12px;
     border: 1px solid var(--border-on-dark);
+    background: var(--bg-dark-hover);
     cursor: pointer;
     font-size: 12px;
     transition: filter 0.3s ease, opacity 0.3s ease, border-color 0.2s ease;
 }
 
-.canvas-row:hover {
+.canvas-card:hover {
     border-color: var(--text-on-dark-tertiary);
 }
 
-.canvas-row.open {
+.canvas-card.open {
     border-color: var(--text-on-dark);
 }
 
 /* "becomes desaturated in the view" */
-.canvas-row.disabled {
+.canvas-card.disabled {
     filter: saturate(0.2);
     opacity: 0.55;
 }
 
-.canvas-row-symbol {
-    font-size: 14px;
+.canvas-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.canvas-card-symbol {
+    font-size: 16px;
     color: var(--text-on-dark-secondary);
 }
 
-.canvas-row-kind,
-.canvas-row-state {
-    font-size: 10px;
-    color: var(--text-on-dark-tertiary);
+.canvas-card-name {
+    font-size: 13px;
+    color: var(--text-on-dark-emphasis);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.canvas-row-owners {
+.canvas-card-kind,
+.canvas-card-state {
+    font-size: 10px;
+    color: var(--text-on-dark-tertiary);
+}
+
+.canvas-card-state {
+    min-height: 1.2em;
+}
+
+.canvas-card-owners {
     display: flex;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 6px;
     font-size: 11px;
     color: var(--text-on-dark-secondary);
 }
@@ -120,9 +141,11 @@
     font-style: italic;
 }
 
-.canvas-row-actions {
+.canvas-card-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
+    margin-top: 4px;
 }
 
 .canvas-ask {
@@ -216,6 +239,11 @@
         animation: none;
         background: #4ade80;
     }
+}
+
+/* A disabled canvas, opened on purpose: "also desaturated view". */
+body.canvas-disabled [data-element-id="canvas-workspace"] {
+    filter: saturate(0.2);
 }
 
 .namespace-page-failure {
