@@ -130,19 +130,35 @@ body.disconnected #container {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-width: 0;
+    flex: 0 0 auto;
 }
 
+/* The build stamp gives way to the person, never the other way round. */
+.build-stamp {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: #888;
+}
+
+/* Always round; empty is a frame with nobody in it yet, never the logo. */
 #who-picture {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     display: block;
     flex-shrink: 0;
     object-fit: cover;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    box-sizing: border-box;
+    background: var(--bg-almost-white);
 }
 
-#who-picture.round {
-    border-radius: 50%;
+#who-picture.empty {
+    /* No src, so no broken-image glyph: the frame alone. */
+    content: '';
 }
 
 .who-words {
@@ -153,11 +169,9 @@ body.disconnected #container {
 }
 
 #who-name {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-primary);
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 #who-namespace {

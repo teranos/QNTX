@@ -1,5 +1,6 @@
 /* The namespace's page, behind the canvas: its name, its canvases, and ⌗. */
 
+/* "I dont like how white it is": the page is the canvas's dark, not the panel's white. */
 #namespace-page {
     flex: 1;
     min-width: 0;
@@ -7,6 +8,7 @@
     overflow-y: auto;
     font-family: var(--font-mono);
     color: var(--text-on-dark);
+    background: var(--bg-dark);
 }
 
 .namespace-page-head {
