@@ -1,0 +1,253 @@
+/* The namespace's page, behind the canvas: who is looking, the namespace's
+   name, its canvases, and ⌗. Drawn in the canvas's dark, from the tokens. */
+
+/* The page is the whole of what is behind the canvas: the old left panel
+   stands aside while it shows. */
+#container.namespace-page-shown #left-panel {
+    display: none;
+}
+
+#namespace-page {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    color: var(--text-on-dark);
+    background: var(--bg-dark);
+}
+
+/* Who is looking, top-left; the way out of the door, top-right. */
+.namespace-page-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-on-dark);
+}
+
+.namespace-page-top .who {
+    gap: 10px;
+}
+
+.namespace-page-top #who-picture {
+    width: 32px;
+    height: 32px;
+    border-color: var(--border-on-dark);
+    background: var(--bg-dark-hover);
+}
+
+.namespace-page-top #who-name {
+    color: var(--text-on-dark-emphasis);
+}
+
+.namespace-page-top #who-namespace {
+    color: var(--text-on-dark-secondary);
+}
+
+.namespace-page-body {
+    padding: 20px 24px;
+}
+
+.namespace-page-name {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-on-dark-emphasis);
+}
+
+/* "canvas cards should feel more like cards": a grid of them, each its own box. */
+.canvas-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 220px);
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.canvas-none {
+    font-size: 12px;
+    color: var(--text-on-dark-tertiary);
+}
+
+.canvas-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 220px;
+    box-sizing: border-box;
+    padding: 12px;
+    border: 1px solid var(--border-on-dark);
+    background: var(--bg-dark-hover);
+    cursor: pointer;
+    font-size: 12px;
+    transition: filter 0.3s ease, opacity 0.3s ease, border-color 0.2s ease;
+}
+
+.canvas-card:hover {
+    border-color: var(--text-on-dark-tertiary);
+}
+
+.canvas-card.open {
+    border-color: var(--text-on-dark);
+}
+
+/* "becomes desaturated in the view" */
+.canvas-card.disabled {
+    filter: saturate(0.2);
+    opacity: 0.55;
+}
+
+.canvas-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.canvas-card-symbol {
+    font-size: 16px;
+    color: var(--text-on-dark-secondary);
+}
+
+.canvas-card-name {
+    font-size: 13px;
+    color: var(--text-on-dark-emphasis);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.canvas-card-kind,
+.canvas-card-state {
+    font-size: 10px;
+    color: var(--text-on-dark-tertiary);
+}
+
+.canvas-card-state {
+    min-height: 1.2em;
+}
+
+.canvas-card-owners {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-on-dark-secondary);
+}
+
+.canvas-owner.unowned {
+    color: var(--text-on-dark-tertiary);
+    font-style: italic;
+}
+
+.canvas-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.canvas-ask {
+    width: 360px;
+    margin-bottom: 16px;
+    padding: 4px 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-on-dark);
+    background: transparent;
+    border: 1px solid var(--border-on-dark);
+    outline: none;
+}
+
+.canvas-ask:focus {
+    border-color: var(--text-on-dark-tertiary);
+}
+
+/* The birth: ⌗ alone, then the name and a same-sized + beside it. */
+.canvas-birth {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.canvas-birth-symbol.qntx-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 20px;
+}
+
+.canvas-birth-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.canvas-birth-symbol.pressed {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    border: 1px solid var(--border-on-dark);
+    color: var(--text-on-dark);
+}
+
+.canvas-birth-name {
+    width: 240px;
+    height: 40px;
+    box-sizing: border-box;
+    padding: 0 10px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-on-dark);
+    background: transparent;
+    border: 1px solid var(--border-on-dark);
+    outline: none;
+}
+
+.canvas-birth-name:focus {
+    border-color: var(--text-on-dark-tertiary);
+}
+
+.canvas-birth-plus.qntx-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 18px;
+}
+
+/* "button becomes green and shimmers, 2nd click actually creates it": the
+   system button's confirming state, in success, with the shimmer. */
+.canvas-birth-plus.qntx-btn-confirming {
+    color: #0b1a0f;
+    border-color: #4ade80;
+    background: linear-gradient(110deg, #4ade80 0%, #86efac 40%, #4ade80 60%, #86efac 100%);
+    background-size: 200% 100%;
+    animation: canvas-birth-shimmer 1.2s linear infinite;
+}
+
+@keyframes canvas-birth-shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .canvas-birth-plus.qntx-btn-confirming {
+        animation: none;
+        background: #4ade80;
+    }
+}
+
+/* A disabled canvas, opened on purpose: "also desaturated view". */
+body.canvas-disabled [data-element-id="canvas-workspace"] {
+    filter: saturate(0.2);
+}
+
+.namespace-page-failure {
+    margin-top: 12px;
+    font-size: 11px;
+    color: #fbbf24;
+}

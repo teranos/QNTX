@@ -38,6 +38,7 @@ func (h *Handler) joinPublic(acct account, door string) (User, error) {
 	// of what identifies one.
 	for _, u := range held {
 		if u.Level == LevelPublicRegistration && u.Namespace == door && u.Reaches(acct.CanonicalID) {
+			u, _ = u.withPicture(acct.CanonicalID, acct.Picture)
 			return h.withAddress(u, acct.Handle)
 		}
 	}
@@ -51,7 +52,7 @@ func (h *Handler) joinPublic(acct account, door string) (User, error) {
 	if err != nil {
 		return User{}, errors.Wrapf(err, "failed to generate a User id for %q at %q", acct.CanonicalID, door)
 	}
-	u.Accounts = []UserAccount{{CanonicalID: acct.CanonicalID, Handle: acct.Handle}}
+	u.Accounts = []UserAccount{{CanonicalID: acct.CanonicalID, Handle: acct.Handle, Picture: acct.Picture}}
 
 	written, err := h.withAddress(u, acct.Handle)
 	if err != nil {
@@ -125,6 +126,7 @@ func (h *Handler) admitPublic(w http.ResponseWriter, r *http.Request, vouched []
 	if binding.Claim.Handle != nil {
 		acct.Handle = *binding.Claim.Handle
 	}
+	acct.Picture = h.pictureFor(&binding)
 
 	u, err := h.joinPublic(acct, arrived.namespace)
 	if err != nil {

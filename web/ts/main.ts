@@ -23,6 +23,10 @@ import { signedIn, openDoor } from './signin.ts';
 import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
+import { person, type Person } from './self-person.ts';
+import { setOpenCanvas, setStanding } from './standing.ts';
+import { drawWho } from './who.ts';
+import type { CanvasRow } from './api/canvases.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
 import { formatDateTime } from './html-utils.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -92,7 +96,9 @@ function handleVersion(data: VersionMessage): void {
 
         // Format build time if available
         let buildTimeText = '';
-        if (data.build_time) {
+        // A nix build stamps "nix-build" here, which is not a time: nothing is
+        // printed for it, rather than "Invalid Date".
+        if (data.build_time && !Number.isNaN(Date.parse(data.build_time))) {
             buildTimeText = ` · ${formatDateTime(data.build_time)}`;
         }
 
@@ -249,7 +255,57 @@ async function init(): Promise<void> {
         throw error; // Stop initialization - storage is critical
     }
 
-    // Load persisted UI state from IndexedDB (must happen after initStorage())
+    // Where this person stands decides which canvas the browser loads: one
+    // per namespace (ADR-026). A node that will not say is nowhere, which is
+    // the key the browser always used.
+    let who: Person | null = null;
+    try {
+        who = await person();
+        setStanding(who.standing);
+    } catch (err: unknown) {
+        log.debug(SEG.UI, '[Init] Standing nowhere:', err);
+        setStanding('');
+    }
+    drawWho(who).catch((err: unknown) => log.warn(SEG.UI, '[Init] Who was not drawn:', err));
+
+    // An invitation to own a canvas, accepted through the mail's link: said
+    // yes to here, and the link is spent, so the address is cleaned of it.
+    const invite = new URLSearchParams(location.search).get('canvas-invite');
+    if (invite && who) {
+        try {
+            const { acceptInvitation } = await import('./api/canvases.ts');
+            const owned = await acceptInvitation(invite);
+            log.info(SEG.UI, `[Init] Accepted the invitation to own ${owned.name}`);
+        } catch (err: unknown) {
+            log.error(SEG.UI, '[Init] The invitation was not accepted:', err);
+        }
+        const cleaned = new URL(location.href);
+        cleaned.searchParams.delete('canvas-invite');
+        history.replaceState(null, '', cleaned.toString());
+    }
+
+    // The canvases this person may act on where they stand, and which one the
+    // page is built for: the one remembered, or the namespace's own, or none.
+    // "i expect to not see any canvas if a namespace has none"
+    let rows: CanvasRow[] = [];
+    let hasCanvas = true;
+    if (who) {
+        try {
+            const { listCanvases } = await import('./api/canvases.ts');
+            rows = await listCanvases();
+            const { opening } = await import('./namespace-page.ts');
+            const chosen = opening(rows);
+            setOpenCanvas(chosen.open);
+            hasCanvas = chosen.hasCanvas;
+            // "can either be seen by opening it (also desaturated view)"
+            document.body.classList.toggle('canvas-disabled', chosen.disabled);
+        } catch (err: unknown) {
+            log.warn(SEG.ELEMENT, '[Init] The node did not say which canvases are here:', err);
+        }
+    }
+
+    // Load persisted UI state from IndexedDB (must happen after initStorage(),
+    // and after the canvas is known: the key is the canvas's).
     uiState.loadPersistedState();
     console.log('[TIMING] storage ready, state loaded:', (performance.now() - _t0).toFixed(0), 'ms');
 
@@ -260,7 +316,7 @@ async function init(): Promise<void> {
     initLaye().catch(err => log.error(SEG.WASM, '[Init] laye init failed:', err));
     installCopyable();
 
-    (async () => {
+    const synced = !hasCanvas ? Promise.resolve() : (async () => {
         const { loadCanvasState, mergeCanvasState, upsertCanvasElement, upsertComposition, addMinimizedWindow } = await import('./api/canvas.ts');
 
         let backendReachable = false;
@@ -303,6 +359,14 @@ async function init(): Promise<void> {
             }
         }
     })().catch(err => log.warn(SEG.ELEMENT, '[Init] Canvas sync failed:', err));
+
+    // A canvas the browser holds nothing of is drawn from what the node holds
+    // of it, so a new canvas opens on its note rather than on nothing. What
+    // the browser already holds is drawn at once, and the node's merged in
+    // behind it, as before.
+    if (hasCanvas && uiState.getCanvasElements().length === 0) {
+        await synced;
+    }
 
     // Restore previous session if exists
     const graphSession = uiState.getGraphSession();
@@ -366,10 +430,10 @@ async function init(): Promise<void> {
     // This ensures the run is ready to receive elements
     tray.init();
 
-    registerDefaultElements();
+    registerDefaultElements(hasCanvas);
 
     // Restore minimized elements from persisted state
-    const minimizedIds = uiState.getMinimizedWindows();
+    const minimizedIds = hasCanvas ? uiState.getMinimizedWindows() : [];
     if (minimizedIds.length > 0) {
         for (const id of minimizedIds) {
             if (tray.has(id)) continue;
@@ -409,7 +473,15 @@ async function init(): Promise<void> {
     // Plugin elements load in background; unknown types show placeholders that
     // auto-replace when the plugin becomes available (see renderElement retry).
     console.log('[TIMING] canvas opening:', (performance.now() - _t0).toFixed(0), 'ms');
-    tray.open('canvas-workspace');
+    // The namespace's page is behind whatever canvas opens: its canvases,
+    // their owners, ⌗ to create one, and the way out of the door.
+    if (who) {
+        const { initNamespacePage } = await import('./namespace-page.ts');
+        initNamespacePage(who, rows);
+    }
+    if (hasCanvas) {
+        tray.open('canvas-workspace');
+    }
 
     // Load plugin elements in background — non-blocking
     import('./components/element/plugin-provided-elements.ts')

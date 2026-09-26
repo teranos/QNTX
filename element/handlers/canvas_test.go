@@ -920,7 +920,7 @@ func TestCompileSubscriptions_SEtoSE_CreatesCompoundAndDisablesDownstream(t *tes
 	}
 
 	// Compile subscriptions
-	if err := handler.compileSubscriptions(ctx, comp); err != nil {
+	if err := handler.compileSubscriptions(ctx, handler.store, comp); err != nil {
 		t.Fatalf("compileSubscriptions failed: %v", err)
 	}
 
@@ -970,7 +970,7 @@ func TestCompileSubscriptions_SEtoSE_EngineSuppressesStandalone(t *testing.T) {
 	if err := handler.store.UpsertComposition(ctx, comp); err != nil {
 		t.Fatalf("UpsertComposition failed: %v", err)
 	}
-	if err := handler.compileSubscriptions(ctx, comp); err != nil {
+	if err := handler.compileSubscriptions(ctx, handler.store, comp); err != nil {
 		t.Fatalf("compileSubscriptions failed: %v", err)
 	}
 
@@ -1067,7 +1067,7 @@ func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
 	}
 
 	// Compile subscriptions
-	if err := handler.compileSubscriptions(ctx, comp); err != nil {
+	if err := handler.compileSubscriptions(ctx, handler.store, comp); err != nil {
 		t.Fatalf("compileSubscriptions failed: %v", err)
 	}
 
@@ -1107,7 +1107,7 @@ func TestCompileSubscriptions_SEtoSE_UnmeldRestoresEngineState(t *testing.T) {
 	if err := handler.store.UpsertComposition(ctx, comp); err != nil {
 		t.Fatalf("UpsertComposition failed: %v", err)
 	}
-	if err := handler.compileSubscriptions(ctx, comp); err != nil {
+	if err := handler.compileSubscriptions(ctx, handler.store, comp); err != nil {
 		t.Fatalf("compileSubscriptions failed: %v", err)
 	}
 

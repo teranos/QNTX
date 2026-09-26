@@ -117,9 +117,68 @@ body.disconnected #container {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: relative;
+    z-index: 1;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-primary);
+}
+
+/* Who is looking: the picture, round once the node answered one, the name,
+   and the namespace stood in. The QNTX mark holds the place otherwise. */
+.who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+/* The build stamp gives way to the person, never the other way round. */
+.build-stamp {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: #888;
+}
+
+/* Always round; empty is a frame with nobody in it yet, never the logo. */
+#who-picture {
+    width: 28px;
+    height: 28px;
+    display: block;
+    flex-shrink: 0;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    box-sizing: border-box;
+    background: var(--bg-almost-white);
+}
+
+#who-picture.empty {
+    /* No src, so no broken-image glyph: the frame alone. */
+    content: '';
+}
+
+.who-words {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 0;
+}
+
+#who-name {
+    font-size: 12px;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+#who-namespace {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 #header h1 {

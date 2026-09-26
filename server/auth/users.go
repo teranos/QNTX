@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"slices"
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
@@ -26,6 +27,9 @@ type UserAccount struct {
 	Provider    string `json:"provider"`
 	CanonicalID string `json:"canonical_id"`
 	Handle      string `json:"handle"`
+	// What the provider last showed this person as. Unsigned, like the handle,
+	// and replaced by whatever the provider gives at the next login.
+	Picture string `json:"picture,omitempty"`
 	// The signed binding that reached this account (ADR-031). Kept as it was
 	// presented, so auth.binding_signers can be asked about its signer again
 	// each time the account admits someone. Nil on a record written before
@@ -118,6 +122,35 @@ func (u User) Name() string {
 	return ""
 }
 
+// Picture is what this person looks like: the first picture any of their
+// accounts carries. Empty is a person no provider has shown.
+func (u User) Picture() string {
+	for _, a := range u.Accounts {
+		if a.Picture != "" {
+			return a.Picture
+		}
+	}
+	return ""
+}
+
+// withPicture writes what a provider just showed onto the account it showed it
+// for. Reports whether anything changed, so an unchanged User is not rewritten.
+func (u User) withPicture(canonicalID, picture string) (User, bool) {
+	if picture == "" {
+		return u, false
+	}
+	changed := false
+	accounts := slices.Clone(u.Accounts)
+	for i, a := range accounts {
+		if a.CanonicalID == canonicalID && a.Picture != picture {
+			accounts[i].Picture = picture
+			changed = true
+		}
+	}
+	u.Accounts = accounts
+	return u, changed
+}
+
 // HoldsKey reports whether this User already logged in from this browser.
 func (u User) HoldsKey(did string) bool {
 	for _, k := range u.Keys {
@@ -167,16 +200,21 @@ func (h *Handler) joinUser(route string, matched *SignedBinding, layeDID string)
 		}
 	}
 
+	// What the provider showed at this login, over whatever it showed last.
+	u, pictured := u.withPicture(route, h.pictureFor(matched))
+
 	// The browser this login came from is one more place the User is reachable.
-	if u.HoldsKey(layeDID) {
+	if u.HoldsKey(layeDID) && !pictured {
 		return u, nil
 	}
-
-	u.Keys = append(u.Keys, UserKey{DID: layeDID, Origin: OriginBrowser})
+	if !u.HoldsKey(layeDID) {
+		u.Keys = append(u.Keys, UserKey{DID: layeDID, Origin: OriginBrowser})
+	}
 	if err := h.users.Put(u); err != nil {
-		// Losing a way to reach a User is not losing the User, so this login
-		// stands and the next one writes the key again.
-		h.logger.Errorw("could not record the key a User logged in with",
+		// Losing a way to reach a User is not losing the User, and neither is
+		// losing a picture. This login stands; the next one writes the key
+		// again, and the next ceremony the picture.
+		h.logger.Errorw("could not record the key or the picture a User logged in with",
 			"user", u.ID, "did", layeDID, "error", err)
 	}
 	return u, nil

@@ -554,7 +554,36 @@ func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct a
 		picture:  acct.Picture,
 		signedAt: time.Now(),
 	})
+	// The login this binding reaches is where the User is written, and only the
+	// binding travels there. Its signature names this ceremony and no other.
+	if acct.Picture != "" {
+		h.pictures.Store(binding.SignatureHex, heldPicture{picture: acct.Picture, signedAt: time.Now()})
+	}
 	return binding, nil
+}
+
+// heldPicture is what a provider showed at a ceremony, waiting for the login
+// that presents the binding signed there.
+type heldPicture struct {
+	picture  string
+	signedAt time.Time
+}
+
+// pictureFor is the picture shown at the ceremony that signed this binding, or
+// "" for a binding from an older ceremony. Spent on read, like the binding.
+func (h *Handler) pictureFor(b *SignedBinding) string {
+	if b == nil {
+		return ""
+	}
+	val, ok := h.pictures.LoadAndDelete(b.SignatureHex)
+	if !ok {
+		return ""
+	}
+	held, ok := val.(heldPicture)
+	if !ok || time.Since(held.signedAt) > bindingFlowTTL {
+		return ""
+	}
+	return held.picture
 }
 
 // handleBindingResult hands the binding to the browser holding the ticket the
@@ -590,12 +619,19 @@ func (h *Handler) handleBindingResult(w http.ResponseWriter, r *http.Request) {
 
 // sweepSignedBindings drops bindings nobody came back for, so an abandoned
 // ceremony is not a node signature sitting in memory for the life of the
-// process.
+// process. The same for pictures no login came for.
 func (h *Handler) sweepSignedBindings() {
 	h.signedBindings.Range(func(key, val any) bool {
 		held, ok := val.(heldBinding)
 		if !ok || time.Since(held.signedAt) > bindingFlowTTL {
 			h.signedBindings.Delete(key)
+		}
+		return true
+	})
+	h.pictures.Range(func(key, val any) bool {
+		held, ok := val.(heldPicture)
+		if !ok || time.Since(held.signedAt) > bindingFlowTTL {
+			h.pictures.Delete(key)
 		}
 		return true
 	})

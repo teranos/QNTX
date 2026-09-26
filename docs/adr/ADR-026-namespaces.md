@@ -46,10 +46,25 @@ world.
 
 Things don't cross namespaces. A canvas lives in one namespace and only that one.
 
-The system namespace is the node: `node_identity`, the row keyed `'self'`. It has no canvas.
+The system namespace is the node: `node_identity`, the row keyed `'self'`.
 
-There is a default namespace. It is the default project, and it is where the canvas lives that is
-the default canvas of today.
+"system namespace should have no canvas"
+
+"default namespace has default canvas, whihc is the current canvas i am working with."
+
+"and for every other namespace the canvas needs to be explicitly created and named."
+
+"watcher should be per namespace"
+
+"schedules should be per namespace"
+
+"not all namespaces need watchers enabled."
+
+"not all namespaces need schedules enabled."
+
+"not all namespaces need to have access to all plugins"
+
+"not all plugins need to have access to all namespaces"
 
 ### A project is a namespace
 
@@ -87,10 +102,15 @@ those.
 Clicking a namespace highlights a tile in the namespaces bar. A session acts in
 the default namespace, whatever is highlighted.
 
-Watchers, schedules, the canvas and the element handlers are stored once, so a
-namespace other than the default has none of its own — nor its own search index
-or embeddings. A schedule created during a sigil call runs in its creator's
-namespace. Attestations and observers are per namespace.
+The canvas is one for the node, in `qntx-operational.db`.
+
+Schedules are one table for the node. A schedule created during a sigil call
+keeps its creator's namespace, and each run carries it to the plugin. Every
+other schedule has none.
+
+Embeddings are one store for the node.
+
+Attestations and observers are per namespace.
 
 Reach is a granted relation (ADR-031). What grants and strikes it is unbuilt;
 disabling a namespace refuses reads, and a login stands.

@@ -31,10 +31,11 @@ export { updateSigmaPanel } from './sigma-panel';
 // the socket already calls stay, and forward.
 export { updateAmVersion as updateSelfVersion, updateAmCapabilities as updateSelfCapabilities } from './am-element.ts';
 
-// Register default system elements
-export function registerDefaultElements(): void {
+// Register default system elements. A namespace with no canvas has no canvas
+// element either: nothing of it is drawn, not even the dot in the tray.
+export function registerDefaultElements(hasCanvas: boolean = true): void {
     // Canvas Element - Fractal container with spatial grid
-    tray.add(createCanvasElement());
+    if (hasCanvas) tray.add(createCanvasElement());
 
     // Database Statistics Element
     tray.add(createDbElement());

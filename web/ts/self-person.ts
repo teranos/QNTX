@@ -26,6 +26,8 @@ export interface Person {
     user: string;
     display_name?: string;
     name: string;
+    /** What a provider last showed them as. Empty is a person no provider has shown. */
+    picture: string;
     level: string;
     namespaces: string[];
     door?: string;

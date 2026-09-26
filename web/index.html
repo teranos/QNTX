@@ -29,6 +29,7 @@
     <link rel="stylesheet" href="/css/pulse-panel.css">
     <link rel="stylesheet" href="/css/handlers-panel.css">
     <link rel="stylesheet" href="/css/namespaces-bar.css">
+    <link rel="stylesheet" href="/css/namespace-page.css">
     <link rel="stylesheet" href="/css/element-table.css">
     <link rel="stylesheet" href="/css/pulse-scheduling.css">
 
@@ -286,10 +287,14 @@
                  phone's display: none, and the wordmark stood alone in the
                  band under the island. -->
             <header id="header">
-                <div style="display: block; width: 24px; height: 24px; transition: all 0.2s ease; flex-shrink: 0;" onmouseover="this.style.filter='invert(1)'" onmouseout="this.style.filter='none'">
-                    <img src="/qntx.jpg" alt="QNTX" style="width: 100%; height: 100%; display: block;">
+                <div class="who">
+                    <img id="who-picture" class="empty" alt="">
+                    <div class="who-words">
+                        <span id="who-name"></span>
+                        <span id="who-namespace"></span>
+                    </div>
                 </div>
-                <div style="font-size: 11px; color: #888; white-space: nowrap;">
+                <div class="build-stamp">
                     <span id="build-hash"></span>
                 </div>
             </header>

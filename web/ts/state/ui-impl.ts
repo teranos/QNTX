@@ -24,6 +24,7 @@ import type { PanelState } from '../../types/core';
 import type { CompositionState } from '@teranos/elements';
 import type { CanvasElement } from '../generated/proto/element/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
+import { keyFor } from '../standing';
 import { log, SEG } from '../logger';
 import { upsertCanvasElement as apiUpsertElement, deleteCanvasElement as apiDeleteElement, addMinimizedWindow as apiAddMinimized, deleteMinimizedWindow as apiDeleteMinimized } from '../api/canvas';
 
@@ -229,6 +230,9 @@ function createDefaultState(): UIStateData {
 // UIState Class
 // ============================================================================
 
+// Under keyFor (standing.ts): default keeps this one, every other namespace
+// keeps its own. One canvas per namespace, in the browser as on the node
+// (ADR-026). Resolved per call, since standing is set after this module loads.
 const STORAGE_KEY = 'qntx-ui-state';
 const STORAGE_VERSION = 2; // Bumped for graph session addition
 const MAX_SUBSCRIBER_FAILURES = 3;
@@ -736,14 +740,14 @@ export class UIState {
      * Save state to localStorage using storage.ts
      */
     private saveToStorage(): void {
-        setItem(STORAGE_KEY, this.getPersistedState(), { version: STORAGE_VERSION });
+        setItem(keyFor(STORAGE_KEY), this.getPersistedState(), { version: STORAGE_VERSION });
     }
 
     /**
      * Load state from localStorage using storage.ts
      */
     private loadFromStorage(): UIStateData | null {
-        const persisted = getItem<PersistedUIState>(STORAGE_KEY, {
+        const persisted = getItem<PersistedUIState>(keyFor(STORAGE_KEY), {
             version: STORAGE_VERSION,
             maxAge: GRAPH_SESSION_MAX_AGE,
         });
@@ -768,7 +772,7 @@ export class UIState {
      * Clear all persisted state
      */
     clearStorage(): void {
-        removeItem(STORAGE_KEY);
+        removeItem(keyFor(STORAGE_KEY));
     }
 
     /**

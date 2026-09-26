@@ -32,7 +32,8 @@ type Made struct {
 	Watchers storage.Watchers
 	// Schedules are the jobs that tick here.
 	Schedules *schedule.Store
-	// Canvas is the elements placed here, and how they compose.
+	// Canvas is the elements placed here, and how they compose. Nil is a
+	// namespace with no canvas: "system namespace should have no canvas"
 	Canvas *elementstorage.CanvasStore
 	// Embeddings are the vectors of what was attested here, and the clusters
 	// they fall into.
@@ -87,6 +88,9 @@ func unanswered(made Made) []string {
 	var quiet []string
 	value := reflect.ValueOf(made)
 	for i := range value.NumField() {
+		if value.Type().Field(i).Name == "Canvas" {
+			continue
+		}
 		if value.Field(i).IsNil() {
 			quiet = append(quiet, value.Type().Field(i).Name)
 		}

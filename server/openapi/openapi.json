@@ -58,25 +58,45 @@
         "ATTESTOR"
       ]
     },
+    "/api/canvas": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
+      ]
+    },
     "/api/canvas/compositions": {
       "x-qntx-reach": [
-        "ROOT"
+        "ROOT",
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
       ]
     },
     "/api/canvas/compositions/": {
       "x-qntx-reach": [
-        "ROOT"
+        "ROOT",
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
       ],
       "x-qntx-prefix": true
     },
     "/api/canvas/elements": {
       "x-qntx-reach": [
-        "ROOT"
+        "ROOT",
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
       ]
     },
     "/api/canvas/elements/": {
       "x-qntx-reach": [
-        "ROOT"
+        "ROOT",
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
       ],
       "x-qntx-prefix": true
     },
@@ -93,13 +113,34 @@
     "/api/canvas/minimized-windows": {
       "x-qntx-reach": [
         "ROOT",
-        "SUPER"
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
       ]
     },
     "/api/canvas/minimized-windows/": {
       "x-qntx-reach": [
         "ROOT",
-        "SUPER"
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
+      ],
+      "x-qntx-prefix": true
+    },
+    "/api/canvases": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
+      ]
+    },
+    "/api/canvases/": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
       ],
       "x-qntx-prefix": true
     },
@@ -581,6 +622,15 @@
     "/i/enable": {
       "x-qntx-reach": [
         "ANYONE"
+      ]
+    },
+    "/i/picture": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
       ]
     },
     "/i/standing": {

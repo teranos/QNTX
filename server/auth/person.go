@@ -24,6 +24,9 @@ type Person struct {
 	// Name is what to call them either way: the ROOT User is root until it says
 	// otherwise, which is why it never has to say anything.
 	Name string `json:"name"`
+	// Picture is what a provider last showed them as, and empty is a person no
+	// provider has shown.
+	Picture string `json:"picture"`
 	// Level is how much this admission may do (ADR-027), as a word to read
 	// rather than a thing to compare — server/reach decides reach.
 	Level string `json:"level"`
@@ -131,6 +134,21 @@ func (h *Handler) theUser(admitted Admission) (User, int, error) {
 		errors.Newf("the admission names User %s and the store holds no such User", admitted.UserID)
 }
 
+// pictureOf is the picture of the User a session names. A lookup that fails is
+// a person drawn without one, never a status that does not answer.
+func (h *Handler) pictureOf(p Presented) string {
+	if h.users == nil || !p.SessionLive || p.UserID == "" {
+		return ""
+	}
+	u, _, err := h.theUser(Admission{Identity: p.Session, UserID: p.UserID})
+	if err != nil {
+		h.logger.Warnw("the picture of the User a session names was not read",
+			"user", p.UserID, "error", err)
+		return ""
+	}
+	return u.Picture()
+}
+
 // personOf is what to publish about a User to the User themselves, together
 // with how this request got here.
 func personOf(u User, admitted Admission) Person {
@@ -138,6 +156,7 @@ func personOf(u User, admitted Admission) Person {
 		User:        u.ID,
 		DisplayName: u.DisplayName,
 		Name:        u.Name(),
+		Picture:     u.Picture(),
 		Level:       admitted.LevelName(),
 		Namespaces:  admitted.Namespaces,
 		Door:        u.Namespace,

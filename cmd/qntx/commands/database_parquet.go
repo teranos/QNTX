@@ -177,6 +177,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		location:    location,
 		dbPath:      dbPath,
 		operational: database,
+		defaultDB:   defaultLanding.db,
 		landings: map[string]*sqlitecgo.RustStore{
 			duckdbcgo.NamespaceDefault: defaultLanding.RustStore,
 			duckdbcgo.NamespaceSystem:  systemLanding.RustStore,
@@ -207,6 +208,8 @@ type parquetHandles struct {
 	// (ADR-024). A namespace is made of its schedules, and this is where they
 	// are kept until the rows move under the namespace with everything else.
 	operational *sql.DB
+	// defaultDB is default's landing file, where default's canvas is.
+	defaultDB *sql.DB
 	// closing is how each opened namespace is closed, by the name it was opened
 	// under: its flusher stopped and its landing file closed. A namespace
 	// switched off or deleted leaves a tick behind otherwise, on a prefix that
@@ -257,13 +260,16 @@ type opened struct {
 	flushed  <-chan struct{}
 	duck     *duckdbcgo.DuckdbStore
 	watchers *duckdbcgo.WatcherStore
-	landing  *sqlitecgo.RustStore
+	landing  *landed
 }
 
 // landed is a namespace's landing file: the buffer its writes land in, and
 // the count of what it holds that the record does not have yet.
 type landed struct {
 	*sqlitecgo.RustStore
+	// db is the file's tables as database/sql speaks them: the canvas, and the
+	// watcher execution queue.
+	db     *sql.DB
 	name   string
 	sent   storage.FileSentMark
 	unsent atomic.Int64
@@ -303,8 +309,11 @@ func openLanding(dbPath, name string, record *duckdbcgo.DuckdbStore) (*landed, e
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the landing file of %s at %s", name, path)
 	}
-	landing := &landed{RustStore: store, name: name, sent: storage.FileSentMark{Path: path + ".sent"}}
+	db := sql.OpenDB(rustdriver.Connector("namespace:"+name, store.StorePtr(), store.ReadConnPtr(), store.Mu(), store.MuRead()))
+	db.SetMaxOpenConns(4)
+	landing := &landed{RustStore: store, db: db, name: name, sent: storage.FileSentMark{Path: path + ".sent"}}
 	fail := func(err error) (*landed, error) {
+		sqlclose.Log(db.Close(), logger.Logger, "the driver of the landing file of "+name)
 		sqlclose.Log(store.Close(), logger.Logger, "the landing file of "+name)
 		return nil, err
 	}
@@ -418,7 +427,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 	if h.closing == nil {
 		h.closing = map[string]opened{}
 	}
-	h.closing[name] = opened{stop: stop, flushed: flushed, duck: duck, watchers: watchers, landing: landing.RustStore}
+	h.closing[name] = opened{stop: stop, flushed: flushed, duck: duck, watchers: watchers, landing: landing}
 	h.landings[name] = landing.RustStore
 	h.records[name] = duck
 	h.mu.Unlock()
@@ -431,7 +440,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 		Store:       store,
 		Watchers:    duckdbcgo.NewWatchers(watchers),
 		Schedules:   schedule.NewStore(h.operational),
-		Canvas:      elementstorage.NewCanvasStore(h.operational),
+		Canvas:      elementstorage.NewCanvasStore(landing.db),
 		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
 		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),
@@ -463,6 +472,7 @@ func (h *parquetHandles) CloseNamespace(name string) {
 	<-was.flushed
 	sqlclose.Log(was.watchers.Close(), logger.Logger, "the watchers of "+name)
 	sqlclose.Log(was.duck.Close(), logger.Logger, "the parquet store of "+name)
+	sqlclose.Log(was.landing.db.Close(), logger.Logger, "the driver of the landing file of "+name)
 	sqlclose.Log(was.landing.Close(), logger.Logger, "the landing file of "+name)
 }
 
@@ -671,7 +681,7 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 		Store:       dflt,
 		Watchers:    h.watchers,
 		Schedules:   schedule.NewStore(h.operational),
-		Canvas:      elementstorage.NewCanvasStore(h.operational),
+		Canvas:      elementstorage.NewCanvasStore(h.defaultDB),
 		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
 		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),
@@ -685,7 +695,9 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 		return nil, err
 	}
 	// system is the node itself, and it is made the same way anything is.
+	// "system namespace should have no canvas"
 	made.Store = h.system
+	made.Canvas = nil
 	sys, err := namespaces.NewUniverse(duckdbcgo.NamespaceSystem, made)
 	if err != nil {
 		return nil, err

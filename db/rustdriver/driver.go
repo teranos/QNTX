@@ -21,6 +21,7 @@ package rustdriver
 import "C"
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/base64"
@@ -56,6 +57,31 @@ func RegisterNamed(name, caller string, storePtr, readConnPtr unsafe.Pointer, mu
 		muRead:   muRead,
 		caller:   caller,
 	})
+}
+
+// Connector is the driver for one store, handed to sql.OpenDB. A namespace's
+// file opens and closes more than once in a process, and sql.Register panics
+// on a name it already holds.
+func Connector(caller string, storePtr, readConnPtr unsafe.Pointer, muWrite, muRead *sync.Mutex) driver.Connector {
+	return &rustConnector{driver: &RustDriver{
+		store:    (*C.SqliteStore)(storePtr),
+		readConn: (*C.ReadConn)(readConnPtr),
+		muWrite:  muWrite,
+		muRead:   muRead,
+		caller:   caller,
+	}}
+}
+
+type rustConnector struct {
+	driver *RustDriver
+}
+
+func (c *rustConnector) Connect(context.Context) (driver.Conn, error) {
+	return c.driver.Open("")
+}
+
+func (c *rustConnector) Driver() driver.Driver {
+	return c.driver
 }
 
 // SetCaller sets the flight recorder caller tag for the current OS thread.

@@ -11,6 +11,7 @@ import { apiFetch, connectivity } from '../client';
 import { jsonBody } from '../http-utils';
 import { syncStateManager } from '../state/sync-state';
 import { uiState } from '../state/ui';
+import { canvasQuery, keyFor } from '../standing';
 
 export type CanvasSyncOp = 'element_upsert' | 'element_delete' | 'composition_upsert' | 'composition_delete' | 'minimized_add' | 'minimized_delete';
 
@@ -21,6 +22,8 @@ export interface CanvasSyncEntry {
     nextRetryAt?: number;
 }
 
+// Under keyFor (standing.ts): a namespace's mutations wait under its own key,
+// so a step to another namespace never flushes them into it.
 const STORAGE_KEY = 'qntx-canvas-sync-queue';
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 1000;
@@ -38,7 +41,7 @@ class CanvasSyncQueueImpl {
     private listeners = new Set<() => void>();
 
     private get queue(): CanvasSyncEntry[] {
-        const stored = globalThis.localStorage?.getItem(STORAGE_KEY);
+        const stored = globalThis.localStorage?.getItem(keyFor(STORAGE_KEY));
         if (!stored) return [];
         try {
             const parsed = JSON.parse(stored);
@@ -62,7 +65,7 @@ class CanvasSyncQueueImpl {
 
     private set queue(entries: CanvasSyncEntry[]) {
         try {
-            globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(entries));
+            globalThis.localStorage?.setItem(keyFor(STORAGE_KEY), JSON.stringify(entries));
         } catch (err) {
             log.error(SEG.ELEMENT, `[CanvasSync] Failed to persist queue (${entries.length} entries) to ${STORAGE_KEY}; pending canvas mutations will not survive reload:`, err);
         }
@@ -213,7 +216,7 @@ class CanvasSyncQueueImpl {
         }
 
         syncStateManager.setState(id, 'syncing');
-        const response = await apiFetch('/api/canvas/elements', jsonBody('POST', {
+        const response = await apiFetch('/api/canvas/elements' + canvasQuery(), jsonBody('POST', {
             ...item,
             x: Math.round(item.x),
             y: Math.round(item.y),
@@ -233,7 +236,7 @@ class CanvasSyncQueueImpl {
     }
 
     private async syncElementDelete(id: string): Promise<boolean> {
-        const response = await apiFetch(`/api/canvas/elements/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`/api/canvas/elements/${id}${canvasQuery()}`, { method: 'DELETE' });
 
         if (response.ok || response.status === 404) {
             syncStateManager.clearState(id);
@@ -254,7 +257,7 @@ class CanvasSyncQueueImpl {
         }
 
         syncStateManager.setState(id, 'syncing');
-        const response = await apiFetch('/api/canvas/compositions', jsonBody('POST', {
+        const response = await apiFetch('/api/canvas/compositions' + canvasQuery(), jsonBody('POST', {
             id: composition.id,
             edges: composition.edges,
             x: Math.round(composition.x),
@@ -273,7 +276,7 @@ class CanvasSyncQueueImpl {
     }
 
     private async syncCompositionDelete(id: string): Promise<boolean> {
-        const response = await apiFetch(`/api/canvas/compositions/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`/api/canvas/compositions/${id}${canvasQuery()}`, { method: 'DELETE' });
 
         if (response.ok || response.status === 404) {
             syncStateManager.clearState(id);
@@ -287,7 +290,7 @@ class CanvasSyncQueueImpl {
     }
 
     private async syncMinimizedAdd(id: string): Promise<boolean> {
-        const response = await apiFetch('/api/canvas/minimized-windows', jsonBody('POST', { element_id: id }));
+        const response = await apiFetch('/api/canvas/minimized-windows' + canvasQuery(), jsonBody('POST', { element_id: id }));
 
         if (response.ok) {
             log.debug(SEG.ELEMENT, `[CanvasSync] Synced minimized window ${id}`);
@@ -299,7 +302,7 @@ class CanvasSyncQueueImpl {
     }
 
     private async syncMinimizedDelete(id: string): Promise<boolean> {
-        const response = await apiFetch(`/api/canvas/minimized-windows/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`/api/canvas/minimized-windows/${id}${canvasQuery()}`, { method: 'DELETE' });
 
         if (response.ok || response.status === 404) {
             log.debug(SEG.ELEMENT, `[CanvasSync] Deleted minimized window ${id}`);

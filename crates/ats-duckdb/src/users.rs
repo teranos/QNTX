@@ -47,6 +47,11 @@ pub struct AccountRecord {
     #[serde(default)]
     pub handle: String,
 
+    /// What the provider last showed this person as. Display only, and the
+    /// next login replaces it. Absent on a record no provider showed.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub picture: String,
+
     /// The signed binding that reached this account (ADR-031), as Go wrote it.
     /// Carried through unread: the node re-verifies it, this store only keeps
     /// it. Absent on a record written before bindings were kept.
@@ -345,6 +350,7 @@ mod tests {
             provider: "mastodon".to_string(),
             canonical_id: "https://mastodon.example/@tim".to_string(),
             handle: "@tim@mastodon.example".to_string(),
+            picture: String::new(),
             binding: None,
         });
         store.put(&u).expect("put");
@@ -372,6 +378,7 @@ mod tests {
             provider: "mastodon".to_string(),
             canonical_id: "https://mastodon.example/@tim".to_string(),
             handle: "@tim@mastodon.example".to_string(),
+            picture: String::new(),
             binding: Some(binding.clone()),
         });
         store.put(&u).expect("put");
@@ -384,6 +391,23 @@ mod tests {
             "accounts":[{"provider":"mastodon","canonical_id":"https://mastodon.example/@old","handle":""}],"created_at":1}"#;
         let old: UserRecord = serde_json::from_str(body).expect("an old record still reads");
         assert_eq!(old.accounts[0].binding, None);
+    }
+
+    /// "qntx should keep the picture" — the account Go wrote it on is read
+    /// back holding it, rather than refused for naming a field.
+    #[test]
+    fn an_accounts_picture_survives_the_round_trip() {
+        let body = r#"{"id":"US-TIM-6","level":"ROOT","keys":null,
+            "accounts":[{"provider":"google","canonical_id":"google:110","handle":"tim@example.com",
+            "picture":"https://lh3.example/tim.jpg"}],"created_at":1}"#;
+        let record: UserRecord = serde_json::from_str(body).expect("a User Go wrote");
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let store = UserStore::open(format!("file://{}", dir.path().display())).expect("open");
+        store.put(&record).expect("put");
+
+        let read = store.all().expect("all").remove(0);
+        assert_eq!(read.accounts[0].picture, "https://lh3.example/tim.jpg");
     }
 
     /// A second write replaces the object.
