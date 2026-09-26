@@ -101,6 +101,10 @@ Optional interfaces extend the base — a plugin opts in by implementing them:
 
 ### HTTP Routing
 
+"any plugin to be its own signum without the plugin having to define it"
+
+"the plugin should just be able to declare routes"
+
 - **Route prefix**: All plugin routes are mounted at `/api/<plugin-name>/*`
 - **No conflicts by design**: The per-plugin prefix prevents routing collisions
 - **Roles**: Plugins declare roles on their routes (e.g., `llm-provider`). The UI discovers capabilities via `/api/plugins/routes` without hardcoding plugin names.
