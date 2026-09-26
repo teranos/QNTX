@@ -280,10 +280,14 @@ func splitParam(v string) []string {
 	return result
 }
 
+// Past this a write is worth a line.
+const attestationWriteQuiet = 250 * time.Millisecond
+
 // handleCreateAttestation accepts a browser-created attestation and stores it server-side.
 // POST /api/attestations — idempotent (returns 200 if already exists).
 func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Request) {
-	// The phases of a write, each timed, said on the log line at the end. A
+	// The phases of a write, each timed, said on the log line at the end when
+	// the write was slow. A
 	// write is several reads of the store in a row, and which one is slow is
 	// not a thing to guess at.
 	entered := time.Now()
@@ -540,19 +544,29 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	// bookkeeping writes — clustering, refusals, plugin sync — are not this
 	// number, and the store's own count is the place to go for those.
 	measure.Count(measure.AttestationsWritten, 1)
+	tookHandler := time.Since(entered)
+	// The gate before the handler and the handler itself, as the access log
+	// sees the request: a long wait before a quick handler is a slow write.
+	took := beforeHandler + tookHandler
+	measure.Took(measure.AttestationWriteTook, took)
 
-	s.logger.Infow("Attestation created",
-		"id", req.ID,
-		"subjects", req.Subjects,
-		"predicates", req.Predicates,
-		"source", req.Source,
-		"client", r.RemoteAddr,
-		"before_handler", beforeHandler,
-		"store", tookStore,
-		"exists", tookExists,
-		"put", tookPut,
-		"rebuild", tookRebuild,
-		"handler", time.Since(entered))
+	// A write that went well is the attestation itself and the two numbers
+	// above. A slow one is said, with the phase it was slow in.
+	if took >= attestationWriteQuiet {
+		s.logger.Infow("Attestation created slowly",
+			"id", req.ID,
+			"subjects", req.Subjects,
+			"predicates", req.Predicates,
+			"source", req.Source,
+			"client", r.RemoteAddr,
+			"before_handler", beforeHandler,
+			"store", tookStore,
+			"exists", tookExists,
+			"put", tookPut,
+			"rebuild", tookRebuild,
+			"handler", tookHandler,
+			"took", took)
+	}
 
 	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
 }

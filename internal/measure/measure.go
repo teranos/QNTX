@@ -28,6 +28,11 @@ const (
 	// accepted and stored.
 	AttestationsWritten = "qntx.attestations.written"
 
+	// AttestationWriteTook is how long a POST that stored one ran, from the
+	// request arriving to the answer. Every write is here; only a slow one is
+	// also a log line, which names the phase it spent it in.
+	AttestationWriteTook = "qntx.attestations.write.took"
+
 	// QueryTook and QueryReturned are the two halves of the attestation query:
 	// how long it ran, and how much it answered with. A query that gets slower
 	// while returning the same amount is a different problem from one that got
