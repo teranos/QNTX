@@ -11,6 +11,7 @@ import { apiFetch, connectivity } from '../client';
 import { jsonBody } from '../http-utils';
 import { syncStateManager } from '../state/sync-state';
 import { uiState } from '../state/ui';
+import { keyFor } from '../standing';
 
 export type CanvasSyncOp = 'element_upsert' | 'element_delete' | 'composition_upsert' | 'composition_delete' | 'minimized_add' | 'minimized_delete';
 
@@ -21,6 +22,8 @@ export interface CanvasSyncEntry {
     nextRetryAt?: number;
 }
 
+// Under keyFor (standing.ts): a namespace's mutations wait under its own key,
+// so a step to another namespace never flushes them into it.
 const STORAGE_KEY = 'qntx-canvas-sync-queue';
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 1000;
@@ -38,7 +41,7 @@ class CanvasSyncQueueImpl {
     private listeners = new Set<() => void>();
 
     private get queue(): CanvasSyncEntry[] {
-        const stored = globalThis.localStorage?.getItem(STORAGE_KEY);
+        const stored = globalThis.localStorage?.getItem(keyFor(STORAGE_KEY));
         if (!stored) return [];
         try {
             const parsed = JSON.parse(stored);
@@ -62,7 +65,7 @@ class CanvasSyncQueueImpl {
 
     private set queue(entries: CanvasSyncEntry[]) {
         try {
-            globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(entries));
+            globalThis.localStorage?.setItem(keyFor(STORAGE_KEY), JSON.stringify(entries));
         } catch (err) {
             log.error(SEG.ELEMENT, `[CanvasSync] Failed to persist queue (${entries.length} entries) to ${STORAGE_KEY}; pending canvas mutations will not survive reload:`, err);
         }

@@ -1,0 +1,41 @@
+/* A namespace with no canvas: ⌗ and a name, in the middle of nothing. */
+
+.canvas-birth {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-on-dark);
+}
+
+.canvas-birth-symbol {
+    font-size: 48px;
+    line-height: 1;
+    opacity: 0.6;
+}
+
+.canvas-birth-name {
+    width: 240px;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: var(--font-mono);
+    text-align: center;
+    color: var(--text-on-dark);
+    background: transparent;
+    border: 1px solid var(--border-on-dark);
+    outline: none;
+}
+
+.canvas-birth-name:focus {
+    border-color: var(--text-on-dark);
+}
+
+.canvas-birth-said {
+    font-size: 11px;
+    color: #fbbf24;
+    min-height: 1.4em;
+}

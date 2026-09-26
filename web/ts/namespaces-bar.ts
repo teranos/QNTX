@@ -96,6 +96,13 @@ async function step(name: string): Promise<void> {
     }
 
     const moved = await response.json() as { namespace: string };
+    // A canvas lives in one namespace and only that one (ADR-026). The page
+    // was built for the one left; it is built again for the one stepped to,
+    // from what the browser keeps of it and what the node says it has.
+    if (moved.namespace !== standing) {
+        location.reload();
+        return;
+    }
     standing = moved.namespace;
     // The node answered a namespace other than the one pressed: this person
     // registered at a door, and a door is where their requests act whatever

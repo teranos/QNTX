@@ -23,6 +23,8 @@ import { signedIn, openDoor } from './signin.ts';
 import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
+import { person } from './self-person.ts';
+import { setStanding } from './standing.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
 import { formatDateTime } from './html-utils.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -249,8 +251,28 @@ async function init(): Promise<void> {
         throw error; // Stop initialization - storage is critical
     }
 
+    // Where this person stands decides which canvas the browser loads: one
+    // per namespace (ADR-026). A node that will not say is nowhere, which is
+    // the key the browser always used.
+    try {
+        setStanding((await person()).standing);
+    } catch (err: unknown) {
+        log.debug(SEG.UI, '[Init] Standing nowhere:', err);
+        setStanding('');
+    }
+
     // Load persisted UI state from IndexedDB (must happen after initStorage())
     uiState.loadPersistedState();
+
+    // "i expect to not see any canvas if a namespace has none". Only the
+    // node's 404 is that; a node that would not answer has not said so.
+    let hasCanvas = true;
+    try {
+        const { theCanvas } = await import('./api/canvas.ts');
+        hasCanvas = (await theCanvas()) !== null;
+    } catch (err: unknown) {
+        log.warn(SEG.ELEMENT, '[Init] The node did not say whether this namespace has a canvas:', err);
+    }
     console.log('[TIMING] storage ready, state loaded:', (performance.now() - _t0).toFixed(0), 'ms');
 
     // WASM and canvas sync run in the background — neither is needed before the
@@ -260,7 +282,7 @@ async function init(): Promise<void> {
     initLaye().catch(err => log.error(SEG.WASM, '[Init] laye init failed:', err));
     installCopyable();
 
-    (async () => {
+    if (hasCanvas) (async () => {
         const { loadCanvasState, mergeCanvasState, upsertCanvasElement, upsertComposition, addMinimizedWindow } = await import('./api/canvas.ts');
 
         let backendReachable = false;
@@ -366,10 +388,10 @@ async function init(): Promise<void> {
     // This ensures the run is ready to receive elements
     tray.init();
 
-    registerDefaultElements();
+    registerDefaultElements(hasCanvas);
 
     // Restore minimized elements from persisted state
-    const minimizedIds = uiState.getMinimizedWindows();
+    const minimizedIds = hasCanvas ? uiState.getMinimizedWindows() : [];
     if (minimizedIds.length > 0) {
         for (const id of minimizedIds) {
             if (tray.has(id)) continue;
@@ -409,7 +431,17 @@ async function init(): Promise<void> {
     // Plugin elements load in background; unknown types show placeholders that
     // auto-replace when the plugin becomes available (see renderElement retry).
     console.log('[TIMING] canvas opening:', (performance.now() - _t0).toFixed(0), 'ms');
-    tray.open('canvas-workspace');
+    if (hasCanvas) {
+        tray.open('canvas-workspace');
+    } else {
+        // Nothing but ⌗ and a name. Created, the page is built again with it.
+        const { askForACanvas } = await import('./canvas-birth.ts');
+        const { createCanvas } = await import('./api/canvas.ts');
+        askForACanvas(document.body, async (name) => {
+            await createCanvas(name);
+            location.reload();
+        });
+    }
 
     // Load plugin elements in background — non-blocking
     import('./components/element/plugin-provided-elements.ts')

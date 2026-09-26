@@ -9,8 +9,31 @@ import type { CanvasElementState, CompositionState } from '../state/ui';
 import type { CanvasElement, Composition, MinimizedWindow } from '../generated/proto/element/proto/canvas';
 import { log, SEG } from '../logger';
 import { apiFetch, apiJson } from '../client';
-import { assertOk } from '../http-utils';
+import { assertOk, jsonBody } from '../http-utils';
 import { canvasSyncQueue } from './canvas-sync';
+import { refusal } from '../self-person';
+
+/**
+ * The canvas of the namespace this person stands in, by name. Null is a
+ * namespace with none: the node answered 404, and nothing is drawn for it.
+ * Anything else the node would not answer is thrown in its words.
+ */
+export async function theCanvas(): Promise<{ name: string } | null> {
+    const response = await apiFetch('/api/canvas');
+    if (response.status === 404) return null;
+    if (!response.ok) {
+        throw new Error(`/api/canvas: ${await refusal(response)}`);
+    }
+    return await response.json() as { name: string };
+}
+
+/** Creates the canvas of this namespace under a name. The node's refusal is the error. */
+export async function createCanvas(name: string): Promise<void> {
+    const response = await apiFetch('/api/canvas', jsonBody('POST', { name }));
+    if (!response.ok) {
+        throw new Error(await refusal(response));
+    }
+}
 
 /**
  * Upsert a canvas element (create or update).
