@@ -345,14 +345,7 @@ func setContentType(w http.ResponseWriter, path string) bool {
 
 // HandleStatic serves the static HTML/JS/CSS frontend
 func (s *QNTXServer) HandleStatic(w http.ResponseWriter, r *http.Request) {
-	requestStart := time.Now()
 	path := resolveStaticPath(r.URL.Path)
-
-	s.logger.Infow("HTTP request received",
-		"path", path,
-		"method", r.Method,
-		"remote_addr", r.RemoteAddr,
-	)
 
 	if isHTML := setContentType(w, path); isHTML {
 		// Block browser extension content scripts (especially MetaMask's lockdown-install.js)
@@ -380,14 +373,6 @@ func (s *QNTXServer) HandleStatic(w http.ResponseWriter, r *http.Request) {
 			"error", err,
 		)
 	}
-
-	// Log response timing at INFO level to track page load timing
-	duration := time.Since(requestStart)
-	s.logger.Infow("HTTP response sent",
-		"path", path,
-		"duration_ms", duration.Milliseconds(),
-		"size_bytes", len(data),
-	)
 }
 
 // HandleLogDownload serves the log file for download.

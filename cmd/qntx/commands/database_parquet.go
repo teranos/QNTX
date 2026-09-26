@@ -378,8 +378,12 @@ func (h *parquetHandles) WALCheckpointTruncate() (busy, walPages, checkpointedPa
 		if lerr != nil {
 			return busy, walPages, checkpointedPages, errors.Wrapf(lerr, "the landing file of %s did not checkpoint", name)
 		}
-		logger.Logger.Infow("Landing file checkpointed",
-			"namespace", name, "busy", b, "wal_pages", w, "checkpointed_pages", c)
+		// A TRUNCATE that worked reports all three as zero, every tick, for
+		// every namespace. Only a landing file that reports something is said.
+		if b != 0 || w != 0 || c != 0 {
+			logger.Logger.Infow("Landing file checkpointed",
+				"namespace", name, "busy", b, "wal_pages", w, "checkpointed_pages", c)
+		}
 		busy += b
 		walPages += w
 		checkpointedPages += c

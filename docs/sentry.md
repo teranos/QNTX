@@ -122,8 +122,8 @@ emitted, without one every call is a method on a no-op that discards it.
 
 Every number the node emits is named in `internal/measure`, in one const block.
 That is the point of the package — the set is one screen, not something found by
-grepping for calls. Today it is: attestations taken in over the API, how long
-the attestation query ran and how much it answered with, admissions by level,
+grepping for calls. Today it is: attestations taken in over the API and how long
+each write took, how long the attestation query ran and how much it answered with, admissions by level,
 refusals by which of the three states turned the caller away, and Pulse's queue
 depth beside its active workers.
 
