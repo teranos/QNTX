@@ -86,6 +86,12 @@ type Admission struct {
 	// empty for every other caller. To a connector the namespace does not exist
 	// (ADR-038), and this is how a surface knows the caller is one.
 	ClientDID string
+	// TokenDID and TokenLabel are the token a connector presented, when
+	// ClientDID is set: its own did:key and its name. Grant stays nil, because
+	// that token is admitted as the person who said yes (admittedAsThePerson);
+	// these only say which token did the asking.
+	TokenDID   string
+	TokenLabel string
 }
 
 // Admitted builds one. What a request holds is what Middleware resolved for

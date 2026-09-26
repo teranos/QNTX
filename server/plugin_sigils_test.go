@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/sigil"
 )
 
 // sigilPlugin is fakePlugin handing the node signa, answering what a sigil
@@ -166,6 +167,52 @@ func TestAPluginIsToldWhoIsAsking(t *testing.T) {
 
 	require.Len(t, p.handed, 1)
 	assert.Equal(t, []string{rootAccount}, headerOf(p.handed[0], HeaderAsker))
+}
+
+// "i know i minted the oauth specifically for Manus to use and the token even
+// has a name". A connector's token acts as the person, and the plugin is told
+// the person and also which token asked and through which client. A token with
+// a grant is named the same way.
+func TestAPluginIsToldWhichTokenAsked(t *testing.T) {
+	held := stubSignum("stub").GetSigils()[0]
+	headers := func(admitted auth.Admission) map[string][]string {
+		ctx := auth.WithAdmission(context.Background(), admitted)
+		req, err := forwarded("stub", held, sigil.Sent{"kind": "competitor"}, ctx, "call")
+		require.NoError(t, err)
+		out := map[string][]string{}
+		for _, h := range req.GetHeaders() {
+			out[h.GetName()] = h.GetValues()
+		}
+		return out
+	}
+
+	connector := auth.Admitted(auth.LevelRoot, "Clean")
+	connector.Identity = rootAccount
+	connector.ClientDID = "did:key:zclient"
+	connector.TokenDID = "did:key:ztoken"
+	connector.TokenLabel = "ManusClean"
+	got := headers(connector)
+	assert.Equal(t, []string{rootAccount}, got[HeaderAsker])
+	assert.Equal(t, []string{"did:key:ztoken"}, got[HeaderAskerDID])
+	assert.Equal(t, []string{"ManusClean"}, got[HeaderAskerLabel])
+	assert.Equal(t, []string{"did:key:zclient"}, got[HeaderAskerClient])
+
+	token := auth.Admitted(auth.LevelToken, "Clean")
+	token.Identity = rootAccount
+	token.Grant = &auth.Grant{DID: "did:key:zgrant", Label: "a-script"}
+	got = headers(token)
+	assert.Equal(t, []string{"did:key:zgrant"}, got[HeaderAskerDID])
+	assert.Equal(t, []string{"a-script"}, got[HeaderAskerLabel])
+	assert.Empty(t, got[HeaderAskerClient], "a token no client issued was named a client")
+
+	// A person with a passkey is the person, and nothing more.
+	person := auth.Admitted(auth.LevelRoot)
+	person.Identity = rootAccount
+	got = headers(person)
+	assert.Equal(t, []string{rootAccount}, got[HeaderAsker])
+	assert.Empty(t, got[HeaderAskerDID])
+	assert.Empty(t, got[HeaderAskerLabel])
+	assert.Empty(t, got[HeaderAskerClient])
 }
 
 // A plugin answering a sigil reads and writes where its caller acts, through

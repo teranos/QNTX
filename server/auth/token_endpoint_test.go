@@ -149,6 +149,10 @@ func TestTheCodeIsExchangedForTheTokenTheStoreWrites(t *testing.T) {
 	assert.Equal(t, []string{NamespaceDefault}, admission.Namespaces)
 	assert.Nil(t, admission.Grant, "the token was admitted as a token rather than as the person")
 	assert.Equal(t, did, admission.ClientDID, "a connector is not known to be one")
+	// "i know i minted the oauth specifically for Manus to use and the token
+	// even has a name": which token asked is still known, by its DID and name.
+	assert.Equal(t, grant.DID, admission.TokenDID)
+	assert.Equal(t, "app", admission.TokenLabel)
 }
 
 // The level is the person's at the moment the token is used, the same question
