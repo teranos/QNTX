@@ -29,7 +29,7 @@ const (
 	AttestationsWritten = "qntx.attestations.written"
 
 	// AttestationWriteTook is how long a POST that stored one ran, from the
-	// handler entered to the answer. Every write is here; only a slow one is
+	// request arriving to the answer. Every write is here; only a slow one is
 	// also a log line, which names the phase it spent it in.
 	AttestationWriteTook = "qntx.attestations.write.took"
 

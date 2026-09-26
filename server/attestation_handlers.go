@@ -545,11 +545,14 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	// number, and the store's own count is the place to go for those.
 	measure.Count(measure.AttestationsWritten, 1)
 	tookHandler := time.Since(entered)
-	measure.Took(measure.AttestationWriteTook, tookHandler)
+	// The gate before the handler and the handler itself, as the access log
+	// sees the request: a long wait before a quick handler is a slow write.
+	took := beforeHandler + tookHandler
+	measure.Took(measure.AttestationWriteTook, took)
 
 	// A write that went well is the attestation itself and the two numbers
 	// above. A slow one is said, with the phase it was slow in.
-	if tookHandler >= attestationWriteQuiet {
+	if took >= attestationWriteQuiet {
 		s.logger.Infow("Attestation created slowly",
 			"id", req.ID,
 			"subjects", req.Subjects,
@@ -561,7 +564,8 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 			"exists", tookExists,
 			"put", tookPut,
 			"rebuild", tookRebuild,
-			"handler", tookHandler)
+			"handler", tookHandler,
+			"took", took)
 	}
 
 	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
