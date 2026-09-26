@@ -50,6 +50,16 @@ type Invitation struct {
 	AcceptedAt *time.Time
 }
 
+// timeOf is a stored RFC3339 instant, and the zero time for one that does
+// not parse: a row's when is display, never a decision.
+func timeOf(stored string) time.Time {
+	t, err := time.Parse(time.RFC3339Nano, stored)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
 // ErrNoSuchCanvas is a canvas id this namespace does not hold.
 var ErrNoSuchCanvas = errors.New("no such canvas in this namespace")
 
@@ -94,7 +104,7 @@ func (s *CanvasStore) namespaceCanvas(ctx context.Context) (Canvas, error) {
 	if err != nil {
 		return Canvas{}, errors.Wrap(err, "failed to read the namespace's canvas")
 	}
-	c.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+	c.CreatedAt = timeOf(createdAt)
 	return c, nil
 }
 
@@ -174,7 +184,7 @@ func (s *CanvasStore) Canvases(ctx context.Context) (_ []Canvas, err error) {
 		if err := rows.Scan(&c.ID, &c.Name, &c.Kind, &c.CreatedBy, &createdAt, &c.DisabledBy); err != nil {
 			return nil, errors.Wrap(err, "failed to scan a canvas")
 		}
-		c.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+		c.CreatedAt = timeOf(createdAt)
 		canvases = append(canvases, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -204,7 +214,7 @@ func (s *CanvasStore) Canvas(ctx context.Context, id string) (Canvas, error) {
 	if err != nil {
 		return Canvas{}, errors.Wrapf(err, "failed to read the canvas %s", id)
 	}
-	c.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+	c.CreatedAt = timeOf(createdAt)
 	if c.Owners, err = s.people(ctx, "canvas_owners", id); err != nil {
 		return Canvas{}, err
 	}
@@ -349,7 +359,7 @@ func (s *CanvasStore) Accept(ctx context.Context, token, userID string) (_ Invit
 	if inv.Invitee != userID {
 		return Invitation{}, errors.Newf("this invitation is %s's, not %s's", inv.Invitee, userID)
 	}
-	inv.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+	inv.CreatedAt = timeOf(createdAt)
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

@@ -26,7 +26,6 @@ mock.module('./api/canvases', () => ({
     inviteOwner: async () => {},
     acceptInvitation: async () => ({}),
 }));
-mock.module('./signin', () => ({ standAtTheDoor: () => {} }));
 
 const { initNamespacePage } = await import('./namespace-page.ts');
 

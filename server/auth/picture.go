@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/errors"
 )
 
@@ -78,10 +79,9 @@ func (h *Handler) HandlePicture(w http.ResponseWriter, r *http.Request) {
 
 // fetchPicture is the bytes at a picture URL, from memory when they were
 // fetched within pictureTTL, and from the provider otherwise.
-func fetchPicture(src string) (heldPictureBytes, error) {
+func fetchPicture(src string) (_ heldPictureBytes, err error) {
 	if val, ok := pictureBytes.Load(src); ok {
-		held := val.(heldPictureBytes)
-		if time.Since(held.fetchedAt) < pictureTTL {
+		if held, ok := val.(heldPictureBytes); ok && time.Since(held.fetchedAt) < pictureTTL {
 			return held, nil
 		}
 	}
@@ -98,7 +98,7 @@ func fetchPicture(src string) (heldPictureBytes, error) {
 	if err != nil {
 		return heldPictureBytes{}, errors.Wrapf(err, "the picture at %s was not answered", parsed.Host)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { err = sqlclose.With(err, resp.Body.Close(), "the picture response body") }()
 	if resp.StatusCode != http.StatusOK {
 		return heldPictureBytes{}, errors.Newf("the picture at %s answered %d", parsed.Host, resp.StatusCode)
 	}
