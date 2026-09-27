@@ -245,9 +245,13 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 	binding := s.namespaceDoorBinding(market)
 	host := originHost(r.Referer())
 	if !originAllowed(binding, host) {
-		s.logger.Infow("Stand arrival refused",
-			"market", market, "slug", slug, "reason", "origin not the namespace door",
-			"door", binding, "host", host, "client", r.RemoteAddr)
+		// Refused from localhost is the site's own dev copy: noise. Any other
+		// host is someone else carrying the pixel, and that is said.
+		if host != "localhost" {
+			s.logger.Infow("Stand arrival refused",
+				"market", market, "slug", slug, "reason", "origin not the namespace door",
+				"door", binding, "host", host, "client", r.RemoteAddr)
+		}
 		return
 	}
 
