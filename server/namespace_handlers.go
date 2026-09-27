@@ -1,28 +1,21 @@
 package server
 
 import (
-	"encoding/json"
-	"io"
+	"context"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/slug"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/errors"
 )
 
-// maxNamespaceBodyBytes bounds the create body. The whole of it is one name,
-// and a name is one path segment.
-const maxNamespaceBodyBytes = 8 << 10
-
-// createNamespaceRequest is the whole of what a caller supplies: a name.
-// Ownership is not the request's to state — the node signs it and records who
-// asked.
-type createNamespaceRequest struct {
-	Name string `json:"name"`
-}
+// Namespaces is the signum of the namespaces a node keeps (ADR-026, ADR-039):
+// listing them, making one, switching one on or off, ending one, and emptying
+// default.
 
 // listNamespacesResponse names the count so an empty list and a backend that
 // keeps none are visibly different answers.
@@ -31,197 +24,101 @@ type listNamespacesResponse struct {
 	Count      int                 `json:"count"`
 }
 
-// HandleNamespaces lists namespaces, and creates one.
-//
-//	GET  /api/namespaces  {"namespaces": [...], "count": n}
-//	POST /api/namespaces  {"name": "pond"}
-//
-// 501 on a node that keeps every attestation in one namespace, which is every
-// backend but parquet: nothing a caller sends makes this route work there, and
-// the answer says which backend is running.
-func (s *QNTXServer) HandleNamespaces(w http.ResponseWriter, r *http.Request) {
-	namespaces, ok := s.superNamespaces(w, r)
-	if !ok {
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		found, err := namespaces.List()
-		if err != nil {
-			writeRichError(w, s.logger, errors.Wrap(err, "failed to list namespaces"),
-				http.StatusInternalServerError)
-			return
-		}
-		if err := writeJSON(w, http.StatusOK, listNamespacesResponse{Namespaces: found, Count: len(found)}); err != nil {
-			s.logger.Errorw("failed to write the namespace list", "error", err)
-		}
-
-	case http.MethodPost:
-		s.createNamespace(w, r, namespaces)
-
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+func (s *QNTXServer) namespacesSignum() sigil.Signum {
+	name := &protocol.Param{Name: "name", Required: true, Says: "The namespace, by its name."}
+	named := []*protocol.Field{{Name: "name", Says: "The namespace acted on."}}
+	return sigil.Signum{
+		Signum: &protocol.Signum{
+			Name: "namespaces",
+			Sigils: []*protocol.Sigil{
+				{
+					Name: "list",
+					Does: "Every namespace the node keeps, with who owns it, whether it is switched on, and the kinds it holds.",
+					Gives: []*protocol.Field{
+						{Name: "namespaces", Says: "One row per namespace."},
+						{Name: "count", Says: "How many there are, so none and a backend that keeps none are different answers."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/namespaces"},
+				},
+				{
+					Name:  "create",
+					Does:  "Make a namespace, switched on, owned by whoever asked.",
+					Takes: []*protocol.Param{{Name: "name", Required: true, Says: "The new namespace's name: one path segment."}},
+					Gives: []*protocol.Field{
+						{Name: "name", Says: "The namespace made."},
+						{Name: "definition", Says: "Its owner, that it is switched on, and when it was made."},
+						{Name: "kinds", Says: "The kinds it holds: none yet."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces"},
+				},
+				{
+					Name:  "disable",
+					Does:  "Switch a namespace off. Not system or default, and not the one the caller stands in.",
+					Takes: []*protocol.Param{name},
+					Gives: named,
+					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces/{name}/disable"},
+				},
+				{
+					Name:  "enable",
+					Does:  "Switch a namespace back on.",
+					Takes: []*protocol.Param{name},
+					Gives: named,
+					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces/{name}/enable"},
+				},
+				{
+					Name:  "delete",
+					Does:  "End a switched-off namespace, draining what it held into default. ROOT's, standing in system.",
+					Takes: []*protocol.Param{name},
+					Gives: named,
+					Http:  &protocol.Endpoint{Method: http.MethodDelete, Path: "/api/namespaces/{name}"},
+				},
+				{
+					Name:  "nuke",
+					Does:  "Empty default without ending it: the one place data leaves. Reached standing in system.",
+					Gives: named,
+					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces/default/nuke"},
+				},
+			},
+		},
+		Answers: map[string]sigil.Answer{
+			"list":         s.namespacesList,
+			"create":       s.namespacesCreate,
+			"disable":      func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.namespacesSwitch(ctx, sent["name"], false) },
+			"enable":       func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.namespacesSwitch(ctx, sent["name"], true) },
+			"delete":       s.namespacesDelete,
+			"nuke":         s.namespacesNuke,
+		},
 	}
 }
 
-// HandleNamespaceByName is the switch on one namespace, and its ending.
-//
-//	POST   /api/namespaces/{name}/disable
-//	POST   /api/namespaces/{name}/enable
-//	DELETE /api/namespaces/{name}
-//
-// DELETE is ROOT's, from system: 403 below ROOT, 409 standing anywhere else.
-func (s *QNTXServer) HandleNamespaceByName(w http.ResponseWriter, r *http.Request) {
-	namespaces, ok := s.superNamespaces(w, r)
-	if !ok {
-		return
+func (s *QNTXServer) namespacesList(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	namespaces, refusal := s.superNamespaces(ctx)
+	if refusal != nil {
+		return nil, refusal
 	}
+	found, err := namespaces.List()
+	if err != nil {
+		s.logger.Errorw("failed to list namespaces", "error", err)
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrap(err, "failed to list namespaces").Error()}
+	}
+	return listNamespacesResponse{Namespaces: found, Count: len(found)}, nil
+}
 
-	const prefix = "/api/namespaces/"
-	name, verb, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, prefix), "/")
+func (s *QNTXServer) namespacesCreate(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	namespaces, refusal := s.superNamespaces(ctx)
+	if refusal != nil {
+		return nil, refusal
+	}
+	name := sent["name"]
 	if name == "" {
-		http.Error(w, "no namespace in "+r.URL.Path, http.StatusBadRequest)
-		return
-	}
-
-	// You cannot switch off or end the namespace you are standing in. The UI
-	// says so by refusing the right-click; this is what makes it true for a
-	// caller that never opened the UI.
-	if admitted, gated := auth.AdmissionFrom(r.Context()); gated {
-		if standing := s.namespaceOf(admitted); slug.Of(standing) == slug.Of(name) {
-			http.Error(w, "you are standing in "+standing+"; step somewhere else first",
-				http.StatusConflict)
-			return
-		}
-	}
-
-	if r.Method == http.MethodDelete && verb == "" {
-		s.deleteNamespace(w, r, namespaces, name)
-		return
-	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "POST switches a namespace, DELETE ends one", http.StatusMethodNotAllowed)
-		return
-	}
-	switch verb {
-	case "disable":
-		s.switchNamespace(w, r, namespaces, name, false)
-	case "enable":
-		s.switchNamespace(w, r, namespaces, name, true)
-	default:
-		http.Error(w, "no such verb on a namespace: "+verb, http.StatusNotFound)
-	}
-}
-
-// HandleNukeDefault empties default without ending it.
-//
-//	POST /api/namespaces/default/nuke
-//
-// Everything a delete drains lands in default, so it is the one namespace that
-// would otherwise only grow, and emptying it is the one place data leaves.
-//
-// You stand in the node to empty the project, never in the thing you are
-// emptying: 409 when you are standing anywhere but system. 204 on success, and
-// the open door is dropped so the next caller opens default and finds it empty.
-func (s *QNTXServer) HandleNukeDefault(w http.ResponseWriter, r *http.Request) {
-	namespaces, ok := s.superNamespaces(w, r)
-	if !ok {
-		return
-	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "POST empties it", http.StatusMethodNotAllowed)
-		return
-	}
-
-	admitted, gated := auth.AdmissionFrom(r.Context())
-	if standing := s.namespaceOf(admitted); !gated || standing != auth.NamespaceSystem {
-		http.Error(w, "nuking "+auth.NamespaceDefault+" is reached from "+auth.NamespaceSystem,
-			http.StatusConflict)
-		return
-	}
-
-	if err := namespaces.Nuke(); err != nil {
-		writeRichError(w, s.logger, err, http.StatusInternalServerError)
-		return
-	}
-	// The open door holds a store whose files are gone. The next caller opens
-	// default again and finds it empty, which is what it now is.
-	s.held.Forget(auth.NamespaceDefault)
-	s.logger.Infow("default nuked", "by", askedBy(r))
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// switchNamespace puts one in or out of service. The store refuses system and
-// default, because a disabled system is a node that cannot read who anybody is.
-func (s *QNTXServer) switchNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces, name string, enabled bool) {
-	if err := namespaces.SetEnabled(name, enabled); err != nil {
-		writeRichError(w, s.logger, err, http.StatusBadRequest)
-		return
-	}
-	// The door held from before the switch would keep serving what was just
-	// switched off. Dropped either way: re-enabling reopens it on the next call.
-	s.held.Forget(name)
-	s.logger.Infow("namespace switched", "namespace", name, "enabled", enabled, "by", askedBy(r))
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// deleteNamespace ends one, draining what it held into default. The store
-// refuses system, default, and a namespace still enabled.
-func (s *QNTXServer) deleteNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces, name string) {
-	// "consider it additive when i say that i want the same to apply for namespace deletion as well"
-	// "that you need to stand in system for it and you also need to be root for it"
-	admitted, gated := auth.AdmissionFrom(r.Context())
-	if !gated || !admitted.MayEndNamespaces() {
-		http.Error(w, "ending a namespace is ROOT's", http.StatusForbidden)
-		return
-	}
-	if standing := s.namespaceOf(admitted); standing != auth.NamespaceSystem {
-		http.Error(w, "ending a namespace is reached from "+auth.NamespaceSystem+", and you are standing in "+standing,
-			http.StatusConflict)
-		return
-	}
-
-	// The door closes first. Its last flush writes what is still buffered, so
-	// the drain below carries those rows too rather than leaving a tick to
-	// write them into a prefix that is no longer there.
-	s.held.Forget(name)
-	if err := namespaces.Delete(name); err != nil {
-		writeRichError(w, s.logger, err, http.StatusBadRequest)
-		return
-	}
-	// "thats an issue, fix now"
-	if err := s.held.Ended(name); err != nil {
-		writeRichError(w, s.logger, errors.Wrapf(err, "namespace %s ended, and its landing file was not removed", name),
-			http.StatusInternalServerError)
-		return
-	}
-	s.logger.Infow("namespace deleted", "namespace", name, "by", askedBy(r))
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, namespaces storage.Namespaces) {
-	var req createNamespaceRequest
-	// A namespace name is one path segment, so this body is small however
-	// privileged the request. SUPER is not a reason to read what arrives.
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxNamespaceBodyBytes)).Decode(&req); err != nil {
-		writeRichError(w, s.logger, errors.Wrap(err, "failed to decode the namespace request"),
-			http.StatusBadRequest)
-		return
-	}
-	if req.Name == "" {
-		http.Error(w, "name is required", http.StatusBadRequest)
-		return
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: "name is required"}
 	}
 
 	// An identity owns a namespace, so a request nobody was admitted for has
 	// nobody to own what it would create.
-	asked := askedBy(r)
+	asked := askedBy(ctx)
 	if asked == "" {
-		writeRichError(w, s.logger,
-			errors.New("this request carries no identity, so there is nobody to own a namespace"),
-			http.StatusInternalServerError)
-		return
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this request carries no identity, so there is nobody to own a namespace"}
 	}
 
 	// Who asked is the owner. It does not come from the request, because a
@@ -231,48 +128,147 @@ func (s *QNTXServer) createNamespace(w http.ResponseWriter, r *http.Request, nam
 		Enabled:   true,
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
-	if err := namespaces.Create(req.Name, definition); err != nil {
-		writeRichError(w, s.logger, err, http.StatusBadRequest)
-		return
+	if err := namespaces.Create(name, definition); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 	}
 
-	s.logger.Infow("namespace created", "namespace", req.Name, "by", definition.Owner)
-	created := storage.Namespace{Name: req.Name, Definition: &definition, Kinds: []string{}}
-	if err := writeJSON(w, http.StatusCreated, created); err != nil {
-		s.logger.Errorw("failed to write the created namespace", "error", err, "namespace", req.Name)
-	}
+	s.logger.Infow("namespace created", "namespace", name, "by", definition.Owner)
+	return storage.Namespace{Name: name, Definition: &definition, Kinds: []string{}}, nil
 }
 
-// superNamespaces answers both questions a namespace route has: does this
-// backend keep namespaces at all, and did this request come through a gate.
-func (s *QNTXServer) superNamespaces(w http.ResponseWriter, r *http.Request) (storage.Namespaces, bool) {
+// namespacesSwitch puts one in or out of service. The store refuses system and
+// default, because a disabled system is a node that cannot read who anybody is.
+func (s *QNTXServer) namespacesSwitch(ctx context.Context, name string, enabled bool) (any, *protocol.Refusal) {
+	namespaces, refusal := s.superNamespaces(ctx)
+	if refusal != nil {
+		return nil, refusal
+	}
+	if refusal := s.notStandingIn(ctx, name); refusal != nil {
+		return nil, refusal
+	}
+	if err := namespaces.SetEnabled(name, enabled); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
+	}
+	// The door held from before the switch would keep serving what was just
+	// switched off. Dropped either way: re-enabling reopens it on the next call.
+	s.held.Forget(name)
+	s.logger.Infow("namespace switched", "namespace", name, "enabled", enabled, "by", askedBy(ctx))
+	return map[string]string{"name": name}, nil
+}
+
+// namespacesDelete ends one, draining what it held into default. The store
+// refuses system, default, and a namespace still enabled.
+func (s *QNTXServer) namespacesDelete(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	namespaces, refusal := s.superNamespaces(ctx)
+	if refusal != nil {
+		return nil, refusal
+	}
+	name := sent["name"]
+	if name == "" {
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: "no namespace named"}
+	}
+	if refusal := s.notStandingIn(ctx, name); refusal != nil {
+		return nil, refusal
+	}
+	// "consider it additive when i say that i want the same to apply for namespace deletion as well"
+	// "that you need to stand in system for it and you also need to be root for it"
+	admitted, gated := auth.AdmissionFrom(ctx)
+	if !gated || !admitted.MayEndNamespaces() {
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: "ending a namespace is ROOT's"}
+	}
+	if standing := s.namespaceOf(admitted); standing != auth.NamespaceSystem {
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed,
+			Says: "ending a namespace is reached from " + auth.NamespaceSystem + ", and you are standing in " + standing}
+	}
+
+	// The door closes first. Its last flush writes what is still buffered, so
+	// the drain below carries those rows too rather than leaving a tick to
+	// write them into a prefix that is no longer there.
+	s.held.Forget(name)
+	if err := namespaces.Delete(name); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
+	}
+	// "thats an issue, fix now"
+	if err := s.held.Ended(name); err != nil {
+		s.logger.Errorw("namespace ended, and its landing file was not removed", "namespace", name, "error", err)
+		return nil, &protocol.Refusal{Why: sigil.Failed,
+			Says: errors.Wrapf(err, "namespace %s ended, and its landing file was not removed", name).Error()}
+	}
+	s.logger.Infow("namespace deleted", "namespace", name, "by", askedBy(ctx))
+	return map[string]string{"name": name}, nil
+}
+
+// namespacesNuke empties default without ending it. Everything a delete drains
+// lands in default, so it is the one namespace that would otherwise only grow,
+// and emptying it is the one place data leaves.
+//
+// You stand in the node to empty the project, never in the thing you are
+// emptying: refused standing anywhere but system. The open door is dropped so
+// the next caller opens default and finds it empty.
+func (s *QNTXServer) namespacesNuke(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	namespaces, refusal := s.superNamespaces(ctx)
+	if refusal != nil {
+		return nil, refusal
+	}
+	admitted, gated := auth.AdmissionFrom(ctx)
+	if standing := s.namespaceOf(admitted); !gated || standing != auth.NamespaceSystem {
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed,
+			Says: "nuking " + auth.NamespaceDefault + " is reached from " + auth.NamespaceSystem}
+	}
+	if err := namespaces.Nuke(); err != nil {
+		s.logger.Errorw("default was not nuked", "error", err)
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	// The open door holds a store whose files are gone. The next caller opens
+	// default again and finds it empty, which is what it now is.
+	s.held.Forget(auth.NamespaceDefault)
+	s.logger.Infow("default nuked", "by", askedBy(ctx))
+	return map[string]string{"name": auth.NamespaceDefault}, nil
+}
+
+// notStandingIn refuses switching off or ending the namespace the caller
+// stands in. The UI says so by refusing the right-click; this is what makes it
+// true for a caller that never opened the UI.
+func (s *QNTXServer) notStandingIn(ctx context.Context, name string) *protocol.Refusal {
+	admitted, gated := auth.AdmissionFrom(ctx)
+	if !gated {
+		return nil
+	}
+	if standing := s.namespaceOf(admitted); slug.Of(standing) == slug.Of(name) {
+		return &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
+			Says: "you are standing in " + standing + "; step somewhere else first"}
+	}
+	return nil
+}
+
+// superNamespaces answers both questions a namespace sigil has: does this
+// backend keep namespaces at all, and was this call asked through a gate.
+func (s *QNTXServer) superNamespaces(ctx context.Context) (storage.Namespaces, *protocol.Refusal) {
 	known := s.held.Known()
 	if known == nil {
 		// Which store is running is the whole of the answer: nothing the caller
-		// can send makes this route work. See ADR-026 — the reference stays in
-		// the source, where somebody can go and read it.
+		// can send makes this work. See ADR-026 — the reference stays in the
+		// source, where somebody can go and read it.
 		said := "namespaces exist only on the parquet backend, and this node keeps every attestation in one namespace"
 		if s.store != "" {
 			said = "namespaces exist only on the parquet backend; this node runs the " + s.store +
 				" backend, which keeps every attestation in one namespace"
 		}
-		http.Error(w, said, http.StatusNotImplemented)
-		return nil, false
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: said}
 	}
 
-	// Which levels reach this route is server/reach's. No caller means the route
-	// ran outside Middleware, which is a wiring mistake rather than a refusal.
-	if _, ok := auth.AdmissionFrom(r.Context()); !ok {
-		http.Error(w, "refused", http.StatusForbidden)
-		return nil, false
+	// Which levels reach this is server/reach's. No caller means the sigil was
+	// asked outside the gate, which is a wiring mistake rather than a refusal.
+	if _, ok := auth.AdmissionFrom(ctx); !ok {
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: "refused"}
 	}
-	return known, true
+	return known, nil
 }
 
-// askedBy is the identity a request was admitted as, or empty when the route
-// ran outside Middleware.
-func askedBy(r *http.Request) string {
-	if admitted, ok := auth.AdmissionFrom(r.Context()); ok {
+// askedBy is the identity a call was admitted as, or empty when it was asked
+// outside the gate.
+func askedBy(ctx context.Context) string {
+	if admitted, ok := auth.AdmissionFrom(ctx); ok {
 		return admitted.Identity
 	}
 	return ""

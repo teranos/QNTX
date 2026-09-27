@@ -25,7 +25,7 @@ let failure = '';
 // signed in yet. None is an error to show — they mean there is no bar.
 async function load(): Promise<boolean> {
     const response = await apiFetch('/api/namespaces');
-    if (response.status === 501 || response.status === 403 || response.status === 401) return false;
+    if (response.status === 404 || response.status === 403 || response.status === 401) return false;
     if (!response.ok) {
         failure = `could not read namespaces: HTTP ${response.status} ${await response.text()}`;
         return true;

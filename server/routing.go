@@ -114,9 +114,6 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/watchers/queue/stats", s.watcherHandler.HandleWatcherQueueStats)    // Watcher execution queue stats (GET)
 	s.answer("/api/watchers/", s.watcherHandler.HandleWatchers)                        // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
 	s.answer("/api/watchers", s.watcherHandler.HandleWatchers)                         // List/create watchers (GET/POST)
-	s.answer("/api/namespaces", s.HandleNamespaces)                                    // List/create namespaces (GET/POST)
-	s.answer("/api/namespaces/", s.HandleNamespaceByName)                              // Switch one on or off, or end it
-	s.answer("/api/namespaces/default/nuke", s.HandleNukeDefault)                      // Empty default without ending it
 	s.answer("/api/attestations", s.HandleAttestations)                                // Query (GET) / create (POST) attestations
 	s.answer("/api/element-config", s.HandleElementConfig)                             // Plugin element config via attestations (GET/POST)
 	s.answer("/api/canvases", s.canvasHandler.HandleCanvases)                            // The canvases of this namespace (GET), one created (POST)
