@@ -138,6 +138,23 @@ func TestASignumIsNamedForSuper(t *testing.T) {
 	assert.NotContains(t, sorted(routesIn(granted)), "datapunt", "a signum was read as a route")
 }
 
+// SUPER brought plugins up and down through the '/api/plugins/' prefix line.
+// The actions are sigils now, and SUPER reaches them by name.
+func TestSuperReachesThePluginActions(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+	served := &Served{}
+	served.rows.Store(&granted)
+
+	for _, action := range []string{"pause", "resume", "restart", "enable", "disable"} {
+		for _, surface := range []string{OverHTTP, OverMCP} {
+			reaching, anyone := served.ReachingSigil(surface, "plugins", action, "/api/plugins/{name}/"+action)
+			assert.False(t, anyone, action+" is served without asking who is calling")
+			assert.Equal(t, []auth.Level{auth.LevelSuper}, reaching.Beyond(), action+" over "+surface)
+		}
+	}
+}
+
 // A line that does not read is a lie about what the node serves.
 func TestALineThatDoesNotReadIsRefused(t *testing.T) {
 	for _, line := range []string{

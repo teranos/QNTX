@@ -24,7 +24,7 @@ import (
 
 // signa is every signum the node holds: its own, and every ready plugin's.
 func (s *QNTXServer) signa() []sigil.Signum {
-	return append([]sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum()}, s.pluginSigna()...)
+	return append([]sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum()}, s.pluginSigna()...)
 }
 
 // checkedSigna is the signa that say what they hold. One that does not is said
@@ -109,6 +109,12 @@ func overHTTP(path string, bound []heldBy, gate sigil.Gate, reaching func(string
 			if err != nil {
 				writeError(w, http.StatusBadRequest, err.Error())
 				return
+			}
+			// A param the path names, {name}, arrives in the path.
+			for _, param := range held.sigil.GetTakes() {
+				if value := r.PathValue(param.GetName()); value != "" {
+					arrived[param.GetName()] = value
+				}
 			}
 			asked := held.asking(reach.OverHTTP, gate, reaching, r).Ask(r.Context(), arrived)
 			switch {

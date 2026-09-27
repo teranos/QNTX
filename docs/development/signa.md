@@ -47,17 +47,17 @@ Every signum the node holds or will hold, a table each, a row per sigil (ADR-039
 
 | sigil | mark |
 | --- | --- |
-| list | |
-| elements | |
-| routes | |
+| list | done |
+| elements | done |
+| routes | done |
 | read config | |
 | update config | |
 | logs | |
-| pause | |
-| resume | |
-| restart | |
-| enable | |
-| disable | |
+| pause | done |
+| resume | done |
+| restart | done |
+| enable | done |
+| disable | done |
 
 ## canvas
 

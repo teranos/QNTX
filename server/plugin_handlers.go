@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/teranos/QNTX/plugin"
@@ -30,18 +29,10 @@ func NewPluginHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 	return &PluginHandler{registry: registry, logger: logger, health: health}
 }
 
-// HandlePlugins returns all installed plugins and their status.
-// GET /api/plugins
-func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-
+// list is every installed plugin and its status: plugins_list's answer.
+func (h *PluginHandler) list() map[string]interface{} {
 	if h.registry == nil {
-		respond(w, h.logger, http.StatusOK, map[string]interface{}{
-			"plugins": []interface{}{},
-		})
-		return
+		return map[string]interface{}{"plugins": []interface{}{}}
 	}
 
 	// Read the last probe rather than making one. Probing here cost gRPC calls
@@ -140,20 +131,13 @@ func (h *PluginHandler) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 	if probeFailure != "" {
 		response["health_probe_failure"] = probeFailure
 	}
-
-	respond(w, h.logger, http.StatusOK, response)
+	return response
 }
 
-// HandlePluginRoutes returns all plugin-registered routes and capabilities.
-// GET /api/plugins/routes
-func (h *PluginHandler) HandlePluginRoutes(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-
+// routes is what each running plugin serves: plugins_routes's answer.
+func (h *PluginHandler) routes() map[string]interface{} {
 	if h.registry == nil {
-		respond(w, h.logger, http.StatusOK, map[string]interface{}{"routes": []interface{}{}})
-		return
+		return map[string]interface{}{"routes": []interface{}{}}
 	}
 
 	type RouteEndpoint struct {
@@ -210,33 +194,19 @@ func (h *PluginHandler) HandlePluginRoutes(w http.ResponseWriter, r *http.Reques
 			route.Handlers = proxy.GetHandlerNames()
 			route.Schedules = len(proxy.GetSchedules())
 			route.Watchers = len(proxy.GetWatchers())
-			for _, signum := range proxy.GetSigna() {
-				for _, held := range signum.GetSigils() {
-					route.Endpoints = append(route.Endpoints, RouteEndpoint{
-						Method:      held.GetHttp().GetMethod(),
-						Path:        held.GetHttp().GetPath(),
-						Description: held.GetDoes(),
-					})
-				}
-			}
 		}
 
 		routes = append(routes, route)
 	}
 
-	respond(w, h.logger, http.StatusOK, map[string]interface{}{"routes": routes})
+	return map[string]interface{}{"routes": routes}
 }
 
-// HandlePluginElements returns custom element type definitions from all plugins.
-// GET /api/plugins/elements
-func (h *PluginHandler) HandlePluginElements(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-
+// elements is the element definitions running plugins make: plugins_elements's
+// answer. A sigil gives an object, so the rows are under elements.
+func (h *PluginHandler) elements(ctx context.Context) map[string]interface{} {
 	if h.registry == nil {
-		respond(w, h.logger, http.StatusOK, []interface{}{})
-		return
+		return map[string]interface{}{"elements": []interface{}{}}
 	}
 
 	type PluginElementDef struct {
@@ -252,7 +222,6 @@ func (h *PluginHandler) HandlePluginElements(w http.ResponseWriter, r *http.Requ
 	}
 
 	items := make([]PluginElementDef, 0)
-	ctx := r.Context()
 
 	// Iterate through all plugins and get their element definitions
 	for _, name := range h.registry.List() {
@@ -308,5 +277,5 @@ func (h *PluginHandler) HandlePluginElements(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	respond(w, h.logger, http.StatusOK, items)
+	return map[string]interface{}{"elements": items}
 }
