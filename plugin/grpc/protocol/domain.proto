@@ -234,10 +234,8 @@ message InitializeResponse {
   // Core routes embedding calls to it instead of using the builtin CGO/FFI path.
   bool embedding_provider = 7;
 
-  // http_routes said what signa say, and nothing served it: a signum is the one
-  // place an endpoint of a plugin is defined.
-  reserved 8;
-  reserved "http_routes";
+  // The routes this plugin answers through HandleHTTP (ADR-001).
+  repeated RouteInfo http_routes = 8;
 
   // python_provider indicates this plugin can execute Python code.
   // Core registers "py" element type when any loaded plugin declares this.
@@ -247,6 +245,13 @@ message InitializeResponse {
   // under /api/{plugin}/ and answered by HandleHTTP there; the node serves it as
   // an endpoint and an MCP tool, behind the same gate as its own.
   repeated Signum signa = 10;
+}
+
+// RouteInfo is one route a plugin declares.
+message RouteInfo {
+  string method = 1;       // HTTP method: GET, POST, PUT, DELETE
+  string path = 2;         // Path relative to plugin root (e.g., "/status")
+  string description = 3;
 }
 
 // WatcherRegistration declares a watcher a plugin wants core to manage.

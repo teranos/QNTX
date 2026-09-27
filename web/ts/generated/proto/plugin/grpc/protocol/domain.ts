@@ -243,6 +243,8 @@ export interface InitializeResponse {
    * Core routes embedding calls to it instead of using the builtin CGO/FFI path.
    */
   embedding_provider: boolean;
+  /** The routes this plugin answers through HandleHTTP (ADR-001). */
+  http_routes: RouteInfo[];
   /**
    * python_provider indicates this plugin can execute Python code.
    * Core registers "py" element type when any loaded plugin declares this.
@@ -254,6 +256,15 @@ export interface InitializeResponse {
    * an endpoint and an MCP tool, behind the same gate as its own.
    */
   signa: Signum[];
+}
+
+/** RouteInfo is one route a plugin declares. */
+export interface RouteInfo {
+  /** HTTP method: GET, POST, PUT, DELETE */
+  method: string;
+  /** Path relative to plugin root (e.g., "/status") */
+  path: string;
+  description: string;
 }
 
 /**

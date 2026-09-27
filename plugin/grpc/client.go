@@ -63,6 +63,9 @@ type ExternalDomainProxy struct {
 	// Initialize. The node serves each sigil and hands it to HandleHTTP.
 	signa []*protocol.Signum
 
+	// httpRoutes are the routes this plugin declared at Initialize (ADR-001).
+	httpRoutes []*protocol.RouteInfo
+
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
@@ -238,6 +241,11 @@ func (c *ExternalDomainProxy) PythonServiceClient() protocol.PythonServiceClient
 // GetSigna returns the signa this plugin handed the node during Initialize.
 func (c *ExternalDomainProxy) GetSigna() []*protocol.Signum {
 	return c.signa
+}
+
+// GetHTTPRoutes returns the routes this plugin declared during Initialize.
+func (c *ExternalDomainProxy) GetHTTPRoutes() []*protocol.RouteInfo {
+	return c.httpRoutes
 }
 
 // SigilRoutes is each endpoint the plugin's signa bind, as "METHOD /path", for
@@ -473,6 +481,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	c.embeddingProvider = resp.GetEmbeddingProvider()
 
 	c.signa = resp.GetSigna()
+	c.httpRoutes = resp.GetHttpRoutes()
 
 	// Store Python provider capability
 	c.pythonProvider = resp.GetPythonProvider()
