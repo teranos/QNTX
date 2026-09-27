@@ -81,21 +81,8 @@ func setDoors(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) er
 		})
 	}
 
-	if err := h.SetDoors(doors); err != nil {
-		return err
-	}
-
-	for _, opened := range doors {
-		logger.Infow("Front door open",
-			"namespace", opened.Namespace,
-			"rp_id", opened.RPID,
-			"origins", opened.Origins,
-			// Which providers this door consents under its own name. Absent
-			// means the node's client, and a consent screen naming the node.
-			"own_clients", slices.Sorted(maps.Keys(opened.Clients)),
-		)
-	}
-	return nil
+	// A door that opens is silent; one that cannot is the error returned.
+	return h.SetDoors(doors)
 }
 
 // doorClients resolves the OAuth clients one door registered for itself.
