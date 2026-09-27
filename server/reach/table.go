@@ -84,7 +84,8 @@ REACH is '/auth/users' '/auth/users/'                                     of ROO
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
 # The standing guard is the handler's, not this line's.
-REACH is '/api/namespaces' '/api/namespaces/'                             of ROOT SUPER
+REACH is '/api/namespaces' '/api/namespaces/{name}'                       of ROOT SUPER
+REACH is '/api/namespaces/{name}/disable' '/api/namespaces/{name}/enable' of ROOT SUPER
 
 # The lines the gate reads (ADR-034). Writing one is gated at the
 # attestation handler, not by this line.

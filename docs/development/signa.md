@@ -28,12 +28,12 @@ Every signum the node holds or will hold, a table each, a row per sigil (ADR-039
 
 | sigil | mark |
 | --- | --- |
-| list | |
-| create | |
-| disable | |
-| enable | |
-| delete | |
-| nuke default | |
+| list | done |
+| create | done |
+| disable | done |
+| enable | done |
+| delete | done |
+| nuke | done |
 
 ## types
 

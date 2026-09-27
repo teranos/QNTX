@@ -271,16 +271,27 @@
         "SUPER"
       ]
     },
-    "/api/namespaces/": {
-      "x-qntx-reach": [
-        "ROOT",
-        "SUPER"
-      ],
-      "x-qntx-prefix": true
-    },
     "/api/namespaces/default/nuke": {
       "x-qntx-reach": [
         "ROOT"
+      ]
+    },
+    "/api/namespaces/{name}": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/api/namespaces/{name}/disable": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/api/namespaces/{name}/enable": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
       ]
     },
     "/api/plugins": {
