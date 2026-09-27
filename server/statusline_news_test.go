@@ -123,15 +123,7 @@ func TestNewsItemAnswersByID(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/am/statusline/n-1", nil)
 	req = req.WithContext(auth.WithAdmission(req.Context(), tokenCaller("did:key:alice")))
-	rec := httptest.NewRecorder()
-	h.HandleStatusLineItem(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
-	}
-	var detail map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil {
-		t.Fatalf("detail is not json: %v", err)
-	}
+	detail := itemDetail(t, h, req, "n-1")
 	if detail["repo"] != "teranos/ground" || detail["conclusion"] != "success" {
 		t.Fatalf("detail is %v", detail)
 	}

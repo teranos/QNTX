@@ -28,7 +28,6 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
-	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/errors"
 )
 
@@ -462,27 +461,6 @@ func (s *QNTXServer) attestationStoreFailing() bool {
 	}
 	_, failed := cached.response["error"]
 	return failed
-}
-
-// HandleVersion answers which build is running, in full. The connect frame in
-// HandleWebSocket sends Short() — seven characters, enough to read and not
-// enough to look up — and a caller polling over HTTP needs the whole hash.
-func (s *QNTXServer) HandleVersion(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-	respond(w, s.logger, http.StatusOK, version.Get())
-}
-
-// HandleSyscap answers what this build can do: which storage backend and which
-// parser it was built against. The same answer the connect frame pushes, asked
-// for instead of waited on — a caller without a socket has no other way to it,
-// and ≡ draws it.
-func (s *QNTXServer) HandleSyscap(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-	respond(w, s.logger, http.StatusOK, syscap.Get(s.store))
 }
 
 // HandleUsageTimeSeries serves time-series usage data for charting

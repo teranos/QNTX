@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,7 +10,9 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -507,52 +510,35 @@ func (h *StatusLineHandler) noteWriteFailure(err error) {
 	h.logger.Errorw("status line not written", "error", err)
 }
 
-// Where the row is answered, and where one item off it is. The item handler
-// reads the name off the path, so the prefix it strips and the path routing.go
-// registers are one string and cannot drift apart.
-const statusLineItemPrefix = "/am/statusline/"
-
-// HandleStatusLineItem answers what one item on the row is doing, in full.
-// The row has one line and cannot carry this; a click is where it goes.
-// GET /am/statusline/{name}
-func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-
-	name := strings.TrimPrefix(r.URL.Path, statusLineItemPrefix)
+// item is what one item on the row is doing, in full: am_item's answer. The
+// row has one line and cannot carry this; a click is where it goes.
+func (h *StatusLineHandler) item(ctx context.Context, name string) (any, *protocol.Refusal) {
 	if name == "" {
-		respond(w, h.log(), http.StatusBadRequest, map[string]any{"error": "name is required"})
-		return
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: "name is required"}
 	}
 
-	admitted, ok := auth.AdmissionFrom(r.Context())
+	admitted, ok := auth.AdmissionFrom(ctx)
 	if !ok {
-		respond(w, h.log(), http.StatusNotFound, map[string]any{"error": "no such item"})
-		return
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: "no such item"}
 	}
 
 	// News first: it is the caller's, by id, and nothing else on the row is.
 	if detail, ok := h.newsDetail(admitted, name); ok {
-		h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
-		return
+		return detail, nil
 	}
 
 	// Failures outrank the registry here the way they do on the row: a name
 	// that matches a failing handler or watcher answers with the failure in
 	// full, which is where the exact error lives.
 	if detail, ok := h.handlerFailureDetail(name); ok {
-		h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
-		return
+		return detail, nil
 	}
-	if detail, ok := h.watcherFailureDetail(r.Context(), name); ok {
-		h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
-		return
+	if detail, ok := h.watcherFailureDetail(ctx, name); ok {
+		return detail, nil
 	}
 
 	if h == nil || h.registry == nil {
-		respond(w, h.log(), http.StatusNotFound, map[string]any{"error": "no such item"})
-		return
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: "no such item"}
 	}
 
 	// The row truncates a long name to fit tmux's range argument, so what comes
@@ -568,8 +554,7 @@ func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.
 		}
 	}
 	if full == "" {
-		respond(w, h.log(), http.StatusNotFound, map[string]any{"error": "no such item", "name": name})
-		return
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: "no such item: " + name}
 	}
 
 	hs := health[full]
@@ -587,8 +572,7 @@ func (h *StatusLineHandler) HandleStatusLineItem(w http.ResponseWriter, r *http.
 		detail["version"] = meta.Version
 		detail["description"] = meta.Description
 	}
-
-	h.noteWriteFailure(writeJSON(w, http.StatusOK, detail))
+	return detail, nil
 }
 
 // The same items, spelled for whichever surface asked. The write can fail and
