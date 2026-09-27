@@ -1,9 +1,8 @@
 package server
 
 import (
-	"encoding/json"
+	"context"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,14 +12,9 @@ import (
 
 func readLines(t *testing.T, s *QNTXServer) linesResponse {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, "/api/roles", nil)
-	req = req.WithContext(auth.WithAdmission(req.Context(), rootOf(s)))
-	rec := httptest.NewRecorder()
-	s.HandleRoles(rec, req)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	var answer linesResponse
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &answer))
-	return answer
+	answer, refusal := s.rolesList(auth.WithAdmission(context.Background(), rootOf(s)), nil)
+	require.Nil(t, refusal, "roles list refused")
+	return answer.(linesResponse)
 }
 
 // "its a fucking audit trail": every line the gate reads, as written, newest
