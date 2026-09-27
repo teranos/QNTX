@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"net/http"
 
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/server/openapi"
@@ -29,28 +28,4 @@ func (s *QNTXServer) openapiServed() ([]byte, error) {
 	info["version"] = version.VersionTag
 	sigilsInto(document, s.checkedSigna())
 	return json.Marshal(document)
-}
-
-// HandleOpenAPI answers with the OpenAPI document for this build: every path
-// server/reach's table names, who reaches it, and what each sigil does there.
-
-// The document served differs from the one in the tree by the version, which
-// is this build's tag, and by the sigils' operations.
-func (s *QNTXServer) HandleOpenAPI(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "GET is the whole of it")
-		return
-	}
-
-	document, err := s.openapiServed()
-	if err != nil {
-		writeWrappedError(w, s.logger, err,
-			"the OpenAPI document is not servable", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if _, err := w.Write(document); err != nil {
-		s.logger.Errorw("could not write the OpenAPI document", "error", err)
-	}
 }

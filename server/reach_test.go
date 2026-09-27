@@ -38,11 +38,11 @@ func TestAHandlerNoLineNamesIsRoots(t *testing.T) {
 // describing it.
 func TestAGrantToNowhereStopsTheNode(t *testing.T) {
 	srv := servedForTest(t)
-	delete(srv.answering, "/api/timeseries/usage")
+	delete(srv.answering, "/api/types")
 
 	err := srv.open()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "/api/timeseries/usage")
+	assert.Contains(t, err.Error(), "/api/types")
 }
 
 // servedForTest builds a node that answers and opens what the table grants.
