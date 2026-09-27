@@ -286,7 +286,7 @@ func TestTheServedDocumentSaysWhatTheSigilsSay(t *testing.T) {
 	assert.Equal(t, "staands_create", stands.Post.Sigil)
 	assert.Equal(t, "staands_take-down", stands.Delete.Sigil)
 
-	assert.Nil(t, document.Paths["/api/roles"].Get, "an operation no sigil says was invented")
+	assert.Nil(t, document.Paths["/api/types"].Get, "an operation no sigil says was invented")
 
 	metrics := document.Paths["/api/staands/metrics"].Get
 	require.NotNil(t, metrics, "metrics is not in the document")

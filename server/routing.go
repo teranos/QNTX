@@ -43,7 +43,6 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer(elementPathPrefix, s.HandleElementModule)
 
 	// Every role the lines name, whole (ADR-034).
-	s.answer("/api/roles", s.HandleRoles)
 
 	// What a signum holds is answered from its sigils (ADR-039): a path per
 	// endpoint a sigil is bound to, the method picking the sigil. Staands

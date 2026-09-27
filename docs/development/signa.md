@@ -118,7 +118,7 @@ The answer to query is a bare array today, and the cut has nowhere to go but a h
 
 | sigil | mark |
 | --- | --- |
-| list | |
+| list | done |
 
 ## tokens
 
