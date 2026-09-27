@@ -24,8 +24,10 @@ import (
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/errors"
 )
@@ -512,36 +514,13 @@ func asyncJobStatusPtr(status async.JobStatus) *async.JobStatus {
 	return &status
 }
 
-// HandlePlugins serves plugin information endpoint
-// Returns list of installed plugins with their metadata and health status
-// HandlePluginAction handles lifecycle actions for plugins
-// POST /api/plugins/{name}/pause - Pause a plugin
-// POST /api/plugins/{name}/resume - Resume a plugin
-// POST /api/plugins/{name}/restart - Restart a plugin
-// POST /api/plugins/{name}/enable - Enable a plugin at runtime
-// POST /api/plugins/{name}/disable - Disable a plugin at runtime
-func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodPost) {
-		return
-	}
-
+// pluginAction is the answer of the plugins signum's pause, resume, restart,
+// enable and disable sigils.
+func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map[string]interface{}, *protocol.Refusal) {
 	if s.pluginRegistry == nil {
-		writeError(w, http.StatusServiceUnavailable, "Plugin registry not available")
-		return
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin registry not available"}
 	}
 
-	// Parse path: /api/plugins/{name}/{action}
-	path := strings.TrimPrefix(r.URL.Path, "/api/plugins/")
-	parts := strings.Split(path, "/")
-	if len(parts) != 2 {
-		writeError(w, http.StatusBadRequest, "Invalid path: expected /api/plugins/{name}/{action}")
-		return
-	}
-
-	name := parts[0]
-	action := parts[1]
-
-	ctx := r.Context()
 	var err error
 
 	switch action {
@@ -549,8 +528,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		err = s.pluginRegistry.Pause(ctx, name)
 		if err != nil {
 			s.logger.Warnw("Failed to pause plugin", "plugin", name, "error", err)
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 		}
 		s.logger.Infow("Plugin paused", "plugin", name)
 		// Broadcast plugin health update to all clients
@@ -561,8 +539,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		err = s.pluginRegistry.Resume(ctx, name)
 		if err != nil {
 			s.logger.Warnw("Failed to resume plugin", "plugin", name, "error", err)
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 		}
 		s.logger.Infow("Plugin resumed", "plugin", name)
 		// Broadcast plugin health update to all clients
@@ -571,8 +548,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 	case "restart":
 		pm := s.getPluginManager()
 		if pm == nil {
-			writeError(w, http.StatusServiceUnavailable, "Plugin manager not available")
-			return
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin manager not available"}
 		}
 		// Check if plugin is in the enabled list
 		appcfg.Reset()
@@ -586,8 +562,8 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 				}
 			}
 			if !enabled {
-				writeError(w, http.StatusBadRequest, fmt.Sprintf("Plugin %q is not enabled in am.toml — add it to [plugin] enabled to use it", name))
-				return
+				return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name",
+					Says: fmt.Sprintf("Plugin %q is not enabled in am.toml — add it to [plugin] enabled to use it", name)}
 			}
 		}
 		// Snapshot config before reset for diff detection
@@ -600,8 +576,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		appcfg.Reset()
 		cfg, cfgErr := appcfg.Load()
 		if cfgErr != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to load config: %v", cfgErr))
-			return
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: fmt.Sprintf("Failed to load config: %v", cfgErr)}
 		}
 		// Run restart asynchronously — RestartPlugin can block for tens of seconds
 		// when ATS queries are queued behind the RustStore mutex.
@@ -625,21 +600,18 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 	case "enable":
 		pm := s.getPluginManager()
 		if pm == nil {
-			writeError(w, http.StatusServiceUnavailable, "Plugin manager not available")
-			return
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin manager not available"}
 		}
 		// Re-read config to get current search paths
 		appcfg.Reset()
 		cfg, cfgErr := appcfg.Load()
 		if cfgErr != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to load config: %v", cfgErr))
-			return
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: fmt.Sprintf("Failed to load config: %v", cfgErr)}
 		}
 		err = pm.EnablePlugin(ctx, name, cfg.Plugin.Paths, s.pluginRegistry, s.services)
 		if err != nil {
 			s.logger.Warnw("Failed to enable plugin", "plugin", name, "error", err)
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
 		// Invalidate HTTP mux cache for the newly enabled plugin
 		s.pluginMuxes.Delete(name)
@@ -653,8 +625,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 	case "disable":
 		pm := s.getPluginManager()
 		if pm == nil {
-			writeError(w, http.StatusServiceUnavailable, "Plugin manager not available")
-			return
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin manager not available"}
 		}
 		// Capture metadata before disabling (plugin will be gone after)
 		var disabledVersion string
@@ -669,8 +640,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		err = pm.DisablePlugin(ctx, name, s.pluginRegistry)
 		if err != nil {
 			s.logger.Warnw("Failed to disable plugin", "plugin", name, "error", err)
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
 		// Clear cached HTTP mux
 		s.pluginMuxes.Delete(name)
@@ -686,8 +656,8 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		s.BroadcastPluginHealth(name, false, string(plugin.StateStopped), "Plugin disabled")
 
 	default:
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Unknown action: %s (expected 'pause', 'resume', 'restart', 'enable', or 'disable')", action))
-		return
+		return nil, &protocol.Refusal{Why: sigil.Failed,
+			Says: fmt.Sprintf("Unknown action: %s (expected 'pause', 'resume', 'restart', 'enable', or 'disable')", action)}
 	}
 
 	// Return updated state
@@ -697,11 +667,9 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 	if action == "restart" {
 		state = plugin.StateRestarting
 	}
-	response := map[string]interface{}{
+	return map[string]interface{}{
 		"name":   name,
 		"state":  string(state),
 		"action": action,
-	}
-
-	respond(w, s.logger, http.StatusOK, response)
+	}, nil
 }

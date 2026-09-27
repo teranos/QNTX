@@ -2,8 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -24,7 +22,7 @@ func TestTheHandlerReadsTheProbeRatherThanMakingOne(t *testing.T) {
 	_ = s
 
 	for i := 0; i < 5; i++ {
-		h.HandlePlugins(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/plugins", nil))
+		h.list()
 	}
 
 	// Five requests read the snapshot five times and reach no plugin. What is
@@ -43,13 +41,7 @@ func TestTheAnswerSaysWhenItWasProbed(t *testing.T) {
 			return map[string]plugin.HealthStatus{}, probedAt, ""
 		})
 
-	rec := httptest.NewRecorder()
-	h.HandlePlugins(rec, httptest.NewRequest(http.MethodGet, "/api/plugins", nil))
-
-	var said map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &said); err != nil {
-		t.Fatalf("body is not JSON: %v", err)
-	}
+	said := answeredAsJSON(t, h.list())
 	if said["health_probed_at"] == nil {
 		t.Error("the answer does not say when it was probed")
 	}
@@ -70,16 +62,24 @@ func TestAnUnansweredProbeIsSaidRatherThanHidden(t *testing.T) {
 			return nil, time.Time{}, "no probe has completed yet"
 		})
 
-	rec := httptest.NewRecorder()
-	h.HandlePlugins(rec, httptest.NewRequest(http.MethodGet, "/api/plugins", nil))
-
-	var said map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &said); err != nil {
-		t.Fatalf("body is not JSON: %v", err)
-	}
+	said := answeredAsJSON(t, h.list())
 	if said["health_probe_failure"] != "no probe has completed yet" {
 		t.Errorf("health_probe_failure = %v, want the reason stated", said["health_probe_failure"])
 	}
+}
+
+// answeredAsJSON is an answer as the surfaces carry it: marshalled.
+func answeredAsJSON(t *testing.T, answer any) map[string]any {
+	t.Helper()
+	body, err := json.Marshal(answer)
+	if err != nil {
+		t.Fatalf("answer does not marshal: %v", err)
+	}
+	var said map[string]any
+	if err := json.Unmarshal(body, &said); err != nil {
+		t.Fatalf("answer is not a JSON object: %v", err)
+	}
+	return said
 }
 
 // Before the first probe completes there is no answer, and saying so beats

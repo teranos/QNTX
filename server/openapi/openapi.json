@@ -289,13 +289,6 @@
         "SUPER"
       ]
     },
-    "/api/plugins/": {
-      "x-qntx-reach": [
-        "ROOT",
-        "SUPER"
-      ],
-      "x-qntx-prefix": true
-    },
     "/api/plugins/elements": {
       "x-qntx-reach": [
         "ROOT"

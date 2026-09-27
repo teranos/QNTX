@@ -71,7 +71,7 @@ export async function loadPluginElements(): Promise<void> {
         if (!resp.ok) {
             log.warn(SEG.ELEMENT, `[PluginElements] Failed to fetch plugin elements: ${resp.status}`);
         } else {
-            const defs: PluginElementDef[] = await resp.json();
+            const { elements: defs }: { elements: PluginElementDef[] } = await resp.json();
             for (const def of defs) {
                 registerPluginElementType(def);
             }
