@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -275,9 +276,34 @@ func (c *ExternalDomainProxy) AnswerHTTP(ctx context.Context, req *protocol.HTTP
 // a request (server.HeaderAsker). A caller sending them is not believed.
 var askerHeaders = map[string]bool{
 	"X-Qntx-Asker":        true,
+	"X-Qntx-Asker-User":   true,
 	"X-Qntx-Asker-Did":    true,
 	"X-Qntx-Asker-Label":  true,
 	"X-Qntx-Asker-Client": true,
+}
+
+// askerFrom is who the node admitted, as the headers a plugin reads it by.
+func askerFrom(ctx context.Context) []*protocol.HTTPHeader {
+	admitted, gated := auth.AdmissionFrom(ctx)
+	if !gated {
+		return nil
+	}
+	var headers []*protocol.HTTPHeader
+	add := func(name, value string) {
+		if value != "" {
+			headers = append(headers, &protocol.HTTPHeader{Name: name, Values: []string{value}})
+		}
+	}
+	add("X-Qntx-Asker", admitted.Identity)
+	add("X-Qntx-Asker-User", admitted.UserID)
+	did, label := admitted.TokenDID, admitted.TokenLabel
+	if admitted.Grant != nil {
+		did, label = admitted.Grant.DID, admitted.Grant.Label
+	}
+	add("X-Qntx-Asker-Did", did)
+	add("X-Qntx-Asker-Label", label)
+	add("X-Qntx-Asker-Client", admitted.ClientDID)
+	return headers
 }
 
 // Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
@@ -596,6 +622,7 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 			Values: values,
 		})
 	}
+	headers = append(headers, askerFrom(r.Context())...)
 
 	// Calculate both stripped and full paths
 	originalPath := r.URL.Path
