@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -67,6 +68,9 @@ type ExternalDomainProxy struct {
 	// httpRoutes are the routes this plugin declared at Initialize (ADR-001).
 	httpRoutes []*protocol.RouteInfo
 
+	// traffic is what the proxy carried to this plugin, per declared route.
+	traffic *Traffic
+
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
@@ -110,10 +114,11 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 	client := protocol.NewDomainPluginServiceClient(conn)
 
 	proxy := &ExternalDomainProxy{
-		conn:   conn,
-		client: client,
-		logger: logger,
-		addr:   addr,
+		conn:    conn,
+		client:  client,
+		logger:  logger,
+		addr:    addr,
+		traffic: newTraffic(),
 	}
 
 	// Fetch and cache metadata
@@ -596,16 +601,43 @@ func (c *ExternalDomainProxy) RegisterHTTP(mux *http.ServeMux) error {
 	return nil
 }
 
+// Traffic is what the proxy carried to this plugin. Nil is a proxy built
+// without the constructor, which carried nothing.
+func (c *ExternalDomainProxy) Traffic() *Traffic {
+	return c.traffic
+}
+
 // proxyHTTPRequest forwards an HTTP request to the remote plugin.
 // Tries stripped path first (without /api/{plugin}), then full path if 404 (Issue #277).
 // This allows plugins to register routes either way without friction.
 func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Request) {
+	// Counted once per request, whatever it came to. A request the browser
+	// abandoned was answered by nobody, and is not counted.
+	started := time.Now()
+	answered := 0
+	defer func() {
+		if c.traffic == nil || answered == 0 {
+			return
+		}
+		route := routeOf(r.Method, c.strippedPath(r.URL.Path), c.httpRoutes)
+		took := time.Since(started)
+		c.traffic.record(route, answered, took, started)
+		attrs := []measure.Attr{
+			measure.String(measure.AttrPlugin, c.metadata.Name),
+			measure.String(measure.AttrPluginRoute, route),
+			measure.String(measure.AttrOutcome, outcomeOf(answered)),
+		}
+		measure.Count(measure.PluginCalled, 1, attrs...)
+		measure.Took(measure.PluginTook, took, attrs...)
+	}()
+
 	// Read request body
 	var body []byte
 	if r.Body != nil {
 		var err error
 		body, err = io.ReadAll(r.Body)
 		if err != nil {
+			answered = http.StatusInternalServerError
 			http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 			return
 		}
@@ -626,20 +658,7 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 
 	// Calculate both stripped and full paths
 	originalPath := r.URL.Path
-	prefix := "/api/" + c.metadata.Name
-	strippedPath := originalPath
-
-	if originalPath == prefix {
-		// Exact match: /api/code -> /
-		strippedPath = "/"
-	} else if len(originalPath) > len(prefix) && originalPath[:len(prefix)] == prefix {
-		// Has prefix: /api/code/... -> /...
-		strippedPath = originalPath[len(prefix):]
-		// Ensure stripped path starts with /
-		if strippedPath == "" || strippedPath[0] != '/' {
-			strippedPath = "/" + strippedPath
-		}
-	}
+	strippedPath := c.strippedPath(originalPath)
 
 	// Add query string
 	queryString := ""
@@ -677,6 +696,7 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 				"plugin", c.metadata.Name,
 				"method", r.Method,
 				"path", req.Path)
+			answered = http.StatusNotFound
 			http.Error(w, fmt.Sprintf("Plugin '%s': %s not found", c.metadata.Name, req.Path), http.StatusNotFound)
 			return
 		}
@@ -686,9 +706,11 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 			"path", req.Path,
 			"addr", c.addr,
 			"error", err)
+		answered = http.StatusBadGateway
 		http.Error(w, fmt.Sprintf("Plugin '%s' error: %v (%s %s)", c.metadata.Name, err, r.Method, req.Path), http.StatusBadGateway)
 		return
 	}
+	answered = int(resp.StatusCode)
 
 	// Write response headers
 	// Support multi-value headers (e.g., Set-Cookie)
@@ -706,6 +728,23 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 				"plugin", c.metadata.Name, "status", resp.StatusCode, "bytes", len(resp.Body), "error", err)
 		}
 	}
+}
+
+// strippedPath is a path under /api/{plugin} with that prefix taken off:
+// /api/code -> /, /api/code/x -> /x. Anything else comes back as it was.
+func (c *ExternalDomainProxy) strippedPath(originalPath string) string {
+	prefix := "/api/" + c.metadata.Name
+	if originalPath == prefix {
+		return "/"
+	}
+	if len(originalPath) > len(prefix) && originalPath[:len(prefix)] == prefix {
+		stripped := originalPath[len(prefix):]
+		if stripped == "" || stripped[0] != '/' {
+			stripped = "/" + stripped
+		}
+		return stripped
+	}
+	return originalPath
 }
 
 // RegisterWebSocket returns WebSocket handlers that proxy to the remote plugin.

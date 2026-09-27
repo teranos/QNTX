@@ -146,6 +146,13 @@ const (
 	HostSwap    = "qntx.host.swap"
 	HostSwapIn  = "qntx.host.swap.in"
 	HostSwapOut = "qntx.host.swap.out"
+
+	// PluginCalled is one per HTTP request the node carried to a plugin, and
+	// PluginTook how long the plugin took to answer it, both sliced by the
+	// plugin, the route it declared and the outcome. The same count draws that
+	// plugin's own row on the statusline.
+	PluginCalled = "qntx.plugin.called"
+	PluginTook   = "qntx.plugin.took"
 )
 
 // The dimensions.
@@ -204,6 +211,14 @@ const (
 	// AttrWhole is whether a take-in read the whole record or from its mark
 	// on: "true" or "false".
 	AttrWhole = "whole"
+
+	// AttrPlugin is which plugin: the ones ROOT enabled in am.toml.
+	AttrPlugin = "plugin"
+
+	// AttrPluginRoute is a route as the plugin declared it at Initialize,
+	// "POST /me/draft", or "undeclared" for every path it did not. Bounded by
+	// the plugin's own table, never by the path a caller sent.
+	AttrPluginRoute = "plugin_route"
 )
 
 // Attr is what a call site builds a dimension with. It is Sentry's own builder,

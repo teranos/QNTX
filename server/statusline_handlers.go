@@ -419,6 +419,18 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// One plugin's own row, when that is what was asked for. A name the node
+	// holds no plugin under is said, not answered with the node's row.
+	if name := r.URL.Query().Get("plugin"); name != "" {
+		row, found := h.pluginRow(name)
+		if !found {
+			respond(w, h.log(), http.StatusNotFound, map[string]any{"error": "no such plugin: " + name})
+			return
+		}
+		h.noteWriteFailure(writeStatusLine(w, format, row))
+		return
+	}
+
 	// Who is looking is pinned leftmost, what was left for them comes next, the
 	// plugins are pinned right; the rotating slot sits between.
 	items := append([]StatusItem{callerItem(admitted)}, h.newsFor(admitted)...)
