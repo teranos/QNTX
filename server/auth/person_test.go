@@ -131,6 +131,45 @@ func TestATokenIsAnsweredWithTheMintersUserAndSaysSo(t *testing.T) {
 	assert.Equal(t, []any{"pond"}, body["namespaces"])
 }
 
+// A role is what lets a person further than their rung (ADR-034), so a surface
+// drawing them has to know which they hold, and the person may know it.
+func TestTheRolesAnAdmissionHoldsAreAnswered(t *testing.T) {
+	h := testHandler()
+	h.users = &memUsers{held: []User{{ID: "US-VISITOR", Level: LevelPublicRegistration, Namespace: "garden"}}}
+
+	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
+	admitted := Holding(Admitted(LevelPublicRegistration, "garden"), "COORDINATOR")
+	admitted.UserID = "US-VISITOR"
+	req = req.WithContext(WithAdmission(req.Context(), admitted))
+
+	rec := httptest.NewRecorder()
+	h.HandleTheUser(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, []any{"COORDINATOR"}, body["roles"])
+}
+
+// Holding none is a list with nothing in it, not a field the node left out.
+func TestHoldingNoRoleIsAnEmptyList(t *testing.T) {
+	h := testHandler()
+	h.users = &memUsers{held: []User{{ID: "US-VISITOR", Level: LevelPublicRegistration}}}
+
+	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
+	admitted := Admitted(LevelPublicRegistration, "garden")
+	admitted.UserID = "US-VISITOR"
+	req = req.WithContext(WithAdmission(req.Context(), admitted))
+
+	rec := httptest.NewRecorder()
+	h.HandleTheUser(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, []any{}, body["roles"])
+}
+
 // A blank row would read as a person with nothing about them. The store not
 // holding the User the admission named is the node's problem, and it says so.
 func TestAUserTheStoreDoesNotHoldIsAnError(t *testing.T) {
