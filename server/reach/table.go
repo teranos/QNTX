@@ -138,7 +138,7 @@ REACH is 'plugins:enable' 'plugins:disable'                               of ROO
 REACH is '/api/plugins/elements' '/api/plugins/routes'                      of ROOT
 REACH is '/api/plugins/{name}/logs'                                       of ROOT
 REACH is '/api/plugins/{name}/config'                                     of ROOT
-REACH is '/am/statusline' '/am/statusline/'                               of ROOT SUPER
+REACH is '/am/statusline' '/am/statusline/{name}'                         of ROOT SUPER
 REACH is '/api/types' '/api/types/'                                       of ROOT
 # A watcher acts inside a namespace, and the standing table is on these paths
 # too. A watcher nobody may read is one that fires unseen.

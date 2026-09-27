@@ -32,12 +32,11 @@
         "SUPER"
       ]
     },
-    "/am/statusline/": {
+    "/am/statusline/{name}": {
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
-      ],
-      "x-qntx-prefix": true
+      ]
     },
     "/am/syscap": {
       "x-qntx-reach": [

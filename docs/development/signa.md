@@ -156,10 +156,10 @@ Under `/auth` with the ceremony, which is routes; split by hand.
 
 | sigil | mark |
 | --- | --- |
-| version | |
-| syscap | |
+| version | done |
+| syscap | done |
 | statusline | |
-| statusline item | |
+| item | done |
 
 ## embeddings
 
