@@ -153,7 +153,8 @@ export class ChartElementState {
                     throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
                 }
 
-                this.data = await response.json() as TimeSeriesDataPoint[];
+                const { points } = await response.json() as { points: TimeSeriesDataPoint[] };
+                this.data = points;
             }
 
             this.render();
