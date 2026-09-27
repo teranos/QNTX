@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -272,4 +273,48 @@ func TestProtocolHeaderConversion(t *testing.T) {
 	assert.Equal(t, httpHeaders.Values("Content-Type"), resultHeaders.Values("Content-Type"))
 	assert.ElementsMatch(t, httpHeaders.Values("Set-Cookie"), resultHeaders.Values("Set-Cookie"))
 	assert.ElementsMatch(t, httpHeaders.Values("Accept"), resultHeaders.Values("Accept"))
+}
+
+func TestAsker_TheNodeSaysWhoIsAsking(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	logger := zaptest.NewLogger(t).Sugar()
+	plugin := newMockPlugin()
+
+	var asker, user []string
+	plugin.httpHandlers["/who"] = func(w http.ResponseWriter, r *http.Request) {
+		asker = r.Header.Values("X-Qntx-Asker")
+		user = r.Header.Values("X-Qntx-Asker-User")
+		w.WriteHeader(http.StatusOK)
+	}
+
+	addr, cleanup := startTestServer(t, plugin)
+	defer cleanup()
+
+	proxy, err := NewExternalDomainProxy(addr, logger)
+	require.NoError(t, err)
+	defer proxy.Close()
+
+	services := &mockServiceRegistry{logger: logger}
+	require.NoError(t, proxy.Initialize(context.Background(), services))
+
+	mux := http.NewServeMux()
+	proxy.RegisterHTTP(mux)
+
+	admitted := auth.Admitted(auth.LevelAttestor)
+	admitted.Identity = "did:key:z6MkTim"
+	admitted.UserID = "US-TIM-7K4M3B9X"
+
+	req := httptest.NewRequest("POST", "/api/mock/who", nil)
+	req.Header.Set("X-Qntx-Asker", "did:key:z6MkForged")
+	req.Header.Set("X-Qntx-Asker-User", "US-FORGED")
+	req = req.WithContext(auth.WithAdmission(req.Context(), admitted))
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	assert.Equal(t, []string{"did:key:z6MkTim"}, asker)
+	assert.Equal(t, []string{"US-TIM-7K4M3B9X"}, user)
 }
