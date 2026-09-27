@@ -194,15 +194,6 @@ func (h *PluginHandler) routes() map[string]interface{} {
 			route.Handlers = proxy.GetHandlerNames()
 			route.Schedules = len(proxy.GetSchedules())
 			route.Watchers = len(proxy.GetWatchers())
-			for _, signum := range proxy.GetSigna() {
-				for _, held := range signum.GetSigils() {
-					route.Endpoints = append(route.Endpoints, RouteEndpoint{
-						Method:      held.GetHttp().GetMethod(),
-						Path:        held.GetHttp().GetPath(),
-						Description: held.GetDoes(),
-					})
-				}
-			}
 		}
 
 		routes = append(routes, route)

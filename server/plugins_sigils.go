@@ -44,7 +44,7 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 				},
 				{
 					Name:  "routes",
-					Does:  "What each running plugin serves: its HTTP and socket paths, the roles it plays, its handlers, schedules, watchers and endpoints.",
+					Does:  "What each running plugin serves: its HTTP and socket paths, the roles it plays, its handlers, schedules and watchers, and the core endpoints its roles are asked through.",
 					Gives: []*protocol.Field{{Name: "routes", Says: "One row per running plugin."}},
 					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: "/api/plugins/routes"},
 				},
