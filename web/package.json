@@ -26,7 +26,7 @@
     "@tauri-apps/api": "2.11.1",
     "@types/d3": "7.4.3",
     "@types/jsdom": "27.0.0",
-    "eslint": "10.8.1",
+    "eslint": "10.10.0",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "20.0.11",
     "jsdom": "27.4.0",
