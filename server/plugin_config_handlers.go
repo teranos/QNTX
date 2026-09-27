@@ -61,8 +61,8 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 
 	// Get all keys for this plugin namespace
 	for _, key := range config.GetViper().AllKeys() {
-		// Check if key starts with plugin namespace
-		prefix := pluginName + "."
+		// Check if key starts with plugin namespace. Viper holds keys lowercased.
+		prefix := strings.ToLower(pluginName) + "."
 		if strings.HasPrefix(key, prefix) {
 			// Strip prefix to get config key
 			configKey := strings.TrimPrefix(key, prefix)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appcfg "github.com/teranos/QNTX/internal/config"
 )
 
 func TestNewConfigProvider_WithoutEndpoints(t *testing.T) {
@@ -69,6 +70,17 @@ func TestNewConfigProvider_GetAlsoInjectsEndpoints(t *testing.T) {
 	config := provider.GetPluginConfig("x")
 
 	assert.Equal(t, "localhost:5555", config.Get("_llm_endpoint"))
+}
+
+// Viper holds every key lowercased. A plugin named with a capital, cleanAPI,
+// was handed no config at all, its github_token among it.
+func TestAPluginNamedWithACapitalIsHandedItsKeys(t *testing.T) {
+	appcfg.Set("cleanAPI.github_token", "ssm:///q/box/github-token")
+	t.Cleanup(appcfg.Reset)
+
+	config := NewConfigProvider(nil).GetPluginConfig("cleanAPI")
+	assert.Contains(t, config.GetKeys(), "github_token")
+	assert.Equal(t, "ssm:///q/box/github-token", config.Get("github_token"))
 }
 
 func TestNewConfigProvider_NonEndpointKeysFallThrough(t *testing.T) {

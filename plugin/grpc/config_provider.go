@@ -71,8 +71,10 @@ func (c *configWithEndpoints) GetKeys() []string {
 		return []string{}
 	}
 
+	// Viper holds every key lowercased, so a plugin named with a capital,
+	// cleanAPI, was never matched and was initialized with no config at all.
 	allKeys := v.AllKeys()
-	prefix := c.domain + "."
+	prefix := strings.ToLower(c.domain) + "."
 	var keys []string
 
 	for _, key := range allKeys {

@@ -113,8 +113,9 @@ func ReloadPluginSection(pluginName string) error {
 		return errors.Wrapf(err, "failed to re-read config from %s", configPath)
 	}
 
-	// Copy all keys under [pluginName] into the global viper
-	prefix := pluginName + "."
+	// Copy all keys under [pluginName] into the global viper. Viper holds keys
+	// lowercased, so the name is too.
+	prefix := strings.ToLower(pluginName) + "."
 	for _, key := range fresh.AllKeys() {
 		if len(key) > len(prefix) && key[:len(prefix)] == prefix {
 			v.Set(key, fresh.Get(key))
