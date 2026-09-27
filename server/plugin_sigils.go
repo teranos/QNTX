@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -26,6 +27,7 @@ import (
 // asked. grpc.ExternalDomainProxy is one.
 type signaHolder interface {
 	GetSigna() []*protocol.Signum
+	GetHTTPRoutes() []*protocol.RouteInfo
 	AnswerHTTP(ctx context.Context, req *protocol.HTTPRequest) (*protocol.HTTPResponse, error)
 }
 
@@ -155,16 +157,20 @@ func (s *QNTXServer) pluginSignaOf(name string) (served []sigil.Signum, refused 
 	if !holds {
 		return nil, nil
 	}
-	for _, handed := range holder.GetSigna() {
+	signa, declared := holder.GetSigna(), false
+	if len(signa) == 0 && len(holder.GetHTTPRoutes()) > 0 {
+		signa, declared = []*protocol.Signum{declaredSignum(name, holder.GetHTTPRoutes())}, true
+	}
+	for _, handed := range signa {
 		if err := boundUnder(name, handed); err != nil {
 			refused = append(refused, err.Error())
 			continue
 		}
 		answers := map[string]sigil.Answer{}
 		for _, held := range handed.GetSigils() {
-			answers[held.GetName()] = s.pluginAnswer(name, held)
+			answers[held.GetName()] = s.pluginAnswer(name, held, declared)
 		}
-		signum := sigil.Signum{Signum: handed, Answers: answers}
+		signum := sigil.Signum{Signum: handed, Answers: answers, Declared: declared}
 		if err := signum.Check(); err != nil {
 			refused = append(refused, err.Error())
 			continue
@@ -172,6 +178,36 @@ func (s *QNTXServer) pluginSignaOf(name string) (served []sigil.Signum, refused 
 		served = append(served, signum)
 	}
 	return served, refused
+}
+
+// declaredSignum is a plugin that declares routes as its own signum (ADR-001):
+// named after it, each declared route a sigil bound to it under /api/{plugin}.
+func declaredSignum(plugin string, routes []*protocol.RouteInfo) *protocol.Signum {
+	signum := &protocol.Signum{Name: plugin}
+	for _, route := range routes {
+		signum.Sigils = append(signum.Sigils, &protocol.Sigil{
+			Name: sigilNameOf(route.GetPath()),
+			Does: route.GetDescription(),
+			Http: &protocol.Endpoint{Method: route.GetMethod(), Path: "/api/" + plugin + route.GetPath()},
+		})
+	}
+	return signum
+}
+
+// sigilNameOf is a declared route's path in the characters a tool name allows:
+// /kvk/zoek/naam is kvk_zoek_naam.
+func sigilNameOf(path string) string {
+	var name []byte
+	for i := 0; i < len(path); i++ {
+		c := path[i]
+		switch {
+		case (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'):
+			name = append(name, c)
+		case len(name) > 0:
+			name = append(name, '_')
+		}
+	}
+	return string(name)
 }
 
 // sigilRow is one sigil a plugin handed the node, as the plugin panel draws it:
@@ -253,7 +289,10 @@ func boundUnder(plugin string, handed *protocol.Signum) error {
 // arrives: in the query for a GET or a DELETE, as a JSON object otherwise, each
 // value as text. The plugin is looked up on every asking, because a restart is
 // a new process and a new connection.
-func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil) sigil.Answer {
+//
+// A declared route names nothing it takes or gives, so what arrived goes to
+// the plugin whole, and what the plugin says comes back as it said it.
+func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared bool) sigil.Answer {
 	return func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 		failed := func(err error) (any, *protocol.Refusal) {
 			if s.logger != nil {
@@ -280,7 +319,14 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil) sigil.Ans
 		}
 		defer done()
 
-		req, err := forwarded(plugin, held, sent, ctx, token)
+		carried := map[string]any{}
+		for name, value := range sent {
+			carried[name] = value
+		}
+		if declared {
+			carried = sigil.Arrived(ctx)
+		}
+		req, err := forwarded(plugin, held, carried, ctx, token)
 		if err != nil {
 			return failed(err)
 		}
@@ -290,10 +336,15 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil) sigil.Ans
 		}
 
 		if resp.GetStatusCode() >= 200 && resp.GetStatusCode() < 300 {
-			if err := sigil.Holds(held, resp.GetBody()); err != nil {
-				return failed(err)
+			if !declared {
+				if err := sigil.Holds(held, resp.GetBody()); err != nil {
+					return failed(err)
+				}
 			}
 			return json.RawMessage(resp.GetBody()), nil
+		}
+		if declared {
+			return nil, &protocol.Refusal{Why: whyOf(resp.GetStatusCode()), Says: strings.TrimSpace(string(resp.GetBody()))}
 		}
 		refusal, err := refusedBy(resp)
 		if err != nil {
@@ -304,23 +355,26 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil) sigil.Ans
 }
 
 // forwarded is the request a plugin is handed for one asking.
-func forwarded(plugin string, held *protocol.Sigil, sent sigil.Sent, ctx context.Context, storeToken string) (*protocol.HTTPRequest, error) {
+func forwarded(plugin string, held *protocol.Sigil, carried map[string]any, ctx context.Context, storeToken string) (*protocol.HTTPRequest, error) {
 	method := held.GetHttp().GetMethod()
 	req := &protocol.HTTPRequest{
 		Method: method,
 		Path:   strings.TrimPrefix(held.GetHttp().GetPath(), "/api/"+plugin),
 	}
 	if carriesBody(method) {
-		body, err := json.Marshal(sent)
+		if carried == nil {
+			carried = map[string]any{}
+		}
+		body, err := json.Marshal(carried)
 		if err != nil {
 			return nil, errors.Wrapf(err, "what was sent to %s did not marshal", held.GetName())
 		}
 		req.Body = body
 		req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: "Content-Type", Values: []string{"application/json"}})
-	} else if len(sent) > 0 {
+	} else if len(carried) > 0 {
 		query := url.Values{}
-		for name, value := range sent {
-			query.Set(name, value)
+		for name, value := range carried {
+			query.Set(name, fmt.Sprint(value))
 		}
 		req.Path += "?" + query.Encode()
 	}
@@ -375,18 +429,22 @@ func refusedBy(resp *protocol.HTTPResponse) (*protocol.Refusal, error) {
 		return nil, errors.Newf("%q is not a kind of no", why)
 	}
 	if why == "" {
-		switch resp.GetStatusCode() {
-		case http.StatusBadRequest:
-			why = sigil.Invalid
-		case http.StatusNotFound:
-			why = sigil.NotFound
-		case http.StatusForbidden:
-			why = sigil.NotAllowed
-		default:
-			why = sigil.Failed
-		}
+		why = whyOf(resp.GetStatusCode())
 	}
 	return &protocol.Refusal{Why: why, Param: said.Param, Says: said.Says}, nil
+}
+
+// whyOf is the kind of no a plugin's status says, when it says no other.
+func whyOf(status int32) string {
+	switch status {
+	case http.StatusBadRequest:
+		return sigil.Invalid
+	case http.StatusNotFound:
+		return sigil.NotFound
+	case http.StatusForbidden:
+		return sigil.NotAllowed
+	}
+	return sigil.Failed
 }
 
 // ServePluginSigils serves again with the signa every ready plugin holds now.

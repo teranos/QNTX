@@ -31,6 +31,9 @@ import (
 type Signum struct {
 	*protocol.Signum
 	Answers map[string]Answer
+	// Declared is a plugin's declared routes as its signum (ADR-001). Over
+	// HTTP they are the plugin's own routes, so the mux is not given them.
+	Declared bool
 }
 
 // Sent is what a caller sent, by the name of each param. Every surface reads

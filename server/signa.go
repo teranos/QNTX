@@ -63,6 +63,9 @@ func carriesBody(method string) bool {
 func (s *QNTXServer) answeredFromSigils() map[string]http.HandlerFunc {
 	bound := map[string][]heldBy{}
 	for _, signum := range s.checkedSigna() {
+		if signum.Declared {
+			continue
+		}
 		for _, held := range signum.GetSigils() {
 			path := held.GetHttp().GetPath()
 			bound[path] = append(bound[path], heldBy{signum: signum.GetName(), sigil: held, answer: signum.Answers[held.GetName()]})

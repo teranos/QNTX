@@ -74,7 +74,7 @@ func (a Asking) Ask(ctx context.Context, arrived map[string]any) Asked {
 			asked = &Asked{Refusal: refusal}
 			return
 		}
-		answer, refusal := a.Answer(r.Context(), sent)
+		answer, refusal := a.Answer(context.WithValue(r.Context(), arrivedKey{}, arrived), sent)
 		asked = &Asked{Answer: answer, Refusal: refusal}
 	}
 	if !a.Anyone {
@@ -88,6 +88,17 @@ func (a Asking) Ask(ctx context.Context, arrived map[string]any) Asked {
 		return Asked{Rejected: &Rejected{Status: wrote.status, Header: wrote.header, Body: wrote.body.String()}}
 	}
 	return *asked
+}
+
+// arrivedKey is where Ask leaves what arrived, whole, for what answers.
+type arrivedKey struct{}
+
+// Arrived is what the caller sent, before it was read against what the sigil
+// takes. A plugin's declared route names nothing it takes, so what answers it
+// hands this on whole.
+func Arrived(ctx context.Context) map[string]any {
+	arrived, _ := ctx.Value(arrivedKey{}).(map[string]any)
+	return arrived
 }
 
 // rejected holds what the gate wrote, so it can be handed on rather than

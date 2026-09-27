@@ -143,10 +143,15 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			if namespaced(admitted, sigil.GetHttp().GetPath()) {
 				continue
 			}
+			schema := takenAsSchema(held.sigil)
+			if signum.Declared {
+				schema["additionalProperties"] = true
+				schema["description"] = "What the route takes, as a JSON object: it arrives at the plugin whole. The plugin declares the route and names none of it."
+			}
 			server.AddTool(&mcp.Tool{
 				Name:        toolNameOf(held.signum, held.sigil),
 				Description: sigil.GetDoes(),
-				InputSchema: takenAsSchema(held.sigil),
+				InputSchema: schema,
 			}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				args := map[string]any{}
 				if len(req.Params.Arguments) > 0 {
