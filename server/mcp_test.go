@@ -65,7 +65,7 @@ func TestARouteToolAskedWithoutAMethodIsRefused(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = asking.Close() })
 
-	result, err := asking.CallTool(ctx, &mcp.CallToolParams{Name: "http_api_roles", Arguments: map[string]any{}})
+	result, err := asking.CallTool(ctx, &mcp.CallToolParams{Name: "http_api_types", Arguments: map[string]any{}})
 	require.NoError(t, err)
 	assert.True(t, result.IsError)
 	assert.Contains(t, textOf(t, result), "needs a method")

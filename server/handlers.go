@@ -28,7 +28,6 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
-	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/errors"
 )
 
@@ -462,50 +461,6 @@ func (s *QNTXServer) attestationStoreFailing() bool {
 	}
 	_, failed := cached.response["error"]
 	return failed
-}
-
-// HandleVersion answers which build is running, in full. The connect frame in
-// HandleWebSocket sends Short() — seven characters, enough to read and not
-// enough to look up — and a caller polling over HTTP needs the whole hash.
-func (s *QNTXServer) HandleVersion(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-	respond(w, s.logger, http.StatusOK, version.Get())
-}
-
-// HandleSyscap answers what this build can do: which storage backend and which
-// parser it was built against. The same answer the connect frame pushes, asked
-// for instead of waited on — a caller without a socket has no other way to it,
-// and ≡ draws it.
-func (s *QNTXServer) HandleSyscap(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-	respond(w, s.logger, http.StatusOK, syscap.Get(s.store))
-}
-
-// HandleUsageTimeSeries serves time-series usage data for charting
-func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Request) {
-	// Parse days parameter (default to 7)
-	daysStr := r.URL.Query().Get("days")
-	days := 7
-	if daysStr != "" {
-		if parsed, err := fmt.Sscanf(daysStr, "%d", &days); err == nil && parsed == 1 {
-			if days < 1 {
-				days = 1
-			} else if days > 365 {
-				days = 365 // Cap at one year
-			}
-		}
-	}
-
-	data, err := s.usageTracker.GetTimeSeriesData(days)
-	if err != nil {
-		writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to fetch time-series data (days=%d)", days), http.StatusInternalServerError)
-		return
-	}
-	respond(w, s.logger, http.StatusOK, data)
 }
 
 // asyncJobStatusPtr returns a pointer to a JobStatus value

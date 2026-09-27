@@ -118,7 +118,7 @@ The answer to query is a bare array today, and the cut has nowhere to go but a h
 
 | sigil | mark |
 | --- | --- |
-| list | |
+| list | done |
 
 ## tokens
 
@@ -156,10 +156,10 @@ Under `/auth` with the ceremony, which is routes; split by hand.
 
 | sigil | mark |
 | --- | --- |
-| version | |
-| syscap | |
+| version | done |
+| syscap | done |
 | statusline | |
-| statusline item | |
+| item | done |
 
 ## embeddings
 
@@ -239,7 +239,7 @@ Seen as a prefix path only.
 
 | sigil | mark |
 | --- | --- |
-| usage | |
+| usage | done |
 
 ## dev
 
@@ -268,7 +268,7 @@ Once the document is written from the signa this may stop being a sigil.
 
 | sigil | mark |
 | --- | --- |
-| document | |
+| document | done |
 
 ## Routes, not sigils
 

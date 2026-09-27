@@ -99,6 +99,24 @@ func TestRepeatedHandlerFailuresCollapseWithACount(t *testing.T) {
 }
 
 // The row names it; the click has the exact error.
+// itemDetail is what am_item answers for one name, as a surface carries it.
+func itemDetail(t *testing.T, h *StatusLineHandler, asked *http.Request, name string) map[string]any {
+	t.Helper()
+	answer, refusal := h.item(asked.Context(), name)
+	if refusal != nil {
+		t.Fatalf("item %s refused: %s", name, refusal.GetSays())
+	}
+	body, err := json.Marshal(answer)
+	if err != nil {
+		t.Fatalf("detail does not marshal: %v", err)
+	}
+	var detail map[string]any
+	if err := json.Unmarshal(body, &detail); err != nil {
+		t.Fatalf("detail is not a json object: %v", err)
+	}
+	return detail
+}
+
 func TestFailingHandlerDetailCarriesTheExactError(t *testing.T) {
 	failedAt := time.Now().Add(-30 * time.Second)
 	h := handlerRow(logWith(HandlerFailure{
@@ -109,17 +127,7 @@ func TestFailingHandlerDetailCarriesTheExactError(t *testing.T) {
 		AtMs:           failedAt.UnixMilli(),
 	}))
 
-	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline/capy.campaigns", nil))
-	rec := httptest.NewRecorder()
-	h.HandleStatusLineItem(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("detail answered %d", rec.Code)
-	}
-	var detail map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil {
-		t.Fatalf("detail is not json: %v", err)
-	}
+	detail := itemDetail(t, h, rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline/capy.campaigns", nil)), "capy.campaigns")
 	if detail["error"] != `rpc error: code = Unavailable desc = closing transport due to: EOF` {
 		t.Fatalf("detail does not carry the error in full: %+v", detail)
 	}
