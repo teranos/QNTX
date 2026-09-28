@@ -5,21 +5,10 @@ Status: Proposed
 
 "GitHubService needs to be a thing, and QNTX should own it."
 
-A plugin that does GitHub things calls it, and keeps no client or token of its
-own.
+"because of the GitHubService the ratelimit is kept in one place"
 
-```toml
-[github]
-# host = "github.com"
-access_token = "ssm:///garden/github-token"
-# This box runs the Actions runner.
-actions_runner = "/opt/actions-runner"
-```
+"the GitHubService is per namespace, QNTX should be able to deal with multiple tokens set by Authenticated users"
 
-`[github]` replaces `[[plugin.access_token]]`.
+"to disable it on the Node entirely"
 
-## Example
-
-Garden enables `https://github.com/garden/grove`. Garden's runner builds grove
-on the same box, under `actions_runner`, and QNTX runs the new grove from
-there. Nothing polls.
+"to see which namespaces have it enabled and if their auth is correct, and wheter is comes from them setting an access token or via OAuth (Oauth path doesnt exist yet, but will)"
