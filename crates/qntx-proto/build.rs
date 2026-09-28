@@ -21,7 +21,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|e| format!("cannot read proto dir {}: {}", proto_dir.display(), e))?
         .filter_map(|entry| {
             let path = entry.ok()?.path();
-            if path.extension().is_some_and(|ext| ext == "proto") {
+            // GitHubService (ADR-043) is a Go side thing; WASM, right now,
+            // doesn't need to be aware of it.
+            let github = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("github"));
+            if !github && path.extension().is_some_and(|ext| ext == "proto") {
                 Some(path)
             } else {
                 None
