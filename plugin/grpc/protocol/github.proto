@@ -7,6 +7,7 @@ import "plugin/grpc/protocol/github_commits_comments.proto";
 import "plugin/grpc/protocol/github_commits_commits.proto";
 import "plugin/grpc/protocol/github_branches_branches.proto";
 import "plugin/grpc/protocol/github_pulls_review_requests.proto";
+import "plugin/grpc/protocol/github_pulls_reviews.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -63,6 +64,23 @@ service GitHubService {
   rpc RequestReviewersForAPullRequest(GitHubRequestReviewersForAPullRequestRequest) returns (GitHubRequestReviewersForAPullRequestResponse);
   // https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10#remove-requested-reviewers-from-a-pull-request
   rpc RemoveRequestedReviewersFromAPullRequest(GitHubRemoveRequestedReviewersFromAPullRequestRequest) returns (GitHubRequestReviewersForAPullRequestResponse);
+
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#list-reviews-for-a-pull-request
+  rpc ListReviewsForAPullRequest(GitHubListReviewsForAPullRequestRequest) returns (GitHubListReviewsForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#create-a-review-for-a-pull-request
+  rpc CreateAReviewForAPullRequest(GitHubCreateAReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#get-a-review-for-a-pull-request
+  rpc GetAReviewForAPullRequest(GitHubGetAReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#update-a-review-for-a-pull-request
+  rpc UpdateAReviewForAPullRequest(GitHubUpdateAReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#delete-a-pending-review-for-a-pull-request
+  rpc DeleteAPendingReviewForAPullRequest(GitHubDeleteAPendingReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#list-comments-for-a-pull-request-review
+  rpc ListCommentsForAPullRequestReview(GitHubListCommentsForAPullRequestReviewRequest) returns (GitHubListCommentsForAPullRequestReviewResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#dismiss-a-review-for-a-pull-request
+  rpc DismissAReviewForAPullRequest(GitHubDismissAReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#submit-a-review-for-a-pull-request
+  rpc SubmitAReviewForAPullRequest(GitHubSubmitAReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
 }
 
 message GitHubRateLimitRequest {
