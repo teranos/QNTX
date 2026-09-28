@@ -34,7 +34,7 @@ See [API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/ope
 
 ## What happens
 
-**Check:** the repo resolves when the newest release carrying the plugin for this node's platform, and its `.sha256`, are read with the host's `[plugin.access_token]`. Nothing is written or installed.
+**Check:** GitHubService is asked, as the node, whether the repository is there ([ADR-043](./ADR-043-github-service.md)). Nothing is written, installed or downloaded.
 
 **Add:** the plugin is recorded with its repository URL, disabled, in the system store.
 
@@ -46,7 +46,7 @@ Plugins not mentioned in the change are untouched. Both transitions emit a color
 
 ## Requirements
 
-- Plugin binary must be discoverable in the configured search paths.
+- Plugin binary must be discoverable in the configured search paths. The runner installs each build that lands under it ([ADR-043](./ADR-043-github-service.md)).
 - The server must be past initialization (services and registry available).
 
 ## Route discovery
@@ -64,4 +64,5 @@ A plugin is its own signum, and the routes it declares are its sigils (ADR-001).
 
 - [ADR-001: Domain Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
 - [ADR-018: Plugin Lifecycle, Watchers, and Developer Experience](./ADR-018-watcher-lifecycle.md)
+- [ADR-043: GitHubService](./ADR-043-github-service.md)
 - [Plugin API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json)

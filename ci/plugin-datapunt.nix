@@ -6,7 +6,7 @@
 # datapunt (teranos/datapunt) is a core with no kind of its own; a company keeps
 # its kinds in one CUE file in its own repo. This builds the plugin out of the
 # core at one rev and every company file at its rev, and releases it on the
-# repo that called, which is the one the node's [plugin] enabled names.
+# repo that called, which is the one the node's plugin record names.
 let
   version = "\${{ steps.version.outputs.version }}";
   artifact = "\${{ steps.package.outputs.artifact }}";

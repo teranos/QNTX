@@ -26,12 +26,12 @@ func (unreadableRecords) Plugin(name string) (PluginRecord, bool, error) {
 	return PluginRecord{}, false, errors.Newf("the system store did not answer for %s", name)
 }
 
-// A record that could not be read is an error, never a plugin with no repository.
+// A record that could not be read is an error, never a plugin with no record.
 func TestAnUnreadableRecordIsAnError(t *testing.T) {
 	SetPluginRecords(unreadableRecords{})
 	t.Cleanup(func() { SetPluginRecords(nil) })
 
-	_, err := pluginRepo("pyre")
+	_, _, err := pluginRecord("pyre")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "pyre")
 }

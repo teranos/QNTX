@@ -11,12 +11,7 @@ make rust-reduce            # build binary to bin/
 make rust-reduce-install    # copy to ~/.qntx/plugins/
 ```
 
-Enable in `am.toml`:
-
-```toml
-[plugin]
-enabled = ["reduce"]
-```
+Add and enable it in the plugin element (ADR-043).
 
 ## Architecture
 

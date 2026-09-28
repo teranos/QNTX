@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -84,6 +85,14 @@ type QNTXServer struct {
 	sentryEnvironment string
 	// What sends the node's own mail; nil when the mail service did not start.
 	nodeMailer nodeMailer
+	// The node's GitHubService (ADR-043), made on first use.
+	githubOnce sync.Once
+	github     *services.GitHubServer
+	// The runner whose plugin builds the node takes, while one is watched.
+	runnerMu   sync.Mutex
+	runner     *grpcplugin.Runner
+	runnerStop context.CancelFunc
+	runnerErr  string
 	// The calls plugins are answering: the token handed for each, and the store
 	// of the caller it was handed for (plugin_sigils.go).
 	callStores sync.Map
