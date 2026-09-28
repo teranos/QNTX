@@ -6,6 +6,7 @@ import "plugin/grpc/protocol/github_commits_statuses.proto";
 import "plugin/grpc/protocol/github_commits_comments.proto";
 import "plugin/grpc/protocol/github_commits_commits.proto";
 import "plugin/grpc/protocol/github_branches_branches.proto";
+import "plugin/grpc/protocol/github_pulls_review_requests.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -55,6 +56,13 @@ service GitHubService {
   rpc SyncAForkBranchWithTheUpstreamRepository(GitHubSyncAForkBranchWithTheUpstreamRepositoryRequest) returns (GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse);
   // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#merge-a-branch
   rpc MergeABranch(GitHubMergeABranchRequest) returns (GitHubMergeABranchResponse);
+
+  // https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10#get-all-requested-reviewers-for-a-pull-request
+  rpc GetAllRequestedReviewersForAPullRequest(GitHubGetAllRequestedReviewersForAPullRequestRequest) returns (GitHubGetAllRequestedReviewersForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10#request-reviewers-for-a-pull-request
+  rpc RequestReviewersForAPullRequest(GitHubRequestReviewersForAPullRequestRequest) returns (GitHubRequestReviewersForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10#remove-requested-reviewers-from-a-pull-request
+  rpc RemoveRequestedReviewersFromAPullRequest(GitHubRemoveRequestedReviewersFromAPullRequestRequest) returns (GitHubRequestReviewersForAPullRequestResponse);
 }
 
 message GitHubRateLimitRequest {
