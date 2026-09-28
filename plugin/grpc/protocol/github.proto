@@ -4,6 +4,7 @@ package protocol;
 
 import "plugin/grpc/protocol/github_commits_statuses.proto";
 import "plugin/grpc/protocol/github_commits_comments.proto";
+import "plugin/grpc/protocol/github_commits_commits.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -31,6 +32,17 @@ service GitHubService {
   rpc ListCommitComments(GitHubListCommitCommentsRequest) returns (GitHubListCommitCommentsForARepositoryResponse);
   // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#create-a-commit-comment
   rpc CreateACommitComment(GitHubCreateACommitCommentRequest) returns (GitHubGetACommitCommentResponse);
+
+  // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-commits
+  rpc ListCommits(GitHubListCommitsRequest) returns (GitHubListCommitsResponse);
+  // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-branches-for-head-commit
+  rpc ListBranchesForHEADCommit(GitHubListBranchesForHEADCommitRequest) returns (GitHubListBranchesForHEADCommitResponse);
+  // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-pull-requests-associated-with-a-commit
+  rpc ListPullRequestsAssociatedWithACommit(GitHubListPullRequestsAssociatedWithACommitRequest) returns (GitHubListPullRequestsAssociatedWithACommitResponse);
+  // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#get-a-commit
+  rpc GetACommit(GitHubGetACommitRequest) returns (GitHubGetACommitResponse);
+  // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#compare-two-commits
+  rpc CompareTwoCommits(GitHubCompareTwoCommitsRequest) returns (GitHubCompareTwoCommitsResponse);
 }
 
 message GitHubRateLimitRequest {
