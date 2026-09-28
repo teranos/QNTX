@@ -136,7 +136,6 @@ function spawnElement(title: string, renderContent: () => HTMLElement): void {
         id: ELEMENT_ID,
         title,
         renderContent,
-        initialWidth: '500px',
         onClose: () => {
             resetState();
             log.debug(SEG.ELEMENT, '[TypeDefElement] Closed');

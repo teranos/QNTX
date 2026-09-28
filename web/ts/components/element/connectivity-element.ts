@@ -96,7 +96,6 @@ export function spawnConnectivityElement(): void {
         id: CONNECTIVITY_ELEMENT_ID,
         title: 'Connectivity',
         renderContent: renderConnectivityContent,
-        initialHeight: '260px',
         onClose: () => {
             log.debug(SEG.ELEMENT, '[ConnectivityElement] Closed');
         },

@@ -150,7 +150,5 @@ export function createIElement() {
             if (!iPersonAsked) void loadPerson();
             return content;
         },
-        initialWidth: '450px',
-        initialHeight: '320px',
     };
 }

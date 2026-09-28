@@ -156,8 +156,6 @@ export function openPageElement(s: StaandInfo, page: string, site: string): void
             renderPageStats(content, s, page, site);
             return content;
         },
-        initialWidth: '560px',
-        initialHeight: '420px',
     } satisfies Element);
 
     tray.open(elementId);

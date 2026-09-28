@@ -17,7 +17,7 @@ import { renderTriple } from './attestation-triple';
 import { stripHtml } from '../../html-utils';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from '@teranos/elements';
-import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@teranos/elements';
+import { preventDrag, makeDraggable, makeResizable, storeCleanup, createCorner } from '@teranos/elements';
 import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';
 import { spawnOnCanvasDragging } from './spawn-on-canvas';
@@ -223,8 +223,6 @@ export function spawnAttestationAsWindow(attestation: Attestation): void {
         id: itemId,
         title,
         symbol: AttestationSym,
-        initialWidth: '420px',
-        initialHeight: attrs ? '300px' : '200px',
         onClose: () => {
             tray.remove(itemId);
             log.debug(SEG.ELEMENT, `[AsElement] Closed window ${itemId}`);
@@ -393,8 +391,8 @@ function placeAttestationWindowOnCanvas(
         storeCleanup(element, cleanupDrag);
     }
     if (attrs) {
-        const resizeHandle = document.createElement('div');
-        resizeHandle.className = 'resize-handle';
+        // The package's corner: its place and size are the package's, its look is resize.css.
+        const resizeHandle = createCorner();
         element.appendChild(resizeHandle);
         const cleanupResize = makeResizable(element, resizeHandle, item, { logLabel: 'AsElement' });
         storeCleanup(element, cleanupResize);

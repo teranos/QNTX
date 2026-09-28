@@ -293,9 +293,6 @@ export function createTokensElement(): Element {
         id: ELEMENT_ID,
         title: 'Access Tokens',
         symbol: '⚿',
-        // No initialWidth: the window then owns width and clips what does not
-        // fit (@teranos/elements window/window.ts). A row carries a
-        // profile URL and two timestamps, so what it needs is what it gets.
         renderContent: () => {
             const content = document.createElement('div');
             content.className = 'tokens-element-content';
