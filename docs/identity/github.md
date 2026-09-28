@@ -28,7 +28,7 @@ parameter. A door takes its own client under
 
 ## What GitHub does differently
 
-The web application flow, as [ADR-043](../adr/ADR-043-github.md) links it:
+The web application flow, as [ADR-044](../adr/ADR-044-github.md) links it:
 PKCE on the authorize and the exchange, `Accept: application/json` on the
 exchange because GitHub otherwise answers form-encoded, and no scope, because
 `GET /user` answers without one.
