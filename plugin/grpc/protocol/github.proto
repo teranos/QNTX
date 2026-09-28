@@ -18,6 +18,7 @@ import "plugin/grpc/protocol/github_checks_runs.proto";
 import "plugin/grpc/protocol/github_checks_suites.proto";
 import "plugin/grpc/protocol/github_issues_comments.proto";
 import "plugin/grpc/protocol/github_orgs_members.proto";
+import "plugin/grpc/protocol/github_orgs_orgs.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -281,6 +282,35 @@ service GitHubService {
   rpc GetAnOrganizationMembershipForTheAuthenticatedUser(GitHubGetAnOrganizationMembershipForTheAuthenticatedUserRequest) returns (GitHubGetOrganizationMembershipForAUserResponse);
   // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#update-an-organization-membership-for-the-authenticated-user
   rpc UpdateAnOrganizationMembershipForTheAuthenticatedUser(GitHubUpdateAnOrganizationMembershipForTheAuthenticatedUserRequest) returns (GitHubGetOrganizationMembershipForAUserResponse);
+
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-organizations
+  rpc ListOrganizations(GitHubListOrganizationsRequest) returns (GitHubListOrganizationsResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#get-an-organization
+  rpc GetAnOrganization(GitHubGetAnOrganizationRequest) returns (GitHubGetAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#update-an-organization
+  rpc UpdateAnOrganization(GitHubUpdateAnOrganizationRequest) returns (GitHubGetAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#delete-an-organization
+  rpc DeleteAnOrganization(GitHubDeleteAnOrganizationRequest) returns (GitHubDeleteAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-app-installations-for-an-organization
+  rpc ListAppInstallationsForAnOrganization(GitHubListAppInstallationsForAnOrganizationRequest) returns (GitHubListAppInstallationsForAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#get-immutable-releases-settings-for-an-organization
+  rpc GetImmutableReleasesSettingsForAnOrganization(GitHubGetImmutableReleasesSettingsForAnOrganizationRequest) returns (GitHubGetImmutableReleasesSettingsForAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#set-immutable-releases-settings-for-an-organization
+  rpc SetImmutableReleasesSettingsForAnOrganization(GitHubSetImmutableReleasesSettingsForAnOrganizationRequest) returns (GitHubSetImmutableReleasesSettingsForAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-selected-repositories-for-immutable-releases-enforcement
+  rpc ListSelectedRepositoriesForImmutableReleasesEnforcement(GitHubListSelectedRepositoriesForImmutableReleasesEnforcementRequest) returns (GitHubListSelectedRepositoriesForImmutableReleasesEnforcementResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#set-selected-repositories-for-immutable-releases-enforcement
+  rpc SetSelectedRepositoriesForImmutableReleasesEnforcement(GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementRequest) returns (GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#enable-a-selected-repository-for-immutable-releases-in-an-organization
+  rpc EnableASelectedRepositoryForImmutableReleasesInAnOrganization(GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationRequest) returns (GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#disable-a-selected-repository-for-immutable-releases-in-an-organization
+  rpc DisableASelectedRepositoryForImmutableReleasesInAnOrganization(GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationRequest) returns (GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#enable-or-disable-a-security-feature-for-an-organization
+  rpc EnableOrDisableASecurityFeatureForAnOrganization(GitHubEnableOrDisableASecurityFeatureForAnOrganizationRequest) returns (GitHubEnableOrDisableASecurityFeatureForAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-organizations-for-the-authenticated-user
+  rpc ListOrganizationsForTheAuthenticatedUser(GitHubListOrganizationsForTheAuthenticatedUserRequest) returns (GitHubListOrganizationsResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-organizations-for-a-user
+  rpc ListOrganizationsForAUser(GitHubListOrganizationsForAUserRequest) returns (GitHubListOrganizationsResponse);
 }
 
 message GitHubRateLimitRequest {
