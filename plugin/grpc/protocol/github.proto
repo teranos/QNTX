@@ -9,6 +9,7 @@ import "plugin/grpc/protocol/github_branches_branches.proto";
 import "plugin/grpc/protocol/github_pulls_review_requests.proto";
 import "plugin/grpc/protocol/github_pulls_reviews.proto";
 import "plugin/grpc/protocol/github_pulls_comments.proto";
+import "plugin/grpc/protocol/github_pulls_pulls.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -97,6 +98,29 @@ service GitHubService {
   rpc CreateAReviewCommentForAPullRequest(GitHubCreateAReviewCommentForAPullRequestRequest) returns (GitHubGetAReviewCommentForAPullRequestResponse);
   // https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#create-a-reply-for-a-review-comment
   rpc CreateAReplyForAReviewComment(GitHubCreateAReplyForAReviewCommentRequest) returns (GitHubGetAReviewCommentForAPullRequestResponse);
+
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-pull-requests
+  rpc ListPullRequests(GitHubListPullRequestsRequest) returns (GitHubListPullRequestsResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#create-a-pull-request
+  rpc CreateAPullRequest(GitHubCreateAPullRequestRequest) returns (GitHubCreateAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#get-a-pull-request
+  rpc GetAPullRequest(GitHubGetAPullRequestRequest) returns (GitHubCreateAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#update-a-pull-request
+  rpc UpdateAPullRequest(GitHubUpdateAPullRequestRequest) returns (GitHubCreateAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-commits-on-a-pull-request
+  rpc ListCommitsOnAPullRequest(GitHubListCommitsOnAPullRequestRequest) returns (GitHubListCommitsOnAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-pull-requests-files
+  rpc ListPullRequestsFiles(GitHubListPullRequestsFilesRequest) returns (GitHubListPullRequestsFilesResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#check-if-a-pull-request-has-been-merged
+  rpc CheckIfAPullRequestHasBeenMerged(GitHubCheckIfAPullRequestHasBeenMergedRequest) returns (GitHubCheckIfAPullRequestHasBeenMergedResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#merge-a-pull-request
+  rpc MergeAPullRequest(GitHubMergeAPullRequestRequest) returns (GitHubMergeAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#merge-a-pull-request-asynchronously
+  rpc MergeAPullRequestAsynchronously(GitHubMergeAPullRequestAsynchronouslyRequest) returns (GitHubMergeAPullRequestAsynchronouslyResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#get-the-result-of-an-asynchronous-merge
+  rpc GetTheResultOfAnAsynchronousMerge(GitHubGetTheResultOfAnAsynchronousMergeRequest) returns (GitHubMergeAPullRequestAsynchronouslyResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#update-a-pull-request-branch
+  rpc UpdateAPullRequestBranch(GitHubUpdateAPullRequestBranchRequest) returns (GitHubUpdateAPullRequestBranchResponse);
 }
 
 message GitHubRateLimitRequest {
