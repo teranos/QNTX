@@ -94,6 +94,9 @@ type providerState struct {
 	// rather than one obtained anywhere. Empty for a provider that is asked
 	// who the person is rather than handed a token saying so.
 	Nonce string
+	// Verifier is the PKCE secret whose hash went out in the authorize URL.
+	// Empty for a provider that is not sent one.
+	Verifier string
 }
 
 // providers is every way in that asks the operator for nothing. Each is
@@ -123,8 +126,8 @@ var providers = []provider{
 }
 
 // offeredAt is what can be linked at one door. The providers above ask the
-// operator for nothing and are always here; Google and Apple are here only
-// once a client exists for them, so a button that could only fail is never
+// operator for nothing and are always here; Google, Apple and GitHub are here
+// only once a client exists for them, so a button that could only fail is never
 // drawn.
 //
 // "you would think a separate door could be given its own OAuth client"
@@ -141,6 +144,9 @@ func (h *Handler) offeredAt(namespace string) []provider {
 	if apple := h.clientAt(namespace, "apple"); apple.signs() {
 		offered = append(slices.Clone(offered), appleProvider(apple))
 	}
+	if github := h.clientAt(namespace, "github"); github.whole() {
+		offered = append(slices.Clone(offered), githubProvider(github))
+	}
 	return offered
 }
 
@@ -154,6 +160,8 @@ func (h *Handler) clientAt(namespace, providerID string) OperatorClient {
 		return *h.google
 	case providerID == "apple" && h.apple != nil:
 		return *h.apple
+	case providerID == "github" && h.github != nil:
+		return *h.github
 	}
 	return OperatorClient{}
 }

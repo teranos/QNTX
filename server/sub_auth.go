@@ -30,6 +30,8 @@ func (authSubsystem) Name() string { return "auth" }
 func setOperatorClients(h *auth.Handler, cfg *appcfg.Config, logger *zap.SugaredLogger) {
 	google := cfg.Auth.Provider.Google
 	setOperatorClient(logger, "Google", google.ClientID, google.ClientSecretRef, h.SetGoogleClient)
+	github := cfg.Auth.Provider.GitHub
+	setOperatorClient(logger, "GitHub", github.ClientID, github.ClientSecretRef, h.SetGitHubClient)
 
 	// Apple's secret is a signing key, and the exchange names whose it is;
 	// the handler takes all of that or takes Apple away.
@@ -108,6 +110,10 @@ func doorClients(logger *zap.SugaredLogger, namespace string, configured appcfg.
 		"apple": {
 			client:    auth.OperatorClient{ID: apple.ClientID, TeamID: apple.TeamID, KeyID: apple.KeyID},
 			secretRef: apple.PrivateKeyRef,
+		},
+		"github": {
+			client:    auth.OperatorClient{ID: configured.GitHub.ClientID},
+			secretRef: configured.GitHub.ClientSecretRef,
 		},
 	} {
 		if own.client.ID == "" {

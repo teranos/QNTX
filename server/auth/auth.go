@@ -51,7 +51,9 @@ type Handler struct {
 	google *OperatorClient
 	// auth.provider.apple, the same way: the key already resolved, nil on a
 	// node configured for no Apple.
-	apple   *OperatorClient
+	apple *OperatorClient
+	// auth.provider.github, the same way as Google.
+	github  *OperatorClient
 	nodeKey ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	// auth.public_origin: where this node answers, which a ceremony's
 	// redirect_uri is built from. Empty falls back to loopbackOrigin.
@@ -169,6 +171,18 @@ func (h *Handler) SetGoogleClient(id, secret string) {
 		return
 	}
 	h.google = &OperatorClient{ID: id, Secret: secret}
+}
+
+// SetGitHubClient hands the handler the OAuth client this node's operator
+// registered with GitHub, or takes it away when either half is missing. The
+// config watcher calls this, so adding [auth.provider.github] to am.toml puts
+// GitHub on the door without waiting for a restart.
+func (h *Handler) SetGitHubClient(id, secret string) {
+	if id == "" || secret == "" {
+		h.github = nil
+		return
+	}
+	h.github = &OperatorClient{ID: id, Secret: secret}
 }
 
 // SetAppleClient hands the handler what this node's operator registered with

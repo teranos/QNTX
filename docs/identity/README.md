@@ -8,6 +8,7 @@ The shape itself, and why, is [ADR-030](../adr/ADR-030-identity-providers.md).
 |---|---|---|---|
 | [Google](google.md) | redirect | `google:<sub>` | an OAuth client in Google's console |
 | [Apple](apple.md) | redirect | `apple:<sub>` | a Services ID and a signing key in Apple's portal |
+| [GitHub](github.md) | redirect | `github:<id>` | a GitHub App at github.com/settings/apps |
 | [Mastodon](mastodon.md) | redirect | the profile URL | none |
 | [atproto](atproto.md) | credential | the DID | none |
 

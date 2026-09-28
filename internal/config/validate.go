@@ -197,6 +197,9 @@ func validateProviders(at string, p ProviderConfig) error {
 	if err := validateOAuthClient(at+".google", p.Google.ClientID, p.Google.ClientSecretRef); err != nil {
 		return err
 	}
+	if err := validateOAuthClient(at+".github", p.GitHub.ClientID, p.GitHub.ClientSecretRef); err != nil {
+		return err
+	}
 	return validateAppleClient(at+".apple", p.Apple)
 }
 
