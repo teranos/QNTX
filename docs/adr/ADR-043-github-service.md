@@ -3,6 +3,8 @@
 Date: 2026-09-28
 Status: Proposed
 
+[`plugin/grpc/protocol/github.proto`](../../plugin/grpc/protocol/github.proto)
+
 "GitHubService needs to be a thing, and QNTX should own it."
 
 "because of the GitHubService the ratelimit is kept in one place"
