@@ -146,12 +146,14 @@ let adding = false;
 let addingRepo = '';
 let resolved: ResolvedPlugin | null = null;
 
-/** What a repo resolves to, as plugins:check answers (plugin/grpc/fetch.go). */
+/** What GitHub said of a repo, as plugins:check answers (server/plugin_check.go). */
 interface ResolvedPlugin {
     name: string;
     repo: string;
-    release: string;
-    asset: string;
+    repository: string;
+    private: boolean;
+    ref: string;
+    path?: string;
 }
 
 // Added and switched off.
@@ -287,8 +289,9 @@ export function renderAddCard(): string {
             ${checked && resolved ? `
             <div class="plugin-add-resolved plugin-mono">
                 <span class="plugin-name">${escapeHtml(resolved.name)}</span>
-                <span>${escapeHtml(resolved.release)}</span>
-                <span>${escapeHtml(resolved.asset)}</span>
+                <span>${escapeHtml(resolved.repository)}${resolved.path ? `/${escapeHtml(resolved.path)}` : ''}</span>
+                <span>${escapeHtml(resolved.ref)}</span>
+                ${resolved.private ? '<span>private</span>' : ''}
             </div>` : ''}
             <div class="plugin-controls">
                 ${checked
@@ -312,7 +315,7 @@ function focusAddField(): void {
     contentElement?.querySelector<HTMLInputElement>('.plugin-add-repo')?.focus();
 }
 
-/** Stage one: whether the repo resolves to a release this node could install. A refusal is the button's to show. */
+/** Stage one: whether GitHub has the repo, asked as the node. A refusal is the button's to show. */
 async function checkPlugin(repo: string): Promise<void> {
     if (repo === '') throw new Error('type the repository URL, then press Check');
     const response = await apiFetch('/api/plugins/check', jsonBody('POST', { repo }));

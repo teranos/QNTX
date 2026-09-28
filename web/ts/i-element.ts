@@ -21,6 +21,7 @@ import { openRolesElement } from './roles-element.ts';
 import { openUsersElement } from './users-element.ts';
 import { openMarketElement } from './market-element.ts';
 import { openMailElement } from './mail-element.ts';
+import { openGitHubElement } from './github-element.ts';
 
 // Who the node thinks is looking, and what it said instead when it would not
 // say. Both empty is nothing asked yet, which draws no section at all.
@@ -125,6 +126,11 @@ function renderI(): void {
             openMailElement();
         });
         actions.appendChild(mailBtn.element);
+        // The node's GitHub and its Actions runner are ROOT's to set (ADR-043).
+        const githubBtn = createGhostButton('⎇ GitHub', async () => {
+            openGitHubElement();
+        });
+        actions.appendChild(githubBtn.element);
     }
 
     // The switch on the person (ADR-031), once the node has said who is looking.
