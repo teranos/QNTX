@@ -12,6 +12,7 @@ import "plugin/grpc/protocol/github_pulls_comments.proto";
 import "plugin/grpc/protocol/github_pulls_pulls.proto";
 import "plugin/grpc/protocol/github_actions_workflows.proto";
 import "plugin/grpc/protocol/github_actions_workflow_jobs.proto";
+import "plugin/grpc/protocol/github_actions_artifacts.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -145,6 +146,17 @@ service GitHubService {
   rpc ListJobsForAWorkflowRunAttempt(GitHubListJobsForAWorkflowRunAttemptRequest) returns (GitHubListJobsForAWorkflowRunAttemptResponse);
   // https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#list-jobs-for-a-workflow-run
   rpc ListJobsForAWorkflowRun(GitHubListJobsForAWorkflowRunRequest) returns (GitHubListJobsForAWorkflowRunAttemptResponse);
+
+  // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#list-artifacts-for-a-repository
+  rpc ListArtifactsForARepository(GitHubListArtifactsForARepositoryRequest) returns (GitHubListArtifactsForARepositoryResponse);
+  // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#get-an-artifact
+  rpc GetAnArtifact(GitHubGetAnArtifactRequest) returns (GitHubGetAnArtifactResponse);
+  // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#delete-an-artifact
+  rpc DeleteAnArtifact(GitHubDeleteAnArtifactRequest) returns (GitHubDeleteAnArtifactResponse);
+  // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#download-an-artifact
+  rpc DownloadAnArtifact(GitHubDownloadAnArtifactRequest) returns (GitHubDownloadAnArtifactResponse);
+  // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#list-workflow-run-artifacts
+  rpc ListWorkflowRunArtifacts(GitHubListWorkflowRunArtifactsRequest) returns (GitHubListArtifactsForARepositoryResponse);
 }
 
 message GitHubRateLimitRequest {

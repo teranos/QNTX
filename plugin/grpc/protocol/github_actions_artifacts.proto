@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10
+
+// GET /repos/{owner}/{repo}/actions/artifacts
+message GitHubListArtifactsForARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 per_page = 4;
+  int64 page = 5;
+  string name = 6;
+}
+
+message GitHubListArtifactsForARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+  int64 total_count = 3;
+  repeated GitHubActionsArtifactsArtifact artifacts = 4;
+}
+
+// GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}
+message GitHubGetAnArtifactRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 artifact_id = 4;
+}
+
+message GitHubGetAnArtifactResponse {
+  bool success = 1;
+  string error = 2;
+  int64 id = 3;
+  string node_id = 4;
+  string name = 5;
+  int64 size_in_bytes = 6;
+  string url = 7;
+  string archive_download_url = 8;
+  bool expired = 9;
+  string created_at = 10;
+  string expires_at = 11;
+  string updated_at = 12;
+  string digest = 13;
+  GitHubActionsArtifactsArtifact.WorkflowRun workflow_run = 14;
+}
+
+// DELETE /repos/{owner}/{repo}/actions/artifacts/{artifact_id}
+message GitHubDeleteAnArtifactRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 artifact_id = 4;
+}
+
+message GitHubDeleteAnArtifactResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}
+message GitHubDownloadAnArtifactRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 artifact_id = 4;
+  string archive_format = 5;
+}
+
+message GitHubDownloadAnArtifactResponse {
+  bool success = 1;
+  string error = 2;
+  // "Look for Location: in the response header to find the URL for the download."
+  string location = 3;
+}
+
+// GET /repos/{owner}/{repo}/actions/runs/{run_id}/artifacts
+// Response: same response schema as List artifacts for a repository.
+message GitHubListWorkflowRunArtifactsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+  int64 per_page = 5;
+  int64 page = 6;
+  string name = 7;
+  string direction = 8;
+}
+
+// Artifact
+message GitHubActionsArtifactsArtifact {
+  message WorkflowRun {
+    int64 id = 1;
+    int64 repository_id = 2;
+    int64 head_repository_id = 3;
+    string head_branch = 4;
+    string head_sha = 5;
+  }
+
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  int64 size_in_bytes = 4;
+  string url = 5;
+  string archive_download_url = 6;
+  bool expired = 7;
+  string created_at = 8;
+  string expires_at = 9;
+  string updated_at = 10;
+  string digest = 11;
+  WorkflowRun workflow_run = 12;
+}
