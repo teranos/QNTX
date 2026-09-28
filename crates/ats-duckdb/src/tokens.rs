@@ -12,7 +12,8 @@
 //! The object is named by the token's SHA-256 hash because `Lookup` is by
 //! hash — the hot path on every authenticated request resolves to one record
 //! with nothing to scan. Only the hash is stored; the raw token is shown once
-//! at creation and never persisted.
+//! at creation and never persisted. A GITHUB token (ADR-043) is the exception:
+//! the node spends it at GitHub, so its record holds the credential.
 
 use std::collections::HashMap;
 
@@ -85,6 +86,28 @@ pub struct TokenRecord {
     pub last_used_at: Option<i64>,
     #[serde(default)]
     pub revoked_at: Option<i64>,
+    /// What a GITHUB token holds and no other kind does: the credential the
+    /// node spends at GitHub (ADR-043). Never in a summary.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github: Option<GitHubSecret>,
+}
+
+/// Mirrors `auth.GitHubSecret` in `server/auth/github_token.go`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GitHubSecret {
+    pub token: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refresh: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refresh_expires_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client: Option<String>,
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub login: Option<String>,
 }
 
 impl TokenRecord {
@@ -241,6 +264,8 @@ struct TokenObject {
     client_did: Option<String>,
     #[serde(default)]
     request_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    github: Option<GitHubSecret>,
 }
 
 impl From<&TokenRecord> for TokenObject {
@@ -264,6 +289,7 @@ impl From<&TokenRecord> for TokenObject {
             return_address: Some(r.return_address.clone()),
             client_did: Some(r.client_did.clone()),
             request_id: Some(r.request_id.clone()),
+            github: r.github.clone(),
         }
     }
 }
@@ -298,6 +324,7 @@ impl From<TokenObject> for TokenRecord {
             expires_at: o.expires_at,
             last_used_at: o.last_used_at,
             revoked_at: o.revoked_at,
+            github: o.github,
         }
     }
 }
@@ -546,6 +573,7 @@ mod tests {
             expires_at: None,
             last_used_at: None,
             revoked_at: None,
+            github: None,
         }
     }
 
@@ -569,6 +597,30 @@ mod tests {
             reopened.summaries()[0].return_address,
             "https://app.example/callback"
         );
+    }
+
+    /// A namespace's GitHub token is spent at GitHub by the node (ADR-043).
+    /// Lost on reopen, the node has no GitHub after every deploy.
+    #[test]
+    fn a_github_token_survives_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = store(&dir);
+        let mut r = record("gh1", "hash-gh1");
+        r.level = "GITHUB".to_string();
+        r.github = Some(GitHubSecret {
+            token: "ghu_spend".to_string(),
+            refresh: Some("ghr_refresh".to_string()),
+            expires_at: Some(1_700_028_800_000),
+            refresh_expires_at: None,
+            client: Some("Iv23client".to_string()),
+            source: "oauth".to_string(),
+            login: Some("teranos".to_string()),
+        });
+        s.put(r.clone()).unwrap();
+
+        let reopened = store(&dir);
+        let found = reopened.resolve("hash-gh1", 1_700_000_001_000).unwrap();
+        assert_eq!(found.github, r.github);
     }
 
     /// A refresh token names the client it was issued through and the request
