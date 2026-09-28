@@ -194,8 +194,6 @@ export function openSegmentElement(segment: Segment, value: string): void {
 
             return content;
         },
-        initialWidth: '560px',
-        initialHeight: '460px',
     } satisfies Element);
 
     tray.open(elementId);

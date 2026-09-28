@@ -296,8 +296,6 @@ export function openStandActivity(s: StaandInfo): void {
         // A dataset needs room a fact row does not. Wide enough for a page path
         // and its bar on one line, tall enough for the twenty events and ten
         // pages the node will send (server/staand.go, topCounts).
-        initialWidth: '720px',
-        initialHeight: '560px',
     } satisfies Element);
 
     tray.open(elementId);

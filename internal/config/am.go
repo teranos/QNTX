@@ -137,6 +137,7 @@ type DoorConfig struct {
 type ProviderConfig struct {
 	Google OAuthClientConfig `mapstructure:"google"` // Registered at console.cloud.google.com
 	Apple  AppleClientConfig `mapstructure:"apple"`  // Registered at developer.apple.com: a Services ID with Sign in with Apple enabled, and a Sign in with Apple key
+	GitHub OAuthClientConfig `mapstructure:"github"` // Registered at github.com/settings/apps
 }
 
 // AppleClientConfig is what Apple hands an operator instead of a client
