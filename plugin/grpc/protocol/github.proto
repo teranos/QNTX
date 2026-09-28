@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043: GitHubService
+service GitHubService {
+  // https://docs.github.com/en/rest/rate-limit/rate-limit?apiVersion=2026-03-10
+  rpc RateLimit(GitHubRateLimitRequest) returns (GitHubRateLimitResponse);
+}
+
+message GitHubRateLimitRequest {
+  string auth_token = 1;
+  string source = 2;
+  string namespace = 3;
+}
+
+message GitHubRate {
+  int64 limit = 1;
+  int64 remaining = 2;
+  int64 reset = 3;
+  int64 used = 4;
+}
+
+message GitHubRateLimitResponse {
+  bool success = 1;
+  string error = 2;
+  map<string, GitHubRate> resources = 3;
+}
