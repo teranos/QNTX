@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10
+
+message GitHubActionsWorkflowJobsGetAJobForAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 job_id = 4;
+}
+
+message GitHubActionsWorkflowJobsGetAJobForAWorkflowRunResponse {
+  message Steps {
+    string status = 1;
+    string conclusion = 2;
+    string name = 3;
+    int64 number = 4;
+    string started_at = 5;
+    string completed_at = 6;
+  }
+  bool success = 1;
+  string error = 2;
+  int64 id = 3;
+  int64 run_id = 4;
+  string run_url = 5;
+  int64 run_attempt = 6;
+  string node_id = 7;
+  string head_sha = 8;
+  string url = 9;
+  string html_url = 10;
+  string status = 11;
+  string conclusion = 12;
+  string created_at = 13;
+  string started_at = 14;
+  string completed_at = 15;
+  string name = 16;
+  repeated Steps steps = 17;
+  string check_run_url = 18;
+  repeated string labels = 19;
+  int64 runner_id = 20;
+  string runner_name = 21;
+  int64 runner_group_id = 22;
+  string runner_group_name = 23;
+  string workflow_name = 24;
+  string head_branch = 25;
+}
+
+message GitHubActionsWorkflowJobsDownloadJobLogsForAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 job_id = 4;
+}
+
+message GitHubActionsWorkflowJobsDownloadJobLogsForAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message GitHubActionsWorkflowJobsListJobsForAWorkflowRunAttemptRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+  int64 attempt_number = 5;
+  int64 per_page = 6;
+  int64 page = 7;
+}
+
+message GitHubActionsWorkflowJobsListJobsForAWorkflowRunAttemptResponse {
+  bool success = 1;
+  string error = 2;
+  int64 total_count = 3;
+  repeated GitHubActionsWorkflowJobsJob jobs = 4;
+}
+
+message GitHubActionsWorkflowJobsListJobsForAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+  string filter = 5;
+  int64 per_page = 6;
+  int64 page = 7;
+}
+
+message GitHubActionsWorkflowJobsJob {
+  message Steps {
+    string status = 1;
+    string conclusion = 2;
+    string name = 3;
+    int64 number = 4;
+    string started_at = 5;
+    string completed_at = 6;
+  }
+  int64 id = 1;
+  int64 run_id = 2;
+  string run_url = 3;
+  int64 run_attempt = 4;
+  string node_id = 5;
+  string head_sha = 6;
+  string url = 7;
+  string html_url = 8;
+  string status = 9;
+  string conclusion = 10;
+  string created_at = 11;
+  string started_at = 12;
+  string completed_at = 13;
+  string name = 14;
+  repeated Steps steps = 15;
+  string check_run_url = 16;
+  repeated string labels = 17;
+  int64 runner_id = 18;
+  string runner_name = 19;
+  int64 runner_group_id = 20;
+  string runner_group_name = 21;
+  string workflow_name = 22;
+  string head_branch = 23;
+}

@@ -1,0 +1,287 @@
+syntax = "proto3";
+
+package protocol;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10
+
+message GitHubCommitsStatusesGetTheCombinedStatusForASpecificReferenceRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string ref = 4;
+  int64 per_page = 5;
+  int64 page = 6;
+}
+
+message GitHubCommitsStatusesGetTheCombinedStatusForASpecificReferenceResponse {
+  bool success = 1;
+  string error = 2;
+  string state = 3;
+  repeated GitHubCommitsStatusesSimpleCommitStatus statuses = 4;
+  string sha = 5;
+  int64 total_count = 6;
+  GitHubCommitsStatusesMinimalRepository repository = 7;
+  string commit_url = 8;
+  string url = 9;
+}
+
+message GitHubCommitsStatusesListCommitStatusesForAReferenceRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string ref = 4;
+  int64 per_page = 5;
+  int64 page = 6;
+}
+
+message GitHubCommitsStatusesListCommitStatusesForAReferenceResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubCommitsStatusesStatus items = 3;
+}
+
+message GitHubCommitsStatusesCreateACommitStatusRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string sha = 4;
+  string state = 5;
+  string target_url = 6;
+  string description = 7;
+  string context = 8;
+}
+
+message GitHubCommitsStatusesCreateACommitStatusResponse {
+  bool success = 1;
+  string error = 2;
+  string url = 3;
+  string avatar_url = 4;
+  int64 id = 5;
+  string node_id = 6;
+  string state = 7;
+  string description = 8;
+  string target_url = 9;
+  string context = 10;
+  string created_at = 11;
+  string updated_at = 12;
+  GitHubCommitsStatusesSimpleUser creator = 13;
+}
+
+message GitHubCommitsStatusesSimpleCommitStatus {
+  string description = 1;
+  int64 id = 2;
+  string node_id = 3;
+  string state = 4;
+  string context = 5;
+  string target_url = 6;
+  bool required = 7;
+  string avatar_url = 8;
+  string url = 9;
+  string created_at = 10;
+  string updated_at = 11;
+}
+
+message GitHubCommitsStatusesSimpleUser {
+  string name = 1;
+  string email = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string avatar_url = 6;
+  string gravatar_id = 7;
+  string url = 8;
+  string html_url = 9;
+  string followers_url = 10;
+  string following_url = 11;
+  string gists_url = 12;
+  string starred_url = 13;
+  string subscriptions_url = 14;
+  string organizations_url = 15;
+  string repos_url = 16;
+  string events_url = 17;
+  string received_events_url = 18;
+  string type = 19;
+  bool site_admin = 20;
+  string starred_at = 21;
+  string user_view_type = 22;
+}
+
+message GitHubCommitsStatusesCodeOfConduct {
+  string key = 1;
+  string name = 2;
+  string url = 3;
+  string body = 4;
+  string html_url = 5;
+}
+
+message GitHubCommitsStatusesMinimalRepository {
+  message Permissions {
+    bool admin = 1;
+    bool maintain = 2;
+    bool push = 3;
+    bool triage = 4;
+    bool pull = 5;
+  }
+  message License {
+    string key = 1;
+    string name = 2;
+    string spdx_id = 3;
+    string url = 4;
+    string node_id = 5;
+  }
+  message SecurityAndAnalysis {
+    message AdvancedSecurity {
+      string status = 1;
+    }
+    message CodeSecurity {
+      string status = 1;
+    }
+    message DependabotSecurityUpdates {
+      string status = 1;
+    }
+    message SecretScanning {
+      string status = 1;
+    }
+    message SecretScanningPushProtection {
+      string status = 1;
+    }
+    message SecretScanningNonProviderPatterns {
+      string status = 1;
+    }
+    message SecretScanningAiDetection {
+      string status = 1;
+    }
+    message SecretScanningDelegatedAlertDismissal {
+      string status = 1;
+    }
+    message SecretScanningDelegatedBypass {
+      string status = 1;
+    }
+    message SecretScanningDelegatedBypassOptions {
+      message Reviewers {
+        int64 reviewer_id = 1;
+        string reviewer_type = 2;
+        string mode = 3;
+      }
+      repeated Reviewers reviewers = 1;
+    }
+    AdvancedSecurity advanced_security = 1;
+    CodeSecurity code_security = 2;
+    DependabotSecurityUpdates dependabot_security_updates = 3;
+    SecretScanning secret_scanning = 4;
+    SecretScanningPushProtection secret_scanning_push_protection = 5;
+    SecretScanningNonProviderPatterns secret_scanning_non_provider_patterns = 6;
+    SecretScanningAiDetection secret_scanning_ai_detection = 7;
+    SecretScanningDelegatedAlertDismissal secret_scanning_delegated_alert_dismissal = 8;
+    SecretScanningDelegatedBypass secret_scanning_delegated_bypass = 9;
+    SecretScanningDelegatedBypassOptions secret_scanning_delegated_bypass_options = 10;
+  }
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string full_name = 4;
+  GitHubCommitsStatusesSimpleUser owner = 5;
+  bool private = 6;
+  string html_url = 7;
+  string description = 8;
+  bool fork = 9;
+  string url = 10;
+  string archive_url = 11;
+  string assignees_url = 12;
+  string blobs_url = 13;
+  string branches_url = 14;
+  string collaborators_url = 15;
+  string comments_url = 16;
+  string commits_url = 17;
+  string compare_url = 18;
+  string contents_url = 19;
+  string contributors_url = 20;
+  string deployments_url = 21;
+  string downloads_url = 22;
+  string events_url = 23;
+  string forks_url = 24;
+  string git_commits_url = 25;
+  string git_refs_url = 26;
+  string git_tags_url = 27;
+  string git_url = 28;
+  string issue_comment_url = 29;
+  string issue_events_url = 30;
+  string issues_url = 31;
+  string keys_url = 32;
+  string labels_url = 33;
+  string languages_url = 34;
+  string merges_url = 35;
+  string milestones_url = 36;
+  string notifications_url = 37;
+  string pulls_url = 38;
+  string releases_url = 39;
+  string ssh_url = 40;
+  string stargazers_url = 41;
+  string statuses_url = 42;
+  string subscribers_url = 43;
+  string subscription_url = 44;
+  string tags_url = 45;
+  string teams_url = 46;
+  string trees_url = 47;
+  string clone_url = 48;
+  string mirror_url = 49;
+  string hooks_url = 50;
+  string svn_url = 51;
+  string homepage = 52;
+  string language = 53;
+  int64 forks_count = 54;
+  int64 stargazers_count = 55;
+  int64 watchers_count = 56;
+  int64 size = 57;
+  string default_branch = 58;
+  int64 open_issues_count = 59;
+  bool is_template = 60;
+  repeated string topics = 61;
+  bool has_issues = 62;
+  bool has_projects = 63;
+  bool has_wiki = 64;
+  bool has_pages = 65;
+  bool has_discussions = 66;
+  bool has_pull_requests = 67;
+  string pull_request_creation_policy = 68;
+  bool archived = 69;
+  bool disabled = 70;
+  string visibility = 71;
+  string pushed_at = 72;
+  string created_at = 73;
+  string updated_at = 74;
+  Permissions permissions = 75;
+  string role_name = 76;
+  string temp_clone_token = 77;
+  bool delete_branch_on_merge = 78;
+  int64 subscribers_count = 79;
+  int64 network_count = 80;
+  GitHubCommitsStatusesCodeOfConduct code_of_conduct = 81;
+  License license = 82;
+  int64 forks = 83;
+  int64 open_issues = 84;
+  int64 watchers = 85;
+  bool allow_forking = 86;
+  bool web_commit_signoff_required = 87;
+  SecurityAndAnalysis security_and_analysis = 88;
+  google.protobuf.Struct custom_properties = 89;
+}
+
+message GitHubCommitsStatusesStatus {
+  string url = 1;
+  string avatar_url = 2;
+  int64 id = 3;
+  string node_id = 4;
+  string state = 5;
+  string description = 6;
+  string target_url = 7;
+  string context = 8;
+  string created_at = 9;
+  string updated_at = 10;
+  GitHubCommitsStatusesSimpleUser creator = 11;
+}

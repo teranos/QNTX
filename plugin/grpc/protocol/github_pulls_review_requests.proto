@@ -1,0 +1,333 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10
+
+message GitHubPullsReviewRequestsGetAllRequestedReviewersForAPullRequestRequest {
+  string namespace = 1;
+}
+
+message GitHubPullsReviewRequestsGetAllRequestedReviewersForAPullRequestResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubPullsReviewRequestsSimpleUser users = 3;
+  repeated GitHubPullsReviewRequestsTeam teams = 4;
+}
+
+message GitHubPullsReviewRequestsRequestReviewersForAPullRequestRequest {
+  string namespace = 1;
+}
+
+message GitHubPullsReviewRequestsRequestReviewersForAPullRequestResponse {
+  message Labels {
+    int64 id = 1;
+    string node_id = 2;
+    string url = 3;
+    string name = 4;
+    string description = 5;
+    string color = 6;
+    bool default = 7;
+    GitHubPullsReviewRequestsSimpleUser archived_by = 8;
+  }
+  message Head {
+    string label = 1;
+    string ref = 2;
+    GitHubPullsReviewRequestsRepository repo = 3;
+    string sha = 4;
+    GitHubPullsReviewRequestsSimpleUser user = 5;
+  }
+  message Base {
+    string label = 1;
+    string ref = 2;
+    GitHubPullsReviewRequestsRepository repo = 3;
+    string sha = 4;
+    GitHubPullsReviewRequestsSimpleUser user = 5;
+  }
+  message Links {
+    GitHubPullsReviewRequestsLink comments = 1;
+    GitHubPullsReviewRequestsLink commits = 2;
+    GitHubPullsReviewRequestsLink statuses = 3;
+    GitHubPullsReviewRequestsLink html = 4;
+    GitHubPullsReviewRequestsLink issue = 5;
+    GitHubPullsReviewRequestsLink review_comments = 6;
+    GitHubPullsReviewRequestsLink review_comment = 7;
+    GitHubPullsReviewRequestsLink self = 8;
+  }
+  bool success = 1;
+  string error = 2;
+  string url = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string html_url = 6;
+  string diff_url = 7;
+  string patch_url = 8;
+  string issue_url = 9;
+  string commits_url = 10;
+  string review_comments_url = 11;
+  string review_comment_url = 12;
+  string comments_url = 13;
+  string statuses_url = 14;
+  int64 number = 15;
+  string state = 16;
+  bool locked = 17;
+  string title = 18;
+  GitHubPullsReviewRequestsSimpleUser user = 19;
+  string body = 20;
+  repeated Labels labels = 21;
+  GitHubPullsReviewRequestsMilestone milestone = 22;
+  string active_lock_reason = 23;
+  string created_at = 24;
+  string updated_at = 25;
+  string closed_at = 26;
+  string merged_at = 27;
+  repeated GitHubPullsReviewRequestsSimpleUser assignees = 28;
+  repeated GitHubPullsReviewRequestsSimpleUser requested_reviewers = 29;
+  repeated GitHubPullsReviewRequestsTeam requested_teams = 30;
+  Head head = 31;
+  Base base = 32;
+  Links _links = 33;
+  string author_association = 34;
+  GitHubPullsReviewRequestsAutoMerge auto_merge = 35;
+  GitHubPullsReviewRequestsPullRequestStack stack = 36;
+  bool draft = 37;
+}
+
+message GitHubPullsReviewRequestsRemoveRequestedReviewersFromAPullRequestRequest {
+  string namespace = 1;
+}
+
+message GitHubPullsReviewRequestsSimpleUser {
+  string name = 1;
+  string email = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string avatar_url = 6;
+  string gravatar_id = 7;
+  string url = 8;
+  string html_url = 9;
+  string followers_url = 10;
+  string following_url = 11;
+  string gists_url = 12;
+  string starred_url = 13;
+  string subscriptions_url = 14;
+  string organizations_url = 15;
+  string repos_url = 16;
+  string events_url = 17;
+  string received_events_url = 18;
+  string type = 19;
+  bool site_admin = 20;
+  string starred_at = 21;
+  string user_view_type = 22;
+}
+
+message GitHubPullsReviewRequestsTeamSimple {
+  int64 id = 1;
+  string node_id = 2;
+  string url = 3;
+  string members_url = 4;
+  string name = 5;
+  string description = 6;
+  string permission = 7;
+  string privacy = 8;
+  string notification_setting = 9;
+  string html_url = 10;
+  string repositories_url = 11;
+  string slug = 12;
+  string ldap_dn = 13;
+  string type = 14;
+  int64 organization_id = 15;
+  int64 enterprise_id = 16;
+}
+
+message GitHubPullsReviewRequestsTeam {
+  message Permissions {
+    bool pull = 1;
+    bool triage = 2;
+    bool push = 3;
+    bool maintain = 4;
+    bool admin = 5;
+  }
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string slug = 4;
+  string description = 5;
+  string privacy = 6;
+  string notification_setting = 7;
+  string permission = 8;
+  Permissions permissions = 9;
+  string url = 10;
+  string html_url = 11;
+  string members_url = 12;
+  string repositories_url = 13;
+  string type = 14;
+  string access_source = 15;
+  int64 organization_id = 16;
+  int64 enterprise_id = 17;
+  GitHubPullsReviewRequestsTeamSimple parent = 18;
+}
+
+message GitHubPullsReviewRequestsMilestone {
+  string url = 1;
+  string html_url = 2;
+  string labels_url = 3;
+  int64 id = 4;
+  string node_id = 5;
+  int64 number = 6;
+  string state = 7;
+  string title = 8;
+  string description = 9;
+  GitHubPullsReviewRequestsSimpleUser creator = 10;
+  int64 open_issues = 11;
+  int64 closed_issues = 12;
+  string created_at = 13;
+  string updated_at = 14;
+  string closed_at = 15;
+  string due_on = 16;
+}
+
+message GitHubPullsReviewRequestsLicenseSimple {
+  string key = 1;
+  string name = 2;
+  string url = 3;
+  string spdx_id = 4;
+  string node_id = 5;
+  string html_url = 6;
+}
+
+message GitHubPullsReviewRequestsRepository {
+  message Permissions {
+    bool admin = 1;
+    bool pull = 2;
+    bool triage = 3;
+    bool push = 4;
+    bool maintain = 5;
+  }
+  message CodeSearchIndexStatus {
+    bool lexical_search_ok = 1;
+    string lexical_commit_sha = 2;
+  }
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string full_name = 4;
+  GitHubPullsReviewRequestsLicenseSimple license = 5;
+  int64 forks = 6;
+  Permissions permissions = 7;
+  GitHubPullsReviewRequestsSimpleUser owner = 8;
+  bool private = 9;
+  string html_url = 10;
+  string description = 11;
+  bool fork = 12;
+  string url = 13;
+  string archive_url = 14;
+  string assignees_url = 15;
+  string blobs_url = 16;
+  string branches_url = 17;
+  string collaborators_url = 18;
+  string comments_url = 19;
+  string commits_url = 20;
+  string compare_url = 21;
+  string contents_url = 22;
+  string contributors_url = 23;
+  string deployments_url = 24;
+  string downloads_url = 25;
+  string events_url = 26;
+  string forks_url = 27;
+  string git_commits_url = 28;
+  string git_refs_url = 29;
+  string git_tags_url = 30;
+  string git_url = 31;
+  string issue_comment_url = 32;
+  string issue_events_url = 33;
+  string issues_url = 34;
+  string keys_url = 35;
+  string labels_url = 36;
+  string languages_url = 37;
+  string merges_url = 38;
+  string milestones_url = 39;
+  string notifications_url = 40;
+  string pulls_url = 41;
+  string releases_url = 42;
+  string ssh_url = 43;
+  string stargazers_url = 44;
+  string statuses_url = 45;
+  string subscribers_url = 46;
+  string subscription_url = 47;
+  string tags_url = 48;
+  string teams_url = 49;
+  string trees_url = 50;
+  string clone_url = 51;
+  string mirror_url = 52;
+  string hooks_url = 53;
+  string svn_url = 54;
+  string homepage = 55;
+  string language = 56;
+  int64 forks_count = 57;
+  int64 stargazers_count = 58;
+  int64 watchers_count = 59;
+  int64 size = 60;
+  string default_branch = 61;
+  int64 open_issues_count = 62;
+  bool is_template = 63;
+  repeated string topics = 64;
+  bool has_issues = 65;
+  bool has_projects = 66;
+  bool has_wiki = 67;
+  bool has_pages = 68;
+  bool has_discussions = 69;
+  bool has_pull_requests = 70;
+  string pull_request_creation_policy = 71;
+  bool archived = 72;
+  bool disabled = 73;
+  string visibility = 74;
+  string pushed_at = 75;
+  string created_at = 76;
+  string updated_at = 77;
+  bool allow_rebase_merge = 78;
+  string temp_clone_token = 79;
+  bool allow_squash_merge = 80;
+  bool allow_auto_merge = 81;
+  bool delete_branch_on_merge = 82;
+  bool allow_update_branch = 83;
+  string squash_merge_commit_title = 84;
+  string squash_merge_commit_message = 85;
+  string merge_commit_title = 86;
+  string merge_commit_message = 87;
+  bool allow_merge_commit = 88;
+  bool allow_forking = 89;
+  bool web_commit_signoff_required = 90;
+  int64 open_issues = 91;
+  int64 watchers = 92;
+  string starred_at = 93;
+  bool anonymous_access_enabled = 94;
+  CodeSearchIndexStatus code_search_index_status = 95;
+}
+
+message GitHubPullsReviewRequestsLink {
+  string href = 1;
+}
+
+message GitHubPullsReviewRequestsAutoMerge {
+  GitHubPullsReviewRequestsSimpleUser enabled_by = 1;
+  string merge_method = 2;
+  string commit_title = 3;
+  string commit_message = 4;
+}
+
+message GitHubPullsReviewRequestsPullRequestStack {
+  message Base {
+    string ref = 1;
+    string sha = 2;
+  }
+  Base base = 1;
+  int64 size = 2;
+  int64 position = 3;
+  int64 id = 4;
+  int64 number = 5;
+}

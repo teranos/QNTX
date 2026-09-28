@@ -1,0 +1,222 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10
+
+message GitHubPullsCommentsListReviewCommentsInARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string sort = 4;
+  string direction = 5;
+  string since = 6;
+  int64 per_page = 7;
+  int64 page = 8;
+}
+
+message GitHubPullsCommentsListReviewCommentsInARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubPullsCommentsPullRequestReviewComment items = 3;
+}
+
+message GitHubPullsCommentsGetAReviewCommentForAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 comment_id = 4;
+}
+
+message GitHubPullsCommentsGetAReviewCommentForAPullRequestResponse {
+  message Links {
+    message Self {
+      string href = 1;
+    }
+    message Html {
+      string href = 1;
+    }
+    message PullRequest {
+      string href = 1;
+    }
+    Self self = 1;
+    Html html = 2;
+    PullRequest pull_request = 3;
+  }
+  bool success = 1;
+  string error = 2;
+  string url = 3;
+  int64 pull_request_review_id = 4;
+  int64 id = 5;
+  string node_id = 6;
+  string diff_hunk = 7;
+  string path = 8;
+  int64 position = 9;
+  int64 original_position = 10;
+  string commit_id = 11;
+  string original_commit_id = 12;
+  int64 in_reply_to_id = 13;
+  GitHubPullsCommentsSimpleUser user = 14;
+  string body = 15;
+  string created_at = 16;
+  string updated_at = 17;
+  string html_url = 18;
+  string pull_request_url = 19;
+  string author_association = 20;
+  Links _links = 21;
+  int64 start_line = 22;
+  int64 original_start_line = 23;
+  string start_side = 24;
+  int64 line = 25;
+  int64 original_line = 26;
+  string side = 27;
+  string subject_type = 28;
+  GitHubPullsCommentsReactionRollup reactions = 29;
+  string body_html = 30;
+  string body_text = 31;
+}
+
+message GitHubPullsCommentsUpdateAReviewCommentForAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 comment_id = 4;
+  string body = 5;
+}
+
+message GitHubPullsCommentsDeleteAReviewCommentForAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 comment_id = 4;
+}
+
+message GitHubPullsCommentsDeleteAReviewCommentForAPullRequestResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message GitHubPullsCommentsListReviewCommentsOnAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  string sort = 5;
+  string direction = 6;
+  string since = 7;
+  int64 per_page = 8;
+  int64 page = 9;
+}
+
+message GitHubPullsCommentsCreateAReviewCommentForAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  string body = 5;
+  string commit_id = 6;
+  string path = 7;
+  int64 position = 8;
+  string side = 9;
+  int64 line = 10;
+  int64 start_line = 11;
+  string start_side = 12;
+  int64 in_reply_to = 13;
+  string subject_type = 14;
+}
+
+message GitHubPullsCommentsCreateAReplyForAReviewCommentRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  int64 comment_id = 5;
+  string body = 6;
+}
+
+message GitHubPullsCommentsSimpleUser {
+  string name = 1;
+  string email = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string avatar_url = 6;
+  string gravatar_id = 7;
+  string url = 8;
+  string html_url = 9;
+  string followers_url = 10;
+  string following_url = 11;
+  string gists_url = 12;
+  string starred_url = 13;
+  string subscriptions_url = 14;
+  string organizations_url = 15;
+  string repos_url = 16;
+  string events_url = 17;
+  string received_events_url = 18;
+  string type = 19;
+  bool site_admin = 20;
+  string starred_at = 21;
+  string user_view_type = 22;
+}
+
+message GitHubPullsCommentsReactionRollup {
+  string url = 1;
+  int64 total_count = 2;
+  int64 plus_1 = 3 [json_name = "+1"];
+  int64 minus_1 = 4 [json_name = "-1"];
+  int64 laugh = 5;
+  int64 confused = 6;
+  int64 heart = 7;
+  int64 hooray = 8;
+  int64 eyes = 9;
+  int64 rocket = 10;
+}
+
+message GitHubPullsCommentsPullRequestReviewComment {
+  message Links {
+    message Self {
+      string href = 1;
+    }
+    message Html {
+      string href = 1;
+    }
+    message PullRequest {
+      string href = 1;
+    }
+    Self self = 1;
+    Html html = 2;
+    PullRequest pull_request = 3;
+  }
+  string url = 1;
+  int64 pull_request_review_id = 2;
+  int64 id = 3;
+  string node_id = 4;
+  string diff_hunk = 5;
+  string path = 6;
+  int64 position = 7;
+  int64 original_position = 8;
+  string commit_id = 9;
+  string original_commit_id = 10;
+  int64 in_reply_to_id = 11;
+  GitHubPullsCommentsSimpleUser user = 12;
+  string body = 13;
+  string created_at = 14;
+  string updated_at = 15;
+  string html_url = 16;
+  string pull_request_url = 17;
+  string author_association = 18;
+  Links _links = 19;
+  int64 start_line = 20;
+  int64 original_start_line = 21;
+  string start_side = 22;
+  int64 line = 23;
+  int64 original_line = 24;
+  string side = 25;
+  string subject_type = 26;
+  GitHubPullsCommentsReactionRollup reactions = 27;
+  string body_html = 28;
+  string body_text = 29;
+}
