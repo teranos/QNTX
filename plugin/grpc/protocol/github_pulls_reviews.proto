@@ -1,0 +1,246 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10
+
+// GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+message GitHubListReviewsForAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  int64 per_page = 5;
+  int64 page = 6;
+}
+
+message GitHubListReviewsForAPullRequestResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubPullsReviewsPullRequestReview items = 3;
+}
+
+// POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+message GitHubCreateAReviewForAPullRequestRequest {
+  message Comments {
+    string path = 1;
+    int64 position = 2;
+    string body = 3;
+    int64 line = 4;
+    string side = 5;
+    int64 start_line = 6;
+    string start_side = 7;
+  }
+
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  string commit_id = 5;
+  string body = 6;
+  string event = 7;
+  repeated Comments comments = 8;
+}
+
+message GitHubCreateAReviewForAPullRequestResponse {
+  bool success = 1;
+  string error = 2;
+  int64 id = 3;
+  string node_id = 4;
+  GitHubPullsReviewsSimpleUser user = 5;
+  string body = 6;
+  string state = 7;
+  string html_url = 8;
+  string pull_request_url = 9;
+  GitHubPullsReviewsPullRequestReview.Links _links = 10;
+  string submitted_at = 11;
+  string commit_id = 12;
+  string body_html = 13;
+  string body_text = 14;
+  string author_association = 15;
+}
+
+// GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}
+// Response: same response schema as Create a review for a pull request.
+message GitHubGetAReviewForAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  int64 review_id = 5;
+}
+
+// PUT /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}
+// Response: same response schema as Create a review for a pull request.
+message GitHubUpdateAReviewForAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  int64 review_id = 5;
+  string body = 6;
+}
+
+// DELETE /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}
+// Response: same response schema as Create a review for a pull request.
+message GitHubDeleteAPendingReviewForAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  int64 review_id = 5;
+}
+
+// GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments
+message GitHubListCommentsForAPullRequestReviewRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  int64 review_id = 5;
+  int64 per_page = 6;
+  int64 page = 7;
+}
+
+message GitHubListCommentsForAPullRequestReviewResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubPullsReviewsLegacyReviewComment items = 3;
+}
+
+// PUT /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/dismissals
+// Response: same response schema as Create a review for a pull request.
+message GitHubDismissAReviewForAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  int64 review_id = 5;
+  string message = 6;
+  string event = 7;
+}
+
+// POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/events
+// Response: same response schema as Create a review for a pull request.
+message GitHubSubmitAReviewForAPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 pull_number = 4;
+  int64 review_id = 5;
+  string body = 6;
+  string event = 7;
+}
+
+// Pull Request Review
+message GitHubPullsReviewsPullRequestReview {
+  message Links {
+    message Href {
+      string href = 1;
+    }
+
+    Href html = 1;
+    Href pull_request = 2;
+  }
+
+  int64 id = 1;
+  string node_id = 2;
+  GitHubPullsReviewsSimpleUser user = 3;
+  string body = 4;
+  string state = 5;
+  string html_url = 6;
+  string pull_request_url = 7;
+  Links _links = 8;
+  string submitted_at = 9;
+  string commit_id = 10;
+  string body_html = 11;
+  string body_text = 12;
+  string author_association = 13;
+}
+
+// Legacy Review Comment
+message GitHubPullsReviewsLegacyReviewComment {
+  message Links {
+    GitHubPullsReviewsLink self = 1;
+    GitHubPullsReviewsLink html = 2;
+    GitHubPullsReviewsLink pull_request = 3;
+  }
+
+  string url = 1;
+  int64 pull_request_review_id = 2;
+  int64 id = 3;
+  string node_id = 4;
+  string diff_hunk = 5;
+  string path = 6;
+  int64 position = 7;
+  int64 original_position = 8;
+  string commit_id = 9;
+  string original_commit_id = 10;
+  int64 in_reply_to_id = 11;
+  GitHubPullsReviewsSimpleUser user = 12;
+  string body = 13;
+  string created_at = 14;
+  string updated_at = 15;
+  string html_url = 16;
+  string pull_request_url = 17;
+  string author_association = 18;
+  Links _links = 19;
+  string body_text = 20;
+  string body_html = 21;
+  GitHubPullsReviewsReactionRollup reactions = 22;
+  string side = 23;
+  string start_side = 24;
+  int64 line = 25;
+  int64 original_line = 26;
+  int64 start_line = 27;
+  int64 original_start_line = 28;
+  string subject_type = 29;
+}
+
+// Simple User
+message GitHubPullsReviewsSimpleUser {
+  string name = 1;
+  string email = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string avatar_url = 6;
+  string gravatar_id = 7;
+  string url = 8;
+  string html_url = 9;
+  string followers_url = 10;
+  string following_url = 11;
+  string gists_url = 12;
+  string starred_url = 13;
+  string subscriptions_url = 14;
+  string organizations_url = 15;
+  string repos_url = 16;
+  string events_url = 17;
+  string received_events_url = 18;
+  string type = 19;
+  bool site_admin = 20;
+  string starred_at = 21;
+  string user_view_type = 22;
+}
+
+// Link
+message GitHubPullsReviewsLink {
+  string href = 1;
+}
+
+// Reaction Rollup
+message GitHubPullsReviewsReactionRollup {
+  string url = 1;
+  int64 total_count = 2;
+  int64 plus_1 = 3 [json_name = "+1"];
+  int64 minus_1 = 4 [json_name = "-1"];
+  int64 laugh = 5;
+  int64 confused = 6;
+  int64 heart = 7;
+  int64 hooray = 8;
+  int64 eyes = 9;
+  int64 rocket = 10;
+}

@@ -1,0 +1,427 @@
+syntax = "proto3";
+
+package protocol;
+
+import "plugin/grpc/protocol/github_commits_statuses.proto";
+import "plugin/grpc/protocol/github_commits_comments.proto";
+import "plugin/grpc/protocol/github_commits_commits.proto";
+import "plugin/grpc/protocol/github_branches_branches.proto";
+import "plugin/grpc/protocol/github_pulls_review_requests.proto";
+import "plugin/grpc/protocol/github_pulls_reviews.proto";
+import "plugin/grpc/protocol/github_pulls_comments.proto";
+import "plugin/grpc/protocol/github_pulls_pulls.proto";
+import "plugin/grpc/protocol/github_actions_workflows.proto";
+import "plugin/grpc/protocol/github_actions_workflow_jobs.proto";
+import "plugin/grpc/protocol/github_actions_artifacts.proto";
+import "plugin/grpc/protocol/github_actions_workflow_runs.proto";
+import "plugin/grpc/protocol/github_checks_runs.proto";
+import "plugin/grpc/protocol/github_checks_suites.proto";
+import "plugin/grpc/protocol/github_issues_comments.proto";
+import "plugin/grpc/protocol/github_orgs_members.proto";
+import "plugin/grpc/protocol/github_orgs_orgs.proto";
+import "plugin/grpc/protocol/github_issues_issues.proto";
+import "plugin/grpc/protocol/github_repos_repos.proto";
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043: GitHubService
+service GitHubService {
+  // https://docs.github.com/en/rest/rate-limit/rate-limit?apiVersion=2026-03-10
+  rpc RateLimit(GitHubRateLimitRequest) returns (GitHubRateLimitResponse);
+
+  // https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10#get-the-combined-status-for-a-specific-reference
+  rpc GetTheCombinedStatusForASpecificReference(GitHubGetTheCombinedStatusForASpecificReferenceRequest) returns (GitHubGetTheCombinedStatusForASpecificReferenceResponse);
+  // https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10#list-commit-statuses-for-a-reference
+  rpc ListCommitStatusesForAReference(GitHubListCommitStatusesForAReferenceRequest) returns (GitHubListCommitStatusesForAReferenceResponse);
+  // https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10#create-a-commit-status
+  rpc CreateACommitStatus(GitHubCreateACommitStatusRequest) returns (GitHubCreateACommitStatusResponse);
+
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#list-commit-comments-for-a-repository
+  rpc ListCommitCommentsForARepository(GitHubListCommitCommentsForARepositoryRequest) returns (GitHubListCommitCommentsForARepositoryResponse);
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#get-a-commit-comment
+  rpc GetACommitComment(GitHubGetACommitCommentRequest) returns (GitHubGetACommitCommentResponse);
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#update-a-commit-comment
+  rpc UpdateACommitComment(GitHubUpdateACommitCommentRequest) returns (GitHubGetACommitCommentResponse);
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#delete-a-commit-comment
+  rpc DeleteACommitComment(GitHubDeleteACommitCommentRequest) returns (GitHubDeleteACommitCommentResponse);
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#list-commit-comments
+  rpc ListCommitComments(GitHubListCommitCommentsRequest) returns (GitHubListCommitCommentsForARepositoryResponse);
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#create-a-commit-comment
+  rpc CreateACommitComment(GitHubCreateACommitCommentRequest) returns (GitHubGetACommitCommentResponse);
+
+  // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-commits
+  rpc ListCommits(GitHubListCommitsRequest) returns (GitHubListCommitsResponse);
+  // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-branches-for-head-commit
+  rpc ListBranchesForHEADCommit(GitHubListBranchesForHEADCommitRequest) returns (GitHubListBranchesForHEADCommitResponse);
+  // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-pull-requests-associated-with-a-commit
+  rpc ListPullRequestsAssociatedWithACommit(GitHubListPullRequestsAssociatedWithACommitRequest) returns (GitHubListPullRequestsAssociatedWithACommitResponse);
+  // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#get-a-commit
+  rpc GetACommit(GitHubGetACommitRequest) returns (GitHubGetACommitResponse);
+  // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#compare-two-commits
+  rpc CompareTwoCommits(GitHubCompareTwoCommitsRequest) returns (GitHubCompareTwoCommitsResponse);
+
+  // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#list-branches
+  rpc ListBranches(GitHubListBranchesRequest) returns (GitHubListBranchesResponse);
+  // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#get-a-branch
+  rpc GetABranch(GitHubGetABranchRequest) returns (GitHubGetABranchResponse);
+  // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#rename-a-branch
+  rpc RenameABranch(GitHubRenameABranchRequest) returns (GitHubGetABranchResponse);
+  // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#sync-a-fork-branch-with-the-upstream-repository
+  rpc SyncAForkBranchWithTheUpstreamRepository(GitHubSyncAForkBranchWithTheUpstreamRepositoryRequest) returns (GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse);
+  // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#merge-a-branch
+  rpc MergeABranch(GitHubMergeABranchRequest) returns (GitHubMergeABranchResponse);
+
+  // https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10#get-all-requested-reviewers-for-a-pull-request
+  rpc GetAllRequestedReviewersForAPullRequest(GitHubGetAllRequestedReviewersForAPullRequestRequest) returns (GitHubGetAllRequestedReviewersForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10#request-reviewers-for-a-pull-request
+  rpc RequestReviewersForAPullRequest(GitHubRequestReviewersForAPullRequestRequest) returns (GitHubRequestReviewersForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10#remove-requested-reviewers-from-a-pull-request
+  rpc RemoveRequestedReviewersFromAPullRequest(GitHubRemoveRequestedReviewersFromAPullRequestRequest) returns (GitHubRequestReviewersForAPullRequestResponse);
+
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#list-reviews-for-a-pull-request
+  rpc ListReviewsForAPullRequest(GitHubListReviewsForAPullRequestRequest) returns (GitHubListReviewsForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#create-a-review-for-a-pull-request
+  rpc CreateAReviewForAPullRequest(GitHubCreateAReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#get-a-review-for-a-pull-request
+  rpc GetAReviewForAPullRequest(GitHubGetAReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#update-a-review-for-a-pull-request
+  rpc UpdateAReviewForAPullRequest(GitHubUpdateAReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#delete-a-pending-review-for-a-pull-request
+  rpc DeleteAPendingReviewForAPullRequest(GitHubDeleteAPendingReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#list-comments-for-a-pull-request-review
+  rpc ListCommentsForAPullRequestReview(GitHubListCommentsForAPullRequestReviewRequest) returns (GitHubListCommentsForAPullRequestReviewResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#dismiss-a-review-for-a-pull-request
+  rpc DismissAReviewForAPullRequest(GitHubDismissAReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#submit-a-review-for-a-pull-request
+  rpc SubmitAReviewForAPullRequest(GitHubSubmitAReviewForAPullRequestRequest) returns (GitHubCreateAReviewForAPullRequestResponse);
+
+  // https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#list-review-comments-in-a-repository
+  rpc ListReviewCommentsInARepository(GitHubListReviewCommentsInARepositoryRequest) returns (GitHubListReviewCommentsInARepositoryResponse);
+  // https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#get-a-review-comment-for-a-pull-request
+  rpc GetAReviewCommentForAPullRequest(GitHubGetAReviewCommentForAPullRequestRequest) returns (GitHubGetAReviewCommentForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#update-a-review-comment-for-a-pull-request
+  rpc UpdateAReviewCommentForAPullRequest(GitHubUpdateAReviewCommentForAPullRequestRequest) returns (GitHubGetAReviewCommentForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#delete-a-review-comment-for-a-pull-request
+  rpc DeleteAReviewCommentForAPullRequest(GitHubDeleteAReviewCommentForAPullRequestRequest) returns (GitHubDeleteAReviewCommentForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#list-review-comments-on-a-pull-request
+  rpc ListReviewCommentsOnAPullRequest(GitHubListReviewCommentsOnAPullRequestRequest) returns (GitHubListReviewCommentsInARepositoryResponse);
+  // https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#create-a-review-comment-for-a-pull-request
+  rpc CreateAReviewCommentForAPullRequest(GitHubCreateAReviewCommentForAPullRequestRequest) returns (GitHubGetAReviewCommentForAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#create-a-reply-for-a-review-comment
+  rpc CreateAReplyForAReviewComment(GitHubCreateAReplyForAReviewCommentRequest) returns (GitHubGetAReviewCommentForAPullRequestResponse);
+
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-pull-requests
+  rpc ListPullRequests(GitHubListPullRequestsRequest) returns (GitHubListPullRequestsResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#create-a-pull-request
+  rpc CreateAPullRequest(GitHubCreateAPullRequestRequest) returns (GitHubCreateAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#get-a-pull-request
+  rpc GetAPullRequest(GitHubGetAPullRequestRequest) returns (GitHubCreateAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#update-a-pull-request
+  rpc UpdateAPullRequest(GitHubUpdateAPullRequestRequest) returns (GitHubCreateAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-commits-on-a-pull-request
+  rpc ListCommitsOnAPullRequest(GitHubListCommitsOnAPullRequestRequest) returns (GitHubListCommitsOnAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-pull-requests-files
+  rpc ListPullRequestsFiles(GitHubListPullRequestsFilesRequest) returns (GitHubListPullRequestsFilesResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#check-if-a-pull-request-has-been-merged
+  rpc CheckIfAPullRequestHasBeenMerged(GitHubCheckIfAPullRequestHasBeenMergedRequest) returns (GitHubCheckIfAPullRequestHasBeenMergedResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#merge-a-pull-request
+  rpc MergeAPullRequest(GitHubMergeAPullRequestRequest) returns (GitHubMergeAPullRequestResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#merge-a-pull-request-asynchronously
+  rpc MergeAPullRequestAsynchronously(GitHubMergeAPullRequestAsynchronouslyRequest) returns (GitHubMergeAPullRequestAsynchronouslyResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#get-the-result-of-an-asynchronous-merge
+  rpc GetTheResultOfAnAsynchronousMerge(GitHubGetTheResultOfAnAsynchronousMergeRequest) returns (GitHubMergeAPullRequestAsynchronouslyResponse);
+  // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#update-a-pull-request-branch
+  rpc UpdateAPullRequestBranch(GitHubUpdateAPullRequestBranchRequest) returns (GitHubUpdateAPullRequestBranchResponse);
+
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#list-repository-workflows
+  rpc ListRepositoryWorkflows(GitHubListRepositoryWorkflowsRequest) returns (GitHubListRepositoryWorkflowsResponse);
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#get-a-workflow
+  rpc GetAWorkflow(GitHubGetAWorkflowRequest) returns (GitHubGetAWorkflowResponse);
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#disable-a-workflow
+  rpc DisableAWorkflow(GitHubDisableAWorkflowRequest) returns (GitHubDisableAWorkflowResponse);
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#create-a-workflow-dispatch-event
+  rpc CreateAWorkflowDispatchEvent(GitHubCreateAWorkflowDispatchEventRequest) returns (GitHubCreateAWorkflowDispatchEventResponse);
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#enable-a-workflow
+  rpc EnableAWorkflow(GitHubEnableAWorkflowRequest) returns (GitHubEnableAWorkflowResponse);
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#get-workflow-usage
+  rpc GetWorkflowUsage(GitHubGetWorkflowUsageRequest) returns (GitHubGetWorkflowUsageResponse);
+
+  // https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#get-a-job-for-a-workflow-run
+  rpc GetAJobForAWorkflowRun(GitHubGetAJobForAWorkflowRunRequest) returns (GitHubGetAJobForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#download-job-logs-for-a-workflow-run
+  rpc DownloadJobLogsForAWorkflowRun(GitHubDownloadJobLogsForAWorkflowRunRequest) returns (GitHubDownloadJobLogsForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#list-jobs-for-a-workflow-run-attempt
+  rpc ListJobsForAWorkflowRunAttempt(GitHubListJobsForAWorkflowRunAttemptRequest) returns (GitHubListJobsForAWorkflowRunAttemptResponse);
+  // https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#list-jobs-for-a-workflow-run
+  rpc ListJobsForAWorkflowRun(GitHubListJobsForAWorkflowRunRequest) returns (GitHubListJobsForAWorkflowRunAttemptResponse);
+
+  // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#list-artifacts-for-a-repository
+  rpc ListArtifactsForARepository(GitHubListArtifactsForARepositoryRequest) returns (GitHubListArtifactsForARepositoryResponse);
+  // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#get-an-artifact
+  rpc GetAnArtifact(GitHubGetAnArtifactRequest) returns (GitHubGetAnArtifactResponse);
+  // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#delete-an-artifact
+  rpc DeleteAnArtifact(GitHubDeleteAnArtifactRequest) returns (GitHubDeleteAnArtifactResponse);
+  // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#download-an-artifact
+  rpc DownloadAnArtifact(GitHubDownloadAnArtifactRequest) returns (GitHubDownloadAnArtifactResponse);
+  // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#list-workflow-run-artifacts
+  rpc ListWorkflowRunArtifacts(GitHubListWorkflowRunArtifactsRequest) returns (GitHubListArtifactsForARepositoryResponse);
+
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#re-run-a-job-from-a-workflow-run
+  rpc ReRunAJobFromAWorkflowRun(GitHubReRunAJobFromAWorkflowRunRequest) returns (GitHubReRunAJobFromAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#list-workflow-runs-for-a-repository
+  rpc ListWorkflowRunsForARepository(GitHubListWorkflowRunsForARepositoryRequest) returns (GitHubListWorkflowRunsForARepositoryResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-a-workflow-run
+  rpc GetAWorkflowRun(GitHubGetAWorkflowRunRequest) returns (GitHubGetAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#delete-a-workflow-run
+  rpc DeleteAWorkflowRun(GitHubDeleteAWorkflowRunRequest) returns (GitHubDeleteAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-the-review-history-for-a-workflow-run
+  rpc GetTheReviewHistoryForAWorkflowRun(GitHubGetTheReviewHistoryForAWorkflowRunRequest) returns (GitHubGetTheReviewHistoryForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#approve-a-workflow-run-for-a-fork-pull-request
+  rpc ApproveAWorkflowRunForAForkPullRequest(GitHubApproveAWorkflowRunForAForkPullRequestRequest) returns (GitHubApproveAWorkflowRunForAForkPullRequestResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-a-workflow-run-attempt
+  rpc GetAWorkflowRunAttempt(GitHubGetAWorkflowRunAttemptRequest) returns (GitHubGetAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#download-workflow-run-attempt-logs
+  rpc DownloadWorkflowRunAttemptLogs(GitHubDownloadWorkflowRunAttemptLogsRequest) returns (GitHubDownloadWorkflowRunAttemptLogsResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#cancel-a-workflow-run
+  rpc CancelAWorkflowRun(GitHubCancelAWorkflowRunRequest) returns (GitHubCancelAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#review-custom-deployment-protection-rules-for-a-workflow-run
+  rpc ReviewCustomDeploymentProtectionRulesForAWorkflowRun(GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunRequest) returns (GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#force-cancel-a-workflow-run
+  rpc ForceCancelAWorkflowRun(GitHubForceCancelAWorkflowRunRequest) returns (GitHubForceCancelAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#download-workflow-run-logs
+  rpc DownloadWorkflowRunLogs(GitHubDownloadWorkflowRunLogsRequest) returns (GitHubDownloadWorkflowRunLogsResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#delete-workflow-run-logs
+  rpc DeleteWorkflowRunLogs(GitHubDeleteWorkflowRunLogsRequest) returns (GitHubDeleteWorkflowRunLogsResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-pending-deployments-for-a-workflow-run
+  rpc GetPendingDeploymentsForAWorkflowRun(GitHubGetPendingDeploymentsForAWorkflowRunRequest) returns (GitHubGetPendingDeploymentsForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#review-pending-deployments-for-a-workflow-run
+  rpc ReviewPendingDeploymentsForAWorkflowRun(GitHubReviewPendingDeploymentsForAWorkflowRunRequest) returns (GitHubReviewPendingDeploymentsForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#re-run-a-workflow
+  rpc ReRunAWorkflow(GitHubReRunAWorkflowRequest) returns (GitHubReRunAWorkflowResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#re-run-failed-jobs-from-a-workflow-run
+  rpc ReRunFailedJobsFromAWorkflowRun(GitHubReRunFailedJobsFromAWorkflowRunRequest) returns (GitHubReRunFailedJobsFromAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-workflow-run-usage
+  rpc GetWorkflowRunUsage(GitHubGetWorkflowRunUsageRequest) returns (GitHubGetWorkflowRunUsageResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#list-workflow-runs-for-a-workflow
+  rpc ListWorkflowRunsForAWorkflow(GitHubListWorkflowRunsForAWorkflowRequest) returns (GitHubListWorkflowRunsForARepositoryResponse);
+
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#create-a-check-run
+  rpc CreateACheckRun(GitHubCreateACheckRunRequest) returns (GitHubCreateACheckRunResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#get-a-check-run
+  rpc GetACheckRun(GitHubGetACheckRunRequest) returns (GitHubCreateACheckRunResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#update-a-check-run
+  rpc UpdateACheckRun(GitHubUpdateACheckRunRequest) returns (GitHubCreateACheckRunResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#list-check-run-annotations
+  rpc ListCheckRunAnnotations(GitHubListCheckRunAnnotationsRequest) returns (GitHubListCheckRunAnnotationsResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#rerequest-a-check-run
+  rpc RerequestACheckRun(GitHubRerequestACheckRunRequest) returns (GitHubRerequestACheckRunResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#list-check-runs-in-a-check-suite
+  rpc ListCheckRunsInACheckSuite(GitHubListCheckRunsInACheckSuiteRequest) returns (GitHubListCheckRunsInACheckSuiteResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#list-check-runs-for-a-git-reference
+  rpc ListCheckRunsForAGitReference(GitHubListCheckRunsForAGitReferenceRequest) returns (GitHubListCheckRunsInACheckSuiteResponse);
+
+  // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#create-a-check-suite
+  rpc CreateACheckSuite(GitHubCreateACheckSuiteRequest) returns (GitHubCreateACheckSuiteResponse);
+  // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#update-repository-preferences-for-check-suites
+  rpc UpdateRepositoryPreferencesForCheckSuites(GitHubUpdateRepositoryPreferencesForCheckSuitesRequest) returns (GitHubUpdateRepositoryPreferencesForCheckSuitesResponse);
+  // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#get-a-check-suite
+  rpc GetACheckSuite(GitHubGetACheckSuiteRequest) returns (GitHubCreateACheckSuiteResponse);
+  // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#rerequest-a-check-suite
+  rpc RerequestACheckSuite(GitHubRerequestACheckSuiteRequest) returns (GitHubRerequestACheckSuiteResponse);
+  // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#list-check-suites-for-a-git-reference
+  rpc ListCheckSuitesForAGitReference(GitHubListCheckSuitesForAGitReferenceRequest) returns (GitHubListCheckSuitesForAGitReferenceResponse);
+
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#list-issue-comments-for-a-repository
+  rpc ListIssueCommentsForARepository(GitHubListIssueCommentsForARepositoryRequest) returns (GitHubListIssueCommentsForARepositoryResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#get-an-issue-comment
+  rpc GetAnIssueComment(GitHubGetAnIssueCommentRequest) returns (GitHubGetAnIssueCommentResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#update-an-issue-comment
+  rpc UpdateAnIssueComment(GitHubUpdateAnIssueCommentRequest) returns (GitHubGetAnIssueCommentResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#delete-an-issue-comment
+  rpc DeleteAnIssueComment(GitHubDeleteAnIssueCommentRequest) returns (GitHubDeleteAnIssueCommentResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#pin-an-issue-comment
+  rpc PinAnIssueComment(GitHubPinAnIssueCommentRequest) returns (GitHubGetAnIssueCommentResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#unpin-an-issue-comment
+  rpc UnpinAnIssueComment(GitHubUnpinAnIssueCommentRequest) returns (GitHubUnpinAnIssueCommentResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#list-issue-comments
+  rpc ListIssueComments(GitHubListIssueCommentsRequest) returns (GitHubListIssueCommentsForARepositoryResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#create-an-issue-comment
+  rpc CreateAnIssueComment(GitHubCreateAnIssueCommentRequest) returns (GitHubGetAnIssueCommentResponse);
+
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-failed-organization-invitations
+  rpc ListFailedOrganizationInvitations(GitHubListFailedOrganizationInvitationsRequest) returns (GitHubListFailedOrganizationInvitationsResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-pending-organization-invitations
+  rpc ListPendingOrganizationInvitations(GitHubListPendingOrganizationInvitationsRequest) returns (GitHubListFailedOrganizationInvitationsResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#create-an-organization-invitation
+  rpc CreateAnOrganizationInvitation(GitHubCreateAnOrganizationInvitationRequest) returns (GitHubCreateAnOrganizationInvitationResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#cancel-an-organization-invitation
+  rpc CancelAnOrganizationInvitation(GitHubCancelAnOrganizationInvitationRequest) returns (GitHubCancelAnOrganizationInvitationResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-organization-invitation-teams
+  rpc ListOrganizationInvitationTeams(GitHubListOrganizationInvitationTeamsRequest) returns (GitHubListOrganizationInvitationTeamsResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-organization-members
+  rpc ListOrganizationMembers(GitHubListOrganizationMembersRequest) returns (GitHubListOrganizationMembersResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#check-organization-membership-for-a-user
+  rpc CheckOrganizationMembershipForAUser(GitHubCheckOrganizationMembershipForAUserRequest) returns (GitHubCheckOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#remove-an-organization-member
+  rpc RemoveAnOrganizationMember(GitHubRemoveAnOrganizationMemberRequest) returns (GitHubRemoveAnOrganizationMemberResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#get-organization-membership-for-a-user
+  rpc GetOrganizationMembershipForAUser(GitHubGetOrganizationMembershipForAUserRequest) returns (GitHubGetOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#set-organization-membership-for-a-user
+  rpc SetOrganizationMembershipForAUser(GitHubSetOrganizationMembershipForAUserRequest) returns (GitHubGetOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#remove-organization-membership-for-a-user
+  rpc RemoveOrganizationMembershipForAUser(GitHubRemoveOrganizationMembershipForAUserRequest) returns (GitHubRemoveOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-public-organization-members
+  rpc ListPublicOrganizationMembers(GitHubListPublicOrganizationMembersRequest) returns (GitHubListOrganizationMembersResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#check-public-organization-membership-for-a-user
+  rpc CheckPublicOrganizationMembershipForAUser(GitHubCheckPublicOrganizationMembershipForAUserRequest) returns (GitHubCheckPublicOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#set-public-organization-membership-for-the-authenticated-user
+  rpc SetPublicOrganizationMembershipForTheAuthenticatedUser(GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserRequest) returns (GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#remove-public-organization-membership-for-the-authenticated-user
+  rpc RemovePublicOrganizationMembershipForTheAuthenticatedUser(GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserRequest) returns (GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-organization-memberships-for-the-authenticated-user
+  rpc ListOrganizationMembershipsForTheAuthenticatedUser(GitHubListOrganizationMembershipsForTheAuthenticatedUserRequest) returns (GitHubListOrganizationMembershipsForTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#get-an-organization-membership-for-the-authenticated-user
+  rpc GetAnOrganizationMembershipForTheAuthenticatedUser(GitHubGetAnOrganizationMembershipForTheAuthenticatedUserRequest) returns (GitHubGetOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#update-an-organization-membership-for-the-authenticated-user
+  rpc UpdateAnOrganizationMembershipForTheAuthenticatedUser(GitHubUpdateAnOrganizationMembershipForTheAuthenticatedUserRequest) returns (GitHubGetOrganizationMembershipForAUserResponse);
+
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-organizations
+  rpc ListOrganizations(GitHubListOrganizationsRequest) returns (GitHubListOrganizationsResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#get-an-organization
+  rpc GetAnOrganization(GitHubGetAnOrganizationRequest) returns (GitHubGetAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#update-an-organization
+  rpc UpdateAnOrganization(GitHubUpdateAnOrganizationRequest) returns (GitHubGetAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#delete-an-organization
+  rpc DeleteAnOrganization(GitHubDeleteAnOrganizationRequest) returns (GitHubDeleteAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-app-installations-for-an-organization
+  rpc ListAppInstallationsForAnOrganization(GitHubListAppInstallationsForAnOrganizationRequest) returns (GitHubListAppInstallationsForAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#get-immutable-releases-settings-for-an-organization
+  rpc GetImmutableReleasesSettingsForAnOrganization(GitHubGetImmutableReleasesSettingsForAnOrganizationRequest) returns (GitHubGetImmutableReleasesSettingsForAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#set-immutable-releases-settings-for-an-organization
+  rpc SetImmutableReleasesSettingsForAnOrganization(GitHubSetImmutableReleasesSettingsForAnOrganizationRequest) returns (GitHubSetImmutableReleasesSettingsForAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-selected-repositories-for-immutable-releases-enforcement
+  rpc ListSelectedRepositoriesForImmutableReleasesEnforcement(GitHubListSelectedRepositoriesForImmutableReleasesEnforcementRequest) returns (GitHubListSelectedRepositoriesForImmutableReleasesEnforcementResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#set-selected-repositories-for-immutable-releases-enforcement
+  rpc SetSelectedRepositoriesForImmutableReleasesEnforcement(GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementRequest) returns (GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#enable-a-selected-repository-for-immutable-releases-in-an-organization
+  rpc EnableASelectedRepositoryForImmutableReleasesInAnOrganization(GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationRequest) returns (GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#disable-a-selected-repository-for-immutable-releases-in-an-organization
+  rpc DisableASelectedRepositoryForImmutableReleasesInAnOrganization(GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationRequest) returns (GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#enable-or-disable-a-security-feature-for-an-organization
+  rpc EnableOrDisableASecurityFeatureForAnOrganization(GitHubEnableOrDisableASecurityFeatureForAnOrganizationRequest) returns (GitHubEnableOrDisableASecurityFeatureForAnOrganizationResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-organizations-for-the-authenticated-user
+  rpc ListOrganizationsForTheAuthenticatedUser(GitHubListOrganizationsForTheAuthenticatedUserRequest) returns (GitHubListOrganizationsResponse);
+  // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-organizations-for-a-user
+  rpc ListOrganizationsForAUser(GitHubListOrganizationsForAUserRequest) returns (GitHubListOrganizationsResponse);
+
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-issues-assigned-to-the-authenticated-user
+  rpc ListIssuesAssignedToTheAuthenticatedUser(GitHubListIssuesAssignedToTheAuthenticatedUserRequest) returns (GitHubListIssuesAssignedToTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-organization-issues-assigned-to-the-authenticated-user
+  rpc ListOrganizationIssuesAssignedToTheAuthenticatedUser(GitHubListOrganizationIssuesAssignedToTheAuthenticatedUserRequest) returns (GitHubListIssuesAssignedToTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-repository-issues
+  rpc ListRepositoryIssues(GitHubListRepositoryIssuesRequest) returns (GitHubListIssuesAssignedToTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#create-an-issue
+  rpc CreateAnIssue(GitHubCreateAnIssueRequest) returns (GitHubCreateAnIssueResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#get-an-issue
+  rpc GetAnIssue(GitHubGetAnIssueRequest) returns (GitHubCreateAnIssueResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#update-an-issue
+  rpc UpdateAnIssue(GitHubUpdateAnIssueRequest) returns (GitHubUpdateAnIssueResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#lock-an-issue
+  rpc LockAnIssue(GitHubLockAnIssueRequest) returns (GitHubLockAnIssueResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#unlock-an-issue
+  rpc UnlockAnIssue(GitHubUnlockAnIssueRequest) returns (GitHubUnlockAnIssueResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-issue-suggestions
+  rpc ListIssueSuggestions(GitHubListIssueSuggestionsRequest) returns (GitHubListIssueSuggestionsResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#approve-an-issue-suggestion
+  rpc ApproveAnIssueSuggestion(GitHubApproveAnIssueSuggestionRequest) returns (GitHubApproveAnIssueSuggestionResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#dismiss-an-issue-suggestion
+  rpc DismissAnIssueSuggestion(GitHubDismissAnIssueSuggestionRequest) returns (GitHubApproveAnIssueSuggestionResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-user-account-issues-assigned-to-the-authenticated-user
+  rpc ListUserAccountIssuesAssignedToTheAuthenticatedUser(GitHubListUserAccountIssuesAssignedToTheAuthenticatedUserRequest) returns (GitHubListIssuesAssignedToTheAuthenticatedUserResponse);
+
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-organization-repositories
+  rpc ListOrganizationRepositories(GitHubListOrganizationRepositoriesRequest) returns (GitHubListOrganizationRepositoriesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-an-organization-repository
+  rpc CreateAnOrganizationRepository(GitHubCreateAnOrganizationRepositoryRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#get-a-repository
+  rpc GetARepository(GitHubGetARepositoryRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#update-a-repository
+  rpc UpdateARepository(GitHubUpdateARepositoryRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#delete-a-repository
+  rpc DeleteARepository(GitHubDeleteARepositoryRequest) returns (GitHubDeleteARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-activities
+  rpc ListRepositoryActivities(GitHubListRepositoryActivitiesRequest) returns (GitHubListRepositoryActivitiesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-dependabot-security-updates-are-enabled-for-a-repository
+  rpc CheckIfDependabotSecurityUpdatesAreEnabledForARepository(GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryRequest) returns (GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-dependabot-security-updates
+  rpc EnableDependabotSecurityUpdates(GitHubEnableDependabotSecurityUpdatesRequest) returns (GitHubEnableDependabotSecurityUpdatesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-dependabot-security-updates
+  rpc DisableDependabotSecurityUpdates(GitHubDisableDependabotSecurityUpdatesRequest) returns (GitHubDisableDependabotSecurityUpdatesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-codeowners-errors
+  rpc ListCODEOWNERSErrors(GitHubListCODEOWNERSErrorsRequest) returns (GitHubListCODEOWNERSErrorsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-contributors
+  rpc ListRepositoryContributors(GitHubListRepositoryContributorsRequest) returns (GitHubListRepositoryContributorsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-a-repository-dispatch-event
+  rpc CreateARepositoryDispatchEvent(GitHubCreateARepositoryDispatchEventRequest) returns (GitHubCreateARepositoryDispatchEventResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#get-the-hash-algorithm-for-a-repository
+  rpc GetTheHashAlgorithmForARepository(GitHubGetTheHashAlgorithmForARepositoryRequest) returns (GitHubGetTheHashAlgorithmForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-immutable-releases-are-enabled-for-a-repository
+  rpc CheckIfImmutableReleasesAreEnabledForARepository(GitHubCheckIfImmutableReleasesAreEnabledForARepositoryRequest) returns (GitHubCheckIfImmutableReleasesAreEnabledForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-immutable-releases
+  rpc EnableImmutableReleases(GitHubEnableImmutableReleasesRequest) returns (GitHubEnableImmutableReleasesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-immutable-releases
+  rpc DisableImmutableReleases(GitHubDisableImmutableReleasesRequest) returns (GitHubDisableImmutableReleasesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-languages
+  rpc ListRepositoryLanguages(GitHubListRepositoryLanguagesRequest) returns (GitHubListRepositoryLanguagesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-private-vulnerability-reporting-is-enabled-for-a-repository
+  rpc CheckIfPrivateVulnerabilityReportingIsEnabledForARepository(GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryRequest) returns (GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-private-vulnerability-reporting-for-a-repository
+  rpc EnablePrivateVulnerabilityReportingForARepository(GitHubEnablePrivateVulnerabilityReportingForARepositoryRequest) returns (GitHubEnablePrivateVulnerabilityReportingForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-private-vulnerability-reporting-for-a-repository
+  rpc DisablePrivateVulnerabilityReportingForARepository(GitHubDisablePrivateVulnerabilityReportingForARepositoryRequest) returns (GitHubDisablePrivateVulnerabilityReportingForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-tags
+  rpc ListRepositoryTags(GitHubListRepositoryTagsRequest) returns (GitHubListRepositoryTagsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-teams
+  rpc ListRepositoryTeams(GitHubListRepositoryTeamsRequest) returns (GitHubListRepositoryTeamsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#get-all-repository-topics
+  rpc GetAllRepositoryTopics(GitHubGetAllRepositoryTopicsRequest) returns (GitHubGetAllRepositoryTopicsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#replace-all-repository-topics
+  rpc ReplaceAllRepositoryTopics(GitHubReplaceAllRepositoryTopicsRequest) returns (GitHubGetAllRepositoryTopicsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#transfer-a-repository
+  rpc TransferARepository(GitHubTransferARepositoryRequest) returns (GitHubTransferARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-vulnerability-alerts-are-enabled-for-a-repository
+  rpc CheckIfVulnerabilityAlertsAreEnabledForARepository(GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryRequest) returns (GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-vulnerability-alerts
+  rpc EnableVulnerabilityAlerts(GitHubEnableVulnerabilityAlertsRequest) returns (GitHubEnableVulnerabilityAlertsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-vulnerability-alerts
+  rpc DisableVulnerabilityAlerts(GitHubDisableVulnerabilityAlertsRequest) returns (GitHubDisableVulnerabilityAlertsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-a-repository-using-a-template
+  rpc CreateARepositoryUsingATemplate(GitHubCreateARepositoryUsingATemplateRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-public-repositories
+  rpc ListPublicRepositories(GitHubListPublicRepositoriesRequest) returns (GitHubListOrganizationRepositoriesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repositories-for-the-authenticated-user
+  rpc ListRepositoriesForTheAuthenticatedUser(GitHubListRepositoriesForTheAuthenticatedUserRequest) returns (GitHubListRepositoriesForTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-a-repository-for-the-authenticated-user
+  rpc CreateARepositoryForTheAuthenticatedUser(GitHubCreateARepositoryForTheAuthenticatedUserRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repositories-for-a-user
+  rpc ListRepositoriesForAUser(GitHubListRepositoriesForAUserRequest) returns (GitHubListOrganizationRepositoriesResponse);
+}
+
+message GitHubRateLimitRequest {
+  string auth_token = 1;
+  string source = 2;
+  string namespace = 3;
+}
+
+message GitHubRate {
+  int64 limit = 1;
+  int64 remaining = 2;
+  int64 reset = 3;
+  int64 used = 4;
+}
+
+message GitHubRateLimitResponse {
+  bool success = 1;
+  string error = 2;
+  map<string, GitHubRate> resources = 3;
+}

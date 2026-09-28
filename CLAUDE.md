@@ -14,8 +14,6 @@ A sigil handles a server capability, the reach table governs it with attestation
 
 ## Testing
 
-**The AI agent MUST execute `make test` before claiming completion of any work.**
-
 `make test` runs both backend (Go) and frontend (TypeScript) tests. See [web/TESTING.md](web/TESTING.md) for frontend testing patterns.
 
 **It is DISCOURAGED to craft custom test commands.**
