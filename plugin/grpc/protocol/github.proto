@@ -2,12 +2,21 @@ syntax = "proto3";
 
 package protocol;
 
+import "plugin/grpc/protocol/github_commits_statuses.proto";
+
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
 // ADR-043: GitHubService
 service GitHubService {
   // https://docs.github.com/en/rest/rate-limit/rate-limit?apiVersion=2026-03-10
   rpc RateLimit(GitHubRateLimitRequest) returns (GitHubRateLimitResponse);
+
+  // https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10#get-the-combined-status-for-a-specific-reference
+  rpc GetTheCombinedStatusForASpecificReference(GitHubGetTheCombinedStatusForASpecificReferenceRequest) returns (GitHubGetTheCombinedStatusForASpecificReferenceResponse);
+  // https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10#list-commit-statuses-for-a-reference
+  rpc ListCommitStatusesForAReference(GitHubListCommitStatusesForAReferenceRequest) returns (GitHubListCommitStatusesForAReferenceResponse);
+  // https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10#create-a-commit-status
+  rpc CreateACommitStatus(GitHubCreateACommitStatusRequest) returns (GitHubCreateACommitStatusResponse);
 }
 
 message GitHubRateLimitRequest {
