@@ -19,6 +19,7 @@ import "plugin/grpc/protocol/github_checks_suites.proto";
 import "plugin/grpc/protocol/github_issues_comments.proto";
 import "plugin/grpc/protocol/github_orgs_members.proto";
 import "plugin/grpc/protocol/github_orgs_orgs.proto";
+import "plugin/grpc/protocol/github_issues_issues.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -311,6 +312,31 @@ service GitHubService {
   rpc ListOrganizationsForTheAuthenticatedUser(GitHubListOrganizationsForTheAuthenticatedUserRequest) returns (GitHubListOrganizationsResponse);
   // https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-organizations-for-a-user
   rpc ListOrganizationsForAUser(GitHubListOrganizationsForAUserRequest) returns (GitHubListOrganizationsResponse);
+
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-issues-assigned-to-the-authenticated-user
+  rpc ListIssuesAssignedToTheAuthenticatedUser(GitHubListIssuesAssignedToTheAuthenticatedUserRequest) returns (GitHubListIssuesAssignedToTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-organization-issues-assigned-to-the-authenticated-user
+  rpc ListOrganizationIssuesAssignedToTheAuthenticatedUser(GitHubListOrganizationIssuesAssignedToTheAuthenticatedUserRequest) returns (GitHubListIssuesAssignedToTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-repository-issues
+  rpc ListRepositoryIssues(GitHubListRepositoryIssuesRequest) returns (GitHubListIssuesAssignedToTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#create-an-issue
+  rpc CreateAnIssue(GitHubCreateAnIssueRequest) returns (GitHubCreateAnIssueResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#get-an-issue
+  rpc GetAnIssue(GitHubGetAnIssueRequest) returns (GitHubCreateAnIssueResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#update-an-issue
+  rpc UpdateAnIssue(GitHubUpdateAnIssueRequest) returns (GitHubUpdateAnIssueResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#lock-an-issue
+  rpc LockAnIssue(GitHubLockAnIssueRequest) returns (GitHubLockAnIssueResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#unlock-an-issue
+  rpc UnlockAnIssue(GitHubUnlockAnIssueRequest) returns (GitHubUnlockAnIssueResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-issue-suggestions
+  rpc ListIssueSuggestions(GitHubListIssueSuggestionsRequest) returns (GitHubListIssueSuggestionsResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#approve-an-issue-suggestion
+  rpc ApproveAnIssueSuggestion(GitHubApproveAnIssueSuggestionRequest) returns (GitHubApproveAnIssueSuggestionResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#dismiss-an-issue-suggestion
+  rpc DismissAnIssueSuggestion(GitHubDismissAnIssueSuggestionRequest) returns (GitHubApproveAnIssueSuggestionResponse);
+  // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-user-account-issues-assigned-to-the-authenticated-user
+  rpc ListUserAccountIssuesAssignedToTheAuthenticatedUser(GitHubListUserAccountIssuesAssignedToTheAuthenticatedUserRequest) returns (GitHubListIssuesAssignedToTheAuthenticatedUserResponse);
 }
 
 message GitHubRateLimitRequest {
