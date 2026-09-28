@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package protocol;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10
+
+// GET /repos/{owner}/{repo}/actions/workflows
+message GitHubListRepositoryWorkflowsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 per_page = 4;
+  int64 page = 5;
+}
+
+message GitHubListRepositoryWorkflowsResponse {
+  bool success = 1;
+  string error = 2;
+  int64 total_count = 3;
+  repeated GitHubActionsWorkflowsWorkflow workflows = 4;
+}
+
+// GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}
+message GitHubGetAWorkflowRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string workflow_id = 4;
+}
+
+message GitHubGetAWorkflowResponse {
+  bool success = 1;
+  string error = 2;
+  int64 id = 3;
+  string node_id = 4;
+  string name = 5;
+  string path = 6;
+  string state = 7;
+  string created_at = 8;
+  string updated_at = 9;
+  string url = 10;
+  string html_url = 11;
+  string badge_url = 12;
+  string deleted_at = 13;
+}
+
+// PUT /repos/{owner}/{repo}/actions/workflows/{workflow_id}/disable
+message GitHubDisableAWorkflowRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string workflow_id = 4;
+}
+
+message GitHubDisableAWorkflowResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches
+message GitHubCreateAWorkflowDispatchEventRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string workflow_id = 4;
+  string ref = 5;
+  google.protobuf.Struct inputs = 6;
+}
+
+message GitHubCreateAWorkflowDispatchEventResponse {
+  bool success = 1;
+  string error = 2;
+  int64 workflow_run_id = 3;
+  string run_url = 4;
+  string html_url = 5;
+}
+
+// PUT /repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable
+message GitHubEnableAWorkflowRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string workflow_id = 4;
+}
+
+message GitHubEnableAWorkflowResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/timing
+message GitHubGetWorkflowUsageRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string workflow_id = 4;
+}
+
+message GitHubGetWorkflowUsageResponse {
+  message Billable {
+    message TotalMs {
+      int64 total_ms = 1;
+    }
+
+    TotalMs UBUNTU = 1;
+    TotalMs MACOS = 2;
+    TotalMs WINDOWS = 3;
+  }
+
+  bool success = 1;
+  string error = 2;
+  Billable billable = 3;
+}
+
+// Workflow
+message GitHubActionsWorkflowsWorkflow {
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string path = 4;
+  string state = 5;
+  string created_at = 6;
+  string updated_at = 7;
+  string url = 8;
+  string html_url = 9;
+  string badge_url = 10;
+  string deleted_at = 11;
+}

@@ -10,6 +10,7 @@ import "plugin/grpc/protocol/github_pulls_review_requests.proto";
 import "plugin/grpc/protocol/github_pulls_reviews.proto";
 import "plugin/grpc/protocol/github_pulls_comments.proto";
 import "plugin/grpc/protocol/github_pulls_pulls.proto";
+import "plugin/grpc/protocol/github_actions_workflows.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -121,6 +122,19 @@ service GitHubService {
   rpc GetTheResultOfAnAsynchronousMerge(GitHubGetTheResultOfAnAsynchronousMergeRequest) returns (GitHubMergeAPullRequestAsynchronouslyResponse);
   // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#update-a-pull-request-branch
   rpc UpdateAPullRequestBranch(GitHubUpdateAPullRequestBranchRequest) returns (GitHubUpdateAPullRequestBranchResponse);
+
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#list-repository-workflows
+  rpc ListRepositoryWorkflows(GitHubListRepositoryWorkflowsRequest) returns (GitHubListRepositoryWorkflowsResponse);
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#get-a-workflow
+  rpc GetAWorkflow(GitHubGetAWorkflowRequest) returns (GitHubGetAWorkflowResponse);
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#disable-a-workflow
+  rpc DisableAWorkflow(GitHubDisableAWorkflowRequest) returns (GitHubDisableAWorkflowResponse);
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#create-a-workflow-dispatch-event
+  rpc CreateAWorkflowDispatchEvent(GitHubCreateAWorkflowDispatchEventRequest) returns (GitHubCreateAWorkflowDispatchEventResponse);
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#enable-a-workflow
+  rpc EnableAWorkflow(GitHubEnableAWorkflowRequest) returns (GitHubEnableAWorkflowResponse);
+  // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#get-workflow-usage
+  rpc GetWorkflowUsage(GitHubGetWorkflowUsageRequest) returns (GitHubGetWorkflowUsageResponse);
 }
 
 message GitHubRateLimitRequest {
