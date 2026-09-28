@@ -16,6 +16,7 @@ import "plugin/grpc/protocol/github_actions_artifacts.proto";
 import "plugin/grpc/protocol/github_actions_workflow_runs.proto";
 import "plugin/grpc/protocol/github_checks_runs.proto";
 import "plugin/grpc/protocol/github_checks_suites.proto";
+import "plugin/grpc/protocol/github_issues_comments.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -225,6 +226,23 @@ service GitHubService {
   rpc RerequestACheckSuite(GitHubRerequestACheckSuiteRequest) returns (GitHubRerequestACheckSuiteResponse);
   // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#list-check-suites-for-a-git-reference
   rpc ListCheckSuitesForAGitReference(GitHubListCheckSuitesForAGitReferenceRequest) returns (GitHubListCheckSuitesForAGitReferenceResponse);
+
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#list-issue-comments-for-a-repository
+  rpc ListIssueCommentsForARepository(GitHubListIssueCommentsForARepositoryRequest) returns (GitHubListIssueCommentsForARepositoryResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#get-an-issue-comment
+  rpc GetAnIssueComment(GitHubGetAnIssueCommentRequest) returns (GitHubGetAnIssueCommentResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#update-an-issue-comment
+  rpc UpdateAnIssueComment(GitHubUpdateAnIssueCommentRequest) returns (GitHubGetAnIssueCommentResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#delete-an-issue-comment
+  rpc DeleteAnIssueComment(GitHubDeleteAnIssueCommentRequest) returns (GitHubDeleteAnIssueCommentResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#pin-an-issue-comment
+  rpc PinAnIssueComment(GitHubPinAnIssueCommentRequest) returns (GitHubGetAnIssueCommentResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#unpin-an-issue-comment
+  rpc UnpinAnIssueComment(GitHubUnpinAnIssueCommentRequest) returns (GitHubUnpinAnIssueCommentResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#list-issue-comments
+  rpc ListIssueComments(GitHubListIssueCommentsRequest) returns (GitHubListIssueCommentsForARepositoryResponse);
+  // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#create-an-issue-comment
+  rpc CreateAnIssueComment(GitHubCreateAnIssueCommentRequest) returns (GitHubGetAnIssueCommentResponse);
 }
 
 message GitHubRateLimitRequest {
