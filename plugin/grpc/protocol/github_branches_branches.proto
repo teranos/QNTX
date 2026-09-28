@@ -1,0 +1,418 @@
+syntax = "proto3";
+
+package protocol;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10
+
+// GET /repos/{owner}/{repo}/branches
+message GitHubListBranchesRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  bool protected = 4;
+  int64 per_page = 5;
+  int64 page = 6;
+}
+
+message GitHubListBranchesResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubBranchesBranchesShortBranch items = 3;
+}
+
+// GET /repos/{owner}/{repo}/branches/{branch}
+message GitHubGetABranchRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string branch = 4;
+}
+
+message GitHubGetABranchResponse {
+  message Links {
+    string html = 1;
+    string self = 2;
+  }
+
+  bool success = 1;
+  string error = 2;
+  string name = 3;
+  GitHubBranchesBranchesCommit commit = 4;
+  Links _links = 5;
+  bool protected = 6;
+  GitHubBranchesBranchesBranchProtection protection = 7;
+  string protection_url = 8;
+  string pattern = 9;
+  int64 required_approving_review_count = 10;
+}
+
+// POST /repos/{owner}/{repo}/branches/{branch}/rename
+// Response: same response schema as Get a branch.
+message GitHubRenameABranchRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string branch = 4;
+  string new_name = 5;
+}
+
+// POST /repos/{owner}/{repo}/merge-upstream
+message GitHubSyncAForkBranchWithTheUpstreamRepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string branch = 4;
+}
+
+message GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse {
+  bool success = 1;
+  string error = 2;
+  string message = 3;
+  string merge_type = 4;
+  string base_branch = 5;
+}
+
+// POST /repos/{owner}/{repo}/merges
+message GitHubMergeABranchRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string base = 4;
+  string head = 5;
+  string commit_message = 6;
+}
+
+message GitHubMergeABranchResponse {
+  bool success = 1;
+  string error = 2;
+  string url = 3;
+  string sha = 4;
+  string node_id = 5;
+  string html_url = 6;
+  string comments_url = 7;
+  GitHubBranchesBranchesCommit.Commit commit = 8;
+  GitHubBranchesBranchesSimpleUser author = 9;
+  GitHubBranchesBranchesSimpleUser committer = 10;
+  repeated GitHubBranchesBranchesCommit.Parents parents = 11;
+  GitHubBranchesBranchesCommit.Stats stats = 12;
+  repeated GitHubBranchesBranchesDiffEntry files = 13;
+}
+
+// Short Branch
+message GitHubBranchesBranchesShortBranch {
+  message Commit {
+    string sha = 1;
+    string url = 2;
+  }
+
+  string name = 1;
+  Commit commit = 2;
+  bool protected = 3;
+  GitHubBranchesBranchesBranchProtection protection = 4;
+  string protection_url = 5;
+}
+
+// Branch Protection
+message GitHubBranchesBranchesBranchProtection {
+  message Enabled {
+    bool enabled = 1;
+  }
+
+  message RequiredSignatures {
+    string url = 1;
+    bool enabled = 2;
+  }
+
+  string url = 1;
+  bool enabled = 2;
+  GitHubBranchesBranchesProtectedBranchRequiredStatusCheck required_status_checks = 3;
+  GitHubBranchesBranchesProtectedBranchAdminEnforced enforce_admins = 4;
+  GitHubBranchesBranchesProtectedBranchPullRequestReview required_pull_request_reviews = 5;
+  GitHubBranchesBranchesBranchRestrictionPolicy restrictions = 6;
+  Enabled required_linear_history = 7;
+  Enabled allow_force_pushes = 8;
+  Enabled allow_deletions = 9;
+  Enabled block_creations = 10;
+  Enabled required_conversation_resolution = 11;
+  string name = 12;
+  string protection_url = 13;
+  RequiredSignatures required_signatures = 14;
+  Enabled lock_branch = 15;
+  Enabled allow_fork_syncing = 16;
+}
+
+// Protected Branch Required Status Check
+message GitHubBranchesBranchesProtectedBranchRequiredStatusCheck {
+  message Checks {
+    string context = 1;
+    int64 app_id = 2;
+  }
+
+  string url = 1;
+  string enforcement_level = 2;
+  repeated string contexts = 3;
+  repeated Checks checks = 4;
+  string contexts_url = 5;
+  bool strict = 6;
+}
+
+// Protected Branch Admin Enforced
+message GitHubBranchesBranchesProtectedBranchAdminEnforced {
+  string url = 1;
+  bool enabled = 2;
+}
+
+// Protected Branch Pull Request Review
+message GitHubBranchesBranchesProtectedBranchPullRequestReview {
+  message DismissalRestrictions {
+    repeated GitHubBranchesBranchesSimpleUser users = 1;
+    repeated GitHubBranchesBranchesTeam teams = 2;
+    repeated GitHubBranchesBranchesGitHubApp apps = 3;
+    string url = 4;
+    string users_url = 5;
+    string teams_url = 6;
+  }
+
+  message BypassPullRequestAllowances {
+    repeated GitHubBranchesBranchesSimpleUser users = 1;
+    repeated GitHubBranchesBranchesTeam teams = 2;
+    repeated GitHubBranchesBranchesGitHubApp apps = 3;
+  }
+
+  string url = 1;
+  DismissalRestrictions dismissal_restrictions = 2;
+  BypassPullRequestAllowances bypass_pull_request_allowances = 3;
+  bool dismiss_stale_reviews = 4;
+  bool require_code_owner_reviews = 5;
+  int64 required_approving_review_count = 6;
+  bool require_last_push_approval = 7;
+}
+
+// Branch Restriction Policy
+message GitHubBranchesBranchesBranchRestrictionPolicy {
+  message Users {
+    string login = 1;
+    int64 id = 2;
+    string node_id = 3;
+    string avatar_url = 4;
+    string gravatar_id = 5;
+    string url = 6;
+    string html_url = 7;
+    string followers_url = 8;
+    string following_url = 9;
+    string gists_url = 10;
+    string starred_url = 11;
+    string subscriptions_url = 12;
+    string organizations_url = 13;
+    string repos_url = 14;
+    string events_url = 15;
+    string received_events_url = 16;
+    string type = 17;
+    bool site_admin = 18;
+    string user_view_type = 19;
+  }
+
+  message Apps {
+    message Owner {
+      string login = 1;
+      int64 id = 2;
+      string node_id = 3;
+      string url = 4;
+      string repos_url = 5;
+      string events_url = 6;
+      string hooks_url = 7;
+      string issues_url = 8;
+      string members_url = 9;
+      string public_members_url = 10;
+      string avatar_url = 11;
+      string description = 12;
+      string gravatar_id = 13;
+      string html_url = 14;
+      string followers_url = 15;
+      string following_url = 16;
+      string gists_url = 17;
+      string starred_url = 18;
+      string subscriptions_url = 19;
+      string organizations_url = 20;
+      string received_events_url = 21;
+      string type = 22;
+      bool site_admin = 23;
+      string user_view_type = 24;
+    }
+
+    message Permissions {
+      string metadata = 1;
+      string contents = 2;
+      string issues = 3;
+      string single_file = 4;
+    }
+
+    int64 id = 1;
+    string slug = 2;
+    string node_id = 3;
+    Owner owner = 4;
+    string name = 5;
+    string client_id = 6;
+    string description = 7;
+    string external_url = 8;
+    string html_url = 9;
+    string created_at = 10;
+    string updated_at = 11;
+    Permissions permissions = 12;
+    repeated string events = 13;
+  }
+
+  string url = 1;
+  string users_url = 2;
+  string teams_url = 3;
+  string apps_url = 4;
+  repeated Users users = 5;
+  repeated GitHubBranchesBranchesTeam teams = 6;
+  repeated Apps apps = 7;
+}
+
+// Team
+message GitHubBranchesBranchesTeam {
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string slug = 4;
+  string description = 5;
+  string privacy = 6;
+  string notification_setting = 7;
+  string permission = 8;
+  google.protobuf.Struct permissions = 9;
+  string url = 10;
+  string html_url = 11;
+  string members_url = 12;
+  string repositories_url = 13;
+  string type = 14;
+  string access_source = 15;
+  int64 organization_id = 16;
+  int64 enterprise_id = 17;
+  // Team Simple: the page lists no fields for it.
+  google.protobuf.Struct parent = 18;
+}
+
+// GitHub app
+message GitHubBranchesBranchesGitHubApp {
+  int64 id = 1;
+  string slug = 2;
+  string node_id = 3;
+  string client_id = 4;
+  // One of Simple User or Enterprise; the page lists no fields for Enterprise.
+  google.protobuf.Struct owner = 5;
+  string name = 6;
+  string description = 7;
+  string external_url = 8;
+  string html_url = 9;
+  string created_at = 10;
+  string updated_at = 11;
+  map<string, string> permissions = 12;
+  repeated string events = 13;
+  int64 installations_count = 14;
+}
+
+// Commit
+message GitHubBranchesBranchesCommit {
+  message Commit {
+    message Tree {
+      string sha = 1;
+      string url = 2;
+    }
+
+    string url = 1;
+    GitHubBranchesBranchesGitUser author = 2;
+    GitHubBranchesBranchesGitUser committer = 3;
+    string message = 4;
+    int64 comment_count = 5;
+    Tree tree = 6;
+    GitHubBranchesBranchesVerification verification = 7;
+  }
+
+  message Parents {
+    string sha = 1;
+    string url = 2;
+    string html_url = 3;
+  }
+
+  message Stats {
+    int64 additions = 1;
+    int64 deletions = 2;
+    int64 total = 3;
+  }
+
+  string url = 1;
+  string sha = 2;
+  string node_id = 3;
+  string html_url = 4;
+  string comments_url = 5;
+  Commit commit = 6;
+  GitHubBranchesBranchesSimpleUser author = 7;
+  GitHubBranchesBranchesSimpleUser committer = 8;
+  repeated Parents parents = 9;
+  Stats stats = 10;
+  repeated GitHubBranchesBranchesDiffEntry files = 11;
+}
+
+// Git User
+message GitHubBranchesBranchesGitUser {
+  string name = 1;
+  string email = 2;
+  string date = 3;
+}
+
+// Verification
+message GitHubBranchesBranchesVerification {
+  bool verified = 1;
+  string reason = 2;
+  string payload = 3;
+  string signature = 4;
+  string verified_at = 5;
+}
+
+// Simple User
+message GitHubBranchesBranchesSimpleUser {
+  string name = 1;
+  string email = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string avatar_url = 6;
+  string gravatar_id = 7;
+  string url = 8;
+  string html_url = 9;
+  string followers_url = 10;
+  string following_url = 11;
+  string gists_url = 12;
+  string starred_url = 13;
+  string subscriptions_url = 14;
+  string organizations_url = 15;
+  string repos_url = 16;
+  string events_url = 17;
+  string received_events_url = 18;
+  string type = 19;
+  bool site_admin = 20;
+  string starred_at = 21;
+  string user_view_type = 22;
+}
+
+// Diff Entry
+message GitHubBranchesBranchesDiffEntry {
+  string sha = 1;
+  string filename = 2;
+  string status = 3;
+  int64 additions = 4;
+  int64 deletions = 5;
+  int64 changes = 6;
+  string blob_url = 7;
+  string raw_url = 8;
+  string contents_url = 9;
+  string patch = 10;
+  string previous_filename = 11;
+}

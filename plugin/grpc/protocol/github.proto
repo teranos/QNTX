@@ -5,6 +5,7 @@ package protocol;
 import "plugin/grpc/protocol/github_commits_statuses.proto";
 import "plugin/grpc/protocol/github_commits_comments.proto";
 import "plugin/grpc/protocol/github_commits_commits.proto";
+import "plugin/grpc/protocol/github_branches_branches.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -43,6 +44,17 @@ service GitHubService {
   rpc GetACommit(GitHubGetACommitRequest) returns (GitHubGetACommitResponse);
   // https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#compare-two-commits
   rpc CompareTwoCommits(GitHubCompareTwoCommitsRequest) returns (GitHubCompareTwoCommitsResponse);
+
+  // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#list-branches
+  rpc ListBranches(GitHubListBranchesRequest) returns (GitHubListBranchesResponse);
+  // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#get-a-branch
+  rpc GetABranch(GitHubGetABranchRequest) returns (GitHubGetABranchResponse);
+  // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#rename-a-branch
+  rpc RenameABranch(GitHubRenameABranchRequest) returns (GitHubGetABranchResponse);
+  // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#sync-a-fork-branch-with-the-upstream-repository
+  rpc SyncAForkBranchWithTheUpstreamRepository(GitHubSyncAForkBranchWithTheUpstreamRepositoryRequest) returns (GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse);
+  // https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#merge-a-branch
+  rpc MergeABranch(GitHubMergeABranchRequest) returns (GitHubMergeABranchResponse);
 }
 
 message GitHubRateLimitRequest {
