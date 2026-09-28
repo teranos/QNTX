@@ -1,0 +1,681 @@
+syntax = "proto3";
+
+package protocol;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10
+
+// POST /repos/{owner}/{repo}/actions/jobs/{job_id}/rerun
+message GitHubReRunAJobFromAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 job_id = 4;
+  bool enable_debug_logging = 5;
+  bool enable_debugger = 6;
+}
+
+message GitHubReRunAJobFromAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/actions/runs
+message GitHubListWorkflowRunsForARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string actor = 4;
+  string branch = 5;
+  string event = 6;
+  string status = 7;
+  int64 per_page = 8;
+  int64 page = 9;
+  string created = 10;
+  bool exclude_pull_requests = 11;
+  int64 check_suite_id = 12;
+  string head_sha = 13;
+}
+
+message GitHubListWorkflowRunsForARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+  int64 total_count = 3;
+  repeated GitHubActionsWorkflowRunsWorkflowRun workflow_runs = 4;
+}
+
+// GET /repos/{owner}/{repo}/actions/runs/{run_id}
+message GitHubGetAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+  bool exclude_pull_requests = 5;
+}
+
+message GitHubGetAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+  int64 id = 3;
+  string name = 4;
+  string node_id = 5;
+  int64 check_suite_id = 6;
+  string check_suite_node_id = 7;
+  string head_branch = 8;
+  string head_sha = 9;
+  string path = 10;
+  int64 run_number = 11;
+  int64 run_attempt = 12;
+  repeated GitHubActionsWorkflowRunsReferencedWorkflow referenced_workflows = 13;
+  string event = 14;
+  string status = 15;
+  string conclusion = 16;
+  int64 workflow_id = 17;
+  string url = 18;
+  string html_url = 19;
+  repeated GitHubActionsWorkflowRunsPullRequestMinimal pull_requests = 20;
+  string created_at = 21;
+  string updated_at = 22;
+  GitHubActionsWorkflowRunsSimpleUser actor = 23;
+  GitHubActionsWorkflowRunsSimpleUser triggering_actor = 24;
+  string run_started_at = 25;
+  string jobs_url = 26;
+  string logs_url = 27;
+  string check_suite_url = 28;
+  string artifacts_url = 29;
+  string cancel_url = 30;
+  string rerun_url = 31;
+  string previous_attempt_url = 32;
+  string workflow_url = 33;
+  GitHubActionsWorkflowRunsSimpleCommit head_commit = 34;
+  GitHubActionsWorkflowRunsMinimalRepository repository = 35;
+  GitHubActionsWorkflowRunsMinimalRepository head_repository = 36;
+  int64 head_repository_id = 37;
+  string display_title = 38;
+}
+
+// DELETE /repos/{owner}/{repo}/actions/runs/{run_id}
+message GitHubDeleteAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+}
+
+message GitHubDeleteAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/actions/runs/{run_id}/approvals
+message GitHubGetTheReviewHistoryForAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+}
+
+message GitHubGetTheReviewHistoryForAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubActionsWorkflowRunsEnvironmentApproval items = 3;
+}
+
+// POST /repos/{owner}/{repo}/actions/runs/{run_id}/approve
+message GitHubApproveAWorkflowRunForAForkPullRequestRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+}
+
+message GitHubApproveAWorkflowRunForAForkPullRequestResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}
+// Response: same response schema as Get a workflow run.
+message GitHubGetAWorkflowRunAttemptRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+  int64 attempt_number = 5;
+  bool exclude_pull_requests = 6;
+}
+
+// GET /repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/logs
+message GitHubDownloadWorkflowRunAttemptLogsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+  int64 attempt_number = 5;
+}
+
+message GitHubDownloadWorkflowRunAttemptLogsResponse {
+  bool success = 1;
+  string error = 2;
+  // "Look for Location: in the response header to find the URL for the download."
+  string location = 3;
+}
+
+// POST /repos/{owner}/{repo}/actions/runs/{run_id}/cancel
+message GitHubCancelAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+}
+
+message GitHubCancelAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// POST /repos/{owner}/{repo}/actions/runs/{run_id}/deployment_protection_rule
+// The page lists no body parameters for this endpoint.
+message GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+}
+
+message GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// POST /repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel
+message GitHubForceCancelAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+}
+
+message GitHubForceCancelAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/actions/runs/{run_id}/logs
+message GitHubDownloadWorkflowRunLogsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+}
+
+message GitHubDownloadWorkflowRunLogsResponse {
+  bool success = 1;
+  string error = 2;
+  // "Look for Location: in the response header to find the URL for the download."
+  string location = 3;
+}
+
+// DELETE /repos/{owner}/{repo}/actions/runs/{run_id}/logs
+message GitHubDeleteWorkflowRunLogsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+}
+
+message GitHubDeleteWorkflowRunLogsResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/actions/runs/{run_id}/pending_deployments
+message GitHubGetPendingDeploymentsForAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+}
+
+message GitHubGetPendingDeploymentsForAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubActionsWorkflowRunsPendingDeployment items = 3;
+}
+
+// POST /repos/{owner}/{repo}/actions/runs/{run_id}/pending_deployments
+message GitHubReviewPendingDeploymentsForAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+  repeated int64 environment_ids = 5;
+  string state = 6;
+  string comment = 7;
+}
+
+message GitHubReviewPendingDeploymentsForAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubActionsWorkflowRunsDeployment items = 3;
+}
+
+// POST /repos/{owner}/{repo}/actions/runs/{run_id}/rerun
+message GitHubReRunAWorkflowRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+  bool enable_debug_logging = 5;
+}
+
+message GitHubReRunAWorkflowResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// POST /repos/{owner}/{repo}/actions/runs/{run_id}/rerun-failed-jobs
+message GitHubReRunFailedJobsFromAWorkflowRunRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+  bool enable_debug_logging = 5;
+}
+
+message GitHubReRunFailedJobsFromAWorkflowRunResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/actions/runs/{run_id}/timing
+message GitHubGetWorkflowRunUsageRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 run_id = 4;
+}
+
+message GitHubGetWorkflowRunUsageResponse {
+  message Billable {
+    message Usage {
+      message JobRuns {
+        int64 job_id = 1;
+        int64 duration_ms = 2;
+      }
+
+      int64 total_ms = 1;
+      int64 jobs = 2;
+      repeated JobRuns job_runs = 3;
+    }
+
+    Usage UBUNTU = 1;
+    Usage MACOS = 2;
+    Usage WINDOWS = 3;
+  }
+
+  bool success = 1;
+  string error = 2;
+  Billable billable = 3;
+  int64 run_duration_ms = 4;
+}
+
+// GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs
+// Response: same response schema as List workflow runs for a repository.
+message GitHubListWorkflowRunsForAWorkflowRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string workflow_id = 4;
+  string actor = 5;
+  string branch = 6;
+  string event = 7;
+  string status = 8;
+  int64 per_page = 9;
+  int64 page = 10;
+  string created = 11;
+  bool exclude_pull_requests = 12;
+  int64 check_suite_id = 13;
+  string head_sha = 14;
+}
+
+// Workflow Run
+message GitHubActionsWorkflowRunsWorkflowRun {
+  int64 id = 1;
+  string name = 2;
+  string node_id = 3;
+  int64 check_suite_id = 4;
+  string check_suite_node_id = 5;
+  string head_branch = 6;
+  string head_sha = 7;
+  string path = 8;
+  int64 run_number = 9;
+  int64 run_attempt = 10;
+  repeated GitHubActionsWorkflowRunsReferencedWorkflow referenced_workflows = 11;
+  string event = 12;
+  string status = 13;
+  string conclusion = 14;
+  int64 workflow_id = 15;
+  string url = 16;
+  string html_url = 17;
+  repeated GitHubActionsWorkflowRunsPullRequestMinimal pull_requests = 18;
+  string created_at = 19;
+  string updated_at = 20;
+  GitHubActionsWorkflowRunsSimpleUser actor = 21;
+  GitHubActionsWorkflowRunsSimpleUser triggering_actor = 22;
+  string run_started_at = 23;
+  string jobs_url = 24;
+  string logs_url = 25;
+  string check_suite_url = 26;
+  string artifacts_url = 27;
+  string cancel_url = 28;
+  string rerun_url = 29;
+  string previous_attempt_url = 30;
+  string workflow_url = 31;
+  GitHubActionsWorkflowRunsSimpleCommit head_commit = 32;
+  GitHubActionsWorkflowRunsMinimalRepository repository = 33;
+  GitHubActionsWorkflowRunsMinimalRepository head_repository = 34;
+  int64 head_repository_id = 35;
+  string display_title = 36;
+}
+
+// Referenced workflow
+message GitHubActionsWorkflowRunsReferencedWorkflow {
+  string path = 1;
+  string sha = 2;
+  string ref = 3;
+}
+
+// Pull Request Minimal
+message GitHubActionsWorkflowRunsPullRequestMinimal {
+  message Ref {
+    message Repo {
+      int64 id = 1;
+      string url = 2;
+      string name = 3;
+    }
+
+    string ref = 1;
+    string sha = 2;
+    Repo repo = 3;
+  }
+
+  int64 id = 1;
+  int64 number = 2;
+  string url = 3;
+  Ref head = 4;
+  Ref base = 5;
+}
+
+// Simple User
+message GitHubActionsWorkflowRunsSimpleUser {
+  string name = 1;
+  string email = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string avatar_url = 6;
+  string gravatar_id = 7;
+  string url = 8;
+  string html_url = 9;
+  string followers_url = 10;
+  string following_url = 11;
+  string gists_url = 12;
+  string starred_url = 13;
+  string subscriptions_url = 14;
+  string organizations_url = 15;
+  string repos_url = 16;
+  string events_url = 17;
+  string received_events_url = 18;
+  string type = 19;
+  bool site_admin = 20;
+  string starred_at = 21;
+  string user_view_type = 22;
+}
+
+// Simple Commit
+message GitHubActionsWorkflowRunsSimpleCommit {
+  message Person {
+    string name = 1;
+    string email = 2;
+  }
+
+  string id = 1;
+  string tree_id = 2;
+  string message = 3;
+  string timestamp = 4;
+  Person author = 5;
+  Person committer = 6;
+}
+
+// Code Of Conduct
+message GitHubActionsWorkflowRunsCodeOfConduct {
+  string key = 1;
+  string name = 2;
+  string url = 3;
+  string body = 4;
+  string html_url = 5;
+}
+
+// Minimal Repository
+message GitHubActionsWorkflowRunsMinimalRepository {
+  message Permissions {
+    bool admin = 1;
+    bool maintain = 2;
+    bool push = 3;
+    bool triage = 4;
+    bool pull = 5;
+  }
+
+  message License {
+    string key = 1;
+    string name = 2;
+    string spdx_id = 3;
+    string url = 4;
+    string node_id = 5;
+  }
+
+  message SecurityAndAnalysis {
+    message Status {
+      string status = 1;
+    }
+
+    message SecretScanningDelegatedBypassOptions {
+      message Reviewers {
+        int64 reviewer_id = 1;
+        string reviewer_type = 2;
+        string mode = 3;
+      }
+
+      repeated Reviewers reviewers = 1;
+    }
+
+    Status advanced_security = 1;
+    Status code_security = 2;
+    Status dependabot_security_updates = 3;
+    Status secret_scanning = 4;
+    Status secret_scanning_push_protection = 5;
+    Status secret_scanning_non_provider_patterns = 6;
+    Status secret_scanning_ai_detection = 7;
+    Status secret_scanning_delegated_alert_dismissal = 8;
+    Status secret_scanning_delegated_bypass = 9;
+    SecretScanningDelegatedBypassOptions secret_scanning_delegated_bypass_options = 10;
+  }
+
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string full_name = 4;
+  GitHubActionsWorkflowRunsSimpleUser owner = 5;
+  bool private = 6;
+  string html_url = 7;
+  string description = 8;
+  bool fork = 9;
+  string url = 10;
+  string archive_url = 11;
+  string assignees_url = 12;
+  string blobs_url = 13;
+  string branches_url = 14;
+  string collaborators_url = 15;
+  string comments_url = 16;
+  string commits_url = 17;
+  string compare_url = 18;
+  string contents_url = 19;
+  string contributors_url = 20;
+  string deployments_url = 21;
+  string downloads_url = 22;
+  string events_url = 23;
+  string forks_url = 24;
+  string git_commits_url = 25;
+  string git_refs_url = 26;
+  string git_tags_url = 27;
+  string git_url = 28;
+  string issue_comment_url = 29;
+  string issue_events_url = 30;
+  string issues_url = 31;
+  string keys_url = 32;
+  string labels_url = 33;
+  string languages_url = 34;
+  string merges_url = 35;
+  string milestones_url = 36;
+  string notifications_url = 37;
+  string pulls_url = 38;
+  string releases_url = 39;
+  string ssh_url = 40;
+  string stargazers_url = 41;
+  string statuses_url = 42;
+  string subscribers_url = 43;
+  string subscription_url = 44;
+  string tags_url = 45;
+  string teams_url = 46;
+  string trees_url = 47;
+  string clone_url = 48;
+  string mirror_url = 49;
+  string hooks_url = 50;
+  string svn_url = 51;
+  string homepage = 52;
+  string language = 53;
+  int64 forks_count = 54;
+  int64 stargazers_count = 55;
+  int64 watchers_count = 56;
+  int64 size = 57;
+  string default_branch = 58;
+  int64 open_issues_count = 59;
+  bool is_template = 60;
+  repeated string topics = 61;
+  bool has_issues = 62;
+  bool has_projects = 63;
+  bool has_wiki = 64;
+  bool has_pages = 65;
+  bool has_discussions = 66;
+  bool has_pull_requests = 67;
+  string pull_request_creation_policy = 68;
+  bool archived = 69;
+  bool disabled = 70;
+  string visibility = 71;
+  string pushed_at = 72;
+  string created_at = 73;
+  string updated_at = 74;
+  Permissions permissions = 75;
+  string role_name = 76;
+  string temp_clone_token = 77;
+  bool delete_branch_on_merge = 78;
+  int64 subscribers_count = 79;
+  int64 network_count = 80;
+  GitHubActionsWorkflowRunsCodeOfConduct code_of_conduct = 81;
+  License license = 82;
+  int64 forks = 83;
+  int64 open_issues = 84;
+  int64 watchers = 85;
+  bool allow_forking = 86;
+  bool web_commit_signoff_required = 87;
+  SecurityAndAnalysis security_and_analysis = 88;
+  google.protobuf.Struct custom_properties = 89;
+}
+
+// Environment Approval
+message GitHubActionsWorkflowRunsEnvironmentApproval {
+  message Environments {
+    int64 id = 1;
+    string node_id = 2;
+    string name = 3;
+    string url = 4;
+    string html_url = 5;
+    string created_at = 6;
+    string updated_at = 7;
+  }
+
+  repeated Environments environments = 1;
+  string state = 2;
+  GitHubActionsWorkflowRunsSimpleUser user = 3;
+  string comment = 4;
+}
+
+// Pending Deployment
+message GitHubActionsWorkflowRunsPendingDeployment {
+  message Environment {
+    int64 id = 1;
+    string node_id = 2;
+    string name = 3;
+    string url = 4;
+    string html_url = 5;
+  }
+
+  message Reviewers {
+    string type = 1;
+    // Any of Simple User or Team.
+    google.protobuf.Struct reviewer = 2;
+  }
+
+  Environment environment = 1;
+  int64 wait_timer = 2;
+  string wait_timer_started_at = 3;
+  bool current_user_can_approve = 4;
+  repeated Reviewers reviewers = 5;
+}
+
+// Deployment
+message GitHubActionsWorkflowRunsDeployment {
+  string url = 1;
+  int64 id = 2;
+  string node_id = 3;
+  string sha = 4;
+  string ref = 5;
+  string task = 6;
+  // One of an object or a string.
+  google.protobuf.Value payload = 7;
+  string original_environment = 8;
+  string environment = 9;
+  string description = 10;
+  GitHubActionsWorkflowRunsSimpleUser creator = 11;
+  string created_at = 12;
+  string updated_at = 13;
+  string statuses_url = 14;
+  string repository_url = 15;
+  bool transient_environment = 16;
+  bool production_environment = 17;
+  GitHubActionsWorkflowRunsGitHubApp performed_via_github_app = 18;
+}
+
+// GitHub app
+message GitHubActionsWorkflowRunsGitHubApp {
+  int64 id = 1;
+  string slug = 2;
+  string node_id = 3;
+  string client_id = 4;
+  // One of Simple User or Enterprise.
+  google.protobuf.Struct owner = 5;
+  string name = 6;
+  string description = 7;
+  string external_url = 8;
+  string html_url = 9;
+  string created_at = 10;
+  string updated_at = 11;
+  map<string, string> permissions = 12;
+  repeated string events = 13;
+  int64 installations_count = 14;
+}

@@ -13,6 +13,7 @@ import "plugin/grpc/protocol/github_pulls_pulls.proto";
 import "plugin/grpc/protocol/github_actions_workflows.proto";
 import "plugin/grpc/protocol/github_actions_workflow_jobs.proto";
 import "plugin/grpc/protocol/github_actions_artifacts.proto";
+import "plugin/grpc/protocol/github_actions_workflow_runs.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -157,6 +158,45 @@ service GitHubService {
   rpc DownloadAnArtifact(GitHubDownloadAnArtifactRequest) returns (GitHubDownloadAnArtifactResponse);
   // https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#list-workflow-run-artifacts
   rpc ListWorkflowRunArtifacts(GitHubListWorkflowRunArtifactsRequest) returns (GitHubListArtifactsForARepositoryResponse);
+
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#re-run-a-job-from-a-workflow-run
+  rpc ReRunAJobFromAWorkflowRun(GitHubReRunAJobFromAWorkflowRunRequest) returns (GitHubReRunAJobFromAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#list-workflow-runs-for-a-repository
+  rpc ListWorkflowRunsForARepository(GitHubListWorkflowRunsForARepositoryRequest) returns (GitHubListWorkflowRunsForARepositoryResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-a-workflow-run
+  rpc GetAWorkflowRun(GitHubGetAWorkflowRunRequest) returns (GitHubGetAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#delete-a-workflow-run
+  rpc DeleteAWorkflowRun(GitHubDeleteAWorkflowRunRequest) returns (GitHubDeleteAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-the-review-history-for-a-workflow-run
+  rpc GetTheReviewHistoryForAWorkflowRun(GitHubGetTheReviewHistoryForAWorkflowRunRequest) returns (GitHubGetTheReviewHistoryForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#approve-a-workflow-run-for-a-fork-pull-request
+  rpc ApproveAWorkflowRunForAForkPullRequest(GitHubApproveAWorkflowRunForAForkPullRequestRequest) returns (GitHubApproveAWorkflowRunForAForkPullRequestResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-a-workflow-run-attempt
+  rpc GetAWorkflowRunAttempt(GitHubGetAWorkflowRunAttemptRequest) returns (GitHubGetAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#download-workflow-run-attempt-logs
+  rpc DownloadWorkflowRunAttemptLogs(GitHubDownloadWorkflowRunAttemptLogsRequest) returns (GitHubDownloadWorkflowRunAttemptLogsResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#cancel-a-workflow-run
+  rpc CancelAWorkflowRun(GitHubCancelAWorkflowRunRequest) returns (GitHubCancelAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#review-custom-deployment-protection-rules-for-a-workflow-run
+  rpc ReviewCustomDeploymentProtectionRulesForAWorkflowRun(GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunRequest) returns (GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#force-cancel-a-workflow-run
+  rpc ForceCancelAWorkflowRun(GitHubForceCancelAWorkflowRunRequest) returns (GitHubForceCancelAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#download-workflow-run-logs
+  rpc DownloadWorkflowRunLogs(GitHubDownloadWorkflowRunLogsRequest) returns (GitHubDownloadWorkflowRunLogsResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#delete-workflow-run-logs
+  rpc DeleteWorkflowRunLogs(GitHubDeleteWorkflowRunLogsRequest) returns (GitHubDeleteWorkflowRunLogsResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-pending-deployments-for-a-workflow-run
+  rpc GetPendingDeploymentsForAWorkflowRun(GitHubGetPendingDeploymentsForAWorkflowRunRequest) returns (GitHubGetPendingDeploymentsForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#review-pending-deployments-for-a-workflow-run
+  rpc ReviewPendingDeploymentsForAWorkflowRun(GitHubReviewPendingDeploymentsForAWorkflowRunRequest) returns (GitHubReviewPendingDeploymentsForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#re-run-a-workflow
+  rpc ReRunAWorkflow(GitHubReRunAWorkflowRequest) returns (GitHubReRunAWorkflowResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#re-run-failed-jobs-from-a-workflow-run
+  rpc ReRunFailedJobsFromAWorkflowRun(GitHubReRunFailedJobsFromAWorkflowRunRequest) returns (GitHubReRunFailedJobsFromAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-workflow-run-usage
+  rpc GetWorkflowRunUsage(GitHubGetWorkflowRunUsageRequest) returns (GitHubGetWorkflowRunUsageResponse);
+  // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#list-workflow-runs-for-a-workflow
+  rpc ListWorkflowRunsForAWorkflow(GitHubListWorkflowRunsForAWorkflowRequest) returns (GitHubListWorkflowRunsForARepositoryResponse);
 }
 
 message GitHubRateLimitRequest {
