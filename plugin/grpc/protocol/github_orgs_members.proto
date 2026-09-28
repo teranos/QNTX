@@ -1,0 +1,368 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10
+
+// GET /orgs/{org}/failed_invitations
+message GitHubListFailedOrganizationInvitationsRequest {
+  string namespace = 1;
+  string org = 2;
+  int64 per_page = 3;
+  int64 page = 4;
+}
+
+message GitHubListFailedOrganizationInvitationsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubOrgsMembersOrganizationInvitation items = 3;
+}
+
+// GET /orgs/{org}/invitations
+// Response: same response schema as List failed organization invitations.
+message GitHubListPendingOrganizationInvitationsRequest {
+  string namespace = 1;
+  string org = 2;
+  int64 per_page = 3;
+  int64 page = 4;
+  string role = 5;
+  string invitation_source = 6;
+}
+
+// POST /orgs/{org}/invitations
+message GitHubCreateAnOrganizationInvitationRequest {
+  string namespace = 1;
+  string org = 2;
+  int64 invitee_id = 3;
+  string email = 4;
+  string role = 5;
+  repeated int64 team_ids = 6;
+}
+
+message GitHubCreateAnOrganizationInvitationResponse {
+  bool success = 1;
+  string error = 2;
+  int64 id = 3;
+  string login = 4;
+  string email = 5;
+  string role = 6;
+  string created_at = 7;
+  string failed_at = 8;
+  string failed_reason = 9;
+  GitHubOrgsMembersSimpleUser inviter = 10;
+  int64 team_count = 11;
+  string node_id = 12;
+  string invitation_teams_url = 13;
+  string invitation_source = 14;
+}
+
+// DELETE /orgs/{org}/invitations/{invitation_id}
+message GitHubCancelAnOrganizationInvitationRequest {
+  string namespace = 1;
+  string org = 2;
+  int64 invitation_id = 3;
+}
+
+message GitHubCancelAnOrganizationInvitationResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /orgs/{org}/invitations/{invitation_id}/teams
+message GitHubListOrganizationInvitationTeamsRequest {
+  string namespace = 1;
+  string org = 2;
+  int64 invitation_id = 3;
+  int64 per_page = 4;
+  int64 page = 5;
+}
+
+message GitHubListOrganizationInvitationTeamsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubOrgsMembersTeam items = 3;
+}
+
+// GET /orgs/{org}/members
+message GitHubListOrganizationMembersRequest {
+  string namespace = 1;
+  string org = 2;
+  string filter = 3;
+  string role = 4;
+  int64 per_page = 5;
+  int64 page = 6;
+}
+
+message GitHubListOrganizationMembersResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubOrgsMembersSimpleUser items = 3;
+}
+
+// GET /orgs/{org}/members/{username}
+message GitHubCheckOrganizationMembershipForAUserRequest {
+  string namespace = 1;
+  string org = 2;
+  string username = 3;
+}
+
+message GitHubCheckOrganizationMembershipForAUserResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// DELETE /orgs/{org}/members/{username}
+message GitHubRemoveAnOrganizationMemberRequest {
+  string namespace = 1;
+  string org = 2;
+  string username = 3;
+}
+
+message GitHubRemoveAnOrganizationMemberResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /orgs/{org}/memberships/{username}
+message GitHubGetOrganizationMembershipForAUserRequest {
+  string namespace = 1;
+  string org = 2;
+  string username = 3;
+}
+
+message GitHubGetOrganizationMembershipForAUserResponse {
+  bool success = 1;
+  string error = 2;
+  string url = 3;
+  string state = 4;
+  string role = 5;
+  bool direct_membership = 6;
+  repeated string enterprise_teams_providing_indirect_membership = 7;
+  string organization_url = 8;
+  GitHubOrgsMembersOrganizationSimple organization = 9;
+  GitHubOrgsMembersSimpleUser user = 10;
+  GitHubOrgsMembersOrgMembership.Permissions permissions = 11;
+}
+
+// PUT /orgs/{org}/memberships/{username}
+// Response: same response schema as Get organization membership for a user.
+message GitHubSetOrganizationMembershipForAUserRequest {
+  string namespace = 1;
+  string org = 2;
+  string username = 3;
+  string role = 4;
+}
+
+// DELETE /orgs/{org}/memberships/{username}
+message GitHubRemoveOrganizationMembershipForAUserRequest {
+  string namespace = 1;
+  string org = 2;
+  string username = 3;
+}
+
+message GitHubRemoveOrganizationMembershipForAUserResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /orgs/{org}/public_members
+// Response: same response schema as List organization members.
+message GitHubListPublicOrganizationMembersRequest {
+  string namespace = 1;
+  string org = 2;
+  int64 per_page = 3;
+  int64 page = 4;
+}
+
+// GET /orgs/{org}/public_members/{username}
+message GitHubCheckPublicOrganizationMembershipForAUserRequest {
+  string namespace = 1;
+  string org = 2;
+  string username = 3;
+}
+
+message GitHubCheckPublicOrganizationMembershipForAUserResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// PUT /orgs/{org}/public_members/{username}
+message GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserRequest {
+  string namespace = 1;
+  string org = 2;
+  string username = 3;
+}
+
+message GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// DELETE /orgs/{org}/public_members/{username}
+message GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserRequest {
+  string namespace = 1;
+  string org = 2;
+  string username = 3;
+}
+
+message GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /user/memberships/orgs
+message GitHubListOrganizationMembershipsForTheAuthenticatedUserRequest {
+  string namespace = 1;
+  string state = 2;
+  int64 per_page = 3;
+  int64 page = 4;
+}
+
+message GitHubListOrganizationMembershipsForTheAuthenticatedUserResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubOrgsMembersOrgMembership items = 3;
+}
+
+// GET /user/memberships/orgs/{org}
+// Response: same response schema as Get organization membership for a user.
+message GitHubGetAnOrganizationMembershipForTheAuthenticatedUserRequest {
+  string namespace = 1;
+  string org = 2;
+}
+
+// PATCH /user/memberships/orgs/{org}
+// Response: same response schema as Get organization membership for a user.
+message GitHubUpdateAnOrganizationMembershipForTheAuthenticatedUserRequest {
+  string namespace = 1;
+  string org = 2;
+  string state = 3;
+}
+
+// Organization Invitation
+message GitHubOrgsMembersOrganizationInvitation {
+  int64 id = 1;
+  string login = 2;
+  string email = 3;
+  string role = 4;
+  string created_at = 5;
+  string failed_at = 6;
+  string failed_reason = 7;
+  GitHubOrgsMembersSimpleUser inviter = 8;
+  int64 team_count = 9;
+  string node_id = 10;
+  string invitation_teams_url = 11;
+  string invitation_source = 12;
+}
+
+// Org Membership
+message GitHubOrgsMembersOrgMembership {
+  message Permissions {
+    bool can_create_repository = 1;
+  }
+
+  string url = 1;
+  string state = 2;
+  string role = 3;
+  bool direct_membership = 4;
+  repeated string enterprise_teams_providing_indirect_membership = 5;
+  string organization_url = 6;
+  GitHubOrgsMembersOrganizationSimple organization = 7;
+  GitHubOrgsMembersSimpleUser user = 8;
+  Permissions permissions = 9;
+}
+
+// Organization Simple
+message GitHubOrgsMembersOrganizationSimple {
+  string login = 1;
+  int64 id = 2;
+  string node_id = 3;
+  string url = 4;
+  string repos_url = 5;
+  string events_url = 6;
+  string hooks_url = 7;
+  string issues_url = 8;
+  string members_url = 9;
+  string public_members_url = 10;
+  string avatar_url = 11;
+  string description = 12;
+}
+
+// Simple User
+message GitHubOrgsMembersSimpleUser {
+  string name = 1;
+  string email = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string avatar_url = 6;
+  string gravatar_id = 7;
+  string url = 8;
+  string html_url = 9;
+  string followers_url = 10;
+  string following_url = 11;
+  string gists_url = 12;
+  string starred_url = 13;
+  string subscriptions_url = 14;
+  string organizations_url = 15;
+  string repos_url = 16;
+  string events_url = 17;
+  string received_events_url = 18;
+  string type = 19;
+  bool site_admin = 20;
+  string starred_at = 21;
+  string user_view_type = 22;
+}
+
+// Team
+message GitHubOrgsMembersTeam {
+  message Permissions {
+    bool pull = 1;
+    bool triage = 2;
+    bool push = 3;
+    bool maintain = 4;
+    bool admin = 5;
+  }
+
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string slug = 4;
+  string description = 5;
+  string privacy = 6;
+  string notification_setting = 7;
+  string permission = 8;
+  Permissions permissions = 9;
+  string url = 10;
+  string html_url = 11;
+  string members_url = 12;
+  string repositories_url = 13;
+  string type = 14;
+  string access_source = 15;
+  int64 organization_id = 16;
+  int64 enterprise_id = 17;
+  GitHubOrgsMembersTeamSimple parent = 18;
+}
+
+// Team Simple
+message GitHubOrgsMembersTeamSimple {
+  int64 id = 1;
+  string node_id = 2;
+  string url = 3;
+  string members_url = 4;
+  string name = 5;
+  string description = 6;
+  string permission = 7;
+  string privacy = 8;
+  string notification_setting = 9;
+  string html_url = 10;
+  string repositories_url = 11;
+  string slug = 12;
+  string ldap_dn = 13;
+  string type = 14;
+  int64 organization_id = 15;
+  int64 enterprise_id = 16;
+}

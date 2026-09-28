@@ -17,6 +17,7 @@ import "plugin/grpc/protocol/github_actions_workflow_runs.proto";
 import "plugin/grpc/protocol/github_checks_runs.proto";
 import "plugin/grpc/protocol/github_checks_suites.proto";
 import "plugin/grpc/protocol/github_issues_comments.proto";
+import "plugin/grpc/protocol/github_orgs_members.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -243,6 +244,43 @@ service GitHubService {
   rpc ListIssueComments(GitHubListIssueCommentsRequest) returns (GitHubListIssueCommentsForARepositoryResponse);
   // https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#create-an-issue-comment
   rpc CreateAnIssueComment(GitHubCreateAnIssueCommentRequest) returns (GitHubGetAnIssueCommentResponse);
+
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-failed-organization-invitations
+  rpc ListFailedOrganizationInvitations(GitHubListFailedOrganizationInvitationsRequest) returns (GitHubListFailedOrganizationInvitationsResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-pending-organization-invitations
+  rpc ListPendingOrganizationInvitations(GitHubListPendingOrganizationInvitationsRequest) returns (GitHubListFailedOrganizationInvitationsResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#create-an-organization-invitation
+  rpc CreateAnOrganizationInvitation(GitHubCreateAnOrganizationInvitationRequest) returns (GitHubCreateAnOrganizationInvitationResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#cancel-an-organization-invitation
+  rpc CancelAnOrganizationInvitation(GitHubCancelAnOrganizationInvitationRequest) returns (GitHubCancelAnOrganizationInvitationResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-organization-invitation-teams
+  rpc ListOrganizationInvitationTeams(GitHubListOrganizationInvitationTeamsRequest) returns (GitHubListOrganizationInvitationTeamsResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-organization-members
+  rpc ListOrganizationMembers(GitHubListOrganizationMembersRequest) returns (GitHubListOrganizationMembersResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#check-organization-membership-for-a-user
+  rpc CheckOrganizationMembershipForAUser(GitHubCheckOrganizationMembershipForAUserRequest) returns (GitHubCheckOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#remove-an-organization-member
+  rpc RemoveAnOrganizationMember(GitHubRemoveAnOrganizationMemberRequest) returns (GitHubRemoveAnOrganizationMemberResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#get-organization-membership-for-a-user
+  rpc GetOrganizationMembershipForAUser(GitHubGetOrganizationMembershipForAUserRequest) returns (GitHubGetOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#set-organization-membership-for-a-user
+  rpc SetOrganizationMembershipForAUser(GitHubSetOrganizationMembershipForAUserRequest) returns (GitHubGetOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#remove-organization-membership-for-a-user
+  rpc RemoveOrganizationMembershipForAUser(GitHubRemoveOrganizationMembershipForAUserRequest) returns (GitHubRemoveOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-public-organization-members
+  rpc ListPublicOrganizationMembers(GitHubListPublicOrganizationMembersRequest) returns (GitHubListOrganizationMembersResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#check-public-organization-membership-for-a-user
+  rpc CheckPublicOrganizationMembershipForAUser(GitHubCheckPublicOrganizationMembershipForAUserRequest) returns (GitHubCheckPublicOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#set-public-organization-membership-for-the-authenticated-user
+  rpc SetPublicOrganizationMembershipForTheAuthenticatedUser(GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserRequest) returns (GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#remove-public-organization-membership-for-the-authenticated-user
+  rpc RemovePublicOrganizationMembershipForTheAuthenticatedUser(GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserRequest) returns (GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-organization-memberships-for-the-authenticated-user
+  rpc ListOrganizationMembershipsForTheAuthenticatedUser(GitHubListOrganizationMembershipsForTheAuthenticatedUserRequest) returns (GitHubListOrganizationMembershipsForTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#get-an-organization-membership-for-the-authenticated-user
+  rpc GetAnOrganizationMembershipForTheAuthenticatedUser(GitHubGetAnOrganizationMembershipForTheAuthenticatedUserRequest) returns (GitHubGetOrganizationMembershipForAUserResponse);
+  // https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#update-an-organization-membership-for-the-authenticated-user
+  rpc UpdateAnOrganizationMembershipForTheAuthenticatedUser(GitHubUpdateAnOrganizationMembershipForTheAuthenticatedUserRequest) returns (GitHubGetOrganizationMembershipForAUserResponse);
 }
 
 message GitHubRateLimitRequest {
