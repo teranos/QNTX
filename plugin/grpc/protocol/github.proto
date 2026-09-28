@@ -15,6 +15,7 @@ import "plugin/grpc/protocol/github_actions_workflow_jobs.proto";
 import "plugin/grpc/protocol/github_actions_artifacts.proto";
 import "plugin/grpc/protocol/github_actions_workflow_runs.proto";
 import "plugin/grpc/protocol/github_checks_runs.proto";
+import "plugin/grpc/protocol/github_checks_suites.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -213,6 +214,17 @@ service GitHubService {
   rpc ListCheckRunsInACheckSuite(GitHubListCheckRunsInACheckSuiteRequest) returns (GitHubListCheckRunsInACheckSuiteResponse);
   // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#list-check-runs-for-a-git-reference
   rpc ListCheckRunsForAGitReference(GitHubListCheckRunsForAGitReferenceRequest) returns (GitHubListCheckRunsInACheckSuiteResponse);
+
+  // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#create-a-check-suite
+  rpc CreateACheckSuite(GitHubCreateACheckSuiteRequest) returns (GitHubCreateACheckSuiteResponse);
+  // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#update-repository-preferences-for-check-suites
+  rpc UpdateRepositoryPreferencesForCheckSuites(GitHubUpdateRepositoryPreferencesForCheckSuitesRequest) returns (GitHubUpdateRepositoryPreferencesForCheckSuitesResponse);
+  // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#get-a-check-suite
+  rpc GetACheckSuite(GitHubGetACheckSuiteRequest) returns (GitHubCreateACheckSuiteResponse);
+  // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#rerequest-a-check-suite
+  rpc RerequestACheckSuite(GitHubRerequestACheckSuiteRequest) returns (GitHubRerequestACheckSuiteResponse);
+  // https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#list-check-suites-for-a-git-reference
+  rpc ListCheckSuitesForAGitReference(GitHubListCheckSuitesForAGitReferenceRequest) returns (GitHubListCheckSuitesForAGitReferenceResponse);
 }
 
 message GitHubRateLimitRequest {
