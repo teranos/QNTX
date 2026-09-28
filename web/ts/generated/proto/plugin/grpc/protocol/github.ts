@@ -9,8 +9,6 @@
 export const protobufPackage = "protocol";
 
 export interface GitHubRateLimitRequest {
-  auth_token: string;
-  source: string;
   namespace: string;
 }
 

@@ -11,9 +11,7 @@ service GitHubService {
 }
 
 message GitHubRateLimitRequest {
-  string auth_token = 1;
-  string source = 2;
-  string namespace = 3;
+  string namespace = 1;
 }
 
 message GitHubRate {

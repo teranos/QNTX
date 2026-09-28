@@ -23,9 +23,7 @@ const (
 
 type GitHubRateLimitRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
-	Source        string                 `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
-	Namespace     string                 `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -58,20 +56,6 @@ func (x *GitHubRateLimitRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GitHubRateLimitRequest.ProtoReflect.Descriptor instead.
 func (*GitHubRateLimitRequest) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_github_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *GitHubRateLimitRequest) GetAuthToken() string {
-	if x != nil {
-		return x.AuthToken
-	}
-	return ""
-}
-
-func (x *GitHubRateLimitRequest) GetSource() string {
-	if x != nil {
-		return x.Source
-	}
-	return ""
 }
 
 func (x *GitHubRateLimitRequest) GetNamespace() string {
@@ -213,12 +197,9 @@ var File_plugin_grpc_protocol_github_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_github_proto_rawDesc = "" +
 	"\n" +
-	"!plugin/grpc/protocol/github.proto\x12\bprotocol\"m\n" +
-	"\x16GitHubRateLimitRequest\x12\x1d\n" +
-	"\n" +
-	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x16\n" +
-	"\x06source\x18\x02 \x01(\tR\x06source\x12\x1c\n" +
-	"\tnamespace\x18\x03 \x01(\tR\tnamespace\"j\n" +
+	"!plugin/grpc/protocol/github.proto\x12\bprotocol\"6\n" +
+	"\x16GitHubRateLimitRequest\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\"j\n" +
 	"\n" +
 	"GitHubRate\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\x03R\x05limit\x12\x1c\n" +
