@@ -11,6 +11,7 @@ import "plugin/grpc/protocol/github_pulls_reviews.proto";
 import "plugin/grpc/protocol/github_pulls_comments.proto";
 import "plugin/grpc/protocol/github_pulls_pulls.proto";
 import "plugin/grpc/protocol/github_actions_workflows.proto";
+import "plugin/grpc/protocol/github_actions_workflow_jobs.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -135,6 +136,15 @@ service GitHubService {
   rpc EnableAWorkflow(GitHubEnableAWorkflowRequest) returns (GitHubEnableAWorkflowResponse);
   // https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#get-workflow-usage
   rpc GetWorkflowUsage(GitHubGetWorkflowUsageRequest) returns (GitHubGetWorkflowUsageResponse);
+
+  // https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#get-a-job-for-a-workflow-run
+  rpc GetAJobForAWorkflowRun(GitHubGetAJobForAWorkflowRunRequest) returns (GitHubGetAJobForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#download-job-logs-for-a-workflow-run
+  rpc DownloadJobLogsForAWorkflowRun(GitHubDownloadJobLogsForAWorkflowRunRequest) returns (GitHubDownloadJobLogsForAWorkflowRunResponse);
+  // https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#list-jobs-for-a-workflow-run-attempt
+  rpc ListJobsForAWorkflowRunAttempt(GitHubListJobsForAWorkflowRunAttemptRequest) returns (GitHubListJobsForAWorkflowRunAttemptResponse);
+  // https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#list-jobs-for-a-workflow-run
+  rpc ListJobsForAWorkflowRun(GitHubListJobsForAWorkflowRunRequest) returns (GitHubListJobsForAWorkflowRunAttemptResponse);
 }
 
 message GitHubRateLimitRequest {
