@@ -3,6 +3,7 @@ syntax = "proto3";
 package protocol;
 
 import "plugin/grpc/protocol/github_commits_statuses.proto";
+import "plugin/grpc/protocol/github_commits_comments.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -17,6 +18,19 @@ service GitHubService {
   rpc ListCommitStatusesForAReference(GitHubListCommitStatusesForAReferenceRequest) returns (GitHubListCommitStatusesForAReferenceResponse);
   // https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10#create-a-commit-status
   rpc CreateACommitStatus(GitHubCreateACommitStatusRequest) returns (GitHubCreateACommitStatusResponse);
+
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#list-commit-comments-for-a-repository
+  rpc ListCommitCommentsForARepository(GitHubListCommitCommentsForARepositoryRequest) returns (GitHubListCommitCommentsForARepositoryResponse);
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#get-a-commit-comment
+  rpc GetACommitComment(GitHubGetACommitCommentRequest) returns (GitHubGetACommitCommentResponse);
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#update-a-commit-comment
+  rpc UpdateACommitComment(GitHubUpdateACommitCommentRequest) returns (GitHubGetACommitCommentResponse);
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#delete-a-commit-comment
+  rpc DeleteACommitComment(GitHubDeleteACommitCommentRequest) returns (GitHubDeleteACommitCommentResponse);
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#list-commit-comments
+  rpc ListCommitComments(GitHubListCommitCommentsRequest) returns (GitHubListCommitCommentsForARepositoryResponse);
+  // https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#create-a-commit-comment
+  rpc CreateACommitComment(GitHubCreateACommitCommentRequest) returns (GitHubGetACommitCommentResponse);
 }
 
 message GitHubRateLimitRequest {
