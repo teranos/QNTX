@@ -25,12 +25,8 @@ end
 (**/**)
 module rec Protocol : sig
   module rec GitHubRateLimitRequest : sig
-    type t = {
-      auth_token:string;
-      source:string;
-      namespace:string;
-    }
-    val make: ?auth_token:string -> ?source:string -> ?namespace:string -> unit -> t
+    type t = (string)
+    val make: ?namespace:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -49,7 +45,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?source:string -> ?namespace:string -> unit -> t
+    type make_t = ?namespace:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -140,12 +136,8 @@ module rec Protocol : sig
 
 end = struct
   module rec GitHubRateLimitRequest : sig
-    type t = {
-      auth_token:string;
-      source:string;
-      namespace:string;
-    }
-    val make: ?auth_token:string -> ?source:string -> ?namespace:string -> unit -> t
+    type t = (string)
+    val make: ?namespace:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -164,7 +156,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?source:string -> ?namespace:string -> unit -> t
+    type make_t = ?namespace:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -173,37 +165,27 @@ end = struct
   end = struct
     module This'_ = GitHubRateLimitRequest
     let name () = ".protocol.GitHubRateLimitRequest"
-    type t = {
-      auth_token:string;
-      source:string;
-      namespace:string;
-    }
-    type make_t = ?auth_token:string -> ?source:string -> ?namespace:string -> unit -> t
-    let make ?(auth_token = {||}) ?(source = {||}) ?(namespace = {||}) () = { auth_token; source; namespace }
+    type t = (string)
+    type make_t = ?namespace:string -> unit -> t
+    let make ?(namespace = {||}) () = (namespace)
     let merge =
-    let merge_auth_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ) in
-    let merge_source = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "source", "source"), string, ({||})) ) in
-    let merge_namespace = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "namespace", "namespace"), string, ({||})) ) in
-    fun t1 t2 -> {
-    	auth_token = (merge_auth_token t1.auth_token t2.auth_token);
-    	source = (merge_source t1.source t2.source);
-    	namespace = (merge_namespace t1.namespace t2.namespace);
-     }
-    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: basic ((2, "source", "source"), string, ({||})) ^:: basic ((3, "namespace", "namespace"), string, ({||})) ^:: nil )
+    let merge_namespace = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "namespace", "namespace"), string, ({||})) ) in
+    fun (t1_namespace) (t2_namespace) -> merge_namespace t1_namespace t2_namespace
+    let spec () = Runtime'.Spec.( basic ((1, "namespace", "namespace"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { auth_token; source; namespace } -> serialize writer auth_token source namespace
+      fun writer (namespace) -> serialize writer namespace
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor auth_token source namespace = { auth_token; source; namespace } in
+      let constructor namespace = (namespace) in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { auth_token; source; namespace } -> serialize auth_token source namespace
+      fun (namespace) -> serialize namespace
     let from_json_exn =
-      let constructor auth_token source namespace = { auth_token; source; namespace } in
+      let constructor namespace = (namespace) in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
