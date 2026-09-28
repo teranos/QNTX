@@ -6,7 +6,7 @@ Status: Proposed
 "GitHubService needs to be a thing, and QNTX should own it."
 
 A plugin that does GitHub things calls it, and keeps no client or token of its
-own. Fetching plugin releases uses it too.
+own.
 
 ```toml
 [github]
