@@ -9,7 +9,8 @@ option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 // ADR-043
 // https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10
 
-message GitHubCommitsStatusesGetTheCombinedStatusForASpecificReferenceRequest {
+// GET /repos/{owner}/{repo}/commits/{ref}/status
+message GitHubGetCombinedStatusRequest {
   string namespace = 1;
   string owner = 2;
   string repo = 3;
@@ -18,19 +19,20 @@ message GitHubCommitsStatusesGetTheCombinedStatusForASpecificReferenceRequest {
   int64 page = 6;
 }
 
-message GitHubCommitsStatusesGetTheCombinedStatusForASpecificReferenceResponse {
+message GitHubGetCombinedStatusResponse {
   bool success = 1;
   string error = 2;
   string state = 3;
-  repeated GitHubCommitsStatusesSimpleCommitStatus statuses = 4;
+  repeated GitHubSimpleCommitStatus statuses = 4;
   string sha = 5;
   int64 total_count = 6;
-  GitHubCommitsStatusesMinimalRepository repository = 7;
+  GitHubMinimalRepository repository = 7;
   string commit_url = 8;
   string url = 9;
 }
 
-message GitHubCommitsStatusesListCommitStatusesForAReferenceRequest {
+// GET /repos/{owner}/{repo}/commits/{ref}/statuses
+message GitHubListCommitStatusesRequest {
   string namespace = 1;
   string owner = 2;
   string repo = 3;
@@ -39,13 +41,14 @@ message GitHubCommitsStatusesListCommitStatusesForAReferenceRequest {
   int64 page = 6;
 }
 
-message GitHubCommitsStatusesListCommitStatusesForAReferenceResponse {
+message GitHubListCommitStatusesResponse {
   bool success = 1;
   string error = 2;
-  repeated GitHubCommitsStatusesStatus items = 3;
+  repeated GitHubStatus statuses = 3;
 }
 
-message GitHubCommitsStatusesCreateACommitStatusRequest {
+// POST /repos/{owner}/{repo}/statuses/{sha}
+message GitHubCreateCommitStatusRequest {
   string namespace = 1;
   string owner = 2;
   string repo = 3;
@@ -56,23 +59,14 @@ message GitHubCommitsStatusesCreateACommitStatusRequest {
   string context = 8;
 }
 
-message GitHubCommitsStatusesCreateACommitStatusResponse {
+message GitHubCreateCommitStatusResponse {
   bool success = 1;
   string error = 2;
-  string url = 3;
-  string avatar_url = 4;
-  int64 id = 5;
-  string node_id = 6;
-  string state = 7;
-  string description = 8;
-  string target_url = 9;
-  string context = 10;
-  string created_at = 11;
-  string updated_at = 12;
-  GitHubCommitsStatusesSimpleUser creator = 13;
+  GitHubStatus status = 3;
 }
 
-message GitHubCommitsStatusesSimpleCommitStatus {
+// Simple Commit Status
+message GitHubSimpleCommitStatus {
   string description = 1;
   int64 id = 2;
   string node_id = 3;
@@ -86,7 +80,23 @@ message GitHubCommitsStatusesSimpleCommitStatus {
   string updated_at = 11;
 }
 
-message GitHubCommitsStatusesSimpleUser {
+// Status
+message GitHubStatus {
+  string url = 1;
+  string avatar_url = 2;
+  int64 id = 3;
+  string node_id = 4;
+  string state = 5;
+  string description = 6;
+  string target_url = 7;
+  string context = 8;
+  string created_at = 9;
+  string updated_at = 10;
+  GitHubSimpleUser creator = 11;
+}
+
+// Simple User
+message GitHubSimpleUser {
   string name = 1;
   string email = 2;
   string login = 3;
@@ -111,7 +121,8 @@ message GitHubCommitsStatusesSimpleUser {
   string user_view_type = 22;
 }
 
-message GitHubCommitsStatusesCodeOfConduct {
+// Code Of Conduct
+message GitHubCodeOfConduct {
   string key = 1;
   string name = 2;
   string url = 3;
@@ -119,7 +130,8 @@ message GitHubCommitsStatusesCodeOfConduct {
   string html_url = 5;
 }
 
-message GitHubCommitsStatusesMinimalRepository {
+// Minimal Repository
+message GitHubMinimalRepository {
   message Permissions {
     bool admin = 1;
     bool maintain = 2;
@@ -127,6 +139,7 @@ message GitHubCommitsStatusesMinimalRepository {
     bool triage = 4;
     bool pull = 5;
   }
+
   message License {
     string key = 1;
     string name = 2;
@@ -134,58 +147,39 @@ message GitHubCommitsStatusesMinimalRepository {
     string url = 4;
     string node_id = 5;
   }
+
   message SecurityAndAnalysis {
-    message AdvancedSecurity {
+    message Status {
       string status = 1;
     }
-    message CodeSecurity {
-      string status = 1;
-    }
-    message DependabotSecurityUpdates {
-      string status = 1;
-    }
-    message SecretScanning {
-      string status = 1;
-    }
-    message SecretScanningPushProtection {
-      string status = 1;
-    }
-    message SecretScanningNonProviderPatterns {
-      string status = 1;
-    }
-    message SecretScanningAiDetection {
-      string status = 1;
-    }
-    message SecretScanningDelegatedAlertDismissal {
-      string status = 1;
-    }
-    message SecretScanningDelegatedBypass {
-      string status = 1;
-    }
+
     message SecretScanningDelegatedBypassOptions {
-      message Reviewers {
+      message Reviewer {
         int64 reviewer_id = 1;
         string reviewer_type = 2;
         string mode = 3;
       }
-      repeated Reviewers reviewers = 1;
+
+      repeated Reviewer reviewers = 1;
     }
-    AdvancedSecurity advanced_security = 1;
-    CodeSecurity code_security = 2;
-    DependabotSecurityUpdates dependabot_security_updates = 3;
-    SecretScanning secret_scanning = 4;
-    SecretScanningPushProtection secret_scanning_push_protection = 5;
-    SecretScanningNonProviderPatterns secret_scanning_non_provider_patterns = 6;
-    SecretScanningAiDetection secret_scanning_ai_detection = 7;
-    SecretScanningDelegatedAlertDismissal secret_scanning_delegated_alert_dismissal = 8;
-    SecretScanningDelegatedBypass secret_scanning_delegated_bypass = 9;
+
+    Status advanced_security = 1;
+    Status code_security = 2;
+    Status dependabot_security_updates = 3;
+    Status secret_scanning = 4;
+    Status secret_scanning_push_protection = 5;
+    Status secret_scanning_non_provider_patterns = 6;
+    Status secret_scanning_ai_detection = 7;
+    Status secret_scanning_delegated_alert_dismissal = 8;
+    Status secret_scanning_delegated_bypass = 9;
     SecretScanningDelegatedBypassOptions secret_scanning_delegated_bypass_options = 10;
   }
+
   int64 id = 1;
   string node_id = 2;
   string name = 3;
   string full_name = 4;
-  GitHubCommitsStatusesSimpleUser owner = 5;
+  GitHubSimpleUser owner = 5;
   bool private = 6;
   string html_url = 7;
   string description = 8;
@@ -261,7 +255,7 @@ message GitHubCommitsStatusesMinimalRepository {
   bool delete_branch_on_merge = 78;
   int64 subscribers_count = 79;
   int64 network_count = 80;
-  GitHubCommitsStatusesCodeOfConduct code_of_conduct = 81;
+  GitHubCodeOfConduct code_of_conduct = 81;
   License license = 82;
   int64 forks = 83;
   int64 open_issues = 84;
@@ -270,18 +264,4 @@ message GitHubCommitsStatusesMinimalRepository {
   bool web_commit_signoff_required = 87;
   SecurityAndAnalysis security_and_analysis = 88;
   google.protobuf.Struct custom_properties = 89;
-}
-
-message GitHubCommitsStatusesStatus {
-  string url = 1;
-  string avatar_url = 2;
-  int64 id = 3;
-  string node_id = 4;
-  string state = 5;
-  string description = 6;
-  string target_url = 7;
-  string context = 8;
-  string created_at = 9;
-  string updated_at = 10;
-  GitHubCommitsStatusesSimpleUser creator = 11;
 }
