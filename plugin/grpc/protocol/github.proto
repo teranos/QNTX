@@ -14,6 +14,7 @@ import "plugin/grpc/protocol/github_actions_workflows.proto";
 import "plugin/grpc/protocol/github_actions_workflow_jobs.proto";
 import "plugin/grpc/protocol/github_actions_artifacts.proto";
 import "plugin/grpc/protocol/github_actions_workflow_runs.proto";
+import "plugin/grpc/protocol/github_checks_runs.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -197,6 +198,21 @@ service GitHubService {
   rpc GetWorkflowRunUsage(GitHubGetWorkflowRunUsageRequest) returns (GitHubGetWorkflowRunUsageResponse);
   // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#list-workflow-runs-for-a-workflow
   rpc ListWorkflowRunsForAWorkflow(GitHubListWorkflowRunsForAWorkflowRequest) returns (GitHubListWorkflowRunsForARepositoryResponse);
+
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#create-a-check-run
+  rpc CreateACheckRun(GitHubCreateACheckRunRequest) returns (GitHubCreateACheckRunResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#get-a-check-run
+  rpc GetACheckRun(GitHubGetACheckRunRequest) returns (GitHubCreateACheckRunResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#update-a-check-run
+  rpc UpdateACheckRun(GitHubUpdateACheckRunRequest) returns (GitHubCreateACheckRunResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#list-check-run-annotations
+  rpc ListCheckRunAnnotations(GitHubListCheckRunAnnotationsRequest) returns (GitHubListCheckRunAnnotationsResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#rerequest-a-check-run
+  rpc RerequestACheckRun(GitHubRerequestACheckRunRequest) returns (GitHubRerequestACheckRunResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#list-check-runs-in-a-check-suite
+  rpc ListCheckRunsInACheckSuite(GitHubListCheckRunsInACheckSuiteRequest) returns (GitHubListCheckRunsInACheckSuiteResponse);
+  // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#list-check-runs-for-a-git-reference
+  rpc ListCheckRunsForAGitReference(GitHubListCheckRunsForAGitReferenceRequest) returns (GitHubListCheckRunsInACheckSuiteResponse);
 }
 
 message GitHubRateLimitRequest {
