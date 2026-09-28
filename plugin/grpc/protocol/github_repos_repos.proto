@@ -1,0 +1,1148 @@
+syntax = "proto3";
+
+package protocol;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10
+
+// GET /orgs/{org}/repos
+message GitHubListOrganizationRepositoriesRequest {
+  string namespace = 1;
+  string org = 2;
+  string type = 3;
+  string sort = 4;
+  string direction = 5;
+  int64 per_page = 6;
+  int64 page = 7;
+}
+
+message GitHubListOrganizationRepositoriesResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubReposReposMinimalRepository items = 3;
+}
+
+// POST /orgs/{org}/repos
+message GitHubCreateAnOrganizationRepositoryRequest {
+  string namespace = 1;
+  string org = 2;
+  string name = 3;
+  string description = 4;
+  string homepage = 5;
+  bool private = 6;
+  string visibility = 7;
+  bool has_issues = 8;
+  bool has_projects = 9;
+  bool has_wiki = 10;
+  bool has_downloads = 11;
+  bool is_template = 12;
+  int64 team_id = 13;
+  bool auto_init = 14;
+  string gitignore_template = 15;
+  string license_template = 16;
+  bool allow_squash_merge = 17;
+  bool allow_merge_commit = 18;
+  bool allow_rebase_merge = 19;
+  bool allow_auto_merge = 20;
+  bool delete_branch_on_merge = 21;
+  bool use_squash_pr_title_as_default = 22;
+  string squash_merge_commit_title = 23;
+  string squash_merge_commit_message = 24;
+  string merge_commit_title = 25;
+  string merge_commit_message = 26;
+  google.protobuf.Struct custom_properties = 27;
+}
+
+message GitHubCreateAnOrganizationRepositoryResponse {
+  message Permissions {
+    bool admin = 1;
+    bool maintain = 2;
+    bool push = 3;
+    bool triage = 4;
+    bool pull = 5;
+  }
+
+  bool success = 1;
+  string error = 2;
+  int64 id = 3;
+  string node_id = 4;
+  string name = 5;
+  string full_name = 6;
+  GitHubReposReposSimpleUser owner = 7;
+  bool private = 8;
+  string html_url = 9;
+  string description = 10;
+  bool fork = 11;
+  string url = 12;
+  string archive_url = 13;
+  string assignees_url = 14;
+  string blobs_url = 15;
+  string branches_url = 16;
+  string collaborators_url = 17;
+  string comments_url = 18;
+  string commits_url = 19;
+  string compare_url = 20;
+  string contents_url = 21;
+  string contributors_url = 22;
+  string deployments_url = 23;
+  string downloads_url = 24;
+  string events_url = 25;
+  string forks_url = 26;
+  string git_commits_url = 27;
+  string git_refs_url = 28;
+  string git_tags_url = 29;
+  string git_url = 30;
+  string issue_comment_url = 31;
+  string issue_events_url = 32;
+  string issues_url = 33;
+  string keys_url = 34;
+  string labels_url = 35;
+  string languages_url = 36;
+  string merges_url = 37;
+  string milestones_url = 38;
+  string notifications_url = 39;
+  string pulls_url = 40;
+  string releases_url = 41;
+  string ssh_url = 42;
+  string stargazers_url = 43;
+  string statuses_url = 44;
+  string subscribers_url = 45;
+  string subscription_url = 46;
+  string tags_url = 47;
+  string teams_url = 48;
+  string trees_url = 49;
+  string clone_url = 50;
+  string mirror_url = 51;
+  string hooks_url = 52;
+  string svn_url = 53;
+  string homepage = 54;
+  string language = 55;
+  int64 forks_count = 56;
+  int64 stargazers_count = 57;
+  int64 watchers_count = 58;
+  int64 size = 59;
+  string default_branch = 60;
+  int64 open_issues_count = 61;
+  bool is_template = 62;
+  repeated string topics = 63;
+  bool has_issues = 64;
+  bool has_projects = 65;
+  bool has_wiki = 66;
+  bool has_pages = 67;
+  bool has_discussions = 68;
+  bool has_pull_requests = 69;
+  string pull_request_creation_policy = 70;
+  bool archived = 71;
+  bool disabled = 72;
+  string visibility = 73;
+  string pushed_at = 74;
+  string created_at = 75;
+  string updated_at = 76;
+  Permissions permissions = 77;
+  bool allow_rebase_merge = 78;
+  GitHubReposReposRepository template_repository = 79;
+  string temp_clone_token = 80;
+  bool allow_squash_merge = 81;
+  bool allow_auto_merge = 82;
+  bool delete_branch_on_merge = 83;
+  bool allow_merge_commit = 84;
+  bool allow_update_branch = 85;
+  string squash_merge_commit_title = 86;
+  string squash_merge_commit_message = 87;
+  string merge_commit_title = 88;
+  string merge_commit_message = 89;
+  bool allow_forking = 90;
+  bool web_commit_signoff_required = 91;
+  int64 subscribers_count = 92;
+  int64 network_count = 93;
+  GitHubReposReposLicenseSimple license = 94;
+  GitHubReposReposSimpleUser organization = 95;
+  GitHubReposReposRepository parent = 96;
+  GitHubReposReposRepository source = 97;
+  int64 forks = 98;
+  string master_branch = 99;
+  int64 open_issues = 100;
+  int64 watchers = 101;
+  bool anonymous_access_enabled = 102;
+  GitHubReposReposCodeOfConductSimple code_of_conduct = 103;
+  GitHubReposReposMinimalRepository.SecurityAndAnalysis security_and_analysis = 104;
+  google.protobuf.Struct custom_properties = 105;
+}
+
+// GET /repos/{owner}/{repo}
+// Response: same response schema as Create an organization repository.
+message GitHubGetARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+// PATCH /repos/{owner}/{repo}
+// Response: same response schema as Create an organization repository.
+message GitHubUpdateARepositoryRequest {
+  message SecurityAndAnalysis {
+    message Status {
+      string status = 1;
+    }
+
+    message SecretScanningDelegatedBypassOptions {
+      message Reviewers {
+        int64 reviewer_id = 1;
+        string reviewer_type = 2;
+        string mode = 3;
+      }
+
+      repeated Reviewers reviewers = 1;
+    }
+
+    Status advanced_security = 1;
+    Status code_security = 2;
+    Status secret_scanning = 3;
+    Status secret_scanning_push_protection = 4;
+    Status secret_scanning_ai_detection = 5;
+    Status secret_scanning_non_provider_patterns = 6;
+    Status secret_scanning_delegated_alert_dismissal = 7;
+    Status secret_scanning_delegated_bypass = 8;
+    SecretScanningDelegatedBypassOptions secret_scanning_delegated_bypass_options = 9;
+  }
+
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string name = 4;
+  string description = 5;
+  string homepage = 6;
+  bool private = 7;
+  string visibility = 8;
+  SecurityAndAnalysis security_and_analysis = 9;
+  bool has_issues = 10;
+  bool has_projects = 11;
+  bool has_wiki = 12;
+  bool has_pull_requests = 13;
+  string pull_request_creation_policy = 14;
+  bool is_template = 15;
+  string default_branch = 16;
+  bool allow_squash_merge = 17;
+  bool allow_merge_commit = 18;
+  bool allow_rebase_merge = 19;
+  bool allow_auto_merge = 20;
+  bool delete_branch_on_merge = 21;
+  bool allow_update_branch = 22;
+  bool use_squash_pr_title_as_default = 23;
+  string squash_merge_commit_title = 24;
+  string squash_merge_commit_message = 25;
+  string merge_commit_title = 26;
+  string merge_commit_message = 27;
+  bool archived = 28;
+  bool allow_forking = 29;
+  bool web_commit_signoff_required = 30;
+}
+
+// DELETE /repos/{owner}/{repo}
+message GitHubDeleteARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubDeleteARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/activity
+message GitHubListRepositoryActivitiesRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string direction = 4;
+  int64 per_page = 5;
+  string before = 6;
+  string after = 7;
+  string ref = 8;
+  string actor = 9;
+  string time_period = 10;
+  string activity_type = 11;
+}
+
+message GitHubListRepositoryActivitiesResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubReposReposActivity items = 3;
+}
+
+// GET /repos/{owner}/{repo}/automated-security-fixes
+message GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+  bool enabled = 3;
+  bool paused = 4;
+}
+
+// PUT /repos/{owner}/{repo}/automated-security-fixes
+message GitHubEnableDependabotSecurityUpdatesRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubEnableDependabotSecurityUpdatesResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// DELETE /repos/{owner}/{repo}/automated-security-fixes
+message GitHubDisableDependabotSecurityUpdatesRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubDisableDependabotSecurityUpdatesResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/codeowners/errors
+message GitHubListCODEOWNERSErrorsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string ref = 4;
+}
+
+message GitHubListCODEOWNERSErrorsResponse {
+  message Errors {
+    int64 line = 1;
+    int64 column = 2;
+    string source = 3;
+    string kind = 4;
+    string suggestion = 5;
+    string message = 6;
+    string path = 7;
+  }
+
+  bool success = 1;
+  string error = 2;
+  repeated Errors errors = 3;
+}
+
+// GET /repos/{owner}/{repo}/contributors
+message GitHubListRepositoryContributorsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string anon = 4;
+  int64 per_page = 5;
+  int64 page = 6;
+}
+
+message GitHubListRepositoryContributorsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubReposReposContributor items = 3;
+}
+
+// POST /repos/{owner}/{repo}/dispatches
+message GitHubCreateARepositoryDispatchEventRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string event_type = 4;
+  google.protobuf.Struct client_payload = 5;
+}
+
+message GitHubCreateARepositoryDispatchEventResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/hash-algorithm
+message GitHubGetTheHashAlgorithmForARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubGetTheHashAlgorithmForARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+  string hash_algorithm = 3;
+}
+
+// GET /repos/{owner}/{repo}/immutable-releases
+message GitHubCheckIfImmutableReleasesAreEnabledForARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubCheckIfImmutableReleasesAreEnabledForARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+  bool enabled = 3;
+  bool enforced_by_owner = 4;
+}
+
+// PUT /repos/{owner}/{repo}/immutable-releases
+message GitHubEnableImmutableReleasesRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubEnableImmutableReleasesResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// DELETE /repos/{owner}/{repo}/immutable-releases
+message GitHubDisableImmutableReleasesRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubDisableImmutableReleasesResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/languages
+message GitHubListRepositoryLanguagesRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubListRepositoryLanguagesResponse {
+  bool success = 1;
+  string error = 2;
+  // "object, additional properties: integer"
+  map<string, int64> items = 3;
+}
+
+// GET /repos/{owner}/{repo}/private-vulnerability-reporting
+message GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+  bool enabled = 3;
+}
+
+// PUT /repos/{owner}/{repo}/private-vulnerability-reporting
+message GitHubEnablePrivateVulnerabilityReportingForARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubEnablePrivateVulnerabilityReportingForARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// DELETE /repos/{owner}/{repo}/private-vulnerability-reporting
+message GitHubDisablePrivateVulnerabilityReportingForARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubDisablePrivateVulnerabilityReportingForARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /repos/{owner}/{repo}/tags
+message GitHubListRepositoryTagsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 per_page = 4;
+  int64 page = 5;
+}
+
+message GitHubListRepositoryTagsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubReposReposTag items = 3;
+}
+
+// GET /repos/{owner}/{repo}/teams
+message GitHubListRepositoryTeamsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 per_page = 4;
+  int64 page = 5;
+}
+
+message GitHubListRepositoryTeamsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubReposReposTeam items = 3;
+}
+
+// GET /repos/{owner}/{repo}/topics
+message GitHubGetAllRepositoryTopicsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  int64 page = 4;
+  int64 per_page = 5;
+}
+
+message GitHubGetAllRepositoryTopicsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated string names = 3;
+}
+
+// PUT /repos/{owner}/{repo}/topics
+// Response: same response schema as Get all repository topics.
+message GitHubReplaceAllRepositoryTopicsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  repeated string names = 4;
+}
+
+// POST /repos/{owner}/{repo}/transfer
+message GitHubTransferARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string new_owner = 4;
+  string new_name = 5;
+  repeated int64 team_ids = 6;
+}
+
+message GitHubTransferARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+  int64 id = 3;
+  string node_id = 4;
+  string name = 5;
+  string full_name = 6;
+  GitHubReposReposSimpleUser owner = 7;
+  bool private = 8;
+  string html_url = 9;
+  string description = 10;
+  bool fork = 11;
+  string url = 12;
+  string archive_url = 13;
+  string assignees_url = 14;
+  string blobs_url = 15;
+  string branches_url = 16;
+  string collaborators_url = 17;
+  string comments_url = 18;
+  string commits_url = 19;
+  string compare_url = 20;
+  string contents_url = 21;
+  string contributors_url = 22;
+  string deployments_url = 23;
+  string downloads_url = 24;
+  string events_url = 25;
+  string forks_url = 26;
+  string git_commits_url = 27;
+  string git_refs_url = 28;
+  string git_tags_url = 29;
+  string git_url = 30;
+  string issue_comment_url = 31;
+  string issue_events_url = 32;
+  string issues_url = 33;
+  string keys_url = 34;
+  string labels_url = 35;
+  string languages_url = 36;
+  string merges_url = 37;
+  string milestones_url = 38;
+  string notifications_url = 39;
+  string pulls_url = 40;
+  string releases_url = 41;
+  string ssh_url = 42;
+  string stargazers_url = 43;
+  string statuses_url = 44;
+  string subscribers_url = 45;
+  string subscription_url = 46;
+  string tags_url = 47;
+  string teams_url = 48;
+  string trees_url = 49;
+  string clone_url = 50;
+  string mirror_url = 51;
+  string hooks_url = 52;
+  string svn_url = 53;
+  string homepage = 54;
+  string language = 55;
+  int64 forks_count = 56;
+  int64 stargazers_count = 57;
+  int64 watchers_count = 58;
+  int64 size = 59;
+  string default_branch = 60;
+  int64 open_issues_count = 61;
+  bool is_template = 62;
+  repeated string topics = 63;
+  bool has_issues = 64;
+  bool has_projects = 65;
+  bool has_wiki = 66;
+  bool has_pages = 67;
+  bool has_discussions = 68;
+  bool has_pull_requests = 69;
+  string pull_request_creation_policy = 70;
+  bool archived = 71;
+  bool disabled = 72;
+  string visibility = 73;
+  string pushed_at = 74;
+  string created_at = 75;
+  string updated_at = 76;
+  GitHubReposReposMinimalRepository.Permissions permissions = 77;
+  string role_name = 78;
+  string temp_clone_token = 79;
+  bool delete_branch_on_merge = 80;
+  int64 subscribers_count = 81;
+  int64 network_count = 82;
+  GitHubReposReposCodeOfConduct code_of_conduct = 83;
+  GitHubReposReposMinimalRepository.License license = 84;
+  int64 forks = 85;
+  int64 open_issues = 86;
+  int64 watchers = 87;
+  bool allow_forking = 88;
+  bool web_commit_signoff_required = 89;
+  GitHubReposReposMinimalRepository.SecurityAndAnalysis security_and_analysis = 90;
+  google.protobuf.Struct custom_properties = 91;
+}
+
+// GET /repos/{owner}/{repo}/vulnerability-alerts
+message GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// PUT /repos/{owner}/{repo}/vulnerability-alerts
+message GitHubEnableVulnerabilityAlertsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubEnableVulnerabilityAlertsResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// DELETE /repos/{owner}/{repo}/vulnerability-alerts
+message GitHubDisableVulnerabilityAlertsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+}
+
+message GitHubDisableVulnerabilityAlertsResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// POST /repos/{template_owner}/{template_repo}/generate
+// Response: same response schema as Create an organization repository.
+message GitHubCreateARepositoryUsingATemplateRequest {
+  string namespace = 1;
+  string template_owner = 2;
+  string template_repo = 3;
+  string owner = 4;
+  string name = 5;
+  string description = 6;
+  bool include_all_branches = 7;
+  bool private = 8;
+}
+
+// GET /repositories
+// Response: same response schema as List organization repositories.
+message GitHubListPublicRepositoriesRequest {
+  string namespace = 1;
+  int64 since = 2;
+}
+
+// GET /user/repos
+message GitHubListRepositoriesForTheAuthenticatedUserRequest {
+  string namespace = 1;
+  string visibility = 2;
+  string affiliation = 3;
+  string type = 4;
+  string sort = 5;
+  string direction = 6;
+  int64 per_page = 7;
+  int64 page = 8;
+  string since = 9;
+  string before = 10;
+}
+
+message GitHubListRepositoriesForTheAuthenticatedUserResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubReposReposRepository items = 3;
+}
+
+// POST /user/repos
+// Response: same response schema as Create an organization repository.
+message GitHubCreateARepositoryForTheAuthenticatedUserRequest {
+  string namespace = 1;
+  string name = 2;
+  string description = 3;
+  string homepage = 4;
+  bool private = 5;
+  bool has_issues = 6;
+  bool has_projects = 7;
+  bool has_wiki = 8;
+  bool has_discussions = 9;
+  int64 team_id = 10;
+  bool auto_init = 11;
+  string gitignore_template = 12;
+  string license_template = 13;
+  bool allow_squash_merge = 14;
+  bool allow_merge_commit = 15;
+  bool allow_rebase_merge = 16;
+  bool allow_auto_merge = 17;
+  bool delete_branch_on_merge = 18;
+  string squash_merge_commit_title = 19;
+  string squash_merge_commit_message = 20;
+  string merge_commit_title = 21;
+  string merge_commit_message = 22;
+  bool has_downloads = 23;
+  bool is_template = 24;
+}
+
+// GET /users/{username}/repos
+// Response: same response schema as List organization repositories.
+message GitHubListRepositoriesForAUserRequest {
+  string namespace = 1;
+  string username = 2;
+  string type = 3;
+  string sort = 4;
+  string direction = 5;
+  int64 per_page = 6;
+  int64 page = 7;
+}
+
+// Simple User
+message GitHubReposReposSimpleUser {
+  string name = 1;
+  string email = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string avatar_url = 6;
+  string gravatar_id = 7;
+  string url = 8;
+  string html_url = 9;
+  string followers_url = 10;
+  string following_url = 11;
+  string gists_url = 12;
+  string starred_url = 13;
+  string subscriptions_url = 14;
+  string organizations_url = 15;
+  string repos_url = 16;
+  string events_url = 17;
+  string received_events_url = 18;
+  string type = 19;
+  bool site_admin = 20;
+  string starred_at = 21;
+  string user_view_type = 22;
+}
+
+// Code Of Conduct
+message GitHubReposReposCodeOfConduct {
+  string key = 1;
+  string name = 2;
+  string url = 3;
+  string body = 4;
+  string html_url = 5;
+}
+
+// Code Of Conduct Simple
+message GitHubReposReposCodeOfConductSimple {
+  string url = 1;
+  string key = 2;
+  string name = 3;
+  string html_url = 4;
+}
+
+// License Simple
+message GitHubReposReposLicenseSimple {
+  string key = 1;
+  string name = 2;
+  string url = 3;
+  string spdx_id = 4;
+  string node_id = 5;
+  string html_url = 6;
+}
+
+// Minimal Repository
+message GitHubReposReposMinimalRepository {
+  message Permissions {
+    bool admin = 1;
+    bool maintain = 2;
+    bool push = 3;
+    bool triage = 4;
+    bool pull = 5;
+  }
+
+  message License {
+    string key = 1;
+    string name = 2;
+    string spdx_id = 3;
+    string url = 4;
+    string node_id = 5;
+  }
+
+  message SecurityAndAnalysis {
+    message Status {
+      string status = 1;
+    }
+
+    message SecretScanningDelegatedBypassOptions {
+      message Reviewers {
+        int64 reviewer_id = 1;
+        string reviewer_type = 2;
+        string mode = 3;
+      }
+
+      repeated Reviewers reviewers = 1;
+    }
+
+    Status advanced_security = 1;
+    Status code_security = 2;
+    Status dependabot_security_updates = 3;
+    Status secret_scanning = 4;
+    Status secret_scanning_push_protection = 5;
+    Status secret_scanning_non_provider_patterns = 6;
+    Status secret_scanning_ai_detection = 7;
+    Status secret_scanning_delegated_alert_dismissal = 8;
+    Status secret_scanning_delegated_bypass = 9;
+    SecretScanningDelegatedBypassOptions secret_scanning_delegated_bypass_options = 10;
+  }
+
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string full_name = 4;
+  GitHubReposReposSimpleUser owner = 5;
+  bool private = 6;
+  string html_url = 7;
+  string description = 8;
+  bool fork = 9;
+  string url = 10;
+  string archive_url = 11;
+  string assignees_url = 12;
+  string blobs_url = 13;
+  string branches_url = 14;
+  string collaborators_url = 15;
+  string comments_url = 16;
+  string commits_url = 17;
+  string compare_url = 18;
+  string contents_url = 19;
+  string contributors_url = 20;
+  string deployments_url = 21;
+  string downloads_url = 22;
+  string events_url = 23;
+  string forks_url = 24;
+  string git_commits_url = 25;
+  string git_refs_url = 26;
+  string git_tags_url = 27;
+  string git_url = 28;
+  string issue_comment_url = 29;
+  string issue_events_url = 30;
+  string issues_url = 31;
+  string keys_url = 32;
+  string labels_url = 33;
+  string languages_url = 34;
+  string merges_url = 35;
+  string milestones_url = 36;
+  string notifications_url = 37;
+  string pulls_url = 38;
+  string releases_url = 39;
+  string ssh_url = 40;
+  string stargazers_url = 41;
+  string statuses_url = 42;
+  string subscribers_url = 43;
+  string subscription_url = 44;
+  string tags_url = 45;
+  string teams_url = 46;
+  string trees_url = 47;
+  string clone_url = 48;
+  string mirror_url = 49;
+  string hooks_url = 50;
+  string svn_url = 51;
+  string homepage = 52;
+  string language = 53;
+  int64 forks_count = 54;
+  int64 stargazers_count = 55;
+  int64 watchers_count = 56;
+  int64 size = 57;
+  string default_branch = 58;
+  int64 open_issues_count = 59;
+  bool is_template = 60;
+  repeated string topics = 61;
+  bool has_issues = 62;
+  bool has_projects = 63;
+  bool has_wiki = 64;
+  bool has_pages = 65;
+  bool has_discussions = 66;
+  bool has_pull_requests = 67;
+  string pull_request_creation_policy = 68;
+  bool archived = 69;
+  bool disabled = 70;
+  string visibility = 71;
+  string pushed_at = 72;
+  string created_at = 73;
+  string updated_at = 74;
+  Permissions permissions = 75;
+  string role_name = 76;
+  string temp_clone_token = 77;
+  bool delete_branch_on_merge = 78;
+  int64 subscribers_count = 79;
+  int64 network_count = 80;
+  GitHubReposReposCodeOfConduct code_of_conduct = 81;
+  License license = 82;
+  int64 forks = 83;
+  int64 open_issues = 84;
+  int64 watchers = 85;
+  bool allow_forking = 86;
+  bool web_commit_signoff_required = 87;
+  SecurityAndAnalysis security_and_analysis = 88;
+  google.protobuf.Struct custom_properties = 89;
+}
+
+// Repository
+message GitHubReposReposRepository {
+  message Permissions {
+    bool admin = 1;
+    bool pull = 2;
+    bool triage = 3;
+    bool push = 4;
+    bool maintain = 5;
+  }
+
+  message CodeSearchIndexStatus {
+    bool lexical_search_ok = 1;
+    string lexical_commit_sha = 2;
+  }
+
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string full_name = 4;
+  GitHubReposReposLicenseSimple license = 5;
+  int64 forks = 6;
+  Permissions permissions = 7;
+  GitHubReposReposSimpleUser owner = 8;
+  bool private = 9;
+  string html_url = 10;
+  string description = 11;
+  bool fork = 12;
+  string url = 13;
+  string archive_url = 14;
+  string assignees_url = 15;
+  string blobs_url = 16;
+  string branches_url = 17;
+  string collaborators_url = 18;
+  string comments_url = 19;
+  string commits_url = 20;
+  string compare_url = 21;
+  string contents_url = 22;
+  string contributors_url = 23;
+  string deployments_url = 24;
+  string downloads_url = 25;
+  string events_url = 26;
+  string forks_url = 27;
+  string git_commits_url = 28;
+  string git_refs_url = 29;
+  string git_tags_url = 30;
+  string git_url = 31;
+  string issue_comment_url = 32;
+  string issue_events_url = 33;
+  string issues_url = 34;
+  string keys_url = 35;
+  string labels_url = 36;
+  string languages_url = 37;
+  string merges_url = 38;
+  string milestones_url = 39;
+  string notifications_url = 40;
+  string pulls_url = 41;
+  string releases_url = 42;
+  string ssh_url = 43;
+  string stargazers_url = 44;
+  string statuses_url = 45;
+  string subscribers_url = 46;
+  string subscription_url = 47;
+  string tags_url = 48;
+  string teams_url = 49;
+  string trees_url = 50;
+  string clone_url = 51;
+  string mirror_url = 52;
+  string hooks_url = 53;
+  string svn_url = 54;
+  string homepage = 55;
+  string language = 56;
+  int64 forks_count = 57;
+  int64 stargazers_count = 58;
+  int64 watchers_count = 59;
+  int64 size = 60;
+  string default_branch = 61;
+  int64 open_issues_count = 62;
+  bool is_template = 63;
+  repeated string topics = 64;
+  bool has_issues = 65;
+  bool has_projects = 66;
+  bool has_wiki = 67;
+  bool has_pages = 68;
+  bool has_discussions = 69;
+  bool has_pull_requests = 70;
+  string pull_request_creation_policy = 71;
+  bool archived = 72;
+  bool disabled = 73;
+  string visibility = 74;
+  string pushed_at = 75;
+  string created_at = 76;
+  string updated_at = 77;
+  bool allow_rebase_merge = 78;
+  string temp_clone_token = 79;
+  bool allow_squash_merge = 80;
+  bool allow_auto_merge = 81;
+  bool delete_branch_on_merge = 82;
+  bool allow_update_branch = 83;
+  string squash_merge_commit_title = 84;
+  string squash_merge_commit_message = 85;
+  string merge_commit_title = 86;
+  string merge_commit_message = 87;
+  bool allow_merge_commit = 88;
+  bool allow_forking = 89;
+  bool web_commit_signoff_required = 90;
+  int64 open_issues = 91;
+  int64 watchers = 92;
+  string starred_at = 93;
+  bool anonymous_access_enabled = 94;
+  CodeSearchIndexStatus code_search_index_status = 95;
+}
+
+// Activity
+message GitHubReposReposActivity {
+  int64 id = 1;
+  string node_id = 2;
+  string before = 3;
+  string after = 4;
+  string ref = 5;
+  string timestamp = 6;
+  string activity_type = 7;
+  GitHubReposReposSimpleUser actor = 8;
+}
+
+// Contributor
+message GitHubReposReposContributor {
+  string login = 1;
+  int64 id = 2;
+  string node_id = 3;
+  string avatar_url = 4;
+  string gravatar_id = 5;
+  string url = 6;
+  string html_url = 7;
+  string followers_url = 8;
+  string following_url = 9;
+  string gists_url = 10;
+  string starred_url = 11;
+  string subscriptions_url = 12;
+  string organizations_url = 13;
+  string repos_url = 14;
+  string events_url = 15;
+  string received_events_url = 16;
+  string type = 17;
+  bool site_admin = 18;
+  int64 contributions = 19;
+  string email = 20;
+  string name = 21;
+  string user_view_type = 22;
+}
+
+// Tag
+message GitHubReposReposTag {
+  message Commit {
+    string sha = 1;
+    string url = 2;
+  }
+
+  string name = 1;
+  Commit commit = 2;
+  string zipball_url = 3;
+  string tarball_url = 4;
+  string node_id = 5;
+}
+
+// Team
+message GitHubReposReposTeam {
+  message Permissions {
+    bool pull = 1;
+    bool triage = 2;
+    bool push = 3;
+    bool maintain = 4;
+    bool admin = 5;
+  }
+
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string slug = 4;
+  string description = 5;
+  string privacy = 6;
+  string notification_setting = 7;
+  string permission = 8;
+  Permissions permissions = 9;
+  string url = 10;
+  string html_url = 11;
+  string members_url = 12;
+  string repositories_url = 13;
+  string type = 14;
+  string access_source = 15;
+  int64 organization_id = 16;
+  int64 enterprise_id = 17;
+  GitHubReposReposTeamSimple parent = 18;
+}
+
+// Team Simple
+message GitHubReposReposTeamSimple {
+  int64 id = 1;
+  string node_id = 2;
+  string url = 3;
+  string members_url = 4;
+  string name = 5;
+  string description = 6;
+  string permission = 7;
+  string privacy = 8;
+  string notification_setting = 9;
+  string html_url = 10;
+  string repositories_url = 11;
+  string slug = 12;
+  string ldap_dn = 13;
+  string type = 14;
+  int64 organization_id = 15;
+  int64 enterprise_id = 16;
+}

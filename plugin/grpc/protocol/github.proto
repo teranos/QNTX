@@ -20,6 +20,7 @@ import "plugin/grpc/protocol/github_issues_comments.proto";
 import "plugin/grpc/protocol/github_orgs_members.proto";
 import "plugin/grpc/protocol/github_orgs_orgs.proto";
 import "plugin/grpc/protocol/github_issues_issues.proto";
+import "plugin/grpc/protocol/github_repos_repos.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -337,6 +338,73 @@ service GitHubService {
   rpc DismissAnIssueSuggestion(GitHubDismissAnIssueSuggestionRequest) returns (GitHubApproveAnIssueSuggestionResponse);
   // https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-user-account-issues-assigned-to-the-authenticated-user
   rpc ListUserAccountIssuesAssignedToTheAuthenticatedUser(GitHubListUserAccountIssuesAssignedToTheAuthenticatedUserRequest) returns (GitHubListIssuesAssignedToTheAuthenticatedUserResponse);
+
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-organization-repositories
+  rpc ListOrganizationRepositories(GitHubListOrganizationRepositoriesRequest) returns (GitHubListOrganizationRepositoriesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-an-organization-repository
+  rpc CreateAnOrganizationRepository(GitHubCreateAnOrganizationRepositoryRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#get-a-repository
+  rpc GetARepository(GitHubGetARepositoryRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#update-a-repository
+  rpc UpdateARepository(GitHubUpdateARepositoryRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#delete-a-repository
+  rpc DeleteARepository(GitHubDeleteARepositoryRequest) returns (GitHubDeleteARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-activities
+  rpc ListRepositoryActivities(GitHubListRepositoryActivitiesRequest) returns (GitHubListRepositoryActivitiesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-dependabot-security-updates-are-enabled-for-a-repository
+  rpc CheckIfDependabotSecurityUpdatesAreEnabledForARepository(GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryRequest) returns (GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-dependabot-security-updates
+  rpc EnableDependabotSecurityUpdates(GitHubEnableDependabotSecurityUpdatesRequest) returns (GitHubEnableDependabotSecurityUpdatesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-dependabot-security-updates
+  rpc DisableDependabotSecurityUpdates(GitHubDisableDependabotSecurityUpdatesRequest) returns (GitHubDisableDependabotSecurityUpdatesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-codeowners-errors
+  rpc ListCODEOWNERSErrors(GitHubListCODEOWNERSErrorsRequest) returns (GitHubListCODEOWNERSErrorsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-contributors
+  rpc ListRepositoryContributors(GitHubListRepositoryContributorsRequest) returns (GitHubListRepositoryContributorsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-a-repository-dispatch-event
+  rpc CreateARepositoryDispatchEvent(GitHubCreateARepositoryDispatchEventRequest) returns (GitHubCreateARepositoryDispatchEventResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#get-the-hash-algorithm-for-a-repository
+  rpc GetTheHashAlgorithmForARepository(GitHubGetTheHashAlgorithmForARepositoryRequest) returns (GitHubGetTheHashAlgorithmForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-immutable-releases-are-enabled-for-a-repository
+  rpc CheckIfImmutableReleasesAreEnabledForARepository(GitHubCheckIfImmutableReleasesAreEnabledForARepositoryRequest) returns (GitHubCheckIfImmutableReleasesAreEnabledForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-immutable-releases
+  rpc EnableImmutableReleases(GitHubEnableImmutableReleasesRequest) returns (GitHubEnableImmutableReleasesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-immutable-releases
+  rpc DisableImmutableReleases(GitHubDisableImmutableReleasesRequest) returns (GitHubDisableImmutableReleasesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-languages
+  rpc ListRepositoryLanguages(GitHubListRepositoryLanguagesRequest) returns (GitHubListRepositoryLanguagesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-private-vulnerability-reporting-is-enabled-for-a-repository
+  rpc CheckIfPrivateVulnerabilityReportingIsEnabledForARepository(GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryRequest) returns (GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-private-vulnerability-reporting-for-a-repository
+  rpc EnablePrivateVulnerabilityReportingForARepository(GitHubEnablePrivateVulnerabilityReportingForARepositoryRequest) returns (GitHubEnablePrivateVulnerabilityReportingForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-private-vulnerability-reporting-for-a-repository
+  rpc DisablePrivateVulnerabilityReportingForARepository(GitHubDisablePrivateVulnerabilityReportingForARepositoryRequest) returns (GitHubDisablePrivateVulnerabilityReportingForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-tags
+  rpc ListRepositoryTags(GitHubListRepositoryTagsRequest) returns (GitHubListRepositoryTagsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-teams
+  rpc ListRepositoryTeams(GitHubListRepositoryTeamsRequest) returns (GitHubListRepositoryTeamsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#get-all-repository-topics
+  rpc GetAllRepositoryTopics(GitHubGetAllRepositoryTopicsRequest) returns (GitHubGetAllRepositoryTopicsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#replace-all-repository-topics
+  rpc ReplaceAllRepositoryTopics(GitHubReplaceAllRepositoryTopicsRequest) returns (GitHubGetAllRepositoryTopicsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#transfer-a-repository
+  rpc TransferARepository(GitHubTransferARepositoryRequest) returns (GitHubTransferARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-vulnerability-alerts-are-enabled-for-a-repository
+  rpc CheckIfVulnerabilityAlertsAreEnabledForARepository(GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryRequest) returns (GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-vulnerability-alerts
+  rpc EnableVulnerabilityAlerts(GitHubEnableVulnerabilityAlertsRequest) returns (GitHubEnableVulnerabilityAlertsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-vulnerability-alerts
+  rpc DisableVulnerabilityAlerts(GitHubDisableVulnerabilityAlertsRequest) returns (GitHubDisableVulnerabilityAlertsResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-a-repository-using-a-template
+  rpc CreateARepositoryUsingATemplate(GitHubCreateARepositoryUsingATemplateRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-public-repositories
+  rpc ListPublicRepositories(GitHubListPublicRepositoriesRequest) returns (GitHubListOrganizationRepositoriesResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repositories-for-the-authenticated-user
+  rpc ListRepositoriesForTheAuthenticatedUser(GitHubListRepositoriesForTheAuthenticatedUserRequest) returns (GitHubListRepositoriesForTheAuthenticatedUserResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-a-repository-for-the-authenticated-user
+  rpc CreateARepositoryForTheAuthenticatedUser(GitHubCreateARepositoryForTheAuthenticatedUserRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
+  // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repositories-for-a-user
+  rpc ListRepositoriesForAUser(GitHubListRepositoriesForAUserRequest) returns (GitHubListOrganizationRepositoriesResponse);
 }
 
 message GitHubRateLimitRequest {
