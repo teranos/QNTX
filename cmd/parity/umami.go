@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -16,15 +17,29 @@ import (
 // and not a blend." Pinned to v3.3.1, at the commit that tag points to.
 //
 // An item is a model in Umami's Prisma schema. Its score is the share of the
-// model's fields that a stand records, 0 to 100. A stand records a field when
-// the Arrival that staandArrival builds carries the Arrival field mapped to it.
+// model's columns that a stand records in the shape Umami gives them, 0 to 100. A
+// stand records a column when the Arrival that staandArrival builds carries the
+// Arrival field mapped to it, and the shape is held against what the handler does
+// with a value (server.StaandProbes): whether a hit can arrive without it, whether
+// it keeps a value that is not a UUID, how long a value it keeps, whether it reads
+// as a timestamp.
 const umamiDir = "cmd/parity/umami_v3.3.1_ca661c7"
+
+// Column is one scalar field of a model, as Umami's schema types it.
+type Column struct {
+	Name     string
+	Type     string // String, Int, DateTime, ...
+	Optional bool
+	Native   string // Uuid, VarChar, Char, Timestamptz, ...
+	MaxLen   int    // the n of VarChar(n) and Char(n), 0 when the column has none
+}
 
 // Model is one Prisma model and its scalar fields. Relations are not fields of
 // the record, so they are left out.
 type Model struct {
-	Name   string
-	Fields []string
+	Name    string
+	Fields  []string
+	Columns map[string]Column
 }
 
 var prismaScalars = []string{"String", "Int", "BigInt", "Boolean", "DateTime", "Decimal", "Json", "Float", "Bytes"}
@@ -44,7 +59,7 @@ func ParsePrisma(path string) ([]Model, error) {
 		case cur == nil:
 			if name, ok := strings.CutPrefix(line, "model "); ok {
 				name, _, _ = strings.Cut(name, " ")
-				models = append(models, Model{Name: name})
+				models = append(models, Model{Name: name, Columns: map[string]Column{}})
 				cur = &models[len(models)-1]
 			}
 		case line == "}":
@@ -58,6 +73,7 @@ func ParsePrisma(path string) ([]Model, error) {
 			kind := strings.TrimSuffix(strings.TrimSuffix(parts[1], "?"), "[]")
 			if slices.Contains(prismaScalars, kind) {
 				cur.Fields = append(cur.Fields, parts[0])
+				cur.Columns[parts[0]] = prismaColumn(parts, kind)
 			}
 		}
 	}
@@ -65,6 +81,26 @@ func ParsePrisma(path string) ([]Model, error) {
 		return nil, errors.Newf("no model found in the Umami schema at %s", path)
 	}
 	return models, nil
+}
+
+// prismaColumn reads a field's type, whether it may be absent, and its native
+// type: @db.Uuid, @db.VarChar(500), @db.Char(2), @db.Timestamptz(6).
+func prismaColumn(parts []string, kind string) Column {
+	col := Column{Name: parts[0], Type: kind, Optional: strings.HasSuffix(parts[1], "?")}
+	for _, part := range parts[2:] {
+		native, ok := strings.CutPrefix(part, "@db.")
+		if !ok {
+			continue
+		}
+		name, arg, hasArg := strings.Cut(native, "(")
+		col.Native = name
+		if hasArg && (name == "VarChar" || name == "Char") {
+			if n, err := strconv.Atoi(strings.TrimSuffix(arg, ")")); err == nil {
+				col.MaxLen = n
+			}
+		}
+	}
+	return col
 }
 
 // umamiColumns says which Umami field each Arrival field is. Every line is the
@@ -116,19 +152,33 @@ var umamiClades = []struct {
 	{"system", []string{"AppSetting"}},
 }
 
-// Item is one model and how much of it a stand records.
-type Item struct {
-	Name    string
-	Covered int
-	Total   int
+// umamiOptionalRows are the models whose rows Umami writes only when there is
+// something to put in them, so a column that is required there is required of a
+// row and not of every arrival.
+var umamiOptionalRows = []string{"EventData"}
+
+// Finding is a column a stand fills that does not take the shape Umami gives it.
+type Finding struct {
+	Column string
+	Reason string
 }
 
-// Score is 0 to 100 and reads 100 only when every field is covered.
+// Item is one model and how much of it a stand records.
+type Item struct {
+	Name string
+	// Present is the columns a stand fills. Conform is those that also take the
+	// shape Umami gives them. Total is every column of the model.
+	Present, Conform, Total int
+	Findings                []Finding
+}
+
+// Score is 0 to 100 and reads 100 only when every column is present and takes
+// Umami's shape.
 func (i Item) Score() int {
 	if i.Total == 0 {
 		return 0
 	}
-	return i.Covered * 100 / i.Total
+	return i.Conform * 100 / i.Total
 }
 
 // Clade is a group of items.
@@ -137,16 +187,44 @@ type Clade struct {
 	Items []Item
 }
 
-// UmamiReport scores every model in the schema against the Arrival fields a
-// stand records.
-func UmamiReport(models []Model, recorded []string) ([]Clade, error) {
+// shapeOf says how a filled Arrival field departs from the column it is in Umami.
+// Nothing comes back when it does not.
+func shapeOf(column Column, arrival string, probe server.StaandProbe, everyArrival bool) []string {
+	var reasons []string
+	if column.Type != "String" && column.Type != "DateTime" {
+		reasons = append(reasons, fmt.Sprintf("%s in Umami, and %s is text", column.Type, arrival))
+	}
+	if everyArrival && !column.Optional && !probe.Required {
+		reasons = append(reasons, fmt.Sprintf("required in Umami, and a hit can arrive without %s", arrival))
+	}
+	if column.Native == "Uuid" && probe.KeepsNonUUID {
+		reasons = append(reasons, fmt.Sprintf("a UUID in Umami, and %s keeps any string", arrival))
+	}
+	if column.MaxLen > 0 && probe.MaxLength > column.MaxLen {
+		kept := strconv.Itoa(probe.MaxLength)
+		if probe.MaxLength >= server.StaandProbeCap {
+			kept = fmt.Sprintf("%d or more", server.StaandProbeCap)
+		}
+		reasons = append(reasons, fmt.Sprintf("at most %d in Umami, and %s keeps %s", column.MaxLen, arrival, kept))
+	}
+	if column.Type == "DateTime" && !probe.Timestamp {
+		reasons = append(reasons, fmt.Sprintf("a timestamp in Umami, and %s does not read as one", arrival))
+	}
+	return reasons
+}
+
+// UmamiReport scores every model in the schema against what a stand records and
+// how each recorded field takes the shape of the column it is.
+func UmamiReport(models []Model, recorded []string, probes map[string]server.StaandProbe) ([]Clade, error) {
 	byName := make(map[string]Model, len(models))
 	for _, m := range models {
 		byName[m.Name] = m
 	}
 
-	// covered[model][field] is true once a recorded Arrival field maps to it.
-	covered := map[string]map[string]bool{}
+	// present[model][field] is true once a recorded Arrival field maps to it;
+	// findings[model][field] is what departs, from each of them.
+	present := map[string]map[string]bool{}
+	findings := map[string]map[string][]string{}
 	for _, mapping := range umamiColumns {
 		for _, column := range mapping.Columns {
 			model, field, _ := strings.Cut(column, ".")
@@ -157,10 +235,17 @@ func UmamiReport(models []Model, recorded []string) ([]Clade, error) {
 			if !slices.Contains(recorded, mapping.Arrival) {
 				continue
 			}
-			if covered[model] == nil {
-				covered[model] = map[string]bool{}
+			probe, ok := probes[mapping.Arrival]
+			if !ok {
+				return nil, errors.Newf("Arrival field %s is recorded and was not probed", mapping.Arrival)
 			}
-			covered[model][field] = true
+			if present[model] == nil {
+				present[model] = map[string]bool{}
+				findings[model] = map[string][]string{}
+			}
+			present[model][field] = true
+			findings[model][field] = append(findings[model][field],
+				shapeOf(m.Columns[field], mapping.Arrival, probe, !slices.Contains(umamiOptionalRows, model))...)
 		}
 	}
 
@@ -174,7 +259,20 @@ func UmamiReport(models []Model, recorded []string) ([]Clade, error) {
 				return nil, errors.Newf("clade %s names model %s, which is not in the Umami schema", def.Name, name)
 			}
 			seen[name] = true
-			clade.Items = append(clade.Items, Item{Name: name, Covered: len(covered[name]), Total: len(m.Fields)})
+			item := Item{Name: name, Present: len(present[name]), Total: len(m.Fields)}
+			for _, field := range m.Fields {
+				if !present[name][field] {
+					continue
+				}
+				if reasons := findings[name][field]; len(reasons) > 0 {
+					for _, reason := range reasons {
+						item.Findings = append(item.Findings, Finding{Column: field, Reason: reason})
+					}
+					continue
+				}
+				item.Conform++
+			}
+			clade.Items = append(clade.Items, item)
 		}
 		clades = append(clades, clade)
 	}
@@ -212,9 +310,9 @@ func RenderUmami(clades []Clade, all bool) string {
 	hidden := 0
 	for _, c := range clades {
 		switch {
-		case c.allAt(func(i Item) bool { return i.Covered == 0 }):
+		case c.allAt(func(i Item) bool { return i.Present == 0 }):
 			fmt.Fprintf(&b, "  %-*s  %3d   (%d models)\n", width, c.Name, 0, len(c.Items))
-		case c.allAt(func(i Item) bool { return i.Covered == i.Total }):
+		case c.allAt(func(i Item) bool { return i.Conform == i.Total }):
 			if !all {
 				hidden++
 				continue
@@ -223,7 +321,10 @@ func RenderUmami(clades []Clade, all bool) string {
 		default:
 			fmt.Fprintf(&b, "  %s\n", c.Name)
 			for _, i := range c.Items {
-				fmt.Fprintf(&b, "    %-*s  %3d   (%d/%d)\n", width-2, i.Name, i.Score(), i.Covered, i.Total)
+				fmt.Fprintf(&b, "    %-*s  %3d   (%d/%d)\n", width-2, i.Name, i.Score(), i.Conform, i.Total)
+				for _, f := range i.Findings {
+					fmt.Fprintf(&b, "        %s: %s\n", f.Column, f.Reason)
+				}
 			}
 		}
 	}
@@ -310,7 +411,11 @@ func Umami(root string, all bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	clades, err := UmamiReport(models, recorded)
+	probes, err := server.StaandProbes()
+	if err != nil {
+		return "", err
+	}
+	clades, err := UmamiReport(models, recorded, probes)
 	if err != nil {
 		return "", err
 	}

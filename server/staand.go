@@ -113,6 +113,12 @@ var staandPixel = []byte{
 	0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
 }
 
+// staandSlugOK is the one rule a slug answers to: it names a stand inside a path,
+// so it carries no slash.
+func staandSlugOK(slug string) bool {
+	return !strings.Contains(slug, "/")
+}
+
 // staandMarket reports whether a namespace may hold a stand's arrivals. Never
 // system or default: an arrival is an untrusted public write, and those two
 // namespaces hold the node's own records — users, tokens, grants (ADR-026).
@@ -726,7 +732,7 @@ func (s *QNTXServer) staandsCreate(ctx context.Context, sent sigil.Sent) (any, *
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "market",
 			Says: "a stand namespace is never system or default"}
 	}
-	if strings.Contains(slug, "/") {
+	if !staandSlugOK(slug) {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "slug",
 			Says: "a stand needs a slug with no slash"}
 	}
