@@ -193,10 +193,11 @@ func findSignum(signa []*protocol.Signum, name string) (*protocol.Signum, error)
 	return nil, errors.Newf("no signum %s; the node holds %s", name, strings.Join(names, ", "))
 }
 
-// inScope is the messages a sigil carries, or nil for the whole signum.
-func inScope(signum *protocol.Signum, sigil string) (map[string]bool, error) {
+// inScope is the messages a sigil carries, and whole when no sigil is named and
+// the signum is held entire.
+func inScope(signum *protocol.Signum, sigil string) (messages map[string]bool, whole bool, err error) {
 	if sigil == "" {
-		return nil, nil
+		return map[string]bool{}, true, nil
 	}
 	var names []string
 	for _, s := range signum.GetSigils() {
@@ -204,18 +205,18 @@ func inScope(signum *protocol.Signum, sigil string) (map[string]bool, error) {
 		if s.GetName() != sigil {
 			continue
 		}
-		messages := map[string]bool{}
+		messages = map[string]bool{}
 		for _, f := range s.GetGives() {
 			if f.GetMessage() != "" {
 				messages[f.GetMessage()] = true
 			}
 		}
 		if len(messages) == 0 {
-			return nil, errors.Newf("%s %s carries no message, so none of its fields can follow a column", signum.GetName(), sigil)
+			return nil, false, errors.Newf("%s %s carries no message, so none of its fields can follow a column", signum.GetName(), sigil)
 		}
-		return messages, nil
+		return messages, false, nil
 	}
-	return nil, errors.Newf("%s holds no sigil %s; it holds %s", signum.GetName(), sigil, strings.Join(names, ", "))
+	return nil, false, errors.Newf("%s holds no sigil %s; it holds %s", signum.GetName(), sigil, strings.Join(names, ", "))
 }
 
 func splitField(full string) (string, string) {
@@ -266,7 +267,7 @@ func pick(signum *protocol.Signum, columns map[string]Column) (*protocol.Follows
 
 // Hold holds a signum, or one sigil of it, to the models of a schema.
 func Hold(signum *protocol.Signum, sigil string, models []Model) (Parity, error) {
-	scope, err := inScope(signum, sigil)
+	scope, whole, err := inScope(signum, sigil)
 	if err != nil {
 		return Parity{}, err
 	}
@@ -289,7 +290,7 @@ func Hold(signum *protocol.Signum, sigil string, models []Model) (Parity, error)
 
 	for _, c := range follows.GetColumns() {
 		message, field := splitField(c.GetField())
-		if scope != nil && !scope[message] {
+		if !whole && !scope[message] {
 			continue
 		}
 		found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(message))
