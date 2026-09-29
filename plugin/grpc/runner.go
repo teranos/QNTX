@@ -315,15 +315,15 @@ type RunnerStats struct {
 	Path       string       `json:"path"`
 	Name       string       `json:"name"`
 	GitHubURL  string       `json:"github_url"`
-	Workspaces []string     `json:"workspaces"`
-	Jobs       int          `json:"jobs"`
-	LastJob    *time.Time   `json:"last_job,omitempty"`
-	Taken      []TakenBuild `json:"taken"`
+	Workspaces []string `json:"workspaces"`
+	// Jobs is when each job the runner ran was last written, oldest first.
+	Jobs  []time.Time  `json:"jobs"`
+	Taken []TakenBuild `json:"taken"`
 }
 
 // Stats is the runner as its directory says it is now.
 func (r *Runner) Stats() RunnerStats {
-	stats := RunnerStats{Path: r.path, Workspaces: []string{}, Taken: []TakenBuild{}}
+	stats := RunnerStats{Path: r.path, Workspaces: []string{}, Jobs: []time.Time{}, Taken: []TakenBuild{}}
 	if raw, err := os.ReadFile(filepath.Join(r.path, runnerFile)); err == nil {
 		var registered struct {
 			AgentName string `json:"agentName"`
@@ -343,21 +343,15 @@ func (r *Runner) Stats() RunnerStats {
 	}
 	// A job leaves a Worker_<time>.log in _diag.
 	if entries, err := os.ReadDir(filepath.Join(r.path, "_diag")); err == nil {
-		var jobs []time.Time
 		for _, entry := range entries {
 			if !strings.HasPrefix(entry.Name(), "Worker_") {
 				continue
 			}
 			if info, err := entry.Info(); err == nil {
-				jobs = append(jobs, info.ModTime())
+				stats.Jobs = append(stats.Jobs, info.ModTime())
 			}
 		}
-		sort.Slice(jobs, func(i, j int) bool { return jobs[i].Before(jobs[j]) })
-		stats.Jobs = len(jobs)
-		if len(jobs) > 0 {
-			last := jobs[len(jobs)-1]
-			stats.LastJob = &last
-		}
+		sort.Slice(stats.Jobs, func(i, j int) bool { return stats.Jobs[i].Before(stats.Jobs[j]) })
 	}
 	r.mu.Lock()
 	stats.Taken = append(stats.Taken, r.taken...)

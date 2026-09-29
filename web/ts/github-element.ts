@@ -16,6 +16,7 @@ import { jsonBody } from './http-utils';
 import { Button } from './components/button';
 import { refusal } from './self-person';
 import { log, SEG } from './logger';
+import { renderSparklines, windowOf } from './components/sparkline';
 
 /** GitHub's core rate limit for one namespace's token. */
 export interface GitHubRate {
@@ -54,8 +55,8 @@ export interface RunnerStats {
     github_url: string;
     /** One per repository the runner has checked out, by name. */
     workspaces: string[];
-    jobs: number;
-    last_job?: string;
+    /** When each job the runner ran was last written, oldest first. */
+    jobs: string[];
     taken: TakenBuild[];
 }
 
@@ -294,8 +295,12 @@ export function renderActions(container: HTMLElement, runner: GitHubRunner, relo
         s.appendChild(row('Name:', st.name || '—'));
         s.appendChild(row('GitHub:', outside(st.github_url)));
         s.appendChild(row('Workspaces:', st.workspaces.length > 0 ? st.workspaces.join(', ') : 'none'));
-        s.appendChild(row('Jobs:', String(st.jobs)));
-        s.appendChild(row('Last job:', fmt(st.last_job)));
+        // "so we see it over time"
+        const jobs = st.jobs.map(at => Date.parse(at));
+        const over = document.createElement('div');
+        over.className = 'github-runner-jobs';
+        renderSparklines(over, 'Jobs', [{ name: st.name || st.path, times: jobs }], windowOf(jobs));
+        s.appendChild(over);
         s.appendChild(takenTable(st.taken));
     }
 
