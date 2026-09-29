@@ -1,6 +1,6 @@
 Umami 3.3.1, the version staands follows.
 
-openapi.json  https://raw.githubusercontent.com/umami-software/docs/master/openapi.json (info.version 3.3.1)
+openapi.json  https://raw.githubusercontent.com/umami-software/docs/869e67ca62644c00e1736c1a3c069031bd9ddf82/openapi.json (info.version 3.3.1; the commit that last touched it, 2026-09-22)
 schema.prisma https://raw.githubusercontent.com/umami-software/umami/v3.3.1/prisma/schema.prisma
 
 09986e60be747a0b7bff3d57a61b91939bf74e8b02d180857384d2e11e3fa1e2  openapi.json
