@@ -48,7 +48,7 @@ Binary launch          gRPC connect          Initialize RPC         Health poll 
 - **Called once per proxy lifetime.** A fresh process gets one `Initialize` call. The `initOnce` guard ensures HTTP routing lazy-init doesn't trigger a second call.
 - **Re-initialization** (`ReinitializePlugin` / `ForceInitialize`) is only for config updates on an existing proxy — not for new processes after restart.
 - **Plugins must handle re-init gracefully.** Stop previous state (nodes, connections, goroutines) before starting new ones. The `Initialize` handler may be called on a proxy that already has running state from a previous call.
-- **Config comes from `am.toml`.** The `config` map in `InitializeRequest` contains key-value pairs from the plugin's config section.
+- **Config comes from the plugin's record.** The `config` map in `InitializeRequest` contains the key-value pairs set in the plugin element.
 
 #### Restart
 
