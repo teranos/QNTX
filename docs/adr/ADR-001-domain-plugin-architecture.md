@@ -52,7 +52,7 @@ Plugin characteristics:
 - Configured via `am.toml` (whitelist model)
 - Run in separate processes for isolation
 - Discovered from configured search paths
-- [Hot-swappable](../plugin-hot-swap.md) — enable/disable at runtime without server restart
+- [Hot-swappable](./ADR-002-plugin-configuration.md) — enable/disable at runtime without server restart
 
 ### Interface Contract
 
@@ -154,4 +154,3 @@ Optional interfaces extend the base — a plugin opts in by implementing them:
 
 - [ADR-002: Plugin Configuration Management](./ADR-002-plugin-configuration.md)
 - [ADR-003: Plugin Communication Patterns](./ADR-003-plugin-communication.md)
-- [Plugin Hot-Swap](../plugin-hot-swap.md) — runtime enable/disable via am.toml or API

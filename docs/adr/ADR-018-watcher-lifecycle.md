@@ -175,6 +175,6 @@ When things go wrong, QNTX emits:
 
 - [ADR-003: Plugin Communication](ADR-003-plugin-communication.md) — watchers are the reactive complement to attestation polling
 - [ADR-004: Plugin-Pulse Integration](ADR-004-plugin-pulse-integration.md) — Phase 5 introduced watchers
-- [Plugin Hot-Swap](../plugin-hot-swap.md) — watcher registration during enable/disable
+- [ADR-002: Plugin Configuration Management](ADR-002-plugin-configuration.md) — watcher registration during enable/disable
 - [gRPC Plugin API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto) — `WatcherRegistration` proto docs
 - [WebSocket API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/server.proto) — WebSocket message types

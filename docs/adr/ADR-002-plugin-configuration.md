@@ -1,287 +1,60 @@
 # ADR-002: Plugin Configuration Management
 
-**Status:** Accepted (revised 2026-05-18)
-**Date:** 2026-01-04
-**Deciders:** QNTX Core Team
+Plugins are added, configured, enabled and disabled at runtime.
 
-## Context
+"I log in to QNTX, open the plugin element, press +, enter a repository URL and confirm. The plugin starts disabled; I edit its config and enable it, and I don't think about it anymore."
 
-Plugins need configuration for:
-1. **Discovery**: Where to find plugin binaries
-2. **Selection**: Which plugins to load (explicit opt-in)
-3. **Plugin-specific settings**: API keys, workspace paths, feature flags
+## 1. The plugin element
 
-Requirements:
-- Works with QNTX's "minimal core" philosophy (no plugins by default)
-- Simple, centralized configuration in `am.toml`
-- Supports plugin discovery from filesystem
-- Plugin-specific config without bloating main config
+Press + and enter the plugin's repository URL. It is added disabled. Its config is edited in the element, and Enable starts it.
 
-## Decision
-
-### Configuration Model: Whitelist + Discovery Paths
-
-Plugins are configured via a single `[plugin]` section in `am.toml`:
-
-```toml
-[plugin]
-enabled = ["code"]                      # Whitelist of plugins to load
-paths = ["~/.qntx/plugins", "./plugins"] # Where to search for binaries
-```
-
-**Key principles:**
-- **No plugins by default**: Empty `enabled` list means minimal core mode
-- **Explicit opt-in**: Users must add plugin name to `enabled` list
-- **Automatic discovery**: QNTX searches configured paths for binaries
-- **Fail-soft**: Missing plugins log warning, don't prevent startup
-
-### Plugin Discovery
-
-QNTX searches for plugin binaries using common naming conventions:
+## 2. API
 
 ```
-~/.qntx/plugins/qntx-code-plugin    # Preferred naming
-~/.qntx/plugins/qntx-code           # Alternative
-~/.qntx/plugins/code                # Fallback
-./plugins/qntx-code-plugin          # Project-level plugins
+POST /api/plugins                    body: repo
+GET  /api/plugins/{name}/config
+PUT  /api/plugins/{name}/config      body: config
+POST /api/plugins/{name}/enable
+POST /api/plugins/{name}/disable
 ```
 
-Discovery algorithm:
-1. For each plugin in `enabled` list (e.g., `"code"`)
-2. Search each path in `paths` for binaries matching:
-   - `qntx-{name}-plugin`
-   - `qntx-{name}`
-   - `{name}`
-3. Verify binary is executable
-4. Load first match via gRPC
+Both return JSON with the plugin's new state:
 
-### Plugin-Specific Configuration
-
-Plugin-specific settings remain in `am.toml` under the plugin's own config key:
-
-```toml
-# Core QNTX configuration
-[storage]
-backend = "sqlite"
-
-[storage.sqlite]
-path = "qntx.db"
-
-[server]
-port = 877
-
-[pulse]
-workers = 4
-
-# Plugin configuration
-[plugin]
-enabled = ["code"]
-paths = ["~/.qntx/plugins"]
-
-# Code plugin specific settings
-[code.gopls]
-enabled = true
-workspace_root = "."
-
-[code.github]
-# API token preferably from environment: QNTX_CODE_GITHUB_TOKEN
+```json
+{"action": "enable", "name": "myplugin", "state": "running"}
+{"action": "disable", "name": "myplugin", "state": "stopped"}
 ```
 
-### Configuration Access in Plugins
+See [API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json) for all plugin endpoints.
 
-Plugins receive `Config` interface via `ServiceRegistry`:
+## What happens
 
-```go
-func (p *Plugin) Initialize(ctx context.Context, services ServiceRegistry) error {
-    config := services.Config("code")  // Gets [code.*] section from am.toml
+**Add:** the plugin is recorded with its repository URL, disabled, in the system store.
 
-    // Provide sensible defaults
-    workspace := config.GetString("gopls.workspace_root")
-    if workspace == "" {
-        workspace = "."  // Default to current directory
-    }
+**Enable:** recorded as enabled, then discovered from search paths, loaded, gRPC connected, registered, initialized, provider services wired, async handlers and watchers registered. Same sequence as boot, but for one plugin.
 
-    // Optional features degrade gracefully
-    apiToken := config.GetString("github.api_token")
-    if apiToken == "" {
-        p.logger.Warn("GitHub API token not configured, PR integration disabled")
-        // Plugin still initializes, feature disabled
-    }
-}
-```
+**Disable:** recorded as disabled, then gRPC shutdown sent, process killed, unregistered from domain registry, watchers pruned, async handlers removed, HTTP mux cleared.
 
-### Environment Variable Overrides
+Plugins not mentioned in the change are untouched. Both transitions emit a colored banner in the log.
 
-Sensitive values should prefer environment variables:
+## Requirements
 
-```bash
-# .env or shell
-export QNTX_CODE_GITHUB_TOKEN="ghp_..."
-export QNTX_STORAGE_SQLITE_PATH="custom.db"
-```
+- Plugin binary must be discoverable in the configured search paths.
+- The server must be past initialization (services and registry available).
 
-Environment variables follow pattern: `QNTX_{DOMAIN}_{KEY}`
+## Route discovery
 
-Configuration precedence:
-1. Environment variables (highest priority)
-2. `am.toml` values
-3. Plugin defaults (lowest priority)
+A plugin is its own signum, and the routes it declares are its sigils (ADR-001).
 
-## Configuration Examples
+`GET /api/plugins/routes` also maps provider roles to core invocation endpoints (e.g. an `llm-provider` plugin includes `POST /api/prompt/direct` with the provider name).
 
-### Minimal Core (No Plugins)
+## Not supported
 
-```toml
-# am.toml - minimal QNTX
-[storage]
-backend = "sqlite"
-
-[storage.sqlite]
-path = "qntx.db"
-
-[server]
-port = 877
-
-# No [plugin] section = no plugins loaded
-```
-
-QNTX runs with only:
-- ATS (attestation system)
-- Database (⊔)
-- Pulse (꩜ async jobs)
-- Server (graph visualization)
-
-### Code Plugin Enabled
-
-```toml
-[plugin]
-enabled = ["code"]
-paths = ["~/.qntx/plugins", "./plugins"]
-
-[code.gopls]
-enabled = true
-workspace_root = "."
-```
-
-### Multiple Plugins
-
-```toml
-[plugin]
-enabled = ["code", "finance", "biotech"]
-paths = ["~/.qntx/plugins"]
-
-[code.gopls]
-workspace_root = "/workspace/main-repo"
-
-[finance]
-api_key = "${FINANCE_API_KEY}"
-
-[biotech.ncbi]
-api_key = "${NCBI_API_KEY}"
-email = "researcher@example.com"
-```
-
-## Consequences
-
-### Positive
-
-✅ **Minimal by default**: No plugins loaded unless explicitly configured
-✅ **Simple discovery**: Just drop binary in `~/.qntx/plugins/` and add to enabled list
-✅ **Centralized config**: All configuration in one `am.toml` file
-✅ **Flexible paths**: Support both user-level (`~/.qntx/plugins`) and project-level (`./plugins`)
-✅ **Optional**: QNTX works without any plugins (minimal core mode)
-✅ **Standard naming**: Common conventions make plugin binaries discoverable
-
-### Negative
-
-⚠️ **Manual installation**: Users must download/build plugin binaries
-⚠️ **Path management**: Users must ensure binaries are in configured paths
-⚠️ **No version management**: No automatic plugin updates (manual for now)
-
-### Neutral
-
-- Plugin configuration lives in same file as core config (under the plugin's own key)
-- Discovery is filesystem-based (simple but requires manual binary management)
-- Future: Could add plugin registry/marketplace for automatic installation
-
-## Implementation
-
-### Configuration Schema
-
-```go
-// internal/config/am.go
-type Config struct {
-    Plugin PluginConfig `mapstructure:"plugin"`
-    // ... other config sections
-}
-
-type PluginConfig struct {
-    Enabled []string `mapstructure:"enabled"` // Whitelist of plugins
-    Paths   []string `mapstructure:"paths"`   // Search paths
-}
-```
-
-### Plugin Discovery
-
-```go
-// plugin/grpc/loader.go
-func LoadPluginsFromConfig(ctx context.Context, cfg *config.Config, logger *zap.SugaredLogger) (*PluginManager, error) {
-    manager := NewPluginManager(logger)
-
-    if len(cfg.Plugin.Enabled) == 0 {
-        logger.Infow("No plugins enabled - QNTX running in minimal core mode")
-        return manager, nil
-    }
-
-    // Discover plugins from configured paths
-    for _, pluginName := range cfg.Plugin.Enabled {
-        pluginConfig, err := discoverPlugin(pluginName, cfg.Plugin.Paths, logger)
-        if err != nil {
-            logger.Warnw("Failed to discover plugin", "plugin", pluginName, "error", err)
-            continue
-        }
-
-        // Load plugin via gRPC
-        if err := manager.LoadPlugins(ctx, []PluginConfig{pluginConfig}); err != nil {
-            return nil, err
-        }
-    }
-
-    return manager, nil
-}
-```
-
-### Binary Naming Conventions
-
-Plugins should use these naming conventions for discoverability:
-
-| Pattern | Example | Priority |
-|---------|---------|----------|
-| `qntx-{name}-plugin` | `qntx-meili-plugin` | Preferred |
-| `qntx-{name}` | `qntx-openrouter` | Alternative |
-| `{name}` | `gaze` | Fallback |
-
-All binaries must be:
-- Executable (`chmod +x`)
-- Located in one of the configured search paths
-- Implement gRPC plugin protocol
-
-## Alternatives Considered
-
-### Individual am.{plugin}.toml Files
-**Rejected**: File proliferation, unclear which plugins are enabled, harder to manage
-
-### Plugin Registry Service
-**Rejected**: Too complex for Phase 3, adds external dependency
-
-### Automatic Plugin Discovery (No Whitelist)
-**Rejected**: Security risk (auto-loading unknown binaries), against minimal core principle
-
-### Go Plugin (.so files)
-**Rejected**: Platform-specific, fragile across Go versions, build complexity
+- Changing plugin search paths at runtime. Restart required.
+- Reordering plugins. Order is alphabetical, same as boot.
 
 ## Related
 
-- [ADR-001: Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
-- [ADR-003: Plugin Communication Patterns](./ADR-003-plugin-communication.md)
-- [Plugin Hot-Swap](../plugin-hot-swap.md) — the enabled list is watched at runtime
+- [ADR-001: Domain Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
+- [ADR-018: Plugin Lifecycle, Watchers, and Developer Experience](./ADR-018-watcher-lifecycle.md)
+- [Plugin API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json)
