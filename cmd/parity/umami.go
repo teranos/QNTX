@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server"
 	"github.com/teranos/errors"
 )
@@ -233,6 +234,72 @@ func RenderUmami(clades []Clade, all bool) string {
 	return b.String()
 }
 
+// OutOfSpec is what a stand carries that Umami has no column for.
+type OutOfSpec struct {
+	// Recorded are Arrival fields the handler fills that map to no Umami column.
+	Recorded []string
+	// Attributes are what the handler writes onto an arrival that no Arrival
+	// field carries.
+	Attributes []string
+	// DeclaredOnly are Arrival fields the proto declares, that no Umami column
+	// matches and nothing fills.
+	DeclaredOnly []string
+}
+
+func arrivalFields() []string {
+	var names []string
+	fields := (&protocol.Arrival{}).ProtoReflect().Descriptor().Fields()
+	for i := 0; i < fields.Len(); i++ {
+		names = append(names, string(fields.Get(i).Name()))
+	}
+	return names
+}
+
+// FindOutOfSpec sorts what the Arrival declares and what the handler fills
+// against the fields that map to an Umami column.
+func FindOutOfSpec(declared, recorded, attributes []string) OutOfSpec {
+	var mapped []string
+	for _, m := range umamiColumns {
+		mapped = append(mapped, m.Arrival)
+	}
+	out := OutOfSpec{Attributes: attributes}
+	for _, name := range recorded {
+		if !slices.Contains(mapped, name) {
+			out.Recorded = append(out.Recorded, name)
+		}
+	}
+	for _, name := range declared {
+		if !slices.Contains(mapped, name) && !slices.Contains(recorded, name) {
+			out.DeclaredOnly = append(out.DeclaredOnly, name)
+		}
+	}
+	slices.Sort(out.DeclaredOnly)
+	return out
+}
+
+// RenderOutOfSpec prints one line for each kind, and one line when there is none.
+func RenderOutOfSpec(o OutOfSpec) string {
+	if len(o.Recorded) == 0 && len(o.Attributes) == 0 && len(o.DeclaredOnly) == 0 {
+		return "  out of spec: none\n\n"
+	}
+	var b strings.Builder
+	b.WriteString("  out of spec\n")
+	for _, line := range []struct {
+		label string
+		names []string
+	}{
+		{"recorded", o.Recorded},
+		{"attributes", o.Attributes},
+		{"declared only", o.DeclaredOnly},
+	} {
+		if len(line.names) > 0 {
+			fmt.Fprintf(&b, "    %-14s  %s\n", line.label, strings.Join(line.names, ", "))
+		}
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
 // Umami reads the pinned schema and what a stand records, and renders the score.
 func Umami(root string, all bool) (string, error) {
 	models, err := ParsePrisma(filepath.Join(root, umamiDir, "schema.prisma"))
@@ -247,5 +314,6 @@ func Umami(root string, all bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return RenderUmami(clades, all), nil
+	out := FindOutOfSpec(arrivalFields(), recorded, server.StaandExtraAttributes())
+	return RenderUmami(clades, all) + RenderOutOfSpec(out), nil
 }

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -41,4 +42,16 @@ func StaandRecorded() ([]string, error) {
 		})
 	sort.Strings(names)
 	return names, nil
+}
+
+// StaandExtraAttributes is the attributes a stand writes onto an arrival that no
+// Arrival field carries. It asks staandAttrs about an arrival that holds nothing
+// but its stand, so whatever comes back is what the handler adds of its own.
+func StaandExtraAttributes() []string {
+	keys := []string{}
+	for key := range staandAttrs(&protocol.Arrival{Market: "market", Slug: "slug"}) {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }

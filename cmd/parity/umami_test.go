@@ -196,3 +196,53 @@ func TestRenderUmami_AHundredIsHiddenUntilAll(t *testing.T) {
 		t.Errorf("all did not show the clade at 100:\n%s", out)
 	}
 }
+
+// TestFindOutOfSpec_SortsWhatHasNoColumn: a filled field with no column, a
+// declared field nothing fills, and a mapped field that is neither.
+func TestFindOutOfSpec_SortsWhatHasNoColumn(t *testing.T) {
+	got := FindOutOfSpec(
+		[]string{"path", "extra_filled", "extra_declared"},
+		[]string{"path", "extra_filled"},
+		[]string{"staand"},
+	)
+	if !slices.Equal(got.Recorded, []string{"extra_filled"}) {
+		t.Errorf("recorded is %v, want [extra_filled]", got.Recorded)
+	}
+	if !slices.Equal(got.DeclaredOnly, []string{"extra_declared"}) {
+		t.Errorf("declared only is %v, want [extra_declared]", got.DeclaredOnly)
+	}
+	if !slices.Equal(got.Attributes, []string{"staand"}) {
+		t.Errorf("attributes is %v, want [staand]", got.Attributes)
+	}
+}
+
+// TestOutOfSpec_WhatAStandCarriesToday pins it: every field a stand fills has an
+// Umami column, the slug rides as an attribute, and three declared fields match
+// none.
+func TestOutOfSpec_WhatAStandCarriesToday(t *testing.T) {
+	recorded, err := server.StaandRecorded()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := FindOutOfSpec(arrivalFields(), recorded, server.StaandExtraAttributes())
+	if len(got.Recorded) != 0 {
+		t.Errorf("a stand fills %v, which no Umami column matches", got.Recorded)
+	}
+	if !slices.Equal(got.Attributes, []string{"staand"}) {
+		t.Errorf("attributes is %v, want [staand]", got.Attributes)
+	}
+	if !slices.Equal(got.DeclaredOnly, []string{"bot", "browser_version", "operating_system_version"}) {
+		t.Errorf("declared only is %v", got.DeclaredOnly)
+	}
+}
+
+// TestRenderOutOfSpec_NoneIsOneLine and a kind with names is one line each.
+func TestRenderOutOfSpec_NoneIsOneLine(t *testing.T) {
+	if out := RenderOutOfSpec(OutOfSpec{}); !strings.Contains(out, "out of spec: none") {
+		t.Errorf("nothing out of spec did not say so:\n%s", out)
+	}
+	out := RenderOutOfSpec(OutOfSpec{Attributes: []string{"staand"}, DeclaredOnly: []string{"bot", "x"}})
+	if !strings.Contains(out, "attributes") || !strings.Contains(out, "bot, x") || strings.Contains(out, "recorded") {
+		t.Errorf("out of spec rendered wrongly:\n%s", out)
+	}
+}
