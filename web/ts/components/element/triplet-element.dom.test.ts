@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { renderTripletResultLine } from './triplet-element.ts';
+import { renderTripletResultLine, fitTimeAxes } from './triplet-element.ts';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 
 const HOUR = 3_600_000;
@@ -43,5 +43,54 @@ describe('renderTripletResultLine', () => {
         const line = renderTripletResultLine([at(0), at(0)], now);
         expect(line.querySelector('.sparkline')).toBeNull();
         expect(line.textContent).not.toContain('(2)');
+    });
+});
+
+const DAY = 24 * HOUR;
+
+const lineOf = (group: Attestation[]): HTMLElement => {
+    const line = renderTripletResultLine(group, now);
+    line.dataset.tripletAttestations = JSON.stringify(group);
+    return line;
+};
+
+const pointsOf = (line: HTMLElement): string[] =>
+    (line.querySelector('.sparkline polyline')?.getAttribute('points') ?? '').split(' ');
+
+describe('fitTimeAxes', () => {
+    test('every line in a list is drawn in one window, from its earliest attestation to now', () => {
+        const list = document.createElement('div');
+        const early = lineOf([at(now - 20 * DAY), at(now - 19 * DAY)]);
+        const late = lineOf([at(now - 3 * DAY), at(now - 2 * DAY)]);
+        list.append(early, late);
+
+        fitTimeAxes(list, now);
+
+        const e = list.children[0] as HTMLElement;
+        const l = list.children[1] as HTMLElement;
+        expect(pointsOf(e).length).toBe(21);
+        expect(pointsOf(l).length).toBe(21);
+        // The late line is flat until its first day: the same x is the same day on both.
+        expect(pointsOf(l)[0].split(',')[1]).toBe('15');
+        expect(e.querySelector('.triplet-time')?.getAttribute('data-window'))
+            .toBe(l.querySelector('.triplet-time')?.getAttribute('data-window'));
+    });
+
+    test('an older attestation arriving moves every line to the new start', () => {
+        const list = document.createElement('div');
+        list.append(lineOf([at(now - 3 * DAY), at(now - 2 * DAY)]));
+        fitTimeAxes(list, now);
+        expect(pointsOf(list.children[0] as HTMLElement).length).toBe(4);
+
+        list.append(lineOf([at(now - 10 * DAY), at(now - 9 * DAY)]));
+        fitTimeAxes(list, now);
+
+        expect(pointsOf(list.children[0] as HTMLElement).length).toBe(11);
+        expect(pointsOf(list.children[1] as HTMLElement).length).toBe(11);
+    });
+
+    test('a line on its own keeps its own window', () => {
+        const line = renderTripletResultLine([at(now - 3 * DAY), at(now - 2 * DAY)], now);
+        expect(pointsOf(line).length).toBe(4);
     });
 });

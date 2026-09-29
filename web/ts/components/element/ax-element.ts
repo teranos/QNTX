@@ -32,7 +32,7 @@ import { queryAttestations, parseQuery } from '../../ats-wasm';
 import { tooltip } from '../tooltip';
 import { isSigmaAttestation, renderSigmaResultLine } from './sigma-element';
 import { isTypeAttestation, groupTypeAttestations, renderTypeResultLine } from './type-result-line';
-import { tripletKey, groupByTriplet, renderTripletResultLine } from './triplet-element';
+import { tripletKey, groupByTriplet, renderTripletResultLine, fitTimeAxes } from './triplet-element';
 import { renderTriple } from './attestation-triple';
 import { attestationResultRow, RESULT_ROW_PALETTE } from './attestation-result-row';
 import { uiState } from '../../state/ui';
@@ -180,6 +180,7 @@ export function createAxElement(item: Element): HTMLElement {
                     row.dataset.tripletAttestations = JSON.stringify(group);
                     resultsContainer.appendChild(row);
                 }
+                fitTimeAxes(resultsContainer);
                 // Render sigmas after triplet groups
                 for (const att of sigmaAtts) {
                     resultsContainer.appendChild(renderSigmaResultLine(att));
@@ -398,6 +399,8 @@ export function updateAxElementResults(elementId: string, attestation: Attestati
         resultItem.dataset.tripletAttestations = JSON.stringify([attestation]);
         resultsContainer.insertBefore(resultItem, resultsContainer.firstChild);
     }
+    // An older attestation moves the window's start, and every line with it.
+    fitTimeAxes(resultsContainer);
 
     log.debug(SEG.ELEMENT, `[AxElement] Added result to ${elementId}:`, attestation.id);
 }

@@ -20,7 +20,7 @@ import { log, SEG } from '../../logger';
 import { spawnOnCanvasDragging } from './spawn-on-canvas';
 import { renderPager } from '../pager';
 import { el } from '../../html-utils';
-import { renderSparkline, windowOf, seriesOf, formatIn } from '../sparkline';
+import { renderSparkline, windowOf, seriesOf, formatIn, bucketStart, type Window } from '../sparkline';
 
 // Quiet blue-grey — lighter, subtle blue touch, easy on the eyes
 const TRIPLET = '#96a4b0';
@@ -121,14 +121,15 @@ function collectTripletMeta(attestations: Attestation[]) {
  * "The axis of time is more useful than a tally": when the triple was attested
  * and when last, rather than how many times. Null when no attestation is dated.
  */
-export function timeAxis(attestations: Attestation[], now: number = Date.now()): HTMLElement | null {
+export function timeAxis(attestations: Attestation[], w?: Window, now: number = Date.now()): HTMLElement | null {
     const { timestamps } = collectTripletMeta(attestations);
     if (timestamps.length === 0) return null;
-    const w = windowOf(timestamps, now);
+    if (!w) w = windowOf(timestamps, now);
     const axis = el('span', {
         class: 'triplet-time',
         style: { display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: '0', marginLeft: 'auto' },
     });
+    axis.dataset.window = windowKey(w);
     const spark = el('span', { class: 'sparkline', style: { display: 'inline-flex' } });
     spark.innerHTML = renderSparkline(seriesOf(timestamps, w));
     axis.appendChild(spark);
@@ -138,6 +139,36 @@ export function timeAxis(attestations: Attestation[], now: number = Date.now()):
         style: { color: TRIPLET_DIM, fontSize: '10px', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums' },
     }));
     return axis;
+}
+
+/** Two windows with the same key draw the same buckets. */
+function windowKey(w: Window): string {
+    return `${bucketStart(w.start, w.unit)}|${bucketStart(w.end, w.unit)}|${w.unit}`;
+}
+
+/**
+ * One window for every triplet line in a result list, from the earliest
+ * attestation the list holds to now, so a day sits at the same place on every
+ * line and the list reads down. A line drawn in another window is redrawn.
+ */
+export function fitTimeAxes(container: HTMLElement, now: number = Date.now()): void {
+    const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-triplet-attestations]'));
+    const groups = rows.map(row => JSON.parse(row.dataset.tripletAttestations || '[]') as Attestation[]);
+    let start = Infinity;
+    for (const group of groups) {
+        for (const t of collectTripletMeta(group).timestamps) {
+            if (t < start) start = t;
+        }
+    }
+    if (start === Infinity) return;
+    const w = windowOf([start], now);
+    const key = windowKey(w);
+    rows.forEach((row, i) => {
+        const axis = row.querySelector<HTMLElement>('.triplet-time');
+        if (!axis || axis.dataset.window === key) return;
+        const fitted = timeAxis(groups[i], w, now);
+        if (fitted) axis.replaceWith(fitted);
+    });
 }
 
 /**
@@ -486,7 +517,7 @@ export function renderTripletResultLine(attestations: Attestation[], now: number
     });
     text.appendChild(tripleSpan);
 
-    const axis = timeAxis(attestations, now);
+    const axis = timeAxis(attestations, undefined, now);
     if (axis) {
         text.appendChild(axis);
         item.dataset.tooltip = collectTripletMeta(attestations).timeRange;
