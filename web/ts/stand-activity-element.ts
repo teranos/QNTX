@@ -12,11 +12,11 @@
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { renderPager } from './components/pager.ts';
-import { renderTally } from './components/tally.ts';
+import { renderSparklines, windowOf } from './components/sparkline.ts';
 import { openPageElement } from './page-element.ts';
 import { renderPredicate } from './components/element/attestation-triple.ts';
 import { openPredicateElement } from './components/element/predicate-element.ts';
-import type { StaandInfo, StandStep, StandWalk } from './market-element.ts';
+import type { StaandInfo, StandSeen, StandStep, StandWalk } from './market-element.ts';
 
 // Literals, not references to another module's constants: the bundler resolves
 // a const that points at an imported const to undefined (web/CLAUDE.md).
@@ -199,7 +199,7 @@ export function renderWalkPager(container: HTMLElement, s: StaandInfo, walks: St
 }
 
 /** Exported for tests: the panel for one stand. */
-export function renderStandActivity(container: HTMLElement, s: StaandInfo): void {
+export function renderStandActivity(container: HTMLElement, s: StaandInfo, now: number = Date.now()): void {
     container.replaceChildren();
 
     const title = document.createElement('div');
@@ -251,15 +251,19 @@ export function renderStandActivity(container: HTMLElement, s: StaandInfo): void
 
     container.appendChild(walks);
 
+    // Events and pages share one window, so their lines read on the same axis.
+    const w = windowOf([...s.events, ...s.pages].flatMap((e) => e.seen), now);
+    const seen = (rows: StandSeen[]) => rows.map((r) => ({ name: r.name, times: r.seen }));
+
     const events = document.createElement('div');
     events.className = 'stand-events';
     events.style.marginBottom = '18px';
-    renderTally(events, 'Events', s.events, (name) => predicateCell(name));
+    renderSparklines(events, 'Events', seen(s.events), w, (name) => predicateCell(name));
     container.appendChild(events);
 
     const pages = document.createElement('div');
     pages.className = 'stand-pages';
-    renderTally(pages, 'Pages', s.pages, (name) => pageCell(s, name, siteOf(s)));
+    renderSparklines(pages, 'Pages', seen(s.pages), w, (name) => pageCell(s, name, siteOf(s)));
     container.appendChild(pages);
 }
 
