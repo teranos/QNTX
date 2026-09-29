@@ -24,9 +24,9 @@ const inLevi: Attestation[] = [
     anAttestation({ subjects: ['crawl'], predicates: ['crawl-timeout'], actors: ['bob'] }),
 ];
 
-const rowsIn = (container: HTMLElement, cls: string): (string | null)[][] =>
-    Array.from(container.querySelectorAll(`.${cls} .stand-tally`))
-        .map((row) => Array.from(row.children).map((cell) => cell.textContent));
+const rowsIn = (container: HTMLElement, cls: string): (string | null)[] =>
+    Array.from(container.querySelectorAll(`.${cls} .sparkline-row`))
+        .map((row) => row.children[0].textContent);
 
 describe('What the context element is', () => {
     test('it draws ∈, the mark of the segment a context sits in', () => {
@@ -56,17 +56,17 @@ describe('What is filed in a context', () => {
         document.body.appendChild(container);
     });
 
-    test('subjects counted, most-filed first, and they open theirs', () => {
+    test('subjects, and they open theirs', () => {
         renderContextStats(container, 'levi:batch', inLevi);
-        expect(rowsIn(container, 'context-subjects')).toEqual([['batch', '2'], ['crawl', '1']]);
-        const first = container.querySelector('.context-subjects .stand-tally')?.children[0] as HTMLElement;
+        expect(rowsIn(container, 'context-subjects')).toEqual(['batch', 'crawl']);
+        const first = container.querySelector('.context-subjects .sparkline-row')?.children[0] as HTMLElement;
         expect(first.dataset.segmentPress).toBe('subject');
     });
 
-    test('predicates counted, and they open theirs', () => {
+    test('predicates, and they open theirs', () => {
         renderContextStats(container, 'levi:batch', inLevi);
-        expect(rowsIn(container, 'context-predicates')).toEqual([['crawl-timeout', '2'], ['retried', '1']]);
-        const first = container.querySelector('.context-predicates .stand-tally')?.children[0] as HTMLElement;
+        expect(rowsIn(container, 'context-predicates')).toEqual(['crawl-timeout', 'retried']);
+        const first = container.querySelector('.context-predicates .sparkline-row')?.children[0] as HTMLElement;
         expect(first.dataset.segmentPress).toBe('predicate');
     });
 

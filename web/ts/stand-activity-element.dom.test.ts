@@ -6,7 +6,7 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { renderStandActivity, renderWalk, renderWalkPager, eventsOf, spanOf, standElementId, siteOf, predicateCell } from './stand-activity-element.ts';
-import { renderTally } from './components/tally.ts';
+import { renderSparklines, windowOf } from './components/sparkline.ts';
 import { pageStatsOf, externalLink, pageElementId } from './page-element.ts';
 import type { StaandInfo } from './market-element.ts';
 
@@ -25,8 +25,14 @@ const aStand = (over: Partial<StaandInfo> = {}): StaandInfo => ({
     visitors: 2,
     dropped: 1,
     lastSeen: '2026-09-07T14:30:00Z',
-    events: [{ name: 'staand:page_view', count: 2 }, { name: 'staand:contact_click', count: 1 }],
-    pages: [{ name: '/deep-clean', count: 2 }, { name: '/', count: 1 }],
+    events: [
+        { name: 'staand:page_view', seen: [Date.parse('2026-09-07T14:00:00Z'), Date.parse('2026-09-07T14:00:20Z')] },
+        { name: 'staand:contact_click', seen: [Date.parse('2026-09-07T14:00:30Z')] },
+    ],
+    pages: [
+        { name: '/deep-clean', seen: [Date.parse('2026-09-07T14:00:20Z'), Date.parse('2026-09-07T14:00:30Z')] },
+        { name: '/', seen: [Date.parse('2026-09-07T14:00:00Z')] },
+    ],
     walks: [{
         who: 'v-1',
         steps: [
@@ -38,9 +44,9 @@ const aStand = (over: Partial<StaandInfo> = {}): StaandInfo => ({
     ...over,
 });
 
-const rowsIn = (container: HTMLElement): (string | null)[][] =>
-    Array.from(container.querySelectorAll('.stand-tally'))
-        .map((row) => Array.from(row.children).map((cell) => cell.textContent));
+const rowsIn = (container: HTMLElement): (string | null)[] =>
+    Array.from(container.querySelectorAll('.sparkline-row'))
+        .map((row) => row.children[0].textContent);
 
 describe('Stand Activity panel', () => {
     if (!USE_JSDOM) {
@@ -64,14 +70,23 @@ describe('Stand Activity panel', () => {
         expect(container.textContent).toContain('1 rate-limited');
     });
 
-    test('one line per entry, name and count on the same row', () => {
+    test('one line per entry, the most recently seen first, however often another was', () => {
         renderStandActivity(container, aStand());
         expect(rowsIn(container)).toEqual([
-            ['staand:page_view', '2'],
-            ['staand:contact_click', '1'],
-            ['/deep-clean', '2'],
-            ['/', '1'],
+            'staand:contact_click',
+            'staand:page_view',
+            '/deep-clean',
+            '/',
         ]);
+    });
+
+    test('a line is drawn over time and no count is shown', () => {
+        renderStandActivity(container, aStand(), Date.parse('2026-09-07T14:30:00Z'));
+        const row = container.querySelector('.stand-events .sparkline-row') as HTMLElement;
+        expect(row.querySelector('.sparkline polyline')).not.toBeNull();
+        const last = row.querySelector('.sparkline-last')?.textContent ?? '';
+        expect(last.startsWith('2026-09-07 ')).toBe(true);
+        expect(last.length).toBe('2026-09-07 14:00'.length);
     });
 
     test('a section with nothing in it says so rather than drawing nothing', () => {
@@ -146,7 +161,7 @@ describe('Stand Activity panel', () => {
         expect(pressable).toContain('/deep-clean');
 
         const odd = document.createElement('div');
-        renderTally(odd, 'Pages', [{ name: 'firsttest', count: 1 }]);
+        renderSparklines(odd, 'Pages', [{ name: 'firsttest', times: [1] }], windowOf([1], 2));
         expect(odd.querySelector('.stand-page-open')).toBeNull();
         expect(odd.textContent).toContain('firsttest');
     });
@@ -161,8 +176,8 @@ describe('Stand Activity panel', () => {
         expect(stats.arrivals).toBe(2);
         expect(stats.visitors).toBe(1);
         expect(stats.events).toEqual([
-            { name: 'staand:contact_click', count: 1 },
-            { name: 'staand:page_view', count: 1 },
+            { name: 'staand:page_view', times: [Date.parse('2026-09-07T14:00:20Z')] },
+            { name: 'staand:contact_click', times: [Date.parse('2026-09-07T14:00:30Z')] },
         ]);
         expect(stats.first).toBe('2026-09-07T14:00:20Z');
         expect(stats.last).toBe('2026-09-07T14:00:30Z');
@@ -226,13 +241,13 @@ describe('The predicates the stand shows', () => {
         expect(predicateCell('staand:page_view').style.cursor).toBe('pointer');
     });
 
-    test('the Events tally is pressable and still reads as it did', () => {
+    test('the Events are pressable and still read as they did', () => {
         renderStandActivity(container, aStand());
-        const names = Array.from(container.querySelectorAll<HTMLElement>('.stand-events .stand-tally'))
+        const names = Array.from(container.querySelectorAll<HTMLElement>('.stand-events .sparkline-row'))
             .map((row) => row.children[0] as HTMLElement);
-        expect(names.map((n) => n.textContent)).toEqual(['staand:page_view', 'staand:contact_click']);
+        expect(names.map((n) => n.textContent)).toEqual(['staand:contact_click', 'staand:page_view']);
         expect(names.map((n) => n.dataset.axSegment))
-            .toEqual(['is staand:page_view', 'is staand:contact_click']);
+            .toEqual(['is staand:contact_click', 'is staand:page_view']);
     });
 
     test('a walk step reads stripped and carries the predicate unstripped', () => {

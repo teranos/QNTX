@@ -20,7 +20,7 @@ import { tray } from '@teranos/elements';
 import { apiJson } from '../../client';
 import { log, SEG } from '../../logger';
 import { el } from '../../html-utils';
-import { renderTally, type TallyItem, type NameCell } from '../tally';
+import { renderSparklines, windowOf, type Seen, type NameCell } from '../sparkline';
 import { parseAttributes } from './attestation-attrs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 
@@ -32,7 +32,7 @@ const MUTE = 'var(--text-on-dark-tertiary)';
 /** How many attestations the sections are folded out of. */
 export const READ_LIMIT = 500;
 
-/** One section: a field of the attestations, counted. */
+/** One section: a field of the attestations, over time. */
 export interface SegmentSection {
     /** Heading, and the class its rows are found under */
     label: string;
@@ -61,25 +61,25 @@ export function segmentElementId(segment: Segment, value: string): string {
     return `${segment.kind}-${value}`;
 }
 
-/** Count the values of one field across attestations, most-seen first. */
-export function tallyOf(
+/** When each value of one field was seen across attestations. */
+export function seenOf(
     attestations: Attestation[],
     pick: (a: Attestation) => string[] | undefined,
-): TallyItem[] {
-    const counts = new Map<string, number>();
+): Seen[] {
+    const times = new Map<string, number[]>();
     for (const att of attestations) {
         for (const value of pick(att) ?? []) {
-            counts.set(value, (counts.get(value) ?? 0) + 1);
+            const at = times.get(value) ?? [];
+            at.push(att.timestamp);
+            times.set(value, at);
         }
     }
-    const items = Array.from(counts, ([name, count]) => ({ name, count }));
-    items.sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-    return items;
+    return Array.from(times, ([name, t]) => ({ name, times: t }));
 }
 
-/** One tally per attribute key: the values seen under it and how often. */
-export function attributeTallies(attestations: Attestation[]): Array<{ key: string; items: TallyItem[] }> {
-    const byKey = new Map<string, Map<string, number>>();
+/** Per attribute key: the values seen under it, and when. */
+export function attributesSeen(attestations: Attestation[]): Array<{ key: string; items: Seen[] }> {
+    const byKey = new Map<string, Map<string, number[]>>();
 
     for (const att of attestations) {
         const attrs = parseAttributes(att);
@@ -87,20 +87,21 @@ export function attributeTallies(attestations: Attestation[]): Array<{ key: stri
         for (const [key, value] of Object.entries(attrs)) {
             const shown = typeof value === 'string' ? value : JSON.stringify(value);
             if (shown === undefined || shown === '') continue;
-            let counts = byKey.get(key);
-            if (!counts) {
-                counts = new Map();
-                byKey.set(key, counts);
+            let values = byKey.get(key);
+            if (!values) {
+                values = new Map();
+                byKey.set(key, values);
             }
-            counts.set(shown, (counts.get(shown) ?? 0) + 1);
+            const at = values.get(shown) ?? [];
+            at.push(att.timestamp);
+            values.set(shown, at);
         }
     }
 
-    const out = Array.from(byKey, ([key, counts]) => {
-        const items = Array.from(counts, ([name, count]) => ({ name, count }));
-        items.sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-        return { key, items };
-    });
+    const out = Array.from(byKey, ([key, values]) => ({
+        key,
+        items: Array.from(values, ([name, t]) => ({ name, times: t })),
+    }));
     out.sort((a, b) => a.key.localeCompare(b.key));
     return out;
 }
@@ -111,6 +112,7 @@ export function renderSegmentStats(
     segment: Segment,
     value: string,
     attestations: Attestation[],
+    now: number = Date.now(),
 ): void {
     container.replaceChildren();
 
@@ -129,20 +131,23 @@ export function renderSegmentStats(
     });
     container.appendChild(summary);
 
+    // One window for the whole element, so every line is drawn on the same axis.
+    const w = windowOf(attestations.map((a) => a.timestamp), now);
+
     for (const section of segment.sections) {
         const box = el('div', { class: section.className, style: { marginBottom: '18px' } });
-        renderTally(box, section.label, tallyOf(attestations, section.pick), section.cell);
+        renderSparklines(box, section.label, seenOf(attestations, section.pick), w, section.cell);
         container.appendChild(box);
     }
 
     const attributes = el('div', { class: `${segment.kind}-attributes` });
-    const tallies = attributeTallies(attestations);
-    if (tallies.length === 0) {
-        renderTally(attributes, 'Attributes', []);
+    const seen = attributesSeen(attestations);
+    if (seen.length === 0) {
+        renderSparklines(attributes, 'Attributes', [], w);
     }
-    for (const { key, items } of tallies) {
+    for (const { key, items } of seen) {
         const section = el('div', { style: { marginBottom: '12px' } });
-        renderTally(section, key, items);
+        renderSparklines(section, key, items, w);
         attributes.appendChild(section);
     }
     container.appendChild(attributes);

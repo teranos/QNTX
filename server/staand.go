@@ -606,31 +606,78 @@ func originAllowed(origin, host string) bool {
 // namespace, the sites reporting back, and its activity: arrivals recorded
 // against arrivals the rate limit refused, and when the last landed.
 type staandInfo struct {
-	Slug     string        `json:"slug"`
-	Market   string        `json:"market"`
-	URL      string        `json:"url"`
-	Origin   string        `json:"origin"`
-	Creator  string        `json:"creator"`
-	DefID    string        `json:"defId"`
-	Created  string        `json:"created"`
-	Sites    []string      `json:"sites"`
-	Arrivals int           `json:"arrivals"`
-	Visitors int           `json:"visitors"`
-	Dropped  int           `json:"dropped"`
-	LastSeen string        `json:"lastSeen"`
-	Events   []staandCount `json:"events"`
-	Pages    []staandCount `json:"pages"`
+	Slug     string       `json:"slug"`
+	Market   string       `json:"market"`
+	URL      string       `json:"url"`
+	Origin   string       `json:"origin"`
+	Creator  string       `json:"creator"`
+	DefID    string       `json:"defId"`
+	Created  string       `json:"created"`
+	Sites    []string     `json:"sites"`
+	Arrivals int          `json:"arrivals"`
+	Visitors int          `json:"visitors"`
+	Dropped  int          `json:"dropped"`
+	LastSeen string       `json:"lastSeen"`
+	Events   []staandSeen `json:"events"`
+	Pages    []staandSeen `json:"pages"`
 
 	// How the people who arrived actually walked — what the counts above are
 	// a fold of.
 	Walks []staandWalk `json:"walks"`
 }
 
-// staandCount is one coarse tally the market view shows: a name (an event, or a
-// page) and how many times it was attested (ADR-035).
+// staandCount is one row the metrics sigil answers with: a value of the
+// dimension asked for and how many arrivals carried it, Umami's metrics shape.
 type staandCount struct {
 	Name  string `json:"name"`
 	Count int    `json:"count"`
+}
+
+// staandSeen is an event or a page and every moment it was attested, in unix
+// milliseconds. "The axis of time is more useful than a tally": the view draws
+// these as a line over time, and a count is not sent.
+type staandSeen struct {
+	Name string  `json:"name"`
+	Seen []int64 `json:"seen"`
+}
+
+// seenOf is each name and when it was seen, the most recently seen first, the
+// first limit of them. Last seen and not most seen: a name that has not been
+// seen since last spring does not lead a list because it was seen often then.
+func seenOf(m map[string][]time.Time, limit int) []staandSeen {
+	type named struct {
+		name string
+		at   []time.Time
+		last time.Time
+	}
+	all := make([]named, 0, len(m))
+	for name, at := range m {
+		n := named{name: name, at: at}
+		for _, t := range at {
+			if t.After(n.last) {
+				n.last = t
+			}
+		}
+		all = append(all, n)
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if !all[i].last.Equal(all[j].last) {
+			return all[i].last.After(all[j].last)
+		}
+		return all[i].name < all[j].name
+	})
+	if limit > 0 && len(all) > limit {
+		all = all[:limit]
+	}
+	out := make([]staandSeen, 0, len(all))
+	for _, n := range all {
+		seen := make([]int64, 0, len(n.at))
+		for _, t := range n.at {
+			seen = append(seen, t.UnixMilli())
+		}
+		out = append(out, staandSeen{Name: n.name, Seen: seen})
+	}
+	return out
 }
 
 // staandStep is one arrival read as a step rather than as a number: when it
@@ -851,8 +898,8 @@ func (s *QNTXServer) liveStaands(since, until *time.Time) ([]staandInfo, error) 
 			Created: as.Timestamp.Format(time.RFC3339),
 			Sites:   []string{},
 			Dropped: s.staandDropCount(key),
-			Events:  []staandCount{},
-			Pages:   []staandCount{},
+			Events:  []staandSeen{},
+			Pages:   []staandSeen{},
 			Walks:   []staandWalk{},
 		}
 		if _, done := activity[market]; !done {
@@ -862,8 +909,8 @@ func (s *QNTXServer) liveStaands(since, until *time.Time) ([]staandInfo, error) 
 			info.Arrivals = t.count
 			info.Visitors = len(t.visitors)
 			info.Sites = t.sites()
-			info.Events = topCounts(t.events, 20)
-			info.Pages = topCounts(t.pages, 10)
+			info.Events = seenOf(t.events, 20)
+			info.Pages = seenOf(t.pages, 10)
 			info.Walks = walksOf(t.walks)
 			if !t.last.IsZero() {
 				info.LastSeen = t.last.Format(time.RFC3339)
@@ -1220,8 +1267,8 @@ type staandTally struct {
 	count    int
 	last     time.Time
 	hosts    map[string]struct{}
-	events   map[string]int
-	pages    map[string]int
+	events   map[string][]time.Time
+	pages    map[string][]time.Time
 	visitors map[string]struct{}
 	walks    map[string][]staandStep
 }
@@ -1266,15 +1313,15 @@ func (s *QNTXServer) staandActivity(market string, since, until *time.Time) map[
 		}
 		t, seen := tally[slug]
 		if !seen {
-			t = &staandTally{hosts: map[string]struct{}{}, events: map[string]int{}, pages: map[string]int{}, visitors: map[string]struct{}{}, walks: map[string][]staandStep{}}
+			t = &staandTally{hosts: map[string]struct{}{}, events: map[string][]time.Time{}, pages: map[string][]time.Time{}, visitors: map[string]struct{}{}, walks: map[string][]staandStep{}}
 			tally[slug] = t
 		}
 		t.count++
 		if len(as.Predicates) > 0 {
-			t.events[as.Predicates[0]]++
+			t.events[as.Predicates[0]] = append(t.events[as.Predicates[0]], as.Timestamp)
 		}
 		if len(as.Subjects) > 0 {
-			t.pages[as.Subjects[0]]++
+			t.pages[as.Subjects[0]] = append(t.pages[as.Subjects[0]], as.Timestamp)
 		}
 		visitor := attrString(as.Attributes, staandVisitor)
 		if visitor != "" {

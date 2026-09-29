@@ -25,8 +25,14 @@ const aStand = (over: Partial<StaandInfo> = {}): StaandInfo => ({
     visitors: 2,
     dropped: 1,
     lastSeen: '2026-09-07T14:30:00Z',
-    events: [{ name: 'staand:page_view', count: 2 }, { name: 'staand:contact_click', count: 1 }],
-    pages: [{ name: '/deep-clean', count: 2 }, { name: '/', count: 1 }],
+    events: [
+        { name: 'staand:page_view', seen: [Date.parse('2026-09-07T14:00:00Z'), Date.parse('2026-09-07T14:00:20Z')] },
+        { name: 'staand:contact_click', seen: [Date.parse('2026-09-07T14:00:30Z')] },
+    ],
+    pages: [
+        { name: '/deep-clean', seen: [Date.parse('2026-09-07T14:00:20Z'), Date.parse('2026-09-07T14:00:30Z')] },
+        { name: '/', seen: [Date.parse('2026-09-07T14:00:00Z')] },
+    ],
     walks: [],
     ...over,
 });
@@ -95,7 +101,7 @@ describe('Stands element', () => {
         expect(container.textContent).toContain('Activity →');
         expect(container.textContent).not.toContain('staand:page_view');
         expect(container.textContent).not.toContain('/deep-clean');
-        expect(container.querySelectorAll('.stand-tally').length).toBe(0);
+        expect(container.querySelectorAll('.sparkline-row').length).toBe(0);
     });
 
     test('a stand with nothing recorded offers no way into an empty panel', () => {

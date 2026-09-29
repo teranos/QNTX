@@ -1,6 +1,7 @@
 import { sendMessage } from './client';
 import { log, SEG } from './logger';
 import { escapeHtml } from './html-utils';
+import { renderSparkline } from './components/sparkline';
 import { DB, Watcher } from './sym';
 import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, getPredicateBreakdown, type PredicateDetail } from './eviction-chart';
 import { getWatchersByPredicate, setDilation, eyeStyle } from './watcher-predicates';
@@ -797,29 +798,6 @@ function renderPerformanceSection(container: HTMLElement, perf: PerfData | null,
             <div style="margin-top: 4px;">${rows}</div>
         </div>
     `;
-}
-
-function renderSparkline(data: (number | null)[]): string {
-    const values = data.filter((v): v is number => v != null);
-    if (values.length < 2) return '';
-
-    const w = 80;
-    const h = 16;
-    const max = Math.max(...values);
-    if (max === 0) return '';
-
-    const points = data.map((v, i) => {
-        if (v == null) return null;
-        const x = (i / (data.length - 1)) * w;
-        const y = h - (v / max) * (h - 2) - 1;
-        return `${x},${y}`;
-    }).filter(Boolean);
-
-    if (points.length < 2) return '';
-
-    return `<svg viewBox="0 0 ${w} ${h}" style="width: ${w}px; height: ${h}px;">
-        <polyline points="${points.join(' ')}" fill="none" stroke="#64748b" stroke-width="1" />
-    </svg>`;
 }
 
 function formatAge(timestamp: string | number): string {
