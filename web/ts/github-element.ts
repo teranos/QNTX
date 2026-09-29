@@ -52,7 +52,8 @@ export interface RunnerStats {
     path: string;
     name: string;
     github_url: string;
-    workspaces: number;
+    /** One per repository the runner has checked out, by name. */
+    workspaces: string[];
     jobs: number;
     last_job?: string;
     taken: TakenBuild[];
@@ -292,7 +293,7 @@ export function renderActions(container: HTMLElement, runner: GitHubRunner, relo
         const st = runner.stats;
         s.appendChild(row('Name:', st.name || '—'));
         s.appendChild(row('GitHub:', outside(st.github_url)));
-        s.appendChild(row('Workspaces:', String(st.workspaces)));
+        s.appendChild(row('Workspaces:', st.workspaces.length > 0 ? st.workspaces.join(', ') : 'none'));
         s.appendChild(row('Jobs:', String(st.jobs)));
         s.appendChild(row('Last job:', fmt(st.last_job)));
         s.appendChild(takenTable(st.taken));

@@ -100,13 +100,14 @@ describe('Tim: ROOT reads the node\'s GitHub', () => {
                 path: '/opt/actions-runner',
                 name: 'box-1',
                 github_url: 'https://github.com/teranos',
-                workspaces: 2,
+                workspaces: ['datapunt', 'garden'],
                 jobs: 7,
                 last_job: '2026-09-28T13:04:05Z',
                 taken: [{ plugin: 'garden', archive: 'qntx-garden-plugin-0.2.0-linux-amd64.tar.gz', digest: 'ab12', at: '2026-09-28T13:05:00Z', changed: true }],
             },
         }), reload);
         expect(container.textContent).toContain('box-1');
+        expect(container.textContent).toContain('datapunt, garden');
         expect(container.textContent).toContain('2026-09-28 13:04:05');
         expect(container.querySelector('a')?.getAttribute('href')).toBe('https://github.com/teranos');
         const taken = container.querySelectorAll('.github-taken-table tbody tr');

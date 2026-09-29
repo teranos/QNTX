@@ -315,7 +315,7 @@ type RunnerStats struct {
 	Path       string       `json:"path"`
 	Name       string       `json:"name"`
 	GitHubURL  string       `json:"github_url"`
-	Workspaces int          `json:"workspaces"`
+	Workspaces []string     `json:"workspaces"`
 	Jobs       int          `json:"jobs"`
 	LastJob    *time.Time   `json:"last_job,omitempty"`
 	Taken      []TakenBuild `json:"taken"`
@@ -323,7 +323,7 @@ type RunnerStats struct {
 
 // Stats is the runner as its directory says it is now.
 func (r *Runner) Stats() RunnerStats {
-	stats := RunnerStats{Path: r.path, Taken: []TakenBuild{}}
+	stats := RunnerStats{Path: r.path, Workspaces: []string{}, Taken: []TakenBuild{}}
 	if raw, err := os.ReadFile(filepath.Join(r.path, runnerFile)); err == nil {
 		var registered struct {
 			AgentName string `json:"agentName"`
@@ -337,7 +337,7 @@ func (r *Runner) Stats() RunnerStats {
 	if entries, err := os.ReadDir(filepath.Join(r.path, runnerWork)); err == nil {
 		for _, entry := range entries {
 			if entry.IsDir() && !runnerOwn[entry.Name()] {
-				stats.Workspaces++
+				stats.Workspaces = append(stats.Workspaces, entry.Name())
 			}
 		}
 	}
