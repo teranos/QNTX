@@ -117,6 +117,8 @@ WORKER in `garden`, so:
 - `/api/config` stays ROOT's, because no runtime line names it and the const table never
   shrinks.
 
+A runtime line on a path nothing answers is not served and is said. A const table path nothing answers stops the node.
+
 A word ending in a colon is every predicate under it: `tag:` is every tag there will ever
 be. `*` is every predicate: `WRITE is * of GROUND` is the line for a token that records what
 happens rather than what a role is for, and it is written, outranked and revoked like any word.
