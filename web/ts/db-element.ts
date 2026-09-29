@@ -1,7 +1,7 @@
 import { sendMessage } from './client';
 import { log, SEG } from './logger';
 import { escapeHtml } from './html-utils';
-import { renderSparkline } from './components/sparkline';
+import { renderSparkline, windowOf, seriesOf, formatIn } from './components/sparkline';
 import { DB, Watcher } from './sym';
 import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, getPredicateBreakdown, type PredicateDetail } from './eviction-chart';
 import { getWatchersByPredicate, setDilation, eyeStyle } from './watcher-predicates';
@@ -325,17 +325,28 @@ function renderDbStats(): void {
             </div>
         `;
 
-        // Predicate list with color indicators matching chart
+        // Predicate list: each over time, most recently seen first, colored the
+        // way the chart colors it.
         if (d.predicates && d.predicates.length > 0) {
             const watcherMap = getWatchersByPredicate();
-            const predRows = d.predicates.map((p: { predicate: string; count: number }, i: number) => {
-                const color = PREDICATE_COLORS[i % PREDICATE_COLORS.length];
-                const info = watcherMap.get(p.predicate);
+            const histograms: Record<string, Record<string, number>> = dbStats.predicate_histograms ?? {};
+            const keys = Array.from(new Set(Object.values(histograms).flatMap(h => Object.keys(h)))).sort();
+            const recent = byRecent(histograms);
+            const charted = recent.slice(0, 10);
+            const named = (d.predicates as Array<{ predicate: string }>).map(p => p.predicate);
+            const ordered = [...recent.filter(p => named.includes(p)), ...named.filter(p => !recent.includes(p))];
+            const predRows = ordered.map((predicate) => {
+                const at = charted.indexOf(predicate);
+                const color = at >= 0 ? PREDICATE_COLORS[at % PREDICATE_COLORS.length] : 'transparent';
+                const hist = histograms[predicate] ?? {};
+                const line = renderSparkline(keys.map(k => hist[k] ?? 0));
+                const info = watcherMap.get(predicate);
                 const eyes = info ? (() => { const s = eyeStyle(info); return `<span style="color: ${s.color}; text-shadow: ${s.shadow}; cursor: default;" title="${info.names.join(', ')}">${Watcher.repeat(info.names.length)}</span>`; })() : '';
-                return `<div style="display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 2px 0;">
+                return `<div class="distillation-row" style="display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 2px 0;">
                     <span style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; flex-shrink: 0;"></span>
-                    <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word; flex: 1;">${p.predicate}${eyes}</span>
-                    <span style="color: #94a3b8; white-space: nowrap;">${p.count}</span>
+                    <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word; flex: 1;">${predicate}${eyes}</span>
+                    <span style="flex-shrink: 0; display: inline-flex;">${line}</span>
+                    <span style="color: #94a3b8; white-space: nowrap;">${lastActiveKey(hist)}</span>
                 </div>`;
             }).join('');
             predicatesHTML += `<div style="margin-top: 4px;">${predRows}</div>`;
@@ -367,11 +378,15 @@ function renderDbStats(): void {
 
         let predicateRows = '';
         if (breakdown.length > 0) {
+            // One window for every predicate, so their lines share an axis.
+            const w = windowOf(breakdown.flatMap(b => b.evictedAt));
             const items = breakdown.map((b, i) => {
                 const age = b.oldestEvicted ? formatAge(b.oldestEvicted) : '';
-                return `<div class="eviction-pred-row" data-pred-idx="${i}" style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; cursor: pointer;">
-                    <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word;">${b.predicate}</span>
-                    <span style="white-space: nowrap; margin-left: 8px;">${age ? `<span style="color: #64748b; margin-right: 6px;">${age}</span>` : ''}<span style="color: #94a3b8;">${b.count.toLocaleString()}</span></span>
+                return `<div class="eviction-pred-row" data-pred-idx="${i}" style="display: flex; align-items: center; gap: 8px; font-size: 11px; padding: 2px 0; cursor: pointer;">
+                    <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word; flex: 1;">${b.predicate}</span>
+                    ${age ? `<span style="color: #64748b; white-space: nowrap;" title="oldest evicted">${age}</span>` : ''}
+                    <span style="flex-shrink: 0; display: inline-flex;">${renderSparkline(seriesOf(b.evictedAt, w))}</span>
+                    <span style="color: #94a3b8; white-space: nowrap;">${formatIn(b.lastEviction, w.unit)}</span>
                 </div>
                 <div class="eviction-pred-detail" data-pred-detail="${i}" style="display: none;"></div>`;
             }).join('');
@@ -423,6 +438,27 @@ function renderDbStats(): void {
     } else {
         sectionPerformance.innerHTML = '';
     }
+}
+
+// The last time key a predicate was seen in. Keys are time buckets that sort as
+// text, so the greatest key with anything in it is the most recent.
+function lastActiveKey(hist: Record<string, number>): string {
+    let last = '';
+    for (const [key, value] of Object.entries(hist)) {
+        if (value > 0 && key > last) last = key;
+    }
+    return last;
+}
+
+// Predicates most recently seen first. "The axis of time is more useful than a
+// tally": which ones are drawn, and in what order, follows when, not how many.
+function byRecent(histograms: Record<string, Record<string, number>>): string[] {
+    return Object.keys(histograms).sort((a, b) => {
+        const la = lastActiveKey(histograms[a]);
+        const lb = lastActiveKey(histograms[b]);
+        if (la !== lb) return la < lb ? 1 : -1;
+        return a.localeCompare(b);
+    });
 }
 
 function renderChartWithControls(container: HTMLElement, histograms: Record<string, Record<string, number>> | null): void {
@@ -510,8 +546,8 @@ function renderViewport(chartArea: HTMLElement, histograms: Record<string, Recor
     renderTimeseriesChart(chartArea, Object.keys(filtered).length > 0 ? filtered : null, rangeLabel);
 }
 
-// Render multi-series timeseries chart from predicate histogram data
-function renderTimeseriesChart(container: HTMLElement, histograms: Record<string, Record<string, number>> | null, rangeLabel?: string): void {
+// Render multi-series timeseries chart from predicate histogram data. Exported for tests.
+export function renderTimeseriesChart(container: HTMLElement, histograms: Record<string, Record<string, number>> | null, rangeLabel?: string): void {
     if (!histograms) {
         container.innerHTML = '<div style="padding: 16px; color: #64748b; font-size: 11px;">No histogram data yet (waiting for distillation)</div>';
         return;
@@ -533,15 +569,8 @@ function renderTimeseriesChart(container: HTMLElement, histograms: Record<string
     const allKeys = Array.from(allKeysSet).sort();
     if (allKeys.length === 0) return;
 
-    // Sort predicates by total observations descending, cap at top 10
-    const predTotals = predicates.map(p => {
-        let total = 0;
-        for (const v of Object.values(histograms[p])) total += v;
-        return { predicate: p, total };
-    }).sort((a, b) => b.total - a.total);
-
-    const topPredicates = predTotals.slice(0, 10);
-    const sortedPredicates = topPredicates.map(p => p.predicate);
+    // The ten most recently seen, most recent first.
+    const sortedPredicates = byRecent(histograms).slice(0, 10);
 
     // Build series data
     const series: { predicate: string; color: string; points: { key: string; value: number }[] }[] = [];
@@ -634,13 +663,13 @@ function renderTimeseriesChart(container: HTMLElement, histograms: Record<string
     // Legend
     const watcherMap = getWatchersByPredicate();
     const legendItems = series.map(s => {
-        const total = predTotals.find(p => p.predicate === s.predicate)?.total || 0;
+        const last = lastActiveKey(histograms[s.predicate]);
         const info = watcherMap.get(s.predicate);
         const eyes = info ? (() => { const st = eyeStyle(info); return `<span style="color: ${st.color}; text-shadow: ${st.shadow}; cursor: default;" title="${info.names.join(', ')}">${Watcher.repeat(info.names.length)}</span>`; })() : '';
         return `<span style="display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-size: var(--font-size-sm);">
             <span style="width: 8px; height: 8px; border-radius: 50%; background: ${s.color};"></span>
             <span style="color: #e2e8f0;">${s.predicate}${eyes}</span>
-            <span style="color: #64748b;">${total.toLocaleString()}</span>
+            <span style="color: #64748b;">${last}</span>
         </span>`;
     }).join('');
 
