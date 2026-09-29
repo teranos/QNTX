@@ -141,21 +141,21 @@ in
 
       # Both names are the fetcher's (plugin/grpc/fetch.go): the asset ends in
       # -<GOOS>-<GOARCH>.tar.gz, and the binary inside is qntx-<name>-plugin.
+      # Written at the workspace root: a build under the runner is looked for there (ADR-043).
       {
         name = "Package";
         id = "package";
         working-directory = "core";
         run = ''
           ARTIFACT="qntx-datapunt-plugin-${version}-linux-amd64.tar.gz"
-          tar -czf "$ARTIFACT" -C bin qntx-datapunt-plugin
-          sha256sum "$ARTIFACT" > "$ARTIFACT.sha256"
+          tar -czf "$GITHUB_WORKSPACE/$ARTIFACT" -C bin qntx-datapunt-plugin
+          (cd "$GITHUB_WORKSPACE" && sha256sum "$ARTIFACT" > "$ARTIFACT.sha256")
           echo "artifact=$ARTIFACT" >> "$GITHUB_OUTPUT"
         '';
       }
 
       {
         name = "Verify the artifact runs";
-        working-directory = "core";
         run = ''
           VERIFY="$RUNNER_TEMP/verify-datapunt"
           rm -rf "$VERIFY" && mkdir -p "$VERIFY"
@@ -171,8 +171,8 @@ in
         "with" = {
           name = artifact;
           path = ''
-            core/${artifact}
-            core/${artifact}.sha256
+            ${artifact}
+            ${artifact}.sha256
           '';
         };
       }
@@ -182,7 +182,6 @@ in
         "if" = "steps.version.outputs.fresh == 'yes'";
         env.GH_TOKEN = "\${{ github.token }}";
         env.GH_REPO = "\${{ github.repository }}";
-        working-directory = "core";
         run = ''
           ${gh}
           TAG="datapunt-v${version}"

@@ -63,13 +63,12 @@
         {
           "id": "package",
           "name": "Package",
-          "run": "ARTIFACT=\"qntx-datapunt-plugin-${{ steps.version.outputs.version }}-linux-amd64.tar.gz\"\ntar -czf \"$ARTIFACT\" -C bin qntx-datapunt-plugin\nsha256sum \"$ARTIFACT\" > \"$ARTIFACT.sha256\"\necho \"artifact=$ARTIFACT\" >> \"$GITHUB_OUTPUT\"\n",
+          "run": "ARTIFACT=\"qntx-datapunt-plugin-${{ steps.version.outputs.version }}-linux-amd64.tar.gz\"\ntar -czf \"$GITHUB_WORKSPACE/$ARTIFACT\" -C bin qntx-datapunt-plugin\n(cd \"$GITHUB_WORKSPACE\" && sha256sum \"$ARTIFACT\" > \"$ARTIFACT.sha256\")\necho \"artifact=$ARTIFACT\" >> \"$GITHUB_OUTPUT\"\n",
           "working-directory": "core"
         },
         {
           "name": "Verify the artifact runs",
-          "run": "VERIFY=\"$RUNNER_TEMP/verify-datapunt\"\nrm -rf \"$VERIFY\" && mkdir -p \"$VERIFY\"\ntar -xzf \"${{ steps.package.outputs.artifact }}\" -C \"$VERIFY\"\n\"$VERIFY/qntx-datapunt-plugin\" --version\n",
-          "working-directory": "core"
+          "run": "VERIFY=\"$RUNNER_TEMP/verify-datapunt\"\nrm -rf \"$VERIFY\" && mkdir -p \"$VERIFY\"\ntar -xzf \"${{ steps.package.outputs.artifact }}\" -C \"$VERIFY\"\n\"$VERIFY/qntx-datapunt-plugin\" --version\n"
         },
         {
           "if": "steps.version.outputs.fresh != 'yes'",
@@ -77,7 +76,7 @@
           "uses": "actions/upload-artifact@v4",
           "with": {
             "name": "${{ steps.package.outputs.artifact }}",
-            "path": "core/${{ steps.package.outputs.artifact }}\ncore/${{ steps.package.outputs.artifact }}.sha256\n"
+            "path": "${{ steps.package.outputs.artifact }}\n${{ steps.package.outputs.artifact }}.sha256\n"
           }
         },
         {
@@ -87,8 +86,7 @@
           },
           "if": "steps.version.outputs.fresh == 'yes'",
           "name": "Publish release",
-          "run": "gh() { nix shell --inputs-from \"$GITHUB_WORKSPACE/core\" nixpkgs#gh -c gh \"$@\"; }\nTAG=\"datapunt-v${{ steps.version.outputs.version }}\"\ngh release create \"$TAG\" \\\n  \"${{ steps.package.outputs.artifact }}\" \\\n  \"${{ steps.package.outputs.artifact }}.sha256\" \\\n  --target \"$GITHUB_SHA\" --title \"$TAG\" \\\n  --notes \"teranos/datapunt at ${{ inputs.core_ref }}, with ${{ inputs.schemas }}\"\n",
-          "working-directory": "core"
+          "run": "gh() { nix shell --inputs-from \"$GITHUB_WORKSPACE/core\" nixpkgs#gh -c gh \"$@\"; }\nTAG=\"datapunt-v${{ steps.version.outputs.version }}\"\ngh release create \"$TAG\" \\\n  \"${{ steps.package.outputs.artifact }}\" \\\n  \"${{ steps.package.outputs.artifact }}.sha256\" \\\n  --target \"$GITHUB_SHA\" --title \"$TAG\" \\\n  --notes \"teranos/datapunt at ${{ inputs.core_ref }}, with ${{ inputs.schemas }}\"\n"
         }
       ],
       "timeout-minutes": 30
