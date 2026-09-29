@@ -13,6 +13,8 @@ am.toml
 .env
 .env.local
 
+sess*
+
 # Node/Bun
 node_modules/
 
