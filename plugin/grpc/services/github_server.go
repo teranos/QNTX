@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -130,6 +131,9 @@ type githubRoute struct {
 	path   string
 	query  []string
 	body   []string
+	// slashed are path parameters that are a path in a repository: each
+	// segment is escaped and the slashes between them stay slashes.
+	slashed []string
 }
 
 // pathFields are the request fields named in the path template, in order.
@@ -278,7 +282,16 @@ func githubPath(route githubRoute, msg protoreflect.Message) (string, error) {
 		if !msg.Has(fd) {
 			return "", errors.Newf("%s is required for %s %s", name, route.method, route.path)
 		}
-		b.WriteString(url.PathEscape(githubScalar(msg.Get(fd), fd)))
+		value := githubScalar(msg.Get(fd), fd)
+		if slices.Contains(route.slashed, name) {
+			segments := strings.Split(value, "/")
+			for i, segment := range segments {
+				segments[i] = url.PathEscape(segment)
+			}
+			b.WriteString(strings.Join(segments, "/"))
+		} else {
+			b.WriteString(url.PathEscape(value))
+		}
 		rest = rest[shut+1:]
 	}
 	b.WriteString(rest)

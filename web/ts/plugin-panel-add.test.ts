@@ -76,7 +76,7 @@ function added(body: unknown): Response {
 
 function resolves(body: unknown): Response {
     const repo = (body as { repo: string }).repo;
-    return new Response(JSON.stringify({ name: 'garden', repo, repository: 'teranos/garden', private: false, ref: 'main' }), { status: 200 });
+    return new Response(JSON.stringify({ name: 'garden', repo, repository: 'teranos/garden', private: false, ref: 'main', readme: '# garden\nGrows.', readme_path: 'README.md' }), { status: 200 });
 }
 
 const flush = async () => {
@@ -140,6 +140,7 @@ describe('Tim: the empty card becomes a plugin, and it starts disabled', () => {
         expect(asked.find(a => a.path === '/api/plugins/check')?.body).toEqual({ repo: REPO });
         expect(asked.find(a => a.method === 'POST' && a.path === '/api/plugins')).toBeUndefined();
         expect(content.querySelector('.plugin-add-resolved')?.textContent).toContain('teranos/garden');
+        expect(content.querySelector('.plugin-add-readme')?.textContent).toBe('# garden\nGrows.');
 
         // Stage two: added for real.
         press(content, '.plugin-add-confirm');

@@ -154,6 +154,10 @@ interface ResolvedPlugin {
     private: boolean;
     ref: string;
     path?: string;
+    readme?: string;
+    readme_path?: string;
+    /** What GitHub answered when no README came back. */
+    readme_said?: string;
 }
 
 // Added and switched off.
@@ -292,7 +296,8 @@ export function renderAddCard(): string {
                 <span>${escapeHtml(resolved.repository)}${resolved.path ? `/${escapeHtml(resolved.path)}` : ''}</span>
                 <span>${escapeHtml(resolved.ref)}</span>
                 ${resolved.private ? '<span>private</span>' : ''}
-            </div>` : ''}
+            </div>
+            ${renderCheckedReadme(resolved)}` : ''}
             <div class="plugin-controls">
                 ${checked
                     ? buttonPlaceholder('plugin-add-confirm', 'Add', 'plugin-add-confirm')
@@ -301,6 +306,17 @@ export function renderAddCard(): string {
             </div>
         </div>
     `;
+}
+
+/** The checked plugin's README, or what GitHub said when there is none. */
+export function renderCheckedReadme(checked: ResolvedPlugin): string {
+    if (checked.readme) {
+        return `
+            <div class="plugin-add-readme-path plugin-mono">${escapeHtml(checked.readme_path ?? '')}</div>
+            <pre class="plugin-add-readme">${escapeHtml(checked.readme)}</pre>
+        `;
+    }
+    return `<div class="plugin-add-readme-path plugin-mono">No README: ${escapeHtml(checked.readme_said ?? '')}</div>`;
 }
 
 function closeAddCard(): void {

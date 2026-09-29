@@ -34,7 +34,9 @@ See [API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/ope
 
 ## What happens
 
-**Check:** GitHubService is asked, as the node, whether the repository is there ([ADR-043](./ADR-043-github-service.md)). Nothing is written, installed or downloaded.
+"I expected to also see the plugin README if there is one."
+
+**Check:** GitHubService is asked, as the node, whether the repository and the plugin's directory in it are there, and for its README ([ADR-043](./ADR-043-github-service.md)). Nothing is written or installed.
 
 **Add:** the plugin is recorded with its repository URL, disabled, in the system store.
 

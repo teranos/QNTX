@@ -370,6 +370,13 @@ var githubRoutes = map[string]githubRoute{
 	"CreateARepositoryForTheAuthenticatedUser": {method: http.MethodPost, path: "/user/repos", body: []string{"name", "description", "homepage", "private", "has_issues", "has_projects", "has_wiki", "has_discussions", "team_id", "auto_init", "gitignore_template", "license_template", "allow_squash_merge", "allow_merge_commit", "allow_rebase_merge", "allow_auto_merge", "delete_branch_on_merge", "squash_merge_commit_title", "squash_merge_commit_message", "merge_commit_title", "merge_commit_message", "has_downloads", "is_template"}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repositories-for-a-user
 	"ListRepositoriesForAUser": {method: http.MethodGet, path: "/users/{username}/repos", query: []string{"type", "sort", "direction", "per_page", "page"}},
+
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-repository-content
+	"GetRepositoryContent": {method: http.MethodGet, path: "/repos/{owner}/{repo}/contents/{path}", query: []string{"ref"}, slashed: []string{"path"}},
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme
+	"GetARepositoryREADME": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme", query: []string{"ref"}},
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
+	"GetARepositoryREADMEForADirectory": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme/{dir}", query: []string{"ref"}, slashed: []string{"dir"}},
 }
 
 func (s *GitHubServer) GetTheCombinedStatusForASpecificReference(ctx context.Context, req *protocol.GitHubGetTheCombinedStatusForASpecificReferenceRequest) (*protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse, error) {
@@ -1086,4 +1093,16 @@ func (s *GitHubServer) CreateARepositoryForTheAuthenticatedUser(ctx context.Cont
 
 func (s *GitHubServer) ListRepositoriesForAUser(ctx context.Context, req *protocol.GitHubListRepositoriesForAUserRequest) (*protocol.GitHubListOrganizationRepositoriesResponse, error) {
 	return githubAnswer(s, ctx, "ListRepositoriesForAUser", req, &protocol.GitHubListOrganizationRepositoriesResponse{})
+}
+
+func (s *GitHubServer) GetRepositoryContent(ctx context.Context, req *protocol.GitHubGetRepositoryContentRequest) (*protocol.GitHubGetRepositoryContentResponse, error) {
+	return githubAnswer(s, ctx, "GetRepositoryContent", req, &protocol.GitHubGetRepositoryContentResponse{})
+}
+
+func (s *GitHubServer) GetARepositoryREADME(ctx context.Context, req *protocol.GitHubGetARepositoryREADMERequest) (*protocol.GitHubGetARepositoryREADMEResponse, error) {
+	return githubAnswer(s, ctx, "GetARepositoryREADME", req, &protocol.GitHubGetARepositoryREADMEResponse{})
+}
+
+func (s *GitHubServer) GetARepositoryREADMEForADirectory(ctx context.Context, req *protocol.GitHubGetARepositoryREADMEForADirectoryRequest) (*protocol.GitHubGetARepositoryREADMEResponse, error) {
+	return githubAnswer(s, ctx, "GetARepositoryREADMEForADirectory", req, &protocol.GitHubGetARepositoryREADMEResponse{})
 }

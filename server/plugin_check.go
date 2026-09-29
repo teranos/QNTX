@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"net/url"
 	"strings"
 
@@ -55,6 +56,11 @@ type checkedPlugin struct {
 	Private    bool   `json:"private"`
 	Ref        string `json:"ref"`
 	Path       string `json:"path,omitempty"`
+	// "I expected to also see the plugin README if there is one."
+	Readme     string `json:"readme,omitempty"`
+	ReadmePath string `json:"readme_path,omitempty"`
+	// ReadmeSaid is what GitHub answered when no README came back.
+	ReadmeSaid string `json:"readme_said,omitempty"`
 }
 
 // checkPlugin asks GitHub, as the node, whether repo is there. Nothing is
@@ -81,8 +87,63 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (checkedPlugi
 	if ref == "" {
 		ref = found.DefaultBranch
 	}
-	return checkedPlugin{
+	checked := checkedPlugin{
 		Name: name, Repo: repo, Repository: found.FullName, Private: found.Private,
 		Ref: ref, Path: source.Path,
-	}, nil
+	}
+
+	if source.Path != "" {
+		held, err := s.gitHubService().GetRepositoryContent(ctx, &protocol.GitHubGetRepositoryContentRequest{
+			Owner: source.Owner, Repo: source.Repo, Path: source.Path, Ref: ref})
+		if err != nil {
+			return checkedPlugin{}, errors.Wrapf(err, "GitHubService did not answer for %s in %s at %s", source.Path, found.FullName, ref)
+		}
+		if !held.Success {
+			return checkedPlugin{}, errors.Newf("%s is not in %s at %s: %s", source.Path, found.FullName, ref, held.Error)
+		}
+		// A directory answers with its entries; a file answers with itself.
+		if held.Type != "" {
+			return checkedPlugin{}, errors.Newf("%s in %s at %s is a %s, and a plugin is a directory", source.Path, found.FullName, ref, held.Type)
+		}
+	}
+
+	readme, err := s.pluginReadme(ctx, source, ref)
+	if err != nil {
+		return checkedPlugin{}, err
+	}
+	if readme.Success {
+		text, err := readmeText(readme)
+		if err != nil {
+			return checkedPlugin{}, errors.Wrapf(err, "the README at %s in %s at %s does not read", readme.Path, found.FullName, ref)
+		}
+		checked.Readme, checked.ReadmePath = text, readme.Path
+	} else {
+		checked.ReadmeSaid = readme.Error
+	}
+	return checked, nil
+}
+
+// pluginReadme is the README of the plugin's directory, or of the repository
+// when the plugin is the whole of it.
+func (s *QNTXServer) pluginReadme(ctx context.Context, source gitHubSource, ref string) (*protocol.GitHubGetARepositoryREADMEResponse, error) {
+	if source.Path == "" {
+		readme, err := s.gitHubService().GetARepositoryREADME(ctx, &protocol.GitHubGetARepositoryREADMERequest{
+			Owner: source.Owner, Repo: source.Repo, Ref: ref})
+		return readme, errors.Wrapf(err, "GitHubService did not answer for the README of %s/%s at %s", source.Owner, source.Repo, ref)
+	}
+	readme, err := s.gitHubService().GetARepositoryREADMEForADirectory(ctx, &protocol.GitHubGetARepositoryREADMEForADirectoryRequest{
+		Owner: source.Owner, Repo: source.Repo, Dir: source.Path, Ref: ref})
+	return readme, errors.Wrapf(err, "GitHubService did not answer for the README of %s in %s/%s at %s", source.Path, source.Owner, source.Repo, ref)
+}
+
+// readmeText is a README's content as text. GitHub sends it base64, wrapped in lines.
+func readmeText(readme *protocol.GitHubGetARepositoryREADMEResponse) (string, error) {
+	if readme.Encoding != "base64" {
+		return "", errors.Newf("it is encoded as %q, and base64 is what is read", readme.Encoding)
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(readme.Content, "\n", ""))
+	if err != nil {
+		return "", errors.Wrap(err, "its base64 does not decode")
+	}
+	return string(raw), nil
 }

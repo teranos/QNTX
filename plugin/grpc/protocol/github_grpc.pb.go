@@ -199,6 +199,9 @@ const (
 	GitHubService_ListRepositoriesForTheAuthenticatedUser_FullMethodName                        = "/protocol.GitHubService/ListRepositoriesForTheAuthenticatedUser"
 	GitHubService_CreateARepositoryForTheAuthenticatedUser_FullMethodName                       = "/protocol.GitHubService/CreateARepositoryForTheAuthenticatedUser"
 	GitHubService_ListRepositoriesForAUser_FullMethodName                                       = "/protocol.GitHubService/ListRepositoriesForAUser"
+	GitHubService_GetRepositoryContent_FullMethodName                                           = "/protocol.GitHubService/GetRepositoryContent"
+	GitHubService_GetARepositoryREADME_FullMethodName                                           = "/protocol.GitHubService/GetARepositoryREADME"
+	GitHubService_GetARepositoryREADMEForADirectory_FullMethodName                              = "/protocol.GitHubService/GetARepositoryREADMEForADirectory"
 )
 
 // GitHubServiceClient is the client API for GitHubService service.
@@ -567,6 +570,12 @@ type GitHubServiceClient interface {
 	CreateARepositoryForTheAuthenticatedUser(ctx context.Context, in *GitHubCreateARepositoryForTheAuthenticatedUserRequest, opts ...grpc.CallOption) (*GitHubCreateAnOrganizationRepositoryResponse, error)
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repositories-for-a-user
 	ListRepositoriesForAUser(ctx context.Context, in *GitHubListRepositoriesForAUserRequest, opts ...grpc.CallOption) (*GitHubListOrganizationRepositoriesResponse, error)
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-repository-content
+	GetRepositoryContent(ctx context.Context, in *GitHubGetRepositoryContentRequest, opts ...grpc.CallOption) (*GitHubGetRepositoryContentResponse, error)
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme
+	GetARepositoryREADME(ctx context.Context, in *GitHubGetARepositoryREADMERequest, opts ...grpc.CallOption) (*GitHubGetARepositoryREADMEResponse, error)
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
+	GetARepositoryREADMEForADirectory(ctx context.Context, in *GitHubGetARepositoryREADMEForADirectoryRequest, opts ...grpc.CallOption) (*GitHubGetARepositoryREADMEResponse, error)
 }
 
 type gitHubServiceClient struct {
@@ -2377,6 +2386,36 @@ func (c *gitHubServiceClient) ListRepositoriesForAUser(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *gitHubServiceClient) GetRepositoryContent(ctx context.Context, in *GitHubGetRepositoryContentRequest, opts ...grpc.CallOption) (*GitHubGetRepositoryContentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GitHubGetRepositoryContentResponse)
+	err := c.cc.Invoke(ctx, GitHubService_GetRepositoryContent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitHubServiceClient) GetARepositoryREADME(ctx context.Context, in *GitHubGetARepositoryREADMERequest, opts ...grpc.CallOption) (*GitHubGetARepositoryREADMEResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GitHubGetARepositoryREADMEResponse)
+	err := c.cc.Invoke(ctx, GitHubService_GetARepositoryREADME_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitHubServiceClient) GetARepositoryREADMEForADirectory(ctx context.Context, in *GitHubGetARepositoryREADMEForADirectoryRequest, opts ...grpc.CallOption) (*GitHubGetARepositoryREADMEResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GitHubGetARepositoryREADMEResponse)
+	err := c.cc.Invoke(ctx, GitHubService_GetARepositoryREADMEForADirectory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GitHubServiceServer is the server API for GitHubService service.
 // All implementations must embed UnimplementedGitHubServiceServer
 // for forward compatibility.
@@ -2743,6 +2782,12 @@ type GitHubServiceServer interface {
 	CreateARepositoryForTheAuthenticatedUser(context.Context, *GitHubCreateARepositoryForTheAuthenticatedUserRequest) (*GitHubCreateAnOrganizationRepositoryResponse, error)
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repositories-for-a-user
 	ListRepositoriesForAUser(context.Context, *GitHubListRepositoriesForAUserRequest) (*GitHubListOrganizationRepositoriesResponse, error)
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-repository-content
+	GetRepositoryContent(context.Context, *GitHubGetRepositoryContentRequest) (*GitHubGetRepositoryContentResponse, error)
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme
+	GetARepositoryREADME(context.Context, *GitHubGetARepositoryREADMERequest) (*GitHubGetARepositoryREADMEResponse, error)
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
+	GetARepositoryREADMEForADirectory(context.Context, *GitHubGetARepositoryREADMEForADirectoryRequest) (*GitHubGetARepositoryREADMEResponse, error)
 	mustEmbedUnimplementedGitHubServiceServer()
 }
 
@@ -3292,6 +3337,15 @@ func (UnimplementedGitHubServiceServer) CreateARepositoryForTheAuthenticatedUser
 }
 func (UnimplementedGitHubServiceServer) ListRepositoriesForAUser(context.Context, *GitHubListRepositoriesForAUserRequest) (*GitHubListOrganizationRepositoriesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListRepositoriesForAUser not implemented")
+}
+func (UnimplementedGitHubServiceServer) GetRepositoryContent(context.Context, *GitHubGetRepositoryContentRequest) (*GitHubGetRepositoryContentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRepositoryContent not implemented")
+}
+func (UnimplementedGitHubServiceServer) GetARepositoryREADME(context.Context, *GitHubGetARepositoryREADMERequest) (*GitHubGetARepositoryREADMEResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetARepositoryREADME not implemented")
+}
+func (UnimplementedGitHubServiceServer) GetARepositoryREADMEForADirectory(context.Context, *GitHubGetARepositoryREADMEForADirectoryRequest) (*GitHubGetARepositoryREADMEResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetARepositoryREADMEForADirectory not implemented")
 }
 func (UnimplementedGitHubServiceServer) mustEmbedUnimplementedGitHubServiceServer() {}
 func (UnimplementedGitHubServiceServer) testEmbeddedByValue()                       {}
@@ -6554,6 +6608,60 @@ func _GitHubService_ListRepositoriesForAUser_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitHubService_GetRepositoryContent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GitHubGetRepositoryContentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitHubServiceServer).GetRepositoryContent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitHubService_GetRepositoryContent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitHubServiceServer).GetRepositoryContent(ctx, req.(*GitHubGetRepositoryContentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitHubService_GetARepositoryREADME_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GitHubGetARepositoryREADMERequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitHubServiceServer).GetARepositoryREADME(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitHubService_GetARepositoryREADME_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitHubServiceServer).GetARepositoryREADME(ctx, req.(*GitHubGetARepositoryREADMERequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitHubService_GetARepositoryREADMEForADirectory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GitHubGetARepositoryREADMEForADirectoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitHubServiceServer).GetARepositoryREADMEForADirectory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitHubService_GetARepositoryREADMEForADirectory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitHubServiceServer).GetARepositoryREADMEForADirectory(ctx, req.(*GitHubGetARepositoryREADMEForADirectoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GitHubService_ServiceDesc is the grpc.ServiceDesc for GitHubService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -7280,6 +7388,18 @@ var GitHubService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListRepositoriesForAUser",
 			Handler:    _GitHubService_ListRepositoriesForAUser_Handler,
+		},
+		{
+			MethodName: "GetRepositoryContent",
+			Handler:    _GitHubService_GetRepositoryContent_Handler,
+		},
+		{
+			MethodName: "GetARepositoryREADME",
+			Handler:    _GitHubService_GetARepositoryREADME_Handler,
+		},
+		{
+			MethodName: "GetARepositoryREADMEForADirectory",
+			Handler:    _GitHubService_GetARepositoryREADMEForADirectory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

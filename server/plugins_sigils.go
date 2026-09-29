@@ -68,7 +68,7 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 				},
 				{
 					Name: "check",
-					Does: "Whether a repository URL is there on GitHub, asked as the node, before adding it. Nothing is written, installed or downloaded.",
+					Does: "Whether a repository URL is there on GitHub, and the plugin's directory in it, asked as the node, before adding it; with its README when it has one. Nothing is written or installed.",
 					Takes: []*protocol.Param{{Name: "repo", Required: true,
 						Says: "The repository URL, or a tree URL naming a plugin inside one."}},
 					Gives: []*protocol.Field{
@@ -78,6 +78,9 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 						{Name: "private", Says: "Whether GitHub keeps the repository private."},
 						{Name: "ref", Says: "The branch the plugin is read from: the tree URL's, or the repository's default."},
 						{Name: "path", Says: "Where in the repository the plugin is. Absent for a plugin that is the whole repository."},
+						{Name: "readme", Says: "The plugin's README as text, when it has one."},
+						{Name: "readme_path", Says: "Where that README is in the repository."},
+						{Name: "readme_said", Says: "What GitHub answered when no README came back."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodPost, Path: "/api/plugins/check"},
 				},
