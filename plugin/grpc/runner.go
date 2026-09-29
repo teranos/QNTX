@@ -146,7 +146,8 @@ func (r *Runner) Watch(ctx context.Context, landed func(name string), logger *za
 		return errors.Wrapf(err, "failed to watch the runner at %s", r.path)
 	}
 	work := filepath.Join(r.path, runnerWork)
-	if err := r.watchUnder(watcher, work, 0); err != nil {
+	var already []string
+	if err := r.watchUnder(watcher, work, 0, &already); err != nil {
 		return sqlclose.With(err, watcher.Close(), "the runner watcher on "+work)
 	}
 
@@ -157,6 +158,24 @@ func (r *Runner) Watch(ctx context.Context, landed func(name string), logger *za
 			}
 		}()
 		pending := map[string]*time.Timer{}
+		take := func(digestFile string) {
+			if timer, ok := pending[digestFile]; ok {
+				timer.Stop()
+			}
+			pending[digestFile] = time.AfterFunc(buildSettle, func() {
+				taken, err := r.Take(digestFile, logger)
+				if err != nil {
+					logger.Errorw("A build landed under the runner and was not installed", "digest", digestFile, "error", err)
+					return
+				}
+				if taken.Changed {
+					landed(taken.Plugin)
+				}
+			})
+		}
+		for _, digestFile := range already {
+			take(digestFile)
+		}
 		for {
 			select {
 			case <-ctx.Done():
@@ -175,32 +194,21 @@ func (r *Runner) Watch(ctx context.Context, landed func(name string), logger *za
 				}
 				if event.Op&fsnotify.Create != 0 {
 					if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-						if err := r.watchUnder(watcher, event.Name, depthUnder(work, event.Name)); err != nil {
+						// What landed in it before its watch was added raised no event.
+						var inside []string
+						if err := r.watchUnder(watcher, event.Name, depthUnder(work, event.Name), &inside); err != nil {
 							logger.Errorw("A new workspace under the runner is not watched", "path", event.Name, "error", err)
+						}
+						for _, digestFile := range inside {
+							take(digestFile)
 						}
 						continue
 					}
 				}
-				if event.Op&(fsnotify.Create|fsnotify.Write) == 0 || !strings.HasSuffix(event.Name, digestSuffix) {
+				if event.Op&(fsnotify.Create|fsnotify.Write) == 0 || !isBuildDigest(event.Name) {
 					continue
 				}
-				digestFile := event.Name
-				if _, ok := BuildPlugin(strings.TrimSuffix(digestFile, digestSuffix)); !ok {
-					continue
-				}
-				if timer, ok := pending[digestFile]; ok {
-					timer.Stop()
-				}
-				pending[digestFile] = time.AfterFunc(buildSettle, func() {
-					taken, err := r.Take(digestFile, logger)
-					if err != nil {
-						logger.Errorw("A build landed under the runner and was not installed", "digest", digestFile, "error", err)
-						return
-					}
-					if taken.Changed {
-						landed(taken.Plugin)
-					}
-				})
+				take(event.Name)
 			}
 		}
 	})
@@ -208,8 +216,18 @@ func (r *Runner) Watch(ctx context.Context, landed func(name string), logger *za
 	return nil
 }
 
-// watchUnder watches dir and the directories under it down to workspaceDepth.
-func (r *Runner) watchUnder(watcher *fsnotify.Watcher, dir string, depth int) error {
+// isBuildDigest is whether a file is the .sha256 of a plugin build for this platform.
+func isBuildDigest(path string) bool {
+	if !strings.HasSuffix(path, digestSuffix) {
+		return false
+	}
+	_, ok := BuildPlugin(strings.TrimSuffix(path, digestSuffix))
+	return ok
+}
+
+// watchUnder watches dir and the directories under it down to workspaceDepth,
+// and adds to found every build digest already in them.
+func (r *Runner) watchUnder(watcher *fsnotify.Watcher, dir string, depth int, found *[]string) error {
 	if depth > workspaceDepth || runnerOwn[filepath.Base(dir)] {
 		return nil
 	}
@@ -221,10 +239,15 @@ func (r *Runner) watchUnder(watcher *fsnotify.Watcher, dir string, depth int) er
 		return errors.Wrapf(err, "failed to list %s", dir)
 	}
 	for _, entry := range entries {
+		path := filepath.Join(dir, entry.Name())
 		if entry.IsDir() {
-			if err := r.watchUnder(watcher, filepath.Join(dir, entry.Name()), depth+1); err != nil {
+			if err := r.watchUnder(watcher, path, depth+1, found); err != nil {
 				return err
 			}
+			continue
+		}
+		if isBuildDigest(path) {
+			*found = append(*found, path)
 		}
 	}
 	return nil

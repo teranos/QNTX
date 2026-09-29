@@ -92,6 +92,28 @@ func TestABuildLandingUnderTheRunnerIsInstalled(t *testing.T) {
 	assert.Equal(t, []byte("\x7fELF pyre"), got)
 }
 
+// A build already under the runner when its directory is first watched raised
+// no event, and is taken all the same.
+func TestABuildAlreadyUnderTheRunnerIsTaken(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	logger := zaptest.NewLogger(t).Sugar()
+	runner, err := OpenRunner(aRunner(t))
+	require.NoError(t, err)
+	landBuild(t, filepath.Join(runner.Path(), "_work", "pyre", "pyre"), "pyre", "1.0.0", []byte("\x7fELF pyre"), "")
+
+	landed := make(chan string, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	require.NoError(t, runner.Watch(ctx, func(name string) { landed <- name }, logger))
+
+	select {
+	case name := <-landed:
+		assert.Equal(t, "pyre", name)
+	case <-time.After(5 * time.Second):
+		t.Fatal("a build already under the runner was not taken")
+	}
+}
+
 // A build whose .sha256 disagrees with it is not installed.
 func TestABuildThatDisagreesWithItsDigestIsNotInstalled(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())

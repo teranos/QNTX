@@ -47,6 +47,9 @@ runner. QNTX sees the file land, checks it against the `.sha256`, takes it into
 its own plugin directory and restarts the plugin. Nothing is downloaded from
 GitHub.
 
+A build is looked for at the root of a job's workspace, `<runner>/_work/<repo>/<repo>/`, and
+no deeper. Its workflow runs on `[self-hosted, q-box]`.
+
 "yes, i want this."
 
 "When a new namespace get's created, it doesnt have access to the service by default"
