@@ -38,7 +38,7 @@ See [API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/ope
 
 **Add:** the plugin is recorded with its repository URL, disabled, in the system store.
 
-**Enable:** recorded as enabled, then discovered from search paths, loaded, gRPC connected, registered, initialized, provider services wired, async handlers and watchers registered. Same sequence as boot, but for one plugin.
+**Enable:** recorded as enabled, then discovered from search paths, loaded, gRPC connected, registered, initialized, provider services wired, async handlers and watchers registered. Same sequence as boot, but for one plugin. Enable probes the plugin's health before it answers; a plugin no probe has seen yet is not probed, not unhealthy.
 
 **Disable:** recorded as disabled, then gRPC shutdown sent, process killed, unregistered from domain registry, watchers pruned, async handlers removed, HTTP mux cleared.
 
