@@ -1,0 +1,5 @@
+Umami v3.3.1, the version staands follows.
+
+schema.prisma https://raw.githubusercontent.com/umami-software/umami/ca661c7057984aa98ed4f7083d84dae2f65bfcb0/prisma/schema.prisma (the commit v3.3.1 points to)
+
+b9f47294b09620aa2c44156dabcfb96168d1cdf881c9e712b6be27901b051b89  schema.prisma

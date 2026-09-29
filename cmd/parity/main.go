@@ -66,6 +66,7 @@ func main() {
 	root := flag.String("root", ".", "repository root to scan for storage contracts")
 	parquetDir := flag.String("parquet", "db/duckdb/migrations", "DuckDB/parquet migrations directory")
 	crateDir := flag.String("crate", "crates/ats-duckdb/src", "DuckDB backend crate, scanned for object prefixes")
+	all := flag.Bool("all", false, "show the Umami models a stand covers completely")
 	flag.Parse()
 
 	things, err := Report(*root, *parquetDir, *crateDir)
@@ -74,6 +75,13 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Print(Render(things))
+
+	umami, err := Umami(*root, *all)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "parity: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Print(umami)
 }
 
 // Report derives every thing and its presence in each backend.
