@@ -10,7 +10,6 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
-	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
@@ -299,60 +298,6 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		if err := setDoors(server.authHandler, newCfg, serverLogger); err != nil {
 			serverLogger.Errorw("Front doors not reloaded, the ones already open are unchanged", "error", err)
 		}
-		return nil
-	})
-
-	configWatcher.OnReload(func(newCfg *appcfg.Config) error {
-		manager := grpcplugin.GetDefaultPluginManager()
-		registry := plugin.GetDefaultRegistry()
-		if manager == nil || registry == nil {
-			serverLogger.Warnw("Plugin hot-swap skipped: manager or registry not initialized",
-				"manager_nil", manager == nil, "registry_nil", registry == nil)
-			return nil
-		}
-
-		nowEnabled := make(map[string]bool, len(newCfg.Plugin.Enabled))
-		for _, name := range newCfg.Plugin.EnabledNames() {
-			nowEnabled[name] = true
-		}
-		currentlyLoaded := make(map[string]bool)
-		for _, name := range manager.LoadedPluginNames() {
-			currentlyLoaded[name] = true
-		}
-
-		for name := range currentlyLoaded {
-			if !nowEnabled[name] {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				if err := manager.DisablePlugin(ctx, name, registry); err != nil {
-					serverLogger.Errorw("Failed to disable plugin", "plugin", name, "error", err)
-				}
-				cancel()
-				server.InvalidatePluginMux(name)
-				server.broadcastDaemonStatus()
-			}
-		}
-
-		for name := range nowEnabled {
-			if !currentlyLoaded[name] {
-				go func(pluginName string) {
-					defer func() {
-						if r := recover(); r != nil {
-							serverLogger.Errorw("Plugin enable panicked", "plugin", pluginName, "panic", r)
-						}
-					}()
-					// Sized for a plugin fetch — adding a repo URL to a running
-					// node downloads the binary here before it loads.
-					ctx, cancel := context.WithTimeout(context.Background(), grpcplugin.PluginFetchTimeout)
-					defer cancel()
-					services := server.GetServices()
-					if err := manager.EnablePlugin(ctx, pluginName, newCfg.Plugin.Paths, registry, services); err != nil {
-						serverLogger.Errorw("Failed to enable plugin", "plugin", pluginName, "error", err)
-					}
-					server.broadcastDaemonStatus()
-				}(name)
-			}
-		}
-
 		return nil
 	})
 

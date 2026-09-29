@@ -34,7 +34,7 @@ Who may log in, the provider ceremony, and what a passkey carries: [ADR-030](doc
 
 **ANY edit to a plugin MUST bump its version in `Metadata().Version`.** Plugins run as separate processes — the version in the UI or logs is the only way to confirm new code is running. No exceptions.
 
-**Hot-swap:** Adding or removing plugins in `[plugin] enabled` in am.toml takes effect immediately — no server restart needed. The config watcher diffs the list and starts/stops plugins. See `docs/plugin-hot-swap.md`.
+**Hot-swap:** Plugins are added, configured, enabled and disabled in the plugin element, at runtime. See [ADR-002](docs/adr/ADR-002-plugin-configuration.md).
 
 ## Go Development Standards
 

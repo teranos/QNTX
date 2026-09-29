@@ -6,10 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"go.uber.org/zap"
 )
 
 func TestNewConfigProvider_WithoutEndpoints(t *testing.T) {
-	provider := NewConfigProvider(nil)
+	provider := NewConfigProvider(nil, zap.NewNop().Sugar())
 	require.NotNil(t, provider)
 
 	config := provider.GetPluginConfig("testdomain")
@@ -34,7 +35,7 @@ func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 		AuthToken:           "test-token-123",
 	}
 
-	provider := NewConfigProvider(endpoints)
+	provider := NewConfigProvider(endpoints, zap.NewNop().Sugar())
 	config := provider.GetPluginConfig("anydomain")
 
 	cases := []struct {
@@ -66,29 +67,37 @@ func TestNewConfigProvider_GetAlsoInjectsEndpoints(t *testing.T) {
 		LLMAddress: "localhost:5555",
 	}
 
-	provider := NewConfigProvider(endpoints)
+	provider := NewConfigProvider(endpoints, zap.NewNop().Sugar())
 	config := provider.GetPluginConfig("x")
 
 	assert.Equal(t, "localhost:5555", config.Get("_llm_endpoint"))
 }
 
-// Viper holds every key lowercased. A plugin named with a capital, cleanAPI,
-// was handed no config at all, its github_token among it.
-func TestAPluginNamedWithACapitalIsHandedItsKeys(t *testing.T) {
-	appcfg.Set("cleanAPI.github_token", "ssm:///q/box/github-token")
-	t.Cleanup(appcfg.Reset)
+// A plugin is handed the config the plugin element saved in its record, a
+// plugin named with a capital included.
+func TestAPluginIsHandedTheConfigItsRecordHolds(t *testing.T) {
+	SetPluginRecords(heldRecords{"cleanAPI": {Name: "cleanAPI", Config: map[string]string{
+		"token":         "ssm:///q/box/token",
+		"poll_interval": "300",
+		"verbose":       "true",
+	}}})
+	t.Cleanup(func() { SetPluginRecords(nil) })
 
-	config := NewConfigProvider(nil).GetPluginConfig("cleanAPI")
-	assert.Contains(t, config.GetKeys(), "github_token")
-	assert.Equal(t, "ssm:///q/box/github-token", config.Get("github_token"))
+	config := NewConfigProvider(nil, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
+	assert.ElementsMatch(t, []string{"token", "poll_interval", "verbose"}, config.GetKeys())
+	assert.Equal(t, "ssm:///q/box/token", config.Get("token"))
+	assert.Equal(t, 300, config.GetInt("poll_interval"))
+	assert.True(t, config.GetBool("verbose"))
 }
 
-func TestNewConfigProvider_NonEndpointKeysFallThrough(t *testing.T) {
-	endpoints := &ServiceEndpoints{LLMAddress: "localhost:5555"}
-	provider := NewConfigProvider(endpoints)
-	config := provider.GetPluginConfig("testdomain")
+// The plugin's record is the whole of its config.
+func TestAPluginsConfigIsItsRecord(t *testing.T) {
+	appcfg.Set("pyre.poll_interval", "300")
+	t.Cleanup(appcfg.Reset)
+	SetPluginRecords(heldRecords{"pyre": {Name: "pyre", Config: map[string]string{}}})
+	t.Cleanup(func() { SetPluginRecords(nil) })
 
-	// Regular keys go through am config (returns zero values in test)
-	assert.Equal(t, 0, config.GetInt("some_number"))
-	assert.Equal(t, false, config.GetBool("some_flag"))
+	config := NewConfigProvider(nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
+	assert.Empty(t, config.GetKeys())
+	assert.Equal(t, 0, config.GetInt("poll_interval"))
 }

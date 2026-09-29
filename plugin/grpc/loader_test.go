@@ -14,63 +14,39 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
-// TestLoadPluginsFromConfig_NoDuplicates verifies that plugins listed in
-// cfg.Plugin.Enabled are only loaded once, not duplicated.
-func TestLoadPluginsFromConfig_NoDuplicates(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-	ctx := context.Background()
+// heldRecords is plugins as a test says the node knows them.
+type heldRecords map[string]PluginRecord
 
-	// Create config with duplicate plugin names (simulating the bug)
-	cfg := &config.Config{
-		Plugin: config.PluginConfig{
-			Enabled: []string{"testplugin", "testplugin"}, // Intentional duplicate
-			Paths:   []string{t.TempDir()},                // Empty dir, no binaries found
-		},
+func (h heldRecords) Plugins() ([]PluginRecord, error) {
+	all := make([]PluginRecord, 0, len(h))
+	for _, record := range h {
+		all = append(all, record)
 	}
-
-	manager := NewPluginManager(logger, logger, "")
-	err := LoadPluginsFromConfig(ctx, manager, cfg, logger)
-	assert.NoError(t, err, "Loading should not error even if plugins not found")
-
-	// Verify no plugins loaded (binaries don't exist)
-	plugins := manager.GetAllPlugins()
-	assert.Equal(t, 0, len(plugins), "No plugins should load since binaries don't exist")
-
-	// The real test: if binaries DID exist, would they be loaded twice?
-	// We can't easily test with real binaries, but we can verify the loop logic
-	// doesn't add duplicates by checking the loop iterates correctly
-	seenPlugins := make(map[string]int)
-	for _, name := range cfg.Plugin.Enabled {
-		seenPlugins[name]++
-	}
-
-	// This demonstrates the bug: if enabled list has duplicates,
-	// the loop will process each entry
-	assert.Equal(t, 2, seenPlugins["testplugin"],
-		"Bug: duplicate entries in enabled list would be processed twice")
+	return all, nil
 }
 
-// TestLoadPluginsFromConfig_UniquePlugins verifies normal case with unique plugins
-func TestLoadPluginsFromConfig_UniquePlugins(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-	ctx := context.Background()
+func (h heldRecords) Plugin(name string) (PluginRecord, bool, error) {
+	record, found := h[name]
+	return record, found, nil
+}
 
-	cfg := &config.Config{
-		Plugin: config.PluginConfig{
-			Enabled: []string{"plugin1", "plugin2", "plugin3"},
-			Paths:   []string{t.TempDir()},
-		},
+// An enabled plugin is loaded, and one that was added and is disabled is left
+// alone: it is neither started nor reported failed.
+func TestOnlyEnabledPluginsAreLoaded(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	cfg := &config.Config{Plugin: config.PluginConfig{Paths: []string{t.TempDir()}}}
+	records := heldRecords{
+		"pyre": {Name: "pyre", Enabled: true},
+		"loom": {Name: "loom"},
 	}
 
 	manager := NewPluginManager(logger, logger, "")
-	err := LoadPluginsFromConfig(ctx, manager, cfg, logger)
-	assert.NoError(t, err)
+	assert.NoError(t, LoadPluginsFromRecords(context.Background(), manager, records, cfg, logger))
 
-	plugins := manager.GetAllPlugins()
-	assert.Equal(t, 0, len(plugins), "No plugins loaded (binaries don't exist)")
-
-	// Verify enabled list processing
-	assert.Equal(t, 3, len(cfg.Plugin.Enabled), "Should have 3 unique plugins in config")
+	assert.Empty(t, manager.GetAllPlugins(), "no binary is on disk")
+	failed := manager.GetFailedPlugins()
+	assert.Contains(t, failed, "pyre", "an enabled plugin with no binary says why")
+	assert.NotContains(t, failed, "loom", "a disabled plugin is left alone")
 }
 
 // TestGetAllPlugins_ReturnsUniqueInstances verifies GetAllPlugins doesn't

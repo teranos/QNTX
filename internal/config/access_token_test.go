@@ -73,9 +73,6 @@ func TestHostAsKeyBreaksConfigLoad(t *testing.T) {
 // every forge host has one, so this is the case that matters.
 func TestAccessTokenHostWithDots(t *testing.T) {
 	path := writeConfig(t, `
-[plugin]
-enabled = ["https://github.com/sbvh-nl/duif"]
-
 [[plugin.access_token]]
 host = "github.com"
 ref  = "ssm:///qntx/github-token"
@@ -186,7 +183,7 @@ ref = "ssm:///qntx/github-token"
 func TestAccessTokenAbsent(t *testing.T) {
 	path := writeConfig(t, `
 [plugin]
-enabled = ["meili"]
+paths = ["~/.qntx/plugins"]
 `)
 
 	cfg, err := LoadFromFile(path)

@@ -16,33 +16,45 @@ import (
 	"go.uber.org/zap"
 )
 
-// LoadPluginsFromConfig loads plugins into an existing PluginManager based on am configuration.
-// It discovers plugin binaries from configured paths and loads enabled plugins.
-func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *config.Config, logger *zap.SugaredLogger) error {
-	// If no plugins enabled, nothing to do
-	if len(cfg.Plugin.Enabled) == 0 {
-		logger.Infow("No plugins enabled in configuration")
+// LoadPluginsFromRecords loads every enabled plugin the node's records hold
+// into an existing PluginManager. It discovers plugin binaries from configured
+// paths and loads them.
+func LoadPluginsFromRecords(ctx context.Context, manager *PluginManager, records PluginRecords, cfg *config.Config, logger *zap.SugaredLogger) error {
+	known, err := records.Plugins()
+	if err != nil {
+		return errors.Wrapf(err, "failed to read the plugin records to load from %v", cfg.Plugin.Paths)
+	}
+	args := make(map[string][]string)
+	var pluginNames []string
+	var failedPlugins []string
+	for _, record := range known {
+		if !record.Enabled {
+			continue
+		}
+		launch, err := recordArgs(record)
+		if err != nil {
+			logger.Errorw("Plugin not loaded: its args do not read", "plugin", record.Name, "error", err)
+			failedPlugins = append(failedPlugins, record.Name)
+			manager.mu.Lock()
+			manager.failedPlugins[record.Name] = err.Error()
+			manager.mu.Unlock()
+			continue
+		}
+		pluginNames = append(pluginNames, record.Name)
+		args[record.Name] = launch
+	}
+	if len(pluginNames) == 0 && len(failedPlugins) == 0 {
+		logger.Infow("No plugin is enabled", "known", len(known))
 		return nil
 	}
 
-	// Build map of enabled plugins for deduplication.
-	// Entries may be bare names or repo URLs — both reduce to a plugin name.
-	enabledPlugins := make(map[string]bool)
-	for _, name := range cfg.Plugin.EnabledNames() {
-		enabledPlugins[name] = true
-	}
-
 	// Sort plugin names for deterministic iteration
-	pluginNames := make([]string, 0, len(enabledPlugins))
-	for name := range enabledPlugins {
-		pluginNames = append(pluginNames, name)
-	}
 	sort.Strings(pluginNames)
+	enabled := len(pluginNames) + len(failedPlugins)
 
 	// Discover plugins from configured paths (deduplicated), fetching any that
 	// declared a repo and are not on disk
 	var pluginConfigs []PluginConfig
-	var failedPlugins []string
 	for _, pluginName := range pluginNames {
 		logger.Debugf("Searching for '%s' plugin binary in %d paths", pluginName, len(cfg.Plugin.Paths))
 
@@ -59,9 +71,8 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *con
 			manager.mu.Unlock()
 			continue
 		}
-		// Read per-plugin args from am.toml (e.g. [myplugin] args = ["--name", "myplugin"])
-		if args := config.GetStringSlice(pluginName + ".args"); len(args) > 0 {
-			pluginConfig.Args = args
+		if len(args[pluginName]) > 0 {
+			pluginConfig.Args = args[pluginName]
 		}
 		logger.Debugf("Will load '%s' plugin from binary: %s", pluginName, pluginConfig.Binary)
 		pluginConfigs = append(pluginConfigs, pluginConfig)
@@ -72,40 +83,57 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *con
 		if err := manager.LoadPlugins(ctx, pluginConfigs); err != nil {
 			return errors.Wrap(err, "failed to load plugins")
 		}
-
-		// Configure WebSocket settings from config.Config
-		keepaliveCfg := NewKeepaliveConfigFromSettings(
-			cfg.Plugin.WebSocket.Keepalive.Enabled,
-			cfg.Plugin.WebSocket.Keepalive.PingIntervalSecs,
-			cfg.Plugin.WebSocket.Keepalive.PongTimeoutSecs,
-			cfg.Plugin.WebSocket.Keepalive.ReconnectAttempts,
-		)
-
-		// Build WebSocket origin config from server allowed origins
-		wsConfig := WebSocketConfig{
-			AllowedOrigins:   cfg.GetServerAllowedOrigins(),
-			AllowAllOrigins:  false,
-			AllowCredentials: false,
-		}
-
-		manager.ConfigureWebSocket(keepaliveCfg, wsConfig)
 	}
 
 	// Log summary of discovery results
 	if len(failedPlugins) > 0 {
 		logger.Warnw("Some enabled plugins failed to load",
-			"enabled", len(cfg.Plugin.Enabled),
+			"enabled", enabled,
 			"loaded", len(pluginConfigs),
 			"failed", failedPlugins,
 		)
 	} else if len(pluginConfigs) > 0 {
 		logger.Debugw("Plugin discovery complete",
-			"enabled", len(cfg.Plugin.Enabled),
+			"enabled", enabled,
 			"loaded", len(pluginConfigs),
 		)
 	}
 
 	return nil
+}
+
+// ConfigureWebSocketFromConfig hands every plugin, loaded now or enabled later,
+// the node's WebSocket settings: keepalive, and server.allowed_origins.
+func ConfigureWebSocketFromConfig(manager *PluginManager, cfg *config.Config) {
+	keepaliveCfg := NewKeepaliveConfigFromSettings(
+		cfg.Plugin.WebSocket.Keepalive.Enabled,
+		cfg.Plugin.WebSocket.Keepalive.PingIntervalSecs,
+		cfg.Plugin.WebSocket.Keepalive.PongTimeoutSecs,
+		cfg.Plugin.WebSocket.Keepalive.ReconnectAttempts,
+	)
+
+	// Build WebSocket origin config from server allowed origins
+	wsConfig := WebSocketConfig{
+		AllowedOrigins:   cfg.GetServerAllowedOrigins(),
+		AllowAllOrigins:  false,
+		AllowCredentials: false,
+	}
+
+	manager.ConfigureWebSocket(keepaliveCfg, wsConfig)
+}
+
+// recordArgs is the launch args a plugin's config holds under args, written
+// as a JSON list. A plugin with no args key has none.
+func recordArgs(record PluginRecord) ([]string, error) {
+	raw, set := record.Config["args"]
+	if !set || strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+	var args []string
+	if err := json.Unmarshal([]byte(raw), &args); err != nil {
+		return nil, errors.Wrapf(err, "plugin %s: args is %q, and args is a JSON list of strings", record.Name, raw)
+	}
+	return args, nil
 }
 
 // formatHints renders an error's hints for a log line, or "" when it has none.
@@ -133,7 +161,10 @@ func formatHints(err error) string {
 func resolvePlugin(ctx context.Context, name string, searchPaths []string, logger *zap.SugaredLogger) (PluginConfig, error) {
 	pluginCfg, discoverErr := discoverPlugin(name, searchPaths, logger)
 
-	repo := config.PluginRepo(name)
+	repo, err := pluginRepo(name)
+	if err != nil {
+		return PluginConfig{}, err
+	}
 	if repo == "" {
 		if discoverErr != nil {
 			return PluginConfig{}, discoverErr

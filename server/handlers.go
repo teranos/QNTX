@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/sqlclose"
@@ -505,38 +504,22 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map
 		if pm == nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin manager not available"}
 		}
-		// Check if plugin is in the enabled list
-		appcfg.Reset()
-		preCheckCfg, preCheckErr := appcfg.Load()
-		if preCheckErr == nil {
-			enabled := false
-			for _, p := range preCheckCfg.Plugin.EnabledNames() {
-				if p == name {
-					enabled = true
-					break
-				}
-			}
-			if !enabled {
-				return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name",
-					Says: fmt.Sprintf("Plugin %q is not enabled in am.toml — add it to [plugin] enabled to use it", name)}
-			}
+		record, found, recordErr := s.pluginRecords().Plugin(name)
+		if recordErr != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: recordErr.Error()}
 		}
-		// Snapshot config before reset for diff detection
+		if !found || !record.Enabled {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name",
+				Says: fmt.Sprintf("Plugin %q is not enabled: enable it in the plugin element", name)}
+		}
+		// Snapshot config for diff detection
 		if acc := pm.Accumulator(); acc != nil {
-			if v := appcfg.GetViper(); v != nil {
-				acc.SnapshotConfig(name, v.GetStringMapString(name))
-			}
-		}
-		// Re-read config from disk so the restarted plugin gets fresh values
-		appcfg.Reset()
-		cfg, cfgErr := appcfg.Load()
-		if cfgErr != nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: fmt.Sprintf("Failed to load config: %v", cfgErr)}
+			acc.SnapshotConfig(name, record.Config)
 		}
 		// Run restart asynchronously — RestartPlugin can block for tens of seconds
 		// when ATS queries are queued behind the RustStore mutex.
 		// The caller sees banners in make dev output when the restart completes.
-		searchPaths := cfg.Plugin.Paths
+		searchPaths := pluginSearchPaths()
 		// Mark plugin not-ready so browser requests get 503 during restart
 		s.pluginRegistry.Unregister(name)
 		// Invalidate mux so it re-creates with the new plugin after restart
@@ -549,6 +532,7 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map
 				s.logger.Warnw("Failed to restart plugin", "plugin", name, "error", err)
 				return
 			}
+			s.refreshPluginHealth()
 			s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin restarted")
 		}()
 
@@ -557,15 +541,14 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map
 		if pm == nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin manager not available"}
 		}
-		// Re-read config to get current search paths
-		appcfg.Reset()
-		cfg, cfgErr := appcfg.Load()
-		if cfgErr != nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: fmt.Sprintf("Failed to load config: %v", cfgErr)}
+		if err := s.pluginRecords().EnablePlugin(actorOf(ctx), name, true); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 		}
-		err = pm.EnablePlugin(ctx, name, cfg.Plugin.Paths, s.pluginRegistry, s.services)
+		err = pm.EnablePlugin(ctx, name, pluginSearchPaths(), s.pluginRegistry, s.services)
 		if err != nil {
-			s.logger.Warnw("Failed to enable plugin", "plugin", name, "error", err)
+			// Said to whoever pressed Enable, and held on the plugin's card.
+			s.logger.Errorw("Failed to enable plugin", "plugin", name, "error", err)
+			s.pluginRegistry.MarkFailed(name, err.Error())
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
 		// Invalidate HTTP mux cache for the newly enabled plugin
@@ -575,12 +558,21 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map
 		if acc := pm.Accumulator(); acc != nil {
 			acc.Emit(name, plugingrpc.BannerBoot)
 		}
+		// The list reads the last probe. Probed now, so the list asked right
+		// after Enable holds this plugin's health, not the probe from before it ran.
+		s.refreshPluginHealth()
 		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin enabled")
 
 	case "disable":
 		pm := s.getPluginManager()
 		if pm == nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin manager not available"}
+		}
+		if err := s.pluginRecords().EnablePlugin(actorOf(ctx), name, false); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
+		}
+		if _, loaded := pm.GetPlugin(name); !loaded {
+			return map[string]interface{}{"name": name, "state": string(plugin.StateStopped), "action": action}, nil
 		}
 		// Capture metadata before disabling (plugin will be gone after)
 		var disabledVersion string

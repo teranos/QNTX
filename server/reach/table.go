@@ -134,6 +134,7 @@ REACH is '/api/pulse/schedules' '/api/pulse/schedules/'                   of ROO
 REACH is '/api/pulse/jobs' '/api/pulse/jobs/'                             of ROOT SUPER
 REACH is '/api/prompt/'                                                   of ROOT
 REACH is '/api/plugins'                                                   of ROOT SUPER
+REACH is '/api/plugins/check'                                             of ROOT SUPER
 REACH is 'plugins:pause' 'plugins:resume' 'plugins:restart'               of ROOT SUPER
 REACH is 'plugins:enable' 'plugins:disable'                               of ROOT SUPER
 REACH is '/api/plugins/elements' '/api/plugins/routes'                      of ROOT

@@ -4,6 +4,10 @@
  * Manifests as an element with 'panel' opensAs — slides in from
  * the opposite edge of the system drawer.
  *
+ * Where a plugin is added, configured and enabled: the empty card at the end of
+ * the list takes a repository URL, Check says whether it resolves, Add commits
+ * it, and the plugin starts disabled.
+ *
  * Displays plugin information:
  * - Lists all installed plugins with metadata
  * - Shows health status for each plugin
@@ -19,6 +23,7 @@ import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
 import { buttonPlaceholder, hydrateButtons, registerButton, type HydrateConfig } from './components/button';
 import { tooltip } from './components/tooltip.ts';
+import { refusal } from './self-person.ts';
 import type { Element } from '@teranos/elements';
 
 interface PluginInfo {
@@ -29,12 +34,18 @@ interface PluginInfo {
     author?: string;
     license?: string;
     healthy: boolean;
+    /** Whether the last probe saw it. One that started after the probe is not unhealthy. */
+    probed?: boolean;
     message?: string;
     details?: Record<string, unknown>;
-    state: 'running' | 'paused' | 'stopped';
+    state: 'running' | 'paused' | 'stopped' | 'loading' | 'failed' | 'restarting' | 'disabled';
     pausable: boolean;
     sigils?: SigilRow[];
     signa_refused?: string[];
+    /** The repository it was added from. */
+    repo?: string;
+    /** Whether its record has it switched on. */
+    enabled?: boolean;
 }
 
 /** One sigil a plugin handed the node (ADR-039), as server/plugin_sigils.go sends it. */
@@ -59,6 +70,8 @@ interface Reached {
 
 interface PluginsResponse {
     plugins: PluginInfo[];
+    /** Why the node could not read which plugins it holds, when it could not. */
+    records_failure?: string;
 }
 
 interface ConfigFieldSchema {
@@ -78,9 +91,10 @@ interface PluginConfigResponse {
     schema: Record<string, ConfigFieldSchema> | null;
 }
 
+/** The node's error envelope (server/error_envelope.go). */
 interface ErrorResponse {
     error: string;
-    details: string;
+    details?: string[];
 }
 
 interface ConfigFormState {
@@ -91,6 +105,8 @@ interface ConfigFormState {
     validationErrors: Record<string, string>;
     needsConfirmation: boolean;
     editingFields: Set<string>;
+    /** No schema came with the config: the plugin is not running, so keys are written as typed. */
+    freeForm: boolean;
     error?: { message: string; details: string; status: number };
 }
 
@@ -124,6 +140,26 @@ let activeLogStream: EventSource | null = null;
 // answer lands on the row it was asked from.
 const grantSaid: Record<string, { ok: boolean; text: string }> = {};
 
+// The empty card in progress: whether it is open, what is typed in it, and what
+// the node said the typed repo resolves to. Adding is two stages: Check, then Add.
+let adding = false;
+let addingRepo = '';
+let resolved: ResolvedPlugin | null = null;
+
+/** What a repo resolves to, as plugins:check answers (plugin/grpc/fetch.go). */
+interface ResolvedPlugin {
+    name: string;
+    repo: string;
+    release: string;
+    asset: string;
+}
+
+// Added and switched off.
+const NOT_RUNNING = ['disabled'];
+
+// Why the last list is not what the node holds; empty when it is.
+let listFailure = '';
+
 async function fetchServerHealth(): Promise<void> {
     try {
         serverHealth = await apiJson<ServerHealth>('/health');
@@ -143,16 +179,25 @@ async function fetchPlugins(): Promise<void> {
         }
 
         plugins = data.plugins;
+        listFailure = data.records_failure ?? '';
         lastRefreshed = new Date();
         log.debug(SEG.UI, 'Successfully loaded', plugins.length, 'plugins');
     } catch (error: unknown) {
         handleError(error, 'Failed to fetch plugins', { context: SEG.UI, silent: true });
         plugins = [];
+        listFailure = error instanceof Error ? error.message : String(error);
     }
+}
+
+/** Why the list is not what the node holds, in full, where the list is. */
+function renderListFailure(): string {
+    if (!listFailure) return '';
+    return `<div class="plugin-list-failure">${escapeHtml(listFailure)}</div>`;
 }
 
 function render(): void {
     if (!contentElement) return;
+    const typing = contentElement.querySelector('.plugin-add-repo') === document.activeElement;
 
     if (plugins.length === 0) {
         // Server unreachable — both fetches failed
@@ -170,27 +215,26 @@ function render(): void {
         }
 
         contentElement.innerHTML = `
-            <div class="element-content">
-                <div class="plugin-search-container" style="padding: 8px 0;">
-                    <input type="text" class="plugin-search-input plugin-mono" placeholder="Filter plugins..." style="width: 100%; padding: 6px 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-on-dark, #555); border-radius: 4px; color: var(--text-on-dark); font-size: 13px;">
-                </div>
-                <div class="panel-empty plugin-empty">
-                    <p>No plugins installed</p>
-                    <p class="panel-empty-hint">Domain plugins extend QNTX with specialized functionality</p>
+            <div class="element-content plugin-panel-body">
+                ${renderToolbar()}
+                ${renderListFailure()}
+                <div class="plugin-list">
+                    ${listFailure ? '' : renderAddCard()}
                 </div>
             </div>
         `;
+        hydratePluginButtons(contentElement);
         refreshTooltips();
+        if (typing) focusAddField();
         return;
     }
 
     const serverBuildTime = formatBuildTime(serverHealth?.build_time);
 
     contentElement.innerHTML = `
-        <div class="element-content">
-            <div class="plugin-search-container" style="padding: 8px 0;">
-                <input type="text" class="plugin-search-input plugin-mono" placeholder="Filter plugins..." style="width: 100%; padding: 6px 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-on-dark, #555); border-radius: 4px; color: var(--text-on-dark); font-size: 13px;">
-            </div>
+        <div class="element-content plugin-panel-body">
+            ${renderToolbar()}
+            ${renderListFailure()}
             <div class="plugin-summary">
                 <div class="plugin-summary-stats">
                     <span class="plugin-count">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''} installed</span>
@@ -207,6 +251,7 @@ function render(): void {
             </div>
             <div class="plugin-list">
                 ${plugins.map(plugin => renderPlugin(plugin)).join('')}
+                ${renderAddCard()}
             </div>
         </div>
     `;
@@ -216,6 +261,82 @@ function render(): void {
 
     // Rebind tooltips for new DOM content
     refreshTooltips();
+    if (typing) focusAddField();
+}
+
+function renderToolbar(): string {
+    return `
+        <div class="plugin-search-container">
+            <input type="text" class="plugin-search-input plugin-mono" placeholder="Filter plugins...">
+        </div>
+    `;
+}
+
+/**
+ * The empty plugin at the end of the list, ready to become one: a repository
+ * URL, checked by the node, then added for real.
+ */
+export function renderAddCard(): string {
+    if (!adding) {
+        return `<div class="plugin-add-card plugin-add-card-closed" role="button" tabindex="0" aria-label="Add a plugin by its repository URL">+</div>`;
+    }
+    const checked = resolved !== null && resolved.repo === addingRepo.trim();
+    return `
+        <div class="plugin-add-card plugin-add-card-open">
+            <input type="text" class="plugin-add-repo plugin-mono" placeholder="https://github.com/owner/repo/tree/main/plugin" value="${escapeHtml(addingRepo)}" autocomplete="off" spellcheck="false">
+            ${checked && resolved ? `
+            <div class="plugin-add-resolved plugin-mono">
+                <span class="plugin-name">${escapeHtml(resolved.name)}</span>
+                <span>${escapeHtml(resolved.release)}</span>
+                <span>${escapeHtml(resolved.asset)}</span>
+            </div>` : ''}
+            <div class="plugin-controls">
+                ${checked
+                    ? buttonPlaceholder('plugin-add-confirm', 'Add', 'plugin-add-confirm')
+                    : buttonPlaceholder('plugin-add-check', 'Check', 'plugin-add-check')}
+                ${buttonPlaceholder('plugin-add-cancel', 'Cancel', 'plugin-add-cancel')}
+            </div>
+        </div>
+    `;
+}
+
+function closeAddCard(): void {
+    adding = false;
+    addingRepo = '';
+    resolved = null;
+}
+
+// Opening the field puts the cursor in it, and a refresh while typing keeps it there.
+function focusAddField(): void {
+    if (!adding) return;
+    contentElement?.querySelector<HTMLInputElement>('.plugin-add-repo')?.focus();
+}
+
+/** Stage one: whether the repo resolves to a release this node could install. A refusal is the button's to show. */
+async function checkPlugin(repo: string): Promise<void> {
+    if (repo === '') throw new Error('type the repository URL, then press Check');
+    const response = await apiFetch('/api/plugins/check', jsonBody('POST', { repo }));
+    if (!response.ok) throw new Error(await refusal(response));
+    resolved = await response.json() as ResolvedPlugin;
+    render();
+}
+
+/** Stage two: add the checked plugin for real. It starts disabled; a refusal is the button's to show. */
+async function addPlugin(repo: string): Promise<void> {
+    const response = await apiFetch('/api/plugins', jsonBody('POST', { repo }));
+    if (!response.ok) throw new Error(await refusal(response));
+    closeAddCard();
+    await fetchPlugins();
+    render();
+}
+
+/** Switch a plugin on or off in its record. A plugin enabled and not started shows why in the list. */
+async function switchPlugin(name: string, verb: 'enable' | 'disable'): Promise<void> {
+    const response = await apiFetch(`/api/plugins/${encodeURIComponent(name)}/${verb}`, { method: 'POST' });
+    const refused = response.ok ? '' : await refusal(response);
+    await fetchPlugins();
+    render();
+    if (refused) throw new Error(refused);
 }
 
 function refreshTooltips(): void {
@@ -282,8 +403,11 @@ function attachEventDelegation(): void {
             e.stopPropagation();
             const fieldName = cancelFieldBtn.dataset.field;
             if (fieldName && configState) {
-                const currentValue = configState.currentConfig[fieldName] || configState.schema[fieldName]?.default_value || '';
-                configState.newConfig[fieldName] = currentValue;
+                if (configState.freeForm && !(fieldName in configState.currentConfig)) {
+                    delete configState.newConfig[fieldName];
+                } else {
+                    configState.newConfig[fieldName] = configState.currentConfig[fieldName] || configState.schema[fieldName]?.default_value || '';
+                }
                 configState.editingFields.delete(fieldName);
                 delete configState.validationErrors[fieldName];
                 render();
@@ -291,9 +415,40 @@ function attachEventDelegation(): void {
             return;
         }
 
+        // Remove a key from a config written as typed
+        const removeKeyBtn = target.closest('.plugin-config-key-remove') as HTMLElement | null;
+        if (removeKeyBtn) {
+            e.stopPropagation();
+            const fieldName = removeKeyBtn.dataset.field;
+            if (fieldName && configState) {
+                delete configState.newConfig[fieldName];
+                configState.editingFields.delete(fieldName);
+                delete configState.validationErrors[fieldName];
+                configState.needsConfirmation = false;
+                render();
+            }
+            return;
+        }
+
+        // Add a key to a config written as typed
+        if (target.closest('.plugin-config-key-add')) {
+            e.stopPropagation();
+            addConfigKey();
+            return;
+        }
+
+        // The empty card opens into the repository field
+        if (target.closest('.plugin-add-card-closed')) {
+            e.stopPropagation();
+            adding = true;
+            render();
+            focusAddField();
+            return;
+        }
+
         // Plugin card click - toggle config expansion
         const card = target.closest('.plugin-card') as HTMLElement | null;
-        if (card && !target.closest('button') && !target.closest('input')) {
+        if (card && !target.closest('button') && !target.closest('input') && !target.closest('a')) {
             const pluginName = card.dataset.plugin;
             if (pluginName) {
                 await togglePluginConfig(pluginName);
@@ -319,7 +474,51 @@ function attachEventDelegation(): void {
         if (target.classList.contains('plugin-search-input')) {
             filterPlugins(target.value);
         }
+
+        // A repo typed after Check is not the one checked: back to Check.
+        if (target.classList.contains('plugin-add-repo')) {
+            const wasChecked = resolved !== null && resolved.repo === addingRepo.trim();
+            addingRepo = target.value;
+            if (wasChecked && resolved?.repo !== addingRepo.trim()) {
+                resolved = null;
+                render();
+            }
+        }
     });
+
+    contentElement.addEventListener('keydown', (e: KeyboardEvent) => {
+        const target = e.target as HTMLInputElement;
+        if (target.classList.contains('plugin-add-repo') && e.key === 'Escape') {
+            closeAddCard();
+            render();
+        }
+        if (target.classList.contains('plugin-add-card-closed') && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            adding = true;
+            render();
+            focusAddField();
+        }
+        if (target.classList.contains('plugin-config-new-key') && e.key === 'Enter') {
+            addConfigKey();
+        }
+    });
+}
+
+/** A key typed in the add row becomes a row of its own, open for its value. */
+function addConfigKey(): void {
+    if (!configState) return;
+    const field = contentElement?.querySelector<HTMLInputElement>('.plugin-config-new-key');
+    const key = field?.value.trim() ?? '';
+    if (key === '') {
+        field?.focus();
+        return;
+    }
+    if (!(key in configState.newConfig)) configState.newConfig[key] = '';
+    configState.editingFields.add(key);
+    configState.needsConfirmation = false;
+    render();
+    const inputs = contentElement?.querySelectorAll<HTMLInputElement>('.plugin-config-value-new') ?? [];
+    Array.from(inputs).find(input => input.dataset.field === key)?.focus();
 }
 
 function hydratePluginButtons(container: HTMLElement): void {
@@ -362,7 +561,59 @@ function hydratePluginButtons(container: HTMLElement): void {
             };
         }
 
-        // TODO(#791): hydrate enable/disable buttons here
+        if (enables(plugin)) {
+            config[`plugin-enable-${plugin.name}`] = {
+                label: 'Enable',
+                onClick: async () => {
+                    await switchPlugin(plugin.name, 'enable');
+                },
+                variant: 'primary',
+                size: 'small'
+            };
+        }
+
+        if (disables(plugin)) {
+            config[`plugin-disable-${plugin.name}`] = {
+                label: 'Disable',
+                onClick: async () => {
+                    await switchPlugin(plugin.name, 'disable');
+                },
+                variant: 'ghost',
+                size: 'small',
+                confirmation: {
+                    label: 'Confirm'
+                }
+            };
+        }
+    }
+
+    if (adding) {
+        config['plugin-add-check'] = {
+            label: 'Check',
+            onClick: async () => {
+                const typed = container.querySelector<HTMLInputElement>('.plugin-add-repo')?.value.trim() ?? '';
+                await checkPlugin(typed);
+            },
+            variant: 'secondary',
+            size: 'small'
+        };
+        config['plugin-add-confirm'] = {
+            label: 'Add',
+            onClick: async () => {
+                if (resolved) await addPlugin(resolved.repo);
+            },
+            variant: 'primary',
+            size: 'small'
+        };
+        config['plugin-add-cancel'] = {
+            label: 'Cancel',
+            onClick: () => {
+                closeAddCard();
+                render();
+            },
+            variant: 'ghost',
+            size: 'small'
+        };
     }
 
     const buttons = hydrateButtons(container, config);
@@ -372,9 +623,20 @@ function hydratePluginButtons(container: HTMLElement): void {
     }
 }
 
+/** Switched off, stopped, or failed. */
+export function enables(plugin: PluginInfo): boolean {
+    return ['disabled', 'stopped', 'failed'].includes(plugin.state);
+}
+
+/** Switched on: running, paused, or failed. */
+export function disables(plugin: PluginInfo): boolean {
+    return ['running', 'paused', 'failed'].includes(plugin.state);
+}
+
 function getHealthSummary(): string {
-    const healthy = plugins.filter(p => p.healthy).length;
-    const unhealthy = plugins.length - healthy;
+    // A plugin that is not running has no health to count.
+    const probed = plugins.filter(p => !NOT_RUNNING.includes(p.state) && p.probed !== false);
+    const unhealthy = probed.filter(p => !p.healthy).length;
 
     if (unhealthy === 0) {
         return '<span class="plugin-health-good">All healthy</span>';
@@ -427,16 +689,17 @@ function buildVersionTooltip(plugin: PluginInfo): string {
 }
 
 function renderPlugin(plugin: PluginInfo): string {
-    const statusClass = plugin.healthy ? 'plugin-status-healthy' : 'plugin-status-unhealthy';
-    const statusIcon = plugin.healthy ? '&#10003;' : '&#10007;';
-    const statusText = plugin.healthy ? 'Healthy' : 'Unhealthy';
+    const unprobed = plugin.probed === false;
+    const statusClass = unprobed ? 'plugin-status-unprobed' : plugin.healthy ? 'plugin-status-healthy' : 'plugin-status-unhealthy';
+    const statusIcon = unprobed ? '&#8230;' : plugin.healthy ? '&#10003;' : '&#10007;';
+    const statusText = unprobed ? 'Not probed' : plugin.healthy ? 'Healthy' : 'Unhealthy';
     const isExpanded = expandedPlugin === plugin.name;
 
     const versionTooltip = buildVersionTooltip(plugin);
     const nameTooltip = [
         plugin.description || 'No description available',
         '---',
-        `Path: ~/.qntx/plugins/${plugin.name}.toml`
+        `Repo: ${plugin.repo || 'not added from a repository'}`
     ].join('\n');
 
     const stateClass = getStateClass(plugin.state);
@@ -451,37 +714,55 @@ function renderPlugin(plugin: PluginInfo): string {
         }
     }
 
+    if (enables(plugin)) {
+        controls += buttonPlaceholder(`plugin-enable-${plugin.name}`, 'Enable', 'plugin-enable-btn');
+    }
+    if (disables(plugin)) {
+        controls += buttonPlaceholder(`plugin-disable-${plugin.name}`, 'Disable', 'plugin-disable-btn');
+    }
+
     let restartBtn = '';
-    // TODO(#791): add enable/disable buttons — stopped plugins show enable, running show disable
     if (plugin.state === 'running') {
         restartBtn = buttonPlaceholder(`plugin-restart-${plugin.name}`, 'Restart', 'plugin-restart-btn');
     }
 
+    const notRunning = NOT_RUNNING.includes(plugin.state);
+
     return `
-        <div class="plugin-card ${isExpanded ? 'plugin-card-expanded' : ''}" data-plugin="${plugin.name}">
+        <div class="plugin-card ${isExpanded ? 'plugin-card-expanded' : ''}" data-plugin="${escapeHtml(plugin.name)}">
             <div class="plugin-card-header">
                 <div class="plugin-name-row">
                     <span class="plugin-name has-tooltip" data-tooltip="${escapeHtml(nameTooltip)}">${escapeHtml(plugin.name)}</span>
-                    <span class="plugin-version has-tooltip plugin-mono" data-tooltip="${escapeHtml(versionTooltip)}">${escapeHtml(plugin.version)}</span>
+                    ${plugin.version ? `<span class="plugin-version has-tooltip plugin-mono" data-tooltip="${escapeHtml(versionTooltip)}">${escapeHtml(plugin.version)}</span>` : ''}
                 </div>
                 <div class="plugin-badges">
                     <div class="plugin-state ${stateClass}">
                         <span class="plugin-state-icon">${stateIcon}</span>
                         <span class="plugin-state-text">${plugin.state}</span>
                     </div>
+                    ${notRunning ? '' : `
                     <div class="plugin-status ${statusClass}">
                         <span class="plugin-status-icon">${statusIcon}</span>
                         <span class="plugin-status-text">${statusText}</span>
-                    </div>
+                    </div>`}
                     ${renderSigilBadges(plugin)}
                     ${restartBtn}
                 </div>
             </div>
+            ${plugin.repo ? `<a class="plugin-repo plugin-mono" href="${escapeHtml(plugin.repo)}" target="_blank" rel="noopener noreferrer">${escapeHtml(plugin.repo)}</a>` : ''}
             ${controls ? `<div class="plugin-controls">${controls}</div>` : ''}
-            ${!plugin.healthy && plugin.message ? `<div class="plugin-message plugin-message-error">${escapeHtml(plugin.message)}</div>` : ''}
+            ${renderPluginMessage(plugin)}
             ${isExpanded ? renderExpandedContent(plugin) : ''}
         </div>
     `;
+}
+
+/** Why a plugin is not healthy. */
+export function renderPluginMessage(plugin: PluginInfo): string {
+    if (!plugin.healthy && plugin.message) {
+        return `<div class="plugin-message plugin-message-error">${escapeHtml(plugin.message)}</div>`;
+    }
+    return '';
 }
 
 function getStateClass(state: string): string {
@@ -490,6 +771,7 @@ function getStateClass(state: string): string {
         case 'paused': return 'plugin-state-paused';
         case 'stopped': return 'plugin-state-stopped';
         case 'restarting': return 'plugin-state-restarting';
+        case 'disabled': return 'plugin-state-disabled';
         default: return '';
     }
 }
@@ -500,6 +782,7 @@ function getStateIcon(state: string): string {
         case 'paused': return '&#10074;&#10074;';
         case 'stopped': return '&#9632;';
         case 'restarting': return '&#8635;';
+        case 'disabled': return '&#9675;';
         default: return '';
     }
 }
@@ -573,7 +856,8 @@ async function fetchPluginConfig(pluginName: string): Promise<void> {
                     validationErrors: {},
                     needsConfirmation: false,
                     editingFields: new Set(),
-                    error: { message: errorData.error, details: errorData.details, status: response.status }
+                    freeForm: false,
+                    error: { message: errorData.error, details: (errorData.details ?? []).join('\n'), status: response.status }
                 };
             } catch (jsonUnreadable) {
                 // The raw text below is the fallback; nothing is dropped.
@@ -586,6 +870,7 @@ async function fetchPluginConfig(pluginName: string): Promise<void> {
                     validationErrors: {},
                     needsConfirmation: false,
                     editingFields: new Set(),
+                    freeForm: false,
                     error: { message: errorText || response.statusText, details: '', status: response.status }
                 };
             }
@@ -602,7 +887,8 @@ async function fetchPluginConfig(pluginName: string): Promise<void> {
             schema: data.schema || {},
             validationErrors: {},
             needsConfirmation: false,
-            editingFields: new Set()
+            editingFields: new Set(),
+            freeForm: data.schema === null
         };
     } catch (error: unknown) {
         handleError(error, `Failed to fetch config for ${pluginName}`, { context: SEG.UI, silent: true });
@@ -614,6 +900,7 @@ async function fetchPluginConfig(pluginName: string): Promise<void> {
             validationErrors: {},
             needsConfirmation: false,
             editingFields: new Set(),
+            freeForm: false,
             error: { message: `Failed to load configuration: ${error}`, details: '', status: 0 }
         };
         render();
@@ -743,25 +1030,34 @@ function renderConfigForm(): string {
         `;
     }
 
-    const fields = Object.entries(configState.schema).map(([fieldName, schema]) => {
-        const currentValue = configState!.currentConfig[fieldName] || schema.default_value;
-        const newValue = configState!.newConfig[fieldName] || schema.default_value;
-        const error = configState!.validationErrors[fieldName];
-        const hasChanged = currentValue !== newValue;
-        const isEditing = configState!.editingFields.has(fieldName);
+    const state = configState;
+    const freeForm = state.freeForm;
+    const fieldNames = freeForm ? Object.keys(state.newConfig).sort() : Object.keys(state.schema);
+
+    const fields = fieldNames.map(fieldName => {
+        const schema: ConfigFieldSchema | undefined = state.schema[fieldName];
+        const defaultValue = schema?.default_value ?? '';
+        const currentValue = state.currentConfig[fieldName] || defaultValue;
+        const newValue = state.newConfig[fieldName] || defaultValue;
+        const error = state.validationErrors[fieldName];
+        const hasChanged = currentValue !== newValue || (freeForm && !(fieldName in state.currentConfig));
+        const isEditing = state.editingFields.has(fieldName);
+        const removeBtn = freeForm
+            ? `<button class="plugin-config-key-remove has-tooltip" data-field="${escapeHtml(fieldName)}" data-tooltip="Remove this key">&#8722;</button>`
+            : '';
 
         let valueCellContent: string;
         if (isEditing) {
             valueCellContent = `
                 <div class="plugin-config-edit-container">
-                    <input type="${getInputType(schema.type)}"
+                    <input type="${getInputType(schema?.type ?? 'string')}"
                            value="${escapeHtml(newValue)}"
                            data-field="${escapeHtml(fieldName)}"
                            class="plugin-config-value-new plugin-mono"
-                           ${schema.min_value ? `min="${escapeHtml(schema.min_value)}"` : ''}
-                           ${schema.max_value ? `max="${escapeHtml(schema.max_value)}"` : ''}
-                           ${schema.pattern ? `pattern="${escapeHtml(schema.pattern)}"` : ''}
-                           ${schema.required ? 'required' : ''}>
+                           ${schema?.min_value ? `min="${escapeHtml(schema.min_value)}"` : ''}
+                           ${schema?.max_value ? `max="${escapeHtml(schema.max_value)}"` : ''}
+                           ${schema?.pattern ? `pattern="${escapeHtml(schema.pattern)}"` : ''}
+                           ${schema?.required ? 'required' : ''}>
                     <button class="plugin-config-field-cancel has-tooltip" data-field="${escapeHtml(fieldName)}" data-tooltip="Cancel">&#10005;</button>
                 </div>
             `;
@@ -773,50 +1069,73 @@ function renderConfigForm(): string {
 
         return `
             <div class="plugin-config-row ${error ? 'plugin-config-row-error' : ''} ${hasChanged ? 'plugin-config-row-changed' : ''}">
-                <label class="plugin-config-label has-tooltip" data-tooltip="${escapeHtml(schema.description)}">
-                    ${escapeHtml(fieldName)}${schema.required ? '<span class="plugin-config-required">*</span>' : ''}
+                <label class="plugin-config-label ${schema ? 'has-tooltip' : ''}" ${schema ? `data-tooltip="${escapeHtml(schema.description)}"` : ''}>
+                    ${escapeHtml(fieldName)}${schema?.required ? '<span class="plugin-config-required">*</span>' : ''}
                 </label>
                 <div class="plugin-config-value-cell">
                     ${valueCellContent}
+                    ${removeBtn}
                 </div>
                 ${error ? `<div class="plugin-config-row-error-msg">${escapeHtml(error)}</div>` : ''}
             </div>
         `;
     }).join('');
 
-    const hasErrors = Object.keys(configState.validationErrors).length > 0;
-    const hasChanges = Object.entries(configState.newConfig).some(([key, value]) =>
-        value !== (configState!.currentConfig[key] || configState!.schema[key].default_value)
-    );
-    const isEditing = configState.editingFields.size > 0;
+    // With no schema the keys are the ones typed here, and one more can be added.
+    const addRow = freeForm ? `
+        <div class="plugin-config-row plugin-config-add-row">
+            <input type="text" class="plugin-config-new-key plugin-mono" placeholder="key" autocomplete="off" spellcheck="false">
+            <div class="plugin-config-value-cell">
+                <button class="plugin-config-key-add">Add key</button>
+            </div>
+        </div>
+    ` : '';
+
+    const hasErrors = Object.keys(state.validationErrors).length > 0;
+    const hasChanges = configChanged(state);
+    const isEditing = state.editingFields.size > 0;
+    const running = plugins.find(p => p.name === state.pluginName)?.state === 'running';
 
     return `
         <div class="plugin-config-form">
+            ${freeForm ? '<div class="plugin-config-free-note">Not running, so the plugin says no schema: keys are written as typed.</div>' : ''}
             <div class="plugin-config-table">
                 <div class="plugin-config-header">
                     <div class="plugin-config-header-label">Setting</div>
                     <div class="plugin-config-header-value">Value</div>
                 </div>
                 ${fields}
+                ${addRow}
             </div>
             ${(hasChanges || isEditing) ? `
                 <div class="plugin-config-actions">
                     <div class="plugin-config-actions-buttons">
                         <button class="plugin-config-cancel-btn">Cancel</button>
-                        <button class="${configState.needsConfirmation ? 'panel-btn-warning' : ''} plugin-config-save-btn"
+                        <button class="${state.needsConfirmation ? 'panel-btn-warning' : ''} plugin-config-save-btn"
                                 ${hasErrors ? 'disabled' : ''}>
-                            ${configState.needsConfirmation ? 'Confirm Restart' : 'Save Changes'}
+                            ${state.needsConfirmation ? (running ? 'Confirm Restart' : 'Confirm Save') : 'Save Changes'}
                         </button>
                     </div>
-                    ${configState.needsConfirmation ? `
+                    ${state.needsConfirmation ? `
                         <div class="plugin-config-warning">
-                            This will apply your changes and reinitialize the plugin.
+                            ${running ? 'This will apply your changes and reinitialize the plugin.' : 'This writes the config; the plugin starts with it once enabled.'}
                         </div>
                     ` : ''}
                 </div>
             ` : ''}
         </div>
     `;
+}
+
+/** Whether the config differs from what the node holds: a value, or with no schema a key added or removed. */
+export function configChanged(state: Pick<ConfigFormState, 'currentConfig' | 'newConfig' | 'schema' | 'freeForm'>): boolean {
+    const keys = new Set([...Object.keys(state.currentConfig), ...Object.keys(state.newConfig)]);
+    for (const key of keys) {
+        if (state.freeForm && (key in state.newConfig) !== (key in state.currentConfig)) return true;
+        const defaultValue = state.schema[key]?.default_value ?? '';
+        if ((state.newConfig[key] || defaultValue) !== (state.currentConfig[key] || defaultValue)) return true;
+    }
+    return false;
 }
 
 function getInputType(schemaType: string): string {
@@ -870,11 +1189,7 @@ function updateSaveButtonState(): void {
     if (!saveBtn || !configState) return;
 
     const hasErrors = Object.keys(configState.validationErrors).length > 0;
-    const hasChanges = Object.entries(configState.newConfig).some(([key, value]) =>
-        value !== (configState!.currentConfig[key] || configState!.schema[key].default_value)
-    );
-
-    saveBtn.disabled = hasErrors || !hasChanges;
+    saveBtn.disabled = hasErrors || !configChanged(configState);
 }
 
 async function savePluginConfig(): Promise<void> {
@@ -900,7 +1215,7 @@ async function savePluginConfig(): Promise<void> {
             const errorData = await response.json().catch((err: unknown) => ({ message: `${response.statusText} (unreadable body: ${err})` }));
             log.debug(SEG.UI, 'Error response:', errorData);
 
-            let errorDetails = errorData.details || '';
+            let errorDetails = Array.isArray(errorData.details) ? errorData.details.join('\n') : (errorData.details || '');
             if (errorData.errors && Object.keys(errorData.errors).length > 0) {
                 errorDetails = 'Field-specific validation errors:\n\n';
                 for (const [field, error] of Object.entries(errorData.errors)) {
@@ -913,7 +1228,8 @@ async function savePluginConfig(): Promise<void> {
             }
 
             configState.error = {
-                message: errorData.message || 'Failed to save configuration',
+                // A refusal from the record says itself in the error envelope's `error`.
+                message: errorData.message || errorData.error || 'Failed to save configuration',
                 details: errorDetails,
                 status: response.status
             };

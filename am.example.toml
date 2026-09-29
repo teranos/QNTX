@@ -328,12 +328,7 @@ ticker_interval_seconds = 1
 # ════════════════════════════════════════════════════════════════
 
 [plugin]
-# Allowlist. Nothing loads unless named here.
-# Hot-swap: adding/removing takes effect without restart.
-#
-# A URL tracks that repo's latest release. A bare name must already be on disk
-# and is yours to manage. Mixing forms is legal.
-# enabled = ["spindle", "meili", "https://github.com/sbvh-nl/duif"]
+# Plugins are added, configured and enabled in the plugin element.
 
 # Forge credentials, one per host, needed only for private repos.
 # The host is a value, not a key — the config keyspace is dot-delimited and
@@ -353,33 +348,5 @@ ticker_interval_seconds = 1
 # [[plugin.access_token]]
 # host = "codeberg.org"
 # ref  = "env:CODEBERG_TOKEN"
-
-# ────────────────────────────────────────────────────────────────
-# MeiliSearch Plugin (ADR-015)
-# Full-text search provider with typo tolerance, faceted search.
-# ────────────────────────────────────────────────────────────────
-
-[meili]
-# Remote mode — connect to an external MeiliSearch instance:
-# url = "http://localhost:7700"
-# key = "your-master-key"
-
-# Embedded mode — spawn a local MeiliSearch subprocess for development.
-# Requires `meilisearch` binary in PATH (or specify meili_bin).
-# Data persists in ~/.qntx/meili-data/ across restarts.
-# embedded = true
-# meili_bin = "meilisearch"
-# meili_db_path = "/custom/path/to/meili-data"
-
-# ════════════════════════════════════════════════════════════════
-# Code Configuration (GitHub & LSP Integration)
-# DEPRECATED: planning for removal of these two integrations
-# ════════════════════════════════════════════════════════════════
-
-[code.github]
-# GitHub personal access token for code review features
-# Required for: qntx code pr, qntx code FIX-N
-# Environment: QNTX_CODE_GITHUB_TOKEN
-# token = "ghp_..."
 
 

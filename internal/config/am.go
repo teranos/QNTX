@@ -274,7 +274,6 @@ type AxConfig struct {
 
 // PluginConfig configures the domain plugin system
 type PluginConfig struct {
-	Enabled     []string              `mapstructure:"enabled"`      // Allowlist of enabled plugins: bare names or repo URLs (see EnabledPlugin)
 	Paths       []string              `mapstructure:"paths"`        // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
 	AccessToken []AccessTokenRef      `mapstructure:"access_token"` // One credential per forge host, for private plugin repos
 	Runtime     PluginRuntimeConfig   `mapstructure:"runtime"`      // Runtime configuration

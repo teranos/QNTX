@@ -18,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/errors"
@@ -150,9 +149,13 @@ func (h *UpdateHandler) Execute(ctx context.Context, job *async.Job) error {
 			return ctx.Err()
 		}
 
-		// A plugin enabled by bare name has no repo and nothing to reconcile
+		// A plugin with no repository in its record has nothing to reconcile
 		// against.
-		repo := config.PluginRepo(name)
+		repo, err := pluginRepo(name)
+		if err != nil {
+			h.Logger.Errorw("Plugin not checked for a newer release: its record was not read", "plugin", name, "error", err)
+			continue
+		}
 		if repo == "" {
 			continue
 		}

@@ -23,7 +23,7 @@ QNTX core is minimal and runs without any plugins:
 - **Core components**: ATS (attestation system), Database (⊔), Pulse (꩜), Server
 - **All domains are plugins**: Code, finance, legal, biotech, etc. are external plugins
 - **Optional by default**: No plugins enabled in default configuration
-- **Explicit opt-in**: Users configure which plugins to load via `am.toml`
+- **Explicit opt-in**: Users add and enable plugins in the plugin element
 
 This ensures QNTX core remains focused on infrastructure, not domain logic.
 
@@ -52,7 +52,7 @@ Plugin characteristics:
 - Configured via `am.toml` (whitelist model)
 - Run in separate processes for isolation
 - Discovered from configured search paths
-- [Hot-swappable](../plugin-hot-swap.md) — enable/disable at runtime without server restart
+- [Hot-swappable](./ADR-002-plugin-configuration.md) — enable/disable at runtime without server restart
 
 ### Interface Contract
 
@@ -154,4 +154,3 @@ Optional interfaces extend the base — a plugin opts in by implementing them:
 
 - [ADR-002: Plugin Configuration Management](./ADR-002-plugin-configuration.md)
 - [ADR-003: Plugin Communication Patterns](./ADR-003-plugin-communication.md)
-- [Plugin Hot-Swap](../plugin-hot-swap.md) — runtime enable/disable via am.toml or API

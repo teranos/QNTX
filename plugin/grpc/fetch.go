@@ -277,6 +277,29 @@ func resolveRelease(ctx context.Context, name, repo string) (publishedRelease, e
 	return publishedRelease{tag: rel.TagName, asset: asset, checksum: checksumAsset, token: token}, nil
 }
 
+// ResolvedPlugin is what a repo publishes for a plugin on this platform.
+type ResolvedPlugin struct {
+	Name    string `json:"name"`
+	Repo    string `json:"repo"`
+	Release string `json:"release"`
+	Asset   string `json:"asset"`
+}
+
+// ResolvePlugin is the first stage of adding a plugin: whether its repo
+// resolves to a release this node could install, without installing it.
+func ResolvePlugin(ctx context.Context, repo string) (ResolvedPlugin, error) {
+	repo = strings.TrimSpace(repo)
+	name := config.PluginNameFromRepo(repo)
+	if name == "" || name == "." || name == "/" {
+		return ResolvedPlugin{}, errors.Newf("%q names no plugin", repo)
+	}
+	rel, err := resolveRelease(ctx, name, repo)
+	if err != nil {
+		return ResolvedPlugin{}, err
+	}
+	return ResolvedPlugin{Name: name, Repo: repo, Release: rel.tag, Asset: rel.asset.Name}, nil
+}
+
 // publishedDigest reads the digest the plugin's newest release publishes for this
 // platform's asset, without downloading the asset.
 func publishedDigest(ctx context.Context, name, repo string) (string, error) {
