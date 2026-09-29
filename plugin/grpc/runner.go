@@ -115,7 +115,9 @@ func (r *Runner) Take(digestFile string, logger *zap.SugaredLogger) (TakenBuild,
 	if err != nil {
 		return TakenBuild{}, err
 	}
+	// A build already installed is still one the runner delivered, and is shown as unchanged.
 	if installed, ok := installedDigest(dir); ok && installed == got {
+		r.record(taken)
 		return taken, nil
 	}
 	binary, files, err := install(archive, dir, PluginBinaryName(name))
@@ -132,10 +134,23 @@ func (r *Runner) Take(digestFile string, logger *zap.SugaredLogger) (TakenBuild,
 	logger.Infow("Installed plugin build from the runner",
 		"plugin", name, "archive", archivePath, "binary", binary, "files", files, "sha256", got)
 
-	r.mu.Lock()
-	r.taken = append(r.taken, taken)
-	r.mu.Unlock()
+	r.record(taken)
 	return taken, nil
+}
+
+// record keeps one row per build: a build seen again replaces its row, and a
+// row that installed it stays marked as having changed the plugin.
+func (r *Runner) record(taken TakenBuild) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, held := range r.taken {
+		if held.Plugin == taken.Plugin && held.Digest == taken.Digest {
+			taken.Changed = taken.Changed || held.Changed
+			r.taken[i] = taken
+			return
+		}
+	}
+	r.taken = append(r.taken, taken)
 }
 
 // Watch takes every build that lands under the runner until ctx ends, and

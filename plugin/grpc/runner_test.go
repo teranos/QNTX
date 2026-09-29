@@ -152,6 +152,37 @@ func TestTheSameBuildTakenTwiceChangesNothing(t *testing.T) {
 	second, err := runner.Take(digestFile, logger)
 	require.NoError(t, err)
 	assert.False(t, second.Changed)
+
+	shown := runner.Stats().Taken
+	require.Len(t, shown, 1, "one build is one row, however often it is seen")
+	assert.True(t, shown[0].Changed, "it is the build that changed the plugin")
+}
+
+// A build found under the runner that is already the installed one is shown,
+// so an element saying no build was taken means none was there.
+func TestABuildAlreadyInstalledIsShownUnchanged(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	logger := zaptest.NewLogger(t).Sugar()
+	workspace := filepath.Join("_work", "pyre", "pyre")
+
+	first, err := OpenRunner(aRunner(t))
+	require.NoError(t, err)
+	landBuild(t, filepath.Join(first.Path(), workspace), "pyre", "1.0.0", []byte("\x7fELF pyre"), "")
+	_, err = first.Take(filepath.Join(first.Path(), workspace, buildArchive("pyre", "1.0.0")+".sha256"), logger)
+	require.NoError(t, err)
+
+	// The same build, seen by a runner watched afresh, as after the node restarts.
+	again, err := OpenRunner(aRunner(t))
+	require.NoError(t, err)
+	landBuild(t, filepath.Join(again.Path(), workspace), "pyre", "1.0.0", []byte("\x7fELF pyre"), "")
+	taken, err := again.Take(filepath.Join(again.Path(), workspace, buildArchive("pyre", "1.0.0")+".sha256"), logger)
+	require.NoError(t, err)
+	assert.False(t, taken.Changed)
+
+	shown := again.Stats().Taken
+	require.Len(t, shown, 1)
+	assert.Equal(t, "pyre", shown[0].Plugin)
+	assert.False(t, shown[0].Changed)
 }
 
 // What the GitHub element shows of a runner, read off its directory.

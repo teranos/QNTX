@@ -139,9 +139,9 @@ in
         '';
       }
 
-      # Both names are the fetcher's (plugin/grpc/fetch.go): the asset ends in
+      # Both names are the runner's (plugin/grpc/runner.go): the archive ends in
       # -<GOOS>-<GOARCH>.tar.gz, and the binary inside is qntx-<name>-plugin.
-      # Written at the workspace root: a build under the runner is looked for there (ADR-043).
+      # Written at the workspace root, where QNTX watches the runner for builds.
       {
         name = "Package";
         id = "package";
