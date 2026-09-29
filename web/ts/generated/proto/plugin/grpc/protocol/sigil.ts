@@ -15,6 +15,32 @@ export const protobufPackage = "protocol";
 export interface Signum {
   name: string;
   sigils: Sigil[];
+  /**
+   * The shapes this signum is held to, each by its name: "Staands will be
+   * Umami, one reference and not a blend." make parity prisma reads these.
+   */
+  follows: Follows[];
+}
+
+/**
+ * Follows says which column of a reference each of a signum's fields is. The
+ * reference is named, not described: its own schema says what its columns are.
+ */
+export interface Follows {
+  reference: string;
+  columns: Corresponds[];
+}
+
+/**
+ * Corresponds is one field and the column it is in the reference. The field is
+ * named in full, message and field, so a field no sigil answers with — what a
+ * signum keeps rather than what it gives — is named the same way.
+ */
+export interface Corresponds {
+  /** protocol.Arrival.path */
+  field: string;
+  /** WebsiteEvent.urlPath */
+  column: string;
 }
 
 /**
@@ -51,6 +77,8 @@ export interface Param {
 export interface Field {
   name: string;
   says: string;
+  /** The message it carries, named in full, when it carries one: protocol.Visit. */
+  message: string;
 }
 
 /** An Endpoint is a sigil's form in the HTTP API: the method and the whole path. */
