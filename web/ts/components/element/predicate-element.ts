@@ -16,7 +16,7 @@ import { openSegmentElement, renderSegmentStats, segmentElementId, type Segment 
 import { pressable } from './segment-press';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 
-export { tallyOf, attributeTallies } from './segment-element';
+export { seenOf, attributesSeen } from './segment-element';
 
 /**
  * Built when asked rather than held at module scope: the bundler resolves a

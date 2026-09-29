@@ -31,9 +31,9 @@ const aboutBatch: Attestation[] = [
     anAttestation({ predicates: ['type'], contexts: ['levi:batch'], actors: ['carol'] }),
 ];
 
-const rowsIn = (container: HTMLElement, cls: string): (string | null)[][] =>
-    Array.from(container.querySelectorAll(`.${cls} .stand-tally`))
-        .map((row) => Array.from(row.children).map((cell) => cell.textContent));
+const rowsIn = (container: HTMLElement, cls: string): (string | null)[] =>
+    Array.from(container.querySelectorAll(`.${cls} .sparkline-row`))
+        .map((row) => row.children[0].textContent);
 
 describe('What the subject element is', () => {
     test('it draws +, the mark of the segment a subject sits in', () => {
@@ -66,18 +66,18 @@ describe('Which predicates the subject carries', () => {
         expect(subjectSegment().sections[0].label).toBe('Related predicates');
     });
 
-    test('every predicate it carries, counted, most-carried first', () => {
+    test('every predicate it carries', () => {
         renderSubjectStats(container, 'batch', aboutBatch);
         expect(rowsIn(container, 'subject-predicates')).toEqual([
-            ['crawl-timeout', '3'],
-            ['retried', '1'],
-            ['type', '1'],
+            'crawl-timeout',
+            'retried',
+            'type',
         ]);
     });
 
     test('a predicate opens its own element', () => {
         renderSubjectStats(container, 'batch', aboutBatch);
-        const first = container.querySelector('.subject-predicates .stand-tally')?.children[0] as HTMLElement;
+        const first = container.querySelector('.subject-predicates .sparkline-row')?.children[0] as HTMLElement;
         expect(first.dataset.segmentPress).toBe('predicate');
         expect(first.style.cursor).toBe('pointer');
     });
@@ -101,30 +101,30 @@ describe('The rest of what it shows', () => {
             .toEqual(['Related predicates', 'Related contexts', 'Related actors']);
     });
 
-    test('contexts are counted and open theirs', () => {
+    test('contexts are listed and open theirs', () => {
         renderSubjectStats(container, 'batch', aboutBatch);
         expect(rowsIn(container, 'subject-contexts')).toEqual([
-            ['levi:batch', '4'],
-            ['levi:crawl', '1'],
+            'levi:batch',
+            'levi:crawl',
         ]);
-        const first = container.querySelector('.subject-contexts .stand-tally')?.children[0] as HTMLElement;
+        const first = container.querySelector('.subject-contexts .sparkline-row')?.children[0] as HTMLElement;
         expect(first.dataset.segmentPress).toBe('context');
     });
 
-    test('actors are counted and open theirs', () => {
+    test('actors are listed and open theirs', () => {
         renderSubjectStats(container, 'batch', aboutBatch);
         expect(rowsIn(container, 'subject-actors')).toEqual([
-            ['alice', '3'],
-            ['bob', '1'],
-            ['carol', '1'],
+            'alice',
+            'bob',
+            'carol',
         ]);
-        const first = container.querySelector('.subject-actors .stand-tally')?.children[0] as HTMLElement;
+        const first = container.querySelector('.subject-actors .sparkline-row')?.children[0] as HTMLElement;
         expect(first.dataset.segmentPress).toBe('actor');
     });
 
     test('attributes are shown under their key', () => {
         renderSubjectStats(container, 'batch', aboutBatch);
-        expect(rowsIn(container, 'subject-attributes')).toEqual([['2', '1']]);
+        expect(rowsIn(container, 'subject-attributes')).toEqual(['2']);
     });
 
     test('how much it was folded out of is said before the sections', () => {

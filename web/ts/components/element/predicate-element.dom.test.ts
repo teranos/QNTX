@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { predicateElementId, tallyOf, attributeTallies, renderPredicateStats } from './predicate-element.ts';
+import { predicateElementId, seenOf, attributesSeen, renderPredicateStats } from './predicate-element.ts';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 
 const anAttestation = (over: Partial<Attestation> = {}): Attestation => ({
@@ -25,9 +25,9 @@ const filed: Attestation[] = [
     anAttestation({ subjects: ['crawl'], contexts: ['levi:crawl'], actors: ['alice'], attributes: '{"host":"other.site"}' }),
 ];
 
-const sectionRows = (container: HTMLElement, cls: string): (string | null)[][] =>
-    Array.from(container.querySelectorAll(`.${cls} .stand-tally`))
-        .map((row) => Array.from(row.children).map((cell) => cell.textContent));
+const sectionRows = (container: HTMLElement, cls: string): (string | null)[] =>
+    Array.from(container.querySelectorAll(`.${cls} .sparkline-row`))
+        .map((row) => row.children[0].textContent);
 
 describe('Predicate element id', () => {
     test('the id says which predicate it is about', () => {
@@ -40,60 +40,56 @@ describe('Predicate element id', () => {
 });
 
 describe('Folding what is filed under a predicate', () => {
-    test('subjects counted, most-seen first', () => {
-        expect(tallyOf(filed, (a) => a.subjects)).toEqual([
-            { name: 'batch', count: 2 },
-            { name: 'crawl', count: 1 },
+    const at = (t: number, over: Partial<Attestation>) => anAttestation({ timestamp: t, ...over });
+    const timed = [
+        at(1, { subjects: ['batch'], attributes: '{"host":"golem.club"}' }),
+        at(2, { subjects: ['batch'], attributes: '{"host":"golem.club"}' }),
+        at(3, { subjects: ['crawl'], attributes: '{"host":"other.site"}' }),
+    ];
+
+    test('every value keeps when it was seen', () => {
+        expect(seenOf(timed, (a) => a.subjects)).toEqual([
+            { name: 'batch', times: [1, 2] },
+            { name: 'crawl', times: [3] },
         ]);
     });
 
-    test('contexts counted the same way', () => {
-        expect(tallyOf(filed, (a) => a.contexts)).toEqual([
-            { name: 'levi:batch', count: 2 },
-            { name: 'levi:crawl', count: 1 },
-        ]);
+    test('a missing field is seen nowhere rather than as undefined', () => {
+        expect(seenOf([anAttestation({ subjects: undefined })], (a) => a.subjects)).toEqual([]);
     });
 
-    test('actors counted the same way', () => {
-        expect(tallyOf(filed, (a) => a.actors)).toEqual([
-            { name: 'alice', count: 2 },
-            { name: 'bob', count: 1 },
-        ]);
-    });
-
-    test('a missing field counts nothing rather than counting undefined', () => {
-        expect(tallyOf([anAttestation({ subjects: undefined })], (a) => a.subjects)).toEqual([]);
-    });
-
-    test('every value of a multi-value field is counted', () => {
-        const many = [anAttestation({ subjects: ['a', 'b'] }), anAttestation({ subjects: ['b'] })];
-        expect(tallyOf(many, (a) => a.subjects)).toEqual([
-            { name: 'b', count: 2 },
-            { name: 'a', count: 1 },
+    test('every value of a multi-value field is seen', () => {
+        const many = [at(1, { subjects: ['a', 'b'] }), at(2, { subjects: ['b'] })];
+        expect(seenOf(many, (a) => a.subjects)).toEqual([
+            { name: 'a', times: [1] },
+            { name: 'b', times: [1, 2] },
         ]);
     });
 });
 
 describe('Attributes across what is filed', () => {
-    test('one tally per key, values counted under it', () => {
-        expect(attributeTallies(filed)).toEqual([
-            { key: 'host', items: [{ name: 'golem.club', count: 2 }, { name: 'other.site', count: 1 }] },
+    test('per key, each value and when it was seen', () => {
+        expect(attributesSeen(filed)).toEqual([
+            { key: 'host', items: [
+                { name: 'golem.club', times: [1788000000000, 1788000000000] },
+                { name: 'other.site', times: [1788000000000] },
+            ] },
         ]);
     });
 
     test('keys are ordered so the same set reads the same way twice', () => {
         const two = [anAttestation({ attributes: '{"zeta":"1","alpha":"2"}' })];
-        expect(attributeTallies(two).map((t) => t.key)).toEqual(['alpha', 'zeta']);
+        expect(attributesSeen(two).map((t) => t.key)).toEqual(['alpha', 'zeta']);
     });
 
     test('an attestation with no attributes contributes none', () => {
-        expect(attributeTallies([anAttestation({ attributes: undefined })])).toEqual([]);
+        expect(attributesSeen([anAttestation({ attributes: undefined })])).toEqual([]);
     });
 
     test('a non-string value is kept rather than dropped', () => {
         const nested = [anAttestation({ attributes: '{"count":3}' })];
-        expect(attributeTallies(nested)).toEqual([
-            { key: 'count', items: [{ name: '3', count: 1 }] },
+        expect(attributesSeen(nested)).toEqual([
+            { key: 'count', items: [{ name: '3', times: [1788000000000] }] },
         ]);
     });
 });
@@ -120,28 +116,28 @@ describe('What the element shows', () => {
     test('subjects section holds the subjects', () => {
         renderPredicateStats(container, 'crawl-timeout', filed);
         expect(sectionRows(container, 'predicate-subjects')).toEqual([
-            ['batch', '2'],
-            ['crawl', '1'],
+            'batch',
+            'crawl',
         ]);
     });
 
     test('contexts and actors are their own sections', () => {
         renderPredicateStats(container, 'crawl-timeout', filed);
         expect(sectionRows(container, 'predicate-contexts')).toEqual([
-            ['levi:batch', '2'],
-            ['levi:crawl', '1'],
+            'levi:batch',
+            'levi:crawl',
         ]);
         expect(sectionRows(container, 'predicate-actors')).toEqual([
-            ['alice', '2'],
-            ['bob', '1'],
+            'alice',
+            'bob',
         ]);
     });
 
     test('attributes are shown under their key', () => {
         renderPredicateStats(container, 'crawl-timeout', filed);
         expect(sectionRows(container, 'predicate-attributes')).toEqual([
-            ['golem.club', '2'],
-            ['other.site', '1'],
+            'golem.club',
+            'other.site',
         ]);
     });
 

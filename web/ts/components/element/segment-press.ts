@@ -8,7 +8,7 @@
  */
 
 import { log, SEG } from '../../logger';
-import type { NameCell } from '../tally';
+import type { NameCell } from '../sparkline';
 
 /** Which segment a press opens. */
 /**
@@ -32,7 +32,7 @@ export function openSegment(kind: SegmentKind, value: string): void {
     });
 }
 
-/** A tally name that opens the segment element for what it names. */
+/** A name that opens the segment element for what it names. */
 export function pressable(kind: SegmentKind): NameCell {
     return (name: string) => {
         const span = document.createElement('span');
