@@ -16,6 +16,26 @@ option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 message Signum {
   string name = 1;
   repeated Sigil sigils = 2;
+  // The shapes this signum is held to, each by its name: "Staands will be
+  // Umami, one reference and not a blend." make parity prisma reads these.
+  repeated Follows follows = 3;
+}
+
+// Follows says which column of a reference each of a signum's fields is. The
+// reference is named, not described: its own schema says what its columns are.
+message Follows {
+  string reference = 1;
+  repeated Corresponds columns = 2;
+}
+
+// Corresponds is one field and the column it is in the reference. The field is
+// named in full, message and field, so a field no sigil answers with — what a
+// signum keeps rather than what it gives — is named the same way.
+message Corresponds {
+  // protocol.Arrival.path
+  string field = 1;
+  // WebsiteEvent.urlPath
+  string column = 2;
 }
 
 // A Sigil is one thing the node does. The function that does it is not here:
@@ -48,6 +68,8 @@ message Param {
 message Field {
   string name = 1;
   string says = 2;
+  // The message it carries, named in full, when it carries one: protocol.Visit.
+  string message = 3;
 }
 
 // An Endpoint is a sigil's form in the HTTP API: the method and the whole path.
