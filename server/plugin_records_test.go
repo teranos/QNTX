@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/teranos/QNTX/ats/types"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 )
 
@@ -75,6 +76,23 @@ func TestTheNewestLineAboutAPluginHolds(t *testing.T) {
 	all, err := records.Plugins()
 	require.NoError(t, err)
 	assert.Equal(t, []grpcplugin.PluginRecord{held}, all)
+}
+
+// A stored line that does not read as a plugin is an error, never a plugin
+// quietly missing part of what was written.
+func TestALineThatDoesNotReadAsAPluginIsAnError(t *testing.T) {
+	s := rootKnowingServer(t)
+	at := time.Now()
+	require.NoError(t, s.held.TheNodesOwnRecords().CreateAttestation(&types.As{
+		ID: "AS-PLUGIN-BAD", Subjects: []string{pluginSubject}, Predicates: []string{"pyre"},
+		Contexts: []string{"https://github.com/teranos/pyre"}, Actors: []string{rootAccount},
+		Timestamp: at, CreatedAt: at, Source: pluginSource,
+		Attributes: map[string]any{"enabled": "yes", "config": map[string]any{"poll_interval": 300}},
+	}))
+
+	_, _, err := s.pluginRecords().Plugin("pyre")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "pyre")
 }
 
 // Enabling and configuring are for a plugin that was added.

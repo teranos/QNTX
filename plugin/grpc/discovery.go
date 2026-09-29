@@ -422,7 +422,10 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, pluginCfg Plugin
 			m.mu.Unlock()
 
 			if registry != nil {
-				m.registerRestarted(retryCtx, pluginCfg.Name, registry, services, BannerRecovered)
+				// Nobody pressed anything here; the registry holds the failure for the list to show.
+				if err := m.registerRestarted(retryCtx, pluginCfg.Name, registry, services, BannerRecovered); err != nil {
+					m.logger.Errorw("Plugin came back and did not initialize", "plugin", pluginCfg.Name, "error", err)
+				}
 			}
 
 			// Clear stale HTTP mux state so next request re-initializes
@@ -1032,7 +1035,7 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, searchPa
 		return nil // not an error to the caller — retry is in progress
 	}
 
-	m.registerRestarted(ctx, name, registry, services, BannerRecovered)
+	initErr := m.registerRestarted(ctx, name, registry, services, BannerRecovered)
 
 	// Clear stale HTTP mux and pre-register new proxy routes.
 	// Must run AFTER registerRestarted which registers the plugin in the registry.
@@ -1040,7 +1043,7 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, searchPa
 		m.onPluginRestarted(pluginCfg.Name)
 	}
 
-	return nil
+	return initErr
 }
 
 // killStalePluginProcesses finds and kills any OS process running a plugin binary
@@ -1116,14 +1119,15 @@ func (m *PluginManager) killStalePluginProcesses(name string) {
 // registerRestarted re-registers a successfully relaunched plugin with the
 // registry and reinitializes it with services. Emits the banner after health
 // check completes (async) so it shows actual health, not "initializing".
-func (m *PluginManager) registerRestarted(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry, reason BannerReason) {
+func (m *PluginManager) registerRestarted(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry, reason BannerReason) error {
+	var initErr error
 	newPlugin, _ := m.GetPlugin(name)
 	// Unregister first to handle races between health poller restarts and
 	// manual restarts — both can call registerRestarted concurrently.
 	registry.Unregister(name)
 	if err := registry.Register(newPlugin); err != nil {
 		m.logger.Errorf("Failed to re-register plugin '%s': %v", name, err)
-		return
+		return errors.Wrapf(err, "plugin %s started and was not registered", name)
 	}
 	registry.MarkReady(name)
 
@@ -1145,11 +1149,17 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 			select {
 			case err := <-initDone:
 				if err != nil {
-					m.logger.Errorf("Failed to initialize plugin '%s' after restart: %v", name, err)
+					initErr = errors.Wrapf(err, "plugin %s did not initialize", name)
 				}
 				m.logger.Debugw("registerRestarted: Initialize returned", "plugin", name)
 			case <-time.After(30 * time.Second):
-				m.logger.Warnw("registerRestarted: Initialize timed out, continuing with banner", "plugin", name)
+				initErr = errors.Newf("plugin %s did not answer Initialize within 30s", name)
+			}
+			// The plugin is running and did not take its config: that is a
+			// failure, and whoever enabled or restarted it is told so.
+			if initErr != nil {
+				m.logger.Errorw("Plugin started and did not initialize", "plugin", name, "error", initErr)
+				registry.MarkFailed(name, initErr.Error())
 			}
 		}
 	}
@@ -1160,7 +1170,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 	m.mu.RUnlock()
 	if !exists {
 		m.logger.Debugf("Plugin '%s' restarted successfully", name)
-		return
+		return initErr
 	}
 	proxy := p.client
 
@@ -1248,6 +1258,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		m.logger.Warnw("registerRestarted: accumulator is nil, no banner will be emitted", "plugin", name)
 	}
 	m.logger.Debugw("registerRestarted: completed", "plugin", name)
+	return initErr
 }
 
 // EnablePlugin discovers, loads, registers, and initializes a plugin at runtime.
@@ -1279,14 +1290,14 @@ func (m *PluginManager) EnablePlugin(ctx context.Context, name string, searchPat
 
 	// Register + initialize + setup handlers/watchers/schedules/providers
 	// Banner emits asynchronously after health check completes
-	m.registerRestarted(ctx, name, registry, services, BannerEnabled)
+	initErr := m.registerRestarted(ctx, name, registry, services, BannerEnabled)
 
 	// Register HTTP/WS routes for hot-swapped plugin
 	if m.onPluginRestarted != nil {
 		m.onPluginRestarted(name)
 	}
 
-	return nil
+	return initErr
 }
 
 // DisablePlugin shuts down a running plugin, unregisters it, and kills its process.

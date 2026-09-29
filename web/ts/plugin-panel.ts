@@ -67,6 +67,8 @@ interface Reached {
 
 interface PluginsResponse {
     plugins: PluginInfo[];
+    /** Why the node could not read which plugins it holds, when it could not. */
+    records_failure?: string;
 }
 
 interface ConfigFieldSchema {
@@ -142,6 +144,9 @@ let addingRepo = '';
 // Added and switched off.
 const NOT_RUNNING = ['disabled'];
 
+// Why the last list is not what the node holds; empty when it is.
+let listFailure = '';
+
 async function fetchServerHealth(): Promise<void> {
     try {
         serverHealth = await apiJson<ServerHealth>('/health');
@@ -161,12 +166,20 @@ async function fetchPlugins(): Promise<void> {
         }
 
         plugins = data.plugins;
+        listFailure = data.records_failure ?? '';
         lastRefreshed = new Date();
         log.debug(SEG.UI, 'Successfully loaded', plugins.length, 'plugins');
     } catch (error: unknown) {
         handleError(error, 'Failed to fetch plugins', { context: SEG.UI, silent: true });
         plugins = [];
+        listFailure = error instanceof Error ? error.message : String(error);
     }
+}
+
+/** Why the list is not what the node holds, in full, where the list is. */
+function renderListFailure(): string {
+    if (!listFailure) return '';
+    return `<div class="plugin-list-failure">${escapeHtml(listFailure)}</div>`;
 }
 
 function render(): void {
@@ -191,10 +204,11 @@ function render(): void {
         contentElement.innerHTML = `
             <div class="element-content">
                 ${renderToolbar()}
+                ${listFailure ? renderListFailure() : `
                 <div class="panel-empty plugin-empty">
                     <p>No plugins added</p>
                     <p class="panel-empty-hint">Press + and enter a plugin's repository URL</p>
-                </div>
+                </div>`}
             </div>
         `;
         hydratePluginButtons(contentElement);
@@ -208,6 +222,7 @@ function render(): void {
     contentElement.innerHTML = `
         <div class="element-content">
             ${renderToolbar()}
+            ${renderListFailure()}
             <div class="plugin-summary">
                 <div class="plugin-summary-stats">
                     <span class="plugin-count">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''} installed</span>

@@ -545,7 +545,9 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map
 		}
 		err = pm.EnablePlugin(ctx, name, pluginSearchPaths(), s.pluginRegistry, s.services)
 		if err != nil {
-			s.logger.Warnw("Failed to enable plugin", "plugin", name, "error", err)
+			// Said to whoever pressed Enable, and held on the plugin's card.
+			s.logger.Errorw("Failed to enable plugin", "plugin", name, "error", err)
+			s.pluginRegistry.MarkFailed(name, err.Error())
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
 		// Invalidate HTTP mux cache for the newly enabled plugin

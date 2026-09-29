@@ -26,26 +26,35 @@ func LoadPluginsFromRecords(ctx context.Context, manager *PluginManager, records
 	}
 	args := make(map[string][]string)
 	var pluginNames []string
+	var failedPlugins []string
 	for _, record := range known {
 		if !record.Enabled {
 			continue
 		}
+		launch, err := recordArgs(record)
+		if err != nil {
+			logger.Errorw("Plugin not loaded: its args do not read", "plugin", record.Name, "error", err)
+			failedPlugins = append(failedPlugins, record.Name)
+			manager.mu.Lock()
+			manager.failedPlugins[record.Name] = err.Error()
+			manager.mu.Unlock()
+			continue
+		}
 		pluginNames = append(pluginNames, record.Name)
-		args[record.Name] = recordArgs(record)
+		args[record.Name] = launch
 	}
-	if len(pluginNames) == 0 {
+	if len(pluginNames) == 0 && len(failedPlugins) == 0 {
 		logger.Infow("No plugin is enabled", "known", len(known))
 		return nil
 	}
 
 	// Sort plugin names for deterministic iteration
 	sort.Strings(pluginNames)
-	enabled := len(pluginNames)
+	enabled := len(pluginNames) + len(failedPlugins)
 
 	// Discover plugins from configured paths (deduplicated), fetching any that
 	// declared a repo and are not on disk
 	var pluginConfigs []PluginConfig
-	var failedPlugins []string
 	for _, pluginName := range pluginNames {
 		logger.Debugf("Searching for '%s' plugin binary in %d paths", pluginName, len(cfg.Plugin.Paths))
 
@@ -114,13 +123,17 @@ func ConfigureWebSocketFromConfig(manager *PluginManager, cfg *config.Config) {
 }
 
 // recordArgs is the launch args a plugin's config holds under args, written
-// as a JSON list.
-func recordArgs(record PluginRecord) []string {
-	var args []string
-	if err := json.Unmarshal([]byte(record.Config["args"]), &args); err != nil {
-		return nil
+// as a JSON list. A plugin with no args key has none.
+func recordArgs(record PluginRecord) ([]string, error) {
+	raw, set := record.Config["args"]
+	if !set || strings.TrimSpace(raw) == "" {
+		return nil, nil
 	}
-	return args
+	var args []string
+	if err := json.Unmarshal([]byte(raw), &args); err != nil {
+		return nil, errors.Wrapf(err, "plugin %s: args is %q, and args is a JSON list of strings", record.Name, raw)
+	}
+	return args, nil
 }
 
 // formatHints renders an error's hints for a log line, or "" when it has none.
@@ -148,7 +161,10 @@ func formatHints(err error) string {
 func resolvePlugin(ctx context.Context, name string, searchPaths []string, logger *zap.SugaredLogger) (PluginConfig, error) {
 	pluginCfg, discoverErr := discoverPlugin(name, searchPaths, logger)
 
-	repo := pluginRepo(name)
+	repo, err := pluginRepo(name)
+	if err != nil {
+		return PluginConfig{}, err
+	}
 	if repo == "" {
 		if discoverErr != nil {
 			return PluginConfig{}, discoverErr

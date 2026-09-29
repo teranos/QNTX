@@ -273,6 +273,17 @@
     color: #f87171;
 }
 
+/* Why the list is not what the node holds: whole, wrapped, where the list is */
+.plugin-list-failure {
+    margin: 8px 0;
+    padding: 8px;
+    background: rgba(248, 113, 113, 0.1);
+    color: #f87171;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
 /* Plugin health indicator (red dot on plugins button) */
 .plugin-health-indicator {
     position: absolute;

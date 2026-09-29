@@ -46,9 +46,13 @@ interface Row { name: string; version: string; description: string; healthy: boo
 let held: Row[];
 let asked: { path: string; method: string; body: unknown }[];
 
+// What the list answers besides its rows, when a test says so.
+let listed: () => Promise<unknown> = () => Promise.resolve({ plugins: held });
+
 function node(extra: Record<string, (body: unknown) => Response> = {}): void {
+    listed = () => Promise.resolve({ plugins: held });
     answerJson = (path: string) => {
-        if (path === '/api/plugins') return Promise.resolve({ plugins: held });
+        if (path === '/api/plugins') return listed();
         if (path === '/health') return Promise.resolve({ status: 'ok', version: 'test', commit: '', build_time: '', clients: 0, verbosity: 0, owner: '' });
         return Promise.resolve({});
     };
@@ -218,5 +222,27 @@ describe('Jenny: configured while it does not run, then enabled', () => {
         const card = content.querySelector<HTMLElement>('.plugin-card[data-plugin="garden"]')!;
         expect(card.querySelector('.plugin-state-text')?.textContent).toBe('failed');
         expect(card.querySelector('.plugin-message-error')?.textContent).toBe(why);
+    });
+});
+
+describe('Tim: the plugins cannot be read', () => {
+    test('the records did not answer, and the element says so in full', async () => {
+        const why = 'failed to read the PLUGIN lines in system: ' + 'the store did not answer '.repeat(20);
+        node();
+        listed = () => Promise.resolve({ plugins: [], records_failure: why });
+        const content = await openPanel();
+
+        expect(content.querySelector('.plugin-list-failure')?.textContent).toBe(why);
+        expect(content.textContent).not.toContain('No plugins added');
+    });
+
+    test('the list did not load, and the element says so in full', async () => {
+        const why = 'GET /api/plugins answered 500: the node is starting';
+        node();
+        listed = () => Promise.reject(new Error(why));
+        const content = await openPanel();
+
+        expect(content.querySelector('.plugin-list-failure')?.textContent).toContain(why);
+        expect(content.textContent).not.toContain('No plugins added');
     });
 });

@@ -61,7 +61,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	}
 
 	// Wrap config provider to inject service endpoints for plugins
-	configProvider := grpcplugin.NewConfigProvider(endpoints)
+	configProvider := grpcplugin.NewConfigProvider(endpoints, s.logger)
 	services := plugin.NewServiceRegistry(s.nodeDB, s.logger, s.held.Served(), configProvider, queue)
 
 	// Wire version resolver: ATSStore and FetchService auto-stamp source_version

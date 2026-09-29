@@ -112,22 +112,33 @@ func (r PluginRecords) pluginLine(actor string, record grpcplugin.PluginRecord) 
 	return nil
 }
 
-func asPluginRecord(as *types.As) grpcplugin.PluginRecord {
+// asPluginRecord reads a PLUGIN line. A line that does not read whole is an
+// error naming the line, never a plugin missing part of what was written.
+func asPluginRecord(as *types.As) (grpcplugin.PluginRecord, error) {
 	record := grpcplugin.PluginRecord{Name: as.Predicates[0], Config: map[string]string{}}
 	if len(as.Contexts) > 0 {
 		record.Repo = as.Contexts[0]
 	}
-	if enabled, ok := as.Attributes["enabled"].(bool); ok {
-		record.Enabled = enabled
+	enabled, ok := as.Attributes["enabled"].(bool)
+	if !ok {
+		return grpcplugin.PluginRecord{}, errors.Newf("%s line %s about %s: enabled is %v, not true or false",
+			pluginSubject, as.ID, record.Name, as.Attributes["enabled"])
 	}
-	if held, ok := as.Attributes["config"].(map[string]any); ok {
-		for key, value := range held {
-			if text, ok := value.(string); ok {
-				record.Config[key] = text
-			}
+	record.Enabled = enabled
+	held, ok := as.Attributes["config"].(map[string]any)
+	if !ok {
+		return grpcplugin.PluginRecord{}, errors.Newf("%s line %s about %s: config is %v, not a map",
+			pluginSubject, as.ID, record.Name, as.Attributes["config"])
+	}
+	for key, value := range held {
+		text, ok := value.(string)
+		if !ok {
+			return grpcplugin.PluginRecord{}, errors.Newf("%s line %s about %s: config %s is %v, not text",
+				pluginSubject, as.ID, record.Name, key, value)
 		}
+		record.Config[key] = text
 	}
-	return record
+	return record, nil
 }
 
 // Plugins is every plugin the node knows, by name.
@@ -138,7 +149,11 @@ func (r PluginRecords) Plugins() ([]grpcplugin.PluginRecord, error) {
 	}
 	records := make([]grpcplugin.PluginRecord, 0, len(newest))
 	for _, as := range newest {
-		records = append(records, asPluginRecord(as))
+		record, err := asPluginRecord(as)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, record)
 	}
 	slices.SortFunc(records, func(a, b grpcplugin.PluginRecord) int { return strings.Compare(a.Name, b.Name) })
 	return records, nil
@@ -154,7 +169,11 @@ func (r PluginRecords) Plugin(name string) (grpcplugin.PluginRecord, bool, error
 	if !ok {
 		return grpcplugin.PluginRecord{}, false, nil
 	}
-	return asPluginRecord(as), true, nil
+	record, err := asPluginRecord(as)
+	if err != nil {
+		return grpcplugin.PluginRecord{}, false, err
+	}
+	return record, true, nil
 }
 
 // AddPlugin records a plugin by its repository URL. It starts disabled.

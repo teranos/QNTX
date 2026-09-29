@@ -336,7 +336,11 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 
 	// Pass all configuration keys from the plugin's namespace
 	// This includes both built-in keys and the keys the plugin's record holds
-	for _, key := range pluginConfig.GetKeys() {
+	keys := pluginConfig.GetKeys()
+	if unread, says := pluginConfig.(interface{ Err() error }); says && unread.Err() != nil {
+		return errors.Wrapf(unread.Err(), "plugin %s was not handed its config", c.metadata.Name)
+	}
+	for _, key := range keys {
 		// Skip internal keys (prefixed with _)
 		if len(key) > 0 && key[0] == '_' {
 			continue

@@ -151,7 +151,11 @@ func (h *UpdateHandler) Execute(ctx context.Context, job *async.Job) error {
 
 		// A plugin with no repository in its record has nothing to reconcile
 		// against.
-		repo := pluginRepo(name)
+		repo, err := pluginRepo(name)
+		if err != nil {
+			h.Logger.Errorw("Plugin not checked for a newer release: its record was not read", "plugin", name, "error", err)
+			continue
+		}
 		if repo == "" {
 			continue
 		}

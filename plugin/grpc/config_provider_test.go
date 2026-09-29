@@ -6,10 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"go.uber.org/zap"
 )
 
 func TestNewConfigProvider_WithoutEndpoints(t *testing.T) {
-	provider := NewConfigProvider(nil)
+	provider := NewConfigProvider(nil, zap.NewNop().Sugar())
 	require.NotNil(t, provider)
 
 	config := provider.GetPluginConfig("testdomain")
@@ -34,7 +35,7 @@ func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 		AuthToken:           "test-token-123",
 	}
 
-	provider := NewConfigProvider(endpoints)
+	provider := NewConfigProvider(endpoints, zap.NewNop().Sugar())
 	config := provider.GetPluginConfig("anydomain")
 
 	cases := []struct {
@@ -66,7 +67,7 @@ func TestNewConfigProvider_GetAlsoInjectsEndpoints(t *testing.T) {
 		LLMAddress: "localhost:5555",
 	}
 
-	provider := NewConfigProvider(endpoints)
+	provider := NewConfigProvider(endpoints, zap.NewNop().Sugar())
 	config := provider.GetPluginConfig("x")
 
 	assert.Equal(t, "localhost:5555", config.Get("_llm_endpoint"))
@@ -82,7 +83,7 @@ func TestAPluginIsHandedTheConfigItsRecordHolds(t *testing.T) {
 	}}})
 	t.Cleanup(func() { SetPluginRecords(nil) })
 
-	config := NewConfigProvider(nil).GetPluginConfig("cleanAPI")
+	config := NewConfigProvider(nil, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
 	assert.ElementsMatch(t, []string{"token", "poll_interval", "verbose"}, config.GetKeys())
 	assert.Equal(t, "ssm:///q/box/token", config.Get("token"))
 	assert.Equal(t, 300, config.GetInt("poll_interval"))
@@ -96,7 +97,7 @@ func TestAPluginsConfigIsItsRecord(t *testing.T) {
 	SetPluginRecords(heldRecords{"pyre": {Name: "pyre", Config: map[string]string{}}})
 	t.Cleanup(func() { SetPluginRecords(nil) })
 
-	config := NewConfigProvider(nil).GetPluginConfig("pyre")
+	config := NewConfigProvider(nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
 	assert.Empty(t, config.GetKeys())
 	assert.Equal(t, 0, config.GetInt("poll_interval"))
 }
