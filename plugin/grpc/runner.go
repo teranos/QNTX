@@ -69,6 +69,9 @@ type TakenBuild struct {
 	Digest  string    `json:"digest"`
 	At      time.Time `json:"at"`
 	Changed bool      `json:"changed"`
+	// Older is a build that landed before the installed one was installed, and
+	// so is not installed over it.
+	Older bool `json:"older"`
 }
 
 // OpenRunner is the runner at path, or an error naming why there is none.
@@ -120,6 +123,19 @@ func (r *Runner) Take(digestFile string, logger *zap.SugaredLogger) (TakenBuild,
 		r.record(taken)
 		return taken, nil
 	}
+	// An archive left in a workspace from an earlier job is older than what is
+	// installed, and never replaces it: the newest build is the one that runs.
+	older, err := landedBeforeInstall(archivePath, dir)
+	if err != nil {
+		return TakenBuild{}, err
+	}
+	if older {
+		taken.Older = true
+		logger.Infow("A build under the runner is older than the installed one; it is not installed",
+			"plugin", name, "archive", archivePath, "sha256", got)
+		r.record(taken)
+		return taken, nil
+	}
 	binary, files, err := install(archive, dir, PluginBinaryName(name))
 	if err != nil {
 		return TakenBuild{}, errors.Wrapf(err, "failed to install plugin %s to %s from %s", name, dir, archivePath)
@@ -136,6 +152,23 @@ func (r *Runner) Take(digestFile string, logger *zap.SugaredLogger) (TakenBuild,
 
 	r.record(taken)
 	return taken, nil
+}
+
+// landedBeforeInstall is whether archive was written before dir's build was
+// installed. Nothing installed yet is never older.
+func landedBeforeInstall(archive, dir string) (bool, error) {
+	installed, err := os.Stat(filepath.Join(dir, installedDigestFile))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, errors.Wrapf(err, "could not tell when the build in %s was installed", dir)
+	}
+	landed, err := os.Stat(archive)
+	if err != nil {
+		return false, errors.Wrapf(err, "could not tell when %s landed", archive)
+	}
+	return landed.ModTime().Before(installed.ModTime()), nil
 }
 
 // record keeps one row per build: a build seen again replaces its row, and a

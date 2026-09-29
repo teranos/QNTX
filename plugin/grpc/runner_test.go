@@ -185,6 +185,36 @@ func TestABuildAlreadyInstalledIsShownUnchanged(t *testing.T) {
 	assert.False(t, shown[0].Changed)
 }
 
+// An archive left in a workspace from an earlier job is never installed over
+// a build installed after it: the newest build is the one that runs.
+func TestAnOlderBuildIsNotInstalledOverANewerOne(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	logger := zaptest.NewLogger(t).Sugar()
+	runner, err := OpenRunner(aRunner(t))
+	require.NoError(t, err)
+
+	fresh := filepath.Join(runner.Path(), "_work", "pyre", "pyre")
+	landBuild(t, fresh, "pyre", "2.0.0", []byte("\x7fELF pyre 2"), "")
+	_, err = runner.Take(filepath.Join(fresh, buildArchive("pyre", "2.0.0")+".sha256"), logger)
+	require.NoError(t, err)
+
+	stale := filepath.Join(runner.Path(), "_work", "old", "old")
+	landBuild(t, stale, "pyre", "1.0.0", []byte("\x7fELF pyre 1"), "")
+	earlier := time.Now().Add(-time.Hour)
+	require.NoError(t, os.Chtimes(filepath.Join(stale, buildArchive("pyre", "1.0.0")), earlier, earlier))
+
+	taken, err := runner.Take(filepath.Join(stale, buildArchive("pyre", "1.0.0")+".sha256"), logger)
+	require.NoError(t, err)
+	assert.True(t, taken.Older)
+	assert.False(t, taken.Changed)
+
+	dir, err := PluginInstallPath("pyre")
+	require.NoError(t, err)
+	got, err := os.ReadFile(filepath.Join(dir, PluginBinaryName("pyre")))
+	require.NoError(t, err)
+	assert.Equal(t, []byte("\x7fELF pyre 2"), got, "the newer build still runs")
+}
+
 // What the GitHub element shows of a runner, read off its directory.
 func TestARunnerSaysWhatItIs(t *testing.T) {
 	runner, err := OpenRunner(aRunner(t))

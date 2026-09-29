@@ -43,6 +43,8 @@ export interface TakenBuild {
     digest: string;
     at: string;
     changed: boolean;
+    /** Landed before the installed build, so not installed over it. */
+    older?: boolean;
 }
 
 /** The runner as its directory says it is now. */
@@ -238,7 +240,7 @@ function takenTable(taken: TakenBuild[]): HTMLElement {
         tr.appendChild(cell(t.plugin));
         tr.appendChild(cell(t.archive));
         tr.appendChild(cell(t.digest));
-        tr.appendChild(cell(t.changed ? 'yes' : 'no'));
+        tr.appendChild(cell(t.changed ? 'yes' : t.older ? 'no, older than installed' : 'no'));
         tbody.appendChild(tr);
     }
     table.appendChild(tbody);
