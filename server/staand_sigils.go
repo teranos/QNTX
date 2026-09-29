@@ -124,6 +124,10 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 // staandsFollowUmami is which Umami column each field of a stand is. "Staands will
 // be Umami, one reference and not a blend." An arrival is the record a stand
 // keeps; a visit is the sitting its visits sigil gives, carrying the same ids.
+//
+// Only what a stand fills is said here. The Arrival fields nothing fills yet —
+// query, browser, operating system, device, screen, language, country, region,
+// city — stay in the proto and are not followed until something fills them.
 func staandsFollowUmami() *protocol.Follows {
 	pairs := []struct{ field, column string }{
 		{"protocol.Arrival.market", "WebsiteEvent.websiteId"},
@@ -135,7 +139,6 @@ func staandsFollowUmami() *protocol.Follows {
 		{"protocol.Arrival.visitor", "Session.id"},
 		{"protocol.Arrival.visit", "WebsiteEvent.visitId"},
 		{"protocol.Arrival.path", "WebsiteEvent.urlPath"},
-		{"protocol.Arrival.query", "WebsiteEvent.urlQuery"},
 		{"protocol.Arrival.event", "WebsiteEvent.eventName"},
 		{"protocol.Arrival.referrer_domain", "WebsiteEvent.referrerDomain"},
 		{"protocol.Arrival.referrer_path", "WebsiteEvent.referrerPath"},
@@ -144,14 +147,6 @@ func staandsFollowUmami() *protocol.Follows {
 		{"protocol.Arrival.utm_campaign", "WebsiteEvent.utmCampaign"},
 		{"protocol.Arrival.utm_content", "WebsiteEvent.utmContent"},
 		{"protocol.Arrival.utm_term", "WebsiteEvent.utmTerm"},
-		{"protocol.Arrival.browser", "Session.browser"},
-		{"protocol.Arrival.operating_system", "Session.os"},
-		{"protocol.Arrival.device", "Session.device"},
-		{"protocol.Arrival.screen", "Session.screen"},
-		{"protocol.Arrival.language", "Session.language"},
-		{"protocol.Arrival.country", "Session.country"},
-		{"protocol.Arrival.region", "Session.region"},
-		{"protocol.Arrival.city", "Session.city"},
 		{"protocol.Arrival.params", "EventData.dataKey"},
 		{"protocol.Arrival.params", "EventData.stringValue"},
 		{"protocol.Visit.market", "WebsiteEvent.websiteId"},

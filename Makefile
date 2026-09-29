@@ -35,8 +35,16 @@ cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM 
 openapi: ## Write what the node serves, from the reach table and the handlers' own prose
 	@go run ./cmd/openapi
 
-parity: ## Report what a node keeps on its own disk and what the record keeps (ADR-024, ADR-037)
-	@go run ./cmd/parity
+# make parity prisma {Signum} [{Sigil}] {Schema.prisma}: the words after parity
+# are its arguments, not targets. ALL=1 shows the models at 100 too.
+ifeq (parity,$(firstword $(MAKECMDGOALS)))
+PARITY_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+$(eval .PHONY: $(PARITY_ARGS))
+$(eval $(PARITY_ARGS):;@:)
+endif
+
+parity: ## Report what a node keeps on its own disk and what the record keeps (ADR-024, ADR-037); make parity prisma {Signum} [{Sigil}] {Schema.prisma}
+	@go run ./cmd/parity $(if $(ALL),-all) $(PARITY_ARGS)
 
 # git is the baseline, so there is no file to keep in step. What already stands
 # keeps standing; what this branch added is what answers. Exit 2 and not 1: a
