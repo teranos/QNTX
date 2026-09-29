@@ -16,28 +16,31 @@ import (
 	"go.uber.org/zap"
 )
 
-// LoadPluginsFromConfig loads plugins into an existing PluginManager based on am configuration.
-// It discovers plugin binaries from configured paths and loads enabled plugins.
-func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *config.Config, logger *zap.SugaredLogger) error {
-	// If no plugins enabled, nothing to do
-	if len(cfg.Plugin.Enabled) == 0 {
-		logger.Infow("No plugins enabled in configuration")
+// LoadPluginsFromRecords loads every enabled plugin the node's records hold
+// into an existing PluginManager. It discovers plugin binaries from configured
+// paths and loads them.
+func LoadPluginsFromRecords(ctx context.Context, manager *PluginManager, records PluginRecords, cfg *config.Config, logger *zap.SugaredLogger) error {
+	known, err := records.Plugins()
+	if err != nil {
+		return errors.Wrapf(err, "failed to read the plugin records to load from %v", cfg.Plugin.Paths)
+	}
+	args := make(map[string][]string)
+	var pluginNames []string
+	for _, record := range known {
+		if !record.Enabled {
+			continue
+		}
+		pluginNames = append(pluginNames, record.Name)
+		args[record.Name] = recordArgs(record)
+	}
+	if len(pluginNames) == 0 {
+		logger.Infow("No plugin is enabled", "known", len(known))
 		return nil
 	}
 
-	// Build map of enabled plugins for deduplication.
-	// Entries may be bare names or repo URLs — both reduce to a plugin name.
-	enabledPlugins := make(map[string]bool)
-	for _, name := range cfg.Plugin.EnabledNames() {
-		enabledPlugins[name] = true
-	}
-
 	// Sort plugin names for deterministic iteration
-	pluginNames := make([]string, 0, len(enabledPlugins))
-	for name := range enabledPlugins {
-		pluginNames = append(pluginNames, name)
-	}
 	sort.Strings(pluginNames)
+	enabled := len(pluginNames)
 
 	// Discover plugins from configured paths (deduplicated), fetching any that
 	// declared a repo and are not on disk
@@ -59,9 +62,8 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *con
 			manager.mu.Unlock()
 			continue
 		}
-		// Read per-plugin args from am.toml (e.g. [myplugin] args = ["--name", "myplugin"])
-		if args := config.GetStringSlice(pluginName + ".args"); len(args) > 0 {
-			pluginConfig.Args = args
+		if len(args[pluginName]) > 0 {
+			pluginConfig.Args = args[pluginName]
 		}
 		logger.Debugf("Will load '%s' plugin from binary: %s", pluginName, pluginConfig.Binary)
 		pluginConfigs = append(pluginConfigs, pluginConfig)
@@ -72,40 +74,53 @@ func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *con
 		if err := manager.LoadPlugins(ctx, pluginConfigs); err != nil {
 			return errors.Wrap(err, "failed to load plugins")
 		}
-
-		// Configure WebSocket settings from config.Config
-		keepaliveCfg := NewKeepaliveConfigFromSettings(
-			cfg.Plugin.WebSocket.Keepalive.Enabled,
-			cfg.Plugin.WebSocket.Keepalive.PingIntervalSecs,
-			cfg.Plugin.WebSocket.Keepalive.PongTimeoutSecs,
-			cfg.Plugin.WebSocket.Keepalive.ReconnectAttempts,
-		)
-
-		// Build WebSocket origin config from server allowed origins
-		wsConfig := WebSocketConfig{
-			AllowedOrigins:   cfg.GetServerAllowedOrigins(),
-			AllowAllOrigins:  false,
-			AllowCredentials: false,
-		}
-
-		manager.ConfigureWebSocket(keepaliveCfg, wsConfig)
 	}
 
 	// Log summary of discovery results
 	if len(failedPlugins) > 0 {
 		logger.Warnw("Some enabled plugins failed to load",
-			"enabled", len(cfg.Plugin.Enabled),
+			"enabled", enabled,
 			"loaded", len(pluginConfigs),
 			"failed", failedPlugins,
 		)
 	} else if len(pluginConfigs) > 0 {
 		logger.Debugw("Plugin discovery complete",
-			"enabled", len(cfg.Plugin.Enabled),
+			"enabled", enabled,
 			"loaded", len(pluginConfigs),
 		)
 	}
 
 	return nil
+}
+
+// ConfigureWebSocketFromConfig hands every plugin, loaded now or enabled later,
+// the node's WebSocket settings: keepalive, and server.allowed_origins.
+func ConfigureWebSocketFromConfig(manager *PluginManager, cfg *config.Config) {
+	keepaliveCfg := NewKeepaliveConfigFromSettings(
+		cfg.Plugin.WebSocket.Keepalive.Enabled,
+		cfg.Plugin.WebSocket.Keepalive.PingIntervalSecs,
+		cfg.Plugin.WebSocket.Keepalive.PongTimeoutSecs,
+		cfg.Plugin.WebSocket.Keepalive.ReconnectAttempts,
+	)
+
+	// Build WebSocket origin config from server allowed origins
+	wsConfig := WebSocketConfig{
+		AllowedOrigins:   cfg.GetServerAllowedOrigins(),
+		AllowAllOrigins:  false,
+		AllowCredentials: false,
+	}
+
+	manager.ConfigureWebSocket(keepaliveCfg, wsConfig)
+}
+
+// recordArgs is the launch args a plugin's config holds under args, written
+// as a JSON list.
+func recordArgs(record PluginRecord) []string {
+	var args []string
+	if err := json.Unmarshal([]byte(record.Config["args"]), &args); err != nil {
+		return nil
+	}
+	return args
 }
 
 // formatHints renders an error's hints for a log line, or "" when it has none.
@@ -133,7 +148,7 @@ func formatHints(err error) string {
 func resolvePlugin(ctx context.Context, name string, searchPaths []string, logger *zap.SugaredLogger) (PluginConfig, error) {
 	pluginCfg, discoverErr := discoverPlugin(name, searchPaths, logger)
 
-	repo := config.PluginRepo(name)
+	repo := pluginRepo(name)
 	if repo == "" {
 		if discoverErr != nil {
 			return PluginConfig{}, discoverErr

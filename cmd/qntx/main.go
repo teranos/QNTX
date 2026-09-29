@@ -146,7 +146,7 @@ func initializePluginRegistry() {
 		return
 	}
 
-	// Always create a plugin manager so hot-swap can enable plugins later via am.toml
+	// Always create a plugin manager: the plugin element enables plugins at runtime
 	manager := grpc.NewPluginManager(pluginLogger, logger.Logger, cfg.Plugin.Runtime.TypeScriptRuntime)
 	manager.SetAccumulator(grpc.NewPluginAccumulator(pluginLogger))
 	if home, err := os.UserHomeDir(); err == nil {
@@ -156,21 +156,9 @@ func initializePluginRegistry() {
 	manager.SetLogDir(filepath.Dir(logPath))
 	grpc.SetDefaultPluginManager(manager)
 
-	// If no plugins enabled, run in minimal mode
-	if len(cfg.Plugin.Enabled) == 0 {
-		pluginLogger.Infow("No plugins enabled - QNTX running in minimal core mode")
-		return
-	}
-
-	// Pre-register plugin names immediately so routes can be registered
-	for _, pluginName := range cfg.Plugin.EnabledNames() {
-		registry.PreRegister(pluginName)
-	}
-	pluginLogger.Debugf("Pre-registered %d plugins, loading in background", len(cfg.Plugin.Enabled))
-
 	// Plugin loading is deferred until the server signals it's ready.
 	// The server calls onReady after migrations, routes, and HTTP listener
-	// are all set up — no timeout polling, no race with migrations.
+	// are all set up, and its store, which holds the plugin records, is open.
 	commands.DeferredPluginInit = func() {
 		loadPluginsAsync(cfg, pluginLogger, registry)
 	}
@@ -178,10 +166,32 @@ func initializePluginRegistry() {
 
 // loadPluginsAsync performs async plugin loading without blocking server startup
 func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, registry *plugin.Registry) {
-	// Load plugin-specific configs from ~/.qntx/plugins/*.toml
-	if err := config.LoadPluginConfigs(cfg.Plugin.Paths); err != nil {
-		pluginLogger.Errorw("Some plugins were skipped because their configuration would not parse", "error", err)
+	defaultServer := server.GetDefaultServer()
+	if defaultServer == nil {
+		pluginLogger.Errorw("No server holds the plugin records; no plugin is loaded")
+		return
 	}
+	records := defaultServer.PluginRecords()
+	known, err := records.Plugins()
+	if err != nil {
+		pluginLogger.Errorw("The plugin records were not read; no plugin is loaded", "error", err)
+		return
+	}
+
+	// Pre-register enabled plugins and answer their routes, so a request that
+	// arrives while they load is told so.
+	var enabledNames []string
+	for _, record := range known {
+		if record.Enabled {
+			enabledNames = append(enabledNames, record.Name)
+			registry.PreRegister(record.Name)
+			defaultServer.RegisterPluginRoutes(record.Name)
+		}
+	}
+	pluginLogger.Debugf("Pre-registered %d plugins, loading in background", len(enabledNames))
+
+	manager := grpc.GetDefaultPluginManager()
+	grpc.ConfigureWebSocketFromConfig(manager, cfg)
 
 	// Load plugins into the existing manager (created in initializePluginRegistry).
 	// Sized for a plugin fetch, not just a local launch — a plugin enabled by
@@ -189,9 +199,8 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 	ctx, cancel := context.WithTimeout(context.Background(), grpc.PluginFetchTimeout)
 	defer cancel()
 
-	manager := grpc.GetDefaultPluginManager()
-	if err := grpc.LoadPluginsFromConfig(ctx, manager, cfg, pluginLogger); err != nil {
-		pluginLogger.Errorw("Failed to load plugins from configuration", "error", err)
+	if err := grpc.LoadPluginsFromRecords(ctx, manager, records, cfg, pluginLogger); err != nil {
+		pluginLogger.Errorw("Failed to load plugins from their records", "error", err)
 		return
 	}
 
@@ -225,7 +234,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 
 	// Mark any pre-registered plugins that never loaded as failed, with the real error
 	failedErrors := manager.GetFailedPlugins()
-	for _, name := range cfg.Plugin.EnabledNames() {
+	for _, name := range enabledNames {
 		if registeredNames[name] {
 			continue
 		}
@@ -243,10 +252,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 	// CRITICAL: Initialize all loaded plugins now that they're registered
 	// This must happen HERE (not in server/init.go) because plugins load asynchronously
 	// and the server starts before plugin loading completes.
-	// Get the server's service registry (this is a bit hacky but necessary for async loading)
-	defaultServer := server.GetDefaultServer()
-
-	if defaultServer != nil && defaultServer.GetServices() != nil {
+	if defaultServer.GetServices() != nil {
 		services := defaultServer.GetServices()
 		sm := defaultServer.GetServicesManager()
 

@@ -675,6 +675,93 @@
     white-space: pre-wrap;
 }
 
+/* The filter and the + that adds a plugin by its repository URL (ADR-043) */
+.plugin-search-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.plugin-search-input,
+.plugin-add-repo,
+.plugin-config-new-key {
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-on-dark, #555);
+    border-radius: 4px;
+    color: var(--text-on-dark);
+    font-size: 13px;
+}
+
+.plugin-search-input,
+.plugin-add-repo {
+    flex: 1;
+    min-width: 0;
+}
+
+.plugin-add-form {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 0 8px;
+}
+
+/* An external link: the underline says it leaves QNTX */
+.plugin-repo {
+    display: block;
+    margin-top: 6px;
+    font-size: var(--font-size-sm);
+    color: #9ca3af;
+    text-decoration: underline;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.plugin-state-disabled {
+    color: #6b7280;
+}
+
+/* A config with no schema: keys as typed, one more added, one removed */
+.plugin-config-free-note {
+    padding: 0 0 8px;
+    font-size: var(--font-size-sm);
+    color: #9ca3af;
+}
+
+.plugin-config-key-remove {
+    background: transparent;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: var(--font-size-sm);
+}
+
+.plugin-config-key-remove:hover {
+    color: #f87171;
+}
+
+.plugin-config-add-row {
+    cursor: default;
+}
+
+.plugin-config-add-row .plugin-config-new-key {
+    margin: 4px 10px;
+    font-family: var(--font-mono);
+}
+
+.plugin-config-key-add {
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: transparent;
+    color: var(--text-on-dark);
+}
+
 /* Log Viewer */
 .plugin-log-viewer {
     margin-top: 10px;

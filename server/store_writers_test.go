@@ -58,6 +58,9 @@ var storeWriters = map[string]string{
 		"node knows of itself. Only a plugin holding the node's service token reaches the " +
 		"writer, and ROOT alone governs what plugins call (ADR-041)",
 
+	"pluginLine": "the plugins this node runs, what the node knows of itself. Reached " +
+		"from the plugins sigils and the plugin config route, which the reach table gives to ROOT",
+
 	"systemAttestor": "what the node writes about itself at the door. The /auth/… routes " +
 		"are ANYONE because logging in cannot ask you to be logged in, so no admission " +
 		"stands behind this one. The closed predicate vocabulary in server/auth does",

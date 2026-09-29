@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/version"
@@ -10,7 +9,7 @@ import (
 )
 
 // printStartupBanner prints the user-friendly startup message
-func printStartupBanner(verbosity int, dbPath string, logPath string, pluginNames []string) {
+func printStartupBanner(verbosity int, dbPath string, logPath string) {
 	// ANSI escape codes
 	cyan := "\033[36m"
 	green := "\033[32m"
@@ -52,12 +51,6 @@ func printStartupBanner(verbosity int, dbPath string, logPath string, pluginName
 	}
 	if verbosity >= 2 {
 		fmt.Printf("%s│%s Logs:      %s\n", green, reset, logPath)
-	}
-	if len(pluginNames) > 0 {
-		logDir := filepath.Dir(logPath)
-		for _, name := range pluginNames {
-			fmt.Printf("%s│%s   %s: %s\n", green, reset, name, filepath.Join(logDir, name+".log"))
-		}
 	}
 	fmt.Printf("%s└─────────────────────────────────────────────────────┘%s\n", green, reset)
 

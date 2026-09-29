@@ -388,6 +388,27 @@ func (s *QNTXServer) AddPythonProvider(client protocol.PythonServiceClient) {
 	}
 }
 
+// RegisterPluginRoutes answers a plugin's paths, /api/<name> and below it and
+// /ws/<name>, loaded yet or not. Who reaches them is what the table says.
+func (s *QNTXServer) RegisterPluginRoutes(name string) {
+	if _, loaded := s.pluginRoutes.LoadOrStore(name, true); loaded {
+		return
+	}
+	s.opening.Lock()
+	s.answer("/api/"+name, s.handlePluginRequest)
+	s.answer("/api/"+name+"/{path...}", s.handlePluginRequest)
+	s.answerSocket("/ws/"+name, s.handlePluginWebSocket)
+
+	unnamed, err := s.reopenHeld()
+	s.opening.Unlock()
+	if err != nil {
+		s.logger.Errorw("Plugin is not served; what the node serves is unchanged",
+			"plugin", name, "error", err)
+		return
+	}
+	s.logger.Infow("Plugin served", "plugin", name, "unnamed", unnamed)
+}
+
 // InvalidatePluginMux clears cached HTTP mux state for a plugin so the next
 // request re-initializes it. Called after plugin auto-restart to avoid stale
 // sync.Once that was poisoned by a previous failed init.
@@ -412,24 +433,7 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 		return
 	}
 	s.pluginMuxes.Store(name, mux)
-
-	// A plugin enabled by editing am.toml can answer on these paths. Whether
-	// anybody reaches them is what the table says, and Reopen asks it again.
-	if _, loaded := s.pluginRoutes.LoadOrStore(name, true); !loaded {
-		s.opening.Lock()
-		s.answer("/api/"+name, s.handlePluginRequest)
-		s.answer("/api/"+name+"/{path...}", s.handlePluginRequest)
-		s.answerSocket("/ws/"+name, s.handlePluginWebSocket)
-
-		unnamed, err := s.reopenHeld()
-		s.opening.Unlock()
-		if err != nil {
-			s.logger.Errorw("Hot-swapped plugin is not served; what the node serves is unchanged",
-				"plugin", name, "error", err)
-			return
-		}
-		s.logger.Infow("Hot-swapped plugin", "plugin", name, "unnamed", unnamed)
-	}
+	s.RegisterPluginRoutes(name)
 
 	if ep, ok := p.(*grpcplugin.ExternalDomainProxy); ok {
 		s.logger.Debugw("Registered HTTP proxy handlers", "plugin", name, "addr", ep.Addr())

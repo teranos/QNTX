@@ -256,19 +256,14 @@ export function createPluginPlaceholderElement(
     } else {
         const displayName = pluginName === 'unknown' ? 'This plugin' : `Plugin "${pluginName}"`;
         // Default message — overwritten if we can fetch actual state
-        content.innerHTML = `
-            <div>${displayName} is not enabled</div>
-            <div style="font-size: 11px; color: #999; max-width: 320px;">
-                Enable in <code style="color: #d4f0d4;">am.toml</code>:
-            </div>
-            ${pluginName !== 'unknown' ? `
-                <code style="color: #d4f0d4; text-align: left; line-height: 1.5;">
-                    [[plugins]]<br>
-                    name = "${pluginName}"<br>
-                    path = "path/to/plugin"
-                </code>
-            ` : ''}
-        `;
+        content.textContent = '';
+        content.append(
+            el('div', { text: `${displayName} is not enabled` }),
+            el('div', {
+                text: 'Add and enable it in the plugin element (⚙ Domain Plugins): press + and enter its repository URL, or press Enable on it.',
+                style: { fontSize: '11px', color: '#999', maxWidth: '320px' },
+            }),
+        );
 
         // Fetch actual plugin state to show real error
         fetchPluginState(pluginName, content, displayName);

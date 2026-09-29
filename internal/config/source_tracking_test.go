@@ -44,7 +44,7 @@ log_level = "info"
 path = "am.db"
 
 [plugin]
-enabled = ["python", "code"]
+paths = ["./plugins"]
 `
 		require.NoError(t, os.WriteFile(
 			filepath.Join(qntxDir, "am.toml"),
@@ -72,7 +72,7 @@ enabled = ["python", "code"]
 		require.NoError(t, err)
 
 		// Find specific settings and verify their sources
-		var dbPath, serverPort, pluginEnabled *SettingInfo
+		var dbPath, serverPort, pluginPaths *SettingInfo
 		// var dbMaxConn *SettingInfo // TODO: Not tracked because not in Config struct
 		for i := range intro.Settings {
 			setting := &intro.Settings[i]
@@ -84,8 +84,8 @@ enabled = ["python", "code"]
 				// dbMaxConn = setting // TODO: Not tracked
 			case "server.port":
 				serverPort = setting
-			case "plugin.enabled":
-				pluginEnabled = setting
+			case "plugin.paths":
+				pluginPaths = setting
 			}
 		}
 
@@ -104,9 +104,9 @@ enabled = ["python", "code"]
 		require.NotNil(t, serverPort, "server.port should be in introspection")
 		assert.Contains(t, serverPort.SourcePath, "config.toml", "server.port should come from config.toml")
 
-		// Verify plugin.enabled came from am.toml (only there)
-		require.NotNil(t, pluginEnabled, "plugin.enabled should be in introspection")
-		assert.Contains(t, pluginEnabled.SourcePath, "am.toml", "plugin.enabled should come from am.toml")
+		// Verify plugin.paths came from am.toml (only there)
+		require.NotNil(t, pluginPaths, "plugin.paths should be in introspection")
+		assert.Contains(t, pluginPaths.SourcePath, "am.toml", "plugin.paths should come from am.toml")
 	})
 
 	// Fixed: Using MergeConfigMap instead of v.Set() to preserve proper precedence

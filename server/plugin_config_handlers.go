@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/internal/config"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
@@ -54,26 +52,26 @@ func (s *QNTXServer) HandlePluginConfig(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// handleGetPluginConfig returns the current configuration and schema for a plugin
+// handleGetPluginConfig returns the configuration a plugin's record holds, and
+// its schema when it is running to say one.
 func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Request, pluginName string) {
-	// Get plugin settings from config (viper)
-	settings := make(map[string]string)
-
-	// Get all keys for this plugin namespace
-	for _, key := range config.GetViper().AllKeys() {
-		// Check if key starts with plugin namespace. Viper holds keys lowercased.
-		prefix := strings.ToLower(pluginName) + "."
-		if strings.HasPrefix(key, prefix) {
-			// Strip prefix to get config key
-			configKey := strings.TrimPrefix(key, prefix)
-			// Skip internal keys (prefixed with _)
-			if len(configKey) > 0 && configKey[0] != internalKeyPrefix {
-				settings[configKey] = config.GetString(key)
-			}
+	record, found, err := s.pluginRecords().Plugin(pluginName)
+	if err != nil {
+		s.writeRichError(w, errors.Wrapf(err, "failed to read the record of plugin %s", pluginName), http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		s.writeRichError(w, errors.Newf("plugin %q was never added: press + in the plugin element", pluginName), http.StatusNotFound)
+		return
+	}
+	settings := make(map[string]string, len(record.Config))
+	for key, value := range record.Config {
+		if len(key) > 0 && key[0] != internalKeyPrefix {
+			settings[key] = value
 		}
 	}
 
-	// Get schema from plugin if available
+	// A plugin that is not running has no schema to say; its config is still its record's.
 	var schema map[string]interface{}
 	if pm := s.getPluginManager(); pm != nil {
 		if pluginClient, ok := pm.GetPlugin(pluginName); ok {
@@ -113,32 +111,24 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 				s.writeRichError(w, err, http.StatusNotImplemented)
 				return
 			}
-		} else {
-			err := errors.WithDetail(
-				errors.Newf("plugin %q not found", pluginName),
-				"The requested plugin is not registered with the plugin manager. Check the plugin name and ensure the plugin is properly installed and loaded.",
-			)
-			s.writeRichError(w, err, http.StatusNotFound)
-			return
 		}
-	} else {
-		err := errors.New("plugin manager not initialized")
-		s.writeRichError(w, err, http.StatusInternalServerError)
-		return
 	}
 
 	response := map[string]interface{}{
-		"plugin": pluginName,
-		"config": settings,
-		"schema": schema,
+		"plugin":  pluginName,
+		"config":  settings,
+		"schema":  schema,
+		"repo":    record.Repo,
+		"enabled": record.Enabled,
 	}
 
 	respond(w, s.logger, http.StatusOK, response)
 }
 
-// handleUpdatePluginConfig updates plugin configuration and reinitializes the plugin
+// handleUpdatePluginConfig writes a plugin's config into its record (ADR-043)
+// and reinitializes the plugin with it when it is running. A plugin that is not
+// running is configured all the same, and starts with this config.
 func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Request, pluginName string) {
-	// Parse request body
 	var req struct {
 		Config   map[string]string `json:"config"`
 		Validate bool              `json:"validate"` // If true, validate config without applying
@@ -153,110 +143,70 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// If validate-only mode, write to temp file and test initialize
-	if req.Validate {
-		s.handleValidatePluginConfig(w, r, pluginName, req.Config)
-		return
-	}
-
-	// Validate config against plugin schema before writing to disk
-	if pm := s.getPluginManager(); pm != nil {
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
-
-		proxy, ok := pm.GetPlugin(pluginName)
-		if !ok {
-			s.writeRichError(w, errors.Newf("plugin not found: %s", pluginName), http.StatusNotFound)
-			return
-		}
-
-		// Get schema from plugin via gRPC
-		if extProxy, ok := proxy.(*grpcplugin.ExternalDomainProxy); ok {
-			schema, err := extProxy.ConfigSchema(ctx)
-			if err != nil {
-				s.logger.Errorw("Failed to get config schema", "error", err, "plugin", pluginName)
-				s.writeRichError(w, errors.Wrap(err, "failed to validate config"), http.StatusInternalServerError)
-				return
-			}
-
-			// Validate config against schema
-			if validationErrs := validateConfigAgainstSchema(req.Config, schema.Fields); len(validationErrs) > 0 {
-				response := map[string]interface{}{
-					"success": false,
-					"message": "Configuration validation failed",
-					"errors":  validationErrs,
+	// A running plugin says what its config may hold; one that is not running
+	// has nobody to ask, so its config is taken as written.
+	pm := s.getPluginManager()
+	var running bool
+	if pm != nil {
+		if proxy, ok := pm.GetPlugin(pluginName); ok {
+			running = true
+			if extProxy, ok := proxy.(*grpcplugin.ExternalDomainProxy); ok {
+				ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+				schema, err := extProxy.ConfigSchema(ctx)
+				cancel()
+				if err != nil {
+					s.logger.Errorw("Failed to get config schema", "error", err, "plugin", pluginName)
+					s.writeRichError(w, errors.Wrapf(err, "failed to validate the config of plugin %s", pluginName), http.StatusInternalServerError)
+					return
 				}
-				respond(w, s.logger, http.StatusBadRequest, response)
-				return
+				if validationErrs := validateConfigAgainstSchema(req.Config, schema.Fields); len(validationErrs) > 0 {
+					respond(w, s.logger, http.StatusBadRequest, map[string]interface{}{
+						"success": false,
+						"message": "Configuration validation failed",
+						"errors":  validationErrs,
+					})
+					return
+				}
 			}
 		}
 	}
 
-	// Update config in TOML file and viper
-	if err := config.UpdatePluginConfig(pluginName, req.Config); err != nil {
-		s.logger.Errorw("Failed to update plugin config", "error", err, "plugin", pluginName)
-		s.writeRichError(w, errors.Wrap(err, "failed to update config"), http.StatusInternalServerError)
+	if req.Validate {
+		respond(w, s.logger, http.StatusOK, map[string]interface{}{
+			"valid":   true,
+			"plugin":  pluginName,
+			"checked": running,
+		})
 		return
 	}
 
-	// Reinitialize the plugin with new config if it's running
-	if pm := s.getPluginManager(); pm != nil {
+	if err := s.pluginRecords().ConfigurePlugin(actorOf(r.Context()), pluginName, req.Config); err != nil {
+		s.logger.Errorw("Failed to update plugin config", "error", err, "plugin", pluginName)
+		s.writeRichError(w, errors.Wrapf(err, "failed to write the config of plugin %s", pluginName), http.StatusBadRequest)
+		return
+	}
+
+	if running {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 
 		if err := pm.ReinitializePlugin(ctx, pluginName, s.services); err != nil {
 			s.logger.Errorw("Failed to reinitialize plugin", "error", err, "plugin", pluginName)
-
-			// Config was written but reinitialization failed
-			response := map[string]interface{}{
+			respond(w, s.logger, http.StatusInternalServerError, map[string]interface{}{
 				"success": false,
 				"message": "Configuration saved but plugin reinitialization failed: " + err.Error(),
 				"plugin":  pluginName,
-			}
-			respond(w, s.logger, http.StatusInternalServerError, response)
+			})
 			return
 		}
 	}
 
-	// Success
-	response := map[string]interface{}{
+	respond(w, s.logger, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "Plugin configuration updated successfully",
 		"plugin":  pluginName,
 		"config":  req.Config,
-	}
-
-	respond(w, s.logger, http.StatusOK, response)
-}
-
-// handleValidatePluginConfig validates plugin config without applying changes
-func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.Request, pluginName string, settings map[string]string) {
-	// Write config to temp file
-	tempPath, err := config.WritePluginConfigToTemp(pluginName, settings)
-	if err != nil {
-		s.logger.Errorw("Failed to write temp config", "error", err, "plugin", pluginName)
-		s.writeRichError(w, errors.Wrap(err, "config validation failed"), http.StatusBadRequest)
-		return
-	}
-	defer func() {
-		if err := os.Remove(tempPath); err != nil {
-			s.logger.Warnw("Temp config not removed", "path", tempPath, "error", err)
-		}
-	}()
-
-	// TODO: Test-initialize plugin with temp config
-	// This would require launching a test instance of the plugin with the temp config
-	// For now, we just validate that the config can be written as valid TOML
-	// Future: Call plugin.Initialize() with test config in isolated context
-
-	response := map[string]interface{}{
-		"valid":   true,
-		"message": "TOML syntax valid. Semantic validation pending (will occur on save)",
-		"plugin":  pluginName,
-		"warning": "Some invalid values may not be detected until plugin restart",
-	}
-
-	respond(w, s.logger, http.StatusOK, response)
+	})
 }
 
 // validateConfigAgainstSchema validates config values against plugin schema constraints

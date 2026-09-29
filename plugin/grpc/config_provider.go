@@ -1,14 +1,15 @@
 package grpc
 
 import (
+	"encoding/json"
+	"strconv"
 	"strings"
 
-	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin"
 )
 
-// NewConfigProvider creates a ConfigProvider that reads from am.toml
-// and injects gRPC service endpoints for plugin discovery.
+// NewConfigProvider creates a ConfigProvider that hands each plugin the config
+// its record holds and injects gRPC service endpoints for plugin discovery.
 // Pass nil endpoints if no services are available.
 func NewConfigProvider(endpoints *ServiceEndpoints) plugin.ConfigProvider {
 	return &configProvider{
@@ -28,61 +29,68 @@ func (p *configProvider) GetPluginConfig(domain string) plugin.Config {
 	}
 }
 
-// configWithEndpoints resolves plugin config keys from am.toml,
-// intercepting underscore-prefixed service keys to return gRPC addresses.
+// configWithEndpoints resolves plugin config keys from the plugin's record,
+// read when asked so what the plugin element saved is what the next Initialize
+// sees, intercepting underscore-prefixed service keys to return gRPC addresses.
 type configWithEndpoints struct {
 	domain    string
 	endpoints *ServiceEndpoints
+}
+
+// held is the plugin's config as its record holds it.
+func (c *configWithEndpoints) held() map[string]string {
+	record, _ := pluginRecord(c.domain)
+	return record.Config
 }
 
 func (c *configWithEndpoints) GetString(key string) string {
 	if v, ok := c.endpointValue(key); ok {
 		return v
 	}
-	return appcfg.GetString(c.domain + "." + key)
+	return c.held()[key]
 }
 
 func (c *configWithEndpoints) GetInt(key string) int {
-	return appcfg.GetInt(c.domain + "." + key)
+	n, err := strconv.Atoi(strings.TrimSpace(c.held()[key]))
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 func (c *configWithEndpoints) GetBool(key string) bool {
-	return appcfg.GetBool(c.domain + "." + key)
+	b, err := strconv.ParseBool(strings.TrimSpace(c.held()[key]))
+	return err == nil && b
 }
 
+// GetStringSlice reads a JSON list, which is how the plugin element writes one.
 func (c *configWithEndpoints) GetStringSlice(key string) []string {
-	return appcfg.GetStringSlice(c.domain + "." + key)
+	var list []string
+	if err := json.Unmarshal([]byte(c.held()[key]), &list); err != nil {
+		return nil
+	}
+	return list
 }
 
 func (c *configWithEndpoints) Get(key string) any {
 	if v, ok := c.endpointValue(key); ok {
 		return v
 	}
-	return appcfg.Get(c.domain + "." + key)
+	if v, found := c.held()[key]; found {
+		return v
+	}
+	return nil
 }
 
-func (c *configWithEndpoints) Set(key string, value any) {
-	appcfg.Set(c.domain+"."+key, value)
-}
+// Set leaves the record as it is: the plugin element is what writes a record.
+func (c *configWithEndpoints) Set(string, any) {}
 
 func (c *configWithEndpoints) GetKeys() []string {
-	v := appcfg.GetViper()
-	if v == nil {
-		return []string{}
+	held := c.held()
+	keys := make([]string, 0, len(held))
+	for key := range held {
+		keys = append(keys, key)
 	}
-
-	// Viper holds every key lowercased, so a plugin named with a capital,
-	// cleanAPI, was never matched and was initialized with no config at all.
-	allKeys := v.AllKeys()
-	prefix := strings.ToLower(c.domain) + "."
-	var keys []string
-
-	for _, key := range allKeys {
-		if after, ok := strings.CutPrefix(key, prefix); ok {
-			keys = append(keys, after)
-		}
-	}
-
 	return keys
 }
 

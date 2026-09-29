@@ -335,7 +335,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	pluginConfig := services.Config(c.metadata.Name)
 
 	// Pass all configuration keys from the plugin's namespace
-	// This includes both built-in keys and custom keys from ~/.qntx/plugins/{name}.toml [config] sections
+	// This includes both built-in keys and the keys the plugin's record holds
 	for _, key := range pluginConfig.GetKeys() {
 		// Skip internal keys (prefixed with _)
 		if len(key) > 0 && key[0] == '_' {

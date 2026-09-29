@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/teranos/QNTX/plugin"
@@ -21,6 +23,9 @@ type PluginHandler struct {
 	// sigils is one plugin's sigils, with who reaches each, and why any signum
 	// it handed is not served. Nil on a node that serves no plugin sigils.
 	sigils func(name string) ([]sigilRow, []string)
+	// records is every plugin the node knows, running or not. Nil lists only
+	// what the registry holds.
+	records func() ([]plugingrpc.PluginRecord, error)
 }
 
 // NewPluginHandler creates a handler for plugin info endpoints.
@@ -60,6 +65,22 @@ func (h *PluginHandler) list() map[string]interface{} {
 		// SignaRefused is why a signum it handed is served nowhere.
 		Sigils       []sigilRow `json:"sigils,omitempty"`
 		SignaRefused []string   `json:"signa_refused,omitempty"`
+		// Repo and Enabled are the plugin's record: where it was added from,
+		// and whether it is switched on.
+		Repo    string `json:"repo,omitempty"`
+		Enabled bool   `json:"enabled"`
+	}
+
+	known := map[string]plugingrpc.PluginRecord{}
+	var recordsFailure string
+	if h.records != nil {
+		held, err := h.records()
+		if err != nil {
+			recordsFailure = err.Error()
+		}
+		for _, record := range held {
+			known[record.Name] = record
+		}
 	}
 
 	// A plugin that serves a canvas module can say which one. Asked of the
@@ -100,6 +121,7 @@ func (h *PluginHandler) list() map[string]interface{} {
 		if h.sigils != nil {
 			info.Sigils, info.SignaRefused = h.sigils(name)
 		}
+		info.Repo, info.Enabled = known[name].Repo, known[name].Enabled
 		plugins = append(plugins, info)
 	}
 
@@ -116,6 +138,25 @@ func (h *PluginHandler) list() map[string]interface{} {
 		if errMsg, ok := h.registry.GetError(name); ok {
 			info.Message = errMsg
 		}
+		seen[name] = true
+		info.Repo, info.Enabled = known[name].Repo, known[name].Enabled
+		plugins = append(plugins, info)
+	}
+
+	// Every added plugin the registry does not hold: disabled, or enabled and
+	// not loaded, with why.
+	for _, name := range slices.Sorted(maps.Keys(known)) {
+		if seen[name] {
+			continue
+		}
+		record := known[name]
+		info := PluginInfo{Name: name, State: "disabled", Repo: record.Repo, Enabled: record.Enabled}
+		if record.Enabled {
+			info.State = string(plugin.StateFailed)
+			if errMsg, ok := h.registry.GetError(name); ok {
+				info.Message = errMsg
+			}
+		}
 		plugins = append(plugins, info)
 	}
 
@@ -130,6 +171,9 @@ func (h *PluginHandler) list() map[string]interface{} {
 	}
 	if probeFailure != "" {
 		response["health_probe_failure"] = probeFailure
+	}
+	if recordsFailure != "" {
+		response["records_failure"] = recordsFailure
 	}
 	return response
 }

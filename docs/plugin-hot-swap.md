@@ -1,23 +1,19 @@
 # Plugin Hot-Swap
 
-Plugins can be enabled and disabled at runtime without restarting the server. Two ways to do it:
+Plugins are added, configured, enabled and disabled at runtime.
 
-## 1. Edit am.toml
+"I log in to QNTX, open the plugin element, press +, enter a repository URL and confirm. The plugin starts disabled; I edit its config and enable it, and I don't think about it anymore."
 
-Edit `[plugin] enabled` while the server is running. The config watcher detects the change, diffs the enabled list against currently loaded plugins, and starts or stops plugins accordingly.
+## 1. The plugin element
 
-```toml
-[plugin]
-enabled = [
-  "reduce",
-  "spindle",
-  #"myplugin",    # comment out to disable
-]
-```
+Press + and enter the plugin's repository URL. It is added disabled. Its config is edited in the element, and Enable starts it.
 
 ## 2. API
 
 ```
+POST /api/plugins                    body: repo
+GET  /api/plugins/{name}/config
+PUT  /api/plugins/{name}/config      body: config
 POST /api/plugins/{name}/enable
 POST /api/plugins/{name}/disable
 ```
@@ -33,15 +29,16 @@ See [API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/ope
 
 ## What happens
 
-**Enable:** discovered from search paths, loaded, gRPC connected, registered, initialized, provider services wired, async handlers and watchers registered. Same sequence as boot, but for one plugin.
+**Add:** the plugin is recorded with its repository URL, disabled, in the system store.
 
-**Disable:** gRPC shutdown sent, process killed, unregistered from domain registry, watchers pruned, async handlers removed, HTTP mux cleared.
+**Enable:** recorded as enabled, then discovered from search paths, loaded, gRPC connected, registered, initialized, provider services wired, async handlers and watchers registered. Same sequence as boot, but for one plugin.
+
+**Disable:** recorded as disabled, then gRPC shutdown sent, process killed, unregistered from domain registry, watchers pruned, async handlers removed, HTTP mux cleared.
 
 Plugins not mentioned in the change are untouched. Both transitions emit a colored banner in the log.
 
 ## Requirements
 
-- Config watcher must be active (requires a project-level am.toml on disk).
 - Plugin binary must be discoverable in the configured search paths.
 - The server must be past initialization (services and registry available).
 
