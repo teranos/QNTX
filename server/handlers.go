@@ -532,6 +532,7 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map
 				s.logger.Warnw("Failed to restart plugin", "plugin", name, "error", err)
 				return
 			}
+			s.refreshPluginHealth()
 			s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin restarted")
 		}()
 
@@ -557,6 +558,9 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map
 		if acc := pm.Accumulator(); acc != nil {
 			acc.Emit(name, plugingrpc.BannerBoot)
 		}
+		// The list reads the last probe. Probed now, so the list asked right
+		// after Enable holds this plugin's health, not the probe from before it ran.
+		s.refreshPluginHealth()
 		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin enabled")
 
 	case "disable":

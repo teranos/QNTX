@@ -53,6 +53,9 @@ func (h *PluginHandler) list() map[string]interface{} {
 		Author      string                 `json:"author,omitempty"`
 		License     string                 `json:"license,omitempty"`
 		Healthy     bool                   `json:"healthy"`
+		// Probed is whether the last probe saw this plugin. Unprobed is not
+		// unhealthy: it started after the probe was taken.
+		Probed      bool                   `json:"probed"`
 		Message     string                 `json:"message,omitempty"`
 		Details     map[string]interface{} `json:"details,omitempty"`
 		State       string                 `json:"state"`
@@ -99,7 +102,7 @@ func (h *PluginHandler) list() map[string]interface{} {
 		}
 
 		meta := p.Metadata()
-		health := healthResults[name]
+		health, probed := healthResults[name]
 		state := stateResults[name]
 
 		info := PluginInfo{
@@ -110,6 +113,7 @@ func (h *PluginHandler) list() map[string]interface{} {
 			Author:      meta.Author,
 			License:     meta.License,
 			Healthy:     health.Healthy,
+			Probed:      probed,
 			Message:     health.Message,
 			Details:     health.Details,
 			State:       string(state),
