@@ -23,9 +23,10 @@ import { log, SEG } from './logger';
 /** One stand as the element sees it: what it is, its defining system attestation,
  *  the door it inherits from its namespace, the sites reporting back, and its
  *  activity. */
-export interface StandCount {
+export interface StandSeen {
     name: string;
-    count: number;
+    /** Every moment it was attested, in unix milliseconds. */
+    seen: number[];
 }
 
 /** One arrival read as a step: when, the page it was about, the event fired. */
@@ -54,8 +55,8 @@ export interface StaandInfo {
     visitors: number;
     dropped: number;
     lastSeen: string;
-    events: StandCount[];
-    pages: StandCount[];
+    events: StandSeen[];
+    pages: StandSeen[];
     walks: StandWalk[];
 }
 

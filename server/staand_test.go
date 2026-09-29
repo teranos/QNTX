@@ -632,3 +632,20 @@ func TestCreatingAStandInSystemOrDefaultIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// A stand's events and pages are named with when they were seen, the most
+// recently seen first however often another was seen, and no count.
+func TestSeenOfLeadsWithTheMostRecent(t *testing.T) {
+	base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	got := seenOf(map[string][]time.Time{
+		"often":  {base, base.Add(time.Hour), base.Add(2 * time.Hour)},
+		"lately": {base.Add(48 * time.Hour)},
+		"never":  {base.Add(-time.Hour)},
+	}, 2)
+	if len(got) != 2 || got[0].Name != "lately" || got[1].Name != "often" {
+		t.Fatalf("seenOf is %+v, want lately then often, capped at two", got)
+	}
+	if len(got[1].Seen) != 3 || got[1].Seen[0] != base.UnixMilli() {
+		t.Fatalf("often was seen at %v", got[1].Seen)
+	}
+}
