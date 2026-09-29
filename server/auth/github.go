@@ -1,6 +1,7 @@
 package auth
 
-// GitHub: an OAuth client the operator registered, spent for one id.
+// GitHub: an OAuth client the operator registered, spent for one id, and for
+// ROOT the token the node spends at GitHub (ADR-043).
 //
 // https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app
 
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/teranos/errors"
 )
@@ -46,8 +48,8 @@ func githubProvider(client OperatorClient) provider {
 				return "", providerState{}, errors.Wrap(err, "failed to mint a PKCE verifier for the GitHub ceremony")
 			}
 			challenge := sha256.Sum256([]byte(verifier))
-			// No scope: GET /user answers for the public profile without one,
-			// and a token that can do nothing else is worth nothing to anyone.
+			// No scope: a GitHub App's user token can do what the App's
+			// permissions and the person's own access both allow, and no more.
 			authorize := "https://" + host + "/login/oauth/authorize" +
 				"?client_id=" + urlEncode(client.ID) +
 				"&redirect_uri=" + urlEncode(redirectURI) +
@@ -80,11 +82,7 @@ func githubExchange(ctx context.Context, st providerState, code, redirectURI str
 
 	// A refused code is answered with an error in the body, so the body says
 	// why rather than only that there is no token.
-	var token struct {
-		AccessToken      string `json:"access_token"`
-		Error            string `json:"error"`
-		ErrorDescription string `json:"error_description"`
-	}
+	var token githubGrant
 	if err := getJSON(req, "token exchange", &token); err != nil {
 		return account{}, err
 	}
@@ -117,10 +115,13 @@ func githubExchange(ctx context.Context, st providerState, code, redirectURI str
 	if who.ID == 0 {
 		return account{}, errors.Newf("user lookup from %s carries no id", githubWhoURL)
 	}
+	kept := token.secret(st.ClientID, time.Now())
+	kept.Login = who.Login
 	return account{
 		CanonicalID: githubIdentityPrefix + strconv.FormatInt(who.ID, 10),
 		Handle:      who.Login,
 		Name:        who.Name,
 		Picture:     who.AvatarURL,
+		github:      &kept,
 	}, nil
 }

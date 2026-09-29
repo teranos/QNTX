@@ -1276,9 +1276,8 @@ func (m *PluginManager) EnablePlugin(ctx context.Context, name string, searchPat
 		return errors.Newf("plugin '%s' is already loaded", name)
 	}
 
-	// Discover binary, fetching from the plugin's repo if it isn't on disk yet.
-	// This is what makes adding a repo URL to a running node work in place.
-	pluginCfg, err := resolvePlugin(ctx, name, searchPaths, m.logger)
+	// The build the runner delivered, or one placed by hand. Never fetched (ADR-043).
+	pluginCfg, err := discoverPlugin(name, searchPaths, m.logger)
 	if err != nil {
 		return errors.Wrapf(err, "failed to discover plugin '%s'", name)
 	}

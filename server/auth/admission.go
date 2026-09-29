@@ -41,6 +41,8 @@ const (
 	// never presented to a route. No reach line names it and the middleware
 	// refuses it as a bearer.
 	LevelRefresh Level = "REFRESH"
+	// LevelGitHub is the GitHub token a namespace spends (ADR-043), a kind and not a rung.
+	LevelGitHub Level = "GITHUB"
 )
 
 // Admission is what a request was granted at the door. Middleware resolves it

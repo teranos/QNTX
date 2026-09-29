@@ -6,8 +6,9 @@ import (
 	"github.com/teranos/errors"
 )
 
-// PluginRecord is a plugin as the node knows it. The plugin element is where
-// one is added, configured and enabled.
+// PluginRecord is a plugin as the node knows it (ADR-043). The plugin element
+// is the only place one is added, configured and enabled.
+// "that means no am.toml"
 type PluginRecord struct {
 	Name    string            `json:"name"`
 	Repo    string            `json:"repo"`
@@ -49,11 +50,4 @@ func pluginRecord(name string) (PluginRecord, bool, error) {
 		return PluginRecord{}, false, errors.Wrapf(err, "failed to read the record of plugin %s", name)
 	}
 	return record, found, nil
-}
-
-// pluginRepo is the repository a plugin was added from; empty for a plugin
-// with no record.
-func pluginRepo(name string) (string, error) {
-	record, _, err := pluginRecord(name)
-	return record.Repo, err
 }

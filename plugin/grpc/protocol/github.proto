@@ -21,6 +21,7 @@ import "plugin/grpc/protocol/github_orgs_members.proto";
 import "plugin/grpc/protocol/github_orgs_orgs.proto";
 import "plugin/grpc/protocol/github_issues_issues.proto";
 import "plugin/grpc/protocol/github_repos_repos.proto";
+import "plugin/grpc/protocol/github_repos_contents.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -405,6 +406,13 @@ service GitHubService {
   rpc CreateARepositoryForTheAuthenticatedUser(GitHubCreateARepositoryForTheAuthenticatedUserRequest) returns (GitHubCreateAnOrganizationRepositoryResponse);
   // https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repositories-for-a-user
   rpc ListRepositoriesForAUser(GitHubListRepositoriesForAUserRequest) returns (GitHubListOrganizationRepositoriesResponse);
+
+  // https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-repository-content
+  rpc GetRepositoryContent(GitHubGetRepositoryContentRequest) returns (GitHubGetRepositoryContentResponse);
+  // https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme
+  rpc GetARepositoryREADME(GitHubGetARepositoryREADMERequest) returns (GitHubGetARepositoryREADMEResponse);
+  // https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
+  rpc GetARepositoryREADMEForADirectory(GitHubGetARepositoryREADMEForADirectoryRequest) returns (GitHubGetARepositoryREADMEResponse);
 }
 
 message GitHubRateLimitRequest {

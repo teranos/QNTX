@@ -49,7 +49,7 @@ registry.Register(externalProxy)
 Plugin characteristics:
 - Standalone binaries in `./qntx-plugins/` (first-party) or external repositories
 - Communicate via gRPC only
-- Configured via `am.toml` (whitelist model)
+- Added, configured and enabled in the plugin element, not am.toml ([ADR-043](./ADR-043-github-service.md))
 - Run in separate processes for isolation
 - Discovered from configured search paths
 - [Hot-swappable](./ADR-002-plugin-configuration.md) — enable/disable at runtime without server restart
@@ -137,7 +137,7 @@ Optional interfaces extend the base — a plugin opts in by implementing them:
 - **PR #134**: Server decoupled from plugin internals, dynamic handler registration
 - **PR #136**: Plugin discovery from search paths, `am.toml` whitelist, gRPC-only communication, minimal core mode
 - **Plugin-provided services**: LLM (ADR-014), Search (ADR-015), Vector Search (ADR-016), Embedding (ADR-017), Graph (ADR-021), Python (ADR-022)
-- **Hot-swap**: Plugins can be enabled/disabled at runtime via `am.toml` changes or API
+- **Hot-swap**: Plugins are enabled/disabled at runtime in the plugin element
 
 ## Alternatives Considered
 
@@ -154,3 +154,4 @@ Optional interfaces extend the base — a plugin opts in by implementing them:
 
 - [ADR-002: Plugin Configuration Management](./ADR-002-plugin-configuration.md)
 - [ADR-003: Plugin Communication Patterns](./ADR-003-plugin-communication.md)
+- [ADR-043: GitHubService](./ADR-043-github-service.md) — plugins as records in the node's system store, builds from the runner

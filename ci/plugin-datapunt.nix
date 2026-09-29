@@ -6,7 +6,7 @@
 # datapunt (teranos/datapunt) is a core with no kind of its own; a company keeps
 # its kinds in one CUE file in its own repo. This builds the plugin out of the
 # core at one rev and every company file at its rev, and releases it on the
-# repo that called, which is the one the node's [plugin] enabled names.
+# repo that called, which is the one the node's plugin record names.
 let
   version = "\${{ steps.version.outputs.version }}";
   artifact = "\${{ steps.package.outputs.artifact }}";
@@ -139,9 +139,9 @@ in
         '';
       }
 
-      # Both names are the fetcher's (plugin/grpc/fetch.go): the asset ends in
+      # Both names are the runner's (plugin/grpc/runner.go): the archive ends in
       # -<GOOS>-<GOARCH>.tar.gz, and the binary inside is qntx-<name>-plugin.
-      # Written at the workspace root: a build under the runner is looked for there (ADR-043).
+      # Written at the workspace root, where QNTX watches the runner for builds.
       {
         name = "Package";
         id = "package";

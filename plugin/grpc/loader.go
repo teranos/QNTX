@@ -16,9 +16,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// LoadPluginsFromRecords loads every enabled plugin the node's records hold
-// into an existing PluginManager. It discovers plugin binaries from configured
-// paths and loads them.
+// LoadPluginsFromRecords loads every enabled plugin the node knows (ADR-043),
+// from the build on disk. One whose build has not landed is marked failed with
+// why, and the runner's next build of it starts it.
 func LoadPluginsFromRecords(ctx context.Context, manager *PluginManager, records PluginRecords, cfg *config.Config, logger *zap.SugaredLogger) error {
 	known, err := records.Plugins()
 	if err != nil {
@@ -51,19 +51,14 @@ func LoadPluginsFromRecords(ctx context.Context, manager *PluginManager, records
 	// Sort plugin names for deterministic iteration
 	sort.Strings(pluginNames)
 	enabled := len(pluginNames) + len(failedPlugins)
+	searchPaths := cfg.Plugin.Paths
 
-	// Discover plugins from configured paths (deduplicated), fetching any that
-	// declared a repo and are not on disk
 	var pluginConfigs []PluginConfig
 	for _, pluginName := range pluginNames {
-		logger.Debugf("Searching for '%s' plugin binary in %d paths", pluginName, len(cfg.Plugin.Paths))
-
-		pluginConfig, err := resolvePlugin(ctx, pluginName, cfg.Plugin.Paths, logger)
+		pluginConfig, err := discoverPlugin(pluginName, searchPaths, logger)
 		if err != nil {
-			// Hints carry the actionable half of these errors ("set access_token",
-			// "install the binary") — without this they never reach the operator.
 			logger.Warnf("Plugin '%s' unavailable: %v - searched paths: %v, tried names: [qntx-%s-plugin, qntx-%s, %s]%s",
-				pluginName, err, cfg.Plugin.Paths, pluginName, pluginName, pluginName,
+				pluginName, err, searchPaths, pluginName, pluginName, pluginName,
 				formatHints(err))
 			failedPlugins = append(failedPlugins, pluginName)
 			manager.mu.Lock()
@@ -78,14 +73,12 @@ func LoadPluginsFromRecords(ctx context.Context, manager *PluginManager, records
 		pluginConfigs = append(pluginConfigs, pluginConfig)
 	}
 
-	// Load discovered plugins
 	if len(pluginConfigs) > 0 {
 		if err := manager.LoadPlugins(ctx, pluginConfigs); err != nil {
-			return errors.Wrap(err, "failed to load plugins")
+			return errors.Wrapf(err, "failed to load %d plugins", len(pluginConfigs))
 		}
 	}
 
-	// Log summary of discovery results
 	if len(failedPlugins) > 0 {
 		logger.Warnw("Some enabled plugins failed to load",
 			"enabled", enabled,
@@ -98,7 +91,6 @@ func LoadPluginsFromRecords(ctx context.Context, manager *PluginManager, records
 			"loaded", len(pluginConfigs),
 		)
 	}
-
 	return nil
 }
 
@@ -144,65 +136,6 @@ func formatHints(err error) string {
 		return ""
 	}
 	return " - " + strings.Join(hints, "; ")
-}
-
-// resolvePlugin finds a plugin binary on disk, fetching it from the plugin's
-// declared repo when it is absent or no longer matches what that repo
-// publishes.
-//
-// A plugin enabled by bare name never reaches the network: no repo, no fetch.
-// A binary QNTX did not install is used as-is, whatever it is — hand-placing
-// one stays a way to run a build of your own choosing.
-//
-// A plugin QNTX installed is reconciled against the release on every start.
-// Without that, the first build to land is the last one that ever runs: a
-// broken binary retries forever and a new release never arrives, both of them
-// fixable only by deleting the file by hand on every host.
-func resolvePlugin(ctx context.Context, name string, searchPaths []string, logger *zap.SugaredLogger) (PluginConfig, error) {
-	pluginCfg, discoverErr := discoverPlugin(name, searchPaths, logger)
-
-	repo, err := pluginRepo(name)
-	if err != nil {
-		return PluginConfig{}, err
-	}
-	if repo == "" {
-		if discoverErr != nil {
-			return PluginConfig{}, discoverErr
-		}
-		return pluginCfg, nil
-	}
-
-	if discoverErr == nil && !managedPluginIsStale(ctx, name, repo, pluginCfg.Binary, logger) {
-		return pluginCfg, nil
-	}
-
-	if discoverErr != nil {
-		logger.Infow("Plugin binary absent, fetching from its repo",
-			"plugin", name, "repo", repo, "searched", searchPaths)
-	}
-
-	fetchCtx, cancel := context.WithTimeout(ctx, PluginFetchTimeout)
-	defer cancel()
-
-	binary, err := fetchPlugin(fetchCtx, name, repo, logger)
-	if err != nil {
-		// Replacing an installed plugin is an improvement, not a requirement.
-		// Losing a working plugin because the forge was unreachable would make
-		// every start depend on the network.
-		if discoverErr == nil {
-			logger.Warnw("Could not fetch the newer plugin; keeping the installed one",
-				"plugin", name, "repo", repo, "binary", pluginCfg.Binary, "error", err)
-			return pluginCfg, nil
-		}
-		return PluginConfig{}, errors.Wrapf(err, "failed to fetch plugin '%s' from %s", name, repo)
-	}
-
-	return PluginConfig{
-		Name:      name,
-		Enabled:   true,
-		Binary:    binary,
-		AutoStart: true,
-	}, nil
 }
 
 // discoverPlugin finds a plugin binary in the configured search paths.
@@ -309,62 +242,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 	}
 
 	err := errors.Newf("plugin binary not found in search paths: %s", strings.Join(expandedPaths, ", "))
-	return PluginConfig{}, errors.WithHintf(err, "install the binary to one of those paths, add its path to [plugin] paths, or enable '%s' by repo URL so QNTX fetches it", name)
-}
-
-// managedPluginIsStale reports whether an installed plugin no longer matches
-// what its repo publishes, and so should be fetched again.
-//
-// Only a plugin under QNTX's own install directory is considered. A binary
-// found anywhere else was put there deliberately and is never replaced.
-//
-// Every uncertain answer is false. A release that cannot be reached, a digest
-// that cannot be read, a plugin installed before digests were recorded — none
-// of those are grounds to discard a plugin that is on disk and may well work. A
-// node with no network keeps running what it has.
-func managedPluginIsStale(ctx context.Context, name, repo, binary string, logger *zap.SugaredLogger) bool {
-	// An install from before plugins were unpacked as trees. QNTX put it there
-	// and it can never carry a digest, so there is nothing to compare — but it
-	// also shadows the tree that would replace it, so it is always superseded.
-	if legacy, err := LegacyPluginInstallPath(name); err == nil && binary == legacy {
-		logger.Infow("Plugin was installed before plugins were unpacked as trees, fetching it again",
-			"plugin", name, "repo", repo, "binary", binary)
-		return true
-	}
-
-	dir, err := PluginInstallPath(name)
-	if err != nil {
-		return false
-	}
-
-	rel, err := filepath.Rel(dir, binary)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return false
-	}
-
-	installed, ok := installedDigest(dir)
-	if !ok {
-		return false
-	}
-
-	checkCtx, cancel := context.WithTimeout(ctx, PluginDigestTimeout)
-	defer cancel()
-
-	published, err := publishedDigest(checkCtx, name, repo)
-	if err != nil {
-		logger.Warnw("Could not check the plugin against its newest release; keeping what is installed",
-			"plugin", name, "repo", repo, "error", err)
-		return false
-	}
-
-	if published == installed {
-		return false
-	}
-
-	logger.Infow("Installed plugin differs from its newest release, fetching it again",
-		"plugin", name, "repo", repo, "installed", installed, "published", published)
-
-	return true
+	return PluginConfig{}, errors.WithHintf(err, "the runner installs a build of '%s' when its workflow's package step lands one; or install the binary to one of those paths, or add its path to [plugin] paths", name)
 }
 
 // nativePluginInDir looks for an executable plugin binary inside dir, trying

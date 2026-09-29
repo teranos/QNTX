@@ -199,6 +199,9 @@ type TokenRecord struct {
 	ExpiresAt           *int64   `json:"expires_at,omitempty"`
 	LastUsedAt          *int64   `json:"last_used_at,omitempty"`
 	RevokedAt           *int64   `json:"revoked_at,omitempty"`
+	// GitHub is what a GITHUB token holds and no other kind does: the
+	// credential itself, which the node spends at GitHub (ADR-043).
+	GitHub *GitHubSecret `json:"github,omitempty"`
 }
 
 // Usable reports whether this token authorizes a request at nowMS. Revoked is

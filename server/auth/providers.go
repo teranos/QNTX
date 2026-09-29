@@ -38,6 +38,9 @@ type account struct {
 	// that gives neither leaves them empty, and a door draws the handle.
 	Name    string
 	Picture string
+	// github is the token a GitHub login was exchanged for, kept rather than
+	// discarded because ROOT's is the node's GitHub (ADR-043).
+	github *GitHubSecret
 }
 
 // kind is how a provider proves an account, which decides what the element asks

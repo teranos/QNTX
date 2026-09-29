@@ -76,7 +76,7 @@ function added(body: unknown): Response {
 
 function resolves(body: unknown): Response {
     const repo = (body as { repo: string }).repo;
-    return new Response(JSON.stringify({ name: 'garden', repo, release: 'garden-v1.0.0', asset: 'qntx-garden-plugin-1.0.0-linux-amd64.tar.gz' }), { status: 200 });
+    return new Response(JSON.stringify({ name: 'garden', repo, repository: 'teranos/garden', private: false, ref: 'main', readme: '# garden\nGrows.', readme_path: 'README.md' }), { status: 200 });
 }
 
 const flush = async () => {
@@ -139,7 +139,8 @@ describe('Tim: the empty card becomes a plugin, and it starts disabled', () => {
 
         expect(asked.find(a => a.path === '/api/plugins/check')?.body).toEqual({ repo: REPO });
         expect(asked.find(a => a.method === 'POST' && a.path === '/api/plugins')).toBeUndefined();
-        expect(content.querySelector('.plugin-add-resolved')?.textContent).toContain('garden-v1.0.0');
+        expect(content.querySelector('.plugin-add-resolved')?.textContent).toContain('teranos/garden');
+        expect(content.querySelector('.plugin-add-readme')?.textContent).toBe('# garden\nGrows.');
 
         // Stage two: added for real.
         press(content, '.plugin-add-confirm');
@@ -160,7 +161,7 @@ describe('Tim: the empty card becomes a plugin, and it starts disabled', () => {
 
 describe('Spike: the node refuses', () => {
     test('a repo that does not resolve is refused in the node\'s words, beside Check, and nothing is added', async () => {
-        const why = 'no release of teranos/garden publishes qntx-garden-plugin-<version>-linux-amd64.tar.gz (newest seen: )';
+        const why = 'teranos/garden: GitHub GET /repos/teranos/garden answered 404: Not Found';
         node({
             'POST /api/plugins/check': () => new Response(JSON.stringify({ id: 'ERR-2', error: why, timestamp: 0 }), { status: 400 }),
         });

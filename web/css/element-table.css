@@ -167,6 +167,14 @@
     padding: 4px 0;
 }
 
+/* GitHub (ADR-043): the runner's page is outside QNTX, and underlined as such. */
+.github-element-content a {
+    color: inherit;
+    text-decoration: underline;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
 /* The lines a token wrote: one attestation per line, read out loud. */
 .element-lines {
     font-family: var(--font-mono);

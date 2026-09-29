@@ -40,6 +40,7 @@ module Imported'modules = struct
   module Github_orgs_orgs = Github_orgs_orgs
   module Github_issues_issues = Github_issues_issues
   module Github_repos_repos = Github_repos_repos
+  module Github_repos_contents = Github_repos_contents
 end
 (**/**)
 module rec Protocol : sig
@@ -2124,6 +2125,39 @@ module rec Protocol : sig
     end
 
     val listRepositoriesForAUser : (module Runtime'.Spec.Message with type t = Imported'modules.Github_repos_repos.Protocol.GitHubListRepositoriesForAUserRequest.t) * (module Runtime'.Spec.Message with type t = Imported'modules.Github_repos_repos.Protocol.GitHubListOrganizationRepositoriesResponse.t)
+    module GetRepositoryContent : sig
+      include Runtime'.Service.Rpc with type Request.t = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentRequest.t and type Response.t = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentResponse.t
+      module Request : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentRequest.t and type make_t = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentResponse.t and type make_t = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val getRepositoryContent : (module Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentRequest.t) * (module Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentResponse.t)
+    module GetARepositoryREADME : sig
+      include Runtime'.Service.Rpc with type Request.t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMERequest.t and type Response.t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.t
+      module Request : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMERequest.t and type make_t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMERequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.t and type make_t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val getARepositoryREADME : (module Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMERequest.t) * (module Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.t)
+    module GetARepositoryREADMEForADirectory : sig
+      include Runtime'.Service.Rpc with type Request.t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEForADirectoryRequest.t and type Response.t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.t
+      module Request : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEForADirectoryRequest.t and type make_t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEForADirectoryRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.t and type make_t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val getARepositoryREADMEForADirectory : (module Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEForADirectoryRequest.t) * (module Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.t)
   end
 
 end = struct
@@ -4678,6 +4712,45 @@ end = struct
     let listRepositoriesForAUser =
       (module Imported'modules.Github_repos_repos.Protocol.GitHubListRepositoriesForAUserRequest : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_repos.Protocol.GitHubListRepositoriesForAUserRequest.t ),
       (module Imported'modules.Github_repos_repos.Protocol.GitHubListOrganizationRepositoriesResponse : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_repos.Protocol.GitHubListOrganizationRepositoriesResponse.t )
+
+    module GetRepositoryContent = struct
+      let package_name = Some "protocol"
+      let service_name = "GitHubService"
+      let method_name = "GetRepositoryContent"
+      let name = "/protocol.GitHubService/GetRepositoryContent"
+      module Request = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentRequest
+      module Response = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentResponse
+    end
+
+    let getRepositoryContent =
+      (module Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentRequest : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentRequest.t ),
+      (module Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentResponse : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetRepositoryContentResponse.t )
+
+    module GetARepositoryREADME = struct
+      let package_name = Some "protocol"
+      let service_name = "GitHubService"
+      let method_name = "GetARepositoryREADME"
+      let name = "/protocol.GitHubService/GetARepositoryREADME"
+      module Request = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMERequest
+      module Response = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse
+    end
+
+    let getARepositoryREADME =
+      (module Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMERequest : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMERequest.t ),
+      (module Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.t )
+
+    module GetARepositoryREADMEForADirectory = struct
+      let package_name = Some "protocol"
+      let service_name = "GitHubService"
+      let method_name = "GetARepositoryREADMEForADirectory"
+      let name = "/protocol.GitHubService/GetARepositoryREADMEForADirectory"
+      module Request = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEForADirectoryRequest
+      module Response = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse
+    end
+
+    let getARepositoryREADMEForADirectory =
+      (module Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEForADirectoryRequest : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEForADirectoryRequest.t ),
+      (module Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.t )
 
   end
 

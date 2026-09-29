@@ -194,9 +194,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 	grpc.ConfigureWebSocketFromConfig(manager, cfg)
 
 	// Load plugins into the existing manager (created in initializePluginRegistry).
-	// Sized for a plugin fetch, not just a local launch — a plugin enabled by
-	// repo URL downloads its binary here on first boot.
-	ctx, cancel := context.WithTimeout(context.Background(), grpc.PluginFetchTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), pluginLoadTimeout)
 	defer cancel()
 
 	if err := grpc.LoadPluginsFromRecords(ctx, manager, records, cfg, pluginLogger); err != nil {
@@ -424,11 +422,14 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		manager.StartHealthPolling(registry, defaultServer.GetServices(), func(event grpc.HealthEvent) {
 			defaultServer.BroadcastPluginHealth(event.Name, event.Healthy, event.State, event.Message)
 		})
-
-		// Keep plugins level with their releases without waiting for a restart
-		defaultServer.SetupPluginUpdateSchedule(manager, registry)
 	}
+
+	// A plugin's new build is taken from the runner the moment it lands (ADR-043).
+	defaultServer.StartRunner()
 }
+
+// pluginLoadTimeout bounds launching every enabled plugin from its build on disk.
+const pluginLoadTimeout = 2 * time.Minute
 
 // registerPluginProviders registers provider services (LLM, VectorSearch, Search, Embedding)
 // for a plugin that has successfully completed Initialize.

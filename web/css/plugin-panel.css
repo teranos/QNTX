@@ -766,6 +766,28 @@
     word-break: break-word;
 }
 
+/* The checked plugin's README, whole, wrapped */
+.plugin-add-readme-path {
+    margin-top: 8px;
+    font-size: var(--font-size-sm);
+    color: #9ca3af;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.plugin-add-readme {
+    margin: 4px 0 0;
+    padding: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    font-size: var(--font-size-sm);
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
 /* An external link: the underline says it leaves QNTX */
 .plugin-repo {
     display: block;

@@ -46,7 +46,7 @@ func (c *PluginConfig) RefForHost(host string) string {
 }
 
 // PluginAccessToken reads the secret reference for a forge host from the loaded
-// configuration. Used where only the host is in hand — runtime fetch.
+// configuration. Used where only the host is in hand — the CI watch.
 //
 // Decodes [[plugin.access_token]] into the slice rather than indexing a map by
 // host: the host is a value here, so a dot in it stays a dot.

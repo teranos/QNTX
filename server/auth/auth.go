@@ -279,6 +279,13 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 				"reason", "a refresh token is not a bearer")
 			return Admission{}, false
 		}
+		// A namespace's GitHub token is spent at GitHub by the node (ADR-043).
+		if grant.Level == LevelGitHub {
+			h.logger.Infow("Bearer token refused",
+				"minted_by", quoteIdentity(grant.MintedBy),
+				"reason", "a GitHub token is not a bearer")
+			return Admission{}, false
+		}
 		// A token speaks for whoever minted it (ADR-025), so striking them out
 		// of am.toml has to reach it too. An empty list strikes out everyone.
 		if !h.stillAdmitted(grant.MintedBy) {

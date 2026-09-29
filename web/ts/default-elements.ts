@@ -20,6 +20,7 @@ import { createRolesElement } from './roles-element.ts';
 import { createUsersElement } from './users-element.ts';
 import { createMarketElement } from './market-element.ts';
 import { createMailElement } from './mail-element.ts';
+import { createGitHubElement } from './github-element.ts';
 import { createIElement } from './i-element.ts';
 import { createAmElement } from './am-element.ts';
 import { log, SEG } from './logger.ts';
@@ -64,6 +65,9 @@ export function registerDefaultElements(hasCanvas: boolean = true): void {
 
     // Mail Element — what the node mails on plugins' behalf, opened from ⍟ (ADR-041)
     tray.add(createMailElement());
+
+    // GitHub Element — the node's GitHub and its Actions runner, opened from ⍟ (ADR-043)
+    tray.add(createGitHubElement());
 
     // Usage & Cost Chart Element
     // TODO(future): Budget alerting with notifications
