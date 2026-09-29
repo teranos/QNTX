@@ -1,6 +1,7 @@
 package reach
 
 import (
+	"maps"
 	"net/http"
 	"slices"
 	"sort"
@@ -59,6 +60,8 @@ type Served struct {
 	rows atomic.Pointer[map[string]aRow]
 	// routes is every path the mux was given, kept with it.
 	routes atomic.Pointer[[]Route]
+	// unanswered is every runtime path the last build could not serve.
+	unanswered atomic.Pointer[[]string]
 }
 
 // A Route is one path the node serves, as it was offered: a WebSocket upgrade,
@@ -185,7 +188,7 @@ func Open(answering map[string]Answering, with Wrapping, runtime Runtime) (*Serv
 }
 
 // Reopen asks the table again and replaces what is served, whole. Plugins come
-// and go by editing am.toml, and a plugin's routes are granted or they are not.
+// and go in the plugin element, and a plugin's routes are granted or they are not.
 // A reach line written at runtime arrives the same way: the store is read
 // again and the mux is rebuilt, never patched.
 func (s *Served) Reopen(answering map[string]Answering, with Wrapping, runtime Runtime) ([]string, error) {
@@ -193,14 +196,15 @@ func (s *Served) Reopen(answering map[string]Answering, with Wrapping, runtime R
 	if err != nil {
 		return nil, err
 	}
+	compiled := maps.Clone(granted)
 	granters := addRuntime(granted, runtime)
 	// Only a path is a route. A line that names a sigil says who reaches it and
 	// is kept with the rest, for whatever answers without a route of its own.
-	mux, unnamed, err := build(routesIn(granted), answering, with)
+	mux, unnamed, unanswered, err := build(routesIn(granted), compiled, answering, with)
 	if err != nil {
 		return nil, err
 	}
-	// build serves every path it is offered, or none of them.
+	// build serves every compiled path it is offered, or none of them.
 	routes := make([]Route, 0, len(answering))
 	for _, path := range sorted(answering) {
 		routes = append(routes, Route{Path: path, Socket: answering[path].Socket, Gates: answering[path].Gates})
@@ -209,20 +213,37 @@ func (s *Served) Reopen(answering map[string]Answering, with Wrapping, runtime R
 	s.granters.Store(&granters)
 	s.rows.Store(&granted)
 	s.routes.Store(&routes)
+	s.unanswered.Store(&unanswered)
 	return unnamed, nil
+}
+
+// Unanswered is every path a runtime line grants reach to that nothing answers
+// now, as the last build found them. Those lines are not served.
+func (s *Served) Unanswered() []string {
+	held := s.unanswered.Load()
+	if held == nil {
+		return nil
+	}
+	return slices.Clone(*held)
 }
 
 // build is the whole of it, against a table the caller supplies — which is how
 // the tests reach it. The production table is not a parameter anywhere.
-func build(granted map[string]aRow, answering map[string]Answering, with Wrapping) (*http.ServeMux, []string, error) {
+func build(granted, compiled map[string]aRow, answering map[string]Answering, with Wrapping) (*http.ServeMux, []string, []string, error) {
 	mux := http.NewServeMux()
+	var unanswered []string
 
 	for _, path := range sorted(granted) {
 		answers, ok := answering[path]
-		if !ok {
-			return nil, nil, errors.Newf("a line grants reach to %s, and nothing answers there", path)
+		if ok {
+			serve(mux, path, granted[path], answers, with)
+			continue
 		}
-		serve(mux, path, granted[path], answers, with)
+		// The compiled table not matching the node stops it; a plugin not running now does not.
+		if _, fromTable := compiled[path]; fromTable {
+			return nil, nil, nil, errors.Newf("a line grants reach to %s, and nothing answers there", path)
+		}
+		unanswered = append(unanswered, path)
 	}
 
 	// Handlers this build carries that no line names. Root gets everything and
@@ -236,7 +257,7 @@ func build(granted map[string]aRow, answering map[string]Answering, with Wrappin
 		serve(mux, path, aRow{}, answering[path], with)
 		unnamed = append(unnamed, path)
 	}
-	return mux, unnamed, nil
+	return mux, unnamed, unanswered, nil
 }
 
 // serve puts one route on the mux behind what its row admits.

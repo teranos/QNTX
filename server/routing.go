@@ -110,10 +110,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/watchers", s.watcherHandler.HandleWatchers)                         // List/create watchers (GET/POST)
 	s.answer("/api/attestations", s.HandleAttestations)                                // Query (GET) / create (POST) attestations
 	s.answer("/api/element-config", s.HandleElementConfig)                             // Plugin element config via attestations (GET/POST)
-	s.answer("/api/canvases", s.canvasHandler.HandleCanvases)                            // The canvases of this namespace (GET), one created (POST)
-	s.answer("/api/canvases/", s.canvasHandler.HandleCanvases)                           // One canvas: disable, enable, owners, access, invite; accept
-	s.answer("/api/canvas", s.canvasHandler.HandleCanvas)                             // The canvas of this namespace (GET), created and named (POST)
-	s.answer("/api/canvas/elements/", s.canvasHandler.HandleElements)                 // Element CRUD (GET/POST/DELETE /api/canvas/elements/{id})
+	s.answer("/api/canvases", s.canvasHandler.HandleCanvases)                          // The canvases of this namespace (GET), one created (POST)
+	s.answer("/api/canvases/", s.canvasHandler.HandleCanvases)                         // One canvas: disable, enable, owners, access, invite; accept
+	s.answer("/api/canvas", s.canvasHandler.HandleCanvas)                              // The canvas of this namespace (GET), created and named (POST)
+	s.answer("/api/canvas/elements/", s.canvasHandler.HandleElements)                  // Element CRUD (GET/POST/DELETE /api/canvas/elements/{id})
 	s.answer("/api/canvas/elements", s.canvasHandler.HandleElements)                   // List/create elements (GET/POST)
 	s.answer("/api/canvas/compositions/", s.canvasHandler.HandleCompositions)          // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})
 	s.answer("/api/canvas/compositions", s.canvasHandler.HandleCompositions)           // List/create compositions (GET/POST)
@@ -151,8 +151,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 }
 
-// open builds what the node serves. A line granting reach to a path nothing
-// answers stops the node, and a handler no line names is ROOT's and nobody else's.
+// open builds what the node serves. A compiled line granting reach to a path
+// nothing answers stops the node; a runtime one is said and not served. A
+// handler no line names is ROOT's and nobody else's.
 func (s *QNTXServer) open() error {
 	s.opening.Lock()
 	defer s.opening.Unlock()
@@ -167,7 +168,17 @@ func (s *QNTXServer) open() error {
 		s.logger.Infow("Only ROOT reaches these; no line in server/reach names them",
 			"paths", unnamed)
 	}
+	s.sayUnanswered()
 	return nil
+}
+
+// sayUnanswered warns of every runtime reach line the node did not serve,
+// because nothing answers its path: a plugin not running now.
+func (s *QNTXServer) sayUnanswered() {
+	for _, path := range s.served.Unanswered() {
+		s.logger.Warnw("A reach line is not served: nothing answers its path; a plugin that serves it is not running",
+			"path", path)
+	}
 }
 
 // corsMiddleware adds CORS headers to HTTP responses using configured allowed origins

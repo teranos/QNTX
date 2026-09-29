@@ -160,7 +160,12 @@ func (s *QNTXServer) reopen() ([]string, error) {
 func (s *QNTXServer) reopenHeld() ([]string, error) {
 	runtime := s.runtime()
 	s.answerLinedPluginPaths(runtime)
-	return s.served.Reopen(s.answering, s.wrapping(), runtime)
+	unnamed, err := s.served.Reopen(s.answering, s.wrapping(), runtime)
+	if err != nil {
+		return nil, err
+	}
+	s.sayUnanswered()
+	return unnamed, nil
 }
 
 // Unspoken is every handler this build carries that no line grants reach to.

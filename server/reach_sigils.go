@@ -75,6 +75,8 @@ type reachLine struct {
 	Revokes bool      `json:"revokes"`
 	By      string    `json:"by"`
 	At      time.Time `json:"at"`
+	// NotServed is why the node does not serve this line now, when it does not.
+	NotServed string `json:"not_served,omitempty"`
 }
 
 func (s *QNTXServer) reachList(_ context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
@@ -104,11 +106,29 @@ func (s *QNTXServer) reachList(_ context.Context, _ sigil.Sent) (any, *protocol.
 				continue
 			}
 			lines = append(lines, reachLine{ID: as.ID, Paths: line.Paths, To: line.Roles,
-				Revokes: line.Revoked, By: line.Actor, At: line.At})
+				Revokes: line.Revoked, By: line.Actor, At: line.At, NotServed: s.notServed(line.Paths)})
 		}
 	}
 	slices.SortFunc(lines, func(a, b reachLine) int { return b.At.Compare(a.At) })
 	return map[string]any{"lines": lines, "compiled": compiled}, nil
+}
+
+// notServed says which of a line's paths nothing answers now, or nothing when
+// the node serves all of them.
+func (s *QNTXServer) notServed(paths []string) string {
+	if s.served == nil {
+		return ""
+	}
+	var unanswered []string
+	for _, path := range paths {
+		if slices.Contains(s.served.Unanswered(), path) {
+			unanswered = append(unanswered, path)
+		}
+	}
+	if len(unanswered) == 0 {
+		return ""
+	}
+	return "nothing answers " + strings.Join(unanswered, ", ") + ": a plugin that serves it is not running"
 }
 
 func (s *QNTXServer) reachGrant(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
