@@ -510,9 +510,18 @@ func (s *GitHubServer) recordHeaders(key string, h http.Header) {
 	if err != nil {
 		return
 	}
-	remaining, _ := strconv.ParseInt(h.Get("X-RateLimit-Remaining"), 10, 64)
-	used, _ := strconv.ParseInt(h.Get("X-RateLimit-Used"), 10, 64)
-	reset, _ := strconv.ParseInt(h.Get("X-RateLimit-Reset"), 10, 64)
+	// A header that does not read is said, never kept as a zero that reads as spent.
+	read := map[string]int64{}
+	for _, name := range []string{"X-RateLimit-Remaining", "X-RateLimit-Used", "X-RateLimit-Reset"} {
+		n, err := strconv.ParseInt(h.Get(name), 10, 64)
+		if err != nil {
+			s.logger.Warnw("GitHub's rate-limit header does not read; the limit is not recorded",
+				"credential", key, "header", name, "value", h.Get(name), "error", err)
+			return
+		}
+		read[name] = n
+	}
+	remaining, used, reset := read["X-RateLimit-Remaining"], read["X-RateLimit-Used"], read["X-RateLimit-Reset"]
 	s.recordLimit(key, GitHubLimit{
 		Limit:     limit,
 		Remaining: remaining,
