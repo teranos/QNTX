@@ -221,6 +221,11 @@
     color: #f87171;
 }
 
+/* Started after the last probe: no health yet, which is not unhealthy */
+.plugin-status-unprobed {
+    color: #9ca3af;
+}
+
 /* Plugin controls */
 .plugin-controls {
     margin-top: 10px;
@@ -711,12 +716,54 @@
     min-width: 0;
 }
 
-.plugin-add-form {
+/* The panel spans the viewport; the plugins in it do not */
+.plugin-panel-body {
+    max-width: 880px;
+}
+
+/* The empty plugin at the end of the list, ready to become one */
+.plugin-add-card {
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+}
+
+.plugin-add-card-closed {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: center;
+    min-height: 56px;
+    font-size: 28px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.plugin-add-card-closed:hover,
+.plugin-add-card-closed:focus-visible {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-on-dark);
+}
+
+.plugin-add-card-open {
+    display: flex;
+    flex-direction: column;
+    padding: 14px 16px;
+}
+
+.plugin-add-card-open .plugin-add-repo {
+    flex: none;
+}
+
+/* What the node said the repo resolves to */
+.plugin-add-resolved {
+    display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 0 0 8px;
+    gap: 4px 12px;
+    margin-top: 8px;
+    font-size: var(--font-size-sm);
+    color: #9ca3af;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 /* An external link: the underline says it leaves QNTX */

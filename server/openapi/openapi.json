@@ -299,6 +299,12 @@
         "SUPER"
       ]
     },
+    "/api/plugins/check": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
     "/api/plugins/elements": {
       "x-qntx-reach": [
         "ROOT"

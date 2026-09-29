@@ -4,6 +4,8 @@
  */
 
 // "I log in to QNTX, open the plugin element, press +, enter a repository URL and confirm. The plugin starts disabled; I edit its config and enable it, and I don't think about it anymore."
+// "i expect it to be a bigger + button as part of the list, like an empty plugin ready to become something."
+// "it should have been two stage, first stage is check if its even possible, and 2nd is to commit to adding it for real"
 
 import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
 
@@ -40,7 +42,7 @@ const { createPluginElement } = await import('./plugin-panel');
 
 const REPO = 'https://github.com/teranos/garden';
 
-interface Row { name: string; version: string; description: string; healthy: boolean; state: string; pausable: boolean; repo?: string; enabled?: boolean; message?: string }
+interface Row { name: string; version: string; description: string; healthy: boolean; probed?: boolean; state: string; pausable: boolean; repo?: string; enabled?: boolean; message?: string }
 
 // What the node holds, and every request the panel made of it.
 let held: Row[];
@@ -72,6 +74,11 @@ function added(body: unknown): Response {
     return new Response(JSON.stringify({ name: 'garden', repo, enabled: false, config: {} }), { status: 200 });
 }
 
+function resolves(body: unknown): Response {
+    const repo = (body as { repo: string }).repo;
+    return new Response(JSON.stringify({ name: 'garden', repo, release: 'garden-v1.0.0', asset: 'qntx-garden-plugin-1.0.0-linux-amd64.tar.gz' }), { status: 200 });
+}
+
 const flush = async () => {
     for (let i = 0; i < 10; i++) await new Promise(resolve => setTimeout(resolve, 0));
 };
@@ -89,10 +96,10 @@ function press(content: HTMLElement, selector: string): void {
     button.click();
 }
 
-// The panel's + opens the field, and a field left open by an earlier panel stays open.
+// The empty card opens into the field, and a field left open by an earlier panel stays open.
 async function openAddField(content: HTMLElement): Promise<void> {
     if (content.querySelector('.plugin-add-repo')) return;
-    press(content, '.plugin-add-open');
+    press(content, '.plugin-add-card-closed');
     await flush();
 }
 
@@ -117,14 +124,24 @@ afterEach(() => {
     document.body.innerHTML = '';
 });
 
-describe('Tim: + adds a plugin, and it starts disabled', () => {
-    test('press +, enter the repository URL, Add: the node is asked and the list shows it disabled', async () => {
-        node({ 'POST /api/plugins': added });
+describe('Tim: the empty card becomes a plugin, and it starts disabled', () => {
+    test('press the empty card, enter the repository URL, Check, then Add: the list shows it disabled', async () => {
+        node({ 'POST /api/plugins/check': resolves, 'POST /api/plugins': added });
         const content = await openPanel();
-        expect(content.textContent).toContain('No plugins added');
+        expect(content.querySelector('.plugin-list .plugin-add-card-closed')).not.toBeNull();
 
         await openAddField(content);
         type(content, '.plugin-add-repo', REPO);
+        // Stage one: nothing is added until the repo resolves.
+        expect(content.querySelector('.plugin-add-confirm')).toBeNull();
+        press(content, '.plugin-add-check');
+        await flush();
+
+        expect(asked.find(a => a.path === '/api/plugins/check')?.body).toEqual({ repo: REPO });
+        expect(asked.find(a => a.method === 'POST' && a.path === '/api/plugins')).toBeUndefined();
+        expect(content.querySelector('.plugin-add-resolved')?.textContent).toContain('garden-v1.0.0');
+
+        // Stage two: added for real.
         press(content, '.plugin-add-confirm');
         await flush();
 
@@ -142,15 +159,50 @@ describe('Tim: + adds a plugin, and it starts disabled', () => {
 });
 
 describe('Spike: the node refuses', () => {
+    test('a repo that does not resolve is refused in the node\'s words, beside Check, and nothing is added', async () => {
+        const why = 'no release of teranos/garden publishes qntx-garden-plugin-<version>-linux-amd64.tar.gz (newest seen: )';
+        node({
+            'POST /api/plugins/check': () => new Response(JSON.stringify({ id: 'ERR-2', error: why, timestamp: 0 }), { status: 400 }),
+        });
+        const content = await openPanel();
+
+        await openAddField(content);
+        type(content, '.plugin-add-repo', REPO);
+        press(content, '.plugin-add-check');
+        await flush();
+
+        expect(content.querySelector('.qntx-btn-error-box')?.textContent).toBe(why);
+        expect(content.querySelector('.plugin-add-confirm')).toBeNull();
+        expect(asked.find(a => a.method === 'POST' && a.path === '/api/plugins')).toBeUndefined();
+    });
+
+    test('a repo changed after Check is checked again before it can be added', async () => {
+        node({ 'POST /api/plugins/check': resolves });
+        const content = await openPanel();
+
+        await openAddField(content);
+        type(content, '.plugin-add-repo', REPO);
+        press(content, '.plugin-add-check');
+        await flush();
+        expect(content.querySelector('.plugin-add-confirm')).not.toBeNull();
+
+        type(content, '.plugin-add-repo', REPO + '-other');
+        expect(content.querySelector('.plugin-add-confirm')).toBeNull();
+        expect(content.querySelector('.plugin-add-check')).not.toBeNull();
+    });
+
     test('a plugin already added is refused in the node\'s words, beside Add, and the field stays', async () => {
         held = [{ name: 'garden', version: '', description: '', healthy: false, state: 'disabled', pausable: false, repo: REPO, enabled: false }];
         node({
+            'POST /api/plugins/check': resolves,
             'POST /api/plugins': () => new Response(JSON.stringify({ id: 'ERR-1', error: `plugin garden is already added, from ${REPO}`, timestamp: 0 }), { status: 400 }),
         });
         const content = await openPanel();
 
         await openAddField(content);
         type(content, '.plugin-add-repo', REPO);
+        press(content, '.plugin-add-check');
+        await flush();
         press(content, '.plugin-add-confirm');
         await flush();
 
@@ -205,6 +257,16 @@ describe('Jenny: configured while it does not run, then enabled', () => {
         expect(card.querySelector('.plugin-enable-btn')).toBeNull();
     });
 
+    test('enabled after the last probe, it is not probed, not unhealthy', async () => {
+        held = [{ name: 'garden', version: '1.0.0', description: '', healthy: false, probed: false, state: 'running', pausable: false, repo: REPO, enabled: true }];
+        node();
+        const content = await openPanel();
+
+        const card = content.querySelector<HTMLElement>('.plugin-card[data-plugin="garden"]')!;
+        expect(card.querySelector('.plugin-status-text')?.textContent).toBe('Not probed');
+        expect(content.querySelector('.plugin-health-summary')?.textContent).toBe('All healthy');
+    });
+
     test('enabled and not started, the list says why', async () => {
         const why = 'failed to discover plugin garden: plugin binary not found';
         held = [{ name: 'garden', version: '', description: '', healthy: false, state: 'disabled', pausable: false, repo: REPO, enabled: false }];
@@ -233,7 +295,7 @@ describe('Tim: the plugins cannot be read', () => {
         const content = await openPanel();
 
         expect(content.querySelector('.plugin-list-failure')?.textContent).toBe(why);
-        expect(content.textContent).not.toContain('No plugins added');
+        expect(content.querySelector('.plugin-add-card')).toBeNull();
     });
 
     test('the list did not load, and the element says so in full', async () => {
@@ -243,6 +305,6 @@ describe('Tim: the plugins cannot be read', () => {
         const content = await openPanel();
 
         expect(content.querySelector('.plugin-list-failure')?.textContent).toContain(why);
-        expect(content.textContent).not.toContain('No plugins added');
+        expect(content.querySelector('.plugin-add-card')).toBeNull();
     });
 });

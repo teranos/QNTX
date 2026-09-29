@@ -3,9 +3,12 @@ package server
 import (
 	"context"
 	"net/http"
+	"strings"
 
+	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/errors"
 )
 
 // Plugins is the signum of the plugins this node runs (ADR-039): what they
@@ -66,6 +69,19 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 					},
 					Http: &protocol.Endpoint{Method: http.MethodPost, Path: "/api/plugins"},
 				},
+				{
+					Name: "check",
+					Does: "Whether a repository URL resolves to a release of a plugin this node could install, before adding it. Nothing is written or installed.",
+					Takes: []*protocol.Param{{Name: "repo", Required: true,
+						Says: "The repository URL, or a tree URL naming a plugin inside one."}},
+					Gives: []*protocol.Field{
+						{Name: "name", Says: "The plugin's name."},
+						{Name: "repo", Says: "The repository URL checked."},
+						{Name: "release", Says: "The newest release carrying the plugin for this node's platform."},
+						{Name: "asset", Says: "The asset in that release this node would install."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodPost, Path: "/api/plugins/check"},
+				},
 				action("pause", "Pause a running plugin. Paused is intended, so it stays healthy."),
 				action("resume", "Resume a paused plugin."),
 				action("restart", "Restart an enabled plugin. It answers at once; the restart completes after."),
@@ -85,6 +101,19 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 					return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "repo", Says: err.Error()}
 				}
 				return added, nil
+			},
+			"check": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+				resolveCtx, cancel := context.WithTimeout(ctx, plugingrpc.PluginDigestTimeout)
+				defer cancel()
+				resolved, err := plugingrpc.ResolvePlugin(resolveCtx, sent["repo"])
+				if err != nil {
+					says := err.Error()
+					if hints := errors.GetAllHints(err); len(hints) > 0 {
+						says += "\n" + strings.Join(hints, "\n")
+					}
+					return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "repo", Says: says}
+				}
+				return resolved, nil
 			},
 			"pause":   s.pluginActionAnswer("pause"),
 			"resume":  s.pluginActionAnswer("resume"),

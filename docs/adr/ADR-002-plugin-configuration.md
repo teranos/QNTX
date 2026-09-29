@@ -4,13 +4,18 @@ Plugins are added, configured, enabled and disabled at runtime.
 
 "I log in to QNTX, open the plugin element, press +, enter a repository URL and confirm. The plugin starts disabled; I edit its config and enable it, and I don't think about it anymore."
 
+"i expect it to be a bigger + button as part of the list, like an empty plugin ready to become something."
+
+"it should have been two stage, first stage is check if its even possible, and 2nd is to commit to adding it for real"
+
 ## 1. The plugin element
 
-Press + and enter the plugin's repository URL. It is added disabled. Its config is edited in the element, and Enable starts it.
+The + is an empty plugin at the end of the list. Press it and enter the plugin's repository URL. Check asks whether the repo resolves; Add commits it. It is added disabled. Its config is edited in the element, and Enable starts it.
 
 ## 2. API
 
 ```
+POST /api/plugins/check              body: repo
 POST /api/plugins                    body: repo
 GET  /api/plugins/{name}/config
 PUT  /api/plugins/{name}/config      body: config
@@ -28,6 +33,8 @@ Both return JSON with the plugin's new state:
 See [API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json) for all plugin endpoints.
 
 ## What happens
+
+**Check:** the repo resolves when the newest release carrying the plugin for this node's platform, and its `.sha256`, are read with the host's `[plugin.access_token]`. Nothing is written or installed.
 
 **Add:** the plugin is recorded with its repository URL, disabled, in the system store.
 

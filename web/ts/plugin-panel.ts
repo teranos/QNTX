@@ -4,8 +4,9 @@
  * Manifests as an element with 'panel' opensAs — slides in from
  * the opposite edge of the system drawer.
  *
- * Where a plugin is added, configured and enabled: + takes a repository URL,
- * and the plugin starts disabled.
+ * Where a plugin is added, configured and enabled: the empty card at the end of
+ * the list takes a repository URL, Check says whether it resolves, Add commits
+ * it, and the plugin starts disabled.
  *
  * Displays plugin information:
  * - Lists all installed plugins with metadata
@@ -33,6 +34,8 @@ interface PluginInfo {
     author?: string;
     license?: string;
     healthy: boolean;
+    /** Whether the last probe saw it. One that started after the probe is not unhealthy. */
+    probed?: boolean;
     message?: string;
     details?: Record<string, unknown>;
     state: 'running' | 'paused' | 'stopped' | 'loading' | 'failed' | 'restarting' | 'disabled';
@@ -137,9 +140,19 @@ let activeLogStream: EventSource | null = null;
 // answer lands on the row it was asked from.
 const grantSaid: Record<string, { ok: boolean; text: string }> = {};
 
-// The + in progress: whether the repository field is open, and what is typed in it.
+// The empty card in progress: whether it is open, what is typed in it, and what
+// the node said the typed repo resolves to. Adding is two stages: Check, then Add.
 let adding = false;
 let addingRepo = '';
+let resolved: ResolvedPlugin | null = null;
+
+/** What a repo resolves to, as plugins:check answers (plugin/grpc/fetch.go). */
+interface ResolvedPlugin {
+    name: string;
+    repo: string;
+    release: string;
+    asset: string;
+}
 
 // Added and switched off.
 const NOT_RUNNING = ['disabled'];
@@ -202,13 +215,12 @@ function render(): void {
         }
 
         contentElement.innerHTML = `
-            <div class="element-content">
+            <div class="element-content plugin-panel-body">
                 ${renderToolbar()}
-                ${listFailure ? renderListFailure() : `
-                <div class="panel-empty plugin-empty">
-                    <p>No plugins added</p>
-                    <p class="panel-empty-hint">Press + and enter a plugin's repository URL</p>
-                </div>`}
+                ${renderListFailure()}
+                <div class="plugin-list">
+                    ${listFailure ? '' : renderAddCard()}
+                </div>
             </div>
         `;
         hydratePluginButtons(contentElement);
@@ -220,7 +232,7 @@ function render(): void {
     const serverBuildTime = formatBuildTime(serverHealth?.build_time);
 
     contentElement.innerHTML = `
-        <div class="element-content">
+        <div class="element-content plugin-panel-body">
             ${renderToolbar()}
             ${renderListFailure()}
             <div class="plugin-summary">
@@ -239,6 +251,7 @@ function render(): void {
             </div>
             <div class="plugin-list">
                 ${plugins.map(plugin => renderPlugin(plugin)).join('')}
+                ${renderAddCard()}
             </div>
         </div>
     `;
@@ -251,21 +264,46 @@ function render(): void {
     if (typing) focusAddField();
 }
 
-/** The filter, and the + that adds a plugin by its repository URL. */
 function renderToolbar(): string {
-    const form = adding ? `
-        <div class="plugin-add-form">
-            <input type="text" class="plugin-add-repo plugin-mono" placeholder="https://github.com/owner/repo" value="${escapeHtml(addingRepo)}" autocomplete="off" spellcheck="false">
-            ${buttonPlaceholder('plugin-add-confirm', 'Add', 'plugin-add-confirm')}
-        </div>
-    ` : '';
     return `
         <div class="plugin-search-container">
             <input type="text" class="plugin-search-input plugin-mono" placeholder="Filter plugins...">
-            ${buttonPlaceholder('plugin-add-open', '+', 'plugin-add-open')}
         </div>
-        ${form}
     `;
+}
+
+/**
+ * The empty plugin at the end of the list, ready to become one: a repository
+ * URL, checked by the node, then added for real.
+ */
+export function renderAddCard(): string {
+    if (!adding) {
+        return `<div class="plugin-add-card plugin-add-card-closed" role="button" tabindex="0" aria-label="Add a plugin by its repository URL">+</div>`;
+    }
+    const checked = resolved !== null && resolved.repo === addingRepo.trim();
+    return `
+        <div class="plugin-add-card plugin-add-card-open">
+            <input type="text" class="plugin-add-repo plugin-mono" placeholder="https://github.com/owner/repo/tree/main/plugin" value="${escapeHtml(addingRepo)}" autocomplete="off" spellcheck="false">
+            ${checked && resolved ? `
+            <div class="plugin-add-resolved plugin-mono">
+                <span class="plugin-name">${escapeHtml(resolved.name)}</span>
+                <span>${escapeHtml(resolved.release)}</span>
+                <span>${escapeHtml(resolved.asset)}</span>
+            </div>` : ''}
+            <div class="plugin-controls">
+                ${checked
+                    ? buttonPlaceholder('plugin-add-confirm', 'Add', 'plugin-add-confirm')
+                    : buttonPlaceholder('plugin-add-check', 'Check', 'plugin-add-check')}
+                ${buttonPlaceholder('plugin-add-cancel', 'Cancel', 'plugin-add-cancel')}
+            </div>
+        </div>
+    `;
+}
+
+function closeAddCard(): void {
+    adding = false;
+    addingRepo = '';
+    resolved = null;
 }
 
 // Opening the field puts the cursor in it, and a refresh while typing keeps it there.
@@ -274,13 +312,20 @@ function focusAddField(): void {
     contentElement?.querySelector<HTMLInputElement>('.plugin-add-repo')?.focus();
 }
 
-/** Add a plugin by its repository URL. It starts disabled; a refusal is the button's to show. */
+/** Stage one: whether the repo resolves to a release this node could install. A refusal is the button's to show. */
+async function checkPlugin(repo: string): Promise<void> {
+    if (repo === '') throw new Error('type the repository URL, then press Check');
+    const response = await apiFetch('/api/plugins/check', jsonBody('POST', { repo }));
+    if (!response.ok) throw new Error(await refusal(response));
+    resolved = await response.json() as ResolvedPlugin;
+    render();
+}
+
+/** Stage two: add the checked plugin for real. It starts disabled; a refusal is the button's to show. */
 async function addPlugin(repo: string): Promise<void> {
-    if (repo === '') throw new Error('type the repository URL, then press Add');
     const response = await apiFetch('/api/plugins', jsonBody('POST', { repo }));
     if (!response.ok) throw new Error(await refusal(response));
-    adding = false;
-    addingRepo = '';
+    closeAddCard();
     await fetchPlugins();
     render();
 }
@@ -392,6 +437,15 @@ function attachEventDelegation(): void {
             return;
         }
 
+        // The empty card opens into the repository field
+        if (target.closest('.plugin-add-card-closed')) {
+            e.stopPropagation();
+            adding = true;
+            render();
+            focusAddField();
+            return;
+        }
+
         // Plugin card click - toggle config expansion
         const card = target.closest('.plugin-card') as HTMLElement | null;
         if (card && !target.closest('button') && !target.closest('input') && !target.closest('a')) {
@@ -421,17 +475,28 @@ function attachEventDelegation(): void {
             filterPlugins(target.value);
         }
 
+        // A repo typed after Check is not the one checked: back to Check.
         if (target.classList.contains('plugin-add-repo')) {
+            const wasChecked = resolved !== null && resolved.repo === addingRepo.trim();
             addingRepo = target.value;
+            if (wasChecked && resolved?.repo !== addingRepo.trim()) {
+                resolved = null;
+                render();
+            }
         }
     });
 
     contentElement.addEventListener('keydown', (e: KeyboardEvent) => {
         const target = e.target as HTMLInputElement;
         if (target.classList.contains('plugin-add-repo') && e.key === 'Escape') {
-            adding = false;
-            addingRepo = '';
+            closeAddCard();
             render();
+        }
+        if (target.classList.contains('plugin-add-card-closed') && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            adding = true;
+            render();
+            focusAddField();
         }
         if (target.classList.contains('plugin-config-new-key') && e.key === 'Enter') {
             addConfigKey();
@@ -502,7 +567,7 @@ function hydratePluginButtons(container: HTMLElement): void {
                 onClick: async () => {
                     await switchPlugin(plugin.name, 'enable');
                 },
-                variant: 'success',
+                variant: 'primary',
                 size: 'small'
             };
         }
@@ -522,26 +587,31 @@ function hydratePluginButtons(container: HTMLElement): void {
         }
     }
 
-    config['plugin-add-open'] = {
-        label: '+',
-        ariaLabel: adding ? 'Close adding a plugin' : 'Add a plugin by its repository URL',
-        onClick: () => {
-            adding = !adding;
-            render();
-            focusAddField();
-        },
-        variant: adding ? 'secondary' : 'ghost',
-        size: 'small'
-    };
-
     if (adding) {
+        config['plugin-add-check'] = {
+            label: 'Check',
+            onClick: async () => {
+                const typed = container.querySelector<HTMLInputElement>('.plugin-add-repo')?.value.trim() ?? '';
+                await checkPlugin(typed);
+            },
+            variant: 'secondary',
+            size: 'small'
+        };
         config['plugin-add-confirm'] = {
             label: 'Add',
             onClick: async () => {
-                const typed = container.querySelector<HTMLInputElement>('.plugin-add-repo')?.value.trim() ?? '';
-                await addPlugin(typed);
+                if (resolved) await addPlugin(resolved.repo);
             },
-            variant: 'success',
+            variant: 'primary',
+            size: 'small'
+        };
+        config['plugin-add-cancel'] = {
+            label: 'Cancel',
+            onClick: () => {
+                closeAddCard();
+                render();
+            },
+            variant: 'ghost',
             size: 'small'
         };
     }
@@ -565,7 +635,7 @@ export function disables(plugin: PluginInfo): boolean {
 
 function getHealthSummary(): string {
     // A plugin that is not running has no health to count.
-    const probed = plugins.filter(p => !NOT_RUNNING.includes(p.state));
+    const probed = plugins.filter(p => !NOT_RUNNING.includes(p.state) && p.probed !== false);
     const unhealthy = probed.filter(p => !p.healthy).length;
 
     if (unhealthy === 0) {
@@ -619,9 +689,10 @@ function buildVersionTooltip(plugin: PluginInfo): string {
 }
 
 function renderPlugin(plugin: PluginInfo): string {
-    const statusClass = plugin.healthy ? 'plugin-status-healthy' : 'plugin-status-unhealthy';
-    const statusIcon = plugin.healthy ? '&#10003;' : '&#10007;';
-    const statusText = plugin.healthy ? 'Healthy' : 'Unhealthy';
+    const unprobed = plugin.probed === false;
+    const statusClass = unprobed ? 'plugin-status-unprobed' : plugin.healthy ? 'plugin-status-healthy' : 'plugin-status-unhealthy';
+    const statusIcon = unprobed ? '&#8230;' : plugin.healthy ? '&#10003;' : '&#10007;';
+    const statusText = unprobed ? 'Not probed' : plugin.healthy ? 'Healthy' : 'Unhealthy';
     const isExpanded = expandedPlugin === plugin.name;
 
     const versionTooltip = buildVersionTooltip(plugin);

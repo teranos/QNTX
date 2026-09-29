@@ -260,7 +260,7 @@ export function createPluginPlaceholderElement(
         content.append(
             el('div', { text: `${displayName} is not enabled` }),
             el('div', {
-                text: 'Add and enable it in the plugin element (⚙ Domain Plugins): press + and enter its repository URL, or press Enable on it.',
+                text: 'Add and enable it in the plugin element (⚙ Domain Plugins): press +, enter its repository URL, Check, then Add; or press Enable on it.',
                 style: { fontSize: '11px', color: '#999', maxWidth: '320px' },
             }),
         );
