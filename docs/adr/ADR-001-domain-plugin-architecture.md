@@ -23,7 +23,7 @@ QNTX core is minimal and runs without any plugins:
 - **Core components**: ATS (attestation system), Database (⊔), Pulse (꩜), Server
 - **All domains are plugins**: Code, finance, legal, biotech, etc. are external plugins
 - **Optional by default**: No plugins enabled in default configuration
-- **Explicit opt-in**: Users configure which plugins to load via `am.toml`
+- **Explicit opt-in**: Users add and enable plugins in the plugin element
 
 This ensures QNTX core remains focused on infrastructure, not domain logic.
 
