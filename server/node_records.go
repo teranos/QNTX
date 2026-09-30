@@ -29,6 +29,8 @@ type GitHubSettings struct {
 	Enabled       bool   `json:"enabled"`
 	RunnerPath    string `json:"runner_path"`
 	RunnerEnabled bool   `json:"runner_enabled"`
+	// WebhookPath is where the App's webhook URL points on the node.
+	WebhookPath string `json:"webhook_path"`
 }
 
 // NodeRecords reads and writes the GITHUB lines.
@@ -92,7 +94,7 @@ func (r NodeRecords) nodeRecord(actor, subject, predicate, context string, attri
 // GitHub is the node's GitHub. On until somebody switches it off; the runner
 // is off until somebody switches it on.
 func (r NodeRecords) GitHub() (GitHubSettings, error) {
-	settings := GitHubSettings{Enabled: true, RunnerPath: DefaultRunnerPath}
+	settings := GitHubSettings{Enabled: true, RunnerPath: DefaultRunnerPath, WebhookPath: githubWebhookPath}
 	newest, err := r.newest(githubSubject)
 	if err != nil {
 		return settings, err
@@ -110,6 +112,9 @@ func (r NodeRecords) GitHub() (GitHubSettings, error) {
 	if enabled, ok := as.Attributes["runner_enabled"].(bool); ok {
 		settings.RunnerEnabled = enabled
 	}
+	if path, ok := as.Attributes["webhook_path"].(string); ok && path != "" {
+		settings.WebhookPath = path
+	}
 	return settings, nil
 }
 
@@ -119,5 +124,6 @@ func (r NodeRecords) SetGitHub(actor string, settings GitHubSettings) error {
 		"enabled":        settings.Enabled,
 		"runner_path":    settings.RunnerPath,
 		"runner_enabled": settings.RunnerEnabled,
+		"webhook_path":   settings.WebhookPath,
 	})
 }

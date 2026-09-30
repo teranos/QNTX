@@ -35,9 +35,22 @@ func TestSignedIsTheDeliverysHMAC(t *testing.T) {
 func TestTheWebhookIsNoneUntilROOTGeneratesItsSecret(t *testing.T) {
 	s := &QNTXServer{logger: zap.NewNop().Sugar()}
 	w := httptest.NewRecorder()
-	s.HandleGitHubPush(w, httptest.NewRequest(http.MethodPost, githubPushPath, strings.NewReader(`{}`)))
+	s.HandleGitHubWebhook(w, httptest.NewRequest(http.MethodPost, githubWebhookPath, strings.NewReader(`{}`)))
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("answered %d before a secret was generated", w.Code)
+	}
+}
+
+func TestTheWebhooksPathIsUnderGitHub(t *testing.T) {
+	for _, path := range []string{"/github/webhook", "/github/hooks/app"} {
+		if err := webhookPath(path); err != nil {
+			t.Errorf("%s refused: %v", path, err)
+		}
+	}
+	for _, path := range []string{"", "/github/", "/api/github/webhook", "/github/web hook", "/github/x?y"} {
+		if err := webhookPath(path); err == nil {
+			t.Errorf("%q taken", path)
+		}
 	}
 }
 

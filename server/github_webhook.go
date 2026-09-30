@@ -1,7 +1,8 @@
 package server
 
-// A push arrives at the App's webhook, QNTX matches it against the plugins'
-// build.* config, and builds, installs and restarts the plugin.
+// Every event the GitHub App is subscribed to arrives at its one webhook. A
+// push is matched against the plugins' build.* config, and QNTX builds,
+// installs and restarts the plugin.
 
 import (
 	"crypto/hmac"
@@ -14,10 +15,24 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/internal/sacred"
+	"github.com/teranos/errors"
 )
 
-// githubPushPath is the App's webhook URL on the node.
-const githubPushPath = "/github/push"
+// The App's webhook is at a path ROOT sets under githubWebhookPrefix, the one
+// prefix the reach table opens; githubWebhookPath until ROOT sets another.
+const (
+	githubWebhookPrefix = "/github/"
+	githubWebhookPath   = githubWebhookPrefix + "webhook"
+)
+
+// webhookPath is a path ROOT may set: under the prefix, and more than it.
+func webhookPath(path string) error {
+	rest, ok := strings.CutPrefix(path, githubWebhookPrefix)
+	if !ok || rest == "" || strings.ContainsAny(rest, " ?#") {
+		return errors.Newf("the webhook's path is under %s, and %q is not", githubWebhookPrefix, path)
+	}
+	return nil
+}
 
 // gitHubWebhook is the App's webhook secret. The route is NONE until ROOT
 // generates one.
@@ -33,8 +48,8 @@ func (s *QNTXServer) gitHubWebhook() (string, bool) {
 	return secret, found
 }
 
-// githubPushBody bounds a delivery; GitHub caps a payload at 25 MB.
-const githubPushBody = 25 << 20
+// githubWebhookBody bounds a delivery; GitHub caps a payload at 25 MB.
+const githubWebhookBody = 25 << 20
 
 // gitHubPush is the part of a push event a build reads.
 type gitHubPush struct {
@@ -97,8 +112,8 @@ func signed(secret, signature string, body []byte) bool {
 	return hmac.Equal(said, mac.Sum(nil))
 }
 
-// HandleGitHubPush takes the App's webhook deliveries.
-func (s *QNTXServer) HandleGitHubPush(w http.ResponseWriter, r *http.Request) {
+// HandleGitHubWebhook takes the App's webhook deliveries.
+func (s *QNTXServer) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "the App's webhook is POST")
 		return
@@ -108,7 +123,12 @@ func (s *QNTXServer) HandleGitHubPush(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, githubPushBody))
+	settings, err := s.nodeRecords().GitHub()
+	if err != nil || r.URL.Path != settings.WebhookPath {
+		http.NotFound(w, r)
+		return
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, githubWebhookBody))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "the delivery did not read: "+err.Error())
 		return

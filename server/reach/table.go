@@ -50,10 +50,9 @@ REACH is '/auth/authorize' '/auth/authorize/done'                         of ANY
 # The client comes for its token with the code and its secret, holding no
 # session: the secret is the credential, checked at the endpoint itself.
 REACH is '/auth/token'                                                    of ANYONE
-# The GitHub App's webhook: GitHub holds no session, the delivery's signature
-# is the credential, checked at the handler. Until ROOT generates the secret
-# the handler answers nobody.
-REACH is '/github/push'                                                   of ANYONE
+# The GitHub App's webhook, at the path ROOT sets under /github/. The
+# delivery's signature is the credential; every other path answers nobody.
+REACH is '/github/'                                                       of ANYONE
 # Discovery documents (RFC 8414, RFC 9728): how a client that has never seen
 # this node finds its doors without being configured by hand. Read before it
 # sends anybody anywhere, so by a stranger.

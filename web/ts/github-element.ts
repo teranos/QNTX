@@ -72,14 +72,17 @@ export interface GitHubStatus {
     enabled: boolean;
     namespaces: GitHubNamespace[];
     runner: GitHubRunner;
-    /** Whether ROOT generated the App's webhook secret, which opens /github/push. */
+    /** Whether ROOT generated the App's webhook secret, which opens the webhook's path. */
     webhook: boolean;
+    webhook_path: string;
+    /** The whole URL to paste into the App's webhook settings. */
+    webhook_url: string;
 }
 
 /** What generating the App's webhook secret gives, this once. */
 export interface GitHubWebhook {
     secret: string;
-    path: string;
+    url: string;
 }
 
 const ELEMENT_ID = 'github-element';
@@ -193,13 +196,38 @@ export function renderNode(container: HTMLElement, status: GitHubStatus, reload:
 }
 
 /** Exported for tests: the App's webhook, and generating its secret. */
-export function renderWebhook(container: HTMLElement, active: boolean, reload: () => Promise<void>): void {
+export function renderWebhook(container: HTMLElement, status: GitHubStatus, reload: () => Promise<void>): void {
+    const active = status.webhook;
     container.innerHTML = '';
     const s = section('Webhook');
     s.appendChild(row('Webhook:', pill(active ? 'open' : 'none', active)));
+
+    // The URL is the node's to say, so it is pasted and never typed.
+    const url = document.createElement('code');
+    url.className = 'github-webhook-url';
+    url.textContent = status.webhook_url;
+    s.appendChild(row('URL:', url));
+
+    const path = document.createElement('input');
+    path.type = 'text';
+    path.className = 'input github-webhook-path';
+    path.value = status.webhook_path;
+    path.autocomplete = 'off';
+    path.spellcheck = false;
+    s.appendChild(row('Path:', path));
+
     const shown = document.createElement('div');
     const actions = document.createElement('div');
     actions.className = 'element-actions';
+    const move = new Button({
+        label: 'Set the path',
+        variant: 'ghost',
+        onClick: async () => {
+            await send('/api/github/webhook/path', { path: path.value.trim() });
+            await reload();
+        },
+    });
+    actions.appendChild(move.element);
     const generate = new Button({
         label: active ? 'Generate a new secret' : 'Generate the secret',
         variant: active ? 'ghost' : 'primary',
@@ -211,7 +239,9 @@ export function renderWebhook(container: HTMLElement, active: boolean, reload: (
             await reload();
             const again = container.querySelector('.github-webhook-shown');
             if (!again) return;
-            again.appendChild(row('Path:', made.path));
+            const madeURL = document.createElement('code');
+            madeURL.textContent = made.url;
+            again.appendChild(row('URL:', madeURL));
             const secret = document.createElement('code');
             secret.textContent = made.secret;
             again.appendChild(row('Secret:', secret));
@@ -362,7 +392,7 @@ export async function load(node: HTMLElement, namespaces: HTMLElement, actions: 
     try {
         const status = await apiJson<GitHubStatus>('/api/github');
         renderNode(node, status, reload);
-        if (webhook) renderWebhook(webhook, status.webhook, reload);
+        if (webhook) renderWebhook(webhook, status, reload);
         renderNamespaces(namespaces, status.namespaces);
         renderActions(actions, status.runner, reload);
     } catch (err: unknown) {

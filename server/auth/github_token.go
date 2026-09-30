@@ -169,6 +169,10 @@ func (h *Handler) NewGitHubWebhook(mintedBy string) (string, error) {
 	return secret, nil
 }
 
+// PublicOrigin is where this node answers from outside, the origin its
+// ceremonies' redirect URIs are built on.
+func (h *Handler) PublicOrigin() string { return h.publicOrigin() }
+
 // GitHubWebhook is the App's webhook secret. False is one ROOT never generated.
 func (h *Handler) GitHubWebhook() (string, bool, error) {
 	table, ok := h.tokens.(*TokenTable)

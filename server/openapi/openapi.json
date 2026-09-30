@@ -608,10 +608,11 @@
       ],
       "x-qntx-prefix": true
     },
-    "/github/push": {
+    "/github/": {
       "x-qntx-reach": [
         "ANYONE"
-      ]
+      ],
+      "x-qntx-prefix": true
     },
     "/health": {
       "x-qntx-reach": [
