@@ -11,11 +11,12 @@ const USE_JSDOM = process.env.USE_JSDOM === '1';
 // Where the node has this person standing, and every step asked of it.
 let standingOnNode = 'default';
 let refuse = '';
+let unreadable = false;
 const steps: string[] = [];
-const warned: string[] = [];
 
 mock.module('./client', () => ({
     apiFetch: async (path: string, init?: RequestInit) => {
+        if (unreadable && path === '/i/standing' && !init?.method) return new Response('node is down', { status: 503 });
         if (path === '/i/standing' && init?.method === 'POST') {
             const { namespace } = JSON.parse(String(init.body)) as { namespace: string };
             steps.push(namespace);
@@ -32,11 +33,8 @@ mock.module('./client', () => ({
         reportReachable: () => {},
     },
 }));
-mock.module('./toast', () => ({
-    toast: { warning: (m: string) => { warned.push(m); }, error: () => {}, success: () => {}, info: () => {} },
-}));
 
-const { addressed, addressOf, entitle, returnHere } = await import('./address.ts');
+const { addressed, addressOf, entitle, returnHere, told } = await import('./address.ts');
 const { setStanding } = await import('./standing.ts');
 
 describe('the address', () => {
@@ -81,8 +79,9 @@ describe('a tab looked at again', () => {
     beforeEach(() => {
         standingOnNode = 'default';
         refuse = '';
+        unreadable = false;
         steps.length = 0;
-        warned.length = 0;
+        told();
         setStanding('default');
     });
 
@@ -98,14 +97,22 @@ describe('a tab looked at again', () => {
         await returnHere();
         expect(steps).toEqual(['default']);
         expect(standingOnNode).toBe('default');
-        expect(warned).toEqual([]);
+        expect(told()).toBe('');
     });
 
-    test('refused, it says so rather than drawing a namespace its writes do not land in', async () => {
+    test('refused, the namespaces bar says so rather than drawing a namespace its writes do not land in', async () => {
         standingOnNode = 'SBVH';
         refuse = 'default';
         await returnHere();
         expect(steps).toEqual(['default']);
-        expect(warned[0]).toContain('SBVH');
+        expect(told()).toContain('could not stand in default again, so it opens SBVH');
+        expect(told()).toBe('');
+    });
+
+    test('not able to tell where it stands, it says so rather than dropping it', async () => {
+        unreadable = true;
+        await returnHere();
+        expect(steps).toEqual([]);
+        expect(told()).toContain('could not tell whether this tab still stands in default');
     });
 });

@@ -232,6 +232,8 @@
 
 .namespaces-failure {
     padding: 4px 2px;
+    /* Each thing said on its own line: a refusal is said beside, never over. */
+    white-space: pre-line;
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--color-error);
@@ -239,4 +241,42 @@
     overflow-wrap: break-word;
     cursor: pointer;
     user-select: text;
+}
+
+/* A refusal nobody pressed for: the canvas and the namespace's page stand
+   crimson behind it until it is pressed. */
+body.refusal-said .canvas-workspace,
+body.refusal-said #namespace-page {
+    background-color: color-mix(in srgb, var(--refusal-crimson) 22%, var(--bg-dark));
+}
+
+/* Said over the canvas the way the door says what went wrong (.door-say):
+   its own dark glass, so it reads on whatever is behind it. */
+.refusal-say {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 40%;
+    margin: 0 auto;
+    z-index: 100001;
+    width: fit-content;
+    max-width: 420px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    background: var(--door-face-glass);
+    backdrop-filter: blur(3px);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .14em;
+    /* Not lowercased as the door is: an error id is read back exactly. */
+    text-align: center;
+    color: var(--color-error);
+    white-space: pre-line;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    cursor: pointer;
+}
+
+.refusal-say[hidden] {
+    display: none;
 }

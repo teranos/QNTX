@@ -52,6 +52,7 @@
     /* Status Colors */
     --color-success: #22c65e;
     --color-error: #e44747;
+    --refusal-crimson: #dc143c; /* A refusal nobody pressed for, standing behind the canvas */
     --color-warning: #ffab00;
     --color-info: #3b83f6;
     --color-scheduled: #7b20a2;
