@@ -99,18 +99,18 @@ export function windowOf(times: number[], now: number = Date.now()): Window {
     return { start, end: now, unit: unitFor(start, now) };
 }
 
-/** How many moments fall in each bucket of the window, empty buckets at zero. */
-export function seriesOf(times: number[], w: Window): number[] {
+/** How many moments fall in each bucket of the window, empty buckets at zero.
+ *  A moment the node already counted comes with how many it stands for. */
+export function seriesOf(times: number[], w: Window, weights?: number[]): number[] {
     const starts: number[] = [];
     for (let t = bucketStart(w.start, w.unit); t <= w.end; t = nextBucket(t, w.unit)) {
         starts.push(t);
     }
     const counts = starts.map(() => 0);
-    for (const t of times) {
-        const b = bucketStart(t, w.unit);
-        const i = starts.indexOf(b);
-        if (i >= 0) counts[i]++;
-    }
+    times.forEach((t, k) => {
+        const i = starts.indexOf(bucketStart(t, w.unit));
+        if (i >= 0) counts[i] += weights ? weights[k] : 1;
+    });
     return counts;
 }
 
@@ -129,15 +129,62 @@ export function formatIn(t: number, unit: Unit): string {
     }
 }
 
-/** A name and every moment it was seen. */
+/** A name and every moment it was seen. When the node sends buckets rather
+ *  than moments, each time is a bucket's start and its weight how many fell in
+ *  it, and last is the moment itself. */
 export interface Seen {
     name: string;
     times: number[];
+    weights?: number[];
+    last?: number;
+}
+
+/**
+ * The start of a bucket the node names by its key, in UTC: `2026-09-11T14:10`
+ * (ten minutes), `2026-09-11T14` (an hour), `2026-09-11` (a day) or `2026-W37`
+ * (an ISO week). Null for a key in none of these shapes.
+ */
+export function timeOfBucket(key: string): number | null {
+    let t = NaN;
+    if (key.length === 8 && key.slice(4, 6) === '-W') {
+        const year = Number(key.slice(0, 4));
+        const week = Number(key.slice(6));
+        const jan4 = Date.UTC(year, 0, 4);
+        const monday = jan4 - ((new Date(jan4).getUTCDay() + 6) % 7) * 86_400_000;
+        t = monday + (week - 1) * 7 * 86_400_000;
+    } else if (key.length === 16) {
+        t = Date.parse(`${key}:00Z`);
+    } else if (key.length === 13) {
+        t = Date.parse(`${key}:00:00Z`);
+    } else if (key.length === 10) {
+        t = Date.parse(`${key}T00:00:00Z`);
+    }
+    return Number.isNaN(t) ? null : t;
+}
+
+/** A name seen by the bucket, as the node sends it: `{ "2026-09-11T14": 3 }`. */
+export function seenOver(name: string, over: Record<string, number> | null | undefined, last?: string): Seen {
+    const times: number[] = [];
+    const weights: number[] = [];
+    for (const [key, n] of Object.entries(over ?? {})) {
+        const t = timeOfBucket(key);
+        if (t === null || n <= 0) continue;
+        times.push(t);
+        weights.push(n);
+    }
+    const at = last ? Date.parse(last) : NaN;
+    return { name, times, weights, last: Number.isNaN(at) ? undefined : at };
+}
+
+/** When a name was last seen, or -Infinity for never. */
+export function lastOf(s: Seen): number {
+    if (s.last !== undefined) return s.last;
+    return s.times.length > 0 ? Math.max(...s.times) : -Infinity;
 }
 
 /** Most recently seen first; a tie reads the same way twice, by name. */
 export function byLastSeen(rows: Seen[]): Seen[] {
-    const last = (s: Seen): number => (s.times.length > 0 ? Math.max(...s.times) : -Infinity);
+    const last = lastOf;
     return rows.slice().sort((a, b) => (last(b) - last(a)) || a.name.localeCompare(b.name));
 }
 
@@ -191,11 +238,12 @@ export function renderSparklines(
         spark.className = 'sparkline';
         spark.style.flexShrink = '0';
         spark.style.display = 'inline-flex';
-        spark.innerHTML = renderSparkline(seriesOf(row.times, w));
+        spark.innerHTML = renderSparkline(seriesOf(row.times, w, row.weights));
 
         const last = document.createElement('span');
         last.className = 'sparkline-last';
-        last.textContent = row.times.length > 0 ? formatIn(Math.max(...row.times), w.unit) : '';
+        const at = lastOf(row);
+        last.textContent = at === -Infinity ? '' : formatIn(at, w.unit);
         last.style.flexShrink = '0';
         last.style.textAlign = 'right';
         last.style.color = MUTE;

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { unitFor, seriesOf, byLastSeen, formatIn, windowOf, renderSparkline } from './sparkline';
+import { unitFor, seriesOf, byLastSeen, formatIn, windowOf, renderSparkline, timeOfBucket, seenOver } from './sparkline';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -56,5 +56,33 @@ describe('Rows', () => {
         expect(formatIn(t, 'day')).toBe('2026-03-07');
         expect(formatIn(t, 'month')).toBe('2026-03');
         expect(formatIn(t, 'year')).toBe('2026');
+    });
+});
+
+describe('Buckets the node sends', () => {
+    test('each key shape the node writes is the start of its bucket, in UTC', () => {
+        expect(timeOfBucket('2026-09-11T14:10')).toBe(Date.UTC(2026, 8, 11, 14, 10));
+        expect(timeOfBucket('2026-09-11T14')).toBe(Date.UTC(2026, 8, 11, 14));
+        expect(timeOfBucket('2026-09-11')).toBe(Date.UTC(2026, 8, 11));
+        // ISO week 37 of 2026 starts on Monday 7 September.
+        expect(timeOfBucket('2026-W37')).toBe(Date.UTC(2026, 8, 7));
+        expect(timeOfBucket('soon')).toBeNull();
+    });
+
+    test('a bucket counts as many as the node says fell in it', () => {
+        const seen = seenOver('page_view', { '2026-09-11T14': 3, '2026-09-12T09': 1 }, '2026-09-12T09:41:00Z');
+        const w = windowOf(seen.times, Date.UTC(2026, 8, 14, 12));
+        expect(w.unit).toBe('day');
+        const series = seriesOf(seen.times, w, seen.weights);
+        expect(series.reduce((a, b) => a + b, 0)).toBe(4);
+        expect(Math.max(...series)).toBe(3);
+    });
+
+    test('when last seen is the moment the node sends, not the start of its bucket', () => {
+        const rows = byLastSeen([
+            seenOver('earlier', { '2026-09-12T09': 1 }, '2026-09-12T09:05:00Z'),
+            seenOver('later', { '2026-09-12T09': 1 }, '2026-09-12T09:41:00Z'),
+        ]);
+        expect(rows.map((r) => r.name)).toEqual(['later', 'earlier']);
     });
 });

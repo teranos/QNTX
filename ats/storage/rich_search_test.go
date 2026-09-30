@@ -607,3 +607,49 @@ func TestDynamicFieldDiscovery(t *testing.T) {
 		assert.True(t, found, "Should find document via custom field")
 	})
 }
+
+// "The axis of time is more useful than a tally": a field carried often but
+// long ago comes after one carried once, lately, and each says when.
+func TestGetRichFieldsWithStats_MostRecentlyCarriedFirst(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewBoundedStore(db, nil, nil)
+	attestTypeDefinition(t, db, "Note", []string{"often", "lately", "never"})
+
+	carry := func(id, field string, at time.Time) {
+		attrsJSON, err := json.Marshal(map[string]interface{}{field: "text"})
+		require.NoError(t, err)
+		_, err = db.Exec(`
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			id, `["n"]`, `[]`, `[]`, `[]`, attrsJSON, at, "test")
+		require.NoError(t, err)
+	}
+	long := time.Date(2026, 9, 1, 10, 15, 0, 0, time.UTC)
+	for i := 0; i < 5; i++ {
+		carry(fmt.Sprintf("often-%d", i), "often", long)
+	}
+	carry("lately-0", "lately", time.Date(2026, 9, 20, 8, 5, 0, 0, time.UTC))
+
+	fields, err := store.GetRichFieldsWithStats(336)
+	require.NoError(t, err)
+	require.Len(t, fields, 3)
+
+	assert.Equal(t, "lately", fields[0].Field)
+	assert.Equal(t, "2026-09-20T08:05:00Z", fields[0].Last)
+	assert.Equal(t, map[string]int64{"2026-09-20T08": 1}, fields[0].Over)
+
+	assert.Equal(t, "often", fields[1].Field)
+	assert.Equal(t, map[string]int64{"2026-09-01T10": 5}, fields[1].Over)
+
+	assert.Equal(t, "never", fields[2].Field)
+	assert.Empty(t, fields[2].Last)
+	assert.Empty(t, fields[2].Over)
+
+	// One hour kept: every field is cut there, and still says when it was last carried.
+	fields, err = store.GetRichFieldsWithStats(1)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int64{"2026-09-20T08": 1}, fields[0].Over)
+	assert.Equal(t, "often", fields[1].Field)
+	assert.Empty(t, fields[1].Over)
+	assert.Equal(t, "2026-09-01T10:15:00Z", fields[1].Last)
+}
