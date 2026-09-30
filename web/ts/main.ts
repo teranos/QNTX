@@ -25,7 +25,7 @@ import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { person, type Person } from './self-person.ts';
 import { setOpenCanvas, setStanding } from './standing.ts';
-import { addressed, keepTabWhereItIs, settle, stepTo } from './address.ts';
+import { addressed, entitle, keepTabWhereItIs, settle, stepTo } from './address.ts';
 import { toast } from './toast';
 import { drawWho } from './who.ts';
 import type { CanvasRow } from './api/canvases.ts';
@@ -275,6 +275,7 @@ async function init(): Promise<void> {
             }
         }
         setStanding(who.standing);
+        entitle(who.standing);
         keepTabWhereItIs();
     } catch (err: unknown) {
         log.debug(SEG.UI, '[Init] Standing nowhere:', err);
@@ -312,6 +313,7 @@ async function init(): Promise<void> {
             setOpenCanvas(chosen.open);
             settle(who.standing, !chosen.hasCanvas ? '' : chosen.open !== '' ? chosen.open : rows.find(c => c.kind === 'namespace')?.id ?? '');
             hasCanvas = chosen.hasCanvas;
+            entitle(who.standing, chosen.open === '' ? '' : rows.find(c => c.id === chosen.open)?.name ?? '');
             // "can either be seen by opening it (also desaturated view)"
             document.body.classList.toggle('canvas-disabled', chosen.disabled);
         } catch (err: unknown) {

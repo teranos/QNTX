@@ -47,6 +47,19 @@ export function settle(ns: string, canvas: string): void {
     history.replaceState(history.state, '', addressOf(ns, canvas));
 }
 
+/**
+ * Names the tab after where it is, so tabs in different namespaces and
+ * canvases are told apart in the browser's tab bar. The namespace's own
+ * canvas is the namespace; another canvas is named beside it.
+ */
+export function entitle(ns: string, canvas = ''): void {
+    if (ns === '') {
+        document.title = 'QNTX';
+        return;
+    }
+    document.title = canvas === '' ? `${ns} — QNTX` : `${ns} · ${canvas} — QNTX`;
+}
+
 /** Builds the page for another namespace or canvas: a new entry, so back returns. */
 export function go(ns: string, canvas: string): void {
     location.assign(addressOf(ns, canvas));
