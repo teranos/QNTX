@@ -75,6 +75,7 @@ func TestOpeningDoesNotWriteBackATokenThatWasOnlyUsed(t *testing.T) {
 	_, err = first.Issue(aToken("abc", "one"))
 	require.NoError(t, err)
 	require.NoError(t, first.Touch("abc"))
+	require.NoError(t, first.Flush())
 	record.puts = nil
 
 	_, done, err := OpenTokenTable(db, record)
@@ -133,4 +134,69 @@ func TestOpeningTakesInTheTokensTheRecordHoldsAndTheTableLacks(t *testing.T) {
 
 	_, live := table.Lookup("abc")
 	assert.True(t, live, "a token taken in from the record does not authorize")
+}
+
+// "we need to keep users in mem"
+//
+// The gate reads a token and records its use on every request. Neither may
+// wait on the operational db: that is where one namespace's flood of requests
+// queued every other namespace's behind it.
+func TestAGatedRequestNeverAsksTheOperationalDb(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	table, _, err := OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	_, err = table.Issue(aToken("abc", "one"))
+	require.NoError(t, err)
+
+	require.NoError(t, db.Close())
+
+	_, live := table.Lookup("abc")
+	assert.True(t, live, "a token was not found once the operational db stopped answering")
+	assert.NoError(t, table.Touch("abc"))
+}
+
+// A use is kept in memory and written on Flush, and until then the token says
+// it was used all the same.
+func TestLastUsedReachesTheTableOnFlush(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	table, _, err := OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	_, err = table.Issue(aToken("abc", "one"))
+	require.NoError(t, err)
+
+	require.NoError(t, table.Touch("abc"))
+	listed, err := table.List()
+	require.NoError(t, err)
+	require.Len(t, listed, 1)
+	assert.NotNil(t, listed[0].LastUsedAt, "a use not yet written is not shown")
+
+	reopened, _, err := OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	written, err := reopened.List()
+	require.NoError(t, err)
+	assert.Nil(t, written[0].LastUsedAt, "a use reached the table before Flush")
+
+	require.NoError(t, table.Flush())
+	reopened, _, err = OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	written, err = reopened.List()
+	require.NoError(t, err)
+	assert.Equal(t, listed[0].LastUsedAt, written[0].LastUsedAt)
+}
+
+// A flush the table refuses loses nothing: the use stays for the next.
+func TestALastUsedTheTableRefusedIsKept(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	table, _, err := OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	_, err = table.Issue(aToken("abc", "one"))
+	require.NoError(t, err)
+	require.NoError(t, table.Touch("abc"))
+
+	require.NoError(t, db.Close())
+	assert.Error(t, table.Flush())
+
+	listed, err := table.List()
+	require.NoError(t, err)
+	assert.NotNil(t, listed[0].LastUsedAt, "a use the table refused was dropped")
 }

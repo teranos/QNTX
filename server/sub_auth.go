@@ -5,9 +5,11 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
@@ -216,6 +218,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 			return errors.Wrap(err, "failed to open the access_tokens table")
 		}
 		tokenStore = table
+		s.keepLastUsed(table)
 		s.logger.Infow("Access tokens held in the operational db",
 			"backend", s.deps.cfg.Storage.Backend,
 			"held", tookIn.Held,
@@ -314,4 +317,31 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		"rp_origins", s.deps.cfg.Auth.RPOrigins,
 	)
 	return nil
+}
+
+// lastUsedFlushInterval is how often the last-used the gate keeps in memory is
+// written to the access_tokens table.
+const lastUsedFlushInterval = time.Minute
+
+// keepLastUsed writes the last-used the gate kept every lastUsedFlushInterval,
+// and once more when the node stops.
+func (s *QNTXServer) keepLastUsed(table *auth.TokenTable) {
+	flush := func() {
+		if err := table.Flush(); err != nil {
+			s.logger.Errorw("Access tokens' last-used were not written; they stay for the next flush", "error", err)
+		}
+	}
+	sacred.GoTracked(&s.wg, "auth.lastUsed", func() {
+		ticker := time.NewTicker(lastUsedFlushInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				flush()
+				return
+			case <-ticker.C:
+				flush()
+			}
+		}
+	})
 }

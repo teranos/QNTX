@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,9 +22,26 @@ import (
 // it: on parquet the one object per token under system/access_tokens/, which
 // is where a token is rebuilt from after host loss and nowhere a request
 // reads from.
+//
+// The table is held in memory as well, rows as they are written, and last-used
+// is kept there until Flush writes it: the gate reads a token and records its
+// use on every request, and the node is the only writer of this table, so a
+// request never needs the operational db behind it.
 type TokenTable struct {
 	db     *sql.DB
 	record TokenRecordStore
+
+	writing sync.Mutex // One write at a time, so the table and memory agree on the last.
+	mu      sync.RWMutex
+	rows    map[string]tokenRow // hash → the row, as the table holds it
+	used    map[string]int64    // hash → when it was last presented, not yet in the table
+}
+
+// tokenRow is one row of access_tokens.
+type tokenRow struct {
+	id        string
+	record    []byte
+	createdAt int64
 }
 
 // TookIn is what opening the table found: how many tokens it already held,
@@ -38,8 +57,11 @@ type TookIn struct {
 // lacks is taken in; a token the table holds is the truth, written back when
 // the record disagrees. A nil record is a deployment that keeps none.
 func OpenTokenTable(db *sql.DB, record TokenRecordStore) (*TokenTable, TookIn, error) {
-	t := &TokenTable{db: db, record: record}
+	t := &TokenTable{db: db, record: record, used: map[string]int64{}}
 	var done TookIn
+	if err := t.load(); err != nil {
+		return nil, done, err
+	}
 	if record == nil {
 		return t, done, nil
 	}
@@ -200,14 +222,47 @@ func (t *TokenTable) SetNamespaces(id string, namespaces []string) error {
 // token and seeing whether anything still presents it is read from — and a
 // watch is not a record. Losing the host loses it, which is the right thing to
 // lose for the one write that runs on every authenticated request.
+//
+// Memory, until Flush: a request records its use without writing, and what is
+// lost with the process is at most one Flush of last-used.
 func (t *TokenTable) Touch(hash string) error {
 	now := time.Now().UTC().UnixMilli()
-	held, found, err := t.byHash(hash)
-	if err != nil || !found {
-		return err
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if _, held := t.rows[hash]; held {
+		t.used[hash] = now
 	}
-	held.LastUsedAt = &now
-	return t.write(held)
+	return nil
+}
+
+// Flush writes every last-used Touch has kept since the one before. A token
+// whose write fails keeps its last-used for the next.
+func (t *TokenTable) Flush() error {
+	t.mu.RLock()
+	hashes := make([]string, 0, len(t.used))
+	for hash := range t.used {
+		hashes = append(hashes, hash)
+	}
+	t.mu.RUnlock()
+
+	var first error
+	failed := 0
+	for _, hash := range hashes {
+		held, found, err := t.byHash(hash)
+		if err == nil && found {
+			err = t.write(held)
+		}
+		if err != nil {
+			failed++
+			if first == nil {
+				first = err
+			}
+		}
+	}
+	if first != nil {
+		return errors.Wrapf(first, "%d of %d access tokens' last-used were not written", failed, len(hashes))
+	}
+	return nil
 }
 
 // change reads a token by id, applies what the caller wants changed, and
@@ -250,6 +305,8 @@ func (t *TokenTable) write(held TokenRecord) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize access token %s", held.ID)
 	}
+	t.writing.Lock()
+	defer t.writing.Unlock()
 	_, err = t.db.Exec(
 		`INSERT INTO access_tokens (hash, id, record) VALUES (?, ?, ?)
 		 ON CONFLICT(hash) DO UPDATE SET id = excluded.id, record = excluded.record`,
@@ -257,50 +314,92 @@ func (t *TokenTable) write(held TokenRecord) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to write access token %s to the operational db", held.ID)
 	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	row := t.rows[held.Hash] // created_at is the table's, and a write leaves it
+	row.id, row.record = held.ID, body
+	t.rows[held.Hash] = row
+	if written := held.LastUsedAt; written != nil && t.used[held.Hash] <= *written {
+		delete(t.used, held.Hash)
+	}
 	return nil
 }
 
-// byHash is the one query a gated request makes.
-func (t *TokenTable) byHash(hash string) (TokenRecord, bool, error) {
-	var body string
-	err := t.db.QueryRow(`SELECT record FROM access_tokens WHERE hash = ?`, hash).Scan(&body)
-	if errors.Is(err, sql.ErrNoRows) {
-		return TokenRecord{}, false, nil
-	}
+// load reads the table into memory, once, when it opens.
+func (t *TokenTable) load() (err error) {
+	rows, err := t.db.Query(`SELECT hash, id, record, created_at FROM access_tokens`)
 	if err != nil {
-		return TokenRecord{}, false, errors.Wrap(err, "failed to read the access_tokens table")
-	}
-	var held TokenRecord
-	if err := json.Unmarshal([]byte(body), &held); err != nil {
-		return TokenRecord{}, false, errors.Wrap(err, "an access token row in the operational db is not a token")
-	}
-	return wholeToken(held), true, nil
-}
-
-// records is every token in the table, oldest first so runs are comparable.
-func (t *TokenTable) records() (_ []TokenRecord, err error) {
-	rows, err := t.db.Query(`SELECT record FROM access_tokens ORDER BY created_at, id`)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read the access_tokens table")
+		return errors.Wrap(err, "failed to read the access_tokens table")
 	}
 	defer func() { err = sqlclose.With(err, rows.Close(), "rows for access_tokens") }()
 
-	held := []TokenRecord{}
+	held := map[string]tokenRow{}
 	for rows.Next() {
-		var body string
-		if err := rows.Scan(&body); err != nil {
-			return nil, errors.Wrap(err, "failed to scan an access token row")
+		var hash, id, body string
+		var createdAt int64
+		if err := rows.Scan(&hash, &id, &body, &createdAt); err != nil {
+			return errors.Wrap(err, "failed to scan an access token row")
 		}
-		var one TokenRecord
-		if err := json.Unmarshal([]byte(body), &one); err != nil {
-			return nil, errors.Wrap(err, "an access token row in the operational db is not a token")
-		}
-		held = append(held, wholeToken(one))
+		held[hash] = tokenRow{id: id, record: []byte(body), createdAt: createdAt}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "the access_tokens table stopped answering")
+		return errors.Wrap(err, "the access_tokens table stopped answering")
+	}
+	t.mu.Lock()
+	t.rows = held
+	t.mu.Unlock()
+	return nil
+}
+
+// byHash is the one read a gated request makes.
+func (t *TokenTable) byHash(hash string) (TokenRecord, bool, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	row, found := t.rows[hash]
+	if !found {
+		return TokenRecord{}, false, nil
+	}
+	held, err := t.token(hash, row)
+	return held, err == nil, err
+}
+
+// records is every token in the table, oldest first so runs are comparable.
+func (t *TokenTable) records() ([]TokenRecord, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	hashes := make([]string, 0, len(t.rows))
+	for hash := range t.rows {
+		hashes = append(hashes, hash)
+	}
+	sort.Slice(hashes, func(i, j int) bool {
+		a, b := t.rows[hashes[i]], t.rows[hashes[j]]
+		if a.createdAt != b.createdAt {
+			return a.createdAt < b.createdAt
+		}
+		return a.id < b.id
+	})
+	held := make([]TokenRecord, 0, len(hashes))
+	for _, hash := range hashes {
+		one, err := t.token(hash, t.rows[hash])
+		if err != nil {
+			return nil, err
+		}
+		held = append(held, one)
 	}
 	return held, nil
+}
+
+// token is a row as a token, with the last-used Touch has kept and not yet
+// written. The caller holds mu.
+func (t *TokenTable) token(hash string, row tokenRow) (TokenRecord, error) {
+	var held TokenRecord
+	if err := json.Unmarshal(row.record, &held); err != nil {
+		return TokenRecord{}, errors.Wrapf(err, "access token %s in the access_tokens table is not a token", row.id)
+	}
+	if used, kept := t.used[hash]; kept && (held.LastUsedAt == nil || *held.LastUsedAt < used) {
+		held.LastUsedAt = &used
+	}
+	return wholeToken(held), nil
 }
 
 // wholeToken is a token with every list present. A nil slice marshals as null
