@@ -1,8 +1,18 @@
 package server
 
 import (
+	"context"
+	"net/http"
+	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/services"
+	"github.com/teranos/QNTX/server/auth"
+	"go.uber.org/zap"
 )
 
 // Every subsystem handles a store error locally and continues, so losing the
@@ -49,4 +59,131 @@ func TestAReadableOperationalStoreStopsNothing(t *testing.T) {
 		t.Fatalf("stopped a healthy node: %v", reason)
 	case <-time.After(2 * operationalCheckInterval):
 	}
+}
+
+// inbox is a transport that keeps what it is handed, from any goroutine.
+type inbox struct {
+	mu    sync.Mutex
+	mails []services.OutgoingMail
+}
+
+func (b *inbox) Send(_ context.Context, m services.OutgoingMail) (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.mails = append(b.mails, m)
+	return "ses-" + m.Subject, nil
+}
+
+func (b *inbox) subjects() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var said []string
+	for _, m := range b.mails {
+		said = append(said, m.Subject)
+	}
+	return said
+}
+
+// watchedNode is a node with a ROOT User to mail and a mail service to mail
+// them with, whose operational store answers one caller at a time, so holding
+// that one connection is a store that does not answer.
+func watchedNode(t *testing.T) (*QNTXServer, *inbox) {
+	t.Helper()
+	s := rootKnowingServer(t)
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	t.Cleanup(s.cancel)
+
+	users, _, err := auth.OpenUserTable(s.nodeDB, nil)
+	require.NoError(t, err)
+	require.NoError(t, users.Put(auth.User{ID: "USroot", Level: auth.LevelRoot, EmailAddresses: []string{"root@garden.test"}}))
+	s.authHandler, err = auth.New(nil, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
+		func(next http.HandlerFunc) http.HandlerFunc { return next },
+		nil, users, false, []string{rootAccount}, nil)
+	require.NoError(t, err)
+
+	box := &inbox{}
+	mail := services.NewMailServer("token", zap.NewNop().Sugar())
+	mail.Wire(services.MailWiring{From: "Garden <mail@garden.test>", Transport: box,
+		Recipients: s.mailRecipient, Records: s.mailRecords, Actor: "did:key:z6Mkgardennode"})
+	s.nodeMailer = mail
+
+	s.nodeDB.SetMaxOpenConns(1)
+	return s, box
+}
+
+// The whole of a minute, shrunk so a test can wait it out.
+var shortPatience = operationalPatience{
+	every:     20 * time.Millisecond,
+	sentry:    30 * time.Millisecond,
+	mailEvery: 100 * time.Millisecond,
+	die:       500 * time.Millisecond,
+	lastWords: time.Second,
+}
+
+// "make it so that we can take up to a minute before it decides to die ...
+// QNTX should send an email at 10 sec, 20 sec, 30 sec up to a minute. And also
+// an email if it recovered back to below 3 sec and how long it took."
+func TestASlowOperationalStoreIsWaitedOnAndROOTIsTold(t *testing.T) {
+	s, box := watchedNode(t)
+
+	stopped := make(chan error, 1)
+	go s.watchOperationalStore(func(reason error) { stopped <- reason }, shortPatience)
+	time.Sleep(3 * shortPatience.every) // ROOT is read while the store answers
+
+	held, err := s.nodeDB.Conn(context.Background())
+	require.NoError(t, err)
+	time.Sleep(250 * time.Millisecond) // past two mails, short of the minute
+	require.NoError(t, held.Close())
+
+	require.Eventually(t, func() bool {
+		for _, subject := range box.subjects() {
+			if strings.HasPrefix(subject, "The operational store answers again, after") {
+				return true
+			}
+		}
+		return false
+	}, time.Second, 10*time.Millisecond, "the store answered again and ROOT was not told: %v", box.subjects())
+
+	var waits int
+	for _, subject := range box.subjects() {
+		if strings.HasPrefix(subject, "The operational store has not answered for") {
+			waits++
+		}
+	}
+	assert.GreaterOrEqual(t, waits, 2, "ROOT was not mailed as the wait grew: %v", box.subjects())
+	for _, m := range box.mails {
+		assert.Equal(t, "root@garden.test", m.To)
+	}
+
+	select {
+	case reason := <-stopped:
+		t.Fatalf("a store that answered within the minute stopped the node: %v", reason)
+	default:
+	}
+}
+
+// A store that has not answered in a minute is given up on, and ROOT is told
+// before the process ends.
+func TestAStoreThatDoesNotAnswerInAMinuteStopsTheNodeAndROOTIsTold(t *testing.T) {
+	s, box := watchedNode(t)
+
+	stopped := make(chan error, 1)
+	go s.watchOperationalStore(func(reason error) { stopped <- reason }, shortPatience)
+	time.Sleep(3 * shortPatience.every)
+
+	held, err := s.nodeDB.Conn(context.Background())
+	require.NoError(t, err)
+	defer held.Close()
+
+	select {
+	case reason := <-stopped:
+		require.ErrorIs(t, reason, context.DeadlineExceeded)
+	case <-time.After(5 * shortPatience.die):
+		t.Fatal("the store did not answer for the whole minute and the node did not stop")
+	}
+
+	subjects := box.subjects()
+	require.NotEmpty(t, subjects)
+	assert.True(t, strings.HasPrefix(subjects[len(subjects)-1], "QNTX stops: the operational store has not answered for"),
+		"the last mail does not say the node stops: %v", subjects)
 }
