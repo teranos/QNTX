@@ -154,15 +154,16 @@ func asksToWrite(body *ast.BlockStmt) bool {
 // below. That is the whole of how this stays true when something new is added:
 // it is a claim somebody makes in the open, or it is a thing a namespace has.
 var nodeReaders = map[string]string{
-	"handlers.go:HandleHealth":                      "the health of the file underneath, which is the node's to answer",
-	"operational_watchdog.go:WatchOperationalStore": "the same ping on a tick, so a node that has stopped answering says so",
-	"lifecycle.go:Stop":                             "shutdown compares the pulse read connection with the node's own",
-	"sub_auth.go:Init":                              "the doors, which are the node's edge: am.toml says which namespace is behind each",
-	"sub_config_watcher.go:Init":                    "am.toml is the node's configuration, and watching it is the node's",
-	"sub_nodedid.go:Init":                           "the node's own identity, the row keyed self",
-	"sub_plugins.go:Init":                           "the plugin service registry, and plugins are the node's",
-	"sub_ticker.go:Init":                            "the poller that reports warnings and evictions about the file itself",
-	"sub_ticker.go:openPulseReadDB":                 "a second connection to the same file, so a read does not wait on a write",
+	"handlers.go:HandleHealth":                    "the health of the file underneath, which is the node's to answer",
+	"operational_watchdog.go:askOperationalStore": "the same ping on a tick, so a node that has stopped answering says so",
+	"operational_watchdog.go:operationalPool":     "where the connections to the node's own file are while a ping waits on it",
+	"lifecycle.go:Stop":                           "shutdown compares the pulse read connection with the node's own",
+	"sub_auth.go:Init":                            "the doors, which are the node's edge: am.toml says which namespace is behind each",
+	"sub_config_watcher.go:Init":                  "am.toml is the node's configuration, and watching it is the node's",
+	"sub_nodedid.go:Init":                         "the node's own identity, the row keyed self",
+	"sub_plugins.go:Init":                         "the plugin service registry, and plugins are the node's",
+	"sub_ticker.go:Init":                          "the poller that reports warnings and evictions about the file itself",
+	"sub_ticker.go:openPulseReadDB":               "a second connection to the same file, so a read does not wait on a write",
 }
 
 // A namespace is made of what Made says, and what is left on the node is the
