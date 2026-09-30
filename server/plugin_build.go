@@ -22,6 +22,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// buildConfigPrefix marks the keys of a plugin's Config that are QNTX's.
+const buildConfigPrefix = "build."
+
 // The keys of a plugin's Config that say how QNTX builds it.
 const (
 	buildCore      = "build.core"

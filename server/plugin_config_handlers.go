@@ -225,6 +225,10 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 
 	// Validate each provided config value
 	for fieldName, value := range settings {
+		// How QNTX builds the plugin is QNTX's, not the plugin's to validate.
+		if strings.HasPrefix(fieldName, buildConfigPrefix) {
+			continue
+		}
 		fieldSchema, schemaExists := schema[fieldName]
 		if !schemaExists {
 			errors[fieldName] = "Unknown configuration field"

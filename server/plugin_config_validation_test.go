@@ -6,6 +6,17 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
+func TestTheBuildKeysAreNotThePluginsToValidate(t *testing.T) {
+	errs := validateConfigAgainstSchema(map[string]string{
+		buildCore:    "teranos/datapunt@main",
+		buildCommand: "dub build",
+		"typo":       "x",
+	}, map[string]*protocol.ConfigFieldSchema{})
+	if len(errs) != 1 || errs["typo"] == "" {
+		t.Fatalf("errors: %v", errs)
+	}
+}
+
 func TestValidateConfigAgainstSchema(t *testing.T) {
 	tests := []struct {
 		name         string
