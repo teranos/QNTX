@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -74,6 +75,16 @@ func (b *inbox) Send(_ context.Context, m services.OutgoingMail) (string, error)
 	return "ses-" + m.Subject, nil
 }
 
+func (b *inbox) texts() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var said []string
+	for _, m := range b.mails {
+		said = append(said, m.Text)
+	}
+	return said
+}
+
 func (b *inbox) subjects() []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -88,6 +99,13 @@ func (b *inbox) subjects() []string {
 // them with, whose operational store answers one caller at a time, so holding
 // that one connection is a store that does not answer.
 func watchedNode(t *testing.T) (*QNTXServer, *inbox) {
+	s, box, _ := watchedNodeWithTokens(t)
+	return s, box
+}
+
+// watchedNodeWithTokens is a watchedNode whose gate admits access tokens and
+// turns away the heaviest while the store is slow.
+func watchedNodeWithTokens(t *testing.T) (*QNTXServer, *inbox, *auth.TokenTable) {
 	t.Helper()
 	s := rootKnowingServer(t)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
@@ -96,10 +114,14 @@ func watchedNode(t *testing.T) (*QNTXServer, *inbox) {
 	users, _, err := auth.OpenUserTable(s.nodeDB, nil)
 	require.NoError(t, err)
 	require.NoError(t, users.Put(auth.User{ID: "USroot", Level: auth.LevelRoot, EmailAddresses: []string{"root@garden.test"}}))
+	tokens, _, err := auth.OpenTokenTable(s.nodeDB, nil)
+	require.NoError(t, err)
 	s.authHandler, err = auth.New(nil, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		nil, users, false, []string{rootAccount}, nil)
+		tokens, users, false, []string{rootAccount}, nil)
 	require.NoError(t, err)
+	s.shed = auth.NewShed(operationalCheckInterval)
+	s.authHandler.SetShed(s.shed)
 
 	box := &inbox{}
 	mail := services.NewMailServer("token", zap.NewNop().Sugar())
@@ -108,7 +130,7 @@ func watchedNode(t *testing.T) (*QNTXServer, *inbox) {
 	s.nodeMailer = mail
 
 	s.nodeDB.SetMaxOpenConns(1)
-	return s, box
+	return s, box, tokens
 }
 
 // The whole of a minute, shrunk so a test can wait it out.
@@ -210,4 +232,59 @@ func TestAWaitROOTWasNotMailedAboutMailsNothingWhenItEnds(t *testing.T) {
 		t.Fatalf("a short wait stopped the node: %v", reason)
 	default:
 	}
+}
+
+// "a stall under load should shed or throttle the heaviest caller, not end
+// the process." — "Yes"
+//
+// While the store is slow the token that sent the most is turned away, and it
+// is let back in, and ROOT told so, once the store answers in time again.
+func TestTheHeaviestTokenIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
+	s, box, tokens := watchedNodeWithTokens(t)
+	heavy, _, err := tokens.Create(auth.NewToken{Label: "ground", MintedBy: rootAccount, Level: auth.LevelAttestor})
+	require.NoError(t, err)
+	light, _, err := tokens.Create(auth.NewToken{Label: "laptop-cron", MintedBy: rootAccount, Level: auth.LevelAttestor})
+	require.NoError(t, err)
+
+	gated := s.authHandler.Middleware("/api/attestations", auth.Also(auth.LevelAttestor), func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	send := func(raw string) int {
+		req := httptest.NewRequest(http.MethodPost, "/api/attestations", nil)
+		req.Header.Set("Authorization", "Bearer "+raw)
+		rec := httptest.NewRecorder()
+		gated.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	stopped := make(chan error, 1)
+	go s.watchOperationalStore(func(reason error) { stopped <- reason }, shortPatience)
+	time.Sleep(3 * shortPatience.every)
+
+	held, err := s.nodeDB.Conn(context.Background())
+	require.NoError(t, err)
+	// Sent while the store is still answering in time, so it is counted and
+	// not lifted before the stall begins.
+	for range 5 {
+		send(heavy)
+	}
+	send(light)
+
+	require.Eventually(t, func() bool {
+		return send(heavy) == http.StatusTooManyRequests
+	}, 2*shortPatience.mailEvery, 5*time.Millisecond, "the heaviest token was not turned away while the store was slow")
+	assert.Equal(t, http.StatusOK, send(light), "a token that was not the heaviest was turned away")
+
+	// Past a mail about the wait, which is what a mail about its end answers.
+	time.Sleep(2 * shortPatience.mailEvery)
+	require.NoError(t, held.Close())
+	require.Eventually(t, func() bool {
+		for _, text := range box.texts() {
+			if strings.Contains(text, "Let back in: ground") {
+				return true
+			}
+		}
+		return false
+	}, time.Second, 10*time.Millisecond, "ROOT was not told the heaviest token was let back in: %v", box.subjects())
+	assert.Equal(t, http.StatusOK, send(heavy), "the heaviest token was still turned away once the store answered in time")
 }

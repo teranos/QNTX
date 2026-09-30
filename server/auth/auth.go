@@ -91,6 +91,7 @@ type Handler struct {
 	ceremonies    sync.Map // ownerUserID -> *webauthn.SessionData
 	secureCookies bool     // true when auth.rp_origins says a browser reaches this over https
 	refused       refusals // what the status line reports about callers turned away
+	shed          *Shed    // the callers turned away while the node is slow; nil turns nobody away
 	// Every door this node answers, by the origin that reaches it.
 	// The node's own relying party is the door onto default and is always in
 	// here; am.toml adds the rest.
@@ -224,6 +225,10 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := h.presented(r)
+		if p.turnedAway {
+			h.rejectTurnedAway(w)
+			return
+		}
 
 		admitted, ok := h.admissionOf(p)
 		if !ok {

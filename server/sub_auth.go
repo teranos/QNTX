@@ -309,6 +309,8 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// Where a person may stand is what the stores serve, asked at the same
 	// door a write goes through.
 	authHandler.SetFooting(s.footing)
+	s.shed = auth.NewShed(operationalCheckInterval)
+	authHandler.SetShed(s.shed)
 	s.authHandler = authHandler
 	s.authEnabled = true
 	s.logger.Debugw("WebAuthn authentication enabled",
