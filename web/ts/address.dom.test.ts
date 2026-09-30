@@ -36,7 +36,7 @@ mock.module('./toast', () => ({
     toast: { warning: (m: string) => { warned.push(m); }, error: () => {}, success: () => {}, info: () => {} },
 }));
 
-const { addressed, addressOf, returnHere } = await import('./address.ts');
+const { addressed, addressOf, entitle, returnHere } = await import('./address.ts');
 const { setStanding } = await import('./standing.ts');
 
 describe('the address', () => {
@@ -53,6 +53,22 @@ describe('the address', () => {
     test('keeps what else it carries', () => {
         expect(addressOf('Clean', 'CV-BOB', 'http://node/?brow')).toBe('http://node/?brow=&ns=Clean&canvas=CV-BOB');
         expect(addressOf('SBVH', '', 'http://node/?ns=Clean&canvas=CV-BOB')).toBe('http://node/?ns=SBVH');
+    });
+});
+
+describe('the tab\'s name', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
+
+    test('is where it is', () => {
+        entitle('Clean');
+        expect(document.title).toBe('Clean — QNTX');
+        entitle('Clean', 'bob\'s');
+        expect(document.title).toBe('Clean · bob\'s — QNTX');
+        entitle('');
+        expect(document.title).toBe('QNTX');
     });
 });
 
