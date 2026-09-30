@@ -30,7 +30,7 @@ Z-index hierarchy:
 - Brow (.brow, Dynamic Island status line): 100004 — above the door: a shut door still shows the node's vitals
 - Door (#door, the identity threshold in the system bar): 100003
 - Glyph tray (.glyph-run): 100002
-- Toast: 100001
+- Toast, and a refusal said over the canvas (.refusal-say): 100001
 - Panel fullscreen: 100000
 - Windows: 10003 and up — each one raised above the last, so the one you just
   opened or touched is in front, including in front of a panel (z-order.ts)

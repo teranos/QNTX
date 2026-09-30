@@ -393,6 +393,7 @@ async function appear(header: HTMLElement): Promise<void> {
         failure = alongside(told());
         render();
         expandDrawer();
+        sound();
     });
 
     if (!bar) {
@@ -415,7 +416,41 @@ async function appear(header: HTMLElement): Promise<void> {
         attach(bar);
     }
     render();
-    if (said !== '') expandDrawer();
+    if (said !== '') {
+        expandDrawer();
+        sound();
+    }
+}
+
+// A refusal nobody pressed for is easy to miss in a bar. Until it is pressed,
+// the canvas and the namespace's page blink crimson behind it and it is said
+// over them, the way the door says what went wrong. Pressing it copies it and
+// stills the blink; the bar keeps saying it.
+let over: HTMLElement | null = null;
+
+function sound(): void {
+    if (failure === '') return;
+    if (!over) {
+        over = document.createElement('div');
+        over.className = 'refusal-say';
+        over.title = 'press to copy';
+        over.addEventListener('click', () => {
+            const message = over?.textContent ?? '';
+            void navigator.clipboard.writeText(message).then(
+                () => { hush(); },
+                (err: unknown) => { log.warn(SEG.UI, '[Namespaces] The refusal was not copied:', err); hush(); },
+            );
+        });
+        document.body.append(over);
+    }
+    over.textContent = failure;
+    over.hidden = false;
+    document.body.classList.add('refusal-said');
+}
+
+function hush(): void {
+    document.body.classList.remove('refusal-said');
+    if (over) over.hidden = true;
 }
 
 // A refusal said beside whatever the bar already says, never over it.
@@ -437,4 +472,5 @@ function teardown(): void {
     open = null;
     failure = '';
     onTold(null);
+    hush();
 }
