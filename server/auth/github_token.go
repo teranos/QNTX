@@ -18,6 +18,8 @@ import (
 const (
 	GitHubSourceOAuth       = "oauth"
 	GitHubSourceAccessToken = "access_token"
+	// GitHubSourceWebhook is the App's webhook secret, which ROOT generates.
+	GitHubSourceWebhook = "webhook"
 )
 
 // githubRefreshAhead is how long before expiry a token is refreshed rather
@@ -123,11 +125,61 @@ func (t *TokenTable) GitHubTokens() ([]TokenRecord, error) {
 	}
 	kept := []TokenRecord{}
 	for _, one := range held {
-		if one.Level == string(LevelGitHub) && one.GitHub != nil {
+		if one.Level == string(LevelGitHub) && one.GitHub != nil && one.GitHub.Source != GitHubSourceWebhook {
 			kept = append(kept, one)
 		}
 	}
 	return kept, nil
+}
+
+// githubWebhookHash is the key the App's webhook secret is kept under.
+func githubWebhookHash() string {
+	return sha256Hex(string(LevelGitHub) + " " + GitHubSourceWebhook)
+}
+
+// NewGitHubWebhook mints the App's webhook secret, replacing the one before.
+// ROOT sees it once, to give to GitHub.
+func (h *Handler) NewGitHubWebhook(mintedBy string) (string, error) {
+	table, ok := h.tokens.(*TokenTable)
+	if !ok {
+		return "", errors.Newf("the token store %T keeps no webhook secret", h.tokens)
+	}
+	secret, err := randomTicket()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to mint the App's webhook secret")
+	}
+	held, found, err := table.byHash(githubWebhookHash())
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		held = TokenRecord{
+			ID:        uuid.NewString(),
+			Hash:      githubWebhookHash(),
+			Label:     "github:" + GitHubSourceWebhook,
+			Level:     string(LevelGitHub),
+			CreatedAt: time.Now().UTC().UnixMilli(),
+		}
+	}
+	held.MintedBy = mintedBy
+	held.GitHub = &GitHubSecret{Token: secret, Source: GitHubSourceWebhook}
+	if err := table.put(wholeToken(held)); err != nil {
+		return "", errors.Wrap(err, "the App's webhook secret was not kept")
+	}
+	return secret, nil
+}
+
+// GitHubWebhook is the App's webhook secret. False is one ROOT never generated.
+func (h *Handler) GitHubWebhook() (string, bool, error) {
+	table, ok := h.tokens.(*TokenTable)
+	if !ok {
+		return "", false, nil
+	}
+	held, found, err := table.byHash(githubWebhookHash())
+	if err != nil || !found || held.GitHub == nil || held.GitHub.Token == "" {
+		return "", false, err
+	}
+	return held.GitHub.Token, true, nil
 }
 
 // GitHubKeeper is where this node keeps its GITHUB tokens, or an error naming
