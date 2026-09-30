@@ -12,7 +12,6 @@ const USE_JSDOM = process.env.USE_JSDOM === '1';
 let standingOnNode = 'default';
 let refuse = '';
 const steps: string[] = [];
-const warned: string[] = [];
 
 mock.module('./client', () => ({
     apiFetch: async (path: string, init?: RequestInit) => {
@@ -32,11 +31,8 @@ mock.module('./client', () => ({
         reportReachable: () => {},
     },
 }));
-mock.module('./toast', () => ({
-    toast: { warning: (m: string) => { warned.push(m); }, error: () => {}, success: () => {}, info: () => {} },
-}));
 
-const { addressed, addressOf, entitle, returnHere } = await import('./address.ts');
+const { addressed, addressOf, entitle, returnHere, told } = await import('./address.ts');
 const { setStanding } = await import('./standing.ts');
 
 describe('the address', () => {
@@ -82,7 +78,7 @@ describe('a tab looked at again', () => {
         standingOnNode = 'default';
         refuse = '';
         steps.length = 0;
-        warned.length = 0;
+        told();
         setStanding('default');
     });
 
@@ -98,14 +94,15 @@ describe('a tab looked at again', () => {
         await returnHere();
         expect(steps).toEqual(['default']);
         expect(standingOnNode).toBe('default');
-        expect(warned).toEqual([]);
+        expect(told()).toBe('');
     });
 
-    test('refused, it says so rather than drawing a namespace its writes do not land in', async () => {
+    test('refused, the namespaces bar says so rather than drawing a namespace its writes do not land in', async () => {
         standingOnNode = 'SBVH';
         refuse = 'default';
         await returnHere();
         expect(steps).toEqual(['default']);
-        expect(warned[0]).toContain('SBVH');
+        expect(told()).toContain('could not stand in default again, so it opens SBVH');
+        expect(told()).toBe('');
     });
 });

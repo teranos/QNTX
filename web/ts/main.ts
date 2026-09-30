@@ -25,8 +25,7 @@ import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { person, type Person } from './self-person.ts';
 import { setOpenCanvas, setStanding } from './standing.ts';
-import { addressed, entitle, keepTabWhereItIs, settle, stepTo } from './address.ts';
-import { toast } from './toast';
+import { addressed, entitle, keepTabWhereItIs, settle, stepTo, tell } from './address.ts';
 import { drawWho } from './who.ts';
 import type { CanvasRow } from './api/canvases.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -271,7 +270,7 @@ async function init(): Promise<void> {
                 who.standing = await stepTo(wanted.ns);
             } catch (err: unknown) {
                 log.warn(SEG.UI, `[Init] The address asked for ${wanted.ns}; staying in ${who.standing}:`, err);
-                toast.warning(err instanceof Error ? err.message : String(err));
+                tell(err instanceof Error ? err.message : String(err));
             }
         }
         setStanding(who.standing);

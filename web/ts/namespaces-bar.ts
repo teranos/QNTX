@@ -5,7 +5,7 @@ import { log, SEG } from './logger.ts';
 import { kindOf, tilesHtml, type Namespace, type Open } from './namespaces-view';
 import { person } from './self-person';
 import { standAtTheDoor } from './signin';
-import { go } from './address';
+import { go, onTold, told } from './address';
 
 let bar: HTMLElement | null = null;
 // The row, whose contents are rewritten, and the rectangle, which is not. One
@@ -383,6 +383,13 @@ async function appear(header: HTMLElement): Promise<void> {
         level = '';
         failure = `could not read where you are standing: ${error instanceof Error ? error.message : String(error)}`;
     }
+    // A step refused before the bar was up, by an address or another tab.
+    const said = told();
+    if (said !== '') failure = said;
+    onTold(() => {
+        failure = told();
+        render();
+    });
 
     if (!bar) {
         bar = document.createElement('div');
@@ -418,4 +425,5 @@ function teardown(): void {
     adding = false;
     open = null;
     failure = '';
+    onTold(null);
 }

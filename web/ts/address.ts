@@ -16,7 +16,6 @@ import { apiFetch } from './client';
 import { jsonBody } from './http-utils';
 import { log, SEG } from './logger.ts';
 import { standingNamespace } from './standing.ts';
-import { toast } from './toast';
 
 export interface Address {
     ns: string;
@@ -82,6 +81,42 @@ async function whereStanding(): Promise<string> {
     return (await response.json() as { namespace: string }).namespace;
 }
 
+// A refusal is said in the namespaces bar, where stepping is pressed. The page
+// may be built again before the bar is up, so it is kept for this tab until
+// the bar says it.
+const TOLD = 'qntx-told';
+let hear: (() => void) | null = null;
+
+/**
+ * Says a refusal in the namespaces bar, now or once it is up. A page about to
+ * be built again says it in the next one.
+ */
+export function tell(said: string, leaving = false): void {
+    try {
+        window.sessionStorage.setItem(TOLD, said);
+    } catch (err: unknown) {
+        log.warn(SEG.UI, `[Address] Could not keep "${said}" for the namespaces bar:`, err);
+    }
+    if (!leaving) hear?.();
+}
+
+/** The refusal waiting to be said, once. */
+export function told(): string {
+    try {
+        const said = window.sessionStorage.getItem(TOLD) ?? '';
+        window.sessionStorage.removeItem(TOLD);
+        return said;
+    } catch (err: unknown) {
+        log.warn(SEG.UI, '[Address] Could not read what the namespaces bar was to say:', err);
+        return '';
+    }
+}
+
+/** The namespaces bar, listening for a refusal while it is up. */
+export function onTold(listener: (() => void) | null): void {
+    hear = listener;
+}
+
 let returning: Promise<void> | null = null;
 
 /**
@@ -107,7 +142,7 @@ export function returnHere(): Promise<void> {
                 log.info(SEG.UI, `[Address] Another tab stepped to ${there}; this tab stands in ${here} again`);
                 return;
             }
-            toast.warning(`Another tab stepped to ${now} and this tab could not stand in ${here} again, so it opens ${now}`);
+            tell(`Another tab stepped to ${now} and this tab could not stand in ${here} again, so it opens ${now}`, true);
             go(now, '');
         } catch (err: unknown) {
             log.warn(SEG.UI, `[Address] Could not tell whether this tab still stands in ${here}:`, err);
