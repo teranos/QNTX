@@ -9,7 +9,7 @@
         "@codemirror/lang-python": "6.2.1",
         "@codemirror/lang-yaml": "6.1.2",
         "@sentry/browser": "10.73.0",
-        "@teranos/elements": "npm:@jsr/teranos__elements@1.0.2",
+        "@teranos/elements": "npm:@jsr/teranos__elements@1.2.0",
         "d3": "7.9.0",
         "regl": "2.1.0",
         "smol-toml": "1.6.0",
@@ -160,7 +160,7 @@
 
     "@tauri-apps/api": ["@tauri-apps/api@2.11.1", "", {}, "sha512-M2FPuYND2m+wh5hfW9ZpSdxMPdEJovPBWwoHJmwUpysTYNHaOkVFN419m/K0LIgjb/7KU2vBgsUepJWugQCvAA=="],
 
-    "@teranos/elements": ["@jsr/teranos__elements@1.0.2", "https://npm.jsr.io/~/11/@jsr/teranos__elements/1.0.2.tgz", {}, "sha512-SThZsYxRStIq1yNRVus11bwVw/frkrp23MlK/GhQBczzIdmc0PN/CH/kW4ygfBBeXLDN2+FLwVaaySc6oLEbsA=="],
+    "@teranos/elements": ["@jsr/teranos__elements@1.2.0", "https://npm.jsr.io/~/11/@jsr/teranos__elements/1.2.0.tgz", {}, "sha512-SLlhxItK7zRzt7M5s0Y4Pnxo/EZHSM1uf2UySLGhiT2TluGjIq95+f/jEecENMBuzjaD2H4Jsu5yGw96vcSzXQ=="],
 
     "@types/d3": ["@types/d3@7.4.3", "", { "dependencies": { "@types/d3-array": "*", "@types/d3-axis": "*", "@types/d3-brush": "*", "@types/d3-chord": "*", "@types/d3-color": "*", "@types/d3-contour": "*", "@types/d3-delaunay": "*", "@types/d3-dispatch": "*", "@types/d3-drag": "*", "@types/d3-dsv": "*", "@types/d3-ease": "*", "@types/d3-fetch": "*", "@types/d3-force": "*", "@types/d3-format": "*", "@types/d3-geo": "*", "@types/d3-hierarchy": "*", "@types/d3-interpolate": "*", "@types/d3-path": "*", "@types/d3-polygon": "*", "@types/d3-quadtree": "*", "@types/d3-random": "*", "@types/d3-scale": "*", "@types/d3-scale-chromatic": "*", "@types/d3-selection": "*", "@types/d3-shape": "*", "@types/d3-time": "*", "@types/d3-time-format": "*", "@types/d3-timer": "*", "@types/d3-transition": "*", "@types/d3-zoom": "*" } }, "sha512-lZXZ9ckh5R8uiFVt8ogUNf+pIrK4EsWrx2Np75WvF/eTpJ0FMHNhjXk8CKEx/+gpHbNQyJWehbFaTvqmHWB3ww=="],
 

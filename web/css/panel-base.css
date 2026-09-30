@@ -554,6 +554,22 @@
     }
 }
 
+/* What a line or a ring says, in tooltip form: an element of @teranos/elements,
+   whose place is the package's and whose look is ours, the tooltip's. */
+[data-form="tooltip"] {
+    border: 1px solid var(--border-on-dark);
+    padding: var(--panel-padding-sm);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+    max-width: 400px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-form="tooltip"] .content-area {
+    padding: 6px 0 0;
+}
+
 /* Interactive element styling - indicates hoverable for more info */
 .has-tooltip {
     cursor: help;

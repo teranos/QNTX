@@ -119,7 +119,7 @@ function renderPanel(): void {
             html += `<span style="display: inline-flex; align-items: center; gap: 3px;">
                 <span style="width: 5px; height: 5px; border-radius: 50%; background: ${color};"></span>
                 <span style="color: #bdae93;">${p.predicate}${eyes}</span>
-                <span style="display: inline-flex;">${renderSparkline(seriesOf(seen[i].times, w, seen[i].weights), labelsOf(w))}</span>
+                <span style="display: inline-flex;">${renderSparkline(seriesOf(seen[i].times, w, seen[i].weights), labelsOf(w), p.predicate)}</span>
                 <span style="color: #7c6f64; font-variant-numeric: tabular-nums;">${at === -Infinity ? '' : formatIn(at, w.unit)}</span>
             </span>`;
         }
