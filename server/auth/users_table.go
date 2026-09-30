@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"sort"
+	"sync"
 
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/errors"
@@ -18,9 +20,17 @@ import (
 // UserTable is the UserStore over the operational db, with the record behind
 // it: on parquet the one object per User under system/users/, which is where
 // a User is rebuilt from after host loss and nowhere the node reads from.
+//
+// The table is held in memory as well, rows as they are written: the gate asks
+// for Users on every request, and the node is the only writer of this table,
+// so a read never needs the operational db behind it.
 type UserTable struct {
 	db     *sql.DB
 	record UserStore
+
+	writing sync.Mutex // One write at a time, so the table and memory agree on the last.
+	mu      sync.RWMutex
+	rows    map[string][]byte // id → the row's record, as the table holds it
 }
 
 // Reconciled is what opening the table found: how many Users the record
@@ -39,6 +49,9 @@ type Reconciled struct {
 func OpenUserTable(db *sql.DB, record UserStore) (*UserTable, Reconciled, error) {
 	t := &UserTable{db: db, record: record}
 	var done Reconciled
+	if err := t.load(); err != nil {
+		return nil, done, err
+	}
 	if record == nil {
 		return t, done, nil
 	}
@@ -75,30 +88,49 @@ func OpenUserTable(db *sql.DB, record UserStore) (*UserTable, Reconciled, error)
 	return t, done, nil
 }
 
-// List returns every User in the table.
-func (t *UserTable) List() (_ []User, err error) {
-	rows, err := t.db.Query(`SELECT record FROM users ORDER BY id`)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read the users table")
+// List returns every User in the table, by id.
+func (t *UserTable) List() ([]User, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	ids := make([]string, 0, len(t.rows))
+	for id := range t.rows {
+		ids = append(ids, id)
 	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for users") }()
-
-	users := []User{}
-	for rows.Next() {
-		var body string
-		if err := rows.Scan(&body); err != nil {
-			return nil, errors.Wrap(err, "failed to scan a User row")
-		}
+	sort.Strings(ids)
+	users := make([]User, 0, len(ids))
+	for _, id := range ids {
 		var u User
-		if err := json.Unmarshal([]byte(body), &u); err != nil {
-			return nil, errors.Wrap(err, "a User row in the operational db is not a User")
+		if err := json.Unmarshal(t.rows[id], &u); err != nil {
+			return nil, errors.Wrapf(err, "User %s in the users table is not a User", id)
 		}
 		users = append(users, whole(u))
 	}
-	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "the users table stopped answering")
-	}
 	return users, nil
+}
+
+// load reads the table into memory, once, when it opens.
+func (t *UserTable) load() (err error) {
+	rows, err := t.db.Query(`SELECT id, record FROM users`)
+	if err != nil {
+		return errors.Wrap(err, "failed to read the users table")
+	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for users") }()
+
+	held := map[string][]byte{}
+	for rows.Next() {
+		var id, body string
+		if err := rows.Scan(&id, &body); err != nil {
+			return errors.Wrap(err, "failed to scan a User row")
+		}
+		held[id] = []byte(body)
+	}
+	if err := rows.Err(); err != nil {
+		return errors.Wrap(err, "the users table stopped answering")
+	}
+	t.mu.Lock()
+	t.rows = held
+	t.mu.Unlock()
+	return nil
 }
 
 // ByRoute resolves an auth.root_identities entry to the User it reaches.
@@ -139,12 +171,17 @@ func (t *UserTable) write(u User) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize User %s", u.ID)
 	}
+	t.writing.Lock()
+	defer t.writing.Unlock()
 	_, err = t.db.Exec(
 		`INSERT INTO users (id, record) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET record = excluded.record`,
 		u.ID, string(body))
 	if err != nil {
 		return errors.Wrapf(err, "failed to write User %s to the operational db", u.ID)
 	}
+	t.mu.Lock()
+	t.rows[u.ID] = body
+	t.mu.Unlock()
 	return nil
 }
 
