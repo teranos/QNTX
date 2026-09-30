@@ -93,6 +93,9 @@ type QNTXServer struct {
 	runner     *grpcplugin.Runner
 	runnerStop context.CancelFunc
 	runnerErr  string
+	// What QNTX last built of each plugin it builds itself, one build at a time.
+	builds   pluginBuilds
+	building sync.Mutex
 	// The calls plugins are answering: the token handed for each, and the store
 	// of the caller it was handed for (plugin_sigils.go).
 	callStores sync.Map
