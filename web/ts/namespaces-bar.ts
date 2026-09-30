@@ -5,6 +5,7 @@ import { log, SEG } from './logger.ts';
 import { kindOf, tilesHtml, type Namespace, type Open } from './namespaces-view';
 import { person } from './self-person';
 import { standAtTheDoor } from './signin';
+import { go } from './address';
 
 let bar: HTMLElement | null = null;
 // The row, whose contents are rewritten, and the rectangle, which is not. One
@@ -100,7 +101,7 @@ async function step(name: string): Promise<void> {
     // was built for the one left; it is built again for the one stepped to,
     // from what the browser keeps of it and what the node says it has.
     if (moved.namespace !== standing) {
-        location.reload();
+        go(moved.namespace, '');
         return;
     }
     standing = moved.namespace;

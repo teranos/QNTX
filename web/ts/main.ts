@@ -25,6 +25,8 @@ import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { person, type Person } from './self-person.ts';
 import { setOpenCanvas, setStanding } from './standing.ts';
+import { addressed, keepTabWhereItIs, settle, stepTo } from './address.ts';
+import { toast } from './toast';
 import { drawWho } from './who.ts';
 import type { CanvasRow } from './api/canvases.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -259,9 +261,21 @@ async function init(): Promise<void> {
     // per namespace (ADR-026). A node that will not say is nowhere, which is
     // the key the browser always used.
     let who: Person | null = null;
+    // The address names where this tab is: the page asks to stand there before
+    // anything is built, the same way a press on the namespaces bar asks.
+    const wanted = addressed();
     try {
         who = await person();
+        if (wanted && wanted.ns !== who.standing) {
+            try {
+                who.standing = await stepTo(wanted.ns);
+            } catch (err: unknown) {
+                log.warn(SEG.UI, `[Init] The address asked for ${wanted.ns}; staying in ${who.standing}:`, err);
+                toast.warning(err instanceof Error ? err.message : String(err));
+            }
+        }
         setStanding(who.standing);
+        keepTabWhereItIs();
     } catch (err: unknown) {
         log.debug(SEG.UI, '[Init] Standing nowhere:', err);
         setStanding('');
@@ -294,8 +308,9 @@ async function init(): Promise<void> {
             const { listCanvases } = await import('./api/canvases.ts');
             rows = await listCanvases();
             const { opening } = await import('./namespace-page.ts');
-            const chosen = opening(rows);
+            const chosen = opening(rows, wanted && wanted.ns === who.standing ? wanted.canvas : '');
             setOpenCanvas(chosen.open);
+            settle(who.standing, !chosen.hasCanvas ? '' : chosen.open !== '' ? chosen.open : rows.find(c => c.kind === 'namespace')?.id ?? '');
             hasCanvas = chosen.hasCanvas;
             // "can either be seen by opening it (also desaturated view)"
             document.body.classList.toggle('canvas-disabled', chosen.disabled);

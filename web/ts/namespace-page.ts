@@ -14,7 +14,8 @@ import { standAtTheDoor } from './signin';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger';
 import { Subcanvas } from './sym';
-import { openCanvas, openCanvasKey, openOnceKey } from './standing';
+import { openCanvas, openCanvasKey, openOnceKey, standingNamespace } from './standing';
+import { go } from './address';
 import { Button, buttonPlaceholder, hydrateButtons, type HydrateConfig } from './components/button';
 import {
     createCanvas, disableCanvas, disownCanvas, enableCanvas, inviteOwner, listCanvases,
@@ -29,7 +30,7 @@ let failure = '';
 // The birth in progress: which kind the ⌗ makes.
 let birth: 'namespace' | 'user' | null = null;
 // How the page is built again for another canvas. A test builds nothing.
-let rebuild: () => void = () => location.reload();
+let rebuild: (id: string) => void = (id) => go(standingNamespace(), id);
 
 function privileged(): boolean {
     return who?.level === 'ROOT' || who?.level === 'SUPER';
@@ -54,7 +55,7 @@ export function enter(id: string): void {
     } catch (err: unknown) {
         log.error(SEG.UI, '[Namespace] The open canvas was not remembered:', err);
     }
-    rebuild();
+    rebuild(id);
 }
 
 /** What the page is built for where this person stands. */
@@ -68,16 +69,16 @@ export interface Opening {
 }
 
 /**
- * The canvas to open: the one remembered, if still here, else the
- * namespace's own. "becomes desaturated in the view and can either be seen
- * by opening it" — a disabled one opens only when it was just pressed, and
- * never on its own.
+ * The canvas to open: the one the address names, else the one remembered, if
+ * still here, else the namespace's own. "becomes desaturated in the view and
+ * can either be seen by opening it" — a disabled one opens only when it was
+ * just pressed, and never on its own.
  */
-export function opening(rows: CanvasRow[]): Opening {
+export function opening(rows: CanvasRow[], addressed = ''): Opening {
     let remembered = '';
     let once = false;
     try {
-        remembered = localStorage.getItem(openCanvasKey()) ?? '';
+        remembered = addressed !== '' ? addressed : localStorage.getItem(openCanvasKey()) ?? '';
         once = localStorage.getItem(openOnceKey()) === '1';
         localStorage.removeItem(openOnceKey());
     } catch (err: unknown) {
@@ -265,7 +266,7 @@ function attach(el: HTMLElement): void {
  * open, and takes the who block from the header to its own top-left. Nobody
  * signed in, or a node with one universe, gets no page.
  */
-export function initNamespacePage(person: Person | null, rows: CanvasRow[], again: () => void = () => location.reload()): void {
+export function initNamespacePage(person: Person | null, rows: CanvasRow[], again: (id: string) => void = (id) => go(standingNamespace(), id)): void {
     const container = document.getElementById('container');
     if (!container || !person) return;
     who = person;
