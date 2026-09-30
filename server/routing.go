@@ -34,6 +34,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 	s.answer("/.well-known/did.json", s.nodeDID.HandleDIDDocument)
 
+	// The GitHub App's one webhook, for every event it is subscribed to.
+	s.answer(githubWebhookPrefix, s.HandleGitHubWebhook)
+
 	// A staand answers the public pixel on /s/{namespace}/{slug} (ADR-035). The
 	// handler reads the market and the slug off the path.
 	s.answer(staandPathPrefix, s.HandleStaand)

@@ -151,6 +151,39 @@ func TestANamespaceWithNoGitHubIsRefused(t *testing.T) {
 	assert.Contains(t, err.Error(), "clean")
 }
 
+// The App's webhook secret exists once ROOT generates it, and generating again
+// replaces it. It is no namespace's GitHub.
+func TestROOTGeneratesTheWebhookSecret(t *testing.T) {
+	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), &countingTokens{})
+	require.NoError(t, err)
+	h := &Handler{logger: zap.NewNop().Sugar(), tokens: table}
+
+	_, found, err := h.GitHubWebhook()
+	require.NoError(t, err)
+	assert.False(t, found, "no secret until ROOT generates one")
+
+	first, err := h.NewGitHubWebhook("github:1")
+	require.NoError(t, err)
+	second, err := h.NewGitHubWebhook("github:1")
+	require.NoError(t, err)
+	assert.NotEqual(t, first, second)
+
+	held, found, err := h.GitHubWebhook()
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, second, held, "generating again replaces it")
+
+	tokens, err := table.GitHubTokens()
+	require.NoError(t, err)
+	assert.Empty(t, tokens)
+
+	listed, err := table.List()
+	require.NoError(t, err)
+	body, err := json.Marshal(listed)
+	require.NoError(t, err)
+	assert.NotContains(t, string(body), second)
+}
+
 // ROOT logging in with GitHub is what gives the node its GitHub. Anybody else
 // linking a GitHub account gives the node nothing.
 func TestTheNodesGitHubIsROOTs(t *testing.T) {
