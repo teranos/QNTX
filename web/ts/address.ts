@@ -24,7 +24,7 @@ export interface Address {
 }
 
 /** What the address asks for, or null when it names no namespace. */
-export function addressed(search: string = location.search): Address | null {
+export function addressed(search: string = window.location.search): Address | null {
     const params = new URLSearchParams(search);
     const ns = params.get('ns') ?? '';
     if (ns === '') return null;
@@ -32,7 +32,7 @@ export function addressed(search: string = location.search): Address | null {
 }
 
 /** The address of a namespace and canvas, keeping whatever else it carries. */
-export function addressOf(ns: string, canvas: string, href: string = location.href): string {
+export function addressOf(ns: string, canvas: string, href: string = window.location.href): string {
     const url = new URL(href);
     url.searchParams.set('ns', ns);
     if (canvas === '') url.searchParams.delete('canvas');
@@ -61,7 +61,7 @@ export function entitle(ns: string, canvas = ''): void {
 
 /** Builds the page for another namespace or canvas: a new entry, so back returns. */
 export function go(ns: string, canvas: string): void {
-    location.assign(addressOf(ns, canvas));
+    window.location.assign(addressOf(ns, canvas));
 }
 
 /** Asks to stand in a namespace. The answer is where this person now stands. */
@@ -133,19 +133,22 @@ export function returnHere(): Promise<void> {
             const there = await whereStanding();
             if (there === here) return;
             let now = there;
+            let why = '';
             try {
                 now = await stepTo(here);
             } catch (err: unknown) {
                 log.warn(SEG.UI, `[Address] This tab is ${here}, another stepped to ${there}:`, err);
+                why = `: ${err instanceof Error ? err.message : String(err)}`;
             }
             if (now === here) {
                 log.info(SEG.UI, `[Address] Another tab stepped to ${there}; this tab stands in ${here} again`);
                 return;
             }
-            tell(`Another tab stepped to ${now} and this tab could not stand in ${here} again, so it opens ${now}`, true);
+            tell(`Another tab stepped to ${now} and this tab could not stand in ${here} again, so it opens ${now}${why}`, true);
             go(now, '');
         } catch (err: unknown) {
             log.warn(SEG.UI, `[Address] Could not tell whether this tab still stands in ${here}:`, err);
+            tell(`could not tell whether this tab still stands in ${here}, so what it writes may land elsewhere: ${err instanceof Error ? err.message : String(err)}`);
         } finally {
             returning = null;
         }

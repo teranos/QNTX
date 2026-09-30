@@ -232,6 +232,8 @@
 
 .namespaces-failure {
     padding: 4px 2px;
+    /* Each thing said on its own line: a refusal is said beside, never over. */
+    white-space: pre-line;
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--color-error);

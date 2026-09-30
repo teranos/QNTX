@@ -6,6 +6,7 @@ import { kindOf, tilesHtml, type Namespace, type Open } from './namespaces-view'
 import { person } from './self-person';
 import { standAtTheDoor } from './signin';
 import { go, onTold, told } from './address';
+import { expandDrawer } from './system-drawer';
 
 let bar: HTMLElement | null = null;
 // The row, whose contents are rewritten, and the rectangle, which is not. One
@@ -383,12 +384,15 @@ async function appear(header: HTMLElement): Promise<void> {
         level = '';
         failure = `could not read where you are standing: ${error instanceof Error ? error.message : String(error)}`;
     }
-    // A step refused before the bar was up, by an address or another tab.
+    // A step refused before the bar was up, by an address or another tab. The
+    // bar is in the drawer, so the drawer opens to say it: never dropped, and
+    // said where stepping is pressed.
     const said = told();
-    if (said !== '') failure = said;
+    if (said !== '') failure = alongside(said);
     onTold(() => {
-        failure = told();
+        failure = alongside(told());
         render();
+        expandDrawer();
     });
 
     if (!bar) {
@@ -411,6 +415,13 @@ async function appear(header: HTMLElement): Promise<void> {
         attach(bar);
     }
     render();
+    if (said !== '') expandDrawer();
+}
+
+// A refusal said beside whatever the bar already says, never over it.
+function alongside(said: string): string {
+    if (said === '') return failure;
+    return failure === '' ? said : `${failure}\n${said}`;
 }
 
 // Losing the session takes the bar with it, rather than leaving a list of

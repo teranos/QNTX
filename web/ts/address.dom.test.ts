@@ -11,10 +11,12 @@ const USE_JSDOM = process.env.USE_JSDOM === '1';
 // Where the node has this person standing, and every step asked of it.
 let standingOnNode = 'default';
 let refuse = '';
+let unreadable = false;
 const steps: string[] = [];
 
 mock.module('./client', () => ({
     apiFetch: async (path: string, init?: RequestInit) => {
+        if (unreadable && path === '/i/standing' && !init?.method) return new Response('node is down', { status: 503 });
         if (path === '/i/standing' && init?.method === 'POST') {
             const { namespace } = JSON.parse(String(init.body)) as { namespace: string };
             steps.push(namespace);
@@ -77,6 +79,7 @@ describe('a tab looked at again', () => {
     beforeEach(() => {
         standingOnNode = 'default';
         refuse = '';
+        unreadable = false;
         steps.length = 0;
         told();
         setStanding('default');
@@ -104,5 +107,12 @@ describe('a tab looked at again', () => {
         expect(steps).toEqual(['default']);
         expect(told()).toContain('could not stand in default again, so it opens SBVH');
         expect(told()).toBe('');
+    });
+
+    test('not able to tell where it stands, it says so rather than dropping it', async () => {
+        unreadable = true;
+        await returnHere();
+        expect(steps).toEqual([]);
+        expect(told()).toContain('could not tell whether this tab still stands in default');
     });
 });
