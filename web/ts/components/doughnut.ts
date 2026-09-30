@@ -5,11 +5,12 @@
  *
  * "We take a different route from Umami because we believe count summations
  * don't mean a lot." No list beside the ring and no count on it: pointing at a
- * segment says its name and value, and a longer hover reveals the whole legend
- * (components/tooltip.ts).
+ * segment says its name and value, and a longer hover reveals the whole legend,
+ * said in tooltip form: an element of @teranos/elements, a new one every time.
  */
 
-import { tooltip } from './tooltip';
+import { tooltipFrom } from '@teranos/elements';
+import { SAID_TIMING, saidId } from './said';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -40,9 +41,10 @@ type Entry = [string, number, string];
 
 /**
  * A ring of slices in the order given, each in the next of Umami's colors.
- * Null when nothing was said, so the caller says so in words.
+ * Null when nothing was said, so the caller says so in words. Named, the
+ * window its legend may become carries the name.
  */
-export function renderDoughnut(slices: Slice[], size = 96): SVGSVGElement | null {
+export function renderDoughnut(slices: Slice[], size = 96, name = ''): SVGSVGElement | null {
     const said = slices.filter((s) => s.value > 0);
     const total = said.reduce((sum, s) => sum + s.value, 0);
     if (total === 0) return null;
@@ -78,27 +80,21 @@ export function renderDoughnut(slices: Slice[], size = 96): SVGSVGElement | null
         segment.setAttribute('stroke-dashoffset', String(-offset));
         // From twelve o'clock, clockwise, as Chart.js starts.
         segment.setAttribute('transform', `rotate(-90 ${outer} ${outer})`);
-        segment.dataset.tooltip = `${slice.name} · ${slice.value}`;
+        const entry = `${slice.name} · ${slice.value}`;
+        tooltipFrom(segment, () => ({
+            id: saidId('ring'),
+            title: name || entry,
+            renderContent: () => wholeLegend(legend),
+        }), SAID_TIMING, () => entry);
         ring.appendChild(segment);
         offset += length;
     });
 
-    ring.dataset.tooltipLegend = JSON.stringify(legend);
     return ring;
 }
 
 /** The whole legend of a ring, for a longer hover: every answer, its color and how many. */
-export function wholeLegend(from: HTMLElement): HTMLElement | null {
-    let legend: Entry[];
-    try {
-        legend = JSON.parse(from.dataset.tooltipLegend ?? '[]') as Entry[];
-    } catch (err: unknown) {
-        const said = document.createElement('div');
-        said.textContent = `this ring's legend could not be read: ${err instanceof Error ? err.message : String(err)}`;
-        return said;
-    }
-    if (legend.length === 0) return null;
-
+export function wholeLegend(legend: Entry[]): HTMLElement {
     const list = document.createElement('div');
     list.className = 'doughnut-legend';
     for (const [name, value, color] of legend) {
@@ -122,5 +118,3 @@ export function wholeLegend(from: HTMLElement): HTMLElement | null {
     }
     return list;
 }
-
-tooltip.expands('data-tooltip-legend', wholeLegend);

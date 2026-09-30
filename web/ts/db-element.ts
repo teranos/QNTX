@@ -369,7 +369,7 @@ function renderDbStats(): void {
                 const at = charted.indexOf(predicate);
                 const color = at >= 0 ? PREDICATE_COLORS[at % PREDICATE_COLORS.length] : 'transparent';
                 const hist = histograms[predicate] ?? {};
-                const line = renderSparkline(keys.map(k => hist[k] ?? 0), keys);
+                const line = renderSparkline(keys.map(k => hist[k] ?? 0), keys, predicate);
                 const info = watcherMap.get(predicate);
                 const eyes = info ? (() => { const s = eyeStyle(info); return `<span style="color: ${s.color}; text-shadow: ${s.shadow}; cursor: default;" title="${info.names.join(', ')}">${Watcher.repeat(info.names.length)}</span>`; })() : '';
                 return `<div class="distillation-row" style="display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 2px 0;">
@@ -415,7 +415,7 @@ function renderDbStats(): void {
                 return `<div class="eviction-pred-row" data-pred-idx="${i}" style="display: flex; align-items: center; gap: 8px; font-size: 11px; padding: 2px 0; cursor: pointer;">
                     <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word; flex: 1;">${b.predicate}</span>
                     ${age ? `<span style="color: #64748b; white-space: nowrap;" title="oldest evicted">${age}</span>` : ''}
-                    <span style="flex-shrink: 0; display: inline-flex;">${renderSparkline(seriesOf(b.evictedAt, w), labelsOf(w))}</span>
+                    <span style="flex-shrink: 0; display: inline-flex;">${renderSparkline(seriesOf(b.evictedAt, w), labelsOf(w), b.predicate)}</span>
                     <span style="color: #94a3b8; white-space: nowrap;">${formatIn(b.lastEviction, w.unit)}</span>
                 </div>
                 <div class="eviction-pred-detail" data-pred-detail="${i}" style="display: none;"></div>`;

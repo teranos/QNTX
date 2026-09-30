@@ -13,7 +13,8 @@
  * The caller decides what a name is — text, or something you can press.
  */
 
-import { tooltip } from './tooltip';
+import { tooltipFrom, type Element as Said } from '@teranos/elements';
+import { SAID_TIMING, saidId } from './said';
 
 const MUTE = 'var(--text-on-dark-tertiary)';
 const LINE = 'var(--border-on-dark)';
@@ -26,9 +27,10 @@ function attr(value: string): string {
 /**
  * Draw one series as an 80×16 line, scaled to its own maximum. Given when each
  * step is, the line answers pointing: when, and the value then, and a longer
- * hover draws the whole of it (the tooltip, components/tooltip.ts).
+ * hover the whole of it, said in tooltip form (wireLineTooltips). Named, the
+ * window it may become carries the name.
  */
-export function renderSparkline(data: (number | null)[], at?: string[]): string {
+export function renderSparkline(data: (number | null)[], at?: string[], name?: string): string {
     const values = data.filter((v): v is number => v != null);
     if (values.length < 2) return '';
 
@@ -48,6 +50,7 @@ export function renderSparkline(data: (number | null)[], at?: string[]): string 
 
     const steps = at && at.length === data.length
         ? ` data-tooltip-series="${attr(JSON.stringify(data.map((v, i) => [at[i], v ?? 0])))}"`
+            + (name ? ` data-tooltip-name="${attr(name)}"` : '')
         : '';
     return `<svg class="sparkline-line"${steps} viewBox="0 0 ${w} ${h}" style="width: ${w}px; height: ${h}px;">
         <polyline points="${points.join(' ')}" fill="none" stroke="#64748b" stroke-width="1" />
@@ -261,7 +264,7 @@ export function renderSparklines(
         spark.className = 'sparkline';
         spark.style.flexShrink = '0';
         spark.style.display = 'inline-flex';
-        spark.innerHTML = renderSparkline(seriesOf(row.times, w, row.weights), labelsOf(w));
+        spark.innerHTML = renderSparkline(seriesOf(row.times, w, row.weights), labelsOf(w), row.name);
 
         const last = document.createElement('span');
         last.className = 'sparkline-last';
@@ -279,24 +282,37 @@ export function renderSparklines(
     }
 }
 
+/** A line's steps: when, and the value then. */
+type Step = [string, number];
+
+function stepsOf(line: Element): Step[] {
+    return JSON.parse((line as SVGElement).dataset.tooltipSeries ?? '[]') as Step[];
+}
+
+/** The step under the pointer: "For one changing value, direct view of time and value". */
+export function stepAt(line: Element, x: number): string {
+    let steps: Step[];
+    try {
+        steps = stepsOf(line);
+    } catch (err: unknown) {
+        return `this line's moments could not be read: ${err instanceof Error ? err.message : String(err)}`;
+    }
+    if (steps.length === 0) return '';
+    const rect = line.getBoundingClientRect();
+    const along = rect.width > 0 ? (x - rect.left) / rect.width : 0;
+    const i = Math.min(steps.length - 1, Math.max(0, Math.round(along * (steps.length - 1))));
+    return `${steps[i]![0]} · ${steps[i]![1]}`;
+}
+
 /**
  * The bigger picture of one line, for a longer hover: the whole line drawn
  * large between the first and last moment of its window, and every moment
  * that saw something, with its value.
  */
-export function wholeLine(from: HTMLElement): HTMLElement | null {
-    let steps: [string, number][];
-    try {
-        steps = JSON.parse(from.dataset.tooltipSeries ?? '[]') as [string, number][];
-    } catch (err: unknown) {
-        const said = document.createElement('div');
-        said.textContent = `this line's moments could not be read: ${err instanceof Error ? err.message : String(err)}`;
-        return said;
-    }
-    if (steps.length < 2) return null;
-
+export function wholeLine(steps: Step[]): HTMLElement {
     const picture = document.createElement('div');
     picture.className = 'sparkline-whole';
+    if (steps.length < 2) return picture;
 
     const w = 320;
     const h = 64;
@@ -316,9 +332,9 @@ export function wholeLine(from: HTMLElement): HTMLElement | null {
     axis.style.justifyContent = 'space-between';
     axis.style.color = MUTE;
     const first = document.createElement('span');
-    first.textContent = steps[0][0];
+    first.textContent = steps[0]![0];
     const last = document.createElement('span');
-    last.textContent = steps[steps.length - 1][0];
+    last.textContent = steps[steps.length - 1]![0];
     axis.append(first, last);
     picture.appendChild(axis);
 
@@ -335,4 +351,40 @@ export function wholeLine(from: HTMLElement): HTMLElement | null {
     return picture;
 }
 
-tooltip.expands('data-tooltip-series', wholeLine);
+/** The element a line says: its name, and the whole line as its content. */
+function lineSaid(line: SVGElement): Said {
+    let steps: Step[] = [];
+    let unread = '';
+    try {
+        steps = stepsOf(line);
+    } catch (err: unknown) {
+        unread = `this line's moments could not be read: ${err instanceof Error ? err.message : String(err)}`;
+    }
+    const span = steps.length > 0 ? `${steps[0]![0]} to ${steps[steps.length - 1]![0]}` : '';
+    return {
+        id: saidId('line'),
+        title: line.dataset.tooltipName ?? span,
+        renderContent: () => {
+            if (unread === '') return wholeLine(steps);
+            const said = document.createElement('div');
+            said.textContent = unread;
+            return said;
+        },
+    };
+}
+
+const wired = new WeakSet<Element>();
+
+/**
+ * Every line that carries its moments answers pointing, wherever it is drawn:
+ * a line is wired the first time a pointer comes over it, before it is entered,
+ * so the lines drawn as markup need no wiring of their own.
+ */
+export function wireLineTooltips(root: Document = document): void {
+    root.addEventListener('pointerover', (e: Event) => {
+        const line = (e.target as Element | null)?.closest?.('[data-tooltip-series]') as SVGElement | null;
+        if (!line || wired.has(line)) return;
+        wired.add(line);
+        tooltipFrom(line, () => lineSaid(line), SAID_TIMING, (at) => stepAt(line, at.x));
+    }, true);
+}

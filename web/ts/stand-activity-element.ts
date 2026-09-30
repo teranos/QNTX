@@ -328,7 +328,7 @@ export function renderCampaigns(container: HTMLElement, s: StaandInfo, read: Cam
         said.style.overflowWrap = 'break-word';
         said.style.wordBreak = 'break-word';
         try {
-            const ring = renderDoughnut(await read(s, param));
+            const ring = renderDoughnut(await read(s, param), 96, name.textContent ?? param);
             if (ring) {
                 cell.appendChild(ring);
                 return;
