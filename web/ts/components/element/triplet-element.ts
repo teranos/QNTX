@@ -20,7 +20,7 @@ import { log, SEG } from '../../logger';
 import { spawnOnCanvasDragging } from './spawn-on-canvas';
 import { renderPager } from '../pager';
 import { el } from '../../html-utils';
-import { renderSparkline, windowOf, seriesOf, formatIn, bucketStart, type Window } from '../sparkline';
+import { renderSparkline, windowOf, seriesOf, labelsOf, formatIn, bucketStart, type Window } from '../sparkline';
 
 // Quiet blue-grey — lighter, subtle blue touch, easy on the eyes
 const TRIPLET = '#96a4b0';
@@ -131,7 +131,7 @@ export function timeAxis(attestations: Attestation[], w?: Window, now: number = 
     });
     axis.dataset.window = windowKey(w);
     const spark = el('span', { class: 'sparkline', style: { display: 'inline-flex' } });
-    spark.innerHTML = renderSparkline(seriesOf(timestamps, w));
+    spark.innerHTML = renderSparkline(seriesOf(timestamps, w), labelsOf(w));
     axis.appendChild(spark);
     axis.appendChild(el('span', {
         class: 'sparkline-last',
