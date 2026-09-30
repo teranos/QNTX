@@ -178,9 +178,9 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		dbPath:      dbPath,
 		operational: database,
 		defaultDB:   defaultLanding.db,
-		landings: map[string]*sqlitecgo.RustStore{
-			duckdbcgo.NamespaceDefault: defaultLanding.RustStore,
-			duckdbcgo.NamespaceSystem:  systemLanding.RustStore,
+		landings: map[string]*landed{
+			duckdbcgo.NamespaceDefault: defaultLanding,
+			duckdbcgo.NamespaceSystem:  systemLanding,
 		},
 		records: map[string]*duckdbcgo.DuckdbStore{
 			duckdbcgo.NamespaceDefault: duckStore,
@@ -218,7 +218,7 @@ type parquetHandles struct {
 	closing map[string]opened
 	// landings is every open landing file by namespace, the two opened at boot
 	// included, so the checkpoint pulse reaches each one's WAL.
-	landings map[string]*sqlitecgo.RustStore
+	landings map[string]*landed
 	// records is every open record store by namespace, the two opened at boot
 	// included. closing holds only what OpenNamespace opened, so a spend read
 	// off it left default and system — the two that run for the life of the
@@ -428,7 +428,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 		h.closing = map[string]opened{}
 	}
 	h.closing[name] = opened{stop: stop, flushed: flushed, duck: duck, watchers: watchers, landing: landing}
-	h.landings[name] = landing.RustStore
+	h.landings[name] = landing
 	h.records[name] = duck
 	h.mu.Unlock()
 	sacred.Go("parquet.send."+name, func() { sendEvery(ctx, landing, duck, name, flushed) })
@@ -652,6 +652,7 @@ func (h *parquetHandles) Landings() ([]server.Landing, error) {
 			Bytes:        sizeOf(path),
 			WalBytes:     sizeOf(path + "-wal"),
 			Attestations: held,
+			DB:           files[name].db,
 		})
 	}
 	return landings, nil

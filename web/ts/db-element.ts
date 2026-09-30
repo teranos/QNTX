@@ -1,7 +1,7 @@
 import { sendMessage } from './client';
 import { log, SEG } from './logger';
 import { escapeHtml } from './html-utils';
-import { renderSparkline, windowOf, seriesOf, formatIn } from './components/sparkline';
+import { renderSparkline, renderSparklines, windowOf, seriesOf, seenOver, formatIn, type Seen, type Window } from './components/sparkline';
 import { DB, Watcher } from './sym';
 import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, getPredicateBreakdown, type PredicateDetail } from './eviction-chart';
 import { getWatchersByPredicate, setDilation, eyeStyle } from './watcher-predicates';
@@ -136,7 +136,8 @@ function landedOverTime(landings: Landing[] | undefined): Record<string, Record<
 
 interface Common {
     name: string;
-    count: number;
+    last: string;
+    over: Record<string, number> | null;
 }
 
 // A panel is as wide as the canvas lets it be, and a row laid out across all
@@ -146,25 +147,46 @@ const LANDING_WIDTH = '860px';
 const LANDING_COLUMNS = '110px minmax(0, 1fr) 84px 84px 132px 72px';
 const SPEND_COLUMNS = '132px 92px 60px 64px';
 
-// What a namespace is mostly about, clickable the way a type is: the same
-// class and data-type the wiring below already listens for.
-function commonHTML(label: string, common: Common[] | null): string {
+// A name that opens the way a type does: the same class and data-type the
+// wiring below already listens for.
+function typeLink(name: string): HTMLElement {
+    const link = document.createElement('span');
+    link.className = 'element-type-link';
+    link.dataset.type = name;
+    link.style.cursor = 'pointer';
+    link.textContent = name;
+    return link;
+}
+
+// Named things over time, drawn as markup for the panels that are written as
+// markup. "The axis of time is more useful than a tally."
+function sparklinesHTML(label: string, rows: Seen[], w: Window): string {
+    const into = document.createElement('div');
+    renderSparklines(into, label, rows, w, typeLink);
+    return into.innerHTML;
+}
+
+// One window for everything a list of names draws, from the earliest of them
+// to now, so a day sits at the same place on every line.
+function windowOfSeen(rows: Seen[], now: number = Date.now()): Window {
+    return windowOf(rows.flatMap(one => one.times), now);
+}
+
+const seenOfCommon = (common: Common[] | null): Seen[] =>
+    (common ?? []).map(one => seenOver(one.name, one.over, one.last));
+
+// What a namespace has used lately, each over time.
+function commonHTML(label: string, common: Common[] | null, w: Window): string {
     if (!common || common.length === 0) {
         return '';
     }
-    const items = common.map(one =>
-        `<span class="element-type-link" data-type="${escapeHtml(one.name)}" style="cursor: pointer; margin-right: 8px;">${escapeHtml(one.name)} <span style="color: #475569;">${one.count.toLocaleString()}</span></span>`
-    ).join('');
-    return `<div style="display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 6px; padding: 1px 0 3px 12px; font-size: 11px; max-width: ${LANDING_WIDTH};">
-        <span style="color: #475569;">${label}</span>
-        <span style="display: flex; flex-wrap: wrap; gap: 2px; color: #94a3b8;">${items}</span>
-    </div>`;
+    return `<div style="padding: 1px 0 3px 12px; font-size: 11px; max-width: ${LANDING_WIDTH};">${sparklinesHTML(label, seenOfCommon(common), w)}</div>`;
 }
 
 // A read is answered from the database of its namespace and never from the
 // record (ADR-037), so there is one of these per namespace and the single
 // path this panel used to print was hiding all but one of them.
-function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: string): string {
+function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: string, now: number = Date.now()): string {
     if (failed) {
         return renderStatsError(failed);
     }
@@ -175,6 +197,7 @@ function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: str
     }
 
     const held = landings.reduce((sum, one) => sum + one.attestations, 0);
+    const w = windowOfSeen(landings.flatMap(one => [...seenOfCommon(one.top_predicates), ...seenOfCommon(one.top_contexts)]), now);
     const rows = landings.map(one => `
         <div style="display: grid; grid-template-columns: ${LANDING_COLUMNS}; gap: 8px; font-size: 11px; padding: 2px 0; max-width: ${LANDING_WIDTH};">
             <span style="color: #e2e8f0; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(one.namespace)}</span>
@@ -184,8 +207,8 @@ function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: str
             <span style="color: #475569; text-align: right;">${one.actors.toLocaleString()}a ${one.subjects.toLocaleString()}s ${one.contexts.toLocaleString()}c</span>
             <span style="color: #94a3b8; text-align: right;">${one.attestations.toLocaleString()}</span>
         </div>
-        ${commonHTML('predicates', one.top_predicates)}
-        ${commonHTML('contexts', one.top_contexts)}`).join('');
+        ${commonHTML('predicates', one.top_predicates, w)}
+        ${commonHTML('contexts', one.top_contexts, w)}`).join('');
 
     return `
         <div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
@@ -194,6 +217,13 @@ function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: str
             <div style="margin-top: 4px;">${rows}</div>
         </div>
     `;
+}
+
+interface RichField {
+    field: string;
+    last?: string;
+    over: Record<string, number> | null;
+    source_types: string[];
 }
 
 interface Spend {
@@ -294,19 +324,19 @@ function renderDbStats(): void {
     const richFields = dbStats.rich_fields;
     if (richFields && richFields.length > 0) {
         const isEnhanced = typeof richFields[0] === 'object' && 'field' in richFields[0];
-        const fieldItems = isEnhanced
-            ? richFields
-                .sort((a: any, b: any) => b.count - a.count)
-                .map((f: any) => `<span class="element-type-link" data-type="${f.field}" style="cursor: pointer; margin-right: 8px;">${f.field} (${f.count})</span>`)
-                .join('')
-            : richFields.sort().map((f: string) => `<span class="element-type-link" data-type="${f}" style="cursor: pointer; margin-right: 8px;">${f}</span>`).join('');
-
-        predicatesHTML += `
+        if (isEnhanced) {
+            // Each over time, the most recently carried first.
+            const seen = (richFields as RichField[]).map(f => seenOver(f.field, f.over, f.last));
+            predicatesHTML += `<div style="margin-bottom: 8px; font-size: 11px;">${sparklinesHTML(`Types (${richFields.length})`, seen, windowOfSeen(seen))}</div>`;
+        } else {
+            const fieldItems = richFields.sort().map((f: string) => `<span class="element-type-link" data-type="${escapeHtml(f)}" style="cursor: pointer; margin-right: 8px;">${escapeHtml(f)}</span>`).join('');
+            predicatesHTML += `
             <div style="margin-bottom: 8px;">
                 <span class="label">Types (${richFields.length}):</span>
                 <span class="element-value" style="display: flex; flex-wrap: wrap; gap: 4px;">${fieldItems}</span>
             </div>
         `;
+        }
     }
 
     // Distillation summary
