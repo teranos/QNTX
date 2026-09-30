@@ -13,6 +13,8 @@ import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { renderPager } from './components/pager.ts';
 import { renderSparklines, windowOf } from './components/sparkline.ts';
+import { renderDoughnut, type Slice } from './components/doughnut.ts';
+import { apiJson } from './client/http';
 import { openPageElement } from './page-element.ts';
 import { renderPredicate } from './components/element/attestation-triple.ts';
 import { openPredicateElement } from './components/element/predicate-element.ts';
@@ -267,6 +269,79 @@ export function renderStandActivity(container: HTMLElement, s: StaandInfo, now: 
     container.appendChild(pages);
 }
 
+/** Umami's UTM_PARAMS, in its order (src/lib/constants.ts). */
+export const CAMPAIGN = ['utm_campaign', 'utm_content', 'utm_medium', 'utm_source', 'utm_term'];
+
+/** How a stand's page views divide by one campaign parameter. */
+export type CampaignReader = (s: StaandInfo, param: string) => Promise<Slice[]>;
+
+async function readCampaign(s: StaandInfo, param: string): Promise<Slice[]> {
+    const q = new URLSearchParams({ market: s.market, slug: s.slug, type: param });
+    const body = await apiJson<{ counts: { name: string; count: number }[] | null }>(`/api/staands/metrics?${q}`);
+    return (body.counts ?? []).map((c) => ({ name: c.name, value: c.count }));
+}
+
+/**
+ * Umami's UTM report for one stand: a ring per campaign parameter, in Umami's
+ * order and colors, and nothing beside it. How many is the tooltip's to say.
+ */
+export function renderCampaigns(container: HTMLElement, s: StaandInfo, read: CampaignReader = readCampaign): Promise<void> {
+    const section = document.createElement('div');
+    section.className = 'stand-campaigns';
+    section.style.marginTop = '18px';
+
+    const heading = document.createElement('div');
+    heading.textContent = 'UTM';
+    heading.style.color = MUTE;
+    heading.style.padding = '0 0 4px';
+    heading.style.borderBottom = '1px solid ' + LINE;
+    heading.style.marginBottom = '8px';
+    section.appendChild(heading);
+
+    const rings = document.createElement('div');
+    rings.style.display = 'flex';
+    rings.style.flexWrap = 'wrap';
+    rings.style.gap = '18px';
+    section.appendChild(rings);
+    container.appendChild(section);
+
+    return Promise.all(CAMPAIGN.map(async (param) => {
+        const cell = document.createElement('div');
+        cell.className = 'stand-campaign';
+        cell.dataset.param = param;
+        cell.style.display = 'flex';
+        cell.style.flexDirection = 'column';
+        cell.style.alignItems = 'center';
+        cell.style.gap = '6px';
+        cell.style.width = '96px';
+
+        const name = document.createElement('div');
+        // Umami's heading: the parameter without its prefix, capitalized.
+        const bare = param.slice('utm_'.length);
+        name.textContent = bare.charAt(0).toUpperCase() + bare.slice(1);
+        cell.appendChild(name);
+        rings.appendChild(cell);
+
+        const said = document.createElement('div');
+        said.style.color = MUTE;
+        said.style.textAlign = 'center';
+        said.style.overflowWrap = 'break-word';
+        said.style.wordBreak = 'break-word';
+        try {
+            const ring = renderDoughnut(await read(s, param));
+            if (ring) {
+                cell.appendChild(ring);
+                return;
+            }
+            said.textContent = 'nothing recorded';
+        } catch (err: unknown) {
+            said.textContent = `could not read ${param}: ${err instanceof Error ? err.message : String(err)}`;
+            said.style.color = 'var(--color-error)';
+        }
+        cell.appendChild(said);
+    })).then(() => undefined);
+}
+
 /**
  * Opens one stand's activity as its own element, the way a token opens as its own
  * (token-element.ts). An element renders its content exactly once and keeps that one
@@ -295,6 +370,7 @@ export function openStandActivity(s: StaandInfo): void {
             content.style.fontSize = SIZE;
             content.style.padding = EDGE;
             renderStandActivity(content, s);
+            void renderCampaigns(content, s);
             return content;
         },
         // A dataset needs room a fact row does not. Wide enough for a page path

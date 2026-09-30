@@ -1,7 +1,7 @@
 import { sendMessage } from './client';
 import { log, SEG } from './logger';
 import { escapeHtml } from './html-utils';
-import { renderSparkline, renderSparklines, windowOf, seriesOf, seenOver, formatIn, type Seen, type Window } from './components/sparkline';
+import { renderSparkline, renderSparklines, windowOf, seriesOf, labelsOf, seenOver, formatIn, type Seen, type Window } from './components/sparkline';
 import { DB, Watcher } from './sym';
 import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, getPredicateBreakdown, type PredicateDetail } from './eviction-chart';
 import { getWatchersByPredicate, setDilation, eyeStyle } from './watcher-predicates';
@@ -369,7 +369,7 @@ function renderDbStats(): void {
                 const at = charted.indexOf(predicate);
                 const color = at >= 0 ? PREDICATE_COLORS[at % PREDICATE_COLORS.length] : 'transparent';
                 const hist = histograms[predicate] ?? {};
-                const line = renderSparkline(keys.map(k => hist[k] ?? 0));
+                const line = renderSparkline(keys.map(k => hist[k] ?? 0), keys);
                 const info = watcherMap.get(predicate);
                 const eyes = info ? (() => { const s = eyeStyle(info); return `<span style="color: ${s.color}; text-shadow: ${s.shadow}; cursor: default;" title="${info.names.join(', ')}">${Watcher.repeat(info.names.length)}</span>`; })() : '';
                 return `<div class="distillation-row" style="display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 2px 0;">
@@ -415,7 +415,7 @@ function renderDbStats(): void {
                 return `<div class="eviction-pred-row" data-pred-idx="${i}" style="display: flex; align-items: center; gap: 8px; font-size: 11px; padding: 2px 0; cursor: pointer;">
                     <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word; flex: 1;">${b.predicate}</span>
                     ${age ? `<span style="color: #64748b; white-space: nowrap;" title="oldest evicted">${age}</span>` : ''}
-                    <span style="flex-shrink: 0; display: inline-flex;">${renderSparkline(seriesOf(b.evictedAt, w))}</span>
+                    <span style="flex-shrink: 0; display: inline-flex;">${renderSparkline(seriesOf(b.evictedAt, w), labelsOf(w))}</span>
                     <span style="color: #94a3b8; white-space: nowrap;">${formatIn(b.lastEviction, w.unit)}</span>
                 </div>
                 <div class="eviction-pred-detail" data-pred-detail="${i}" style="display: none;"></div>`;

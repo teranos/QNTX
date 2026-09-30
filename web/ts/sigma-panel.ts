@@ -4,7 +4,7 @@ import { Sigma, Watcher } from './sym';
 import { spawnSigmaAsWindow } from './components/element/sigma-element';
 import { getWatchersByPredicate, refresh as refreshWatcherPredicates, onWatcherPredicatesChanged, eyeStyle } from './watcher-predicates';
 import type { Element } from '@teranos/elements';
-import { renderSparkline, windowOf, seriesOf, seenOver, lastOf, formatIn } from './components/sparkline';
+import { renderSparkline, windowOf, seriesOf, labelsOf, seenOver, lastOf, formatIn } from './components/sparkline';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 
 let panelElement: HTMLElement | null = null;
@@ -119,7 +119,7 @@ function renderPanel(): void {
             html += `<span style="display: inline-flex; align-items: center; gap: 3px;">
                 <span style="width: 5px; height: 5px; border-radius: 50%; background: ${color};"></span>
                 <span style="color: #bdae93;">${p.predicate}${eyes}</span>
-                <span style="display: inline-flex;">${renderSparkline(seriesOf(seen[i].times, w, seen[i].weights))}</span>
+                <span style="display: inline-flex;">${renderSparkline(seriesOf(seen[i].times, w, seen[i].weights), labelsOf(w))}</span>
                 <span style="color: #7c6f64; font-variant-numeric: tabular-nums;">${at === -Infinity ? '' : formatIn(at, w.unit)}</span>
             </span>`;
         }

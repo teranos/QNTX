@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { unitFor, seriesOf, byLastSeen, formatIn, windowOf, renderSparkline, timeOfBucket, seenOver } from './sparkline';
+import { unitFor, seriesOf, byLastSeen, formatIn, windowOf, renderSparkline, timeOfBucket, seenOver, labelsOf } from './sparkline';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -84,5 +84,23 @@ describe('Buckets the node sends', () => {
             seenOver('later', { '2026-09-12T09': 1 }, '2026-09-12T09:41:00Z'),
         ]);
         expect(rows.map((r) => r.name)).toEqual(['later', 'earlier']);
+    });
+});
+
+describe('A line answers pointing', () => {
+    test('each step carries when it is, the window\'s buckets in their unit', () => {
+        const w = { start: at(2026, 3, 10, 12), end: at(2026, 3, 10, 14, 30), unit: 'hour' as const };
+        expect(labelsOf(w)).toEqual(['2026-03-10 12', '2026-03-10 13', '2026-03-10 14']);
+        expect(labelsOf(w).length).toBe(seriesOf([], w).length);
+    });
+
+    test('given when each step is, the line carries its moments for the tooltip', () => {
+        const svg = renderSparkline([1, 0, 3], ['a', 'b', 'c']);
+        const carried = svg.split('data-tooltip-series="')[1].split('"')[0].split('&quot;').join('"');
+        expect(JSON.parse(carried)).toEqual([['a', 1], ['b', 0], ['c', 3]]);
+    });
+
+    test('without them it is only a line', () => {
+        expect(renderSparkline([1, 0, 3])).not.toContain('data-tooltip-series');
     });
 });

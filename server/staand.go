@@ -1034,9 +1034,17 @@ func (s *QNTXServer) staandsMetrics(_ context.Context, sent sigil.Sent) (any, *p
 		return nil, refusal
 	}
 
+	// A campaign is counted by the pages it brought, as Umami counts it
+	// (getUTM: eventType pageView): a click on the page it landed on is not
+	// another arrival from the campaign.
+	viewsOnly := slices.Contains(staandCampaign, dim)
+
 	counts := map[string]int{}
 	for _, as := range arrivals {
 		if attrString(as.Attributes, staandSlugAttr) != slug {
+			continue
+		}
+		if viewsOnly && staandDimensionOf(as, dimEvent) != staandPredicate(staandView) {
 			continue
 		}
 		if v := staandDimensionOf(as, dim); v != "" {

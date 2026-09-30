@@ -13,11 +13,22 @@
  * The caller decides what a name is — text, or something you can press.
  */
 
+import { tooltip } from './tooltip';
+
 const MUTE = 'var(--text-on-dark-tertiary)';
 const LINE = 'var(--border-on-dark)';
 
-/** Draw one series as an 80×16 line, scaled to its own maximum. */
-export function renderSparkline(data: (number | null)[]): string {
+/** A value for an HTML attribute, whatever it holds. */
+function attr(value: string): string {
+    return value.split('&').join('&amp;').split('"').join('&quot;').split('<').join('&lt;');
+}
+
+/**
+ * Draw one series as an 80×16 line, scaled to its own maximum. Given when each
+ * step is, the line answers pointing: when, and the value then, and a longer
+ * hover draws the whole of it (the tooltip, components/tooltip.ts).
+ */
+export function renderSparkline(data: (number | null)[], at?: string[]): string {
     const values = data.filter((v): v is number => v != null);
     if (values.length < 2) return '';
 
@@ -35,7 +46,10 @@ export function renderSparkline(data: (number | null)[]): string {
 
     if (points.length < 2) return '';
 
-    return `<svg viewBox="0 0 ${w} ${h}" style="width: ${w}px; height: ${h}px;">
+    const steps = at && at.length === data.length
+        ? ` data-tooltip-series="${attr(JSON.stringify(data.map((v, i) => [at[i], v ?? 0])))}"`
+        : '';
+    return `<svg class="sparkline-line"${steps} viewBox="0 0 ${w} ${h}" style="width: ${w}px; height: ${h}px;">
         <polyline points="${points.join(' ')}" fill="none" stroke="#64748b" stroke-width="1" />
     </svg>`;
 }
@@ -115,6 +129,15 @@ export function seriesOf(times: number[], w: Window, weights?: number[]): number
 }
 
 const pad = (n: number): string => String(n).padStart(2, '0');
+
+/** When each step of a window's series is, in its unit's format: seriesOf's buckets. */
+export function labelsOf(w: Window): string[] {
+    const labels: string[] = [];
+    for (let t = bucketStart(w.start, w.unit); t <= w.end; t = nextBucket(t, w.unit)) {
+        labels.push(formatIn(t, w.unit));
+    }
+    return labels;
+}
 
 /** A moment in its unit's format: Umami's DATE_FORMATS. */
 export function formatIn(t: number, unit: Unit): string {
@@ -238,7 +261,7 @@ export function renderSparklines(
         spark.className = 'sparkline';
         spark.style.flexShrink = '0';
         spark.style.display = 'inline-flex';
-        spark.innerHTML = renderSparkline(seriesOf(row.times, w, row.weights));
+        spark.innerHTML = renderSparkline(seriesOf(row.times, w, row.weights), labelsOf(w));
 
         const last = document.createElement('span');
         last.className = 'sparkline-last';
@@ -255,3 +278,61 @@ export function renderSparklines(
         container.appendChild(line);
     }
 }
+
+/**
+ * The bigger picture of one line, for a longer hover: the whole line drawn
+ * large between the first and last moment of its window, and every moment
+ * that saw something, with its value.
+ */
+export function wholeLine(from: HTMLElement): HTMLElement | null {
+    let steps: [string, number][];
+    try {
+        steps = JSON.parse(from.dataset.tooltipSeries ?? '[]') as [string, number][];
+    } catch (err: unknown) {
+        const said = document.createElement('div');
+        said.textContent = `this line's moments could not be read: ${err instanceof Error ? err.message : String(err)}`;
+        return said;
+    }
+    if (steps.length < 2) return null;
+
+    const picture = document.createElement('div');
+    picture.className = 'sparkline-whole';
+
+    const w = 320;
+    const h = 64;
+    const max = Math.max(...steps.map(([, v]) => v));
+    const points = steps.map(([, v], i) => {
+        const x = (i / (steps.length - 1)) * w;
+        const y = max === 0 ? h - 1 : h - (v / max) * (h - 2) - 1;
+        return `${x},${y}`;
+    });
+    picture.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width: ${w}px; height: ${h}px; display: block;">
+        <polyline points="${points.join(' ')}" fill="none" stroke="#94a3b8" stroke-width="1.5" />
+    </svg>`;
+
+    const axis = document.createElement('div');
+    axis.className = 'sparkline-whole-axis';
+    axis.style.display = 'flex';
+    axis.style.justifyContent = 'space-between';
+    axis.style.color = MUTE;
+    const first = document.createElement('span');
+    first.textContent = steps[0][0];
+    const last = document.createElement('span');
+    last.textContent = steps[steps.length - 1][0];
+    axis.append(first, last);
+    picture.appendChild(axis);
+
+    const moments = document.createElement('div');
+    moments.className = 'sparkline-whole-moments';
+    moments.style.marginTop = '6px';
+    for (const [at, value] of steps) {
+        if (value === 0) continue;
+        const moment = document.createElement('div');
+        moment.textContent = `${at} · ${value}`;
+        moments.appendChild(moment);
+    }
+    picture.appendChild(moments);
+    return picture;
+}
+
+tooltip.expands('data-tooltip-series', wholeLine);

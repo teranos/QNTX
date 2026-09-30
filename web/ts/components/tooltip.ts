@@ -16,6 +16,14 @@
  * - Viewport-constrained positioning
  * - Touch support with tap-to-toggle
  * - Auto-cleanup on container removal
+ *
+ * A tally is shown here and nowhere else: "For one changing value, direct view
+ * of time and value", "Same would go for doughnut, revealing a legend as well",
+ * "And a longer hover should expand the tooltip showing the bigger picture".
+ * - data-tooltip-series: one [moment, value] per step along the trigger's
+ *   width, and the tooltip says the one under the pointer as it moves.
+ * - expands(): what a longer hover grows the tooltip into, found by the data
+ *   attribute the trigger or one of its ancestors carries.
  */
 
 export interface TooltipConfig {
@@ -27,13 +35,24 @@ export interface TooltipConfig {
     maxWidth?: number;
     /** Position relative to trigger element (default: 'bottom') */
     position?: 'top' | 'bottom';
+    /** Hover in ms, from the pointer arriving, before the tooltip grows into the bigger picture (default: 1200) */
+    expandDelay?: number;
 }
+
+/** What a longer hover grows the tooltip into, built from the element carrying the attribute. */
+export type Expansion = (from: HTMLElement) => HTMLElement | null;
+
+/** A series trigger's steps: when, and the value then. */
+type Step = [string, number];
+
+const SERIES = '[data-tooltip-series]';
 
 const DEFAULT_CONFIG: Required<TooltipConfig> = {
     delay: 300,
     triggerClass: 'has-tooltip',
     maxWidth: 400,
-    position: 'bottom'
+    position: 'bottom',
+    expandDelay: 1200,
 };
 
 class TooltipManager {
@@ -41,9 +60,55 @@ class TooltipManager {
     private tooltipTimeout: number | null = null;
     private currentTrigger: HTMLElement | null = null;
     private config: Required<TooltipConfig>;
+    private expandTimeout: number | null = null;
+    private expanded = false;
+    private pointerX = 0;
+    private expansions: [string, Expansion][] = [];
 
     constructor(config: TooltipConfig = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
+    }
+
+    /**
+     * What a longer hover over anything carrying `attribute` (a data-* name,
+     * as written in HTML) grows the tooltip into.
+     */
+    expands(attribute: string, build: Expansion): void {
+        this.expansions = this.expansions.filter(([a]) => a !== attribute);
+        this.expansions.push([attribute, build]);
+    }
+
+    /** The trigger under a target: a series first, as the innermost thing pointed at. */
+    private triggerOf(target: HTMLElement, selector: string, container: HTMLElement): HTMLElement | null {
+        const found = (target.closest(SERIES) ?? target.closest(selector)) as HTMLElement | null;
+        return found && container.contains(found) ? found : null;
+    }
+
+    /** What the tooltip says for a trigger: a series says the step under the pointer. */
+    private textFor(trigger: HTMLElement): string {
+        const series = trigger.dataset.tooltipSeries;
+        if (!series) return trigger.dataset.tooltip ?? '';
+        let steps: Step[];
+        try {
+            steps = JSON.parse(series) as Step[];
+        } catch (err: unknown) {
+            return `this line's moments could not be read: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        if (steps.length === 0) return '';
+        const rect = trigger.getBoundingClientRect();
+        const along = rect.width > 0 ? (this.pointerX - rect.left) / rect.width : 0;
+        const i = Math.min(steps.length - 1, Math.max(0, Math.round(along * (steps.length - 1))));
+        const [at, value] = steps[i];
+        return `${at} · ${value}`;
+    }
+
+    /** The bigger picture for a trigger, if anything it sits in has one. */
+    private expansionFor(trigger: HTMLElement): HTMLElement | null {
+        for (const [attribute, build] of this.expansions) {
+            const from = trigger.closest(`[${attribute}]`) as HTMLElement | null;
+            if (from) return build(from);
+        }
+        return null;
     }
 
     /**
@@ -59,21 +124,30 @@ class TooltipManager {
 
         const handleMouseEnter = (e: Event) => {
             const target = e.target as HTMLElement;
-            const trigger = target.closest(selector) as HTMLElement | null;
-            if (trigger) {
-                const tooltipText = trigger.dataset.tooltip;
-                if (tooltipText) {
-                    this.show(trigger, tooltipText);
-                }
+            if (e instanceof MouseEvent) this.pointerX = e.clientX;
+            const trigger = this.triggerOf(target, selector, container);
+            if (trigger && trigger !== this.currentTrigger && this.textFor(trigger)) {
+                this.show(trigger, this.textFor(trigger));
             }
         };
 
         const handleMouseLeave = (e: Event) => {
             const target = e.target as HTMLElement;
-            const trigger = target.closest(selector) as HTMLElement | null;
-            if (trigger) {
+            if (!target.matches(`${SERIES}, ${selector}`)) return;
+            const trigger = this.triggerOf(target, selector, container);
+            if (trigger && trigger === this.currentTrigger) {
                 this.hide();
             }
+        };
+
+        // The one changing value follows the pointer along a series. Once the
+        // tooltip has grown into the bigger picture it holds still.
+        const handleMouseMove = (e: MouseEvent) => {
+            this.pointerX = e.clientX;
+            const trigger = this.currentTrigger;
+            if (!trigger || !trigger.dataset.tooltipSeries || !this.tooltip || this.expanded) return;
+            this.tooltip.textContent = this.textFor(trigger);
+            this.positionTooltip(trigger);
         };
 
         // Touch support: long press to show tooltip
@@ -83,18 +157,20 @@ class TooltipManager {
 
         const handleTouchStart = (e: TouchEvent) => {
             const target = e.target as HTMLElement;
-            touchStartTarget = target.closest(selector) as HTMLElement | null;
+            touchStartTarget = this.triggerOf(target, selector, container);
             touchStartTime = Date.now();
         };
 
         const handleTouchEnd = (e: TouchEvent) => {
             const target = e.target as HTMLElement;
-            const trigger = target.closest(selector) as HTMLElement | null;
+            const trigger = this.triggerOf(target, selector, container);
+            const touch = e.changedTouches[0];
+            if (touch) this.pointerX = touch.clientX;
 
             // Only handle if touch ended on same element it started
             if (trigger && trigger === touchStartTarget) {
                 const touchDuration = Date.now() - touchStartTime;
-                const tooltipText = trigger.dataset.tooltip;
+                const tooltipText = this.textFor(trigger);
 
                 if (tooltipText) {
                     // If tooltip is already showing for this trigger, hide it
@@ -104,6 +180,11 @@ class TooltipManager {
                         // Quick tap: show tooltip immediately
                         this.hideImmediate();
                         this.showImmediate(trigger, tooltipText);
+                    } else if (touchDuration >= this.config.expandDelay) {
+                        // Held as long as a longer hover: the bigger picture
+                        this.hideImmediate();
+                        this.showImmediate(trigger, tooltipText);
+                        this.expand(trigger);
                     }
                 }
             }
@@ -113,6 +194,7 @@ class TooltipManager {
 
         container.addEventListener('mouseenter', handleMouseEnter, true);
         container.addEventListener('mouseleave', handleMouseLeave, true);
+        container.addEventListener('mousemove', handleMouseMove, true);
         container.addEventListener('touchstart', handleTouchStart, { capture: true, passive: true });
         container.addEventListener('touchend', handleTouchEnd, { capture: true, passive: true });
 
@@ -120,6 +202,7 @@ class TooltipManager {
         return () => {
             container.removeEventListener('mouseenter', handleMouseEnter, true);
             container.removeEventListener('mouseleave', handleMouseLeave, true);
+            container.removeEventListener('mousemove', handleMouseMove, true);
             container.removeEventListener('touchstart', handleTouchStart, true);
             container.removeEventListener('touchend', handleTouchEnd, true);
             this.hide();
@@ -135,6 +218,10 @@ class TooltipManager {
             clearTimeout(this.tooltipTimeout);
         }
 
+        if (this.expandTimeout) {
+            clearTimeout(this.expandTimeout);
+        }
+
         this.currentTrigger = trigger;
 
         // Show tooltip after delay
@@ -142,8 +229,8 @@ class TooltipManager {
             // Remove old tooltip if exists
             this.hideImmediate();
 
-            // Create new tooltip
-            this.tooltip = this.createTooltipElement(text);
+            // Create new tooltip, saying the step under the pointer by now
+            this.tooltip = this.createTooltipElement(trigger.dataset.tooltipSeries ? this.textFor(trigger) : text);
 
             // Append to DOM before positioning (getBoundingClientRect needs element in DOM)
             document.body.appendChild(this.tooltip);
@@ -151,6 +238,26 @@ class TooltipManager {
             // Position tooltip
             this.positionTooltip(trigger);
         }, this.config.delay);
+
+        // A longer hover grows the same tooltip into the bigger picture
+        this.expandTimeout = window.setTimeout(() => {
+            if (this.currentTrigger === trigger) this.expand(trigger);
+        }, this.config.expandDelay);
+    }
+
+    /** Grows the tooltip over a trigger into the bigger picture, when there is one. */
+    private expand(trigger: HTMLElement): void {
+        const picture = this.expansionFor(trigger);
+        if (!picture) return;
+        if (!this.tooltip) {
+            this.tooltip = this.createTooltipElement('');
+            document.body.appendChild(this.tooltip);
+        }
+        this.tooltip.replaceChildren(picture);
+        this.tooltip.classList.add('panel-tooltip-expanded');
+        this.tooltip.style.maxWidth = '';
+        this.expanded = true;
+        this.positionTooltip(trigger);
     }
 
     /**
@@ -180,6 +287,10 @@ class TooltipManager {
             clearTimeout(this.tooltipTimeout);
             this.tooltipTimeout = null;
         }
+        if (this.expandTimeout) {
+            clearTimeout(this.expandTimeout);
+            this.expandTimeout = null;
+        }
         this.hideImmediate();
         this.currentTrigger = null;
     }
@@ -207,6 +318,7 @@ class TooltipManager {
             this.tooltip.remove();
             this.tooltip = null;
         }
+        this.expanded = false;
     }
 
     /**

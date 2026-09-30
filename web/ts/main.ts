@@ -22,6 +22,7 @@ import { setupState, claimNode } from './setup.ts';
 import { signedIn, openDoor } from './signin.ts';
 import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
+import { tooltip } from './components/tooltip';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { person, type Person } from './self-person.ts';
 import { setOpenCanvas, setStanding } from './standing.ts';
@@ -403,6 +404,9 @@ async function init(): Promise<void> {
     // Initialize UI components
     if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
     initSystemDrawer();
+    // A tally is shown only in the tooltip, wherever a line or a ring is drawn:
+    // pointing says the one value, a longer hover the bigger picture.
+    tooltip.attach(document.body, '[data-tooltip-series], [data-tooltip-legend] [data-tooltip]');
     // Root only, and the node is what says so — it answers 403 below SUPER and
     // 501 where namespaces do not exist, so no bar is grown either way.
     initNamespacesBar();

@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { renderStandActivity, renderWalk, renderWalkPager, eventsOf, spanOf, standElementId, siteOf, predicateCell } from './stand-activity-element.ts';
+import { renderStandActivity, renderWalk, renderWalkPager, eventsOf, spanOf, standElementId, siteOf, predicateCell, renderCampaigns } from './stand-activity-element.ts';
 import { renderSparklines, windowOf } from './components/sparkline.ts';
 import { pageStatsOf, externalLink, pageElementId } from './page-element.ts';
 import type { StaandInfo } from './market-element.ts';
@@ -257,5 +257,28 @@ describe('The predicates the stand shows', () => {
         expect(steps.map((s) => s.textContent)).toEqual(['page_view', 'page_view', 'contact_click']);
         expect(steps.map((s) => s.dataset.axSegment))
             .toEqual(['is staand:page_view', 'is staand:page_view', 'is staand:contact_click']);
+    });
+});
+
+describe('UTM', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
+
+    test('a ring per campaign parameter in Umami\'s order, and no count beside it', async () => {
+        const container = document.createElement('div');
+        await renderCampaigns(container, aStand(), async (_s, param) => {
+            if (param === 'utm_source') return [{ name: 'chatgpt.com', value: 480 }];
+            if (param === 'utm_term') throw new Error('HTTP 500 the store did not answer');
+            return [];
+        });
+        const cells = Array.from(container.querySelectorAll<HTMLElement>('.stand-campaign'));
+        expect(cells.map((c) => c.dataset.param)).toEqual(['utm_campaign', 'utm_content', 'utm_medium', 'utm_source', 'utm_term']);
+        const source = cells[3];
+        expect(source.querySelector('.doughnut')).not.toBeNull();
+        expect(source.textContent).toBe('Source');
+        expect(cells[0].textContent).toContain('nothing recorded');
+        expect(cells[4].textContent).toContain('could not read utm_term: HTTP 500 the store did not answer');
     });
 });
