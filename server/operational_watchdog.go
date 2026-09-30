@@ -59,6 +59,7 @@ func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationa
 
 	var stalled time.Time // When the store stopped answering within p.sentry; zero while it does.
 	var longest time.Duration
+	var told bool // ROOT was mailed that the store is not answering, so is mailed when it does.
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -67,7 +68,8 @@ func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationa
 		}
 
 		asked := time.Now()
-		took, err := s.askOperationalStore(p, asked, root.Load)
+		took, mailed, err := s.askOperationalStore(p, asked, root.Load)
+		told = told || mailed
 		if s.ctx.Err() != nil {
 			return
 		}
@@ -96,15 +98,18 @@ func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationa
 			answered := asked.Add(took)
 			s.logger.Infow("The operational store answers within the time again",
 				"within", p.sentry, "since", stalled, "took", answered.Sub(stalled), "longest_wait", longest)
-			s.mailRoot(root.Load(), recoveredMail(stalled, answered, longest, p))
-			stalled, longest = time.Time{}, 0
+			if told {
+				s.mailRoot(root.Load(), recoveredMail(stalled, answered, longest, p))
+			}
+			stalled, longest, told = time.Time{}, 0, false
 		}
 	}
 }
 
 // askOperationalStore pings the operational store and waits up to p.die for
-// the answer, saying so at p.sentry and mailing ROOT every p.mailEvery.
-func (s *QNTXServer) askOperationalStore(p operationalPatience, asked time.Time, root func() *services.MailRecipient) (time.Duration, error) {
+// the answer, saying so at p.sentry and mailing ROOT every p.mailEvery. It says
+// whether ROOT was mailed.
+func (s *QNTXServer) askOperationalStore(p operationalPatience, asked time.Time, root func() *services.MailRecipient) (time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(s.ctx, p.die)
 	defer cancel()
 
@@ -115,10 +120,11 @@ func (s *QNTXServer) askOperationalStore(p operationalPatience, asked time.Time,
 	defer sentry.Stop()
 	mail := time.NewTicker(p.mailEvery)
 	defer mail.Stop()
+	mailed := false
 	for {
 		select {
 		case err := <-answered:
-			return time.Since(asked), err
+			return time.Since(asked), mailed, err
 		case <-sentry.C:
 			s.logger.Errorw("The operational store has not answered for "+p.sentry.String(),
 				"asked_at", asked, "pool", s.operationalPool().String(), "dies_at", p.die)
@@ -128,6 +134,7 @@ func (s *QNTXServer) askOperationalStore(p operationalPatience, asked time.Time,
 				continue
 			}
 			s.mailRoot(root(), stalledMail(waited, p, s.operationalPool(), false))
+			mailed = true
 		}
 	}
 }

@@ -187,3 +187,27 @@ func TestAStoreThatDoesNotAnswerInAMinuteStopsTheNodeAndROOTIsTold(t *testing.T)
 	assert.True(t, strings.HasPrefix(subjects[len(subjects)-1], "QNTX stops: the operational store has not answered for"),
 		"the last mail does not say the node stops: %v", subjects)
 }
+
+// The recovery mail answers a mail about the wait: a wait that ended before
+// ROOT was mailed about it mails nothing when it ends.
+func TestAWaitROOTWasNotMailedAboutMailsNothingWhenItEnds(t *testing.T) {
+	s, box := watchedNode(t)
+
+	stopped := make(chan error, 1)
+	go s.watchOperationalStore(func(reason error) { stopped <- reason }, shortPatience)
+	time.Sleep(3 * shortPatience.every)
+
+	held, err := s.nodeDB.Conn(context.Background())
+	require.NoError(t, err)
+	time.Sleep(2 * shortPatience.sentry) // past Sentry, short of the first mail
+	require.NoError(t, held.Close())
+
+	time.Sleep(10 * shortPatience.every) // the store answers in time again
+	assert.Empty(t, box.subjects())
+
+	select {
+	case reason := <-stopped:
+		t.Fatalf("a short wait stopped the node: %v", reason)
+	default:
+	}
+}
