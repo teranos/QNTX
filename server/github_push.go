@@ -127,8 +127,7 @@ func (s *QNTXServer) HandleGitHubPush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	names := s.buildsMovedBy(push)
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string][]string{"building": names})
+	respond(w, s.logger, http.StatusOK, map[string][]string{"building": names})
 }
 
 // buildsMovedBy starts the build of every enabled plugin push moves, and names them.
