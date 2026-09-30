@@ -66,6 +66,11 @@ describe('which canvas opens', () => {
         expect(opening([namespaces, bobs])).toEqual({ open: 'CV-BOB', hasCanvas: true, disabled: false });
     });
 
+    test('the canvas the address names opens, over the one remembered', () => {
+        localStorage.setItem(openCanvasKey(), 'CV-NS');
+        expect(opening([namespaces, bobs], 'CV-BOB')).toEqual({ open: 'CV-BOB', hasCanvas: true, disabled: false });
+    });
+
     test('a disabled canvas never opens on its own', () => {
         localStorage.setItem(openCanvasKey(), 'CV-BOB');
         expect(opening([namespaces, { ...bobs, disabled_by: 'US-ROOT' }])).toEqual({ open: '', hasCanvas: false, disabled: false });
