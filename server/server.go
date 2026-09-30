@@ -99,6 +99,11 @@ type QNTXServer struct {
 	// The calls plugins are answering: the token handed for each, and the store
 	// of the caller it was handed for (plugin_sigils.go).
 	callStores sync.Map
+	// The plugins standing in a namespace of their own: the token handed each
+	// at Initialize and that namespace's store, by token and by plugin
+	// (plugin_stores.go).
+	pluginStores sync.Map
+	pluginTokens sync.Map
 
 	// Plugin HTTP routing (lazy initialization for async plugin loading)
 	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux

@@ -56,7 +56,7 @@ func TestAConfigValueOfTheWrongTypeIsSaid(t *testing.T) {
 	SetPluginRecords(heldRecords{"pyre": {Name: "pyre", Config: map[string]string{"poll_interval": "often"}}})
 	t.Cleanup(func() { SetPluginRecords(nil) })
 
-	config := NewConfigProvider(nil, zap.New(core).Sugar()).GetPluginConfig("pyre")
+	config := NewConfigProvider(nil, nil, zap.New(core).Sugar()).GetPluginConfig("pyre")
 	assert.Equal(t, 0, config.GetInt("poll_interval"))
 	require.Equal(t, 1, logs.Len())
 	assert.Equal(t, "poll_interval", logs.All()[0].ContextMap()["key"])
@@ -68,7 +68,7 @@ func TestAPluginWhoseRecordIsUnreadableDoesNotInitialize(t *testing.T) {
 	SetPluginRecords(unreadableRecords{})
 	t.Cleanup(func() { SetPluginRecords(nil) })
 	logger := zaptest.NewLogger(t).Sugar()
-	services := plugin.NewServiceRegistry(nil, logger, nil, NewConfigProvider(nil, logger), nil)
+	services := plugin.NewServiceRegistry(nil, logger, nil, NewConfigProvider(nil, nil, logger), nil)
 
 	proxy := &ExternalDomainProxy{metadata: plugin.Metadata{Name: "pyre"}, logger: logger}
 	err := proxy.doInitialize(context.Background(), services)
@@ -82,7 +82,7 @@ func TestAnUnreadableRecordIsSaidWhenConfigIsAsked(t *testing.T) {
 	SetPluginRecords(unreadableRecords{})
 	t.Cleanup(func() { SetPluginRecords(nil) })
 
-	config := NewConfigProvider(nil, zap.New(core).Sugar()).GetPluginConfig("pyre")
+	config := NewConfigProvider(nil, nil, zap.New(core).Sugar()).GetPluginConfig("pyre")
 	assert.Empty(t, config.GetKeys())
 	require.Equal(t, 1, logs.Len())
 	assert.Equal(t, "pyre", logs.All()[0].ContextMap()["plugin"])

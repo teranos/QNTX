@@ -6,11 +6,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
 func TestNewConfigProvider_WithoutEndpoints(t *testing.T) {
-	provider := NewConfigProvider(nil, zap.NewNop().Sugar())
+	provider := NewConfigProvider(nil, nil, zap.NewNop().Sugar())
 	require.NotNil(t, provider)
 
 	config := provider.GetPluginConfig("testdomain")
@@ -35,7 +36,7 @@ func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 		AuthToken:           "test-token-123",
 	}
 
-	provider := NewConfigProvider(endpoints, zap.NewNop().Sugar())
+	provider := NewConfigProvider(endpoints, nil, zap.NewNop().Sugar())
 	config := provider.GetPluginConfig("anydomain")
 
 	cases := []struct {
@@ -67,7 +68,7 @@ func TestNewConfigProvider_GetAlsoInjectsEndpoints(t *testing.T) {
 		LLMAddress: "localhost:5555",
 	}
 
-	provider := NewConfigProvider(endpoints, zap.NewNop().Sugar())
+	provider := NewConfigProvider(endpoints, nil, zap.NewNop().Sugar())
 	config := provider.GetPluginConfig("x")
 
 	assert.Equal(t, "localhost:5555", config.Get("_llm_endpoint"))
@@ -83,7 +84,7 @@ func TestAPluginIsHandedTheConfigItsRecordHolds(t *testing.T) {
 	}}})
 	t.Cleanup(func() { SetPluginRecords(nil) })
 
-	config := NewConfigProvider(nil, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
+	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
 	assert.ElementsMatch(t, []string{"token", "poll_interval", "verbose"}, config.GetKeys())
 	assert.Equal(t, "ssm:///q/box/token", config.Get("token"))
 	assert.Equal(t, 300, config.GetInt("poll_interval"))
@@ -97,7 +98,41 @@ func TestAPluginsConfigIsItsRecord(t *testing.T) {
 	SetPluginRecords(heldRecords{"pyre": {Name: "pyre", Config: map[string]string{}}})
 	t.Cleanup(func() { SetPluginRecords(nil) })
 
-	config := NewConfigProvider(nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
+	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
 	assert.Empty(t, config.GetKeys())
 	assert.Equal(t, 0, config.GetInt("poll_interval"))
+}
+
+// A plugin whose record names a namespace is handed a token of its own for it,
+// minted by the node; one whose record names none is handed the shared token
+// (ADR-046).
+func TestAPluginStandingInANamespaceIsHandedItsOwnToken(t *testing.T) {
+	SetPluginRecords(heldRecords{
+		"cleanAPI": {Name: "cleanAPI", Config: map[string]string{PluginNamespaceKey: "Clean"}},
+		"datapunt": {Name: "datapunt", Config: map[string]string{}},
+	})
+	t.Cleanup(func() { SetPluginRecords(nil) })
+	minted := func(plugin, namespace string) (string, error) {
+		return plugin + "@" + namespace, nil
+	}
+
+	provider := NewConfigProvider(&ServiceEndpoints{AuthToken: "shared"}, minted, zap.NewNop().Sugar())
+	assert.Equal(t, "cleanAPI@Clean", provider.GetPluginConfig("cleanAPI").GetString("_auth_token"))
+	assert.Equal(t, "shared", provider.GetPluginConfig("datapunt").GetString("_auth_token"))
+}
+
+// A namespace the node cannot mint a token for is a plugin not handed its
+// config, said with the reason, never a plugin started on an empty token.
+func TestATokenTheNodeCannotMintFailsTheInitialize(t *testing.T) {
+	SetPluginRecords(heldRecords{"cleanAPI": {Name: "cleanAPI", Config: map[string]string{PluginNamespaceKey: "pond"}}})
+	t.Cleanup(func() { SetPluginRecords(nil) })
+	refused := func(plugin, namespace string) (string, error) {
+		return "", errors.Newf("namespace %s is not served", namespace)
+	}
+
+	config := NewConfigProvider(&ServiceEndpoints{AuthToken: "shared"}, refused, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
+	assert.Equal(t, "", config.GetString("_auth_token"))
+	err := config.(interface{ Err() error }).Err()
+	require.Error(t, err, "a token the node could not mint was not said")
+	assert.Contains(t, err.Error(), "pond")
 }

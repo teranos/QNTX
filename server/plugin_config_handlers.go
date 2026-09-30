@@ -225,8 +225,9 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 
 	// Validate each provided config value
 	for fieldName, value := range settings {
-		// How QNTX builds the plugin is QNTX's, not the plugin's to validate.
-		if strings.HasPrefix(fieldName, buildConfigPrefix) {
+		// How QNTX builds the plugin, and where it stands, are QNTX's, not the
+		// plugin's to validate.
+		if strings.HasPrefix(fieldName, buildConfigPrefix) || fieldName == grpcplugin.PluginNamespaceKey {
 			continue
 		}
 		fieldSchema, schemaExists := schema[fieldName]

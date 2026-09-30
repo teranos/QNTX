@@ -276,6 +276,20 @@ func (h *Held) ScheduledRun(namespace string) (*Universe, error) {
 	return h.universeIn(namespace)
 }
 
+// OfPlugin hands back the store of the namespace a plugin's record names, so
+// the plugin stands where ROOT put it rather than in the served universe
+// (ADR-046). system is refused: no plugin acts where the node keeps its own records.
+func (h *Held) OfPlugin(namespace string) (ats.AttestationStore, error) {
+	if namespace == auth.NamespaceSystem {
+		return nil, NotServed{Asked: namespace}
+	}
+	u, err := h.universeIn(namespace)
+	if err != nil {
+		return nil, err
+	}
+	return u.Store(), nil
+}
+
 // WriteWhatTheNodeKnowsOfItself hands back the system store for a line about
 // the node rather than about the world: a role grant, a reach line, a word
 // line, a stand's definition. These land in system whatever namespace their

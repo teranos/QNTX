@@ -440,6 +440,11 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
+	// A token the node could not mint for the namespace the plugin stands in
+	// fails the Initialize here, rather than starting the plugin on no token.
+	if unread, says := pluginConfig.(interface{ Err() error }); says && unread.Err() != nil {
+		return errors.Wrapf(unread.Err(), "plugin %s was not handed its config", c.metadata.Name)
+	}
 
 	// A plugin needing a credential would otherwise need it written literally
 	// in am.toml, which ships as an unencrypted parameter and is kept in

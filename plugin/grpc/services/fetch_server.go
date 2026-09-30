@@ -155,11 +155,34 @@ type FetchServer struct {
 	stats           fetchStats
 	stopPulse       chan struct{}
 	versionResolver VersionResolver
+	// Set after the service is serving, while plugins may already be calling.
+	plugins atomic.Pointer[PluginStores]
 }
 
 // SetVersionResolver sets the function used to resolve plugin versions from source names.
 func (s *FetchServer) SetVersionResolver(resolver VersionResolver) {
 	s.versionResolver = resolver
+}
+
+// SetPluginStores hands the server the stores of the namespaces plugins stand in.
+func (s *FetchServer) SetPluginStores(plugins PluginStores) {
+	s.plugins.Store(&plugins)
+}
+
+// storeFor is the store a fetch is attested into: the served one for the
+// shared token, the namespace a plugin stands in for that plugin's own token
+// (ADR-046), and none for anything else.
+func (s *FetchServer) storeFor(token string) (ats.AttestationStore, error) {
+	err := ValidateToken(token, s.authToken)
+	if err == nil {
+		return s.store, nil
+	}
+	if plugins := s.plugins.Load(); plugins != nil {
+		if store, standing := (*plugins)(token); standing {
+			return store, nil
+		}
+	}
+	return nil, err
 }
 
 func NewFetchServer(store ats.AttestationStore, authToken string, cfg appcfg.FetchConfig, logger *zap.SugaredLogger) *FetchServer {
@@ -221,7 +244,8 @@ func (s *FetchServer) Stop() {
 }
 
 func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*protocol.FetchResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	store, err := s.storeFor(req.AuthToken)
+	if err != nil {
 		return &protocol.FetchResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 	}
 
@@ -230,7 +254,7 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 	}
 
 	// Dedup: return cached attestation if we already fetched this URL
-	if resp, found := s.dedupLookup(req); found {
+	if resp, found := s.dedupLookup(store, req); found {
 		return resp, nil
 	}
 
@@ -243,7 +267,7 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 		return fetchErr, nil
 	}
 
-	attestID := s.attestFetchResult(ctx, req, body, statusCode)
+	attestID := s.attestFetchResult(ctx, store, req, body, statusCode)
 
 	return &protocol.FetchResponse{
 		Success:       true,
@@ -255,12 +279,12 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 
 // dedupLookup checks if we already have an attestation for this URL.
 // Returns the cached response and true if found, nil and false otherwise.
-func (s *FetchServer) dedupLookup(req *protocol.FetchRequest) (*protocol.FetchResponse, bool) {
+func (s *FetchServer) dedupLookup(store ats.AttestationStore, req *protocol.FetchRequest) (*protocol.FetchResponse, bool) {
 	if req.Predicate == "" || req.Fresh || len(req.Subjects) == 0 {
 		return nil, false
 	}
 
-	results, err := s.store.GetAttestations(ats.AttestationFilter{
+	results, err := store.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{req.Predicate},
 		Subjects:   req.Subjects,
 		Limit:      1,
@@ -399,7 +423,7 @@ func (s *FetchServer) doHTTPGet(ctx context.Context, rawURL string) ([]byte, int
 
 // attestFetchResult creates an attestation for the fetch result.
 // Returns the attestation ID, or empty string if attestation was skipped or failed.
-func (s *FetchServer) attestFetchResult(ctx context.Context, req *protocol.FetchRequest, body []byte, statusCode int) string {
+func (s *FetchServer) attestFetchResult(ctx context.Context, store ats.AttestationStore, req *protocol.FetchRequest, body []byte, statusCode int) string {
 	if len(req.Subjects) == 0 || req.Predicate == "" {
 		return ""
 	}
@@ -444,7 +468,7 @@ func (s *FetchServer) attestFetchResult(ctx context.Context, req *protocol.Fetch
 		Attributes: attrs,
 	}
 
-	att, err := s.store.GenerateAndCreateAttestation(ctx, cmd)
+	att, err := store.GenerateAndCreateAttestation(ctx, cmd)
 	if err != nil {
 		s.logger.Warnw("Fetch succeeded but attestation failed",
 			"url", req.Url,
