@@ -135,3 +135,36 @@ func TestAUserWithNoListsIsTheSameUserAsOneWithEmptyOnes(t *testing.T) {
 	assert.True(t, sameUser(User{ID: "US-1"}, User{ID: "US-1", Keys: []UserKey{}, EmailAddresses: []string{}}))
 	assert.False(t, sameUser(User{ID: "US-1"}, User{ID: "US-1", Standing: "garden"}))
 }
+
+// "we need to keep users in mem"
+//
+// The gate asks for Users on every request, and it may not wait on the
+// operational db for them.
+func TestAUserIsReadWithoutTheOperationalDb(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	table, _, err := OpenUserTable(db, nil)
+	require.NoError(t, err)
+	require.NoError(t, table.Put(User{ID: "UStim", Level: LevelRoot, Keys: []UserKey{{DID: "did:key:z6Mktim"}}}))
+
+	require.NoError(t, db.Close())
+
+	held, err := table.List()
+	require.NoError(t, err)
+	require.Len(t, held, 1)
+	_, found, err := table.ByRoute("did:key:z6Mktim")
+	require.NoError(t, err)
+	assert.True(t, found)
+}
+
+// Memory holds what the table took, so a write the table refused is not a User.
+func TestAUserTheTableRefusedIsNotHeld(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	table, _, err := OpenUserTable(db, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	assert.Error(t, table.Put(User{ID: "UStim"}))
+	held, err := table.List()
+	require.NoError(t, err)
+	assert.Empty(t, held)
+}
