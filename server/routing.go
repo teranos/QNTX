@@ -34,6 +34,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 	s.answer("/.well-known/did.json", s.nodeDID.HandleDIDDocument)
 
+	// The App's webhook: a push builds the plugins it moves.
+	s.answer(githubPushPath, s.HandleGitHubPush)
+
 	// A staand answers the public pixel on /s/{namespace}/{slug} (ADR-035). The
 	// handler reads the market and the slug off the path.
 	s.answer(staandPathPrefix, s.HandleStaand)

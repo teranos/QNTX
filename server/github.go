@@ -75,9 +75,11 @@ type gitHubRunner struct {
 
 // gitHubStatus is the whole of what the GitHub element shows.
 type gitHubStatus struct {
-	Enabled    bool              `json:"enabled"`
-	Namespaces []gitHubNamespace `json:"namespaces"`
-	Runner     gitHubRunner      `json:"runner"`
+	Enabled    bool                        `json:"enabled"`
+	Namespaces []gitHubNamespace           `json:"namespaces"`
+	Runner     gitHubRunner                `json:"runner"`
+	Builds     map[string]PluginBuildState `json:"builds"`
+	Webhook    bool                        `json:"webhook"`
 }
 
 func (s *QNTXServer) githubSignum() sigil.Signum {
@@ -93,8 +95,19 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 						{Name: "enabled", Says: "Whether GitHub is on for the node."},
 						{Name: "namespaces", Says: "One row per namespace with a GitHub token: its source, whether GitHub accepts it, and its rate limit."},
 						{Name: "runner", Says: "The runner's path, whether it is on, why it is not running when it is not, and its stats."},
+						{Name: "builds", Says: "Per plugin QNTX builds itself: the revs it was last built from, when, whether that changed the plugin, and what failed."},
+						{Name: "webhook", Says: "Whether ROOT generated the App's webhook secret, which is what opens " + githubPushPath + "."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: githubPath},
+				},
+				{
+					Name: "webhook",
+					Does: "Generate the App's webhook secret, replacing the one before, and open " + githubPushPath + ". It is shown this once, to set in the App's settings.",
+					Gives: []*protocol.Field{
+						{Name: "secret", Says: "The secret, for the App's webhook settings."},
+						{Name: "path", Says: "Where the App's webhook URL points on this node."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/webhook"},
 				},
 				{
 					Name:  "node",
@@ -116,9 +129,10 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 			},
 		},
 		Answers: map[string]sigil.Answer{
-			"status": s.githubStatus,
-			"node":   s.githubNode,
-			"runner": s.githubRunner,
+			"status":  s.githubStatus,
+			"node":    s.githubNode,
+			"runner":  s.githubRunner,
+			"webhook": s.githubWebhook,
 		},
 	}
 }
@@ -128,7 +142,13 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	status := gitHubStatus{Enabled: settings.Enabled, Namespaces: []gitHubNamespace{}, Runner: s.runnerStatus(settings)}
+	status := gitHubStatus{
+		Enabled:    settings.Enabled,
+		Namespaces: []gitHubNamespace{},
+		Runner:     s.runnerStatus(settings),
+		Builds:     s.builds.all(),
+	}
+	_, status.Webhook = s.gitHubWebhook()
 	if s.authHandler == nil {
 		return status, nil
 	}
@@ -208,6 +228,17 @@ func (s *QNTXServer) githubRunner(ctx context.Context, sent sigil.Sent) (any, *p
 	}
 	s.StartRunner()
 	return map[string]gitHubRunner{"runner": s.runnerStatus(settings)}, nil
+}
+
+func (s *QNTXServer) githubWebhook(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	if s.authHandler == nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no login, so it keeps no webhook secret"}
+	}
+	secret, err := s.authHandler.NewGitHubWebhook(actorOf(ctx))
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	return map[string]string{"secret": secret, "path": githubPushPath}, nil
 }
 
 // runnerStatus is the runner as the Actions section shows it.
