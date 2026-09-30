@@ -357,7 +357,7 @@ func (s *Store) UpdateJobInterval(jobID string, newInterval int) error {
 // UpdateJobNextRun sets when a job runs next, without claiming it has run.
 // UpdateJobAfterExecution writes last_run_at along with the next run, so a job
 // that has never run could otherwise only rejoin the schedule by lying.
-func (s *Store) UpdateJobNextRun(jobID string, nextRun time.Time) error {
+func (s *Store) UpdateJobNextRun(jobID string, nextRun time.Time) (err error) {
 	query := `
 		UPDATE scheduled_pulse_jobs
 		SET next_run_at = ?,
@@ -369,7 +369,7 @@ func (s *Store) UpdateJobNextRun(jobID string, nextRun time.Time) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to begin schedule tick transaction for %s", jobID)
 	}
-	defer func() { _ = db.Undone(err, tx) }()
+	defer func() { err = db.Undone(err, tx) }()
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	result, err := tx.Exec(query, nextRun.Format(time.RFC3339), now, jobID)
