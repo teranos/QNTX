@@ -423,9 +423,9 @@ async function appear(header: HTMLElement): Promise<void> {
 }
 
 // A refusal nobody pressed for is easy to miss in a bar. Until it is pressed,
-// the canvas and the namespace's page blink crimson behind it and it is said
+// the canvas and the namespace's page stand crimson behind it and it is said
 // over them, the way the door says what went wrong. Pressing it copies it and
-// stills the blink; the bar keeps saying it.
+// takes the crimson away; the bar keeps saying it.
 let over: HTMLElement | null = null;
 
 function sound(): void {

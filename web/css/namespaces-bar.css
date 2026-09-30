@@ -243,23 +243,11 @@
     user-select: text;
 }
 
-/* A refusal nobody pressed for: the canvas and the namespace's page blink
-   crimson behind it, slowly, until it is pressed. */
+/* A refusal nobody pressed for: the canvas and the namespace's page stand
+   crimson behind it until it is pressed. */
 body.refusal-said .canvas-workspace,
 body.refusal-said #namespace-page {
-    animation: refusalBlink 2400ms ease-in-out infinite;
-}
-
-@keyframes refusalBlink {
-    50% { background-color: color-mix(in srgb, var(--refusal-crimson) 22%, var(--bg-dark)); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    body.refusal-said .canvas-workspace,
-    body.refusal-said #namespace-page {
-        animation: none;
-        background-color: color-mix(in srgb, var(--refusal-crimson) 22%, var(--bg-dark));
-    }
+    background-color: color-mix(in srgb, var(--refusal-crimson) 22%, var(--bg-dark));
 }
 
 /* Said over the canvas the way the door says what went wrong (.door-say):
