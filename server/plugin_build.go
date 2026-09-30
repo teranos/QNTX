@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -171,8 +173,9 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 	for _, source := range b.sources() {
 		rev, err := s.buildRev(ctx, source)
 		if err != nil {
-			logger.Errorw("A source's rev was not read, so the plugin is not built", "plugin", b.name, "source", source.String(), "error", err)
+			logger.Warnw("A source's rev was not read, so the plugin is not built", "plugin", b.name, "source", source.String(), "error", err)
 			s.builds.set(b.name, PluginBuildState{At: time.Now(), Error: err.Error()})
+			s.mailBuildFailure(ctx, b, nil, err, logger)
 			return
 		}
 		revs = append(revs, rev)
@@ -187,8 +190,9 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 	state.Changed, state.Digest = changed, digest
 	if err != nil {
 		state.Error = err.Error()
-		logger.Errorw("A plugin was not built", "plugin", b.name, "revs", revs, "error", err)
+		logger.Warnw("A plugin was not built", "plugin", b.name, "revs", revs, "error", err)
 		s.builds.set(b.name, state)
+		s.mailBuildFailure(ctx, b, revs, err, logger)
 		return
 	}
 	s.builds.set(b.name, state)
@@ -321,4 +325,43 @@ func runBuild(ctx context.Context, dir string, env []string, name string, args .
 		return "", errors.Wrapf(err, "%s %s: %s", name, strings.Join(args, " "), said)
 	}
 	return out.String(), nil
+}
+
+// buildFailureMail is the mail a failed build is, to the ROOT User.
+func buildFailureMail(b pluginBuild, revs []string, failed error) services.NodeMail {
+	var text strings.Builder
+	fmt.Fprintf(&text, "%s did not build.\n\n", b.name)
+	for i, source := range b.sources() {
+		rev := "not read"
+		if i < len(revs) {
+			rev = revs[i]
+		}
+		fmt.Fprintf(&text, "%s at %s\n", source.String(), rev)
+	}
+	fmt.Fprintf(&text, "\n%s\n", failed.Error())
+	return services.NodeMail{
+		Name:    "build.failed",
+		Subject: b.name + " did not build",
+		Text:    text.String(),
+		HTML:    "<pre>" + html.EscapeString(text.String()) + "</pre>",
+	}
+}
+
+// mailBuildFailure mails ROOT that b did not build, and says so when it cannot.
+func (s *QNTXServer) mailBuildFailure(ctx context.Context, b pluginBuild, revs []string, failed error, logger *zap.SugaredLogger) {
+	if s.nodeMailer == nil || s.authHandler == nil {
+		logger.Errorw("A plugin did not build and the node has no mail to say so with", "plugin", b.name)
+		return
+	}
+	root, found, err := s.authHandler.RootUser()
+	if err != nil || !found {
+		logger.Errorw("A plugin did not build and there is no ROOT User to mail", "plugin", b.name, "error", err)
+		return
+	}
+	messageID, attestationID, err := s.nodeMailer.SendAsNode(ctx, root.ID, buildFailureMail(b, revs, failed))
+	if err != nil {
+		logger.Errorw("A plugin did not build and the mail saying so was not sent", "plugin", b.name, "error", err)
+		return
+	}
+	logger.Infow("Mailed ROOT that a plugin did not build", "plugin", b.name, "message_id", messageID, "attestation", attestationID)
 }

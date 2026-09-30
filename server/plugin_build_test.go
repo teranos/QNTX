@@ -1,6 +1,8 @@
 package server
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
@@ -35,6 +37,26 @@ func TestBuildOfReadsWhatDatapuntIsBuiltFrom(t *testing.T) {
 	}
 	if len(b.sources()) != 3 {
 		t.Fatalf("sources: %+v", b.sources())
+	}
+}
+
+func TestAFailedBuildsMailNamesEverySourceAndWhy(t *testing.T) {
+	b := pluginBuild{
+		name:   "datapunt",
+		core:   buildSource{Owner: "teranos", Repo: "datapunt", Branch: "main"},
+		inputs: []buildSource{{Owner: "abcd-nl", Repo: "clean", Branch: "main", Path: "competitor.cue"}},
+	}
+	mail := buildFailureMail(b, []string{"c0ffee"}, errors.New("dub build: <exit 1>"))
+	if mail.Subject != "datapunt did not build" {
+		t.Fatalf("subject: %q", mail.Subject)
+	}
+	for _, want := range []string{"teranos/datapunt@main at c0ffee", "abcd-nl/clean@main:competitor.cue at not read", "dub build: <exit 1>"} {
+		if !strings.Contains(mail.Text, want) {
+			t.Errorf("text lacks %q:\n%s", want, mail.Text)
+		}
+	}
+	if !strings.Contains(mail.HTML, "&lt;exit 1&gt;") {
+		t.Errorf("html not escaped: %s", mail.HTML)
 	}
 }
 
