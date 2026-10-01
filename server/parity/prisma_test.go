@@ -88,7 +88,7 @@ func TestHold_KindAndCardinality(t *testing.T) {
 		"protocol.Visit.views", "Seen.views",
 		"protocol.Visit.entry_path", "Seen.tags",
 	)
-	p, err := Hold(signum, "", "ref", writeSchema(t, shapes))
+	p, err := Hold(signum, "", "ref", Prisma(writeSchema(t, shapes)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestHold_KindAndCardinality(t *testing.T) {
 // lists every column, the zeros too; a clade at 100 is not shown until -all.
 func TestRender_Clades(t *testing.T) {
 	models := writeSchema(t, shapes+"\nmodel Whole {\n  v String\n}\n")
-	p, err := Hold(visitFollows("protocol.Visit.visit", "Seen.id", "protocol.Visit.visitor", "Whole.v"), "", "ref", models)
+	p, err := Hold(visitFollows("protocol.Visit.visit", "Seen.id", "protocol.Visit.visitor", "Whole.v"), "", "ref", Prisma(models))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestRender_Clades(t *testing.T) {
 func TestHold_OneSigil(t *testing.T) {
 	models := writeSchema(t, shapes)
 	signum := visitFollows("protocol.Visit.visit", "Seen.id", "protocol.Arrival.path", "Untouched.a")
-	p, err := Hold(signum, "visits", "ref", models)
+	p, err := Hold(signum, "visits", "ref", Prisma(models))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,17 +146,17 @@ func TestHold_OneSigil(t *testing.T) {
 	if _, ok := p.Unfollowed["protocol.Arrival"]; ok {
 		t.Errorf("visits carries no Arrival, and Arrival is out of its spec")
 	}
-	if _, err := Hold(signum, "list", "ref", models); err == nil {
+	if _, err := Hold(signum, "list", "ref", Prisma(models)); err == nil {
 		t.Errorf("list carries no message and was held")
 	}
-	if _, err := Hold(signum, "nosuch", "ref", models); err == nil {
+	if _, err := Hold(signum, "nosuch", "ref", Prisma(models)); err == nil {
 		t.Errorf("a sigil the signum lacks was held")
 	}
 }
 
 // What follows no column, and a column the schema lacks, are out of spec.
 func TestHold_OutOfSpec(t *testing.T) {
-	p, err := Hold(visitFollows("protocol.Visit.visit", "Seen.id", "protocol.Visit.visitor", "Seen.gone"), "", "ref", writeSchema(t, shapes))
+	p, err := Hold(visitFollows("protocol.Visit.visit", "Seen.id", "protocol.Visit.visitor", "Seen.gone"), "", "ref", Prisma(writeSchema(t, shapes)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestHold_OutOfSpec(t *testing.T) {
 
 // A schema that has none of a signum's columns is not one it follows.
 func TestHold_ASchemaItDoesNotFollow(t *testing.T) {
-	if _, err := Hold(visitFollows("protocol.Visit.visit", "Else.id"), "", "ref", writeSchema(t, shapes)); err == nil {
+	if _, err := Hold(visitFollows("protocol.Visit.visit", "Else.id"), "", "ref", Prisma(writeSchema(t, shapes))); err == nil {
 		t.Errorf("a schema with none of the columns was held")
 	}
 }
@@ -179,11 +179,11 @@ func TestHold_ASchemaItDoesNotFollow(t *testing.T) {
 // caller's to fix; so is a signum that follows nothing.
 func TestHold_TheReferenceNamed(t *testing.T) {
 	models := writeSchema(t, shapes)
-	_, refused := Hold(visitFollows("protocol.Visit.visit", "Seen.id"), "", "other", models)
+	_, refused := Hold(visitFollows("protocol.Visit.visit", "Seen.id"), "", "other", Prisma(models))
 	if refused == nil || refused.GetParam() != "reference" || !strings.Contains(refused.GetSays(), "it follows ref") {
 		t.Errorf("a reference not followed was not refused by name: %v", refused)
 	}
-	_, refused = Hold(&protocol.Signum{Name: "bare"}, "", "ref", models)
+	_, refused = Hold(&protocol.Signum{Name: "bare"}, "", "ref", Prisma(models))
 	if refused == nil || refused.GetSays() != "bare follows nothing" {
 		t.Errorf("a signum that follows nothing was held: %v", refused)
 	}
@@ -191,14 +191,48 @@ func TestHold_TheReferenceNamed(t *testing.T) {
 
 // The node holds umami as pinned, and refuses a reference it holds nothing of.
 func TestReference_Pinned(t *testing.T) {
-	models, refused := Reference("umami")
+	schema, refused := Reference("umami")
 	if refused != nil {
 		t.Fatal(refused)
 	}
-	if !slices.ContainsFunc(models, func(m Model) bool { return m.Name == "WebsiteEvent" }) {
+	if !slices.ContainsFunc(schema.Models, func(m Model) bool { return m.Name == "WebsiteEvent" }) {
 		t.Errorf("umami has no WebsiteEvent")
 	}
 	if _, refused := Reference("nosuch"); refused == nil || refused.GetParam() != "reference" {
 		t.Errorf("a reference the node does not hold was not refused: %v", refused)
+	}
+}
+
+// a2a is read from its .proto: AgentSkill as the spec has it, with what the
+// spec marks REQUIRED.
+func TestReference_A2A(t *testing.T) {
+	schema, refused := Reference("a2a")
+	if refused != nil {
+		t.Fatal(refused)
+	}
+	var skill *Model
+	for i, m := range schema.Models {
+		if m.Name == "AgentSkill" {
+			skill = &schema.Models[i]
+		}
+	}
+	if skill == nil {
+		t.Fatal("a2a has no AgentSkill")
+	}
+	var names, required []string
+	for _, c := range skill.Columns {
+		names = append(names, c.Name)
+		if c.Required {
+			required = append(required, c.Name)
+		}
+	}
+	if !slices.Equal(names, []string{"id", "name", "description", "tags", "examples", "input_modes", "output_modes", "security_requirements"}) {
+		t.Errorf("AgentSkill is %v", names)
+	}
+	if !slices.Equal(required, []string{"id", "name", "description", "tags"}) {
+		t.Errorf("AgentSkill requires %v", required)
+	}
+	if !skill.Columns[3].List || skill.Columns[3].Type != "string" {
+		t.Errorf("tags is %+v", skill.Columns[3])
 	}
 }

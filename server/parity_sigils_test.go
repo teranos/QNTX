@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/teranos/QNTX/server/parity"
@@ -74,4 +75,42 @@ func TestParityStorageIsWhatMakeParityWrote(t *testing.T) {
 		t.Errorf("storage gave %d things, and make parity wrote %d", len(things), len(written))
 	}
 	holds(t, signum, "storage", answer)
+}
+
+// The gate of a2a: any signum held to AgentSkill by its shape. name follows,
+// and id, description and tags, which the spec requires, follow nothing.
+func TestParityHoldsEverySignumToA2A(t *testing.T) {
+	signum := (&QNTXServer{}).paritySignum()
+	for _, name := range []string{"staands", "parity"} {
+		answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": name, "reference": "a2a"})
+		if refused != nil {
+			t.Fatalf("hold refused %s against a2a: %s", name, refused.GetSays())
+		}
+		held := answer.(parity.Parity)
+		var skill *parity.Clade
+		for i, c := range held.Clades {
+			if c.Model == "AgentSkill" {
+				skill = &held.Clades[i]
+			}
+		}
+		if skill == nil {
+			t.Fatalf("%s: no AgentSkill clade", name)
+		}
+		if skill.Score() != 12 {
+			t.Errorf("%s: AgentSkill reads %d", name, skill.Score())
+		}
+		for _, item := range skill.Items {
+			if item.Column == "name" && !item.Conforms() {
+				t.Errorf("%s: name does not conform: %+v", name, item)
+			}
+		}
+		want := []string{"AgentSkill.id", "AgentSkill.description", "AgentSkill.tags"}
+		if strings.Join(held.Required, " ") != strings.Join(want, " ") {
+			t.Errorf("%s: required and unfollowed is %v", name, held.Required)
+		}
+		if strings.Join(held.Unfollowed["protocol.Signum"], " ") != "follows sigils" {
+			t.Errorf("%s: Signum unfollowed is %v", name, held.Unfollowed["protocol.Signum"])
+		}
+		holds(t, signum, "hold", answer)
+	}
 }

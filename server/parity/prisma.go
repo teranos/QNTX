@@ -26,20 +26,38 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
-// Column is one scalar field of a Prisma model.
+// Column is one field of a model of a reference: a scalar of a Prisma model,
+// or a field of a proto message.
 type Column struct {
 	Name string
-	// Type is Prisma's: String, Int, BigInt, Boolean, DateTime, Decimal, Json,
-	// Float, Bytes.
+	// Type is the reference's own word for it. Prisma's: String, Int, BigInt,
+	// Boolean, DateTime, Decimal, Json, Float, Bytes. Proto's: its kind, or map.
 	Type string
 	List bool
+	// Required is the reference saying a value must be there.
+	Required bool
 }
 
-// Model is a Prisma model and its scalar fields, in the order the schema has
-// them. Relations are not columns of the record, so they are left out.
+// Model is a Prisma model or a proto message and its columns, in the order the
+// schema has them. A Prisma relation is not a column of the record, so it is
+// left out.
 type Model struct {
 	Name    string
 	Columns []Column
+}
+
+// Schema is a reference as it is read: its models, and which column a field
+// of ours of one kind can be held in.
+type Schema struct {
+	Models []Model
+	fits   func(kind protoreflect.Kind, column Column) bool
+}
+
+// Prisma is a Prisma schema's models as a reference.
+func Prisma(models []Model) Schema {
+	return Schema{Models: models, fits: func(kind protoreflect.Kind, column Column) bool {
+		return slices.Contains(kindFits[kind], column.Type)
+	}}
 }
 
 var prismaScalars = []string{"String", "Int", "BigInt", "Boolean", "DateTime", "Decimal", "Json", "Float", "Bytes"}
@@ -104,14 +122,14 @@ var kindFits = map[protoreflect.Kind][]string{
 // departs says how a field's kind and cardinality differ from the column it is
 // followed into. A map is held as one row per entry, so it may be followed into
 // a model's single-valued columns.
-func departs(field protoreflect.FieldDescriptor, name string, column Column) []string {
+func departs(field protoreflect.FieldDescriptor, name string, column Column, fits func(protoreflect.Kind, Column) bool) []string {
 	var reasons []string
 	if field.IsMap() {
 		if column.List {
 			reasons = append(reasons, fmt.Sprintf("a list in the schema, and %s is a map", name))
 		}
 		kind := field.MapValue().Kind()
-		if !slices.Contains(kindFits[kind], column.Type) {
+		if !fits(kind, column) {
 			reasons = append(reasons, fmt.Sprintf("%s in the schema, and %s holds %s", column.Type, name, kind))
 		}
 		return reasons
@@ -122,7 +140,7 @@ func departs(field protoreflect.FieldDescriptor, name string, column Column) []s
 	case !field.IsList() && column.List:
 		reasons = append(reasons, fmt.Sprintf("a list in the schema, and %s is one value", name))
 	}
-	if !slices.Contains(kindFits[field.Kind()], column.Type) {
+	if !fits(field.Kind(), column) {
 		reasons = append(reasons, fmt.Sprintf("%s in the schema, and %s is %s", column.Type, name, field.Kind()))
 	}
 	return reasons
@@ -207,6 +225,9 @@ type Parity struct {
 	Unfollowed map[string][]string `json:"unfollowed"`
 	// Missing is what the declaration follows into a column the schema lacks.
 	Missing []string `json:"missing"`
+	// Required is, of the models anything follows, each column the reference
+	// requires and nothing follows.
+	Required []string `json:"required"`
 }
 
 // inScope is the messages a sigil carries, and whole when no sigil is named and
@@ -276,7 +297,8 @@ func following(signum *protocol.Signum, reference string) (*protocol.Follows, *p
 // reference it follows. What is wrong with what was asked is refused as the
 // caller's; what is wrong with a declaration or a schema is the node's, and
 // refused as failed.
-func Hold(signum *protocol.Signum, named, reference string, models []Model) (Parity, *protocol.Refusal) {
+func Hold(signum *protocol.Signum, named, reference string, schema Schema) (Parity, *protocol.Refusal) {
+	models := schema.Models
 	scope, whole, refused := inScope(signum, named)
 	if refused != nil {
 		return Parity{}, refused
@@ -295,7 +317,7 @@ func Hold(signum *protocol.Signum, named, reference string, models []Model) (Par
 		return Parity{}, failed("%s follows %s, and the schema has none of its columns", signum.GetName(), reference)
 	}
 
-	p := Parity{Signum: signum.GetName(), Sigil: named, Reference: reference, Unfollowed: map[string][]string{}}
+	p := Parity{Signum: signum.GetName(), Sigil: named, Reference: reference, Unfollowed: map[string][]string{}, Missing: []string{}, Required: []string{}}
 	followedBy := map[string][]string{}
 	departures := map[string][]string{}
 	followedFields := map[string]bool{}
@@ -324,7 +346,7 @@ func Hold(signum *protocol.Signum, named, reference string, models []Model) (Par
 			continue
 		}
 		followedBy[c.GetColumn()] = append(followedBy[c.GetColumn()], c.GetField())
-		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), column)...)
+		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), column, schema.fits)...)
 	}
 	for message := range scope {
 		if _, ok := messages[message]; ok {
@@ -355,6 +377,14 @@ func Hold(signum *protocol.Signum, named, reference string, models []Model) (Par
 			clade.Items = append(clade.Items, Item{Column: c.Name, Followed: followedBy[key], Departs: departures[key]})
 		}
 		p.Clades = append(p.Clades, clade)
+		if !clade.followed() {
+			continue
+		}
+		for _, c := range m.Columns {
+			if c.Required && len(followedBy[m.Name+"."+c.Name]) == 0 {
+				p.Required = append(p.Required, m.Name+"."+c.Name)
+			}
+		}
 	}
 	return p, nil
 }
@@ -402,7 +432,7 @@ func (p Parity) Render(all bool) string {
 		fmt.Fprintf(&b, "  %d at 100 not shown, all shows them\n", hidden)
 	}
 
-	if len(p.Unfollowed) == 0 && len(p.Missing) == 0 {
+	if len(p.Unfollowed) == 0 && len(p.Missing) == 0 && len(p.Required) == 0 {
 		b.WriteString("\n  out of spec: none\n\n")
 		return b.String()
 	}
@@ -419,6 +449,9 @@ func (p Parity) Render(all bool) string {
 	}
 	for _, missing := range p.Missing {
 		fmt.Fprintf(&b, "    %s, which the schema does not have\n", missing)
+	}
+	for _, required := range p.Required {
+		fmt.Fprintf(&b, "    %s is required, and nothing follows it\n", required)
 	}
 	b.WriteString("\n")
 	return b.String()
