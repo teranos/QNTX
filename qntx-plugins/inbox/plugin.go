@@ -95,17 +95,40 @@ func (p *Plugin) Initialize(_ context.Context, services plugin.ServiceRegistry) 
 		ruleSet: config.GetString("rule_set"),
 		rule:    config.GetString("rule"),
 	}
-	for key, value := range map[string]string{"region": mail.region, "bucket": mail.bucket, "rule_set": mail.ruleSet, "rule": mail.rule} {
-		if value == "" {
-			return errors.Newf("the record names no %s, so no mail can be received or sent", key)
-		}
-	}
 	if every := config.GetInt("receive_every"); every > 0 {
 		p.receiveEvery = int32(every)
 	}
 	p.bag, p.sender, p.rule = mail, mail, mail
+	for _, key := range []string{"region", "bucket", "rule_set", "rule"} {
+		if config.GetString(key) == "" {
+			no := unset{errors.Newf("the record names no %s, so no mail is received or sent and no address is received for", key)}
+			p.bag, p.sender, p.rule = no, no, no
+			p.log().Warnw("inbox has no mail until its record names it", "missing", key)
+			break
+		}
+	}
 	return nil
 }
+
+// ConfigSchema is what inbox's record may hold.
+func (p *Plugin) ConfigSchema() map[string]plugin.ConfigField {
+	return map[string]plugin.ConfigField{
+		"region":        {Type: "string", Description: "AWS region of SES and the bucket", Required: true},
+		"bucket":        {Type: "string", Description: "S3 bucket SES stores received mail in, under inbound/", Required: true},
+		"rule_set":      {Type: "string", Description: "SES receipt rule set", Required: true},
+		"rule":          {Type: "string", Description: "SES receipt rule whose recipients are the granted addresses", Required: true},
+		"receive_every": {Type: "int", Description: "Seconds between receivings", DefaultValue: "30"},
+	}
+}
+
+// unset is mail whose record does not name it yet.
+type unset struct{ err error }
+
+func (u unset) List(context.Context, string) ([]string, error) { return nil, u.err }
+func (u unset) Get(context.Context, string) ([]byte, error)    { return nil, u.err }
+func (u unset) Move(context.Context, string, string) error     { return u.err }
+func (u unset) Send(context.Context, outgoing) (string, error) { return "", u.err }
+func (u unset) Add(context.Context, string) error              { return u.err }
 
 // DeclaredRoutes are the routes QNTX makes sigils and MCP tools.
 func (p *Plugin) DeclaredRoutes() []*protocol.RouteInfo {
@@ -262,3 +285,4 @@ func (p *Plugin) answer(w http.ResponseWriter, resp any, err error) {
 }
 
 var _ plugin.DomainPlugin = (*Plugin)(nil)
+var _ plugin.ConfigurablePlugin = (*Plugin)(nil)

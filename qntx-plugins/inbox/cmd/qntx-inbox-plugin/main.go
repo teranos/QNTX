@@ -2,8 +2,8 @@
 package main
 
 import (
-	qntxinbox "github.com/teranos/QNTX/qntx-plugins/inbox"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
+	qntxinbox "github.com/teranos/QNTX/qntx-plugins/inbox"
 )
 
 func main() {
