@@ -33,6 +33,11 @@ func (b *bucket) Move(_ context.Context, from, to string) error {
 	return nil
 }
 
+func (b *bucket) Delete(_ context.Context, key string) error {
+	delete(b.objects, key)
+	return nil
+}
+
 func stored(to, spam, virus string) []byte {
 	return raw(
 		"Received: from x by inbound-smtp.eu-central-1.amazonaws.com with SMTP id abc for "+to+"; Thu, 01 Oct 2026 21:00:00 +0000",
@@ -93,7 +98,7 @@ func TestSpamIsFiledAsJunk(t *testing.T) {
 func TestAVirusIsDroppedAndTheDropAttested(t *testing.T) {
 	st := &heldStore{}
 	st.grant("timothy@example.com", "US-TIM-7K4M3B9X")
-	p, _ := receiving(st, map[string][]byte{"inbound/m1": stored("timothy@example.com", "PASS", "FAIL")})
+	p, b := receiving(st, map[string][]byte{"inbound/m1": stored("timothy@example.com", "PASS", "FAIL")})
 
 	got, err := p.receive(context.Background(), st)
 	require.NoError(t, err)
@@ -102,6 +107,8 @@ func TestAVirusIsDroppedAndTheDropAttested(t *testing.T) {
 	dropped := st.wrote(PredicateMailDropped)
 	require.Len(t, dropped, 1)
 	assert.Nil(t, dropped[0].Attributes["text"], "a dropped mail's text was kept")
+	assert.Nil(t, dropped[0].Attributes["blob"], "a dropped mail names a copy")
+	assert.Empty(t, b.objects, "a dropped mail was kept in the bucket")
 }
 
 // Mail to an address nobody holds is not filed.

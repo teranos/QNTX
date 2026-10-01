@@ -67,7 +67,7 @@ type tally struct {
 
 // receive files every stored message under the Users holding the addresses it
 // reached, then moves it out of inbound/. A message reaching nobody's address
-// is moved to unfiled/ and not filed.
+// is moved to unfiled/ and not filed. A virus is deleted.
 func (p *Plugin) receive(ctx context.Context, st store) (tally, error) {
 	var t tally
 	keys, err := p.bag.List(ctx, inboundPrefix)
@@ -76,40 +76,43 @@ func (p *Plugin) receive(ctx context.Context, st store) (tally, error) {
 	}
 	var failed []error
 	for _, key := range keys {
-		filed, err := p.receiveOne(ctx, st, key, &t)
-		if err != nil {
+		to, err := p.receiveOne(ctx, st, key, &t)
+		switch {
+		case err != nil:
 			failed = append(failed, err)
-			continue
-		}
-		to := unfiledPrefix
-		if filed {
-			to = filedPrefix
-		}
-		if err := p.bag.Move(ctx, key, to+strings.TrimPrefix(key, inboundPrefix)); err != nil {
-			failed = append(failed, err)
+		case to == "":
+			if err := p.bag.Delete(ctx, key); err != nil {
+				failed = append(failed, err)
+			}
+		default:
+			if err := p.bag.Move(ctx, key, to+strings.TrimPrefix(key, inboundPrefix)); err != nil {
+				failed = append(failed, err)
+			}
 		}
 	}
 	return t, stderrors.Join(failed...)
 }
 
-func (p *Plugin) receiveOne(ctx context.Context, st store, key string, t *tally) (bool, error) {
+// receiveOne files one stored message and says where it goes next: filed/,
+// unfiled/, or nowhere for a virus.
+func (p *Plugin) receiveOne(ctx context.Context, st store, key string, t *tally) (string, error) {
 	raw, err := p.bag.Get(ctx, key)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	name := strings.TrimPrefix(key, inboundPrefix)
 	m, err := parse(raw)
 	if err != nil {
 		t.Unfiled++
 		p.log().Warnw("a stored message is not mail and is not filed", "object", key, "error", err)
-		return false, nil
+		return unfiledPrefix, nil
 	}
 	sum := sha256.Sum256(raw)
 	filed := false
 	for _, address := range m.Recipients() {
 		user, err := holder(st, address)
 		if err != nil {
-			return false, err
+			return "", err
 		}
 		if user == "" {
 			continue
@@ -117,7 +120,7 @@ func (p *Plugin) receiveOne(ctx context.Context, st store, key string, t *tally)
 		filed = true
 		already, err := st.GetAttestations(ats.AttestationFilter{Subjects: []string{name}, Predicates: []string{PredicateMailReceived, PredicateMailDropped}, Contexts: []string{address}, Limit: 1})
 		if err != nil {
-			return false, errors.Wrapf(err, "whether %s was filed for %s did not read", name, address)
+			return "", errors.Wrapf(err, "whether %s was filed for %s did not read", name, address)
 		}
 		if len(already) > 0 {
 			continue
@@ -140,6 +143,7 @@ func (p *Plugin) receiveOne(ctx context.Context, st store, key string, t *tally)
 		case m.Virus:
 			predicate = PredicateMailDropped
 			attributes["reason"] = "X-SES-Virus-Verdict: FAIL"
+			delete(attributes, "blob")
 			t.Dropped++
 		case m.Spam:
 			attributes["mailbox"] = MailboxJunk
@@ -157,13 +161,17 @@ func (p *Plugin) receiveOne(ctx context.Context, st store, key string, t *tally)
 			Source:     p.Metadata().Name,
 			Attributes: attributes,
 		}); err != nil {
-			return false, errors.Wrapf(err, "%s is not attested as %s of %s", name, predicate, address)
+			return "", errors.Wrapf(err, "%s is not attested as %s of %s", name, predicate, address)
 		}
 	}
-	if !filed {
+	switch {
+	case !filed:
 		t.Unfiled++
+		return unfiledPrefix, nil
+	case m.Virus:
+		return "", nil
 	}
-	return filed, nil
+	return filedPrefix, nil
 }
 
 // holder is the User an address is mail:address of, the latest grant's, or

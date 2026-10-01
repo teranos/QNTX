@@ -127,6 +127,7 @@ type unset struct{ err error }
 func (u unset) List(context.Context, string) ([]string, error) { return nil, u.err }
 func (u unset) Get(context.Context, string) ([]byte, error)    { return nil, u.err }
 func (u unset) Move(context.Context, string, string) error     { return u.err }
+func (u unset) Delete(context.Context, string) error           { return u.err }
 func (u unset) Send(context.Context, outgoing) (string, error) { return "", u.err }
 func (u unset) Add(context.Context, string) error              { return u.err }
 

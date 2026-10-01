@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/errors"
 )
 
@@ -19,6 +20,7 @@ type bag interface {
 	List(ctx context.Context, prefix string) ([]string, error)
 	Get(ctx context.Context, key string) ([]byte, error)
 	Move(ctx context.Context, from, to string) error
+	Delete(ctx context.Context, key string) error
 }
 
 // outgoing is one text mail a User sends.
@@ -74,7 +76,7 @@ func (a awsMail) List(ctx context.Context, prefix string) ([]string, error) {
 	return keys, nil
 }
 
-func (a awsMail) Get(ctx context.Context, key string) ([]byte, error) {
+func (a awsMail) Get(ctx context.Context, key string) (_ []byte, err error) {
 	cfg, err := a.config(ctx)
 	if err != nil {
 		return nil, err
@@ -83,7 +85,7 @@ func (a awsMail) Get(ctx context.Context, key string) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "s3://%s/%s did not read", a.bucket, key)
 	}
-	defer out.Body.Close()
+	defer func() { err = sqlclose.With(err, out.Body.Close(), "s3://"+a.bucket+"/"+key) }()
 	data, err := io.ReadAll(out.Body)
 	if err != nil {
 		return nil, errors.Wrapf(err, "s3://%s/%s did not read whole", a.bucket, key)
@@ -102,6 +104,17 @@ func (a awsMail) Move(ctx context.Context, from, to string) error {
 	}
 	if _, err := client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(a.bucket), Key: aws.String(from)}); err != nil {
 		return errors.Wrapf(err, "s3://%s/%s was copied to %s and not deleted", a.bucket, from, to)
+	}
+	return nil
+}
+
+func (a awsMail) Delete(ctx context.Context, key string) error {
+	cfg, err := a.config(ctx)
+	if err != nil {
+		return err
+	}
+	if _, err := s3.NewFromConfig(cfg).DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(a.bucket), Key: aws.String(key)}); err != nil {
+		return errors.Wrapf(err, "s3://%s/%s was not deleted", a.bucket, key)
 	}
 	return nil
 }

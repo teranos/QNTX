@@ -136,8 +136,10 @@ func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsReque
 }
 
 func attribute(as *types.As, key string) string {
-	s, _ := as.Attributes[key].(string)
-	return s
+	if s, ok := as.Attributes[key].(string); ok {
+		return s
+	}
+	return ""
 }
 
 func email(as *types.As) *protocol.Email {
