@@ -134,6 +134,9 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 	if err != nil {
 		return nil, errors.Wrap(err, "gRPC GetAttestations failed")
 	}
+	if !resp.Success {
+		return nil, errors.Newf("the store did not answer the query: %s", resp.Error)
+	}
 
 	attestations := make([]*types.As, len(resp.Attestations))
 	for i, protoAtt := range resp.Attestations {

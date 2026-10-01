@@ -211,8 +211,11 @@ func TestAPluginIsToldWhichTokenAsked(t *testing.T) {
 	// A person with a passkey is the person, and nothing more.
 	person := auth.Admitted(auth.LevelRoot)
 	person.Identity = rootAccount
+	person.UserID = "US-ROOT-1"
 	got = headers(person)
 	assert.Equal(t, []string{rootAccount}, got[HeaderAsker])
+	assert.Equal(t, []string{"US-ROOT-1"}, got[HeaderAskerUser])
+	assert.Equal(t, []string{string(auth.LevelRoot)}, got[HeaderAskerLevel])
 	assert.Empty(t, got[HeaderAskerDID])
 	assert.Empty(t, got[HeaderAskerLabel])
 	assert.Empty(t, got[HeaderAskerClient])

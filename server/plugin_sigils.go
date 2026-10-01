@@ -50,6 +50,10 @@ const (
 	HeaderStoreToken = "X-Qntx-Store-Token"
 	// HeaderNamespace is the namespace that token reaches.
 	HeaderNamespace = "X-Qntx-Namespace"
+	// HeaderAskerUser is the User the node admitted, and HeaderAskerLevel
+	// their level.
+	HeaderAskerUser  = "X-Qntx-Asker-User"
+	HeaderAskerLevel = "X-Qntx-Asker-Level"
 )
 
 // openedCall is what a call's token holds: the store it reaches, and who made
@@ -399,6 +403,10 @@ func forwarded(plugin string, held *protocol.Sigil, carried map[string]any, ctx 
 		if admitted.Identity != "" {
 			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAsker, Values: []string{admitted.Identity}})
 		}
+		if admitted.UserID != "" {
+			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerUser, Values: []string{admitted.UserID}})
+		}
+		req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerLevel, Values: []string{admitted.LevelName()}})
 		// "i know i minted the oauth specifically for Manus to use and the
 		// token even has a name"
 		//
