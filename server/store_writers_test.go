@@ -44,9 +44,9 @@ var storeWriters = map[string]string{
 		"go through, so the rectangle cannot land where universeFor would refuse: " +
 		"a namespace switched off, or system without MaySeeSystem",
 
-	"handleCreateAttestation": "roles land in system whatever namespace the writer is in, " +
+	"createAttestation": "roles land in system whatever namespace the writer is in, " +
 		"and who may write one is settled by mayGrantEvery and MayGrantRoles first",
-	"writeReachLine": "a reach line lands in system, as handleCreateAttestation writes one, " +
+	"writeReachLine": "a reach line lands in system, as createAttestation writes one, " +
 		"and only after MayGrantRoles says ROOT, from /api/reach, which the reach table gives to ROOT",
 	"writeStaandDef": "a stand's definition is trusted config, not an arrival: it lands in " +
 		"system from /api/staands, which the reach table gives to ROOT and SUPER",
