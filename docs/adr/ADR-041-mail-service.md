@@ -3,8 +3,7 @@
 Date: 2026-09-24
 Status: Proposed
 
-- MailService is a service QNTX core provides, not a plugin. A plugin calls it
-  over gRPC, and the plugin provides the template.
+- A plugin calls it over gRPC, and the plugin provides the template.
 - It is served the way FetchService is: core does the outbound act for the
   plugin, and its endpoint reaches the plugin in `InitializeRequest`.
 - Core sends through Amazon SES.
