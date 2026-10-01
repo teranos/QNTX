@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/sqlclose"
@@ -18,6 +19,9 @@ import (
 
 // PredicateMailAddress: as <address> is mail:address of <User>.
 const PredicateMailAddress = "mail:address"
+
+// "[At least 7 characters]@domain.tld"
+const MinLocalPart = 7
 
 // attester is the store one call's token reaches.
 type attester interface {
@@ -37,7 +41,7 @@ func NewPlugin() *Plugin {
 	p := &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "inbox",
-			Version:     "0.1.0",
+			Version:     "0.1.1",
 			QNTXVersion: ">= 0.1.0",
 			Description: "A User's own mail (ADR-047)",
 			Author:      "QNTX Contributors",
@@ -113,6 +117,8 @@ func (p *Plugin) CreateMailIdentity(ctx context.Context, req *protocol.CreateMai
 		return nil, &refused{http.StatusBadRequest, "user_id is required: an address is a User's"}
 	case !strings.Contains(req.GetEmail(), "@") || strings.HasPrefix(req.GetEmail(), "@") || strings.HasSuffix(req.GetEmail(), "@"):
 		return nil, &refused{http.StatusBadRequest, quoted(req.GetEmail()) + " is not an address"}
+	case utf8.RuneCountInString(req.GetEmail()[:strings.LastIndex(req.GetEmail(), "@")]) < MinLocalPart:
+		return nil, &refused{http.StatusBadRequest, quoted(req.GetEmail()) + " has fewer than 7 characters before the @"}
 	}
 
 	store, closeStore, err := p.dial(ctx, p.storeEndpoint, c.token)
