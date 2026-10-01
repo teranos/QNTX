@@ -24,7 +24,7 @@ module Imported'modules = struct
 end
 (**/**)
 module rec Protocol : sig
-  module rec Identity : sig
+  module rec MailIdentity : sig
     type t = {
       id:string;
       email:string;
@@ -100,7 +100,7 @@ module rec Protocol : sig
 <p>as <email> is mail:address of &lt;user_id&gt;</p>
 %}
   *)
-  and CreateIdentityRequest : sig
+  and CreateMailIdentityRequest : sig
     type t = {
       user_id:string;
       email:string;
@@ -132,9 +132,9 @@ module rec Protocol : sig
     (**/**)
   end
 
-  and CreateIdentityResponse : sig
-    type t = (Identity.t option)
-    val make: ?created:Identity.t -> unit -> t
+  and CreateMailIdentityResponse : sig
+    type t = (MailIdentity.t option)
+    val make: ?created:MailIdentity.t -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -153,7 +153,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?created:Identity.t -> unit -> t
+    type make_t = ?created:MailIdentity.t -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -286,17 +286,17 @@ module rec Protocol : sig
   end
 
   module InboxService : sig
-    module CreateIdentity : sig
-      include Runtime'.Service.Rpc with type Request.t = CreateIdentityRequest.t and type Response.t = CreateIdentityResponse.t
-      module Request : Runtime'.Spec.Message with type t = CreateIdentityRequest.t and type make_t = CreateIdentityRequest.make_t
+    module CreateMailIdentity : sig
+      include Runtime'.Service.Rpc with type Request.t = CreateMailIdentityRequest.t and type Response.t = CreateMailIdentityResponse.t
+      module Request : Runtime'.Spec.Message with type t = CreateMailIdentityRequest.t and type make_t = CreateMailIdentityRequest.make_t
       (** Module alias for the request message for this method call *)
 
-      module Response : Runtime'.Spec.Message with type t = CreateIdentityResponse.t and type make_t = CreateIdentityResponse.make_t
+      module Response : Runtime'.Spec.Message with type t = CreateMailIdentityResponse.t and type make_t = CreateMailIdentityResponse.make_t
       (** Module alias for the response message for this method call *)
 
     end
 
-    val createIdentity : (module Runtime'.Spec.Message with type t = CreateIdentityRequest.t) * (module Runtime'.Spec.Message with type t = CreateIdentityResponse.t)
+    val createMailIdentity : (module Runtime'.Spec.Message with type t = CreateMailIdentityRequest.t) * (module Runtime'.Spec.Message with type t = CreateMailIdentityResponse.t)
     module QueryEmails : sig
       include Runtime'.Service.Rpc with type Request.t = QueryEmailsRequest.t and type Response.t = QueryEmailsResponse.t
       module Request : Runtime'.Spec.Message with type t = QueryEmailsRequest.t and type make_t = QueryEmailsRequest.make_t
@@ -322,7 +322,7 @@ module rec Protocol : sig
   end
 
 end = struct
-  module rec Identity : sig
+  module rec MailIdentity : sig
     type t = {
       id:string;
       email:string;
@@ -353,8 +353,8 @@ end = struct
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = Identity
-    let name () = ".protocol.Identity"
+    module This'_ = MailIdentity
+    let name () = ".protocol.MailIdentity"
     type t = {
       id:string;
       email:string;
@@ -476,7 +476,7 @@ end = struct
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and CreateIdentityRequest : sig
+  and CreateMailIdentityRequest : sig
     type t = {
       user_id:string;
       email:string;
@@ -507,8 +507,8 @@ end = struct
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = CreateIdentityRequest
-    let name () = ".protocol.CreateIdentityRequest"
+    module This'_ = CreateMailIdentityRequest
+    let name () = ".protocol.CreateMailIdentityRequest"
     type t = {
       user_id:string;
       email:string;
@@ -541,9 +541,9 @@ end = struct
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and CreateIdentityResponse : sig
-    type t = (Identity.t option)
-    val make: ?created:Identity.t -> unit -> t
+  and CreateMailIdentityResponse : sig
+    type t = (MailIdentity.t option)
+    val make: ?created:MailIdentity.t -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -562,22 +562,22 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?created:Identity.t -> unit -> t
+    type make_t = ?created:MailIdentity.t -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = CreateIdentityResponse
-    let name () = ".protocol.CreateIdentityResponse"
-    type t = (Identity.t option)
-    type make_t = ?created:Identity.t -> unit -> t
+    module This'_ = CreateMailIdentityResponse
+    let name () = ".protocol.CreateMailIdentityResponse"
+    type t = (MailIdentity.t option)
+    type make_t = ?created:MailIdentity.t -> unit -> t
     let make ?created () = (created)
     let merge =
-    let merge_created = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((1, "created", "created"), (message (module Identity))) ) in
+    let merge_created = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((1, "created", "created"), (message (module MailIdentity))) ) in
     fun (t1_created) (t2_created) -> merge_created t1_created t2_created
-    let spec () = Runtime'.Spec.( basic_opt ((1, "created", "created"), (message (module Identity))) ^:: nil )
+    let spec () = Runtime'.Spec.( basic_opt ((1, "created", "created"), (message (module MailIdentity))) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
       fun writer (created) -> serialize writer created
@@ -845,18 +845,18 @@ end = struct
   end
 
   module InboxService = struct
-    module CreateIdentity = struct
+    module CreateMailIdentity = struct
       let package_name = Some "protocol"
       let service_name = "InboxService"
-      let method_name = "CreateIdentity"
-      let name = "/protocol.InboxService/CreateIdentity"
-      module Request = CreateIdentityRequest
-      module Response = CreateIdentityResponse
+      let method_name = "CreateMailIdentity"
+      let name = "/protocol.InboxService/CreateMailIdentity"
+      module Request = CreateMailIdentityRequest
+      module Response = CreateMailIdentityResponse
     end
 
-    let createIdentity =
-      (module CreateIdentityRequest : Runtime'.Spec.Message with type t = CreateIdentityRequest.t ),
-      (module CreateIdentityResponse : Runtime'.Spec.Message with type t = CreateIdentityResponse.t )
+    let createMailIdentity =
+      (module CreateMailIdentityRequest : Runtime'.Spec.Message with type t = CreateMailIdentityRequest.t ),
+      (module CreateMailIdentityResponse : Runtime'.Spec.Message with type t = CreateMailIdentityResponse.t )
 
     module QueryEmails = struct
       let package_name = Some "protocol"

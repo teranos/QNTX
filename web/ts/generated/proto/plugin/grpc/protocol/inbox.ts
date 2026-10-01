@@ -8,7 +8,7 @@
 
 export const protobufPackage = "protocol";
 
-export interface Identity {
+export interface MailIdentity {
   id: string;
   email: string;
 }
@@ -25,13 +25,13 @@ export interface Email {
 }
 
 /** as <email> is mail:address of <user_id> */
-export interface CreateIdentityRequest {
+export interface CreateMailIdentityRequest {
   user_id: string;
   email: string;
 }
 
-export interface CreateIdentityResponse {
-  created: Identity | undefined;
+export interface CreateMailIdentityResponse {
+  created: MailIdentity | undefined;
 }
 
 export interface QueryEmailsRequest {

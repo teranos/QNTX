@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Identity struct {
+type MailIdentity struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
@@ -29,20 +29,20 @@ type Identity struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Identity) Reset() {
-	*x = Identity{}
+func (x *MailIdentity) Reset() {
+	*x = MailIdentity{}
 	mi := &file_plugin_grpc_protocol_inbox_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Identity) String() string {
+func (x *MailIdentity) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Identity) ProtoMessage() {}
+func (*MailIdentity) ProtoMessage() {}
 
-func (x *Identity) ProtoReflect() protoreflect.Message {
+func (x *MailIdentity) ProtoReflect() protoreflect.Message {
 	mi := &file_plugin_grpc_protocol_inbox_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -54,19 +54,19 @@ func (x *Identity) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Identity.ProtoReflect.Descriptor instead.
-func (*Identity) Descriptor() ([]byte, []int) {
+// Deprecated: Use MailIdentity.ProtoReflect.Descriptor instead.
+func (*MailIdentity) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_inbox_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Identity) GetId() string {
+func (x *MailIdentity) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *Identity) GetEmail() string {
+func (x *MailIdentity) GetEmail() string {
 	if x != nil {
 		return x.Email
 	}
@@ -174,7 +174,7 @@ func (x *Email) GetReceivedAt() string {
 }
 
 // as <email> is mail:address of <user_id>
-type CreateIdentityRequest struct {
+type CreateMailIdentityRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
@@ -182,20 +182,20 @@ type CreateIdentityRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateIdentityRequest) Reset() {
-	*x = CreateIdentityRequest{}
+func (x *CreateMailIdentityRequest) Reset() {
+	*x = CreateMailIdentityRequest{}
 	mi := &file_plugin_grpc_protocol_inbox_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateIdentityRequest) String() string {
+func (x *CreateMailIdentityRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateIdentityRequest) ProtoMessage() {}
+func (*CreateMailIdentityRequest) ProtoMessage() {}
 
-func (x *CreateIdentityRequest) ProtoReflect() protoreflect.Message {
+func (x *CreateMailIdentityRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_plugin_grpc_protocol_inbox_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -207,46 +207,46 @@ func (x *CreateIdentityRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateIdentityRequest.ProtoReflect.Descriptor instead.
-func (*CreateIdentityRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateMailIdentityRequest.ProtoReflect.Descriptor instead.
+func (*CreateMailIdentityRequest) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_inbox_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *CreateIdentityRequest) GetUserId() string {
+func (x *CreateMailIdentityRequest) GetUserId() string {
 	if x != nil {
 		return x.UserId
 	}
 	return ""
 }
 
-func (x *CreateIdentityRequest) GetEmail() string {
+func (x *CreateMailIdentityRequest) GetEmail() string {
 	if x != nil {
 		return x.Email
 	}
 	return ""
 }
 
-type CreateIdentityResponse struct {
+type CreateMailIdentityResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Created       *Identity              `protobuf:"bytes,1,opt,name=created,proto3" json:"created,omitempty"`
+	Created       *MailIdentity          `protobuf:"bytes,1,opt,name=created,proto3" json:"created,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateIdentityResponse) Reset() {
-	*x = CreateIdentityResponse{}
+func (x *CreateMailIdentityResponse) Reset() {
+	*x = CreateMailIdentityResponse{}
 	mi := &file_plugin_grpc_protocol_inbox_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateIdentityResponse) String() string {
+func (x *CreateMailIdentityResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateIdentityResponse) ProtoMessage() {}
+func (*CreateMailIdentityResponse) ProtoMessage() {}
 
-func (x *CreateIdentityResponse) ProtoReflect() protoreflect.Message {
+func (x *CreateMailIdentityResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_plugin_grpc_protocol_inbox_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -258,12 +258,12 @@ func (x *CreateIdentityResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateIdentityResponse.ProtoReflect.Descriptor instead.
-func (*CreateIdentityResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateMailIdentityResponse.ProtoReflect.Descriptor instead.
+func (*CreateMailIdentityResponse) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_inbox_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *CreateIdentityResponse) GetCreated() *Identity {
+func (x *CreateMailIdentityResponse) GetCreated() *MailIdentity {
 	if x != nil {
 		return x.Created
 	}
@@ -482,8 +482,8 @@ var File_plugin_grpc_protocol_inbox_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_inbox_proto_rawDesc = "" +
 	"\n" +
-	" plugin/grpc/protocol/inbox.proto\x12\bprotocol\"0\n" +
-	"\bIdentity\x12\x0e\n" +
+	" plugin/grpc/protocol/inbox.proto\x12\bprotocol\"4\n" +
+	"\fMailIdentity\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\"\xcd\x01\n" +
 	"\x05Email\x12\x0e\n" +
@@ -496,12 +496,12 @@ const file_plugin_grpc_protocol_inbox_proto_rawDesc = "" +
 	"\asubject\x18\x06 \x01(\tR\asubject\x12\x1b\n" +
 	"\ttext_body\x18\a \x01(\tR\btextBody\x12\x1f\n" +
 	"\vreceived_at\x18\b \x01(\tR\n" +
-	"receivedAt\"F\n" +
-	"\x15CreateIdentityRequest\x12\x17\n" +
+	"receivedAt\"J\n" +
+	"\x19CreateMailIdentityRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
-	"\x05email\x18\x02 \x01(\tR\x05email\"F\n" +
-	"\x16CreateIdentityResponse\x12,\n" +
-	"\acreated\x18\x01 \x01(\v2\x12.protocol.IdentityR\acreated\"M\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\"N\n" +
+	"\x1aCreateMailIdentityResponse\x120\n" +
+	"\acreated\x18\x01 \x01(\v2\x16.protocol.MailIdentityR\acreated\"M\n" +
 	"\x12QueryEmailsRequest\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x1d\n" +
 	"\n" +
@@ -514,9 +514,9 @@ const file_plugin_grpc_protocol_inbox_proto_rawDesc = "" +
 	"\asubject\x18\x03 \x01(\tR\asubject\x12\x1b\n" +
 	"\ttext_body\x18\x04 \x01(\tR\btextBody\":\n" +
 	"\x13SubmitEmailResponse\x12#\n" +
-	"\x04sent\x18\x01 \x01(\v2\x0f.protocol.EmailR\x04sent2\xfb\x01\n" +
-	"\fInboxService\x12S\n" +
-	"\x0eCreateIdentity\x12\x1f.protocol.CreateIdentityRequest\x1a .protocol.CreateIdentityResponse\x12J\n" +
+	"\x04sent\x18\x01 \x01(\v2\x0f.protocol.EmailR\x04sent2\x87\x02\n" +
+	"\fInboxService\x12_\n" +
+	"\x12CreateMailIdentity\x12#.protocol.CreateMailIdentityRequest\x1a$.protocol.CreateMailIdentityResponse\x12J\n" +
 	"\vQueryEmails\x12\x1c.protocol.QueryEmailsRequest\x1a\x1d.protocol.QueryEmailsResponse\x12J\n" +
 	"\vSubmitEmail\x12\x1c.protocol.SubmitEmailRequest\x1a\x1d.protocol.SubmitEmailResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
@@ -534,23 +534,23 @@ func file_plugin_grpc_protocol_inbox_proto_rawDescGZIP() []byte {
 
 var file_plugin_grpc_protocol_inbox_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_plugin_grpc_protocol_inbox_proto_goTypes = []any{
-	(*Identity)(nil),               // 0: protocol.Identity
-	(*Email)(nil),                  // 1: protocol.Email
-	(*CreateIdentityRequest)(nil),  // 2: protocol.CreateIdentityRequest
-	(*CreateIdentityResponse)(nil), // 3: protocol.CreateIdentityResponse
-	(*QueryEmailsRequest)(nil),     // 4: protocol.QueryEmailsRequest
-	(*QueryEmailsResponse)(nil),    // 5: protocol.QueryEmailsResponse
-	(*SubmitEmailRequest)(nil),     // 6: protocol.SubmitEmailRequest
-	(*SubmitEmailResponse)(nil),    // 7: protocol.SubmitEmailResponse
+	(*MailIdentity)(nil),               // 0: protocol.MailIdentity
+	(*Email)(nil),                      // 1: protocol.Email
+	(*CreateMailIdentityRequest)(nil),  // 2: protocol.CreateMailIdentityRequest
+	(*CreateMailIdentityResponse)(nil), // 3: protocol.CreateMailIdentityResponse
+	(*QueryEmailsRequest)(nil),         // 4: protocol.QueryEmailsRequest
+	(*QueryEmailsResponse)(nil),        // 5: protocol.QueryEmailsResponse
+	(*SubmitEmailRequest)(nil),         // 6: protocol.SubmitEmailRequest
+	(*SubmitEmailResponse)(nil),        // 7: protocol.SubmitEmailResponse
 }
 var file_plugin_grpc_protocol_inbox_proto_depIdxs = []int32{
-	0, // 0: protocol.CreateIdentityResponse.created:type_name -> protocol.Identity
+	0, // 0: protocol.CreateMailIdentityResponse.created:type_name -> protocol.MailIdentity
 	1, // 1: protocol.QueryEmailsResponse.list:type_name -> protocol.Email
 	1, // 2: protocol.SubmitEmailResponse.sent:type_name -> protocol.Email
-	2, // 3: protocol.InboxService.CreateIdentity:input_type -> protocol.CreateIdentityRequest
+	2, // 3: protocol.InboxService.CreateMailIdentity:input_type -> protocol.CreateMailIdentityRequest
 	4, // 4: protocol.InboxService.QueryEmails:input_type -> protocol.QueryEmailsRequest
 	6, // 5: protocol.InboxService.SubmitEmail:input_type -> protocol.SubmitEmailRequest
-	3, // 6: protocol.InboxService.CreateIdentity:output_type -> protocol.CreateIdentityResponse
+	3, // 6: protocol.InboxService.CreateMailIdentity:output_type -> protocol.CreateMailIdentityResponse
 	5, // 7: protocol.InboxService.QueryEmails:output_type -> protocol.QueryEmailsResponse
 	7, // 8: protocol.InboxService.SubmitEmail:output_type -> protocol.SubmitEmailResponse
 	6, // [6:9] is the sub-list for method output_type

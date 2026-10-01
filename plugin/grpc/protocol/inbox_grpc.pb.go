@@ -19,9 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InboxService_CreateIdentity_FullMethodName = "/protocol.InboxService/CreateIdentity"
-	InboxService_QueryEmails_FullMethodName    = "/protocol.InboxService/QueryEmails"
-	InboxService_SubmitEmail_FullMethodName    = "/protocol.InboxService/SubmitEmail"
+	InboxService_CreateMailIdentity_FullMethodName = "/protocol.InboxService/CreateMailIdentity"
+	InboxService_QueryEmails_FullMethodName        = "/protocol.InboxService/QueryEmails"
+	InboxService_SubmitEmail_FullMethodName        = "/protocol.InboxService/SubmitEmail"
 )
 
 // InboxServiceClient is the client API for InboxService service.
@@ -30,7 +30,7 @@ const (
 //
 // A User's own mail (ADR-047), shaped as JMAP for Mail (RFC 8621).
 type InboxServiceClient interface {
-	CreateIdentity(ctx context.Context, in *CreateIdentityRequest, opts ...grpc.CallOption) (*CreateIdentityResponse, error)
+	CreateMailIdentity(ctx context.Context, in *CreateMailIdentityRequest, opts ...grpc.CallOption) (*CreateMailIdentityResponse, error)
 	QueryEmails(ctx context.Context, in *QueryEmailsRequest, opts ...grpc.CallOption) (*QueryEmailsResponse, error)
 	SubmitEmail(ctx context.Context, in *SubmitEmailRequest, opts ...grpc.CallOption) (*SubmitEmailResponse, error)
 }
@@ -43,10 +43,10 @@ func NewInboxServiceClient(cc grpc.ClientConnInterface) InboxServiceClient {
 	return &inboxServiceClient{cc}
 }
 
-func (c *inboxServiceClient) CreateIdentity(ctx context.Context, in *CreateIdentityRequest, opts ...grpc.CallOption) (*CreateIdentityResponse, error) {
+func (c *inboxServiceClient) CreateMailIdentity(ctx context.Context, in *CreateMailIdentityRequest, opts ...grpc.CallOption) (*CreateMailIdentityResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateIdentityResponse)
-	err := c.cc.Invoke(ctx, InboxService_CreateIdentity_FullMethodName, in, out, cOpts...)
+	out := new(CreateMailIdentityResponse)
+	err := c.cc.Invoke(ctx, InboxService_CreateMailIdentity_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (c *inboxServiceClient) SubmitEmail(ctx context.Context, in *SubmitEmailReq
 //
 // A User's own mail (ADR-047), shaped as JMAP for Mail (RFC 8621).
 type InboxServiceServer interface {
-	CreateIdentity(context.Context, *CreateIdentityRequest) (*CreateIdentityResponse, error)
+	CreateMailIdentity(context.Context, *CreateMailIdentityRequest) (*CreateMailIdentityResponse, error)
 	QueryEmails(context.Context, *QueryEmailsRequest) (*QueryEmailsResponse, error)
 	SubmitEmail(context.Context, *SubmitEmailRequest) (*SubmitEmailResponse, error)
 	mustEmbedUnimplementedInboxServiceServer()
@@ -92,8 +92,8 @@ type InboxServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedInboxServiceServer struct{}
 
-func (UnimplementedInboxServiceServer) CreateIdentity(context.Context, *CreateIdentityRequest) (*CreateIdentityResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CreateIdentity not implemented")
+func (UnimplementedInboxServiceServer) CreateMailIdentity(context.Context, *CreateMailIdentityRequest) (*CreateMailIdentityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateMailIdentity not implemented")
 }
 func (UnimplementedInboxServiceServer) QueryEmails(context.Context, *QueryEmailsRequest) (*QueryEmailsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryEmails not implemented")
@@ -122,20 +122,20 @@ func RegisterInboxServiceServer(s grpc.ServiceRegistrar, srv InboxServiceServer)
 	s.RegisterService(&InboxService_ServiceDesc, srv)
 }
 
-func _InboxService_CreateIdentity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateIdentityRequest)
+func _InboxService_CreateMailIdentity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateMailIdentityRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(InboxServiceServer).CreateIdentity(ctx, in)
+		return srv.(InboxServiceServer).CreateMailIdentity(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: InboxService_CreateIdentity_FullMethodName,
+		FullMethod: InboxService_CreateMailIdentity_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(InboxServiceServer).CreateIdentity(ctx, req.(*CreateIdentityRequest))
+		return srv.(InboxServiceServer).CreateMailIdentity(ctx, req.(*CreateMailIdentityRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -184,8 +184,8 @@ var InboxService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*InboxServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateIdentity",
-			Handler:    _InboxService_CreateIdentity_Handler,
+			MethodName: "CreateMailIdentity",
+			Handler:    _InboxService_CreateMailIdentity_Handler,
 		},
 		{
 			MethodName: "QueryEmails",

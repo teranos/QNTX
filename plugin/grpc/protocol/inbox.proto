@@ -6,12 +6,12 @@ option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
 // A User's own mail (ADR-047), shaped as JMAP for Mail (RFC 8621).
 service InboxService {
-  rpc CreateIdentity(CreateIdentityRequest) returns (CreateIdentityResponse);
+  rpc CreateMailIdentity(CreateMailIdentityRequest) returns (CreateMailIdentityResponse);
   rpc QueryEmails(QueryEmailsRequest) returns (QueryEmailsResponse);
   rpc SubmitEmail(SubmitEmailRequest) returns (SubmitEmailResponse);
 }
 
-message Identity {
+message MailIdentity {
   string id = 1;
   string email = 2;
 }
@@ -28,13 +28,13 @@ message Email {
 }
 
 // as <email> is mail:address of <user_id>
-message CreateIdentityRequest {
+message CreateMailIdentityRequest {
   string user_id = 1;
   string email = 2;
 }
 
-message CreateIdentityResponse {
-  Identity created = 1;
+message CreateMailIdentityResponse {
+  MailIdentity created = 1;
 }
 
 message QueryEmailsRequest {
