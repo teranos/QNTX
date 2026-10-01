@@ -63,9 +63,8 @@ func TestAFailedBuildsMailNamesEverySourceAndWhy(t *testing.T) {
 	}
 }
 
-// A restart stops a build the node was running, and nothing pushes again, so
-// the node starts each build that has no binary to show for it.
-func TestUnbuiltIsEachEnabledBuildWithNoBinary(t *testing.T) {
+// On start the node asks after each enabled plugin it builds, and no other.
+func TestEnabledBuildsAreEachEnabledPluginQNTXBuilds(t *testing.T) {
 	built := map[string]string{
 		buildCore:    "teranos/QNTX@real-inboxes",
 		buildCommand: "go build -o bin/qntx-inbox-plugin ./qntx-plugins/inbox/cmd/qntx-inbox-plugin",
@@ -73,18 +72,46 @@ func TestUnbuiltIsEachEnabledBuildWithNoBinary(t *testing.T) {
 	}
 	records := []grpcplugin.PluginRecord{
 		{Name: "inbox", Enabled: true, Config: built},
-		{Name: "installed", Enabled: true, Config: built},
 		{Name: "off", Enabled: false, Config: built},
 		{Name: "cleanAPI", Enabled: true, Config: map[string]string{}},
 	}
-	installed := func(name string) bool { return name == "installed" }
 
-	unbuilt, refused := unbuilt(records, installed)
+	builds, refused := enabledBuilds(records)
 	if len(refused) != 0 {
 		t.Fatalf("refused: %v", refused)
 	}
-	if len(unbuilt) != 1 || unbuilt[0].name != "inbox" {
-		t.Fatalf("unbuilt: %+v", unbuilt)
+	if len(builds) != 1 || builds[0].name != "inbox" {
+		t.Fatalf("builds: %+v", builds)
+	}
+}
+
+// A build killed by a restart, or a push while the node was down, leaves a
+// binary built from older sources; what it was built from is kept beside it,
+// so the next start sees the sources moved.
+func TestABuildKeepsWhatItWasBuiltFrom(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir, err := grpcplugin.PluginInstallPath("inbox")
+	if err != nil {
+		t.Fatalf("install path: %v", err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if revs := installedRevs("inbox"); revs != nil {
+		t.Fatalf("no binary, and revs %v", revs)
+	}
+	if err := os.WriteFile(filepath.Join(dir, grpcplugin.PluginBinaryName("inbox")), []byte("bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if revs := installedRevs("inbox"); revs != nil {
+		t.Fatalf("a binary QNTX did not build, and revs %v", revs)
+	}
+	if err := keepBuiltRevs("inbox", []string{"c0ffee", "beef"}); err != nil {
+		t.Fatalf("keep: %v", err)
+	}
+	if revs := installedRevs("inbox"); strings.Join(revs, " ") != "c0ffee beef" {
+		t.Fatalf("revs %v", revs)
 	}
 }
 

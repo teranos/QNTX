@@ -405,7 +405,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		}
 
 		// A restart stops the build the node was running; this starts it again.
-		defaultServer.BuildUnbuilt()
+		defaultServer.BuildMoved()
 
 		if daemon == nil {
 			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")

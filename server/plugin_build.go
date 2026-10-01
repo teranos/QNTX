@@ -123,13 +123,13 @@ func buildOf(record grpcplugin.PluginRecord) (pluginBuild, bool, error) {
 	return b, true, nil
 }
 
-// unbuilt is each enabled plugin QNTX builds that has no binary installed, and
-// why any record's build is not one QNTX can run.
-func unbuilt(records []grpcplugin.PluginRecord, installed func(name string) bool) ([]pluginBuild, []error) {
+// enabledBuilds is each enabled plugin QNTX builds, and why any record's build
+// is not one QNTX can run.
+func enabledBuilds(records []grpcplugin.PluginRecord) ([]pluginBuild, []error) {
 	var builds []pluginBuild
 	var refused []error
 	for _, record := range records {
-		if !record.Enabled || installed(record.Name) {
+		if !record.Enabled {
 			continue
 		}
 		b, built, err := buildOf(record)
@@ -144,31 +144,56 @@ func unbuilt(records []grpcplugin.PluginRecord, installed func(name string) bool
 	return builds, refused
 }
 
-// installedBuild is whether a build of name is where InstallBuild puts one.
-func installedBuild(name string) bool {
+// builtRevsFile is beside a build QNTX installed: the revs it was built from.
+const builtRevsFile = "built-revs"
+
+// installedRevs is what name's installed build was built from. None is a
+// plugin with no binary, or one whose binary QNTX did not build.
+func installedRevs(name string) []string {
 	dir, err := grpcplugin.PluginInstallPath(name)
 	if err != nil {
-		return false
+		return nil
 	}
-	info, err := os.Stat(filepath.Join(dir, grpcplugin.PluginBinaryName(name)))
-	return err == nil && !info.IsDir()
+	if info, err := os.Stat(filepath.Join(dir, grpcplugin.PluginBinaryName(name))); err != nil || info.IsDir() {
+		return nil
+	}
+	held, err := os.ReadFile(filepath.Join(dir, builtRevsFile))
+	if err != nil {
+		return nil
+	}
+	return strings.Fields(string(held))
 }
 
-// BuildUnbuilt builds each enabled plugin that has no binary. A restart stops
-// the build the node was running, and no push comes to start it again.
-func (s *QNTXServer) BuildUnbuilt() {
+// keepBuiltRevs writes what name's installed build was built from beside it.
+func keepBuiltRevs(name string, revs []string) error {
+	dir, err := grpcplugin.PluginInstallPath(name)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, builtRevsFile), []byte(strings.Join(revs, " ")+"\n"), 0o644); err != nil {
+		return errors.Wrapf(err, "the revs of %s's build were not kept", name)
+	}
+	return nil
+}
+
+// BuildMoved builds each enabled plugin whose sources are not what its
+// installed build was built from: a restart stops a running build, and a
+// push while the node is down reaches nobody.
+func (s *QNTXServer) BuildMoved() {
 	logger := s.logger.Named("build")
 	records, err := s.pluginRecords().Plugins()
 	if err != nil {
-		logger.Errorw("The plugin records were not read, so no unbuilt plugin is built", "error", err)
+		logger.Errorw("The plugin records were not read, so no moved plugin is built", "error", err)
 		return
 	}
-	builds, refused := unbuilt(records, installedBuild)
+	builds, refused := enabledBuilds(records)
 	for _, err := range refused {
 		logger.Errorw("A plugin's build is not one QNTX can run", "error", err)
 	}
 	for _, b := range builds {
-		logger.Infow("Building a plugin that has no build", "plugin", b.name)
+		if revs := installedRevs(b.name); revs != nil {
+			s.builds.set(b.name, PluginBuildState{Revs: revs, At: time.Now()})
+		}
 		sacred.Go("plugin.build."+b.name, func() {
 			s.building.Lock()
 			defer s.building.Unlock()
@@ -253,6 +278,9 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 		return
 	}
 	s.builds.set(b.name, state)
+	if err := keepBuiltRevs(b.name, revs); err != nil {
+		logger.Errorw("A plugin built and what it was built from was not kept, so the next start builds it again", "plugin", b.name, "error", err)
+	}
 	if changed {
 		s.buildLanded(b.name)
 	}
