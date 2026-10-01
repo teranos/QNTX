@@ -104,8 +104,43 @@ describe('Stands element', () => {
         expect(container.querySelectorAll('.sparkline-row').length).toBe(0);
     });
 
+    test('Activity → is the stand\'s activity itself, resting as a button like the others', () => {
+        renderStandDetail(container, aStand(), noop, noopAsync);
+        const activity = container.querySelector<HTMLElement>('[data-form="button"]');
+        expect(activity).not.toBeNull();
+        expect(activity!.dataset.elementId).toBe('stand-activity-clean-boutique');
+        expect(activity!.textContent).toBe('Activity →');
+        expect(activity!.classList.contains('qntx-btn')).toBe(true);
+        expect(activity!.classList.contains('qntx-btn-ghost')).toBe(true);
+    });
+
+    test('opened again, a stand shows the same activity, never a second one', () => {
+        renderStandDetail(container, aStand({ slug: 'kiosk' }), noop, noopAsync);
+        const first = container.querySelector('[data-element-id="stand-activity-clean-kiosk"]');
+        const again = document.createElement('div');
+        document.body.appendChild(again);
+        renderStandDetail(again, aStand({ slug: 'kiosk' }), noop, noopAsync);
+        expect(document.querySelectorAll('[data-element-id="stand-activity-clean-kiosk"]')).toHaveLength(1);
+        expect(again.querySelector('[data-element-id="stand-activity-clean-kiosk"]')).toBe(first);
+    });
+
+    test('pressed, the activity is the window, and the stand opened again keeps its hole', () => {
+        renderStandDetail(container, aStand({ slug: 'atelier' }), noop, noopAsync);
+        const activity = container.querySelector<HTMLElement>('[data-element-id="stand-activity-clean-atelier"]')!;
+        activity.click();
+        expect(activity.dataset.form).toBe('window');
+        container.remove();
+        const again = document.createElement('div');
+        document.body.appendChild(again);
+        renderStandDetail(again, aStand({ slug: 'atelier' }), noop, noopAsync);
+        expect(again.querySelector('.button-gap')).not.toBeNull();
+        expect(document.querySelectorAll('[data-element-id="stand-activity-clean-atelier"]')).toHaveLength(1);
+    });
+
     test('a stand with nothing recorded offers no way into an empty panel', () => {
-        renderStandDetail(container, aStand({ events: [], pages: [] }), noop, noopAsync);
+        // Its own stand: a stand's Activity row is kept across openings, and
+        // boutique has recorded something in the tests above.
+        renderStandDetail(container, aStand({ slug: 'quiet', events: [], pages: [] }), noop, noopAsync);
         expect(container.textContent).not.toContain('Activity →');
     });
 
