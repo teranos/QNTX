@@ -37,6 +37,9 @@ openapi: ## Write what the node serves, from the reach table and the handlers' o
 
 # make parity prisma {Signum} [{Sigil}] {Schema.prisma}: the words after parity
 # are its arguments, not targets. ALL=1 shows the models at 100 too.
+# "Make parity would just be for the storage backend specifically": prisma
+# moves to datapunt, and stays here until datapunt gives what
+# cmd/parity/umami_v3.3.1_ca661c7/staands records.
 ifeq (parity,$(firstword $(MAKECMDGOALS)))
 PARITY_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 $(eval .PHONY: $(PARITY_ARGS))
