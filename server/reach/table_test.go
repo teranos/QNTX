@@ -296,7 +296,7 @@ func TestAUserReachesTheirMailAndNotGivingAddresses(t *testing.T) {
 	served := &Served{}
 	served.rows.Store(&granted)
 
-	for _, sigil := range []string{"send", "mailbox"} {
+	for _, sigil := range []string{"send", "mailbox", "addresses"} {
 		reaching, _ := served.ReachingSigil("http", "inbox", sigil, "/api/inbox/"+sigil)
 		assert.Contains(t, reaching.Beyond(), auth.LevelPublicRegistration, "a User does not reach inbox:%s", sigil)
 	}

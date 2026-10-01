@@ -132,6 +132,22 @@ func TestROOTReadingAnotherUsersMailIsAttested(t *testing.T) {
 	assert.Equal(t, MailboxInbox, read[0].Attributes["mailbox"])
 }
 
+// A User sees the addresses they hold; ROOT sees every address and its holder.
+func TestAddressesAreTheCallersOwnOrEveryOneForROOT(t *testing.T) {
+	st := &heldStore{}
+	st.grant("timothy@example.com", "US-TIM-7K4M3B9X")
+	st.grant("contact@example.com", "US-ADA-0000000")
+	p := pluginWith(st)
+
+	w := serve(t, p, by(http.MethodGet, "/addresses", "", "US-TIM-7K4M3B9X", "PUBLIC_REGISTRATION"))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.JSONEq(t, `{"addresses":[{"email":"timothy@example.com","user":"US-TIM-7K4M3B9X"}]}`, w.Body.String())
+
+	w = serve(t, p, by(http.MethodGet, "/addresses", "", "US-ROOT-0000000", "ROOT"))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.JSONEq(t, `{"addresses":[{"email":"contact@example.com","user":"US-ADA-0000000"},{"email":"timothy@example.com","user":"US-TIM-7K4M3B9X"}]}`, w.Body.String())
+}
+
 func TestAMailboxIsInboxJunkOrSent(t *testing.T) {
 	st := &heldStore{}
 	st.grant("timothy@example.com", "US-TIM-7K4M3B9X")

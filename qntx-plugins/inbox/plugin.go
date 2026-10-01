@@ -149,6 +149,11 @@ func (p *Plugin) DeclaredRoutes() []*protocol.RouteInfo {
 			Path:        "/mailbox",
 			Description: "The mail of an address the caller holds, newest first. Takes address and mailbox (inbox, junk or sent). ROOT reading another User's mail is attested.",
 		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/addresses",
+			Description: "The addresses the caller holds; for ROOT and SUPER, every address and the User holding it.",
+		},
 	}
 }
 
@@ -157,6 +162,7 @@ func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
 	mux.HandleFunc("POST /identity", p.identity)
 	mux.HandleFunc("POST /send", p.send)
 	mux.HandleFunc("GET /mailbox", p.mailbox)
+	mux.HandleFunc("GET /addresses", p.addressesOf)
 	return nil
 }
 

@@ -127,6 +127,50 @@ func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsReque
 	return resp, nil
 }
 
+// held is one address and the User holding it, by the latest grant.
+type held struct {
+	Email string `json:"email"`
+	User  string `json:"user"`
+}
+
+// addresses is every address the caller holds; ROOT and SUPER see every
+// address and who holds it, to give and to read.
+func (p *Plugin) addresses(ctx context.Context) ([]held, error) {
+	c, err := asking(ctx)
+	if err != nil {
+		return nil, err
+	}
+	grants, err := p.own().GetAttestations(ats.AttestationFilter{Predicates: []string{PredicateMailAddress}, Limit: 10000})
+	if err != nil {
+		return nil, errors.Wrap(err, "the addresses did not read")
+	}
+	latest := map[string]*types.As{}
+	for _, as := range grants {
+		for _, email := range as.Subjects {
+			if was, seen := latest[email]; !seen || as.Timestamp.After(was.Timestamp) {
+				latest[email] = as
+			}
+		}
+	}
+	all := c.level == string(auth.LevelRoot) || c.level == string(auth.LevelSuper)
+	out := []held{}
+	for email, as := range latest {
+		if len(as.Contexts) == 0 {
+			continue
+		}
+		if all || as.Contexts[0] == c.user {
+			out = append(out, held{Email: email, User: as.Contexts[0]})
+		}
+	}
+	slices.SortFunc(out, func(a, b held) int { return strings.Compare(a.Email, b.Email) })
+	return out, nil
+}
+
+func (p *Plugin) addressesOf(w http.ResponseWriter, r *http.Request) {
+	list, err := p.addresses(callOf(r))
+	p.answer(w, map[string][]held{"addresses": list}, err)
+}
+
 func attribute(as *types.As, key string) string {
 	if s, ok := as.Attributes[key].(string); ok {
 		return s

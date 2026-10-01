@@ -216,7 +216,7 @@ func TestThePluginDeclaresTheRoutes(t *testing.T) {
 	for _, r := range NewPlugin().DeclaredRoutes() {
 		declared = append(declared, r.GetMethod()+" "+r.GetPath())
 	}
-	assert.Equal(t, []string{"POST /identity", "POST /send", "GET /mailbox"}, declared)
+	assert.Equal(t, []string{"POST /identity", "POST /send", "GET /mailbox", "GET /addresses"}, declared)
 }
 
 var _ protocol.InboxServiceServer = (*Plugin)(nil)
