@@ -10,7 +10,6 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 )
 
@@ -24,7 +23,7 @@ const (
 // SubmitEmail sends a text mail through SES from an address the caller holds,
 // and attests it as sent.
 func (p *Plugin) SubmitEmail(ctx context.Context, req *protocol.SubmitEmailRequest) (*protocol.SubmitEmailResponse, error) {
-	c, err := asking(ctx)
+	c, err := p.asking(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +74,7 @@ func (p *Plugin) SubmitEmail(ctx context.Context, req *protocol.SubmitEmailReque
 // QueryEmails is one mailbox of an address, newest first: the caller's own,
 // or any for ROOT, whose reading of another User's mail is attested.
 func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsRequest) (*protocol.QueryEmailsResponse, error) {
-	c, err := asking(ctx)
+	c, err := p.asking(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +97,7 @@ func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsReque
 		return nil, &refused{http.StatusNotFound, "nobody holds " + address}
 	}
 	if user != c.user {
-		if c.level != string(auth.LevelRoot) {
+		if !c.root() {
 			return nil, &refused{http.StatusForbidden, address + " is not the caller's"}
 		}
 		if _, err := st.GenerateAndCreateAttestation(ctx, &types.AsCommand{
@@ -136,7 +135,7 @@ type held struct {
 // addresses is every address the caller holds; ROOT and SUPER see every
 // address and who holds it, to give and to read.
 func (p *Plugin) addresses(ctx context.Context) ([]held, error) {
-	c, err := asking(ctx)
+	c, err := p.asking(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +151,7 @@ func (p *Plugin) addresses(ctx context.Context) ([]held, error) {
 			}
 		}
 	}
-	all := c.level == string(auth.LevelRoot) || c.level == string(auth.LevelSuper)
+	all := c.rootOrSuper()
 	out := []held{}
 	for email, as := range latest {
 		if len(as.Contexts) == 0 {

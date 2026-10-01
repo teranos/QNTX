@@ -304,6 +304,7 @@ func askerFrom(ctx context.Context) []*protocol.HTTPHeader {
 	}
 	add("X-Qntx-Asker", admitted.Identity)
 	add("X-Qntx-Asker-User", admitted.UserID)
+	add("X-Qntx-Asker-Level", admitted.LevelName())
 	did, label := admitted.TokenDID, admitted.TokenLabel
 	if admitted.Grant != nil {
 		did, label = admitted.Grant.DID, admitted.Grant.Label

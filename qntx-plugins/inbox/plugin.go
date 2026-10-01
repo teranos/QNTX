@@ -11,7 +11,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -38,13 +37,12 @@ type store interface {
 type Plugin struct {
 	plugin.Base
 	protocol.UnimplementedInboxServiceServer
-	storeEndpoint string
-	receiveEvery  int32
-	dial          func(ctx context.Context, endpoint, token string) (store, func() error, error)
-	own           func() store
-	bag           bag
-	sender        sender
-	rule          receiptRule
+	namespace    string
+	receiveEvery int32
+	own          func() store
+	bag          bag
+	sender       sender
+	rule         receiptRule
 }
 
 // NewPlugin creates the inbox plugin.
@@ -60,17 +58,8 @@ func NewPlugin() *Plugin {
 		}),
 		receiveEvery: 30,
 	}
-	p.dial = p.dialStore
 	p.own = func() store { return p.Services().ATSStore() }
 	return p
-}
-
-func (p *Plugin) dialStore(ctx context.Context, endpoint, token string) (store, func() error, error) {
-	st, err := plugingrpc.NewRemoteATSStore(ctx, endpoint, token, p.log())
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "the store at %s could not be reached", endpoint)
-	}
-	return st, st.Close, nil
 }
 
 func (p *Plugin) log() *zap.SugaredLogger {
@@ -80,15 +69,12 @@ func (p *Plugin) log() *zap.SugaredLogger {
 	return p.Services().Logger("inbox")
 }
 
-// Initialize keeps where the store is, and the bucket, receipt rule and region
-// the record names.
+// Initialize keeps the namespace inbox stands in, and the bucket, receipt rule
+// and region the record names.
 func (p *Plugin) Initialize(_ context.Context, services plugin.ServiceRegistry) error {
 	p.Init(services)
 	config := services.Config("inbox")
-	p.storeEndpoint = config.GetString("_ats_store_endpoint")
-	if p.storeEndpoint == "" {
-		return errors.New("the node named no ATS store endpoint, so no address can be written")
-	}
+	p.namespace = strings.TrimSpace(config.GetString(plugingrpc.PluginNamespaceKey))
 	mail := awsMail{
 		region:  config.GetString("region"),
 		bucket:  config.GetString("bucket"),
@@ -187,33 +173,23 @@ func callOf(r *http.Request) context.Context {
 	})
 }
 
-// handed is the call the node handed, refused when it cannot be mail's.
-func handed(ctx context.Context) (call, error) {
+// asking is a User's call, by the User and level the node names. A User's own
+// token may reach no store, so inbox reads and writes mail through its own,
+// in the namespace its record names, and decides whose mail it is itself.
+func (p *Plugin) asking(ctx context.Context) (call, error) {
 	c, ok := ctx.Value(callKey{}).(call)
 	switch {
-	case !ok || c.token == "":
-		return c, &refused{http.StatusForbidden, "mail is reached only through the node's sigil: no call token was handed"}
-	case c.asker == "":
-		return c, &refused{http.StatusForbidden, "the node named no asker"}
-	case c.namespace == "" || c.namespace == auth.NamespaceSystem || c.namespace == auth.NamespaceDefault:
-		return c, &refused{http.StatusForbidden, "mail is never in " + quoted(c.namespace)}
+	case p.namespace == "" || p.namespace == auth.NamespaceSystem || p.namespace == auth.NamespaceDefault:
+		return c, &refused{http.StatusForbidden, "mail is never in " + quoted(p.namespace)}
+	case !ok || c.asker == "" || c.user == "":
+		return c, &refused{http.StatusForbidden, "mail is reached only through the node, by a User it names"}
 	}
 	return c, nil
 }
 
-// asking is a User's call to their own mail. Their own token may reach no
-// store, so inbox reads and writes mail through its own and decides whose
-// mail it is from the User the node names.
-func asking(ctx context.Context) (call, error) {
-	c, ok := ctx.Value(callKey{}).(call)
-	switch {
-	case !ok || c.asker == "" || c.user == "":
-		return c, &refused{http.StatusForbidden, "mail is reached only through the node's sigil, by a User it names"}
-	case c.namespace == auth.NamespaceSystem || c.namespace == auth.NamespaceDefault:
-		return c, &refused{http.StatusForbidden, "mail is never in " + quoted(c.namespace)}
-	}
-	return c, nil
-}
+func (c call) root() bool { return c.level == string(auth.LevelRoot) }
+
+func (c call) rootOrSuper() bool { return c.root() || c.level == string(auth.LevelSuper) }
 
 // refused is a no, with the status it is said with.
 type refused struct {
@@ -224,15 +200,17 @@ type refused struct {
 func (r *refused) Error() string { return r.says }
 
 // CreateMailIdentity writes as <email> is mail:address of <user_id>, with the
-// call's token and the asker the node named as actor, and has SES receive
-// mail for the address.
-func (p *Plugin) CreateMailIdentity(ctx context.Context, req *protocol.CreateMailIdentityRequest) (_ *protocol.CreateMailIdentityResponse, err error) {
-	c, err := handed(ctx)
+// asker the node named as actor, and has SES receive mail for the address.
+func (p *Plugin) CreateMailIdentity(ctx context.Context, req *protocol.CreateMailIdentityRequest) (*protocol.CreateMailIdentityResponse, error) {
+	c, err := p.asking(ctx)
 	if err != nil {
 		return nil, err
 	}
 	email := strings.ToLower(req.GetEmail())
 	switch {
+	// "they get it via ROOT approval"
+	case !c.rootOrSuper():
+		return nil, &refused{http.StatusForbidden, "an address is given by ROOT or SUPER, and the node names this caller " + c.level}
 	case req.GetUserId() == "":
 		return nil, &refused{http.StatusBadRequest, "user_id is required: an address is a User's"}
 	case !strings.Contains(email, "@") || strings.HasPrefix(email, "@") || strings.HasSuffix(email, "@"):
@@ -241,13 +219,7 @@ func (p *Plugin) CreateMailIdentity(ctx context.Context, req *protocol.CreateMai
 		return nil, &refused{http.StatusBadRequest, quoted(req.GetEmail()) + " has fewer than 7 characters before the @"}
 	}
 
-	st, closeStore, err := p.dial(ctx, p.storeEndpoint, c.token)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { err = sqlclose.With(err, closeStore(), "the connection to the store at "+p.storeEndpoint) }()
-
-	as, err := st.GenerateAndCreateAttestation(ctx, &types.AsCommand{
+	as, err := p.own().GenerateAndCreateAttestation(ctx, &types.AsCommand{
 		Subjects:   []string{email},
 		Predicates: []string{PredicateMailAddress},
 		Contexts:   []string{req.GetUserId()},

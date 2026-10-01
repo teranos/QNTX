@@ -91,13 +91,10 @@ func (s *outbox) Send(_ context.Context, m outgoing) (string, error) {
 	return "ses-" + strconv.Itoa(len(s.sent)), nil
 }
 
+// pluginWith is inbox standing in Clean, reaching st as its own store.
 func pluginWith(st *heldStore) *Plugin {
 	p := NewPlugin()
-	p.storeEndpoint = "localhost:50051"
-	p.dial = func(_ context.Context, endpoint, token string) (store, func() error, error) {
-		st.token = token
-		return st, func() error { return nil }, nil
-	}
+	p.namespace = "Clean"
 	p.own = func() store { return st }
 	p.rule = &rule{}
 	p.sender = &outbox{}
@@ -105,15 +102,13 @@ func pluginWith(st *heldStore) *Plugin {
 	return p
 }
 
-// asked is the request the node hands the plugin for one sigil call.
-func asked(body, namespace string) *http.Request {
+// asked is giving an address, by a User at a level, as the node hands it.
+func asked(body, level string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/identity", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Qntx-Asker", "did:key:z6MkTim")
-	req.Header.Set("X-Qntx-Store-Token", "call")
-	if namespace != "" {
-		req.Header.Set("X-Qntx-Namespace", namespace)
-	}
+	req.Header.Set("X-Qntx-Asker-User", "US-ROOT-0000000")
+	req.Header.Set("X-Qntx-Asker-Level", level)
 	return req
 }
 
@@ -129,10 +124,9 @@ func serve(t *testing.T, p *Plugin, req *http.Request) *httptest.ResponseRecorde
 // as <address> is mail:address of <User>, written by the asker the node named.
 func TestAnAddressIsAttestedAsTheUsersByTheAsker(t *testing.T) {
 	st := &heldStore{}
-	w := serve(t, pluginWith(st), asked(`{"user_id":"US-TIM-7K4M3B9X","email":"timothy@example.com"}`, "Clean"))
+	w := serve(t, pluginWith(st), asked(`{"user_id":"US-TIM-7K4M3B9X","email":"timothy@example.com"}`, "ROOT"))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-	assert.Equal(t, "call", st.token, "the write went with another token than the call's")
 	require.Len(t, st.written, 1)
 	written := st.written[0]
 	assert.Equal(t, []string{"timothy@example.com"}, written.Subjects)
@@ -145,18 +139,33 @@ func TestAnAddressIsAttestedAsTheUsersByTheAsker(t *testing.T) {
 // A granted address is one SES receives mail for.
 func TestAGrantedAddressIsReceivedFor(t *testing.T) {
 	p := pluginWith(&heldStore{})
-	w := serve(t, p, asked(`{"user_id":"US-TIM-7K4M3B9X","email":"Timothy@example.com"}`, "Clean"))
+	w := serve(t, p, asked(`{"user_id":"US-TIM-7K4M3B9X","email":"Timothy@example.com"}`, "SUPER"))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.Equal(t, []string{"timothy@example.com"}, p.rule.(*rule).recipients)
 }
 
 // "it will also be namespace specific, and cant be system of default"
-func TestNoAddressInSystemOrDefault(t *testing.T) {
+func TestNoMailInSystemOrDefault(t *testing.T) {
 	for _, namespace := range []string{"system", "default", ""} {
 		st := &heldStore{}
-		w := serve(t, pluginWith(st), asked(`{"user_id":"US-TIM-7K4M3B9X","email":"timothy@example.com"}`, namespace))
+		st.grant("timothy@example.com", "US-TIM-7K4M3B9X")
+		p := pluginWith(st)
+		p.namespace = namespace
+		w := serve(t, p, asked(`{"user_id":"US-TIM-7K4M3B9X","email":"contact@example.com"}`, "ROOT"))
+		assert.Equal(t, http.StatusForbidden, w.Code, "namespace %q: %s", namespace, w.Body.String())
+		w = serve(t, p, by(http.MethodGet, "/mailbox?address=timothy@example.com&mailbox=inbox", "", "US-TIM-7K4M3B9X", "PUBLIC_REGISTRATION"))
 		assert.Equal(t, http.StatusForbidden, w.Code, "namespace %q: %s", namespace, w.Body.String())
 		assert.Empty(t, st.written, "namespace %q took an address", namespace)
+	}
+}
+
+// "they get it via ROOT approval"
+func TestOnlyROOTAndSUPERGiveAnAddress(t *testing.T) {
+	for _, level := range []string{"ATTESTOR", "PUBLIC_REGISTRATION", "TOKEN", ""} {
+		st := &heldStore{}
+		w := serve(t, pluginWith(st), asked(`{"user_id":"US-TIM-7K4M3B9X","email":"timothy@example.com"}`, level))
+		assert.Equal(t, http.StatusForbidden, w.Code, "level %q: %s", level, w.Body.String())
+		assert.Empty(t, st.written, "level %q gave an address", level)
 	}
 }
 
@@ -165,18 +174,18 @@ func TestAUserHoldsMoreThanOneAddress(t *testing.T) {
 	st := &heldStore{}
 	p := pluginWith(st)
 	for _, email := range []string{"timothy@example.com", "contact@example.com"} {
-		w := serve(t, p, asked(`{"user_id":"US-TIM-7K4M3B9X","email":"`+email+`"}`, "Clean"))
+		w := serve(t, p, asked(`{"user_id":"US-TIM-7K4M3B9X","email":"`+email+`"}`, "ROOT"))
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	}
 	require.Len(t, st.written, 2)
 	assert.Equal(t, []string{"US-TIM-7K4M3B9X"}, st.written[1].Contexts)
 }
 
-// Only a call the node handed can write: no token, no asker, no address.
+// Only a call the node handed can write: no asker, no User, no address.
 func TestNoAddressWithoutTheNodesCall(t *testing.T) {
-	for _, header := range []string{"X-Qntx-Store-Token", "X-Qntx-Asker"} {
+	for _, header := range []string{"X-Qntx-Asker", "X-Qntx-Asker-User"} {
 		st := &heldStore{}
-		req := asked(`{"user_id":"US-TIM-7K4M3B9X","email":"timothy@example.com"}`, "Clean")
+		req := asked(`{"user_id":"US-TIM-7K4M3B9X","email":"timothy@example.com"}`, "ROOT")
 		req.Header.Del(header)
 		w := serve(t, pluginWith(st), req)
 		assert.Equal(t, http.StatusForbidden, w.Code, "without %s: %s", header, w.Body.String())
@@ -191,7 +200,7 @@ func TestAnAddressNamesAUserAndIsAnAddress(t *testing.T) {
 		`{"user_id":"US-TIM-7K4M3B9X","email":"example.com"}`,
 	} {
 		st := &heldStore{}
-		w := serve(t, pluginWith(st), asked(body, "Clean"))
+		w := serve(t, pluginWith(st), asked(body, "ROOT"))
 		assert.Equal(t, http.StatusBadRequest, w.Code, "%s: %s", body, w.Body.String())
 		assert.Empty(t, st.written, "%s was written", body)
 	}
@@ -205,7 +214,7 @@ func TestAnAddressHasAtLeastSevenCharactersBeforeTheAt(t *testing.T) {
 		"ëëëëëëë@example.com": http.StatusOK,
 	} {
 		st := &heldStore{}
-		w := serve(t, pluginWith(st), asked(`{"user_id":"US-TIM-7K4M3B9X","email":"`+email+`"}`, "Clean"))
+		w := serve(t, pluginWith(st), asked(`{"user_id":"US-TIM-7K4M3B9X","email":"`+email+`"}`, "ROOT"))
 		assert.Equal(t, status, w.Code, "%s: %s", email, w.Body.String())
 	}
 }
