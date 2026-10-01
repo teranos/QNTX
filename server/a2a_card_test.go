@@ -1,0 +1,68 @@
+package server
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"slices"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/server/a2a"
+	"github.com/teranos/QNTX/server/auth"
+)
+
+func askedAs(level auth.Level) *http.Request {
+	r := httptest.NewRequest(http.MethodGet, "https://node.example/a2a/extendedAgentCard", nil)
+	return r.WithContext(auth.WithAdmission(r.Context(), auth.Admitted(level)))
+}
+
+// A caller is shown only what they reach over A2A. A line that names no
+// surface is about every surface, so SUPER is shown the signa its lines reach,
+// staands among them, and not parity or reach, which are ROOT's alone. Calling
+// A2A at all is /a2a/'s line, ROOT's alone (TestA2AIsServedToRootAlone).
+func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
+	srv, _ := pluginServingServer(t, "fake")
+	names := func(card a2a.Card) []string {
+		var named []string
+		for _, skill := range card.Skills {
+			named = append(named, skill.Name)
+		}
+		return named
+	}
+
+	root := srv.a2aCard(askedAs(auth.LevelRoot))
+	for _, signum := range []string{"staands", "parity", "am", "reach"} {
+		assert.Contains(t, names(root), signum, "ROOT's card lacks "+signum)
+	}
+	assert.Equal(t, "https://node.example/a2a", root.URL)
+
+	super := srv.a2aCard(askedAs(auth.LevelSuper))
+	assert.Contains(t, names(super), "staands", "SUPER's lines reach staands")
+	for _, signum := range []string{"parity", "reach"} {
+		assert.NotContains(t, names(super), signum, "SUPER was shown "+signum+", which is ROOT's alone")
+	}
+}
+
+// The card is an lf.a2a.v1.AgentCard, and what it leaves empty that the spec
+// requires is named: the node's name and description when am.toml says none,
+// the modes nothing serves yet, and each skill's id, and the description and
+// tags no signum fills yet.
+func TestTheCardSaysWhatItLacks(t *testing.T) {
+	srv, _ := pluginServingServer(t, "fake")
+	card, err := srv.a2aCard(askedAs(auth.LevelRoot)).Message()
+	require.NoError(t, err)
+
+	missing := a2a.Missing(card)
+	for _, want := range []string{
+		"AgentCard.name", "AgentCard.description",
+		"AgentCard.default_input_modes", "AgentCard.default_output_modes",
+		"AgentCard.skills[0].id", "AgentCard.skills[0].description", "AgentCard.skills[0].tags",
+	} {
+		assert.Contains(t, missing, want)
+	}
+	for _, said := range []string{"AgentCard.supported_interfaces", "AgentCard.capabilities", "AgentCard.version", "AgentCard.skills", "AgentCard.skills[0].name"} {
+		assert.NotContains(t, missing, said, said+" is on the card")
+	}
+	assert.False(t, slices.ContainsFunc(missing, func(m string) bool { return m == "AgentCard.supported_interfaces[0].url" }))
+}
