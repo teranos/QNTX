@@ -203,7 +203,7 @@ func TestStaandsHoldsToThePinnedUmami(t *testing.T) {
 	if len(p.Missing) != 0 {
 		t.Errorf("staands follows columns the pinned schema lacks: %v", p.Missing)
 	}
-	// What datapunt has to give before this command is let go of.
+	// What the parity sigil has to give before this command is let go of.
 	want, err := os.ReadFile(filepath.Join("umami_v3.3.1_ca661c7", "staands"))
 	if err != nil {
 		t.Fatal(err)
