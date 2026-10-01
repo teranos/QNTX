@@ -402,6 +402,9 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 			pluginLogger.Errorw("Failed to reload watchers after plugin init", "error", err)
 		}
 
+		// A restart stops the build the node was running; this starts it again.
+		defaultServer.BuildUnbuilt()
+
 		if daemon == nil {
 			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")
 			sacred.Go("plugin.retrySetup.noDaemon", func() {

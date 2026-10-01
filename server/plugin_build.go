@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -120,6 +121,60 @@ func buildOf(record grpcplugin.PluginRecord) (pluginBuild, bool, error) {
 		return pluginBuild{}, false, errors.Newf("plugin %s takes %s and names no %s", record.Name, buildInputs, buildInputsEnv)
 	}
 	return b, true, nil
+}
+
+// unbuilt is each enabled plugin QNTX builds that has no binary installed, and
+// why any record's build is not one QNTX can run.
+func unbuilt(records []grpcplugin.PluginRecord, installed func(name string) bool) ([]pluginBuild, []error) {
+	var builds []pluginBuild
+	var refused []error
+	for _, record := range records {
+		if !record.Enabled || installed(record.Name) {
+			continue
+		}
+		b, built, err := buildOf(record)
+		if err != nil {
+			refused = append(refused, err)
+			continue
+		}
+		if built {
+			builds = append(builds, b)
+		}
+	}
+	return builds, refused
+}
+
+// installedBuild is whether a build of name is where InstallBuild puts one.
+func installedBuild(name string) bool {
+	dir, err := grpcplugin.PluginInstallPath(name)
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(dir, grpcplugin.PluginBinaryName(name)))
+	return err == nil && !info.IsDir()
+}
+
+// BuildUnbuilt builds each enabled plugin that has no binary. A restart stops
+// the build the node was running, and no push comes to start it again.
+func (s *QNTXServer) BuildUnbuilt() {
+	logger := s.logger.Named("build")
+	records, err := s.pluginRecords().Plugins()
+	if err != nil {
+		logger.Errorw("The plugin records were not read, so no unbuilt plugin is built", "error", err)
+		return
+	}
+	builds, refused := unbuilt(records, installedBuild)
+	for _, err := range refused {
+		logger.Errorw("A plugin's build is not one QNTX can run", "error", err)
+	}
+	for _, b := range builds {
+		logger.Infow("Building a plugin that has no build", "plugin", b.name)
+		sacred.Go("plugin.build."+b.name, func() {
+			s.building.Lock()
+			defer s.building.Unlock()
+			s.buildIfMoved(s.lifetime(), b, logger)
+		})
+	}
 }
 
 // sources is every source of the build, the core first.

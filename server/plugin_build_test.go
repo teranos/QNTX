@@ -60,6 +60,31 @@ func TestAFailedBuildsMailNamesEverySourceAndWhy(t *testing.T) {
 	}
 }
 
+// A restart stops a build the node was running, and nothing pushes again, so
+// the node starts each build that has no binary to show for it.
+func TestUnbuiltIsEachEnabledBuildWithNoBinary(t *testing.T) {
+	built := map[string]string{
+		buildCore:    "teranos/QNTX@real-inboxes",
+		buildCommand: "go build -o bin/qntx-inbox-plugin ./qntx-plugins/inbox/cmd/qntx-inbox-plugin",
+		buildOutput:  "bin/qntx-inbox-plugin",
+	}
+	records := []grpcplugin.PluginRecord{
+		{Name: "inbox", Enabled: true, Config: built},
+		{Name: "installed", Enabled: true, Config: built},
+		{Name: "off", Enabled: false, Config: built},
+		{Name: "cleanAPI", Enabled: true, Config: map[string]string{}},
+	}
+	installed := func(name string) bool { return name == "installed" }
+
+	unbuilt, refused := unbuilt(records, installed)
+	if len(refused) != 0 {
+		t.Fatalf("refused: %v", refused)
+	}
+	if len(unbuilt) != 1 || unbuilt[0].name != "inbox" {
+		t.Fatalf("unbuilt: %+v", unbuilt)
+	}
+}
+
 func TestBuildOfLeavesAPluginWithoutABuildAlone(t *testing.T) {
 	_, built, err := buildOf(grpcplugin.PluginRecord{Name: "cleanAPI", Config: map[string]string{}})
 	if err != nil || built {
