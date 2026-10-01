@@ -23,6 +23,17 @@ export interface Signum {
 }
 
 /**
+ * Node is the node about itself: what it is called, what it is for, and the
+ * signa it holds. am node answers it; the parity sigil holds it to A2A's
+ * AgentCard. Mirrors server.amNode.
+ */
+export interface Node {
+  name: string;
+  description: string;
+  signa: Signum[];
+}
+
+/**
  * Follows says which column of a reference each of a signum's fields is. The
  * reference is named, not described: its own schema says what its columns are.
  */

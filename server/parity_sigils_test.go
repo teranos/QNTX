@@ -139,7 +139,7 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 }
 
 // The gate of mcp: every sigil held to Tool by its shape, as mcp.go makes one.
-// name, title, description and annotations follow and conform; inputSchema follows
+// name, description and annotations follow and conform; inputSchema follows
 // takes and outputSchema gives, and both depart, since each is a list and the
 // schema one object.
 func TestParityHoldsEverySigilToMCP(t *testing.T) {
@@ -159,12 +159,12 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 		if tool == nil {
 			t.Fatalf("%s: no Tool clade", name)
 		}
-		if tool.Score() != 50 {
+		if tool.Score() != 37 {
 			t.Errorf("%s: Tool reads %d", name, tool.Score())
 		}
 		for _, item := range tool.Items {
 			switch item.Column {
-			case "name", "title", "description", "annotations":
+			case "name", "description", "annotations":
 				if !item.Conforms() {
 					t.Errorf("%s: %s does not conform: %+v", name, item.Column, item)
 				}
@@ -199,6 +199,37 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 		}
 		holds(t, signum, "hold", answer)
 	}
+}
+
+// The gate of 4a: the node held to AgentCard, by what am declares of itself.
+// name, description, version and skills follow; what an A2A binding would
+// fill does not, and is said to be required.
+func TestParityHoldsTheNodeToAgentCard(t *testing.T) {
+	signum := (&QNTXServer{}).paritySignum()
+	answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": "am"})
+	if refused != nil {
+		t.Fatalf("hold refused am: %s", refused.GetSays())
+	}
+	held := answer.(parity.Parity)
+	if held.Reference != "a2a" {
+		t.Fatalf("am was held to %s", held.Reference)
+	}
+	scores := map[string]int{}
+	for _, c := range held.Clades {
+		scores[c.Model] = c.Score()
+	}
+	if scores["AgentCard"] != 28 || scores["AgentSkill"] != 12 {
+		t.Errorf("AgentCard reads %d and AgentSkill %d", scores["AgentCard"], scores["AgentSkill"])
+	}
+	want := []string{
+		"AgentCard.supported_interfaces", "AgentCard.capabilities",
+		"AgentCard.default_input_modes", "AgentCard.default_output_modes",
+		"AgentSkill.id", "AgentSkill.description", "AgentSkill.tags",
+	}
+	if strings.Join(held.Required, " ") != strings.Join(want, " ") {
+		t.Errorf("required and unfollowed is %v", held.Required)
+	}
+	holds(t, signum, "hold", answer)
 }
 
 // follows is what the parity window offers to hold: every signum, what it

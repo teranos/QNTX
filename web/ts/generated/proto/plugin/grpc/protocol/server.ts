@@ -238,6 +238,18 @@ export interface SystemCapabilitiesMessage {
 }
 
 /**
+ * VersionInfo is which build is running, as am version answers it.
+ * Mirrors version.Info.
+ */
+export interface VersionInfo {
+  commit_hash: string;
+  build_time: string;
+  version: string;
+  go_version: string;
+  platform: string;
+}
+
+/**
  * LLMStreamMessage is one chunk of streamed model output.
  * Mirrors server.LLMStreamMessage.
  */

@@ -26,8 +26,6 @@ func everySignumFollows() []*protocol.Follows {
 		{Reference: "mcp", Columns: []*protocol.Corresponds{
 			{Field: "protocol.Signum.name", Column: "Tool.name"},
 			{Field: "protocol.Sigil.name", Column: "Tool.name"},
-			{Field: "protocol.Signum.name", Column: "Tool.title"},
-			{Field: "protocol.Sigil.name", Column: "Tool.title"},
 			{Field: "protocol.Sigil.does", Column: "Tool.description"},
 			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema"},
 			{Field: "protocol.Sigil.gives", Column: "Tool.outputSchema"},
@@ -123,12 +121,29 @@ func (s *QNTXServer) parityHold(_ context.Context, sent sigil.Sent) (any, *proto
 		return nil, refused
 	}
 	declared := &protocol.Signum{Name: held.GetName(), Sigils: held.GetSigils(),
-		Follows: append(append([]*protocol.Follows{}, held.GetFollows()...), everySignumFollows()...)}
+		Follows: byReference(append(append([]*protocol.Follows{}, held.GetFollows()...), everySignumFollows()...))}
 	p, refused := parity.Hold(declared, sent["sigil"], reference, schema)
 	if refused != nil {
 		return nil, refused
 	}
 	return p, nil
+}
+
+// byReference is one Follows per reference: what a signum declares of a
+// reference and what every signum follows of it by its shape are held together.
+func byReference(follows []*protocol.Follows) []*protocol.Follows {
+	var merged []*protocol.Follows
+	at := map[string]*protocol.Follows{}
+	for _, f := range follows {
+		held, ok := at[f.GetReference()]
+		if !ok {
+			held = &protocol.Follows{Reference: f.GetReference()}
+			at[f.GetReference()] = held
+			merged = append(merged, held)
+		}
+		held.Columns = append(held.Columns, f.GetColumns()...)
+	}
+	return merged
 }
 
 // parityFollows is what the parity window offers to hold: every signum, with
