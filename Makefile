@@ -296,8 +296,8 @@ atproto-plugin: ## Build, install, and restart AT Protocol plugin
 	$(call restart-plugin,atproto)
 
 inbox-plugin: ## Build, install, and restart inbox plugin (ADR-047)
-	$(call check-plugin-version,qntx-plugins/qntx-inbox,go,qntx-plugins/qntx-inbox/plugin.go)
-	@$(MAKE) -C qntx-plugins/qntx-inbox install PREFIX=$(PREFIX)
+	$(call check-plugin-version,qntx-plugins/inbox,go,qntx-plugins/inbox/plugin.go)
+	@$(MAKE) -C qntx-plugins/inbox install PREFIX=$(PREFIX)
 	$(call restart-plugin,inbox)
 
 github-plugin: ## Build, install, and restart GitHub plugin

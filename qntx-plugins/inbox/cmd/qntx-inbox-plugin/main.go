@@ -2,7 +2,7 @@
 package main
 
 import (
-	qntxinbox "github.com/teranos/QNTX/qntx-plugins/qntx-inbox"
+	qntxinbox "github.com/teranos/QNTX/qntx-plugins/inbox"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 )
 
