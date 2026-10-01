@@ -45,6 +45,23 @@ func TestAUserSendsFromTheirAddress(t *testing.T) {
 	assert.Equal(t, []string{"did:key:z6MkUS-TIM-7K4M3B9X"}, filed[0].Actors)
 }
 
+// A User whose own token reaches no store still sends and reads their own mail.
+func TestAUserWithoutAStoreSendsAndReads(t *testing.T) {
+	st := &heldStore{}
+	st.grant("timothy@example.com", "US-TIM-7K4M3B9X")
+	p := pluginWith(st)
+
+	send := by(http.MethodPost, "/send", sending, "US-TIM-7K4M3B9X", "PUBLIC_REGISTRATION")
+	send.Header.Del("X-Qntx-Store-Token")
+	require.Equal(t, http.StatusOK, serve(t, p, send).Code)
+
+	read := by(http.MethodGet, "/mailbox?address=timothy@example.com&mailbox=sent", "", "US-TIM-7K4M3B9X", "PUBLIC_REGISTRATION")
+	read.Header.Del("X-Qntx-Store-Token")
+	w := serve(t, p, read)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "Under the mat.")
+}
+
 // Nobody sends from an address they do not hold, ROOT included.
 func TestNobodySendsFromAnotherUsersAddress(t *testing.T) {
 	for _, level := range []string{"ATTESTOR", "ROOT"} {

@@ -111,6 +111,10 @@ REACH is '/mcp' '/mcp/'                                                   of ROO
 # path the plugin bound them to (ReachingSigil).
 REACH is 'datapunt'                                                       of ROOT SUPER
 REACH is 'inbox'                                                          of ROOT SUPER
+# "everyone get's their own mail address"
+# A User sends and reads their own; whose it is, inbox decides from the User
+# the node names.
+REACH is 'inbox:send' 'inbox:mailbox'                                     of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
 
 # A longer path wins over the prefix above, so widening that line does not
 # widen this one.

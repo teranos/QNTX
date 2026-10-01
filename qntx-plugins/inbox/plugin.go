@@ -195,6 +195,20 @@ func handed(ctx context.Context) (call, error) {
 	return c, nil
 }
 
+// asking is a User's call to their own mail. Their own token may reach no
+// store, so inbox reads and writes mail through its own and decides whose
+// mail it is from the User the node names.
+func asking(ctx context.Context) (call, error) {
+	c, ok := ctx.Value(callKey{}).(call)
+	switch {
+	case !ok || c.asker == "" || c.user == "":
+		return c, &refused{http.StatusForbidden, "mail is reached only through the node's sigil, by a User it names"}
+	case c.namespace == auth.NamespaceSystem || c.namespace == auth.NamespaceDefault:
+		return c, &refused{http.StatusForbidden, "mail is never in " + quoted(c.namespace)}
+	}
+	return c, nil
+}
+
 // refused is a no, with the status it is said with.
 type refused struct {
 	status int

@@ -9,7 +9,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
@@ -24,8 +23,8 @@ const (
 
 // SubmitEmail sends a text mail through SES from an address the caller holds,
 // and attests it as sent.
-func (p *Plugin) SubmitEmail(ctx context.Context, req *protocol.SubmitEmailRequest) (_ *protocol.SubmitEmailResponse, err error) {
-	c, err := handed(ctx)
+func (p *Plugin) SubmitEmail(ctx context.Context, req *protocol.SubmitEmailRequest) (*protocol.SubmitEmailResponse, error) {
+	c, err := asking(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -39,12 +38,7 @@ func (p *Plugin) SubmitEmail(ctx context.Context, req *protocol.SubmitEmailReque
 		}
 	}
 
-	st, closeStore, err := p.dial(ctx, p.storeEndpoint, c.token)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { err = sqlclose.With(err, closeStore(), "the connection to the store at "+p.storeEndpoint) }()
-
+	st := p.own()
 	user, err := holder(st, from)
 	if err != nil {
 		return nil, err
@@ -80,8 +74,8 @@ func (p *Plugin) SubmitEmail(ctx context.Context, req *protocol.SubmitEmailReque
 
 // QueryEmails is one mailbox of an address, newest first: the caller's own,
 // or any for ROOT, whose reading of another User's mail is attested.
-func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsRequest) (_ *protocol.QueryEmailsResponse, err error) {
-	c, err := handed(ctx)
+func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsRequest) (*protocol.QueryEmailsResponse, error) {
+	c, err := asking(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,17 +89,15 @@ func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsReque
 		return nil, &refused{http.StatusBadRequest, "mailbox is inbox, junk or sent, not " + quoted(req.GetInMailbox())}
 	}
 
-	st, closeStore, err := p.dial(ctx, p.storeEndpoint, c.token)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { err = sqlclose.With(err, closeStore(), "the connection to the store at "+p.storeEndpoint) }()
-
+	st := p.own()
 	user, err := holder(st, address)
 	if err != nil {
 		return nil, err
 	}
-	if user == "" || user != c.user {
+	if user == "" {
+		return nil, &refused{http.StatusNotFound, "nobody holds " + address}
+	}
+	if user != c.user {
 		if c.level != string(auth.LevelRoot) {
 			return nil, &refused{http.StatusForbidden, address + " is not the caller's"}
 		}
