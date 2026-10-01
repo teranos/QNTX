@@ -258,7 +258,7 @@ func (s *QNTXServer) pluginSigilRows(name string) ([]sigilRow, []string) {
 				Method: held.GetHttp().GetMethod(), Path: held.GetHttp().GetPath(), Does: held.GetDoes(),
 				Takes: held.GetTakes(), Gives: held.GetGives(), Reach: map[string]reached{},
 			}
-			for _, surface := range []string{reach.OverHTTP, reach.OverMCP} {
+			for _, surface := range []string{reach.OverHTTP, reach.OverMCP, reach.OverA2A} {
 				reaching, anyone := s.reachingOver(surface, heldBy{signum: signum.GetName(), sigil: held})
 				who := reached{Anyone: anyone, Levels: []string{}, Roles: reaching.Roles()}
 				for _, level := range reaching.Beyond() {
