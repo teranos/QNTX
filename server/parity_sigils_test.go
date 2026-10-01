@@ -77,8 +77,8 @@ func TestParityStorageIsWhatMakeParityWrote(t *testing.T) {
 	holds(t, signum, "storage", answer)
 }
 
-// The gate of a2a: any signum held to AgentSkill by its shape. name follows,
-// and id, description and tags, which the spec requires, follow nothing.
+// The gate of a2a: any signum held to AgentSkill by its shape. name,
+// description and tags follow, and id, which the spec requires, does not.
 func TestParityHoldsEverySignumToA2A(t *testing.T) {
 	signum := (&QNTXServer{}).paritySignum()
 	for _, name := range []string{"staands", "parity"} {
@@ -96,16 +96,15 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 		if skill == nil {
 			t.Fatalf("%s: no AgentSkill clade", name)
 		}
-		if skill.Score() != 12 {
+		if skill.Score() != 37 {
 			t.Errorf("%s: AgentSkill reads %d", name, skill.Score())
 		}
 		for _, item := range skill.Items {
-			if item.Column == "name" && !item.Conforms() {
-				t.Errorf("%s: name does not conform: %+v", name, item)
+			if (item.Column == "name" || item.Column == "description" || item.Column == "tags") && !item.Conforms() {
+				t.Errorf("%s: %s does not conform: %+v", name, item.Column, item)
 			}
 		}
-		want := []string{"AgentSkill.id", "AgentSkill.description", "AgentSkill.tags"}
-		if strings.Join(held.Required, " ") != strings.Join(want, " ") {
+		if strings.Join(held.Required, " ") != "AgentSkill.id" {
 			t.Errorf("%s: required and unfollowed is %v", name, held.Required)
 		}
 		if strings.Join(held.Unfollowed["protocol.Signum"], " ") != "follows sigils" {
@@ -182,13 +181,13 @@ func TestParityHoldsTheNodeToAgentCard(t *testing.T) {
 	for _, c := range held.Clades {
 		scores[c.Model] = c.Score()
 	}
-	if scores["AgentCard"] != 28 || scores["AgentSkill"] != 12 {
+	if scores["AgentCard"] != 28 || scores["AgentSkill"] != 37 {
 		t.Errorf("AgentCard reads %d and AgentSkill %d", scores["AgentCard"], scores["AgentSkill"])
 	}
 	want := []string{
 		"AgentCard.supported_interfaces", "AgentCard.capabilities",
 		"AgentCard.default_input_modes", "AgentCard.default_output_modes",
-		"AgentSkill.id", "AgentSkill.description", "AgentSkill.tags",
+		"AgentSkill.id",
 	}
 	if strings.Join(held.Required, " ") != strings.Join(want, " ") {
 		t.Errorf("required and unfollowed is %v", held.Required)

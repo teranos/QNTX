@@ -20,6 +20,12 @@ export interface Signum {
    * Umami, one reference and not a blend." The parity sigil reads these.
    */
   follows: Follows[];
+  /**
+   * What it is for, in words, and the words it is found by. To A2A these are
+   * a skill's description and tags.
+   */
+  description: string;
+  tags: string[];
 }
 
 /**
