@@ -285,6 +285,7 @@ var askerHeaders = map[string]bool{
 	"X-Qntx-Asker-Did":    true,
 	"X-Qntx-Asker-Label":  true,
 	"X-Qntx-Asker-Client": true,
+	"X-Qntx-Namespace":    true,
 }
 
 // askerFrom is who the node admitted, as the headers a plugin reads it by.
