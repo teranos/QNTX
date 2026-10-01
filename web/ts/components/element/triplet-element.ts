@@ -20,6 +20,7 @@ import { log, SEG } from '../../logger';
 import { spawnOnCanvasDragging } from './spawn-on-canvas';
 import { renderPager } from '../pager';
 import { el } from '../../html-utils';
+import { renderSparkline, windowOf, seriesOf, labelsOf, formatIn, bucketStart, type Window } from '../sparkline';
 
 // Quiet blue-grey — lighter, subtle blue touch, easy on the eyes
 const TRIPLET = '#96a4b0';
@@ -67,6 +68,20 @@ function formatTs(value: unknown): string {
     return String(value);
 }
 
+/** A timestamp in milliseconds. The type says a number, but a watcher streams
+ *  the attestation with an ISO string (`2026-09-11T18:24:16Z`). */
+function timeOf(value: unknown): number | null {
+    if (typeof value === 'number') {
+        if (value <= 0) return null;
+        return value < 1e12 ? value * 1000 : value;
+    }
+    if (typeof value === 'string') {
+        const t = Date.parse(value);
+        return Number.isNaN(t) ? null : t;
+    }
+    return null;
+}
+
 /** Collect summary stats for the triplet meta pill */
 function collectTripletMeta(attestations: Attestation[]) {
     const actors = new Set<string>();
@@ -88,9 +103,8 @@ function collectTripletMeta(attestations: Attestation[]) {
             const list = sourceToAtts.get(att.source);
             if (list) list.push(att); else sourceToAtts.set(att.source, [att]);
         }
-        if (typeof att.timestamp === 'number' && att.timestamp > 0) {
-            timestamps.push(att.timestamp);
-        }
+        const t = timeOf(att.timestamp);
+        if (t !== null) timestamps.push(t);
     }
 
     let timeRange = '';
@@ -101,6 +115,60 @@ function collectTripletMeta(attestations: Attestation[]) {
     }
 
     return { actors, sources, timestamps, actorToAtts, sourceToAtts, timeRange };
+}
+
+/**
+ * "The axis of time is more useful than a tally": when the triple was attested
+ * and when last, rather than how many times. Null when no attestation is dated.
+ */
+export function timeAxis(attestations: Attestation[], w?: Window, now: number = Date.now()): HTMLElement | null {
+    const { timestamps } = collectTripletMeta(attestations);
+    if (timestamps.length === 0) return null;
+    if (!w) w = windowOf(timestamps, now);
+    const axis = el('span', {
+        class: 'triplet-time',
+        style: { display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: '0', marginLeft: 'auto' },
+    });
+    axis.dataset.window = windowKey(w);
+    const spark = el('span', { class: 'sparkline', style: { display: 'inline-flex' } });
+    spark.innerHTML = renderSparkline(seriesOf(timestamps, w), labelsOf(w));
+    axis.appendChild(spark);
+    axis.appendChild(el('span', {
+        class: 'sparkline-last',
+        text: formatIn(Math.max(...timestamps), w.unit),
+        style: { color: TRIPLET_DIM, fontSize: '10px', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums' },
+    }));
+    return axis;
+}
+
+/** Two windows with the same key draw the same buckets. */
+function windowKey(w: Window): string {
+    return `${bucketStart(w.start, w.unit)}|${bucketStart(w.end, w.unit)}|${w.unit}`;
+}
+
+/**
+ * One window for every triplet line in a result list, from the earliest
+ * attestation the list holds to now, so a day sits at the same place on every
+ * line and the list reads down. A line drawn in another window is redrawn.
+ */
+export function fitTimeAxes(container: HTMLElement, now: number = Date.now()): void {
+    const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-triplet-attestations]'));
+    const groups = rows.map(row => JSON.parse(row.dataset.tripletAttestations || '[]') as Attestation[]);
+    let start = Infinity;
+    for (const group of groups) {
+        for (const t of collectTripletMeta(group).timestamps) {
+            if (t < start) start = t;
+        }
+    }
+    if (start === Infinity) return;
+    const w = windowOf([start], now);
+    const key = windowKey(w);
+    rows.forEach((row, i) => {
+        const axis = row.querySelector<HTMLElement>('.triplet-time');
+        if (!axis || axis.dataset.window === key) return;
+        const fitted = timeAxis(groups[i], w, now);
+        if (fitted) axis.replaceWith(fitted);
+    });
 }
 
 /**
@@ -286,7 +354,7 @@ export function createTripletElement(item: Element): HTMLElement {
 
     const representative = attestations[0] || null;
 
-    // Title bar: ⫶ + triple + count
+    // Title bar: ⫶ + triple + when
     const titleBar = el('div', {
         class: 'title-bar title-bar--auto',
         style: { position: 'relative' },
@@ -315,15 +383,10 @@ export function createTripletElement(item: Element): HTMLElement {
         titleBar.appendChild(tripleText);
     }
 
-    // Count badge
-    if (attestations.length > 1) {
-        titleBar.appendChild(el('span', {
-            text: `(${attestations.length})`,
-            style: {
-                fontSize: '10px', color: TRIPLET_DIM, fontFamily: 'monospace',
-                flexShrink: '0', marginLeft: '6px',
-            },
-        }));
+    const axis = timeAxis(attestations);
+    if (axis) {
+        axis.style.marginLeft = '6px';
+        titleBar.appendChild(axis);
     }
 
     const expandBtn = el('button', {
@@ -413,9 +476,8 @@ export function spawnTripletElement(attestations: Attestation[], mouseX?: number
 // ─── Result line rendering (for AX/SE) ──────────────────────
 
 /** Render a triplet group as a one-line summary for result lists */
-export function renderTripletResultLine(attestations: Attestation[]): HTMLElement {
+export function renderTripletResultLine(attestations: Attestation[], now: number = Date.now()): HTMLElement {
     const representative = attestations[0];
-    const count = attestations.length;
 
     const item = el('div', {
         class: 'ax-element-result-item has-tooltip',
@@ -455,15 +517,12 @@ export function renderTripletResultLine(attestations: Attestation[]): HTMLElemen
     });
     text.appendChild(tripleSpan);
 
-    // Count badge
-    if (count > 1) {
-        text.appendChild(el('span', {
-            text: `(${count})`,
-            style: { color: TRIPLET_DIM, fontSize: '10px', flexShrink: '0' },
-        }));
+    const axis = timeAxis(attestations, undefined, now);
+    if (axis) {
+        text.appendChild(axis);
+        item.dataset.tooltip = collectTripletMeta(attestations).timeRange;
     }
 
-    item.dataset.tooltip = `${count} attestation${count !== 1 ? 's' : ''}`;
     item.appendChild(text);
 
     return item;

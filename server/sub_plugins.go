@@ -20,6 +20,8 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	s.pluginRegistry = pluginRegistry
 	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth)
 	s.pluginHandler.sigils = s.pluginSigilRows
+	s.pluginHandler.records = s.pluginRecords().Plugins
+	grpcplugin.SetPluginRecords(s.pluginRecords())
 	if s.handlerFailures == nil {
 		s.handlerFailures = newHandlerFailureLog()
 	}
@@ -58,8 +60,9 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 		)
 	}
 
-	// Wrap config provider to inject service endpoints for plugins
-	configProvider := grpcplugin.NewConfigProvider(endpoints)
+	// Wrap config provider to inject service endpoints for plugins. A plugin
+	// whose record names a namespace is handed a token of its own for it.
+	configProvider := grpcplugin.NewConfigProvider(endpoints, s.pluginToken, s.logger)
 	services := plugin.NewServiceRegistry(s.nodeDB, s.logger, s.held.Served(), configProvider, queue)
 
 	// Wire version resolver: ATSStore and FetchService auto-stamp source_version
@@ -73,6 +76,9 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 
 	// A plugin answering a sigil reads and writes where its caller acts.
 	servicesManager.SetCallStores(s.storeOfCall)
+
+	// A plugin whose record names a namespace reads and writes there (ADR-046).
+	servicesManager.SetPluginStores(s.storeOfPlugin)
 
 	// "a schedule remembers who created it and where", and each run goes there.
 	servicesManager.SetCallers(s.callerOf)

@@ -13,8 +13,8 @@
 
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
-import { renderTally } from './components/tally.ts';
-import type { StaandInfo, StandCount } from './market-element.ts';
+import { renderSparklines, windowOf, type Seen } from './components/sparkline.ts';
+import type { StaandInfo } from './market-element.ts';
 
 const FONT = 'var(--font-mono)';
 const SIZE = '13px';
@@ -33,19 +33,19 @@ export interface PageStats {
     page: string;
     arrivals: number;
     visitors: number;
-    events: StandCount[];
+    events: Seen[];
     first: string;
     last: string;
 }
 
 /**
- * One page's account, folded out of the walks. The arrival count comes from the
- * stand's own page tally rather than from the walks, because the walks are what
- * the node chose to report and the tally is what it counted.
+ * One page's account, folded out of the walks. How many arrived comes from what
+ * the stand saw of the page rather than from the walks, because the walks are
+ * what the node chose to report and the page is what it recorded.
  */
 export function pageStatsOf(s: StaandInfo, page: string): PageStats {
-    const counted = s.pages.find((p) => p.name === page);
-    const events = new Map<string, number>();
+    const recorded = s.pages.find((p) => p.name === page);
+    const events = new Map<string, number[]>();
     const visitors = new Set<string>();
     let first = '';
     let last = '';
@@ -54,20 +54,19 @@ export function pageStatsOf(s: StaandInfo, page: string): PageStats {
         for (const step of walk.steps) {
             if (step.page !== page) continue;
             visitors.add(walk.who);
-            events.set(step.event, (events.get(step.event) ?? 0) + 1);
+            const at = events.get(step.event) ?? [];
+            at.push(Date.parse(step.at));
+            events.set(step.event, at);
             if (first === '' || step.at < first) first = step.at;
             if (last === '' || step.at > last) last = step.at;
         }
     }
 
-    const tally = Array.from(events, ([name, count]) => ({ name, count }));
-    tally.sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
-
     return {
         page,
-        arrivals: counted?.count ?? 0,
+        arrivals: recorded?.seen.length ?? 0,
         visitors: visitors.size,
-        events: tally,
+        events: Array.from(events, ([name, times]) => ({ name, times })),
         first,
         last,
     };
@@ -94,7 +93,7 @@ export function externalLink(site: string, page: string): HTMLElement | null {
 }
 
 /** Exported for tests: what one page's element draws. */
-export function renderPageStats(container: HTMLElement, s: StaandInfo, page: string, site: string): void {
+export function renderPageStats(container: HTMLElement, s: StaandInfo, page: string, site: string, now: number = Date.now()): void {
     container.replaceChildren();
 
     const stats = pageStatsOf(s, page);
@@ -129,7 +128,7 @@ export function renderPageStats(container: HTMLElement, s: StaandInfo, page: str
 
     const events = document.createElement('div');
     events.className = 'page-events';
-    renderTally(events, 'Events on this page', stats.events);
+    renderSparklines(events, 'Events on this page', stats.events, windowOf(stats.events.flatMap((e) => e.times), now));
     container.appendChild(events);
 }
 
@@ -156,8 +155,6 @@ export function openPageElement(s: StaandInfo, page: string, site: string): void
             renderPageStats(content, s, page, site);
             return content;
         },
-        initialWidth: '560px',
-        initialHeight: '420px',
     } satisfies Element);
 
     tray.open(elementId);

@@ -69,27 +69,62 @@ type Landing struct {
 	// Over is when this namespace's attestations landed, by the hour, which is
 	// the line the chart draws for it.
 	Over map[string]int64 `json:"over"`
+
+	// DB is the file's own tables, held open by the backend. The driver opens
+	// the store it was registered with whatever path it is given, so a file
+	// opened by its path read the node's store under every namespace's name.
+	DB *sql.DB `json:"-"`
 }
 
-// A Common is one value a namespace uses often, and how often. What a panel
-// shows to say what a namespace is about without reading any of it.
+// A Common is one value a namespace uses: when it was last used, and when it
+// was used by the hour. "The axis of time is more useful than a tally."
 type Common struct {
-	Name  string `json:"name"`
-	Count int    `json:"count"`
+	Name string           `json:"name"`
+	Last string           `json:"last"`
+	Over map[string]int64 `json:"over"`
 }
 
-// commonTo is the values one column uses most, most first.
-func commonTo(db *sql.DB, query string, most int) (_ []Common, err error) {
-	rows, err := db.Query(query, most)
+// commonTo is the values one junction column holds, the most recently used
+// first, each with when it was used from the hour since on. Which are shown
+// follows when, not how many. Every value is cut at the same hour, so a busy
+// one is not drawn shorter than a quiet one. The table and column are this
+// file's constants, never a request's.
+func commonTo(db *sql.DB, table, column string, most int, since string) (_ []Common, err error) {
+	common, err := recentIn(db,
+		"SELECT j."+column+", MAX(strftime('%Y-%m-%dT%H:%M:%SZ', a.timestamp)) AS last "+
+			"FROM "+table+" j JOIN attestations a ON a.id = j.attestation_id "+
+			"GROUP BY j."+column+" HAVING last IS NOT NULL ORDER BY last DESC LIMIT ?", most)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for commonTo") }()
+
+	// recentIn has closed its rows: a second query on a single connection
+	// would wait on the first for ever.
+	for i := range common {
+		common[i].Over, err = bucketsOf(db,
+			"SELECT strftime('%Y-%m-%dT%H', a.timestamp) AS bucket, COUNT(*) "+
+				"FROM "+table+" j JOIN attestations a ON a.id = j.attestation_id "+
+				"WHERE j."+column+" = ? AND bucket >= ? "+
+				"GROUP BY bucket", common[i].Name, since)
+		if err != nil {
+			return nil, errors.Wrapf(err, "when %s %s was used did not answer", column, common[i].Name)
+		}
+	}
+	return common, nil
+}
+
+// recentIn reads (name, when last) rows.
+func recentIn(db *sql.DB, query string, args ...any) (_ []Common, err error) {
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for recentIn") }()
 
 	var common []Common
 	for rows.Next() {
 		var one Common
-		if err := rows.Scan(&one.Name, &one.Count); err != nil {
+		if err := rows.Scan(&one.Name, &one.Last); err != nil {
 			return nil, err
 		}
 		common = append(common, one)
@@ -97,15 +132,45 @@ func commonTo(db *sql.DB, query string, most int) (_ []Common, err error) {
 	return common, rows.Err()
 }
 
+// earliest is the first hour a chart line starts at, or "" for no line.
+func earliest(over map[string]int64) string {
+	first := ""
+	for bucket := range over {
+		if first == "" || bucket < first {
+			first = bucket
+		}
+	}
+	return first
+}
+
+// bucketsOf reads (bucket, how many) rows into the shape the chart draws.
+func bucketsOf(db *sql.DB, query string, args ...any) (_ map[string]int64, err error) {
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for bucketsOf") }()
+
+	over := map[string]int64{}
+	for rows.Next() {
+		var bucket string
+		var held int64
+		if err := rows.Scan(&bucket, &held); err != nil {
+			return nil, err
+		}
+		over[bucket] = held
+	}
+	return over, rows.Err()
+}
+
 // dimensionsOf counts the distinct actors, subjects and contexts one landing
 // file holds. These are its own tables (ADR-037): the file answers every read
 // of that namespace, so it is the file that describes it.
-func (s *QNTXServer) dimensionsOf(landing *Landing) error {
-	db, err := sql.Open("rustsqlite", landing.Path)
-	if err != nil {
-		return errors.Wrapf(err, "the landing file of %s at %s did not open", landing.Namespace, landing.Path)
+func (s *QNTXServer) dimensionsOf(landing *Landing) (err error) {
+	db := landing.DB
+	if db == nil {
+		return errors.Newf("the backend handed no database for the landing file of %s at %s", landing.Namespace, landing.Path)
 	}
-	defer func() { sqlclose.Log(db.Close(), s.logger, "the landing file of "+landing.Namespace) }()
 
 	for _, counting := range []struct {
 		query string
@@ -120,23 +185,20 @@ func (s *QNTXServer) dimensionsOf(landing *Landing) error {
 		}
 	}
 
-	landing.TopPredicates, err = commonTo(db,
-		"SELECT predicate, COUNT(*) AS held FROM attestation_predicates "+
-			"GROUP BY predicate ORDER BY held DESC LIMIT ?", commonAtMost)
+	landing.Over, err = overTime(db)
+	if err != nil {
+		return errors.Wrapf(err, "when the attestations of %s landed did not answer", landing.Namespace)
+	}
+	since := earliest(landing.Over)
+
+	landing.TopPredicates, err = commonTo(db, "attestation_predicates", "predicate", commonAtMost, since)
 	if err != nil {
 		return errors.Wrapf(err, "the predicates of %s did not answer", landing.Namespace)
 	}
 
-	landing.TopContexts, err = commonTo(db,
-		"SELECT context, COUNT(*) AS held FROM attestation_contexts "+
-			"GROUP BY context ORDER BY held DESC LIMIT ?", commonAtMost)
+	landing.TopContexts, err = commonTo(db, "attestation_contexts", "context", commonAtMost, since)
 	if err != nil {
 		return errors.Wrapf(err, "the contexts of %s did not answer", landing.Namespace)
-	}
-
-	landing.Over, err = overTime(db)
-	if err != nil {
-		return errors.Wrapf(err, "when the attestations of %s landed did not answer", landing.Namespace)
 	}
 	return nil
 }
@@ -152,29 +214,14 @@ const overAtMost = 336
 // overTime is when a namespace's attestations landed, by the hour. The old
 // chart read distillation output, which a node that persists cheaply to the
 // record does not produce; this reads the attestations themselves.
-func overTime(db *sql.DB) (_ map[string]int64, err error) {
-	rows, err := db.Query(`
+func overTime(db *sql.DB) (map[string]int64, error) {
+	return bucketsOf(db, `
 		SELECT strftime('%Y-%m-%dT%H', timestamp) AS bucket, COUNT(*) AS held
 		FROM attestations
 		WHERE bucket IS NOT NULL
 		GROUP BY bucket
 		ORDER BY bucket DESC
 		LIMIT ?`, overAtMost)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for overTime") }()
-
-	over := map[string]int64{}
-	for rows.Next() {
-		var bucket string
-		var held int64
-		if err := rows.Scan(&bucket, &held); err != nil {
-			return nil, err
-		}
-		over[bucket] = held
-	}
-	return over, rows.Err()
 }
 
 // Spend is one reader and what it has cost against the record: the name make
@@ -368,7 +415,7 @@ func (s *QNTXServer) refreshDBStats() {
 	// Rich fields
 	boundedStore := storage.NewBoundedStore(statsDB, nil, s.logger.Named("db-stats-cache"))
 	var richFields interface{}
-	richFieldsWithStats, err := boundedStore.GetRichFieldsWithStats()
+	richFieldsWithStats, err := boundedStore.GetRichFieldsWithStats(overAtMost)
 	if err != nil {
 		richFields = boundedStore.GetDiscoveredRichFields()
 	} else {
@@ -685,14 +732,16 @@ func queryDistillStats(db *sql.DB) (_ map[string]interface{}, err error) {
 		result["newest"] = newestDistill.String
 	}
 
-	// Top distill predicates
+	// Distill predicates, the most recently observed first: which are named
+	// follows when, not how many. Their lines come from predicate_histograms.
 	rows, err := db.Query(`
-		SELECT jp.predicate, COUNT(*) as cnt
+		SELECT jp.predicate,
+		       MAX(strftime('%Y-%m-%dT%H:%M:%SZ', json_extract(a.attributes, '$._last_seen'))) AS last
 		FROM attestation_predicates jp
 		JOIN attestations a ON a.id = jp.attestation_id
 		WHERE a.source = 'distill'
 		GROUP BY jp.predicate
-		ORDER BY cnt DESC
+		ORDER BY last IS NULL, last DESC, jp.predicate
 		LIMIT 10
 	`)
 	if err != nil {
@@ -702,14 +751,15 @@ func queryDistillStats(db *sql.DB) (_ map[string]interface{}, err error) {
 	var predicates []map[string]interface{}
 	for rows.Next() {
 		var pred string
-		var cnt int
-		if err := rows.Scan(&pred, &cnt); err != nil {
+		var last sql.NullString
+		if err := rows.Scan(&pred, &last); err != nil {
 			return nil, errors.Wrap(err, "failed to scan a distill predicate")
 		}
-		predicates = append(predicates, map[string]interface{}{
-			"predicate": pred,
-			"count":     cnt,
-		})
+		one := map[string]interface{}{"predicate": pred}
+		if last.Valid {
+			one["last"] = last.String
+		}
+		predicates = append(predicates, one)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, errors.Wrap(err, "failed to iterate distill predicates")

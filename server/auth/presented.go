@@ -2,8 +2,6 @@ package auth
 
 import (
 	"net/http"
-
-	"github.com/teranos/QNTX/internal/sacred"
 )
 
 // What a request carries, and the only place a request is read for it.
@@ -37,6 +35,9 @@ type Presented struct {
 	// caller holding a token nothing resolves is stuck; a caller holding none
 	// is a browser that has not signed in.
 	bearerPresented bool
+	// Whether the bearer is a caller the node is turning away while it is
+	// slow. Nothing about the token was looked up.
+	turnedAway bool
 
 	// Who the session belongs to, resolved when it was made rather than now.
 	UserID      string
@@ -83,13 +84,20 @@ func (h *Handler) presented(r *http.Request) Presented {
 		}
 		if h.tokens != nil {
 			hash := sha256Hex(raw)
+			// A person is never turned away; a token may be, and is before
+			// anything about it is looked up.
+			if h.shed != nil && !p.SessionLive && h.shed.presented(hash) {
+				p.turnedAway = true
+				return p
+			}
 			if grant, live := h.tokens.Lookup(hash); live {
 				p.Bearer = &grant
+				if h.shed != nil {
+					h.shed.named(hash, grant.Label)
+				}
 				// Last used is what a revocation is watched by (ADR-025), and
-				// nothing wrote it. Off the request's path: a token's record is
-				// rewritten on every use, and the caller does not wait for that.
-				did := grant.DID
-				sacred.Go("auth.touch", func() { h.touch(hash, did) })
+				// nothing wrote it.
+				h.touch(hash, grant.DID)
 			}
 		}
 	}

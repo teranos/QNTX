@@ -65,7 +65,7 @@ func TestARouteToolAskedWithoutAMethodIsRefused(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = asking.Close() })
 
-	result, err := asking.CallTool(ctx, &mcp.CallToolParams{Name: "http_api_roles", Arguments: map[string]any{}})
+	result, err := asking.CallTool(ctx, &mcp.CallToolParams{Name: "http_api_types", Arguments: map[string]any{}})
 	require.NoError(t, err)
 	assert.True(t, result.IsError)
 	assert.Contains(t, textOf(t, result), "needs a method")
@@ -183,7 +183,7 @@ func TestAConnectorIsOfferedNoNamespaceTool(t *testing.T) {
 	}
 	toPerson, toConnector := offered(person), offered(connector)
 
-	for _, namespaced := range []string{"i_standing", "i_step", "http_i_", "http_api_namespaces", "http_api_namespaces_"} {
+	for _, namespaced := range []string{"i_standing", "i_step", "http_i_", "namespaces_list", "namespaces_delete"} {
 		assert.True(t, toPerson[namespaced], namespaced+" is not offered to the person")
 		assert.False(t, toConnector[namespaced], namespaced+" is offered to a connector")
 	}

@@ -1,0 +1,551 @@
+syntax = "proto3";
+
+package protocol;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10
+
+// GET /organizations
+message GitHubListOrganizationsRequest {
+  string namespace = 1;
+  int64 since = 2;
+  int64 per_page = 3;
+}
+
+message GitHubListOrganizationsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubOrgsOrgsOrganizationSimple items = 3;
+}
+
+// GET /orgs/{org}
+message GitHubGetAnOrganizationRequest {
+  string namespace = 1;
+  string org = 2;
+}
+
+message GitHubGetAnOrganizationResponse {
+  message Plan {
+    string name = 1;
+    int64 space = 2;
+    int64 private_repos = 3;
+    int64 filled_seats = 4;
+    int64 seats = 5;
+  }
+
+  bool success = 1;
+  string error = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string url = 6;
+  string repos_url = 7;
+  string events_url = 8;
+  string hooks_url = 9;
+  string issues_url = 10;
+  string members_url = 11;
+  string public_members_url = 12;
+  string avatar_url = 13;
+  string description = 14;
+  string name = 15;
+  string company = 16;
+  string blog = 17;
+  string location = 18;
+  string email = 19;
+  string twitter_username = 20;
+  bool is_verified = 21;
+  bool has_organization_projects = 22;
+  bool has_repository_projects = 23;
+  int64 public_repos = 24;
+  int64 public_gists = 25;
+  int64 followers = 26;
+  int64 following = 27;
+  string html_url = 28;
+  string type = 29;
+  int64 total_private_repos = 30;
+  int64 owned_private_repos = 31;
+  int64 private_gists = 32;
+  int64 disk_usage = 33;
+  int64 collaborators = 34;
+  string billing_email = 35;
+  Plan plan = 36;
+  string default_repository_permission = 37;
+  string default_repository_branch = 38;
+  bool members_can_create_repositories = 39;
+  bool two_factor_requirement_enabled = 40;
+  string members_allowed_repository_creation_type = 41;
+  bool members_can_create_public_repositories = 42;
+  bool members_can_create_private_repositories = 43;
+  bool members_can_create_internal_repositories = 44;
+  bool members_can_create_pages = 45;
+  bool members_can_create_public_pages = 46;
+  bool members_can_create_private_pages = 47;
+  bool members_can_delete_repositories = 48;
+  bool members_can_change_repo_visibility = 49;
+  bool members_can_invite_outside_collaborators = 50;
+  bool members_can_delete_issues = 51;
+  bool display_commenter_full_name_setting_enabled = 52;
+  bool readers_can_create_discussions = 53;
+  bool members_can_create_teams = 54;
+  bool members_can_view_dependency_insights = 55;
+  bool members_can_fork_private_repositories = 56;
+  bool web_commit_signoff_required = 57;
+  bool advanced_security_enabled_for_new_repositories = 58;
+  bool dependabot_alerts_enabled_for_new_repositories = 59;
+  bool dependabot_security_updates_enabled_for_new_repositories = 60;
+  bool dependency_graph_enabled_for_new_repositories = 61;
+  bool secret_scanning_enabled_for_new_repositories = 62;
+  bool secret_scanning_push_protection_enabled_for_new_repositories = 63;
+  string secret_scanning_push_protection_custom_link = 64;
+  string created_at = 65;
+  string updated_at = 66;
+  string archived_at = 67;
+  bool deploy_keys_enabled_for_repositories = 68;
+}
+
+// PATCH /orgs/{org}
+// Response: same response schema as Get an organization.
+message GitHubUpdateAnOrganizationRequest {
+  string namespace = 1;
+  string org = 2;
+  string billing_email = 3;
+  string company = 4;
+  string email = 5;
+  string twitter_username = 6;
+  string location = 7;
+  string name = 8;
+  string description = 9;
+  bool has_organization_projects = 10;
+  bool has_repository_projects = 11;
+  string default_repository_permission = 12;
+  bool members_can_create_repositories = 13;
+  bool members_can_create_internal_repositories = 14;
+  bool members_can_create_private_repositories = 15;
+  bool members_can_create_public_repositories = 16;
+  string members_allowed_repository_creation_type = 17;
+  bool members_can_create_pages = 18;
+  bool members_can_create_public_pages = 19;
+  bool members_can_create_private_pages = 20;
+  bool members_can_fork_private_repositories = 21;
+  bool web_commit_signoff_required = 22;
+  string blog = 23;
+  bool advanced_security_enabled_for_new_repositories = 24;
+  bool dependabot_alerts_enabled_for_new_repositories = 25;
+  bool dependabot_security_updates_enabled_for_new_repositories = 26;
+  bool dependency_graph_enabled_for_new_repositories = 27;
+  bool secret_scanning_enabled_for_new_repositories = 28;
+  bool secret_scanning_push_protection_enabled_for_new_repositories = 29;
+  string secret_scanning_push_protection_custom_link = 30;
+  bool deploy_keys_enabled_for_repositories = 31;
+}
+
+// DELETE /orgs/{org}
+// The page gives the 202 body as "object" with no fields.
+message GitHubDeleteAnOrganizationRequest {
+  string namespace = 1;
+  string org = 2;
+}
+
+message GitHubDeleteAnOrganizationResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /orgs/{org}/installations
+message GitHubListAppInstallationsForAnOrganizationRequest {
+  string namespace = 1;
+  string org = 2;
+  int64 per_page = 3;
+  int64 page = 4;
+}
+
+message GitHubListAppInstallationsForAnOrganizationResponse {
+  bool success = 1;
+  string error = 2;
+  int64 total_count = 3;
+  repeated GitHubOrgsOrgsInstallation installations = 4;
+}
+
+// GET /orgs/{org}/settings/immutable-releases
+message GitHubGetImmutableReleasesSettingsForAnOrganizationRequest {
+  string namespace = 1;
+  string org = 2;
+}
+
+message GitHubGetImmutableReleasesSettingsForAnOrganizationResponse {
+  bool success = 1;
+  string error = 2;
+  string enforced_repositories = 3;
+  string selected_repositories_url = 4;
+}
+
+// PUT /orgs/{org}/settings/immutable-releases
+message GitHubSetImmutableReleasesSettingsForAnOrganizationRequest {
+  string namespace = 1;
+  string org = 2;
+  string enforced_repositories = 3;
+  repeated int64 selected_repository_ids = 4;
+}
+
+message GitHubSetImmutableReleasesSettingsForAnOrganizationResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /orgs/{org}/settings/immutable-releases/repositories
+message GitHubListSelectedRepositoriesForImmutableReleasesEnforcementRequest {
+  string namespace = 1;
+  string org = 2;
+  int64 page = 3;
+  int64 per_page = 4;
+}
+
+message GitHubListSelectedRepositoriesForImmutableReleasesEnforcementResponse {
+  bool success = 1;
+  string error = 2;
+  int64 total_count = 3;
+  repeated GitHubOrgsOrgsMinimalRepository repositories = 4;
+}
+
+// PUT /orgs/{org}/settings/immutable-releases/repositories
+message GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementRequest {
+  string namespace = 1;
+  string org = 2;
+  repeated int64 selected_repository_ids = 3;
+}
+
+message GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// PUT /orgs/{org}/settings/immutable-releases/repositories/{repository_id}
+message GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationRequest {
+  string namespace = 1;
+  string org = 2;
+  int64 repository_id = 3;
+}
+
+message GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// DELETE /orgs/{org}/settings/immutable-releases/repositories/{repository_id}
+message GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationRequest {
+  string namespace = 1;
+  string org = 2;
+  int64 repository_id = 3;
+}
+
+message GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// POST /orgs/{org}/{security_product}/{enablement}
+message GitHubEnableOrDisableASecurityFeatureForAnOrganizationRequest {
+  string namespace = 1;
+  string org = 2;
+  string security_product = 3;
+  string enablement = 4;
+  string query_suite = 5;
+}
+
+message GitHubEnableOrDisableASecurityFeatureForAnOrganizationResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GET /user/orgs
+// Response: same response schema as List organizations.
+message GitHubListOrganizationsForTheAuthenticatedUserRequest {
+  string namespace = 1;
+  int64 per_page = 2;
+  int64 page = 3;
+}
+
+// GET /users/{username}/orgs
+// Response: same response schema as List organizations.
+message GitHubListOrganizationsForAUserRequest {
+  string namespace = 1;
+  string username = 2;
+  int64 per_page = 3;
+  int64 page = 4;
+}
+
+// Organization Simple
+message GitHubOrgsOrgsOrganizationSimple {
+  string login = 1;
+  int64 id = 2;
+  string node_id = 3;
+  string url = 4;
+  string repos_url = 5;
+  string events_url = 6;
+  string hooks_url = 7;
+  string issues_url = 8;
+  string members_url = 9;
+  string public_members_url = 10;
+  string avatar_url = 11;
+  string description = 12;
+}
+
+// Installation
+message GitHubOrgsOrgsInstallation {
+  int64 id = 1;
+  // Any of Simple User or Enterprise.
+  google.protobuf.Struct account = 2;
+  string repository_selection = 3;
+  string access_tokens_url = 4;
+  string repositories_url = 5;
+  string html_url = 6;
+  int64 app_id = 7;
+  string client_id = 8;
+  int64 target_id = 9;
+  string target_type = 10;
+  GitHubOrgsOrgsAppPermissions permissions = 11;
+  repeated string events = 12;
+  string created_at = 13;
+  string updated_at = 14;
+  string single_file_name = 15;
+  bool has_multiple_single_files = 16;
+  repeated string single_file_paths = 17;
+  string app_slug = 18;
+  GitHubOrgsOrgsSimpleUser suspended_by = 19;
+  string suspended_at = 20;
+  string contact_email = 21;
+}
+
+// App Permissions
+message GitHubOrgsOrgsAppPermissions {
+  string actions = 1;
+  string administration = 2;
+  string artifact_metadata = 3;
+  string attestations = 4;
+  string checks = 5;
+  string code_quality = 6;
+  string codespaces = 7;
+  string contents = 8;
+  string dependabot_secrets = 9;
+  string deployments = 10;
+  string discussions = 11;
+  string environments = 12;
+  string issues = 13;
+  string merge_queues = 14;
+  string metadata = 15;
+  string packages = 16;
+  string pages = 17;
+  string pull_requests = 18;
+  string repository_custom_properties = 19;
+  string repository_hooks = 20;
+  string repository_projects = 21;
+  string secret_scanning_alerts = 22;
+  string secrets = 23;
+  string security_events = 24;
+  string single_file = 25;
+  string statuses = 26;
+  string vulnerability_alerts = 27;
+  string workflows = 28;
+  string custom_properties_for_organizations = 29;
+  string members = 30;
+  string organization_administration = 31;
+  string organization_custom_roles = 32;
+  string organization_custom_org_roles = 33;
+  string organization_custom_properties = 34;
+  string organization_copilot_seat_management = 35;
+  string organization_copilot_agent_settings = 36;
+  string organization_announcement_banners = 37;
+  string organization_events = 38;
+  string organization_hooks = 39;
+  string organization_personal_access_tokens = 40;
+  string organization_personal_access_token_requests = 41;
+  string organization_plan = 42;
+  string organization_projects = 43;
+  string organization_packages = 44;
+  string organization_secrets = 45;
+  string organization_self_hosted_runners = 46;
+  string organization_user_blocking = 47;
+  string email_addresses = 48;
+  string followers = 49;
+  string git_ssh_keys = 50;
+  string gpg_keys = 51;
+  string interaction_limits = 52;
+  string profile = 53;
+  string starring = 54;
+  string enterprise_custom_properties_for_organizations = 55;
+}
+
+// Simple User
+message GitHubOrgsOrgsSimpleUser {
+  string name = 1;
+  string email = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string avatar_url = 6;
+  string gravatar_id = 7;
+  string url = 8;
+  string html_url = 9;
+  string followers_url = 10;
+  string following_url = 11;
+  string gists_url = 12;
+  string starred_url = 13;
+  string subscriptions_url = 14;
+  string organizations_url = 15;
+  string repos_url = 16;
+  string events_url = 17;
+  string received_events_url = 18;
+  string type = 19;
+  bool site_admin = 20;
+  string starred_at = 21;
+  string user_view_type = 22;
+}
+
+// Code Of Conduct
+message GitHubOrgsOrgsCodeOfConduct {
+  string key = 1;
+  string name = 2;
+  string url = 3;
+  string body = 4;
+  string html_url = 5;
+}
+
+// Minimal Repository
+message GitHubOrgsOrgsMinimalRepository {
+  message Permissions {
+    bool admin = 1;
+    bool maintain = 2;
+    bool push = 3;
+    bool triage = 4;
+    bool pull = 5;
+  }
+
+  message License {
+    string key = 1;
+    string name = 2;
+    string spdx_id = 3;
+    string url = 4;
+    string node_id = 5;
+  }
+
+  message SecurityAndAnalysis {
+    message Status {
+      string status = 1;
+    }
+
+    message SecretScanningDelegatedBypassOptions {
+      message Reviewers {
+        int64 reviewer_id = 1;
+        string reviewer_type = 2;
+        string mode = 3;
+      }
+
+      repeated Reviewers reviewers = 1;
+    }
+
+    Status advanced_security = 1;
+    Status code_security = 2;
+    Status dependabot_security_updates = 3;
+    Status secret_scanning = 4;
+    Status secret_scanning_push_protection = 5;
+    Status secret_scanning_non_provider_patterns = 6;
+    Status secret_scanning_ai_detection = 7;
+    Status secret_scanning_delegated_alert_dismissal = 8;
+    Status secret_scanning_delegated_bypass = 9;
+    SecretScanningDelegatedBypassOptions secret_scanning_delegated_bypass_options = 10;
+  }
+
+  int64 id = 1;
+  string node_id = 2;
+  string name = 3;
+  string full_name = 4;
+  GitHubOrgsOrgsSimpleUser owner = 5;
+  bool private = 6;
+  string html_url = 7;
+  string description = 8;
+  bool fork = 9;
+  string url = 10;
+  string archive_url = 11;
+  string assignees_url = 12;
+  string blobs_url = 13;
+  string branches_url = 14;
+  string collaborators_url = 15;
+  string comments_url = 16;
+  string commits_url = 17;
+  string compare_url = 18;
+  string contents_url = 19;
+  string contributors_url = 20;
+  string deployments_url = 21;
+  string downloads_url = 22;
+  string events_url = 23;
+  string forks_url = 24;
+  string git_commits_url = 25;
+  string git_refs_url = 26;
+  string git_tags_url = 27;
+  string git_url = 28;
+  string issue_comment_url = 29;
+  string issue_events_url = 30;
+  string issues_url = 31;
+  string keys_url = 32;
+  string labels_url = 33;
+  string languages_url = 34;
+  string merges_url = 35;
+  string milestones_url = 36;
+  string notifications_url = 37;
+  string pulls_url = 38;
+  string releases_url = 39;
+  string ssh_url = 40;
+  string stargazers_url = 41;
+  string statuses_url = 42;
+  string subscribers_url = 43;
+  string subscription_url = 44;
+  string tags_url = 45;
+  string teams_url = 46;
+  string trees_url = 47;
+  string clone_url = 48;
+  string mirror_url = 49;
+  string hooks_url = 50;
+  string svn_url = 51;
+  string homepage = 52;
+  string language = 53;
+  int64 forks_count = 54;
+  int64 stargazers_count = 55;
+  int64 watchers_count = 56;
+  int64 size = 57;
+  string default_branch = 58;
+  int64 open_issues_count = 59;
+  bool is_template = 60;
+  repeated string topics = 61;
+  bool has_issues = 62;
+  bool has_projects = 63;
+  bool has_wiki = 64;
+  bool has_pages = 65;
+  bool has_discussions = 66;
+  bool has_pull_requests = 67;
+  string pull_request_creation_policy = 68;
+  bool archived = 69;
+  bool disabled = 70;
+  string visibility = 71;
+  string pushed_at = 72;
+  string created_at = 73;
+  string updated_at = 74;
+  Permissions permissions = 75;
+  string role_name = 76;
+  string temp_clone_token = 77;
+  bool delete_branch_on_merge = 78;
+  int64 subscribers_count = 79;
+  int64 network_count = 80;
+  GitHubOrgsOrgsCodeOfConduct code_of_conduct = 81;
+  License license = 82;
+  int64 forks = 83;
+  int64 open_issues = 84;
+  int64 watchers = 85;
+  bool allow_forking = 86;
+  bool web_commit_signoff_required = 87;
+  SecurityAndAnalysis security_and_analysis = 88;
+  google.protobuf.Struct custom_properties = 89;
+}

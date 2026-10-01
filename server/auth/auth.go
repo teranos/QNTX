@@ -51,7 +51,9 @@ type Handler struct {
 	google *OperatorClient
 	// auth.provider.apple, the same way: the key already resolved, nil on a
 	// node configured for no Apple.
-	apple   *OperatorClient
+	apple *OperatorClient
+	// auth.provider.github, the same way as Google.
+	github  *OperatorClient
 	nodeKey ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	// auth.public_origin: where this node answers, which a ceremony's
 	// redirect_uri is built from. Empty falls back to loopbackOrigin.
@@ -89,6 +91,7 @@ type Handler struct {
 	ceremonies    sync.Map // ownerUserID -> *webauthn.SessionData
 	secureCookies bool     // true when auth.rp_origins says a browser reaches this over https
 	refused       refusals // what the status line reports about callers turned away
+	shed          *Shed    // the callers turned away while the node is slow; nil turns nobody away
 	// Every door this node answers, by the origin that reaches it.
 	// The node's own relying party is the door onto default and is always in
 	// here; am.toml adds the rest.
@@ -171,6 +174,18 @@ func (h *Handler) SetGoogleClient(id, secret string) {
 	h.google = &OperatorClient{ID: id, Secret: secret}
 }
 
+// SetGitHubClient hands the handler the OAuth client this node's operator
+// registered with GitHub, or takes it away when either half is missing. The
+// config watcher calls this, so adding [auth.provider.github] to am.toml puts
+// GitHub on the door without waiting for a restart.
+func (h *Handler) SetGitHubClient(id, secret string) {
+	if id == "" || secret == "" {
+		h.github = nil
+		return
+	}
+	h.github = &OperatorClient{ID: id, Secret: secret}
+}
+
 // SetAppleClient hands the handler what this node's operator registered with
 // Apple — a Services ID, the team it belongs to, and the key Apple issued
 // under that team, by id and by value — or takes Apple away when any part is
@@ -210,6 +225,10 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := h.presented(r)
+		if p.turnedAway {
+			h.rejectTurnedAway(w)
+			return
+		}
 
 		admitted, ok := h.admissionOf(p)
 		if !ok {
@@ -263,6 +282,13 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			h.logger.Infow("Bearer token refused",
 				"did", grant.DID,
 				"reason", "a refresh token is not a bearer")
+			return Admission{}, false
+		}
+		// A namespace's GitHub token is spent at GitHub by the node (ADR-043).
+		if grant.Level == LevelGitHub {
+			h.logger.Infow("Bearer token refused",
+				"minted_by", quoteIdentity(grant.MintedBy),
+				"reason", "a GitHub token is not a bearer")
 			return Admission{}, false
 		}
 		// A token speaks for whoever minted it (ADR-025), so striking them out

@@ -19,16 +19,16 @@ const anAttestation = (over: Partial<Attestation> = {}): Attestation => ({
 } as Attestation);
 
 const byAlice: Attestation[] = [
-    anAttestation({ predicates: ['crawl-timeout'], contexts: ['levi:batch'] }),
-    anAttestation({ predicates: ['crawl-timeout'], contexts: ['levi:batch'] }),
-    anAttestation({ predicates: ['crawl-timeout'], contexts: ['levi:crawl'] }),
-    anAttestation({ predicates: ['handler'], contexts: ['levi:batch'] }),
-    anAttestation({ predicates: ['module'], contexts: ['_'] }),
+    anAttestation({ timestamp: 1788000000001, predicates: ['crawl-timeout'], contexts: ['levi:batch'] }),
+    anAttestation({ timestamp: 1788000000002, predicates: ['crawl-timeout'], contexts: ['levi:batch'] }),
+    anAttestation({ timestamp: 1788000000003, predicates: ['crawl-timeout'], contexts: ['levi:crawl'] }),
+    anAttestation({ timestamp: 1788000000004, predicates: ['handler'], contexts: ['levi:batch'] }),
+    anAttestation({ timestamp: 1788000000005, predicates: ['module'], contexts: ['_'] }),
 ];
 
-const rowsIn = (container: HTMLElement, cls: string): (string | null)[][] =>
-    Array.from(container.querySelectorAll(`.${cls} .stand-tally`))
-        .map((row) => Array.from(row.children).map((cell) => cell.textContent));
+const rowsIn = (container: HTMLElement, cls: string): (string | null)[] =>
+    Array.from(container.querySelectorAll(`.${cls} .sparkline-row`))
+        .map((row) => row.children[0].textContent);
 
 describe('What the actor element is', () => {
     test('it draws ⌬, the mark of by', () => {
@@ -62,33 +62,33 @@ describe('What an actor is paired with', () => {
         document.body.appendChild(container);
     });
 
-    test('predicates counted, most-paired first', () => {
+    test('predicates, most recently paired first', () => {
         renderActorStats(container, 'did:key:z6Mkalice', byAlice);
         expect(rowsIn(container, 'actor-predicates')).toEqual([
-            ['crawl-timeout', '3'],
-            ['handler', '1'],
-            ['module', '1'],
+            'module',
+            'handler',
+            'crawl-timeout',
         ]);
     });
 
-    test('contexts counted, most-used first', () => {
+    test('contexts, most recently used first, however often', () => {
         renderActorStats(container, 'did:key:z6Mkalice', byAlice);
         expect(rowsIn(container, 'actor-contexts')).toEqual([
-            ['levi:batch', '3'],
-            ['_', '1'],
-            ['levi:crawl', '1'],
+            '_',
+            'levi:batch',
+            'levi:crawl',
         ]);
     });
 
     test('a predicate opens its own element', () => {
         renderActorStats(container, 'did:key:z6Mkalice', byAlice);
-        const first = container.querySelector('.actor-predicates .stand-tally')?.children[0] as HTMLElement;
+        const first = container.querySelector('.actor-predicates .sparkline-row')?.children[0] as HTMLElement;
         expect(first.dataset.segmentPress).toBe('predicate');
     });
 
     test('a context opens its own element', () => {
         renderActorStats(container, 'did:key:z6Mkalice', byAlice);
-        const first = container.querySelector('.actor-contexts .stand-tally')?.children[0] as HTMLElement;
+        const first = container.querySelector('.actor-contexts .sparkline-row')?.children[0] as HTMLElement;
         expect(first.dataset.segmentPress).toBe('context');
     });
 

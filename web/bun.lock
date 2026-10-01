@@ -6,13 +6,13 @@
       "name": "qntx-web",
       "dependencies": {
         "@codemirror/lang-javascript": "6.2.2",
-        "@codemirror/lang-python": "^6.2.1",
-        "@codemirror/lang-yaml": "^6.1.2",
+        "@codemirror/lang-python": "6.2.1",
+        "@codemirror/lang-yaml": "6.1.2",
         "@sentry/browser": "10.73.0",
-        "@teranos/elements": "npm:@jsr/teranos__elements@1.0.1",
+        "@teranos/elements": "npm:@jsr/teranos__elements@1.2.0",
         "d3": "7.9.0",
         "regl": "2.1.0",
-        "smol-toml": "^1.6.0",
+        "smol-toml": "1.6.0",
       },
       "devDependencies": {
         "@codemirror/autocomplete": "6.18.6",
@@ -28,7 +28,7 @@
         "@types/d3": "7.4.3",
         "@types/jsdom": "27.0.0",
         "eslint": "10.8.1",
-        "fake-indexeddb": "^6.2.5",
+        "fake-indexeddb": "6.2.5",
         "happy-dom": "20.0.11",
         "jsdom": "27.4.0",
         "prosemirror-commands": "1.6.2",
@@ -42,7 +42,7 @@
         "prosemirror-state": "1.4.3",
         "prosemirror-tables": "1.6.1",
         "prosemirror-view": "1.38.1",
-        "ts-proto": "^2.11.2",
+        "ts-proto": "2.11.2",
         "typescript": "5.7.2",
         "typescript-eslint": "8.67.0",
       },
@@ -160,7 +160,7 @@
 
     "@tauri-apps/api": ["@tauri-apps/api@2.11.1", "", {}, "sha512-M2FPuYND2m+wh5hfW9ZpSdxMPdEJovPBWwoHJmwUpysTYNHaOkVFN419m/K0LIgjb/7KU2vBgsUepJWugQCvAA=="],
 
-    "@teranos/elements": ["@jsr/teranos__elements@1.0.1", "https://npm.jsr.io/~/11/@jsr/teranos__elements/1.0.1.tgz", {}, "sha512-8gh1AgBDliPmoCayTMAlKbQGsgRsqzrx3dApzAurIqBRmnsILWUqSkD+kVaPKR43M/tlt44hZsq0ZAK4OtZTmg=="],
+    "@teranos/elements": ["@jsr/teranos__elements@1.2.0", "https://npm.jsr.io/~/11/@jsr/teranos__elements/1.2.0.tgz", {}, "sha512-SLlhxItK7zRzt7M5s0Y4Pnxo/EZHSM1uf2UySLGhiT2TluGjIq95+f/jEecENMBuzjaD2H4Jsu5yGw96vcSzXQ=="],
 
     "@types/d3": ["@types/d3@7.4.3", "", { "dependencies": { "@types/d3-array": "*", "@types/d3-axis": "*", "@types/d3-brush": "*", "@types/d3-chord": "*", "@types/d3-color": "*", "@types/d3-contour": "*", "@types/d3-delaunay": "*", "@types/d3-dispatch": "*", "@types/d3-drag": "*", "@types/d3-dsv": "*", "@types/d3-ease": "*", "@types/d3-fetch": "*", "@types/d3-force": "*", "@types/d3-format": "*", "@types/d3-geo": "*", "@types/d3-hierarchy": "*", "@types/d3-interpolate": "*", "@types/d3-path": "*", "@types/d3-polygon": "*", "@types/d3-quadtree": "*", "@types/d3-random": "*", "@types/d3-scale": "*", "@types/d3-scale-chromatic": "*", "@types/d3-selection": "*", "@types/d3-shape": "*", "@types/d3-time": "*", "@types/d3-time-format": "*", "@types/d3-timer": "*", "@types/d3-transition": "*", "@types/d3-zoom": "*" } }, "sha512-lZXZ9ckh5R8uiFVt8ogUNf+pIrK4EsWrx2Np75WvF/eTpJ0FMHNhjXk8CKEx/+gpHbNQyJWehbFaTvqmHWB3ww=="],
 

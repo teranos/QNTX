@@ -35,7 +35,7 @@ const (
 //
 // The raw token is minted here and never crosses the FFI boundary — only its
 // SHA-256 hash does, and only inbound. Nothing below this line can hand a
-// working credential back out.
+// working credential back out, except a GITHUB token's (ADR-043).
 type TokenStore struct {
 	ptr unsafe.Pointer // *C.TokenStore
 	mu  sync.Mutex

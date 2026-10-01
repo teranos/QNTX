@@ -32,12 +32,11 @@
         "SUPER"
       ]
     },
-    "/am/statusline/": {
+    "/am/statusline/{name}": {
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
-      ],
-      "x-qntx-prefix": true
+      ]
     },
     "/am/syscap": {
       "x-qntx-reach": [
@@ -271,19 +270,36 @@
         "SUPER"
       ]
     },
-    "/api/namespaces/": {
-      "x-qntx-reach": [
-        "ROOT",
-        "SUPER"
-      ],
-      "x-qntx-prefix": true
-    },
     "/api/namespaces/default/nuke": {
       "x-qntx-reach": [
         "ROOT"
       ]
     },
+    "/api/namespaces/{name}": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/api/namespaces/{name}/disable": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/api/namespaces/{name}/enable": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
     "/api/plugins": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/api/plugins/check": {
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
@@ -587,6 +603,12 @@
       "x-qntx-prefix": true
     },
     "/g/": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ],
+      "x-qntx-prefix": true
+    },
+    "/github/": {
       "x-qntx-reach": [
         "ANYONE"
       ],

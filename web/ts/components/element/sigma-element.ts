@@ -593,8 +593,6 @@ export function spawnSigmaAsWindow(attestation: Attestation): void {
         id: itemId,
         title,
         symbol: Sigma,
-        initialWidth: '380px',
-        initialHeight: '400px',
         onClose: () => {
             tray.remove(itemId);
             log.debug(SEG.ELEMENT, `[SigmaElement] Closed window ${itemId}`);

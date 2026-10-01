@@ -137,6 +137,7 @@ type DoorConfig struct {
 type ProviderConfig struct {
 	Google OAuthClientConfig `mapstructure:"google"` // Registered at console.cloud.google.com
 	Apple  AppleClientConfig `mapstructure:"apple"`  // Registered at developer.apple.com: a Services ID with Sign in with Apple enabled, and a Sign in with Apple key
+	GitHub OAuthClientConfig `mapstructure:"github"` // Registered at github.com/settings/apps
 }
 
 // AppleClientConfig is what Apple hands an operator instead of a client
@@ -273,7 +274,6 @@ type AxConfig struct {
 
 // PluginConfig configures the domain plugin system
 type PluginConfig struct {
-	Enabled     []string              `mapstructure:"enabled"`      // Allowlist of enabled plugins: bare names or repo URLs (see EnabledPlugin)
 	Paths       []string              `mapstructure:"paths"`        // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
 	AccessToken []AccessTokenRef      `mapstructure:"access_token"` // One credential per forge host, for private plugin repos
 	Runtime     PluginRuntimeConfig   `mapstructure:"runtime"`      // Runtime configuration

@@ -64,7 +64,7 @@ export function hasEvictions(): boolean {
 
 export interface PredicateDetail {
     predicate: string;
-    count: number;
+    evictedAt: number[];          // when each eviction naming it happened (epoch ms)
     actors: string[];
     contexts: string[];
     entities: string[];
@@ -72,19 +72,20 @@ export interface PredicateDetail {
     lastEviction: number;         // when the most recent eviction happened (epoch ms)
 }
 
-/** Aggregate predicate breakdown with actors, contexts, entities, and data age. */
+/** Aggregate predicate breakdown with actors, contexts, entities, and data age,
+ *  the most recently evicted first. */
 export function getPredicateBreakdown(): PredicateDetail[] {
-    const byPredicate = new Map<string, { count: number; actors: Set<string>; contexts: Set<string>; entities: Set<string>; oldestEvicted: string | null; lastEviction: number }>();
+    const byPredicate = new Map<string, { evictedAt: number[]; actors: Set<string>; contexts: Set<string>; entities: Set<string>; oldestEvicted: string | null; lastEviction: number }>();
 
     for (const ev of evictions) {
         if (!ev.predicates || ev.predicates.length === 0) continue;
         for (const pred of ev.predicates) {
             let entry = byPredicate.get(pred);
             if (!entry) {
-                entry = { count: 0, actors: new Set(), contexts: new Set(), entities: new Set(), oldestEvicted: null, lastEviction: 0 };
+                entry = { evictedAt: [], actors: new Set(), contexts: new Set(), entities: new Set(), oldestEvicted: null, lastEviction: 0 };
                 byPredicate.set(pred, entry);
             }
-            entry.count += ev.deletions_count;
+            entry.evictedAt.push(ev.timestamp);
             if (ev.actor) entry.actors.add(ev.actor);
             if (ev.context) entry.contexts.add(ev.context);
             if (ev.entity) entry.entities.add(ev.entity);
@@ -96,16 +97,16 @@ export function getPredicateBreakdown(): PredicateDetail[] {
     }
 
     return Array.from(byPredicate.entries())
-        .map(([predicate, { count, actors, contexts, entities, oldestEvicted, lastEviction }]) => ({
+        .map(([predicate, { evictedAt, actors, contexts, entities, oldestEvicted, lastEviction }]) => ({
             predicate,
-            count,
+            evictedAt,
             actors: [...actors],
             contexts: [...contexts],
             entities: [...entities],
             oldestEvicted,
             lastEviction,
         }))
-        .sort((a, b) => b.count - a.count);
+        .sort((a, b) => (b.lastEviction - a.lastEviction) || a.predicate.localeCompare(b.predicate));
 }
 
 // Color per enforcement policy

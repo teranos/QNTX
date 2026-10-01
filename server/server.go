@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -84,9 +85,25 @@ type QNTXServer struct {
 	sentryEnvironment string
 	// What sends the node's own mail; nil when the mail service did not start.
 	nodeMailer nodeMailer
+	// The node's GitHubService (ADR-043), made on first use.
+	githubOnce sync.Once
+	github     *services.GitHubServer
+	// The runner whose plugin builds the node takes, while one is watched.
+	runnerMu   sync.Mutex
+	runner     *grpcplugin.Runner
+	runnerStop context.CancelFunc
+	runnerErr  string
+	// What QNTX last built of each plugin it builds itself, one build at a time.
+	builds   pluginBuilds
+	building sync.Mutex
 	// The calls plugins are answering: the token handed for each, and the store
 	// of the caller it was handed for (plugin_sigils.go).
 	callStores sync.Map
+	// The plugins standing in a namespace of their own: the token handed each
+	// at Initialize and that namespace's store, by token and by plugin
+	// (plugin_stores.go).
+	pluginStores sync.Map
+	pluginTokens sync.Map
 
 	// Plugin HTTP routing (lazy initialization for async plugin loading)
 	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux
@@ -175,6 +192,7 @@ type QNTXServer struct {
 	walCheckpointer             WALCheckpointer    // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
 	ageDistiller                AgeDistiller       // Rust-side age distillation (fold old attestations into sigmas)
 	writeLockInspector          WriteLockInspector // Rust-side write lock holder tracking
+	shed                        *auth.Shed         // the tokens the gate turns away while the operational store is slow
 	recordReporters             []RecordReporter   // What reading the record off-node has cost, per reader
 	saidSpend                   map[Spend]int64    // What of that was already said as a metric, so the next say is a delta
 	landingReporter             LandingReporter    // The database per namespace a read is answered from (ADR-037)
@@ -388,6 +406,27 @@ func (s *QNTXServer) AddPythonProvider(client protocol.PythonServiceClient) {
 	}
 }
 
+// RegisterPluginRoutes answers a plugin's paths, /api/<name> and below it and
+// /ws/<name>, loaded yet or not. Who reaches them is what the table says.
+func (s *QNTXServer) RegisterPluginRoutes(name string) {
+	if _, loaded := s.pluginRoutes.LoadOrStore(name, true); loaded {
+		return
+	}
+	s.opening.Lock()
+	s.answer("/api/"+name, s.handlePluginRequest)
+	s.answer("/api/"+name+"/{path...}", s.handlePluginRequest)
+	s.answerSocket("/ws/"+name, s.handlePluginWebSocket)
+
+	unnamed, err := s.reopenHeld()
+	s.opening.Unlock()
+	if err != nil {
+		s.logger.Errorw("Plugin is not served; what the node serves is unchanged",
+			"plugin", name, "error", err)
+		return
+	}
+	s.logger.Infow("Plugin served", "plugin", name, "unnamed", unnamed)
+}
+
 // InvalidatePluginMux clears cached HTTP mux state for a plugin so the next
 // request re-initializes it. Called after plugin auto-restart to avoid stale
 // sync.Once that was poisoned by a previous failed init.
@@ -412,24 +451,7 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 		return
 	}
 	s.pluginMuxes.Store(name, mux)
-
-	// A plugin enabled by editing am.toml can answer on these paths. Whether
-	// anybody reaches them is what the table says, and Reopen asks it again.
-	if _, loaded := s.pluginRoutes.LoadOrStore(name, true); !loaded {
-		s.opening.Lock()
-		s.answer("/api/"+name, s.handlePluginRequest)
-		s.answer("/api/"+name+"/{path...}", s.handlePluginRequest)
-		s.answerSocket("/ws/"+name, s.handlePluginWebSocket)
-
-		unnamed, err := s.reopenHeld()
-		s.opening.Unlock()
-		if err != nil {
-			s.logger.Errorw("Hot-swapped plugin is not served; what the node serves is unchanged",
-				"plugin", name, "error", err)
-			return
-		}
-		s.logger.Infow("Hot-swapped plugin", "plugin", name, "unnamed", unnamed)
-	}
+	s.RegisterPluginRoutes(name)
 
 	if ep, ok := p.(*grpcplugin.ExternalDomainProxy); ok {
 		s.logger.Debugw("Registered HTTP proxy handlers", "plugin", name, "addr", ep.Addr())

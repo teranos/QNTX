@@ -117,7 +117,6 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("watcher.max_fires_per_second", 3)
 
 	// Plugin configuration defaults
-	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
 	pluginPaths := []string{"~/.qntx/plugins"}
 	// If qntx-plugins/ exists in CWD, include it — typically present when running from repo root
 	if _, err := os.Stat("qntx-plugins"); err == nil {

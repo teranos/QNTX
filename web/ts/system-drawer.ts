@@ -33,9 +33,12 @@ function setDrawerHeight(panel: HTMLElement, height: number): void {
     }
 }
 
-function expandDrawer(): void {
+/** Opens the drawer to where it was last open, when it is closed. */
+export function expandDrawer(): void {
     if (!drawerPanel) return;
-    const current = drawerPanel.offsetHeight;
+    // The height it was set to: offsetHeight carries the border, so a closed
+    // drawer read as open and never opened.
+    const current = drawerPanel.clientHeight;
     if (current <= DRAWER_HEADER) {
         const target = lastExpandedHeight > DRAWER_HEADER ? lastExpandedHeight : DRAWER_MAX;
         setDrawerHeight(drawerPanel, target);
@@ -45,7 +48,7 @@ function expandDrawer(): void {
 
 function collapseDrawer(): void {
     if (!drawerPanel) return;
-    const current = drawerPanel.offsetHeight;
+    const current = drawerPanel.clientHeight;
     if (current > DRAWER_HEADER) {
         lastExpandedHeight = current;
     }

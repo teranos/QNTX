@@ -25,6 +25,11 @@ type VersionResolver func(source string) string
 // node handed the plugin for that one call. False is no call open under it.
 type CallStores func(token string) (ats.AttestationStore, bool)
 
+// PluginStores is the store of the namespace a plugin stands in, by the token
+// the node handed that plugin at Initialize (ADR-046). False is no plugin
+// standing under it.
+type PluginStores func(token string) (ats.AttestationStore, bool)
+
 // ATSStoreServer implements the ATSStoreService gRPC server
 type ATSStoreServer struct {
 	protocol.UnimplementedATSStoreServiceServer
@@ -33,7 +38,8 @@ type ATSStoreServer struct {
 	logger          *zap.SugaredLogger
 	versionResolver VersionResolver
 	// Set after the service is serving, while plugins may already be calling.
-	calls atomic.Pointer[CallStores]
+	calls   atomic.Pointer[CallStores]
+	plugins atomic.Pointer[PluginStores]
 
 	// streamMu protects streamCtx/streamCancel
 	streamMu     sync.Mutex
@@ -63,14 +69,25 @@ func (s *ATSStoreServer) SetCallStores(calls CallStores) {
 	s.calls.Store(&calls)
 }
 
+// SetPluginStores hands the server the stores of the namespaces plugins stand in.
+func (s *ATSStoreServer) SetPluginStores(plugins PluginStores) {
+	s.plugins.Store(&plugins)
+}
+
 // storeFor is the store a token reaches: the served one for the shared token,
-// the caller's for a call's token, and none for anything else.
+// the caller's for a call's token, the namespace a plugin stands in for that
+// plugin's own token, and none for anything else.
 func (s *ATSStoreServer) storeFor(token string) (ats.AttestationStore, error) {
 	if ValidateToken(token, s.authToken) == nil {
 		return s.store, nil
 	}
 	if calls := s.calls.Load(); calls != nil {
 		if store, open := (*calls)(token); open {
+			return store, nil
+		}
+	}
+	if plugins := s.plugins.Load(); plugins != nil {
+		if store, standing := (*plugins)(token); standing {
 			return store, nil
 		}
 	}

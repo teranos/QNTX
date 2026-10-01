@@ -127,7 +127,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	}
 
 	// What this node can answer, and then what the table grants reach to. A
-	// grant naming a path nothing answers stops the node here.
+	// compiled grant naming a path nothing answers stops the node here.
 	s.setupHTTPRoutes()
 	if err := s.open(); err != nil {
 		return errors.Wrap(err, "the node cannot serve what server/reach grants")

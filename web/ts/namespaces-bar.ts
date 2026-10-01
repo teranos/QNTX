@@ -5,6 +5,8 @@ import { log, SEG } from './logger.ts';
 import { kindOf, tilesHtml, type Namespace, type Open } from './namespaces-view';
 import { person } from './self-person';
 import { standAtTheDoor } from './signin';
+import { go, onTold, told } from './address';
+import { expandDrawer } from './system-drawer';
 
 let bar: HTMLElement | null = null;
 // The row, whose contents are rewritten, and the rectangle, which is not. One
@@ -25,7 +27,7 @@ let failure = '';
 // signed in yet. None is an error to show — they mean there is no bar.
 async function load(): Promise<boolean> {
     const response = await apiFetch('/api/namespaces');
-    if (response.status === 501 || response.status === 403 || response.status === 401) return false;
+    if (response.status === 404 || response.status === 403 || response.status === 401) return false;
     if (!response.ok) {
         failure = `could not read namespaces: HTTP ${response.status} ${await response.text()}`;
         return true;
@@ -100,7 +102,7 @@ async function step(name: string): Promise<void> {
     // was built for the one left; it is built again for the one stepped to,
     // from what the browser keeps of it and what the node says it has.
     if (moved.namespace !== standing) {
-        location.reload();
+        go(moved.namespace, '');
         return;
     }
     standing = moved.namespace;
@@ -382,6 +384,17 @@ async function appear(header: HTMLElement): Promise<void> {
         level = '';
         failure = `could not read where you are standing: ${error instanceof Error ? error.message : String(error)}`;
     }
+    // A step refused before the bar was up, by an address or another tab. The
+    // bar is in the drawer, so the drawer opens to say it: never dropped, and
+    // said where stepping is pressed.
+    const said = told();
+    if (said !== '') failure = alongside(said);
+    onTold(() => {
+        failure = alongside(told());
+        render();
+        expandDrawer();
+        sound();
+    });
 
     if (!bar) {
         bar = document.createElement('div');
@@ -403,6 +416,47 @@ async function appear(header: HTMLElement): Promise<void> {
         attach(bar);
     }
     render();
+    if (said !== '') {
+        expandDrawer();
+        sound();
+    }
+}
+
+// A refusal nobody pressed for is easy to miss in a bar. Until it is pressed,
+// the canvas and the namespace's page stand crimson behind it and it is said
+// over them, the way the door says what went wrong. Pressing it copies it and
+// takes the crimson away; the bar keeps saying it.
+let over: HTMLElement | null = null;
+
+function sound(): void {
+    if (failure === '') return;
+    if (!over) {
+        over = document.createElement('div');
+        over.className = 'refusal-say';
+        over.title = 'press to copy';
+        over.addEventListener('click', () => {
+            const message = over?.textContent ?? '';
+            void navigator.clipboard.writeText(message).then(
+                () => { hush(); },
+                (err: unknown) => { log.warn(SEG.UI, '[Namespaces] The refusal was not copied:', err); hush(); },
+            );
+        });
+        document.body.append(over);
+    }
+    over.textContent = failure;
+    over.hidden = false;
+    document.body.classList.add('refusal-said');
+}
+
+function hush(): void {
+    document.body.classList.remove('refusal-said');
+    if (over) over.hidden = true;
+}
+
+// A refusal said beside whatever the bar already says, never over it.
+function alongside(said: string): string {
+    if (said === '') return failure;
+    return failure === '' ? said : `${failure}\n${said}`;
 }
 
 // Losing the session takes the bar with it, rather than leaving a list of
@@ -417,4 +471,6 @@ function teardown(): void {
     adding = false;
     open = null;
     failure = '';
+    onTold(null);
+    hush();
 }

@@ -558,9 +558,11 @@ func TestABreakdownGroupsByOneDimension(t *testing.T) {
 	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&utm_source=newsletter", "https://clean.example/")
 	fire(s, "/s/clean/boutique?page=/&v=WHO-000002&utm_source=newsletter", "https://clean.example/")
 	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001", "https://clean.example/prices")
+	// A click on the page a campaign brought is not another page it brought.
+	fire(s, "/s/clean/boutique?e=contact_click&page=/&v=WHO-000001&utm_source=newsletter", "https://clean.example/")
 
 	pages := breakdown(t, s, "page")
-	if len(pages) != 2 || pages[0].Name != "/" || pages[0].Count != 2 {
+	if len(pages) != 2 || pages[0].Name != "/" || pages[0].Count != 3 {
 		t.Fatalf("by page: %+v", pages)
 	}
 	campaign := breakdown(t, s, "utm_source")
@@ -630,5 +632,22 @@ func TestCreatingAStandInSystemOrDefaultIsRefused(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("%s: create returned %d, want 400", market, rec.Code)
 		}
+	}
+}
+
+// A stand's events and pages are named with when they were seen, the most
+// recently seen first however often another was seen, and no count.
+func TestSeenOfLeadsWithTheMostRecent(t *testing.T) {
+	base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	got := seenOf(map[string][]time.Time{
+		"often":  {base, base.Add(time.Hour), base.Add(2 * time.Hour)},
+		"lately": {base.Add(48 * time.Hour)},
+		"never":  {base.Add(-time.Hour)},
+	}, 2)
+	if len(got) != 2 || got[0].Name != "lately" || got[1].Name != "often" {
+		t.Fatalf("seenOf is %+v, want lately then often, capped at two", got)
+	}
+	if len(got[1].Seen) != 3 || got[1].Seen[0] != base.UnixMilli() {
+		t.Fatalf("often was seen at %v", got[1].Seen)
 	}
 }

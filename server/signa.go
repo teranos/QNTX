@@ -24,7 +24,17 @@ import (
 
 // signa is every signum the node holds: its own, and every ready plugin's.
 func (s *QNTXServer) signa() []sigil.Signum {
-	return append([]sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum()}, s.pluginSigna()...)
+	return append([]sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum(), s.githubSignum(), s.namespacesSignum(), s.rolesSignum(), s.amSignum(), s.timeseriesSignum(), s.openapiSignum()}, s.pluginSigna()...)
+}
+
+// DeclaredSigna is what every signum the node holds says of itself, without a
+// node running: make parity prisma reads a signum's declaration from here.
+func DeclaredSigna() []*protocol.Signum {
+	var out []*protocol.Signum
+	for _, signum := range (&QNTXServer{}).signa() {
+		out = append(out, signum.Signum)
+	}
+	return out
 }
 
 // checkedSigna is the signa that say what they hold. One that does not is said

@@ -506,6 +506,17 @@ func (m *ServicesManager) SetCallStores(calls services.CallStores) {
 	}
 }
 
+// SetPluginStores hands the ATS store and fetch services the stores of the
+// namespaces plugins stand in, by the tokens the node handed them (ADR-046).
+func (m *ServicesManager) SetPluginStores(plugins services.PluginStores) {
+	if m.atsStore != nil {
+		m.atsStore.SetPluginStores(plugins)
+	}
+	if m.fetchSrv != nil {
+		m.fetchSrv.SetPluginStores(plugins)
+	}
+}
+
 // SetCallers hands the schedule service the callers of the calls plugins are
 // answering, so a schedule created during one remembers who created it and
 // where.

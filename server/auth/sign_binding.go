@@ -455,6 +455,7 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 	// log sinks by every login.
 	h.logger.Infow("account bound", "provider", p.ID, "canonical_id", acct.CanonicalID)
 	h.attestRegistration(p.ID, acct, fl.door)
+	h.keepNodeGitHub(p.ID, acct)
 
 	// Back where they started, carrying the ticket that names what was signed.
 	// The cookie cannot carry it: a door on another domain reads the result

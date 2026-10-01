@@ -52,7 +52,8 @@ func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
 	// The list and the making of one, then the switch on one and its ending.
 	// Both are named, so dropping the second is a failing test rather than a
 	// route nobody reaches.
-	for _, path := range []string{"/api/namespaces", "/api/namespaces/"} {
+	for _, path := range []string{"/api/namespaces", "/api/namespaces/{name}",
+		"/api/namespaces/{name}/disable", "/api/namespaces/{name}/enable"} {
 		row, said := granted[path]
 		require.True(t, said, path+" is granted to nobody at all")
 		assert.False(t, row.anyone, path+" is served without asking who is calling")
@@ -169,14 +170,34 @@ func TestALineThatDoesNotReadIsRefused(t *testing.T) {
 	}
 }
 
-// A grant naming a path nothing answers stops the node.
+// A compiled grant naming a path nothing answers stops the node.
 func TestAGrantToNowhereIsRefused(t *testing.T) {
 	granted, err := readReaches("REACH is '/pond' of ROOT")
 	require.NoError(t, err)
 
-	_, _, err = build(granted, map[string]Answering{}, plainly())
+	_, _, _, err = build(granted, granted, map[string]Answering{}, plainly())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "/pond")
+}
+
+// A runtime line on a path nothing answers — a plugin the node does not run
+// now — is not served and is said, and the node serves the rest.
+func TestARuntimeLineToNowhereIsNotServedAndSaid(t *testing.T) {
+	compiled, err := readReaches("REACH is '/pond' of ROOT")
+	require.NoError(t, err)
+	granted, err := readReaches("REACH is '/pond' of ROOT")
+	require.NoError(t, err)
+	addRuntime(granted, Runtime{Lines: []Line{{Paths: []string{"/api/cleanAPI/coverage"}, Roles: []string{"WORKER"}}}})
+
+	mux, _, unanswered, err := build(routesIn(granted), compiled, map[string]Answering{
+		"/pond": {Handler: func(http.ResponseWriter, *http.Request) {}},
+	}, plainly())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/api/cleanAPI/coverage"}, unanswered)
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/pond", nil))
+	assert.Equal(t, http.StatusOK, w.Code, "the node stopped serving what it answers")
 }
 
 // A handler no line names is ROOT's and nobody else's. It is served, behind a
@@ -197,7 +218,7 @@ func TestAHandlerNoLineNamesIsRoots(t *testing.T) {
 			h(w, r)
 		}
 	}
-	mux, unnamed, err := build(granted, answering, with)
+	mux, unnamed, _, err := build(granted, granted, answering, with)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"/pond/keeper"}, unnamed)
@@ -290,7 +311,7 @@ func TestWhatGatesItselfIsNotGatedByThePathsLineToo(t *testing.T) {
 			h(w, r)
 		}
 	}
-	mux, _, err := build(granted, map[string]Answering{
+	mux, _, _, err := build(granted, granted, map[string]Answering{
 		"/pond":   {Handler: func(http.ResponseWriter, *http.Request) {}},
 		"/stands": {Handler: func(http.ResponseWriter, *http.Request) {}, Gates: true},
 	}, with)
@@ -314,7 +335,7 @@ func TestANamedLineIsNotARoute(t *testing.T) {
 	assert.Contains(t, routes, "/pond")
 	assert.NotContains(t, routes, "staands:metrics")
 
-	_, _, err = build(routes, map[string]Answering{
+	_, _, _, err = build(routes, routes, map[string]Answering{
 		"/pond": {Handler: func(http.ResponseWriter, *http.Request) {}},
 	}, plainly())
 	require.NoError(t, err)

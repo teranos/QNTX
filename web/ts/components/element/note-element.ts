@@ -95,6 +95,8 @@ export async function setupNoteElement(element: HTMLElement, item: Element): Pro
         defaults: { x: 300, y: 200, width: 320, height: 280 },
         resizable: { minWidth: 120, minHeight: 100 },
         resizeHandleClass: 'resize-handle--small',
+        // Over the folded corner. The size is the package's to write; the class is only the look.
+        resizeHandleSize: 10,
         logLabel: 'NoteElement',
     });
 

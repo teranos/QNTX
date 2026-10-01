@@ -41,7 +41,8 @@ func staandEchoed(fields ...*protocol.Field) []*protocol.Field {
 func (s *QNTXServer) staandsSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "staands",
+			Name:    "staands",
+			Follows: []*protocol.Follows{staandsFollowUmami()},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:  "list",
@@ -103,7 +104,7 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 					Does:  "One stand's sittings, derived from its arrivals every time and stored nowhere.",
 					Takes: []*protocol.Param{staandMarketParam(), staandSlugParam(), staandSinceParam(), staandUntilParam()},
 					Gives: staandEchoed(
-						&protocol.Field{Name: "visits", Says: "One row per sitting: who, when it started and ended, how long, the first and last page, how many views and events, and whether it was a bounce."},
+						&protocol.Field{Name: "visits", Message: "protocol.Visit", Says: "One row per sitting: who, when it started and ended, how long, the first and last page, how many views and events, and whether it was a bounce."},
 					),
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/visits"},
 				},
@@ -118,4 +119,44 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 			"visits":    s.staandsVisits,
 		},
 	}
+}
+
+// staandsFollowUmami is which Umami column each field of a stand is. "Staands will
+// be Umami, one reference and not a blend." An arrival is the record a stand
+// keeps; a visit is the sitting its visits sigil gives, carrying the same ids.
+//
+// Only what a stand fills is said here. The Arrival fields nothing fills yet —
+// query, browser, operating system, device, screen, language, country, region,
+// city — stay in the proto and are not followed until something fills them.
+func staandsFollowUmami() *protocol.Follows {
+	pairs := []struct{ field, column string }{
+		{"protocol.Arrival.market", "WebsiteEvent.websiteId"},
+		{"protocol.Arrival.market", "Session.websiteId"},
+		{"protocol.Arrival.slug", "WebsiteEvent.websiteId"},
+		{"protocol.Arrival.slug", "Session.websiteId"},
+		{"protocol.Arrival.at", "WebsiteEvent.createdAt"},
+		{"protocol.Arrival.visitor", "WebsiteEvent.sessionId"},
+		{"protocol.Arrival.visitor", "Session.id"},
+		{"protocol.Arrival.visit", "WebsiteEvent.visitId"},
+		{"protocol.Arrival.path", "WebsiteEvent.urlPath"},
+		{"protocol.Arrival.event", "WebsiteEvent.eventName"},
+		{"protocol.Arrival.referrer_domain", "WebsiteEvent.referrerDomain"},
+		{"protocol.Arrival.referrer_path", "WebsiteEvent.referrerPath"},
+		{"protocol.Arrival.utm_source", "WebsiteEvent.utmSource"},
+		{"protocol.Arrival.utm_medium", "WebsiteEvent.utmMedium"},
+		{"protocol.Arrival.utm_campaign", "WebsiteEvent.utmCampaign"},
+		{"protocol.Arrival.utm_content", "WebsiteEvent.utmContent"},
+		{"protocol.Arrival.utm_term", "WebsiteEvent.utmTerm"},
+		{"protocol.Arrival.params", "EventData.dataKey"},
+		{"protocol.Arrival.params", "EventData.stringValue"},
+		{"protocol.Visit.market", "WebsiteEvent.websiteId"},
+		{"protocol.Visit.slug", "WebsiteEvent.websiteId"},
+		{"protocol.Visit.visitor", "WebsiteEvent.sessionId"},
+		{"protocol.Visit.visit", "WebsiteEvent.visitId"},
+	}
+	follows := &protocol.Follows{Reference: "umami"}
+	for _, p := range pairs {
+		follows.Columns = append(follows.Columns, &protocol.Corresponds{Field: p.field, Column: p.column})
+	}
+	return follows
 }

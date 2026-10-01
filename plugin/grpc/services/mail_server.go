@@ -294,30 +294,54 @@ func (s *MailServer) SendAsNode(ctx context.Context, userID string, m NodeMail) 
 	return s.deliver(ctx, w, userID, NodeSource, m.Name, mail)
 }
 
+// SendAsNodeTo is SendAsNode to a User read before, so a mail saying the store
+// the Users are in does not answer is not held up behind that store.
+func (s *MailServer) SendAsNodeTo(ctx context.Context, u MailRecipient, m NodeMail) (messageID, attestationID string, err error) {
+	w, err := s.wiring()
+	if err == nil {
+		err = sendable(u)
+	}
+	if err != nil {
+		s.logger.Warnw("Node mail not sent", "mail", m.Name, "user", u.ID, "error", err)
+		return "", "", err
+	}
+	mail := OutgoingMail{From: w.From, To: u.Email, Subject: m.Subject, HTML: m.HTML, Text: m.Text, Inline: m.Inline}
+	return s.deliver(ctx, w, u.ID, NodeSource, m.Name, mail)
+}
+
 // ready is the wiring a send needs and the address it goes to, or why there is
 // none.
 func (s *MailServer) ready(userID string) (*MailWiring, string, error) {
-	w := s.wired.Load()
-	if w == nil {
-		return nil, "", errors.New("the mail service is not wired yet: the node has not finished starting")
-	}
-	if w.Transport == nil {
-		return nil, "", errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml")
-	}
-	if w.From == "" {
-		return nil, "", errors.New("no address to send from: set mail.from in am.toml")
-	}
-	if w.Recipients == nil {
-		return nil, "", errors.New("this node keeps no Users, so there is nobody to mail")
-	}
-	if w.Records == nil || w.Records() == nil {
-		return nil, "", errors.New("the node holds no store to attest the mail in, so none is sent")
+	w, err := s.wiring()
+	if err != nil {
+		return nil, "", err
 	}
 	to, err := s.recipient(w, userID)
 	if err != nil {
 		return nil, "", err
 	}
 	return w, to, nil
+}
+
+// wiring is what a send needs besides the User, or why there is none.
+func (s *MailServer) wiring() (*MailWiring, error) {
+	w := s.wired.Load()
+	if w == nil {
+		return nil, errors.New("the mail service is not wired yet: the node has not finished starting")
+	}
+	if w.Transport == nil {
+		return nil, errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml")
+	}
+	if w.From == "" {
+		return nil, errors.New("no address to send from: set mail.from in am.toml")
+	}
+	if w.Recipients == nil {
+		return nil, errors.New("this node keeps no Users, so there is nobody to mail")
+	}
+	if w.Records == nil || w.Records() == nil {
+		return nil, errors.New("the node holds no store to attest the mail in, so none is sent")
+	}
+	return w, nil
 }
 
 // deliver hands a filled mail to the transport and attests what became of it:
@@ -390,13 +414,22 @@ func (s *MailServer) recipient(w *MailWiring, userID string) (string, error) {
 	if !found {
 		return "", errors.Newf("no User %s", userID)
 	}
-	if u.DisabledBy != "" {
-		return "", errors.Newf("User %s is switched off by %s", userID, u.DisabledBy)
-	}
-	if u.Email == "" {
-		return "", errors.Newf("User %s has no email address", userID)
+	u.ID = userID
+	if err := sendable(u); err != nil {
+		return "", err
 	}
 	return u.Email, nil
+}
+
+// sendable is a User mail may go to: switched on, with an address.
+func sendable(u MailRecipient) error {
+	if u.DisabledBy != "" {
+		return errors.Newf("User %s is switched off by %s", u.ID, u.DisabledBy)
+	}
+	if u.Email == "" {
+		return errors.Newf("User %s has no email address", u.ID)
+	}
+	return nil
 }
 
 // template is what a Send is filled from: QNTX's neutral template when it names

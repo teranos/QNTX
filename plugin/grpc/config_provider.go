@@ -1,86 +1,182 @@
 package grpc
 
 import (
+	"encoding/json"
+	"strconv"
 	"strings"
 
-	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/errors"
+	"go.uber.org/zap"
 )
 
-// NewConfigProvider creates a ConfigProvider that reads from am.toml
-// and injects gRPC service endpoints for plugin discovery.
+// PluginNamespaceKey is the key of a plugin's record that names the namespace
+// the plugin stands in (ADR-046). QNTX's, like the build keys: the plugin does
+// not validate it, and the node hands the plugin a token for that namespace.
+const PluginNamespaceKey = "namespace"
+
+// PluginTokens is how the node mints a plugin its own store token for the
+// namespace its record names. Nil is a node that hands every plugin the shared
+// token, whatever its record names.
+type PluginTokens func(plugin, namespace string) (string, error)
+
+// NewConfigProvider creates a ConfigProvider that hands each plugin the config
+// its record holds and injects gRPC service endpoints for plugin discovery.
 // Pass nil endpoints if no services are available.
-func NewConfigProvider(endpoints *ServiceEndpoints) plugin.ConfigProvider {
+func NewConfigProvider(endpoints *ServiceEndpoints, tokens PluginTokens, logger *zap.SugaredLogger) plugin.ConfigProvider {
 	return &configProvider{
 		endpoints: endpoints,
+		tokens:    tokens,
+		logger:    logger,
 	}
 }
 
-// configProvider wraps am config with service endpoint injection.
+// configProvider wraps plugin records with service endpoint injection.
 type configProvider struct {
 	endpoints *ServiceEndpoints
+	tokens    PluginTokens
+	logger    *zap.SugaredLogger
 }
 
 func (p *configProvider) GetPluginConfig(domain string) plugin.Config {
 	return &configWithEndpoints{
 		domain:    domain,
 		endpoints: p.endpoints,
+		tokens:    p.tokens,
+		logger:    p.logger,
 	}
 }
 
-// configWithEndpoints resolves plugin config keys from am.toml,
-// intercepting underscore-prefixed service keys to return gRPC addresses.
+// configWithEndpoints resolves plugin config keys from the plugin's record,
+// read when asked so what the plugin element saved is what the next Initialize
+// sees, intercepting underscore-prefixed service keys to return gRPC addresses.
 type configWithEndpoints struct {
 	domain    string
 	endpoints *ServiceEndpoints
+	tokens    PluginTokens
+	logger    *zap.SugaredLogger
+	// readErr is the first failure to read the plugin's record, kept for Err.
+	readErr error
+}
+
+// held is the plugin's config as its record holds it. The interface has no
+// error to return, so a record that could not be read is said once and kept.
+func (c *configWithEndpoints) held() map[string]string {
+	record, _, err := pluginRecord(c.domain)
+	if err != nil && c.readErr == nil {
+		c.readErr = err
+		c.logger.Errorw("Plugin handed no config: its record was not read", "plugin", c.domain, "error", err)
+	}
+	return record.Config
+}
+
+// Err is why the plugin's record could not be read, so Initialize fails with
+// it rather than starting the plugin with no config.
+func (c *configWithEndpoints) Err() error { return c.readErr }
+
+// failed keeps the first failure for Err, and says it.
+func (c *configWithEndpoints) failed(err error) {
+	if c.readErr == nil {
+		c.readErr = err
+	}
+	c.logger.Errorw("Plugin handed no config", "plugin", c.domain, "error", err)
+}
+
+// authToken is the token the plugin reaches the node's services with: its own,
+// for the namespace its record names, else the shared one (ADR-046).
+func (c *configWithEndpoints) authToken() string {
+	namespace := strings.TrimSpace(c.held()[PluginNamespaceKey])
+	if namespace == "" {
+		return c.endpoints.AuthToken
+	}
+	if c.tokens == nil {
+		c.failed(errors.Newf("plugin %s stands in %s and this node mints no token for it", c.domain, namespace))
+		return ""
+	}
+	token, err := c.tokens(c.domain, namespace)
+	if err != nil {
+		c.failed(errors.Wrapf(err, "plugin %s stands in %s", c.domain, namespace))
+		return ""
+	}
+	return token
+}
+
+// unread says a value that does not read as the type asked for.
+func (c *configWithEndpoints) unread(key, raw, as string, err error) {
+	c.logger.Errorw("Plugin config value does not read as "+as,
+		"plugin", c.domain, "key", key, "value", raw, "error", err)
 }
 
 func (c *configWithEndpoints) GetString(key string) string {
 	if v, ok := c.endpointValue(key); ok {
 		return v
 	}
-	return appcfg.GetString(c.domain + "." + key)
+	return c.held()[key]
 }
 
 func (c *configWithEndpoints) GetInt(key string) int {
-	return appcfg.GetInt(c.domain + "." + key)
+	raw, set := c.held()[key]
+	if !set {
+		return 0
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		c.unread(key, raw, "an integer", err)
+		return 0
+	}
+	return n
 }
 
 func (c *configWithEndpoints) GetBool(key string) bool {
-	return appcfg.GetBool(c.domain + "." + key)
+	raw, set := c.held()[key]
+	if !set {
+		return false
+	}
+	b, err := strconv.ParseBool(strings.TrimSpace(raw))
+	if err != nil {
+		c.unread(key, raw, "true or false", err)
+		return false
+	}
+	return b
 }
 
+// GetStringSlice reads a JSON list, which is how the plugin element writes one.
 func (c *configWithEndpoints) GetStringSlice(key string) []string {
-	return appcfg.GetStringSlice(c.domain + "." + key)
+	raw, set := c.held()[key]
+	if !set {
+		return nil
+	}
+	var list []string
+	if err := json.Unmarshal([]byte(raw), &list); err != nil {
+		c.unread(key, raw, "a JSON list of strings", err)
+		return nil
+	}
+	return list
 }
 
 func (c *configWithEndpoints) Get(key string) any {
 	if v, ok := c.endpointValue(key); ok {
 		return v
 	}
-	return appcfg.Get(c.domain + "." + key)
+	if v, found := c.held()[key]; found {
+		return v
+	}
+	return nil
 }
 
+// Set leaves the record as it is, and says so: the plugin element is what
+// writes a record.
 func (c *configWithEndpoints) Set(key string, value any) {
-	appcfg.Set(c.domain+"."+key, value)
+	c.logger.Errorw("Plugin config not set: a plugin's config is written in the plugin element",
+		"plugin", c.domain, "key", key, "value", value)
 }
 
 func (c *configWithEndpoints) GetKeys() []string {
-	v := appcfg.GetViper()
-	if v == nil {
-		return []string{}
+	held := c.held()
+	keys := make([]string, 0, len(held))
+	for key := range held {
+		keys = append(keys, key)
 	}
-
-	allKeys := v.AllKeys()
-	prefix := c.domain + "."
-	var keys []string
-
-	for _, key := range allKeys {
-		if after, ok := strings.CutPrefix(key, prefix); ok {
-			keys = append(keys, after)
-		}
-	}
-
 	return keys
 }
 
@@ -113,7 +209,7 @@ func (c *configWithEndpoints) endpointValue(key string) (string, bool) {
 	case "_mail_endpoint":
 		return c.endpoints.MailAddress, true
 	case "_auth_token":
-		return c.endpoints.AuthToken, true
+		return c.authToken(), true
 	}
 	return "", false
 }

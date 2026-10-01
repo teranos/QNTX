@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
@@ -51,9 +52,10 @@ type RichSearchResult struct {
 
 // RichFieldInfo contains detailed information about a rich string field
 type RichFieldInfo struct {
-	Field       string   `json:"field"`
-	Count       int      `json:"count"`        // Number of attestations using this field
-	SourceTypes []string `json:"source_types"` // Type definitions that include this field
+	Field       string           `json:"field"`
+	Last        string           `json:"last,omitempty"` // When an attestation last carried this field
+	Over        map[string]int64 `json:"over"`           // When it was carried, by the hour
+	SourceTypes []string         `json:"source_types"`   // Type definitions that include this field
 }
 
 // SearchRichStringFields searches for matches in RichStringFields across attestations.
@@ -349,9 +351,13 @@ func (bs *BoundedStore) GetDiscoveredRichFields() []string {
 	return bs.buildDynamicRichStringFields(ctx)
 }
 
-// GetRichFieldsWithStats returns detailed information about rich string fields
-// including usage counts and source types.
-func (bs *BoundedStore) GetRichFieldsWithStats() ([]RichFieldInfo, error) {
+// GetRichFieldsWithStats returns the rich string fields, each with when an
+// attestation last carried it and when it was carried by the hour, from the
+// earliest of the latest overAtMost hours anything landed in. Every field is
+// cut at that same hour, so a busy one is not drawn shorter than a quiet one.
+// The most recently carried come first: "The axis of time is more useful than
+// a tally."
+func (bs *BoundedStore) GetRichFieldsWithStats(overAtMost int) ([]RichFieldInfo, error) {
 	ctx := context.Background()
 
 	// Get type definitions with their fields
@@ -376,26 +382,32 @@ func (bs *BoundedStore) GetRichFieldsWithStats() ([]RichFieldInfo, error) {
 		return []RichFieldInfo{}, nil
 	}
 
-	// Now count actual usage of each field
+	var since sql.NullString
+	if err := bs.db.QueryRowContext(ctx, `
+		SELECT MIN(bucket) FROM (
+			SELECT DISTINCT strftime('%Y-%m-%dT%H', timestamp) AS bucket
+			FROM attestations WHERE bucket IS NOT NULL
+			ORDER BY bucket DESC LIMIT ?)`, overAtMost).Scan(&since); err != nil {
+		return nil, errors.Wrapf(err, "the latest %d hours anything landed in did not answer", overAtMost)
+	}
+
 	result := []RichFieldInfo{}
 	for field, sources := range fieldSources {
-		// Count attestations that have non-null values for this field
-		var count int
-		query := fmt.Sprintf(`
-			SELECT COUNT(*)
-			FROM attestations
-			WHERE json_extract(attributes, '$.%s') IS NOT NULL
-			  AND json_extract(attributes, '$.%s') != ''
-			  AND json_extract(attributes, '$.%s') != 'null'
-		`, field, field, field)
+		carried := fmt.Sprintf(`
+			json_extract(attributes, '$.%s') IS NOT NULL
+			AND json_extract(attributes, '$.%s') != ''
+			AND json_extract(attributes, '$.%s') != 'null'`, field, field, field)
 
-		err := bs.db.QueryRowContext(ctx, query).Scan(&count)
-		if err != nil {
-			// Log but don't fail - field might not exist in any attestation
-			if bs.logger != nil {
-				bs.logger.Errorw("Field usage count unavailable; this field will show no usage rather than unknown usage", "field", field, "error", err)
-			}
-			count = 0
+		// Log but don't fail - field might not exist in any attestation
+		over, err := bs.carriedOver(ctx, carried, since.String)
+		if err != nil && bs.logger != nil {
+			bs.logger.Errorw("When a field was carried is unavailable; this field will show no usage rather than unknown usage", "field", field, "error", err)
+		}
+		var last sql.NullString
+		if err := bs.db.QueryRowContext(ctx,
+			"SELECT MAX(strftime('%Y-%m-%dT%H:%M:%SZ', timestamp)) FROM attestations WHERE"+carried,
+		).Scan(&last); err != nil && bs.logger != nil {
+			bs.logger.Errorw("When a field was last carried is unavailable; this field will show no usage rather than unknown usage", "field", field, "error", err)
 		}
 
 		// Sort source types for consistent display
@@ -403,20 +415,44 @@ func (bs *BoundedStore) GetRichFieldsWithStats() ([]RichFieldInfo, error) {
 
 		result = append(result, RichFieldInfo{
 			Field:       field,
-			Count:       count,
+			Last:        last.String,
+			Over:        over,
 			SourceTypes: sources,
 		})
 	}
 
-	// Sort by count descending, then by field name
+	// Most recently carried first, a field never carried last, then by name
 	sort.Slice(result, func(i, j int) bool {
-		if result[i].Count != result[j].Count {
-			return result[i].Count > result[j].Count
+		if result[i].Last != result[j].Last {
+			return result[i].Last > result[j].Last
 		}
 		return result[i].Field < result[j].Field
 	})
 
 	return result, nil
+}
+
+// carriedOver is how many attestations matching a condition landed in each
+// hour from the hour since on.
+func (bs *BoundedStore) carriedOver(ctx context.Context, condition, since string) (_ map[string]int64, err error) {
+	rows, err := bs.db.QueryContext(ctx,
+		"SELECT strftime('%Y-%m-%dT%H', timestamp) AS bucket, COUNT(*) FROM attestations WHERE"+condition+
+			" AND bucket >= ? GROUP BY bucket", since)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for carriedOver") }()
+
+	over := map[string]int64{}
+	for rows.Next() {
+		var bucket string
+		var held int64
+		if err := rows.Scan(&bucket, &held); err != nil {
+			return nil, err
+		}
+		over[bucket] = held
+	}
+	return over, rows.Err()
 }
 
 // buildDynamicRichStringFields creates a list of searchable fields

@@ -110,7 +110,7 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 	logPath := cfg.GetLogPath(serverPort)
 
 	// Print startup banner
-	printStartupBanner(verbosity, dbPath, logPath, cfg.Plugin.EnabledNames())
+	printStartupBanner(verbosity, dbPath, logPath)
 
 	// The node's universes, as the backend that keeps them says they are. They
 	// arrive whole and before the subsystems run, because a subsystem that

@@ -12,11 +12,13 @@
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { renderPager } from './components/pager.ts';
-import { renderTally } from './components/tally.ts';
+import { renderSparklines, windowOf } from './components/sparkline.ts';
+import { renderDoughnut, type Slice } from './components/doughnut.ts';
+import { apiJson } from './client/http';
 import { openPageElement } from './page-element.ts';
 import { renderPredicate } from './components/element/attestation-triple.ts';
 import { openPredicateElement } from './components/element/predicate-element.ts';
-import type { StaandInfo, StandStep, StandWalk } from './market-element.ts';
+import type { StaandInfo, StandSeen, StandStep, StandWalk } from './market-element.ts';
 
 // Literals, not references to another module's constants: the bundler resolves
 // a const that points at an imported const to undefined (web/CLAUDE.md).
@@ -199,7 +201,7 @@ export function renderWalkPager(container: HTMLElement, s: StaandInfo, walks: St
 }
 
 /** Exported for tests: the panel for one stand. */
-export function renderStandActivity(container: HTMLElement, s: StaandInfo): void {
+export function renderStandActivity(container: HTMLElement, s: StaandInfo, now: number = Date.now()): void {
     container.replaceChildren();
 
     const title = document.createElement('div');
@@ -251,16 +253,93 @@ export function renderStandActivity(container: HTMLElement, s: StaandInfo): void
 
     container.appendChild(walks);
 
+    // Events and pages share one window, so their lines read on the same axis.
+    const w = windowOf([...s.events, ...s.pages].flatMap((e) => e.seen), now);
+    const seen = (rows: StandSeen[]) => rows.map((r) => ({ name: r.name, times: r.seen }));
+
     const events = document.createElement('div');
     events.className = 'stand-events';
     events.style.marginBottom = '18px';
-    renderTally(events, 'Events', s.events, (name) => predicateCell(name));
+    renderSparklines(events, 'Events', seen(s.events), w, (name) => predicateCell(name));
     container.appendChild(events);
 
     const pages = document.createElement('div');
     pages.className = 'stand-pages';
-    renderTally(pages, 'Pages', s.pages, (name) => pageCell(s, name, siteOf(s)));
+    renderSparklines(pages, 'Pages', seen(s.pages), w, (name) => pageCell(s, name, siteOf(s)));
     container.appendChild(pages);
+}
+
+/** Umami's UTM_PARAMS, in its order (src/lib/constants.ts). */
+export const CAMPAIGN = ['utm_campaign', 'utm_content', 'utm_medium', 'utm_source', 'utm_term'];
+
+/** How a stand's page views divide by one campaign parameter. */
+export type CampaignReader = (s: StaandInfo, param: string) => Promise<Slice[]>;
+
+async function readCampaign(s: StaandInfo, param: string): Promise<Slice[]> {
+    const q = new URLSearchParams({ market: s.market, slug: s.slug, type: param });
+    const body = await apiJson<{ counts: { name: string; count: number }[] | null }>(`/api/staands/metrics?${q}`);
+    return (body.counts ?? []).map((c) => ({ name: c.name, value: c.count }));
+}
+
+/**
+ * Umami's UTM report for one stand: a ring per campaign parameter, in Umami's
+ * order and colors, and nothing beside it. How many is the tooltip's to say.
+ */
+export function renderCampaigns(container: HTMLElement, s: StaandInfo, read: CampaignReader = readCampaign): Promise<void> {
+    const section = document.createElement('div');
+    section.className = 'stand-campaigns';
+    section.style.marginTop = '18px';
+
+    const heading = document.createElement('div');
+    heading.textContent = 'UTM';
+    heading.style.color = MUTE;
+    heading.style.padding = '0 0 4px';
+    heading.style.borderBottom = '1px solid ' + LINE;
+    heading.style.marginBottom = '8px';
+    section.appendChild(heading);
+
+    const rings = document.createElement('div');
+    rings.style.display = 'flex';
+    rings.style.flexWrap = 'wrap';
+    rings.style.gap = '18px';
+    section.appendChild(rings);
+    container.appendChild(section);
+
+    return Promise.all(CAMPAIGN.map(async (param) => {
+        const cell = document.createElement('div');
+        cell.className = 'stand-campaign';
+        cell.dataset.param = param;
+        cell.style.display = 'flex';
+        cell.style.flexDirection = 'column';
+        cell.style.alignItems = 'center';
+        cell.style.gap = '6px';
+        cell.style.width = '96px';
+
+        const name = document.createElement('div');
+        // Umami's heading: the parameter without its prefix, capitalized.
+        const bare = param.slice('utm_'.length);
+        name.textContent = bare.charAt(0).toUpperCase() + bare.slice(1);
+        cell.appendChild(name);
+        rings.appendChild(cell);
+
+        const said = document.createElement('div');
+        said.style.color = MUTE;
+        said.style.textAlign = 'center';
+        said.style.overflowWrap = 'break-word';
+        said.style.wordBreak = 'break-word';
+        try {
+            const ring = renderDoughnut(await read(s, param), 96, name.textContent ?? param);
+            if (ring) {
+                cell.appendChild(ring);
+                return;
+            }
+            said.textContent = 'nothing recorded';
+        } catch (err: unknown) {
+            said.textContent = `could not read ${param}: ${err instanceof Error ? err.message : String(err)}`;
+            said.style.color = 'var(--color-error)';
+        }
+        cell.appendChild(said);
+    })).then(() => undefined);
 }
 
 /**
@@ -291,13 +370,12 @@ export function openStandActivity(s: StaandInfo): void {
             content.style.fontSize = SIZE;
             content.style.padding = EDGE;
             renderStandActivity(content, s);
+            void renderCampaigns(content, s);
             return content;
         },
         // A dataset needs room a fact row does not. Wide enough for a page path
         // and its bar on one line, tall enough for the twenty events and ten
         // pages the node will send (server/staand.go, topCounts).
-        initialWidth: '720px',
-        initialHeight: '560px',
     } satisfies Element);
 
     tray.open(elementId);

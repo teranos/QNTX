@@ -58,6 +58,12 @@ var storeWriters = map[string]string{
 		"node knows of itself. Only a plugin holding the node's service token reaches the " +
 		"writer, and ROOT alone governs what plugins call (ADR-041)",
 
+	"pluginLine": "the plugins this node runs, what the node knows of itself. Reached " +
+		"from the plugins sigils and the plugin config route, which the reach table gives to ROOT",
+
+	"nodeRecord": "the node's GitHub settings (ADR-043), what the node knows of itself. " +
+		"Reached from the github sigils, which the reach table gives to ROOT",
+
 	"systemAttestor": "what the node writes about itself at the door. The /auth/… routes " +
 		"are ANYONE because logging in cannot ask you to be logged in, so no admission " +
 		"stands behind this one. The closed predicate vocabulary in server/auth does",
@@ -148,16 +154,16 @@ func asksToWrite(body *ast.BlockStmt) bool {
 // below. That is the whole of how this stays true when something new is added:
 // it is a claim somebody makes in the open, or it is a thing a namespace has.
 var nodeReaders = map[string]string{
-	"handlers.go:HandleHealth":                         "the health of the file underneath, which is the node's to answer",
-	"operational_watchdog.go:WatchOperationalStore":    "the same ping on a tick, so a node that has stopped answering says so",
-	"lifecycle.go:Stop":                                "shutdown compares the pulse read connection with the node's own",
-	"plugin_update_pulse.go:SetupPluginUpdateSchedule": "plugins are loaded once however many namespaces the node runs",
-	"sub_auth.go:Init":                                 "the doors, which are the node's edge: am.toml says which namespace is behind each",
-	"sub_config_watcher.go:Init":                       "am.toml is the node's configuration, and watching it is the node's",
-	"sub_nodedid.go:Init":                              "the node's own identity, the row keyed self",
-	"sub_plugins.go:Init":                              "the plugin service registry, and plugins are the node's",
-	"sub_ticker.go:Init":                               "the poller that reports warnings and evictions about the file itself",
-	"sub_ticker.go:openPulseReadDB":                    "a second connection to the same file, so a read does not wait on a write",
+	"handlers.go:HandleHealth":                    "the health of the file underneath, which is the node's to answer",
+	"operational_watchdog.go:askOperationalStore": "the same ping on a tick, so a node that has stopped answering says so",
+	"operational_watchdog.go:operationalPool":     "where the connections to the node's own file are while a ping waits on it",
+	"lifecycle.go:Stop":                           "shutdown compares the pulse read connection with the node's own",
+	"sub_auth.go:Init":                            "the doors, which are the node's edge: am.toml says which namespace is behind each",
+	"sub_config_watcher.go:Init":                  "am.toml is the node's configuration, and watching it is the node's",
+	"sub_nodedid.go:Init":                         "the node's own identity, the row keyed self",
+	"sub_plugins.go:Init":                         "the plugin service registry, and plugins are the node's",
+	"sub_ticker.go:Init":                          "the poller that reports warnings and evictions about the file itself",
+	"sub_ticker.go:openPulseReadDB":               "a second connection to the same file, so a read does not wait on a write",
 }
 
 // A namespace is made of what Made says, and what is left on the node is the

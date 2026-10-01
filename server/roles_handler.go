@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"slices"
 	"strings"
@@ -9,8 +10,10 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
+	"github.com/teranos/QNTX/server/sigil"
 )
 
 // lineAnswer is one attestation the gate reads, as it was written: the five
@@ -34,41 +37,52 @@ type linesResponse struct {
 	Count int          `json:"count"`
 }
 
-// HandleRoles answers every line the gate reads about roles, as written.
-//
-//	GET /api/roles  {"lines": [...], "count": n}
-//
-// A REACH, WRITE or READ line, or a grant or a revoke. Nothing is settled
-// here: a superseded line is kept, since the store is the audit trail, and
-// what holds is the gate's business at the moment it decides.
-func (s *QNTXServer) HandleRoles(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
+// Roles is the signum of the lines the gate reads about roles (ADR-039).
+func (s *QNTXServer) rolesSignum() sigil.Signum {
+	return sigil.Signum{
+		Signum: &protocol.Signum{
+			Name: "roles",
+			Sigils: []*protocol.Sigil{
+				{
+					Name: "list",
+					Does: "Every line the gate reads about roles, as written, newest first: a REACH, WRITE or READ line, or a grant or a revoke. A superseded line is kept; what holds is the gate's to decide.",
+					Gives: []*protocol.Field{
+						{Name: "lines", Says: "One row per line: its slots, who wrote it, the token that did if one did, and when."},
+						{Name: "count", Says: "How many lines there are."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/roles"},
+				},
+			},
+		},
+		Answers: map[string]sigil.Answer{"list": s.rolesList},
 	}
+}
+
+// rolesList answers every line the gate reads about roles, as written.
+// Nothing is settled here: a superseded line is kept, since the store is the
+// audit trail, and what holds is the gate's business at the moment it decides.
+func (s *QNTXServer) rolesList(_ context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
 	if s.authHandler == nil {
-		http.Error(w, "this node has no login, so nobody holds a role", http.StatusServiceUnavailable)
-		return
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "this node has no login, so nobody holds a role"}
 	}
 	// The lines live in system. A node without one keeps no lines, and that
 	// is the answer rather than an empty list pretending to be one.
 	if !s.held.KeepsSystem() {
-		http.Error(w, "the lines are kept in "+auth.NamespaceSystem+", and this node keeps no "+auth.NamespaceSystem+" store",
-			http.StatusNotImplemented)
-		return
+		return nil, &protocol.Refusal{Why: sigil.NotFound,
+			Says: "the lines are kept in " + auth.NamespaceSystem + ", and this node keeps no " + auth.NamespaceSystem + " store"}
 	}
 
 	store, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
-		writeRichError(w, s.logger, err, http.StatusInternalServerError)
-		return
+		s.logger.Errorw("the system store did not open for the lines", "error", err)
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	// One scan. The store's ceiling, newest first, so a node past it loses
 	// the oldest lines rather than the ones that decide.
 	found, err := store.GetAttestations(ats.AttestationFilter{Limit: storage.MaxAttestationLimit})
 	if err != nil {
-		writeRichError(w, s.logger, err, http.StatusInternalServerError)
-		return
+		s.logger.Errorw("the lines were not read", "error", err)
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 
 	lines := make([]lineAnswer, 0)
@@ -89,10 +103,7 @@ func (s *QNTXServer) HandleRoles(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	slices.SortFunc(lines, func(a, b lineAnswer) int { return b.At.Compare(a.At) })
-
-	if err := writeJSON(w, http.StatusOK, linesResponse{Lines: lines, Count: len(lines)}); err != nil {
-		s.logger.Errorw("failed to write the lines", "error", err)
-	}
+	return linesResponse{Lines: lines, Count: len(lines)}, nil
 }
 
 // aboutRoles is whether the gate reads this attestation: a REACH, WRITE or

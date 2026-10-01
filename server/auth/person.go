@@ -30,6 +30,9 @@ type Person struct {
 	// Level is how much this admission may do (ADR-027), as a word to read
 	// rather than a thing to compare — server/reach decides reach.
 	Level string `json:"level"`
+	// Roles is what this admission holds where it acts, from the lines ROOT
+	// wrote (ADR-034). Empty is a person holding none.
+	Roles []string `json:"roles"`
 	// Namespaces is where this admission acts: the door a session came in by,
 	// or what a token's record names. Empty is every namespace the node serves.
 	Namespaces []string `json:"namespaces"`
@@ -158,6 +161,7 @@ func personOf(u User, admitted Admission) Person {
 		Name:        u.Name(),
 		Picture:     u.Picture(),
 		Level:       admitted.LevelName(),
+		Roles:       admitted.Roles(),
 		Namespaces:  admitted.Namespaces,
 		Door:        u.Namespace,
 		Standing:    StandingIn(admitted, u.Standing),
@@ -171,6 +175,9 @@ func personOf(u User, admitted Admission) Person {
 	}
 	// A list is a list even when it is empty. Null would read as "the node did
 	// not say" to anything drawing this.
+	if p.Roles == nil {
+		p.Roles = []string{}
+	}
 	if p.Namespaces == nil {
 		p.Namespaces = []string{}
 	}

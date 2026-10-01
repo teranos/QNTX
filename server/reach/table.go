@@ -50,6 +50,9 @@ REACH is '/auth/authorize' '/auth/authorize/done'                         of ANY
 # The client comes for its token with the code and its secret, holding no
 # session: the secret is the credential, checked at the endpoint itself.
 REACH is '/auth/token'                                                    of ANYONE
+# The GitHub App's webhook, at the path ROOT sets under /github/. The
+# delivery's signature is the credential; every other path answers nobody.
+REACH is '/github/'                                                       of ANYONE
 # Discovery documents (RFC 8414, RFC 9728): how a client that has never seen
 # this node finds its doors without being configured by hand. Read before it
 # sends anybody anywhere, so by a stranger.
@@ -84,7 +87,8 @@ REACH is '/auth/users' '/auth/users/'                                     of ROO
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
 # The standing guard is the handler's, not this line's.
-REACH is '/api/namespaces' '/api/namespaces/'                             of ROOT SUPER
+REACH is '/api/namespaces' '/api/namespaces/{name}'                       of ROOT SUPER
+REACH is '/api/namespaces/{name}/disable' '/api/namespaces/{name}/enable' of ROOT SUPER
 
 # The lines the gate reads (ADR-034). Writing one is gated at the
 # attestation handler, not by this line.
@@ -133,12 +137,13 @@ REACH is '/api/pulse/schedules' '/api/pulse/schedules/'                   of ROO
 REACH is '/api/pulse/jobs' '/api/pulse/jobs/'                             of ROOT SUPER
 REACH is '/api/prompt/'                                                   of ROOT
 REACH is '/api/plugins'                                                   of ROOT SUPER
+REACH is '/api/plugins/check'                                             of ROOT SUPER
 REACH is 'plugins:pause' 'plugins:resume' 'plugins:restart'               of ROOT SUPER
 REACH is 'plugins:enable' 'plugins:disable'                               of ROOT SUPER
 REACH is '/api/plugins/elements' '/api/plugins/routes'                      of ROOT
 REACH is '/api/plugins/{name}/logs'                                       of ROOT
 REACH is '/api/plugins/{name}/config'                                     of ROOT
-REACH is '/am/statusline' '/am/statusline/'                               of ROOT SUPER
+REACH is '/am/statusline' '/am/statusline/{name}'                         of ROOT SUPER
 REACH is '/api/types' '/api/types/'                                       of ROOT
 # A watcher acts inside a namespace, and the standing table is on these paths
 # too. A watcher nobody may read is one that fires unseen.

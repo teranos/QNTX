@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
@@ -114,6 +113,10 @@ type PluginManager struct {
 	db                       *sql.DB                       // for schedule setup on restart
 	handlerRegistry          *async.HandlerRegistry        // for handler re-registration on restart
 	retryCancels             map[string]context.CancelFunc // per-plugin retry cancellation
+	// The node's WebSocket settings, kept so a plugin loaded after they were
+	// set gets them too. Nil until ConfigureWebSocket runs.
+	wsKeepalive *KeepaliveConfig
+	wsConfig    *WebSocketConfig
 }
 
 // managedPlugin tracks a running plugin.
@@ -419,7 +422,10 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, pluginCfg Plugin
 			m.mu.Unlock()
 
 			if registry != nil {
-				m.registerRestarted(retryCtx, pluginCfg.Name, registry, services, BannerRecovered)
+				// Nobody pressed anything here; the registry holds the failure for the list to show.
+				if err := m.registerRestarted(retryCtx, pluginCfg.Name, registry, services, BannerRecovered); err != nil {
+					m.logger.Errorw("Plugin came back and did not initialize", "plugin", pluginCfg.Name, "error", err)
+				}
 			}
 
 			// Clear stale HTTP mux state so next request re-initializes
@@ -561,6 +567,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, pluginCfg PluginConfig) 
 	if m.onWatchersSetup != nil {
 		client.OnWatchersSetup = m.onWatchersSetup
 	}
+	m.applyWebSocket(client)
 
 	// Derive process shortcut for code that only needs the PID
 	var process *os.Process
@@ -900,12 +907,13 @@ func (m *PluginManager) GetAllPlugins() []plugin.DomainPlugin {
 	return plugins
 }
 
-// ConfigureWebSocket sets WebSocket configuration on all loaded plugins.
-// This should be called after LoadPlugins to configure keepalive and origin validation.
+// ConfigureWebSocket sets WebSocket configuration on all loaded plugins, and
+// on every plugin loaded after.
 func (m *PluginManager) ConfigureWebSocket(keepalive KeepaliveConfig, wsConfig WebSocketConfig) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
+	m.wsKeepalive, m.wsConfig = &keepalive, &wsConfig
 	for _, p := range m.plugins {
 		p.client.SetWebSocketConfig(keepalive, wsConfig)
 	}
@@ -914,6 +922,16 @@ func (m *PluginManager) ConfigureWebSocket(keepalive KeepaliveConfig, wsConfig W
 		"ping_interval", keepalive.PingInterval,
 		"allowed_origins_count", len(wsConfig.AllowedOrigins),
 	)
+}
+
+// applyWebSocket hands a newly connected plugin the node's WebSocket settings,
+// once ConfigureWebSocket has set them.
+func (m *PluginManager) applyWebSocket(client *ExternalDomainProxy) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.wsKeepalive != nil && m.wsConfig != nil {
+		client.SetWebSocketConfig(*m.wsKeepalive, *m.wsConfig)
+	}
 }
 
 // ReinitializePlugin reinitializes a plugin with updated configuration.
@@ -1017,7 +1035,7 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, searchPa
 		return nil // not an error to the caller — retry is in progress
 	}
 
-	m.registerRestarted(ctx, name, registry, services, BannerRecovered)
+	initErr := m.registerRestarted(ctx, name, registry, services, BannerRecovered)
 
 	// Clear stale HTTP mux and pre-register new proxy routes.
 	// Must run AFTER registerRestarted which registers the plugin in the registry.
@@ -1025,7 +1043,7 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, searchPa
 		m.onPluginRestarted(pluginCfg.Name)
 	}
 
-	return nil
+	return initErr
 }
 
 // killStalePluginProcesses finds and kills any OS process running a plugin binary
@@ -1101,22 +1119,19 @@ func (m *PluginManager) killStalePluginProcesses(name string) {
 // registerRestarted re-registers a successfully relaunched plugin with the
 // registry and reinitializes it with services. Emits the banner after health
 // check completes (async) so it shows actual health, not "initializing".
-func (m *PluginManager) registerRestarted(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry, reason BannerReason) {
+func (m *PluginManager) registerRestarted(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry, reason BannerReason) error {
+	var initErr error
 	newPlugin, _ := m.GetPlugin(name)
 	// Unregister first to handle races between health poller restarts and
 	// manual restarts — both can call registerRestarted concurrently.
 	registry.Unregister(name)
 	if err := registry.Register(newPlugin); err != nil {
 		m.logger.Errorf("Failed to re-register plugin '%s': %v", name, err)
-		return
+		return errors.Wrapf(err, "plugin %s started and was not registered", name)
 	}
 	registry.MarkReady(name)
 
 	if services != nil {
-		// Re-read am.toml from disk so plugin gets fresh config without server restart
-		if err := config.ReloadPluginSection(name); err != nil {
-			m.logger.Errorw("Plugin restarted with its previous config; am.toml changes did not take", "plugin", name, "error", err)
-		}
 		// Initialize with a 30s deadline. Plugin ATS connectivity checks can take
 		// 10-15s when the RustStore mutex is contended (5s watchdog alerts).
 		// Use a goroutine + select so we never block banner emission.
@@ -1134,11 +1149,17 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 			select {
 			case err := <-initDone:
 				if err != nil {
-					m.logger.Errorf("Failed to initialize plugin '%s' after restart: %v", name, err)
+					initErr = errors.Wrapf(err, "plugin %s did not initialize", name)
 				}
 				m.logger.Debugw("registerRestarted: Initialize returned", "plugin", name)
 			case <-time.After(30 * time.Second):
-				m.logger.Warnw("registerRestarted: Initialize timed out, continuing with banner", "plugin", name)
+				initErr = errors.Newf("plugin %s did not answer Initialize within 30s", name)
+			}
+			// The plugin is running and did not take its config: that is a
+			// failure, and whoever enabled or restarted it is told so.
+			if initErr != nil {
+				m.logger.Errorw("Plugin started and did not initialize", "plugin", name, "error", initErr)
+				registry.MarkFailed(name, initErr.Error())
 			}
 		}
 	}
@@ -1149,7 +1170,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 	m.mu.RUnlock()
 	if !exists {
 		m.logger.Debugf("Plugin '%s' restarted successfully", name)
-		return
+		return initErr
 	}
 	proxy := p.client
 
@@ -1237,6 +1258,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		m.logger.Warnw("registerRestarted: accumulator is nil, no banner will be emitted", "plugin", name)
 	}
 	m.logger.Debugw("registerRestarted: completed", "plugin", name)
+	return initErr
 }
 
 // EnablePlugin discovers, loads, registers, and initializes a plugin at runtime.
@@ -1254,9 +1276,8 @@ func (m *PluginManager) EnablePlugin(ctx context.Context, name string, searchPat
 		return errors.Newf("plugin '%s' is already loaded", name)
 	}
 
-	// Discover binary, fetching from the plugin's repo if it isn't on disk yet.
-	// This is what makes adding a repo URL to a running node work in place.
-	pluginCfg, err := resolvePlugin(ctx, name, searchPaths, m.logger)
+	// The build the runner delivered, or one placed by hand. Never fetched (ADR-043).
+	pluginCfg, err := discoverPlugin(name, searchPaths, m.logger)
 	if err != nil {
 		return errors.Wrapf(err, "failed to discover plugin '%s'", name)
 	}
@@ -1268,14 +1289,14 @@ func (m *PluginManager) EnablePlugin(ctx context.Context, name string, searchPat
 
 	// Register + initialize + setup handlers/watchers/schedules/providers
 	// Banner emits asynchronously after health check completes
-	m.registerRestarted(ctx, name, registry, services, BannerEnabled)
+	initErr := m.registerRestarted(ctx, name, registry, services, BannerEnabled)
 
 	// Register HTTP/WS routes for hot-swapped plugin
 	if m.onPluginRestarted != nil {
 		m.onPluginRestarted(name)
 	}
 
-	return nil
+	return initErr
 }
 
 // DisablePlugin shuts down a running plugin, unregisters it, and kills its process.

@@ -22,9 +22,11 @@ import { setupState, claimNode } from './setup.ts';
 import { signedIn, openDoor } from './signin.ts';
 import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
+import { wireLineTooltips } from './components/sparkline';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { person, type Person } from './self-person.ts';
 import { setOpenCanvas, setStanding } from './standing.ts';
+import { addressed, entitle, keepTabWhereItIs, settle, stepTo, tell } from './address.ts';
 import { drawWho } from './who.ts';
 import type { CanvasRow } from './api/canvases.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
@@ -259,9 +261,22 @@ async function init(): Promise<void> {
     // per namespace (ADR-026). A node that will not say is nowhere, which is
     // the key the browser always used.
     let who: Person | null = null;
+    // The address names where this tab is: the page asks to stand there before
+    // anything is built, the same way a press on the namespaces bar asks.
+    const wanted = addressed();
     try {
         who = await person();
+        if (wanted && wanted.ns !== who.standing) {
+            try {
+                who.standing = await stepTo(wanted.ns);
+            } catch (err: unknown) {
+                log.warn(SEG.UI, `[Init] The address asked for ${wanted.ns}; staying in ${who.standing}:`, err);
+                tell(err instanceof Error ? err.message : String(err));
+            }
+        }
         setStanding(who.standing);
+        entitle(who.standing);
+        keepTabWhereItIs();
     } catch (err: unknown) {
         log.debug(SEG.UI, '[Init] Standing nowhere:', err);
         setStanding('');
@@ -294,9 +309,11 @@ async function init(): Promise<void> {
             const { listCanvases } = await import('./api/canvases.ts');
             rows = await listCanvases();
             const { opening } = await import('./namespace-page.ts');
-            const chosen = opening(rows);
+            const chosen = opening(rows, wanted && wanted.ns === who.standing ? wanted.canvas : '');
             setOpenCanvas(chosen.open);
+            settle(who.standing, !chosen.hasCanvas ? '' : chosen.open !== '' ? chosen.open : rows.find(c => c.kind === 'namespace')?.id ?? '');
             hasCanvas = chosen.hasCanvas;
+            entitle(who.standing, chosen.open === '' ? '' : rows.find(c => c.id === chosen.open)?.name ?? '');
             // "can either be seen by opening it (also desaturated view)"
             document.body.classList.toggle('canvas-disabled', chosen.disabled);
         } catch (err: unknown) {
@@ -387,6 +404,9 @@ async function init(): Promise<void> {
     // Initialize UI components
     if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
     initSystemDrawer();
+    // A tally is shown only in the tooltip, wherever a line is drawn: pointing
+    // says the one value, a longer hover the bigger picture, in tooltip form.
+    wireLineTooltips();
     // Root only, and the node is what says so — it answers 403 below SUPER and
     // 501 where namespaces do not exist, so no bar is grown either way.
     initNamespacesBar();

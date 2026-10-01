@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10
+
+// One entry of a directory GitHub lists.
+message GitHubReposContentsEntry {
+  string type = 1;
+  int64 size = 2;
+  string name = 3;
+  string path = 4;
+  string sha = 5;
+  string url = 6;
+  string git_url = 7;
+  string html_url = 8;
+  string download_url = 9;
+}
+
+// GET /repos/{owner}/{repo}/contents/{path}
+// A directory answers with its entries in items; a file with itself.
+message GitHubGetRepositoryContentRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string path = 4;
+  string ref = 5;
+}
+
+message GitHubGetRepositoryContentResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubReposContentsEntry items = 3;
+  string type = 4;
+  string encoding = 5;
+  int64 size = 6;
+  string name = 7;
+  string path = 8;
+  string content = 9;
+  string sha = 10;
+  string url = 11;
+  string git_url = 12;
+  string html_url = 13;
+  string download_url = 14;
+}
+
+// GET /repos/{owner}/{repo}/readme
+message GitHubGetARepositoryREADMERequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string ref = 4;
+}
+
+// GET /repos/{owner}/{repo}/readme/{dir}
+// Response: same response schema as Get a repository README.
+message GitHubGetARepositoryREADMEForADirectoryRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string dir = 4;
+  string ref = 5;
+}
+
+message GitHubGetARepositoryREADMEResponse {
+  bool success = 1;
+  string error = 2;
+  string type = 3;
+  string encoding = 4;
+  int64 size = 5;
+  string name = 6;
+  string path = 7;
+  string content = 8;
+  string sha = 9;
+  string url = 10;
+  string git_url = 11;
+  string html_url = 12;
+  string download_url = 13;
+}

@@ -31,8 +31,6 @@ export function createLlmProviderElement(): Element {
             setupLlmProviderContent(content).catch((err: unknown) => log.error(SEG.CONFIG, '[LLMProvider] panel content failed:', err));
             return content;
         },
-        initialWidth: '420px',
-        initialHeight: '240px',
     };
 }
 

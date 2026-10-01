@@ -124,6 +124,23 @@ func TestWritingSystemNeedsMaySeeSystem(t *testing.T) {
 	require.NoError(t, err, "SUPER was refused the system namespace")
 }
 
+// A plugin stands in the namespace its record names (ADR-046): its door reaches
+// that namespace by slug, the way any other does, and never system.
+func TestAPluginStandsWhereItsRecordSaysAndNeverInSystem(t *testing.T) {
+	opener := &openedNamespaces{}
+	held := serving([]string{"Clean"}, opener)
+	held.SetDefault(mustMake("default", nothing{}, nil))
+	held.SetSystem(mustMake("system", nothing{}, nil))
+
+	_, err := held.OfPlugin("clean")
+	require.NoError(t, err, "a plugin standing in clean was refused")
+	assert.Equal(t, []string{"Clean"}, opener.asked)
+
+	_, err = held.OfPlugin(auth.NamespaceSystem)
+	require.Error(t, err, "a plugin stood where the node keeps its own records")
+	assert.Contains(t, err.Error(), auth.NamespaceSystem)
+}
+
 // A write no admission stands behind never lands in the two namespaces that
 // hold the node's own records, whatever the handler asks for (ADR-035).
 func TestPublicWritesNeverReachSystemOrDefault(t *testing.T) {

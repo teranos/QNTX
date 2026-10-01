@@ -26,6 +26,7 @@ const (
 // nodeMailer is what sends the node's own mail: the mail service.
 type nodeMailer interface {
 	SendAsNode(ctx context.Context, userID string, m services.NodeMail) (messageID, attestationID string, err error)
+	SendAsNodeTo(ctx context.Context, u services.MailRecipient, m services.NodeMail) (messageID, attestationID string, err error)
 }
 
 type reportHandler struct{ server *QNTXServer }

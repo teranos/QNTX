@@ -187,7 +187,5 @@ export function createAmElement() {
             void loadStatusRow();
             return content;
         },
-        initialWidth: '450px',
-        initialHeight: '560px',
     };
 }

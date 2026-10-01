@@ -4,14 +4,17 @@ import { Sigma, Watcher } from './sym';
 import { spawnSigmaAsWindow } from './components/element/sigma-element';
 import { getWatchersByPredicate, refresh as refreshWatcherPredicates, onWatcherPredicatesChanged, eyeStyle } from './watcher-predicates';
 import type { Element } from '@teranos/elements';
+import { renderSparkline, windowOf, seriesOf, labelsOf, seenOver, lastOf, formatIn } from './components/sparkline';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 
 let panelElement: HTMLElement | null = null;
 let cachedDistillation: any = null;
+let cachedHistograms: Record<string, Record<string, number>> = {};
 
 export function updateSigmaPanel(stats: any): void {
     if (!stats?.distillation) return;
     cachedDistillation = stats.distillation;
+    cachedHistograms = stats.predicate_histograms ?? {};
     if (panelElement) renderPanel();
 }
 
@@ -93,8 +96,19 @@ function renderPanel(): void {
     if (d.predicates && d.predicates.length > 0) {
         const predColors = ['#fe8019', '#fabd2f', '#b8bb26', '#83a598', '#d3869b', '#8ec07c', '#fb4934', '#d65d0e'];
         html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0; border-bottom: 1px solid #3c3836; font-size: 10px;">';
+        // Each predicate over time and when last observed, not how many: one
+        // window for them all, so a day sits at the same place on each line.
+        // The histograms are keyed with every distill: layer stripped.
+        const clean = (predicate: string): string => {
+            let name = predicate;
+            while (name.startsWith('distill:')) name = name.slice('distill:'.length);
+            return name;
+        };
+        const seen = d.predicates.map((p: any) => seenOver(p.predicate, cachedHistograms[clean(p.predicate)], p.last));
+        const w = windowOf(seen.flatMap((one: any) => one.times));
         for (let i = 0; i < d.predicates.length; i++) {
             const p = d.predicates[i];
+            const at = lastOf(seen[i]);
             const color = predColors[i % predColors.length];
             const info = getWatchersByPredicate().get(p.predicate);
             let eyes = '';
@@ -105,7 +119,8 @@ function renderPanel(): void {
             html += `<span style="display: inline-flex; align-items: center; gap: 3px;">
                 <span style="width: 5px; height: 5px; border-radius: 50%; background: ${color};"></span>
                 <span style="color: #bdae93;">${p.predicate}${eyes}</span>
-                <span style="color: #7c6f64;">${p.count}</span>
+                <span style="display: inline-flex;">${renderSparkline(seriesOf(seen[i].times, w, seen[i].weights), labelsOf(w), p.predicate)}</span>
+                <span style="color: #7c6f64; font-variant-numeric: tabular-nums;">${at === -Infinity ? '' : formatIn(at, w.unit)}</span>
             </span>`;
         }
         html += '</div>';

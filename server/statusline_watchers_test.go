@@ -70,17 +70,7 @@ func TestFailingWatcherDetailAnswersInFull(t *testing.T) {
 		}}
 	}, nil, nil)
 
-	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline/ingest", nil))
-	rec := httptest.NewRecorder()
-	h.HandleStatusLineItem(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("detail answered %d", rec.Code)
-	}
-	var detail map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil {
-		t.Fatalf("detail is not json: %v", err)
-	}
+	detail := itemDetail(t, h, rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline/ingest", nil)), "ingest")
 	if detail["error"] != "plugin not loaded" {
 		t.Fatalf("detail does not carry the error in full: %+v", detail)
 	}
