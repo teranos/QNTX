@@ -293,6 +293,11 @@
         "SUPER"
       ]
     },
+    "/api/parity/hold": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/plugins": {
       "x-qntx-reach": [
         "ROOT",

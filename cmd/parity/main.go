@@ -66,18 +66,7 @@ func main() {
 	root := flag.String("root", ".", "repository root to scan for storage contracts")
 	parquetDir := flag.String("parquet", "db/duckdb/migrations", "DuckDB/parquet migrations directory")
 	crateDir := flag.String("crate", "crates/ats-duckdb/src", "DuckDB backend crate, scanned for object prefixes")
-	all := flag.Bool("all", false, "make parity prisma: show the models at 100 too")
 	flag.Parse()
-
-	if args := flag.Args(); len(args) > 0 && args[0] == "prisma" {
-		out, err := runPrisma(args[1:], *all)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "parity: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Print(out)
-		return
-	}
 
 	things, err := Report(*root, *parquetDir, *crateDir)
 	if err != nil {
