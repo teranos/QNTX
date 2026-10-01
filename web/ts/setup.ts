@@ -33,13 +33,21 @@ export interface SetupState {
 const POLL_INTERVAL_MS = 2000;
 const CLAIM_TIMEOUT_MS = 600000;
 
+// What a node with auth.enabled = false answers on every path of the ceremony.
+// It is said, not missing: the node has no door and nobody claims it.
+const NO_LOGIN = 'this node has no login';
+
+/** What a node's answer to /setup says about it being owned. */
+export function readSetup(status: number, body: string): SetupState {
+    if (status === 200) return JSON.parse(body) as SetupState;
+    if (status === 404 && body.trim() === NO_LOGIN) return { claimed: false, governed: false };
+    throw new Error(`this node did not say whether it has an owner (${status}: ${body.trim()})`);
+}
+
 /** What this node says about being owned. */
 export async function setupState(): Promise<SetupState> {
     const response = await apiFetch('/setup');
-    if (!response.ok) {
-        throw new Error(`this node did not say whether it has an owner (${response.status} ${response.statusText})`);
-    }
-    return await response.json() as SetupState;
+    return readSetup(response.status, await response.text());
 }
 
 /** Waits for the binding the provider consent produces. The redirect severs
