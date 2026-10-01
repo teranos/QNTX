@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin inbox-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -294,6 +294,11 @@ atproto-plugin: ## Build, install, and restart AT Protocol plugin
 	$(call check-plugin-version,qntx-plugins/qntx-atproto,go,qntx-plugins/qntx-atproto/plugin.go)
 	@$(MAKE) -C qntx-plugins/qntx-atproto install PREFIX=$(PREFIX)
 	$(call restart-plugin,atproto)
+
+inbox-plugin: ## Build, install, and restart inbox plugin (ADR-047)
+	$(call check-plugin-version,qntx-plugins/qntx-inbox,go,qntx-plugins/qntx-inbox/plugin.go)
+	@$(MAKE) -C qntx-plugins/qntx-inbox install PREFIX=$(PREFIX)
+	$(call restart-plugin,inbox)
 
 github-plugin: ## Build, install, and restart GitHub plugin
 	$(call check-plugin-version,qntx-plugins/qntx-github,go,qntx-plugins/qntx-github/plugin.go)

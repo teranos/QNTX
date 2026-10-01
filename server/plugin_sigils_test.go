@@ -245,6 +245,25 @@ func TestAPluginIsHandedTheStoreOfItsCallersNamespace(t *testing.T) {
 	assert.False(t, still, "the call's token outlived the call")
 }
 
+// "it will also be namespace specific, and cant be system of default"
+func TestAPluginIsToldTheNamespaceOfItsCall(t *testing.T) {
+	p := &sigilPlugin{
+		fakePlugin: fakePlugin{name: "stub"},
+		signa:      []*protocol.Signum{stubSignum("stub")},
+		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
+	}
+	srv, tokens := sigilServingServer(t, p)
+
+	req := asBearer(http.MethodGet, "/api/stub/read?kind=competitor", tokens[auth.LevelRoot])
+	req.Header.Set(HeaderNamespace, "somewhere-else")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	require.Len(t, p.handed, 1)
+	assert.Equal(t, []string{srv.held.ServedUniverse().Name()}, headerOf(p.handed[0], HeaderNamespace))
+}
+
 // A plugin's sigil is one tool, as the node's are, and asked over MCP it is
 // the plugin that answers.
 func TestAPluginsSigilIsATool(t *testing.T) {

@@ -48,6 +48,8 @@ const (
 	// HeaderStoreToken is what the plugin presents to the ATS store for this one
 	// call, and it reaches the store of the namespace the caller acts in.
 	HeaderStoreToken = "X-Qntx-Store-Token"
+	// HeaderNamespace is the namespace that token reaches.
+	HeaderNamespace = "X-Qntx-Namespace"
 )
 
 // openedCall is what a call's token holds: the store it reaches, and who made
@@ -330,6 +332,11 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared 
 		if err != nil {
 			return failed(err)
 		}
+		caller, open := s.callerOf(token)
+		if !open {
+			return failed(errors.Newf("the call to %s closed before it was handed", plugin))
+		}
+		req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderNamespace, Values: []string{caller.Namespace}})
 		resp, err := holder.AnswerHTTP(ctx, req)
 		if err != nil {
 			return failed(errors.Wrapf(err, "%s %s did not answer", req.GetMethod(), req.GetPath()))
