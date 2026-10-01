@@ -14,6 +14,12 @@ import (
 // ActionType defines the type of action a watcher performs
 type ActionType string
 
+// PluginExecuteAction is the JSON structure stored in ActionData for plugin_execute watchers
+type PluginExecuteAction struct {
+	PluginName  string `json:"plugin_name"`
+	HandlerName string `json:"handler_name"`
+}
+
 const (
 	ActionTypePython         ActionType = "python"
 	ActionTypeWebhook        ActionType = "webhook"

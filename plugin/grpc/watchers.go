@@ -8,7 +8,6 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -87,7 +86,7 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 		}
 		watcherID := fmt.Sprintf("%s-%s", pluginName, reg.Id)
 
-		actionData, err := json.Marshal(watcher.PluginExecuteAction{
+		actionData, err := json.Marshal(storage.PluginExecuteAction{
 			PluginName:  pluginName,
 			HandlerName: reg.HandlerName,
 		})
