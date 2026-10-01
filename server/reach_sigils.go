@@ -26,7 +26,7 @@ const reachPath = "/api/reach"
 
 func (s *QNTXServer) reachSignum() sigil.Signum {
 	pathParam := &protocol.Param{Name: "path", Required: true,
-		Says: "What the line is about: a path, a signum, or signum:sigil, optionally after http: or mcp:."}
+		Says: "What the line is about: a path, a signum, or signum:sigil, optionally after http:, mcp: or a2a:."}
 	toParam := &protocol.Param{Name: "to", Required: true,
 		Says: "A role, or a level (SUPER, TOKEN, ATTESTOR, PUBLIC_REGISTRATION, ANYONE), which opens only a plugin's route or sigil the compiled table does not name."}
 	written := []*protocol.Field{{Name: "id", Says: "The attestation the line was written as."}}

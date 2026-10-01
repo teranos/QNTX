@@ -26,6 +26,12 @@
         "ANYONE"
       ]
     },
+    "/a2a/": {
+      "x-qntx-reach": [
+        "ROOT"
+      ],
+      "x-qntx-prefix": true
+    },
     "/am/node": {
       "x-qntx-reach": [
         "ROOT"

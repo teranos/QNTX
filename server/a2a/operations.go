@@ -52,6 +52,9 @@ type Operation struct {
 	Tenant Route
 	// JSONRPC is the JSON-RPC method: the rpc's own name (§9.1).
 	JSONRPC string
+
+	request  protoreflect.MessageDescriptor
+	response protoreflect.MessageDescriptor
 }
 
 // Operations is every operation in scope, in the order the service declares
@@ -84,6 +87,8 @@ func Operations() ([]Operation, error) {
 			HTTP:     routeOf(rule),
 			Tenant:   routeOf(rule.GetAdditionalBindings()[0]),
 			JSONRPC:  name,
+			request:  method.Input(),
+			response: method.Output(),
 		})
 	}
 	return operations, nil
