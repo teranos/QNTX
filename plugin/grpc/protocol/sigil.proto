@@ -19,6 +19,10 @@ message Signum {
   // The shapes this signum is held to, each by its name: "Staands will be
   // Umami, one reference and not a blend." The parity sigil reads these.
   repeated Follows follows = 3;
+  // What it is for, in words, and the words it is found by. To A2A these are
+  // a skill's description and tags.
+  string description = 4;
+  repeated string tags = 5;
 }
 
 // Node is the node about itself: what it is called, what it is for, and the
