@@ -15,7 +15,6 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/QNTX/server/sigil"
 )
 
 // sigilPlugin is fakePlugin handing the node signa, answering what a sigil
@@ -23,6 +22,7 @@ import (
 type sigilPlugin struct {
 	fakePlugin
 	signa  []*protocol.Signum
+	routes []*protocol.RouteInfo
 	answer *protocol.HTTPResponse
 	handed []*protocol.HTTPRequest
 	// during is what the plugin does while the call is open, before answering.
@@ -30,6 +30,8 @@ type sigilPlugin struct {
 }
 
 func (p *sigilPlugin) GetSigna() []*protocol.Signum { return p.signa }
+
+func (p *sigilPlugin) GetHTTPRoutes() []*protocol.RouteInfo { return p.routes }
 
 func (p *sigilPlugin) AnswerHTTP(_ context.Context, req *protocol.HTTPRequest) (*protocol.HTTPResponse, error) {
 	p.handed = append(p.handed, req)
@@ -177,7 +179,7 @@ func TestAPluginIsToldWhichTokenAsked(t *testing.T) {
 	held := stubSignum("stub").GetSigils()[0]
 	headers := func(admitted auth.Admission) map[string][]string {
 		ctx := auth.WithAdmission(context.Background(), admitted)
-		req, err := forwarded("stub", held, sigil.Sent{"kind": "competitor"}, ctx, "call")
+		req, err := forwarded("stub", held, map[string]any{"kind": "competitor"}, ctx, "call")
 		require.NoError(t, err)
 		out := map[string][]string{}
 		for _, h := range req.GetHeaders() {
@@ -280,6 +282,81 @@ func TestAPluginsSigilIsATool(t *testing.T) {
 		map[string]any{"kind": "competitor"})
 	require.False(t, answered.IsError, textOf(t, answered))
 	assert.JSONEq(t, `{"observed":false}`, textOf(t, answered))
+}
+
+// "any plugin to be its own signum without the plugin having to define it"
+//
+// "the plugin should just be able to declare routes"
+//
+// Each declared route is a tool. What arrives is handed to the plugin whole,
+// what the plugin says comes back in its words, and over HTTP the routes stay
+// the plugin's own.
+func TestAPluginsDeclaredRoutesAreItsSigils(t *testing.T) {
+	p := &sigilPlugin{
+		fakePlugin: fakePlugin{name: "stub"},
+		routes: []*protocol.RouteInfo{
+			{Method: http.MethodPost, Path: "/book/new", Description: "Start a booking."},
+			{Method: http.MethodPost, Path: "/kvk/zoek/naam", Description: "Find companies by trade name."},
+		},
+		answer: &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"resultaten":[]}`)},
+	}
+	srv, _ := sigilServingServer(t, p)
+
+	named := map[string]*mcp.Tool{}
+	for _, tool := range toolsOffered(t, srv) {
+		named[tool.Name] = tool
+	}
+	require.Contains(t, named, "stub_book_new")
+	require.Contains(t, named, "stub_kvk_zoek_naam")
+	assert.Equal(t, "Find companies by trade name.", named["stub_kvk_zoek_naam"].Description)
+
+	var zoek heldBy
+	for _, signum := range srv.checkedSigna() {
+		for _, held := range signum.GetSigils() {
+			if signum.GetName() == "stub" && held.GetName() == "kvk_zoek_naam" {
+				zoek = heldBy{signum: "stub", sigil: held, answer: signum.Answers["kvk_zoek_naam"]}
+			}
+		}
+	}
+	require.NotNil(t, zoek.sigil)
+	admits := func(_ string, _ auth.Reach, next http.HandlerFunc) http.HandlerFunc { return next }
+	everyone := func(string, heldBy) (auth.Reach, bool) { return auth.Reach{}, true }
+	ask := func(args map[string]any) *mcp.CallToolResult {
+		return overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), zoek, args)
+	}
+
+	answered := ask(map[string]any{"naam": "acme", "filter": map[string]any{"plaats": "Amsterdam"}})
+	require.False(t, answered.IsError, textOf(t, answered))
+	assert.JSONEq(t, `{"resultaten":[]}`, textOf(t, answered))
+	require.Len(t, p.handed, 1)
+	assert.Equal(t, "/kvk/zoek/naam", p.handed[0].GetPath())
+	assert.JSONEq(t, `{"naam":"acme","filter":{"plaats":"Amsterdam"}}`, string(p.handed[0].GetBody()))
+
+	p.answer = &protocol.HTTPResponse{StatusCode: http.StatusNotFound, Body: []byte(`{"error":"niet in het handelsregister"}`)}
+	answered = ask(map[string]any{"naam": "acme"})
+	assert.True(t, answered.IsError)
+	assert.Contains(t, textOf(t, answered), "niet in het handelsregister")
+
+	_, bound := srv.answering["/api/stub/kvk/zoek/naam"]
+	assert.False(t, bound, "a declared route was taken off the plugin's own HTTP route")
+}
+
+// A plugin that hands its own signa is served by them, and its routes make no
+// second signum beside them.
+func TestAPluginsOwnSignaAreServedOverItsRoutes(t *testing.T) {
+	p := &sigilPlugin{
+		fakePlugin: fakePlugin{name: "stub"},
+		signa:      []*protocol.Signum{stubSignum("stub")},
+		routes:     []*protocol.RouteInfo{{Method: http.MethodPost, Path: "/book/new", Description: "Start a booking."}},
+	}
+	srv, _ := sigilServingServer(t, p)
+
+	named := map[string]bool{}
+	for _, tool := range toolsOffered(t, srv) {
+		named[tool.Name] = true
+	}
+	assert.True(t, named["stub_read"])
+	assert.False(t, named["stub_book_new"])
 }
 
 // A plugin's signum is its own: named after it and bound under /api/{plugin}/.
