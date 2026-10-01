@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// A User's own mail (ADR-047), shaped as JMAP for Mail (RFC 8621).
+service InboxService {
+  rpc CreateIdentity(CreateIdentityRequest) returns (CreateIdentityResponse);
+  rpc QueryEmails(QueryEmailsRequest) returns (QueryEmailsResponse);
+  rpc SubmitEmail(SubmitEmailRequest) returns (SubmitEmailResponse);
+}
+
+message Identity {
+  string id = 1;
+  string email = 2;
+}
+
+message Email {
+  string id = 1;
+  string blob_id = 2;
+  repeated string mailbox_ids = 3;
+  string from = 4;
+  repeated string to = 5;
+  string subject = 6;
+  string text_body = 7;
+  string received_at = 8;
+}
+
+message CreateIdentityRequest {
+  string account_id = 1;
+  string email = 2;
+}
+
+message CreateIdentityResponse {
+  Identity created = 1;
+}
+
+message QueryEmailsRequest {
+  string account_id = 1;
+  string in_mailbox = 2;
+}
+
+message QueryEmailsResponse {
+  repeated Email list = 1;
+}
+
+message SubmitEmailRequest {
+  string identity_id = 1;
+  repeated string to = 2;
+  string subject = 3;
+  string text_body = 4;
+}
+
+message SubmitEmailResponse {
+  Email sent = 1;
+}
