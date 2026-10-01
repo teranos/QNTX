@@ -112,7 +112,10 @@ func WithCaller(ctx context.Context, r *http.Request) context.Context {
 // Caller is the request that carried the asking: where the caller reached the
 // node. Nil for an answer asked with no request.
 func Caller(ctx context.Context) *http.Request {
-	r, _ := ctx.Value(callerKey{}).(*http.Request)
+	r, carried := ctx.Value(callerKey{}).(*http.Request)
+	if !carried {
+		return nil
+	}
 	return r
 }
 
