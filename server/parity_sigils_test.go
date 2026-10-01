@@ -53,3 +53,25 @@ func TestParityHoldRefuses(t *testing.T) {
 		}
 	}
 }
+
+// storage gives what make parity wrote, and says it is of the source.
+func TestParityStorageIsWhatMakeParityWrote(t *testing.T) {
+	signum := (&QNTXServer{}).paritySignum()
+	answer, refused := signum.Answers["storage"](context.Background(), nil)
+	if refused != nil {
+		t.Fatalf("storage refused: %s", refused.GetSays())
+	}
+	given := answer.(map[string]any)
+	if given["describes"] != "source" {
+		t.Errorf("storage describes %v", given["describes"])
+	}
+	written, err := parity.Storage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	things := given["things"].([]parity.Stored)
+	if len(things) == 0 || len(things) != len(written) {
+		t.Errorf("storage gave %d things, and make parity wrote %d", len(things), len(written))
+	}
+	holds(t, signum, "storage", answer)
+}

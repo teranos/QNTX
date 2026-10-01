@@ -18,6 +18,11 @@
 //     whether or not anything implements it. TokenStore in server/auth is the
 //     case that matters: the contract is written, no backend satisfies it.
 //
+// It prints the picture and writes what it read to server/parity/storage.json,
+// which the node embeds and the parity sigil serves: "Make parity would just
+// be for the storage backend specifically", and "parity the sigil is what an
+// Agent should deal with through MCP".
+//
 // The output ranks nothing and scores nothing. Neither column is the baseline
 // the other is measured against, and a line reads the same either way.
 //
@@ -26,17 +31,20 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
 	qntxdb "github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/errors"
 )
 
@@ -73,7 +81,41 @@ func main() {
 		fmt.Fprintf(os.Stderr, "parity: %v\n", err)
 		os.Exit(1)
 	}
+	body, err := Written(*root, things)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "parity: %v\n", err)
+		os.Exit(1)
+	}
+	path := filepath.Join(*root, parity.StorageFile)
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "parity: %v\n", errors.Wrapf(err, "failed to write %s", path))
+		os.Exit(1)
+	}
 	fmt.Print(Render(things))
+}
+
+// Written is the things as the node embeds them: each site by its file, once,
+// and relative to root, so the file reads the same wherever it was run from.
+func Written(root string, things []Thing) ([]byte, error) {
+	stored := make([]parity.Stored, 0, len(things))
+	for _, t := range things {
+		files := []string{}
+		for _, site := range t.Sites {
+			file, err := filepath.Rel(root, site.File)
+			if err != nil {
+				return nil, errors.Wrapf(err, "%s is not under %s", site.File, root)
+			}
+			files = append(files, filepath.ToSlash(file))
+		}
+		sort.Strings(files)
+		files = slices.Compact(files)
+		stored = append(stored, parity.Stored{Name: t.Name, Node: t.Node, Record: t.Record, Rebuilt: t.Rebuilt, Sites: files})
+	}
+	body, err := json.MarshalIndent(stored, "", "  ")
+	if err != nil {
+		return nil, errors.Wrap(err, "the things did not marshal")
+	}
+	return append(body, '\n'), nil
 }
 
 // Report derives every thing and its presence in each backend.
