@@ -15,6 +15,10 @@ Status: Proposed
 
 "both meaning, the box sending mail (because its dying) vs A User with an inbox who has mail and wants to get back to it later"
 
+"ROOT should be able to read other user's mail as well, but doing so is an attested event."
+
+"[At least 7 characters]@domain.tld"
+
 ## Standard
 
 JMAP for Mail, RFC 8621. The message is RFC 5322; mailbox roles are RFC 6154.
