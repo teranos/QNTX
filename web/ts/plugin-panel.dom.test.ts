@@ -36,7 +36,7 @@ function datapunt(overrides: Partial<Plugin> = {}): Plugin {
                 { name: 'name', says: 'One subject.' },
             ],
             gives: [{ name: 'observed', says: 'Whether it is.' }],
-            reach: { http: nobody, mcp: { anyone: false, levels: [], roles: ['manus'] } },
+            reach: { http: nobody, mcp: { anyone: false, levels: [], roles: ['manus'] }, a2a: nobody },
         }],
         ...overrides,
     };
@@ -76,6 +76,7 @@ describe('Plugin panel sigils', () => {
         const reach = container.querySelector('.plugin-sigil-reach')?.textContent ?? '';
         expect(reach).toContain('http: ROOT only');
         expect(reach).toContain('mcp: ROOT, manus');
+        expect(reach).toContain('a2a: ROOT only');
     });
 
     test('a sigil row offers a grant, keyed by the signum and the sigil', () => {

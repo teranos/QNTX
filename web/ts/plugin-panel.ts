@@ -58,7 +58,7 @@ interface SigilRow {
     does: string;
     takes: { name: string; says: string; required?: boolean; one_of?: string[] }[];
     gives: { name: string; says: string }[];
-    reach: Record<'http' | 'mcp', Reached>;
+    reach: Record<'http' | 'mcp' | 'a2a', Reached>;
 }
 
 /** Who the lines say reaches a sigil over one surface. ROOT is never listed. */
@@ -973,6 +973,7 @@ export function renderSigils(plugin: PluginInfo): string {
                 <div class="plugin-sigil-reach plugin-mono">
                     <span>http: ${escapeHtml(reachedInWords(row.reach.http))}</span>
                     <span>mcp: ${escapeHtml(reachedInWords(row.reach.mcp))}</span>
+                    <span>a2a: ${escapeHtml(reachedInWords(row.reach.a2a))}</span>
                 </div>
                 <div class="plugin-sigil-grant">
                     <input type="text" class="plugin-sigil-grant-role plugin-mono" data-sigil="${escapeHtml(key)}" placeholder="role">
