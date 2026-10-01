@@ -264,6 +264,8 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 			pm.SetOnPluginRestarted(func(name string) {
 				defaultServer.InvalidatePluginMux(name)
 				defaultServer.RegisterPluginMux(name)
+				// "i want runtime restarts to register new ones though"
+				defaultServer.ServePluginSigils()
 			})
 			pm.SetOnEmbeddingProviderReady(func(name string, client protocol.EmbeddingServiceClient) {
 				defaultServer.SetupPluginEmbeddingService(client)
