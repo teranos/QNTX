@@ -111,11 +111,13 @@ func TestABuildWorksOnDiskUnderTheNodesHome(t *testing.T) {
 }
 
 // "needs to be kinder with the system, we can tolerate slower less resource intensive builds"
-func TestABuildRunsOneJobAtATime(t *testing.T) {
+//
+// "18 minutes is also too slow"
+func TestABuildRunsAtTheLowestPriority(t *testing.T) {
 	env := buildEnv("/w", "", nil)
-	for _, want := range []string{"CARGO_BUILD_JOBS=1", "GOFLAGS=-p=1", "MAKEFLAGS=-j1"} {
-		if !slices.Contains(env, want) {
-			t.Fatalf("%s is not in the build's env: %v", want, env)
+	for _, held := range []string{"CARGO_BUILD_JOBS=1", "GOFLAGS=-p=1", "MAKEFLAGS=-j1"} {
+		if slices.Contains(env, held) {
+			t.Fatalf("%s holds the build to one job: %v", held, env)
 		}
 	}
 	name, args := gentle("/nix/bin/nix", []string{"shell"})

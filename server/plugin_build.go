@@ -299,9 +299,6 @@ func buildEnv(work, inputsEnv string, files []string) []string {
 	env := []string{
 		"PATH=" + nixBin + ":" + os.Getenv("PATH"),
 		"TMPDIR=" + filepath.Join(work, "tmp"),
-		"CARGO_BUILD_JOBS=1",
-		"GOFLAGS=-p=1",
-		"MAKEFLAGS=-j1",
 	}
 	if inputsEnv != "" {
 		env = append(env, inputsEnv+"="+strings.Join(files, " "))
