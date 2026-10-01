@@ -16,7 +16,15 @@ type Config struct {
 	Mail         MailConfig       `mapstructure:"mail"`
 	Distill      DistillConfig    `mapstructure:"distill"`
 	Sentry       SentryConfig     `mapstructure:"sentry"`
+	Node         NodeConfig       `mapstructure:"node"`
 	GroundDBPath string           `mapstructure:"ground_db_path"` // Path to Ground's database for deferred news delivery
+}
+
+// NodeConfig is what the node says of itself, through am node. Empty says
+// nothing: no name is made up for a node that was not given one.
+type NodeConfig struct {
+	Name        string `mapstructure:"name"`        // What the node is called.
+	Description string `mapstructure:"description"` // What the node is for, in words.
 }
 
 // SentryConfig points the node's logs at a Sentry project.

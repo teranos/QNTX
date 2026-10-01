@@ -114,3 +114,34 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 		holds(t, signum, "hold", answer)
 	}
 }
+
+// The gate of 4a: the node held to AgentCard, by what am declares of itself.
+// name, description, version and skills follow; what an A2A binding would
+// fill does not, and is said to be required.
+func TestParityHoldsTheNodeToAgentCard(t *testing.T) {
+	signum := (&QNTXServer{}).paritySignum()
+	answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": "am"})
+	if refused != nil {
+		t.Fatalf("hold refused am: %s", refused.GetSays())
+	}
+	held := answer.(parity.Parity)
+	if held.Reference != "a2a" {
+		t.Fatalf("am was held to %s", held.Reference)
+	}
+	scores := map[string]int{}
+	for _, c := range held.Clades {
+		scores[c.Model] = c.Score()
+	}
+	if scores["AgentCard"] != 28 || scores["AgentSkill"] != 12 {
+		t.Errorf("AgentCard reads %d and AgentSkill %d", scores["AgentCard"], scores["AgentSkill"])
+	}
+	want := []string{
+		"AgentCard.supported_interfaces", "AgentCard.capabilities",
+		"AgentCard.default_input_modes", "AgentCard.default_output_modes",
+		"AgentSkill.id", "AgentSkill.description", "AgentSkill.tags",
+	}
+	if strings.Join(held.Required, " ") != strings.Join(want, " ") {
+		t.Errorf("required and unfollowed is %v", held.Required)
+	}
+	holds(t, signum, "hold", answer)
+}
