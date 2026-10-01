@@ -11,9 +11,17 @@ Status: Proposed
 
 "I want SES in both directions"
 
+"no search, no drafts"
+
 "MailService Provider Plugin"
 
 "both meaning, the box sending mail (because its dying) vs A User with an inbox who has mail and wants to get back to it later"
+
+"it will also be namespace specific, and cant be system of default"
+
+"A user can have multiple inboxes"
+
+"Add SUPER to it"
 
 "ROOT should be able to read other user's mail as well, but doing so is an attested event."
 
