@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/sigil"
 )
 
 // sigilPlugin is fakePlugin handing the node signa, answering what a sigil
@@ -358,6 +359,26 @@ func TestAPluginsDeclaredRoutesAreItsSigils(t *testing.T) {
 
 	_, bound := srv.answering["/api/stub/kvk/zoek/naam"]
 	assert.False(t, bound, "a declared route was taken off the plugin's own HTTP route")
+}
+
+// Two methods on one path are two sigils, each named with its method, and the
+// signum is served; a path with one route keeps its name.
+func TestDeclaredRoutesOnOnePathAreNamedByMethod(t *testing.T) {
+	signum := declaredSignum("stub", []*protocol.RouteInfo{
+		{Method: http.MethodGet, Path: "/painter/coverage", Description: "Read the coverage."},
+		{Method: http.MethodPut, Path: "/painter/coverage", Description: "Write the coverage."},
+		{Method: http.MethodPost, Path: "/book/new", Description: "Start a booking."},
+	})
+	var names []string
+	for _, held := range signum.GetSigils() {
+		names = append(names, held.GetName())
+	}
+	assert.Equal(t, []string{"painter_coverage_get", "painter_coverage_put", "book_new"}, names)
+	answers := map[string]sigil.Answer{}
+	for _, name := range names {
+		answers[name] = func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return nil, nil }
+	}
+	require.NoError(t, sigil.Signum{Signum: signum, Answers: answers, Declared: true}.Check())
 }
 
 // A plugin that hands its own signa is served by them, and its routes make no

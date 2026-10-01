@@ -186,9 +186,17 @@ func (s *QNTXServer) pluginSignaOf(name string) (served []sigil.Signum, refused 
 // named after it, each declared route a sigil bound to it under /api/{plugin}.
 func declaredSignum(plugin string, routes []*protocol.RouteInfo) *protocol.Signum {
 	signum := &protocol.Signum{Name: plugin}
+	onPath := map[string]int{}
 	for _, route := range routes {
+		onPath[route.GetPath()]++
+	}
+	for _, route := range routes {
+		name := sigilNameOf(route.GetPath())
+		if onPath[route.GetPath()] > 1 {
+			name += "_" + strings.ToLower(route.GetMethod())
+		}
 		signum.Sigils = append(signum.Sigils, &protocol.Sigil{
-			Name: sigilNameOf(route.GetPath()),
+			Name: name,
 			Does: route.GetDescription(),
 			Http: &protocol.Endpoint{Method: route.GetMethod(), Path: "/api/" + plugin + route.GetPath()},
 		})
