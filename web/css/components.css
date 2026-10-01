@@ -216,6 +216,11 @@
     transition: none;
 }
 
+/* The A2A card at rest in ≡: a stylistic italic A2A. Upright once it is its window. */
+.a2a-card-button[data-form="button"] {
+    font-style: italic;
+}
+
 /* States */
 .qntx-btn:disabled,
 .qntx-btn-disabled {
