@@ -47,7 +47,7 @@ A plugin declares routes; QNTX makes each a sigil and an MCP tool. Go: `Declared
 
 A Go plugin imports `plugin/grpc`, which links `libats_sqlite`: build with `-tags rustsqlite`, after removing `target/release/libats_sqlite.so`, so the binary carries the static library.
 
-TODO: sweep every repository and file for the old am.toml way of managing QNTX plugins, and point each at one canonical public place, ADR-002.
+TODO: sweep every repository and file for the old am.toml way of managing QNTX plugins, and point each at [ADR-002](docs/adr/ADR-002-plugin-configuration.md).
 
 ## Go Development Standards
 
