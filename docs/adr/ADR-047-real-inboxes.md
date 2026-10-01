@@ -28,3 +28,12 @@ JMAP for Mail, RFC 8621. The message is RFC 5322; mailbox roles are RFC 6154.
 RFC 8621's `Identity` is `MailIdentity`. In QNTX identity is taken: ADR-010 is
 the identity system, ADR-030 covers identity providers, and ADR-031 attests
 `identity:disabled` and `identity:enabled`.
+
+An `Email` is an attestation, not a JMAP object: `mail:received` and
+`mail:sent` of the address, the text in its attributes. Its id is the ASID.
+
+A mailbox is one of three roles, `inbox`, `junk` and `sent`, and has no
+object of its own. SES's spam verdict is what puts mail in `junk`.
+
+A message SES's virus scan fails is never an `Email`: it is `mail:dropped`,
+and the stored copy is deleted.
