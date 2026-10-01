@@ -280,11 +280,44 @@ func (s *QNTXServer) buildRev(ctx context.Context, source buildSource) (string, 
 	return said.Items[0].Sha, nil
 }
 
+// buildsDir is where builds work: on disk under the node's home.
+func buildsDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", errors.Wrap(err, "the node's home was not found, so there is nowhere to build")
+	}
+	dir := filepath.Join(home, ".qntx", "builds")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", errors.Wrapf(err, "failed to make %s to build in", dir)
+	}
+	return dir, nil
+}
+
+// buildEnv is what a build runs with: the node's nix, its inputs, and its
+// temp files inside its own work directory.
+func buildEnv(work, inputsEnv string, files []string) []string {
+	env := []string{
+		"PATH=" + nixBin + ":" + os.Getenv("PATH"),
+		"TMPDIR=" + filepath.Join(work, "tmp"),
+	}
+	if inputsEnv != "" {
+		env = append(env, inputsEnv+"="+strings.Join(files, " "))
+	}
+	return env
+}
+
 // buildPlugin builds b from revs, packages what it built, and installs it.
 func (s *QNTXServer) buildPlugin(ctx context.Context, b pluginBuild, revs []string) (bool, string, error) {
-	work, err := os.MkdirTemp("", "qntx-build-"+b.name+"-")
+	builds, err := buildsDir()
 	if err != nil {
-		return false, "", errors.Wrap(err, "failed to make a directory to build in")
+		return false, "", err
+	}
+	work, err := os.MkdirTemp(builds, b.name+"-")
+	if err != nil {
+		return false, "", errors.Wrapf(err, "failed to make a directory in %s to build in", builds)
+	}
+	if err := os.Mkdir(filepath.Join(work, "tmp"), 0o755); err != nil {
+		return false, "", errors.Wrapf(err, "failed to make the build's temp directory in %s", work)
 	}
 	defer func() {
 		if err := os.RemoveAll(work); err != nil {
@@ -321,11 +354,7 @@ func (s *QNTXServer) buildPlugin(ctx context.Context, b pluginBuild, revs []stri
 		args = append(args, "nixpkgs#"+p)
 	}
 	args = append(args, "-c", "sh", "-c", b.command)
-	env := []string{"PATH=" + nixBin + ":" + os.Getenv("PATH")}
-	if b.inputsEnv != "" {
-		env = append(env, b.inputsEnv+"="+strings.Join(files, " "))
-	}
-	if _, err := runBuild(ctx, src, env, filepath.Join(nixBin, "nix"), args...); err != nil {
+	if _, err := runBuild(ctx, src, buildEnv(work, b.inputsEnv, files), filepath.Join(nixBin, "nix"), args...); err != nil {
 		return false, "", errors.Wrapf(err, "the build of %s at %s failed", b.name, revs[0])
 	}
 

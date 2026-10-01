@@ -2,6 +2,9 @@ package server
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -82,6 +85,28 @@ func TestUnbuiltIsEachEnabledBuildWithNoBinary(t *testing.T) {
 	}
 	if len(unbuilt) != 1 || unbuilt[0].name != "inbox" {
 		t.Fatalf("unbuilt: %+v", unbuilt)
+	}
+}
+
+// A box's /tmp can be a tmpfs held in memory, smaller than one build.
+func TestABuildWorksOnDiskUnderTheNodesHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	dir, err := buildsDir()
+	if err != nil {
+		t.Fatalf("buildsDir: %v", err)
+	}
+	if dir != filepath.Join(home, ".qntx", "builds") {
+		t.Fatalf("builds in %s", dir)
+	}
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Fatalf("%s is not a directory: %v", dir, err)
+	}
+
+	env := buildEnv("/w", "", nil)
+	if !slices.Contains(env, "TMPDIR=/w/tmp") {
+		t.Fatalf("the build's temp files go elsewhere: %v", env)
 	}
 }
 
