@@ -35,6 +35,7 @@ require (
 )
 
 require (
+	github.com/bufbuild/protocompile v0.14.1
 	github.com/cockroachdb/errors v1.12.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/ory/fosite v0.49.0
@@ -217,7 +218,7 @@ require (
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/api v0.256.0 // indirect
 	google.golang.org/genproto v0.0.0-20250922171735-9219d122eba9 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251111163417-95abcf5c77ba // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251111163417-95abcf5c77ba
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251111163417-95abcf5c77ba // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
 )

@@ -15,6 +15,14 @@ import (
 // "A way to keep Agents honest, of course": what a signum declares it follows,
 // held to the reference as the node pins it.
 
+// everySignumFollows is what every signum follows by its shape alone, declared
+// once and not signum by signum: "To A2A a signum is a skill" (sigil.proto).
+func everySignumFollows() []*protocol.Follows {
+	return []*protocol.Follows{{Reference: "a2a", Columns: []*protocol.Corresponds{
+		{Field: "protocol.Signum.name", Column: "AgentSkill.name"},
+	}}}
+}
+
 func (s *QNTXServer) paritySignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
@@ -26,7 +34,7 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 					Takes: []*protocol.Param{
 						{Name: "signum", Required: true, Says: "The signum to hold, by name."},
 						{Name: "sigil", Says: "One sigil of it, held by the messages it gives. Naming none holds the whole signum."},
-						{Name: "reference", Says: "The reference, by name. Naming none is the one the signum follows, when it follows one."},
+						{Name: "reference", Says: "The reference, by name. Naming none is the one the signum follows, when it follows one. a2a holds any signum by its shape, as a skill."},
 					},
 					Gives: []*protocol.Field{
 						{Name: "signum", Says: "The signum that was held."},
@@ -35,6 +43,7 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 						{Name: "clades", Says: "One per model of the reference, in its order: its score, and per column the fields that follow it and how they depart."},
 						{Name: "unfollowed", Says: "Per message in scope, its fields that follow no column."},
 						{Name: "missing", Says: "What the signum follows into a column the reference does not have."},
+						{Name: "required", Says: "Of the models anything follows, each column the reference requires and nothing follows."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/hold"},
 				},
@@ -75,7 +84,8 @@ func (s *QNTXServer) parityHold(_ context.Context, sent sigil.Sent) (any, *proto
 		}
 		switch len(followed) {
 		case 0:
-			return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "signum", Says: held.GetName() + " follows nothing"}
+			return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "signum",
+				Says: held.GetName() + " follows nothing of its own; a2a holds it by its shape, when named"}
 		case 1:
 			reference = followed[0]
 		default:
@@ -84,11 +94,13 @@ func (s *QNTXServer) parityHold(_ context.Context, sent sigil.Sent) (any, *proto
 		}
 	}
 
-	models, refused := parity.Reference(reference)
+	schema, refused := parity.Reference(reference)
 	if refused != nil {
 		return nil, refused
 	}
-	p, refused := parity.Hold(held, sent["sigil"], reference, models)
+	declared := &protocol.Signum{Name: held.GetName(), Sigils: held.GetSigils(),
+		Follows: append(append([]*protocol.Follows{}, held.GetFollows()...), everySignumFollows()...)}
+	p, refused := parity.Hold(declared, sent["sigil"], reference, schema)
 	if refused != nil {
 		return nil, refused
 	}

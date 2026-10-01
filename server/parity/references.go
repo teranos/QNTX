@@ -1,28 +1,38 @@
 package parity
 
 import (
+	"context"
 	"embed"
+	"io"
 	"io/fs"
 	"path"
 	"strings"
 
+	"github.com/bufbuild/protocompile"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
+	"google.golang.org/genproto/googleapis/api/annotations"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 // The references a signum can be held to, each pinned in a directory named for
 // the reference, its version and the commit it was taken at, with SOURCE
-// saying where it came from: umami is umami_v3.3.1_ca661c7.
+// saying where it came from: umami is umami_v3.3.1_ca661c7, a2a is
+// a2a_v1.0.1_3303592. A reference is read as it is: a schema.prisma as Prisma,
+// a .proto as the descriptors it compiles to.
 //
-//go:embed */schema.prisma
+//go:embed */schema.prisma */*.proto
 var pinned embed.FS
 
-// Reference is the models of the reference named, from the one directory
+// Reference is the schema of the reference named, from the one directory
 // pinned for it.
-func Reference(name string) ([]Model, *protocol.Refusal) {
+func Reference(name string) (Schema, *protocol.Refusal) {
 	entries, err := fs.ReadDir(pinned, ".")
 	if err != nil {
-		return nil, failed("the pinned references did not read: %v", err)
+		return Schema{}, failed("the pinned references did not read: %v", err)
 	}
 	var found, held []string
 	for _, entry := range entries {
@@ -34,20 +44,121 @@ func Reference(name string) ([]Model, *protocol.Refusal) {
 	}
 	switch len(found) {
 	case 0:
-		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "reference",
+		return Schema{}, &protocol.Refusal{Why: sigil.NotFound, Param: "reference",
 			Says: "the node holds no schema for " + name + "; it holds " + strings.Join(held, ", ")}
 	case 1:
 	default:
-		return nil, failed("%s is pinned more than once: %s", name, strings.Join(found, ", "))
+		return Schema{}, failed("%s is pinned more than once: %s", name, strings.Join(found, ", "))
 	}
-	schema := path.Join(found[0], "schema.prisma")
+
+	files, err := fs.ReadDir(pinned, found[0])
+	if err != nil {
+		return Schema{}, failed("%s did not read: %v", found[0], err)
+	}
+	var protos []string
+	for _, file := range files {
+		if file.Name() == "schema.prisma" {
+			return prismaAt(path.Join(found[0], file.Name()))
+		}
+		if strings.HasSuffix(file.Name(), ".proto") {
+			protos = append(protos, file.Name())
+		}
+	}
+	if len(protos) == 0 {
+		return Schema{}, failed("%s holds no schema.prisma and no .proto", found[0])
+	}
+	return protoAt(found[0], protos)
+}
+
+func prismaAt(schema string) (Schema, *protocol.Refusal) {
 	raw, err := pinned.ReadFile(schema)
 	if err != nil {
-		return nil, failed("%s did not read: %v", schema, err)
+		return Schema{}, failed("%s did not read: %v", schema, err)
 	}
 	models, err := ParsePrisma(schema, raw)
 	if err != nil {
-		return nil, failed("%v", err)
+		return Schema{}, failed("%v", err)
 	}
-	return models, nil
+	return Prisma(models), nil
+}
+
+// protoAt compiles the .proto files of dir. What they import from google/api is
+// what this binary links of genproto; google/protobuf is protocompile's own.
+func protoAt(dir string, names []string) (Schema, *protocol.Refusal) {
+	compiler := protocompile.Compiler{
+		Resolver: protocompile.WithStandardImports(protocompile.CompositeResolver{
+			&protocompile.SourceResolver{Accessor: func(name string) (io.ReadCloser, error) {
+				return pinned.Open(path.Join(dir, name))
+			}},
+			protocompile.ResolverFunc(func(name string) (protocompile.SearchResult, error) {
+				file, err := protoregistry.GlobalFiles.FindFileByPath(name)
+				if err != nil {
+					return protocompile.SearchResult{}, err
+				}
+				return protocompile.SearchResult{Desc: file}, nil
+			}),
+		}),
+	}
+	files, err := compiler.Compile(context.Background(), names...)
+	if err != nil {
+		return Schema{}, failed("%s did not compile: %v", dir, err)
+	}
+	var models []Model
+	for _, file := range files {
+		models = append(models, messagesOf(file.Package(), file.Messages())...)
+	}
+	return Schema{Models: models, fits: func(kind protoreflect.Kind, column Column) bool {
+		return column.Type == kind.String()
+	}}, nil
+}
+
+// messagesOf is every message, nested ones after their parent, each named
+// without its package: AgentSkill, not lf.a2a.v1.AgentSkill.
+func messagesOf(pkg protoreflect.FullName, messages protoreflect.MessageDescriptors) []Model {
+	var models []Model
+	for i := 0; i < messages.Len(); i++ {
+		message := messages.Get(i)
+		if message.IsMapEntry() {
+			continue
+		}
+		model := Model{Name: strings.TrimPrefix(string(message.FullName()), string(pkg)+".")}
+		fields := message.Fields()
+		for j := 0; j < fields.Len(); j++ {
+			field := fields.Get(j)
+			kind := field.Kind().String()
+			if field.IsMap() {
+				kind = "map"
+			}
+			model.Columns = append(model.Columns, Column{
+				Name: string(field.Name()), Type: kind, List: field.IsList(), Required: required(field),
+			})
+		}
+		models = append(models, model)
+		models = append(models, messagesOf(pkg, message.Messages())...)
+	}
+	return models
+}
+
+// required reads google.api.field_behavior off a field. The compiled options
+// carry the extension as bytes, so they are read again against the registry
+// this binary links, where field_behavior is known.
+func required(field protoreflect.FieldDescriptor) bool {
+	raw, err := proto.Marshal(field.Options())
+	if err != nil {
+		return false
+	}
+	options := &descriptorpb.FieldOptions{}
+	if err := proto.Unmarshal(raw, options); err != nil {
+		return false
+	}
+	behaviors, ok := proto.GetExtension(options, annotations.E_FieldBehavior).([]annotations.FieldBehavior)
+	if !ok {
+		return false
+	}
+	for _, behavior := range behaviors {
+		if behavior == annotations.FieldBehavior_REQUIRED {
+			return true
+		}
+	}
+	return false
 }
