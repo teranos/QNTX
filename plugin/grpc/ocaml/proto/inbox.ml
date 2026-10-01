@@ -5,7 +5,7 @@
 (* https://github.com/andersfugmann/ocaml-protoc-plugin *)
 (********************************************************)
 (*
-  Source: plugin/grpc/protocol/sigil.proto
+  Source: plugin/grpc/protocol/inbox.proto
   Syntax: proto3
   Parameters:
     debug=false
@@ -24,32 +24,12 @@ module Imported'modules = struct
 end
 (**/**)
 module rec Protocol : sig
-
-  (**
-{%html:
-<p>A Signum holds the sigils of one subject: watchers is a signum, and list,
-create, read, update and delete are its sigils. To A2A a signum is a skill.</p>
-<p>What the node does, in the shape that crosses a boundary (ADR-039). The
-browser reads these to name a sigil in a reach line, and a plugin hands the
-node a Signum to say what it can do.</p>
-<p>A signum is data the node holds rather than a service compiled in, because
-reach is governed at runtime and a plugin comes and goes while the node runs.</p>
-%}
-  *)
-  module rec Signum : sig
+  module rec Identity : sig
     type t = {
-      name:string;
-      sigils:Sigil.t list;
-      follows:Follows.t list;
-      (**
-{%html:
-<p>The shapes this signum is held to, each by its name: &quot;Staands will be
-Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
-%}
-      *)
-
+      id:string;
+      email:string;
     }
-    val make: ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> unit -> t
+    val make: ?id:string -> ?email:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -68,7 +48,45 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> unit -> t
+    type make_t = ?id:string -> ?email:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+  and Email : sig
+    type t = {
+      id:string;
+      blob_id:string;
+      mailbox_ids:string list;
+      from:string;
+      to':string list;
+      subject:string;
+      text_body:string;
+      received_at:string;
+    }
+    val make: ?id:string -> ?blob_id:string -> ?mailbox_ids:string list -> ?from:string -> ?to':string list -> ?subject:string -> ?text_body:string -> ?received_at:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?blob_id:string -> ?mailbox_ids:string list -> ?from:string -> ?to':string list -> ?subject:string -> ?text_body:string -> ?received_at:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -79,16 +97,15 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
 
   (**
 {%html:
-<p>Follows says which column of a reference each of a signum's fields is. The
-reference is named, not described: its own schema says what its columns are.</p>
+<p>as <email> is mail:address of &lt;user_id&gt;</p>
 %}
   *)
-  and Follows : sig
+  and CreateIdentityRequest : sig
     type t = {
-      reference:string;
-      columns:Corresponds.t list;
+      user_id:string;
+      email:string;
     }
-    val make: ?reference:string -> ?columns:Corresponds.t list -> unit -> t
+    val make: ?user_id:string -> ?email:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -107,7 +124,7 @@ reference is named, not described: its own schema says what its columns are.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?reference:string -> ?columns:Corresponds.t list -> unit -> t
+    type make_t = ?user_id:string -> ?email:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -115,32 +132,9 @@ reference is named, not described: its own schema says what its columns are.</p>
     (**/**)
   end
 
-
-  (**
-{%html:
-<p>Corresponds is one field and the column it is in the reference. The field is
-named in full, message and field, so a field no sigil answers with — what a
-signum keeps rather than what it gives — is named the same way.</p>
-%}
-  *)
-  and Corresponds : sig
-    type t = {
-      field:string;
-      (**
-{%html:
-<p>protocol.Arrival.path</p>
-%}
-      *)
-
-      column:string;
-      (**
-{%html:
-<p>WebsiteEvent.urlPath</p>
-%}
-      *)
-
-    }
-    val make: ?field:string -> ?column:string -> unit -> t
+  and CreateIdentityResponse : sig
+    type t = (Identity.t option)
+    val make: ?created:Identity.t -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -159,7 +153,7 @@ signum keeps rather than what it gives — is named the same way.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?field:string -> ?column:string -> unit -> t
+    type make_t = ?created:Identity.t -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -167,46 +161,12 @@ signum keeps rather than what it gives — is named the same way.</p>
     (**/**)
   end
 
-
-  (**
-{%html:
-<p>A Sigil is one thing the node does. The function that does it is not here:
-a function is not a shape.</p>
-%}
-  *)
-  and Sigil : sig
+  and QueryEmailsRequest : sig
     type t = {
-      name:string;
-      does:string;
-      (**
-{%html:
-<p>What it is for, in words, for somebody who has never seen the code.</p>
-%}
-      *)
-
-      takes:Param.t list;
-      (**
-{%html:
-<p>What goes in.</p>
-%}
-      *)
-
-      gives:Field.t list;
-      (**
-{%html:
-<p>What comes out, by field.</p>
-%}
-      *)
-
-      http:Endpoint.t option;
-      (**
-{%html:
-<p>Where it answers on the HTTP API.</p>
-%}
-      *)
-
+      address:string;
+      in_mailbox:string;
     }
-    val make: ?name:string -> ?does:string -> ?takes:Param.t list -> ?gives:Field.t list -> ?http:Endpoint.t -> unit -> t
+    val make: ?address:string -> ?in_mailbox:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -225,7 +185,7 @@ a function is not a shape.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?does:string -> ?takes:Param.t list -> ?gives:Field.t list -> ?http:Endpoint.t -> unit -> t
+    type make_t = ?address:string -> ?in_mailbox:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -233,34 +193,9 @@ a function is not a shape.</p>
     (**/**)
   end
 
-
-  (**
-{%html:
-<p>A Param is one thing a sigil takes. It says nothing about how it travels:
-that is each surface's to decide.</p>
-%}
-  *)
-  and Param : sig
-    type t = {
-      name:string;
-      says:string;
-      required:bool;
-      one_of:string list;
-      (**
-{%html:
-<p>Every value it takes, when it takes only some.</p>
-%}
-      *)
-
-      kind:string;
-      (**
-{%html:
-<p>What its value is: empty is text, &quot;count&quot; is a whole number, zero or more.</p>
-%}
-      *)
-
-    }
-    val make: ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> ?kind:string -> unit -> t
+  and QueryEmailsResponse : sig
+    type t = (Email.t list)
+    val make: ?list:Email.t list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -279,7 +214,7 @@ that is each surface's to decide.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> ?kind:string -> unit -> t
+    type make_t = ?list:Email.t list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -287,25 +222,14 @@ that is each surface's to decide.</p>
     (**/**)
   end
 
-
-  (**
-{%html:
-<p>A Field is one thing a sigil's answer carries, at the top of the answer.</p>
-%}
-  *)
-  and Field : sig
+  and SubmitEmailRequest : sig
     type t = {
-      name:string;
-      says:string;
-      message:string;
-      (**
-{%html:
-<p>The message it carries, named in full, when it carries one: protocol.Visit.</p>
-%}
-      *)
-
+      from:string;
+      to':string list;
+      subject:string;
+      text_body:string;
     }
-    val make: ?name:string -> ?says:string -> ?message:string -> unit -> t
+    val make: ?from:string -> ?to':string list -> ?subject:string -> ?text_body:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -324,7 +248,7 @@ that is each surface's to decide.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?says:string -> ?message:string -> unit -> t
+    type make_t = ?from:string -> ?to':string list -> ?subject:string -> ?text_body:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -332,18 +256,9 @@ that is each surface's to decide.</p>
     (**/**)
   end
 
-
-  (**
-{%html:
-<p>An Endpoint is a sigil's form in the HTTP API: the method and the whole path.</p>
-%}
-  *)
-  and Endpoint : sig
-    type t = {
-      method':string;
-      path:string;
-    }
-    val make: ?method':string -> ?path:string -> unit -> t
+  and SubmitEmailResponse : sig
+    type t = (Email.t option)
+    val make: ?sent:Email.t -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -362,7 +277,7 @@ that is each surface's to decide.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?method':string -> ?path:string -> unit -> t
+    type make_t = ?sent:Email.t -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -370,69 +285,49 @@ that is each surface's to decide.</p>
     (**/**)
   end
 
+  module InboxService : sig
+    module CreateIdentity : sig
+      include Runtime'.Service.Rpc with type Request.t = CreateIdentityRequest.t and type Response.t = CreateIdentityResponse.t
+      module Request : Runtime'.Spec.Message with type t = CreateIdentityRequest.t and type make_t = CreateIdentityRequest.make_t
+      (** Module alias for the request message for this method call *)
 
-  (**
-{%html:
-<p>A Refusal is a sigil saying no, in its own terms. It names the param the
-caller has to change. Each surface gives it its form: the HTTP API a status,
-MCP a tool error.</p>
-%}
-  *)
-  and Refusal : sig
-    type t = {
-      why:string;
-      (**
-{%html:
-<p>The kind of no: &quot;missing&quot;, &quot;not one of&quot;, &quot;invalid&quot;, &quot;not found&quot;,
-&quot;not allowed&quot;, &quot;failed&quot;.</p>
-%}
-      *)
+      module Response : Runtime'.Spec.Message with type t = CreateIdentityResponse.t and type make_t = CreateIdentityResponse.make_t
+      (** Module alias for the response message for this method call *)
 
-      param:string;
-      says:string;
-    }
-    val make: ?why:string -> ?param:string -> ?says:string -> unit -> t
-    (** Helper function to generate a message using default values *)
+    end
 
-    val to_proto: t -> Runtime'.Writer.t
-    (** Serialize the message to binary format *)
+    val createIdentity : (module Runtime'.Spec.Message with type t = CreateIdentityRequest.t) * (module Runtime'.Spec.Message with type t = CreateIdentityResponse.t)
+    module QueryEmails : sig
+      include Runtime'.Service.Rpc with type Request.t = QueryEmailsRequest.t and type Response.t = QueryEmailsResponse.t
+      module Request : Runtime'.Spec.Message with type t = QueryEmailsRequest.t and type make_t = QueryEmailsRequest.make_t
+      (** Module alias for the request message for this method call *)
 
-    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
-    (** Deserialize from binary format *)
+      module Response : Runtime'.Spec.Message with type t = QueryEmailsResponse.t and type make_t = QueryEmailsResponse.make_t
+      (** Module alias for the response message for this method call *)
 
-    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
-    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+    end
 
-    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
-    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+    val queryEmails : (module Runtime'.Spec.Message with type t = QueryEmailsRequest.t) * (module Runtime'.Spec.Message with type t = QueryEmailsResponse.t)
+    module SubmitEmail : sig
+      include Runtime'.Service.Rpc with type Request.t = SubmitEmailRequest.t and type Response.t = SubmitEmailResponse.t
+      module Request : Runtime'.Spec.Message with type t = SubmitEmailRequest.t and type make_t = SubmitEmailRequest.make_t
+      (** Module alias for the request message for this method call *)
 
-    val name: unit -> string
-    (** Fully qualified protobuf name of this message *)
+      module Response : Runtime'.Spec.Message with type t = SubmitEmailResponse.t and type make_t = SubmitEmailResponse.make_t
+      (** Module alias for the response message for this method call *)
 
-    (**/**)
-    type make_t = ?why:string -> ?param:string -> ?says:string -> unit -> t
-    val merge: t -> t -> t
-    val to_proto': Runtime'.Writer.t -> t -> unit
-    val from_proto_exn: Runtime'.Reader.t -> t
-    val from_json_exn: Runtime'.Json.t -> t
-    (**/**)
+    end
+
+    val submitEmail : (module Runtime'.Spec.Message with type t = SubmitEmailRequest.t) * (module Runtime'.Spec.Message with type t = SubmitEmailResponse.t)
   end
 
 end = struct
-  module rec Signum : sig
+  module rec Identity : sig
     type t = {
-      name:string;
-      sigils:Sigil.t list;
-      follows:Follows.t list;
-      (**
-{%html:
-<p>The shapes this signum is held to, each by its name: &quot;Staands will be
-Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
-%}
-      *)
-
+      id:string;
+      email:string;
     }
-    val make: ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> unit -> t
+    val make: ?id:string -> ?email:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -451,56 +346,59 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> unit -> t
+    type make_t = ?id:string -> ?email:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = Signum
-    let name () = ".protocol.Signum"
+    module This'_ = Identity
+    let name () = ".protocol.Identity"
     type t = {
-      name:string;
-      sigils:Sigil.t list;
-      follows:Follows.t list;
+      id:string;
+      email:string;
     }
-    type make_t = ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> unit -> t
-    let make ?(name = {||}) ?(sigils = []) ?(follows = []) () = { name; sigils; follows }
+    type make_t = ?id:string -> ?email:string -> unit -> t
+    let make ?(id = {||}) ?(email = {||}) () = { id; email }
     let merge =
-    let merge_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ) in
-    let merge_sigils = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "sigils", "sigils"), (message (module Sigil)), not_packed) ) in
-    let merge_follows = Runtime'.Merge.merge Runtime'.Spec.( repeated ((3, "follows", "follows"), (message (module Follows)), not_packed) ) in
+    let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
+    let merge_email = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "email", "email"), string, ({||})) ) in
     fun t1 t2 -> {
-    	name = (merge_name t1.name t2.name);
-    	sigils = (merge_sigils t1.sigils t2.sigils);
-    	follows = (merge_follows t1.follows t2.follows);
+    	id = (merge_id t1.id t2.id);
+    	email = (merge_email t1.email t2.email);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ^:: repeated ((2, "sigils", "sigils"), (message (module Sigil)), not_packed) ^:: repeated ((3, "follows", "follows"), (message (module Follows)), not_packed) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "email", "email"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { name; sigils; follows } -> serialize writer name sigils follows
+      fun writer { id; email } -> serialize writer id email
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor name sigils follows = { name; sigils; follows } in
+      let constructor id email = { id; email } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { name; sigils; follows } -> serialize name sigils follows
+      fun { id; email } -> serialize id email
     let from_json_exn =
-      let constructor name sigils follows = { name; sigils; follows } in
+      let constructor id email = { id; email } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and Follows : sig
+  and Email : sig
     type t = {
-      reference:string;
-      columns:Corresponds.t list;
+      id:string;
+      blob_id:string;
+      mailbox_ids:string list;
+      from:string;
+      to':string list;
+      subject:string;
+      text_body:string;
+      received_at:string;
     }
-    val make: ?reference:string -> ?columns:Corresponds.t list -> unit -> t
+    val make: ?id:string -> ?blob_id:string -> ?mailbox_ids:string list -> ?from:string -> ?to':string list -> ?subject:string -> ?text_body:string -> ?received_at:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -519,65 +417,71 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?reference:string -> ?columns:Corresponds.t list -> unit -> t
+    type make_t = ?id:string -> ?blob_id:string -> ?mailbox_ids:string list -> ?from:string -> ?to':string list -> ?subject:string -> ?text_body:string -> ?received_at:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = Follows
-    let name () = ".protocol.Follows"
+    module This'_ = Email
+    let name () = ".protocol.Email"
     type t = {
-      reference:string;
-      columns:Corresponds.t list;
+      id:string;
+      blob_id:string;
+      mailbox_ids:string list;
+      from:string;
+      to':string list;
+      subject:string;
+      text_body:string;
+      received_at:string;
     }
-    type make_t = ?reference:string -> ?columns:Corresponds.t list -> unit -> t
-    let make ?(reference = {||}) ?(columns = []) () = { reference; columns }
+    type make_t = ?id:string -> ?blob_id:string -> ?mailbox_ids:string list -> ?from:string -> ?to':string list -> ?subject:string -> ?text_body:string -> ?received_at:string -> unit -> t
+    let make ?(id = {||}) ?(blob_id = {||}) ?(mailbox_ids = []) ?(from = {||}) ?(to' = []) ?(subject = {||}) ?(text_body = {||}) ?(received_at = {||}) () = { id; blob_id; mailbox_ids; from; to'; subject; text_body; received_at }
     let merge =
-    let merge_reference = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "reference", "reference"), string, ({||})) ) in
-    let merge_columns = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "columns", "columns"), (message (module Corresponds)), not_packed) ) in
+    let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
+    let merge_blob_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "blob_id", "blobId"), string, ({||})) ) in
+    let merge_mailbox_ids = Runtime'.Merge.merge Runtime'.Spec.( repeated ((3, "mailbox_ids", "mailboxIds"), string, not_packed) ) in
+    let merge_from = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "from", "from"), string, ({||})) ) in
+    let merge_to' = Runtime'.Merge.merge Runtime'.Spec.( repeated ((5, "to", "to"), string, not_packed) ) in
+    let merge_subject = Runtime'.Merge.merge Runtime'.Spec.( basic ((6, "subject", "subject"), string, ({||})) ) in
+    let merge_text_body = Runtime'.Merge.merge Runtime'.Spec.( basic ((7, "text_body", "textBody"), string, ({||})) ) in
+    let merge_received_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((8, "received_at", "receivedAt"), string, ({||})) ) in
     fun t1 t2 -> {
-    	reference = (merge_reference t1.reference t2.reference);
-    	columns = (merge_columns t1.columns t2.columns);
+    	id = (merge_id t1.id t2.id);
+    	blob_id = (merge_blob_id t1.blob_id t2.blob_id);
+    	mailbox_ids = (merge_mailbox_ids t1.mailbox_ids t2.mailbox_ids);
+    	from = (merge_from t1.from t2.from);
+    	to' = (merge_to' t1.to' t2.to');
+    	subject = (merge_subject t1.subject t2.subject);
+    	text_body = (merge_text_body t1.text_body t2.text_body);
+    	received_at = (merge_received_at t1.received_at t2.received_at);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "reference", "reference"), string, ({||})) ^:: repeated ((2, "columns", "columns"), (message (module Corresponds)), not_packed) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "blob_id", "blobId"), string, ({||})) ^:: repeated ((3, "mailbox_ids", "mailboxIds"), string, not_packed) ^:: basic ((4, "from", "from"), string, ({||})) ^:: repeated ((5, "to", "to"), string, not_packed) ^:: basic ((6, "subject", "subject"), string, ({||})) ^:: basic ((7, "text_body", "textBody"), string, ({||})) ^:: basic ((8, "received_at", "receivedAt"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { reference; columns } -> serialize writer reference columns
+      fun writer { id; blob_id; mailbox_ids; from; to'; subject; text_body; received_at } -> serialize writer id blob_id mailbox_ids from to' subject text_body received_at
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor reference columns = { reference; columns } in
+      let constructor id blob_id mailbox_ids from to' subject text_body received_at = { id; blob_id; mailbox_ids; from; to'; subject; text_body; received_at } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { reference; columns } -> serialize reference columns
+      fun { id; blob_id; mailbox_ids; from; to'; subject; text_body; received_at } -> serialize id blob_id mailbox_ids from to' subject text_body received_at
     let from_json_exn =
-      let constructor reference columns = { reference; columns } in
+      let constructor id blob_id mailbox_ids from to' subject text_body received_at = { id; blob_id; mailbox_ids; from; to'; subject; text_body; received_at } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and Corresponds : sig
+  and CreateIdentityRequest : sig
     type t = {
-      field:string;
-      (**
-{%html:
-<p>protocol.Arrival.path</p>
-%}
-      *)
-
-      column:string;
-      (**
-{%html:
-<p>WebsiteEvent.urlPath</p>
-%}
-      *)
-
+      user_id:string;
+      email:string;
     }
-    val make: ?field:string -> ?column:string -> unit -> t
+    val make: ?user_id:string -> ?email:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -596,80 +500,50 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?field:string -> ?column:string -> unit -> t
+    type make_t = ?user_id:string -> ?email:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = Corresponds
-    let name () = ".protocol.Corresponds"
+    module This'_ = CreateIdentityRequest
+    let name () = ".protocol.CreateIdentityRequest"
     type t = {
-      field:string;
-      column:string;
+      user_id:string;
+      email:string;
     }
-    type make_t = ?field:string -> ?column:string -> unit -> t
-    let make ?(field = {||}) ?(column = {||}) () = { field; column }
+    type make_t = ?user_id:string -> ?email:string -> unit -> t
+    let make ?(user_id = {||}) ?(email = {||}) () = { user_id; email }
     let merge =
-    let merge_field = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "field", "field"), string, ({||})) ) in
-    let merge_column = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "column", "column"), string, ({||})) ) in
+    let merge_user_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "user_id", "userId"), string, ({||})) ) in
+    let merge_email = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "email", "email"), string, ({||})) ) in
     fun t1 t2 -> {
-    	field = (merge_field t1.field t2.field);
-    	column = (merge_column t1.column t2.column);
+    	user_id = (merge_user_id t1.user_id t2.user_id);
+    	email = (merge_email t1.email t2.email);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "field", "field"), string, ({||})) ^:: basic ((2, "column", "column"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "user_id", "userId"), string, ({||})) ^:: basic ((2, "email", "email"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { field; column } -> serialize writer field column
+      fun writer { user_id; email } -> serialize writer user_id email
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor field column = { field; column } in
+      let constructor user_id email = { user_id; email } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { field; column } -> serialize field column
+      fun { user_id; email } -> serialize user_id email
     let from_json_exn =
-      let constructor field column = { field; column } in
+      let constructor user_id email = { user_id; email } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and Sigil : sig
-    type t = {
-      name:string;
-      does:string;
-      (**
-{%html:
-<p>What it is for, in words, for somebody who has never seen the code.</p>
-%}
-      *)
-
-      takes:Param.t list;
-      (**
-{%html:
-<p>What goes in.</p>
-%}
-      *)
-
-      gives:Field.t list;
-      (**
-{%html:
-<p>What comes out, by field.</p>
-%}
-      *)
-
-      http:Endpoint.t option;
-      (**
-{%html:
-<p>Where it answers on the HTTP API.</p>
-%}
-      *)
-
-    }
-    val make: ?name:string -> ?does:string -> ?takes:Param.t list -> ?gives:Field.t list -> ?http:Endpoint.t -> unit -> t
+  and CreateIdentityResponse : sig
+    type t = (Identity.t option)
+    val make: ?created:Identity.t -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -688,77 +562,46 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?does:string -> ?takes:Param.t list -> ?gives:Field.t list -> ?http:Endpoint.t -> unit -> t
+    type make_t = ?created:Identity.t -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = Sigil
-    let name () = ".protocol.Sigil"
-    type t = {
-      name:string;
-      does:string;
-      takes:Param.t list;
-      gives:Field.t list;
-      http:Endpoint.t option;
-    }
-    type make_t = ?name:string -> ?does:string -> ?takes:Param.t list -> ?gives:Field.t list -> ?http:Endpoint.t -> unit -> t
-    let make ?(name = {||}) ?(does = {||}) ?(takes = []) ?(gives = []) ?http () = { name; does; takes; gives; http }
+    module This'_ = CreateIdentityResponse
+    let name () = ".protocol.CreateIdentityResponse"
+    type t = (Identity.t option)
+    type make_t = ?created:Identity.t -> unit -> t
+    let make ?created () = (created)
     let merge =
-    let merge_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ) in
-    let merge_does = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "does", "does"), string, ({||})) ) in
-    let merge_takes = Runtime'.Merge.merge Runtime'.Spec.( repeated ((3, "takes", "takes"), (message (module Param)), not_packed) ) in
-    let merge_gives = Runtime'.Merge.merge Runtime'.Spec.( repeated ((4, "gives", "gives"), (message (module Field)), not_packed) ) in
-    let merge_http = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((5, "http", "http"), (message (module Endpoint))) ) in
-    fun t1 t2 -> {
-    	name = (merge_name t1.name t2.name);
-    	does = (merge_does t1.does t2.does);
-    	takes = (merge_takes t1.takes t2.takes);
-    	gives = (merge_gives t1.gives t2.gives);
-    	http = (merge_http t1.http t2.http);
-     }
-    let spec () = Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ^:: basic ((2, "does", "does"), string, ({||})) ^:: repeated ((3, "takes", "takes"), (message (module Param)), not_packed) ^:: repeated ((4, "gives", "gives"), (message (module Field)), not_packed) ^:: basic_opt ((5, "http", "http"), (message (module Endpoint))) ^:: nil )
+    let merge_created = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((1, "created", "created"), (message (module Identity))) ) in
+    fun (t1_created) (t2_created) -> merge_created t1_created t2_created
+    let spec () = Runtime'.Spec.( basic_opt ((1, "created", "created"), (message (module Identity))) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { name; does; takes; gives; http } -> serialize writer name does takes gives http
+      fun writer (created) -> serialize writer created
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor name does takes gives http = { name; does; takes; gives; http } in
+      let constructor created = (created) in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { name; does; takes; gives; http } -> serialize name does takes gives http
+      fun (created) -> serialize created
     let from_json_exn =
-      let constructor name does takes gives http = { name; does; takes; gives; http } in
+      let constructor created = (created) in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and Param : sig
+  and QueryEmailsRequest : sig
     type t = {
-      name:string;
-      says:string;
-      required:bool;
-      one_of:string list;
-      (**
-{%html:
-<p>Every value it takes, when it takes only some.</p>
-%}
-      *)
-
-      kind:string;
-      (**
-{%html:
-<p>What its value is: empty is text, &quot;count&quot; is a whole number, zero or more.</p>
-%}
-      *)
-
+      address:string;
+      in_mailbox:string;
     }
-    val make: ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> ?kind:string -> unit -> t
+    val make: ?address:string -> ?in_mailbox:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -777,69 +620,50 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> ?kind:string -> unit -> t
+    type make_t = ?address:string -> ?in_mailbox:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = Param
-    let name () = ".protocol.Param"
+    module This'_ = QueryEmailsRequest
+    let name () = ".protocol.QueryEmailsRequest"
     type t = {
-      name:string;
-      says:string;
-      required:bool;
-      one_of:string list;
-      kind:string;
+      address:string;
+      in_mailbox:string;
     }
-    type make_t = ?name:string -> ?says:string -> ?required:bool -> ?one_of:string list -> ?kind:string -> unit -> t
-    let make ?(name = {||}) ?(says = {||}) ?(required = false) ?(one_of = []) ?(kind = {||}) () = { name; says; required; one_of; kind }
+    type make_t = ?address:string -> ?in_mailbox:string -> unit -> t
+    let make ?(address = {||}) ?(in_mailbox = {||}) () = { address; in_mailbox }
     let merge =
-    let merge_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ) in
-    let merge_says = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "says", "says"), string, ({||})) ) in
-    let merge_required = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "required", "required"), bool, (false)) ) in
-    let merge_one_of = Runtime'.Merge.merge Runtime'.Spec.( repeated ((4, "one_of", "oneOf"), string, not_packed) ) in
-    let merge_kind = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "kind", "kind"), string, ({||})) ) in
+    let merge_address = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "address", "address"), string, ({||})) ) in
+    let merge_in_mailbox = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "in_mailbox", "inMailbox"), string, ({||})) ) in
     fun t1 t2 -> {
-    	name = (merge_name t1.name t2.name);
-    	says = (merge_says t1.says t2.says);
-    	required = (merge_required t1.required t2.required);
-    	one_of = (merge_one_of t1.one_of t2.one_of);
-    	kind = (merge_kind t1.kind t2.kind);
+    	address = (merge_address t1.address t2.address);
+    	in_mailbox = (merge_in_mailbox t1.in_mailbox t2.in_mailbox);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ^:: basic ((2, "says", "says"), string, ({||})) ^:: basic ((3, "required", "required"), bool, (false)) ^:: repeated ((4, "one_of", "oneOf"), string, not_packed) ^:: basic ((5, "kind", "kind"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "address", "address"), string, ({||})) ^:: basic ((2, "in_mailbox", "inMailbox"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { name; says; required; one_of; kind } -> serialize writer name says required one_of kind
+      fun writer { address; in_mailbox } -> serialize writer address in_mailbox
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor name says required one_of kind = { name; says; required; one_of; kind } in
+      let constructor address in_mailbox = { address; in_mailbox } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { name; says; required; one_of; kind } -> serialize name says required one_of kind
+      fun { address; in_mailbox } -> serialize address in_mailbox
     let from_json_exn =
-      let constructor name says required one_of kind = { name; says; required; one_of; kind } in
+      let constructor address in_mailbox = { address; in_mailbox } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and Field : sig
-    type t = {
-      name:string;
-      says:string;
-      message:string;
-      (**
-{%html:
-<p>The message it carries, named in full, when it carries one: protocol.Visit.</p>
-%}
-      *)
-
-    }
-    val make: ?name:string -> ?says:string -> ?message:string -> unit -> t
+  and QueryEmailsResponse : sig
+    type t = (Email.t list)
+    val make: ?list:Email.t list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -858,56 +682,48 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?says:string -> ?message:string -> unit -> t
+    type make_t = ?list:Email.t list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = Field
-    let name () = ".protocol.Field"
-    type t = {
-      name:string;
-      says:string;
-      message:string;
-    }
-    type make_t = ?name:string -> ?says:string -> ?message:string -> unit -> t
-    let make ?(name = {||}) ?(says = {||}) ?(message = {||}) () = { name; says; message }
+    module This'_ = QueryEmailsResponse
+    let name () = ".protocol.QueryEmailsResponse"
+    type t = (Email.t list)
+    type make_t = ?list:Email.t list -> unit -> t
+    let make ?(list = []) () = (list)
     let merge =
-    let merge_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ) in
-    let merge_says = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "says", "says"), string, ({||})) ) in
-    let merge_message = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "message", "message"), string, ({||})) ) in
-    fun t1 t2 -> {
-    	name = (merge_name t1.name t2.name);
-    	says = (merge_says t1.says t2.says);
-    	message = (merge_message t1.message t2.message);
-     }
-    let spec () = Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ^:: basic ((2, "says", "says"), string, ({||})) ^:: basic ((3, "message", "message"), string, ({||})) ^:: nil )
+    let merge_list = Runtime'.Merge.merge Runtime'.Spec.( repeated ((1, "list", "list"), (message (module Email)), not_packed) ) in
+    fun (t1_list) (t2_list) -> merge_list t1_list t2_list
+    let spec () = Runtime'.Spec.( repeated ((1, "list", "list"), (message (module Email)), not_packed) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { name; says; message } -> serialize writer name says message
+      fun writer (list) -> serialize writer list
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor name says message = { name; says; message } in
+      let constructor list = (list) in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { name; says; message } -> serialize name says message
+      fun (list) -> serialize list
     let from_json_exn =
-      let constructor name says message = { name; says; message } in
+      let constructor list = (list) in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and Endpoint : sig
+  and SubmitEmailRequest : sig
     type t = {
-      method':string;
-      path:string;
+      from:string;
+      to':string list;
+      subject:string;
+      text_body:string;
     }
-    val make: ?method':string -> ?path:string -> unit -> t
+    val make: ?from:string -> ?to':string list -> ?subject:string -> ?text_body:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -926,61 +742,56 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?method':string -> ?path:string -> unit -> t
+    type make_t = ?from:string -> ?to':string list -> ?subject:string -> ?text_body:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = Endpoint
-    let name () = ".protocol.Endpoint"
+    module This'_ = SubmitEmailRequest
+    let name () = ".protocol.SubmitEmailRequest"
     type t = {
-      method':string;
-      path:string;
+      from:string;
+      to':string list;
+      subject:string;
+      text_body:string;
     }
-    type make_t = ?method':string -> ?path:string -> unit -> t
-    let make ?(method' = {||}) ?(path = {||}) () = { method'; path }
+    type make_t = ?from:string -> ?to':string list -> ?subject:string -> ?text_body:string -> unit -> t
+    let make ?(from = {||}) ?(to' = []) ?(subject = {||}) ?(text_body = {||}) () = { from; to'; subject; text_body }
     let merge =
-    let merge_method' = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "method", "method"), string, ({||})) ) in
-    let merge_path = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "path", "path"), string, ({||})) ) in
+    let merge_from = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "from", "from"), string, ({||})) ) in
+    let merge_to' = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "to", "to"), string, not_packed) ) in
+    let merge_subject = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "subject", "subject"), string, ({||})) ) in
+    let merge_text_body = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "text_body", "textBody"), string, ({||})) ) in
     fun t1 t2 -> {
-    	method' = (merge_method' t1.method' t2.method');
-    	path = (merge_path t1.path t2.path);
+    	from = (merge_from t1.from t2.from);
+    	to' = (merge_to' t1.to' t2.to');
+    	subject = (merge_subject t1.subject t2.subject);
+    	text_body = (merge_text_body t1.text_body t2.text_body);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "method", "method"), string, ({||})) ^:: basic ((2, "path", "path"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "from", "from"), string, ({||})) ^:: repeated ((2, "to", "to"), string, not_packed) ^:: basic ((3, "subject", "subject"), string, ({||})) ^:: basic ((4, "text_body", "textBody"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { method'; path } -> serialize writer method' path
+      fun writer { from; to'; subject; text_body } -> serialize writer from to' subject text_body
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor method' path = { method'; path } in
+      let constructor from to' subject text_body = { from; to'; subject; text_body } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { method'; path } -> serialize method' path
+      fun { from; to'; subject; text_body } -> serialize from to' subject text_body
     let from_json_exn =
-      let constructor method' path = { method'; path } in
+      let constructor from to' subject text_body = { from; to'; subject; text_body } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
-  and Refusal : sig
-    type t = {
-      why:string;
-      (**
-{%html:
-<p>The kind of no: &quot;missing&quot;, &quot;not one of&quot;, &quot;invalid&quot;, &quot;not found&quot;,
-&quot;not allowed&quot;, &quot;failed&quot;.</p>
-%}
-      *)
-
-      param:string;
-      says:string;
-    }
-    val make: ?why:string -> ?param:string -> ?says:string -> unit -> t
+  and SubmitEmailResponse : sig
+    type t = (Email.t option)
+    val make: ?sent:Email.t -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -999,48 +810,80 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?why:string -> ?param:string -> ?says:string -> unit -> t
+    type make_t = ?sent:Email.t -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
     val from_json_exn: Runtime'.Json.t -> t
     (**/**)
   end = struct
-    module This'_ = Refusal
-    let name () = ".protocol.Refusal"
-    type t = {
-      why:string;
-      param:string;
-      says:string;
-    }
-    type make_t = ?why:string -> ?param:string -> ?says:string -> unit -> t
-    let make ?(why = {||}) ?(param = {||}) ?(says = {||}) () = { why; param; says }
+    module This'_ = SubmitEmailResponse
+    let name () = ".protocol.SubmitEmailResponse"
+    type t = (Email.t option)
+    type make_t = ?sent:Email.t -> unit -> t
+    let make ?sent () = (sent)
     let merge =
-    let merge_why = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "why", "why"), string, ({||})) ) in
-    let merge_param = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "param", "param"), string, ({||})) ) in
-    let merge_says = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "says", "says"), string, ({||})) ) in
-    fun t1 t2 -> {
-    	why = (merge_why t1.why t2.why);
-    	param = (merge_param t1.param t2.param);
-    	says = (merge_says t1.says t2.says);
-     }
-    let spec () = Runtime'.Spec.( basic ((1, "why", "why"), string, ({||})) ^:: basic ((2, "param", "param"), string, ({||})) ^:: basic ((3, "says", "says"), string, ({||})) ^:: nil )
+    let merge_sent = Runtime'.Merge.merge Runtime'.Spec.( basic_opt ((1, "sent", "sent"), (message (module Email))) ) in
+    fun (t1_sent) (t2_sent) -> merge_sent t1_sent t2_sent
+    let spec () = Runtime'.Spec.( basic_opt ((1, "sent", "sent"), (message (module Email))) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { why; param; says } -> serialize writer why param says
+      fun writer (sent) -> serialize writer sent
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor why param says = { why; param; says } in
+      let constructor sent = (sent) in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { why; param; says } -> serialize why param says
+      fun (sent) -> serialize sent
     let from_json_exn =
-      let constructor why param says = { why; param; says } in
+      let constructor sent = (sent) in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  module InboxService = struct
+    module CreateIdentity = struct
+      let package_name = Some "protocol"
+      let service_name = "InboxService"
+      let method_name = "CreateIdentity"
+      let name = "/protocol.InboxService/CreateIdentity"
+      module Request = CreateIdentityRequest
+      module Response = CreateIdentityResponse
+    end
+
+    let createIdentity =
+      (module CreateIdentityRequest : Runtime'.Spec.Message with type t = CreateIdentityRequest.t ),
+      (module CreateIdentityResponse : Runtime'.Spec.Message with type t = CreateIdentityResponse.t )
+
+    module QueryEmails = struct
+      let package_name = Some "protocol"
+      let service_name = "InboxService"
+      let method_name = "QueryEmails"
+      let name = "/protocol.InboxService/QueryEmails"
+      module Request = QueryEmailsRequest
+      module Response = QueryEmailsResponse
+    end
+
+    let queryEmails =
+      (module QueryEmailsRequest : Runtime'.Spec.Message with type t = QueryEmailsRequest.t ),
+      (module QueryEmailsResponse : Runtime'.Spec.Message with type t = QueryEmailsResponse.t )
+
+    module SubmitEmail = struct
+      let package_name = Some "protocol"
+      let service_name = "InboxService"
+      let method_name = "SubmitEmail"
+      let name = "/protocol.InboxService/SubmitEmail"
+      module Request = SubmitEmailRequest
+      module Response = SubmitEmailResponse
+    end
+
+    let submitEmail =
+      (module SubmitEmailRequest : Runtime'.Spec.Message with type t = SubmitEmailRequest.t ),
+      (module SubmitEmailResponse : Runtime'.Spec.Message with type t = SubmitEmailResponse.t )
+
   end
 
 end
