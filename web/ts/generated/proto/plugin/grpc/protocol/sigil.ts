@@ -17,9 +17,20 @@ export interface Signum {
   sigils: Sigil[];
   /**
    * The shapes this signum is held to, each by its name: "Staands will be
-   * Umami, one reference and not a blend." make parity prisma reads these.
+   * Umami, one reference and not a blend." The parity sigil reads these.
    */
   follows: Follows[];
+}
+
+/**
+ * Node is the node about itself: what it is called, what it is for, and the
+ * signa it holds. am node answers it; the parity sigil holds it to A2A's
+ * AgentCard. Mirrors server.amNode.
+ */
+export interface Node {
+  name: string;
+  description: string;
+  signa: Signum[];
 }
 
 /**

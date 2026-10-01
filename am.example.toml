@@ -84,6 +84,13 @@ entity_actors_limit = 64
 # The numbers the node emits are named in internal/measure.
 # ════════════════════════════════════════════════════════════════
 
+[node]
+# What the node says of itself, through am node, and what the parity sigil
+# holds to A2A's AgentCard.
+# Default: "" (says nothing)
+# name = "the-node"
+# description = "What this node is for."
+
 [sentry]
 # The project logs and metrics are shipped to. Empty is off, and
 # nothing else in this section is read. A DSN is an ingest key — it

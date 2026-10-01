@@ -17,8 +17,17 @@ message Signum {
   string name = 1;
   repeated Sigil sigils = 2;
   // The shapes this signum is held to, each by its name: "Staands will be
-  // Umami, one reference and not a blend." make parity prisma reads these.
+  // Umami, one reference and not a blend." The parity sigil reads these.
   repeated Follows follows = 3;
+}
+
+// Node is the node about itself: what it is called, what it is for, and the
+// signa it holds. am node answers it; the parity sigil holds it to A2A's
+// AgentCard. Mirrors server.amNode.
+message Node {
+  string name = 1;
+  string description = 2;
+  repeated Signum signa = 3;
 }
 
 // Follows says which column of a reference each of a signum's fields is. The

@@ -26,6 +26,11 @@
         "ANYONE"
       ]
     },
+    "/am/node": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/am/statusline": {
       "x-qntx-reach": [
         "ROOT",
