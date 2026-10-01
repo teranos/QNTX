@@ -33,35 +33,14 @@ var pinned embed.FS
 // Reference is the schema of the reference named, from the one directory
 // pinned for it.
 func Reference(name string) (Schema, *protocol.Refusal) {
-	entries, err := fs.ReadDir(pinned, ".")
-	if err != nil {
-		return Schema{}, failed("the pinned references did not read: %v", err)
-	}
-	var found, held []string
-	for _, entry := range entries {
-		reference, _, _ := strings.Cut(entry.Name(), "_")
-		held = append(held, reference)
-		if reference == name {
-			found = append(found, entry.Name())
-		}
-	}
-	switch len(found) {
-	case 0:
-		return Schema{}, &protocol.Refusal{Why: sigil.NotFound, Param: "reference",
-			Says: "the node holds no schema for " + name + "; it holds " + strings.Join(held, ", ")}
-	case 1:
-	default:
-		return Schema{}, failed("%s is pinned more than once: %s", name, strings.Join(found, ", "))
-	}
-
-	files, err := fs.ReadDir(pinned, found[0])
-	if err != nil {
-		return Schema{}, failed("%s did not read: %v", found[0], err)
+	dir, files, refused := pinnedAt(name)
+	if refused != nil {
+		return Schema{}, refused
 	}
 	var protos, declarations []string
 	prisma, jsonSchema, openAPI := false, false, false
-	for _, file := range files {
-		switch name := file.Name(); {
+	for _, name := range files {
+		switch {
 		case name == "schema.prisma":
 			prisma = true
 		case name == "schema.json":
@@ -78,22 +57,74 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 	case prisma:
 		// A record and the types of what is sent to it are one reference:
 		// Umami's schema.prisma and its tracker's index.d.ts.
-		schema, refused := prismaAt(found[0], "schema.prisma")
+		schema, refused := prismaAt(dir, "schema.prisma")
 		if refused != nil {
 			return Schema{}, refused
 		}
-		return withDeclarations(schema, found[0], declarations)
+		return withDeclarations(schema, dir, declarations)
 	case jsonSchema:
-		return jsonSchemaAt(path.Join(found[0], "schema.json"))
+		return jsonSchemaAt(path.Join(dir, "schema.json"))
 	case openAPI:
-		return openAPIAt(path.Join(found[0], "openapi.json"))
+		return openAPIAt(path.Join(dir, "openapi.json"))
 	case len(declarations) > 0:
-		return withDeclarations(Schema{fits: tsFits}, found[0], declarations)
+		return withDeclarations(Schema{fits: tsFits}, dir, declarations)
 	}
 	if len(protos) == 0 {
-		return Schema{}, failed("%s holds no schema.prisma, no .proto, no schema.json, no .d.ts and no openapi.json", found[0])
+		return Schema{}, failed("%s holds no schema.prisma, no .proto, no schema.json, no .d.ts and no openapi.json", dir)
 	}
-	return protoAt(found[0], protos)
+	return protoAt(dir, protos)
+}
+
+// Descriptors is the .proto files pinned for the reference named, as they
+// compile, for whatever reads more of a reference than its messages.
+func Descriptors(name string) ([]protoreflect.FileDescriptor, *protocol.Refusal) {
+	dir, files, refused := pinnedAt(name)
+	if refused != nil {
+		return nil, refused
+	}
+	var protos []string
+	for _, file := range files {
+		if strings.HasSuffix(file, ".proto") {
+			protos = append(protos, file)
+		}
+	}
+	if len(protos) == 0 {
+		return nil, failed("%s holds no .proto", dir)
+	}
+	return compileAt(dir, protos)
+}
+
+// pinnedAt is the one directory pinned for the reference named, and its files.
+func pinnedAt(name string) (string, []string, *protocol.Refusal) {
+	entries, err := fs.ReadDir(pinned, ".")
+	if err != nil {
+		return "", nil, failed("the pinned references did not read: %v", err)
+	}
+	var found, held []string
+	for _, entry := range entries {
+		reference, _, _ := strings.Cut(entry.Name(), "_")
+		held = append(held, reference)
+		if reference == name {
+			found = append(found, entry.Name())
+		}
+	}
+	switch len(found) {
+	case 0:
+		return "", nil, &protocol.Refusal{Why: sigil.NotFound, Param: "reference",
+			Says: "the node holds no schema for " + name + "; it holds " + strings.Join(held, ", ")}
+	case 1:
+	default:
+		return "", nil, failed("%s is pinned more than once: %s", name, strings.Join(found, ", "))
+	}
+	entries, err = fs.ReadDir(pinned, found[0])
+	if err != nil {
+		return "", nil, failed("%s did not read: %v", found[0], err)
+	}
+	var files []string
+	for _, entry := range entries {
+		files = append(files, entry.Name())
+	}
+	return found[0], files, nil
 }
 
 func prismaAt(dir, file string) (Schema, *protocol.Refusal) {
@@ -167,9 +198,24 @@ func openAPIAt(description string) (Schema, *protocol.Refusal) {
 	return read, nil
 }
 
-// protoAt compiles the .proto files of dir. What they import from google/api is
-// what this binary links of genproto; google/protobuf is protocompile's own.
+// protoAt is the messages of the .proto files of dir as a reference.
 func protoAt(dir string, names []string) (Schema, *protocol.Refusal) {
+	files, refused := compileAt(dir, names)
+	if refused != nil {
+		return Schema{}, refused
+	}
+	var models []Model
+	for _, file := range files {
+		models = append(models, messagesOf(file.Package(), file.Messages())...)
+	}
+	return Schema{Models: models, fits: func(kind protoreflect.Kind, column Column) bool {
+		return column.Type == kind.String()
+	}}, nil
+}
+
+// compileAt compiles the .proto files of dir. What they import from google/api
+// is what this binary links of genproto; google/protobuf is protocompile's own.
+func compileAt(dir string, names []string) ([]protoreflect.FileDescriptor, *protocol.Refusal) {
 	compiler := protocompile.Compiler{
 		// The comments are what the spec says of its own messages and fields.
 		SourceInfoMode: protocompile.SourceInfoStandard,
@@ -188,15 +234,13 @@ func protoAt(dir string, names []string) (Schema, *protocol.Refusal) {
 	}
 	files, err := compiler.Compile(context.Background(), names...)
 	if err != nil {
-		return Schema{}, failed("%s did not compile: %v", dir, err)
+		return nil, failed("%s did not compile: %v", dir, err)
 	}
-	var models []Model
+	compiled := make([]protoreflect.FileDescriptor, 0, len(files))
 	for _, file := range files {
-		models = append(models, messagesOf(file.Package(), file.Messages())...)
+		compiled = append(compiled, file)
 	}
-	return Schema{Models: models, fits: func(kind protoreflect.Kind, column Column) bool {
-		return column.Type == kind.String()
-	}}, nil
+	return compiled, nil
 }
 
 // messagesOf is every message, nested ones after their parent, each named
