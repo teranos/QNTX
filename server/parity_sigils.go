@@ -20,6 +20,8 @@ import (
 func everySignumFollows() []*protocol.Follows {
 	return []*protocol.Follows{{Reference: "a2a", Columns: []*protocol.Corresponds{
 		{Field: "protocol.Signum.name", Column: "AgentSkill.name"},
+		{Field: "protocol.Signum.description", Column: "AgentSkill.description"},
+		{Field: "protocol.Signum.tags", Column: "AgentSkill.tags"},
 	}}}
 }
 
