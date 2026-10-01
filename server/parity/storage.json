@@ -1,0 +1,418 @@
+[
+  {
+    "name": "access_tokens",
+    "node": true,
+    "record": true,
+    "rebuilt": false,
+    "sites": [
+      "server/auth/tokens_table.go"
+    ]
+  },
+  {
+    "name": "ai_model_usage",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ai/tracker/usage_tracker.go",
+      "pulse/budget/store.go"
+    ]
+  },
+  {
+    "name": "aliases",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/alias_store.go"
+    ]
+  },
+  {
+    "name": "async_ix_jobs",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "plugin/grpc/pulse_handler.go",
+      "pulse/async/store.go"
+    ]
+  },
+  {
+    "name": "attestation_actors",
+    "node": true,
+    "record": false,
+    "rebuilt": true,
+    "sites": [
+      "ats/storage/query_builder.go",
+      "internal/testing/database.go",
+      "server/db_stats_cache.go"
+    ]
+  },
+  {
+    "name": "attestation_contexts",
+    "node": true,
+    "record": false,
+    "rebuilt": true,
+    "sites": [
+      "ats/storage/query_builder.go",
+      "internal/testing/database.go",
+      "server/db_stats_cache.go"
+    ]
+  },
+  {
+    "name": "attestation_predicates",
+    "node": true,
+    "record": false,
+    "rebuilt": true,
+    "sites": [
+      "ats/storage/query_builder.go",
+      "internal/testing/database.go",
+      "server/db_stats_cache.go"
+    ]
+  },
+  {
+    "name": "attestation_subjects",
+    "node": true,
+    "record": false,
+    "rebuilt": true,
+    "sites": [
+      "ats/storage/query_builder.go",
+      "internal/testing/database.go",
+      "server/db_stats_cache.go"
+    ]
+  },
+  {
+    "name": "attestations",
+    "node": true,
+    "record": true,
+    "rebuilt": false,
+    "sites": [
+      "ats/so/actions/prompt/store.go",
+      "ats/storage/embedding_sweep.go",
+      "ats/storage/lands_first.go",
+      "ats/storage/query_store.go",
+      "ats/storage/retrieval.go",
+      "ats/storage/rich_search.go",
+      "ats/storage/testutil/ax_helpers.go",
+      "cmd/parity/main.go",
+      "cmd/qntx/commands/db.go",
+      "internal/testing/database.go",
+      "plugin/grpc/services/ground_server.go",
+      "server/db_stats_cache.go",
+      "server/embeddings/clustering.go",
+      "server/embeddings/handlers.go",
+      "server/ground_bridge.go"
+    ]
+  },
+  {
+    "name": "canvas_access",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "element/storage/canvases.go"
+    ]
+  },
+  {
+    "name": "canvas_compositions",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "element/storage/canvas_store.go",
+      "element/storage/canvases.go"
+    ]
+  },
+  {
+    "name": "canvas_elements",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/watcher/engine_execute.go",
+      "element/storage/canvas_store.go",
+      "element/storage/canvases.go"
+    ]
+  },
+  {
+    "name": "canvas_invitations",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "element/storage/canvases.go"
+    ]
+  },
+  {
+    "name": "canvas_owners",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "element/storage/canvases.go"
+    ]
+  },
+  {
+    "name": "canvases",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "element/storage/canvases.go"
+    ]
+  },
+  {
+    "name": "cluster_centroids",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/embedding_store.go"
+    ]
+  },
+  {
+    "name": "cluster_events",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/embedding_store.go"
+    ]
+  },
+  {
+    "name": "cluster_runs",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/embedding_store.go"
+    ]
+  },
+  {
+    "name": "cluster_snapshots",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/embedding_store.go"
+    ]
+  },
+  {
+    "name": "clusters",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/embedding_cluster_membership.go",
+      "ats/storage/embedding_store.go"
+    ]
+  },
+  {
+    "name": "composition_edge_cursors",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/watcher/engine_execute.go",
+      "element/handlers/canvas.go"
+    ]
+  },
+  {
+    "name": "composition_edges",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "element/storage/canvas_store.go",
+      "element/storage/canvases.go"
+    ]
+  },
+  {
+    "name": "embedding_projections",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/embedding_store.go"
+    ]
+  },
+  {
+    "name": "embeddings",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/embedding_cluster_membership.go",
+      "ats/storage/embedding_store.go",
+      "ats/storage/embedding_sweep.go",
+      "server/embeddings/handlers.go"
+    ]
+  },
+  {
+    "name": "enforcement_actor_context",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": []
+  },
+  {
+    "name": "enforcement_actor_contexts",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": []
+  },
+  {
+    "name": "enforcement_entity_actors",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": []
+  },
+  {
+    "name": "enforcement_entity_actors_detail",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": []
+  },
+  {
+    "name": "job_checkpoints",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": []
+  },
+  {
+    "name": "minimized_windows",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "element/storage/canvas_store.go",
+      "element/storage/canvases.go"
+    ]
+  },
+  {
+    "name": "node_identity",
+    "node": true,
+    "record": true,
+    "rebuilt": false,
+    "sites": [
+      "server/nodedid/store.go"
+    ]
+  },
+  {
+    "name": "pulse_executions",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "pulse/schedule/execution_store.go",
+      "pulse/schedule/store.go",
+      "server/embeddings/pulse.go"
+    ]
+  },
+  {
+    "name": "schedule_ticks",
+    "node": false,
+    "record": true,
+    "rebuilt": false,
+    "sites": []
+  },
+  {
+    "name": "scheduled_pulse_jobs",
+    "node": true,
+    "record": true,
+    "rebuilt": false,
+    "sites": [
+      "plugin/grpc/schedules.go",
+      "pulse/schedule/store.go",
+      "server/embeddings/pulse.go"
+    ]
+  },
+  {
+    "name": "storage_events",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "cmd/qntx/commands/db.go",
+      "server/db_stats_cache.go",
+      "server/storage_events.go"
+    ]
+  },
+  {
+    "name": "task_logs",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "plugin/grpc/pulse_handler.go",
+      "pulse/async/worker.go",
+      "pulse/schedule/task_log_store.go",
+      "server/embeddings/pulse.go"
+    ]
+  },
+  {
+    "name": "users",
+    "node": true,
+    "record": true,
+    "rebuilt": false,
+    "sites": [
+      "server/auth/users_table.go"
+    ]
+  },
+  {
+    "name": "vec_embeddings",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": []
+  },
+  {
+    "name": "watcher_execution_queue",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/watcher/queue_store.go"
+    ]
+  },
+  {
+    "name": "watcher_fires",
+    "node": true,
+    "record": true,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/watcher_store.go"
+    ]
+  },
+  {
+    "name": "watchers",
+    "node": true,
+    "record": true,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/watcher_store.go"
+    ]
+  },
+  {
+    "name": "webauthn_credential_owners",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "server/auth/credentials.go"
+    ]
+  },
+  {
+    "name": "webauthn_credentials",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "server/auth/credentials.go"
+    ]
+  }
+]

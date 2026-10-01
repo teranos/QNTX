@@ -38,9 +38,18 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/hold"},
 				},
+				{
+					Name: "storage",
+					Does: "For every thing QNTX persists, whether a node keeps it on its own disk and whether the record under the storage location keeps it, as make parity read the source this build was made from. It says nothing of this node's own stores.",
+					Gives: []*protocol.Field{
+						{Name: "describes", Says: "What was read: source, the code this build was made from, and never this node."},
+						{Name: "things", Says: "One per thing, by name: on the node, in the record, rebuilt by a take-in, and the Go files that reach it with SQL written by hand."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/storage"},
+				},
 			},
 		},
-		Answers: map[string]sigil.Answer{"hold": s.parityHold},
+		Answers: map[string]sigil.Answer{"hold": s.parityHold, "storage": s.parityStorage},
 	}
 }
 
@@ -84,4 +93,12 @@ func (s *QNTXServer) parityHold(_ context.Context, sent sigil.Sent) (any, *proto
 		return nil, refused
 	}
 	return p, nil
+}
+
+func (s *QNTXServer) parityStorage(context.Context, sigil.Sent) (any, *protocol.Refusal) {
+	things, err := parity.Storage()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	return map[string]any{"describes": "source", "things": things}, nil
 }
