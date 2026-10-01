@@ -24,6 +24,12 @@ import (
 // A model is a clade and its columns are its items. A model nothing follows is
 // one line at 0; a model anything follows opens and lists every column; a model
 // at 100 is not shown unless -all is given.
+//
+// Datapunt takes this over: "Imagine datapunt subsuming the ownership of what
+// make parity does", "but also own it for prism". "Make parity would just be
+// for the storage backend specifically." "Agnostic core remains agnostic."
+//
+// This stays until datapunt gives what umami_v3.3.1_ca661c7/staands records.
 
 // Column is one scalar field of a Prisma model.
 type Column struct {
