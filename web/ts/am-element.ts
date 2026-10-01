@@ -26,6 +26,20 @@ let amVersion: VersionMessage | null = null;
 let amCapabilities: SystemCapabilitiesMessage | null = null;
 let amNodeDID: string | null = null;
 let amStatusRow: StatusItem[] = [];
+let amCard: AmCard | null = null;
+
+// What am card answers: the A2A card this caller would be given, and what it
+// leaves empty that the spec requires.
+interface AmCard {
+    card: {
+        name?: string;
+        description?: string;
+        version?: string;
+        supportedInterfaces?: { url?: string; protocolBinding?: string; protocolVersion?: string }[];
+        skills?: { name?: string }[];
+    };
+    missing: string[];
+}
 
 /** The build, pushed on the connect frame. */
 export function updateAmVersion(data: VersionMessage): void {
@@ -87,6 +101,21 @@ async function loadStatusRow(): Promise<void> {
         if (amElement) renderAm();
     } catch (error: unknown) {
         log.warn(SEG.SELF, `[am] /am/statusline fetch failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+// The card an A2A caller would be given, as this operator.
+async function loadCard(): Promise<void> {
+    try {
+        const response = await apiFetch('/am/card');
+        if (!response.ok) {
+            log.warn(SEG.SELF, `[am] /am/card answered ${response.status} ${response.statusText}`);
+            return;
+        }
+        amCard = await response.json() as AmCard;
+        if (amElement) renderAm();
+    } catch (error: unknown) {
+        log.warn(SEG.SELF, `[am] /am/card fetch failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
@@ -165,6 +194,34 @@ function renderAm(): void {
         `);
     }
 
+    // What the node would say of itself to an A2A caller, and what the spec
+    // requires that it leaves empty. Nothing is filled in here that the node
+    // did not say.
+    if (amCard) {
+        const card = amCard.card;
+        const said = (value: string | undefined) => value
+            ? escapeHtml(value)
+            : '<span class="status-unwell">not said</span>';
+        const interfaces = (card.supportedInterfaces ?? [])
+            .map((i) => escapeHtml(`${i.url ?? ''} ${i.protocolBinding ?? ''} ${i.protocolVersion ?? ''}`))
+            .join('<br>');
+        const skills = (card.skills ?? []).map((s) => escapeHtml(s.name ?? '')).join(', ');
+        const missing = amCard.missing.length > 0
+            ? amCard.missing.map((m) => `<span class="status-unwell">${escapeHtml(m)}</span>`).join('<br>')
+            : '<span class="status-well">nothing</span>';
+        sections.push(`
+            <div class="element-section">
+                <h3 class="element-section-title">A2A card</h3>
+                ${row('Name:', said(card.name))}
+                ${row('Description:', said(card.description))}
+                ${row('Version:', said(card.version))}
+                ${row('Interface:', interfaces || said(undefined))}
+                ${row('Skills:', skills || said(undefined))}
+                ${row('Missing:', missing)}
+            </div>
+        `);
+    }
+
     amElement.innerHTML = `
         <div class="element-content">
             ${sections.join('\n')}
@@ -185,6 +242,7 @@ export function createAmElement() {
             if (!amNodeDID) void loadNodeDID();
             if (!amCapabilities) void loadSyscap();
             void loadStatusRow();
+            void loadCard();
             return content;
         },
     };

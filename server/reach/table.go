@@ -130,6 +130,7 @@ REACH is '/ws' '/ws/llm'                                                  of ROO
 REACH is '/am/version'                                                    of ROOT SUPER
 REACH is '/am/syscap'                                                     of ROOT
 REACH is '/am/node'                                                       of ROOT
+REACH is '/am/card'                                                       of ROOT
 
 # A signum held to a reference it follows (the parity signum): "parity the
 # sigil is what an Agent should deal with through MCP".

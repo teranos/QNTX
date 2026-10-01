@@ -2,13 +2,17 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/syscap"
+	"github.com/teranos/errors"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // Am is the node about itself (ADR-039): which build runs, what it can do, and
@@ -63,6 +67,15 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/node"},
 				},
 				{
+					Name: "card",
+					Does: "The A2A agent card the asker would be given, read through the pinned spec, and what it leaves empty that the spec requires.",
+					Gives: []*protocol.Field{
+						{Name: "card", Says: "The card, as lf.a2a.v1.AgentCard of the pinned A2A spec."},
+						{Name: "missing", Says: "Every field the card leaves empty that the spec requires, by its path."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/card"},
+				},
+				{
 					Name: "syscap",
 					Does: "What this build can do: the storage backend and the parser it was built against. What the connect frame pushes, asked for.",
 					Gives: []*protocol.Field{
@@ -90,12 +103,39 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 		Answers: map[string]sigil.Answer{
 			"version": func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return version.Get(), nil },
 			"node":    s.amNode,
+			"card":    s.amCard,
 			"syscap":  func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return syscap.Get(s.store), nil },
 			"item": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 				return s.statusLineHandler.item(ctx, sent["name"])
 			},
 		},
 	}
+}
+
+// amCard is what am card answers.
+type amCard struct {
+	Card    json.RawMessage `json:"card"`
+	Missing []string        `json:"missing"`
+}
+
+func (s *QNTXServer) amCard(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	caller := sigil.Caller(ctx)
+	if caller == nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the card names where its caller reached the node, and this asking carried no request"}
+	}
+	card, err := s.a2aCard(caller).Message()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	body, err := protojson.Marshal(card.Interface())
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrap(err, "the card did not marshal").Error()}
+	}
+	missing := a2a.Missing(card)
+	if missing == nil {
+		missing = []string{}
+	}
+	return amCard{Card: body, Missing: missing}, nil
 }
 
 func (s *QNTXServer) amNode(context.Context, sigil.Sent) (any, *protocol.Refusal) {
