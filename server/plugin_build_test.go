@@ -110,6 +110,20 @@ func TestABuildWorksOnDiskUnderTheNodesHome(t *testing.T) {
 	}
 }
 
+// "needs to be kinder with the system, we can tolerate slower less resource intensive builds"
+func TestABuildRunsOneJobAtATime(t *testing.T) {
+	env := buildEnv("/w", "", nil)
+	for _, want := range []string{"CARGO_BUILD_JOBS=1", "GOFLAGS=-p=1", "MAKEFLAGS=-j1"} {
+		if !slices.Contains(env, want) {
+			t.Fatalf("%s is not in the build's env: %v", want, env)
+		}
+	}
+	name, args := gentle("/nix/bin/nix", []string{"shell"})
+	if name != "nice" || !slices.Equal(args, []string{"-n", "19", "/nix/bin/nix", "shell"}) {
+		t.Fatalf("the build runs as %s %v", name, args)
+	}
+}
+
 func TestBuildOfLeavesAPluginWithoutABuildAlone(t *testing.T) {
 	_, built, err := buildOf(grpcplugin.PluginRecord{Name: "cleanAPI", Config: map[string]string{}})
 	if err != nil || built {

@@ -299,11 +299,20 @@ func buildEnv(work, inputsEnv string, files []string) []string {
 	env := []string{
 		"PATH=" + nixBin + ":" + os.Getenv("PATH"),
 		"TMPDIR=" + filepath.Join(work, "tmp"),
+		"CARGO_BUILD_JOBS=1",
+		"GOFLAGS=-p=1",
+		"MAKEFLAGS=-j1",
 	}
 	if inputsEnv != "" {
 		env = append(env, inputsEnv+"="+strings.Join(files, " "))
 	}
 	return env
+}
+
+// gentle runs a build at the lowest CPU priority, so the node it builds on
+// keeps answering.
+func gentle(name string, args []string) (string, []string) {
+	return "nice", append([]string{"-n", "19", name}, args...)
 }
 
 // buildPlugin builds b from revs, packages what it built, and installs it.
@@ -354,7 +363,8 @@ func (s *QNTXServer) buildPlugin(ctx context.Context, b pluginBuild, revs []stri
 		args = append(args, "nixpkgs#"+p)
 	}
 	args = append(args, "-c", "sh", "-c", b.command)
-	if _, err := runBuild(ctx, src, buildEnv(work, b.inputsEnv, files), filepath.Join(nixBin, "nix"), args...); err != nil {
+	nice, niceArgs := gentle(filepath.Join(nixBin, "nix"), args)
+	if _, err := runBuild(ctx, src, buildEnv(work, b.inputsEnv, files), nice, niceArgs...); err != nil {
 		return false, "", errors.Wrapf(err, "the build of %s at %s failed", b.name, revs[0])
 	}
 
