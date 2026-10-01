@@ -30,9 +30,59 @@ var pinned embed.FS
 // Reference is the schema of the reference named, from the one directory
 // pinned for it.
 func Reference(name string) (Schema, *protocol.Refusal) {
+	dir, files, refused := pinnedAt(name)
+	if refused != nil {
+		return Schema{}, refused
+	}
+	var protos []string
+	for _, file := range files {
+		if file == "schema.prisma" {
+			return prismaAt(path.Join(dir, file))
+		}
+		if strings.HasSuffix(file, ".proto") {
+			protos = append(protos, file)
+		}
+	}
+	if len(protos) == 0 {
+		return Schema{}, failed("%s holds no schema.prisma and no .proto", dir)
+	}
+	compiled, refused := compileAt(dir, protos)
+	if refused != nil {
+		return Schema{}, refused
+	}
+	var models []Model
+	for _, file := range compiled {
+		models = append(models, messagesOf(file.Package(), file.Messages())...)
+	}
+	return Schema{Models: models, fits: func(kind protoreflect.Kind, column Column) bool {
+		return column.Type == kind.String()
+	}}, nil
+}
+
+// Descriptors is the .proto files pinned for the reference named, as they
+// compile, for whatever reads more of a reference than its messages.
+func Descriptors(name string) ([]protoreflect.FileDescriptor, *protocol.Refusal) {
+	dir, files, refused := pinnedAt(name)
+	if refused != nil {
+		return nil, refused
+	}
+	var protos []string
+	for _, file := range files {
+		if strings.HasSuffix(file, ".proto") {
+			protos = append(protos, file)
+		}
+	}
+	if len(protos) == 0 {
+		return nil, failed("%s holds no .proto", dir)
+	}
+	return compileAt(dir, protos)
+}
+
+// pinnedAt is the one directory pinned for the reference named, and its files.
+func pinnedAt(name string) (string, []string, *protocol.Refusal) {
 	entries, err := fs.ReadDir(pinned, ".")
 	if err != nil {
-		return Schema{}, failed("the pinned references did not read: %v", err)
+		return "", nil, failed("the pinned references did not read: %v", err)
 	}
 	var found, held []string
 	for _, entry := range entries {
@@ -44,30 +94,21 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 	}
 	switch len(found) {
 	case 0:
-		return Schema{}, &protocol.Refusal{Why: sigil.NotFound, Param: "reference",
+		return "", nil, &protocol.Refusal{Why: sigil.NotFound, Param: "reference",
 			Says: "the node holds no schema for " + name + "; it holds " + strings.Join(held, ", ")}
 	case 1:
 	default:
-		return Schema{}, failed("%s is pinned more than once: %s", name, strings.Join(found, ", "))
+		return "", nil, failed("%s is pinned more than once: %s", name, strings.Join(found, ", "))
 	}
-
-	files, err := fs.ReadDir(pinned, found[0])
+	entries, err = fs.ReadDir(pinned, found[0])
 	if err != nil {
-		return Schema{}, failed("%s did not read: %v", found[0], err)
+		return "", nil, failed("%s did not read: %v", found[0], err)
 	}
-	var protos []string
-	for _, file := range files {
-		if file.Name() == "schema.prisma" {
-			return prismaAt(path.Join(found[0], file.Name()))
-		}
-		if strings.HasSuffix(file.Name(), ".proto") {
-			protos = append(protos, file.Name())
-		}
+	var files []string
+	for _, entry := range entries {
+		files = append(files, entry.Name())
 	}
-	if len(protos) == 0 {
-		return Schema{}, failed("%s holds no schema.prisma and no .proto", found[0])
-	}
-	return protoAt(found[0], protos)
+	return found[0], files, nil
 }
 
 func prismaAt(schema string) (Schema, *protocol.Refusal) {
@@ -82,9 +123,9 @@ func prismaAt(schema string) (Schema, *protocol.Refusal) {
 	return Prisma(models), nil
 }
 
-// protoAt compiles the .proto files of dir. What they import from google/api is
-// what this binary links of genproto; google/protobuf is protocompile's own.
-func protoAt(dir string, names []string) (Schema, *protocol.Refusal) {
+// compileAt compiles the .proto files of dir. What they import from google/api
+// is what this binary links of genproto; google/protobuf is protocompile's own.
+func compileAt(dir string, names []string) ([]protoreflect.FileDescriptor, *protocol.Refusal) {
 	compiler := protocompile.Compiler{
 		Resolver: protocompile.WithStandardImports(protocompile.CompositeResolver{
 			&protocompile.SourceResolver{Accessor: func(name string) (io.ReadCloser, error) {
@@ -101,15 +142,13 @@ func protoAt(dir string, names []string) (Schema, *protocol.Refusal) {
 	}
 	files, err := compiler.Compile(context.Background(), names...)
 	if err != nil {
-		return Schema{}, failed("%s did not compile: %v", dir, err)
+		return nil, failed("%s did not compile: %v", dir, err)
 	}
-	var models []Model
+	compiled := make([]protoreflect.FileDescriptor, 0, len(files))
 	for _, file := range files {
-		models = append(models, messagesOf(file.Package(), file.Messages())...)
+		compiled = append(compiled, file)
 	}
-	return Schema{Models: models, fits: func(kind protoreflect.Kind, column Column) bool {
-		return column.Type == kind.String()
-	}}, nil
+	return compiled, nil
 }
 
 // messagesOf is every message, nested ones after their parent, each named
