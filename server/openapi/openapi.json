@@ -32,6 +32,11 @@
       ],
       "x-qntx-prefix": true
     },
+    "/am/card": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/am/node": {
       "x-qntx-reach": [
         "ROOT"

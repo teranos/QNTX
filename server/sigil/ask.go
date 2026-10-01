@@ -74,7 +74,7 @@ func (a Asking) Ask(ctx context.Context, arrived map[string]any) Asked {
 			asked = &Asked{Refusal: refusal}
 			return
 		}
-		answer, refusal := a.Answer(context.WithValue(r.Context(), arrivedKey{}, arrived), sent)
+		answer, refusal := a.Answer(WithCaller(context.WithValue(r.Context(), arrivedKey{}, arrived), r), sent)
 		asked = &Asked{Answer: answer, Refusal: refusal}
 	}
 	if !a.Anyone {
@@ -99,6 +99,21 @@ type arrivedKey struct{}
 func Arrived(ctx context.Context) map[string]any {
 	arrived, _ := ctx.Value(arrivedKey{}).(map[string]any)
 	return arrived
+}
+
+// callerKey is where Ask leaves the request that carried the asking.
+type callerKey struct{}
+
+// WithCaller is ctx carrying the request that carried an asking.
+func WithCaller(ctx context.Context, r *http.Request) context.Context {
+	return context.WithValue(ctx, callerKey{}, r)
+}
+
+// Caller is the request that carried the asking: where the caller reached the
+// node. Nil for an answer asked with no request.
+func Caller(ctx context.Context) *http.Request {
+	r, _ := ctx.Value(callerKey{}).(*http.Request)
+	return r
 }
 
 // rejected holds what the gate wrote, so it can be handed on rather than
