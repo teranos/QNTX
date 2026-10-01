@@ -123,6 +123,45 @@ func (s *GitHubServer) RateLimit(ctx context.Context, req *protocol.GitHubRateLi
 	return resp, nil
 }
 
+// Tarball is a repository at ref as GitHub archives it, read with the
+// namespace's credential, so a private repository comes the way a public one
+// does. GitHub answers at a signed codeload URL, which the client follows.
+func (s *GitHubServer) Tarball(ctx context.Context, namespace, owner, repo, ref string) (io.ReadCloser, error) {
+	if !s.enabled() {
+		return nil, errors.New(githubDisabled)
+	}
+	token, key, err := s.creds.Token(ctx, namespace)
+	if err != nil {
+		return nil, errors.Wrapf(err, "no GitHub credential for namespace %q", namespace)
+	}
+	if token == "" {
+		return nil, errors.Newf("namespace %q has an empty GitHub token", namespace)
+	}
+	path := "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo) + "/tarball/" + url.PathEscape(ref)
+	s.mu.Lock()
+	target := s.baseURL + path
+	s.mu.Unlock()
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to build GitHub request GET %s", path)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Accept", "application/vnd.github+json")
+	httpReq.Header.Set("X-GitHub-Api-Version", githubAPIVersion)
+	httpResp, err := s.client.Do(httpReq)
+	if err != nil {
+		return nil, errors.Wrapf(err, "GitHub GET %s failed", path)
+	}
+	s.recordHeaders(key, httpResp.Header)
+	if httpResp.StatusCode < 200 || httpResp.StatusCode > 299 {
+		raw, _ := io.ReadAll(io.LimitReader(httpResp.Body, 4096))
+		sqlclose.Log(httpResp.Body.Close(), s.logger, "the GitHub response body")
+		return nil, errors.Newf("GitHub GET %s answered %d: %s", path, httpResp.StatusCode, githubMessage(raw))
+	}
+	// The archive is the caller's to read and close.
+	return httpResp.Body, nil
+}
+
 // githubRoute is where one RPC goes on GitHub. Path parameters are the {names}
 // in path; query and body name the request fields sent there. Field names are
 // GitHub's parameter names: the protos were written from the same pages.

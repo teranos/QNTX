@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"html"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/sqlclose"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
@@ -235,17 +237,19 @@ func (s *QNTXServer) buildPlugin(ctx context.Context, b pluginBuild, revs []stri
 		}
 	}()
 
+	// The core comes through the node's GitHub, as the inputs do: a private
+	// repository has no public archive to fetch.
 	src := filepath.Join(work, "src")
-	fetched, err := runBuild(ctx, work, nil, filepath.Join(nixBin, "nix"), "eval", "--raw", "--impure", "--expr",
-		fmt.Sprintf(`builtins.fetchTarball "https://github.com/%s/%s/archive/%s.tar.gz"`, b.core.Owner, b.core.Repo, revs[0]))
-	if err != nil {
-		return false, "", errors.Wrapf(err, "failed to fetch %s at %s", b.core.String(), revs[0])
-	}
-	if _, err := runBuild(ctx, work, nil, "cp", "-R", strings.TrimSpace(fetched), src); err != nil {
+	tarball := filepath.Join(work, "core.tar.gz")
+	if err := s.fetchCore(ctx, b.core, revs[0], tarball); err != nil {
 		return false, "", err
 	}
-	if _, err := runBuild(ctx, work, nil, "chmod", "-R", "u+w", src); err != nil {
-		return false, "", err
+	if err := os.Mkdir(src, 0o755); err != nil {
+		return false, "", errors.Wrapf(err, "failed to make %s", src)
+	}
+	// GitHub's archive holds one directory named for the repository and rev.
+	if _, err := runBuild(ctx, work, nil, "tar", "-xzf", tarball, "--strip-components=1", "-C", src); err != nil {
+		return false, "", errors.Wrapf(err, "failed to unpack %s at %s", b.core.String(), revs[0])
 	}
 
 	var files []string
@@ -275,6 +279,27 @@ func (s *QNTXServer) buildPlugin(ctx context.Context, b pluginBuild, revs []stri
 		return false, "", err
 	}
 	return grpcplugin.InstallBuild(b.name, archive, s.logger.Named("build"))
+}
+
+// fetchCore writes the core's archive at rev to path.
+func (s *QNTXServer) fetchCore(ctx context.Context, core buildSource, rev, path string) error {
+	body, err := s.gitHubService().Tarball(ctx, "", core.Owner, core.Repo, rev)
+	if err != nil {
+		return errors.Wrapf(err, "failed to fetch %s at %s", core.String(), rev)
+	}
+	defer func() { sqlclose.Log(body.Close(), s.logger, "the archive of "+core.String()) }()
+	file, err := os.Create(path)
+	if err != nil {
+		return errors.Wrapf(err, "failed to make %s", path)
+	}
+	if _, err := io.Copy(file, body); err != nil {
+		sqlclose.Log(file.Close(), s.logger, path)
+		return errors.Wrapf(err, "failed to write %s at %s to %s", core.String(), rev, path)
+	}
+	if err := file.Close(); err != nil {
+		return errors.Wrapf(err, "failed to finish writing %s", path)
+	}
+	return nil
 }
 
 // fetchInput writes one input file at rev into work, and says where.

@@ -194,6 +194,35 @@ func TestGitHubLocationResponse(t *testing.T) {
 	assert.Equal(t, "https://pipelines.actions.githubusercontent.com/artifact.zip?sig=x", resp.Location)
 }
 
+func TestGitHubTarballIsReadAsTheNamespace(t *testing.T) {
+	s, seen := fakeGitHub(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-gzip")
+		_, _ = w.Write([]byte("gzip bytes"))
+	})
+
+	body, err := s.Tarball(context.Background(), "garden", "abcd-nl", "clean", "c0ffee")
+	require.NoError(t, err)
+	got, err := io.ReadAll(body)
+	require.NoError(t, err)
+	require.NoError(t, body.Close())
+	assert.Equal(t, "gzip bytes", string(got))
+
+	require.Len(t, *seen, 1)
+	assert.Equal(t, "/repos/abcd-nl/clean/tarball/c0ffee", (*seen)[0].Path)
+	// The credential is what lets a private repository answer at all.
+	assert.Equal(t, "Bearer ghp_garden", (*seen)[0].Header.Get("Authorization"))
+}
+
+func TestGitHubTarballRefusalNamesTheCall(t *testing.T) {
+	s, _ := fakeGitHub(t, answerJSON(404, `{"message":"Not Found"}`))
+
+	_, err := s.Tarball(context.Background(), "garden", "abcd-nl", "clean", "c0ffee")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "GET /repos/abcd-nl/clean/tarball/c0ffee")
+	assert.Contains(t, err.Error(), "404")
+	assert.Contains(t, err.Error(), "Not Found")
+}
+
 func TestGitHubRefusalNamesTheCall(t *testing.T) {
 	s, _ := fakeGitHub(t, answerJSON(404, `{"message":"Not Found","documentation_url":"https://docs.github.com/rest"}`))
 
