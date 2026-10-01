@@ -122,7 +122,7 @@ and each door is a different promise about what stands behind the write.
 
 `server/store_writers_test.go` reads the package and fails on a function that
 asks for a store it can write and is not written down with what stands behind
-it. Five do: `storeFor`, `handleCreateAttestation`, `writeStaandDef`,
+it. Five do: `storeFor`, `createAttestation`, `writeStaandDef`,
 `HandleStaand`, and `systemAttestor`.
 
 That last one is the residue, and no boundary removes it.
