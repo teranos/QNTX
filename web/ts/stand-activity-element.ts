@@ -10,7 +10,6 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
 import { renderPager } from './components/pager.ts';
 import { renderSparklines, windowOf } from './components/sparkline.ts';
 import { renderDoughnut, type Slice } from './components/doughnut.ts';
@@ -314,6 +313,9 @@ export function renderCampaigns(container: HTMLElement, s: StaandInfo, read: Cam
         cell.style.alignItems = 'center';
         cell.style.gap = '6px';
         cell.style.width = '96px';
+        // The ring's place is held while it is read, so the window it opens in
+        // is measured the size it will be (@teranos/elements buttonFrom).
+        cell.style.minHeight = 'calc(96px + 6px + 1.6em)';
 
         const name = document.createElement('div');
         // Umami's heading: the parameter without its prefix, capitalized.
@@ -343,26 +345,19 @@ export function renderCampaigns(container: HTMLElement, s: StaandInfo, read: Cam
 }
 
 /**
- * Opens one stand's activity as its own element, the way a token opens as its own
- * (token-element.ts). An element renders its content exactly once and keeps that one
- * element for its lifetime, so the stand it is about is fixed when it is made.
+ * One stand's activity as its own element. An element renders its content exactly
+ * once and keeps that one element for its lifetime, so the stand it is about is
+ * fixed when it is made.
  *
- * That is why there is no module-level "which stand" and no element registered at
- * startup: a stand-less activity panel could only ever draw an empty one, and a
- * shared panel would show the first stand opened forever.
+ * "Button as another element form": it rests as the stand's Activity → button,
+ * and the button itself becomes the window (market-element.ts). "It really feels
+ * like a button. Until you click it."
  */
-export function openStandActivity(s: StaandInfo): void {
-    const elementId = standElementId(s.market, s.slug);
-    if (tray.has(elementId)) {
-        tray.open(elementId);
-        return;
-    }
-
-    tray.add({
-        id: elementId,
-        title: s.market + ' / ' + s.slug,
+export function standActivity(s: StaandInfo): Element {
+    return {
+        id: standElementId(s.market, s.slug),
+        title: 'Activity →',
         symbol: '⛬',
-        onClose: () => { tray.remove(elementId); },
         renderContent: () => {
             const content = document.createElement('div');
             content.className = 'stand-activity-content';
@@ -373,10 +368,5 @@ export function openStandActivity(s: StaandInfo): void {
             void renderCampaigns(content, s);
             return content;
         },
-        // A dataset needs room a fact row does not. Wide enough for a page path
-        // and its bar on one line, tall enough for the twenty events and ten
-        // pages the node will send (server/staand.go, topCounts).
-    } satisfies Element);
-
-    tray.open(elementId);
+    };
 }

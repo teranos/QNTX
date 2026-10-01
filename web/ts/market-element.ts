@@ -11,13 +11,13 @@
 // event; a stand writes only under staand:*, so nothing here sets a predicate.
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { tray, buttonFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { backendUrl } from './client/url';
 import { createPrimaryButton, createDangerButton, createGhostButton } from './components/button';
 import { tooltip } from './components/tooltip';
 import { kindOf } from './namespaces-view';
-import { openStandActivity } from './stand-activity-element';
+import { standActivity, standElementId } from './stand-activity-element';
 import { log, SEG } from './logger';
 
 /** One stand as the element sees it: what it is, its defining system attestation,
@@ -289,6 +289,35 @@ function fact(label: string, value: HTMLElement | string, tip?: string): HTMLEle
     return row;
 }
 
+// One Activity row per stand, kept across every time the stand is opened. The
+// button in it is the stand's activity element (stand-activity-element.ts), and
+// an element is one DOM element for its whole lifetime: opened again, the stand
+// shows the same one, or the hole it left while it is a window elsewhere.
+const activityRows = new Map<string, { row: HTMLElement; alive: HTMLElement; button: HTMLElement | null }>();
+
+function activityRow(s: StaandInfo): HTMLElement {
+    const id = standElementId(s.market, s.slug);
+    let kept = activityRows.get(id);
+    if (!kept) {
+        const row = document.createElement('span');
+        row.style.display = 'flex';
+        row.style.alignItems = 'baseline';
+        row.style.gap = '10px';
+        const alive = document.createElement('span');
+        row.appendChild(alive);
+        kept = { row, alive, button: null };
+        activityRows.set(id, kept);
+    }
+    kept.alive.textContent = aliveText(s);
+    if (!kept.button && (s.events.length > 0 || s.pages.length > 0)) {
+        // Dressed as every other ghost button here (components/button.ts):
+        // nothing gives it away until it is pressed.
+        kept.button = buttonFrom(standActivity(s), { className: 'qntx-btn qntx-btn-ghost qntx-btn-medium' });
+        kept.row.appendChild(kept.button);
+    }
+    return kept.row;
+}
+
 /** Exported for tests: one stand opened. Its defining system attestation, the
  *  door it inherits, the sites reporting back, its activity, the snippet to
  *  paste — and Delete, the one destructive act, set apart at the foot. */
@@ -322,17 +351,7 @@ export function renderStandDetail(
     // open as their own panel, which is the room a dataset needs. The way in is
     // the Activity row itself — a button on a row with no label belongs to
     // nothing on the screen.
-    const activity = document.createElement('span');
-    activity.style.display = 'flex';
-    activity.style.alignItems = 'baseline';
-    activity.style.gap = '10px';
-    const alive = document.createElement('span');
-    alive.textContent = aliveText(s);
-    activity.appendChild(alive);
-    if (s.events.length > 0 || s.pages.length > 0) {
-        activity.appendChild(createGhostButton('Activity →', () => { openStandActivity(s); }).element);
-    }
-    container.appendChild(fact('Activity', activity));
+    container.appendChild(fact('Activity', activityRow(s)));
 
     container.appendChild(fact('URL', copyable(fullURL(s.url), fullURL(s.url))));
 

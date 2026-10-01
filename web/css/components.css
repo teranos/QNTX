@@ -94,6 +94,10 @@
 
 .qntx-btn {
     /* Base styles */
+    /* What a <button> is given by the browser, said here so an element resting
+       as a button (@teranos/elements buttonFrom) is the same size. */
+    box-sizing: border-box;
+    text-align: center;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -195,6 +199,21 @@
 
 .qntx-btn-ghost:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.06);
+}
+
+/* An element resting as a button (@teranos/elements buttonFrom) keeps this
+   class in every form it takes; it is only a button in button form. As a
+   window its text wraps (web/CLAUDE.md: no truncation) and it does not ease
+   its colours under a morph. */
+.qntx-btn[data-form]:not([data-form="button"]) {
+    text-align: start;
+    justify-content: normal;
+    align-items: normal;
+    gap: 0;
+    font-weight: inherit;
+    white-space: normal;
+    cursor: auto;
+    transition: none;
 }
 
 /* States */
