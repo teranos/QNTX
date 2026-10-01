@@ -169,7 +169,7 @@ func messagesOf(pkg protoreflect.FullName, messages protoreflect.MessageDescript
 				kind = "map"
 			}
 			model.Columns = append(model.Columns, Column{
-				Name: string(field.Name()), Type: kind, List: field.IsList(), Required: required(field),
+				Name: string(field.Name()), Type: kind, List: field.IsList(), Required: Required(field),
 			})
 		}
 		models = append(models, model)
@@ -178,10 +178,11 @@ func messagesOf(pkg protoreflect.FullName, messages protoreflect.MessageDescript
 	return models
 }
 
-// required reads google.api.field_behavior off a field. The compiled options
+// Required reads google.api.field_behavior off a field: whether the reference
+// says a value must be there. The compiled options
 // carry the extension as bytes, so they are read again against the registry
 // this binary links, where field_behavior is known.
-func required(field protoreflect.FieldDescriptor) bool {
+func Required(field protoreflect.FieldDescriptor) bool {
 	raw, err := proto.Marshal(field.Options())
 	if err != nil {
 		return false
