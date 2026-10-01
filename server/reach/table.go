@@ -110,6 +110,7 @@ REACH is '/mcp' '/mcp/'                                                   of ROO
 # A line that names a signum is about its sigils, over every surface, whatever
 # path the plugin bound them to (ReachingSigil).
 REACH is 'datapunt'                                                       of ROOT SUPER
+REACH is 'inbox'                                                          of ROOT SUPER
 
 # A longer path wins over the prefix above, so widening that line does not
 # widen this one.
