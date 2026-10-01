@@ -71,19 +71,22 @@ func (p *Plugin) SubmitEmail(ctx context.Context, req *protocol.SubmitEmailReque
 	return &protocol.SubmitEmailResponse{Sent: email(as)}, nil
 }
 
-// QueryEmails is one mailbox of an address, newest first: the caller's own,
-// or any for ROOT, whose reading of another User's mail is attested.
+// QueryEmails is one mailbox of an address, or all three when none is named,
+// newest first: the caller's own, or any for ROOT, whose reading of another
+// User's mail is attested.
 func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsRequest) (*protocol.QueryEmailsResponse, error) {
 	c, err := p.asking(ctx)
 	if err != nil {
 		return nil, err
 	}
 	address := strings.ToLower(req.GetAddress())
-	predicate := PredicateMailReceived
+	predicates := []string{PredicateMailReceived, PredicateMailSent}
 	switch req.GetInMailbox() {
+	case "":
 	case MailboxInbox, MailboxJunk:
+		predicates = []string{PredicateMailReceived}
 	case MailboxSent:
-		predicate = PredicateMailSent
+		predicates = []string{PredicateMailSent}
 	default:
 		return nil, &refused{http.StatusBadRequest, "mailbox is inbox, junk or sent, not " + quoted(req.GetInMailbox())}
 	}
@@ -112,14 +115,14 @@ func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsReque
 		}
 	}
 
-	held, err := st.GetAttestations(ats.AttestationFilter{Predicates: []string{predicate}, Contexts: []string{address}, Limit: 1000})
+	held, err := st.GetAttestations(ats.AttestationFilter{Predicates: predicates, Contexts: []string{address}, Limit: 1000})
 	if err != nil {
-		return nil, errors.Wrapf(err, "the %s of %s did not read", req.GetInMailbox(), address)
+		return nil, errors.Wrapf(err, "the mail of %s did not read", address)
 	}
 	slices.SortFunc(held, func(a, b *types.As) int { return b.Timestamp.Compare(a.Timestamp) })
 	resp := &protocol.QueryEmailsResponse{}
 	for _, as := range held {
-		if attribute(as, "mailbox") == req.GetInMailbox() {
+		if mailbox := attribute(as, "mailbox"); mailbox != "" && (req.GetInMailbox() == "" || mailbox == req.GetInMailbox()) {
 			resp.List = append(resp.List, email(as))
 		}
 	}

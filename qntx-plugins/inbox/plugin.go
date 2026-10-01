@@ -133,7 +133,7 @@ func (p *Plugin) DeclaredRoutes() []*protocol.RouteInfo {
 		{
 			Method:      http.MethodGet,
 			Path:        "/mailbox",
-			Description: "The mail of an address the caller holds, newest first. Takes address and mailbox (inbox, junk or sent). ROOT reading another User's mail is attested.",
+			Description: "The mail of an address the caller holds, newest first. Takes address, and mailbox (inbox, junk or sent) for one of them; none is all three. ROOT reading another User's mail is attested.",
 		},
 		{
 			Method:      http.MethodGet,

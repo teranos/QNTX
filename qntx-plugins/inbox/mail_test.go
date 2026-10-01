@@ -148,6 +148,29 @@ func TestAddressesAreTheCallersOwnOrEveryOneForROOT(t *testing.T) {
 	assert.JSONEq(t, `{"addresses":[{"email":"contact@example.com","user":"US-ADA-0000000"},{"email":"timothy@example.com","user":"US-TIM-7K4M3B9X"}]}`, w.Body.String())
 }
 
+// A path opened to Users answers one call per second per caller, so a mail
+// client asks once for all three mailboxes.
+func TestNoMailboxNamedIsAllThree(t *testing.T) {
+	st := &heldStore{}
+	st.grant("timothy@example.com", "US-TIM-7K4M3B9X")
+	p := pluginWith(st)
+	p.bag = &bucket{objects: map[string][]byte{
+		"inbound/m1": stored("timothy@example.com", "PASS", "PASS"),
+		"inbound/m2": stored("timothy@example.com", "FAIL", "PASS"),
+	}}
+	_, err := p.receive(t.Context(), st)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, serve(t, p, by(http.MethodPost, "/send", sending, "US-TIM-7K4M3B9X", "ATTESTOR")).Code)
+
+	code, list := mailboxOf(t, p, "US-TIM-7K4M3B9X", "ATTESTOR", "")
+	require.Equal(t, http.StatusOK, code)
+	var boxes []string
+	for _, e := range list {
+		boxes = append(boxes, e.GetMailboxIds()...)
+	}
+	assert.ElementsMatch(t, []string{MailboxInbox, MailboxJunk, MailboxSent}, boxes)
+}
+
 func TestAMailboxIsInboxJunkOrSent(t *testing.T) {
 	st := &heldStore{}
 	st.grant("timothy@example.com", "US-TIM-7K4M3B9X")
