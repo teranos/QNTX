@@ -46,19 +46,35 @@ func TestAPublicRegistrationCannotWriteAReachLine(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), reach.Subject)
 }
 
-// The const is the floor. A line naming a level is refused before it is
-// stored, with the level named.
+// The const is the floor. A line opening the node's own path to a level is
+// refused before it is stored, with the path named; one naming ROOT likewise.
 func TestAReachLineNamingALevelIsRefusedAtTheDoor(t *testing.T) {
 	s := rootKnowingServer(t)
 	root := auth.Admitted(auth.LevelRoot, "garden")
 	root.Identity = rootAccount
 
 	rec := grants(t, s, root, `{"subjects":["REACH"],"predicates":["/api/config"],"contexts":["SUPER"]}`)
-
 	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), "SUPER")
-	held := systemHolds(t, s)
-	assert.Empty(t, held, "a refused line was stored")
+	assert.Contains(t, rec.Body.String(), "/api/config")
+
+	rec = grants(t, s, root, `{"subjects":["REACH"],"predicates":["/api/config"],"contexts":["ROOT"]}`)
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "ROOT")
+	assert.Empty(t, systemHolds(t, s), "a refused line was stored")
+}
+
+// A plugin's sigil is opened to a level at runtime, so the compiled table
+// names no plugin.
+func TestAPluginsSigilIsOpenedToALevelAtRuntime(t *testing.T) {
+	s := rootKnowingServer(t)
+	s.pluginRoutes.Store("hello-world", true)
+	root := auth.Admitted(auth.LevelRoot, "garden")
+	root.Identity = rootAccount
+
+	rec := grants(t, s, root, `{"subjects":["REACH"],"predicates":["hello-world"],"contexts":["SUPER"]}`)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	rec = grants(t, s, root, `{"subjects":["REACH"],"predicates":["hello-world:greet"],"contexts":["ATTESTOR"]}`)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 }
 
 // "this is for plugin routes, the runtime configurable part, the reach table
@@ -84,11 +100,13 @@ func TestAPluginRouteIsOneTheNodeOffersAPlugin(t *testing.T) {
 	s := &QNTXServer{}
 	s.pluginRoutes.Store("hello-world", true)
 
-	for _, path := range []string{"/api/hello-world", "/api/hello-world/{path...}", "/ws/hello-world", "/api/hello-world/book/new"} {
+	for _, path := range []string{"/api/hello-world", "/api/hello-world/{path...}", "/ws/hello-world", "/api/hello-world/book/new",
+		"hello-world", "hello-world:greet", "mcp:hello-world", "http:hello-world:greet"} {
 		assert.True(t, s.pluginRoute(path), path)
 	}
 	for _, path := range []string{"/api/staands", "/api/", "/ws/", "/i/standing", "/api/other/{path...}",
-		"/api/other/book/new", "/api/hello-world/{id}", "/api/hello-world/a b", "/ws/hello-world/x"} {
+		"/api/other/book/new", "/api/hello-world/{id}", "/api/hello-world/a b", "/ws/hello-world/x",
+		"staands", "staands:metrics", "mcp:other:greet", "", "mcp:"} {
 		assert.False(t, s.pluginRoute(path), path)
 	}
 }

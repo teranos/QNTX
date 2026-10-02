@@ -9,14 +9,38 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 )
 
-// The const table is the floor and never shrinks. A line written at runtime
-// adds roles, PUBLIC_REGISTRATION and ANYONE; one naming another level is
-// refused.
-func TestARuntimeLineNamingALevelIsRefused(t *testing.T) {
-	for _, context := range []string{"ROOT", "SUPER", "TOKEN", "ATTESTOR", "root"} {
+// ROOT reaches everything, so a line naming ROOT says nothing and is refused.
+func TestARuntimeLineNamingROOTIsRefused(t *testing.T) {
+	for _, context := range []string{"ROOT", "root"} {
 		_, err := ReadLine([]string{"REACH"}, []string{"/pond"}, []string{context}, nil, time.Now())
 		assert.Error(t, err, context)
 	}
+}
+
+// A plugin's sigils are reached by level from a line written at runtime, so
+// the compiled table names no plugin; the node's own names stay the table's.
+func TestARuntimeLineOpensAPluginsSigilsToALevel(t *testing.T) {
+	plugin := func(name string) bool { return name == "inbox" || name == "inbox:send" }
+	super, err := ReadLine([]string{"REACH"}, []string{"inbox"}, []string{"SUPER"}, nil, time.Now())
+	require.NoError(t, err)
+	users, err := ReadLine([]string{"REACH"}, []string{"inbox:send"}, []string{"ATTESTOR", "PUBLIC_REGISTRATION"}, nil, time.Now())
+	require.NoError(t, err)
+	assert.Empty(t, super.Unopenable(plugin))
+	assert.Empty(t, users.Unopenable(plugin))
+
+	rows, err := readReaches("REACH is '/pond' of ROOT SUPER")
+	require.NoError(t, err)
+	addRuntime(rows, Runtime{Lines: []Line{super, users}, Plugin: plugin})
+	served := &Served{}
+	served.rows.Store(&rows)
+
+	send, _ := served.ReachingSigil(OverHTTP, "inbox", "send", "/api/inbox/send")
+	assert.ElementsMatch(t, []auth.Level{auth.LevelSuper, auth.LevelAttestor, auth.LevelPublicRegistration}, send.Beyond())
+	identity, _ := served.ReachingSigil(OverHTTP, "inbox", "identity", "/api/inbox/identity")
+	assert.Equal(t, []auth.Level{auth.LevelSuper}, identity.Beyond(), "a User reaches giving an address")
+
+	onTheNode := Line{Paths: []string{"/pond"}, Roles: []string{"SUPER"}}
+	assert.Equal(t, []string{"/pond"}, onTheNode.Unopenable(plugin), "a level was opened on the node's own path")
 }
 
 const aPluginRoute = "/api/hello-world/{path...}"

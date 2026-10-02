@@ -28,7 +28,7 @@ func (s *QNTXServer) reachSignum() sigil.Signum {
 	pathParam := &protocol.Param{Name: "path", Required: true,
 		Says: "What the line is about: a path, a signum, or signum:sigil, optionally after http: or mcp:."}
 	toParam := &protocol.Param{Name: "to", Required: true,
-		Says: "A role, or PUBLIC_REGISTRATION, which opens only a plugin's route the compiled table does not name."}
+		Says: "A role, or a level (SUPER, TOKEN, ATTESTOR, PUBLIC_REGISTRATION, ANYONE), which opens only a plugin's route or sigil the compiled table does not name."}
 	written := []*protocol.Field{{Name: "id", Says: "The attestation the line was written as."}}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
@@ -45,7 +45,7 @@ func (s *QNTXServer) reachSignum() sigil.Signum {
 				},
 				{
 					Name:  "grant",
-					Does:  "Open something to a role, or a plugin's route to PUBLIC_REGISTRATION, by writing a reach line. Served from the next request on.",
+					Does:  "Open something to a role, or a plugin's route or sigil to a level, by writing a reach line. Served from the next request on.",
 					Takes: []*protocol.Param{pathParam, toParam},
 					Gives: written,
 					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: reachPath},
