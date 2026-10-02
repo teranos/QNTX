@@ -12,7 +12,7 @@ import (
 // segment, with any .git suffix removed.
 //
 //	https://github.com/sbvh-nl/duif                          → duif
-//	https://github.com/teranos/QNTX/tree/main/qntx-plugins/loom → loom
+//	https://github.com/teranos/QNTX/tree/main/qntx-plugins/kern → kern
 //	https://github.com/teranos/pyre/tree/main/               → pyre
 //
 // The last segment is only the name once tree and its ref are accounted for.
