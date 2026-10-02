@@ -21,6 +21,8 @@ export const render = (item: any, ui: any): HTMLElement => {
     });
     content.style.padding = '0';
     content.style.overflow = 'hidden';
+    // A turn is pressed, not dragged: the title bar is what moves the element.
+    ui.preventDrag(content);
     const app = mount(App, { target: content, props: { ui } });
     ui.onCleanup(() => unmount(app));
     return element;
