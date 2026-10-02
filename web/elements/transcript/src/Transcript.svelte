@@ -1,7 +1,7 @@
 <script lang="ts">
   import Warp from './Warp.svelte'
   import { timeSpacers } from './timespacers'
-  import type { Session, Turn } from './transcript'
+  import { msOf, type Transcript as Read, type Turn } from './transcript'
 
   let {
     sessions,
@@ -9,12 +9,14 @@
     turns,
     said,
     onChoose,
+    onOpen,
   }: {
-    sessions: Session[]
+    sessions: Read[]
     session: string
     turns: Turn[]
     said: string
     onChoose: (session: string) => void
+    onOpen: (turn: Turn) => void
   } = $props()
 
   let columnEl: HTMLElement | null = $state(null)
@@ -55,8 +57,8 @@
     return out
   }
 
-  function when(at: number): string {
-    const d = new Date(at)
+  function when(at: string): string {
+    const d = new Date(msOf(at))
     return d.toLocaleString('en', { month: 'short' }) + ' ' + d.getDate() + ' ' +
       String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
   }
@@ -76,7 +78,7 @@
     {#each sessions as s}
       <button class="tr-session" onclick={() => onChoose(s.session)}>
         <span class="tr-when">{when(s.started)}</span>
-        <span class="tr-opening">{s.opening}</span>
+        <span class="tr-opening">{s.turns.find(t => t.speaker === 'human')?.text ?? s.session}</span>
       </button>
     {/each}
   {:else}
@@ -89,10 +91,11 @@
     <div class="tr-body">
       <div class="tr-col" bind:this={columnEl}>
         {#each turns as turn, i (turn.of)}
-          {#each timeSpacers(i > 0 ? turns[i - 1].at : 0, turn.at) as px}
+          {#each timeSpacers(i > 0 ? msOf(turns[i - 1].at) : 0, msOf(turn.at)) as px}
             <div class="tr-spacer" style="height: {px}px"></div>
           {/each}
-          <div class="tr-turn {weight(turn.speaker)} sp-{turn.speaker}" title={turn.of}>
+          <div class="tr-turn {weight(turn.speaker)} sp-{turn.speaker}" title={turn.of} role="button" tabindex="0"
+            onclick={() => onOpen(turn)} onkeydown={(e) => { if (e.key === 'Enter') onOpen(turn) }}>
             <span class="tr-speaker">[{turn.speaker}]</span>
             {#if turn.speaker === 'assistant'}
               <span class="tr-text">{@html renderText(turn.text)}</span>
@@ -152,7 +155,7 @@
     border-right: 1px dashed var(--border-on-dark);
   }
 
-  .tr-turn { padding: 0 6px; overflow-wrap: break-word; word-break: break-word; }
+  .tr-turn { cursor: pointer; padding: 0 6px; overflow-wrap: break-word; word-break: break-word; }
   .tr-speaker { font-weight: 500; font-size: var(--font-size-xs, 10px); margin-right: 4px; }
   .tr-text { font-size: 11px; line-height: 1.3; white-space: pre-wrap; }
 
