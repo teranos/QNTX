@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Turn } from './transcript'
+  import { msOf, type Turn } from './transcript'
 
   // Loom's warp, as the transcript's own scrollbar: one segment per turn, a gap
   // past twelve hours weighs three, the wheel zooms, a press or a drag scrolls.
@@ -14,7 +14,7 @@
   const items: Item[] = $derived.by(() => {
     const out: Item[] = []
     for (let i = 0; i < turns.length; i++) {
-      if (i > 0 && turns[i].at - turns[i - 1].at > GAP_MS) out.push({ gap: true, weight: GAP_WEIGHT })
+      if (i > 0 && msOf(turns[i].at) - msOf(turns[i - 1].at) > GAP_MS) out.push({ gap: true, weight: GAP_WEIGHT })
       out.push({ gap: false, weight: 1, turn: turns[i] })
     }
     return out
