@@ -17,7 +17,7 @@ import (
 // Transcripts are loom's job, done by the node.
 // "I want to kill it, and make sure QNTX takes over"
 
-// Built from what Ground already streams into the namespace the caller stands
+// Derived from what Ground already streams into the namespace the caller stands
 // in, and nothing is written to make them.
 
 // transcriptPredicates is every hook event a transcript reads. Each is asked
