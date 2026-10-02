@@ -34,5 +34,5 @@ Python plugin has not been migrated to custom UI yet.
 ## Links
 
 - [ADR-001: Domain Plugin Architecture](../adr/ADR-001-domain-plugin-architecture.md) - plugin isolation model
-- [Element Migration](../vision/element-migration.md) - future direction (attested elements, grammar)
+- [Element Migration](../vision/element-migration.md) - attested elements, grammar
 - [ADR-001: Domain Plugin Architecture](../adr/ADR-001-domain-plugin-architecture.md) - building plugins
