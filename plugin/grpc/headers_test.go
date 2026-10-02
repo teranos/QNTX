@@ -326,4 +326,12 @@ func TestAsker_TheNodeSaysWhoIsAsking(t *testing.T) {
 	assert.Equal(t, []string{"ATTESTOR"}, level, "the level the caller named reached the plugin, or the node's did not")
 	assert.Empty(t, namespace, "a namespace the caller named reached the plugin")
 	assert.Empty(t, storeToken, "a store token the caller named reached the plugin")
+
+	// The call the node opened for the request is what the plugin is handed.
+	req = httptest.NewRequest("POST", "/api/mock/who", nil)
+	req.Header.Set("X-Qntx-Store-Token", "forged")
+	req = req.WithContext(WithCall(auth.WithAdmission(req.Context(), admitted), "node-token", "Clean"))
+	mux.ServeHTTP(httptest.NewRecorder(), req)
+	assert.Equal(t, []string{"node-token"}, storeToken)
+	assert.Equal(t, []string{"Clean"}, namespace)
 }

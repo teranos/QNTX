@@ -328,6 +328,13 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 		sqlclose.Log(r.Body.Close(), s.logger, "the plugin request body")
 	}
 
+	// The plugin answers as its caller, the way a sigil does: the caller's call,
+	// open until the plugin has answered.
+	r = r.WithContext(s.callFor(r.Context()))
+	if done, opened := r.Context().Value(callDoneKey{}).(func()); opened {
+		defer done()
+	}
+
 	// Try stripped path first (modern approach)
 	recorder := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
 	newReq := r.Clone(r.Context())

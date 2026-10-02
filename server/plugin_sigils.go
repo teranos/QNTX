@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
@@ -79,6 +80,28 @@ func (s *QNTXServer) openCall(ctx context.Context) (string, func(), *protocol.Re
 	}
 	token, done, err := s.mintCall(openedCall{store: store, userID: admitted.UserID, namespace: universe.Name()})
 	return token, done, nil, err
+}
+
+type callDoneKey struct{}
+
+// callFor is ctx carrying a call opened for an admitted caller who reaches a
+// store, for a plugin answering over HTTP, and what closes it. A stranger, or
+// a User who reaches no store, is handed on with none.
+func (s *QNTXServer) callFor(ctx context.Context) context.Context {
+	if _, gated := auth.AdmissionFrom(ctx); !gated {
+		return ctx
+	}
+	token, done, refusal, err := s.openCall(ctx)
+	if refusal != nil || err != nil {
+		return ctx
+	}
+	caller, open := s.callerOf(token)
+	if !open {
+		done()
+		return ctx
+	}
+	ctx = grpc.WithCall(ctx, token, caller.Namespace)
+	return context.WithValue(ctx, callDoneKey{}, done)
 }
 
 // openRun is a token for one run of a job a caller's schedule started, reaching
