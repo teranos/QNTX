@@ -57,9 +57,9 @@ export const render = (item, ui) => {
 that lifts the element off the canvas into a window and puts it back. A module
 that returns a bare element instead gets that frame wrapped around it.
 
-What else `ui` carries: `log`, `onCleanup`, `attestations(query)`,
-`pluginFetch`, `pluginWebSocket`, `onMeld`, `loadConfig`/`saveConfig`,
-`input`/`button`/`statusLine`, `spawnResult`. Register every timer, socket and
+What else `ui` carries is `ElementUI`, in
+[`@teranos/elements` canvas/element-ui.ts](https://jsr.io/@teranos/elements), each
+member with what it is for. Register every timer, socket and
 subscription through `onCleanup` — it runs when the element closes and again
 before a republished module draws in its place. Without it, publishing twice
 leaves the first one still running underneath the second.
