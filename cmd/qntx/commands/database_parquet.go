@@ -454,7 +454,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),
 		Prompts:     prompt.NewPromptStore(h.operational, store),
-		Aliases:     storage.NewAliasStore(h.operational),
+		Aliases:     storage.NewAliasStore(landing.db),
 		Queries:     landing.queries(),
 		Operational: h.operational,
 	})
@@ -686,6 +686,8 @@ func (h *parquetHandles) Namespaces() storage.Namespaces {
 // all of it — dflt is the store already opened at boot, handed back rather than
 // opened twice.
 func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held, error) {
+	dfltLanding := h.landings[duckdbcgo.NamespaceDefault]
+	systemLanding := h.landings[duckdbcgo.NamespaceSystem]
 	made := namespaces.Made{
 		Store:       dflt,
 		Watchers:    h.watchers,
@@ -695,8 +697,8 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),
 		Prompts:     prompt.NewPromptStore(h.operational, dflt),
-		Aliases:     storage.NewAliasStore(h.operational),
-		Queries:     h.landings[duckdbcgo.NamespaceDefault].queries(),
+		Aliases:     storage.NewAliasStore(dfltLanding.db),
+		Queries:     dfltLanding.queries(),
 		Operational: h.operational,
 	}
 	def, err := namespaces.NewUniverse(duckdbcgo.NamespaceDefault, made)
@@ -707,7 +709,8 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 	// "system namespace should have no canvas"
 	made.Store = h.system
 	made.Canvas = nil
-	made.Queries = h.landings[duckdbcgo.NamespaceSystem].queries()
+	made.Aliases = storage.NewAliasStore(systemLanding.db)
+	made.Queries = systemLanding.queries()
 	sys, err := namespaces.NewUniverse(duckdbcgo.NamespaceSystem, made)
 	if err != nil {
 		return nil, err
