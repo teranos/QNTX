@@ -28,6 +28,8 @@ func everySignumFollows() []*protocol.Follows {
 			{Field: "protocol.Sigil.name", Column: "Tool.name"},
 			{Field: "protocol.Sigil.does", Column: "Tool.description"},
 			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema"},
+			{Field: "protocol.Sigil.gives", Column: "Tool.outputSchema"},
+			{Field: "protocol.Sigil.http", Column: "Tool.annotations"},
 		}},
 	}
 }
