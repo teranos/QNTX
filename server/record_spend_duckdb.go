@@ -16,10 +16,7 @@ type asksItsLocation interface {
 // store is one that reaches a location at all.
 //
 // The access token and User stores are opened where the auth routes are rather
-// than by the backend, so the backend's reporter never sees them. Tokens are
-// held nowhere on the node (make parity: access_tokens is NO/YES) and a
-// token's record is rewritten on every use, which makes theirs the tally the
-// panel most needs and the one it was missing.
+// than by the backend, so the backend's reporter never sees them.
 func recordSpendOf(store any) (RecordReporter, bool) {
 	asks, ok := store.(asksItsLocation)
 	if !ok {
@@ -41,10 +38,9 @@ func (s spendOf) RecordSpend() ([]Spend, error) {
 	spend := make([]Spend, 0, len(asked))
 	for _, one := range asked {
 		spend = append(spend, Spend{
-			Of:         one.Of,
-			Request:    one.Request,
-			HeldOnNode: one.HeldOnNode,
-			Count:      one.Count,
+			Of:      one.Of,
+			Request: one.Request,
+			Count:   one.Count,
 		})
 	}
 	return spend, nil

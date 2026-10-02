@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/sacred"
 
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/element/handlers"
@@ -135,7 +136,7 @@ type QNTXServer struct {
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
 	cancel         context.CancelFunc // Cancels all goroutines
-	wg             sync.WaitGroup     // Tracks active goroutines for clean shutdown
+	wg             sacred.Group       // Tracks active goroutines by name for clean shutdown
 	broadcastDrops atomic.Int64       // Tracks dropped broadcasts for monitoring
 	state          atomic.Int32       // Opening/Closing Phase 4: Server state (Running/Draining/Stopped)
 
@@ -312,7 +313,7 @@ func (s *QNTXServer) removeSlowClient(client *Client) {
 func (s *QNTXServer) Run() {
 	// Start dedicated broadcast worker (MUST start before processing any messages)
 	// This worker owns all client channel sends to prevent race conditions
-	go s.runBroadcastWorker()
+	s.wg.Go("broadcast.worker", s.runBroadcastWorker)
 
 	for {
 		select {

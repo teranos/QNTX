@@ -225,8 +225,7 @@ func overTime(db *sql.DB) (map[string]int64, error) {
 }
 
 // Spend is one reader and what it has cost against the record: the name make
-// parity gives it, the request, and how many. A row here that parity calls
-// record-only is a read that never has to leave the node.
+// parity gives it, the request, and how many. HeldOnNode is filled by heldOnNode.
 type Spend struct {
 	Of         string `json:"of"`
 	Request    string `json:"request"`
@@ -248,7 +247,7 @@ func spentAcross(reporters []RecordReporter) ([]Spend, error) {
 			return nil, err
 		}
 		for _, one := range spent {
-			summed[Spend{Of: one.Of, Request: one.Request, HeldOnNode: one.HeldOnNode}] += one.Count
+			summed[Spend{Of: one.Of, Request: one.Request}] += one.Count
 		}
 	}
 
@@ -259,6 +258,36 @@ func spentAcross(reporters []RecordReporter) ([]Spend, error) {
 	}
 	sort.Slice(spend, func(i, j int) bool { return spend[i].Count > spend[j].Count })
 	return spend, nil
+}
+
+// heldOnNode marks each reader the node keeps a table of. The answer is the
+// node's own schema, which is what make parity replays for its ON THE NODE
+// column, so the panel and parity read one source.
+func heldOnNode(db *sql.DB, spend []Spend) (err error) {
+	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type = 'table'`)
+	if err != nil {
+		return errors.Wrap(err, "the node's schema did not say which tables it holds")
+	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for heldOnNode") }()
+
+	tables := map[string]bool{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return errors.Wrap(err, "failed to scan a table name from sqlite_master")
+		}
+		tables[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		return errors.Wrap(err, "the node's schema stopped answering")
+	}
+
+	// No table is no copy. A reader whose name matches nothing reads as
+	// record only, never as held.
+	for at := range spend {
+		spend[at].HeldOnNode = tables[spend[at].Of]
+	}
+	return nil
 }
 
 // saySpend emits what each reader has cost since the last refresh.
@@ -276,7 +305,7 @@ func (s *QNTXServer) saySpend(spend []Spend) {
 		s.saidSpend = map[Spend]int64{}
 	}
 	for _, one := range spend {
-		seen := Spend{Of: one.Of, Request: one.Request, HeldOnNode: one.HeldOnNode}
+		seen := Spend{Of: one.Of, Request: one.Request}
 		since := one.Count - s.saidSpend[seen]
 		s.saidSpend[seen] = one.Count
 		if since <= 0 {
@@ -338,10 +367,7 @@ func (s *QNTXServer) publishStatsFailure(surface string, err error) {
 // startDBStatsRefresher launches a background goroutine that refreshes
 // the database stats cache every 30 seconds.
 func (s *QNTXServer) startDBStatsRefresher() {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-
+	s.wg.Go("dbStats.refresher", func() {
 		// First refresh runs async — doesn't block startup.
 		s.refreshDBStats()
 
@@ -355,7 +381,7 @@ func (s *QNTXServer) startDBStatsRefresher() {
 				s.refreshDBStats()
 			}
 		}
-	}()
+	})
 }
 
 func (s *QNTXServer) refreshDBStats() {
@@ -450,6 +476,9 @@ func (s *QNTXServer) refreshDBStats() {
 	if len(s.recordReporters) > 0 {
 		recordSpend, recordSpendErr = spentAcross(s.recordReporters)
 		s.saySpend(recordSpend)
+		if recordSpendErr == nil {
+			recordSpendErr = heldOnNode(statsDB, recordSpend)
+		}
 	}
 
 	// The database behind each namespace. A read is answered from one of these

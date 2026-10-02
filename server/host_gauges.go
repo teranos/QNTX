@@ -9,7 +9,6 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 
 	"github.com/teranos/QNTX/internal/measure"
-	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/pulse/async"
 )
 
@@ -22,7 +21,7 @@ const hostGaugeInterval = time.Minute
 // and network. The node already read the first two every ten seconds to decide
 // how fast watchers may fire, and kept none of it.
 func (s *QNTXServer) startHostGauges() {
-	sacred.GoTracked(&s.wg, "server.hostGauges", func() {
+	s.wg.Go("server.hostGauges", func() {
 		ticker := time.NewTicker(hostGaugeInterval)
 		defer ticker.Stop()
 

@@ -37,11 +37,7 @@ func (tickerSubsystem) Init(s *QNTXServer) error {
 		ticker.SetBackupProvider(bp, s.dbPath, backupInterval)
 	}
 
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		storagePoller.Start(s.ctx)
-	}()
+	s.wg.Go("storageEvents.poller", func() { storagePoller.Start(s.ctx) })
 
 	return nil
 }

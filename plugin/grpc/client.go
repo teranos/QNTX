@@ -290,6 +290,24 @@ var askerHeaders = map[string]bool{
 	"X-Qntx-Asker-Level":  true,
 }
 
+// openedCall is the call the node opened for one request: the token a plugin
+// presents to the store, and the namespace the caller acts in.
+type openedCall struct {
+	token     string
+	namespace string
+}
+
+type openedCallKey struct{}
+
+// WithCall hands the proxy the call the node opened for this request, which it
+// sends as X-Qntx-Store-Token and X-Qntx-Namespace, as a sigil does.
+func WithCall(ctx context.Context, token, namespace string) context.Context {
+	return context.WithValue(ctx, openedCallKey{}, openedCall{token: token, namespace: namespace})
+}
+
+// HeadersFor is what a plugin is handed about who asked, for the node to check.
+func HeadersFor(ctx context.Context) []*protocol.HTTPHeader { return askerFrom(ctx) }
+
 // askerFrom is who the node admitted, as the headers a plugin reads it by.
 func askerFrom(ctx context.Context) []*protocol.HTTPHeader {
 	admitted, gated := auth.AdmissionFrom(ctx)
@@ -301,6 +319,10 @@ func askerFrom(ctx context.Context) []*protocol.HTTPHeader {
 		if value != "" {
 			headers = append(headers, &protocol.HTTPHeader{Name: name, Values: []string{value}})
 		}
+	}
+	if call, opened := ctx.Value(openedCallKey{}).(openedCall); opened {
+		add("X-Qntx-Store-Token", call.token)
+		add("X-Qntx-Namespace", call.namespace)
 	}
 	add("X-Qntx-Asker", admitted.Identity)
 	add("X-Qntx-Asker-User", admitted.UserID)

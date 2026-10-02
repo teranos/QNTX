@@ -268,10 +268,7 @@ func (c *Client) handleUpload(filename, fileType, data string) {
 	)
 
 	// Process upload in a goroutine to avoid blocking the WebSocket
-	c.server.wg.Add(1)
-	go func() {
-		defer c.server.wg.Done()
-
+	c.server.wg.Go("ws.upload", func() {
 		// Decode base64 data (but don't process it yet - handler not implemented)
 		_, err := base64Decode(data)
 		if err != nil {
@@ -300,7 +297,7 @@ func (c *Client) handleUpload(filename, fileType, data string) {
 			"client_id", c.id,
 			"filename", filename,
 		)
-	}()
+	})
 }
 
 // sendJSON is a helper to send JSON messages to the client

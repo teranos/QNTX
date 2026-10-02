@@ -17,9 +17,7 @@ func (s *QNTXServer) startPulseExecutionPoller() {
 	ticker := time.NewTicker(3 * time.Second) // Poll every 3 seconds
 	lastCheckTime := time.Now()
 
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go("pulse.executionPoller", func() {
 		defer ticker.Stop()
 
 		for {
@@ -30,7 +28,7 @@ func (s *QNTXServer) startPulseExecutionPoller() {
 				s.checkCompletedExecutions(&lastCheckTime)
 			}
 		}
-	}()
+	})
 
 	logger.AddPulseSymbol(s.logger).Debugw("Pulse execution poller started", "interval", "3s")
 }

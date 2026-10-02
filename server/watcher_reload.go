@@ -137,15 +137,13 @@ func (c *watcherReloadCoalescer) postReload(p pendingUpsert) {
 				// Trigger historical query on compound watcher(s)
 				for _, cw := range compoundWatchers {
 					cwID := cw.ID
-					s.wg.Add(1)
-					go func() {
-						defer s.wg.Done()
+					s.wg.Go("watcher.historicalCompound", func() {
 						if err := s.watcherEngine.QueryHistoricalMatches(cwID); err != nil {
 							s.logger.Errorw("Failed to query historical matches for compound watcher",
 								"watcher_id", cwID,
 								"error", err)
 						}
-					}()
+					})
 				}
 				return
 			}
@@ -175,14 +173,12 @@ func (c *watcherReloadCoalescer) postReload(p pendingUpsert) {
 	}
 
 	// Query historical matches for the watcher (in goroutine to avoid blocking)
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go("watcher.historical", func() {
 		if err := s.watcherEngine.QueryHistoricalMatches(p.watcherID); err != nil {
 			s.logger.Errorw("Failed to query historical matches",
 				"watcher_id", p.watcherID,
 				"error", err,
 			)
 		}
-	}()
+	})
 }

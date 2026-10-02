@@ -24,10 +24,7 @@ func (s *QNTXServer) startPluginHealthRefresher() {
 		return
 	}
 
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-
+	s.wg.Go("plugins.healthRefresher", func() {
 		s.refreshPluginHealth()
 
 		ticker := time.NewTicker(pluginHealthRefreshInterval)
@@ -40,7 +37,7 @@ func (s *QNTXServer) startPluginHealthRefresher() {
 				s.refreshPluginHealth()
 			}
 		}
-	}()
+	})
 }
 
 func (s *QNTXServer) refreshPluginHealth() {

@@ -9,7 +9,6 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
@@ -333,7 +332,7 @@ func (s *QNTXServer) keepLastUsed(table *auth.TokenTable) {
 			s.logger.Errorw("Access tokens' last-used were not written; they stay for the next flush", "error", err)
 		}
 	}
-	sacred.GoTracked(&s.wg, "auth.lastUsed", func() {
+	s.wg.Go("auth.lastUsed", func() {
 		ticker := time.NewTicker(lastUsedFlushInterval)
 		defer ticker.Stop()
 		for {

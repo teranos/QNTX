@@ -18,7 +18,6 @@ import (
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/logger"
-	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/errors"
@@ -120,7 +119,7 @@ func (s *QNTXServer) broadcastUsageUpdate() {
 // startUsageUpdateTicker starts a periodic usage update broadcaster
 func (s *QNTXServer) startUsageUpdateTicker() {
 	ticker := time.NewTicker(500 * time.Millisecond) // Update every 0.5s for real-time UI
-	sacred.GoTracked(&s.wg, "broadcast.usageUpdate", func() {
+	s.wg.Go("broadcast.usageUpdate", func() {
 		defer ticker.Stop()
 
 		// Send initial update
@@ -164,7 +163,7 @@ func (s *QNTXServer) startJobUpdateBroadcaster() {
 	executionStore := s.held.ServedUniverse().Executions()
 	scheduleStore := s.newScheduleStore()
 
-	sacred.GoTracked(&s.wg, "broadcast.jobUpdate", func() {
+	s.wg.Go("broadcast.jobUpdate", func() {
 		defer func() {
 			// Unsubscribe first (removes from list), then close
 			// Order matters: closing while still subscribed could panic on send
@@ -321,7 +320,7 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 // startDaemonStatusBroadcaster periodically broadcasts daemon status to WebSocket clients
 // Uses adaptive polling: fast updates when busy, slow updates when idle
 func (s *QNTXServer) startDaemonStatusBroadcaster() {
-	sacred.GoTracked(&s.wg, "broadcast.daemonStatus", func() {
+	s.wg.Go("broadcast.daemonStatus", func() {
 		// Start with idle state
 		currentState := DaemonIdle
 		interval := s.getIntervalForActivityState(currentState)
@@ -680,7 +679,7 @@ func (s *QNTXServer) BroadcastPluginHealth(name string, healthy bool, state, mes
 // startWatcherQueueBroadcaster periodically broadcasts queue status.
 // Sends updates while queue is non-empty, plus one final total_queued:0 when it drains.
 func (s *QNTXServer) startWatcherQueueBroadcaster() {
-	sacred.GoTracked(&s.wg, "broadcast.watcherQueue", func() {
+	s.wg.Go("broadcast.watcherQueue", func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 
@@ -772,9 +771,6 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 // This eliminates race conditions by ensuring only one goroutine ever sends to client channels.
 // The worker processes broadcast requests and handles client channel closure.
 func (s *QNTXServer) runBroadcastWorker() {
-	s.wg.Add(1)
-	defer s.wg.Done()
-
 	for {
 		select {
 		case <-s.ctx.Done():

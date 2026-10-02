@@ -33,3 +33,21 @@ func TestStoppingTheNodeStopsWatchingPlugins(t *testing.T) {
 	require.NoError(t, srv.Stop())
 	require.False(t, pm.Watching(), "the node stopped and still restarts plugins that fail their health checks")
 }
+
+// The node's db belongs to whoever opened it, and Stop is not that. Stop closed
+// it as the embeddings handler's read handle, before pulse, the token flush and
+// the namespaces had stopped reading and writing it.
+func TestStoppingTheNodeLeavesItsDatabaseOpen(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	testDB, err := sql.Open("sqlite3", dbPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Close() })
+	require.NoError(t, db.Migrate(testDB, nil))
+	testStore, _ := createTestStore(t)
+
+	srv, err := NewQNTXServer(testDB, servingOne(testDB, testStore), dbPath, 0)
+	require.NoError(t, err)
+
+	require.NoError(t, srv.Stop())
+	require.NoError(t, testDB.Ping(), "Stop closed the node's database, which its caller opened and closes")
+}

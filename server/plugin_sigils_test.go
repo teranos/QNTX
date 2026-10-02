@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
@@ -528,4 +529,31 @@ func TestACallsTokenNamesItsCallerAndARunReachesTheirNamespace(t *testing.T) {
 	done()
 	_, still := srv.storeOfCall(token)
 	assert.False(t, still, "the run's token outlived the run")
+}
+
+// A plugin answering over HTTP is handed its caller's call, the way a sigil
+// is; a stranger is handed none.
+func TestAPluginOverHTTPIsHandedItsCallersCall(t *testing.T) {
+	p := &sigilPlugin{fakePlugin: fakePlugin{name: "stub"}, signa: []*protocol.Signum{stubSignum("stub")}}
+	srv, _ := sigilServingServer(t, p)
+
+	stranger := srv.callFor(context.Background())
+	_, opened := stranger.Value(callDoneKey{}).(func())
+	assert.False(t, opened, "a call was opened for nobody the node admitted")
+
+	ctx := srv.callFor(auth.WithAdmission(context.Background(), auth.Admitted(auth.LevelRoot)))
+	done, opened := ctx.Value(callDoneKey{}).(func())
+	require.True(t, opened, "no call was opened for an admitted caller")
+	headers := map[string]string{}
+	for _, h := range grpc.HeadersFor(ctx) {
+		headers[h.GetName()] = h.GetValues()[0]
+	}
+	reached, open := srv.storeOfCall(headers[HeaderStoreToken])
+	require.True(t, open, "the plugin was not handed the call's token")
+	assert.Same(t, srv.held.Served(), reached)
+	assert.Equal(t, srv.held.ServedUniverse().Name(), headers[HeaderNamespace])
+
+	done()
+	_, still := srv.storeOfCall(headers[HeaderStoreToken])
+	assert.False(t, still, "the call's token outlived the request")
 }

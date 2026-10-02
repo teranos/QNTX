@@ -275,6 +275,15 @@ type landed struct {
 	unsent atomic.Int64
 }
 
+// queries answers a namespace's ax reads from this file, which is where its
+// attestations are (ADR-037). Built over the operational db, every ax read
+// answered from a table holding none of them.
+func (l *landed) queries() *storage.SQLQueryStore {
+	queries := storage.NewSQLQueryStore(l.db)
+	queries.SetRawQuerier(l.RustStore)
+	return queries
+}
+
 // CreateAttestation lands the write and counts it as unsent. The record is
 // not touched: the next send carries it (ADR-037).
 func (l *landed) CreateAttestation(as *types.As) error {
@@ -446,7 +455,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 		Executions:  schedule.NewExecutionStore(h.operational),
 		Prompts:     prompt.NewPromptStore(h.operational, store),
 		Aliases:     storage.NewAliasStore(h.operational),
-		Queries:     storage.NewSQLQueryStore(h.operational),
+		Queries:     landing.queries(),
 		Operational: h.operational,
 	})
 }
@@ -509,8 +518,7 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 	// What each reader has asked the location for is said where every store
 	// that reaches it can be reached: server.saySpend, off the db stats
 	// refresher. Said per namespace here, it covered the record stores and
-	// none of the others — and access_tokens, held nowhere on the node
-	// (ADR-037), is the one that spends per request.
+	// none of the others.
 	sendOnce := func() {
 		defer sacred.Said("parquet.send." + name)
 		if err := sendAndCompact(landing, record); err != nil {
@@ -604,7 +612,7 @@ func (h *parquetHandles) RecordSpend() ([]server.Spend, error) {
 			return nil, errors.Wrap(err, "a store did not say what it asked its location for")
 		}
 		for _, one := range asked {
-			summed[server.Spend{Of: one.Of, Request: one.Request, HeldOnNode: one.HeldOnNode}] += one.Count
+			summed[server.Spend{Of: one.Of, Request: one.Request}] += one.Count
 		}
 	}
 
@@ -688,7 +696,7 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 		Executions:  schedule.NewExecutionStore(h.operational),
 		Prompts:     prompt.NewPromptStore(h.operational, dflt),
 		Aliases:     storage.NewAliasStore(h.operational),
-		Queries:     storage.NewSQLQueryStore(h.operational),
+		Queries:     h.landings[duckdbcgo.NamespaceDefault].queries(),
 		Operational: h.operational,
 	}
 	def, err := namespaces.NewUniverse(duckdbcgo.NamespaceDefault, made)
@@ -699,6 +707,7 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 	// "system namespace should have no canvas"
 	made.Store = h.system
 	made.Canvas = nil
+	made.Queries = h.landings[duckdbcgo.NamespaceSystem].queries()
 	sys, err := namespaces.NewUniverse(duckdbcgo.NamespaceSystem, made)
 	if err != nil {
 		return nil, err

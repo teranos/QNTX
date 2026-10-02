@@ -349,10 +349,9 @@ func TestRevokeHitsOnlyItsOwnToken(t *testing.T) {
 	}
 }
 
-// The token store asks its location for things nothing else counts: a token
-// is rewritten on every use (ADR-037), and that PUT is invisible while
-// Requests reaches only the attestation store's tally. A file:// location
-// asks for nothing, so what this proves is the seam, not a number.
+// The token store asks its location for things the attestation store's tally
+// does not count. A file:// location asks for nothing, so what this proves is
+// the seam, not a number.
 func TestTheTokenStoreSaysWhatItAskedFor(t *testing.T) {
 	store := newStore(t)
 	if _, _, err := store.Create(auth.NewToken{Label: "counted", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}}); err != nil {
@@ -363,10 +362,8 @@ func TestTheTokenStoreSaysWhatItAskedFor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Requests: %v", err)
 	}
-	for _, one := range asked {
-		if one.HeldOnNode {
-			t.Errorf("the token store counted %s as held on the node; make parity says access_tokens is NO on the node", one.Of)
-		}
+	if len(asked) != 0 {
+		t.Errorf("a file:// location was asked for %v", asked)
 	}
 }
 

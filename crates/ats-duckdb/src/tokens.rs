@@ -357,10 +357,6 @@ impl TokenStore {
     }
 
     /// The requests this store has made of its location since it opened.
-    ///
-    /// A token is not held on the node (ADR-037), so every one of these is a
-    /// request a node with the table would not have made. `touch` is the one
-    /// that runs per authenticated request.
     pub fn asked(&self) -> Vec<Asked> {
         self.objects.asked()
     }
