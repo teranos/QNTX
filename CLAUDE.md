@@ -36,6 +36,19 @@ Who may log in, the provider ceremony, and what a passkey carries: [ADR-030](doc
 
 **Hot-swap:** Plugins are added, configured, enabled and disabled in the plugin element, at runtime. See [ADR-002](docs/adr/ADR-002-plugin-configuration.md).
 
+A plugin is its record on the node, written through sigils:
+
+1. `plugins_add` a repo or tree URL. Its last segment is the plugin's name, and equals `Metadata().Name`; the binary is `qntx-<name>-plugin`.
+2. `PUT /api/plugins/<name>/config` writes the record: the plugin's own keys, `namespace` (ADR-046), and `build.core`, `build.command`, `build.output`, `build.packages`, `build.inputs`, `build.inputs_env` ([server/plugin_build.go](server/plugin_build.go)).
+3. `plugins_enable`.
+4. A push to a `build.*` source reaches the GitHub App's webhook; the node builds with its own nix, installs and restarts the plugin.
+
+A plugin declares routes; QNTX makes each a sigil and an MCP tool. Go: `DeclaredRoutes()`.
+
+A Go plugin imports `plugin/grpc`, which links `libats_sqlite`: build with `-tags rustsqlite`, after removing `target/release/libats_sqlite.so`, so the binary carries the static library.
+
+TODO: sweep every repository and file for the old am.toml way of managing QNTX plugins, and point each at [ADR-002](docs/adr/ADR-002-plugin-configuration.md).
+
 ## Go Development Standards
 
 ### WASM Integration

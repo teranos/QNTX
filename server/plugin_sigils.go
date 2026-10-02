@@ -48,6 +48,12 @@ const (
 	// HeaderStoreToken is what the plugin presents to the ATS store for this one
 	// call, and it reaches the store of the namespace the caller acts in.
 	HeaderStoreToken = "X-Qntx-Store-Token"
+	// HeaderNamespace is the namespace that token reaches.
+	HeaderNamespace = "X-Qntx-Namespace"
+	// HeaderAskerUser is the User the node admitted, and HeaderAskerLevel
+	// their level.
+	HeaderAskerUser  = "X-Qntx-Asker-User"
+	HeaderAskerLevel = "X-Qntx-Asker-Level"
 )
 
 // openedCall is what a call's token holds: the store it reaches, and who made
@@ -184,9 +190,17 @@ func (s *QNTXServer) pluginSignaOf(name string) (served []sigil.Signum, refused 
 // named after it, each declared route a sigil bound to it under /api/{plugin}.
 func declaredSignum(plugin string, routes []*protocol.RouteInfo) *protocol.Signum {
 	signum := &protocol.Signum{Name: plugin}
+	onPath := map[string]int{}
 	for _, route := range routes {
+		onPath[route.GetPath()]++
+	}
+	for _, route := range routes {
+		name := sigilNameOf(route.GetPath())
+		if onPath[route.GetPath()] > 1 {
+			name += "_" + strings.ToLower(route.GetMethod())
+		}
 		signum.Sigils = append(signum.Sigils, &protocol.Sigil{
-			Name: sigilNameOf(route.GetPath()),
+			Name: name,
 			Does: route.GetDescription(),
 			Http: &protocol.Endpoint{Method: route.GetMethod(), Path: "/api/" + plugin + route.GetPath()},
 		})
@@ -330,6 +344,11 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared 
 		if err != nil {
 			return failed(err)
 		}
+		caller, open := s.callerOf(token)
+		if !open {
+			return failed(errors.Newf("the call to %s closed before it was handed", plugin))
+		}
+		req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderNamespace, Values: []string{caller.Namespace}})
 		resp, err := holder.AnswerHTTP(ctx, req)
 		if err != nil {
 			return failed(errors.Wrapf(err, "%s %s did not answer", req.GetMethod(), req.GetPath()))
@@ -384,6 +403,10 @@ func forwarded(plugin string, held *protocol.Sigil, carried map[string]any, ctx 
 		if admitted.Identity != "" {
 			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAsker, Values: []string{admitted.Identity}})
 		}
+		if admitted.UserID != "" {
+			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerUser, Values: []string{admitted.UserID}})
+		}
+		req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerLevel, Values: []string{admitted.LevelName()}})
 		// "i know i minted the oauth specifically for Manus to use and the
 		// token even has a name"
 		//

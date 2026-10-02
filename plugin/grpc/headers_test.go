@@ -283,10 +283,13 @@ func TestAsker_TheNodeSaysWhoIsAsking(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	plugin := newMockPlugin()
 
-	var asker, user []string
+	var asker, user, level, namespace, storeToken []string
 	plugin.httpHandlers["/who"] = func(w http.ResponseWriter, r *http.Request) {
 		asker = r.Header.Values("X-Qntx-Asker")
 		user = r.Header.Values("X-Qntx-Asker-User")
+		level = r.Header.Values("X-Qntx-Asker-Level")
+		namespace = r.Header.Values("X-Qntx-Namespace")
+		storeToken = r.Header.Values("X-Qntx-Store-Token")
 		w.WriteHeader(http.StatusOK)
 	}
 
@@ -310,6 +313,9 @@ func TestAsker_TheNodeSaysWhoIsAsking(t *testing.T) {
 	req := httptest.NewRequest("POST", "/api/mock/who", nil)
 	req.Header.Set("X-Qntx-Asker", "did:key:z6MkForged")
 	req.Header.Set("X-Qntx-Asker-User", "US-FORGED")
+	req.Header.Set("X-Qntx-Asker-Level", "ROOT")
+	req.Header.Set("X-Qntx-Namespace", "Forged")
+	req.Header.Set("X-Qntx-Store-Token", "forged")
 	req = req.WithContext(auth.WithAdmission(req.Context(), admitted))
 
 	w := httptest.NewRecorder()
@@ -317,4 +323,7 @@ func TestAsker_TheNodeSaysWhoIsAsking(t *testing.T) {
 
 	assert.Equal(t, []string{"did:key:z6MkTim"}, asker)
 	assert.Equal(t, []string{"US-TIM-7K4M3B9X"}, user)
+	assert.Equal(t, []string{"ATTESTOR"}, level, "the level the caller named reached the plugin, or the node's did not")
+	assert.Empty(t, namespace, "a namespace the caller named reached the plugin")
+	assert.Empty(t, storeToken, "a store token the caller named reached the plugin")
 }

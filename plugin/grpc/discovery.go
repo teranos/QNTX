@@ -1396,6 +1396,17 @@ func (m *PluginManager) LoadedPluginNames() []string {
 	return names
 }
 
+// StopWatching stops health polling and every retry, so nothing restarts a
+// plugin the node is shutting down.
+func (m *PluginManager) StopWatching() {
+	m.shutdownCancel()
+}
+
+// Watching reports whether health polling and retries still run.
+func (m *PluginManager) Watching() bool {
+	return m.shutdownCtx.Err() == nil
+}
+
 // Shutdown stops all managed plugins and retry goroutines.
 func (m *PluginManager) Shutdown(ctx context.Context) error {
 	// Stop retry goroutines first

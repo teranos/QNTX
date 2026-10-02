@@ -292,11 +292,8 @@ func (e *Engine) executeElementPrompt(elementID string, template string, attesta
 	return body, nil
 }
 
-// PluginExecuteAction is the JSON structure stored in ActionData for plugin_execute watchers
-type PluginExecuteAction struct {
-	PluginName  string `json:"plugin_name"`
-	HandlerName string `json:"handler_name"`
-}
+// PluginExecuteAction is storage's, where plugin/grpc reaches it without the engine.
+type PluginExecuteAction = storage.PluginExecuteAction
 
 // executePlugin dispatches a job to a named plugin via gRPC ExecuteJob
 func (e *Engine) executePlugin(watcher *storage.Watcher, as *types.As) error {

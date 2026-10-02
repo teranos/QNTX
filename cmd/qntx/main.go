@@ -264,6 +264,8 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 			pm.SetOnPluginRestarted(func(name string) {
 				defaultServer.InvalidatePluginMux(name)
 				defaultServer.RegisterPluginMux(name)
+				// "i want runtime restarts to register new ones though"
+				defaultServer.ServePluginSigils()
 			})
 			pm.SetOnEmbeddingProviderReady(func(name string, client protocol.EmbeddingServiceClient) {
 				defaultServer.SetupPluginEmbeddingService(client)
@@ -401,6 +403,9 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		if err := defaultServer.ReloadWatchers(); err != nil {
 			pluginLogger.Errorw("Failed to reload watchers after plugin init", "error", err)
 		}
+
+		// A restart stops the build the node was running; this starts it again.
+		defaultServer.BuildMoved()
 
 		if daemon == nil {
 			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")

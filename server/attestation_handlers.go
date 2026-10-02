@@ -3,7 +3,10 @@ package server
 // Attestation HTTP handlers — query and create attestations.
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
 	"strconv"
@@ -286,6 +289,71 @@ const attestationWriteQuiet = 250 * time.Millisecond
 // handleCreateAttestation accepts a browser-created attestation and stores it server-side.
 // POST /api/attestations — idempotent (returns 200 if already exists).
 func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Request) {
+	// Cap request body to prevent unbounded memory allocation.
+	r.Body = http.MaxBytesReader(w, r.Body, maxAttestationBody)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
+		return
+	}
+
+	if !isList(body) {
+		s.createAttestation(w, r, body)
+		return
+	}
+
+	// "what i want is to move from 30 per minute to 1 per 30 sec"
+	// A list is a batch: each one is written as a single POST of it would be,
+	// and answered in the order sent, so a sender knows which landed.
+	var batch []json.RawMessage
+	if err := json.Unmarshal(body, &batch); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
+		return
+	}
+	type result struct {
+		Status int             `json:"status"`
+		Answer json.RawMessage `json:"answer"`
+	}
+	results := make([]result, 0, len(batch))
+	for _, one := range batch {
+		answered := &answerWriter{header: http.Header{}}
+		s.createAttestation(answered, r, one)
+		results = append(results, result{Status: answered.status, Answer: bytes.TrimSpace(answered.body.Bytes())})
+	}
+	respond(w, s.logger, http.StatusOK, map[string]any{"results": results})
+}
+
+// isList says whether a body's first value is a JSON array.
+func isList(body []byte) bool {
+	trimmed := bytes.TrimSpace(body)
+	return len(trimmed) > 0 && trimmed[0] == '['
+}
+
+// answerWriter keeps one attestation's answer in a batch: the status and body
+// a single POST of it would have sent.
+type answerWriter struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+}
+
+func (a *answerWriter) Header() http.Header { return a.header }
+
+func (a *answerWriter) WriteHeader(status int) {
+	if a.status == 0 {
+		a.status = status
+	}
+}
+
+func (a *answerWriter) Write(p []byte) (int, error) {
+	if a.status == 0 {
+		a.status = http.StatusOK
+	}
+	return a.body.Write(p)
+}
+
+// createAttestation writes one attestation from its JSON and answers on w.
+func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, raw []byte) {
 	// The phases of a write, each timed, said on the log line at the end when
 	// the write was slow. A
 	// write is several reads of the store in a row, and which one is slow is
@@ -293,9 +361,6 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	entered := time.Now()
 	beforeHandler := sinceStarted(r.Context())
 	var tookStore, tookExists, tookPut, tookRebuild time.Duration
-
-	// Cap request body to prevent unbounded memory allocation.
-	r.Body = http.MaxBytesReader(w, r.Body, maxAttestationBody)
 
 	var req struct {
 		ID         string                 `json:"id"`
@@ -308,7 +373,8 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		Attributes map[string]interface{} `json:"attributes"`
 	}
 
-	if err := readJSON(w, r, &req); err != nil {
+	if err := json.Unmarshal(raw, &req); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 		return
 	}
 

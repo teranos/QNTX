@@ -285,6 +285,9 @@ var askerHeaders = map[string]bool{
 	"X-Qntx-Asker-Did":    true,
 	"X-Qntx-Asker-Label":  true,
 	"X-Qntx-Asker-Client": true,
+	"X-Qntx-Namespace":    true,
+	"X-Qntx-Store-Token":  true,
+	"X-Qntx-Asker-Level":  true,
 }
 
 // askerFrom is who the node admitted, as the headers a plugin reads it by.
@@ -301,6 +304,7 @@ func askerFrom(ctx context.Context) []*protocol.HTTPHeader {
 	}
 	add("X-Qntx-Asker", admitted.Identity)
 	add("X-Qntx-Asker-User", admitted.UserID)
+	add("X-Qntx-Asker-Level", admitted.LevelName())
 	did, label := admitted.TokenDID, admitted.TokenLabel
 	if admitted.Grant != nil {
 		did, label = admitted.Grant.DID, admitted.Grant.Label

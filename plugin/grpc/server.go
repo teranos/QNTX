@@ -199,6 +199,10 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		if req.MailEndpoint != "" {
 			pluginConfig["_mail_endpoint"] = req.MailEndpoint
 		}
+		// A plugin answering a sigil presents the call's token to the store here.
+		if req.AtsStoreEndpoint != "" {
+			pluginConfig["_ats_store_endpoint"] = req.AtsStoreEndpoint
+		}
 		if req.AuthToken != "" {
 			pluginConfig["_auth_token"] = req.AuthToken
 		}
@@ -246,6 +250,10 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 	type handlerAnnouncer interface {
 		GetHandlerNames() []string
 	}
+	// "the plugin should just be able to declare routes"
+	type routeDeclarer interface {
+		DeclaredRoutes() []*protocol.RouteInfo
+	}
 
 	if sa, ok := s.plugin.(scheduleAnnouncer); ok {
 		schedules = sa.GetSchedules()
@@ -253,6 +261,11 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 
 	if ha, ok := s.plugin.(handlerAnnouncer); ok {
 		handlerNames = ha.GetHandlerNames()
+	}
+
+	var routes []*protocol.RouteInfo
+	if rd, ok := s.plugin.(routeDeclarer); ok {
+		routes = rd.DeclaredRoutes()
 	}
 
 	_, isLLMProvider := s.plugin.(plugin.LLMProvider)
@@ -265,6 +278,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		LlmProvider:       isLLMProvider,
 		SearchProvider:    isSearchProvider,
 		EmbeddingProvider: isEmbeddingProvider,
+		HttpRoutes:        routes,
 	}, nil
 }
 

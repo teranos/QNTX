@@ -2,6 +2,9 @@ package server
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -57,6 +60,96 @@ func TestAFailedBuildsMailNamesEverySourceAndWhy(t *testing.T) {
 	}
 	if !strings.Contains(mail.HTML, "&lt;exit 1&gt;") {
 		t.Errorf("html not escaped: %s", mail.HTML)
+	}
+}
+
+// On start the node asks after each enabled plugin it builds, and no other.
+func TestEnabledBuildsAreEachEnabledPluginQNTXBuilds(t *testing.T) {
+	built := map[string]string{
+		buildCore:    "teranos/QNTX@real-inboxes",
+		buildCommand: "go build -o bin/qntx-inbox-plugin ./cmd/qntx-inbox-plugin",
+		buildOutput:  "bin/qntx-inbox-plugin",
+	}
+	records := []grpcplugin.PluginRecord{
+		{Name: "inbox", Enabled: true, Config: built},
+		{Name: "off", Enabled: false, Config: built},
+		{Name: "cleanAPI", Enabled: true, Config: map[string]string{}},
+	}
+
+	builds, refused := enabledBuilds(records)
+	if len(refused) != 0 {
+		t.Fatalf("refused: %v", refused)
+	}
+	if len(builds) != 1 || builds[0].name != "inbox" {
+		t.Fatalf("builds: %+v", builds)
+	}
+}
+
+// A build killed by a restart, or a push while the node was down, leaves a
+// binary built from older sources; what it was built from is kept beside it,
+// so the next start sees the sources moved.
+func TestABuildKeepsWhatItWasBuiltFrom(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir, err := grpcplugin.PluginInstallPath("inbox")
+	if err != nil {
+		t.Fatalf("install path: %v", err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if revs := installedRevs("inbox"); revs != nil {
+		t.Fatalf("no binary, and revs %v", revs)
+	}
+	if err := os.WriteFile(filepath.Join(dir, grpcplugin.PluginBinaryName("inbox")), []byte("bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if revs := installedRevs("inbox"); revs != nil {
+		t.Fatalf("a binary QNTX did not build, and revs %v", revs)
+	}
+	if err := keepBuiltRevs("inbox", []string{"c0ffee", "beef"}); err != nil {
+		t.Fatalf("keep: %v", err)
+	}
+	if revs := installedRevs("inbox"); strings.Join(revs, " ") != "c0ffee beef" {
+		t.Fatalf("revs %v", revs)
+	}
+}
+
+// A box's /tmp can be a tmpfs held in memory, smaller than one build.
+func TestABuildWorksOnDiskUnderTheNodesHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	dir, err := buildsDir()
+	if err != nil {
+		t.Fatalf("buildsDir: %v", err)
+	}
+	if dir != filepath.Join(home, ".qntx", "builds") {
+		t.Fatalf("builds in %s", dir)
+	}
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Fatalf("%s is not a directory: %v", dir, err)
+	}
+
+	env := buildEnv("/w", "", nil)
+	if !slices.Contains(env, "TMPDIR=/w/tmp") {
+		t.Fatalf("the build's temp files go elsewhere: %v", env)
+	}
+}
+
+// "needs to be kinder with the system, we can tolerate slower less resource intensive builds"
+//
+// "18 minutes is also too slow"
+func TestABuildRunsAtTheLowestPriority(t *testing.T) {
+	env := buildEnv("/w", "", nil)
+	for _, held := range []string{"CARGO_BUILD_JOBS=1", "GOFLAGS=-p=1", "MAKEFLAGS=-j1"} {
+		if slices.Contains(env, held) {
+			t.Fatalf("%s holds the build to one job: %v", held, env)
+		}
+	}
+	name, args := gentle("/nix/bin/nix", []string{"shell"})
+	if name != "nice" || !slices.Equal(args, []string{"-n", "19", "/nix/bin/nix", "shell"}) {
+		t.Fatalf("the build runs as %s %v", name, args)
 	}
 }
 

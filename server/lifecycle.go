@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
+	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/errors"
 )
 
@@ -208,6 +209,12 @@ func (s *QNTXServer) Stop() error {
 
 	// Opening/Closing Phase 4: Transition to draining state
 	s.setState(ServerStateDraining)
+
+	// A plugin closing is not a plugin failing: health polling restarted
+	// plugins mid-shutdown, and the stop hung until systemd killed it.
+	if pm := grpcplugin.GetDefaultPluginManager(); pm != nil {
+		pm.StopWatching()
+	}
 
 	// Stop daemon FIRST before stopping server goroutines
 	if s.daemon != nil {

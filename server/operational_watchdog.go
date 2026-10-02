@@ -119,7 +119,12 @@ func (s *QNTXServer) askOperationalStore(p operationalPatience, asked time.Time,
 	defer cancel()
 
 	answered := make(chan error, 1)
-	go func() { answered <- s.nodeDB.PingContext(ctx) }()
+	sacred.Go("operational.ping", func() {
+		var err error
+		defer func() { answered <- err }()
+		defer sacred.Recovered("operational.ping", &err)
+		err = s.nodeDB.PingContext(ctx)
+	})
 
 	sentry := time.NewTimer(p.sentry)
 	defer sentry.Stop()
@@ -239,10 +244,12 @@ func (s *QNTXServer) lastWords(p operationalPatience, root *services.MailRecipie
 	defer cancel()
 	sent := make(chan error, 1)
 	to := *root
-	go func() {
-		_, _, err := s.nodeMailer.SendAsNodeTo(ctx, to, m)
-		sent <- err
-	}()
+	sacred.Go("operational.last_words", func() {
+		var err error
+		defer func() { sent <- err }()
+		defer sacred.Recovered("operational.last_words", &err)
+		_, _, err = s.nodeMailer.SendAsNodeTo(ctx, to, m)
+	})
 	select {
 	case err := <-sent:
 		if err != nil {

@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -122,6 +123,85 @@ func buildOf(record grpcplugin.PluginRecord) (pluginBuild, bool, error) {
 	return b, true, nil
 }
 
+// enabledBuilds is each enabled plugin QNTX builds, and why any record's build
+// is not one QNTX can run.
+func enabledBuilds(records []grpcplugin.PluginRecord) ([]pluginBuild, []error) {
+	var builds []pluginBuild
+	var refused []error
+	for _, record := range records {
+		if !record.Enabled {
+			continue
+		}
+		b, built, err := buildOf(record)
+		if err != nil {
+			refused = append(refused, err)
+			continue
+		}
+		if built {
+			builds = append(builds, b)
+		}
+	}
+	return builds, refused
+}
+
+// builtRevsFile is beside a build QNTX installed: the revs it was built from.
+const builtRevsFile = "built-revs"
+
+// installedRevs is what name's installed build was built from. None is a
+// plugin with no binary, or one whose binary QNTX did not build.
+func installedRevs(name string) []string {
+	dir, err := grpcplugin.PluginInstallPath(name)
+	if err != nil {
+		return nil
+	}
+	if info, err := os.Stat(filepath.Join(dir, grpcplugin.PluginBinaryName(name))); err != nil || info.IsDir() {
+		return nil
+	}
+	held, err := os.ReadFile(filepath.Join(dir, builtRevsFile))
+	if err != nil {
+		return nil
+	}
+	return strings.Fields(string(held))
+}
+
+// keepBuiltRevs writes what name's installed build was built from beside it.
+func keepBuiltRevs(name string, revs []string) error {
+	dir, err := grpcplugin.PluginInstallPath(name)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, builtRevsFile), []byte(strings.Join(revs, " ")+"\n"), 0o644); err != nil {
+		return errors.Wrapf(err, "the revs of %s's build were not kept", name)
+	}
+	return nil
+}
+
+// BuildMoved builds each enabled plugin whose sources are not what its
+// installed build was built from: a restart stops a running build, and a
+// push while the node is down reaches nobody.
+func (s *QNTXServer) BuildMoved() {
+	logger := s.logger.Named("build")
+	records, err := s.pluginRecords().Plugins()
+	if err != nil {
+		logger.Errorw("The plugin records were not read, so no moved plugin is built", "error", err)
+		return
+	}
+	builds, refused := enabledBuilds(records)
+	for _, err := range refused {
+		logger.Errorw("A plugin's build is not one QNTX can run", "error", err)
+	}
+	for _, b := range builds {
+		if revs := installedRevs(b.name); revs != nil {
+			s.builds.set(b.name, PluginBuildState{Revs: revs, At: time.Now()})
+		}
+		sacred.Go("plugin.build."+b.name, func() {
+			s.building.Lock()
+			defer s.building.Unlock()
+			s.buildIfMoved(s.lifetime(), b, logger)
+		})
+	}
+}
+
 // sources is every source of the build, the core first.
 func (b pluginBuild) sources() []buildSource {
 	return append([]buildSource{b.core}, b.inputs...)
@@ -198,6 +278,9 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 		return
 	}
 	s.builds.set(b.name, state)
+	if err := keepBuiltRevs(b.name, revs); err != nil {
+		logger.Errorw("A plugin built and what it was built from was not kept, so the next start builds it again", "plugin", b.name, "error", err)
+	}
 	if changed {
 		s.buildLanded(b.name)
 	}
@@ -225,11 +308,50 @@ func (s *QNTXServer) buildRev(ctx context.Context, source buildSource) (string, 
 	return said.Items[0].Sha, nil
 }
 
+// buildsDir is where builds work: on disk under the node's home.
+func buildsDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", errors.Wrap(err, "the node's home was not found, so there is nowhere to build")
+	}
+	dir := filepath.Join(home, ".qntx", "builds")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", errors.Wrapf(err, "failed to make %s to build in", dir)
+	}
+	return dir, nil
+}
+
+// buildEnv is what a build runs with: the node's nix, its inputs, and its
+// temp files inside its own work directory.
+func buildEnv(work, inputsEnv string, files []string) []string {
+	env := []string{
+		"PATH=" + nixBin + ":" + os.Getenv("PATH"),
+		"TMPDIR=" + filepath.Join(work, "tmp"),
+	}
+	if inputsEnv != "" {
+		env = append(env, inputsEnv+"="+strings.Join(files, " "))
+	}
+	return env
+}
+
+// gentle runs a build at the lowest CPU priority, so the node it builds on
+// keeps answering.
+func gentle(name string, args []string) (string, []string) {
+	return "nice", append([]string{"-n", "19", name}, args...)
+}
+
 // buildPlugin builds b from revs, packages what it built, and installs it.
 func (s *QNTXServer) buildPlugin(ctx context.Context, b pluginBuild, revs []string) (bool, string, error) {
-	work, err := os.MkdirTemp("", "qntx-build-"+b.name+"-")
+	builds, err := buildsDir()
 	if err != nil {
-		return false, "", errors.Wrap(err, "failed to make a directory to build in")
+		return false, "", err
+	}
+	work, err := os.MkdirTemp(builds, b.name+"-")
+	if err != nil {
+		return false, "", errors.Wrapf(err, "failed to make a directory in %s to build in", builds)
+	}
+	if err := os.Mkdir(filepath.Join(work, "tmp"), 0o755); err != nil {
+		return false, "", errors.Wrapf(err, "failed to make the build's temp directory in %s", work)
 	}
 	defer func() {
 		if err := os.RemoveAll(work); err != nil {
@@ -266,11 +388,8 @@ func (s *QNTXServer) buildPlugin(ctx context.Context, b pluginBuild, revs []stri
 		args = append(args, "nixpkgs#"+p)
 	}
 	args = append(args, "-c", "sh", "-c", b.command)
-	env := []string{"PATH=" + nixBin + ":" + os.Getenv("PATH")}
-	if b.inputsEnv != "" {
-		env = append(env, b.inputsEnv+"="+strings.Join(files, " "))
-	}
-	if _, err := runBuild(ctx, src, env, filepath.Join(nixBin, "nix"), args...); err != nil {
+	nice, niceArgs := gentle(filepath.Join(nixBin, "nix"), args)
+	if _, err := runBuild(ctx, src, buildEnv(work, b.inputsEnv, files), nice, niceArgs...); err != nil {
 		return false, "", errors.Wrapf(err, "the build of %s at %s failed", b.name, revs[0])
 	}
 
