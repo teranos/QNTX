@@ -72,7 +72,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 	}
 
 	// A plugin that is not running has no schema to say; its config is still its record's.
-	var schema map[string]interface{}
+	var schema map[string]any
 	if pm := s.getPluginManager(); pm != nil {
 		if pluginClient, ok := pm.GetPlugin(pluginName); ok {
 			// Try to get schema from plugin
@@ -83,9 +83,9 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 			if proxy, ok := pluginClient.(*grpcplugin.ExternalDomainProxy); ok {
 				if schemaResp, err := proxy.ConfigSchema(ctx); err == nil && schemaResp != nil {
 					// Convert protobuf schema to JSON-friendly map
-					schema = make(map[string]interface{})
+					schema = make(map[string]any)
 					for fieldName, fieldSchema := range schemaResp.Fields {
-						schema[fieldName] = map[string]interface{}{
+						schema[fieldName] = map[string]any{
 							"type":          fieldSchema.Type,
 							"description":   fieldSchema.Description,
 							"default_value": fieldSchema.DefaultValue,
@@ -114,7 +114,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"plugin":  pluginName,
 		"config":  settings,
 		"schema":  schema,
@@ -160,7 +160,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 					return
 				}
 				if validationErrs := validateConfigAgainstSchema(req.Config, schema.Fields); len(validationErrs) > 0 {
-					respond(w, s.logger, http.StatusBadRequest, map[string]interface{}{
+					respond(w, s.logger, http.StatusBadRequest, map[string]any{
 						"success": false,
 						"message": "Configuration validation failed",
 						"errors":  validationErrs,
@@ -172,7 +172,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	if req.Validate {
-		respond(w, s.logger, http.StatusOK, map[string]interface{}{
+		respond(w, s.logger, http.StatusOK, map[string]any{
 			"valid":   true,
 			"plugin":  pluginName,
 			"checked": running,
@@ -192,7 +192,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 
 		if err := pm.ReinitializePlugin(ctx, pluginName, s.services); err != nil {
 			s.logger.Errorw("Failed to reinitialize plugin", "error", err, "plugin", pluginName)
-			respond(w, s.logger, http.StatusInternalServerError, map[string]interface{}{
+			respond(w, s.logger, http.StatusInternalServerError, map[string]any{
 				"success": false,
 				"message": "Configuration saved but plugin reinitialization failed: " + err.Error(),
 				"plugin":  pluginName,
@@ -201,7 +201,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	respond(w, s.logger, http.StatusOK, map[string]interface{}{
+	respond(w, s.logger, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Plugin configuration updated successfully",
 		"plugin":  pluginName,

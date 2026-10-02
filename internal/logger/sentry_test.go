@@ -90,7 +90,7 @@ func TestWriteShipsEveryFieldAsItWasWritten(t *testing.T) {
 		t.Fatalf("Write returned %v", err)
 	}
 
-	want := map[string]interface{}{
+	want := map[string]any{
 		"namespace": "acme",
 		// zap flattens every integer width to int64, and the attribute keeps
 		// that width rather than narrowing it back.

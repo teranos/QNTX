@@ -51,7 +51,7 @@ const (
 type Client struct {
 	server  *QNTXServer
 	conn    *websocket.Conn
-	sendMsg chan interface{} // Generic message channel for all WebSocket messages
+	sendMsg chan any // Generic message channel for all WebSocket messages
 	id      string
 	// admitted is what the upgrade request was granted, and gated is whether
 	// there was a gate at all. A socket is a request that stayed, so what it may
@@ -304,7 +304,7 @@ func (c *Client) handleUpload(filename, fileType, data string) {
 }
 
 // sendJSON is a helper to send JSON messages to the client
-func (c *Client) sendJSON(data interface{}) {
+func (c *Client) sendJSON(data any) {
 	select {
 	case c.sendMsg <- data:
 		// Message queued successfully
@@ -380,7 +380,7 @@ func (c *Client) handleJobControl(msg QueryMessage) {
 			c.sendMsg <- JobUpdateMessage{
 				Type: "job_details",
 				Job:  job,
-				Metadata: map[string]interface{}{
+				Metadata: map[string]any{
 					"timestamp": time.Now().Unix(),
 				},
 			}
@@ -410,7 +410,7 @@ func (c *Client) handleJobControl(msg QueryMessage) {
 func (c *Client) handleGetDatabaseStats() {
 	cached := c.server.dbStatsCache.Load()
 	if cached == nil {
-		c.sendJSON(map[string]interface{}{
+		c.sendJSON(map[string]any{
 			"type":  "database_stats",
 			"error": "Database stats not yet available (first refresh pending)",
 		})
@@ -473,7 +473,7 @@ func (c *Client) handleRichSearch(query string) {
 		if err != nil {
 			c.server.logger.Errorw("Search refused: this connection reaches no namespace",
 				"query", query, "client_id", c.id, "error", err)
-			c.sendJSON(map[string]interface{}{
+			c.sendJSON(map[string]any{
 				"type":  "rich_search_error",
 				"error": err.Error(),
 			})
@@ -487,7 +487,7 @@ func (c *Client) handleRichSearch(query string) {
 				"error", err,
 				"client_id", c.id,
 			)
-			c.sendJSON(map[string]interface{}{
+			c.sendJSON(map[string]any{
 				"type":  "rich_search_error",
 				"error": err.Error(),
 			})
@@ -557,7 +557,7 @@ func (c *Client) searchMeili(ctx context.Context, query string, limit int) ([]st
 	matches := make([]storage.RichSearchMatch, 0, len(resp.Hits))
 	for _, hit := range resp.Hits {
 		// Parse the document JSON to extract fields
-		var doc map[string]interface{}
+		var doc map[string]any
 		if err := json.Unmarshal(hit.Document, &doc); err != nil {
 			continue
 		}
@@ -580,7 +580,7 @@ func (c *Client) searchMeili(ctx context.Context, query string, limit int) ([]st
 		// Use highlighted text as excerpt if available
 		excerpt := fieldValue
 		if len(hit.Highlighted) > 0 {
-			var highlighted map[string]interface{}
+			var highlighted map[string]any
 			if err := json.Unmarshal(hit.Highlighted, &highlighted); err == nil {
 				if hl, ok := highlighted["field_value"].(string); ok {
 					excerpt = hl
@@ -650,7 +650,7 @@ func (c *Client) searchSemantic(query string) ([]storage.RichSearchMatch, error)
 
 		displayLabel := nodeID
 		typeName := "Document"
-		var attributes map[string]interface{}
+		var attributes map[string]any
 		if attestation.Attributes != nil {
 			attributes = attestation.Attributes
 			if label, ok := attributes["label"].(string); ok && label != "" {
@@ -790,7 +790,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	if watcher.IsStanding(watcherID) {
 		c.server.logger.Warnw("A watcher upsert named a standing watcher and was refused",
 			"watcher_id", watcherID, "client_id", c.id)
-		c.sendJSON(map[string]interface{}{
+		c.sendJSON(map[string]any{
 			"type":  "watcher_error",
 			"error": watcherID + " is what this node is born watching and cannot be changed",
 		})

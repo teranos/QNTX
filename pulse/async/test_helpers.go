@@ -4,7 +4,7 @@ import "encoding/json"
 
 // createTestJob is a shared helper for all tests to create jobs with generic payloads
 func createTestJob(handlerName, source string, totalOps int, estimatedCost float64) (*Job, error) {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"source": source,
 		"actor":  "test-system",
 	}

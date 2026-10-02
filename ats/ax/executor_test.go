@@ -140,7 +140,7 @@ func TestExecuteAsk_LoggerInvoked(t *testing.T) {
 		if entry.Message == "executing ax query" {
 			found = true
 			// Verify structured fields are present
-			fieldMap := make(map[string]interface{})
+			fieldMap := make(map[string]any)
 			for _, field := range entry.Context {
 				fieldMap[field.Key] = field.Interface
 			}

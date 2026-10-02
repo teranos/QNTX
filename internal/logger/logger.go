@@ -232,84 +232,84 @@ func Cleanup() error {
 }
 
 // Info logs an info message
-func Info(args ...interface{}) {
+func Info(args ...any) {
 	if Logger != nil {
 		Logger.Info(args...)
 	}
 }
 
 // Infof logs a formatted info message
-func Infof(format string, args ...interface{}) {
+func Infof(format string, args ...any) {
 	if Logger != nil {
 		Logger.Infof(format, args...)
 	}
 }
 
 // Infow logs an info message with structured fields
-func Infow(msg string, keysAndValues ...interface{}) {
+func Infow(msg string, keysAndValues ...any) {
 	if Logger != nil {
 		Logger.Infow(msg, keysAndValues...)
 	}
 }
 
 // Error logs an error message
-func Error(args ...interface{}) {
+func Error(args ...any) {
 	if Logger != nil {
 		Logger.Error(args...)
 	}
 }
 
 // Errorf logs a formatted error message
-func Errorf(format string, args ...interface{}) {
+func Errorf(format string, args ...any) {
 	if Logger != nil {
 		Logger.Errorf(format, args...)
 	}
 }
 
 // Errorw logs an error message with structured fields
-func Errorw(msg string, keysAndValues ...interface{}) {
+func Errorw(msg string, keysAndValues ...any) {
 	if Logger != nil {
 		Logger.Errorw(msg, keysAndValues...)
 	}
 }
 
 // Warn logs a warning message
-func Warn(args ...interface{}) {
+func Warn(args ...any) {
 	if Logger != nil {
 		Logger.Warn(args...)
 	}
 }
 
 // Warnf logs a formatted warning message
-func Warnf(format string, args ...interface{}) {
+func Warnf(format string, args ...any) {
 	if Logger != nil {
 		Logger.Warnf(format, args...)
 	}
 }
 
 // Warnw logs a warning message with structured fields
-func Warnw(msg string, keysAndValues ...interface{}) {
+func Warnw(msg string, keysAndValues ...any) {
 	if Logger != nil {
 		Logger.Warnw(msg, keysAndValues...)
 	}
 }
 
 // Debug logs a debug message
-func Debug(args ...interface{}) {
+func Debug(args ...any) {
 	if Logger != nil {
 		Logger.Debug(args...)
 	}
 }
 
 // Debugf logs a formatted debug message
-func Debugf(format string, args ...interface{}) {
+func Debugf(format string, args ...any) {
 	if Logger != nil {
 		Logger.Debugf(format, args...)
 	}
 }
 
 // Debugw logs a debug message with structured fields
-func Debugw(msg string, keysAndValues ...interface{}) {
+func Debugw(msg string, keysAndValues ...any) {
 	if Logger != nil {
 		Logger.Debugw(msg, keysAndValues...)
 	}

@@ -355,7 +355,7 @@ func TestEngine_ExecuteWebhook(t *testing.T) {
 	logger := zap.NewNop().Sugar()
 
 	// Mock webhook endpoint
-	var receivedBody map[string]interface{}
+	var receivedBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewDecoder(r.Body).Decode(&receivedBody)
 		w.WriteHeader(http.StatusOK)
@@ -402,7 +402,7 @@ func TestEngine_ExecuteWebhook(t *testing.T) {
 	if receivedBody["watcher_id"] != "webhook-test" {
 		t.Errorf("Wrong watcher_id: %v", receivedBody["watcher_id"])
 	}
-	attestationData := receivedBody["attestation"].(map[string]interface{})
+	attestationData := receivedBody["attestation"].(map[string]any)
 	if attestationData["id"] != "webhook-attestation" {
 		t.Errorf("Wrong attestation ID: %v", attestationData["id"])
 	}
@@ -612,7 +612,7 @@ func TestEngine_NoSharedMutation(t *testing.T) {
 
 	// Mock endpoint that captures attestations
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]interface{}
+		var body map[string]any
 		json.NewDecoder(r.Body).Decode(&body)
 
 		if attestationData, ok := body["attestation"]; ok {
@@ -908,7 +908,7 @@ func TestEngine_AttributeFilter_Equals(t *testing.T) {
 		ID:         "match-1",
 		Subjects:   []string{"s"},
 		Predicates: []string{"PostToolUse"},
-		Attributes: map[string]interface{}{"tool_name": "Bash", "other": "stuff"},
+		Attributes: map[string]any{"tool_name": "Bash", "other": "stuff"},
 	})
 
 	// Should NOT match — tool_name equals "Read"
@@ -916,7 +916,7 @@ func TestEngine_AttributeFilter_Equals(t *testing.T) {
 		ID:         "no-match-1",
 		Subjects:   []string{"s"},
 		Predicates: []string{"PostToolUse"},
-		Attributes: map[string]interface{}{"tool_name": "Read"},
+		Attributes: map[string]any{"tool_name": "Read"},
 	})
 
 	time.Sleep(100 * time.Millisecond)
@@ -972,8 +972,8 @@ func TestEngine_AttributeFilter_ContainsNestedPath(t *testing.T) {
 		ID:         "commit-event",
 		Subjects:   []string{"branch"},
 		Predicates: []string{"PostToolUse"},
-		Attributes: map[string]interface{}{
-			"tool_input": map[string]interface{}{
+		Attributes: map[string]any{
+			"tool_input": map[string]any{
 				"command": "git add . && git commit -m 'fix things'",
 			},
 		},
@@ -984,8 +984,8 @@ func TestEngine_AttributeFilter_ContainsNestedPath(t *testing.T) {
 		ID:         "status-event",
 		Subjects:   []string{"branch"},
 		Predicates: []string{"PostToolUse"},
-		Attributes: map[string]interface{}{
-			"tool_input": map[string]interface{}{
+		Attributes: map[string]any{
+			"tool_input": map[string]any{
 				"command": "git status",
 			},
 		},

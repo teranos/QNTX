@@ -27,8 +27,8 @@ func GetJobScanArgs() *JobScanArgs {
 
 // GetJobScanTargets returns a slice of interface{} pointers for the job and scan args,
 // in the order expected by the standard job SELECT query
-func GetJobScanTargets(job *Job, args *JobScanArgs) []interface{} {
-	return []interface{}{
+func GetJobScanTargets(job *Job, args *JobScanArgs) []any {
+	return []any{
 		&job.ID,
 		&args.HandlerName,
 		&job.Source,

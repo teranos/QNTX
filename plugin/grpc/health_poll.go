@@ -170,7 +170,7 @@ func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugi
 		// reason a plugin is unhealthy can't be present in one and silently
 		// missing from another — a field added or dropped here changes both
 		// at once instead of needing to be repeated correctly by hand.
-		base := []interface{}{
+		base := []any{
 			"plugin", name,
 			"message", health.Message,
 			"consecutive_failures", count,

@@ -29,17 +29,17 @@ const (
 
 // RichSearchMatch represents a match in RichStringFields
 type RichSearchMatch struct {
-	NodeID       string                 `json:"node_id"`       // The subject ID from the attestation
-	TypeName     string                 `json:"type_name"`     // The type of the entity
-	TypeLabel    string                 `json:"type_label"`    // The label of the type
-	FieldName    string                 `json:"field_name"`    // The name of the matched field
-	FieldValue   string                 `json:"field_value"`   // The full value of the field
-	Excerpt      string                 `json:"excerpt"`       // An excerpt showing the match in context
-	Score        float64                `json:"score"`         // Match score (0.0-1.0)
-	Strategy     string                 `json:"strategy"`      // The matching strategy used
-	DisplayLabel string                 `json:"display_label"` // Label to display for this entity
-	Attributes   map[string]interface{} `json:"attributes"`    // Full attributes for the entity
-	MatchedWords []string               `json:"matched_words"` // The actual words that were matched (for highlighting)
+	NodeID       string         `json:"node_id"`       // The subject ID from the attestation
+	TypeName     string         `json:"type_name"`     // The type of the entity
+	TypeLabel    string         `json:"type_label"`    // The label of the type
+	FieldName    string         `json:"field_name"`    // The name of the matched field
+	FieldValue   string         `json:"field_value"`   // The full value of the field
+	Excerpt      string         `json:"excerpt"`       // An excerpt showing the match in context
+	Score        float64        `json:"score"`         // Match score (0.0-1.0)
+	Strategy     string         `json:"strategy"`      // The matching strategy used
+	DisplayLabel string         `json:"display_label"` // Label to display for this entity
+	Attributes   map[string]any `json:"attributes"`    // Full attributes for the entity
+	MatchedWords []string       `json:"matched_words"` // The actual words that were matched (for highlighting)
 }
 
 // RichSearchResult contains search results with potential warnings
@@ -107,7 +107,7 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 
 	// Build dynamic WHERE clause based on discovered fields
 	whereClauses := make([]string, len(richStringFields))
-	queryParams := make([]interface{}, len(richStringFields))
+	queryParams := make([]any, len(richStringFields))
 	for i, field := range richStringFields {
 		whereClauses[i] = fmt.Sprintf("json_extract(a.attributes, '$.%s') LIKE '%%' || ? || '%%'", field)
 		queryParams[i] = query
@@ -160,7 +160,7 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 		// (richStringFields is already defined at the top of this function)
 
 		// Parse attributes
-		var attributes map[string]interface{}
+		var attributes map[string]any
 		if err := json.Unmarshal([]byte(attributesJSON), &attributes); err != nil {
 			continue
 		}
@@ -188,7 +188,7 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 					switch v := value.(type) {
 					case string:
 						strValue = v
-					case []interface{}:
+					case []any:
 						// Handle array fields by joining them
 						parts := make([]string, 0, len(v))
 						for _, item := range v {
@@ -310,7 +310,7 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (_ map[string][]
 			continue
 		}
 
-		var attrMap map[string]interface{}
+		var attrMap map[string]any
 		if err := json.Unmarshal([]byte(attributesJSON), &attrMap); err != nil {
 			continue
 		}

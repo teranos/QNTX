@@ -109,7 +109,7 @@ func TestExecute_FridgeInventory(t *testing.T) {
 		Actors:     []string{"smartfridge_001"},
 		Timestamp:  timestamp,
 		Source:     "smart_home",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"milk":    "240ml",
 			"paprika": "1pc",
 			"butter":  "100g",
@@ -191,7 +191,7 @@ func TestExecute_CupboardInventory(t *testing.T) {
 		Actors:     []string{"manual_entry"},
 		Timestamp:  timestamp,
 		Source:     "user_input",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"olive_oil":       "500ml",
 			"rigatoni":        "250g",
 			"canned_tomatoes": "2pc",
@@ -260,7 +260,7 @@ func TestExecute_RecipePromptConstruction(t *testing.T) {
 		Actors:     []string{"smartfridge_001", "manual_entry"},
 		Timestamp:  timestamp,
 		Source:     "inventory_aggregator",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"eggs":            "6pc",
 			"butter":          "100g",
 			"milk":            "240ml",

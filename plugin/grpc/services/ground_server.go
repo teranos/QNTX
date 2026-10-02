@@ -70,7 +70,7 @@ func (s *GroundServer) WriteToGround(ctx context.Context, req *protocol.WriteToG
 		}, nil
 	}
 
-	attributes := make(map[string]interface{})
+	attributes := make(map[string]any)
 	if req.Attributes != nil {
 		attributes = req.Attributes.AsMap()
 	}
@@ -153,7 +153,7 @@ func (s *GroundServer) ReadUndelivered(ctx context.Context, req *protocol.ReadUn
 	}
 
 	// Extract detail from attributes JSON
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal([]byte(attributes), &parsed); err != nil {
 		return &protocol.ReadUndeliveredResponse{
 			Error: fmt.Sprintf("failed to parse attributes: %v", err),

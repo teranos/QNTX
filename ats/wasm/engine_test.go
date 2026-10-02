@@ -81,7 +81,7 @@ func TestParseAxQueryTemporal(t *testing.T) {
 		t.Fatalf("Call: %v", err)
 	}
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal([]byte(result), &parsed); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestParseAxQueryTemporal(t *testing.T) {
 		t.Fatal("expected temporal clause")
 	}
 
-	tc, ok := temporal.(map[string]interface{})
+	tc, ok := temporal.(map[string]any)
 	if !ok {
 		t.Fatalf("expected temporal to be map, got %T", temporal)
 	}

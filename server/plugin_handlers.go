@@ -35,9 +35,9 @@ func NewPluginHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 }
 
 // list is every installed plugin and its status: plugins_list's answer.
-func (h *PluginHandler) list() map[string]interface{} {
+func (h *PluginHandler) list() map[string]any {
 	if h.registry == nil {
-		return map[string]interface{}{"plugins": []interface{}{}}
+		return map[string]any{"plugins": []any{}}
 	}
 
 	// Read the last probe rather than making one. Probing here cost gRPC calls
@@ -46,20 +46,20 @@ func (h *PluginHandler) list() map[string]interface{} {
 	stateResults := h.registry.GetAllStates()
 
 	type PluginInfo struct {
-		Name        string                 `json:"name"`
-		Version     string                 `json:"version"`
-		QNTXVersion string                 `json:"qntx_version,omitempty"`
-		Description string                 `json:"description"`
-		Author      string                 `json:"author,omitempty"`
-		License     string                 `json:"license,omitempty"`
-		Healthy     bool                   `json:"healthy"`
+		Name        string `json:"name"`
+		Version     string `json:"version"`
+		QNTXVersion string `json:"qntx_version,omitempty"`
+		Description string `json:"description"`
+		Author      string `json:"author,omitempty"`
+		License     string `json:"license,omitempty"`
+		Healthy     bool   `json:"healthy"`
 		// Probed is whether the last probe saw this plugin. Unprobed is not
 		// unhealthy: it started after the probe was taken.
-		Probed      bool                   `json:"probed"`
-		Message     string                 `json:"message,omitempty"`
-		Details     map[string]interface{} `json:"details,omitempty"`
-		State       string                 `json:"state"`
-		Pausable    bool                   `json:"pausable"`
+		Probed   bool           `json:"probed"`
+		Message  string         `json:"message,omitempty"`
+		Details  map[string]any `json:"details,omitempty"`
+		State    string         `json:"state"`
+		Pausable bool           `json:"pausable"`
 		// ModuleDigest identifies the element module this plugin serves, so the
 		// browser can import a replaced one instead of the module record it
 		// already holds for that URL. Empty for anything not serving a module.
@@ -166,7 +166,7 @@ func (h *PluginHandler) list() map[string]interface{} {
 
 	// Health here is a probe with an age. Saying when it was taken is what keeps
 	// a stale answer from reading as a current one.
-	response := map[string]interface{}{
+	response := map[string]any{
 		"plugins": plugins,
 	}
 	if !probedAt.IsZero() {
@@ -183,9 +183,9 @@ func (h *PluginHandler) list() map[string]interface{} {
 }
 
 // routes is what each running plugin serves: plugins_routes's answer.
-func (h *PluginHandler) routes() map[string]interface{} {
+func (h *PluginHandler) routes() map[string]any {
 	if h.registry == nil {
-		return map[string]interface{}{"routes": []interface{}{}}
+		return map[string]any{"routes": []any{}}
 	}
 
 	type RouteEndpoint struct {
@@ -247,14 +247,14 @@ func (h *PluginHandler) routes() map[string]interface{} {
 		routes = append(routes, route)
 	}
 
-	return map[string]interface{}{"routes": routes}
+	return map[string]any{"routes": routes}
 }
 
 // elements is the element definitions running plugins make: plugins_elements's
 // answer. A sigil gives an object, so the rows are under elements.
-func (h *PluginHandler) elements(ctx context.Context) map[string]interface{} {
+func (h *PluginHandler) elements(ctx context.Context) map[string]any {
 	if h.registry == nil {
-		return map[string]interface{}{"elements": []interface{}{}}
+		return map[string]any{"elements": []any{}}
 	}
 
 	type PluginElementDef struct {
@@ -325,5 +325,5 @@ func (h *PluginHandler) elements(ctx context.Context) map[string]interface{} {
 		}
 	}
 
-	return map[string]interface{}{"elements": items}
+	return map[string]any{"elements": items}
 }

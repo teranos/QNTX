@@ -11,11 +11,11 @@ import (
 // queryBuilder accumulates SQL WHERE clauses and parameters for attestation queries
 type queryBuilder struct {
 	whereClauses []string
-	args         []interface{}
+	args         []any
 }
 
 // addClause appends a WHERE clause with its arguments
-func (qb *queryBuilder) addClause(clause string, args ...interface{}) {
+func (qb *queryBuilder) addClause(clause string, args ...any) {
 	qb.whereClauses = append(qb.whereClauses, clause)
 	qb.args = append(qb.args, args...)
 }
@@ -84,7 +84,7 @@ func (qb *queryBuilder) buildActorFilter(actors []string) {
 // BuildFilterQuery builds a SQL query from an AxFilter, returning the full SELECT
 // with WHERE clauses and ORDER BY. Used by the watcher engine to push structural
 // filters into SQL instead of loading the entire table.
-func BuildFilterQuery(filter types.AxFilter) (string, []interface{}) {
+func BuildFilterQuery(filter types.AxFilter) (string, []any) {
 	qb := &queryBuilder{}
 	qb.buildSubjectFilter(filter.Subjects)
 	qb.buildPredicateFilter(filter.Predicates)

@@ -209,15 +209,15 @@ func (s *Store) UpdateJob(job *Job) error {
 // ListJobs returns all jobs, optionally filtered by status
 func (s *Store) ListJobs(status *JobStatus, limit int) (_ []*Job, err error) {
 	var query string
-	var args []interface{}
+	var args []any
 
 	baseQuery := `SELECT ` + StandardJobSelectColumns() + ` FROM async_ix_jobs`
 	if status != nil {
 		query = baseQuery + ` WHERE status = ? ORDER BY created_at DESC LIMIT ?`
-		args = []interface{}{*status, limit}
+		args = []any{*status, limit}
 	} else {
 		query = baseQuery + ` ORDER BY created_at DESC LIMIT ?`
-		args = []interface{}{limit}
+		args = []any{limit}
 	}
 
 	rows, err := s.db.Query(query, args...)

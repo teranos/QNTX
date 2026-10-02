@@ -113,9 +113,9 @@ type UsageUpdateMessage struct {
 
 // JobUpdateMessage represents async IX job update
 type JobUpdateMessage struct {
-	Type     string                 `json:"type"`                    // "job_update"
-	Job      *async.Job             `json:"job" tstype:"Job | null"` // Full job details (from pulse/async)
-	Metadata map[string]interface{} `json:"metadata"`                // Additional metadata
+	Type     string         `json:"type"`                    // "job_update"
+	Job      *async.Job     `json:"job" tstype:"Job | null"` // Full job details (from pulse/async)
+	Metadata map[string]any `json:"metadata"`                // Additional metadata
 }
 
 // DaemonStatusMessage represents daemon status update
@@ -245,12 +245,12 @@ type PluginHealthMessage struct {
 // WatcherMatchMessage represents a watcher match event
 // Sent when an attestation matches a watcher's filter
 type WatcherMatchMessage struct {
-	Type            string      `json:"type"`                        // "watcher_match"
-	WatcherID       string      `json:"watcher_id"`                  // ID of watcher that matched
-	Attestation     interface{} `json:"attestation"`                 // The matching attestation (types.As)
-	Score           float32     `json:"score,omitempty"`             // Semantic similarity score (0-1), 0 for structural matches
-	TargetElementID string      `json:"target_element_id,omitempty"` // Target element for meld-edge routed matches
-	Timestamp       int64       `json:"timestamp"`                   // Unix timestamp
+	Type            string  `json:"type"`                        // "watcher_match"
+	WatcherID       string  `json:"watcher_id"`                  // ID of watcher that matched
+	Attestation     any     `json:"attestation"`                 // The matching attestation (types.As)
+	Score           float32 `json:"score,omitempty"`             // Semantic similarity score (0-1), 0 for structural matches
+	TargetElementID string  `json:"target_element_id,omitempty"` // Target element for meld-edge routed matches
+	Timestamp       int64   `json:"timestamp"`                   // Unix timestamp
 }
 
 // ElementFiredMessage wraps proto.ElementFired with WebSocket type discriminator

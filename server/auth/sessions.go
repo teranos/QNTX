@@ -106,7 +106,7 @@ func (s *sessionStore) invalidate(token string) {
 
 func (s *sessionStore) sweep() {
 	now := time.Now()
-	s.sessions.Range(func(key, value interface{}) bool {
+	s.sessions.Range(func(key, value any) bool {
 		sess, isSession := value.(*session)
 		if !isSession || now.After(sess.expiresAt) {
 			s.sessions.Delete(key)

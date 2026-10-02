@@ -14,10 +14,10 @@ type ProgressEmitter interface {
 	// EmitProgress announces batch progress with count and optional metadata.
 	// This is the generic replacement for domain-specific methods like EmitAttestations.
 	// Domains can pass entity data as metadata maps.
-	EmitProgress(count int, metadata map[string]interface{})
+	EmitProgress(count int, metadata map[string]any)
 
 	// EmitComplete announces successful completion with summary
-	EmitComplete(summary map[string]interface{})
+	EmitComplete(summary map[string]any)
 
 	// EmitError announces an error during processing
 	EmitError(stage string, err error)
@@ -29,9 +29,9 @@ type ProgressEmitter interface {
 // ProgressEntity represents a generic entity for progress tracking.
 // This is domain-agnostic - any domain can use it for their entities.
 type ProgressEntity struct {
-	ID       string                 `json:"id"`
-	Type     string                 `json:"type"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 // JobBroadcaster is an optional interface that ProgressEmitter implementations
@@ -39,7 +39,7 @@ type ProgressEntity struct {
 type JobBroadcaster interface {
 	// BroadcastJobUpdate sends a job update to all connected clients
 	// The job parameter should be of type *async.Job but is interface{} to avoid import cycles
-	BroadcastJobUpdate(job interface{})
+	BroadcastJobUpdate(job any)
 }
 
 // TaskTracker is an optional interface that ProgressEmitter implementations

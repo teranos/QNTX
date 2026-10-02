@@ -31,16 +31,16 @@ const (
 
 // ParseError represents a structured parser error with metadata
 type ParseError struct {
-	Err         error                  // Underlying error
-	Kind        ErrorKind              // Error category
-	Severity    ErrorSeverity          // Error severity
-	Message     string                 // Human-readable message
-	Position    int                    // Token position where error occurred
-	TokenCount  int                    // Total tokens being parsed
-	Token       *axToken               // Token that caused the error (optional)
-	Suggestions []string               // Possible fixes
-	Context     map[string]interface{} // Additional debug context
-	Timestamp   time.Time              // When error occurred
+	Err         error          // Underlying error
+	Kind        ErrorKind      // Error category
+	Severity    ErrorSeverity  // Error severity
+	Message     string         // Human-readable message
+	Position    int            // Token position where error occurred
+	TokenCount  int            // Total tokens being parsed
+	Token       *axToken       // Token that caused the error (optional)
+	Suggestions []string       // Possible fixes
+	Context     map[string]any // Additional debug context
+	Timestamp   time.Time      // When error occurred
 }
 
 // Error implements error interface
@@ -124,7 +124,7 @@ func NewParseError(kind ErrorKind, message string) *ParseError {
 		Severity:  SeverityError,
 		Message:   message,
 		Position:  -1,
-		Context:   make(map[string]interface{}),
+		Context:   make(map[string]any),
 		Timestamp: time.Now(),
 	}
 }
@@ -155,7 +155,7 @@ func (e *ParseError) WithSuggestion(suggestion string) *ParseError {
 }
 
 // WithContext adds debug context metadata
-func (e *ParseError) WithContext(key string, value interface{}) *ParseError {
+func (e *ParseError) WithContext(key string, value any) *ParseError {
 	e.Context[key] = value
 	return e
 }

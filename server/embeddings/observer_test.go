@@ -24,7 +24,7 @@ func createObserverWithRichFields(t *testing.T, richFields []string) *EmbeddingO
 		Subjects:   []string{"testtype"},
 		Predicates: []string{"type"},
 		Contexts:   []string{"graph"},
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"display_label":      "T",
 			"display_color":      "#000000",
 			"rich_string_fields": richFields,
@@ -51,7 +51,7 @@ func TestExtractRichText_Mikolov(t *testing.T) {
 
 	as := &types.As{
 		ID: "AS-MIKOLOV-001",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"insight": "A neural network trained on raw text learns that king minus man plus woman equals queen",
 		},
 	}
@@ -67,7 +67,7 @@ func TestExtractRichText_BengioCurriculum(t *testing.T) {
 
 	as := &types.As{
 		ID: "AS-BENGIO-001",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"contribution": "Proposed learning a distributed representation for words that allows the model to generalize to unseen word sequences",
 			"insight":      "The curse of dimensionality is fought by learning to map each word to a continuous vector",
 		},
@@ -85,7 +85,7 @@ func TestExtractRichText_VaswaniAttention(t *testing.T) {
 
 	as := &types.As{
 		ID: "AS-VASWANI-001",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"abstract": "We propose a new simple network architecture based solely on attention mechanisms, dispensing with recurrence and convolutions entirely",
 		},
 	}
@@ -101,8 +101,8 @@ func TestExtractRichText_ReimersGuptaSentenceBERT(t *testing.T) {
 
 	as := &types.As{
 		ID: "AS-REIMERS-001",
-		Attributes: map[string]interface{}{
-			"method": []interface{}{
+		Attributes: map[string]any{
+			"method": []any{
 				"Siamese BERT networks derive semantically meaningful sentence embeddings that can be compared using cosine similarity",
 				"Finding the most similar pair in a collection of 10000 sentences is reduced from 65 hours to about 5 seconds",
 			},
@@ -130,7 +130,7 @@ func TestExtractRichText_NoMatchingFields(t *testing.T) {
 	// have similar meanings. But "unrelated_key" is not a rich field.
 	as := &types.As{
 		ID: "AS-HARRIS-001",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"unrelated_key": "Words that occur in similar contexts tend to have similar meanings",
 		},
 	}
@@ -144,7 +144,7 @@ func TestExtractRichText_EmptyStringSkipped(t *testing.T) {
 	// An empty embedding is like Hinton's dropout — nothing fires
 	as := &types.As{
 		ID:         "AS-HINTON-001",
-		Attributes: map[string]interface{}{"insight": ""},
+		Attributes: map[string]any{"insight": ""},
 	}
 
 	assert.Empty(t, observer.extractRichText(as))
@@ -160,7 +160,7 @@ func TestExtractRichText_NoRichFieldsDefined(t *testing.T) {
 
 	as := &types.As{
 		ID: "AS-PENNINGTON-001",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"insight": "GloVe combines global matrix factorization with local context window methods",
 		},
 	}

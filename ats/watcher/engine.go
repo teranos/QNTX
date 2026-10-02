@@ -919,7 +919,7 @@ func deepCopyAttestation(as *types.As) *types.As {
 	asCopy.Contexts = append([]string(nil), as.Contexts...)
 	asCopy.Actors = append([]string(nil), as.Actors...)
 	if as.Attributes != nil {
-		asCopy.Attributes = make(map[string]interface{})
+		asCopy.Attributes = make(map[string]any)
 		for k, v := range as.Attributes {
 			asCopy.Attributes[k] = v
 		}

@@ -40,7 +40,7 @@ func TestRustStore_CreateAndGet(t *testing.T) {
 		Actors:     []string{"human:bob"},
 		Timestamp:  time.Now(),
 		Source:     "test",
-		Attributes: make(map[string]interface{}),
+		Attributes: make(map[string]any),
 	}
 
 	// Create
@@ -86,7 +86,7 @@ func TestRustStore_Exists(t *testing.T) {
 		Actors:     []string{"human:alice"},
 		Timestamp:  time.Now(),
 		Source:     "test",
-		Attributes: make(map[string]interface{}),
+		Attributes: make(map[string]any),
 	}
 	if err := store.CreateAttestation(as); err != nil {
 		t.Fatalf("CreateAttestation() error: %v", err)
@@ -124,7 +124,7 @@ func TestRustStore_Count(t *testing.T) {
 			Actors:     []string{"human:sebastian"},
 			Timestamp:  time.Now(),
 			Source:     "github",
-			Attributes: make(map[string]interface{}),
+			Attributes: make(map[string]any),
 		},
 		{
 			ID:         "AS-count-2",
@@ -134,7 +134,7 @@ func TestRustStore_Count(t *testing.T) {
 			Actors:     []string{"bot:github-actions"},
 			Timestamp:  time.Now(),
 			Source:     "ci",
-			Attributes: make(map[string]interface{}),
+			Attributes: make(map[string]any),
 		},
 	}
 
@@ -171,7 +171,7 @@ func TestRustStore_ListIDs(t *testing.T) {
 			Actors:     []string{"human:chef_mario"},
 			Timestamp:  time.Now(),
 			Source:     "cooking_app",
-			Attributes: make(map[string]interface{}),
+			Attributes: make(map[string]any),
 		},
 		{
 			ID:         "AS-2",
@@ -181,7 +181,7 @@ func TestRustStore_ListIDs(t *testing.T) {
 			Actors:     []string{"human:beethoven"},
 			Timestamp:  time.Now(),
 			Source:     "music_db",
-			Attributes: make(map[string]interface{}),
+			Attributes: make(map[string]any),
 		},
 		{
 			ID:         "AS-3",
@@ -191,7 +191,7 @@ func TestRustStore_ListIDs(t *testing.T) {
 			Actors:     []string{"sensor:weather_station"},
 			Timestamp:  time.Now(),
 			Source:     "weather_api",
-			Attributes: make(map[string]interface{}),
+			Attributes: make(map[string]any),
 		},
 	}
 
@@ -238,7 +238,7 @@ func TestRustStore_Update(t *testing.T) {
 		Actors:     []string{"device:neuralink_sensor"},
 		Timestamp:  time.Now(),
 		Source:     "neurotech",
-		Attributes: make(map[string]interface{}),
+		Attributes: make(map[string]any),
 	}
 
 	// Create

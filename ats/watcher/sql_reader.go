@@ -62,7 +62,7 @@ func (r *SQLReader) GetAttestations(filter ats.AttestationFilter) ([]*types.As, 
 	return r.QueryAttestationsRaw(query, args)
 }
 
-func (r *SQLReader) QueryAttestationsRaw(sqlQuery string, params []interface{}) (_ []*types.As, err error) {
+func (r *SQLReader) QueryAttestationsRaw(sqlQuery string, params []any) (_ []*types.As, err error) {
 	rows, err := r.db.Query(sqlQuery, params...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute raw query")

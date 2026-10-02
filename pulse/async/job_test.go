@@ -53,7 +53,7 @@ func TestNewJobWithPayload(t *testing.T) {
 			t.Logf("🎮 TAS Bot: %s", tt.description)
 
 			// Create generic payload
-			payload := map[string]interface{}{
+			payload := map[string]any{
 				"source": tt.source,
 				"actor":  "tas-bot",
 			}
@@ -280,7 +280,7 @@ func TestJobPayload(t *testing.T) {
 	t.Log("   Payload can store arbitrary mission-specific data")
 
 	// Create payload with mission-specific parameters
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"role_id":   "VIDRENDER",
 		"video_id":  "VIDEO_4K_001",
 		"title":     "4K Speedrun Compilation",
@@ -302,7 +302,7 @@ func TestJobPayload(t *testing.T) {
 	}
 
 	// Decode and verify payload
-	var decodedPayload map[string]interface{}
+	var decodedPayload map[string]any
 	if err := json.Unmarshal(job.Payload, &decodedPayload); err != nil {
 		t.Fatalf("Failed to unmarshal payload: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestParentJobHierarchy(t *testing.T) {
 	t.Logf("  ✓ Parent mission created: %s", parent.ID)
 
 	// Create child subtask with payload containing task details
-	taskPayload := map[string]interface{}{
+	taskPayload := map[string]any{
 		"frame_id":          "FRAME_4K_001",
 		"quality_threshold": 0.95,
 		"actor":             "render-worker",
@@ -392,7 +392,7 @@ func TestParentJobHierarchy(t *testing.T) {
 	}
 
 	// Verify task payload
-	var decodedPayload map[string]interface{}
+	var decodedPayload map[string]any
 	if err := json.Unmarshal(task.Payload, &decodedPayload); err != nil {
 		t.Fatalf("Failed to decode task payload: %v", err)
 	}
@@ -450,15 +450,15 @@ func TestTaskPayloads(t *testing.T) {
 	tests := []struct {
 		name        string
 		handlerName string
-		payload     map[string]interface{}
+		payload     map[string]any
 		wantField   string
-		wantValue   interface{}
+		wantValue   any
 		description string
 	}{
 		{
 			name:        "video rendering parent job",
 			handlerName: "test.video-coordinator",
-			payload: map[string]interface{}{
+			payload: map[string]any{
 				"phase":     "render",
 				"video_url": "s3://videos/speedrun.mp4",
 				"actor":     "render-coordinator",
@@ -470,7 +470,7 @@ func TestTaskPayloads(t *testing.T) {
 		{
 			name:        "image processing task",
 			handlerName: "test.image-processor",
-			payload: map[string]interface{}{
+			payload: map[string]any{
 				"image_id":  "IMG_4K_001",
 				"min_score": 0.90,
 				"actor":     "image-worker",
@@ -482,7 +482,7 @@ func TestTaskPayloads(t *testing.T) {
 		{
 			name:        "data aggregation phase",
 			handlerName: "test.aggregator",
-			payload: map[string]interface{}{
+			payload: map[string]any{
 				"phase":   "aggregate",
 				"role_id": "DATASYNC",
 				"actor":   "aggregator",
@@ -504,7 +504,7 @@ func TestTaskPayloads(t *testing.T) {
 			}
 
 			// Verify payload field
-			var decoded map[string]interface{}
+			var decoded map[string]any
 			if err := json.Unmarshal(job.Payload, &decoded); err != nil {
 				t.Fatalf("Failed to decode payload: %v", err)
 			}
@@ -532,7 +532,7 @@ func TestTaskAggregation(t *testing.T) {
 	// Create 5 worker tasks
 	tasks := make([]*Job, 5)
 	for i := 0; i < 5; i++ {
-		taskPayload := map[string]interface{}{
+		taskPayload := map[string]any{
 			"image_id": fmt.Sprintf("IMG_%d", i),
 			"actor":    "image-worker",
 		}

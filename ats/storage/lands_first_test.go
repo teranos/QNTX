@@ -84,7 +84,7 @@ func (l *landedInOrder) land(as *types.As) {
 	l.landed = append(l.landed, as.ID)
 }
 
-func (l *landedInOrder) QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error) {
+func (l *landedInOrder) QueryAttestationsRaw(sql string, params []any) ([]*types.As, error) {
 	from, limit := 0, 0
 	switch sql {
 	case pastTheMark:

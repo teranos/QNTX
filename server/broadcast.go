@@ -27,10 +27,10 @@ import (
 // broadcastRequest represents a request to broadcast data to clients.
 // All broadcasts go through a dedicated worker goroutine to prevent race conditions.
 type broadcastRequest struct {
-	reqType  string      // "message", "close", "watcher_match"
-	msg      interface{} // Generic message (for reqType="message")
-	payload  interface{} // Generic payload (for reqType="watcher_match")
-	clientID string      // Target client ID. Empty string means "broadcast to all clients"
+	reqType  string // "message", "close", "watcher_match"
+	msg      any    // Generic message (for reqType="message")
+	payload  any    // Generic payload (for reqType="watcher_match")
+	clientID string // Target client ID. Empty string means "broadcast to all clients"
 	// (semantically: no specific target = all targets).
 
 	// in is the namespace this is about, and empty is a message about the node
@@ -54,14 +54,14 @@ type broadcastRequest struct {
 // What is said here is about the node — its daemon, its plugins, its spend —
 // and is the same fact whichever universe the reader is in. Anything that came
 // out of one namespace goes through broadcastIn.
-func (s *QNTXServer) broadcastMessage(msg interface{}) {
+func (s *QNTXServer) broadcastMessage(msg any) {
 	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg})
 }
 
 // broadcastIn sends a message to the clients in one namespace and to nobody
 // else. An empty namespace reaches nobody: a message that cannot say where it
 // came from is not sent to everybody as a consolation.
-func (s *QNTXServer) broadcastIn(in string, msg interface{}) {
+func (s *QNTXServer) broadcastIn(in string, msg any) {
 	if in == "" {
 		s.logger.Errorw("A namespace message names no namespace and was not sent",
 			"message", fmt.Sprintf("%T", msg))
@@ -368,7 +368,7 @@ func (s *QNTXServer) startDaemonStatusBroadcaster() {
 
 // broadcastJobUpdate sends a job update to all connected clients
 func (s *QNTXServer) broadcastJobUpdate(job *async.Job) {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"timestamp": time.Now().Unix(),
 	}
 
@@ -821,7 +821,7 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 // node, which every client gets whichever universe they are in.
 // about is the attestation the message carries, or nil when it carries none.
 // A client who may not read it is not sent it, even inside its own namespace.
-func (s *QNTXServer) sendMessageToClients(msg interface{}, targetClientID string, in string, about *types.As) {
+func (s *QNTXServer) sendMessageToClients(msg any, targetClientID string, in string, about *types.As) {
 	s.mu.RLock()
 	clients := make([]*Client, 0, len(s.clients))
 	withheld := 0

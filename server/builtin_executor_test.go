@@ -36,7 +36,7 @@ func TestBuiltinExecutorReachesTheRegisteredHandler(t *testing.T) {
 	var failed []HandlerFailure
 	ex := &builtinExecutor{registry: reg, noteFailure: func(f HandlerFailure) { failed = append(failed, f) }}
 
-	as := &types.As{ID: "as-1", Predicates: []string{"p"}, Attributes: map[string]interface{}{"k": "v"}}
+	as := &types.As{ID: "as-1", Predicates: []string{"p"}, Attributes: map[string]any{"k": "v"}}
 	if err := ex.ExecuteBuiltin(context.Background(), "test.builtin", as); err != nil {
 		t.Fatalf("ExecuteBuiltin: %v", err)
 	}

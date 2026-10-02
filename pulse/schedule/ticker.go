@@ -464,7 +464,7 @@ func (t *Ticker) resolvePayloadLastRun(scheduled *Job) []byte {
 	}
 
 	// Parse payload to check/modify since field
-	var payloadMap map[string]interface{}
+	var payloadMap map[string]any
 	if err := json.Unmarshal(scheduled.Payload, &payloadMap); err != nil {
 		// Can't parse - return original
 		return scheduled.Payload
@@ -576,11 +576,11 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 }
 
 // GetStats returns ticker statistics
-func (t *Ticker) GetStats() map[string]interface{} {
+func (t *Ticker) GetStats() map[string]any {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	return map[string]interface{}{
+	return map[string]any{
 		"last_tick_at":      t.lastTickAt,
 		"ticks_since_start": t.ticksSinceStart,
 		"interval":          t.interval,

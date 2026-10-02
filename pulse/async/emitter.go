@@ -15,13 +15,13 @@ import (
 type JobProgressEmitter struct {
 	job               *Job
 	queue             *Queue
-	streamBroadcaster interface{}        // Optional: WebSocket broadcaster for LLM streaming (nil for CLI jobs)
+	streamBroadcaster any                // Optional: WebSocket broadcaster for LLM streaming (nil for CLI jobs)
 	log               *zap.SugaredLogger // Context-aware logger with job_id pre-configured
 }
 
 // NewJobProgressEmitter creates a new progress emitter for an async job.
 // The provided logger should be the WorkerPool's logger for proper WebSocket broadcasting.
-func NewJobProgressEmitter(job *Job, queue *Queue, streamBroadcaster interface{}, baseLogger *zap.SugaredLogger) *JobProgressEmitter {
+func NewJobProgressEmitter(job *Job, queue *Queue, streamBroadcaster any, baseLogger *zap.SugaredLogger) *JobProgressEmitter {
 	// Create context-aware logger with job_id pre-configured
 	// Use provided logger (from WorkerPool) instead of global logger
 	contextLogger := baseLogger.With("job_id", job.ID)
@@ -49,7 +49,7 @@ func (e *JobProgressEmitter) EmitStage(stage, message string) {
 // EmitProgress updates job progress with a count and optional metadata.
 // This is the domain-agnostic method for reporting batch progress.
 // Domains can pass any relevant data in the metadata map.
-func (e *JobProgressEmitter) EmitProgress(count int, metadata map[string]interface{}) {
+func (e *JobProgressEmitter) EmitProgress(count int, metadata map[string]any) {
 	// Update job progress
 	e.job.UpdateProgress(e.job.Progress.Current + count)
 
@@ -65,7 +65,7 @@ func (e *JobProgressEmitter) EmitProgress(count int, metadata map[string]interfa
 // EmitComplete is a no-op for JobProgressEmitter.
 // Job completion is handled by the worker via job status updates in the database,
 // so this emitter doesn't need to take any action when the handler calls EmitComplete.
-func (e *JobProgressEmitter) EmitComplete(summary map[string]interface{}) {
+func (e *JobProgressEmitter) EmitComplete(summary map[string]any) {
 	// Intentionally empty - worker handles completion via UpdateJob
 }
 
@@ -99,9 +99,9 @@ func (e *JobProgressEmitter) EmitError(stage string, err error) {
 	// Type-check broadcaster for the broadcastIxProgress method
 	// Define the event structure inline to match internal/server/ix.go:IxProgressEvent
 	type ixProgressEvent struct {
-		Type      string                 `json:"type"`
-		Timestamp time.Time              `json:"timestamp"`
-		Data      map[string]interface{} `json:"data"`
+		Type      string         `json:"type"`
+		Timestamp time.Time      `json:"timestamp"`
+		Data      map[string]any `json:"data"`
 	}
 
 	type serverBroadcaster interface {
@@ -113,7 +113,7 @@ func (e *JobProgressEmitter) EmitError(stage string, err error) {
 		event := ixProgressEvent{
 			Type:      "error",
 			Timestamp: time.Now(),
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"job_id":      e.job.ID,
 				"stage":       ctx.Stage,
 				"code":        string(ctx.Code),

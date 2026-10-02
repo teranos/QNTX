@@ -23,7 +23,7 @@ func TestSendSystemCapabilities(t *testing.T) {
 	// Create a mock client
 	client := &Client{
 		server:  srv,
-		sendMsg: make(chan interface{}, 256),
+		sendMsg: make(chan any, 256),
 		id:      "test_client_capabilities",
 	}
 
@@ -76,7 +76,7 @@ func TestSendSystemCapabilities_ClosedClient(t *testing.T) {
 	// Create a client with closed channel
 	client := &Client{
 		server:  srv,
-		sendMsg: make(chan interface{}),
+		sendMsg: make(chan any),
 		id:      "test_client_closed",
 	}
 
@@ -105,7 +105,7 @@ func TestSendSystemCapabilities_FullChannel(t *testing.T) {
 	// Create a client with unbuffered channel (will fill immediately)
 	client := &Client{
 		server:  srv,
-		sendMsg: make(chan interface{}), // unbuffered
+		sendMsg: make(chan any),
 		id:      "test_client_full",
 	}
 

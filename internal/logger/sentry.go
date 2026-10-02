@@ -199,7 +199,7 @@ func (c *sentryCore) Sync() error { return nil }
 // attributes flattens the zap fields the same way the JSON encoder does, then
 // ships them. The logger name and the caller are added because they are
 // the two things a log line loses when it leaves the machine it was written on.
-func (c *sentryCore) attributes(ent zapcore.Entry, fields []zapcore.Field) map[string]interface{} {
+func (c *sentryCore) attributes(ent zapcore.Entry, fields []zapcore.Field) map[string]any {
 	enc := zapcore.NewMapObjectEncoder()
 	for _, field := range c.fields {
 		field.AddTo(enc)
@@ -208,7 +208,7 @@ func (c *sentryCore) attributes(ent zapcore.Entry, fields []zapcore.Field) map[s
 		field.AddTo(enc)
 	}
 
-	attrs := make(map[string]interface{}, len(enc.Fields)+2)
+	attrs := make(map[string]any, len(enc.Fields)+2)
 	for key, value := range enc.Fields {
 		attrs[key] = value
 	}
@@ -245,7 +245,7 @@ func (c *sentryCore) entryFor(level zapcore.Level) sentry.LogEntry {
 // captureIssue raises the entry as an issue alongside the log line. When a
 // field carries the error itself the exception is captured from it, which is
 // what carries the type and the stack; otherwise the message is all there is.
-func (c *sentryCore) captureIssue(ent zapcore.Entry, attrs map[string]interface{}, fields []zapcore.Field) {
+func (c *sentryCore) captureIssue(ent zapcore.Entry, attrs map[string]any, fields []zapcore.Field) {
 	hub := sentry.CurrentHub().Clone()
 	hub.WithScope(func(scope *sentry.Scope) {
 		scope.SetLevel(sentryLevel(ent.Level))
@@ -313,7 +313,7 @@ func sentryLevel(level zapcore.Level) sentry.Level {
 	}
 }
 
-func sortedKeys(attrs map[string]interface{}) []string {
+func sortedKeys(attrs map[string]any) []string {
 	keys := make([]string, 0, len(attrs))
 	for key := range attrs {
 		keys = append(keys, key)
@@ -325,7 +325,7 @@ func sortedKeys(attrs map[string]interface{}) []string {
 // attach puts one flattened field onto the entry as its own type, so a count
 // stays a number and a duration stays comparable in the Sentry UI. Anything
 // with no typed home is printed rather than dropped.
-func attach(entry sentry.LogEntry, key string, value interface{}) sentry.LogEntry {
+func attach(entry sentry.LogEntry, key string, value any) sentry.LogEntry {
 	switch v := value.(type) {
 	case string:
 		return entry.String(key, v)

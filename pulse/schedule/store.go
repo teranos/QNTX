@@ -36,7 +36,7 @@ type rowScanner interface {
 }
 
 // nullIfEmpty writes NULL for an unset column rather than an empty string.
-func nullIfEmpty(s string) interface{} {
+func nullIfEmpty(s string) any {
 	if s == "" {
 		return nil
 	}

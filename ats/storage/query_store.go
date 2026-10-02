@@ -15,7 +15,7 @@ import (
 // RawQuerier executes attestation queries through a single connection (Rust FFI).
 // When set on SQLQueryStore, all attestation queries route through this instead of *sql.DB.
 type RawQuerier interface {
-	QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
+	QueryAttestationsRaw(sql string, params []any) ([]*types.As, error)
 	QueryFilter(filter types.AxFilter) ([]*types.As, error)
 	GetAllPredicates() ([]string, error)
 	GetAllContexts() ([]string, error)

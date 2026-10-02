@@ -15,7 +15,7 @@ import (
 
 // attestTypeDefinition is a helper to attest type definitions with rich string fields
 func attestTypeDefinition(t *testing.T, db *sql.DB, typeName string, richFields []string) {
-	typeAttrs := map[string]interface{}{
+	typeAttrs := map[string]any{
 		"name":               typeName,
 		"label":              typeName,
 		"rich_string_fields": richFields,
@@ -52,12 +52,12 @@ func TestSearchRichStringFields(t *testing.T) {
 	testCases := []struct {
 		nodeID     string
 		typeName   string
-		attributes map[string]interface{}
+		attributes map[string]any
 	}{
 		{
 			nodeID:   "commit-1",
 			typeName: "Commit",
-			attributes: map[string]interface{}{
+			attributes: map[string]any{
 				"type":        "Commit",
 				"message":     "Add fuzzy search functionality to RichStringFields",
 				"description": "This implements a fuzzy matching algorithm for searching text fields",
@@ -67,7 +67,7 @@ func TestSearchRichStringFields(t *testing.T) {
 		{
 			nodeID:   "commit-2",
 			typeName: "Commit",
-			attributes: map[string]interface{}{
+			attributes: map[string]any{
 				"type":        "Commit",
 				"message":     "Fix bug in WebSocket handler",
 				"description": "WebSocket connection was dropping unexpectedly",
@@ -77,7 +77,7 @@ func TestSearchRichStringFields(t *testing.T) {
 		{
 			nodeID:   "note-1",
 			typeName: "Note",
-			attributes: map[string]interface{}{
+			attributes: map[string]any{
 				"type":    "Note",
 				"content": "Remember to implement fuzzy search for better UX",
 				"summary": "Fuzzy search todo",
@@ -87,7 +87,7 @@ func TestSearchRichStringFields(t *testing.T) {
 		{
 			nodeID:   "note-2",
 			typeName: "Note",
-			attributes: map[string]interface{}{
+			attributes: map[string]any{
 				"type":    "Note",
 				"content": "The WebSocket implementation needs refactoring",
 				"summary": "Technical debt",
@@ -152,7 +152,7 @@ func TestSearchRichStringFields(t *testing.T) {
 	t.Run("Limit is respected", func(t *testing.T) {
 		// Add more attestations to test limit
 		for i := 0; i < 10; i++ {
-			attrs := map[string]interface{}{
+			attrs := map[string]any{
 				"type":    "Note",
 				"content": "This note contains the word fuzzy multiple times fuzzy fuzzy",
 				"summary": "Fuzzy test note",
@@ -178,7 +178,7 @@ func TestSearchRichStringFields(t *testing.T) {
 			"We want to make sure that the excerpt generation correctly extracts a portion of text " +
 			"around the match and adds ellipsis where appropriate."
 
-		attrs := map[string]interface{}{
+		attrs := map[string]any{
 			"type":    "Note",
 			"content": longText,
 			"summary": "Long note",
@@ -208,7 +208,7 @@ func TestSearchRichStringFields(t *testing.T) {
 
 	t.Run("No duplicate nodes in results", func(t *testing.T) {
 		// Add attestation with multiple rich fields containing the search term
-		attrs := map[string]interface{}{
+		attrs := map[string]any{
 			"type":        "Commit",
 			"message":     "Add fuzzy search to message field",
 			"description": "Also add fuzzy search to description field",
@@ -237,7 +237,7 @@ func TestSearchRichStringFields(t *testing.T) {
 
 	t.Run("Display label preference", func(t *testing.T) {
 		// Add attestation with label and name fields
-		attrs := map[string]interface{}{
+		attrs := map[string]any{
 			"type":    "Note",
 			"label":   "My Important Note",
 			"name":    "note-with-label",
@@ -265,9 +265,9 @@ func TestSearchRichStringFields(t *testing.T) {
 
 	t.Run("Array field handling", func(t *testing.T) {
 		// Add attestation with array field
-		attrs := map[string]interface{}{
+		attrs := map[string]any{
 			"type":    "Note",
-			"content": []interface{}{"First line with fuzzy", "Second line also fuzzy"},
+			"content": []any{"First line with fuzzy", "Second line also fuzzy"},
 			"summary": "Array test",
 		}
 		attrsJSON, _ := json.Marshal(attrs)
@@ -314,7 +314,7 @@ func TestSearchRichStringFields_FuzzyMatching(t *testing.T) {
 	}
 
 	for _, td := range testData {
-		attrs := map[string]interface{}{
+		attrs := map[string]any{
 			"type":    "Commit",
 			"message": td.content,
 		}
@@ -437,7 +437,7 @@ func TestSearchRichStringFields_Performance(t *testing.T) {
 
 	// Insert many attestations
 	for i := 0; i < 1000; i++ {
-		attrs := map[string]interface{}{
+		attrs := map[string]any{
 			"type":        "Commit",
 			"message":     fmt.Sprintf("Commit message %d with some text", i),
 			"description": fmt.Sprintf("Description %d with fuzzy if i=%d", i, i%100),
@@ -470,7 +470,7 @@ func TestDynamicFieldDiscovery(t *testing.T) {
 
 	t.Run("Discovers fields from type definitions", func(t *testing.T) {
 		// Insert a type definition attestation with custom rich fields
-		typeAttrs := map[string]interface{}{
+		typeAttrs := map[string]any{
 			"name":               "CustomNote",
 			"rich_string_fields": []string{"notes", "comments", "remarks"},
 		}
@@ -517,7 +517,7 @@ func TestDynamicFieldDiscovery(t *testing.T) {
 		attestTypeDefinition(t, freshDB, "SearchTestNote", []string{"notes", "message"})
 
 		// Insert some test data with custom fields
-		attrs := map[string]interface{}{
+		attrs := map[string]any{
 			"type":    "SearchTestNote",
 			"notes":   "This is a note with fuzzy content",
 			"message": "Regular message field with fuzzy too",
@@ -556,7 +556,7 @@ func TestDynamicFieldDiscovery(t *testing.T) {
 
 	t.Run("Dynamic SQL generation handles variable field counts", func(t *testing.T) {
 		// Insert type with many custom fields
-		typeAttrs := map[string]interface{}{
+		typeAttrs := map[string]any{
 			"name": "RichDocument",
 			"rich_string_fields": []string{
 				"field1", "field2", "field3", "field4", "field5",
@@ -578,7 +578,7 @@ func TestDynamicFieldDiscovery(t *testing.T) {
 		store.typeFieldsCache = nil
 
 		// Insert test document
-		docAttrs := map[string]interface{}{
+		docAttrs := map[string]any{
 			"type":   "RichDocument",
 			"field5": "This contains the search term fuzzy",
 		}
@@ -616,7 +616,7 @@ func TestGetRichFieldsWithStats_MostRecentlyCarriedFirst(t *testing.T) {
 	attestTypeDefinition(t, db, "Note", []string{"often", "lately", "never"})
 
 	carry := func(id, field string, at time.Time) {
-		attrsJSON, err := json.Marshal(map[string]interface{}{field: "text"})
+		attrsJSON, err := json.Marshal(map[string]any{field: "text"})
 		require.NoError(t, err)
 		_, err = db.Exec(`
 			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)

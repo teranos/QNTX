@@ -98,7 +98,7 @@ func SetTheme(theme string) {
 }
 
 // getColors returns the color palette for the current theme
-func getColors() interface{} {
+func getColors() any {
 	if currentTheme == "everforest" {
 		return everforest
 	}

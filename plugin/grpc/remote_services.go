@@ -266,7 +266,7 @@ func (c *remoteConfig) GetStringSlice(key string) []string {
 	}
 
 	// If it's an interface slice, convert to string slice
-	if slice, ok := val.([]interface{}); ok {
+	if slice, ok := val.([]any); ok {
 		result := make([]string, len(slice))
 		for i, v := range slice {
 			result[i] = fmt.Sprintf("%v", v)
@@ -300,11 +300,11 @@ func (c *remoteConfig) GetStringSlice(key string) []string {
 	return nil
 }
 
-func (c *remoteConfig) Get(key string) interface{} {
+func (c *remoteConfig) Get(key string) any {
 	return c.viper.Get(key)
 }
 
-func (c *remoteConfig) Set(key string, value interface{}) {
+func (c *remoteConfig) Set(key string, value any) {
 	c.viper.Set(key, value)
 }
 

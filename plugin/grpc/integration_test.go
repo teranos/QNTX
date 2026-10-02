@@ -633,11 +633,11 @@ func (c *testConfig) GetStringSlice(key string) []string {
 	return nil
 }
 
-func (c *testConfig) Get(key string) interface{} {
+func (c *testConfig) Get(key string) any {
 	return c.settings[key]
 }
 
-func (c *testConfig) Set(key string, value interface{}) {
+func (c *testConfig) Set(key string, value any) {
 	if s, ok := value.(string); ok {
 		c.settings[key] = s
 	}

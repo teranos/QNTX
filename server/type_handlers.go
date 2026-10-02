@@ -54,7 +54,7 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 
 	// Deduplicate: keep latest per type name (attestations come sorted by timestamp DESC)
 	seen := make(map[string]bool)
-	typeList := make([]map[string]interface{}, 0)
+	typeList := make([]map[string]any, 0)
 	for _, as := range allTypes {
 		if len(as.Subjects) == 0 {
 			continue
@@ -67,10 +67,10 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 
 		attributes := as.Attributes
 		if attributes == nil {
-			attributes = make(map[string]interface{})
+			attributes = make(map[string]any)
 		}
 
-		typeObj := map[string]interface{}{
+		typeObj := map[string]any{
 			"name":               typeName,
 			"label":              attributes["display_label"],
 			"color":              attributes["display_color"],
@@ -105,10 +105,10 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 
 	attributes := results[0].Attributes
 	if attributes == nil {
-		attributes = make(map[string]interface{})
+		attributes = make(map[string]any)
 	}
 
-	typeObj := map[string]interface{}{
+	typeObj := map[string]any{
 		"name":               typeName,
 		"label":              attributes["display_label"],
 		"color":              attributes["display_color"],
@@ -194,7 +194,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build attributes map for the attestation
-	attributes := map[string]interface{}{
+	attributes := map[string]any{
 		"display_label":      req.Label,
 		"display_color":      req.Color,
 		"deprecated":         req.Deprecated,
@@ -226,7 +226,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		"client", r.RemoteAddr)
 
 	// Return the created type
-	response := map[string]interface{}{
+	response := map[string]any{
 		"name":               req.Name,
 		"label":              req.Label,
 		"color":              req.Color,

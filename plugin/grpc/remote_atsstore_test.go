@@ -66,7 +66,7 @@ func TestRemoteATSStore_CreateAttestation(t *testing.T) {
 		Actors:     []string{"test@user"},
 		Timestamp:  time.Now(),
 		Source:     "test",
-		Attributes: map[string]interface{}{"key": "value"},
+		Attributes: map[string]any{"key": "value"},
 		CreatedAt:  time.Now(),
 	}
 

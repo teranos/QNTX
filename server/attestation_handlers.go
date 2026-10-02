@@ -363,14 +363,14 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 	var tookStore, tookExists, tookPut, tookRebuild time.Duration
 
 	var req struct {
-		ID         string                 `json:"id"`
-		Subjects   []string               `json:"subjects"`
-		Predicates []string               `json:"predicates"`
-		Contexts   []string               `json:"contexts"`
-		Actors     []string               `json:"actors"`
-		Timestamp  int64                  `json:"timestamp"`
-		Source     string                 `json:"source"`
-		Attributes map[string]interface{} `json:"attributes"`
+		ID         string         `json:"id"`
+		Subjects   []string       `json:"subjects"`
+		Predicates []string       `json:"predicates"`
+		Contexts   []string       `json:"contexts"`
+		Actors     []string       `json:"actors"`
+		Timestamp  int64          `json:"timestamp"`
+		Source     string         `json:"source"`
+		Attributes map[string]any `json:"attributes"`
 	}
 
 	if err := json.Unmarshal(raw, &req); err != nil {

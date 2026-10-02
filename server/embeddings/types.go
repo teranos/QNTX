@@ -40,10 +40,10 @@ type ClusterResult struct {
 
 // VectorSearchResult represents a semantic search result
 type VectorSearchResult struct {
-	ID         string                 `json:"id"`
-	Text       string                 `json:"text"`
-	Distance   float32                `json:"distance"`
-	Similarity float32                `json:"similarity"`
-	Metadata   map[string]interface{} `json:"metadata,omitempty"`
-	CreatedAt  time.Time              `json:"created_at"`
+	ID         string         `json:"id"`
+	Text       string         `json:"text"`
+	Distance   float32        `json:"distance"`
+	Similarity float32        `json:"similarity"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
+	CreatedAt  time.Time      `json:"created_at"`
 }

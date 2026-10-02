@@ -12,12 +12,12 @@ import (
 
 // wasmMatchAttestation is the JSON shape Rust expects.
 type wasmMatchAttestation struct {
-	Subjects    []string               `json:"subjects"`
-	Predicates  []string               `json:"predicates"`
-	Contexts    []string               `json:"contexts"`
-	Actors      []string               `json:"actors"`
-	TimestampMs int64                  `json:"timestamp_ms"`
-	Attributes  map[string]interface{} `json:"attributes,omitempty"`
+	Subjects    []string       `json:"subjects"`
+	Predicates  []string       `json:"predicates"`
+	Contexts    []string       `json:"contexts"`
+	Actors      []string       `json:"actors"`
+	TimestampMs int64          `json:"timestamp_ms"`
+	Attributes  map[string]any `json:"attributes,omitempty"`
 }
 
 // wasmWatcherFilter is the JSON shape for a single watcher filter.

@@ -201,17 +201,17 @@ func getFieldValue(as *types.As, seg segment) (string, error) {
 }
 
 // getAttributeValue navigates a dot-separated path in the attributes map
-func getAttributeValue(attrs map[string]interface{}, path string) (string, error) {
+func getAttributeValue(attrs map[string]any, path string) (string, error) {
 	if attrs == nil {
 		return "", nil // Empty string for missing attributes
 	}
 
 	parts := strings.Split(path, ".")
-	var current interface{} = attrs
+	var current any = attrs
 
 	for i, part := range parts {
 		switch v := current.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			val, ok := v[part]
 			if !ok {
 				return "", nil // Missing key returns empty string
@@ -235,7 +235,7 @@ func getAttributeValue(attrs map[string]interface{}, path string) (string, error
 }
 
 // valueToString converts any value to a string representation
-func valueToString(v interface{}) string {
+func valueToString(v any) string {
 	if v == nil {
 		return ""
 	}
@@ -273,7 +273,7 @@ func joinOrFirst(items []string) string {
 }
 
 // toJSON marshals a value to JSON string
-func toJSON(v interface{}) string {
+func toJSON(v any) string {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return ""

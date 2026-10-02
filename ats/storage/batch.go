@@ -73,7 +73,7 @@ func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix str
 			Actors:     []string{actor}, // Self-certifying: ASID vouches for itself
 			Timestamp:  time.Now(),
 			Source:     bp.source,
-			Attributes: make(map[string]interface{}),
+			Attributes: make(map[string]any),
 		}
 
 		// Add metadata as attributes if available

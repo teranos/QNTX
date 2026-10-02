@@ -97,8 +97,8 @@ func WithComponent(ctx context.Context, component string) context.Context {
 
 // FieldsFromContext extracts logging fields from context.
 // Returns key-value pairs suitable for use with Infow/Errorw/etc.
-func FieldsFromContext(ctx context.Context) []interface{} {
-	var fields []interface{}
+func FieldsFromContext(ctx context.Context) []any {
+	var fields []any
 
 	if jobID, ok := ctx.Value(jobIDKey).(string); ok && jobID != "" {
 		fields = append(fields, FieldJobID, jobID)
@@ -150,6 +150,6 @@ func ComponentLogger(name string) *zap.SugaredLogger {
 // Example:
 //
 //	jobLogger := logger.ChildLogger(baseLogger, "job_id", job.ID)
-func ChildLogger(parent *zap.SugaredLogger, keysAndValues ...interface{}) *zap.SugaredLogger {
+func ChildLogger(parent *zap.SugaredLogger, keysAndValues ...any) *zap.SugaredLogger {
 	return parent.With(keysAndValues...)
 }

@@ -69,7 +69,7 @@ func ciStatusAs(actor string) *types.As {
 		Contexts:   []string{"session:sess-1"},
 		Actors:     []string{actor, "ground"},
 		Timestamp:  time.Now().Add(-10 * time.Second),
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"repo":   "teranos/ground",
 			"branch": "sky-whisper",
 			"sha":    "abc123",
@@ -356,7 +356,7 @@ func dispatchAs(actor string) *types.As {
 		Contexts:   []string{"session:sess-1"},
 		Actors:     []string{actor, "ground"},
 		Timestamp:  time.Now().Add(-10 * time.Second),
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"repo":  "sbvh-nl/q.sbvh.nl",
 			"token": "q-deploy-1790:TARGET",
 		},

@@ -98,7 +98,7 @@ func TestSetDefaults(t *testing.T) {
 	// Verify critical defaults are set
 	tests := []struct {
 		key      string
-		expected interface{}
+		expected any
 	}{
 		{"storage.backend", "sqlite"},
 		{"storage.sqlite.path", "qntx.db"},

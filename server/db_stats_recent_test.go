@@ -55,7 +55,7 @@ func TestQueryDistillStats_MostRecentlyObservedFirst(t *testing.T) {
 		require.NoError(t, store.CreateAttestation(&types.As{
 			ID: id, Subjects: []string{"s"}, Predicates: []string{predicate},
 			Contexts: []string{"c"}, Actors: []string{"a"}, Timestamp: time.Now(), Source: "distill",
-			Attributes: map[string]interface{}{"_count": 1, "_first_seen": lastSeen, "_last_seen": lastSeen},
+			Attributes: map[string]any{"_count": 1, "_first_seen": lastSeen, "_last_seen": lastSeen},
 		}))
 	}
 	for i := 0; i < 5; i++ {
@@ -65,10 +65,10 @@ func TestQueryDistillStats_MostRecentlyObservedFirst(t *testing.T) {
 
 	stats, err := queryDistillStats(db)
 	require.NoError(t, err)
-	predicates, ok := stats["predicates"].([]map[string]interface{})
+	predicates, ok := stats["predicates"].([]map[string]any)
 	require.True(t, ok, "predicates is %T", stats["predicates"])
 	require.Len(t, predicates, 2)
-	assert.Equal(t, map[string]interface{}{"predicate": "lately", "last": "2026-09-20T08:05:00Z"}, predicates[0])
+	assert.Equal(t, map[string]any{"predicate": "lately", "last": "2026-09-20T08:05:00Z"}, predicates[0])
 	assert.Equal(t, "often", predicates[1]["predicate"])
 	assert.NotContains(t, predicates[1], "count")
 }

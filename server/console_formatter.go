@@ -44,7 +44,7 @@ func (cf *ConsoleFormatter) formatMessage(msg string) string {
 // summarizeJSON summarizes JSON payloads based on verbosity level
 func (cf *ConsoleFormatter) summarizeJSON(jsonStr string) string {
 	// Try to parse JSON first
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
 		// Not valid JSON - just return as-is
 		return jsonStr
@@ -65,15 +65,15 @@ func (cf *ConsoleFormatter) summarizeJSON(jsonStr string) string {
 }
 
 // compactSummary creates a very compact summary (level 0-1)
-func (cf *ConsoleFormatter) compactSummary(data map[string]interface{}, totalBytes int) string {
+func (cf *ConsoleFormatter) compactSummary(data map[string]any, totalBytes int) string {
 	summary := "{"
 	parts := []string{}
 
 	for key, val := range data {
 		switch v := val.(type) {
-		case []interface{}:
+		case []any:
 			parts = append(parts, fmt.Sprintf("%s: [%d]", key, len(v)))
-		case map[string]interface{}:
+		case map[string]any:
 			parts = append(parts, fmt.Sprintf("%s: {...}", key))
 		default:
 			// Skip primitives in compact mode
@@ -87,14 +87,14 @@ func (cf *ConsoleFormatter) compactSummary(data map[string]interface{}, totalByt
 }
 
 // detailedSummary creates a detailed summary showing all fields (level 2)
-func (cf *ConsoleFormatter) detailedSummary(data map[string]interface{}, totalBytes int) string {
+func (cf *ConsoleFormatter) detailedSummary(data map[string]any, totalBytes int) string {
 	parts := []string{}
 
 	for key, val := range data {
 		switch v := val.(type) {
-		case []interface{}:
+		case []any:
 			parts = append(parts, fmt.Sprintf("%s: [%d items]", key, len(v)))
-		case map[string]interface{}:
+		case map[string]any:
 			// Count keys in nested object
 			parts = append(parts, fmt.Sprintf("%s: {%d keys}", key, len(v)))
 		case string:

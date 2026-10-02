@@ -523,9 +523,9 @@ func (s *QNTXServer) getAttestationsByIDs(ids []string) (map[string]*types.As, e
 
 // queryAttestationsRaw executes a raw SQL query through the attestation store (Rust FFI).
 // Falls back to Go's *sql.DB if the store doesn't support raw queries.
-func (s *QNTXServer) queryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error) {
+func (s *QNTXServer) queryAttestationsRaw(sql string, params []any) ([]*types.As, error) {
 	type rawQuerier interface {
-		QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
+		QueryAttestationsRaw(sql string, params []any) ([]*types.As, error)
 	}
 	if rq, ok := s.held.Served().(rawQuerier); ok {
 		return rq.QueryAttestationsRaw(sql, params)

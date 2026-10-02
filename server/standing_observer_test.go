@@ -40,7 +40,7 @@ func TestStandingObserverReachesTheBuiltInForAnyNamespace(t *testing.T) {
 		ID:         "ci-status-in-ground",
 		Predicates: []string{watcher.CIPushedPredicate},
 		Contexts:   []string{"session:s"},
-		Attributes: map[string]interface{}{"repo": "teranos/ground", "branch": "main", "sha": "abc"},
+		Attributes: map[string]any{"repo": "teranos/ground", "branch": "main", "sha": "abc"},
 	})
 
 	rec.mu.Lock()

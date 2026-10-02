@@ -368,7 +368,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 			config[key] = fmt.Sprintf("%f", v)
 		case bool:
 			config[key] = fmt.Sprintf("%v", v)
-		case []interface{}:
+		case []any:
 			// Array types - serialize as JSON
 			if jsonBytes, err := json.Marshal(v); err == nil {
 				config[key] = string(jsonBytes)
@@ -1056,13 +1056,13 @@ func (c *ExternalDomainProxy) Health(ctx context.Context) plugin.HealthStatus {
 		return plugin.HealthStatus{
 			Healthy: false,
 			Message: fmt.Sprintf("Failed to check plugin health: %v", err),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"error": err.Error(),
 			},
 		}
 	}
 
-	details := make(map[string]interface{})
+	details := make(map[string]any)
 	for key, value := range resp.Details {
 		details[key] = value
 	}

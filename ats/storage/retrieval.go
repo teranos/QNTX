@@ -199,7 +199,7 @@ func GetAttestationByID(db *sql.DB, id string) (_ *types.As, err error) {
 
 // GetAttestationsRaw executes a raw SQL query and scans attestation rows.
 // Fallback for non-Rust stores (tests). Production uses Rust FFI via QueryAttestationsRaw.
-func GetAttestationsRaw(db *sql.DB, query string, params []interface{}) (_ []*types.As, err error) {
+func GetAttestationsRaw(db *sql.DB, query string, params []any) (_ []*types.As, err error) {
 	rows, err := db.Query(query, params...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute raw attestation query")
@@ -225,7 +225,7 @@ func GetAttestationsByIDs(db *sql.DB, ids []string) (_ []*types.As, err error) {
 	}
 
 	placeholders := make([]byte, 0, len(ids)*2-1)
-	args := make([]interface{}, len(ids))
+	args := make([]any, len(ids))
 	for i, id := range ids {
 		if i > 0 {
 			placeholders = append(placeholders, ',')

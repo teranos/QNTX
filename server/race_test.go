@@ -34,7 +34,7 @@ func TestRace_BroadcastDuringUnregister(t *testing.T) {
 		for i := 0; i < numClients; i++ {
 			client := &Client{
 				server:  srv,
-				sendMsg: make(chan interface{}, 256),
+				sendMsg: make(chan any, 256),
 				id:      t.Name() + "_client_" + string(rune('A'+i)),
 			}
 			clients[i] = client
@@ -57,7 +57,7 @@ func TestRace_BroadcastDuringUnregister(t *testing.T) {
 				case <-stopBroadcast:
 					return
 				default:
-					msg := map[string]interface{}{
+					msg := map[string]any{
 						"type":    "test",
 						"message": "race test",
 					}
@@ -106,7 +106,7 @@ func TestRace_ConcurrentBroadcastAndChannelClose(t *testing.T) {
 		// Create a client
 		client := &Client{
 			server:  srv,
-			sendMsg: make(chan interface{}, 1),
+			sendMsg: make(chan any, 1),
 			id:      t.Name() + "_iteration_" + string(rune('A'+(iteration%26))),
 		}
 		srv.register <- client
@@ -119,7 +119,7 @@ func TestRace_ConcurrentBroadcastAndChannelClose(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 100; i++ {
-				msg := map[string]interface{}{
+				msg := map[string]any{
 					"type": "test",
 					"seq":  i,
 				}
@@ -160,7 +160,7 @@ func TestRace_UsageBroadcastDuringClientDisconnect(t *testing.T) {
 		for i := 0; i < numClients; i++ {
 			client := &Client{
 				server:  srv,
-				sendMsg: make(chan interface{}, 256),
+				sendMsg: make(chan any, 256),
 				id:      t.Name() + "_client_" + string(rune('A'+i)),
 			}
 			clients[i] = client
@@ -209,7 +209,7 @@ func TestRace_MultipleWritersToClientChannels(t *testing.T) {
 
 	client := &Client{
 		server:  srv,
-		sendMsg: make(chan interface{}, 10),
+		sendMsg: make(chan any, 10),
 		id:      "multi_writer_test",
 	}
 	srv.register <- client
@@ -223,7 +223,7 @@ func TestRace_MultipleWritersToClientChannels(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			for j := 0; j < 100; j++ {
-				srv.broadcastMessage(map[string]interface{}{
+				srv.broadcastMessage(map[string]any{
 					"type":     "test",
 					"writer":   id,
 					"sequence": j,

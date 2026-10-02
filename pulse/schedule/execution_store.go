@@ -30,8 +30,8 @@ func (s *ExecutionStore) CreateExecution(exec *Execution) error {
 	`
 
 	// Convert optional fields to sql.Null* types
-	var asyncJobID, completedAt, logs, resultSummary, errorMessage interface{}
-	var durationMs interface{}
+	var asyncJobID, completedAt, logs, resultSummary, errorMessage any
+	var durationMs any
 
 	if exec.AsyncJobId != nil {
 		asyncJobID = *exec.AsyncJobId
@@ -90,8 +90,8 @@ func (s *ExecutionStore) UpdateExecution(exec *Execution) error {
 	`
 
 	// Convert optional fields
-	var asyncJobID, completedAt, logs, resultSummary, errorMessage interface{}
-	var durationMs interface{}
+	var asyncJobID, completedAt, logs, resultSummary, errorMessage any
+	var durationMs any
 
 	if exec.AsyncJobId != nil {
 		asyncJobID = *exec.AsyncJobId
@@ -208,7 +208,7 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 		FROM pulse_executions
 		WHERE scheduled_job_id = ?
 	`
-	args := []interface{}{scheduledJobID}
+	args := []any{scheduledJobID}
 
 	if statusFilter != "" {
 		baseQuery += " AND status = ?"

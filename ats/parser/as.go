@@ -41,7 +41,7 @@ func ParseAsCommandWithOptions(args []string, opts ParserOptions) (*types.AsComm
 		Contexts:   []string{},
 		Actors:     []string{},
 		Timestamp:  time.Now(),
-		Attributes: make(map[string]interface{}),
+		Attributes: make(map[string]any),
 	}
 
 	// Tokenize with quote handling

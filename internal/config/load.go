@@ -175,7 +175,7 @@ func trackSource(key string, source ConfigSource, path string) {
 
 // TrackNestedSources recursively tracks sources for nested configuration
 // Exported for testing
-func TrackNestedSources(settings map[string]interface{}, prefix string, source ConfigSource, path string) {
+func TrackNestedSources(settings map[string]any, prefix string, source ConfigSource, path string) {
 	for key, value := range settings {
 		fullKey := key
 		if prefix != "" {
@@ -186,7 +186,7 @@ func TrackNestedSources(settings map[string]interface{}, prefix string, source C
 		trackSource(fullKey, source, path)
 
 		// If nested map, recurse
-		if nestedMap, ok := value.(map[string]interface{}); ok {
+		if nestedMap, ok := value.(map[string]any); ok {
 			TrackNestedSources(nestedMap, fullKey, source, path)
 		}
 	}
@@ -234,7 +234,7 @@ func mergeConfigFiles(v *viper.Viper) error {
 	for key, value := range v.AllSettings() {
 		trackSource(key, SourceDefault, "")
 		// Track nested defaults
-		if nestedMap, ok := value.(map[string]interface{}); ok {
+		if nestedMap, ok := value.(map[string]any); ok {
 			TrackNestedSources(nestedMap, key, SourceDefault, "")
 		}
 	}
@@ -294,7 +294,7 @@ func reportViperInitErr(key string, err error) {
 }
 
 // Get returns a configuration value using dot notation
-func Get(key string) interface{} {
+func Get(key string) any {
 	v, err := initViper()
 	if v == nil {
 		reportViperInitErr(key, err)
@@ -364,7 +364,7 @@ func GetStringMapString(key string) map[string]string {
 }
 
 // Set sets a configuration value using dot notation (runtime override)
-func Set(key string, value interface{}) {
+func Set(key string, value any) {
 	v, err := initViper()
 	if v == nil {
 		reportViperInitErr(key, err)

@@ -131,7 +131,7 @@ func (s *QNTXServer) Refusals() (int64, int64) {
 
 // cachedLive is the live section of the stats cache, absent until the first
 // refresh has run.
-func (s *QNTXServer) cachedLive() (map[string]interface{}, bool) {
+func (s *QNTXServer) cachedLive() (map[string]any, bool) {
 	if s == nil {
 		return nil, false
 	}
@@ -140,6 +140,6 @@ func (s *QNTXServer) cachedLive() (map[string]interface{}, bool) {
 	if cached == nil {
 		return nil, false
 	}
-	live, ok := cached.response["live"].(map[string]interface{})
+	live, ok := cached.response["live"].(map[string]any)
 	return live, ok
 }
