@@ -187,7 +187,7 @@ export function showSpawnMenu(
         ? getSymbolContextEntries()
         : [
             ...getSpawnableElements(),
-            ...getAllElementTypes().filter(g => g.className.includes('canvas-plugin-element'))
+            ...getAllElementTypes().filter(g => g.className.includes('canvas-plugin-element') || g.publishedName !== undefined)
         ];
 
     // Assign each element a vertical list position with per-element float phase
