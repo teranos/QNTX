@@ -156,8 +156,6 @@ impl UserStore {
     }
 
     /// The requests this store has made of its location since it opened.
-    /// A User is held on the node (ADR-037), so these are the record's, made
-    /// at the open that takes it in and when one is written back.
     pub fn asked(&self) -> Vec<Asked> {
         self.objects.asked()
     }

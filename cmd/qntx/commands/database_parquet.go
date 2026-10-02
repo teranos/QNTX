@@ -509,8 +509,7 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 	// What each reader has asked the location for is said where every store
 	// that reaches it can be reached: server.saySpend, off the db stats
 	// refresher. Said per namespace here, it covered the record stores and
-	// none of the others — and access_tokens, held nowhere on the node
-	// (ADR-037), is the one that spends per request.
+	// none of the others.
 	sendOnce := func() {
 		defer sacred.Said("parquet.send." + name)
 		if err := sendAndCompact(landing, record); err != nil {
@@ -604,7 +603,7 @@ func (h *parquetHandles) RecordSpend() ([]server.Spend, error) {
 			return nil, errors.Wrap(err, "a store did not say what it asked its location for")
 		}
 		for _, one := range asked {
-			summed[server.Spend{Of: one.Of, Request: one.Request, HeldOnNode: one.HeldOnNode}] += one.Count
+			summed[server.Spend{Of: one.Of, Request: one.Request}] += one.Count
 		}
 	}
 

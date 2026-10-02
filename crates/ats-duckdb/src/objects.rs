@@ -41,9 +41,13 @@ pub(crate) struct Bucket {
 /// What the bucket was asked for, counted by who asked and what was asked.
 /// A count that cannot say which reader spent it names no path to go and fix,
 /// and S3 prices a request rather than a statement.
+///
+/// Whether the node holds a copy of the reader is not said here. The node's
+/// schema says it, the same schema `make parity` reads, and a second answer
+/// written down in this crate is one that goes stale.
 #[derive(Default)]
 pub(crate) struct Tally {
-    spent: Mutex<BTreeMap<(&'static str, &'static str, bool), u64>>,
+    spent: Mutex<BTreeMap<(&'static str, &'static str), u64>>,
 }
 
 impl Tally {
@@ -55,7 +59,7 @@ impl Tally {
             Err(poisoned) => poisoned.into_inner(),
         };
         *spent
-            .entry((what.counted_as(), request.named(), what.held_on_node()))
+            .entry((what.counted_as(), request.named()))
             .or_insert(0) += times;
     }
 
@@ -67,7 +71,7 @@ impl Tally {
             Err(poisoned) => poisoned.into_inner(),
         };
         *spent
-            .entry((what.counted_as(), request.named(), what.held_on_node()))
+            .entry((what.counted_as(), request.named()))
             .or_insert(0) += 1;
     }
 
@@ -80,10 +84,9 @@ impl Tally {
         };
         spent
             .iter()
-            .map(|((of, request, held), count)| Asked {
+            .map(|((of, request), count)| Asked {
                 of: (*of).to_string(),
                 request: (*request).to_string(),
-                held_on_node: *held,
                 count: *count,
             })
             .collect()
@@ -96,7 +99,6 @@ impl Tally {
 pub struct Asked {
     pub of: String,
     pub request: String,
-    pub held_on_node: bool,
     pub count: u64,
 }
 
@@ -618,25 +620,6 @@ mod tests {
 
         // Reading leaves it standing: this number has more than one reader.
         assert_eq!(tally.asked(), asked);
-    }
-
-    #[test]
-    fn a_reader_the_node_keeps_nothing_of_says_so_beside_its_cost() {
-        let tally = Tally::default();
-        tally.note(&Object::Tokens, Request::List);
-        tally.note(&Object::ParquetFiles, Request::List);
-
-        let asked = tally.asked();
-        let held = |of: &str| {
-            asked
-                .iter()
-                .find(|one| one.of == of)
-                .map(|one| one.held_on_node)
-        };
-        // Every read of an access token leaves the box (ADR-037), and a count
-        // that did not say so would read the same as one that was just busy.
-        assert_eq!(held("access_tokens"), Some(false));
-        assert_eq!(held("attestations"), Some(true));
     }
 
     #[test]
