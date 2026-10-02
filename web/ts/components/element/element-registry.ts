@@ -105,17 +105,28 @@ export function replacePluginElementType(entry: ElementTypeEntry): boolean {
     return true;
 }
 
+/** What an entry is, said the way a refusal names it. */
+function nameOf(entry: ElementTypeEntry | undefined): string {
+    if (!entry) return 'nothing';
+    if (entry.pluginName !== undefined) return `plugin ${entry.pluginName}, as ${entry.title}`;
+    if (entry.publishedName !== undefined) return `published element ${entry.publishedName}`;
+    return `the built-in ${entry.title}`;
+}
+
+/** What holds a symbol, read from the registry when it is asked. */
+export function holderOf(symbol: string): string {
+    return nameOf(_bySymbol.get(symbol));
+}
+
 /** Register a new element type at runtime (for plugin elements) */
 export function registerElementType(entry: ElementTypeEntry): void {
-    // Check for symbol collision with built-in elements
     if (_bySymbol.has(entry.symbol)) {
-        console.warn(`[ElementRegistry] Symbol ${entry.symbol} already registered, skipping`);
+        console.warn(`[ElementRegistry] ${nameOf(entry)} is not registered: ${entry.symbol} is held by ${holderOf(entry.symbol)}`);
         return;
     }
 
-    // Check for className collision
     if (_byClassName.has(entry.className)) {
-        console.warn(`[ElementRegistry] Class ${entry.className} already registered, skipping`);
+        console.warn(`[ElementRegistry] ${nameOf(entry)} is not registered: class ${entry.className} is held by ${nameOf(_byClassName.get(entry.className))}`);
         return;
     }
 

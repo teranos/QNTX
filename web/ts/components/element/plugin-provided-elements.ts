@@ -11,7 +11,7 @@
  * A module whose elementDef says 'panel' is added to the tray.
  */
 
-import { registerElementType, getElementTypeBySymbol, replacePluginElementType } from './element-registry';
+import { registerElementType, getElementTypeBySymbol, replacePluginElementType, holderOf } from './element-registry';
 import { createPluginElement } from './plugin-element';
 import { createPluginElementFromModule, wrapInCanvasPlaced } from './element-module-loader';
 import { redrawPlacedElements } from './canvas/canvas-workspace-builder';
@@ -192,7 +192,7 @@ async function place(item: PublishedElement, def: ElementDef, mod: ElementModule
         if (tray.has(id)) {
             // Nothing on this page put it there, so replacing it would take
             // over something this code does not own.
-            log.error(SEG.ELEMENT, `[Elements] ${name} cannot take tray id ${id}; something else holds it`);
+            log.error(SEG.ELEMENT, `[Elements] ${name} cannot take tray id ${id}: the tray already holds it, and nothing on this page put it there`);
             return;
         }
         addPanel(id, name, def, mod);
@@ -227,7 +227,7 @@ async function place(item: PublishedElement, def: ElementDef, mod: ElementModule
 
     if (getElementTypeBySymbol(def.symbol)) {
         if (!replacePluginElementType(entry)) {
-            log.error(SEG.ELEMENT, `[Elements] ${name} claims ${def.symbol}, which is held by something else`);
+            log.error(SEG.ELEMENT, `[Elements] ${name} claims ${def.symbol}, which ${holderOf(def.symbol)} holds`);
             return;
         }
         publishedAs.set(name, item.as);

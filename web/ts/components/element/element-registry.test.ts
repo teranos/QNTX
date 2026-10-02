@@ -11,6 +11,7 @@ import {
     replacePluginElementType,
     getElementTypeBySymbol,
     getAllElementTypes,
+    holderOf,
 } from './element-registry';
 import type { Element } from '@teranos/elements';
 
@@ -76,5 +77,36 @@ describe('replacePluginElementType', () => {
     test('a symbol nobody registered is not replaced into existence', () => {
         expect(replacePluginElementType(entry('\u{1F6F8}', 'ufo', 'first'))).toBe(false);
         expect(getElementTypeBySymbol('\u{1F6F8}')).toBeUndefined();
+    });
+});
+
+// "Make sure ui logs can't lie or become stale": a refusal names what holds the
+// symbol, read from the registry when it is said.
+describe('holderOf', () => {
+    test('a built-in is named as the built-in it is', () => {
+        expect(holderOf('🧵')).toBe('the built-in Transcript');
+    });
+
+    test('a plugin is named with the element it registered', () => {
+        const symbol = '\u{1F52D}';
+        registerElementType(entry(symbol, 'telescope', 'first'));
+        expect(holderOf(symbol)).toBe('plugin telescope, as Chart');
+    });
+
+    test('a published element is named as published', () => {
+        const symbol = '\u{1F9F6}';
+        registerElementType({ ...entry(symbol, undefined, 'first'), className: 'canvas-published-element element-yarn', publishedName: 'yarn' });
+        expect(holderOf(symbol)).toBe('published element yarn');
+    });
+
+    test('a replaced holder is named as it is now, not as it was', () => {
+        const symbol = '\u{1F9EE}';
+        registerElementType({ ...entry(symbol, 'abacus', 'first'), title: 'Old' });
+        replacePluginElementType({ ...entry(symbol, 'abacus', 'second'), title: 'New' });
+        expect(holderOf(symbol)).toBe('plugin abacus, as New');
+    });
+
+    test('a symbol nobody holds says so', () => {
+        expect(holderOf('\u{1F6F8}')).toBe('nothing');
     });
 });
