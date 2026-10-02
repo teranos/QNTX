@@ -85,6 +85,38 @@ func TestEnabledBuildsAreEachEnabledPluginQNTXBuilds(t *testing.T) {
 	}
 }
 
+// A build that failed is not built and mailed again at every start; a push,
+// or a change to its record, is a different build and is tried.
+func TestAFailedBuildIsTriedOncePerRevsAndRecipe(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	b := pluginBuild{name: "cleanAPI", command: "cargo build", packages: []string{"cargo", "rustc"}, output: "target/release/cleanAPI"}
+	key := b.failedKey([]string{"c0ffee"})
+
+	if failedBefore("cleanAPI", key) {
+		t.Fatal("nothing failed yet, and a build counts as failed")
+	}
+	if err := keepFailed("cleanAPI", key); err != nil {
+		t.Fatalf("keep: %v", err)
+	}
+	if !failedBefore("cleanAPI", key) {
+		t.Fatal("the same build at the same revs is not known to have failed")
+	}
+	if failedBefore("cleanAPI", b.failedKey([]string{"beef"})) {
+		t.Fatal("a push to a new rev is taken as already failed")
+	}
+	fixed := b
+	fixed.packages = []string{"cargo", "rustc", "protobuf"}
+	if failedBefore("cleanAPI", fixed.failedKey([]string{"c0ffee"})) {
+		t.Fatal("a record changed at the same revs is taken as already failed")
+	}
+	if err := keepFailed("cleanAPI", ""); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	if failedBefore("cleanAPI", key) {
+		t.Fatal("a built plugin still counts its earlier failure")
+	}
+}
+
 // A build killed by a restart, or a push while the node was down, leaves a
 // binary built from older sources; what it was built from is kept beside it,
 // so the next start sees the sources moved.

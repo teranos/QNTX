@@ -176,6 +176,47 @@ func keepBuiltRevs(name string, revs []string) error {
 	return nil
 }
 
+// failedBuildFile is beside a plugin's install: the build that last failed,
+// as failedKey writes it.
+const failedBuildFile = "failed-build"
+
+// failedKey is one build as it would run again: the revs, and the record's
+// recipe, so a record changed at the same revs is a different build.
+func (b pluginBuild) failedKey(revs []string) string {
+	return strings.Join([]string{strings.Join(revs, " "), b.command, strings.Join(b.packages, " "), b.output, b.inputsEnv}, "\n") + "\n"
+}
+
+// failedBefore is whether this exact build already failed.
+func failedBefore(name, key string) bool {
+	dir, err := grpcplugin.PluginInstallPath(name)
+	if err != nil {
+		return false
+	}
+	held, err := os.ReadFile(filepath.Join(dir, failedBuildFile))
+	return err == nil && string(held) == key
+}
+
+// keepFailed writes which build failed beside the install; a built one clears it.
+func keepFailed(name, key string) error {
+	dir, err := grpcplugin.PluginInstallPath(name)
+	if err != nil {
+		return err
+	}
+	if key == "" {
+		if err := os.Remove(filepath.Join(dir, failedBuildFile)); err != nil && !os.IsNotExist(err) {
+			return errors.Wrapf(err, "the failed build of %s was not cleared", name)
+		}
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return errors.Wrapf(err, "failed to make %s to keep %s's failed build in", dir, name)
+	}
+	if err := os.WriteFile(filepath.Join(dir, failedBuildFile), []byte(key), 0o644); err != nil {
+		return errors.Wrapf(err, "the failed build of %s was not kept", name)
+	}
+	return nil
+}
+
 // BuildMoved builds each enabled plugin whose sources are not what its
 // installed build was built from: a restart stops a running build, and a
 // push while the node is down reaches nobody.
@@ -265,6 +306,14 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 	if held, ok := s.builds.get(b.name); ok && held.Error == "" && strings.Join(held.Revs, " ") == strings.Join(revs, " ") {
 		return
 	}
+	// A build that failed fails again at the same revs with the same recipe,
+	// and ROOT was mailed the first time.
+	key := b.failedKey(revs)
+	if failedBefore(b.name, key) {
+		logger.Infow("Not building again: this build failed before, and ROOT was told", "plugin", b.name, "revs", revs)
+		s.builds.set(b.name, PluginBuildState{Revs: revs, At: time.Now(), Error: "this build failed before at these revs; a push or a change to its record builds it again"})
+		return
+	}
 
 	logger.Infow("Building a plugin whose sources moved", "plugin", b.name, "revs", revs)
 	state := PluginBuildState{Revs: revs, At: time.Now()}
@@ -275,11 +324,17 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 		logger.Warnw("A plugin was not built", "plugin", b.name, "revs", revs, "error", err)
 		s.builds.set(b.name, state)
 		s.mailBuildFailure(ctx, b, revs, err, logger)
+		if err := keepFailed(b.name, key); err != nil {
+			logger.Errorw("A failed build was not kept, so the next start builds and mails it again", "plugin", b.name, "error", err)
+		}
 		return
 	}
 	s.builds.set(b.name, state)
 	if err := keepBuiltRevs(b.name, revs); err != nil {
 		logger.Errorw("A plugin built and what it was built from was not kept, so the next start builds it again", "plugin", b.name, "error", err)
+	}
+	if err := keepFailed(b.name, ""); err != nil {
+		logger.Errorw("A plugin built and its earlier failure was not cleared", "plugin", b.name, "error", err)
 	}
 	if changed {
 		s.buildLanded(b.name)
