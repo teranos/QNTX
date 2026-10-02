@@ -1,0 +1,12 @@
+{
+  "name": "transcript-element",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "svelte": "5.53.11"
+  }
+}
