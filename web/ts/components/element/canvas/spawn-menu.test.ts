@@ -37,11 +37,11 @@ describe('Canvas Spawn Menu - Tim (Happy Path)', () => {
 
     test('Tim places an element that was published, not built in', () => {
         registerElementType({
-            symbol: '🧵',
-            className: 'canvas-published-element element-transcript',
-            title: 'TRANSCRIPT',
-            label: 'transcript',
-            publishedName: 'transcript',
+            symbol: '◇',
+            className: 'canvas-published-element element-example',
+            title: 'EXAMPLE',
+            label: 'example',
+            publishedName: 'example',
             render: () => document.createElement('div'),
         });
         const canvas = document.createElement('div');
@@ -49,7 +49,7 @@ describe('Canvas Spawn Menu - Tim (Happy Path)', () => {
 
         showSpawnMenu(150, 200, canvas, []);
         const offered = [...document.querySelectorAll('.canvas-spawn-button')].map(b => b.firstChild?.textContent);
-        expect(offered).toContain('🧵');
+        expect(offered).toContain('◇');
 
         document.body.innerHTML = '';
     });
