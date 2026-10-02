@@ -36,9 +36,9 @@ func (s *QNTXServer) a2aCard(r *http.Request) a2a.Card {
 		if !reached {
 			continue
 		}
-		// id is required and nothing the node has follows it yet.
+		// "skill id is its signum"
 		card.Skills = append(card.Skills, a2a.Skill{
-			Name: signum.GetName(), Description: signum.GetDescription(), Tags: signum.GetTags(),
+			ID: signum.GetName(), Name: signum.GetName(), Description: signum.GetDescription(), Tags: signum.GetTags(),
 		})
 	}
 	return card
