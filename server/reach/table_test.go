@@ -289,22 +289,6 @@ func TestALineNamesASigilASignumOrEitherOverOneSurface(t *testing.T) {
 	assert.NotContains(t, visits.Roles(), "ANALYST", "a line about one sigil let a role into another")
 }
 
-// "everyone get's their own mail address, and they get it via ROOT approval"
-func TestAUserReachesTheirMailAndNotGivingAddresses(t *testing.T) {
-	granted, err := readReaches(reachTable)
-	require.NoError(t, err)
-	served := &Served{}
-	served.rows.Store(&granted)
-
-	for _, sigil := range []string{"send", "mailbox", "addresses"} {
-		reaching, _ := served.ReachingSigil("http", "inbox", sigil, "/api/inbox/"+sigil)
-		assert.Contains(t, reaching.Beyond(), auth.LevelPublicRegistration, "a User does not reach inbox:%s", sigil)
-	}
-	identity, _ := served.ReachingSigil("http", "inbox", "identity", "/api/inbox/identity")
-	assert.NotContains(t, identity.Beyond(), auth.LevelPublicRegistration, "a User reaches giving an address")
-	assert.NotContains(t, identity.Beyond(), auth.LevelAttestor, "an ATTESTOR reaches giving an address")
-}
-
 // A path sigils are bound to is gated a sigil at a time by what answers there,
 // with every line about each sigil. The mux does not gate it again with the
 // path's line alone, which would turn away somebody a line about the sigil

@@ -66,12 +66,22 @@ func (s *QNTXServer) wrapping() reach.Wrapping {
 	}
 }
 
-// pluginRoute is whether a path is a loaded plugin's: /api/{name},
-// /api/{name}/{path...}, /ws/{name}, or one literal path under /api/{name}/.
-// The only paths a runtime line may open to a level.
+// pluginRoute is whether a name is a loaded plugin's, the only names a
+// runtime line may open to a level: a path, or a sigil by its reach name.
 func (s *QNTXServer) pluginRoute(path string) bool {
 	var name string
 	switch {
+	// {name} or {name}:{sigil}, either after http: or mcp:.
+	case !strings.HasPrefix(path, "/"):
+		named := path
+		for _, surface := range []string{reach.OverHTTP + ":", reach.OverMCP + ":"} {
+			named = strings.TrimPrefix(named, surface)
+		}
+		name, _, _ = strings.Cut(named, ":")
+		if strings.ContainsAny(name, "/{} ") {
+			return false
+		}
+	// /api/{name}, /api/{name}/{path...}, /ws/{name}, or one literal path under /api/{name}/.
 	case strings.HasPrefix(path, "/ws/"):
 		name = strings.TrimPrefix(path, "/ws/")
 		if strings.Contains(name, "/") {

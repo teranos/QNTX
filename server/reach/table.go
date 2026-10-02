@@ -110,11 +110,6 @@ REACH is '/mcp' '/mcp/'                                                   of ROO
 # A line that names a signum is about its sigils, over every surface, whatever
 # path the plugin bound them to (ReachingSigil).
 REACH is 'datapunt'                                                       of ROOT SUPER
-REACH is 'inbox'                                                          of ROOT SUPER
-# "everyone get's their own mail address"
-# A User sends and reads their own; whose it is, inbox decides from the User
-# the node names.
-REACH is 'inbox:send' 'inbox:mailbox' 'inbox:addresses'                   of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
 
 # A longer path wins over the prefix above, so widening that line does not
 # widen this one.
@@ -233,8 +228,12 @@ var levels = map[auth.Level]bool{
 }
 
 // runtimeLevels is every level a runtime line may name, and only on a plugin's
-// routes: the node's own paths stay the const table's, which is static.
+// routes and sigils: the node's own paths stay the const table's, which is
+// static. ROOT is never named; ROOT reaches everything.
 var runtimeLevels = map[auth.Level]bool{
+	auth.LevelSuper:              true,
+	auth.LevelToken:              true,
+	auth.LevelAttestor:           true,
 	auth.LevelPublicRegistration: true,
 	anyone:                       true,
 }

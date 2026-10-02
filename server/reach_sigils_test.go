@@ -146,7 +146,8 @@ func TestAGrantOverTheCompiledTableIsRefused(t *testing.T) {
 	assert.Empty(t, systemHolds(t, s), "a refused line was stored")
 }
 
-// A level other than PUBLIC_REGISTRATION is the compiled table's alone.
+// A level opens a plugin's names at runtime, never the node's own; ROOT is
+// never named.
 func TestAGrantToAnotherLevelIsRefused(t *testing.T) {
 	s := rootKnowingServer(t)
 	root := auth.Admitted(auth.LevelRoot, "garden")
@@ -154,6 +155,12 @@ func TestAGrantToAnotherLevelIsRefused(t *testing.T) {
 
 	_, refusal := s.reachGrant(auth.WithAdmission(context.Background(), root),
 		sigil.Sent{"path": "/api/staands", "to": "SUPER"})
+	require.NotNil(t, refusal)
+	assert.Equal(t, sigil.NotAllowed, refusal.GetWhy())
+	assert.Equal(t, "path", refusal.GetParam())
+
+	_, refusal = s.reachGrant(auth.WithAdmission(context.Background(), root),
+		sigil.Sent{"path": "/api/staands", "to": "ROOT"})
 	require.NotNil(t, refusal)
 	assert.Equal(t, sigil.Invalid, refusal.GetWhy())
 	assert.Equal(t, "to", refusal.GetParam())
