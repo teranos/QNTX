@@ -23,7 +23,8 @@ import (
 // "no handrolled tools"
 //
 // The tools are the sigils, and beside them every route the node serves that
-// no sigil answers yet. Nothing else is a tool, and no document is read.
+// no sigil answers yet and that asks who is calling. Nothing else is a tool,
+// and no document is read.
 func TestTheToolsAreTheSigilsAndTheRoutesServed(t *testing.T) {
 	srv := servedForTest(t)
 
@@ -34,7 +35,7 @@ func TestTheToolsAreTheSigilsAndTheRoutesServed(t *testing.T) {
 		}
 	}
 	for _, route := range srv.served.Routes() {
-		if routeTool(route) {
+		if _, anyone := srv.served.Reaching(route.Path); routeTool(route) && !anyone {
 			expected = append(expected, toolName(route.Path))
 		}
 	}
@@ -52,6 +53,14 @@ func TestTheToolsAreTheSigilsAndTheRoutesServed(t *testing.T) {
 	assert.False(t, named["http_api_staands_metrics"], "a path sigils answer is offered twice")
 	assert.False(t, named["http_ws"], "a socket is not something a tool call can hold open")
 	assert.False(t, named["http_mcp"], "the MCP endpoint offers itself")
+
+	// "served without asking who is calling" (reach/table.go): a door, a
+	// discovery document, a receive point, UI. Whoever calls a tool was asked.
+	for _, door := range []string{"http_auth_login_begin", "http_auth_register_finish", "http_auth_token",
+		"http__well_known_oauth_protected_resource", "http_setup_claim", "http_s_", "http_g_", "http_github_", "http_health", "http_"} {
+		assert.False(t, named[door], door+" is served to anyone, and offered as a tool")
+	}
+	assert.True(t, named["http_auth_tokens"], "the tokens ROOT and SUPER reach are not a tool")
 }
 
 // Nothing says which methods a route no sigil answers takes, so a call that

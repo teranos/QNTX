@@ -557,3 +557,24 @@ func TestAPluginOverHTTPIsHandedItsCallersCall(t *testing.T) {
 	_, still := srv.storeOfCall(headers[HeaderStoreToken])
 	assert.False(t, still, "the call's token outlived the request")
 }
+
+// A plugin that declares its routes said what it serves: each is a sigil and
+// its tool, and its prefix is not offered beside them. A plugin that declares
+// nothing is reached through its prefix, as before.
+func TestAPluginThatDeclaresItsRoutesIsOfferedOnlyThem(t *testing.T) {
+	p := &sigilPlugin{
+		fakePlugin: fakePlugin{name: "stub"},
+		routes:     []*protocol.RouteInfo{{Method: http.MethodPost, Path: "/book/new", Description: "Start a booking."}},
+	}
+	srv, _ := sigilServingServer(t, p)
+
+	named := map[string]bool{}
+	for _, tool := range toolsOffered(t, srv) {
+		named[tool.Name] = true
+	}
+	assert.True(t, named["stub_book_new"], "a declared route is not a tool")
+	for name := range named {
+		assert.False(t, strings.HasPrefix(name, "http_api_stub"), name+" is offered beside the routes stub declared")
+	}
+	assert.True(t, named["http_api_other"] && named["http_api_other__path____"], "a plugin that declares nothing cannot be reached")
+}
