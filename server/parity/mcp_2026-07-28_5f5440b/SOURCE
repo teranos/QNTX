@@ -1,0 +1,5 @@
+MCP 2026-07-28, the newest version the go-sdk the node serves MCP with speaks.
+
+schema.json https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/5f5440bb26a62e2cf3440b92da5a667efa03b267/schema/2026-07-28/schema.json (the commit 2026-07-28 points to)
+
+ef70b61f99b6d2e5e3b46863822eab08dff6a45bedc7a08914e0e5b133f40203  schema.json

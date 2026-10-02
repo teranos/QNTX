@@ -114,3 +114,48 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 		holds(t, signum, "hold", answer)
 	}
 }
+
+// The gate of mcp: every sigil held to Tool by its shape, as mcp.go makes one.
+// name and description follow and conform; inputSchema follows takes, and
+// departs, since takes is a list and the schema one object.
+func TestParityHoldsEverySigilToMCP(t *testing.T) {
+	signum := (&QNTXServer{}).paritySignum()
+	for _, name := range []string{"staands", "parity"} {
+		answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": name, "reference": "mcp"})
+		if refused != nil {
+			t.Fatalf("hold refused %s against mcp: %s", name, refused.GetSays())
+		}
+		held := answer.(parity.Parity)
+		var tool *parity.Clade
+		for i, c := range held.Clades {
+			if c.Model == "Tool" {
+				tool = &held.Clades[i]
+			}
+		}
+		if tool == nil {
+			t.Fatalf("%s: no Tool clade", name)
+		}
+		if tool.Score() != 25 {
+			t.Errorf("%s: Tool reads %d", name, tool.Score())
+		}
+		for _, item := range tool.Items {
+			switch item.Column {
+			case "name", "description":
+				if !item.Conforms() {
+					t.Errorf("%s: %s does not conform: %+v", name, item.Column, item)
+				}
+			case "inputSchema":
+				if item.Conforms() || strings.Join(item.Departs, ";") != "one value in the schema, and protocol.Sigil.takes is repeated" {
+					t.Errorf("%s: inputSchema is %+v", name, item)
+				}
+			}
+		}
+		if len(held.Required) != 0 {
+			t.Errorf("%s: required and unfollowed is %v", name, held.Required)
+		}
+		if strings.Join(held.Unfollowed["protocol.Sigil"], " ") != "gives http" {
+			t.Errorf("%s: Sigil unfollowed is %v", name, held.Unfollowed["protocol.Sigil"])
+		}
+		holds(t, signum, "hold", answer)
+	}
+}

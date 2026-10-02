@@ -27,20 +27,25 @@ import (
 )
 
 // Column is one field of a model of a reference: a scalar of a Prisma model,
-// or a field of a proto message.
+// a field of a proto message, or a property of a JSON Schema definition.
 type Column struct {
 	Name string
 	// Type is the reference's own word for it. Prisma's: String, Int, BigInt,
 	// Boolean, DateTime, Decimal, Json, Float, Bytes. Proto's: its kind, or map.
+	// JSON Schema's: its type, the definition it refers to, its branches, or
+	// any.
 	Type string
 	List bool
 	// Required is the reference saying a value must be there.
 	Required bool
+	// holds is, for JSON Schema, the types a value of it may be once every
+	// definition it refers to is read: what Type names, resolved.
+	holds []string
 }
 
-// Model is a Prisma model or a proto message and its columns, in the order the
-// schema has them. A Prisma relation is not a column of the record, so it is
-// left out.
+// Model is a Prisma model, a proto message or a JSON Schema definition and its
+// columns, in the order the schema has them. A Prisma relation is not a column
+// of the record, so it is left out.
 type Model struct {
 	Name    string
 	Columns []Column

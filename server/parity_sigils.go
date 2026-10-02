@@ -16,11 +16,20 @@ import (
 // held to the reference as the node pins it.
 
 // everySignumFollows is what every signum follows by its shape alone, declared
-// once and not signum by signum: "To A2A a signum is a skill" (sigil.proto).
+// once and not signum by signum: "To A2A a signum is a skill" (sigil.proto),
+// and to MCP "a tool is one sigil" (mcp.go).
 func everySignumFollows() []*protocol.Follows {
-	return []*protocol.Follows{{Reference: "a2a", Columns: []*protocol.Corresponds{
-		{Field: "protocol.Signum.name", Column: "AgentSkill.name"},
-	}}}
+	return []*protocol.Follows{
+		{Reference: "a2a", Columns: []*protocol.Corresponds{
+			{Field: "protocol.Signum.name", Column: "AgentSkill.name"},
+		}},
+		{Reference: "mcp", Columns: []*protocol.Corresponds{
+			{Field: "protocol.Signum.name", Column: "Tool.name"},
+			{Field: "protocol.Sigil.name", Column: "Tool.name"},
+			{Field: "protocol.Sigil.does", Column: "Tool.description"},
+			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema"},
+		}},
+	}
 }
 
 func (s *QNTXServer) paritySignum() sigil.Signum {
@@ -34,7 +43,7 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 					Takes: []*protocol.Param{
 						{Name: "signum", Required: true, Says: "The signum to hold, by name."},
 						{Name: "sigil", Says: "One sigil of it, held by the messages it gives. Naming none holds the whole signum."},
-						{Name: "reference", Says: "The reference, by name. Naming none is the one the signum follows, when it follows one. a2a holds any signum by its shape, as a skill."},
+						{Name: "reference", Says: "The reference, by name. Naming none is the one the signum follows, when it follows one. a2a holds any signum by its shape, as a skill, and mcp each of its sigils, as a tool."},
 					},
 					Gives: []*protocol.Field{
 						{Name: "signum", Says: "The signum that was held."},
@@ -85,7 +94,7 @@ func (s *QNTXServer) parityHold(_ context.Context, sent sigil.Sent) (any, *proto
 		switch len(followed) {
 		case 0:
 			return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "signum",
-				Says: held.GetName() + " follows nothing of its own; a2a holds it by its shape, when named"}
+				Says: held.GetName() + " follows nothing of its own; a2a and mcp hold it by its shape, when named"}
 		case 1:
 			reference = followed[0]
 		default:

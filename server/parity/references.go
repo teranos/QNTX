@@ -21,10 +21,11 @@ import (
 // The references a signum can be held to, each pinned in a directory named for
 // the reference, its version and the commit it was taken at, with SOURCE
 // saying where it came from: umami is umami_v3.3.1_ca661c7, a2a is
-// a2a_v1.0.1_3303592. A reference is read as it is: a schema.prisma as Prisma,
-// a .proto as the descriptors it compiles to.
+// a2a_v1.0.1_3303592, mcp is mcp_2026-07-28_5f5440b. A reference is read as it
+// is: a schema.prisma as Prisma, a .proto as the descriptors it compiles to, a
+// schema.json as JSON Schema.
 //
-//go:embed */schema.prisma */*.proto
+//go:embed */schema.prisma */*.proto */schema.json
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory
@@ -60,12 +61,15 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 		if file.Name() == "schema.prisma" {
 			return prismaAt(path.Join(found[0], file.Name()))
 		}
+		if file.Name() == "schema.json" {
+			return jsonSchemaAt(path.Join(found[0], file.Name()))
+		}
 		if strings.HasSuffix(file.Name(), ".proto") {
 			protos = append(protos, file.Name())
 		}
 	}
 	if len(protos) == 0 {
-		return Schema{}, failed("%s holds no schema.prisma and no .proto", found[0])
+		return Schema{}, failed("%s holds no schema.prisma, no .proto and no schema.json", found[0])
 	}
 	return protoAt(found[0], protos)
 }
@@ -80,6 +84,18 @@ func prismaAt(schema string) (Schema, *protocol.Refusal) {
 		return Schema{}, failed("%v", err)
 	}
 	return Prisma(models), nil
+}
+
+func jsonSchemaAt(schema string) (Schema, *protocol.Refusal) {
+	raw, err := pinned.ReadFile(schema)
+	if err != nil {
+		return Schema{}, failed("%s did not read: %v", schema, err)
+	}
+	read, err := ParseJSONSchema(schema, raw)
+	if err != nil {
+		return Schema{}, failed("%v", err)
+	}
+	return read, nil
 }
 
 // protoAt compiles the .proto files of dir. What they import from google/api is
