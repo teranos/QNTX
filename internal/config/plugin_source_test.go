@@ -35,8 +35,8 @@ func TestPluginNameFromRepo(t *testing.T) {
 		},
 		{
 			name:     "a path inside a repo names the plugin",
-			repo:     "https://github.com/teranos/QNTX/tree/main/qntx-plugins/loom",
-			wantName: "loom",
+			repo:     "https://github.com/teranos/QNTX/tree/main/qntx-plugins/kern",
+			wantName: "kern",
 		},
 		{
 			name:     "a ref with no path falls back to the repo",

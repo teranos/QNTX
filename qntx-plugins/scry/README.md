@@ -75,7 +75,7 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **SSL** — ~~No signal summary for streaming.~~ `StreamChat` now logs per-generation timing breakdown (decode/signal/callback ms) and callback sub-timings (proto/submit_dist/store_kf/trail/grpc_write). Entropy/confidence summary still only on the non-streaming path.
 
-- **ATS** — ~~Resolved.~~ Each generation writes a `["Weave"]` attestation to ATS with embedded per-token signals (confidence, entropy, top-gap, top-k) in `attributes.tokens`. One attestation per generation. Loom renders these as confidence-colored token spans.
+- **ATS** — ~~Resolved.~~ Each generation writes a `["Weave"]` attestation to ATS with embedded per-token signals (confidence, entropy, top-gap, top-k) in `attributes.tokens`. One attestation per generation.
 
 - **WLOG** — Weave attestation log noise. Every generation logs `[scry] Weave attestation created: AS-...`. At low priority (taxonomy builds, note gen) this floods the log. Should be batched into the periodic ticker instead of logging each one individually.
 
