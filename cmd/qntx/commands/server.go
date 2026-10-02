@@ -119,6 +119,11 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 	// A backend with a single universe answers with the default holding the
 	// store it opened. One that keeps namespaces answers with system too, the
 	// watchers each namespace has its own of, and a way to open the rest.
+	queries := storage.NewSQLQueryStore(database)
+	// An ax read resolves in Rust or not at all.
+	if rq, ok := rustStore.(storage.RawQuerier); ok {
+		queries.SetRawQuerier(rq)
+	}
 	held, err := namespaces.Serving(namespaces.Made{
 		Store: atsStore,
 		// A node with one namespace keeps its watchers in the operational
@@ -132,7 +137,7 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		Executions:  schedule.NewExecutionStore(database),
 		Prompts:     prompt.NewPromptStore(database, atsStore),
 		Aliases:     storage.NewAliasStore(database),
-		Queries:     storage.NewSQLQueryStore(database),
+		Queries:     queries,
 		Operational: database,
 		Sqlite:      database,
 	})
