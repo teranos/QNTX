@@ -20,7 +20,7 @@ import (
 // Derived from what Ground already streams into the namespace the caller stands
 // in, and nothing is written to make them.
 
-// transcriptPredicates is every hook event a transcript reads. Each is asked
+// transcriptPredicates are the hook events a session is found by. Each is asked
 // for on its own: a store's filter may AND predicates rather than OR them.
 var transcriptPredicates = []string{
 	"UserPromptSubmit", "Stop", "PreToolUse",
@@ -100,15 +100,28 @@ func (s *QNTXServer) transcriptsRead(ctx context.Context, sent sigil.Sent) (any,
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "limit", Says: "limit is a whole number, and " + sent["limit"] + " is not"}
 		}
 	}
-	var contexts []string
-	if sent["session"] != "" {
-		contexts = []string{"session:" + sent["session"]}
+	sessions := []string{sent["session"]}
+	if sent["session"] == "" {
+		var events []*types.As
+		for _, predicate := range transcriptPredicates {
+			found, err := store.GetAttestations(ats.AttestationFilter{Predicates: []string{predicate}, Limit: maxTranscriptRead})
+			if err != nil {
+				return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not read " + predicate + ": " + err.Error()}
+			}
+			events = append(events, found...)
+		}
+		sessions = sessions[:0]
+		for _, t := range transcriptsOf(events, limit) {
+			sessions = append(sessions, t.Session)
+		}
 	}
+	// A session is read whole, by its context. Ground names a control's row
+	// Grounded and the event, for any event, so no list of predicates holds them all.
 	var events []*types.As
-	for _, predicate := range transcriptPredicates {
-		found, err := store.GetAttestations(ats.AttestationFilter{Predicates: []string{predicate}, Contexts: contexts, Limit: maxTranscriptRead})
+	for _, session := range sessions {
+		found, err := store.GetAttestations(ats.AttestationFilter{Contexts: []string{"session:" + session}, Limit: maxTranscriptRead})
 		if err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not read " + predicate + ": " + err.Error()}
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not read session " + session + ": " + err.Error()}
 		}
 		events = append(events, found...)
 	}

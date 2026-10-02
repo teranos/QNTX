@@ -135,7 +135,7 @@
     cursor: pointer;
   }
   .tr-session:hover { background: var(--bg-dark-hover); }
-  .tr-opening { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tr-opening { overflow-wrap: break-word; word-break: break-word; }
   .tr-head {
     display: flex;
     gap: 8px;
