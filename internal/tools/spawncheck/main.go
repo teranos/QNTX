@@ -28,6 +28,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/teranos/errors"
 )
 
 // skipDirs are not this repository's code to answer for, or are build output.
@@ -152,7 +154,7 @@ func walk(root string) (map[string]int, error) {
 		// have counted the tree, and claiming that is its whole job.
 		file, err := parser.ParseFile(fset, path, nil, 0)
 		if err != nil {
-			return fmt.Errorf("%s could not be parsed, so its goroutines went uncounted: %w", rel, err)
+			return errors.Wrapf(err, "%s could not be parsed, so its goroutines went uncounted", rel)
 		}
 
 		count := 0
@@ -193,7 +195,7 @@ func exempt(rel string) bool {
 func load(path string) (map[string]int, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("the baseline at %s could not be read: %w", path, err)
+		return nil, errors.Wrapf(err, "the baseline at %s could not be read", path)
 	}
 
 	baseline := map[string]int{}
@@ -206,12 +208,12 @@ func load(path string) (map[string]int, error) {
 		}
 		tab := strings.Index(text, "\t")
 		if tab < 0 {
-			return nil, fmt.Errorf("%s:%d holds no tab between the count and the path: %q",
+			return nil, errors.Newf("%s:%d holds no tab between the count and the path: %q",
 				path, line, text)
 		}
 		count, err := strconv.Atoi(strings.TrimSpace(text[:tab]))
 		if err != nil {
-			return nil, fmt.Errorf("%s:%d does not start with a count: %q", path, line, text)
+			return nil, errors.Newf("%s:%d does not start with a count: %q", path, line, text)
 		}
 		baseline[strings.TrimSpace(text[tab+1:])] = count
 	}

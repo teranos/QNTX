@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/teranos/errors"
 )
 
 // WriteJSON writes a JSON response with the given status code. The status is
@@ -20,7 +22,7 @@ func WriteJSON(w http.ResponseWriter, status int, data interface{}) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		return fmt.Errorf("the %d response body was not delivered: %w", status, err)
+		return errors.Wrapf(err, "the %d response body was not delivered", status)
 	}
 	return nil
 }
@@ -36,7 +38,7 @@ func ReadJSON(w http.ResponseWriter, r *http.Request, v interface{}) error {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		// The 400 failing to send does not change why the request was refused.
 		if writeErr := WriteError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err)); writeErr != nil {
-			return fmt.Errorf("%w (and the 400 saying so was not delivered: %w)", err, writeErr)
+			return errors.Wrapf(err, "the 400 saying so was not delivered (%v)", writeErr)
 		}
 		return err
 	}
