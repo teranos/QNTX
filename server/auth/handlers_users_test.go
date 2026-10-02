@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,6 +69,38 @@ func TestRootSwitchesTimOffAndTimStaysOffUntilRootSaysOtherwise(t *testing.T) {
 	rec = asRoot(h, rootSession, http.MethodPost, "/auth/users/"+tim.ID+"/enable")
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.Empty(t, store.held[1].DisabledBy)
+}
+
+func naming(h *Handler, session, id, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/auth/users/"+id+"/name", strings.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+	rec := httptest.NewRecorder()
+	h.sessionOnly(h.handleUserByID)(rec, req)
+	return rec
+}
+
+// ROOT names a User who has no name, once; the User does not name another.
+func TestRootNamesAUserWhoHasNone(t *testing.T) {
+	h, store, rootSession, tim := rootAndTim(t)
+	ada := User{ID: "US-ADA-1", Level: LevelPublicRegistration, Keys: []UserKey{{DID: "did:key:zAda", Origin: OriginBrowser}}, CreatedAt: 3}
+	require.NoError(t, store.Put(ada))
+
+	timSession, err := h.sessions.create("did:key:zTim", tim)
+	require.NoError(t, err)
+	rec := naming(h, timSession, ada.ID, `{"display_name":"Ada Lovelace"}`)
+	assert.NotEqual(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Empty(t, store.held[2].DisplayName)
+
+	rec = naming(h, rootSession, ada.ID, `{"display_name":"Ada\r\nLovelace"}`)
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+
+	rec = naming(h, rootSession, ada.ID, `{"display_name":"Ada Lovelace"}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, "Ada Lovelace", store.held[2].DisplayName)
+
+	rec = naming(h, rootSession, ada.ID, `{"display_name":"Ada King"}`)
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Equal(t, "Ada Lovelace", store.held[2].DisplayName)
 }
 
 // A User nobody holds is said so, and a verb that is not the switch is refused.

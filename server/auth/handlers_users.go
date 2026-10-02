@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
+	"unicode"
 )
 
 // "could you create a ts Users glyph to let us do the minimal management of users as ROOT ?"
@@ -39,6 +41,7 @@ func (h *Handler) usersCollection(w http.ResponseWriter, r *http.Request, _ Pres
 //
 //	POST /auth/users/{id}/disable
 //	POST /auth/users/{id}/enable
+//	POST /auth/users/{id}/name
 func (h *Handler) handleUserByID(w http.ResponseWriter, r *http.Request, p Presented) {
 	if h.users == nil {
 		h.writeError(w, http.StatusServiceUnavailable, "this node keeps no Users")
@@ -60,9 +63,60 @@ func (h *Handler) handleUserByID(w http.ResponseWriter, r *http.Request, p Prese
 		h.switchUser(w, r, p, id, true)
 	case "enable":
 		h.switchUser(w, r, p, id, false)
+	case "name":
+		h.nameUser(w, r, p, id)
 	default:
 		h.writeError(w, http.StatusNotFound, "no such verb on a User: "+verb)
 	}
+}
+
+// nameUser is ROOT giving a User who has none a display_name, by the rules a
+// User naming themselves on arrival is held to.
+func (h *Handler) nameUser(w http.ResponseWriter, r *http.Request, p Presented, id string) {
+	route, _ := p.Admitted()
+	if h.levelOf(route) != LevelRoot {
+		h.writeError(w, http.StatusForbidden, "a User is named by ROOT")
+		return
+	}
+	var body struct {
+		DisplayName string `json:"display_name"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+		h.writeError(w, http.StatusBadRequest, "the body is not a JSON object of display_name")
+		return
+	}
+	name := strings.TrimSpace(body.DisplayName)
+	if name == "" || strings.ContainsFunc(name, unicode.IsControl) {
+		h.writeError(w, http.StatusBadRequest, "display_name is one line of text")
+		return
+	}
+	u, found, err := h.userByID(id)
+	if err != nil {
+		h.attest(PredicateUnanswered, route, map[string]any{
+			"asked": "User store", "doing": "read", "user": id, "error": err.Error(),
+		})
+		h.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !found {
+		h.writeError(w, http.StatusNotFound, "no User "+id)
+		return
+	}
+	if refusal, bad := refuseName(u, name); bad {
+		h.writeError(w, http.StatusBadRequest, refusal)
+		return
+	}
+	u.DisplayName = name
+	if err := h.users.Put(u); err != nil {
+		h.attest(PredicateUnanswered, route, map[string]any{
+			"asked": "User store", "doing": "write", "user": u.ID, "error": err.Error(),
+		})
+		h.writeError(w, http.StatusInternalServerError, "User "+u.ID+" was not written: "+err.Error())
+		return
+	}
+	h.logger.Infow("User named", "user", u.ID, "by", p.UserID, "path", r.URL.Path)
+	h.attest(PredicateNamed, route, map[string]any{"user": u.ID, "by": p.UserID, "display_name": name})
+	h.writeJSON(w, http.StatusOK, map[string]string{"user": u.ID, "display_name": name})
 }
 
 // switchUser is ROOT flipping the switch on the User named by id.
