@@ -74,7 +74,7 @@ func (s *QNTXServer) transcriptsSignum() sigil.Signum {
 						{Name: "limit", Kind: sigil.Count, Says: "How many sessions, newest first."},
 					},
 					Gives: []*protocol.Field{
-						{Name: "transcripts", Says: "Each session: its id, the subjects it was about, when it started and ended, and its turns, each naming the attestation it was read from."},
+						{Name: "transcripts", Says: "Each session: its id, the subjects it was about, when it started and ended, and its turns, each naming the attestation it was read from.", Message: "protocol.Transcript"},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/transcripts"},
 				},
