@@ -40,6 +40,7 @@ const (
 	Prose      = "▣" // Documentation and prose content
 	Doc        = "▤" // Document/file content (PDF, etc.)
 	Subcanvas  = "⌗" // Nested canvas (subcanvas workspace)
+	Parity     = "≍" // Parity: a signum held to a reference it follows
 )
 
 // SymbolToCommand maps symbols to their text command equivalents

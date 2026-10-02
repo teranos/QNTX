@@ -1,0 +1,133 @@
+/* Parity element (≍) — the seam: a reference's columns beside the fields that
+   follow them, each in its own words. "D+ is what I am settling for". */
+
+.parity-element-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 560px;
+    max-width: 760px;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    line-height: 17px;
+    color: var(--text-on-dark);
+}
+
+.parity-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-on-dark);
+}
+
+.parity-pill {
+    min-height: 28px;
+    padding: 0 10px;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    background: var(--bg-dark-light);
+    color: var(--text-on-dark-secondary);
+    border: 1px solid var(--border-on-dark);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+}
+
+.parity-pill:hover {
+    background: var(--bg-dark-hover);
+}
+
+.parity-pill[aria-pressed="true"] {
+    background: var(--element-status-success-bg);
+    color: var(--element-status-success-text);
+    border-color: var(--accent-on-dark);
+}
+
+.parity-pill-reference {
+    font-style: italic;
+}
+
+.parity-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+    column-gap: 14px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.parity-row-head {
+    border-bottom-color: var(--border-on-dark);
+}
+
+.parity-side {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.parity-where {
+    font-size: var(--font-size-xs);
+    color: var(--text-on-dark-tertiary);
+}
+
+.parity-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    font-weight: 700;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.parity-says {
+    color: var(--text-on-dark-secondary);
+    overflow-wrap: break-word;
+    word-break: break-word;
+    white-space: pre-line;
+}
+
+.parity-silent {
+    color: var(--text-on-dark-tertiary);
+}
+
+.parity-required {
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    padding: 1px 5px;
+    color: var(--text-on-dark-secondary);
+    border: 1px solid var(--border-on-dark);
+    border-radius: var(--border-radius);
+}
+
+.parity-mark {
+    text-align: center;
+    font-weight: 700;
+}
+
+.parity-conforms { color: var(--accent-on-dark); }
+.parity-departs { color: var(--element-status-warning-text); }
+.parity-owed { color: var(--element-status-error-text); }
+.parity-unfollowed { color: var(--text-on-dark-tertiary); }
+
+.parity-required.parity-owed {
+    color: var(--element-status-error-text);
+    border-color: var(--element-status-error-text);
+}
+
+.parity-departure {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+    padding: 6px 8px;
+    color: var(--element-status-warning-text);
+    background: var(--element-status-warning-section-bg);
+    border-radius: var(--border-radius);
+    overflow-wrap: break-word;
+}
+
+.parity-out-of-spec {
+    padding: 14px 16px 18px;
+    color: var(--text-on-dark-tertiary);
+    overflow-wrap: break-word;
+}

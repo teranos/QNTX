@@ -177,3 +177,32 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 		holds(t, signum, "hold", answer)
 	}
 }
+
+// follows is what the parity window offers to hold: every signum, what it
+// declares it follows, and what every signum follows by its shape.
+func TestParityFollowsIsEverySignumAndItsReferences(t *testing.T) {
+	signum := (&QNTXServer{}).paritySignum()
+	answer, refused := signum.Answers["follows"](context.Background(), nil)
+	if refused != nil {
+		t.Fatalf("follows refused: %s", refused.GetSays())
+	}
+	rows := answer.([]map[string]any)
+	byName := map[string]map[string]any{}
+	for _, row := range rows {
+		byName[row["signum"].(string)] = row
+	}
+	staands, ok := byName["staands"]
+	if !ok {
+		t.Fatalf("follows has no staands: %v", rows)
+	}
+	if strings.Join(staands["declares"].([]string), " ") != "umami" {
+		t.Errorf("staands declares %v", staands["declares"])
+	}
+	if strings.Join(staands["by_shape"].([]string), " ") != "a2a mcp" {
+		t.Errorf("by its shape staands follows %v", staands["by_shape"])
+	}
+	if len(byName["parity"]["declares"].([]string)) != 0 {
+		t.Errorf("parity declares %v", byName["parity"]["declares"])
+	}
+	holds(t, signum, "follows", answer)
+}

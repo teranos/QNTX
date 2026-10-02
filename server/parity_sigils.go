@@ -68,9 +68,19 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/storage"},
 				},
+				{
+					Name: "follows",
+					Does: "Every signum the node serves, and each reference it can be held to: the ones it declares it follows, and the ones every signum follows by its shape.",
+					Gives: []*protocol.Field{
+						{Name: "signum", Says: "The signum, by name."},
+						{Name: "declares", Says: "The references it declares it follows."},
+						{Name: "by_shape", Says: "The references every signum follows by its shape."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/follows"},
+				},
 			},
 		},
-		Answers: map[string]sigil.Answer{"hold": s.parityHold, "storage": s.parityStorage},
+		Answers: map[string]sigil.Answer{"hold": s.parityHold, "storage": s.parityStorage, "follows": s.parityFollows},
 	}
 }
 
@@ -117,6 +127,24 @@ func (s *QNTXServer) parityHold(_ context.Context, sent sigil.Sent) (any, *proto
 		return nil, refused
 	}
 	return p, nil
+}
+
+// parityFollows is what the parity window offers to hold: every signum, with
+// what it declares it follows and what every signum follows by its shape.
+func (s *QNTXServer) parityFollows(context.Context, sigil.Sent) (any, *protocol.Refusal) {
+	var byShape []string
+	for _, f := range everySignumFollows() {
+		byShape = append(byShape, f.GetReference())
+	}
+	rows := []map[string]any{}
+	for _, signum := range s.signa() {
+		declares := []string{}
+		for _, f := range signum.GetFollows() {
+			declares = append(declares, f.GetReference())
+		}
+		rows = append(rows, map[string]any{"signum": signum.GetName(), "declares": declares, "by_shape": byShape})
+	}
+	return rows, nil
 }
 
 func (s *QNTXServer) parityStorage(context.Context, sigil.Sent) (any, *protocol.Refusal) {
