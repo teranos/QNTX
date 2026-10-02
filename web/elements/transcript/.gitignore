@@ -1,4 +1,0 @@
-node_modules
-dist
-src/*.svelte.js
-src/element-module.staged.ts
