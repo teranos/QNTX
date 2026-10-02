@@ -1,6 +1,6 @@
 # The Element Migration
 
-The element runtime lives in [teranos/elements](https://github.com/teranos/elements/blob/main/VISION.md). The tray is what we use: all palette functionality has been replaced by the tray, fully. One step is still law and still ahead, in [web/CLAUDE.md](https://github.com/teranos/QNTX/blob/main/web/CLAUDE.md): the `sym` package becomes `element/sym`. This doc holds the step after that, which has not started.
+The element runtime lives in [teranos/elements](https://github.com/teranos/elements/blob/main/VISION.md). The tray is what we use: all palette functionality has been replaced by the tray, fully. One step is still law and still ahead, in [web/CLAUDE.md](https://github.com/teranos/QNTX/blob/main/web/CLAUDE.md): the `sym` package becomes `element/sym`. This doc holds the step after that, which is done.
 
 ## Element state becomes attestation
 

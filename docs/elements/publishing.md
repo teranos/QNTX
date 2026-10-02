@@ -36,7 +36,7 @@ export const elementDef = {
   symbol: '📯',              // what it is drawn as
   title: 'CRIER',
   label: 'crier',
-  manifestation: 'panel',   // omit for the canvas; 'panel' puts it in the tray
+  form: 'panel',   // omit for the canvas; 'panel' puts it in the tray
   defaultWidth: 960,
   defaultHeight: 640,
 }
