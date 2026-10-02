@@ -8,7 +8,7 @@
 # a goroutine that is meant to end the process is an admitted exemption, and
 # the point of this file is that admitting it is the only way to keep it.
 #
-# 39 goroutines in 24 files.
+# 28 goroutines in 17 files.
 
 1	ats/storage/sqlitecgo/slowlog.go
 2	ats/storage/sqlitecgo/watchdog.go
@@ -24,13 +24,6 @@
 1	plugin/grpc/websocket_keepalive.go
 1	plugin/registry.go
 1	server/auth/auth.go
-1	server/client.go
-1	server/db_stats_cache.go
-4	server/handlers.go
-1	server/plugin_health_cache.go
+1	server/handlers.go
 2	server/prompt_handlers.go
-1	server/pulse_execution_poller.go
-1	server/server.go
-1	server/sub_ticker.go
 1	server/watcher_handlers.go
-2	server/watcher_reload.go

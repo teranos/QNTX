@@ -16,6 +16,8 @@ const (
 	// - WorkerPool.Stop() can take up to 20s for checkpoint completion (configurable via WorkerPoolConfig.WorkerStopTimeout)
 	// - Additional time for other goroutines (WebSocket, config watcher, etc.)
 	ShutdownTimeout = 60 * time.Second
+	// shutdownWaitSaid is how often a shutdown still waiting says on what.
+	shutdownWaitSaid = 5 * time.Second
 )
 
 // DaemonState represents the activity level of the daemon for adaptive polling

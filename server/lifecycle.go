@@ -66,12 +66,11 @@ func (s *QNTXServer) startBackgroundServices() {
 
 	// Start auth session sweep (if auth is enabled)
 	if s.authHandler != nil {
-		s.wg.Add(1)
-		s.authHandler.StartSessionSweep(s.wg.Done, s.ctx.Done())
+		s.authHandler.StartSessionSweep(s.wg.Add("auth.sessionSweep"), s.ctx.Done())
 	}
 
 	// Start rate limiter sweep goroutine
-	sacred.GoTracked(&s.wg, "server.sweepRateLimiters", func() {
+	s.wg.Go("server.sweepRateLimiters", func() {
 		s.sweepRateLimiters(s.ctx)
 	})
 
@@ -109,7 +108,7 @@ func (s *QNTXServer) startBackgroundServices() {
 func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	// Start the hub in a goroutine. It owns every send to every client, so it
 	// ending quietly is the node still up and answering nobody.
-	sacred.GoTracked(&s.wg, "server.hub", s.Run)
+	s.wg.Go("server.hub", s.Run)
 
 	// Start all background services
 	s.startBackgroundServices()
@@ -151,7 +150,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		s.logger.Infow("Browser launch triggered (async)")
 
 		// Detect slow browser connection
-		sacred.GoTracked(&s.wg, "server.monitorBrowserConnection", s.monitorBrowserConnection)
+		s.wg.Go("server.monitorBrowserConnection", s.monitorBrowserConnection)
 	}
 
 	// Signal that the server is fully ready — plugins can now initialize.
@@ -231,9 +230,8 @@ func (s *QNTXServer) Stop() error {
 	if s.pulseReadDB != nil && s.pulseReadDB != s.nodeDB {
 		sqlclose.Log(s.pulseReadDB.Close(), s.logger, "the pulse read db")
 	}
-	if s.embeddingsHandler != nil && s.embeddingsHandler.ReadDB != nil {
-		sqlclose.Log(s.embeddingsHandler.ReadDB.Close(), s.logger, "the embeddings read db")
-	}
+	// The embeddings handler reads the node's own db, which its opener closes
+	// after Stop returns. Closed here, every reader after this line failed.
 
 	// Clear service providers before killing plugins — observers check HasProvider()
 	// and will skip routing once providers are cleared.
@@ -301,13 +299,24 @@ func (s *QNTXServer) Stop() error {
 		close(done)
 	})
 
-	select {
-	case <-done:
-		s.logger.Debugw("All goroutines stopped cleanly")
-	case <-time.After(ShutdownTimeout):
-		s.logger.Warnw("Goroutine shutdown timed out, forcing exit",
-			"timeout", ShutdownTimeout,
-		)
+	waitStart := time.Now()
+	still := time.NewTicker(shutdownWaitSaid)
+	defer still.Stop()
+	deadline := time.After(ShutdownTimeout)
+waiting:
+	for {
+		select {
+		case <-done:
+			s.logger.Infow("Server goroutines stopped", "took", time.Since(waitStart))
+			break waiting
+		case <-still.C:
+			s.logger.Infow("Still waiting on server goroutines",
+				"waited", time.Since(waitStart).Round(time.Second), "running", s.wg.Running())
+		case <-deadline:
+			s.logger.Warnw("Goroutine shutdown timed out, forcing exit",
+				"timeout", ShutdownTimeout, "running", s.wg.Running())
+			break waiting
+		}
 	}
 
 	// Every namespace sends what its landing file holds before the process

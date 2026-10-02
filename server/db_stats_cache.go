@@ -367,10 +367,7 @@ func (s *QNTXServer) publishStatsFailure(surface string, err error) {
 // startDBStatsRefresher launches a background goroutine that refreshes
 // the database stats cache every 30 seconds.
 func (s *QNTXServer) startDBStatsRefresher() {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-
+	s.wg.Go("dbStats.refresher", func() {
 		// First refresh runs async — doesn't block startup.
 		s.refreshDBStats()
 
@@ -384,7 +381,7 @@ func (s *QNTXServer) startDBStatsRefresher() {
 				s.refreshDBStats()
 			}
 		}
-	}()
+	})
 }
 
 func (s *QNTXServer) refreshDBStats() {

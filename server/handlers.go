@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/measure"
-	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
@@ -87,31 +86,19 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	s.register <- client
 
 	// Send system capabilities on connection (inform client of available optimizations)
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.sendSystemCapabilitiesToClient(client)
-	}()
+	s.wg.Go("ws.sendSystemCapabilities", func() { s.sendSystemCapabilitiesToClient(client) })
 
 	// Send active jobs on connection (so hard refresh shows current jobs)
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.sendInitialJobsToClient(client)
-	}()
+	s.wg.Go("ws.sendInitialJobs", func() { s.sendInitialJobsToClient(client) })
 
 	// Send daemon status on connection (so budget bars + daemon badge render immediately)
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.sendInitialDaemonStatusToClient(client)
-	}()
+	s.wg.Go("ws.sendInitialDaemonStatus", func() { s.sendInitialDaemonStatusToClient(client) })
 
 	// Reading and writing the socket. Through sacred so a panic in either is a
 	// logged error rather than the end of the node: one of these took the
 	// whole process down on a watcher upsert, and nothing was told.
-	sacred.GoTracked(&s.wg, "ws.readPump", client.readPump)
-	sacred.GoTracked(&s.wg, "ws.writePump", client.writePump)
+	s.wg.Go("ws.readPump", client.readPump)
+	s.wg.Go("ws.writePump", client.writePump)
 }
 
 // sendInitialJobsToClient sends job history to a newly connected client.
