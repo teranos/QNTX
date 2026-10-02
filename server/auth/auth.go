@@ -137,7 +137,7 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		webauthn:       w,
 		ownOrigins:     rpOrigins,
 		creds:          newCredentialStore(db, logger),
-		sessions:       newSessionStore(sessionExpiryHours),
+		sessions:       newSessionStore(sessionExpiryHours).kept(db, logger),
 		tokens:         tokens,
 		users:          users,
 		secureCookies:  secureCookies,

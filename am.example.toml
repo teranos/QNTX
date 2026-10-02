@@ -231,7 +231,7 @@ log_theme = "everforest"
 # [auth]
 # Biometric passkey gate. Required when server.bind_address is non-loopback.
 # enabled = false
-# session_expiry_hours = 24
+# session_expiry_hours = 168
 #
 # WebAuthn Relying Party ID and Origins. MUST be set for any public
 # deployment.
