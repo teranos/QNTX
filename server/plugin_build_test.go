@@ -67,7 +67,7 @@ func TestAFailedBuildsMailNamesEverySourceAndWhy(t *testing.T) {
 func TestEnabledBuildsAreEachEnabledPluginQNTXBuilds(t *testing.T) {
 	built := map[string]string{
 		buildCore:    "teranos/QNTX@real-inboxes",
-		buildCommand: "go build -o bin/qntx-inbox-plugin ./qntx-plugins/inbox/cmd/qntx-inbox-plugin",
+		buildCommand: "go build -o bin/qntx-inbox-plugin ./cmd/qntx-inbox-plugin",
 		buildOutput:  "bin/qntx-inbox-plugin",
 	}
 	records := []grpcplugin.PluginRecord{

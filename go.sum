@@ -86,8 +86,6 @@ github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.16 h1:NSbvS17MlI2lu
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.16/go.mod h1:SwT8Tmqd4sA6G1qaGdzWCJN99bUmPGHfRwwq3G5Qb+A=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.95.0 h1:MIWra+MSq53CFaXXAywB2qg9YvVZifkk6vEGl/1Qor0=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.95.0/go.mod h1:79S2BdqCJpScXZA2y+cpZuocWsjGjJINyXnOsf5DTz8=
-github.com/aws/aws-sdk-go-v2/service/ses v1.42.1 h1:iYp8k/RHROMak70szhT1IR02WL78dDjCtNOXcRsRWVg=
-github.com/aws/aws-sdk-go-v2/service/ses v1.42.1/go.mod h1:6yxhDdUZ2pwgKLc3VAOwwp1uelsC8yGqzZO+UkVz7hw=
 github.com/aws/aws-sdk-go-v2/service/sesv2 v1.59.0 h1:HQYog9wJM8D9aF0bOVzzWbjpWZ7exyjc3rLb7P8Qb8E=
 github.com/aws/aws-sdk-go-v2/service/sesv2 v1.59.0/go.mod h1:p0iz0in3/mt3aS2Ovk3aKeOq5vwM/V3prQG9nlBO/OM=
 github.com/aws/aws-sdk-go-v2/service/signin v1.0.4 h1:HpI7aMmJ+mm1wkSHIA2t5EaFFv5EFYXePW30p1EIrbQ=

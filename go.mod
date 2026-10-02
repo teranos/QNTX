@@ -35,7 +35,6 @@ require (
 )
 
 require (
-	github.com/aws/aws-sdk-go-v2/service/ses v1.42.1
 	github.com/cockroachdb/errors v1.12.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/ory/fosite v0.49.0
@@ -104,7 +103,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.16 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.16 // indirect
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.95.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.95.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.8 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.12 // indirect
