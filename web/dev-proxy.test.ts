@@ -166,7 +166,6 @@ describe('isBackendPath', () => {
         expect(isBackendPath('/setup/claim')).toBe(true);
         expect(isBackendPath('/health')).toBe(true);
         expect(isBackendPath('/.well-known/did.json')).toBe(true);
-        expect(isBackendPath('/logs/download')).toBe(true);
     });
 
     test('the bundle is this server’s, and is what is being tested', () => {

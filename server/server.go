@@ -41,7 +41,7 @@ type QNTXServer struct {
 	nodeDB              *sql.DB
 	startedAt           time.Time             // When this process began answering; zero until New runs
 	dbPath              string                // Database file path (for display in banner)
-	logPath             string                // File log path (for download endpoint and banner)
+	logPath             string                // File log path (for banner)
 	deps                *serverDependencies   // Initialization dependencies (available during subsystem init)
 	store               string                // Configured storage backend, "sqlite" or "parquet" (ADR-023)
 	held                *namespaces.Held      // The node's universes, and the only way to reach one

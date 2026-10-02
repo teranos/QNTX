@@ -657,11 +657,6 @@
         "PUBLIC_REGISTRATION"
       ]
     },
-    "/logs/download": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
     "/mcp": {
       "x-qntx-reach": [
         "ROOT",
