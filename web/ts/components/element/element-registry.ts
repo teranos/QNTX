@@ -8,7 +8,7 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { AX, SO, SE, AS, Attestation, Sigma, Type, Triplet, Prose, Subcanvas } from '../../sym';
+import { AX, SO, SE, AS, Attestation, Sigma, Type, Triplet, Prose, Subcanvas, Transcript } from '../../sym';
 import { createAxElement } from './ax-element';
 import { createSemanticElement } from './semantic-element';
 import { createPyElement, PY_DEFAULT_CODE } from './py-element';
@@ -22,6 +22,7 @@ import { createTypeElement } from './type-element';
 import { createTripletElement } from './triplet-element';
 import { createResultElement } from './result-element';
 import { createThreadElement } from './thread-element';
+import { createTranscriptElement } from './transcript-element';
 
 export interface ElementTypeEntry {
     /** Symbol identifier (e.g., AX, 'py', SO, Prose) */
@@ -60,6 +61,7 @@ const ELEMENT_TYPES: ElementTypeEntry[] = [
     { symbol: SO,       className: 'canvas-prompt-element',  title: 'Prompt',          label: 'Prompt',    render: createPromptElement,    spawnMenuOrder: 4, defaultContent: PROMPT_DEFAULT_TEMPLATE, commandAliases: ['so'] },
     { symbol: Prose,    className: 'canvas-note-element',    title: 'Note',            label: 'Note',      render: createNoteElement,      spawnMenuOrder: 5, defaultContent: 'Write here — select and click ⟶ to convert to a prompt element.', commandAliases: ['prose'] },
     { symbol: Subcanvas, className: 'canvas-subcanvas-element', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasElement, spawnMenuOrder: 6 },
+    { symbol: Transcript, className: 'canvas-transcript-element', title: 'Transcript', label: 'Transcript', render: createTranscriptElement, spawnMenuOrder: 7 },
     { symbol: Attestation, className: 'canvas-attestation-element', title: 'Attestation', label: 'Attestation', render: createAttestationElement },
     { symbol: Triplet,  className: 'canvas-triplet-element',     title: 'Triplet',     label: 'Triplet',   render: createTripletElement },
     { symbol: Sigma,    className: 'canvas-sigma-element',       title: 'Sigma',       label: 'Sigma',     render: createSigmaElement },

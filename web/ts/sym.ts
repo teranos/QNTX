@@ -44,6 +44,7 @@ export const DB = '⊔';         // database/storage layer
 export const Prose = '▣';      // documentation and prose content
 export const Doc = '▤';        // document/file content
 export const Subcanvas = '⌗';  // nested canvas workspace
+export const Transcript = '🧵'; // one session Ground recorded, read as what was said and done
 
 /** Symbol to its text command, for dual-mode acceptance. */
 export const SymbolToCommand: Record<string, string> = {

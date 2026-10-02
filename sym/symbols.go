@@ -40,6 +40,7 @@ const (
 	Prose      = "▣" // Documentation and prose content
 	Doc        = "▤" // Document/file content (PDF, etc.)
 	Subcanvas  = "⌗" // Nested canvas (subcanvas workspace)
+	Transcript = "🧵" // One session Ground recorded, read as what was said and done
 )
 
 // SymbolToCommand maps symbols to their text command equivalents
