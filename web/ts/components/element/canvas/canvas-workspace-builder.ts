@@ -456,6 +456,38 @@ export function buildCanvasWorkspace(
         showSpawnMenu(e.clientX, e.clientY, contentLayer, items, canvasId, symbolEl);
     });
 
+    // Long-press opens the same menu on touch: iOS Safari never fires contextmenu,
+    // so without this an iPhone cannot spawn from the canvas. Android fires both;
+    // the isSpawnMenuOpen guard makes the second a no-op.
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    let longPressX = 0;
+    let longPressY = 0;
+    const cancelLongPress = () => {
+        if (longPressTimer !== null) clearTimeout(longPressTimer);
+        longPressTimer = null;
+    };
+    container.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'touch' || !e.isPrimary) return;
+        cancelLongPress();
+        longPressX = e.clientX;
+        longPressY = e.clientY;
+        const target = e.target as HTMLElement;
+        longPressTimer = setTimeout(() => {
+            longPressTimer = null;
+            if (isPlacementActive() || isSpawnMenuOpen()) return;
+            const elementEl = target.closest('.canvas-element') as HTMLElement | null;
+            const symbolEl = target.closest('.symbol') as HTMLElement | null
+                ?? elementEl?.querySelector('.symbol') as HTMLElement | null;
+            showSpawnMenu(longPressX, longPressY, contentLayer, items, canvasId, symbolEl);
+        }, 500);
+    });
+    container.addEventListener('pointermove', (e) => {
+        if (longPressTimer === null) return;
+        if (Math.hypot(e.clientX - longPressX, e.clientY - longPressY) > 10) cancelLongPress();
+    });
+    container.addEventListener('pointerup', cancelLongPress);
+    container.addEventListener('pointercancel', cancelLongPress);
+
     // Prevent dblclick from bubbling past workspace boundary (stops re-morph on parent subcanvas)
     container.addEventListener('dblclick', (e) => { e.stopPropagation(); });
 

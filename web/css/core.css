@@ -53,6 +53,7 @@ body {
 #container {
     display: flex;
     height: 100vh;
+    height: 100dvh; /* tracks the mobile URL bar; 100vh above is the fallback */
     transition: filter 0.4s ease-out, opacity 0.4s ease-out;
 }
 
