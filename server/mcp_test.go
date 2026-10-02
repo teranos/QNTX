@@ -13,7 +13,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/sigil"
 )
 
 // "a new thing is a new handler is a new mcp tool is a new api endpoint"
@@ -226,6 +228,12 @@ func toolsOffered(t *testing.T, s *QNTXServer) []*mcp.Tool {
 // toolsOfferedFor is toolsOffered for one request, carrying whoever it carries.
 func toolsOfferedFor(t *testing.T, s *QNTXServer, asked *http.Request) []*mcp.Tool {
 	t.Helper()
+	return listedFor(t, s, asked).Tools
+}
+
+// listedFor is the whole tools/list result one request is answered with.
+func listedFor(t *testing.T, s *QNTXServer, asked *http.Request) *mcp.ListToolsResult {
+	t.Helper()
 	ctx := context.Background()
 
 	server := s.mcpServerFor(asked)
@@ -242,5 +250,95 @@ func toolsOfferedFor(t *testing.T, s *QNTXServer, asked *http.Request) []*mcp.To
 
 	found, err := asking.ListTools(ctx, nil)
 	require.NoError(t, err)
-	return found.Tools
+	return found
+}
+
+// A caller is shown only what they reach, so the list one caller is given is
+// theirs: no cache may hand it to another (cacheScope, 2026-07-28). A node
+// with no login knows nobody and lists the same to everyone.
+func TestAToolListIsTheCallersOwn(t *testing.T) {
+	srv := servedForTest(t)
+	asked := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+	assert.Equal(t, "public", listedFor(t, srv, asked).CacheScope, "a node that knows nobody")
+
+	asked = asked.WithContext(auth.WithAdmission(asked.Context(), auth.Admitted(auth.LevelRoot)))
+	assert.Equal(t, "private", listedFor(t, srv, asked).CacheScope, "a caller's list was cacheable for others")
+}
+
+// A tool says what its sigil promises: what it gives, as its outputSchema, and
+// what its method promises, as hints. A GET is safe, a DELETE idempotent, and
+// a POST promises neither.
+func TestAToolSaysWhatItGivesAndWhatItsMethodPromises(t *testing.T) {
+	named := map[string]*mcp.Tool{}
+	for _, tool := range toolsOffered(t, servedForTest(t)) {
+		named[tool.Name] = tool
+	}
+
+	hold := named["parity_hold"]
+	require.NotNil(t, hold)
+	require.NotNil(t, hold.Annotations)
+	assert.True(t, hold.Annotations.ReadOnlyHint)
+	schema, err := json.Marshal(hold.OutputSchema)
+	require.NoError(t, err)
+	for _, given := range []string{"clades", "unfollowed", "missing", "required"} {
+		assert.Contains(t, string(schema), `"`+given+`"`, "outputSchema leaves out "+given)
+	}
+
+	takeDown := named["staands_take-down"]
+	require.NotNil(t, takeDown)
+	require.NotNil(t, takeDown.Annotations)
+	assert.True(t, takeDown.Annotations.IdempotentHint)
+	assert.False(t, takeDown.Annotations.ReadOnlyHint)
+
+	assert.Nil(t, named["staands_create"].Annotations, "a POST promised something")
+	assert.Nil(t, named["http_api_attestations"].OutputSchema, "a route no sigil answers said what it gives")
+}
+
+// What a tool says it gives is what it gives: the answer is the structured
+// content, and an answer of another shape is the node's failure, not the
+// caller's result. A refusal names its kind and its param.
+func TestAToolGivesWhatItSaysItGives(t *testing.T) {
+	var answer any
+	given := heldBy{
+		signum: "s",
+		sigil: &protocol.Sigil{
+			Name:  "read",
+			Takes: []*protocol.Param{{Name: "kind", Says: "The kind."}},
+			Gives: []*protocol.Field{{Name: "rows", Says: "The rows."}},
+			Http:  &protocol.Endpoint{Method: http.MethodGet, Path: "/api/s"},
+		},
+		answer: func(context.Context, sigil.Sent) (any, *protocol.Refusal) {
+			if answer == nil {
+				return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "kind", Says: "no such kind"}
+			}
+			return answer, nil
+		},
+	}
+	admits := func(_ string, _ auth.Reach, next http.HandlerFunc) http.HandlerFunc { return next }
+	everyone := func(string, heldBy) (auth.Reach, bool) { return auth.Reach{}, true }
+	ask := func() *mcp.CallToolResult {
+		return overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), given, nil, true)
+	}
+
+	answer = map[string]any{"rows": []int{1}}
+	answered := ask()
+	require.False(t, answered.IsError, textOf(t, answered))
+	structured, err := json.Marshal(answered.StructuredContent)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"rows":[1]}`, string(structured))
+	assert.JSONEq(t, `{"rows":[1]}`, textOf(t, answered))
+
+	answer = []map[string]any{{"rows": 1}, {"rows": 2}}
+	assert.False(t, ask().IsError, "a list of rows is what a sigil gives")
+
+	answer = "rows"
+	failed := ask()
+	assert.True(t, failed.IsError)
+	assert.Contains(t, textOf(t, failed), "is not what it says it gives")
+	assert.Nil(t, failed.StructuredContent)
+
+	answer = nil
+	refusedByIt := ask()
+	assert.True(t, refusedByIt.IsError)
+	assert.Equal(t, "not found (kind): no such kind", textOf(t, refusedByIt))
 }
