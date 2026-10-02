@@ -34,6 +34,9 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 	}
 
 	root := srv.a2aCard(askedAs(auth.LevelRoot))
+	for _, skill := range root.Skills {
+		assert.Equal(t, skill.Name, skill.ID, "a skill's id is its signum")
+	}
 	for _, signum := range []string{"staands", "parity", "am", "reach"} {
 		assert.Contains(t, names(root), signum, "ROOT's card lacks "+signum)
 	}
@@ -49,8 +52,8 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 
 // The card is an lf.a2a.v1.AgentCard, and what it leaves empty that the spec
 // requires is named: the node's name and description when am.toml says none,
-// the modes nothing serves yet, and each skill's id, and the description and
-// tags no signum fills yet.
+// the modes nothing serves yet, and the description and tags no signum fills
+// yet. A skill's id is its signum.
 func TestTheCardSaysWhatItLacks(t *testing.T) {
 	srv, _ := pluginServingServer(t, "fake")
 	card, err := srv.a2aCard(askedAs(auth.LevelRoot)).Message()
@@ -60,11 +63,11 @@ func TestTheCardSaysWhatItLacks(t *testing.T) {
 	for _, want := range []string{
 		"AgentCard.name", "AgentCard.description",
 		"AgentCard.default_input_modes", "AgentCard.default_output_modes",
-		"AgentCard.skills[0].id", "AgentCard.skills[0].description", "AgentCard.skills[0].tags",
+		"AgentCard.skills[0].description", "AgentCard.skills[0].tags",
 	} {
 		assert.Contains(t, missing, want)
 	}
-	for _, said := range []string{"AgentCard.supported_interfaces", "AgentCard.capabilities", "AgentCard.version", "AgentCard.skills", "AgentCard.skills[0].name"} {
+	for _, said := range []string{"AgentCard.supported_interfaces", "AgentCard.capabilities", "AgentCard.version", "AgentCard.skills", "AgentCard.skills[0].id", "AgentCard.skills[0].name"} {
 		assert.NotContains(t, missing, said, said+" is on the card")
 	}
 	assert.False(t, slices.ContainsFunc(missing, func(m string) bool { return m == "AgentCard.supported_interfaces[0].url" }))

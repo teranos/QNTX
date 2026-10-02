@@ -66,7 +66,7 @@ func TestAmCardIsTheCardTheAskerWouldGet(t *testing.T) {
 	assert.Equal(t, mcpProtocolVersion, got.Card.SupportedInterfaces[1].ProtocolVersion)
 	assert.NotEmpty(t, got.Card.Skills)
 	assert.Contains(t, got.Missing, "AgentCard.name")
-	assert.Contains(t, got.Missing, "AgentCard.skills[0].id")
+	assert.NotContains(t, got.Missing, "AgentCard.skills[0].id")
 }
 
 func TestAmCardIsRootsAlone(t *testing.T) {

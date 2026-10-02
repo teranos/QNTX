@@ -13,10 +13,13 @@ const USE_JSDOM = process.env.USE_JSDOM === '1';
 const answered: AmCard = {
     card: {
         version: 'v0.36.0',
-        supportedInterfaces: [{ url: 'http://localhost:8770/a2a', protocolBinding: 'HTTP+JSON', protocolVersion: '1.0' }],
+        supportedInterfaces: [
+            { url: 'http://localhost:8770/a2a', protocolBinding: 'HTTP+JSON', protocolVersion: '1.0' },
+            { url: 'http://localhost:8770/mcp', protocolBinding: 'MCP', protocolVersion: '2026-07-28' },
+        ],
         skills: [{ name: 'staands' }, { name: 'parity' }],
     },
-    missing: ['AgentCard.name', 'AgentCard.description', 'AgentCard.skills[0].id', 'AgentCard.skills[1].id'],
+    missing: ['AgentCard.name', 'AgentCard.description', 'AgentCard.skills[0].tags', 'AgentCard.skills[1].tags'],
 };
 
 describe('A2A card', () => {
@@ -40,9 +43,10 @@ describe('A2A card', () => {
         expect(text).toContain('not said');
         expect(text).toContain('v0.36.0');
         expect(text).toContain('http://localhost:8770/a2a HTTP+JSON 1.0');
+        expect(text).toContain('http://localhost:8770/mcp MCP 2026-07-28');
         expect(text).toContain('staands, parity');
         expect(text).toContain('AgentCard.name');
-        expect(text).toContain('AgentCard.skills[1].id');
+        expect(text).toContain('AgentCard.skills[1].tags');
     });
 
     // Tim: in ≡ it rests as one small italic button saying A2A.
