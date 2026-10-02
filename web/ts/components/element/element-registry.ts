@@ -61,13 +61,13 @@ const ELEMENT_TYPES: ElementTypeEntry[] = [
     { symbol: SO,       className: 'canvas-prompt-element',  title: 'Prompt',          label: 'Prompt',    render: createPromptElement,    spawnMenuOrder: 4, defaultContent: PROMPT_DEFAULT_TEMPLATE, commandAliases: ['so'] },
     { symbol: Prose,    className: 'canvas-note-element',    title: 'Note',            label: 'Note',      render: createNoteElement,      spawnMenuOrder: 5, defaultContent: 'Write here — select and click ⟶ to convert to a prompt element.', commandAliases: ['prose'] },
     { symbol: Subcanvas, className: 'canvas-subcanvas-element', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasElement, spawnMenuOrder: 6 },
-    { symbol: Transcript, className: 'canvas-transcript-element', title: 'Transcript', label: 'Transcript', render: createTranscriptElement, spawnMenuOrder: 7 },
     { symbol: Attestation, className: 'canvas-attestation-element', title: 'Attestation', label: 'Attestation', render: createAttestationElement },
     { symbol: Triplet,  className: 'canvas-triplet-element',     title: 'Triplet',     label: 'Triplet',   render: createTripletElement },
     { symbol: Sigma,    className: 'canvas-sigma-element',       title: 'Sigma',       label: 'Sigma',     render: createSigmaElement },
     { symbol: Type,     className: 'canvas-type-element',        title: 'Type',        label: 'Type',      render: createTypeElement },
     { symbol: 'stream', className: 'canvas-stream-element',      title: 'Stream',      label: 'Stream',    render: (g) => createResultElement(g) },
     { symbol: '\u303D', className: 'canvas-thread-element',     title: 'Thread',      label: 'Thread',    render: createThreadElement },
+    { symbol: Transcript, className: 'canvas-transcript-element', title: 'Transcript', label: 'Transcript', render: createTranscriptElement },
 ];
 
 const _bySymbol = new Map(ELEMENT_TYPES.map(e => [e.symbol, e]));

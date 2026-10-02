@@ -2,14 +2,21 @@
 // "It's really the Svelte UI part that I want to rehome into QNTX"
 // The node derives it (transcripts read); this draws what it answers.
 
+// "Transcripts in Transcript / List of sessions in ground"
+// "It opens as window, but can be placed onto the canvas"
+
 import type { Element } from '@teranos/elements';
-import { canvasPlaced, wireExpandToWindow, preventDrag, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
+import {
+    tray, canvasPlaced, wireExpandToWindow, preventDrag, createSymbolSpan, settleSymbolSpan,
+    getForm, setForm, teardownWindowDrag, removeWindowControls, makeDraggable, makeResizable, storeCleanup, createCorner,
+} from '@teranos/elements';
 import { apiJson } from '../../client';
 import { escapeHtml } from '../../html-utils';
 import { log, SEG } from '../../logger';
 import { Transcript as TranscriptSym } from '../../sym';
-import { createAutoSave } from './element-autosave';
 import { spawnAttestationAsWindow } from './attestation-element';
+import { screenToCanvas } from './canvas/canvas-pan';
+import { uiState } from '../../state/ui';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 
 // One thing said or done in a session, naming the attestation it was read from (protocol.Turn).
@@ -96,7 +103,7 @@ function weightOf(speaker: string): string {
     return speaker;
 }
 
-function when(at: string): string {
+export function when(at: string): string {
     const d = new Date(Date.parse(at));
     return d.toLocaleString('en', { month: 'short' }) + ' ' + d.getDate() + ' ' +
         String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
@@ -227,34 +234,6 @@ export function renderTranscript(body: HTMLElement, read: TranscriptRead, onOpen
     body.append(head, rows);
 }
 
-/** The sessions Ground recorded here, newest first, each opened by its first prompt. */
-export function renderSessions(body: HTMLElement, reads: TranscriptRead[], onChoose: (session: string) => void): void {
-    body.replaceChildren();
-    if (reads.length === 0) {
-        const none = document.createElement('div');
-        none.className = 'tr-said';
-        none.textContent = 'No session Ground recorded is in this namespace.';
-        body.appendChild(none);
-        return;
-    }
-    for (const read of reads) {
-        const row = document.createElement('button');
-        row.className = 'tr-session';
-        const at = document.createElement('span');
-        at.className = 'tr-when';
-        at.textContent = when(read.started);
-        const opening = document.createElement('span');
-        opening.className = 'tr-opening';
-        opening.textContent = read.turns.find(t => t.speaker === 'human')?.text ?? read.session;
-        row.append(at, opening);
-        row.addEventListener('click', (e) => {
-            e.stopPropagation();
-            onChoose(read.session);
-        });
-        body.appendChild(row);
-    }
-}
-
 // ─── Element ──────────────────────────────────────────────────
 
 function said(body: HTMLElement, text: string): void {
@@ -275,15 +254,44 @@ async function openTurn(session: string, turn: Turn): Promise<void> {
     spawnAttestationAsWindow(as);
 }
 
-/** Create a transcript element: the sessions to choose from, or the one it holds. */
+const SIZE = { width: 520, height: 640 };
+
+// Reads one session into body, or says why it could not.
+function readInto(body: HTMLElement, session: string): void {
+    said(body, 'Reading session ' + session + '…');
+    apiJson<{ transcripts: TranscriptRead[] }>(`/api/transcripts?session=${encodeURIComponent(session)}`)
+        .then(answer => {
+            const read = answer.transcripts[0];
+            if (!read) { said(body, 'No session ' + session + ' is in this namespace.'); return; }
+            renderTranscript(body, read, (turn) => {
+                openTurn(session, turn).catch((err: unknown) => log.error(SEG.ELEMENT, `[Transcript] turn ${turn.of} did not open:`, err));
+            });
+        })
+        .catch((err: unknown) => said(body, 'Could not read session ' + session + ': ' + String(err)));
+}
+
+function transcriptBody(session: string): HTMLElement {
+    const body = document.createElement('div');
+    body.className = 'content-area tr';
+    // A turn is pressed, not dragged: the title bar is what moves the element.
+    preventDrag(body);
+    readInto(body, session);
+    return body;
+}
+
+function titleOf(session: string): string {
+    return `Transcript ${session.substring(0, 8)}`;
+}
+
+/** A Transcript placed on the canvas: the session it holds is its content. */
 export function createTranscriptElement(item: Element): HTMLElement {
-    let session = item.content ?? '';
+    const session = item.content ?? '';
 
     const titleBar = document.createElement('div');
     titleBar.className = 'title-bar';
     const symbol = item.symbolElement ? settleSymbolSpan(item.symbolElement) : createSymbolSpan(TranscriptSym);
     const label = document.createElement('span');
-    label.textContent = 'Transcript';
+    label.textContent = titleOf(session);
     const expandBtn = document.createElement('button');
     expandBtn.className = 'titlebar-btn';
     expandBtn.textContent = '⬆';
@@ -295,55 +303,167 @@ export function createTranscriptElement(item: Element): HTMLElement {
     const { element } = canvasPlaced({
         item,
         className: 'canvas-transcript-element',
-        defaults: { x: 200, y: 200, width: 520, height: 640 },
+        defaults: { x: 200, y: 200, ...SIZE },
         resizable: true,
         logLabel: 'Transcript',
     });
     element.appendChild(titleBar);
-
-    const body = document.createElement('div');
-    body.className = 'content-area tr';
-    // A turn is pressed, not dragged: the title bar is what moves the element.
-    preventDrag(body);
+    const body = transcriptBody(session);
     element.appendChild(body);
-
-    const { save } = createAutoSave(item.id, () => session, 'Transcript');
-
-    const show = (id: string) => {
-        said(body, 'Reading session ' + id + '…');
-        apiJson<{ transcripts: TranscriptRead[] }>(`/api/transcripts?session=${encodeURIComponent(id)}`)
-            .then(answer => {
-                const read = answer.transcripts[0];
-                if (!read) { said(body, 'No session ' + id + ' is in this namespace.'); return; }
-                renderTranscript(body, read, (turn) => {
-                    openTurn(id, turn).catch((err: unknown) => log.error(SEG.ELEMENT, `[Transcript] turn ${turn.of} did not open:`, err));
-                });
-            })
-            .catch((err: unknown) => said(body, 'Could not read session ' + id + ': ' + String(err)));
-    };
-
-    if (session) {
-        show(session);
-    } else {
-        said(body, 'Reading the sessions Ground recorded here…');
-        apiJson<{ transcripts: TranscriptRead[] }>('/api/transcripts')
-            .then(answer => renderSessions(body, answer.transcripts, (id) => {
-                session = id;
-                save();
-                show(id);
-            }))
-            .catch((err: unknown) => said(body, 'Could not read sessions: ' + String(err)));
-    }
 
     wireExpandToWindow({
         element,
         expandBtn,
         elementId: item.id,
-        title: 'Transcript',
+        title: titleOf(session),
         symbol: TranscriptSym,
         renderContent: () => body,
         logLabel: 'Transcript',
     });
 
     return element;
+}
+
+/** Opens one session as a Transcript window, which can be placed onto the canvas. Called from Ground. */
+export function openTranscriptElement(session: string): void {
+    const itemId = `transcript-${session}`;
+    if (tray.has(itemId)) {
+        tray.open(itemId);
+        return;
+    }
+    if (document.querySelector(`[data-element-id="${itemId}"]`)) {
+        log.debug(SEG.ELEMENT, `[Transcript] session ${session} is already open as ${itemId}`);
+        return;
+    }
+
+    tray.add({
+        id: itemId,
+        title: titleOf(session),
+        symbol: TranscriptSym,
+        onClose: () => { tray.remove(itemId); },
+        renderTitleBar: () => windowTitleBar(session, itemId),
+        renderContent: () => {
+            const body = transcriptBody(session);
+            // A window is what its content measures; the canvas sizes a placed one.
+            body.classList.add('tr-natural');
+            return body;
+        },
+    } satisfies Element);
+
+    tray.open(itemId);
+}
+
+function windowTitleBar(session: string, itemId: string): HTMLElement {
+    const titleBar = document.createElement('div');
+    titleBar.className = 'title-bar';
+    const label = document.createElement('span');
+    label.textContent = titleOf(session);
+    const placeBtn = document.createElement('button');
+    placeBtn.className = 'titlebar-btn';
+    placeBtn.textContent = '⬇';
+    placeBtn.title = 'Place on canvas';
+    placeBtn.style.marginLeft = 'auto';
+    preventDrag(placeBtn);
+    titleBar.append(createSymbolSpan(TranscriptSym), label, placeBtn);
+
+    placeBtn.addEventListener('click', (e) => {
+        // The tray's own press on the element would open it again.
+        e.stopPropagation();
+        const element = placeBtn.closest('[data-element-id]') as HTMLElement | null;
+        if (!element) return;
+        placeOnCanvas(element, session, itemId, placeBtn);
+    });
+    return titleBar;
+}
+
+// The window becomes the canvas element: the same DOM element, reparented
+// into the canvas, the way an attestation window is placed.
+function placeOnCanvas(element: HTMLElement, session: string, itemId: string, placeBtn: HTMLElement): void {
+    const form = getForm(element);
+    if (form !== 'window' && form !== 'canvasExpanded') return;
+
+    const canvasEl = document.querySelector('.canvas-workspace') as HTMLElement | null;
+    if (!canvasEl) {
+        log.warn(SEG.ELEMENT, `[Transcript] no canvas workspace to place ${itemId} on`);
+        return;
+    }
+    const canvasId = canvasEl.dataset.canvasId ?? 'canvas-workspace';
+    const contentLayer = canvasEl.querySelector('.canvas-content-layer') as HTMLElement | null;
+    if (!contentLayer) {
+        log.warn(SEG.ELEMENT, `[Transcript] canvas ${canvasId} has no content layer to place ${itemId} in`);
+        return;
+    }
+
+    const windowRect = element.getBoundingClientRect();
+    const canvasRect = canvasEl.getBoundingClientRect();
+    const at = screenToCanvas(canvasId, windowRect.left - canvasRect.left, windowRect.top - canvasRect.top);
+    const x = Math.round(at.x);
+    const y = Math.round(at.y);
+
+    teardownWindowDrag(element);
+    const resizeObserver = (element as any).__resizeObserver as ResizeObserver | undefined;
+    if (resizeObserver) {
+        resizeObserver.disconnect();
+        delete (element as any).__resizeObserver;
+    }
+    const titleBar = element.querySelector('.title-bar') as HTMLElement | null;
+    if (titleBar) removeWindowControls(titleBar);
+    const contentDiv = element.querySelector('.canvas-window-content');
+    if (contentDiv) {
+        while (contentDiv.firstChild) element.appendChild(contentDiv.firstChild);
+        contentDiv.remove();
+    }
+
+    setForm(element, 'canvasPlaced');
+    element.remove();
+    element.style.cssText = '';
+    // Detached first, so the tray letting go of it does not remove it again.
+    if (tray.has(itemId)) tray.remove(itemId);
+
+    element.style.position = 'absolute';
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
+    element.style.width = `${SIZE.width}px`;
+    element.style.height = `${SIZE.height}px`;
+    element.classList.add('canvas-element', 'canvas-transcript-element');
+    contentLayer.appendChild(element);
+
+    const body = element.querySelector('.tr') as HTMLElement | null;
+    body?.classList.remove('tr-natural');
+    const item: Element = {
+        id: itemId,
+        title: titleOf(session),
+        symbol: TranscriptSym,
+        x,
+        y,
+        content: session,
+        renderContent: () => body ?? transcriptBody(session),
+    };
+    if (titleBar) storeCleanup(element, makeDraggable(element, titleBar, item, { logLabel: 'Transcript' }));
+    const corner = createCorner();
+    element.appendChild(corner);
+    storeCleanup(element, makeResizable(element, corner, item, { logLabel: 'Transcript' }));
+
+    uiState.addCanvasElement({ id: itemId, symbol: TranscriptSym, x, y, ...SIZE, content: session });
+
+    // The button now lifts it back into a window.
+    const expandBtn = document.createElement('button');
+    expandBtn.className = 'titlebar-btn';
+    expandBtn.textContent = '⬆';
+    expandBtn.title = 'Expand to window';
+    expandBtn.style.marginLeft = 'auto';
+    preventDrag(expandBtn);
+    placeBtn.replaceWith(expandBtn);
+    wireExpandToWindow({
+        element,
+        expandBtn,
+        elementId: itemId,
+        title: titleOf(session),
+        symbol: TranscriptSym,
+        renderContent: () => body ?? transcriptBody(session),
+        logLabel: 'Transcript',
+        stopPropagation: true,
+    });
+
+    log.debug(SEG.ELEMENT, `[Transcript] placed ${itemId} on canvas ${canvasId} at (${x}, ${y})`);
 }

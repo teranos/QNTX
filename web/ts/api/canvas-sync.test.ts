@@ -339,6 +339,28 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         expect(stored[0].op).toBe('element_upsert');
     });
 
+    // A window placed on the canvas leaves the tray (a minimized delete) and
+    // lands on the canvas (an element upsert) while that delete is flushing.
+    test('Spike: add() during an online flush() is synced by the same flush', async () => {
+        const posted: string[] = [];
+        mockApiFetch = async (path, init) => {
+            if (path.startsWith('/api/canvas/minimized-windows')) {
+                canvasSyncQueue.add({ id: 'g-2', op: 'element_upsert' });
+                return new Response(null, { status: 200 });
+            }
+            posted.push(JSON.parse(init?.body as string).id);
+            return new Response(null, { status: 200 });
+        };
+
+        canvasSyncQueue.add({ id: 'g-2', op: 'minimized_delete' });
+        mockConnectivity = 'online';
+        await canvasSyncQueue.flush();
+
+        expect(posted).toEqual(['g-2']);
+        expect(syncStateManager.getState('g-2')).toBe('synced');
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')).toEqual([]);
+    });
+
     test('Spike: empty queue flush, nothing happens', async () => {
         let fetchCalled = false;
         mockApiFetch = async () => {
