@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
-	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/errors"
 )
 
@@ -76,7 +75,7 @@ func (a awsMail) List(ctx context.Context, prefix string) ([]string, error) {
 	return keys, nil
 }
 
-func (a awsMail) Get(ctx context.Context, key string) (_ []byte, err error) {
+func (a awsMail) Get(ctx context.Context, key string) ([]byte, error) {
 	cfg, err := a.config(ctx)
 	if err != nil {
 		return nil, err
@@ -85,10 +84,13 @@ func (a awsMail) Get(ctx context.Context, key string) (_ []byte, err error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "s3://%s/%s did not read", a.bucket, key)
 	}
-	defer func() { err = sqlclose.With(err, out.Body.Close(), "s3://"+a.bucket+"/"+key) }()
 	data, err := io.ReadAll(out.Body)
+	closed := out.Body.Close()
 	if err != nil {
 		return nil, errors.Wrapf(err, "s3://%s/%s did not read whole", a.bucket, key)
+	}
+	if closed != nil {
+		return nil, errors.Wrapf(closed, "s3://%s/%s was read and did not close", a.bucket, key)
 	}
 	return data, nil
 }
