@@ -18,46 +18,6 @@ export type { RenderFn, ElementModule, ElementDef, ElementUI, ElementOpts, Fetch
 // The node's query keys, in its own spelling — nothing else on the query reaches it.
 const ATTESTATION_QUERY_KEYS = ['subject', 'predicate', 'context', 'actor', 'source', 'limit'] as const;
 
-// Where each sigil answers over HTTP, as am node says, read once per page.
-type SigilEndpoints = Map<string, { method: string; path: string }>;
-let sigilEndpoints: Promise<SigilEndpoints> | null = null;
-
-function endpoints(): Promise<SigilEndpoints> {
-    sigilEndpoints ??= apiJson<{ signa: Array<{ name: string; sigils?: Array<{ name: string; http?: { method: string; path: string } }> }> }>('/am/node')
-        .then(node => {
-            const found: SigilEndpoints = new Map();
-            for (const signum of node.signa) {
-                for (const s of signum.sigils ?? []) {
-                    if (s.http) found.set(`${signum.name} ${s.name}`, s.http);
-                }
-            }
-            return found;
-        })
-        .catch((err: unknown) => {
-            sigilEndpoints = null;
-            throw err;
-        });
-    return sigilEndpoints;
-}
-
-/** A sigil asked over its HTTP form: path params from what was sent, the rest as the query or the body. */
-async function askSigil(signum: string, sigil: string, sent: Record<string, string>): Promise<unknown> {
-    const http = (await endpoints()).get(`${signum} ${sigil}`);
-    if (!http) throw new Error(`the node serves no sigil ${signum} ${sigil} over HTTP`);
-    let path = http.path;
-    const rest: Record<string, string> = {};
-    for (const [key, value] of Object.entries(sent)) {
-        const slot = `{${key}}`;
-        if (path.includes(slot)) path = path.replace(slot, encodeURIComponent(value));
-        else rest[key] = value;
-    }
-    if (http.method === 'GET' || http.method === 'DELETE') {
-        const qs = new URLSearchParams(rest).toString();
-        return apiJson(qs ? `${path}?${qs}` : path, { method: http.method });
-    }
-    return apiJson(path, { method: http.method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rest) });
-}
-
 /** The ⬆ in an element's title bar. The same one the result element carries. */
 function liftButton(): HTMLButtonElement {
     const lift = document.createElement('button');
@@ -300,19 +260,6 @@ export function createElementUI(item: Element, name: string, root?: HTMLElement)
             const qs = params.toString();
             // apiJson rejects on a non-ok response with the status and body
             return apiJson<Attestation[]>(`/api/attestations${qs ? '?' + qs : ''}`);
-        },
-
-        sigil(signum: string, sigil: string, sent: Record<string, string> = {}): Promise<unknown> {
-            return askSigil(signum, sigil, sent);
-        },
-
-        openAttestation(attestation: Attestation): void {
-            // Read when pressed, as segment-press.ts reads the element it opens.
-            import('./attestation-element')
-                .then(m => m.spawnAttestationAsWindow(attestation as unknown as Parameters<typeof m.spawnAttestationAsWindow>[0]))
-                .catch((err: unknown) => {
-                    log.error(SEG.ELEMENT, `${prefix} attestation ${attestation.id} did not open:`, err);
-                });
         },
 
         spawnResult(result) {
