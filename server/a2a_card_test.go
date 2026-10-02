@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"slices"
 	"testing"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/a2a"
@@ -36,6 +38,7 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 		assert.Contains(t, names(root), signum, "ROOT's card lacks "+signum)
 	}
 	assert.Equal(t, "https://node.example/a2a", root.URL)
+	assert.Equal(t, "https://node.example/mcp", root.MCP.URL)
 
 	super := srv.a2aCard(askedAs(auth.LevelSuper))
 	assert.Contains(t, names(super), "staands", "SUPER's lines reach staands")
@@ -65,4 +68,21 @@ func TestTheCardSaysWhatItLacks(t *testing.T) {
 		assert.NotContains(t, missing, said, said+" is on the card")
 	}
 	assert.False(t, slices.ContainsFunc(missing, func(m string) bool { return m == "AgentCard.supported_interfaces[0].url" }))
+}
+
+// "it lets agents figure out MCP surface amongst other things": the card names
+// the MCP the node speaks, which is what a client asking for the newest is
+// answered in. A go-sdk that speaks a newer one fails here, not on the card.
+func TestTheCardNamesTheMCPTheNodeSpeaks(t *testing.T) {
+	ctx := context.Background()
+	server := servedForTest(t).mcpServerFor(httptest.NewRequest(http.MethodPost, "/mcp/", nil))
+	clientSide, serverSide := mcp.NewInMemoryTransports()
+	serving, err := server.Connect(ctx, serverSide, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = serving.Close() })
+	asking, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "0"}, nil).Connect(ctx, clientSide, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = asking.Close() })
+
+	assert.Equal(t, mcpProtocolVersion, asking.InitializeResult().ProtocolVersion)
 }

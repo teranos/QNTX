@@ -22,6 +22,13 @@ type Skill struct {
 	Tags        []string
 }
 
+// Interface is one more way the node is reached, beside the A2A binding.
+type Interface struct {
+	URL string
+	// Version is the protocol version spoken at URL.
+	Version string
+}
+
 // Card is what the node can say of itself to one caller. What it does not
 // have it leaves empty, and Missing says so; nothing here is made up to fill a
 // field the spec requires.
@@ -30,7 +37,9 @@ type Card struct {
 	Description string
 	Version     string
 	// URL is where the HTTP+JSON binding answers, for the interface entry.
-	URL    string
+	URL string
+	// MCP is where the node's MCP answers, when the card says.
+	MCP    Interface
 	Skills []Skill
 }
 
@@ -49,13 +58,18 @@ func (c Card) Message() (protoreflect.Message, error) {
 		}
 		skills = append(skills, map[string]any{"id": s.ID, "name": s.Name, "description": s.Description, "tags": tags})
 	}
+	interfaces := []map[string]any{
+		{"url": c.URL, "protocolBinding": "HTTP+JSON", "protocolVersion": Version},
+	}
+	// "it lets agents figure out MCP surface amongst other things"
+	if c.MCP.URL != "" {
+		interfaces = append(interfaces, map[string]any{"url": c.MCP.URL, "protocolBinding": "MCP", "protocolVersion": c.MCP.Version})
+	}
 	body, err := json.Marshal(map[string]any{
-		"name":        c.Name,
-		"description": c.Description,
-		"version":     c.Version,
-		"supportedInterfaces": []map[string]any{
-			{"url": c.URL, "protocolBinding": "HTTP+JSON", "protocolVersion": Version},
-		},
+		"name":                c.Name,
+		"description":         c.Description,
+		"version":             c.Version,
+		"supportedInterfaces": interfaces,
 		// What the node does not do is said as false (§3.3.4).
 		"capabilities": map[string]any{"streaming": false, "pushNotifications": false},
 		// The node's token is a bearer token (§3.1.11: the extended card is
