@@ -35,6 +35,7 @@ export const DB = '⊔';         // database/storage layer
 export const Prose = '▣';      // documentation and prose content
 export const Doc = '▤';        // document/file content
 export const Subcanvas = '⌗';  // nested canvas workspace
+export const Transcript = '🧵'; // one session Ground recorded, read as what was said and done
 export const Parity = '≍';     // a signum held to a reference it follows
 
 /** Segment to its glyph. */
