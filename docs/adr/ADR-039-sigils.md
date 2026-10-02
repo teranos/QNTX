@@ -5,10 +5,12 @@ Status: Proposed
 
 - A sigil is the one place something QNTX does is defined: what it is for, what
   goes in, what comes out and how it refuses.
-- The HTTP API and MCP are surfaces of a sigil, and A2A is one: an a2a:<signum>
-  line reaches over A2A alone, and am card shows the card a caller would be
-  given. A sigil is one endpoint and one tool, and every surface does the same
-  thing and refuses the same way.
+- The HTTP API and MCP are surfaces of a sigil. Both do the same thing.
+- A2A describes the node to other agents.
+- The A2A card says what the node is and how to reach it. MCP is one of those
+  ways.
+- An a2a:<signum> line decides which skills a caller sees. am card shows the
+  card a caller would get.
 - A signum holds the sigils of one subject: watchers is a signum, and list,
   create, read, update and delete are its sigils. To A2A a signum is a skill.
 - Their shape is proto and nothing else. What is not a shape, the function that
