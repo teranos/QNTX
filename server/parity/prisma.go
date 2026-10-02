@@ -40,6 +40,9 @@ type Column struct {
 	Required bool
 	// Says is what the reference says of it, in its own words, when it does.
 	Says string
+	// SaysFrom is where Says was read, when not from the schema itself:
+	// openapi.json · WebsiteSession.screen.
+	SaysFrom string
 	// holds is, for JSON Schema, the types a value of it may be once every
 	// definition it refers to is read: what Type names, resolved.
 	holds []string
@@ -51,8 +54,10 @@ type Column struct {
 type Model struct {
 	Name string
 	// Says is what the reference says of the model, when it does.
-	Says    string
-	Columns []Column
+	Says string
+	// SaysFrom is where Says was read, when not from the schema itself.
+	SaysFrom string
+	Columns  []Column
 }
 
 // Schema is a reference as it is read: its models, and which column a field
@@ -170,6 +175,7 @@ type Item struct {
 	Followed []string
 	Departs  []string
 	Says     string
+	SaysFrom string
 	Required bool
 }
 
@@ -186,15 +192,16 @@ func (i Item) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"column": i.Column, "score": score,
 		"followed": nonNil(i.Followed), "departs": nonNil(i.Departs),
-		"says": i.Says, "required": i.Required,
+		"says": i.Says, "says_from": i.SaysFrom, "required": i.Required,
 	})
 }
 
 // Clade is one model and its columns, with what the reference says of it.
 type Clade struct {
-	Model string
-	Says  string
-	Items []Item
+	Model    string
+	Says     string
+	SaysFrom string
+	Items    []Item
 }
 
 // MarshalJSON is a clade as the sigil gives it, with its score.
@@ -203,7 +210,7 @@ func (c Clade) MarshalJSON() ([]byte, error) {
 	if items == nil {
 		items = []Item{}
 	}
-	return json.Marshal(map[string]any{"model": c.Model, "says": c.Says, "score": c.Score(), "items": items})
+	return json.Marshal(map[string]any{"model": c.Model, "says": c.Says, "says_from": c.SaysFrom, "score": c.Score(), "items": items})
 }
 
 func nonNil(s []string) []string {
@@ -401,10 +408,10 @@ func Hold(signum *protocol.Signum, named, reference string, schema Schema) (Pari
 	p.Ours = said
 
 	for _, m := range models {
-		clade := Clade{Model: m.Name, Says: m.Says}
+		clade := Clade{Model: m.Name, Says: m.Says, SaysFrom: m.SaysFrom}
 		for _, c := range m.Columns {
 			key := m.Name + "." + c.Name
-			clade.Items = append(clade.Items, Item{Column: c.Name, Followed: followedBy[key], Departs: departures[key], Says: c.Says, Required: c.Required})
+			clade.Items = append(clade.Items, Item{Column: c.Name, Followed: followedBy[key], Departs: departures[key], Says: c.Says, SaysFrom: c.SaysFrom, Required: c.Required})
 		}
 		p.Clades = append(p.Clades, clade)
 		if !clade.followed() {

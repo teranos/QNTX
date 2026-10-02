@@ -23,6 +23,8 @@ export interface HeldItem {
     followed: string[];
     departs: string[];
     says: string;
+    /** Where says was read, when not from the spec's schema itself. */
+    says_from: string;
     required: boolean;
 }
 
@@ -30,6 +32,7 @@ export interface HeldItem {
 export interface HeldClade {
     model: string;
     says: string;
+    says_from: string;
     score: number;
     items: HeldItem[];
 }
@@ -94,6 +97,7 @@ export function renderSeam(container: HTMLElement, held: Held, clade: HeldClade)
     theirs.appendChild(el('span', 'parity-where', held.reference));
     theirs.appendChild(el('span', 'parity-name', clade.model));
     theirs.appendChild(says(clade.says, 'the spec says nothing of it'));
+    if (clade.says_from) theirs.appendChild(el('span', 'parity-where', `from ${clade.says_from}`));
     head.appendChild(theirs);
     head.appendChild(el('span', 'parity-mark'));
     const ours = el('div', 'parity-side');
@@ -120,6 +124,7 @@ export function renderSeam(container: HTMLElement, held: Held, clade: HeldClade)
         if (item.required) name.appendChild(el('span', owed ? 'parity-required parity-owed' : 'parity-required', 'REQUIRED'));
         column.appendChild(name);
         column.appendChild(says(item.says, 'the spec says nothing of it'));
+        if (item.says_from) column.appendChild(el('span', 'parity-where', `from ${item.says_from}`));
         row.appendChild(column);
 
         row.appendChild(el('span', `parity-mark ${tone}`, conforms ? '=' : departs ? '≠' : ''));

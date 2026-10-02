@@ -116,3 +116,50 @@ func modelNamed(t *testing.T, schema Schema, name string) Model {
 	t.Fatalf("no %s", name)
 	return Model{}
 }
+
+// Umami's schema says nothing; its API document speaks for the models words
+// links it to, a column taking the words of the property of its name, and
+// saying where they were read.
+func TestReference_UmamiSaysFromItsAPI(t *testing.T) {
+	schema, refused := Reference("umami")
+	if refused != nil {
+		t.Fatal(refused)
+	}
+	session := modelNamed(t, schema, "Session")
+	for _, c := range session.Columns {
+		if c.Name == "screen" && (c.Says != "Screen resolution of the visitor device." || c.SaysFrom != "openapi.json · WebsiteSession.screen") {
+			t.Errorf("Session.screen says %q, from %q", c.Says, c.SaysFrom)
+		}
+	}
+	event := modelNamed(t, schema, "WebsiteEvent")
+	for _, c := range event.Columns {
+		if c.Name == "gclid" && (c.Says != "" || c.SaysFrom != "") {
+			t.Errorf("WebsiteEvent.gclid, which the API document says nothing of, says %q from %q", c.Says, c.SaysFrom)
+		}
+	}
+	if modelNamed(t, schema, "EventData").Columns[0].Says != "" {
+		t.Error("EventData, which words links to no schema, has words")
+	}
+}
+
+// A words line that names what is not there is the pin's to fix, by line.
+func TestApplyAPIWords_Refuses(t *testing.T) {
+	doc := []byte(`{"components":{"schemas":{"WebsiteSession":{"properties":{"id":{"description":"Unique."}}}}}}`)
+	for name, links := range map[string]string{
+		"no such model":  "Nosuch WebsiteSession\n",
+		"no such schema": "Session Nosuch\n",
+		"not a pair":     "Session\n",
+	} {
+		models := []Model{{Name: "Session", Columns: []Column{{Name: "id"}}}}
+		if err := applyAPIWords("umami", []byte(links), doc, models); err == nil {
+			t.Errorf("%s: applied without error", name)
+		}
+	}
+	models := []Model{{Name: "Session", Columns: []Column{{Name: "id"}, {Name: "os"}}}}
+	if err := applyAPIWords("umami", []byte("# a comment\nSession WebsiteSession\n"), doc, models); err != nil {
+		t.Fatal(err)
+	}
+	if models[0].Columns[0].Says != "Unique." || models[0].Columns[1].Says != "" {
+		t.Errorf("Session's columns say %+v", models[0].Columns)
+	}
+}

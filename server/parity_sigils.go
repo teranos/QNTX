@@ -51,7 +51,7 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 						{Name: "signum", Says: "The signum that was held."},
 						{Name: "sigil", Says: "The sigil that was held, or empty for the whole signum."},
 						{Name: "reference", Says: "The reference it was held to."},
-						{Name: "clades", Says: "One per model of the reference, in its order: what the reference says of it, its score, and per column what the reference says of it, whether it requires it, the fields that follow it and how they depart."},
+						{Name: "clades", Says: "One per model of the reference, in its order: what the reference says of it, its score, and per column what the reference says of it and where that was read when not from its schema, whether it requires it, the fields that follow it and how they depart."},
 						{Name: "unfollowed", Says: "Per message in scope, its fields that follow no column."},
 						{Name: "missing", Says: "What the signum follows into a column the reference does not have."},
 						{Name: "required", Says: "Of the models anything follows, each column the reference requires and nothing follows."},

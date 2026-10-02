@@ -25,7 +25,7 @@ import (
 // is: a schema.prisma as Prisma, a .proto as the descriptors it compiles to, a
 // schema.json as JSON Schema.
 //
-//go:embed */schema.prisma */*.proto */schema.json
+//go:embed */schema.prisma */*.proto */schema.json */openapi.json */words
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory
@@ -59,7 +59,7 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 	var protos []string
 	for _, file := range files {
 		if file.Name() == "schema.prisma" {
-			return prismaAt(path.Join(found[0], file.Name()))
+			return prismaAt(found[0], file.Name())
 		}
 		if file.Name() == "schema.json" {
 			return jsonSchemaAt(path.Join(found[0], file.Name()))
@@ -74,13 +74,17 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 	return protoAt(found[0], protos)
 }
 
-func prismaAt(schema string) (Schema, *protocol.Refusal) {
+func prismaAt(dir, file string) (Schema, *protocol.Refusal) {
+	schema := path.Join(dir, file)
 	raw, err := pinned.ReadFile(schema)
 	if err != nil {
 		return Schema{}, failed("%s did not read: %v", schema, err)
 	}
 	models, err := ParsePrisma(schema, raw)
 	if err != nil {
+		return Schema{}, failed("%v", err)
+	}
+	if err := wordsFromAPI(dir, models); err != nil {
 		return Schema{}, failed("%v", err)
 	}
 	return Prisma(models), nil

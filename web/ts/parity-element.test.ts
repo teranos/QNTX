@@ -9,16 +9,16 @@ function held(): Held {
         sigil: '',
         reference: 'mcp',
         clades: [
-            { model: 'Annotations', says: 'Optional annotations for the client.', score: 0,
-              items: [{ column: 'audience', score: 0, followed: [], departs: [], says: 'Describes who the intended audience is.', required: false }] },
-            { model: 'Tool', says: 'Definition for a tool the client can call.', score: 33,
+            { model: 'Annotations', says: 'Optional annotations for the client.', says_from: '', score: 0,
+              items: [{ column: 'audience', score: 0, followed: [], departs: [], says: 'Describes who the intended audience is.', says_from: '', required: false }] },
+            { model: 'Tool', says: 'Definition for a tool the client can call.', says_from: '', score: 33,
               items: [
                   { column: 'description', score: 100, followed: ['protocol.Sigil.does'], departs: [],
-                    says: 'A human-readable description of the tool.', required: false },
+                    says: 'A human-readable description of the tool.', says_from: '', required: false },
                   { column: 'inputSchema', score: 0, followed: ['protocol.Sigil.takes'],
                     departs: ['one value in the schema, and protocol.Sigil.takes is repeated'],
-                    says: 'A JSON Schema object defining the expected parameters for the tool.', required: true },
-                  { column: '_meta', score: 0, followed: [], departs: [], says: '', required: false },
+                    says: 'A JSON Schema object defining the expected parameters for the tool.', says_from: '', required: true },
+                  { column: '_meta', score: 0, followed: [], departs: [], says: '', says_from: '', required: false },
               ] },
         ],
         unfollowed: { 'protocol.Signum': ['follows', 'sigils'] },
@@ -82,4 +82,16 @@ test('a refused reference says why beside the ones held', () => {
     renderHolds(content, [held()], ['umami: staands follows umami, and the schema has none of its columns']);
     expect(content.querySelector('.element-error')?.textContent).toContain('umami:');
     expect(content.querySelectorAll('.parity-pill').length).toBe(1);
+});
+
+// Words the schema does not have itself say where they were read.
+test('words read from beside the schema say where', () => {
+    const seam = document.createElement('div');
+    const h = held();
+    h.reference = 'umami';
+    h.clades[1].items[0].says_from = 'openapi.json · WebsiteSession.screen';
+    renderSeam(seam, h, h.clades[1]);
+    const row = [...seam.querySelectorAll('.parity-row')][1];
+    expect(row.textContent).toContain('from openapi.json · WebsiteSession.screen');
+    expect([...seam.querySelectorAll('.parity-row')][2].textContent).not.toContain('from ');
 });
