@@ -7,7 +7,9 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { renderTranscript, renderSessions, renderAssistant, timeSpacers, type TranscriptRead, type Turn } from './transcript-element';
+import { renderSessions } from '../../ground-element';
+import { renderSessions } from '../../ground-element';
+import { renderTranscript, renderAssistant, timeSpacers, type TranscriptRead, type Turn } from './transcript-element';
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
@@ -56,7 +58,7 @@ describe('Transcript - Tim', () => {
         expect(body.querySelectorAll('.tr-spacer')).toHaveLength(3);
     });
 
-    // Tim: the sessions are offered by their first prompt, and one is chosen.
+    // Tim: Ground offers the sessions by their first prompt, and one is chosen.
     test('a session is chosen from the list by its first prompt', () => {
         const body = document.createElement('div');
         const chosen: string[] = [];
@@ -88,7 +90,7 @@ describe('Transcript - Spike', () => {
         expect(Math.min(...year)).toBeGreaterThan(5);
     });
 
-    // Spike: a namespace with no session says so.
+    // Spike: Ground in a namespace with no session says so.
     test('no sessions is said, not an empty box', () => {
         const body = document.createElement('div');
         renderSessions(body, [], () => {});
