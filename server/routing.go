@@ -91,7 +91,6 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// Core QNTX handlers
 	s.answerSocket("/ws", s.HandleWebSocket) // Custom WebSocket protocol (graph updates, logs, etc.)
 	s.answer("/health", s.HandleHealth)
-	s.answer("/logs/download", s.HandleLogDownload)
 	s.answer("/api/dev", s.HandleDevMode)                                              // Dev mode status
 	s.answer("/api/debug", s.HandleDebug)                                              // Browser console debugging (dev mode only)
 	s.answer("/api/crash-test", s.HandleCrashTest)                                     // Flight recorder crash test (dev mode only)

@@ -4,7 +4,6 @@ package server
 // It provides HTTP endpoints for:
 // - WebSocket connections (HandleWebSocket)
 // - Static file serving (HandleStatic)
-// - Log downloads (HandleLogDownload)
 // - Health checks (HandleHealth)
 // - Usage time series data (HandleUsageTimeSeries)
 
@@ -12,7 +11,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -370,45 +368,6 @@ func (s *QNTXServer) HandleStatic(w http.ResponseWriter, r *http.Request) {
 			"error", err,
 		)
 	}
-}
-
-// HandleLogDownload serves the log file for download.
-// Deprecated: log download UI has been removed. Scheduled for deletion.
-func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
-	logPath := s.logPath
-
-	// Check if file logging is enabled
-	verbosity := int(s.verbosity.Load())
-	if verbosity < 2 {
-		http.Error(w, "File logging is not enabled. Use verbosity >= 2 (-vv) to enable file logging.", http.StatusNotFound)
-		s.logger.Warnw("Log download attempted but file logging disabled",
-			"verbosity", verbosity,
-			"client", r.RemoteAddr,
-		)
-		return
-	}
-
-	// Check if file exists
-	if _, err := os.Stat(logPath); os.IsNotExist(err) {
-		http.Error(w, "Log file not found. It may not have been created yet.", http.StatusNotFound)
-		s.logger.Warnw("Log file not found",
-			"path", logPath,
-			"client", r.RemoteAddr,
-		)
-		return
-	}
-
-	// Serve the file
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition", "attachment; filename=qntx.log")
-	w.Header().Set("Cache-Control", "no-cache")
-
-	http.ServeFile(w, r, logPath)
-
-	s.logger.Infow("Log file downloaded",
-		"path", logPath,
-		"client", r.RemoteAddr,
-	)
 }
 
 // HandleHealth serves the unauthenticated liveness probe.
