@@ -118,7 +118,7 @@ func (s *QNTXServer) projectToCanvas(embeddingID string, embedding []float32) {
 			continue
 		}
 
-		reqBody, err := json.Marshal(map[string]interface{}{
+		reqBody, err := json.Marshal(map[string]any{
 			"embeddings": [][]float32{embedding},
 			"method":     method,
 		})

@@ -33,7 +33,7 @@ func NewAxExecutor(queryStore ats.AttestationQueryStore, aliasResolver *alias.Re
 type AxExecutorOptions struct {
 	EntityResolver ats.EntityResolver // Optional entity ID resolution (default: NoOpEntityResolver)
 	Logger         *zap.SugaredLogger // Optional logger for debug output (default: nil, no logging)
-	RawQuerier     interface{}        // Optional: routes attestation queries through Rust FFI (storage.RawQuerier)
+	RawQuerier     any                // Optional: routes attestation queries through Rust FFI (storage.RawQuerier)
 }
 
 // NewAxExecutorWithOptions creates an executor with custom options.

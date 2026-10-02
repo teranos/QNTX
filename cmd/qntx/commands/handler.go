@@ -108,7 +108,7 @@ func runHandlerCreate(cmd *cobra.Command, args []string) (err error) {
 		Contexts:   []string{"python"},
 		Actors:     []string{handlerName}, // Self-certifying: handler is its own actor
 		Source:     "qntx-cli",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"code": code,
 		},
 	}

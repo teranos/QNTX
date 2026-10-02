@@ -98,8 +98,8 @@ func TestAnUngatedSocketIsNotAdmittedToAnything(t *testing.T) {
 }
 
 // queued drains what the worker put on a client's channel.
-func queued(client *Client) []interface{} {
-	var got []interface{}
+func queued(client *Client) []any {
+	var got []any
 	for {
 		select {
 		case msg := <-client.sendMsg:
@@ -116,8 +116,8 @@ func queued(client *Client) []interface{} {
 func TestAMessageAboutOneNamespaceReachesOnlyIt(t *testing.T) {
 	srv := &QNTXServer{logger: zap.NewNop().Sugar(), held: servingStub(stubStore{})}
 
-	here := &Client{server: srv, sendMsg: make(chan interface{}, 4), id: "here", in: "default"}
-	elsewhere := &Client{server: srv, sendMsg: make(chan interface{}, 4), id: "elsewhere", in: "pond"}
+	here := &Client{server: srv, sendMsg: make(chan any, 4), id: "here", in: "default"}
+	elsewhere := &Client{server: srv, sendMsg: make(chan any, 4), id: "elsewhere", in: "pond"}
 	srv.clients = map[*Client]bool{here: true, elsewhere: true}
 
 	srv.sendMessageToClients("what happened in default", "", "default", nil)
@@ -135,8 +135,8 @@ func TestAMessageAboutOneNamespaceReachesOnlyIt(t *testing.T) {
 func TestAMessageAboutTheNodeReachesEveryone(t *testing.T) {
 	srv := &QNTXServer{logger: zap.NewNop().Sugar(), held: servingStub(stubStore{})}
 
-	here := &Client{server: srv, sendMsg: make(chan interface{}, 4), id: "here", in: "default"}
-	elsewhere := &Client{server: srv, sendMsg: make(chan interface{}, 4), id: "elsewhere", in: "pond"}
+	here := &Client{server: srv, sendMsg: make(chan any, 4), id: "here", in: "default"}
+	elsewhere := &Client{server: srv, sendMsg: make(chan any, 4), id: "elsewhere", in: "pond"}
 	srv.clients = map[*Client]bool{here: true, elsewhere: true}
 
 	srv.sendMessageToClients("the daemon stopped", "", "", nil)

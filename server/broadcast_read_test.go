@@ -24,7 +24,7 @@ func broadcastServer() *QNTXServer {
 func connected(srv *QNTXServer, id string, as auth.Admission) *Client {
 	return &Client{
 		server:   srv,
-		sendMsg:  make(chan interface{}, 4),
+		sendMsg:  make(chan any, 4),
 		id:       id,
 		in:       auth.NamespaceDefault,
 		admitted: as,
@@ -154,7 +154,7 @@ func TestAMessageCarryingNoAttestationIsNotGated(t *testing.T) {
 func TestAnUngatedClientIsHandedEverything(t *testing.T) {
 	srv := broadcastServer()
 
-	held := &Client{server: srv, sendMsg: make(chan interface{}, 4), id: "ungated", in: auth.NamespaceDefault}
+	held := &Client{server: srv, sendMsg: make(chan any, 4), id: "ungated", in: auth.NamespaceDefault}
 	srv.clients = map[*Client]bool{held: true}
 
 	srv.sendMessageToClients("a match", "", auth.NamespaceDefault, row("anything"))

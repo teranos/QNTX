@@ -56,17 +56,17 @@ type pulseLogger struct {
 }
 
 // Starting logs an Opening (✿) event - uses DEBUG level for "STARTING" appearance
-func (l pulseLogger) Starting(msg string, keysAndValues ...interface{}) {
+func (l pulseLogger) Starting(msg string, keysAndValues ...any) {
 	l.Debugw("✿ "+msg, keysAndValues...)
 }
 
 // Closing logs a Closing (❀) event - uses WARN level for "CLOSING" appearance
-func (l pulseLogger) Closing(msg string, keysAndValues ...interface{}) {
+func (l pulseLogger) Closing(msg string, keysAndValues ...any) {
 	l.Warnw("❀ "+msg, keysAndValues...)
 }
 
 // Pulse logs general Pulse/worker operations - uses INFO level
-func (l pulseLogger) Pulse(msg string, keysAndValues ...interface{}) {
+func (l pulseLogger) Pulse(msg string, keysAndValues ...any) {
 	l.Infow(msg, keysAndValues...)
 }
 

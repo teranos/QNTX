@@ -59,13 +59,13 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, w.Code) // GET requests return 200
 
-		var typeResp map[string]interface{}
+		var typeResp map[string]any
 		err := json.Unmarshal(w.Body.Bytes(), &typeResp)
 		require.NoError(t, err)
 
 		// Check rich_string_fields
 		if expectedRichFields != nil {
-			richFields, ok := typeResp["rich_string_fields"].([]interface{})
+			richFields, ok := typeResp["rich_string_fields"].([]any)
 			require.True(t, ok, "rich_string_fields should be an array")
 
 			var richStrings []string
@@ -79,7 +79,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 
 		// Check array_fields
 		if expectedArrayFields != nil {
-			arrayFields, ok := typeResp["array_fields"].([]interface{})
+			arrayFields, ok := typeResp["array_fields"].([]any)
 			require.True(t, ok, "array_fields should be an array")
 
 			var arrayStrings []string
@@ -273,7 +273,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var types []map[string]interface{}
+		var types []map[string]any
 		err = json.Unmarshal(w.Body.Bytes(), &types)
 		require.NoError(t, err)
 
@@ -281,7 +281,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 		require.Len(t, types, 7, "Should have restaurant, menu_item, city, food_review, health_inspection, prompt-result, and labeled")
 
 		// Map for easy verification
-		typeMap := make(map[string]map[string]interface{})
+		typeMap := make(map[string]map[string]any)
 		for _, t := range types {
 			if name, ok := t["name"].(string); ok {
 				typeMap[name] = t

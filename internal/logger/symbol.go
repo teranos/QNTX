@@ -19,85 +19,85 @@ import (
 // This makes logs queryable by symbol and keeps messages clean.
 
 // PulseInfow logs an info message with the Pulse symbol (꩜)
-func PulseInfow(msg string, keysAndValues ...interface{}) {
+func PulseInfow(msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, sym.Pulse}, keysAndValues...)
+		fields := append([]any{FieldSymbol, sym.Pulse}, keysAndValues...)
 		Logger.Infow(msg, fields...)
 	}
 }
 
 // PulseDebugw logs a debug message with the Pulse symbol (꩜)
-func PulseDebugw(msg string, keysAndValues ...interface{}) {
+func PulseDebugw(msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, sym.Pulse}, keysAndValues...)
+		fields := append([]any{FieldSymbol, sym.Pulse}, keysAndValues...)
 		Logger.Debugw(msg, fields...)
 	}
 }
 
 // PulseWarnw logs a warning message with the Pulse symbol (꩜)
-func PulseWarnw(msg string, keysAndValues ...interface{}) {
+func PulseWarnw(msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, sym.Pulse}, keysAndValues...)
+		fields := append([]any{FieldSymbol, sym.Pulse}, keysAndValues...)
 		Logger.Warnw(msg, fields...)
 	}
 }
 
 // PulseErrorw logs an error message with the Pulse symbol (꩜)
-func PulseErrorw(msg string, keysAndValues ...interface{}) {
+func PulseErrorw(msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, sym.Pulse}, keysAndValues...)
+		fields := append([]any{FieldSymbol, sym.Pulse}, keysAndValues...)
 		Logger.Errorw(msg, fields...)
 	}
 }
 
 // PulseOpenInfow logs an info message with the PulseOpen symbol (✿)
 // Used for graceful startup operations
-func PulseOpenInfow(msg string, keysAndValues ...interface{}) {
+func PulseOpenInfow(msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, sym.PulseOpen}, keysAndValues...)
+		fields := append([]any{FieldSymbol, sym.PulseOpen}, keysAndValues...)
 		Logger.Infow(msg, fields...)
 	}
 }
 
 // PulseCloseInfow logs an info message with the PulseClose symbol (❀)
 // Used for graceful shutdown operations
-func PulseCloseInfow(msg string, keysAndValues ...interface{}) {
+func PulseCloseInfow(msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, sym.PulseClose}, keysAndValues...)
+		fields := append([]any{FieldSymbol, sym.PulseClose}, keysAndValues...)
 		Logger.Infow(msg, fields...)
 	}
 }
 
 // AxInfow logs an info message with the Ax symbol (⋈)
 // Used for query/expand operations
-func AxInfow(msg string, keysAndValues ...interface{}) {
+func AxInfow(msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, sym.AX}, keysAndValues...)
+		fields := append([]any{FieldSymbol, sym.AX}, keysAndValues...)
 		Logger.Infow(msg, fields...)
 	}
 }
 
 // AxDebugw logs a debug message with the Ax symbol (⋈)
-func AxDebugw(msg string, keysAndValues ...interface{}) {
+func AxDebugw(msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, sym.AX}, keysAndValues...)
+		fields := append([]any{FieldSymbol, sym.AX}, keysAndValues...)
 		Logger.Debugw(msg, fields...)
 	}
 }
 
 // DBInfow logs an info message with the DB symbol (⊔)
 // Used for database/storage operations
-func DBInfow(msg string, keysAndValues ...interface{}) {
+func DBInfow(msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, sym.DB}, keysAndValues...)
+		fields := append([]any{FieldSymbol, sym.DB}, keysAndValues...)
 		Logger.Infow(msg, fields...)
 	}
 }
 
 // DBDebugw logs a debug message with the DB symbol (⊔)
-func DBDebugw(msg string, keysAndValues ...interface{}) {
+func DBDebugw(msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, sym.DB}, keysAndValues...)
+		fields := append([]any{FieldSymbol, sym.DB}, keysAndValues...)
 		Logger.Debugw(msg, fields...)
 	}
 }
@@ -114,9 +114,9 @@ func WithSymbol(symbol string) *zap.SugaredLogger {
 }
 
 // SymbolInfow logs with any symbol - for dynamic symbol usage
-func SymbolInfow(symbol, msg string, keysAndValues ...interface{}) {
+func SymbolInfow(symbol, msg string, keysAndValues ...any) {
 	if Logger != nil {
-		fields := append([]interface{}{FieldSymbol, symbol}, keysAndValues...)
+		fields := append([]any{FieldSymbol, symbol}, keysAndValues...)
 		Logger.Infow(msg, fields...)
 	}
 }

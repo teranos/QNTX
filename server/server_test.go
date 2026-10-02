@@ -66,7 +66,7 @@ func TestServerHubRegistration(t *testing.T) {
 	// Create a mock client
 	client := &Client{
 		server:  srv,
-		sendMsg: make(chan interface{}, 256),
+		sendMsg: make(chan any, 256),
 		id:      "test_client_1",
 	}
 
@@ -108,7 +108,7 @@ func TestServerHubUnregistration(t *testing.T) {
 	// Create and register a client
 	client := &Client{
 		server:  srv,
-		sendMsg: make(chan interface{}, 256),
+		sendMsg: make(chan any, 256),
 		id:      "test_client_unreg",
 	}
 
@@ -167,7 +167,7 @@ func TestServerConcurrentRegistration(t *testing.T) {
 			defer wg.Done()
 			client := &Client{
 				server:  srv,
-				sendMsg: make(chan interface{}, 256),
+				sendMsg: make(chan any, 256),
 				id:      fmt.Sprintf("client_%d", id),
 			}
 			srv.register <- client
@@ -374,7 +374,7 @@ func TestHandleQueryMessage(t *testing.T) {
 	defer conn.Close()
 
 	// Send query message
-	queryMsg := map[string]interface{}{
+	queryMsg := map[string]any{
 		"type":  "query",
 		"query": "is engineer",
 	}
@@ -386,7 +386,7 @@ func TestHandleQueryMessage(t *testing.T) {
 
 	// Read response
 	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	var response map[string]interface{}
+	var response map[string]any
 	err = conn.ReadJSON(&response)
 	if err != nil {
 		t.Fatalf("Failed to read response: %v", err)
@@ -445,7 +445,7 @@ func TestHandlePingMessage(t *testing.T) {
 	}()
 
 	// Send ping message (as JSON per protocol)
-	pingMsg := map[string]interface{}{
+	pingMsg := map[string]any{
 		"type": "ping",
 	}
 
@@ -536,7 +536,7 @@ func TestMultipleWebSocketClients(t *testing.T) {
 }
 
 // Helper function to get map keys
-func getKeys(m map[string]interface{}) []string {
+func getKeys(m map[string]any) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -560,12 +560,12 @@ func TestBroadcastMessage(t *testing.T) {
 	// Create clients
 	client1 := &Client{
 		server:  srv,
-		sendMsg: make(chan interface{}, 256),
+		sendMsg: make(chan any, 256),
 		id:      "client1",
 	}
 	client2 := &Client{
 		server:  srv,
-		sendMsg: make(chan interface{}, 256),
+		sendMsg: make(chan any, 256),
 		id:      "client2",
 	}
 
@@ -574,7 +574,7 @@ func TestBroadcastMessage(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	// Send generic message
-	testMsg := map[string]interface{}{
+	testMsg := map[string]any{
 		"type":    "test",
 		"message": "hello",
 	}
@@ -584,7 +584,7 @@ func TestBroadcastMessage(t *testing.T) {
 	// Verify clients received the message
 	select {
 	case msg := <-client1.sendMsg:
-		if msgMap, ok := msg.(map[string]interface{}); ok {
+		if msgMap, ok := msg.(map[string]any); ok {
 			if msgMap["message"] != "hello" {
 				t.Error("Client1 received incorrect message")
 			}
@@ -597,7 +597,7 @@ func TestBroadcastMessage(t *testing.T) {
 
 	select {
 	case msg := <-client2.sendMsg:
-		if msgMap, ok := msg.(map[string]interface{}); ok {
+		if msgMap, ok := msg.(map[string]any); ok {
 			if msgMap["message"] != "hello" {
 				t.Error("Client2 received incorrect message")
 			}

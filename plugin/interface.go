@@ -75,7 +75,7 @@ type HealthStatus struct {
 	Healthy bool
 	Paused  bool // True if plugin is intentionally paused (not a failure)
 	Message string
-	Details map[string]interface{}
+	Details map[string]any
 }
 
 // PluginState represents the current state of a plugin

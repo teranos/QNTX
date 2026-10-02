@@ -574,7 +574,7 @@ func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, r
 		Actors:     []string{actor},
 		Timestamp:  now,
 		Source:     "prompt-direct",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"response": resp.Content,
 			"template": req.Template,
 		},
@@ -717,7 +717,7 @@ func (s *QNTXServer) HandlePromptList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respond(w, s.logger, http.StatusOK, map[string]interface{}{
+	respond(w, s.logger, http.StatusOK, map[string]any{
 		"prompts": prompts,
 		"count":   len(prompts),
 	})
@@ -760,7 +760,7 @@ func (s *QNTXServer) HandlePromptVersions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	respond(w, s.logger, http.StatusOK, map[string]interface{}{
+	respond(w, s.logger, http.StatusOK, map[string]any{
 		"versions": versions,
 		"count":    len(versions),
 	})

@@ -257,7 +257,7 @@ func (e *Engine) executeElementPython(elementID string, content string, attestat
 // executeElementPrompt runs a prompt element's template with attestation fields interpolated.
 // Returns the JSON-encoded execution result on success.
 func (e *Engine) executeElementPrompt(elementID string, template string, attestationJSON []byte) (_ []byte, err error) {
-	reqBody, err := json.Marshal(map[string]interface{}{
+	reqBody, err := json.Marshal(map[string]any{
 		"template":             template,
 		"element_id":           elementID,
 		"upstream_attestation": json.RawMessage(attestationJSON),
@@ -352,7 +352,7 @@ func (e *Engine) executeBuiltin(watcher *storage.Watcher, as *types.As) error {
 
 // executeWebhook sends the attestation to a webhook URL
 func (e *Engine) executeWebhook(watcher *storage.Watcher, as *types.As) (err error) {
-	body, err := json.Marshal(map[string]interface{}{
+	body, err := json.Marshal(map[string]any{
 		"watcher_id":  watcher.ID,
 		"attestation": as,
 		"fired_at":    time.Now(),

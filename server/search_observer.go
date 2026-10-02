@@ -120,7 +120,7 @@ func (o *SearchIndexObserver) OnAttestationCreated(as *types.As) {
 
 // buildDocument creates a MeiliSearch document from an attestation.
 // Returns nil if the attestation has no rich text fields to index.
-func (o *SearchIndexObserver) buildDocument(as *types.As) map[string]interface{} {
+func (o *SearchIndexObserver) buildDocument(as *types.As) map[string]any {
 	if as.Attributes == nil || len(as.Attributes) == 0 {
 		return nil
 	}
@@ -145,7 +145,7 @@ func (o *SearchIndexObserver) buildDocument(as *types.As) map[string]interface{}
 	}
 
 	// Build the document — include all attributes plus structural fields
-	doc := make(map[string]interface{})
+	doc := make(map[string]any)
 	doc["id"] = as.ID
 
 	// Structural fields for filtering and display

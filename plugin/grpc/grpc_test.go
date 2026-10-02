@@ -49,7 +49,7 @@ func newMockPluginWithName(name string) *mockPlugin {
 		healthStatus: pluginpkg.HealthStatus{
 			Healthy: true,
 			Message: "Mock plugin healthy",
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"test": "value",
 			},
 		},
@@ -119,8 +119,8 @@ func (c *mockConfig) GetString(key string) string        { return "" }
 func (c *mockConfig) GetInt(key string) int              { return 0 }
 func (c *mockConfig) GetBool(key string) bool            { return false }
 func (c *mockConfig) GetStringSlice(key string) []string { return nil }
-func (c *mockConfig) Get(key string) interface{}         { return nil }
-func (c *mockConfig) Set(key string, value interface{})  {}
+func (c *mockConfig) Get(key string) any                 { return nil }
+func (c *mockConfig) Set(key string, value any)          {}
 func (c *mockConfig) GetKeys() []string                  { return []string{} }
 
 // startTestServer starts a gRPC server for testing and returns its address
@@ -189,7 +189,7 @@ func TestPluginServer_Health_Unhealthy(t *testing.T) {
 	plugin.healthStatus = pluginpkg.HealthStatus{
 		Healthy: false,
 		Message: "Plugin is unhealthy",
-		Details: map[string]interface{}{
+		Details: map[string]any{
 			"error": "connection failed",
 		},
 	}
@@ -1173,7 +1173,7 @@ func TestBrowserWSMessage_MarshalForBrowser(t *testing.T) {
 	require.NoError(t, err)
 
 	// Browser must be able to JSON.parse this and find type + data
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	err = json.Unmarshal(jsonBytes, &parsed)
 	require.NoError(t, err)
 

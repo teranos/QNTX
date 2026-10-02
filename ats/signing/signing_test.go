@@ -172,7 +172,7 @@ func TestSignVerifyJSONRoundTrip(t *testing.T) {
 		Actors:     []string{"AS-MODELAMA-WEAVE-TEST-ABCD1234"},
 		Timestamp:  time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC),
 		Source:     "llama-cpp",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"prompt":          "hello",
 			"text":            "world",
 			"model":           "llama-3.2-1b",
@@ -181,16 +181,16 @@ func TestSignVerifyJSONRoundTrip(t *testing.T) {
 			"mean_entropy":    float64(2.3),
 			"weave_source":    "llama-cpp",
 			"source_version":  "0.18.1",
-			"tokens": []interface{}{
-				map[string]interface{}{
+			"tokens": []any{
+				map[string]any{
 					"text":       "hello",
 					"position":   float64(0),
 					"confidence": float64(0.9),
 					"entropy":    float64(1.5),
 					"top_gap":    float64(0.3),
-					"top_k": []interface{}{
-						map[string]interface{}{"text": "hello", "prob": float64(0.9)},
-						map[string]interface{}{"text": "world", "prob": float64(0.1)},
+					"top_k": []any{
+						map[string]any{"text": "hello", "prob": float64(0.9)},
+						map[string]any{"text": "world", "prob": float64(0.1)},
 					},
 				},
 			},
@@ -205,17 +205,17 @@ func TestSignVerifyJSONRoundTrip(t *testing.T) {
 
 	// Simulate DB roundtrip: marshal to JSON, unmarshal back (like fromRustJSON)
 	type ffiAttestation struct {
-		ID         string                 `json:"id,omitempty"`
-		Subjects   []string               `json:"subjects,omitempty"`
-		Predicates []string               `json:"predicates,omitempty"`
-		Contexts   []string               `json:"contexts,omitempty"`
-		Actors     []string               `json:"actors,omitempty"`
-		Timestamp  int64                  `json:"timestamp,omitempty"`
-		Source     string                 `json:"source,omitempty"`
-		Attributes map[string]interface{} `json:"attributes,omitempty"`
-		CreatedAt  int64                  `json:"created_at,omitempty"`
-		Signature  []byte                 `json:"signature,omitempty"`
-		SignerDID  string                 `json:"signer_did,omitempty"`
+		ID         string         `json:"id,omitempty"`
+		Subjects   []string       `json:"subjects,omitempty"`
+		Predicates []string       `json:"predicates,omitempty"`
+		Contexts   []string       `json:"contexts,omitempty"`
+		Actors     []string       `json:"actors,omitempty"`
+		Timestamp  int64          `json:"timestamp,omitempty"`
+		Source     string         `json:"source,omitempty"`
+		Attributes map[string]any `json:"attributes,omitempty"`
+		CreatedAt  int64          `json:"created_at,omitempty"`
+		Signature  []byte         `json:"signature,omitempty"`
+		SignerDID  string         `json:"signer_did,omitempty"`
 	}
 
 	ffi := ffiAttestation{
@@ -278,7 +278,7 @@ func TestSignVerifyProtoRoundTrip(t *testing.T) {
 		Actors:     []string{"AS-MODELAMA-WEAVE-TEST-EFGH5678"},
 		Timestamp:  time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC),
 		Source:     "llama-cpp",
-		Attributes: map[string]interface{}{
+		Attributes: map[string]any{
 			"prompt":          "hello",
 			"text":            "world",
 			"model":           "llama-3.2-1b",
@@ -287,16 +287,16 @@ func TestSignVerifyProtoRoundTrip(t *testing.T) {
 			"mean_entropy":    float64(2.3),
 			"weave_source":    "llama-cpp",
 			"source_version":  "0.18.1",
-			"tokens": []interface{}{
-				map[string]interface{}{
+			"tokens": []any{
+				map[string]any{
 					"text":       "hello",
 					"position":   float64(0),
 					"confidence": float64(0.9),
 					"entropy":    float64(1.5),
 					"top_gap":    float64(0.3),
-					"top_k": []interface{}{
-						map[string]interface{}{"text": "hello", "prob": float64(0.9)},
-						map[string]interface{}{"text": "world", "prob": float64(0.1)},
+					"top_k": []any{
+						map[string]any{"text": "hello", "prob": float64(0.9)},
+						map[string]any{"text": "world", "prob": float64(0.1)},
 					},
 				},
 			},

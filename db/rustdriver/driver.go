@@ -308,7 +308,7 @@ func (s *RustStmt) Query(args []driver.Value) (driver.Rows, error) {
 		}
 	}
 
-	var rows [][]interface{}
+	var rows [][]any
 	if rowsJSON != "" && rowsJSON != "[]" {
 		if err := json.Unmarshal([]byte(rowsJSON), &rows); err != nil {
 			return nil, errors.Wrapf(err, "failed to parse rows JSON")
@@ -316,7 +316,7 @@ func (s *RustStmt) Query(args []driver.Value) (driver.Rows, error) {
 		// Decode $blob wrappers into []byte at parse time
 		for i, row := range rows {
 			for j, val := range row {
-				if m, ok := val.(map[string]interface{}); ok {
+				if m, ok := val.(map[string]any); ok {
 					if b64, ok := m["$blob"].(string); ok {
 						decoded, err := base64Decode(b64)
 						if err != nil {
@@ -335,7 +335,7 @@ func (s *RustStmt) Query(args []driver.Value) (driver.Rows, error) {
 // RustRows implements driver.Rows with pre-fetched in-memory data.
 type RustRows struct {
 	columns []string
-	rows    [][]interface{}
+	rows    [][]any
 	pos     int
 }
 
@@ -444,7 +444,7 @@ func marshalParams(args []driver.Value) (string, error) {
 	if len(args) == 0 {
 		return "[]", nil
 	}
-	converted := make([]interface{}, len(args))
+	converted := make([]any, len(args))
 	for i, v := range args {
 		if b, ok := v.([]byte); ok {
 			converted[i] = map[string]string{"$blob": base64.StdEncoding.EncodeToString(b)}

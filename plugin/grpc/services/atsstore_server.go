@@ -369,7 +369,7 @@ func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequ
 }
 
 func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error) {
-	attributes := make(map[string]interface{})
+	attributes := make(map[string]any)
 	if proto.Attributes != nil {
 		attributes = proto.Attributes.AsMap()
 	}

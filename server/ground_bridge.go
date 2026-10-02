@@ -80,7 +80,7 @@ var cachedProjectCtx = projectctx.Namespace()
 
 // writeGroundNews writes an attestation to Ground's database with the given
 // predicate prefix ("deferred:" or "immediate:").
-func writeGroundNews(dbPath string, prefix, subject, predicate, actor, detail string, extraAttrs map[string]interface{}, logger *zap.SugaredLogger) {
+func writeGroundNews(dbPath string, prefix, subject, predicate, actor, detail string, extraAttrs map[string]any, logger *zap.SugaredLogger) {
 	if dbPath == "" {
 		return
 	}
@@ -94,7 +94,7 @@ func writeGroundNews(dbPath string, prefix, subject, predicate, actor, detail st
 		return
 	}
 
-	attrs := map[string]interface{}{
+	attrs := map[string]any{
 		"detail": detail,
 		"after":  time.Now().Unix(),
 	}
@@ -118,12 +118,12 @@ func writeGroundNews(dbPath string, prefix, subject, predicate, actor, detail st
 
 // WriteDeferredNews writes a deferred news attestation to Ground's database.
 // Delivered at the next Stop hook after the "after" timestamp passes.
-func WriteDeferredNews(dbPath string, subject, predicate, actor, detail string, extraAttrs map[string]interface{}, logger *zap.SugaredLogger) {
+func WriteDeferredNews(dbPath string, subject, predicate, actor, detail string, extraAttrs map[string]any, logger *zap.SugaredLogger) {
 	writeGroundNews(dbPath, "deferred:", subject, predicate, actor, detail, extraAttrs, logger)
 }
 
 // WriteImmediateNews writes an immediate news attestation to Ground's database.
 // Delivered in real time by Ground's asyncRewake watcher polling every 2s.
-func WriteImmediateNews(dbPath string, subject, predicate, actor, detail string, extraAttrs map[string]interface{}, logger *zap.SugaredLogger) {
+func WriteImmediateNews(dbPath string, subject, predicate, actor, detail string, extraAttrs map[string]any, logger *zap.SugaredLogger) {
 	writeGroundNews(dbPath, "immediate:", subject, predicate, actor, detail, extraAttrs, logger)
 }

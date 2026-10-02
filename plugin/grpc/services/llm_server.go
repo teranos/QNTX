@@ -267,7 +267,7 @@ func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatReques
 		return
 	}
 
-	attrs := map[string]interface{}{
+	attrs := map[string]any{
 		"prompt":       prompt,
 		"text":         responseText,
 		"model":        model,
@@ -287,18 +287,18 @@ func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatReques
 		attrs["mean_entropy"] = entSum / n
 
 		// Pack per-token signal data
-		tokens := make([]interface{}, 0, len(signals))
+		tokens := make([]any, 0, len(signals))
 		for i, sig := range signals {
-			tok := map[string]interface{}{
+			tok := map[string]any{
 				"position":   i,
 				"confidence": sig.Confidence,
 				"entropy":    sig.Entropy,
 				"top_gap":    sig.TopGap,
 			}
 			if len(sig.TopK) > 0 {
-				topK := make([]interface{}, 0, len(sig.TopK))
+				topK := make([]any, 0, len(sig.TopK))
 				for _, c := range sig.TopK {
-					topK = append(topK, map[string]interface{}{
+					topK = append(topK, map[string]any{
 						"text": c.Text,
 						"prob": c.Prob,
 					})

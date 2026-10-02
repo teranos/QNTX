@@ -66,7 +66,7 @@ func TestEngine_ExecuteBuiltin(t *testing.T) {
 		ID:         "builtin-1",
 		Subjects:   []string{"teranos/ground:main"},
 		Predicates: []string{"builtin-test"},
-		Attributes: map[string]interface{}{"repo": "teranos/ground", "branch": "main", "sha": "abc"},
+		Attributes: map[string]any{"repo": "teranos/ground", "branch": "main", "sha": "abc"},
 	}
 	engine.OnAttestationCreated(as)
 	time.Sleep(100 * time.Millisecond)
@@ -103,7 +103,7 @@ func TestEngineRunsNoStandingBuiltIn(t *testing.T) {
 	engine.OnAttestationCreated(&types.As{
 		ID:         "ci-status-1",
 		Predicates: []string{watcher.CIPushedPredicate},
-		Attributes: map[string]interface{}{"repo": "teranos/ground", "branch": "main", "sha": "abc"},
+		Attributes: map[string]any{"repo": "teranos/ground", "branch": "main", "sha": "abc"},
 	})
 	time.Sleep(100 * time.Millisecond)
 

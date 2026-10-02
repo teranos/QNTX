@@ -10,7 +10,7 @@ import (
 )
 
 // writeJSON writes a JSON response with the given status code
-func writeJSON(w http.ResponseWriter, status int, data interface{}) error {
+func writeJSON(w http.ResponseWriter, status int, data any) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
@@ -22,7 +22,7 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) error {
 // respond writes a JSON response and records a body that never reached the
 // client. By then the status is on the wire and the caller is gone, so there is
 // nothing left to send and only somewhere to write it down.
-func respond(w http.ResponseWriter, logger *zap.SugaredLogger, status int, data interface{}) {
+func respond(w http.ResponseWriter, logger *zap.SugaredLogger, status int, data any) {
 	if err := writeJSON(w, status, data); err != nil && logger != nil {
 		logger.Errorw("Response body not delivered", "status", status, "error", err)
 	}
@@ -104,7 +104,7 @@ func handleError(w http.ResponseWriter, logger *zap.SugaredLogger, err error, co
 }
 
 // readJSON reads and decodes a JSON request body
-func readJSON(w http.ResponseWriter, r *http.Request, v interface{}) error {
+func readJSON(w http.ResponseWriter, r *http.Request, v any) error {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 		return errors.Wrap(err, "failed to decode JSON request body")

@@ -181,7 +181,7 @@ func (s *EmbeddingStore) Save(embedding *EmbeddingModel) error {
 // When model is empty, returns the first matching embedding regardless of model.
 func (s *EmbeddingStore) GetBySource(sourceType, sourceID, model string) (*EmbeddingModel, error) {
 	var query string
-	var args []interface{}
+	var args []any
 
 	if model != "" {
 		query = `
@@ -190,7 +190,7 @@ func (s *EmbeddingStore) GetBySource(sourceType, sourceID, model string) (*Embed
 			FROM embeddings
 			WHERE source_type = ? AND source_id = ? AND model = ?
 		`
-		args = []interface{}{sourceType, sourceID, model}
+		args = []any{sourceType, sourceID, model}
 	} else {
 		query = `
 			SELECT id, source_type, source_id, text, embedding,
@@ -198,7 +198,7 @@ func (s *EmbeddingStore) GetBySource(sourceType, sourceID, model string) (*Embed
 			FROM embeddings
 			WHERE source_type = ? AND source_id = ?
 		`
-		args = []interface{}{sourceType, sourceID}
+		args = []any{sourceType, sourceID}
 	}
 
 	var embedding EmbeddingModel
@@ -252,7 +252,7 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 	// Use L2 distance with sqlite-vec
 	// Lower distance means more similar
 	var query string
-	var args []interface{}
+	var args []any
 
 	// Build WHERE clauses
 	var filters []string
@@ -285,7 +285,7 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 		LIMIT ?
 	`, table, whereClause)
 	// Prepend queryEmbedding, append limit
-	args = append([]interface{}{queryEmbedding}, args...)
+	args = append([]any{queryEmbedding}, args...)
 	args = append(args, limit)
 
 	rows, err := s.db.Query(query, args...)
@@ -511,7 +511,7 @@ func (s *EmbeddingStore) GetBySourceIDs(sourceIDs []string) (_ []EmbeddingModel,
 
 	// Build IN clause with placeholders
 	placeholders := make([]string, len(sourceIDs))
-	args := make([]interface{}, len(sourceIDs))
+	args := make([]any, len(sourceIDs))
 	for i, id := range sourceIDs {
 		placeholders[i] = "?"
 		args[i] = id
@@ -587,7 +587,7 @@ func (s *EmbeddingStore) CountEmbeddingsByModel() (_ []ModelEmbeddingCount, err 
 // When model is non-empty, only embeddings from that model are returned.
 func (s *EmbeddingStore) GetAllEmbeddingVectors(model string) (ids []string, blobs [][]byte, err error) {
 	query := `SELECT id, embedding FROM embeddings`
-	var args []interface{}
+	var args []any
 	if model != "" {
 		query += ` WHERE model = ?`
 		args = append(args, model)

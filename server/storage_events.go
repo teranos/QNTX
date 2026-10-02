@@ -125,7 +125,7 @@ func (p *StorageEventsPoller) pollEvents() {
 // broadcastEviction sends an eviction notification to WebSocket clients
 func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entity string, deletionsCount, limit int, evictionDetailsJSON string) {
 	// Parse eviction details if available
-	var detailsMap map[string]interface{}
+	var detailsMap map[string]any
 	if evictionDetailsJSON != "" {
 		if err := json.Unmarshal([]byte(evictionDetailsJSON), &detailsMap); err != nil {
 			p.logger.Debugw("Failed to parse eviction details JSON",
@@ -150,7 +150,7 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 	}
 
 	// Build log fields with eviction details
-	logFields := []interface{}{
+	logFields := []any{
 		"event_type", eventType,
 		"actor", actor,
 		"context", context,
@@ -166,7 +166,7 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 	measure.Count(measure.AttestationsEvicted, int64(deletionsCount))
 
 	// Broadcast as storage_eviction message
-	msg := map[string]interface{}{
+	msg := map[string]any{
 		"type":            "storage_eviction",
 		"event_type":      eventType,
 		"actor":           actor,

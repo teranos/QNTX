@@ -279,10 +279,10 @@ type Config interface {
 	GetStringSlice(key string) []string
 
 	// Get retrieves a raw configuration value
-	Get(key string) interface{}
+	Get(key string) any
 
 	// Set sets a configuration value (for runtime overrides)
-	Set(key string, value interface{})
+	Set(key string, value any)
 
 	// GetKeys returns all available configuration keys (sorted)
 	GetKeys() []string

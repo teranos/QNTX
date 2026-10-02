@@ -99,7 +99,7 @@ func TakeIn(first, record RawAttestationStore, mark Mark) (TakenIn, error) {
 // Landed is a landing file read in the order its rows landed.
 type Landed interface {
 	RawAttestationStore
-	QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
+	QueryAttestationsRaw(sql string, params []any) ([]*types.As, error)
 }
 
 // FileWriter is the record taking a batch of attestations as one file.
@@ -161,9 +161,9 @@ func SendOut(first Landed, record FileWriter, mark SentMark) (int, error) {
 	for {
 		var batch []*types.As
 		if marked {
-			batch, err = first.QueryAttestationsRaw(pastTheMark, []interface{}{last, sendBatch})
+			batch, err = first.QueryAttestationsRaw(pastTheMark, []any{last, sendBatch})
 		} else {
-			batch, err = first.QueryAttestationsRaw(fromTheStart, []interface{}{sendBatch})
+			batch, err = first.QueryAttestationsRaw(fromTheStart, []any{sendBatch})
 		}
 		if err != nil {
 			return sent, errors.Wrap(err, "the landing file did not say what it holds past the send mark")

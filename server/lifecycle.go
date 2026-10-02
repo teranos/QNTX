@@ -359,7 +359,7 @@ func (s *QNTXServer) emitLifecycleNews(event string, port int) {
 		}
 	}
 
-	attrs := map[string]interface{}{
+	attrs := map[string]any{
 		"event":      event,
 		"version":    v.Version,
 		"commit":     v.CommitHash,

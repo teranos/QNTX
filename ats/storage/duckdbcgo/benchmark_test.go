@@ -101,7 +101,7 @@ func makeAttestation(id string, sizeKB int) *types.As {
 		Actors:     []string{"human:bench"},
 		Timestamp:  time.UnixMilli(1_700_000_000_000),
 		Source:     "bench",
-		Attributes: map[string]interface{}{"pad": pad},
+		Attributes: map[string]any{"pad": pad},
 		CreatedAt:  time.UnixMilli(1_700_000_000_000),
 	}
 }

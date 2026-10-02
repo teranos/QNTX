@@ -320,7 +320,7 @@ func countAttestations(store any) (int, error) {
 
 // cachedDBStats holds pre-computed database statistics.
 type cachedDBStats struct {
-	response map[string]interface{}
+	response map[string]any
 }
 
 // publishStatsFailure puts the failure in the cache the element reads, so the
@@ -329,7 +329,7 @@ func (s *QNTXServer) publishStatsFailure(surface string, err error) {
 	envelope := newErrorEnvelope(surface, err)
 	s.logger.Warnw("Database stats unavailable",
 		"surface", surface, "error", err, "error_id", envelope.ID)
-	s.dbStatsCache.Store(&cachedDBStats{response: map[string]interface{}{
+	s.dbStatsCache.Store(&cachedDBStats{response: map[string]any{
 		"type":  "database_stats",
 		"error": envelope,
 	}})
@@ -414,7 +414,7 @@ func (s *QNTXServer) refreshDBStats() {
 
 	// Rich fields
 	boundedStore := storage.NewBoundedStore(statsDB, nil, s.logger.Named("db-stats-cache"))
-	var richFields interface{}
+	var richFields any
 	richFieldsWithStats, err := boundedStore.GetRichFieldsWithStats(overAtMost)
 	if err != nil {
 		richFields = boundedStore.GetDiscoveredRichFields()
@@ -479,7 +479,7 @@ func (s *QNTXServer) refreshDBStats() {
 		}
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"type":               "database_stats",
 		"path":               s.dbPath,
 		"storage_backend":    storageBackend,
@@ -557,14 +557,14 @@ func (s *QNTXServer) refreshDBStats() {
 
 // buildLiveStatus collects real-time system metrics for the frontend:
 // write lock holder, WAL file size, and dilation state.
-func buildLiveStatus(s *QNTXServer) map[string]interface{} {
-	status := make(map[string]interface{})
+func buildLiveStatus(s *QNTXServer) map[string]any {
+	status := make(map[string]any)
 
 	// Write lock holder
 	if s.writeLockInspector != nil {
 		holder, held := s.writeLockInspector.WriteHolderInfo()
 		if holder != "" {
-			status["write_lock"] = map[string]interface{}{
+			status["write_lock"] = map[string]any{
 				"holder":  holder,
 				"held_ms": held.Milliseconds(),
 			}
@@ -593,7 +593,7 @@ func buildLiveStatus(s *QNTXServer) map[string]interface{} {
 
 // buildPerformanceData converts the slow log collector's rolling history
 // into a JSON-friendly structure for the frontend.
-func buildPerformanceData() map[string]interface{} {
+func buildPerformanceData() map[string]any {
 	snap := sqlitecgo.GetPerformanceSnapshot()
 	if snap.Current == nil {
 		return nil
@@ -620,7 +620,7 @@ func buildPerformanceData() map[string]interface{} {
 		}
 	}
 
-	var current []map[string]interface{}
+	var current []map[string]any
 	for _, op := range ops {
 		kind := "op"
 		name := op.name
@@ -628,7 +628,7 @@ func buildPerformanceData() map[string]interface{} {
 			kind = "mutex"
 			name = strings.TrimPrefix(name, "mutex:")
 		}
-		current = append(current, map[string]interface{}{
+		current = append(current, map[string]any{
 			"name":  name,
 			"kind":  kind,
 			"count": op.stats.Count,
@@ -647,9 +647,9 @@ func buildPerformanceData() map[string]interface{} {
 		}
 	}
 
-	sparklines := make(map[string][]interface{})
+	sparklines := make(map[string][]any)
 	for name := range allOps {
-		series := make([]interface{}, len(snap.History))
+		series := make([]any, len(snap.History))
 		for i, window := range snap.History {
 			if stats, ok := window[name]; ok {
 				series[i] = stats.Avg.Milliseconds()
@@ -660,7 +660,7 @@ func buildPerformanceData() map[string]interface{} {
 		sparklines[name] = series
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"current":    current,
 		"sparklines": sparklines,
 		"windows":    len(snap.History),
@@ -669,8 +669,8 @@ func buildPerformanceData() map[string]interface{} {
 
 // parseLegacyPredicates converts old sample_predicates (each entry is a JSON
 // array string like "[\"type\"]") into a flat deduplicated list of strings.
-func parseLegacyPredicates(raw interface{}) []string {
-	arr, ok := raw.([]interface{})
+func parseLegacyPredicates(raw any) []string {
+	arr, ok := raw.([]any)
 	if !ok {
 		return nil
 	}
@@ -696,7 +696,7 @@ func parseLegacyPredicates(raw interface{}) []string {
 
 // queryDistillStats returns nil when nothing has been distilled, and an error
 // when it could not find out — which are different answers.
-func queryDistillStats(db *sql.DB) (_ map[string]interface{}, err error) {
+func queryDistillStats(db *sql.DB) (_ map[string]any, err error) {
 	var distillCount int
 	var totalPreserved sql.NullInt64
 	var oldestDistill, newestDistill sql.NullString
@@ -706,7 +706,7 @@ func queryDistillStats(db *sql.DB) (_ map[string]interface{}, err error) {
 		return nil, errors.Wrap(err, "failed to count distilled attestations")
 	}
 	if distillCount == 0 {
-		return map[string]interface{}{}, nil
+		return map[string]any{}, nil
 	}
 
 	if err := db.QueryRow(`
@@ -719,7 +719,7 @@ func queryDistillStats(db *sql.DB) (_ map[string]interface{}, err error) {
 		return nil, errors.Wrap(err, "failed to summarize distilled attestations")
 	}
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"sigmas": distillCount,
 	}
 	if totalPreserved.Valid {
@@ -748,14 +748,14 @@ func queryDistillStats(db *sql.DB) (_ map[string]interface{}, err error) {
 		return nil, errors.Wrap(err, "failed to query distill predicates")
 	}
 	defer func() { err = sqlclose.With(err, rows.Close(), "rows for queryDistillStats") }()
-	var predicates []map[string]interface{}
+	var predicates []map[string]any
 	for rows.Next() {
 		var pred string
 		var last sql.NullString
 		if err := rows.Scan(&pred, &last); err != nil {
 			return nil, errors.Wrap(err, "failed to scan a distill predicate")
 		}
-		one := map[string]interface{}{"predicate": pred}
+		one := map[string]any{"predicate": pred}
 		if last.Valid {
 			one["last"] = last.String
 		}
@@ -784,7 +784,7 @@ func queryDistillStats(db *sql.DB) (_ map[string]interface{}, err error) {
 	}
 	defer func() { err = sqlclose.With(err, sigmaRows.Close(), "the sigma rows") }()
 
-	var topSigmas []map[string]interface{}
+	var topSigmas []map[string]any
 	for sigmaRows.Next() {
 		var id, subjects, predicates, actors, contexts, source string
 		var timestamp sql.NullString
@@ -793,7 +793,7 @@ func queryDistillStats(db *sql.DB) (_ map[string]interface{}, err error) {
 			&timestamp, &source, &attributes); err != nil {
 			return nil, errors.Wrap(err, "failed to scan a top sigma")
 		}
-		sigma := map[string]interface{}{
+		sigma := map[string]any{
 			"id":         id,
 			"subjects":   subjects,
 			"predicates": predicates,
@@ -847,7 +847,7 @@ func queryPredicateHistograms(db *sql.DB) (_ map[string]map[string]int64, err er
 
 		// The row was selected for having a histogram, so one that will not
 		// parse is a row nobody can read rather than a row without one.
-		var attrs map[string]interface{}
+		var attrs map[string]any
 		if err := json.Unmarshal([]byte(attrsJSON), &attrs); err != nil {
 			return nil, errors.Wrapf(err, "the attributes of a %s histogram do not parse", clean)
 		}
@@ -855,7 +855,7 @@ func queryPredicateHistograms(db *sql.DB) (_ map[string]map[string]int64, err er
 		if !ok {
 			continue
 		}
-		hist, ok := histRaw.(map[string]interface{})
+		hist, ok := histRaw.(map[string]any)
 		if !ok {
 			return nil, errors.Newf("the _histogram of %s is %T, not an object", clean, histRaw)
 		}

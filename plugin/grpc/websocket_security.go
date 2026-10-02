@@ -32,11 +32,11 @@ func DefaultWebSocketConfig() WebSocketConfig {
 }
 
 // CreateOriginChecker creates a CheckOrigin function for websocket.Upgrader
-func CreateOriginChecker(config WebSocketConfig, logger interface{}) func(*http.Request) bool {
+func CreateOriginChecker(config WebSocketConfig, logger any) func(*http.Request) bool {
 	// Logger interface for optional logging
 	type sugaredLogger interface {
-		Warnw(msg string, keysAndValues ...interface{})
-		Debugw(msg string, keysAndValues ...interface{})
+		Warnw(msg string, keysAndValues ...any)
+		Debugw(msg string, keysAndValues ...any)
 	}
 
 	var log sugaredLogger

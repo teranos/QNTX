@@ -108,7 +108,7 @@ func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*type
 }
 
 // nullIfEmpty returns nil for empty strings (for nullable SQL columns)
-func nullIfEmpty(s string) interface{} {
+func nullIfEmpty(s string) any {
 	if s == "" {
 		return nil
 	}

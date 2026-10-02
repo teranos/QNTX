@@ -130,7 +130,7 @@ func enqueue(t *testing.T, pool *WorkerPool, handlerName string) *Job {
 }
 
 // traceContext is the map the transaction event carries op, status and data in.
-func traceContext(t *testing.T, event *sentry.Event) map[string]interface{} {
+func traceContext(t *testing.T, event *sentry.Event) map[string]any {
 	t.Helper()
 
 	trace, ok := event.Contexts["trace"]
@@ -140,10 +140,10 @@ func traceContext(t *testing.T, event *sentry.Event) map[string]interface{} {
 	return trace
 }
 
-func traceData(t *testing.T, event *sentry.Event) map[string]interface{} {
+func traceData(t *testing.T, event *sentry.Event) map[string]any {
 	t.Helper()
 
-	data, ok := traceContext(t, event)["data"].(map[string]interface{})
+	data, ok := traceContext(t, event)["data"].(map[string]any)
 	if !ok {
 		t.Fatal("the trace context carries no data")
 	}

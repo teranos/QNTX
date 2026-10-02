@@ -535,7 +535,7 @@ func (p *BookPlugin) Health(ctx context.Context) plugin.HealthStatus {
 	return plugin.HealthStatus{
 		Healthy: true,
 		Message: "Book plugin is healthy",
-		Details: map[string]interface{}{
+		Details: map[string]any{
 			"books":   len(p.books),
 			"authors": len(p.authors),
 		},

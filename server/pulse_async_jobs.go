@@ -130,7 +130,7 @@ func (s *QNTXServer) handleListAsyncJobs(w http.ResponseWriter, r *http.Request)
 	allJobs = append(allJobs, failedJobs...)
 
 	// Return jobs as JSON
-	response := map[string]interface{}{
+	response := map[string]any{
 		"jobs":  allJobs,
 		"count": len(allJobs),
 	}

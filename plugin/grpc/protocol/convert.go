@@ -26,7 +26,7 @@ func ErrUnknownHandler(handlerName string) error {
 
 // ToTypes converts a proto Attestation to types.As.
 func (p *Attestation) ToTypes() *types.As {
-	attributes := make(map[string]interface{})
+	attributes := make(map[string]any)
 	if p.Attributes != nil {
 		attributes = p.Attributes.AsMap()
 	}
@@ -77,29 +77,29 @@ func AttestationFromTypes(as *types.As) (*Attestation, error) {
 
 // convertToProtoCompatible recursively converts Go types to protobuf-compatible types.
 // Specifically converts []string to []interface{} which structpb.NewStruct requires.
-func convertToProtoCompatible(m map[string]interface{}) map[string]interface{} {
-	result := make(map[string]interface{}, len(m))
+func convertToProtoCompatible(m map[string]any) map[string]any {
+	result := make(map[string]any, len(m))
 	for k, v := range m {
 		result[k] = convertValue(v)
 	}
 	return result
 }
 
-func convertValue(v interface{}) interface{} {
+func convertValue(v any) any {
 	switch val := v.(type) {
 	case []string:
 		// Convert []string to []interface{}
-		result := make([]interface{}, len(val))
+		result := make([]any, len(val))
 		for i, s := range val {
 			result[i] = s
 		}
 		return result
-	case map[string]interface{}:
+	case map[string]any:
 		// Recursively convert nested maps
 		return convertToProtoCompatible(val)
-	case []interface{}:
+	case []any:
 		// Recursively convert slice elements
-		result := make([]interface{}, len(val))
+		result := make([]any, len(val))
 		for i, item := range val {
 			result[i] = convertValue(item)
 		}

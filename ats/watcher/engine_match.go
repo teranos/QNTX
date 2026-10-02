@@ -305,7 +305,7 @@ func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher) bool {
 
 // matchesAttributeFilter checks a single attribute filter against an attestation's attributes.
 // Path uses dot-separated keys (e.g., "tool_input.command") to navigate nested maps.
-func matchesAttributeFilter(attrs map[string]interface{}, af storage.AttributeFilter) bool {
+func matchesAttributeFilter(attrs map[string]any, af storage.AttributeFilter) bool {
 	if attrs == nil {
 		return false
 	}
@@ -327,12 +327,12 @@ func matchesAttributeFilter(attrs map[string]interface{}, af storage.AttributeFi
 
 // resolveAttrPath navigates a dot-separated path through nested maps and returns the string value.
 // Returns "" if the path doesn't resolve to a string.
-func resolveAttrPath(attrs map[string]interface{}, path string) string {
+func resolveAttrPath(attrs map[string]any, path string) string {
 	parts := strings.Split(path, ".")
-	var current interface{} = attrs
+	var current any = attrs
 
 	for _, part := range parts {
-		m, ok := current.(map[string]interface{})
+		m, ok := current.(map[string]any)
 		if !ok {
 			return ""
 		}
@@ -423,7 +423,7 @@ func extractAttestationText(as *types.As) string {
 			if v != "" {
 				parts = append(parts, v)
 			}
-		case []interface{}:
+		case []any:
 			for _, item := range v {
 				if str, ok := item.(string); ok && str != "" {
 					parts = append(parts, str)

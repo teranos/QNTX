@@ -579,7 +579,7 @@ func (ws *WatcherStore) RecordError(ctx context.Context, id, errMsg, attestation
 
 // scanWatcher scans a single row into a Watcher
 func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
-	w, err := scanWatcherFields(func(dest ...interface{}) error {
+	w, err := scanWatcherFields(func(dest ...any) error {
 		return row.Scan(dest...)
 	})
 	// Wrapping the sentinel rather than saying the words lets a caller ask
@@ -597,7 +597,7 @@ func (ws *WatcherStore) scanWatcherRows(rows *sql.Rows) (*Watcher, error) {
 }
 
 // scanWatcherFields is the shared scanner for both sql.Row and sql.Rows.
-func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
+func scanWatcherFields(scan func(dest ...any) error) (*Watcher, error) {
 	var w Watcher
 	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON sql.NullString
 	var timeStart, timeEnd sql.NullString
@@ -767,7 +767,7 @@ func marshalAttributeFilters(filters []AttributeFilter) (string, error) {
 }
 
 // nullIfZero returns nil for zero values, allowing SQL NULL storage.
-func nullIfZero(f float32) interface{} {
+func nullIfZero(f float32) any {
 	if f == 0 {
 		return nil
 	}

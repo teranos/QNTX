@@ -377,7 +377,7 @@ func TestRegistry_HealthCheckAll(t *testing.T) {
 		plugin2.healthStatus = HealthStatus{
 			Healthy: false,
 			Message: "Error",
-			Details: map[string]interface{}{"error": "test error"},
+			Details: map[string]any{"error": "test error"},
 		}
 		registry.Register(plugin1)
 		registry.Register(plugin2)
@@ -666,8 +666,8 @@ func (m *mockConfig) GetString(key string) string        { return "" }
 func (m *mockConfig) GetInt(key string) int              { return 0 }
 func (m *mockConfig) GetBool(key string) bool            { return false }
 func (m *mockConfig) GetStringSlice(key string) []string { return nil }
-func (m *mockConfig) Get(key string) interface{}         { return nil }
-func (m *mockConfig) Set(key string, value interface{})  {}
+func (m *mockConfig) Get(key string) any                 { return nil }
+func (m *mockConfig) Set(key string, value any)          {}
 func (m *mockConfig) GetKeys() []string                  { return []string{} }
 
 // Verify mockConfig implements Config

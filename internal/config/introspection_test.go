@@ -12,7 +12,7 @@ import (
 
 func TestMarkSettingsFromSource(t *testing.T) {
 	t.Run("Flat settings", func(t *testing.T) {
-		settings := map[string]interface{}{
+		settings := map[string]any{
 			"workers":                 1,
 			"daily_budget_usd":        3.0,
 			"ticker_interval_seconds": 1,
@@ -28,13 +28,13 @@ func TestMarkSettingsFromSource(t *testing.T) {
 	})
 
 	t.Run("Nested settings", func(t *testing.T) {
-		settings := map[string]interface{}{
-			"pulse": map[string]interface{}{
+		settings := map[string]any{
+			"pulse": map[string]any{
 				"workers":          1,
 				"daily_budget_usd": 3.0,
 			},
-			"storage": map[string]interface{}{
-				"sqlite": map[string]interface{}{
+			"storage": map[string]any{
+				"sqlite": map[string]any{
 					"path": "qntx.db",
 				},
 			},
@@ -53,10 +53,10 @@ func TestMarkSettingsFromSource(t *testing.T) {
 	})
 
 	t.Run("Deeply nested settings", func(t *testing.T) {
-		settings := map[string]interface{}{
-			"storage": map[string]interface{}{
-				"sqlite": map[string]interface{}{
-					"bounded_storage": map[string]interface{}{
+		settings := map[string]any{
+			"storage": map[string]any{
+				"sqlite": map[string]any{
+					"bounded_storage": map[string]any{
 						"actor_context_limit": 32,
 					},
 				},
@@ -76,8 +76,8 @@ func TestMarkSettingsFromSource(t *testing.T) {
 
 func TestFlattenSettingsWithSources(t *testing.T) {
 	t.Run("Basic flattening with source assignment", func(t *testing.T) {
-		settings := map[string]interface{}{
-			"pulse": map[string]interface{}{
+		settings := map[string]any{
+			"pulse": map[string]any{
 				"workers":          1,
 				"daily_budget_usd": 3.0,
 			},
@@ -126,8 +126,8 @@ func TestFlattenSettingsWithSources(t *testing.T) {
 		defer os.Setenv("QNTX_PULSE_WORKERS", oldEnv)
 		os.Setenv("QNTX_PULSE_WORKERS", "5")
 
-		settings := map[string]interface{}{
-			"pulse": map[string]interface{}{
+		settings := map[string]any{
+			"pulse": map[string]any{
 				"workers": 1, // Config file value
 			},
 		}
@@ -151,8 +151,8 @@ func TestFlattenSettingsWithSources(t *testing.T) {
 	})
 
 	t.Run("Default source for unmapped settings", func(t *testing.T) {
-		settings := map[string]interface{}{
-			"pulse": map[string]interface{}{
+		settings := map[string]any{
+			"pulse": map[string]any{
 				"workers": 1,
 			},
 		}
@@ -191,8 +191,8 @@ workers = 1
 		os.Setenv("QNTX_PULSE_DAILY_BUDGET_USD", "7.0")
 
 		// Test environment variable override
-		settings := map[string]interface{}{
-			"pulse": map[string]interface{}{
+		settings := map[string]any{
+			"pulse": map[string]any{
 				"daily_budget_usd": 3.0,
 				"workers":          1,
 			},

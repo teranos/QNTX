@@ -1048,9 +1048,9 @@ func (rs *RustStore) CrashTest() {
 // QueryAttestationsRaw executes a raw SQL query through Rust's connection.
 // The query must select standard attestation columns in order.
 // params is a slice of bind parameters (strings, ints, floats, nil).
-func (rs *RustStore) QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error) {
+func (rs *RustStore) QueryAttestationsRaw(sql string, params []any) ([]*types.As, error) {
 	if params == nil {
-		params = []interface{}{}
+		params = []any{}
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {

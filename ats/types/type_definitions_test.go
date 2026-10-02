@@ -20,7 +20,7 @@ func (m *MockAttestationStore) CreateAttestation(as *As) error {
 func TestAttestType_Basic(t *testing.T) {
 	store := &MockAttestationStore{}
 
-	err := AttestType(store, "document", "test-source", map[string]interface{}{
+	err := AttestType(store, "document", "test-source", map[string]any{
 		"display_color": "#3498db",
 		"display_label": "Document",
 	})
@@ -53,7 +53,7 @@ func TestAttestType_Basic(t *testing.T) {
 func TestAttestType_SelfCertifyingActor(t *testing.T) {
 	store := &MockAttestationStore{}
 
-	err := AttestType(store, "artifact", "test-source", map[string]interface{}{
+	err := AttestType(store, "artifact", "test-source", map[string]any{
 		"display_color": "#9b59b6",
 	})
 
@@ -82,7 +82,7 @@ func TestAttestType_SelfCertifyingActor(t *testing.T) {
 func TestAttestType_EmptyTypeName(t *testing.T) {
 	store := &MockAttestationStore{}
 
-	err := AttestType(store, "", "test-source", map[string]interface{}{
+	err := AttestType(store, "", "test-source", map[string]any{
 		"display_color": "#000000",
 	})
 
@@ -103,7 +103,7 @@ func TestAttestType_EmptyTypeName(t *testing.T) {
 func TestAttestType_EmptySource(t *testing.T) {
 	store := &MockAttestationStore{}
 
-	err := AttestType(store, "document", "", map[string]interface{}{
+	err := AttestType(store, "document", "", map[string]any{
 		"display_color": "#000000",
 	})
 

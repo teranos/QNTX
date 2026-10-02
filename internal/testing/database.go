@@ -119,7 +119,7 @@ func (s *sqlTestStore) GenerateAndCreateAttestation(ctx context.Context, cmd *ty
 func (s *sqlTestStore) GetAttestations(filters ats.AttestationFilter) (_ []*types.As, err error) {
 	query := `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at FROM attestations`
 	var clauses []string
-	var args []interface{}
+	var args []any
 
 	if len(filters.Subjects) > 0 {
 		for _, subj := range filters.Subjects {

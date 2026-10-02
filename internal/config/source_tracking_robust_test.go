@@ -172,7 +172,7 @@ workers = 3`),
 		require.NoError(t, err)
 
 		// Observable behavior: All settings appear in introspection
-		settingsMap := make(map[string]interface{})
+		settingsMap := make(map[string]any)
 		for _, s := range intro.Settings {
 			settingsMap[s.Key] = s.Value
 		}

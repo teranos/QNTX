@@ -22,7 +22,7 @@ const (
 // SettingInfo contains metadata about a configuration setting
 type SettingInfo struct {
 	Key        string       `json:"key"`
-	Value      interface{}  `json:"value"`
+	Value      any          `json:"value"`
 	Source     ConfigSource `json:"source"`
 	SourcePath string       `json:"source_path,omitempty"` // File path or env var name
 }
@@ -74,7 +74,7 @@ type SourceInfo struct {
 }
 
 // flattenSettingsWithSources flattens settings and assigns sources from sourceMap
-func flattenSettingsWithSources(settings map[string]interface{}, prefix string, introspection *ConfigIntrospection, sourceMap map[string]SourceInfo) {
+func flattenSettingsWithSources(settings map[string]any, prefix string, introspection *ConfigIntrospection, sourceMap map[string]SourceInfo) {
 	// Sort keys for deterministic iteration
 	keys := make([]string, 0, len(settings))
 	for k := range settings {
@@ -90,7 +90,7 @@ func flattenSettingsWithSources(settings map[string]interface{}, prefix string, 
 		}
 
 		// Check if value is a nested map
-		if nestedMap, ok := value.(map[string]interface{}); ok {
+		if nestedMap, ok := value.(map[string]any); ok {
 			flattenSettingsWithSources(nestedMap, fullKey, introspection, sourceMap)
 			continue
 		}
@@ -120,10 +120,10 @@ func flattenSettingsWithSources(settings map[string]interface{}, prefix string, 
 }
 
 // GetConfigSummary returns a human-readable config summary
-func GetConfigSummary() map[string]interface{} {
+func GetConfigSummary() map[string]any {
 	v := GetViper()
 
-	summary := map[string]interface{}{
+	summary := map[string]any{
 		"config_file": v.ConfigFileUsed(),
 		"sources": map[string]int{
 			"environment": 0,

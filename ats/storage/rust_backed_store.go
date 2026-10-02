@@ -96,7 +96,7 @@ func (s *RustBackedStore) GetAttestation(id string) (*types.As, error) {
 }
 
 // QueryAttestationsRaw executes a raw SQL query through Rust's connection.
-func (s *RustBackedStore) QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error) {
+func (s *RustBackedStore) QueryAttestationsRaw(sql string, params []any) ([]*types.As, error) {
 	return s.rust.QueryAttestationsRaw(sql, params)
 }
 

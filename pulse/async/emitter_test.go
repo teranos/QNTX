@@ -93,7 +93,7 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 
 		// Mission Control: "10 satellites deployed successfully"
 		// Using generic EmitProgress with metadata (domain-agnostic)
-		metadata := map[string]interface{}{
+		metadata := map[string]any{
 			"type": "satellites",
 			"ids":  []string{"sat-001", "sat-002", "sat-003", "sat-004", "sat-005", "sat-006", "sat-007", "sat-008", "sat-009", "sat-010"},
 		}
@@ -131,7 +131,7 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 
 		// Mission Control: "Item processed" - using generic EmitProgress
 		// Domain-specific details (like scoring) go in metadata
-		metadata := map[string]interface{}{
+		metadata := map[string]any{
 			"item_id": "ITEM-042",
 			"result":  "processed",
 		}

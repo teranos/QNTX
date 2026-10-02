@@ -15,31 +15,31 @@ import (
 //
 // TODO(#605): Rename to Attestation (and AsCommand → As) for clarity.
 type As struct {
-	ID         string                 `db:"id" json:"id" validate:"required"`                       // ASID: AS + UUID
-	Subjects   []string               `db:"subjects" json:"subjects" validate:"required,min=1"`     // Entities being attested about
-	Predicates []string               `db:"predicates" json:"predicates" validate:"required,min=1"` // Claims being made
-	Contexts   []string               `db:"contexts" json:"contexts" validate:"required,min=1"`     // Object of the claim ("of X") — a grammatical slot
-	Actors     []string               `db:"actors" json:"actors" validate:"required,min=1"`         // Who made the attestation
-	Timestamp  time.Time              `db:"timestamp" json:"timestamp" validate:"required"`         // When attestation was made
-	Source     string                 `db:"source" json:"source" validate:"required"`               // How attestation was created
-	Attributes map[string]interface{} `db:"attributes" json:"attributes,omitempty"`                 // Arbitrary JSON
-	CreatedAt  time.Time              `db:"created_at" json:"created_at"`                           // Database creation time
-	Signature  []byte                 `db:"signature" json:"signature,omitempty"`                   // Ed25519 signature over canonical JSON
-	SignerDID  string                 `db:"signer_did" json:"signer_did,omitempty"`                 // did:key of a signing node
+	ID         string         `db:"id" json:"id" validate:"required"`                       // ASID: AS + UUID
+	Subjects   []string       `db:"subjects" json:"subjects" validate:"required,min=1"`     // Entities being attested about
+	Predicates []string       `db:"predicates" json:"predicates" validate:"required,min=1"` // Claims being made
+	Contexts   []string       `db:"contexts" json:"contexts" validate:"required,min=1"`     // Object of the claim ("of X") — a grammatical slot
+	Actors     []string       `db:"actors" json:"actors" validate:"required,min=1"`         // Who made the attestation
+	Timestamp  time.Time      `db:"timestamp" json:"timestamp" validate:"required"`         // When attestation was made
+	Source     string         `db:"source" json:"source" validate:"required"`               // How attestation was created
+	Attributes map[string]any `db:"attributes" json:"attributes,omitempty"`                 // Arbitrary JSON
+	CreatedAt  time.Time      `db:"created_at" json:"created_at"`                           // Database creation time
+	Signature  []byte         `db:"signature" json:"signature,omitempty"`                   // Ed25519 signature over canonical JSON
+	SignerDID  string         `db:"signer_did" json:"signer_did,omitempty"`                 // did:key of a signing node
 }
 
 // AsCommand represents the parsed CLI command for creating attestations
 //
 // TODO(#605): Rename to As (and As → Attestation) for clarity.
 type AsCommand struct {
-	Subjects      []string               `json:"subjects"`                 // Entities being attested about
-	Predicates    []string               `json:"predicates"`               // What is being claimed (optional, defaults to ["_"])
-	Contexts      []string               `json:"contexts"`                 // Optional "of" context (defaults to ["_"])
-	Actors        []string               `json:"actors"`                   // Who made the attestation (optional, uses default)
-	Timestamp     time.Time              `json:"timestamp"`                // When attestation was made (optional, uses now)
-	Source        string                 `json:"source,omitempty"`         // Source of attestation (e.g., "cli", "github", "atproto")
-	SourceVersion string                 `json:"source_version,omitempty"` // Version of the source that created this attestation
-	Attributes    map[string]interface{} `json:"attributes,omitempty"`     // Arbitrary JSON
+	Subjects      []string       `json:"subjects"`                 // Entities being attested about
+	Predicates    []string       `json:"predicates"`               // What is being claimed (optional, defaults to ["_"])
+	Contexts      []string       `json:"contexts"`                 // Optional "of" context (defaults to ["_"])
+	Actors        []string       `json:"actors"`                   // Who made the attestation (optional, uses default)
+	Timestamp     time.Time      `json:"timestamp"`                // When attestation was made (optional, uses now)
+	Source        string         `json:"source,omitempty"`         // Source of attestation (e.g., "cli", "github", "atproto")
+	SourceVersion string         `json:"source_version,omitempty"` // Version of the source that created this attestation
+	Attributes    map[string]any `json:"attributes,omitempty"`     // Arbitrary JSON
 }
 
 // ToAs converts an AsCommand to an As struct with generated ASID and source
@@ -127,7 +127,7 @@ type AxResult struct {
 type AxDebug struct {
 	ExecutionTimeMs  int64               `json:"execution_time_ms"`
 	SQLQuery         string              `json:"sql_query,omitempty"`
-	SQLArgs          []interface{}       `json:"sql_args,omitempty"`
+	SQLArgs          []any               `json:"sql_args,omitempty"`
 	OriginalFilter   AxFilter            `json:"original_filter"`
 	ExpandedFilter   AxFilter            `json:"expanded_filter,omitempty"`
 	AliasExpansions  map[string][]string `json:"alias_expansions,omitempty"`

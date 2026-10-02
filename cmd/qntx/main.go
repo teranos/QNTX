@@ -282,7 +282,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 				if len(routes) > 0 {
 					detail += " — " + strings.Join(routes, ", ")
 				}
-				attrs := map[string]interface{}{
+				attrs := map[string]any{
 					"event":          event,
 					"plugin_version": version,
 					"log_path":       filepath.Join(filepath.Dir(cfg.GetLogPath(config.GetServerPort())), pluginName+".log"),

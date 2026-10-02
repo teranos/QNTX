@@ -13,17 +13,17 @@ import (
 // using serde with base64_serde for signature and serde(default) for missing fields.
 // Go's omitempty omits nil/zero fields; Rust's serde(default) fills in defaults.
 type ffiAttestation struct {
-	ID         string                 `json:"id,omitempty"`
-	Subjects   []string               `json:"subjects,omitempty"`
-	Predicates []string               `json:"predicates,omitempty"`
-	Contexts   []string               `json:"contexts,omitempty"`
-	Actors     []string               `json:"actors,omitempty"`
-	Timestamp  int64                  `json:"timestamp,omitempty"`
-	Source     string                 `json:"source,omitempty"`
-	Attributes map[string]interface{} `json:"attributes,omitempty"`
-	CreatedAt  int64                  `json:"created_at,omitempty"`
-	Signature  []byte                 `json:"signature,omitempty"` // base64 in JSON
-	SignerDID  string                 `json:"signer_did,omitempty"`
+	ID         string         `json:"id,omitempty"`
+	Subjects   []string       `json:"subjects,omitempty"`
+	Predicates []string       `json:"predicates,omitempty"`
+	Contexts   []string       `json:"contexts,omitempty"`
+	Actors     []string       `json:"actors,omitempty"`
+	Timestamp  int64          `json:"timestamp,omitempty"`
+	Source     string         `json:"source,omitempty"`
+	Attributes map[string]any `json:"attributes,omitempty"`
+	CreatedAt  int64          `json:"created_at,omitempty"`
+	Signature  []byte         `json:"signature,omitempty"` // base64 in JSON
+	SignerDID  string         `json:"signer_did,omitempty"`
 }
 
 // toRustJSON converts Go types.As to JSON for the Rust FFI boundary.
