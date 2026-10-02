@@ -1,4 +1,0 @@
-(executable
- (name main)
- (public_name qntx-loom)
- (libraries qntx_loom qntx-plugin))

@@ -19,7 +19,7 @@ const (
 	ActionTypeWebhook        ActionType = "webhook"
 	ActionTypeLLMPrompt      ActionType = "llm_prompt"
 	ActionTypeElementExecute ActionType = "element_execute"
-	ActionTypePluginExecute  ActionType = "plugin_execute" // Added 2026-03-11, no active consumers yet (loom uses UDP instead)
+	ActionTypePluginExecute  ActionType = "plugin_execute" // Added 2026-03-11, no active consumers yet
 	ActionTypeSemanticMatch  ActionType = "semantic_match"
 
 	// ActionTypeTell runs nothing. It tells the browsers watching that an

@@ -31,9 +31,9 @@ func TestAnAddedPluginStartsDisabled(t *testing.T) {
 // A tree URL names the plugin by its last segment.
 func TestATreeURLNamesThePluginByItsLastSegment(t *testing.T) {
 	s := rootKnowingServer(t)
-	added, err := s.pluginRecords().AddPlugin(rootAccount, "https://github.com/teranos/QNTX/tree/main/qntx-plugins/loom")
+	added, err := s.pluginRecords().AddPlugin(rootAccount, "https://github.com/teranos/QNTX/tree/main/qntx-plugins/kern")
 	require.NoError(t, err)
-	assert.Equal(t, "loom", added.Name)
+	assert.Equal(t, "kern", added.Name)
 }
 
 // What is entered has to be a repository URL.

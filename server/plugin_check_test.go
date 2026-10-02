@@ -16,10 +16,10 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 )
 
-const loomRepo = "https://github.com/teranos/QNTX/tree/main/qntx-plugins/loom"
+const kernRepo = "https://github.com/teranos/QNTX/tree/main/qntx-plugins/kern"
 
 // checkingServer is a node whose own GitHub answers from a stand-in holding
-// teranos/QNTX with qntx-plugins/loom in it; readme is that directory's README,
+// teranos/QNTX with qntx-plugins/kern in it; readme is that directory's README,
 // or none when empty. It returns the paths GitHub was asked for.
 func checkingServer(t *testing.T, readme string) (*QNTXServer, *[]string) {
 	t.Helper()
@@ -42,15 +42,15 @@ func checkingServer(t *testing.T, readme string) (*QNTXServer, *[]string) {
 		switch r.URL.EscapedPath() {
 		case "/repos/teranos/QNTX":
 			_ = json.NewEncoder(w).Encode(map[string]any{"full_name": "teranos/QNTX", "private": false, "default_branch": "main"})
-		case "/repos/teranos/QNTX/contents/qntx-plugins/loom":
-			_ = json.NewEncoder(w).Encode([]map[string]any{{"type": "file", "name": "main.go", "path": "qntx-plugins/loom/main.go"}})
-		case "/repos/teranos/QNTX/readme/qntx-plugins/loom":
+		case "/repos/teranos/QNTX/contents/qntx-plugins/kern":
+			_ = json.NewEncoder(w).Encode([]map[string]any{{"type": "file", "name": "main.go", "path": "qntx-plugins/kern/main.go"}})
+		case "/repos/teranos/QNTX/readme/qntx-plugins/kern":
 			if readme == "" {
 				w.WriteHeader(http.StatusNotFound)
 				_ = json.NewEncoder(w).Encode(map[string]string{"message": "Not Found"})
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"type": "file", "encoding": "base64", "path": "qntx-plugins/loom/README.md",
+			_ = json.NewEncoder(w).Encode(map[string]any{"type": "file", "encoding": "base64", "path": "qntx-plugins/kern/README.md",
 				"content": base64.StdEncoding.EncodeToString([]byte(readme))})
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -64,24 +64,24 @@ func checkingServer(t *testing.T, readme string) (*QNTXServer, *[]string) {
 
 // Check asks GitHub as the node, and brings back the plugin's README.
 func TestCheckFindsThePluginsDirectoryAndItsReadme(t *testing.T) {
-	s, asked := checkingServer(t, "# loom\nWeaves.")
+	s, asked := checkingServer(t, "# kern\nParses Ax.")
 
-	checked, err := s.checkPlugin(context.Background(), loomRepo)
+	checked, err := s.checkPlugin(context.Background(), kernRepo)
 	require.NoError(t, err)
-	assert.Equal(t, "loom", checked.Name)
+	assert.Equal(t, "kern", checked.Name)
 	assert.Equal(t, "teranos/QNTX", checked.Repository)
 	assert.Equal(t, "main", checked.Ref)
-	assert.Equal(t, "qntx-plugins/loom", checked.Path)
-	assert.Equal(t, "# loom\nWeaves.", checked.Readme)
-	assert.Equal(t, "qntx-plugins/loom/README.md", checked.ReadmePath)
-	assert.Contains(t, *asked, "/repos/teranos/QNTX/contents/qntx-plugins/loom?ref=main", "the path keeps its slashes")
+	assert.Equal(t, "qntx-plugins/kern", checked.Path)
+	assert.Equal(t, "# kern\nParses Ax.", checked.Readme)
+	assert.Equal(t, "qntx-plugins/kern/README.md", checked.ReadmePath)
+	assert.Contains(t, *asked, "/repos/teranos/QNTX/contents/qntx-plugins/kern?ref=main", "the path keeps its slashes")
 }
 
 // A plugin with no README is still there; what GitHub said is kept.
 func TestCheckWithoutAReadmeSaysWhy(t *testing.T) {
 	s, _ := checkingServer(t, "")
 
-	checked, err := s.checkPlugin(context.Background(), loomRepo)
+	checked, err := s.checkPlugin(context.Background(), kernRepo)
 	require.NoError(t, err)
 	assert.Empty(t, checked.Readme)
 	assert.Contains(t, checked.ReadmeSaid, "404")
@@ -101,7 +101,7 @@ func TestCheckWithGitHubOffOnTheNodeIsRefused(t *testing.T) {
 	s, asked := checkingServer(t, "")
 	require.NoError(t, s.nodeRecords().SetGitHub(rootAccount, GitHubSettings{Enabled: false, RunnerPath: DefaultRunnerPath}))
 
-	_, err := s.checkPlugin(context.Background(), loomRepo)
+	_, err := s.checkPlugin(context.Background(), kernRepo)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "disabled")
 	assert.Empty(t, *asked)

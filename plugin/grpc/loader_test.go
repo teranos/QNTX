@@ -33,7 +33,7 @@ func TestOnlyEnabledPluginsAreLoaded(t *testing.T) {
 	cfg := &config.Config{Plugin: config.PluginConfig{Paths: []string{t.TempDir()}}}
 	records := heldRecords{
 		"pyre": {Name: "pyre", Enabled: true},
-		"loom": {Name: "loom"},
+		"kern": {Name: "kern"},
 	}
 
 	manager := NewPluginManager(logger, logger, "")
@@ -42,7 +42,7 @@ func TestOnlyEnabledPluginsAreLoaded(t *testing.T) {
 	assert.Empty(t, manager.GetAllPlugins(), "no binary is on disk")
 	failed := manager.GetFailedPlugins()
 	assert.Contains(t, failed, "pyre", "an enabled plugin with no binary says why")
-	assert.NotContains(t, failed, "loom", "a disabled plugin is left alone")
+	assert.NotContains(t, failed, "kern", "a disabled plugin is left alone")
 }
 
 // A plugin with no build on disk waits for one; it is never fetched.
