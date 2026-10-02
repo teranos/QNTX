@@ -62,9 +62,9 @@ func TestAUserWithoutAStoreSendsAndReads(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "Under the mat.")
 }
 
-// Nobody sends from an address they do not hold, ROOT included.
+// Nobody but ROOT sends from an address they do not hold.
 func TestNobodySendsFromAnotherUsersAddress(t *testing.T) {
-	for _, level := range []string{"ATTESTOR", "ROOT"} {
+	for _, level := range []string{"ATTESTOR", "PUBLIC_REGISTRATION", "SUPER"} {
 		st := &heldStore{}
 		st.grant("timothy@example.com", "US-TIM-7K4M3B9X")
 		p := pluginWith(st)
@@ -72,6 +72,29 @@ func TestNobodySendsFromAnotherUsersAddress(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, w.Code, "%s: %s", level, w.Body.String())
 		assert.Empty(t, p.sender.(*outbox).sent, "%s sent from another User's address", level)
 	}
+}
+
+// "I also expect to be able to send mail as another user as ROOT, and this should also be an attested event"
+func TestROOTSendingAsAnotherUserIsAttested(t *testing.T) {
+	st := &heldStore{}
+	st.grant("timothy@example.com", "US-TIM-7K4M3B9X")
+	p := pluginWith(st)
+
+	w := serve(t, p, by(http.MethodPost, "/send", sending, "US-ROOT-0000000", "ROOT"))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	sentAs := st.wrote(PredicateMailSentAs)
+	require.Len(t, sentAs, 1)
+	assert.Equal(t, []string{"timothy@example.com"}, sentAs[0].Subjects)
+	assert.Equal(t, []string{"US-TIM-7K4M3B9X"}, sentAs[0].Contexts)
+	assert.Equal(t, []string{"did:key:z6MkUS-ROOT-0000000"}, sentAs[0].Actors)
+	assert.Equal(t, "US-ROOT-0000000", sentAs[0].Attributes["sender"])
+
+	sent := st.wrote(PredicateMailSent)
+	require.Len(t, sent, 1)
+	assert.Equal(t, "US-TIM-7K4M3B9X", sent[0].Attributes["user"], "the mail is not in the holder's sent mailbox")
+	assert.Equal(t, "US-ROOT-0000000", sent[0].Attributes["sender"])
+	assert.Len(t, p.sender.(*outbox).sent, 1)
 }
 
 func mailboxOf(t *testing.T, p *Plugin, user, level, mailbox string) (int, []*protocol.Email) {
@@ -141,11 +164,11 @@ func TestAddressesAreTheCallersOwnOrEveryOneForROOT(t *testing.T) {
 
 	w := serve(t, p, by(http.MethodGet, "/addresses", "", "US-TIM-7K4M3B9X", "PUBLIC_REGISTRATION"))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-	assert.JSONEq(t, `{"addresses":[{"email":"timothy@example.com","user":"US-TIM-7K4M3B9X"}]}`, w.Body.String())
+	assert.JSONEq(t, `{"addresses":[{"email":"timothy@example.com","user":"US-TIM-7K4M3B9X"}],"domains":["example.com"]}`, w.Body.String())
 
 	w = serve(t, p, by(http.MethodGet, "/addresses", "", "US-ROOT-0000000", "ROOT"))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-	assert.JSONEq(t, `{"addresses":[{"email":"contact@example.com","user":"US-ADA-0000000"},{"email":"timothy@example.com","user":"US-TIM-7K4M3B9X"}]}`, w.Body.String())
+	assert.JSONEq(t, `{"addresses":[{"email":"contact@example.com","user":"US-ADA-0000000"},{"email":"timothy@example.com","user":"US-TIM-7K4M3B9X"}],"domains":["example.com"]}`, w.Body.String())
 }
 
 // A path opened to Users answers one call per second per caller, so a mail

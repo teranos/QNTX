@@ -27,6 +27,8 @@ Status: Proposed
 
 "[At least 7 characters]@domain.tld"
 
+"I also expect to be able to send mail as another user as ROOT, and this should also be an attested event"
+
 ## Standard
 
 JMAP for Mail, RFC 8621. The message is RFC 5322; mailbox roles are RFC 6154.

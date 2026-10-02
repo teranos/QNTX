@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -38,6 +39,7 @@ type Plugin struct {
 	plugin.Base
 	protocol.UnimplementedInboxServiceServer
 	namespace    string
+	domains      []string
 	receiveEvery int32
 	own          func() store
 	bag          bag
@@ -75,6 +77,7 @@ func (p *Plugin) Initialize(_ context.Context, services plugin.ServiceRegistry) 
 	p.Init(services)
 	config := services.Config("inbox")
 	p.namespace = strings.TrimSpace(config.GetString(plugingrpc.PluginNamespaceKey))
+	p.domains = strings.Fields(strings.ToLower(config.GetString("domains")))
 	mail := awsMail{
 		region:  config.GetString("region"),
 		bucket:  config.GetString("bucket"),
@@ -103,6 +106,7 @@ func (p *Plugin) ConfigSchema() map[string]plugin.ConfigField {
 		"bucket":        {Type: "string", Description: "S3 bucket SES stores received mail in, under inbound/", Required: true},
 		"rule_set":      {Type: "string", Description: "SES receipt rule set", Required: true},
 		"rule":          {Type: "string", Description: "SES receipt rule whose recipients are the granted addresses", Required: true},
+		"domains":       {Type: "string", Description: "The domains an address is given on, space separated: the ones SES receives for"},
 		"receive_every": {Type: "int", Description: "Seconds between receivings", DefaultValue: "30"},
 	}
 }
@@ -217,6 +221,8 @@ func (p *Plugin) CreateMailIdentity(ctx context.Context, req *protocol.CreateMai
 		return nil, &refused{http.StatusBadRequest, quoted(req.GetEmail()) + " is not an address"}
 	case utf8.RuneCountInString(email[:strings.LastIndex(email, "@")]) < MinLocalPart:
 		return nil, &refused{http.StatusBadRequest, quoted(req.GetEmail()) + " has fewer than 7 characters before the @"}
+	case !slices.Contains(p.domains, email[strings.LastIndex(email, "@")+1:]):
+		return nil, &refused{http.StatusBadRequest, "an address is given on " + strings.Join(p.domains, " or ") + ", the domains inbox receives for, and not on " + quoted(email[strings.LastIndex(email, "@")+1:])}
 	}
 
 	as, err := p.own().GenerateAndCreateAttestation(ctx, &types.AsCommand{

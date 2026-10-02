@@ -18,10 +18,13 @@ const (
 	PredicateMailSent = "mail:sent"
 	// "ROOT should be able to read other user's mail as well, but doing so is an attested event."
 	PredicateMailRead = "mail:read"
+	// "I also expect to be able to send mail as another user as ROOT, and this should also be an attested event"
+	PredicateMailSentAs = "mail:sent-as"
 )
 
 // SubmitEmail sends a text mail through SES from an address the caller holds,
-// and attests it as sent.
+// or any for ROOT, whose sending as another User is attested first, and
+// attests it as sent in the holder's sent mailbox.
 func (p *Plugin) SubmitEmail(ctx context.Context, req *protocol.SubmitEmailRequest) (*protocol.SubmitEmailResponse, error) {
 	c, err := p.asking(ctx)
 	if err != nil {
@@ -42,8 +45,27 @@ func (p *Plugin) SubmitEmail(ctx context.Context, req *protocol.SubmitEmailReque
 	if err != nil {
 		return nil, err
 	}
-	if user == "" || user != c.user {
-		return nil, &refused{http.StatusForbidden, "mail is sent only from an address the sender holds, and " + from + " is not the caller's"}
+	if user == "" {
+		return nil, &refused{http.StatusForbidden, "mail is sent only from an address somebody holds, and nobody holds " + from}
+	}
+	if user != c.user {
+		if !c.root() {
+			return nil, &refused{http.StatusForbidden, "mail is sent only from an address the sender holds, and " + from + " is not the caller's"}
+		}
+		if _, err := st.GenerateAndCreateAttestation(ctx, &types.AsCommand{
+			Subjects:   []string{from},
+			Predicates: []string{PredicateMailSentAs},
+			Contexts:   []string{user},
+			Actors:     []string{c.asker},
+			Source:     p.Metadata().Name,
+			Attributes: map[string]interface{}{
+				"sender":  c.user,
+				"to":      strings.Join(req.GetTo(), ", "),
+				"subject": req.GetSubject(),
+			},
+		}); err != nil {
+			return nil, errors.Wrapf(err, "ROOT's sending as %s is not attested, so it is not sent", from)
+		}
 	}
 
 	id, err := p.sender.Send(ctx, outgoing{From: from, To: req.GetTo(), Subject: req.GetSubject(), Text: req.GetTextBody()})
@@ -59,6 +81,7 @@ func (p *Plugin) SubmitEmail(ctx context.Context, req *protocol.SubmitEmailReque
 		Attributes: map[string]interface{}{
 			"mailbox": MailboxSent,
 			"user":    user,
+			"sender":  c.user,
 			"from":    from,
 			"to":      strings.Join(req.GetTo(), ", "),
 			"subject": req.GetSubject(),
@@ -109,7 +132,7 @@ func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsReque
 			Contexts:   []string{user},
 			Actors:     []string{c.asker},
 			Source:     p.Metadata().Name,
-			Attributes: map[string]interface{}{"mailbox": req.GetInMailbox(), "reader": c.user},
+			Attributes: map[string]interface{}{"mailbox": readOf(req.GetInMailbox()), "reader": c.user},
 		}); err != nil {
 			return nil, errors.Wrapf(err, "ROOT's reading of %s is not attested, so it is not read", address)
 		}
@@ -127,6 +150,14 @@ func (p *Plugin) QueryEmails(ctx context.Context, req *protocol.QueryEmailsReque
 		}
 	}
 	return resp, nil
+}
+
+// readOf is the mailboxes a reading read: the one named, or all three.
+func readOf(mailbox string) string {
+	if mailbox == "" {
+		return strings.Join([]string{MailboxInbox, MailboxJunk, MailboxSent}, " ")
+	}
+	return mailbox
 }
 
 // held is one address and the User holding it, by the latest grant.
@@ -170,7 +201,7 @@ func (p *Plugin) addresses(ctx context.Context) ([]held, error) {
 
 func (p *Plugin) addressesOf(w http.ResponseWriter, r *http.Request) {
 	list, err := p.addresses(callOf(r))
-	p.answer(w, map[string][]held{"addresses": list}, err)
+	p.answer(w, map[string]any{"addresses": list, "domains": p.domains}, err)
 }
 
 func attribute(as *types.As, key string) string {

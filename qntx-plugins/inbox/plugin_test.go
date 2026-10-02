@@ -95,6 +95,7 @@ func (s *outbox) Send(_ context.Context, m outgoing) (string, error) {
 func pluginWith(st *heldStore) *Plugin {
 	p := NewPlugin()
 	p.namespace = "Clean"
+	p.domains = []string{"example.com"}
 	p.own = func() store { return st }
 	p.rule = &rule{}
 	p.sender = &outbox{}
@@ -217,6 +218,19 @@ func TestAnAddressHasAtLeastSevenCharactersBeforeTheAt(t *testing.T) {
 		w := serve(t, pluginWith(st), asked(`{"user_id":"US-TIM-7K4M3B9X","email":"`+email+`"}`, "ROOT"))
 		assert.Equal(t, status, w.Code, "%s: %s", email, w.Body.String())
 	}
+}
+
+// "it should just give me the options"
+func TestAnAddressIsGivenOnADomainInboxReceivesFor(t *testing.T) {
+	st := &heldStore{}
+	p := pluginWith(st)
+	w := serve(t, p, asked(`{"user_id":"US-TIM-7K4M3B9X","email":"timothy@elsewhere.org"}`, "ROOT"))
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Empty(t, st.written)
+
+	w = serve(t, p, by(http.MethodGet, "/addresses", "", "US-ROOT-0000000", "ROOT"))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), `"domains":["example.com"]`)
 }
 
 // QNTX makes the declared routes sigils and MCP tools.
