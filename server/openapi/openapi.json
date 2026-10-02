@@ -452,6 +452,11 @@
         "SUPER"
       ]
     },
+    "/api/transcripts": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/types": {
       "x-qntx-reach": [
         "ROOT"
