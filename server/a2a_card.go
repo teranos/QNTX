@@ -20,6 +20,7 @@ func (s *QNTXServer) a2aCard(r *http.Request) a2a.Card {
 		Description: appcfg.GetString("node.description"),
 		Version:     version.VersionTag,
 		URL:         a2aURL(r),
+		MCP:         a2a.Interface{URL: nodeURL(r) + "/mcp", Version: mcpProtocolVersion},
 		Skills:      []a2a.Skill{},
 	}
 	admitted, known := auth.AdmissionFrom(r.Context())
@@ -43,11 +44,21 @@ func (s *QNTXServer) a2aCard(r *http.Request) a2a.Card {
 	return card
 }
 
-// a2aURL is where the caller of r reached the binding.
-func a2aURL(r *http.Request) string {
+// mcpProtocolVersion is the newest MCP the go-sdk this node is built with
+// speaks, which a client asking for the newest is answered in. The SDK keeps it
+// unexported, so TestTheCardNamesTheMCPTheNodeSpeaks holds it to a handshake.
+const mcpProtocolVersion = "2026-07-28"
+
+// nodeURL is the node as the caller of r reached it.
+func nodeURL(r *http.Request) string {
 	scheme := "http"
 	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 		scheme = "https"
 	}
-	return scheme + "://" + r.Host + a2aPrefix[:len(a2aPrefix)-1]
+	return scheme + "://" + r.Host
+}
+
+// a2aURL is where the caller of r reached the binding.
+func a2aURL(r *http.Request) string {
+	return nodeURL(r) + a2aPrefix[:len(a2aPrefix)-1]
 }

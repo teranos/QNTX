@@ -48,7 +48,9 @@ func TestAmCardIsTheCardTheAskerWouldGet(t *testing.T) {
 	var got struct {
 		Card struct {
 			SupportedInterfaces []struct {
-				URL string `json:"url"`
+				URL             string `json:"url"`
+				ProtocolBinding string `json:"protocolBinding"`
+				ProtocolVersion string `json:"protocolVersion"`
 			} `json:"supportedInterfaces"`
 			Skills []struct {
 				Name string `json:"name"`
@@ -57,8 +59,11 @@ func TestAmCardIsTheCardTheAskerWouldGet(t *testing.T) {
 		Missing []string `json:"missing"`
 	}
 	require.NoError(t, json.Unmarshal(body, &got))
-	require.Len(t, got.Card.SupportedInterfaces, 1)
+	require.Len(t, got.Card.SupportedInterfaces, 2)
 	assert.Equal(t, "https://node.example/a2a", got.Card.SupportedInterfaces[0].URL)
+	assert.Equal(t, "https://node.example/mcp", got.Card.SupportedInterfaces[1].URL)
+	assert.Equal(t, "MCP", got.Card.SupportedInterfaces[1].ProtocolBinding)
+	assert.Equal(t, mcpProtocolVersion, got.Card.SupportedInterfaces[1].ProtocolVersion)
 	assert.NotEmpty(t, got.Card.Skills)
 	assert.Contains(t, got.Missing, "AgentCard.name")
 	assert.Contains(t, got.Missing, "AgentCard.skills[0].id")
