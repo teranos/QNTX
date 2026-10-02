@@ -40,6 +40,31 @@ export interface Node {
 }
 
 /**
+ * Transcript is one agent session Ground recorded, derived from its hook
+ * events: transcripts read answers these. Mirrors server.transcript.
+ */
+export interface Transcript {
+  session: string;
+  subjects: string[];
+  started: string;
+  ended: string;
+  turns: Turn[];
+  /** Events the store folded into sigmas (ADR-020), counted and not read. */
+  folded: number;
+}
+
+/**
+ * Turn is one thing said or done in a session, naming the attestation it was
+ * read from. Mirrors server.transcriptTurn.
+ */
+export interface Turn {
+  at: string;
+  speaker: string;
+  text: string;
+  of: string;
+}
+
+/**
  * Follows says which column of a reference each of a signum's fields is. The
  * reference is named, not described: its own schema says what its columns are.
  */

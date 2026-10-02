@@ -70,7 +70,7 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 					Name: "card",
 					Does: "The A2A agent card the asker would be given, read through the pinned spec, and what it leaves empty that the spec requires.",
 					Gives: []*protocol.Field{
-						{Name: "card", Says: "The card, as lf.a2a.v1.AgentCard of the pinned A2A spec."},
+						{Name: "card", Says: "The card, as the pinned A2A spec shapes it.", Message: a2a.AgentCard},
 						{Name: "missing", Says: "Every field the card leaves empty that the spec requires, by its path."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/card"},
