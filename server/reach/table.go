@@ -136,6 +136,9 @@ REACH is '/am/card'                                                       of ROO
 # sigil is what an Agent should deal with through MCP".
 REACH is '/api/parity/hold' '/api/parity/storage'                         of ROOT
 
+# What was said and done in each agent session Ground recorded (transcripts).
+REACH is '/api/transcripts'                                               of ROOT
+
 # A2A over HTTP+JSON, one line for every operation: a route like
 # /tasks/{id}:cancel is no pattern the mux reads. "A2A is ROOT's alone for the
 # foreseeable future" (ADR-039); a2a:<signum> lines say who reaches a skill.
