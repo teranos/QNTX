@@ -158,6 +158,19 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 		if len(held.Required) != 0 {
 			t.Errorf("%s: required and unfollowed is %v", name, held.Required)
 		}
+		// "seeing prose from the specs themselves where they have it": theirs on
+		// the column, ours by field.
+		for _, item := range tool.Items {
+			if item.Column == "description" && !strings.HasPrefix(item.Says, "A human-readable description of the tool.") {
+				t.Errorf("%s: Tool.description says %q", name, item.Says)
+			}
+			if item.Column == "name" && !item.Required {
+				t.Errorf("%s: Tool.name is not required", name)
+			}
+		}
+		if held.Ours["protocol.Sigil.does"] != "What it is for, in words, for somebody who has never seen the code." {
+			t.Errorf("%s: Sigil.does says %q", name, held.Ours["protocol.Sigil.does"])
+		}
 		if len(held.Unfollowed["protocol.Sigil"]) != 0 {
 			t.Errorf("%s: Sigil unfollowed is %v", name, held.Unfollowed["protocol.Sigil"])
 		}

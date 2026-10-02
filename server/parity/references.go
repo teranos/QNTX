@@ -102,6 +102,8 @@ func jsonSchemaAt(schema string) (Schema, *protocol.Refusal) {
 // what this binary links of genproto; google/protobuf is protocompile's own.
 func protoAt(dir string, names []string) (Schema, *protocol.Refusal) {
 	compiler := protocompile.Compiler{
+		// The comments are what the spec says of its own messages and fields.
+		SourceInfoMode: protocompile.SourceInfoStandard,
 		Resolver: protocompile.WithStandardImports(protocompile.CompositeResolver{
 			&protocompile.SourceResolver{Accessor: func(name string) (io.ReadCloser, error) {
 				return pinned.Open(path.Join(dir, name))
@@ -137,7 +139,7 @@ func messagesOf(pkg protoreflect.FullName, messages protoreflect.MessageDescript
 		if message.IsMapEntry() {
 			continue
 		}
-		model := Model{Name: strings.TrimPrefix(string(message.FullName()), string(pkg)+".")}
+		model := Model{Name: strings.TrimPrefix(string(message.FullName()), string(pkg)+"."), Says: saysOf(message)}
 		fields := message.Fields()
 		for j := 0; j < fields.Len(); j++ {
 			field := fields.Get(j)
@@ -146,7 +148,7 @@ func messagesOf(pkg protoreflect.FullName, messages protoreflect.MessageDescript
 				kind = "map"
 			}
 			model.Columns = append(model.Columns, Column{
-				Name: string(field.Name()), Type: kind, List: field.IsList(), Required: required(field),
+				Name: string(field.Name()), Type: kind, List: field.IsList(), Required: required(field), Says: saysOf(field),
 			})
 		}
 		models = append(models, model)
