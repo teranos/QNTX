@@ -101,7 +101,7 @@ type WatcherConfig struct {
 // AuthConfig configures biometric authentication (WebAuthn)
 type AuthConfig struct {
 	Enabled            bool                  `mapstructure:"enabled"`              // Enable biometric auth gate (default: false)
-	SessionExpiryHours int                   `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
+	SessionExpiryHours int                   `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 168, seven days)
 	RPID               string                `mapstructure:"rp_id"`                // WebAuthn Relying Party ID — the domain (e.g. "qntx.example.com"). Empty = "localhost" fallback for dev. Required when server.bind_address is non-loopback and auth.enabled is true.
 	RPOrigins          []string              `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Empty = loopback URLs derived from server.port / server.frontend_port. These are the door onto "default", so an app's scheme ("qntx://door") belongs here as well; it is a return address, and the relying party never sees it.
 	RootIdentities     []string              `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way. Required when server.bind_address is non-loopback and auth.enabled is true.

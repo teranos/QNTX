@@ -38,7 +38,7 @@ func SetDefaults(v *viper.Viper) {
 
 	// Auth defaults (disabled by default — zero auth code runs when disabled)
 	v.SetDefault("auth.enabled", false)
-	v.SetDefault("auth.session_expiry_hours", 24)
+	v.SetDefault("auth.session_expiry_hours", 168)
 
 	// Server configuration defaults
 	v.SetDefault("server.port", DefaultServerPort)
