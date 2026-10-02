@@ -105,6 +105,15 @@
     ]
   },
   {
+    "name": "auth_sessions",
+    "node": true,
+    "record": false,
+    "rebuilt": false,
+    "sites": [
+      "server/auth/sessions.go"
+    ]
+  },
+  {
     "name": "canvas_access",
     "node": true,
     "record": false,
