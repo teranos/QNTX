@@ -4,11 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/teranos/errors"
 )
 
 // Single-use and short-lived, so a signature proves possession now rather

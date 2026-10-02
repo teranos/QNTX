@@ -2,12 +2,13 @@ package auth
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/teranos/errors"
 )
 
 // mintable resolves what kind of token was asked for. Minting names the kind,
@@ -30,7 +31,7 @@ func mintable(asked string) (Level, bool) {
 func returnable(address string) error {
 	parsed, err := url.Parse(address)
 	if err != nil {
-		return errors.New("the return address does not parse as a URL: " + err.Error())
+		return errors.Wrapf(err, "the return address does not parse as a URL")
 	}
 	if parsed.Scheme == "" || (parsed.Host == "" && parsed.Opaque == "") {
 		return errors.New("the return address " + address + " is not absolute")

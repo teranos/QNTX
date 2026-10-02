@@ -21,6 +21,8 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/teranos/errors"
 )
 
 const (
@@ -71,7 +73,7 @@ func main() {
 func flakeTags(path string) ([]string, error) {
 	text, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("%s could not be read: %w", path, err)
+		return nil, errors.Wrapf(err, "%s could not be read", path)
 	}
 
 	var tags []string
@@ -86,21 +88,21 @@ func flakeTags(path string) ([]string, error) {
 		// without saying so. There is one today; if that changes, this has to
 		// be taught which derivation is the deployed binary.
 		if tags != nil {
-			return nil, fmt.Errorf("%s holds %q at line %d and again at line %d, "+
+			return nil, errors.Newf("%s holds %q at line %d and again at line %d, "+
 				"so which tags the shipped binary is built with is ambiguous",
 				path, flakeMarker, at, number+1)
 		}
 		open := strings.Index(trimmed, "[")
 		shut := strings.Index(trimmed, "]")
 		if open < 0 || shut < open {
-			return nil, fmt.Errorf("%s:%d holds %q with its closing bracket on another line; "+
+			return nil, errors.Newf("%s:%d holds %q with its closing bracket on another line; "+
 				"this reads a single line and cannot say what the binary is built with",
 				path, number+1, flakeMarker)
 		}
 		tags, at = quoted(trimmed[open+1:shut]), number+1
 	}
 	if tags == nil {
-		return nil, fmt.Errorf("%s holds no %q line, so what the binary is built with is unknown; "+
+		return nil, errors.Newf("%s holds no %q line, so what the binary is built with is unknown; "+
 			"failing rather than passing a check that read nothing", path, flakeMarker)
 	}
 	return tags, nil
@@ -110,7 +112,7 @@ func flakeTags(path string) ([]string, error) {
 func golangciTags(path string) ([]string, error) {
 	text, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("%s could not be read: %w", path, err)
+		return nil, errors.Wrapf(err, "%s could not be read", path)
 	}
 
 	lines := strings.Split(string(text), "\n")
@@ -130,11 +132,11 @@ func golangciTags(path string) ([]string, error) {
 			tags = append(tags, strings.TrimSpace(trimmed[2:]))
 		}
 		if len(tags) == 0 {
-			return nil, fmt.Errorf("%s holds %q with nothing under it", path, golangciMarker)
+			return nil, errors.Newf("%s holds %q with nothing under it", path, golangciMarker)
 		}
 		return tags, nil
 	}
-	return nil, fmt.Errorf("%s holds no %q, so what the linters can see is unknown; "+
+	return nil, errors.Newf("%s holds no %q, so what the linters can see is unknown; "+
 		"failing rather than passing a check that read nothing", path, golangciMarker)
 }
 
