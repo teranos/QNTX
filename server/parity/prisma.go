@@ -1,20 +1,7 @@
-package main
-
-import (
-	"fmt"
-	"os"
-	"slices"
-	"strings"
-
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/server"
-	"github.com/teranos/errors"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
-)
-
-// make parity prisma {Signum} {Schema.prisma}
-// make parity prisma {Signum} {Sigil} {Schema.prisma}
+// Package parity holds a signum, or one sigil of it, to a reference it follows.
+//
+// "parity the sigil is what an Agent should deal with through MCP." "Make
+// parity would just be for the storage backend specifically."
 //
 // How far a signum is from a reference it follows. Our side is the signum's own
 // declaration — which column of the reference each of its fields is — read the
@@ -23,32 +10,66 @@ import (
 //
 // A model is a clade and its columns are its items. A model nothing follows is
 // one line at 0; a model anything follows opens and lists every column; a model
-// at 100 is not shown unless -all is given.
+// at 100 is not shown unless all is asked for.
+package parity
 
-// Column is one scalar field of a Prisma model.
+import (
+	"encoding/json"
+	"fmt"
+	"slices"
+	"strings"
+
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/errors"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+)
+
+// Column is one field of a model of a reference: a scalar of a Prisma model,
+// a field of a proto message, or a property of a JSON Schema definition.
 type Column struct {
 	Name string
-	// Type is Prisma's: String, Int, BigInt, Boolean, DateTime, Decimal, Json,
-	// Float, Bytes.
+	// Type is the reference's own word for it. Prisma's: String, Int, BigInt,
+	// Boolean, DateTime, Decimal, Json, Float, Bytes. Proto's: its kind, or map.
+	// JSON Schema's: its type, the definition it refers to, its branches, or
+	// any.
 	Type string
 	List bool
+	// Required is the reference saying a value must be there.
+	Required bool
+	// holds is, for JSON Schema, the types a value of it may be once every
+	// definition it refers to is read: what Type names, resolved.
+	holds []string
 }
 
-// Model is a Prisma model and its scalar fields, in the order the schema has
-// them. Relations are not columns of the record, so they are left out.
+// Model is a Prisma model, a proto message or a JSON Schema definition and its
+// columns, in the order the schema has them. A Prisma relation is not a column
+// of the record, so it is left out.
 type Model struct {
 	Name    string
 	Columns []Column
 }
 
+// Schema is a reference as it is read: its models, and which column a field
+// of ours of one kind can be held in.
+type Schema struct {
+	Models []Model
+	fits   func(kind protoreflect.Kind, column Column) bool
+}
+
+// Prisma is a Prisma schema's models as a reference.
+func Prisma(models []Model) Schema {
+	return Schema{Models: models, fits: func(kind protoreflect.Kind, column Column) bool {
+		return slices.Contains(kindFits[kind], column.Type)
+	}}
+}
+
 var prismaScalars = []string{"String", "Int", "BigInt", "Boolean", "DateTime", "Decimal", "Json", "Float", "Bytes"}
 
-// ParsePrisma reads the models of a schema.prisma.
-func ParsePrisma(path string) ([]Model, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read the schema at %s", path)
-	}
+// ParsePrisma reads the models of a schema.prisma; path is only where it says
+// the schema came from.
+func ParsePrisma(path string, raw []byte) ([]Model, error) {
 	var models []Model
 	var cur *Model
 	for _, line := range strings.Split(string(raw), "\n") {
@@ -106,14 +127,14 @@ var kindFits = map[protoreflect.Kind][]string{
 // departs says how a field's kind and cardinality differ from the column it is
 // followed into. A map is held as one row per entry, so it may be followed into
 // a model's single-valued columns.
-func departs(field protoreflect.FieldDescriptor, name string, column Column) []string {
+func departs(field protoreflect.FieldDescriptor, name string, column Column, fits func(protoreflect.Kind, Column) bool) []string {
 	var reasons []string
 	if field.IsMap() {
 		if column.List {
 			reasons = append(reasons, fmt.Sprintf("a list in the schema, and %s is a map", name))
 		}
 		kind := field.MapValue().Kind()
-		if !slices.Contains(kindFits[kind], column.Type) {
+		if !fits(kind, column) {
 			reasons = append(reasons, fmt.Sprintf("%s in the schema, and %s holds %s", column.Type, name, kind))
 		}
 		return reasons
@@ -124,7 +145,7 @@ func departs(field protoreflect.FieldDescriptor, name string, column Column) []s
 	case !field.IsList() && column.List:
 		reasons = append(reasons, fmt.Sprintf("a list in the schema, and %s is one value", name))
 	}
-	if !slices.Contains(kindFits[field.Kind()], column.Type) {
+	if !fits(field.Kind(), column) {
 		reasons = append(reasons, fmt.Sprintf("%s in the schema, and %s is %s", column.Type, name, field.Kind()))
 	}
 	return reasons
@@ -140,10 +161,39 @@ type Item struct {
 // Conforms is followed and departs in nothing.
 func (i Item) Conforms() bool { return len(i.Followed) > 0 && len(i.Departs) == 0 }
 
+// MarshalJSON is an item as the sigil gives it: 100 when it conforms, 0 when
+// not, as the picture reads it.
+func (i Item) MarshalJSON() ([]byte, error) {
+	score := 0
+	if i.Conforms() {
+		score = 100
+	}
+	return json.Marshal(map[string]any{
+		"column": i.Column, "score": score,
+		"followed": nonNil(i.Followed), "departs": nonNil(i.Departs),
+	})
+}
+
 // Clade is one model and its columns.
 type Clade struct {
 	Model string
 	Items []Item
+}
+
+// MarshalJSON is a clade as the sigil gives it, with its score.
+func (c Clade) MarshalJSON() ([]byte, error) {
+	items := c.Items
+	if items == nil {
+		items = []Item{}
+	}
+	return json.Marshal(map[string]any{"model": c.Model, "score": c.Score(), "items": items})
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 // Score is 0 to 100: the share of the model's columns that are followed and
@@ -172,37 +222,29 @@ func (c Clade) followed() bool {
 
 // Parity is one signum, or one sigil of it, held to one schema.
 type Parity struct {
-	Signum    string
-	Sigil     string
-	Reference string
-	Clades    []Clade
+	Signum    string  `json:"signum"`
+	Sigil     string  `json:"sigil"`
+	Reference string  `json:"reference"`
+	Clades    []Clade `json:"clades"`
 	// Unfollowed is, per message in scope, its fields that follow no column.
-	Unfollowed map[string][]string
+	Unfollowed map[string][]string `json:"unfollowed"`
 	// Missing is what the declaration follows into a column the schema lacks.
-	Missing []string
-}
-
-func findSignum(signa []*protocol.Signum, name string) (*protocol.Signum, error) {
-	var names []string
-	for _, s := range signa {
-		if s.GetName() == name {
-			return s, nil
-		}
-		names = append(names, s.GetName())
-	}
-	return nil, errors.Newf("no signum %s; the node holds %s", name, strings.Join(names, ", "))
+	Missing []string `json:"missing"`
+	// Required is, of the models anything follows, each column the reference
+	// requires and nothing follows.
+	Required []string `json:"required"`
 }
 
 // inScope is the messages a sigil carries, and whole when no sigil is named and
 // the signum is held entire.
-func inScope(signum *protocol.Signum, sigil string) (messages map[string]bool, whole bool, err error) {
-	if sigil == "" {
+func inScope(signum *protocol.Signum, named string) (messages map[string]bool, whole bool, refused *protocol.Refusal) {
+	if named == "" {
 		return map[string]bool{}, true, nil
 	}
 	var names []string
 	for _, s := range signum.GetSigils() {
 		names = append(names, s.GetName())
-		if s.GetName() != sigil {
+		if s.GetName() != named {
 			continue
 		}
 		messages = map[string]bool{}
@@ -212,11 +254,13 @@ func inScope(signum *protocol.Signum, sigil string) (messages map[string]bool, w
 			}
 		}
 		if len(messages) == 0 {
-			return nil, false, errors.Newf("%s %s carries no message, so none of its fields can follow a column", signum.GetName(), sigil)
+			return nil, false, &protocol.Refusal{Why: sigil.Invalid, Param: "sigil",
+				Says: fmt.Sprintf("%s %s carries no message, so none of its fields can follow a column", signum.GetName(), named)}
 		}
 		return messages, false, nil
 	}
-	return nil, false, errors.Newf("%s holds no sigil %s; it holds %s", signum.GetName(), sigil, strings.Join(names, ", "))
+	return nil, false, &protocol.Refusal{Why: sigil.NotFound, Param: "sigil",
+		Says: fmt.Sprintf("%s holds no sigil %s; it holds %s", signum.GetName(), named, strings.Join(names, ", "))}
 }
 
 func splitField(full string) (string, string) {
@@ -238,38 +282,35 @@ func resolves(follows *protocol.Follows, columns map[string]Column) int {
 	return n
 }
 
-// pick is the reference the schema is: the one whose columns it names most.
-func pick(signum *protocol.Signum, columns map[string]Column) (*protocol.Follows, error) {
-	var best *protocol.Follows
-	bestN, tied := 0, false
+// following is the reference by its name, as the signum declares it follows.
+func following(signum *protocol.Signum, reference string) (*protocol.Follows, *protocol.Refusal) {
 	var names []string
 	for _, f := range signum.GetFollows() {
-		names = append(names, f.GetReference())
-		n := resolves(f, columns)
-		switch {
-		case n > bestN:
-			best, bestN, tied = f, n, false
-		case n == bestN && n > 0:
-			tied = true
+		if f.GetReference() == reference {
+			return f, nil
 		}
+		names = append(names, f.GetReference())
 	}
 	if len(names) == 0 {
-		return nil, errors.Newf("%s follows nothing", signum.GetName())
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "signum", Says: signum.GetName() + " follows nothing"}
 	}
-	if bestN == 0 {
-		return nil, errors.Newf("%s follows %s, and the schema has none of their columns", signum.GetName(), strings.Join(names, ", "))
-	}
-	if tied {
-		return nil, errors.Newf("%s follows %s, and the schema is more than one of them", signum.GetName(), strings.Join(names, ", "))
-	}
-	return best, nil
+	return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "reference",
+		Says: fmt.Sprintf("%s does not follow %s; it follows %s", signum.GetName(), reference, strings.Join(names, ", "))}
 }
 
-// Hold holds a signum, or one sigil of it, to the models of a schema.
-func Hold(signum *protocol.Signum, sigil string, models []Model) (Parity, error) {
-	scope, whole, err := inScope(signum, sigil)
-	if err != nil {
-		return Parity{}, err
+// Hold holds a signum, or one sigil of it, to the models of the schema of a
+// reference it follows. What is wrong with what was asked is refused as the
+// caller's; what is wrong with a declaration or a schema is the node's, and
+// refused as failed.
+func Hold(signum *protocol.Signum, named, reference string, schema Schema) (Parity, *protocol.Refusal) {
+	models := schema.Models
+	scope, whole, refused := inScope(signum, named)
+	if refused != nil {
+		return Parity{}, refused
+	}
+	follows, refused := following(signum, reference)
+	if refused != nil {
+		return Parity{}, refused
 	}
 	columns := map[string]Column{}
 	for _, m := range models {
@@ -277,12 +318,11 @@ func Hold(signum *protocol.Signum, sigil string, models []Model) (Parity, error)
 			columns[m.Name+"."+c.Name] = c
 		}
 	}
-	follows, err := pick(signum, columns)
-	if err != nil {
-		return Parity{}, err
+	if resolves(follows, columns) == 0 {
+		return Parity{}, failed("%s follows %s, and the schema has none of its columns", signum.GetName(), reference)
 	}
 
-	p := Parity{Signum: signum.GetName(), Sigil: sigil, Reference: follows.GetReference(), Unfollowed: map[string][]string{}}
+	p := Parity{Signum: signum.GetName(), Sigil: named, Reference: reference, Unfollowed: map[string][]string{}, Missing: []string{}, Required: []string{}}
 	followedBy := map[string][]string{}
 	departures := map[string][]string{}
 	followedFields := map[string]bool{}
@@ -295,12 +335,12 @@ func Hold(signum *protocol.Signum, sigil string, models []Model) (Parity, error)
 		}
 		found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(message))
 		if err != nil {
-			return Parity{}, errors.Wrapf(err, "%s follows %s, and %s is no message", signum.GetName(), c.GetField(), message)
+			return Parity{}, failed("%s follows %s, and %s is no message", signum.GetName(), c.GetField(), message)
 		}
 		descriptor := found.Descriptor()
 		fd := descriptor.Fields().ByName(protoreflect.Name(field))
 		if fd == nil {
-			return Parity{}, errors.Newf("%s follows %s, and %s has no field %s", signum.GetName(), c.GetField(), message, field)
+			return Parity{}, failed("%s follows %s, and %s has no field %s", signum.GetName(), c.GetField(), message, field)
 		}
 		messages[message] = descriptor
 		followedFields[c.GetField()] = true
@@ -311,7 +351,7 @@ func Hold(signum *protocol.Signum, sigil string, models []Model) (Parity, error)
 			continue
 		}
 		followedBy[c.GetColumn()] = append(followedBy[c.GetColumn()], c.GetField())
-		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), column)...)
+		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), column, schema.fits)...)
 	}
 	for message := range scope {
 		if _, ok := messages[message]; ok {
@@ -319,7 +359,7 @@ func Hold(signum *protocol.Signum, sigil string, models []Model) (Parity, error)
 		}
 		found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(message))
 		if err != nil {
-			return Parity{}, errors.Wrapf(err, "%s %s carries %s, which is no message", signum.GetName(), sigil, message)
+			return Parity{}, failed("%s %s carries %s, which is no message", signum.GetName(), named, message)
 		}
 		messages[message] = found.Descriptor()
 	}
@@ -342,6 +382,14 @@ func Hold(signum *protocol.Signum, sigil string, models []Model) (Parity, error)
 			clade.Items = append(clade.Items, Item{Column: c.Name, Followed: followedBy[key], Departs: departures[key]})
 		}
 		p.Clades = append(p.Clades, clade)
+		if !clade.followed() {
+			continue
+		}
+		for _, c := range m.Columns {
+			if c.Required && len(followedBy[m.Name+"."+c.Name]) == 0 {
+				p.Required = append(p.Required, m.Name+"."+c.Name)
+			}
+		}
 	}
 	return p, nil
 }
@@ -386,10 +434,10 @@ func (p Parity) Render(all bool) string {
 		}
 	}
 	if hidden > 0 {
-		fmt.Fprintf(&b, "  %d at 100 not shown, -all shows them\n", hidden)
+		fmt.Fprintf(&b, "  %d at 100 not shown, all shows them\n", hidden)
 	}
 
-	if len(p.Unfollowed) == 0 && len(p.Missing) == 0 {
+	if len(p.Unfollowed) == 0 && len(p.Missing) == 0 && len(p.Required) == 0 {
 		b.WriteString("\n  out of spec: none\n\n")
 		return b.String()
 	}
@@ -407,32 +455,14 @@ func (p Parity) Render(all bool) string {
 	for _, missing := range p.Missing {
 		fmt.Fprintf(&b, "    %s, which the schema does not have\n", missing)
 	}
+	for _, required := range p.Required {
+		fmt.Fprintf(&b, "    %s is required, and nothing follows it\n", required)
+	}
 	b.WriteString("\n")
 	return b.String()
 }
 
-// runPrisma is `parity prisma {Signum} [{Sigil}] {Schema.prisma}`.
-func runPrisma(args []string, all bool) (string, error) {
-	var signumName, sigil, schema string
-	switch len(args) {
-	case 2:
-		signumName, schema = args[0], args[1]
-	case 3:
-		signumName, sigil, schema = args[0], args[1], args[2]
-	default:
-		return "", errors.New("usage: make parity prisma {Signum} [{Sigil}] {Schema.prisma}")
-	}
-	models, err := ParsePrisma(schema)
-	if err != nil {
-		return "", err
-	}
-	signum, err := findSignum(server.DeclaredSigna(), signumName)
-	if err != nil {
-		return "", err
-	}
-	p, err := Hold(signum, sigil, models)
-	if err != nil {
-		return "", err
-	}
-	return p.Render(all), nil
+// failed is a refusal that is the node's own: its declaration or its schema.
+func failed(format string, args ...any) *protocol.Refusal {
+	return &protocol.Refusal{Why: sigil.Failed, Says: fmt.Sprintf(format, args...)}
 }

@@ -27,12 +27,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
+	"github.com/teranos/QNTX/server/sigil"
 )
 
 // operation is one route no sigil answers yet, called with one method.
@@ -48,6 +50,18 @@ type operation struct {
 // cannot hold open, not a path sigils answer, and not the MCP endpoint itself.
 func routeTool(route reach.Route) bool {
 	return !route.Socket && !route.Gates && route.Path != "/mcp" && route.Path != "/mcp/"
+}
+
+// declaredBy is a plugin's path whose plugin serves a signum of its own: the
+// plugin said what it serves (DeclaredRoutes, ADR-001), each a sigil and its
+// tool, and the rest of its prefix is not offered beside them.
+func declaredBy(signa []sigil.Signum, path string, pluginRoute func(string) bool) bool {
+	rest, ok := strings.CutPrefix(path, "/api/")
+	if !ok || !pluginRoute(path) {
+		return false
+	}
+	plugin, _, _ := strings.Cut(rest, "/")
+	return slices.ContainsFunc(signa, func(signum sigil.Signum) bool { return signum.GetName() == plugin })
 }
 
 // namespaced is a path that says or moves where its caller acts. To a
@@ -127,14 +141,23 @@ func (s *QNTXServer) HandleMCP(w http.ResponseWriter, r *http.Request) {
 // mcpServerFor is the server one request is answered by: one tool per
 // operation, each calling through with this request's credential.
 func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
-	server := mcp.NewServer(&mcp.Implementation{Name: "qntx", Version: version.VersionTag}, nil)
-	// A sigil is one tool, read from the sigil itself (ADR-039). Its path gates
-	// itself and is no route tool below, so one thing is offered once.
-
 	// Who is asking was settled by the gate in front of /mcp and is in the
 	// request's context.
 	admitted, known := auth.AdmissionFrom(r.Context())
-	for _, signum := range s.checkedSigna() {
+
+	// A caller is shown only what they reach, so what this server lists is
+	// that caller's, and no cache is to hand it to another (cacheScope). A
+	// node with no login knows nobody and lists the same to everyone.
+	options := &mcp.ServerOptions{SetCacheable: func(_ context.Context, _ mcp.Request, c *mcp.Cacheable) {
+		if known {
+			c.CacheScope = "private"
+		}
+	}}
+	server := mcp.NewServer(&mcp.Implementation{Name: "qntx", Version: version.VersionTag}, options)
+	// A sigil is one tool, read from the sigil itself (ADR-039). Its path gates
+	// itself and is no route tool below, so one thing is offered once.
+	signa := s.checkedSigna()
+	for _, signum := range signa {
 		for _, sigil := range signum.GetSigils() {
 			held := heldBy{signum: signum.GetName(), sigil: sigil, answer: signum.Answers[sigil.GetName()]}
 			if reaching, anyone := s.reachingOver(reach.OverMCP, held); !offeredTo(admitted, known, reaching, anyone) {
@@ -148,11 +171,20 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				schema["additionalProperties"] = true
 				schema["description"] = "What the route takes, as a JSON object: it arrives at the plugin whole. The plugin declares the route and names none of it."
 			}
-			server.AddTool(&mcp.Tool{
+			tool := &mcp.Tool{
 				Name:        toolNameOf(held.signum, held.sigil),
 				Description: sigil.GetDoes(),
 				InputSchema: schema,
-			}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				Annotations: annotationsOf(held.sigil),
+			}
+			// A declared route's answer is the plugin's own and is not held to
+			// what it gives on the plugin path, so it is not promised here.
+			given := givenAsSchema(held.sigil)
+			saysWhatItGives := given != nil && !signum.Declared
+			if saysWhatItGives {
+				tool.OutputSchema = given
+			}
+			server.AddTool(tool, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				args := map[string]any{}
 				if len(req.Params.Arguments) > 0 {
 					if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
@@ -164,7 +196,7 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				}
 				// Who reaches it is asked again on the call, so a line written
 				// since the list was drawn holds, and a listed tool is still gated.
-				return overMCP(ctx, s.gate, s.reachingOver, r, held, args), nil
+				return overMCP(ctx, s.gate, s.reachingOver, r, held, args, saysWhatItGives), nil
 			})
 		}
 	}
@@ -175,11 +207,15 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 		return server
 	}
 	for _, route := range s.served.Routes() {
-		if !routeTool(route) {
+		if !routeTool(route) || declaredBy(signa, route.Path, s.pluginRoute) {
 			continue
 		}
-		// The same cut for a route's tool: who reaches its path.
-		if reaching, anyone := s.served.Reaching(route.Path); !offeredTo(admitted, known, reaching, anyone) {
+		// The same cut for a route's tool: who reaches its path. A path served
+		// to ANYONE is "served without asking who is calling" (reach/table.go):
+		// a door, a discovery document, a receive point. Whoever calls a tool
+		// was asked at /mcp, so none of them is theirs to call.
+		reaching, anyone := s.served.Reaching(route.Path)
+		if anyone || !offeredTo(admitted, known, reaching, anyone) {
 			continue
 		}
 		if namespaced(admitted, route.Path) {

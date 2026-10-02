@@ -24,17 +24,7 @@ import (
 
 // signa is every signum the node holds: its own, and every ready plugin's.
 func (s *QNTXServer) signa() []sigil.Signum {
-	return append([]sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum(), s.githubSignum(), s.namespacesSignum(), s.rolesSignum(), s.amSignum(), s.timeseriesSignum(), s.openapiSignum()}, s.pluginSigna()...)
-}
-
-// DeclaredSigna is what every signum the node holds says of itself, without a
-// node running: make parity prisma reads a signum's declaration from here.
-func DeclaredSigna() []*protocol.Signum {
-	var out []*protocol.Signum
-	for _, signum := range (&QNTXServer{}).signa() {
-		out = append(out, signum.Signum)
-	}
-	return out
+	return append([]sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum(), s.githubSignum(), s.namespacesSignum(), s.rolesSignum(), s.amSignum(), s.timeseriesSignum(), s.openapiSignum(), s.paritySignum()}, s.pluginSigna()...)
 }
 
 // checkedSigna is the signa that say what they hold. One that does not is said
@@ -224,6 +214,61 @@ func takenAsSchema(held *protocol.Sigil) map[string]any {
 	return map[string]any{"type": "object", "properties": properties, "required": required}
 }
 
+// givenAsSchema is what a sigil gives, as MCP's outputSchema: one object, or a
+// list of them a row at a time, with the fields it names. Nil when it names
+// none.
+//
+// A Field says nothing of whether it is always there, and an answer leaves
+// some out (plugins list's health_probed_at is "absent before the first
+// probe") and one carries a field it does not name, so no field is required
+// and none is refused.
+func givenAsSchema(held *protocol.Sigil) map[string]any {
+	if len(held.GetGives()) == 0 {
+		return nil
+	}
+	properties := map[string]any{}
+	for _, field := range held.GetGives() {
+		properties[field.GetName()] = map[string]any{"description": field.GetSays()}
+	}
+	row := map[string]any{"type": "object", "properties": properties}
+	return map[string]any{"anyOf": []any{row, map[string]any{"type": "array", "items": row}, map[string]any{"type": "null"}}}
+}
+
+// shapedAsGiven is whether an answer is what givenAsSchema promises: one
+// object, a list of objects, or nothing.
+func shapedAsGiven(body []byte) error {
+	var answer any
+	if err := json.Unmarshal(body, &answer); err != nil {
+		return err
+	}
+	switch answer := answer.(type) {
+	case nil, map[string]any:
+		return nil
+	case []any:
+		for i, row := range answer {
+			if _, ok := row.(map[string]any); !ok {
+				return errors.Newf("row %d of the answer is %T, not an object", i, row)
+			}
+		}
+		return nil
+	default:
+		return errors.Newf("the answer is %T, neither an object nor a list of them", answer)
+	}
+}
+
+// annotationsOf is what a sigil's method promises, as MCP's hints: a GET is
+// safe, and a PUT and a DELETE are idempotent (RFC 9110 §9.2). Any other
+// method promises neither, and the spec's defaults stand.
+func annotationsOf(held *protocol.Sigil) *mcp.ToolAnnotations {
+	switch held.GetHttp().GetMethod() {
+	case http.MethodGet:
+		return &mcp.ToolAnnotations{ReadOnlyHint: true}
+	case http.MethodPut, http.MethodDelete:
+		return &mcp.ToolAnnotations{IdempotentHint: true}
+	}
+	return nil
+}
+
 // offeredTo reports whether a tool is shown to whoever is asking: a caller is
 // shown only what they reach. It asks the gate's own question of the row the
 // gate will be given on the call, so the list and the gate cannot disagree. A
@@ -240,20 +285,46 @@ func offeredTo(admitted auth.Admission, known bool, reaching auth.Reach, anyone 
 // caller of its endpoint: the arguments are what arrived, the sigil is asked
 // with the gate inside the asking and the credential the MCP request carried,
 // and the answer is the sigil's own, never an HTTP response read back.
-func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy) (auth.Reach, bool), caller *http.Request, held heldBy, args map[string]any) *mcp.CallToolResult {
+//
+// The answer is the result's structured content, and its text too. A tool that
+// says what it gives must give that (outputSchema), so its answer is held to
+// the shape it promised first.
+func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy) (auth.Reach, bool), caller *http.Request, held heldBy, args map[string]any, saysWhatItGives bool) *mcp.CallToolResult {
 	asked := held.asking(reach.OverMCP, gate, reaching, caller).Ask(ctx, args)
 	switch {
 	case asked.Rejected != nil:
 		// The gate's answer, in the gate's own words.
 		return refused("%s is not yours to ask: %s", held.sigil.GetName(), strings.TrimSpace(asked.Rejected.Body))
 	case asked.Refusal != nil:
-		return refused("%s", asked.Refusal.GetSays())
+		return refused("%s", refusalSays(asked.Refusal))
 	}
 	body, err := json.Marshal(asked.Answer)
 	if err != nil {
 		return refused("what %s answered does not marshal: %v", held.sigil.GetName(), err)
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}}
+	if saysWhatItGives {
+		if err := shapedAsGiven(body); err != nil {
+			return refused("%s: what %s answered is not what it says it gives: %v", sigil.Failed, held.sigil.GetName(), err)
+		}
+	}
+	return &mcp.CallToolResult{
+		Content:           []mcp.Content{&mcp.TextContent{Text: string(body)}},
+		StructuredContent: json.RawMessage(body),
+	}
+}
+
+// refusalSays is a refusal in its own terms: the kind of no, the param the
+// caller has to change when it names one, and what it says. A tool error has
+// only words, so they carry what the HTTP API gives as a status.
+func refusalSays(r *protocol.Refusal) string {
+	why := r.GetWhy()
+	if r.GetParam() != "" {
+		why += " (" + r.GetParam() + ")"
+	}
+	if why == "" {
+		return r.GetSays()
+	}
+	return why + ": " + r.GetSays()
 }
 
 // sigilsInto lays the sigils' operations into the written document, whose

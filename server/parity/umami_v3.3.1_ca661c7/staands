@@ -1,0 +1,84 @@
+
+  staands follows umami
+  User                   0
+  Session               16
+    id                 100  protocol.Arrival.visitor
+    websiteId          100  protocol.Arrival.market, protocol.Arrival.slug
+    browser              0
+    os                   0
+    device               0
+    screen               0
+    language             0
+    country              0
+    region               0
+    city                 0
+    distinctId           0
+    createdAt            0
+  SessionLink            0
+  Website                0
+  WebsiteEvent          38
+    id                   0
+    websiteId          100  protocol.Arrival.market, protocol.Arrival.slug, protocol.Visit.market, protocol.Visit.slug
+    sessionId          100  protocol.Arrival.visitor, protocol.Visit.visitor
+    visitId            100  protocol.Arrival.visit, protocol.Visit.visit
+    createdAt            0  protocol.Arrival.at
+      DateTime in the schema, and protocol.Arrival.at is string
+    urlPath            100  protocol.Arrival.path
+    urlQuery             0
+    utmSource          100  protocol.Arrival.utm_source
+    utmMedium          100  protocol.Arrival.utm_medium
+    utmCampaign        100  protocol.Arrival.utm_campaign
+    utmContent         100  protocol.Arrival.utm_content
+    utmTerm            100  protocol.Arrival.utm_term
+    referrerPath       100  protocol.Arrival.referrer_path
+    referrerQuery        0
+    referrerDomain     100  protocol.Arrival.referrer_domain
+    pageTitle            0
+    gclid                0
+    fbclid               0
+    msclkid              0
+    ttclid               0
+    lifatid              0
+    twclid               0
+    eventType            0
+    eventName          100  protocol.Arrival.event
+    tag                  0
+    hostname             0
+    lcp                  0
+    inp                  0
+    cls                  0
+    fcp                  0
+    ttfb                 0
+  EventData             22
+    id                   0
+    websiteId            0
+    websiteEventId       0
+    dataKey            100  protocol.Arrival.params
+    stringValue        100  protocol.Arrival.params
+    numberValue          0
+    dateValue            0
+    dataType             0
+    createdAt            0
+  SessionData            0
+  Team                   0
+  TeamUser               0
+  Report                 0
+  Segment                0
+  Revenue                0
+  Link                   0
+  Pixel                  0
+  Board                  0
+  Share                  0
+  SessionReplay          0
+  SessionReplaySaved     0
+  HeatmapEvent           0
+  TwoFactorAuth          0
+  TwoFactorBackupCode    0
+  TwoFactorOtpUsed       0
+  TwoFactorRateLimit     0
+  AppSetting             0
+
+  out of spec
+    protocol.Arrival follows no column with bot, browser, browser_version, city, country, device, language, operating_system, operating_system_version, query, region, screen
+    protocol.Visit follows no column with bounce, duration_seconds, ended, entry_path, events, exit_path, started, views
+
