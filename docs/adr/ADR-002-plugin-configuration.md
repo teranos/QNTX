@@ -58,7 +58,7 @@ The plugin's own keys, which it reads through `config.GetString(key)`, and QNTX'
 
 ## 5. The build
 
-QNTX builds a plugin itself ([server/plugin_build.go](../../server/plugin_build.go)). The node is a GitHub App, and a push to a repository the App is installed on reaches its webhook. For each enabled plugin whose `build.*` sources the push moves, QNTX fetches the sources at their branches through the node's GitHub, runs `build.command` in `nix shell --inputs-from <core> nixpkgs#<package>...`, installs `build.output` as `qntx-<name>-plugin` and restarts the plugin. A build that fails is a mail to ROOT, naming every source with the rev it was built from and why it failed.
+QNTX builds a plugin itself ([server/plugin_build.go](../../server/plugin_build.go)). The node is a GitHub App, and a push to a repository the App is installed on reaches its webhook. For each enabled plugin whose `build.*` sources the push moves, QNTX fetches the sources at their branches through the node's GitHub, runs `build.command` in `nix shell --inputs-from <core> nixpkgs#<package>...`, installs `build.output` as `qntx-<name>-plugin` and, when what it built differs from what is installed and the plugin is enabled, restarts it. A build that fails is a mail to ROOT, naming every source with the rev it was built from and why it failed.
 
 ROOT generates the webhook's secret with the `github` signum's webhook sigil, sets its path in the GitHub element, and pastes the URL the element shows into the App's settings.
 

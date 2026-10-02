@@ -100,7 +100,7 @@ listed as a namespace nobody defined. The ones written before `ns.toml` are
 those.
 
 Clicking a namespace highlights a tile in the namespaces bar. A session acts in
-the default namespace, whatever is highlighted.
+the namespace its person stands in, which `i step` moves.
 
 The canvas is one for the node, in `qntx-operational.db`.
 
