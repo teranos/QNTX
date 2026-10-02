@@ -161,6 +161,30 @@ func TestATranscriptIsTheShapeProtoDeclares(t *testing.T) {
 	assert.Equal(t, fieldsOf(t, declared, "Turn"), jsonNamesOf(t, transcriptTurn{}))
 }
 
+// Spike: Ground names a control's row Grounded and the event, for any event.
+// One no read predicate names is still a turn of the session it was in.
+func TestAGroundedRowNoPredicateNamesIsATurn(t *testing.T) {
+	store, db := qntxtest.CreateTestStore(t)
+	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)
+	rows := append(aSession(at),
+		streamed("ground:payload:GroundedPermissionDeny:8", "GroundedPermissionDeny", "s-1", at.Add(7*time.Second),
+			map[string]any{"control": "no-kill"}))
+	for _, as := range rows {
+		require.NoError(t, store.CreateAttestation(as))
+	}
+	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
+	asked := httptest.NewRequest(http.MethodGet, "/api/transcripts", nil)
+
+	for _, sent := range []sigil.Sent{{}, {"session": "s-1"}} {
+		answer, refused := s.transcriptsRead(sigil.WithCaller(context.Background(), asked), sent)
+		require.Nil(t, refused)
+		read := answer.(map[string]any)["transcripts"].([]transcript)
+		require.Len(t, read, 1)
+		last := read[0].Turns[len(read[0].Turns)-1]
+		assert.Equal(t, "no-kill on PermissionDeny", last.Text, "asked with %v", sent)
+	}
+}
+
 func TestTranscriptsAreRootsAlone(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
