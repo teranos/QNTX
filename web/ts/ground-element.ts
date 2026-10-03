@@ -464,9 +464,9 @@ export function drawGround(body: HTMLElement): GroundScene {
     sky.body.append(
         carried,
         flying,
-        limit('Ground runs as a Claude Code hook, so the agents here are the ones Claude Code ran.'),
+        limit('Ground runs as a Claude Code hook, so the agents here are the ones Claude Code ran. A model is here only when its SessionStart named it: ug keeps each session\'s model and effort in Ground\'s own store, and that is not streamed.'),
         limit('One sky runs per tree, and Ground keeps each in its process table. Sky streams attestations, not that table, so how many skies there are is not known here.'),
-        limit('What QNTX refused and what is still pending stay on the machine, as qntx_status and qntx_at. Sky ships both counts to Sentry, not to QNTX.'),
+        limit('What QNTX refused and what is still pending stay on the machine, as qntx_status and qntx_at. Sky tells Sentry both counts when it ends or warns, and tells QNTX neither. A row QNTX answered with a 4xx is parked there and not sent again.'),
     );
 
     const surface = stratum('surface', 'Ground', 'the ground itself', horizon());
@@ -475,11 +475,11 @@ export function drawGround(body: HTMLElement): GroundScene {
     surface.body.append(runs, limit('What each run cost stays on the machine: Ground writes it to its timing table and sky ships it to Sentry. PostToolUse reaches QNTX and no transcript reads it, so the whole count of runs is not here.'));
 
     const under = stratum('under gr-unreal', 'Underground', 'ug: how many of them, tmux ug', seam(3));
-    under.body.appendChild(limit('ug tmux asks /am/statusline and prints one line, and ug writes down the news it reads, for sky to carry. Nothing this element reads counts them, so how many ug there are is not known here.'));
+    under.body.appendChild(limit('ug tmux asks /am/statusline and prints one line, and writes down the news it reads, for sky to carry. The status-line ug posts a usage reading for its session to QNTX. Nothing this element reads counts either, so how many ug there are is not known here.'));
 
     const rites = stratum('rites', 'Rituals and rites', '', seam(5));
     const walks = make('div', 'gr-says');
-    rites.body.append(walks, limit('How often a performance turned back, and who held the mic at each rite, stay in Ground\'s ritual_position table. The rites Ground runs before a session carries the performance name no session, and no transcript reads them.'));
+    rites.body.append(walks, limit('How often a performance turned back, and who holds its mic, stay in Ground\'s ritual_position table: one holder for the whole performance, set again at every rite. The rites Ground runs before a session carries the performance name no session, and no transcript reads them.'));
 
     const deep = stratum('deep', 'Deeper', 'sessions, by place', seam(8));
     const sessions = make('div', 'gr-says');
