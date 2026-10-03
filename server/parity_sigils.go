@@ -21,6 +21,8 @@ import (
 func everySignumFollows() []*protocol.Follows {
 	return []*protocol.Follows{
 		{Reference: "a2a", Columns: []*protocol.Corresponds{
+			// "there cant be two signa of the same name"
+			{Field: "protocol.Signum.name", Column: "AgentSkill.id"},
 			{Field: "protocol.Signum.name", Column: "AgentSkill.name"},
 			{Field: "protocol.Signum.description", Column: "AgentSkill.description"},
 			{Field: "protocol.Signum.tags", Column: "AgentSkill.tags"},
@@ -28,6 +30,8 @@ func everySignumFollows() []*protocol.Follows {
 		{Reference: "mcp", Columns: []*protocol.Corresponds{
 			{Field: "protocol.Signum.name", Column: "Tool.name"},
 			{Field: "protocol.Sigil.name", Column: "Tool.name"},
+			{Field: "protocol.Signum.name", Column: "Tool.title"},
+			{Field: "protocol.Sigil.name", Column: "Tool.title"},
 			{Field: "protocol.Sigil.does", Column: "Tool.description"},
 			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema"},
 			{Field: "protocol.Sigil.gives", Column: "Tool.outputSchema"},

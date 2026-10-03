@@ -100,8 +100,8 @@ func TestParityStorageIsWhatMakeParityWrote(t *testing.T) {
 	holds(t, signum, "storage", answer)
 }
 
-// The gate of a2a: any signum held to AgentSkill by its shape. name,
-// description and tags follow, and id, which the spec requires, does not.
+// The gate of a2a: any signum held to AgentSkill by its shape. id, name,
+// description and tags follow, and nothing the spec requires is left.
 func TestParityHoldsEverySignumToA2A(t *testing.T) {
 	signum := (&QNTXServer{}).paritySignum()
 	for _, name := range []string{"staands", "parity"} {
@@ -119,15 +119,15 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 		if skill == nil {
 			t.Fatalf("%s: no AgentSkill clade", name)
 		}
-		if skill.Score() != 37 {
+		if skill.Score() != 50 {
 			t.Errorf("%s: AgentSkill reads %d", name, skill.Score())
 		}
 		for _, item := range skill.Items {
-			if (item.Column == "name" || item.Column == "description" || item.Column == "tags") && !item.Conforms() {
+			if (item.Column == "id" || item.Column == "name" || item.Column == "description" || item.Column == "tags") && !item.Conforms() {
 				t.Errorf("%s: %s does not conform: %+v", name, item.Column, item)
 			}
 		}
-		if strings.Join(held.Required, " ") != "AgentSkill.id" {
+		if len(held.Required) != 0 {
 			t.Errorf("%s: required and unfollowed is %v", name, held.Required)
 		}
 		if strings.Join(held.Unfollowed["protocol.Signum"], " ") != "follows sigils" {
@@ -138,7 +138,7 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 }
 
 // The gate of mcp: every sigil held to Tool by its shape, as mcp.go makes one.
-// name, description and annotations follow and conform; inputSchema follows
+// name, title, description and annotations follow and conform; inputSchema follows
 // takes and outputSchema gives, and both depart, since each is a list and the
 // schema one object.
 func TestParityHoldsEverySigilToMCP(t *testing.T) {
@@ -158,12 +158,12 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 		if tool == nil {
 			t.Fatalf("%s: no Tool clade", name)
 		}
-		if tool.Score() != 37 {
+		if tool.Score() != 50 {
 			t.Errorf("%s: Tool reads %d", name, tool.Score())
 		}
 		for _, item := range tool.Items {
 			switch item.Column {
-			case "name", "description", "annotations":
+			case "name", "title", "description", "annotations":
 				if !item.Conforms() {
 					t.Errorf("%s: %s does not conform: %+v", name, item.Column, item)
 				}
@@ -217,13 +217,12 @@ func TestParityHoldsTheNodeToAgentCard(t *testing.T) {
 	for _, c := range held.Clades {
 		scores[c.Model] = c.Score()
 	}
-	if scores["AgentCard"] != 28 || scores["AgentSkill"] != 37 {
+	if scores["AgentCard"] != 28 || scores["AgentSkill"] != 50 {
 		t.Errorf("AgentCard reads %d and AgentSkill %d", scores["AgentCard"], scores["AgentSkill"])
 	}
 	want := []string{
 		"AgentCard.supported_interfaces", "AgentCard.capabilities",
 		"AgentCard.default_input_modes", "AgentCard.default_output_modes",
-		"AgentSkill.id",
 	}
 	if strings.Join(held.Required, " ") != strings.Join(want, " ") {
 		t.Errorf("required and unfollowed is %v", held.Required)
