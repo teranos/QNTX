@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -260,7 +259,7 @@ func (s *QNTXServer) initWatcherEngine() error {
 	// edge cursors). This eliminates contention with the main RustStore connection —
 	// without it, watcher goroutines pile up waiting for the single MaxOpenConns(1) slot,
 	// blocking attestation writes for 5+ seconds during high-volume crawls.
-	watcherDB, err := sql.Open("rustsqlite", s.dbPath)
+	watcherDB, err := openSQLite(s.dbPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to open watcher DB connection")
 	}

@@ -387,6 +387,12 @@ func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		say(http.StatusOK, "degraded")
 		return
 	}
+	// Built without ATS, the node keeps no attestations at all, and ok would
+	// say it does.
+	if atsless {
+		say(http.StatusOK, "atsless")
+		return
+	}
 	say(http.StatusOK, "ok")
 }
 

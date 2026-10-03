@@ -1,7 +1,6 @@
 package server
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
@@ -45,7 +44,7 @@ func (tickerSubsystem) Init(s *QNTXServer) error {
 // pulseReadDBSubsystem opens a dedicated read connection for pulse API reads.
 // Inlined into NewQNTXServer since it's a one-liner with fallback.
 func openPulseReadDB(s *QNTXServer) {
-	pulseReadDB, err := sql.Open("rustsqlite", s.dbPath)
+	pulseReadDB, err := openSQLite(s.dbPath)
 	if err != nil {
 		s.logger.Warnw("Failed to open pulse read DB, falling back to main DB", "error", err)
 		s.pulseReadDB = s.nodeDB

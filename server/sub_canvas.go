@@ -24,7 +24,12 @@ func (canvasSubsystem) Init(s *QNTXServer) error {
 	// "default namespace has default canvas, whihc is the current canvas i am working with."
 	if _, err := canvasStore.Name(context.Background()); errors.Is(err, elementstorage.ErrNoCanvas) {
 		if err := canvasStore.Create(context.Background(), "default", "", "the node"); err != nil {
-			return errors.Wrap(err, "default could not be given its canvas")
+			// Built without ATS, a canvas id cannot be minted. The handlers
+			// still come up, and each canvas asked for refuses the same way.
+			if !atsless || !wantsATS(err) {
+				return errors.Wrap(err, "default could not be given its canvas")
+			}
+			s.logger.Warnw("default has no canvas: this node runs ATSless and cannot mint a canvas id", "error", err)
 		}
 	} else if err != nil {
 		return errors.Wrap(err, "default's canvas could not be read")

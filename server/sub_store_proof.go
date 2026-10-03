@@ -25,6 +25,12 @@ type storeProofSubsystem struct{}
 func (storeProofSubsystem) Name() string { return "store-proof" }
 
 func (storeProofSubsystem) Init(s *QNTXServer) error {
+	// Built without ATS, there is no store to prove. It comes up on loopback
+	// only, and /health says atsless rather than ok.
+	if atsless {
+		s.logger.Warnw("Attestation store not proven: this node runs ATSless and keeps no attestations")
+		return nil
+	}
 	store := s.systemAttestor()
 	if store == nil {
 		return errors.New("no attestation store, so nothing can be written down")

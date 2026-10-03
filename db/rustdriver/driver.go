@@ -1,3 +1,5 @@
+//go:build !atsless
+
 // Package rustdriver implements database/sql/driver over Rust's SQLite connections.
 //
 // Go's database/sql routes all SQL through Rust via CGO FFI, eliminating

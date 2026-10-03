@@ -29,6 +29,9 @@ const (
 	SubsystemFatal SubsystemPolicy = iota
 	// SubsystemWarn — Init error is logged but startup continues.
 	SubsystemWarn
+	// SubsystemSkipped — Init failed for want of ATS on an ATSless node, and
+	// that was already said.
+	SubsystemSkipped
 )
 
 type subsystemEntry struct {

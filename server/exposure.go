@@ -42,6 +42,12 @@ func refusePublicDeploy(bindAddr string, auth appcfg.AuthConfig) error {
 	if !offLoopback(bindAddr) {
 		return nil
 	}
+	if atsless {
+		return errors.Newf(
+			"this node runs ATSless and keeps no attestations, so it binds loopback only, not server.bind_address %q",
+			bindAddr,
+		)
+	}
 	if !auth.Enabled {
 		return errors.Newf(
 			"auth.enabled must be true when server.bind_address is %q (non-loopback bind exposes all endpoints to the network)",
