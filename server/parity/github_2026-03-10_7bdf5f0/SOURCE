@@ -1,0 +1,15 @@
+GitHub's REST API, version 2026-03-10, the one GitHubService sends (ADR-043).
+
+api.github.com.2026-03-10.json https://raw.githubusercontent.com/github/rest-api-description/7bdf5f00553689c2dabb027685cf29081093767e/descriptions/api.github.com/api.github.com.2026-03-10.json (GitHub's OpenAPI description, openapi 3.0.3, info.version 1.1.4)
+
+2d3c97fbbcff73734b9e53329837d7a6d0c857dc81aa47b117082c843a03f22e  api.github.com.2026-03-10.json
+
+openapi.json is that description narrowed to what GitHubService calls of it:
+nix/references/github.nix fetches it by its hash and keeps, of each operation
+operations.json names, its words, parameters, JSON body and 2xx answers, and
+every schema those reach, without examples. make says writes operations.json
+from the messages of plugin/grpc/protocol/github_*.proto that name an
+operation, then openapi.json.
+
+github is what parity hold gives of the github signum held to it, every model
+at 100 left out: the gate TestParityHoldsGitHubAsRecorded holds it to.

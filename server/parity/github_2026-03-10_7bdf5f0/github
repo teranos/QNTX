@@ -1,0 +1,525 @@
+
+  github follows github
+  app-permissions                                                                                        98
+    actions                                                                                             100  protocol.GitHubOrgsOrgsAppPermissions.actions
+    administration                                                                                      100  protocol.GitHubOrgsOrgsAppPermissions.administration
+    artifact_metadata                                                                                   100  protocol.GitHubOrgsOrgsAppPermissions.artifact_metadata
+    attestations                                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.attestations
+    checks                                                                                              100  protocol.GitHubOrgsOrgsAppPermissions.checks
+    code_quality                                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.code_quality
+    codespaces                                                                                          100  protocol.GitHubOrgsOrgsAppPermissions.codespaces
+    contents                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.contents
+    custom_properties_for_organizations                                                                 100  protocol.GitHubOrgsOrgsAppPermissions.custom_properties_for_organizations
+    dependabot_secrets                                                                                  100  protocol.GitHubOrgsOrgsAppPermissions.dependabot_secrets
+    deployments                                                                                         100  protocol.GitHubOrgsOrgsAppPermissions.deployments
+    discussions                                                                                         100  protocol.GitHubOrgsOrgsAppPermissions.discussions
+    email_addresses                                                                                     100  protocol.GitHubOrgsOrgsAppPermissions.email_addresses
+    enterprise_custom_properties_for_organizations                                                      100  protocol.GitHubOrgsOrgsAppPermissions.enterprise_custom_properties_for_organizations
+    environments                                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.environments
+    followers                                                                                           100  protocol.GitHubOrgsOrgsAppPermissions.followers
+    git_ssh_keys                                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.git_ssh_keys
+    gpg_keys                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.gpg_keys
+    interaction_limits                                                                                  100  protocol.GitHubOrgsOrgsAppPermissions.interaction_limits
+    issues                                                                                              100  protocol.GitHubOrgsOrgsAppPermissions.issues
+    members                                                                                             100  protocol.GitHubOrgsOrgsAppPermissions.members
+    merge_queues                                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.merge_queues
+    metadata                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.metadata
+    organization_administration                                                                         100  protocol.GitHubOrgsOrgsAppPermissions.organization_administration
+    organization_announcement_banners                                                                   100  protocol.GitHubOrgsOrgsAppPermissions.organization_announcement_banners
+    organization_copilot_agent_settings                                                                 100  protocol.GitHubOrgsOrgsAppPermissions.organization_copilot_agent_settings
+    organization_copilot_seat_management                                                                100  protocol.GitHubOrgsOrgsAppPermissions.organization_copilot_seat_management
+    organization_custom_org_roles                                                                       100  protocol.GitHubOrgsOrgsAppPermissions.organization_custom_org_roles
+    organization_custom_properties                                                                      100  protocol.GitHubOrgsOrgsAppPermissions.organization_custom_properties
+    organization_custom_roles                                                                           100  protocol.GitHubOrgsOrgsAppPermissions.organization_custom_roles
+    organization_events                                                                                 100  protocol.GitHubOrgsOrgsAppPermissions.organization_events
+    organization_external_properties_for_repos                                                            0
+    organization_hooks                                                                                  100  protocol.GitHubOrgsOrgsAppPermissions.organization_hooks
+    organization_packages                                                                               100  protocol.GitHubOrgsOrgsAppPermissions.organization_packages
+    organization_personal_access_token_requests                                                         100  protocol.GitHubOrgsOrgsAppPermissions.organization_personal_access_token_requests
+    organization_personal_access_tokens                                                                 100  protocol.GitHubOrgsOrgsAppPermissions.organization_personal_access_tokens
+    organization_plan                                                                                   100  protocol.GitHubOrgsOrgsAppPermissions.organization_plan
+    organization_projects                                                                               100  protocol.GitHubOrgsOrgsAppPermissions.organization_projects
+    organization_secrets                                                                                100  protocol.GitHubOrgsOrgsAppPermissions.organization_secrets
+    organization_self_hosted_runners                                                                    100  protocol.GitHubOrgsOrgsAppPermissions.organization_self_hosted_runners
+    organization_user_blocking                                                                          100  protocol.GitHubOrgsOrgsAppPermissions.organization_user_blocking
+    packages                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.packages
+    pages                                                                                               100  protocol.GitHubOrgsOrgsAppPermissions.pages
+    profile                                                                                             100  protocol.GitHubOrgsOrgsAppPermissions.profile
+    pull_requests                                                                                       100  protocol.GitHubOrgsOrgsAppPermissions.pull_requests
+    repository_custom_properties                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.repository_custom_properties
+    repository_hooks                                                                                    100  protocol.GitHubOrgsOrgsAppPermissions.repository_hooks
+    repository_projects                                                                                 100  protocol.GitHubOrgsOrgsAppPermissions.repository_projects
+    secret_scanning_alerts                                                                              100  protocol.GitHubOrgsOrgsAppPermissions.secret_scanning_alerts
+    secrets                                                                                             100  protocol.GitHubOrgsOrgsAppPermissions.secrets
+    security_events                                                                                     100  protocol.GitHubOrgsOrgsAppPermissions.security_events
+    single_file                                                                                         100  protocol.GitHubOrgsOrgsAppPermissions.single_file
+    starring                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.starring
+    statuses                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.statuses
+    vulnerability_alerts                                                                                100  protocol.GitHubOrgsOrgsAppPermissions.vulnerability_alerts
+    workflows                                                                                           100  protocol.GitHubOrgsOrgsAppPermissions.workflows
+  content-file                                                                                           78
+    _links                                                                                                0
+    content                                                                                             100  protocol.GitHubGetARepositoryREADMEResponse.content
+    download_url                                                                                        100  protocol.GitHubGetARepositoryREADMEResponse.download_url
+    encoding                                                                                            100  protocol.GitHubGetARepositoryREADMEResponse.encoding
+    git_url                                                                                             100  protocol.GitHubGetARepositoryREADMEResponse.git_url
+    html_url                                                                                            100  protocol.GitHubGetARepositoryREADMEResponse.html_url
+    name                                                                                                100  protocol.GitHubGetARepositoryREADMEResponse.name
+    path                                                                                                100  protocol.GitHubGetARepositoryREADMEResponse.path
+    sha                                                                                                 100  protocol.GitHubGetARepositoryREADMEResponse.sha
+    size                                                                                                100  protocol.GitHubGetARepositoryREADMEResponse.size
+    submodule_git_url                                                                                     0
+    target                                                                                                0
+    type                                                                                                100  protocol.GitHubGetARepositoryREADMEResponse.type
+    url                                                                                                 100  protocol.GitHubGetARepositoryREADMEResponse.url
+  content-file._links                                                                                     0
+  content-submodule                                                                                       0
+  content-submodule._links                                                                                0
+  content-symlink                                                                                         0
+  content-symlink._links                                                                                  0
+  enterprise                                                                                              0
+  integration                                                                                            92
+    client_id                                                                                           100  protocol.GitHubBranchesBranchesGitHubApp.client_id
+    created_at                                                                                          100  protocol.GitHubBranchesBranchesGitHubApp.created_at
+    description                                                                                         100  protocol.GitHubBranchesBranchesGitHubApp.description
+    events                                                                                              100  protocol.GitHubBranchesBranchesGitHubApp.events
+    external_url                                                                                        100  protocol.GitHubBranchesBranchesGitHubApp.external_url
+    html_url                                                                                            100  protocol.GitHubBranchesBranchesGitHubApp.html_url
+    id                                                                                                  100  protocol.GitHubBranchesBranchesGitHubApp.id
+    installations_count                                                                                 100  protocol.GitHubBranchesBranchesGitHubApp.installations_count
+    name                                                                                                100  protocol.GitHubBranchesBranchesGitHubApp.name
+    node_id                                                                                             100  protocol.GitHubBranchesBranchesGitHubApp.node_id
+    owner                                                                                               100  protocol.GitHubBranchesBranchesGitHubApp.owner
+    permissions                                                                                           0  protocol.GitHubBranchesBranchesGitHubApp.permissions
+      object in the schema, and protocol.GitHubBranchesBranchesGitHubApp.permissions holds string
+    slug                                                                                                100  protocol.GitHubBranchesBranchesGitHubApp.slug
+    updated_at                                                                                          100  protocol.GitHubBranchesBranchesGitHubApp.updated_at
+  integration.permissions                                                                                 0
+  issue.labels                                                                                            0
+  issue-field-value                                                                                      85
+    data_type                                                                                           100  protocol.GitHubIssuesIssuesIssueFieldValue.data_type
+    issue_field_id                                                                                      100  protocol.GitHubIssuesIssuesIssueFieldValue.issue_field_id
+    issue_field_name                                                                                    100  protocol.GitHubIssuesIssuesIssueFieldValue.issue_field_name
+    multi_select_options                                                                                100  protocol.GitHubIssuesIssuesIssueFieldValue.multi_select_options
+    node_id                                                                                             100  protocol.GitHubIssuesIssuesIssueFieldValue.node_id
+    single_select_option                                                                                100  protocol.GitHubIssuesIssuesIssueFieldValue.single_select_option
+    value                                                                                                 0  protocol.GitHubIssuesIssuesIssueFieldValue.value
+      string | number | integer in the schema, and protocol.GitHubIssuesIssuesIssueFieldValue.value is message
+  issue-suggestion                                                                                       92
+    action                                                                                              100  protocol.GitHubApproveAnIssueSuggestionResponse.action, protocol.GitHubIssuesIssuesIssueSuggestion.action
+    actor_id                                                                                            100  protocol.GitHubApproveAnIssueSuggestionResponse.actor_id, protocol.GitHubIssuesIssuesIssueSuggestion.actor_id
+    confidence                                                                                          100  protocol.GitHubApproveAnIssueSuggestionResponse.confidence, protocol.GitHubIssuesIssuesIssueSuggestion.confidence
+    created_at                                                                                          100  protocol.GitHubApproveAnIssueSuggestionResponse.created_at, protocol.GitHubIssuesIssuesIssueSuggestion.created_at
+    id                                                                                                  100  protocol.GitHubApproveAnIssueSuggestionResponse.id, protocol.GitHubIssuesIssuesIssueSuggestion.id
+    issue_event_id                                                                                      100  protocol.GitHubApproveAnIssueSuggestionResponse.issue_event_id, protocol.GitHubIssuesIssuesIssueSuggestion.issue_event_id
+    issue_id                                                                                            100  protocol.GitHubApproveAnIssueSuggestionResponse.issue_id, protocol.GitHubIssuesIssuesIssueSuggestion.issue_id
+    rationale                                                                                           100  protocol.GitHubApproveAnIssueSuggestionResponse.rationale, protocol.GitHubIssuesIssuesIssueSuggestion.rationale
+    resolved_by                                                                                         100  protocol.GitHubApproveAnIssueSuggestionResponse.resolved_by, protocol.GitHubIssuesIssuesIssueSuggestion.resolved_by
+    state                                                                                               100  protocol.GitHubApproveAnIssueSuggestionResponse.state, protocol.GitHubIssuesIssuesIssueSuggestion.state
+    target_id                                                                                           100  protocol.GitHubApproveAnIssueSuggestionResponse.target_id, protocol.GitHubIssuesIssuesIssueSuggestion.target_id
+    target_value                                                                                          0  protocol.GitHubApproveAnIssueSuggestionResponse.target_value, protocol.GitHubIssuesIssuesIssueSuggestion.target_value
+      string | number | boolean | array in the schema, and protocol.GitHubApproveAnIssueSuggestionResponse.target_value is message
+      string | number | boolean | array in the schema, and protocol.GitHubIssuesIssuesIssueSuggestion.target_value is message
+    updated_at                                                                                          100  protocol.GitHubApproveAnIssueSuggestionResponse.updated_at, protocol.GitHubIssuesIssuesIssueSuggestion.updated_at
+  nullable-integration                                                                                   92
+    client_id                                                                                           100  protocol.GitHubChecksRunsGitHubApp.client_id, protocol.GitHubChecksSuitesGitHubApp.client_id, protocol.GitHubIssuesIssuesGitHubApp.client_id, protocol.GitHubIssuesCommentsGitHubApp.client_id, protocol.GitHubActionsWorkflowRunsGitHubApp.client_id
+    created_at                                                                                          100  protocol.GitHubChecksRunsGitHubApp.created_at, protocol.GitHubChecksSuitesGitHubApp.created_at, protocol.GitHubIssuesIssuesGitHubApp.created_at, protocol.GitHubIssuesCommentsGitHubApp.created_at, protocol.GitHubActionsWorkflowRunsGitHubApp.created_at
+    description                                                                                         100  protocol.GitHubChecksRunsGitHubApp.description, protocol.GitHubChecksSuitesGitHubApp.description, protocol.GitHubIssuesIssuesGitHubApp.description, protocol.GitHubIssuesCommentsGitHubApp.description, protocol.GitHubActionsWorkflowRunsGitHubApp.description
+    events                                                                                              100  protocol.GitHubChecksRunsGitHubApp.events, protocol.GitHubChecksSuitesGitHubApp.events, protocol.GitHubIssuesIssuesGitHubApp.events, protocol.GitHubIssuesCommentsGitHubApp.events, protocol.GitHubActionsWorkflowRunsGitHubApp.events
+    external_url                                                                                        100  protocol.GitHubChecksRunsGitHubApp.external_url, protocol.GitHubChecksSuitesGitHubApp.external_url, protocol.GitHubIssuesIssuesGitHubApp.external_url, protocol.GitHubIssuesCommentsGitHubApp.external_url, protocol.GitHubActionsWorkflowRunsGitHubApp.external_url
+    html_url                                                                                            100  protocol.GitHubChecksRunsGitHubApp.html_url, protocol.GitHubChecksSuitesGitHubApp.html_url, protocol.GitHubIssuesIssuesGitHubApp.html_url, protocol.GitHubIssuesCommentsGitHubApp.html_url, protocol.GitHubActionsWorkflowRunsGitHubApp.html_url
+    id                                                                                                  100  protocol.GitHubChecksRunsGitHubApp.id, protocol.GitHubChecksSuitesGitHubApp.id, protocol.GitHubIssuesIssuesGitHubApp.id, protocol.GitHubIssuesCommentsGitHubApp.id, protocol.GitHubActionsWorkflowRunsGitHubApp.id
+    installations_count                                                                                 100  protocol.GitHubChecksRunsGitHubApp.installations_count, protocol.GitHubChecksSuitesGitHubApp.installations_count, protocol.GitHubIssuesIssuesGitHubApp.installations_count, protocol.GitHubIssuesCommentsGitHubApp.installations_count, protocol.GitHubActionsWorkflowRunsGitHubApp.installations_count
+    name                                                                                                100  protocol.GitHubChecksRunsGitHubApp.name, protocol.GitHubChecksSuitesGitHubApp.name, protocol.GitHubIssuesIssuesGitHubApp.name, protocol.GitHubIssuesCommentsGitHubApp.name, protocol.GitHubActionsWorkflowRunsGitHubApp.name
+    node_id                                                                                             100  protocol.GitHubChecksRunsGitHubApp.node_id, protocol.GitHubChecksSuitesGitHubApp.node_id, protocol.GitHubIssuesIssuesGitHubApp.node_id, protocol.GitHubIssuesCommentsGitHubApp.node_id, protocol.GitHubActionsWorkflowRunsGitHubApp.node_id
+    owner                                                                                               100  protocol.GitHubChecksRunsGitHubApp.owner, protocol.GitHubChecksSuitesGitHubApp.owner, protocol.GitHubIssuesIssuesGitHubApp.owner, protocol.GitHubIssuesCommentsGitHubApp.owner, protocol.GitHubActionsWorkflowRunsGitHubApp.owner
+    permissions                                                                                           0  protocol.GitHubChecksRunsGitHubApp.permissions, protocol.GitHubChecksSuitesGitHubApp.permissions, protocol.GitHubIssuesIssuesGitHubApp.permissions, protocol.GitHubIssuesCommentsGitHubApp.permissions, protocol.GitHubActionsWorkflowRunsGitHubApp.permissions
+      object in the schema, and protocol.GitHubChecksRunsGitHubApp.permissions holds string
+      object in the schema, and protocol.GitHubChecksSuitesGitHubApp.permissions holds string
+      object in the schema, and protocol.GitHubIssuesIssuesGitHubApp.permissions holds string
+      object in the schema, and protocol.GitHubIssuesCommentsGitHubApp.permissions holds string
+      object in the schema, and protocol.GitHubActionsWorkflowRunsGitHubApp.permissions holds string
+    slug                                                                                                100  protocol.GitHubChecksRunsGitHubApp.slug, protocol.GitHubChecksSuitesGitHubApp.slug, protocol.GitHubIssuesIssuesGitHubApp.slug, protocol.GitHubIssuesCommentsGitHubApp.slug, protocol.GitHubActionsWorkflowRunsGitHubApp.slug
+    updated_at                                                                                          100  protocol.GitHubChecksRunsGitHubApp.updated_at, protocol.GitHubChecksSuitesGitHubApp.updated_at, protocol.GitHubIssuesIssuesGitHubApp.updated_at, protocol.GitHubIssuesCommentsGitHubApp.updated_at, protocol.GitHubActionsWorkflowRunsGitHubApp.updated_at
+  nullable-integration.permissions                                                                        0
+  pull-request-merge-async-result.details                                                                85
+    bypass_rules                                                                                          0
+    expected_head_sha                                                                                   100  protocol.GitHubMergeAPullRequestAsynchronouslyResponse.Details.expected_head_sha
+    merge_action                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyResponse.Details.merge_action
+    merge_method                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyResponse.Details.merge_method
+    message                                                                                             100  protocol.GitHubMergeAPullRequestAsynchronouslyResponse.Details.message
+    uuid                                                                                                100  protocol.GitHubMergeAPullRequestAsynchronouslyResponse.Details.uuid
+    sha                                                                                                 100  protocol.GitHubMergeAPullRequestAsynchronouslyResponse.Details.sha
+  reaction-rollup                                                                                        80
+    +1                                                                                                    0
+    -1                                                                                                    0
+    confused                                                                                            100  protocol.GitHubIssuesIssuesReactionRollup.confused, protocol.GitHubCommitsCommentsReactionRollup.confused, protocol.GitHubPullsCommentsReactionRollup.confused, protocol.GitHubIssuesCommentsReactionRollup.confused, protocol.GitHubPullsReviewsReactionRollup.confused
+    eyes                                                                                                100  protocol.GitHubIssuesIssuesReactionRollup.eyes, protocol.GitHubCommitsCommentsReactionRollup.eyes, protocol.GitHubPullsCommentsReactionRollup.eyes, protocol.GitHubIssuesCommentsReactionRollup.eyes, protocol.GitHubPullsReviewsReactionRollup.eyes
+    heart                                                                                               100  protocol.GitHubIssuesIssuesReactionRollup.heart, protocol.GitHubCommitsCommentsReactionRollup.heart, protocol.GitHubPullsCommentsReactionRollup.heart, protocol.GitHubIssuesCommentsReactionRollup.heart, protocol.GitHubPullsReviewsReactionRollup.heart
+    hooray                                                                                              100  protocol.GitHubIssuesIssuesReactionRollup.hooray, protocol.GitHubCommitsCommentsReactionRollup.hooray, protocol.GitHubPullsCommentsReactionRollup.hooray, protocol.GitHubIssuesCommentsReactionRollup.hooray, protocol.GitHubPullsReviewsReactionRollup.hooray
+    laugh                                                                                               100  protocol.GitHubIssuesIssuesReactionRollup.laugh, protocol.GitHubCommitsCommentsReactionRollup.laugh, protocol.GitHubPullsCommentsReactionRollup.laugh, protocol.GitHubIssuesCommentsReactionRollup.laugh, protocol.GitHubPullsReviewsReactionRollup.laugh
+    rocket                                                                                              100  protocol.GitHubIssuesIssuesReactionRollup.rocket, protocol.GitHubCommitsCommentsReactionRollup.rocket, protocol.GitHubPullsCommentsReactionRollup.rocket, protocol.GitHubIssuesCommentsReactionRollup.rocket, protocol.GitHubPullsReviewsReactionRollup.rocket
+    total_count                                                                                         100  protocol.GitHubIssuesIssuesReactionRollup.total_count, protocol.GitHubCommitsCommentsReactionRollup.total_count, protocol.GitHubPullsCommentsReactionRollup.total_count, protocol.GitHubIssuesCommentsReactionRollup.total_count, protocol.GitHubPullsReviewsReactionRollup.total_count
+    url                                                                                                 100  protocol.GitHubIssuesIssuesReactionRollup.url, protocol.GitHubCommitsCommentsReactionRollup.url, protocol.GitHubPullsCommentsReactionRollup.url, protocol.GitHubIssuesCommentsReactionRollup.url, protocol.GitHubPullsReviewsReactionRollup.url
+  review-custom-gates-comment-required                                                                    0
+  review-custom-gates-state-required                                                                      0
+  GET /repos/{owner}/{repo}/actions/runs/{run_id}/artifacts 200                                           0
+  POST /repos/{owner}/{repo}/actions/runs/{run_id}/deployment_protection_rule                            50
+    owner                                                                                               100  protocol.GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunRequest.owner
+    repo                                                                                                100  protocol.GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunRequest.repo
+    run_id                                                                                              100  protocol.GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunRequest.run_id
+    comment                                                                                               0
+    environment_name                                                                                      0
+    state                                                                                                 0
+  GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs 200                                                0
+  GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs 200                                      0
+  POST /repos/{owner}/{repo}/check-runs                                                                  25
+    owner                                                                                               100  protocol.GitHubCreateACheckRunRequest.owner
+    repo                                                                                                100  protocol.GitHubCreateACheckRunRequest.repo
+    actions                                                                                               0
+    completed_at                                                                                          0
+    conclusion                                                                                            0
+    details_url                                                                                           0
+    external_id                                                                                           0
+    head_sha                                                                                              0
+    name                                                                                                  0
+    output                                                                                                0
+    started_at                                                                                            0
+    status                                                                                              100  protocol.GitHubCreateACheckRunRequest.status
+  POST /repos/{owner}/{repo}/check-runs.actions                                                           0
+  POST /repos/{owner}/{repo}/check-runs.output                                                            0
+  POST /repos/{owner}/{repo}/check-runs.output.annotations                                                0
+  POST /repos/{owner}/{repo}/check-runs.output.images                                                     0
+  GET /repos/{owner}/{repo}/commits/{ref}/check-runs 200                                                  0
+  GET /repos/{owner}/{repo}/contents/{path} 200                                                          78
+    _links                                                                                                0
+    content                                                                                             100  protocol.GitHubGetRepositoryContentResponse.content
+    download_url                                                                                        100  protocol.GitHubGetRepositoryContentResponse.download_url
+    encoding                                                                                            100  protocol.GitHubGetRepositoryContentResponse.encoding
+    git_url                                                                                             100  protocol.GitHubGetRepositoryContentResponse.git_url
+    html_url                                                                                            100  protocol.GitHubGetRepositoryContentResponse.html_url
+    name                                                                                                100  protocol.GitHubGetRepositoryContentResponse.name
+    path                                                                                                100  protocol.GitHubGetRepositoryContentResponse.path
+    sha                                                                                                 100  protocol.GitHubGetRepositoryContentResponse.sha
+    size                                                                                                100  protocol.GitHubGetRepositoryContentResponse.size
+    submodule_git_url                                                                                     0
+    target                                                                                                0
+    type                                                                                                100  protocol.GitHubGetRepositoryContentResponse.type
+    url                                                                                                 100  protocol.GitHubGetRepositoryContentResponse.url
+  POST /repos/{owner}/{repo}/issues                                                                      80
+    owner                                                                                               100  protocol.GitHubCreateAnIssueRequest.owner
+    repo                                                                                                100  protocol.GitHubCreateAnIssueRequest.repo
+    assignees                                                                                           100  protocol.GitHubCreateAnIssueRequest.assignees
+    body                                                                                                100  protocol.GitHubCreateAnIssueRequest.body
+    issue_field_values                                                                                  100  protocol.GitHubCreateAnIssueRequest.issue_field_values
+    labels                                                                                              100  protocol.GitHubCreateAnIssueRequest.labels
+    milestone                                                                                             0  protocol.GitHubCreateAnIssueRequest.milestone
+      string | integer in the schema, and protocol.GitHubCreateAnIssueRequest.milestone is message
+    parent_issue_id                                                                                     100  protocol.GitHubCreateAnIssueRequest.parent_issue_id
+    title                                                                                                 0  protocol.GitHubCreateAnIssueRequest.title
+      string | integer in the schema, and protocol.GitHubCreateAnIssueRequest.title is message
+    type                                                                                                100  protocol.GitHubCreateAnIssueRequest.type
+  POST /repos/{owner}/{repo}/issues.issue_field_values                                                   50
+    field_id                                                                                            100  protocol.GitHubCreateAnIssueRequest.IssueFieldValues.field_id
+    value                                                                                                 0  protocol.GitHubCreateAnIssueRequest.IssueFieldValues.value
+      string | number | array in the schema, and protocol.GitHubCreateAnIssueRequest.IssueFieldValues.value is message
+  POST /repos/{owner}/{repo}/issues.labels                                                                0
+  PATCH /repos/{owner}/{repo}/issues/{issue_number}                                                      84
+    owner                                                                                               100  protocol.GitHubUpdateAnIssueRequest.owner
+    repo                                                                                                100  protocol.GitHubUpdateAnIssueRequest.repo
+    issue_number                                                                                        100  protocol.GitHubUpdateAnIssueRequest.issue_number
+    assignees                                                                                           100  protocol.GitHubUpdateAnIssueRequest.assignees
+    body                                                                                                100  protocol.GitHubUpdateAnIssueRequest.body
+    duplicate_issue_id                                                                                  100  protocol.GitHubUpdateAnIssueRequest.duplicate_issue_id
+    issue_field_values                                                                                  100  protocol.GitHubUpdateAnIssueRequest.issue_field_values
+    labels                                                                                              100  protocol.GitHubUpdateAnIssueRequest.labels
+    milestone                                                                                             0  protocol.GitHubUpdateAnIssueRequest.milestone
+      string | integer in the schema, and protocol.GitHubUpdateAnIssueRequest.milestone is message
+    state                                                                                               100  protocol.GitHubUpdateAnIssueRequest.state
+    state_reason                                                                                        100  protocol.GitHubUpdateAnIssueRequest.state_reason
+    title                                                                                                 0  protocol.GitHubUpdateAnIssueRequest.title
+      string | integer in the schema, and protocol.GitHubUpdateAnIssueRequest.title is message
+    type                                                                                                100  protocol.GitHubUpdateAnIssueRequest.type
+  PATCH /repos/{owner}/{repo}/issues/{issue_number}.assignees                                             0
+  PATCH /repos/{owner}/{repo}/issues/{issue_number}.issue_field_values                                   80
+    confidence                                                                                          100  protocol.GitHubUpdateAnIssueRequest.IssueFieldValues.confidence
+    field_id                                                                                            100  protocol.GitHubUpdateAnIssueRequest.IssueFieldValues.field_id
+    rationale                                                                                           100  protocol.GitHubUpdateAnIssueRequest.IssueFieldValues.rationale
+    suggest                                                                                             100  protocol.GitHubUpdateAnIssueRequest.IssueFieldValues.suggest
+    value                                                                                                 0  protocol.GitHubUpdateAnIssueRequest.IssueFieldValues.value
+      string | number | array in the schema, and protocol.GitHubUpdateAnIssueRequest.IssueFieldValues.value is message
+  PATCH /repos/{owner}/{repo}/issues/{issue_number}.labels                                                0
+  PATCH /repos/{owner}/{repo}/issues/{issue_number}.type                                                  0
+  PATCH /repos/{owner}/{repo}/issues/{issue_number} 200.suggestions.issue_field_values                   85
+    confidence                                                                                          100  protocol.GitHubUpdateAnIssueResponse.Suggestions.IssueFieldValues.confidence
+    field_id                                                                                            100  protocol.GitHubUpdateAnIssueResponse.Suggestions.IssueFieldValues.field_id
+    ignored                                                                                             100  protocol.GitHubUpdateAnIssueResponse.Suggestions.IssueFieldValues.ignored
+    ignored_reason                                                                                      100  protocol.GitHubUpdateAnIssueResponse.Suggestions.IssueFieldValues.ignored_reason
+    rationale                                                                                           100  protocol.GitHubUpdateAnIssueResponse.Suggestions.IssueFieldValues.rationale
+    suggest                                                                                             100  protocol.GitHubUpdateAnIssueResponse.Suggestions.IssueFieldValues.suggest
+    value                                                                                                 0  protocol.GitHubUpdateAnIssueResponse.Suggestions.IssueFieldValues.value
+      string | number | array in the schema, and protocol.GitHubUpdateAnIssueResponse.Suggestions.IssueFieldValues.value is message
+  PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge-async                                              88
+    owner                                                                                               100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.owner
+    repo                                                                                                100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.repo
+    pull_number                                                                                         100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.pull_number
+    bypass_rules                                                                                          0
+    commit_message                                                                                      100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.commit_message
+    commit_title                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.commit_title
+    merge_action                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.merge_action
+    merge_method                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.merge_method
+    sha                                                                                                 100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.sha
+  387 at 100 not shown, all shows them
+
+  out of spec
+    protocol.GitHubApproveAWorkflowRunForAForkPullRequestRequest follows no column with namespace
+    protocol.GitHubApproveAnIssueSuggestionRequest follows no column with namespace
+    protocol.GitHubApproveAnIssueSuggestionResponse follows no column with error, success
+    protocol.GitHubCancelAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubCancelAnOrganizationInvitationRequest follows no column with namespace
+    protocol.GitHubCheckIfAPullRequestHasBeenMergedRequest follows no column with namespace
+    protocol.GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryRequest follows no column with namespace
+    protocol.GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryResponse follows no column with error, success
+    protocol.GitHubCheckIfImmutableReleasesAreEnabledForARepositoryRequest follows no column with namespace
+    protocol.GitHubCheckIfImmutableReleasesAreEnabledForARepositoryResponse follows no column with error, success
+    protocol.GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryRequest follows no column with namespace
+    protocol.GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryResponse follows no column with error, success
+    protocol.GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryRequest follows no column with namespace
+    protocol.GitHubCheckOrganizationMembershipForAUserRequest follows no column with namespace
+    protocol.GitHubCheckPublicOrganizationMembershipForAUserRequest follows no column with namespace
+    protocol.GitHubCompareTwoCommitsRequest follows no column with namespace
+    protocol.GitHubCompareTwoCommitsResponse follows no column with error, success
+    protocol.GitHubCreateACheckRunRequest follows no column with namespace
+    protocol.GitHubCreateACheckRunResponse follows no column with error, success
+    protocol.GitHubCreateACheckSuiteRequest follows no column with namespace
+    protocol.GitHubCreateACheckSuiteResponse follows no column with error, success
+    protocol.GitHubCreateACommitCommentRequest follows no column with namespace
+    protocol.GitHubCreateACommitStatusRequest follows no column with namespace
+    protocol.GitHubCreateACommitStatusResponse follows no column with error, success
+    protocol.GitHubCreateAPullRequestRequest follows no column with namespace
+    protocol.GitHubCreateAPullRequestResponse follows no column with error, success
+    protocol.GitHubCreateAReplyForAReviewCommentRequest follows no column with namespace
+    protocol.GitHubCreateARepositoryDispatchEventRequest follows no column with namespace
+    protocol.GitHubCreateARepositoryForTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubCreateARepositoryUsingATemplateRequest follows no column with namespace
+    protocol.GitHubCreateAReviewCommentForAPullRequestRequest follows no column with namespace
+    protocol.GitHubCreateAReviewForAPullRequestRequest follows no column with namespace
+    protocol.GitHubCreateAReviewForAPullRequestResponse follows no column with error, success
+    protocol.GitHubCreateAWorkflowDispatchEventRequest follows no column with namespace
+    protocol.GitHubCreateAWorkflowDispatchEventResponse follows no column with error, success
+    protocol.GitHubCreateAnIssueCommentRequest follows no column with namespace
+    protocol.GitHubCreateAnIssueRequest follows no column with namespace
+    protocol.GitHubCreateAnIssueResponse follows no column with error, success
+    protocol.GitHubCreateAnOrganizationInvitationRequest follows no column with namespace
+    protocol.GitHubCreateAnOrganizationInvitationResponse follows no column with error, success
+    protocol.GitHubCreateAnOrganizationRepositoryRequest follows no column with namespace
+    protocol.GitHubCreateAnOrganizationRepositoryResponse follows no column with error, success
+    protocol.GitHubDeleteACommitCommentRequest follows no column with namespace
+    protocol.GitHubDeleteAPendingReviewForAPullRequestRequest follows no column with namespace
+    protocol.GitHubDeleteARepositoryRequest follows no column with namespace
+    protocol.GitHubDeleteAReviewCommentForAPullRequestRequest follows no column with namespace
+    protocol.GitHubDeleteAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubDeleteAnArtifactRequest follows no column with namespace
+    protocol.GitHubDeleteAnIssueCommentRequest follows no column with namespace
+    protocol.GitHubDeleteAnOrganizationRequest follows no column with namespace
+    protocol.GitHubDeleteWorkflowRunLogsRequest follows no column with namespace
+    protocol.GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationRequest follows no column with namespace
+    protocol.GitHubDisableAWorkflowRequest follows no column with namespace
+    protocol.GitHubDisableDependabotSecurityUpdatesRequest follows no column with namespace
+    protocol.GitHubDisableImmutableReleasesRequest follows no column with namespace
+    protocol.GitHubDisablePrivateVulnerabilityReportingForARepositoryRequest follows no column with namespace
+    protocol.GitHubDisableVulnerabilityAlertsRequest follows no column with namespace
+    protocol.GitHubDismissAReviewForAPullRequestRequest follows no column with namespace
+    protocol.GitHubDismissAnIssueSuggestionRequest follows no column with namespace
+    protocol.GitHubDownloadAnArtifactRequest follows no column with namespace
+    protocol.GitHubDownloadJobLogsForAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubDownloadWorkflowRunAttemptLogsRequest follows no column with namespace
+    protocol.GitHubDownloadWorkflowRunLogsRequest follows no column with namespace
+    protocol.GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationRequest follows no column with namespace
+    protocol.GitHubEnableAWorkflowRequest follows no column with namespace
+    protocol.GitHubEnableDependabotSecurityUpdatesRequest follows no column with namespace
+    protocol.GitHubEnableImmutableReleasesRequest follows no column with namespace
+    protocol.GitHubEnableOrDisableASecurityFeatureForAnOrganizationRequest follows no column with namespace
+    protocol.GitHubEnablePrivateVulnerabilityReportingForARepositoryRequest follows no column with namespace
+    protocol.GitHubEnableVulnerabilityAlertsRequest follows no column with namespace
+    protocol.GitHubForceCancelAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubGetABranchRequest follows no column with namespace
+    protocol.GitHubGetABranchResponse follows no column with error, success
+    protocol.GitHubGetACheckRunRequest follows no column with namespace
+    protocol.GitHubGetACheckSuiteRequest follows no column with namespace
+    protocol.GitHubGetACommitCommentRequest follows no column with namespace
+    protocol.GitHubGetACommitCommentResponse follows no column with error, success
+    protocol.GitHubGetACommitRequest follows no column with namespace
+    protocol.GitHubGetACommitResponse follows no column with error, success
+    protocol.GitHubGetAJobForAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubGetAJobForAWorkflowRunResponse follows no column with error, success
+    protocol.GitHubGetAPullRequestRequest follows no column with namespace
+    protocol.GitHubGetARepositoryREADMEForADirectoryRequest follows no column with namespace
+    protocol.GitHubGetARepositoryREADMERequest follows no column with namespace
+    protocol.GitHubGetARepositoryREADMEResponse follows no column with error, success
+    protocol.GitHubGetARepositoryRequest follows no column with namespace
+    protocol.GitHubGetAReviewCommentForAPullRequestRequest follows no column with namespace
+    protocol.GitHubGetAReviewCommentForAPullRequestResponse follows no column with error, success
+    protocol.GitHubGetAReviewForAPullRequestRequest follows no column with namespace
+    protocol.GitHubGetAWorkflowRequest follows no column with namespace
+    protocol.GitHubGetAWorkflowResponse follows no column with error, success
+    protocol.GitHubGetAWorkflowRunAttemptRequest follows no column with namespace
+    protocol.GitHubGetAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubGetAWorkflowRunResponse follows no column with error, success
+    protocol.GitHubGetAllRepositoryTopicsRequest follows no column with namespace
+    protocol.GitHubGetAllRepositoryTopicsResponse follows no column with error, success
+    protocol.GitHubGetAllRequestedReviewersForAPullRequestRequest follows no column with namespace
+    protocol.GitHubGetAllRequestedReviewersForAPullRequestResponse follows no column with error, success
+    protocol.GitHubGetAnArtifactRequest follows no column with namespace
+    protocol.GitHubGetAnArtifactResponse follows no column with error, success
+    protocol.GitHubGetAnIssueCommentRequest follows no column with namespace
+    protocol.GitHubGetAnIssueCommentResponse follows no column with error, success
+    protocol.GitHubGetAnIssueRequest follows no column with namespace
+    protocol.GitHubGetAnOrganizationMembershipForTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubGetAnOrganizationRequest follows no column with namespace
+    protocol.GitHubGetAnOrganizationResponse follows no column with error, success
+    protocol.GitHubGetImmutableReleasesSettingsForAnOrganizationRequest follows no column with namespace
+    protocol.GitHubGetImmutableReleasesSettingsForAnOrganizationResponse follows no column with error, success
+    protocol.GitHubGetOrganizationMembershipForAUserRequest follows no column with namespace
+    protocol.GitHubGetOrganizationMembershipForAUserResponse follows no column with error, success
+    protocol.GitHubGetPendingDeploymentsForAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubGetRepositoryContentRequest follows no column with namespace
+    protocol.GitHubGetRepositoryContentResponse follows no column with error, success
+    protocol.GitHubGetTheCombinedStatusForASpecificReferenceRequest follows no column with namespace
+    protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse follows no column with error, success
+    protocol.GitHubGetTheHashAlgorithmForARepositoryRequest follows no column with namespace
+    protocol.GitHubGetTheHashAlgorithmForARepositoryResponse follows no column with error, success
+    protocol.GitHubGetTheResultOfAnAsynchronousMergeRequest follows no column with namespace
+    protocol.GitHubGetTheReviewHistoryForAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubGetWorkflowRunUsageRequest follows no column with namespace
+    protocol.GitHubGetWorkflowRunUsageResponse follows no column with error, success
+    protocol.GitHubGetWorkflowUsageRequest follows no column with namespace
+    protocol.GitHubGetWorkflowUsageResponse follows no column with error, success
+    protocol.GitHubListAppInstallationsForAnOrganizationRequest follows no column with namespace
+    protocol.GitHubListAppInstallationsForAnOrganizationResponse follows no column with error, success
+    protocol.GitHubListArtifactsForARepositoryRequest follows no column with namespace
+    protocol.GitHubListArtifactsForARepositoryResponse follows no column with error, success
+    protocol.GitHubListBranchesForHEADCommitRequest follows no column with namespace
+    protocol.GitHubListBranchesRequest follows no column with namespace
+    protocol.GitHubListCODEOWNERSErrorsRequest follows no column with namespace
+    protocol.GitHubListCODEOWNERSErrorsResponse follows no column with error, success
+    protocol.GitHubListCheckRunAnnotationsRequest follows no column with namespace
+    protocol.GitHubListCheckRunsForAGitReferenceRequest follows no column with namespace
+    protocol.GitHubListCheckRunsInACheckSuiteRequest follows no column with namespace
+    protocol.GitHubListCheckRunsInACheckSuiteResponse follows no column with error, success
+    protocol.GitHubListCheckSuitesForAGitReferenceRequest follows no column with namespace
+    protocol.GitHubListCheckSuitesForAGitReferenceResponse follows no column with error, success
+    protocol.GitHubListCommentsForAPullRequestReviewRequest follows no column with namespace
+    protocol.GitHubListCommitCommentsForARepositoryRequest follows no column with namespace
+    protocol.GitHubListCommitCommentsRequest follows no column with namespace
+    protocol.GitHubListCommitStatusesForAReferenceRequest follows no column with namespace
+    protocol.GitHubListCommitsOnAPullRequestRequest follows no column with namespace
+    protocol.GitHubListCommitsRequest follows no column with namespace
+    protocol.GitHubListFailedOrganizationInvitationsRequest follows no column with namespace
+    protocol.GitHubListIssueCommentsForARepositoryRequest follows no column with namespace
+    protocol.GitHubListIssueCommentsRequest follows no column with namespace
+    protocol.GitHubListIssueSuggestionsRequest follows no column with namespace
+    protocol.GitHubListIssuesAssignedToTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubListJobsForAWorkflowRunAttemptRequest follows no column with namespace
+    protocol.GitHubListJobsForAWorkflowRunAttemptResponse follows no column with error, success
+    protocol.GitHubListJobsForAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubListOrganizationInvitationTeamsRequest follows no column with namespace
+    protocol.GitHubListOrganizationIssuesAssignedToTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubListOrganizationMembersRequest follows no column with namespace
+    protocol.GitHubListOrganizationMembershipsForTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubListOrganizationRepositoriesRequest follows no column with namespace
+    protocol.GitHubListOrganizationsForAUserRequest follows no column with namespace
+    protocol.GitHubListOrganizationsForTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubListOrganizationsRequest follows no column with namespace
+    protocol.GitHubListPendingOrganizationInvitationsRequest follows no column with namespace
+    protocol.GitHubListPublicOrganizationMembersRequest follows no column with namespace
+    protocol.GitHubListPublicRepositoriesRequest follows no column with namespace
+    protocol.GitHubListPullRequestsAssociatedWithACommitRequest follows no column with namespace
+    protocol.GitHubListPullRequestsFilesRequest follows no column with namespace
+    protocol.GitHubListPullRequestsRequest follows no column with namespace
+    protocol.GitHubListRepositoriesForAUserRequest follows no column with namespace
+    protocol.GitHubListRepositoriesForTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubListRepositoryActivitiesRequest follows no column with namespace
+    protocol.GitHubListRepositoryContributorsRequest follows no column with namespace
+    protocol.GitHubListRepositoryIssuesRequest follows no column with namespace
+    protocol.GitHubListRepositoryLanguagesRequest follows no column with namespace
+    protocol.GitHubListRepositoryTagsRequest follows no column with namespace
+    protocol.GitHubListRepositoryTeamsRequest follows no column with namespace
+    protocol.GitHubListRepositoryWorkflowsRequest follows no column with namespace
+    protocol.GitHubListRepositoryWorkflowsResponse follows no column with error, success
+    protocol.GitHubListReviewCommentsInARepositoryRequest follows no column with namespace
+    protocol.GitHubListReviewCommentsOnAPullRequestRequest follows no column with namespace
+    protocol.GitHubListReviewsForAPullRequestRequest follows no column with namespace
+    protocol.GitHubListSelectedRepositoriesForImmutableReleasesEnforcementRequest follows no column with namespace
+    protocol.GitHubListSelectedRepositoriesForImmutableReleasesEnforcementResponse follows no column with error, success
+    protocol.GitHubListUserAccountIssuesAssignedToTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubListWorkflowRunArtifactsRequest follows no column with namespace
+    protocol.GitHubListWorkflowRunsForARepositoryRequest follows no column with namespace
+    protocol.GitHubListWorkflowRunsForARepositoryResponse follows no column with error, success
+    protocol.GitHubListWorkflowRunsForAWorkflowRequest follows no column with namespace
+    protocol.GitHubLockAnIssueRequest follows no column with namespace
+    protocol.GitHubMergeABranchRequest follows no column with namespace
+    protocol.GitHubMergeABranchResponse follows no column with error, success
+    protocol.GitHubMergeAPullRequestAsynchronouslyRequest follows no column with namespace
+    protocol.GitHubMergeAPullRequestAsynchronouslyResponse follows no column with error, success
+    protocol.GitHubMergeAPullRequestRequest follows no column with namespace
+    protocol.GitHubMergeAPullRequestResponse follows no column with error, success
+    protocol.GitHubPinAnIssueCommentRequest follows no column with namespace
+    protocol.GitHubReRunAJobFromAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubReRunAWorkflowRequest follows no column with namespace
+    protocol.GitHubReRunFailedJobsFromAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubRemoveAnOrganizationMemberRequest follows no column with namespace
+    protocol.GitHubRemoveOrganizationMembershipForAUserRequest follows no column with namespace
+    protocol.GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubRemoveRequestedReviewersFromAPullRequestRequest follows no column with namespace
+    protocol.GitHubRenameABranchRequest follows no column with namespace
+    protocol.GitHubReplaceAllRepositoryTopicsRequest follows no column with namespace
+    protocol.GitHubRequestReviewersForAPullRequestRequest follows no column with namespace
+    protocol.GitHubRequestReviewersForAPullRequestResponse follows no column with error, success
+    protocol.GitHubRerequestACheckRunRequest follows no column with namespace
+    protocol.GitHubRerequestACheckSuiteRequest follows no column with namespace
+    protocol.GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubReviewPendingDeploymentsForAWorkflowRunRequest follows no column with namespace
+    protocol.GitHubSetImmutableReleasesSettingsForAnOrganizationRequest follows no column with namespace
+    protocol.GitHubSetOrganizationMembershipForAUserRequest follows no column with namespace
+    protocol.GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementRequest follows no column with namespace
+    protocol.GitHubSubmitAReviewForAPullRequestRequest follows no column with namespace
+    protocol.GitHubSyncAForkBranchWithTheUpstreamRepositoryRequest follows no column with namespace
+    protocol.GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse follows no column with error, success
+    protocol.GitHubTransferARepositoryRequest follows no column with namespace
+    protocol.GitHubTransferARepositoryResponse follows no column with error, success
+    protocol.GitHubUnlockAnIssueRequest follows no column with namespace
+    protocol.GitHubUnpinAnIssueCommentRequest follows no column with namespace
+    protocol.GitHubUpdateACheckRunRequest follows no column with namespace
+    protocol.GitHubUpdateACommitCommentRequest follows no column with namespace
+    protocol.GitHubUpdateAPullRequestBranchRequest follows no column with namespace
+    protocol.GitHubUpdateAPullRequestBranchResponse follows no column with error, success
+    protocol.GitHubUpdateAPullRequestRequest follows no column with namespace
+    protocol.GitHubUpdateARepositoryRequest follows no column with namespace
+    protocol.GitHubUpdateAReviewCommentForAPullRequestRequest follows no column with namespace
+    protocol.GitHubUpdateAReviewForAPullRequestRequest follows no column with namespace
+    protocol.GitHubUpdateAnIssueCommentRequest follows no column with namespace
+    protocol.GitHubUpdateAnIssueRequest follows no column with namespace
+    protocol.GitHubUpdateAnIssueResponse follows no column with error, success
+    protocol.GitHubUpdateAnOrganizationMembershipForTheAuthenticatedUserRequest follows no column with namespace
+    protocol.GitHubUpdateAnOrganizationRequest follows no column with namespace
+    protocol.GitHubUpdateRepositoryPreferencesForCheckSuitesRequest follows no column with namespace
+    protocol.GitHubUpdateRepositoryPreferencesForCheckSuitesResponse follows no column with error, success
+    protocol.GitHubIssuesIssuesReactionRollup.plus_1 → reaction-rollup.plus_1, which the schema does not have
+    protocol.GitHubIssuesIssuesReactionRollup.minus_1 → reaction-rollup.minus_1, which the schema does not have
+    protocol.GitHubCommitsCommentsReactionRollup.plus_1 → reaction-rollup.plus_1, which the schema does not have
+    protocol.GitHubCommitsCommentsReactionRollup.minus_1 → reaction-rollup.minus_1, which the schema does not have
+    protocol.GitHubPullsCommentsReactionRollup.plus_1 → reaction-rollup.plus_1, which the schema does not have
+    protocol.GitHubPullsCommentsReactionRollup.minus_1 → reaction-rollup.minus_1, which the schema does not have
+    protocol.GitHubIssuesCommentsReactionRollup.plus_1 → reaction-rollup.plus_1, which the schema does not have
+    protocol.GitHubIssuesCommentsReactionRollup.minus_1 → reaction-rollup.minus_1, which the schema does not have
+    protocol.GitHubGetRepositoryContentResponse.items → GET /repos/{owner}/{repo}/contents/{path} 200.items, which the schema does not have
+    protocol.GitHubPullsReviewsReactionRollup.plus_1 → reaction-rollup.plus_1, which the schema does not have
+    protocol.GitHubPullsReviewsReactionRollup.minus_1 → reaction-rollup.minus_1, which the schema does not have
+    content-file._links is required, and nothing follows it
+    reaction-rollup.+1 is required, and nothing follows it
+    reaction-rollup.-1 is required, and nothing follows it
+    POST /repos/{owner}/{repo}/check-runs.head_sha is required, and nothing follows it
+    POST /repos/{owner}/{repo}/check-runs.name is required, and nothing follows it
+

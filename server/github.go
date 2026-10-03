@@ -94,9 +94,18 @@ func (s *QNTXServer) webhookURL(path string) string {
 
 func (s *QNTXServer) githubSignum() sigil.Signum {
 	enabled := &protocol.Param{Name: "enabled", Required: true, Says: "true or false."}
+	var follows []*protocol.Follows
+	if f, err := githubFollowGitHub(); err != nil {
+		if s.logger != nil {
+			s.logger.Errorw("GitHubService's messages were not read against GitHub's description, so parity cannot hold github", "error", err)
+		}
+	} else {
+		follows = append(follows, f)
+	}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "github",
+			Name:    "github",
+			Follows: follows,
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "status",

@@ -138,16 +138,25 @@ var (
 	protocolSaysErr  error
 )
 
-// oursSay is what one of our messages or fields says of itself, by full name,
-// as make says last wrote it.
-func oursSay(name string) (string, error) {
+// protocolSaid is what every message and field of ours says of itself, by
+// full name, as make says last wrote it.
+func protocolSaid() (map[string]string, error) {
 	protocolSaysOnce.Do(func() {
 		protocolSaysErr = json.Unmarshal(protocolSaysJSON, &protocolSays)
 	})
 	if protocolSaysErr != nil {
-		return "", errors.Wrap(protocolSaysErr, "protocol.says.json did not read")
+		return nil, errors.Wrap(protocolSaysErr, "protocol.says.json did not read")
 	}
-	return protocolSays[name], nil
+	return protocolSays, nil
+}
+
+// oursSay is what one of our messages or fields says of itself, by full name.
+func oursSay(name string) (string, error) {
+	says, err := protocolSaid()
+	if err != nil {
+		return "", err
+	}
+	return says[name], nil
 }
 
 // ours is what each message in scope and each of its fields says of itself.

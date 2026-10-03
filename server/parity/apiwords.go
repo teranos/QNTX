@@ -11,7 +11,7 @@ import (
 
 // A schema that says nothing of its own models may be spoken for by the
 // reference's API document: what it says of its schemas pinned beside it as
-// openapi.words.json (nix/umami-words.nix, from the document by its hash),
+// openapi.words.json (nix/references/umami.nix, from the document by its hash),
 // with words saying which of its schemas speaks for which model, since nothing
 // in the reference links them. A column the schema says nothing of takes the words
 // of the property of the same name, and says where they were read.
