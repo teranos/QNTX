@@ -101,6 +101,17 @@ func TestATranscriptSaysItsModelAndEffort(t *testing.T) {
 	assert.Empty(t, bare[0].Effort)
 }
 
+// Tim: a tool an MCP server answers is said as one.
+// "MCP needs to be shown as [mcp] not [tool]"
+func TestAnMCPToolIsMCP(t *testing.T) {
+	speaker, text := toolTurn("mcp__claude_ai_QNTX__roles_list", "", "")
+	assert.Equal(t, "mcp", speaker)
+	assert.Equal(t, "mcp__claude_ai_QNTX__roles_list", text)
+
+	speaker, _ = toolTurn("ToolSearch", "", "")
+	assert.Equal(t, "tool", speaker)
+}
+
 // Spike: an event with no session, or one a transcript does not read, is not
 // a turn; sessions come newest first and stop at the limit.
 func TestTranscriptsAreNewestFirstAndCut(t *testing.T) {

@@ -274,6 +274,9 @@ func toolTurn(tool, path, command string) (string, string) {
 	case "Grep", "Glob":
 		return "search", tool
 	}
+	if strings.HasPrefix(tool, "mcp__") {
+		return "mcp", tool
+	}
 	return "tool", tool
 }
 
