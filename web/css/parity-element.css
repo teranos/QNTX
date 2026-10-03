@@ -52,6 +52,11 @@
     column-gap: 14px;
     padding: 12px 16px;
     border-bottom: 1px solid var(--bg-tertiary);
+    cursor: pointer;
+}
+
+.parity-row:hover {
+    background: var(--bg-dark-hover);
 }
 
 .parity-row-head {
@@ -110,6 +115,19 @@
 .parity-departs { color: var(--element-status-warning-text); }
 .parity-owed { color: var(--element-status-error-text); }
 .parity-unfollowed { color: var(--text-on-dark-tertiary); }
+
+/* What follows nothing, at a glance: a bright red rectangle. */
+.parity-nothing {
+    display: inline-block;
+    padding: 2px 6px;
+    color: var(--color-error);
+    border: 2px solid var(--color-error);
+}
+
+.parity-out-of-spec.parity-nothing {
+    display: block;
+    margin: 12px 16px 18px;
+}
 
 .parity-required.parity-owed {
     color: var(--element-status-error-text);
