@@ -179,7 +179,11 @@ func (r *openAPIReader) answers(name string, op openAPIOperation) (Answers, erro
 			return Answers{}, nil
 		}
 		value, list := *body.Schema, false
-		if types, _ := typeWords(value.Type); slices.Equal(types, []string{"array"}) && value.Items != nil {
+		types, err := typeWords(value.Type)
+		if err != nil {
+			return Answers{}, errors.Wrapf(err, "what %s answers with in %s", name, r.path)
+		}
+		if slices.Equal(types, []string{"array"}) && value.Items != nil {
 			value, list = *value.Items, true
 		}
 		if refers := r.refers(value); refers != "" {
