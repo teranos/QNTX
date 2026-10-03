@@ -14,10 +14,8 @@ import { apiJson } from '../../client';
 import { escapeHtml } from '../../html-utils';
 import { log, SEG } from '../../logger';
 import { Transcript as TranscriptSym } from '../../sym';
-import { spawnAttestationAsWindow } from './attestation-element';
 import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';
-import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 
 // One thing said or done in a session, naming the attestation it was read from (protocol.Turn).
 export interface Turn {
@@ -36,9 +34,6 @@ export interface TranscriptRead {
     turns: Turn[];
     folded: number;
 }
-
-// The node answers at most this many rows to one ask.
-const MOST = 1000;
 
 // ─── Time spacers ─────────────────────────────────────────────
 
@@ -109,7 +104,12 @@ export function when(at: string): string {
         String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
-function turnRow(turn: Turn, onOpen: (turn: Turn) => void): HTMLElement {
+// What folds into a chip; everything else is a row and ends a line of chips.
+function folds(speaker: string): boolean {
+    return SMALL.has(speaker) || speaker === 'ground';
+}
+
+function turnRow(turn: Turn, selection: Selection): HTMLElement {
     const row = document.createElement('div');
     row.className = `tr-turn tr-${weightOf(turn.speaker)} tr-sp-${turn.speaker}`;
     row.title = turn.of;
@@ -122,11 +122,120 @@ function turnRow(turn: Turn, onOpen: (turn: Turn) => void): HTMLElement {
     if (turn.speaker === 'assistant') text.innerHTML = renderAssistant(turn.text);
     else text.textContent = turn.text;
     row.append(speaker, text);
-    row.addEventListener('click', (e) => {
-        e.stopPropagation();
-        onOpen(turn);
-    });
+    selection.pressable(row, [turn]);
     return row;
+}
+
+// ─── Chips ────────────────────────────────────────────────────
+
+const LIST_DELAY_MS = 300;
+const LIST_GRACE_MS = 120;
+
+// "[read] 2x [tool] 3x [ground] [read] 2x"
+function chip(turns: Turn[], selection: Selection): HTMLElement {
+    const speaker = turns[0].speaker;
+    const el = document.createElement('span');
+    el.className = `tr-chip tr-${weightOf(speaker)} tr-sp-${speaker}`;
+    const label = document.createElement('span');
+    label.className = 'tr-speaker';
+    label.textContent = `[${speaker}]`;
+    el.appendChild(label);
+    if (turns.length > 1) el.append(` ${turns.length}x`);
+    selection.pressable(el, turns);
+    listOnHover(el, turns, selection);
+    return el;
+}
+
+// Hovering a chip lists its turns in sequence, each one pressable alone.
+function listOnHover(el: HTMLElement, turns: Turn[], selection: Selection): void {
+    let list: HTMLElement | null = null;
+    let showing: ReturnType<typeof setTimeout> | null = null;
+    let going: ReturnType<typeof setTimeout> | null = null;
+    let onChip = false;
+    let onList = false;
+
+    const hide = () => {
+        if (!list) return;
+        for (const row of list.querySelectorAll<HTMLElement>('.tr-turn')) selection.forget(row);
+        list.remove();
+        list = null;
+    };
+    const maybeHide = () => {
+        if (going) clearTimeout(going);
+        going = setTimeout(() => { going = null; if (!onChip && !onList) hide(); }, LIST_GRACE_MS);
+    };
+    const show = () => {
+        list = document.createElement('div');
+        list.className = 'tr-chip-list';
+        for (const turn of turns) list.appendChild(turnRow(turn, selection));
+        list.addEventListener('pointerenter', () => { onList = true; });
+        list.addEventListener('pointerleave', () => { onList = false; maybeHide(); });
+        document.body.appendChild(list);
+        const at = el.getBoundingClientRect();
+        const size = list.getBoundingClientRect();
+        list.style.left = `${Math.max(4, Math.min(at.left, window.innerWidth - size.width - 4))}px`;
+        const below = at.bottom + 4;
+        list.style.top = `${Math.max(4, below + size.height > window.innerHeight ? at.top - size.height - 4 : below)}px`;
+    };
+
+    el.addEventListener('pointerenter', () => {
+        onChip = true;
+        if (list || showing) return;
+        showing = setTimeout(() => { showing = null; if (onChip) show(); }, LIST_DELAY_MS);
+    });
+    el.addEventListener('pointerleave', () => {
+        onChip = false;
+        if (showing) { clearTimeout(showing); showing = null; }
+        maybeHide();
+    });
+}
+
+// ─── Selection ────────────────────────────────────────────────
+
+// "left adds to selection and right removes it left on already selected adds to clipboard what is selected"
+class Selection {
+    private chosen = new Set<string>();
+    private marks = new Map<HTMLElement, Turn[]>();
+
+    constructor(private order: Turn[], private copy: (text: string) => void) {}
+
+    /** An element that stands for these turns is pressed for all of them. */
+    pressable(el: HTMLElement, turns: Turn[]): void {
+        this.marks.set(el, turns);
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (turns.every(t => this.chosen.has(t.of))) {
+                this.copy(this.said());
+                return;
+            }
+            for (const t of turns) this.chosen.add(t.of);
+            this.paint();
+        });
+        el.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            for (const t of turns) this.chosen.delete(t.of);
+            this.paint();
+        });
+        this.paintOne(el, turns);
+    }
+
+    /** An element that is gone stands for nothing. */
+    forget(el: HTMLElement): void {
+        this.marks.delete(el);
+    }
+
+    private said(): string {
+        return this.order.filter(t => this.chosen.has(t.of)).map(t => `[${t.speaker}] ${t.text}`).join('\n');
+    }
+
+    private paintOne(el: HTMLElement, turns: Turn[]): void {
+        el.classList.toggle('tr-selected', turns.every(t => this.chosen.has(t.of)));
+    }
+
+    private paint(): void {
+        for (const [el, turns] of this.marks) this.paintOne(el, turns);
+    }
 }
 
 // ─── Warp ─────────────────────────────────────────────────────
@@ -208,8 +317,12 @@ export function warpFor(turns: Turn[], column: HTMLElement): HTMLElement {
 
 // ─── Views ────────────────────────────────────────────────────
 
-/** One session drawn into body: its turns in order, the gaps between them, and the warp. */
-export function renderTranscript(body: HTMLElement, read: TranscriptRead, onOpen: (turn: Turn) => void): void {
+/**
+ * One session drawn into body: its turns in order, the gaps between them, and
+ * the warp. A run of what was done is one line of chips; copy is handed what a
+ * press on the selection copies.
+ */
+export function renderTranscript(body: HTMLElement, read: TranscriptRead, copy: (text: string) => void): void {
     body.replaceChildren();
     const head = document.createElement('div');
     head.className = 'tr-head';
@@ -218,18 +331,45 @@ export function renderTranscript(body: HTMLElement, read: TranscriptRead, onOpen
     rows.className = 'tr-body';
     const column = document.createElement('div');
     column.className = 'tr-col';
+    const selection = new Selection(read.turns, copy);
     let prev = 0;
+    // The line of chips being drawn, and the run its last chip holds.
+    let line: HTMLElement | null = null;
+    let run: Turn[] = [];
+    const endRun = () => {
+        if (line && run.length > 0) line.appendChild(chip(run, selection));
+        run = [];
+    };
+    const endLine = () => {
+        endRun();
+        line = null;
+    };
     for (const turn of read.turns) {
         const at = Date.parse(turn.at);
-        for (const px of timeSpacers(prev, at)) {
+        const spacers = timeSpacers(prev, at);
+        // A gap is drawn between lines, never inside one.
+        if (spacers.length > 0) endLine();
+        for (const px of spacers) {
             const spacer = document.createElement('div');
             spacer.className = 'tr-spacer';
             spacer.style.height = `${px}px`;
             column.appendChild(spacer);
         }
         prev = at;
-        column.appendChild(turnRow(turn, onOpen));
+        if (!folds(turn.speaker)) {
+            endLine();
+            column.appendChild(turnRow(turn, selection));
+            continue;
+        }
+        if (!line) {
+            line = document.createElement('div');
+            line.className = 'tr-chips';
+            column.appendChild(line);
+        }
+        if (run.length > 0 && run[0].speaker !== turn.speaker) endRun();
+        run.push(turn);
     }
+    endLine();
     rows.append(column, warpFor(read.turns, column));
     body.append(head, rows);
 }
@@ -243,15 +383,10 @@ function said(body: HTMLElement, text: string): void {
     body.replaceChildren(line);
 }
 
-// A turn names the attestation it was read from; pressing it opens that one.
-async function openTurn(session: string, turn: Turn): Promise<void> {
-    const held = await apiJson<Attestation[]>(`/api/attestations?context=${encodeURIComponent('session:' + session)}&limit=${MOST}`);
-    const as = held.find(a => a.id === turn.of);
-    if (!as) {
-        log.error(SEG.ELEMENT, `[Transcript] turn ${turn.of} names an attestation session ${session} no longer answers`);
-        return;
-    }
-    spawnAttestationAsWindow(as);
+// What a press on the selection copies goes to the clipboard.
+function toClipboard(session: string, text: string): void {
+    navigator.clipboard.writeText(text).catch((err: unknown) =>
+        log.error(SEG.ELEMENT, `[Transcript] the selection of session ${session} did not reach the clipboard:`, err));
 }
 
 const SIZE = { width: 520, height: 640 };
@@ -263,9 +398,7 @@ function readInto(body: HTMLElement, session: string): void {
         .then(answer => {
             const read = answer.transcripts[0];
             if (!read) { said(body, 'No session ' + session + ' is in this namespace.'); return; }
-            renderTranscript(body, read, (turn) => {
-                openTurn(session, turn).catch((err: unknown) => log.error(SEG.ELEMENT, `[Transcript] turn ${turn.of} did not open:`, err));
-            });
+            renderTranscript(body, read, (text) => toClipboard(session, text));
         })
         .catch((err: unknown) => said(body, 'Could not read session ' + session + ': ' + String(err)));
 }
