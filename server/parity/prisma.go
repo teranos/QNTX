@@ -50,6 +50,8 @@ type Column struct {
 	// holds is, for JSON Schema, the types a value of it may be once every
 	// definition it refers to is read: what Type names, resolved.
 	holds []string
+	// refers is, for OpenAPI, the model a value of it is, or holds a list of.
+	refers string
 }
 
 // Model is a Prisma model, a proto message or a JSON Schema definition and its
@@ -69,6 +71,8 @@ type Model struct {
 type Schema struct {
 	Models []Model
 	fits   func(kind protoreflect.Kind, column Column) bool
+	// answers is, for OpenAPI, what each operation answers with.
+	answers map[string]Answers
 }
 
 // Prisma is a Prisma schema's models as a reference.

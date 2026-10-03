@@ -1,0 +1,730 @@
+[
+  {
+    "method": "get",
+    "path": "/issues"
+  },
+  {
+    "method": "get",
+    "path": "/organizations"
+  },
+  {
+    "method": "delete",
+    "path": "/orgs/{org}"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}"
+  },
+  {
+    "method": "patch",
+    "path": "/orgs/{org}"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/failed_invitations"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/installations"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/invitations"
+  },
+  {
+    "method": "post",
+    "path": "/orgs/{org}/invitations"
+  },
+  {
+    "method": "delete",
+    "path": "/orgs/{org}/invitations/{invitation_id}"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/invitations/{invitation_id}/teams"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/issues"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/members"
+  },
+  {
+    "method": "delete",
+    "path": "/orgs/{org}/members/{username}"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/members/{username}"
+  },
+  {
+    "method": "delete",
+    "path": "/orgs/{org}/memberships/{username}"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/memberships/{username}"
+  },
+  {
+    "method": "put",
+    "path": "/orgs/{org}/memberships/{username}"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/public_members"
+  },
+  {
+    "method": "delete",
+    "path": "/orgs/{org}/public_members/{username}"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/public_members/{username}"
+  },
+  {
+    "method": "put",
+    "path": "/orgs/{org}/public_members/{username}"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/repos"
+  },
+  {
+    "method": "post",
+    "path": "/orgs/{org}/repos"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/settings/immutable-releases"
+  },
+  {
+    "method": "put",
+    "path": "/orgs/{org}/settings/immutable-releases"
+  },
+  {
+    "method": "get",
+    "path": "/orgs/{org}/settings/immutable-releases/repositories"
+  },
+  {
+    "method": "put",
+    "path": "/orgs/{org}/settings/immutable-releases/repositories"
+  },
+  {
+    "method": "delete",
+    "path": "/orgs/{org}/settings/immutable-releases/repositories/{repository_id}"
+  },
+  {
+    "method": "put",
+    "path": "/orgs/{org}/settings/immutable-releases/repositories/{repository_id}"
+  },
+  {
+    "method": "post",
+    "path": "/orgs/{org}/{security_product}/{enablement}"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}"
+  },
+  {
+    "method": "patch",
+    "path": "/repos/{owner}/{repo}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/artifacts"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/actions/artifacts/{artifact_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/artifacts/{artifact_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/jobs/{job_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/jobs/{job_id}/logs"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/actions/jobs/{job_id}/rerun"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/approvals"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/approve"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/jobs"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/logs"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/cancel"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/deployment_protection_rule"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/jobs"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/logs"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/logs"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/pending_deployments"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/pending_deployments"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/rerun"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/rerun-failed-jobs"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/runs/{run_id}/timing"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/workflows"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/workflows/{workflow_id}"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/disable"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/timing"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/activity"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/automated-security-fixes"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/automated-security-fixes"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/automated-security-fixes"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/branches"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/branches/{branch}"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/branches/{branch}/rename"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/check-runs"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/check-runs/{check_run_id}"
+  },
+  {
+    "method": "patch",
+    "path": "/repos/{owner}/{repo}/check-runs/{check_run_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/check-runs/{check_run_id}/annotations"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/check-runs/{check_run_id}/rerequest"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/check-suites"
+  },
+  {
+    "method": "patch",
+    "path": "/repos/{owner}/{repo}/check-suites/preferences"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/check-suites/{check_suite_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/check-suites/{check_suite_id}/check-runs"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/check-suites/{check_suite_id}/rerequest"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/codeowners/errors"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/comments"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/comments/{comment_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/comments/{comment_id}"
+  },
+  {
+    "method": "patch",
+    "path": "/repos/{owner}/{repo}/comments/{comment_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/commits"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/commits/{commit_sha}/branches-where-head"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/commits/{commit_sha}/comments"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/commits/{commit_sha}/comments"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/commits/{commit_sha}/pulls"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/commits/{ref}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/commits/{ref}/check-runs"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/commits/{ref}/check-suites"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/commits/{ref}/status"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/commits/{ref}/statuses"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/compare/{basehead}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/contents/{path}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/contributors"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/dispatches"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/hash-algorithm"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/immutable-releases"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/immutable-releases"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/immutable-releases"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/issues"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/issues"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/issues/comments"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/issues/comments/{comment_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/issues/comments/{comment_id}"
+  },
+  {
+    "method": "patch",
+    "path": "/repos/{owner}/{repo}/issues/comments/{comment_id}"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/issues/comments/{comment_id}/pin"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/issues/comments/{comment_id}/pin"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/issues/{issue_number}"
+  },
+  {
+    "method": "patch",
+    "path": "/repos/{owner}/{repo}/issues/{issue_number}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/issues/{issue_number}/comments"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/issues/{issue_number}/comments"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/issues/{issue_number}/lock"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/issues/{issue_number}/lock"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/issues/{issue_number}/suggestions"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/issues/{issue_number}/suggestions/{suggestion_id}/approve"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/issues/{issue_number}/suggestions/{suggestion_id}/dismiss"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/languages"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/merge-upstream"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/merges"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/private-vulnerability-reporting"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/private-vulnerability-reporting"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/private-vulnerability-reporting"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/pulls"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/comments"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/pulls/comments/{comment_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/comments/{comment_id}"
+  },
+  {
+    "method": "patch",
+    "path": "/repos/{owner}/{repo}/pulls/comments/{comment_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}"
+  },
+  {
+    "method": "patch",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/comments"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/comments"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/commits"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/files"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/merge"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/merge"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/merge-async"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/merge-async/{uuid}"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/dismissals"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/events"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/pulls/{pull_number}/update-branch"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/readme"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/readme/{dir}"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/statuses/{sha}"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/tags"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/teams"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/topics"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/topics"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/transfer"
+  },
+  {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/vulnerability-alerts"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/vulnerability-alerts"
+  },
+  {
+    "method": "put",
+    "path": "/repos/{owner}/{repo}/vulnerability-alerts"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{template_owner}/{template_repo}/generate"
+  },
+  {
+    "method": "get",
+    "path": "/repositories"
+  },
+  {
+    "method": "get",
+    "path": "/user/issues"
+  },
+  {
+    "method": "get",
+    "path": "/user/memberships/orgs"
+  },
+  {
+    "method": "get",
+    "path": "/user/memberships/orgs/{org}"
+  },
+  {
+    "method": "patch",
+    "path": "/user/memberships/orgs/{org}"
+  },
+  {
+    "method": "get",
+    "path": "/user/orgs"
+  },
+  {
+    "method": "get",
+    "path": "/user/repos"
+  },
+  {
+    "method": "post",
+    "path": "/user/repos"
+  },
+  {
+    "method": "get",
+    "path": "/users/{username}/orgs"
+  },
+  {
+    "method": "get",
+    "path": "/users/{username}/repos"
+  }
+]

@@ -34,6 +34,29 @@ func TestParityHoldsStaandsAsRecorded(t *testing.T) {
 	holds(t, signum, "hold", answer)
 }
 
+// GitHubService held to GitHub's own description: what the github signum
+// follows is read from its messages, and gives what is recorded beside the
+// pinned description. A model at 100 is not recorded.
+func TestParityHoldsGitHubAsRecorded(t *testing.T) {
+	s := &QNTXServer{}
+	signum := s.paritySignum()
+	answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": "github"})
+	if refused != nil {
+		t.Fatalf("hold refused github: %s", refused.GetSays())
+	}
+	held, ok := answer.(parity.Parity)
+	if !ok {
+		t.Fatalf("answer is %T, not parity.Parity", answer)
+	}
+	want, err := os.ReadFile(filepath.Join("parity", "github_2026-03-10_7bdf5f0", "github"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := held.Render(false); got != string(want) {
+		t.Errorf("github no longer reads as parity/github_2026-03-10_7bdf5f0/github records; got\n%s", got)
+	}
+}
+
 // What hold is asked that the node cannot answer is refused by the param.
 func TestParityHoldRefuses(t *testing.T) {
 	hold := (&QNTXServer{}).paritySignum().Answers["hold"]
