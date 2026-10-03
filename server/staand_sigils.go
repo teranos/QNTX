@@ -41,8 +41,10 @@ func staandEchoed(fields ...*protocol.Field) []*protocol.Field {
 func (s *QNTXServer) staandsSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name:    "staands",
-			Follows: []*protocol.Follows{staandsFollowUmami()},
+			Name:        "staands",
+			Description: "Stands: a market's public pixel, created and taken down, and what arrived at each, read as metrics, activity and visits.",
+			Tags:        []string{"analytics", "pixel", "visits"},
+			Follows:     []*protocol.Follows{staandsFollowUmami()},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:  "list",
