@@ -153,6 +153,16 @@ func staandsFollowUmami() *protocol.Follows {
 		{"protocol.Visit.slug", "WebsiteEvent.websiteId"},
 		{"protocol.Visit.visitor", "WebsiteEvent.sessionId"},
 		{"protocol.Visit.visit", "WebsiteEvent.visitId"},
+		// What Umami's tracker sends, beside what Umami keeps: one reference,
+		// read from its record and its tracker. A stand splits the URL and
+		// the referrer the tracker sends whole, so two fields follow each.
+		{"protocol.Arrival.market", "TrackedProperties.website"},
+		{"protocol.Arrival.slug", "TrackedProperties.website"},
+		{"protocol.Arrival.path", "TrackedProperties.url"},
+		{"protocol.Arrival.referrer_domain", "TrackedProperties.referrer"},
+		{"protocol.Arrival.referrer_path", "TrackedProperties.referrer"},
+		{"protocol.Arrival.event", "EventProperties.name"},
+		{"protocol.Arrival.params", "EventProperties.data"},
 	}
 	follows := &protocol.Follows{Reference: "umami"}
 	for _, p := range pairs {

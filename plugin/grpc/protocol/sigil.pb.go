@@ -28,7 +28,7 @@ type Signum struct {
 	Name   string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Sigils []*Sigil               `protobuf:"bytes,2,rep,name=sigils,proto3" json:"sigils,omitempty"`
 	// The shapes this signum is held to, each by its name: "Staands will be
-	// Umami, one reference and not a blend." make parity prisma reads these.
+	// Umami, one reference and not a blend." The parity sigil reads these.
 	Follows       []*Follows `protobuf:"bytes,3,rep,name=follows,proto3" json:"follows,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

@@ -1,0 +1,6 @@
+# Which schema of openapi.json speaks for which model of schema.prisma, by
+# hand: Umami links them nowhere. A column takes the words of the property of
+# the same name, and the seam says they are the API document's.
+WebsiteEvent WebsiteEvent
+Session      WebsiteSession
+Website      Website

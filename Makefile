@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity openapi publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -39,6 +39,14 @@ openapi: ## Write what the node serves, from the reach table and the handlers' o
 # held to a reference it follows is the parity sigil's (server/parity).
 parity: ## Report what a node keeps on its own disk and what the record keeps (ADR-024, ADR-037)
 	@go run ./cmd/parity
+
+# The generated Go keeps no .proto comment, and the parity sigil gives what our
+# fields say of themselves beside what each spec says of its own. Umami's API
+# document is 1.4 MB and parity reads only its words, so nix fetches it by its
+# hash and keeps those.
+says: ## Write what the specs and our protocol say of themselves for the parity sigil
+	@go run ./cmd/says
+	@nix eval --raw -f nix/umami-words.nix > server/parity/umami_v3.3.1_ca661c7/openapi.words.json
 
 # git is the baseline, so there is no file to keep in step. What already stands
 # keeps standing; what this branch added is what answers. Exit 2 and not 1: a
