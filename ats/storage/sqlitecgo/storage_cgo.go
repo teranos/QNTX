@@ -1,4 +1,4 @@
-//go:build !atsless
+//go:build !quickdev
 
 // Package sqlitecgo provides a CGO wrapper for the Rust ats-sqlite storage backend.
 //

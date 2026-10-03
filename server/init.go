@@ -179,16 +179,7 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		took := time.Since(stepStart)
 		measure.Took(measure.BootSubsystemTook, took, measure.String(measure.AttrSubsystem, entry.sub.Name()))
 		if err != nil {
-			policy := entry.policy
-			// Built without ATS, a step that failed for want of it is said and
-			// passed, so the node comes up with what needs no ATS. Any other
-			// failure is what it always was.
-			if atsless && wantsATS(err) {
-				serverLogger.Warnw("Subsystem needs ATS, and this node runs ATSless",
-					"subsystem", entry.sub.Name(), "error", err)
-				policy = SubsystemSkipped
-			}
-			switch policy {
+			switch entry.policy {
 			case SubsystemFatal:
 				cancel()
 				return nil, errors.Wrapf(err, "subsystem %s failed", entry.sub.Name())

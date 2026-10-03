@@ -1,4 +1,4 @@
-//go:build cgo && !atsless
+//go:build cgo && !quickdev
 
 package commands
 

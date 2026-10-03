@@ -12,10 +12,6 @@ package identity
 
 import "github.com/teranos/errors"
 
-// ErrNoWASM is what every id this build cannot mint is refused with: ids come
-// from Rust WASM, and this build was made without the qntxwasm tag.
-var ErrNoWASM = errors.New("requires the qntxwasm build tag")
-
 // GenerateASUID generates an Attestation System Unique ID with the given prefix.
 // Prefix is typically "AS" for attestations.
 func GenerateASUID(prefix, subject, predicate, context string) (string, error) {

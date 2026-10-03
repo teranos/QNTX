@@ -42,9 +42,9 @@ func refusePublicDeploy(bindAddr string, auth appcfg.AuthConfig) error {
 	if !offLoopback(bindAddr) {
 		return nil
 	}
-	if atsless {
+	if quickdev {
 		return errors.Newf(
-			"this node runs ATSless and keeps no attestations, so it binds loopback only, not server.bind_address %q",
+			"QuickDev is for developing against, so it binds loopback only, not server.bind_address %q",
 			bindAddr,
 		)
 	}

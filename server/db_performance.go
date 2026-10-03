@@ -1,4 +1,4 @@
-//go:build !atsless
+//go:build !quickdev
 
 package server
 

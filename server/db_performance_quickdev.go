@@ -1,6 +1,6 @@
-//go:build atsless
+//go:build quickdev
 
 package server
 
-// An ATSless node has no Rust slow log to report from.
+// QuickDev has no Rust slow log to report from.
 func buildPerformanceData() map[string]any { return nil }

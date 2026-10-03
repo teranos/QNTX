@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi atsless publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -33,12 +33,11 @@ cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM 
 		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
 
-# "an ATSless mode, so we don't need to do that part every time": no Rust and
-# no WASM, so neither target/ nor ats.wasm is built. What needs ATS, an
-# attestation or an id, refuses and says so; the node binds loopback only and
-# answers atsless at /health.
-atsless: ## Build a node without ATS, as bin/qntx-atsless: no Rust, no WASM, loopback only
-	@go build -tags atsless $(GO_LDFLAGS) -o bin/qntx-atsless ./cmd/qntx
+# QuickDev: "One of the distributions of QNTX, purpose is to build FAST, help
+# with plugin development, for use by Claude Code Web and Mobile sessions.
+# Doesn't need ATS or wasm"
+quickdev: ## Build QuickDev, as bin/qntx-quickdev: no ATS, no WASM, loopback only
+	@go build -tags quickdev $(GO_LDFLAGS) -o bin/qntx-quickdev ./cmd/qntx
 
 openapi: ## Write what the node serves, from the reach table and the handlers' own prose
 	@go run ./cmd/openapi

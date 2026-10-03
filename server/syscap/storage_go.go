@@ -1,4 +1,4 @@
-//go:build !cgo || !rustsqlite || atsless
+//go:build !cgo || !rustsqlite || quickdev
 
 package syscap
 

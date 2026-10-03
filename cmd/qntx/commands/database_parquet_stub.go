@@ -1,4 +1,4 @@
-//go:build cgo && (!rustduckdb || atsless)
+//go:build cgo && (!rustduckdb || quickdev)
 
 package commands
 

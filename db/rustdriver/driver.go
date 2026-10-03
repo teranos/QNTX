@@ -1,4 +1,4 @@
-//go:build !atsless
+//go:build !quickdev
 
 // Package rustdriver implements database/sql/driver over Rust's SQLite connections.
 //

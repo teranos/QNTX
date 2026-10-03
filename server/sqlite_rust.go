@@ -1,11 +1,11 @@
-//go:build !atsless
+//go:build !quickdev
 
 package server
 
 import "database/sql"
 
-// atsless is false: this node keeps attestations through ATS.
-const atsless = false
+// quickdev is false: this is not the QuickDev distribution.
+const quickdev = false
 
 // openSQLite opens another connection to the node's SQLite through the Rust
 // driver: the same SQLite library instance as the write path. A separate Go
