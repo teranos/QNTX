@@ -153,6 +153,14 @@ func TestTheTranscriptsSigilReadsWhereTheCallerStands(t *testing.T) {
 	assert.Equal(t, "s-1", one[0].Session)
 }
 
+// transcripts read answers Go structs for their json tags, and proto declares
+// their shape (ADR-006): the two are held to the same fields here.
+func TestATranscriptIsTheShapeProtoDeclares(t *testing.T) {
+	const declared = "../plugin/grpc/protocol/sigil.proto"
+	assert.Equal(t, fieldsOf(t, declared, "Transcript"), jsonNamesOf(t, transcript{}))
+	assert.Equal(t, fieldsOf(t, declared, "Turn"), jsonNamesOf(t, transcriptTurn{}))
+}
+
 func TestTranscriptsAreRootsAlone(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
