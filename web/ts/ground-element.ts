@@ -30,7 +30,7 @@ import { apiJson } from './client/http';
 import { log, SEG } from './logger';
 import { Ground } from './sym';
 import { openTranscriptElement, when, type TranscriptRead, type Turn } from './components/element/transcript-element';
-import { cloud, cloudBank, comet, horizon, nebula, seam, starburst, starField } from './ground-scene';
+import { cloud, cloudBank, comet, core, horizon, nebula, seam, starburst, starField } from './ground-scene';
 import { labelsOf, renderSparkline, seenOver, seriesOf, type Window as Span } from './components/sparkline';
 
 const ELEMENT_ID = 'ground-element';
@@ -173,6 +173,7 @@ function eventOf(turn: Turn): string | null {
         case 'compaction': return 'PreCompact';
         case 'agent': return turn.text.startsWith('Stop') ? 'SubagentStop' : 'SubagentStart';
         case 'task': return 'TaskCompleted';
+        case 'error': return 'StopFailure';
         default: return null;
     }
 }
@@ -482,6 +483,70 @@ function saySky(into: HTMLElement, reads: TranscriptRead[]): void {
     into.appendChild(make('div', 'gr-told', `${rows.toLocaleString('en')} rows came up through sky, in ${sessionsRead(reads.length)}.`));
 }
 
+// "AT THE BOTTOM OF THE GROUND ELEMENT IS FIERY RED ERROR RED FATAL RED HIGH ENTROPY MADNESS"
+// "BUT ITS SACRED"
+
+// One failure, whole: what failed, why in the words it came in, and where and when.
+interface Sacred {
+    key: string;
+    title: string;
+    why: string;
+    where: string;
+    at: string;
+    session: string;
+    fatal: boolean;
+}
+
+// What failed inside the sessions read: an API error that ended a turn, said as
+// the API said it (server/transcripts.go turnOf), and a rite that halted.
+function errorsIn(reads: TranscriptRead[]): Sacred[] {
+    const found: Sacred[] = [];
+    for (const read of reads) {
+        const where = [walkOf(read), placeOf(read).place, read.session.substring(0, 8)].filter(Boolean).join(' · ');
+        for (const turn of read.turns) {
+            if (turn.speaker === 'error') {
+                const colon = turn.text.indexOf(': ');
+                found.push({
+                    key: turn.of, where, at: turn.at, session: read.session, fatal: true,
+                    title: colon < 0 ? turn.text : turn.text.substring(0, colon),
+                    why: colon < 0 ? '' : turn.text.substring(colon + 2),
+                });
+            } else if (turn.speaker === 'rite' && turn.text.split(' ')[1] === 'halt') {
+                found.push({ key: turn.of, title: `rite ${turn.text}`, why: '', where, at: turn.at, session: read.session, fatal: false });
+            }
+        }
+    }
+    return found;
+}
+
+// What failed on the node's side of Ground: ci.watch itself, and a push or a run it concluded unwell.
+function errorsOf(done: Does): Sacred[] {
+    const failed = done.failed.map(failure => ({
+        key: `failed:${failure.execution_id}:${failure.at}`, title: 'ci.watch failed', why: failure.error,
+        where: failure.execution_id, at: failure.at, session: '', fatal: false,
+    }));
+    const unwell = done.news.filter(news => !news.waiting && news.symbol !== '+').map(news => ({
+        key: `news:${news.id}`, title: `${news.name} ${news.note}`, why: '',
+        where: 'left on the row', at: news.at, session: '', fatal: false,
+    }));
+    return [...failed, ...unwell];
+}
+
+// One error drawn whole, never shortened: what it is, why, and where and when.
+function errorBlock(error: Sacred, onChoose: (session: string) => void): HTMLElement {
+    const block = make(error.session ? 'button' : 'div', error.fatal ? 'gr-err gr-err-fatal' : 'gr-err');
+    const said = (label: string, text: string, as: string) => {
+        const line = make('span', 'gr-err-line');
+        line.append(make('span', 'gr-err-label', label), make('span', as, text));
+        block.appendChild(line);
+    };
+    said('error:', error.title, 'gr-err-title');
+    if (error.why) said('why:', error.why, 'gr-err-why');
+    said('at:', `${error.where} · ${when(error.at)}`, 'gr-err-at');
+    if (error.session) block.addEventListener('click', () => { onChoose(error.session); });
+    return block;
+}
+
 // How wide an agent's cloud is drawn: wider the more it flew, by the root of the count.
 function cloudWide(count: number): number {
     return Math.min(120, 52 + Math.round(Math.sqrt(count) * 14));
@@ -610,7 +675,19 @@ export function drawGround(body: HTMLElement): GroundScene {
     sessions.appendChild(make('div', 'tr-said', 'Reading the sessions Ground recorded here…'));
     deep.body.append(sessions, limit('Ground streams no project and no scope. A place here is the last two directories of the repo, or of where the session began, so a worktree is a place of its own.'));
 
-    body.replaceChildren(scry.section, stars.section, fall.section, sky.section, surface.section, under.section, rites.section, deep.section);
+    // The core, under everything: what failed, each one whole.
+    const fire = stratum('core', 'Errors', 'sacred', seam(13));
+    const sacred = make('div', 'gr-sacred');
+    const unburnt = make('div', 'tr-said', 'Reading for what failed…');
+    fire.body.append(
+        sacred,
+        unburnt,
+        limit('Ground writes its own errors as immediate:exec-result rows, the same row an exec\'s result is, and nothing typed tells one from the other: no transcript reads them. Each also goes to Sentry.'),
+        limit('A tool that failed reaches QNTX as PostToolUseFailure, and no transcript reads it. The render here is this element\'s own: QNTX\'s web UI does not depend on sacred-error, whose render is the one an error is owed.'),
+    );
+    fire.section.appendChild(core());
+
+    body.replaceChildren(scry.section, stars.section, fall.section, sky.section, surface.section, under.section, rites.section, deep.section, fire.section);
 
     const lit = new Map<string, Star>();
     // What the node does for Ground, as it last answered: null is not answered yet, a string is why not.
@@ -642,6 +719,23 @@ export function drawGround(body: HTMLElement): GroundScene {
         hang(hung, written, lit, hanging, under.slice(0, WRITTEN_AT_MOST));
         unhung.textContent = unsaid.join('\n');
         burrow(done !== null && typeof done !== 'string' ? done.ug : undefined);
+        burn();
+    };
+
+    // What failed, in the sessions read and on the node's own side, newest
+    // first. It is drawn again only when what failed changed.
+    let failedInSessions: Sacred[] | null = null;
+    let choose: (session: string) => void = () => {};
+    let burnt = '';
+    const burn = () => {
+        if (failedInSessions === null && done === null) return;
+        const onTheNode = done !== null && typeof done !== 'string' ? errorsOf(done) : [];
+        const all = [...(failedInSessions ?? []), ...onTheNode].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+        unburnt.textContent = all.length === 0 ? 'Nothing read here failed: no API error, no halted rite, no failed run.' : '';
+        const keys = all.map(error => error.key).join('\n');
+        if (keys === burnt) return;
+        burnt = keys;
+        sacred.replaceChildren(...all.map(error => errorBlock(error, choose)));
     };
 
     // The underground: what the node sees of ug, as lines over time.
@@ -698,6 +792,9 @@ export function drawGround(body: HTMLElement): GroundScene {
             saySky(carried, reads);
             sayAgents(flying, reads);
             sayRuns(runs, reads);
+            failedInSessions = errorsIn(reads);
+            choose = onChoose;
+            burn();
             const walked = reads.filter(read => walkOf(read) !== null || ritesOf(read).length > 0);
             walks.replaceChildren(...walked.map(read => walkRow(read, onChoose)));
             if (walked.length === 0) walks.appendChild(make('div', 'tr-said', 'No session read here was walked by a ritual.'));

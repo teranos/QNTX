@@ -75,7 +75,7 @@ describe('Ground - Tim', () => {
     // "THE ELEMENT NEEDS TO SHOW THESE IN ORDER"
     test('the picture is drawn in order, from the nebula down', () => {
         const { body } = drawn();
-        expect(names(body)).toEqual(['Scry', 'Stars', 'Comet', 'Sky', 'Ground', 'Underground', 'Rituals and rites', 'Deeper']);
+        expect(names(body)).toEqual(['Scry', 'Stars', 'Comet', 'Sky', 'Ground', 'Underground', 'Rituals and rites', 'Deeper', 'Errors']);
     });
 
     // Tim: every stratum is drawn as something, before anything is read.
@@ -264,6 +264,56 @@ describe('Ground - underground', () => {
         const now = Date.parse('2026-10-03T22:00:00Z');
         expect(agoFor('2026-10-03T21:59:56Z', now)).toBe('4s ago');
         expect(agoFor('2026-10-03T21:53:00Z', now)).toBe('7m ago');
+    });
+});
+
+describe('Ground - the core', () => {
+    const said = 'API Error: Unable to connect to API (ENOTFOUND)\n\nRequest ID: req-1';
+    const failing = session('s-9', ['grove', 'user/QNTX:main'], [
+        turn('human', 'Performing ritual grove, rite 1 of 3: built. Nothing is asked of you'),
+        turn('rite', 'built halt 2', 'ritual:rite:grove-2:built:9'),
+        turn('error', `server_error: ${said}`, 'ground:payload:StopFailure:9'),
+    ]);
+
+    // "BUT ITS SACRED"
+    test('what failed is said whole', () => {
+        const { body, scene } = drawn();
+        const chosen: string[] = [];
+        scene.read([held, failing], id => chosen.push(id));
+        scene.does({ ...does, failed: [{ at: '2026-10-03T22:00:00Z', error: 'ci.watch: stopped waiting on main@162d82f: context canceled', execution_id: 'rearm:p-0' }] });
+
+        const titles = texts(body, '.gr-core .gr-err-title');
+        expect(titles).toContain('server_error');
+        expect(titles).toContain('rite built halt 2');
+        expect(titles).toContain('ci.watch failed');
+        expect(titles).toContain('ci failure main 162d82f 1/4');
+        expect(texts(body, '.gr-core .gr-err-why')).toContain(said);
+        expect(texts(body, '.gr-core .gr-err-why')).toContain('ci.watch: stopped waiting on main@162d82f: context canceled');
+
+        const fatal = body.querySelector<HTMLElement>('.gr-core .gr-err-fatal')!;
+        expect(fatal.querySelector('.gr-err-title')?.textContent).toBe('server_error');
+        fatal.click();
+        expect(chosen).toEqual(['s-9']);
+    });
+
+    // Spike: nothing failing is said, not left as an empty fire.
+    test('nothing failed is said', () => {
+        const { body, scene } = drawn();
+        scene.read([held], () => {});
+        scene.does({ ...does, news: [does.news[0]] });
+        expect(body.querySelectorAll('.gr-core .gr-err')).toHaveLength(0);
+        expect(body.querySelector('.gr-core')?.textContent).toContain('Nothing read here failed');
+    });
+
+    // Jenny: an error told again is the block it already was.
+    test('what failed is not drawn again while nothing new fails', () => {
+        const { body, scene } = drawn();
+        scene.read([failing], () => {});
+        const before = [...body.querySelectorAll('.gr-core .gr-err')];
+        scene.does({ ...does, news: [does.news[0]] });
+        const after = [...body.querySelectorAll('.gr-core .gr-err')];
+        expect(after).toHaveLength(2);
+        after.forEach((block, i) => expect(block).toBe(before[i]));
     });
 });
 

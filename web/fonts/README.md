@@ -1,3 +1,13 @@
+# QNTX Fonts
+
+## Ground's faces
+
+`ground/` holds the faces Ground's book is typeset in, copied as they are from
+`teranos/ground` `doc/fonts/`, with their licences beside them: TeX Gyre Schola
+(GUST Font License) and IBM Plex Mono (SIL Open Font License). The Ground
+element alone wears them (`css/components.css`, `--ground-serif` and
+`--ground-mono` in `css/tokens.css`).
+
 # QNTX Command Palette Fonts
 
 ## Bytesized Font

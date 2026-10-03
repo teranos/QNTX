@@ -201,6 +201,38 @@ export function horizon(): SVGSVGElement {
     return svg;
 }
 
+// "AT THE BOTTOM OF THE GROUND ELEMENT IS FIERY RED ERROR RED FATAL RED HIGH ENTROPY MADNESS"
+// "BUT ITS SACRED"
+
+/** The core: cracks and sparks with no order to them, and at its heart rings that none of them breaks. */
+export function core(): SVGSVGElement {
+    const svg = plate(170, 'core');
+    const next = seeded(41);
+    const heat = () => `gr-ember-${1 + Math.floor(next() * 3)}`;
+    for (let crack = 0; crack < 38; crack++) {
+        let x = next() * WIDE;
+        let y = 170;
+        let d = `M ${x.toFixed(1)} ${y}`;
+        const turns = 4 + Math.floor(next() * 9);
+        for (let turn = 0; turn < turns; turn++) {
+            x += (next() - 0.5) * 48;
+            y -= 5 + next() * 21;
+            d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+        }
+        draw(svg, 'path', { class: `gr-crack ${heat()}`, d });
+    }
+    for (let spark = 0; spark < 96; spark++) {
+        const size = (1 + next() * 2.6).toFixed(1);
+        draw(svg, 'rect', { class: `gr-spark ${heat()}`, x: (next() * WIDE).toFixed(1), y: (next() * 170).toFixed(1), width: size, height: size });
+    }
+    for (let ring = 0; ring < 7; ring++) {
+        const r = 86 - ring * 11;
+        const arc = `M ${260 - r} 170 A ${r} ${r} 0 0 1 ${260 + r} 170`;
+        draw(svg, 'path', ring === 0 ? { class: 'gr-heart', d: `${arc} Z` } : { class: 'gr-heart-ring', d: arc });
+    }
+    return svg;
+}
+
 /** A seam between two layers of earth: three contour lines, no two seams alike. */
 export function seam(seed: number): SVGSVGElement {
     const svg = plate(22, 'seam');

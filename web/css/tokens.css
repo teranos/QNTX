@@ -80,6 +80,16 @@
     --night-teal: #1b4f63;
     --star-gold: #e6cf9a;
 
+    /* Ground's own faces, the ones its book is typeset in (web/fonts/ground) */
+    --ground-serif: "TeX Gyre Schola", serif;
+    --ground-mono: "IBM Plex Mono", monospace;
+
+    /* An error's own colours, as the Sacred Error Axiom gives them (teranos/sacred-error ERROR.md) */
+    --sacred-ground: #2a0c0c;
+    --sacred-border: #4a1414;
+    --sacred-error: #ff6666;
+    --sacred-warn: #ffcc66;
+
     /* What a rite found */
     --rite-advance: #5f7a45;
     --rite-hold: #a0812f;
