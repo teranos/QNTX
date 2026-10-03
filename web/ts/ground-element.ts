@@ -9,6 +9,12 @@
 // Ground lists the sessions it recorded in this namespace; pressing one opens
 // it as its own Transcript, the way Users opens a User.
 
+// Not drawn yet, the branches a session touched: loom's BranchBar.svelte at d512ffb2.
+
+// Not drawn yet, a session's share of each embedding cluster: loom's ClusterBar.svelte at d512ffb2.
+
+// Not drawn yet, every session file on disk and its import state: loom's SessionList.svelte at d512ffb2.
+
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';

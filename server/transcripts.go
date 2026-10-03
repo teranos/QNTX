@@ -20,6 +20,10 @@ import (
 // Derived from what Ground already streams into the namespace the caller stands
 // in, and nothing is written to make them.
 
+// What this cannot read: a session Ground never streamed, or streamed only in
+// part. Loom read those from the files Claude Code writes under
+// ~/.claude/projects (qntx-plugins/loom/lib/jsonl_reader.ml at d512ffb2).
+
 // transcriptPredicates are the hook events a session is found by. Each is asked
 // for on its own: a store's filter may AND predicates rather than OR them.
 var transcriptPredicates = []string{
