@@ -68,8 +68,7 @@ type transcript struct {
 func (s *QNTXServer) transcriptsSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name:        "transcripts",
-			Description: "What was said and done in each agent session Ground recorded, read from the namespace the caller stands in.",
+			Name: "transcripts",
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "read",
