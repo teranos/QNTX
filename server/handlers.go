@@ -387,6 +387,12 @@ func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		say(http.StatusOK, "degraded")
 		return
 	}
+	// QuickDev keeps its attestations without ATS, for developing against and
+	// not for keeping, and ok would say otherwise.
+	if quickdev {
+		say(http.StatusOK, "quickdev")
+		return
+	}
 	say(http.StatusOK, "ok")
 }
 

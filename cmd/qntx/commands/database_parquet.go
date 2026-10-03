@@ -1,4 +1,4 @@
-//go:build cgo && rustduckdb
+//go:build cgo && rustduckdb && !quickdev
 
 package commands
 

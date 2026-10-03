@@ -93,6 +93,7 @@
       "ats/storage/query_store.go",
       "ats/storage/retrieval.go",
       "ats/storage/rich_search.go",
+      "ats/storage/sql_raw_store.go",
       "ats/storage/testutil/ax_helpers.go",
       "cmd/parity/main.go",
       "cmd/qntx/commands/db.go",

@@ -1,4 +1,4 @@
-//go:build cgo && rustsqlite
+//go:build cgo && rustsqlite && !quickdev
 
 package syscap
 
