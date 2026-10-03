@@ -21,6 +21,27 @@ message Signum {
   repeated Follows follows = 3;
 }
 
+// Transcript is one agent session Ground recorded, derived from its hook
+// events: transcripts read answers these. Mirrors server.transcript.
+message Transcript {
+  string session = 1;
+  repeated string subjects = 2;
+  string started = 3;
+  string ended = 4;
+  repeated Turn turns = 5;
+  // Events the store folded into sigmas (ADR-020), counted and not read.
+  int64 folded = 6;
+}
+
+// Turn is one thing said or done in a session, naming the attestation it was
+// read from. Mirrors server.transcriptTurn.
+message Turn {
+  string at = 1;
+  string speaker = 2;
+  string text = 3;
+  string of = 4;
+}
+
 // Follows says which column of a reference each of a signum's fields is. The
 // reference is named, not described: its own schema says what its columns are.
 message Follows {
