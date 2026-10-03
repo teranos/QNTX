@@ -47,6 +47,7 @@ parity: ## Report what a node keeps on its own disk and what the record keeps (A
 says: ## Write what the specs and our protocol say of themselves for the parity sigil
 	@go run ./cmd/says
 	@nix eval --raw -f nix/umami-words.nix > server/parity/umami_v3.3.1_ca661c7/openapi.words.json
+	@nix eval --raw -f nix/references/a2a.nix > server/parity/a2a_v1.0.1_3303592/specification.md
 
 # git is the baseline, so there is no file to keep in step. What already stands
 # keeps standing; what this branch added is what answers. Exit 2 and not 1: a
