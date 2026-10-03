@@ -163,6 +163,10 @@ export function getElementTypeBySavedSymbol(symbol: string, content?: string): E
     if (symbol === AS && holdsAnAttestation(content)) {
         return _bySymbol.get(Attestation);
     }
+    // A transcript placed before it moved from 🧵 to ⏦. Nothing else was 🧵.
+    if (symbol === '🧵') {
+        return _bySymbol.get(Transcript);
+    }
     return _bySymbol.get(symbol);
 }
 
