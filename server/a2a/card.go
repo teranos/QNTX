@@ -20,7 +20,21 @@ type Skill struct {
 	Name        string
 	Description string
 	Tags        []string
+	// Bearer says calling the skill takes the node's bearer token, for a card
+	// that shows a skill to whoever reads it and not only to who reaches it.
+	Bearer bool
 }
+
+// Extension is one AgentExtension the card declares (§4.6): what a field of
+// the AgentCard has no place for.
+type Extension struct {
+	URI         string
+	Description string
+	Params      map[string]any
+}
+
+// Modes is the media types the node takes and gives: JSON, everywhere.
+var Modes = []string{"application/json"}
 
 // Interface is one more way the node is reached, beside the A2A binding.
 type Interface struct {
@@ -39,8 +53,9 @@ type Card struct {
 	// URL is where the HTTP+JSON binding answers, for the interface entry.
 	URL string
 	// MCP is where the node's MCP answers, when the card says.
-	MCP    Interface
-	Skills []Skill
+	MCP        Interface
+	Skills     []Skill
+	Extensions []Extension
 }
 
 // Message is the card as lf.a2a.v1.AgentCard, read through the pinned spec, so
@@ -56,7 +71,15 @@ func (c Card) Message() (protoreflect.Message, error) {
 		if tags == nil {
 			tags = []string{}
 		}
-		skills = append(skills, map[string]any{"id": s.ID, "name": s.Name, "description": s.Description, "tags": tags})
+		skill := map[string]any{"id": s.ID, "name": s.Name, "description": s.Description, "tags": tags}
+		if s.Bearer {
+			skill["securityRequirements"] = bearerRequired
+		}
+		skills = append(skills, skill)
+	}
+	extensions := []map[string]any{}
+	for _, e := range c.Extensions {
+		extensions = append(extensions, map[string]any{"uri": e.URI, "description": e.Description, "required": false, "params": e.Params})
 	}
 	interfaces := []map[string]any{
 		{"url": c.URL, "protocolBinding": "HTTP+JSON", "protocolVersion": Version},
@@ -71,13 +94,15 @@ func (c Card) Message() (protoreflect.Message, error) {
 		"version":             c.Version,
 		"supportedInterfaces": interfaces,
 		// What the node does not do is said as false (§3.3.4).
-		"capabilities": map[string]any{"streaming": false, "pushNotifications": false},
+		"capabilities": map[string]any{"streaming": false, "pushNotifications": false, "extensions": extensions},
 		// The node's token is a bearer token (§3.1.11: the extended card is
 		// authenticated with a scheme the card declares).
 		"securitySchemes": map[string]any{
 			"bearer": map[string]any{"httpAuthSecurityScheme": map[string]any{"scheme": "Bearer"}},
 		},
-		"securityRequirements": []map[string]any{{"schemes": map[string]any{"bearer": map[string]any{"list": []string{}}}}},
+		"securityRequirements": bearerRequired,
+		"defaultInputModes":    Modes,
+		"defaultOutputModes":   Modes,
 		"skills":               skills,
 	})
 	if err != nil {
@@ -89,6 +114,10 @@ func (c Card) Message() (protoreflect.Message, error) {
 	}
 	return card, nil
 }
+
+// bearerRequired is a SecurityRequirement naming the bearer scheme the card
+// declares, with no scopes.
+var bearerRequired = []map[string]any{{"schemes": map[string]any{"bearer": map[string]any{"list": []string{}}}}}
 
 // Missing is every field the card leaves empty that the spec requires: a
 // REQUIRED field unset or empty, and a REQUIRED list with no element (§5.7).

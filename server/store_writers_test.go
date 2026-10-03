@@ -154,7 +154,7 @@ func asksToWrite(body *ast.BlockStmt) bool {
 // below. That is the whole of how this stays true when something new is added:
 // it is a claim somebody makes in the open, or it is a thing a namespace has.
 var nodeReaders = map[string]string{
-	"handlers.go:HandleHealth":                    "the health of the file underneath, which is the node's to answer",
+	"handlers.go:health":                          "the health of the file underneath, which is the node's to answer",
 	"operational_watchdog.go:askOperationalStore": "the same ping on a tick, so a node that has stopped answering says so",
 	"operational_watchdog.go:operationalPool":     "where the connections to the node's own file are while a ping waits on it",
 	"lifecycle.go:Stop":                           "shutdown compares the pulse read connection with the node's own",

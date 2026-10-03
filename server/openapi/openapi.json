@@ -11,6 +11,11 @@
         "ANYONE"
       ]
     },
+    "/.well-known/agent-card.json": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/.well-known/did.json": {
       "x-qntx-reach": [
         "ANYONE"

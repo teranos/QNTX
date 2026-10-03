@@ -58,6 +58,9 @@ REACH is '/github/'                                                       of ANY
 # sends anybody anywhere, so by a stranger.
 REACH is '/.well-known/oauth-authorization-server'                        of ANYONE
 REACH is '/.well-known/oauth-protected-resource'                          of ANYONE
+# The A2A agent card (ADR-039): how an agent that has never seen this node
+# finds what it is and what it serves.
+REACH is '/.well-known/agent-card.json'                                   of ANYONE
 REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
 
 # The switch on the person (ADR-031). Gated by the handler and not by this
