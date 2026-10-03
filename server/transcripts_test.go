@@ -217,8 +217,9 @@ func TestAGroundedRowNoPredicateNamesIsATurn(t *testing.T) {
 	}
 }
 
-func TestTranscriptsAreRootsAlone(t *testing.T) {
+// "if SUPER cant access transcripts, make it so SUPER can access it"
+func TestTranscriptsAreRootsAndSupers(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"ROOT"}, compiled["/api/transcripts"])
+	assert.Equal(t, []string{"ROOT", "SUPER"}, compiled["/api/transcripts"])
 }
