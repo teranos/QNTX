@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { byPlace, drawGround, openingOf, placeOf, upFor, walkOf, type Does, type Said } from './ground-element';
+import { agoFor, byPlace, drawGround, openingOf, placeOf, upFor, walkOf, type Does, type Said, type Ug } from './ground-element';
 import type { TranscriptRead, Turn } from './components/element/transcript-element';
 
 let nth = 0;
@@ -200,6 +200,70 @@ describe('Ground - Spike', () => {
         const { body, scene } = drawn();
         scene.unread('/api/transcripts: HTTP 403');
         expect(body.querySelector('.gr-deep')?.textContent).toContain('HTTP 403');
+    });
+});
+
+describe('Ground - underground', () => {
+    const ago = (ms: number, keyLength: number) => new Date(Date.now() - ms).toISOString().slice(0, keyLength);
+    const ug: Ug = {
+        since: ago(86_400_000, 19) + 'Z',
+        tmux: { asked: 240, last: ago(4000, 19) + 'Z', over: { [ago(120_000, 16)]: 12, [ago(60_000, 16)]: 11 } },
+        sessions: [
+            { session: 's-1-of-a-person', first: ago(7_200_000, 19) + 'Z', last: ago(600_000, 19) + 'Z', readings: 3, over: { [ago(7_200_000, 13)]: 1, [ago(3_600_000, 13)]: 2 } },
+        ],
+        windows: [
+            { window: 'five_hour', readings: [{ at: ago(7_200_000, 19) + 'Z', used: 4 }, { at: ago(600_000, 19) + 'Z', used: 13 }] },
+        ],
+    };
+
+    // "this seems like a QNTX change from the backend side, have we tackled this yet?"
+    test('the underground is hatched until the node says what it sees of ug', () => {
+        const { body, scene } = drawn();
+        const under = body.querySelector<HTMLElement>('.gr-under')!;
+        scene.does(does);
+        expect(under.classList.contains('gr-unreal')).toBe(true);
+        scene.does({ ...does, ug });
+        expect(under.classList.contains('gr-unreal')).toBe(false);
+        expect(under.querySelector('.gr-limit')?.textContent).toContain('which of them still run is not known here');
+    });
+
+    // "i expect you to also use sparklines underground"
+    test('each ug is a line over time', () => {
+        const { body, scene } = drawn();
+        scene.does({ ...does, ug });
+        expect(texts(body, '.gr-under .gr-line-name')).toEqual(['tmux ug', 's-1-of-a', 'five_hour']);
+        expect(body.querySelectorAll('.gr-under .gr-line-spark svg.sparkline-line')).toHaveLength(3);
+        const lasts = texts(body, '.gr-under .gr-line-last');
+        expect(lasts[0]).toContain('s ago');
+        expect(lasts[2]).toBe('13%');
+        expect(body.querySelector('.gr-under')?.textContent).toContain('240 since QNTX began');
+    });
+
+    // Spike: a person with no tmux bar is told so, and gets no line for one.
+    test('no tmux ug is said, not drawn', () => {
+        const { body, scene } = drawn();
+        scene.does({ ...does, ug: { ...ug, tmux: { asked: 0, last: '' } } });
+        expect(texts(body, '.gr-under .gr-line-name')).toEqual(['s-1-of-a', 'five_hour']);
+        expect(body.querySelector('.gr-under')?.textContent).toContain('No tmux ug of yours has asked');
+    });
+
+    // Jenny: a line told again is the row it already was, and a line of no change is not drawn again.
+    test('a line told again is the same row', () => {
+        const { body, scene } = drawn();
+        scene.does({ ...does, ug });
+        const before = [...body.querySelectorAll<HTMLElement>('.gr-under .gr-line')];
+        const drawnBefore = before.map(row => row.querySelector('svg'));
+        scene.does({ ...does, ug: { ...ug, tmux: { ...ug.tmux, asked: 241 } } });
+        const after = [...body.querySelectorAll<HTMLElement>('.gr-under .gr-line')];
+        after.forEach((row, i) => expect(row).toBe(before[i]));
+        expect(after[1].querySelector('svg')).toBe(drawnBefore[1]);
+    });
+
+    // Spike: under a minute is said to the second, past it in the status line's words.
+    test('how long ago', () => {
+        const now = Date.parse('2026-10-03T22:00:00Z');
+        expect(agoFor('2026-10-03T21:59:56Z', now)).toBe('4s ago');
+        expect(agoFor('2026-10-03T21:53:00Z', now)).toBe('7m ago');
     });
 });
 

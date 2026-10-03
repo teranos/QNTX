@@ -465,6 +465,15 @@
 .gr-agent-sent .gr-puff { fill: var(--night-teal); stroke: var(--night-glow); }
 .gr-agent-sent .gr-puff-ring { stroke: var(--night-glow); opacity: 0.75; }
 
+/* Underground: each ug is a line over time, a name, its sparkline and where it stands now */
+.gr-label:empty, .gr-lines:empty { display: none; }
+.gr-lines { display: flex; flex-direction: column; gap: 3px; }
+.gr-line { display: grid; grid-template-columns: minmax(0, 1fr) 80px minmax(72px, auto); align-items: center; gap: 10px; font-size: 11px; }
+.gr-line-name { color: var(--earth-chalk); overflow-wrap: break-word; word-break: break-word; }
+.gr-line-spark { display: inline-flex; width: 80px; height: 16px; }
+.gr-line-last { text-align: right; font-size: var(--font-size-xs, 10px); font-variant-numeric: tabular-nums; color: var(--earth-dust); }
+.ground .sparkline-line polyline { stroke: var(--earth-ochre); }
+
 /* What was counted, and the sessions under their place */
 .gr-told { font-size: 11px; overflow-wrap: break-word; word-break: break-word; }
 .gr-told:empty { display: none; }

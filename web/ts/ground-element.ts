@@ -31,6 +31,7 @@ import { log, SEG } from './logger';
 import { Ground } from './sym';
 import { openTranscriptElement, when, type TranscriptRead, type Turn } from './components/element/transcript-element';
 import { cloud, cloudBank, comet, horizon, nebula, seam, starburst, starField } from './ground-scene';
+import { labelsOf, renderSparkline, seenOver, seriesOf, type Window as Span } from './components/sparkline';
 
 const ELEMENT_ID = 'ground-element';
 
@@ -49,6 +50,17 @@ export interface Does {
     watches: Array<{ id: string; name: string; predicates?: string[] }>;
     news: Array<{ id: string; name: string; note: string; symbol: string; waiting: boolean; at: string; on_row: boolean }>;
     failed: Array<{ at: string; error: string; execution_id: string }>;
+    // What the node sees of ug. A node from before it saw any answers without it.
+    ug?: Ug;
+}
+
+// The tmux bar's asks by the minute, each session's readings by the hour, and
+// what each window read: `over` is a count per bucket, keyed by the bucket's start in UTC.
+export interface Ug {
+    since: string;
+    tmux: { asked: number; last: string; over?: Record<string, number> };
+    sessions: Array<{ session: string; first: string; last: string; readings: number; over?: Record<string, number> }>;
+    windows: Array<{ window: string; readings: Array<{ at: string; used: number }> }>;
 }
 
 // ─── What a session is, read off what the node answers ────────
@@ -222,6 +234,12 @@ function relimit(hatched: HTMLElement, text: string): void {
     if (tape) tape.textContent = text;
 }
 
+// What the picture says of ug where the node says nothing of it.
+const UG_UNSEEN = 'ug tmux asks /am/statusline and prints one line, and writes down the news it reads, for sky to carry. The status-line ug posts a usage reading for its session to QNTX. Nothing this element reads counts either, so how many ug there are is not known here.';
+
+// What stays unknown once the node says what it sees of ug (ground ug/usage.d CLAIM_SQL).
+const UG_SEEN = 'A status-line ug posts its session\'s first reading of a window, and after that only the ug that claims the interval posts, so which of them still run is not known here. Two tmux bars of one person are one asker to QNTX.';
+
 // What Scry is, in its own README's words (qntx-plugins/scry/README.md).
 const SCRY_IS = 'Scry is local inference through llama.cpp with Metal, a plugin of a node.';
 
@@ -240,8 +258,103 @@ export function upFor(started: string, now: number): string {
     return `${minutes}m`;
 }
 
+// How long ago, to the second under a minute and in the status line's words past it.
+export function agoFor(at: string, now: number): string {
+    const seconds = Math.max(0, Math.floor((now - Date.parse(at)) / 1000));
+    return seconds < 60 ? `${seconds}s ago` : `${upFor(at, now)} ago`;
+}
+
 // How many of what ci.watch said are written under the stars; the count of the rest is said.
 const WRITTEN_AT_MOST = 8;
+
+// How many sessions' status-line ugs are drawn as lines; the count of the rest is said.
+const SESSION_UGS_AT_MOST = 6;
+
+// "i expect you to also use sparklines underground"
+
+// One line underground: a name, its sparkline, and where it stands now.
+interface Lined {
+    key: string;
+    name: string;
+    spark: string;
+    last: string;
+}
+
+interface Line {
+    row: HTMLElement;
+    spark: HTMLElement;
+    last: HTMLElement;
+    drawn: string;
+}
+
+// The lines of one block, each kept as the row it already was: its sparkline is
+// drawn again only when its series changed, so pointing at one is not cut short.
+function lineRows(into: HTMLElement, lines: Map<string, Line>, told: Lined[]): void {
+    const kept = new Set<string>();
+    told.forEach((one, i) => {
+        kept.add(one.key);
+        let line = lines.get(one.key);
+        if (!line) {
+            const row = make('div', 'gr-line');
+            const spark = make('span', 'gr-line-spark');
+            const last = make('span', 'gr-line-last');
+            row.append(make('span', 'gr-line-name', one.name), spark, last);
+            line = { row, spark, last, drawn: '' };
+            lines.set(one.key, line);
+        }
+        if (line.drawn !== one.spark) {
+            line.spark.innerHTML = one.spark;
+            line.drawn = one.spark;
+        }
+        line.last.textContent = one.last;
+        if (into.children[i] !== line.row) into.insertBefore(line.row, into.children[i] ?? null);
+    });
+    for (const [key, line] of lines) {
+        if (kept.has(key)) continue;
+        line.row.remove();
+        lines.delete(key);
+    }
+}
+
+// The tmux bar's asks, by the minute over the last hour.
+function tmuxLined(ug: Ug, now: number): Lined[] {
+    if (!ug.tmux.last) return [];
+    const hour: Span = { start: now - 3_600_000, end: now, unit: 'minute' };
+    const seen = seenOver('tmux ug', ug.tmux.over, ug.tmux.last);
+    return [{
+        key: 'tmux',
+        name: 'tmux ug',
+        spark: renderSparkline(seriesOf(seen.times, hour, seen.weights), labelsOf(hour), 'tmux ug, asks by the minute'),
+        last: `asked ${agoFor(ug.tmux.last, now)}`,
+    }];
+}
+
+// Each session whose status-line ug posted, by the hour over the last day.
+function sessionLined(ug: Ug, now: number): Lined[] {
+    const day: Span = { start: now - 86_400_000, end: now, unit: 'hour' };
+    return ug.sessions.slice(0, SESSION_UGS_AT_MOST).map(drew => {
+        const seen = seenOver(drew.session, drew.over, drew.last);
+        return {
+            key: drew.session,
+            name: drew.session.substring(0, 8),
+            spark: renderSparkline(seriesOf(seen.times, day, seen.weights), labelsOf(day), `ug of ${drew.session}, readings by the hour`),
+            last: when(drew.last),
+        };
+    });
+}
+
+// What each window read, over the last day.
+function windowLined(ug: Ug): Lined[] {
+    return ug.windows.map(read => {
+        const latest = read.readings[read.readings.length - 1];
+        return {
+            key: read.window,
+            name: read.window,
+            spark: renderSparkline(read.readings.map(r => r.used), read.readings.map(r => when(r.at)), `${read.window}, used`),
+            last: latest ? `${latest.used}%` : '',
+        };
+    });
+}
 
 // One thing drawn as a star. Its key is where it came from, so the same thing
 // told again is the star it already was.
@@ -474,8 +587,19 @@ export function drawGround(body: HTMLElement): GroundScene {
     const runs = make('div', 'gr-says');
     surface.body.append(runs, limit('What each run cost stays on the machine: Ground writes it to its timing table and sky ships it to Sentry. PostToolUse reaches QNTX and no transcript reads it, so the whole count of runs is not here.'));
 
+    // Real once the node says what it sees of ug (am ground's ug).
     const under = stratum('under gr-unreal', 'Underground', 'ug: how many of them, tmux ug', seam(3));
-    under.body.appendChild(limit('ug tmux asks /am/statusline and prints one line, and writes down the news it reads, for sky to carry. The status-line ug posts a usage reading for its session to QNTX. Nothing this element reads counts either, so how many ug there are is not known here.'));
+    const tmuxSaid = make('div', 'gr-label');
+    const tmuxLines = make('div', 'gr-lines');
+    const sessionSaid = make('div', 'gr-label');
+    const sessionLines = make('div', 'gr-lines');
+    const windowSaid = make('div', 'gr-label');
+    const windowLines = make('div', 'gr-lines');
+    const underLimit = limit(UG_UNSEEN);
+    under.body.append(tmuxSaid, tmuxLines, sessionSaid, sessionLines, windowSaid, windowLines, underLimit);
+    const tmuxKept = new Map<string, Line>();
+    const sessionKept = new Map<string, Line>();
+    const windowKept = new Map<string, Line>();
 
     const rites = stratum('rites', 'Rituals and rites', '', seam(5));
     const walks = make('div', 'gr-says');
@@ -517,6 +641,32 @@ export function drawGround(body: HTMLElement): GroundScene {
         }
         hang(hung, written, lit, hanging, under.slice(0, WRITTEN_AT_MOST));
         unhung.textContent = unsaid.join('\n');
+        burrow(done !== null && typeof done !== 'string' ? done.ug : undefined);
+    };
+
+    // The underground: what the node sees of ug, as lines over time.
+    const burrow = (ug: Ug | undefined) => {
+        const now = Date.now();
+        under.section.classList.toggle('gr-unreal', !ug);
+        relimit(underLimit, ug ? UG_SEEN : UG_UNSEEN);
+        lineRows(tmuxLines, tmuxKept, ug ? tmuxLined(ug, now) : []);
+        lineRows(sessionLines, sessionKept, ug ? sessionLined(ug, now) : []);
+        lineRows(windowLines, windowKept, ug ? windowLined(ug) : []);
+        tmuxSaid.textContent = '';
+        sessionSaid.textContent = '';
+        windowSaid.textContent = '';
+        if (!ug) return;
+        tmuxSaid.textContent = ug.tmux.last
+            ? `tmux ug, asks by the minute over the last hour, ${ug.tmux.asked.toLocaleString('en')} since QNTX began:`
+            : 'No tmux ug of yours has asked QNTX for its status line since it began.';
+        const drew = ug.sessions.length;
+        if (drew === 0) {
+            sessionSaid.textContent = 'No status-line ug posted a reading in the last day.';
+        } else {
+            const more = drew > SESSION_UGS_AT_MOST ? `, the latest ${SESSION_UGS_AT_MOST} drawn` : '';
+            sessionSaid.textContent = `Status-line ug, readings by the hour over the last day, for ${drew === 1 ? '1 session' : `${drew} sessions`}${more}:`;
+        }
+        if (ug.windows.length > 0) windowSaid.textContent = 'What ug read, over the last day:';
     };
     restar();
 
