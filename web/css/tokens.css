@@ -65,6 +65,25 @@
     --earth-soil-hover: #3a2f25;
     --earth-clay: #b9774f;
     --earth-ochre: #c9a24a;
+    --earth-chalk: #e6d8c3; /* What is written on the earth and the night */
+    --earth-dust: #a8957c; /* Written smaller, and what a limitation says */
+    --earth-loam: #1f1813; /* Under the soil */
+    --earth-peat: #1a1410; /* Under the loam */
+    --earth-bedrock: #15100c; /* The deepest layer */
+
+    /* Night, over the earth Ground stands on */
+    --night-void: #05081a; /* Past the stars, where the nebula is */
+    --night-glow: #7fb4c8; /* What a nebula is lit with */
+    --night-ink: #0a0f25;
+    --night-navy: #111b3f;
+    --night-haze: #35507a;
+    --night-teal: #1b4f63;
+    --star-gold: #e6cf9a;
+
+    /* What a rite found */
+    --rite-advance: #5f7a45;
+    --rite-hold: #a0812f;
+    --rite-halt: #9c4a2e;
 
     /* Element Status Colors - dark-bg tints for lifecycle states */
     --element-status-idle-bg: rgba(30, 30, 35, 0.92);
