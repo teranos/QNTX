@@ -30,8 +30,20 @@ let
   read = kind: x: if x ? "$ref" then doc.components.${kind}.${named kind x."$ref"} else x;
 
   # A schema's words and shape, and nothing else of it.
-  shape = { "$ref" = null; type = null; title = null; description = null; required = null; nullable = null;
-            properties = null; items = null; additionalProperties = null; allOf = null; anyOf = null; oneOf = null; };
+  shape = {
+    "$ref" = null;
+    type = null;
+    title = null;
+    description = null;
+    required = null;
+    nullable = null;
+    properties = null;
+    items = null;
+    additionalProperties = null;
+    allOf = null;
+    anyOf = null;
+    oneOf = null;
+  };
   kept = s:
     let s' = builtins.intersectAttrs shape s; in
     s'
@@ -55,11 +67,16 @@ let
       answered = builtins.filter (code: builtins.substring 0 1 code == "2") (builtins.attrNames op.responses);
     in
     builtins.intersectAttrs { summary = null; description = null; operationId = null; } op // {
-      parameters = map (p: let q = read "parameters" p; in
-        { inherit (q) name "in"; description = q.description or ""; required = q.required or false; schema = kept (q.schema or { }); })
+      parameters = map
+        (p:
+          let q = read "parameters" p; in
+          { inherit (q) name"in"; description = q.description or ""; required = q.required or false; schema = kept (q.schema or { }); })
         (op.parameters or [ ]);
-      responses = builtins.listToAttrs (map (code: let r = read "responses" op.responses.${code}; in
-        { name = code; value = { description = r.description or ""; content = json (r.content or { }); }; }) answered);
+      responses = builtins.listToAttrs (map
+        (code:
+          let r = read "responses" op.responses.${code}; in
+          { name = code; value = { description = r.description or ""; content = json (r.content or { }); }; })
+        answered);
     } // (if op ? requestBody then { requestBody.content = json (read "requestBodies" op.requestBody).content; } else { });
 
   paths = builtins.foldl' (acc: o: acc // { ${o.path} = (acc.${o.path} or { }) // { ${o.method} = operation o; }; }) { } operations;
