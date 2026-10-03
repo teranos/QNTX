@@ -126,6 +126,7 @@ class CanvasSyncQueueImpl {
     async flush(): Promise<void> {
         if (this.flushing) return;
         this.flushing = true;
+        let addedWhileFlushing = false;
 
         try {
             const q = this.queue;
@@ -167,6 +168,7 @@ class CanvasSyncQueueImpl {
             // Merge entries added during flush (fresh adds take precedence)
             const additions = this.flushAdditions;
             this.flushAdditions = [];
+            addedWhileFlushing = additions.length > 0;
             for (const entry of additions) {
                 const entityType = entityTypeOf(entry.op);
                 const idx = survived.findIndex(e => {
@@ -181,6 +183,10 @@ class CanvasSyncQueueImpl {
             this.flushing = false;
             this.notify();
         }
+
+        // An add() during this flush asked for a flush that this one turned
+        // away; without this it waits for the next edit or reconnect.
+        if (addedWhileFlushing && connectivity.state === 'online') await this.flush();
     }
 
     /** Increment retry count and set exponential backoff delay */

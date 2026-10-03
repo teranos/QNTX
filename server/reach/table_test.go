@@ -352,3 +352,32 @@ func plainly() Wrapping {
 		Upgraded: same,
 	}
 }
+
+// A2A is a surface like the other two (ADR-039): a line about a2a lets a role
+// reach a signum over A2A and says nothing of HTTP or MCP, and a line about
+// another surface says nothing of A2A.
+func TestALineAboutA2AIsAboutA2AAlone(t *testing.T) {
+	// What reach grant writes, read back the way the node reads it.
+	written, err := ReadLine([]string{Subject}, []string{OverA2A + ":staands"}, []string{"agent"}, []string{"root"}, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"a2a:staands"}, written.Paths)
+	assert.Empty(t, written.Unopenable(nil), "a line naming a role over A2A was refused")
+
+	granted, err := readReaches("REACH is '/api/staands' of ROOT\n")
+	require.NoError(t, err)
+	addRuntime(granted, Runtime{Lines: []Line{
+		{Paths: []string{OverA2A + ":staands"}, Roles: []string{"AGENT"}, Actor: "root", At: time.Now()},
+		{Paths: []string{OverMCP + ":staands:list"}, Roles: []string{"ANALYST"}, Actor: "root", At: time.Now()},
+	}})
+	served := &Served{}
+	served.rows.Store(&granted)
+
+	overA2A, anyone := served.ReachingSigil(OverA2A, "staands", "list", "/api/staands")
+	assert.False(t, anyone)
+	assert.Equal(t, []string{"AGENT"}, overA2A.Roles(), "the a2a line did not let its role in over A2A")
+
+	for _, surface := range []string{OverHTTP, OverMCP} {
+		other, _ := served.ReachingSigil(surface, "staands", "list", "/api/staands")
+		assert.NotContains(t, other.Roles(), "AGENT", "a line about A2A let a role in over %s", surface)
+	}
+}

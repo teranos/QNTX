@@ -152,6 +152,16 @@ message SystemCapabilitiesMessage {
   string parser_size = 9;         // WASM module size, e.g. "89KB"
 }
 
+// VersionInfo is which build is running, as am version answers it.
+// Mirrors version.Info.
+message VersionInfo {
+  string commit_hash = 1;
+  string build_time = 2;
+  string version = 3;
+  string go_version = 4;
+  string platform = 5;
+}
+
 // LLMStreamMessage is one chunk of streamed model output.
 // Mirrors server.LLMStreamMessage.
 message LLMStreamMessage {

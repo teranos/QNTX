@@ -103,6 +103,23 @@ func TestSomebodyTheGateTurnsAwayReachesNothing(t *testing.T) {
 	require.Equal(t, `Bearer resource_metadata="/.well-known/oauth-protected-resource"`, asked.Rejected.Header.Get("WWW-Authenticate"))
 }
 
+// What answers is handed the request that carried the asking, which is where
+// the caller reached the node: the host an A2A card names as its interface.
+func TestTheAnswerIsHandedTheCaller(t *testing.T) {
+	var host string
+	asking := Asking{
+		Surface: "http", Signum: "am", Sigil: breakdown(),
+		Answer: func(ctx context.Context, _ Sent) (any, *protocol.Refusal) {
+			host = Caller(ctx).Host
+			return nil, nil
+		},
+		Anyone: true,
+		Caller: httptest.NewRequest(http.MethodGet, "https://node.example/am/node", nil),
+	}
+	asking.Ask(context.Background(), map[string]any{"market": "clean", "type": "page"})
+	require.Equal(t, "node.example", host)
+}
+
 // A sigil the lines serve to anyone is asked without the gate.
 func TestWhatIsServedToAnyoneIsNotGated(t *testing.T) {
 	gated := false

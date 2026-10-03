@@ -361,39 +361,42 @@ func (s *QNTXServer) HandleStatic(w http.ResponseWriter, r *http.Request) {
 //
 // Deliberately returns nothing beyond {"status":"ok"} — the endpoint is
 // public (wrapPublic in routing), so any additional field is a reconnaissance
-// signal for an unauthenticated caller. Version and commit are behind auth,
-// at /am/version.
+// signal for an unauthenticated caller. The commit is behind auth, at
+// /am/version; the version tag, health and syscap are on the agent card.
 func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	// The operational store holds the passkeys, jobs, schedules and canvas.
 	// Unreadable, QNTX cannot function, so health is that read and ok means
 	// nothing else.
 	// A probe that could not be delivered is a probe nobody answered, and the
 	// caller is already gone by then, so it goes where the operator can find it.
-	say := func(status int, state string) {
-		if err := writeJSON(w, status, map[string]string{"status": state}); err != nil {
-			s.logger.Errorw("health not written", "state", state, "error", err)
-		}
+	status, state := s.health(r.Context())
+	if err := writeJSON(w, status, map[string]string{"status": state}); err != nil {
+		s.logger.Errorw("health not written", "state", state, "error", err)
 	}
+}
 
-	if err := s.nodeDB.PingContext(r.Context()); err != nil {
+// health is what HandleHealth answers: ok, degraded or down, with its status.
+// The agent card says the same word.
+func (s *QNTXServer) health(ctx context.Context) (int, string) {
+	if s.nodeDB == nil {
+		return http.StatusServiceUnavailable, "down"
+	}
+	if err := s.nodeDB.PingContext(ctx); err != nil {
 		s.logger.Errorw("health: the operational store is unreadable", "error", err)
-		say(http.StatusServiceUnavailable, "down")
-		return
+		return http.StatusServiceUnavailable, "down"
 	}
 	// That ping is the operational store and says nothing about the store the
 	// attestations are in. A node refusing every attestation answered ok here
 	// for seven days.
 	if s.attestationStoreFailing() {
-		say(http.StatusOK, "degraded")
-		return
+		return http.StatusOK, "degraded"
 	}
 	// QuickDev keeps its attestations without ATS, for developing against and
 	// not for keeping, and ok would say otherwise.
 	if quickdev {
-		say(http.StatusOK, "quickdev")
-		return
+		return http.StatusOK, "quickdev"
 	}
-	say(http.StatusOK, "ok")
+	return http.StatusOK, "ok"
 }
 
 // attestationStoreFailing reports whether the last stats refresh could not

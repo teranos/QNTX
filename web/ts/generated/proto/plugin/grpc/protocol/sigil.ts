@@ -20,6 +20,52 @@ export interface Signum {
    * Umami, one reference and not a blend." The parity sigil reads these.
    */
   follows: Follows[];
+  /**
+   * What it is for, in words, and the words it is found by. To A2A these are
+   * a skill's description and tags.
+   */
+  description: string;
+  tags: string[];
+}
+
+/**
+ * Node is the node about itself: what it is called, what it is for, and the
+ * signa it holds. It is what fills A2A's AgentCard, which am node answers, and
+ * the parity sigil holds it to that card.
+ */
+export interface Node {
+  name: string;
+  description: string;
+  signa: Signum[];
+}
+
+/**
+ * Transcript is one agent session Ground recorded, derived from its hook
+ * events: transcripts read answers these. Mirrors server.transcript.
+ */
+export interface Transcript {
+  session: string;
+  subjects: string[];
+  started: string;
+  ended: string;
+  turns: Turn[];
+  /** Events the store folded into sigmas (ADR-020), counted and not read. */
+  folded: number;
+  /** The model the session started on, as its SessionStart says. */
+  model: string;
+  /** The effort its last Stop ran at, as that Stop's effort.level says. */
+  effort: string;
+}
+
+/**
+ * Turn is one thing said or done in a session, naming the attestation it was
+ * read from. Mirrors server.transcriptTurn.
+ */
+export interface Turn {
+  at: string;
+  speaker: string;
+  text: string;
+  of: string;
 }
 
 /**

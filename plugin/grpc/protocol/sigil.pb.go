@@ -29,7 +29,11 @@ type Signum struct {
 	Sigils []*Sigil               `protobuf:"bytes,2,rep,name=sigils,proto3" json:"sigils,omitempty"`
 	// The shapes this signum is held to, each by its name: "Staands will be
 	// Umami, one reference and not a blend." The parity sigil reads these.
-	Follows       []*Follows `protobuf:"bytes,3,rep,name=follows,proto3" json:"follows,omitempty"`
+	Follows []*Follows `protobuf:"bytes,3,rep,name=follows,proto3" json:"follows,omitempty"`
+	// What it is for, in words, and the words it is found by. To A2A these are
+	// a skill's description and tags.
+	Description   string   `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Tags          []string `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -85,6 +89,258 @@ func (x *Signum) GetFollows() []*Follows {
 	return nil
 }
 
+func (x *Signum) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *Signum) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+// Node is the node about itself: what it is called, what it is for, and the
+// signa it holds. It is what fills A2A's AgentCard, which am node answers, and
+// the parity sigil holds it to that card.
+type Node struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Signa         []*Signum              `protobuf:"bytes,3,rep,name=signa,proto3" json:"signa,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Node) Reset() {
+	*x = Node{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Node) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Node) ProtoMessage() {}
+
+func (x *Node) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Node.ProtoReflect.Descriptor instead.
+func (*Node) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Node) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Node) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *Node) GetSigna() []*Signum {
+	if x != nil {
+		return x.Signa
+	}
+	return nil
+}
+
+// Transcript is one agent session Ground recorded, derived from its hook
+// events: transcripts read answers these. Mirrors server.transcript.
+type Transcript struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Session  string                 `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Subjects []string               `protobuf:"bytes,2,rep,name=subjects,proto3" json:"subjects,omitempty"`
+	Started  string                 `protobuf:"bytes,3,opt,name=started,proto3" json:"started,omitempty"`
+	Ended    string                 `protobuf:"bytes,4,opt,name=ended,proto3" json:"ended,omitempty"`
+	Turns    []*Turn                `protobuf:"bytes,5,rep,name=turns,proto3" json:"turns,omitempty"`
+	// Events the store folded into sigmas (ADR-020), counted and not read.
+	Folded int64 `protobuf:"varint,6,opt,name=folded,proto3" json:"folded,omitempty"`
+	// The model the session started on, as its SessionStart says.
+	Model string `protobuf:"bytes,7,opt,name=model,proto3" json:"model,omitempty"`
+	// The effort its last Stop ran at, as that Stop's effort.level says.
+	Effort        string `protobuf:"bytes,8,opt,name=effort,proto3" json:"effort,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Transcript) Reset() {
+	*x = Transcript{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Transcript) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Transcript) ProtoMessage() {}
+
+func (x *Transcript) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Transcript.ProtoReflect.Descriptor instead.
+func (*Transcript) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Transcript) GetSession() string {
+	if x != nil {
+		return x.Session
+	}
+	return ""
+}
+
+func (x *Transcript) GetSubjects() []string {
+	if x != nil {
+		return x.Subjects
+	}
+	return nil
+}
+
+func (x *Transcript) GetStarted() string {
+	if x != nil {
+		return x.Started
+	}
+	return ""
+}
+
+func (x *Transcript) GetEnded() string {
+	if x != nil {
+		return x.Ended
+	}
+	return ""
+}
+
+func (x *Transcript) GetTurns() []*Turn {
+	if x != nil {
+		return x.Turns
+	}
+	return nil
+}
+
+func (x *Transcript) GetFolded() int64 {
+	if x != nil {
+		return x.Folded
+	}
+	return 0
+}
+
+func (x *Transcript) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *Transcript) GetEffort() string {
+	if x != nil {
+		return x.Effort
+	}
+	return ""
+}
+
+// Turn is one thing said or done in a session, naming the attestation it was
+// read from. Mirrors server.transcriptTurn.
+type Turn struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	At            string                 `protobuf:"bytes,1,opt,name=at,proto3" json:"at,omitempty"`
+	Speaker       string                 `protobuf:"bytes,2,opt,name=speaker,proto3" json:"speaker,omitempty"`
+	Text          string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	Of            string                 `protobuf:"bytes,4,opt,name=of,proto3" json:"of,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Turn) Reset() {
+	*x = Turn{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Turn) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Turn) ProtoMessage() {}
+
+func (x *Turn) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Turn.ProtoReflect.Descriptor instead.
+func (*Turn) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Turn) GetAt() string {
+	if x != nil {
+		return x.At
+	}
+	return ""
+}
+
+func (x *Turn) GetSpeaker() string {
+	if x != nil {
+		return x.Speaker
+	}
+	return ""
+}
+
+func (x *Turn) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *Turn) GetOf() string {
+	if x != nil {
+		return x.Of
+	}
+	return ""
+}
+
 // Follows says which column of a reference each of a signum's fields is. The
 // reference is named, not described: its own schema says what its columns are.
 type Follows struct {
@@ -97,7 +353,7 @@ type Follows struct {
 
 func (x *Follows) Reset() {
 	*x = Follows{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -109,7 +365,7 @@ func (x *Follows) String() string {
 func (*Follows) ProtoMessage() {}
 
 func (x *Follows) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -122,7 +378,7 @@ func (x *Follows) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Follows.ProtoReflect.Descriptor instead.
 func (*Follows) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{1}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Follows) GetReference() string {
@@ -154,7 +410,7 @@ type Corresponds struct {
 
 func (x *Corresponds) Reset() {
 	*x = Corresponds{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -166,7 +422,7 @@ func (x *Corresponds) String() string {
 func (*Corresponds) ProtoMessage() {}
 
 func (x *Corresponds) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -179,7 +435,7 @@ func (x *Corresponds) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Corresponds.ProtoReflect.Descriptor instead.
 func (*Corresponds) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{2}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Corresponds) GetField() string {
@@ -215,7 +471,7 @@ type Sigil struct {
 
 func (x *Sigil) Reset() {
 	*x = Sigil{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -227,7 +483,7 @@ func (x *Sigil) String() string {
 func (*Sigil) ProtoMessage() {}
 
 func (x *Sigil) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -240,7 +496,7 @@ func (x *Sigil) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sigil.ProtoReflect.Descriptor instead.
 func (*Sigil) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{3}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Sigil) GetName() string {
@@ -295,7 +551,7 @@ type Param struct {
 
 func (x *Param) Reset() {
 	*x = Param{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -307,7 +563,7 @@ func (x *Param) String() string {
 func (*Param) ProtoMessage() {}
 
 func (x *Param) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -320,7 +576,7 @@ func (x *Param) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Param.ProtoReflect.Descriptor instead.
 func (*Param) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Param) GetName() string {
@@ -371,7 +627,7 @@ type Field struct {
 
 func (x *Field) Reset() {
 	*x = Field{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -383,7 +639,7 @@ func (x *Field) String() string {
 func (*Field) ProtoMessage() {}
 
 func (x *Field) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -396,7 +652,7 @@ func (x *Field) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Field.ProtoReflect.Descriptor instead.
 func (*Field) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Field) GetName() string {
@@ -431,7 +687,7 @@ type Endpoint struct {
 
 func (x *Endpoint) Reset() {
 	*x = Endpoint{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -443,7 +699,7 @@ func (x *Endpoint) String() string {
 func (*Endpoint) ProtoMessage() {}
 
 func (x *Endpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -456,7 +712,7 @@ func (x *Endpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Endpoint.ProtoReflect.Descriptor instead.
 func (*Endpoint) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{6}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Endpoint) GetMethod() string {
@@ -489,7 +745,7 @@ type Refusal struct {
 
 func (x *Refusal) Reset() {
 	*x = Refusal{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -501,7 +757,7 @@ func (x *Refusal) String() string {
 func (*Refusal) ProtoMessage() {}
 
 func (x *Refusal) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -514,7 +770,7 @@ func (x *Refusal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Refusal.ProtoReflect.Descriptor instead.
 func (*Refusal) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{7}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Refusal) GetWhy() string {
@@ -542,11 +798,32 @@ var File_plugin_grpc_protocol_sigil_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\n" +
-	" plugin/grpc/protocol/sigil.proto\x12\bprotocol\"r\n" +
+	" plugin/grpc/protocol/sigil.proto\x12\bprotocol\"\xa8\x01\n" +
 	"\x06Signum\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12'\n" +
 	"\x06sigils\x18\x02 \x03(\v2\x0f.protocol.SigilR\x06sigils\x12+\n" +
-	"\afollows\x18\x03 \x03(\v2\x11.protocol.FollowsR\afollows\"X\n" +
+	"\afollows\x18\x03 \x03(\v2\x11.protocol.FollowsR\afollows\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\"d\n" +
+	"\x04Node\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12&\n" +
+	"\x05signa\x18\x03 \x03(\v2\x10.protocol.SignumR\x05signa\"\xde\x01\n" +
+	"\n" +
+	"Transcript\x12\x18\n" +
+	"\asession\x18\x01 \x01(\tR\asession\x12\x1a\n" +
+	"\bsubjects\x18\x02 \x03(\tR\bsubjects\x12\x18\n" +
+	"\astarted\x18\x03 \x01(\tR\astarted\x12\x14\n" +
+	"\x05ended\x18\x04 \x01(\tR\x05ended\x12$\n" +
+	"\x05turns\x18\x05 \x03(\v2\x0e.protocol.TurnR\x05turns\x12\x16\n" +
+	"\x06folded\x18\x06 \x01(\x03R\x06folded\x12\x14\n" +
+	"\x05model\x18\a \x01(\tR\x05model\x12\x16\n" +
+	"\x06effort\x18\b \x01(\tR\x06effort\"T\n" +
+	"\x04Turn\x12\x0e\n" +
+	"\x02at\x18\x01 \x01(\tR\x02at\x12\x18\n" +
+	"\aspeaker\x18\x02 \x01(\tR\aspeaker\x12\x12\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\x12\x0e\n" +
+	"\x02of\x18\x04 \x01(\tR\x02of\"X\n" +
 	"\aFollows\x12\x1c\n" +
 	"\treference\x18\x01 \x01(\tR\treference\x12/\n" +
 	"\acolumns\x18\x02 \x03(\v2\x15.protocol.CorrespondsR\acolumns\";\n" +
@@ -589,29 +866,34 @@ func file_plugin_grpc_protocol_sigil_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*Signum)(nil),      // 0: protocol.Signum
-	(*Follows)(nil),     // 1: protocol.Follows
-	(*Corresponds)(nil), // 2: protocol.Corresponds
-	(*Sigil)(nil),       // 3: protocol.Sigil
-	(*Param)(nil),       // 4: protocol.Param
-	(*Field)(nil),       // 5: protocol.Field
-	(*Endpoint)(nil),    // 6: protocol.Endpoint
-	(*Refusal)(nil),     // 7: protocol.Refusal
+	(*Node)(nil),        // 1: protocol.Node
+	(*Transcript)(nil),  // 2: protocol.Transcript
+	(*Turn)(nil),        // 3: protocol.Turn
+	(*Follows)(nil),     // 4: protocol.Follows
+	(*Corresponds)(nil), // 5: protocol.Corresponds
+	(*Sigil)(nil),       // 6: protocol.Sigil
+	(*Param)(nil),       // 7: protocol.Param
+	(*Field)(nil),       // 8: protocol.Field
+	(*Endpoint)(nil),    // 9: protocol.Endpoint
+	(*Refusal)(nil),     // 10: protocol.Refusal
 }
 var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
-	3, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
-	1, // 1: protocol.Signum.follows:type_name -> protocol.Follows
-	2, // 2: protocol.Follows.columns:type_name -> protocol.Corresponds
-	4, // 3: protocol.Sigil.takes:type_name -> protocol.Param
-	5, // 4: protocol.Sigil.gives:type_name -> protocol.Field
-	6, // 5: protocol.Sigil.http:type_name -> protocol.Endpoint
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	6, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
+	4, // 1: protocol.Signum.follows:type_name -> protocol.Follows
+	0, // 2: protocol.Node.signa:type_name -> protocol.Signum
+	3, // 3: protocol.Transcript.turns:type_name -> protocol.Turn
+	5, // 4: protocol.Follows.columns:type_name -> protocol.Corresponds
+	7, // 5: protocol.Sigil.takes:type_name -> protocol.Param
+	8, // 6: protocol.Sigil.gives:type_name -> protocol.Field
+	9, // 7: protocol.Sigil.http:type_name -> protocol.Endpoint
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }
@@ -625,7 +907,7 @@ func file_plugin_grpc_protocol_sigil_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_sigil_proto_rawDesc), len(file_plugin_grpc_protocol_sigil_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -9,6 +9,7 @@
 
 import { describe, test, expect } from 'bun:test';
 import { showSpawnMenu } from './spawn-menu';
+import { registerElementType } from '../element-registry';
 
 // Mock browser APIs not available in happy-dom
 (globalThis.window as any).Element.prototype.animate = function() {
@@ -31,6 +32,25 @@ describe('Canvas Spawn Menu - Tim (Happy Path)', () => {
         }).not.toThrow();
 
         // Cleanup
+        document.body.innerHTML = '';
+    });
+
+    test('Tim places an element that was published, not built in', () => {
+        registerElementType({
+            symbol: '◇',
+            className: 'canvas-published-element element-example',
+            title: 'EXAMPLE',
+            label: 'example',
+            publishedName: 'example',
+            render: () => document.createElement('div'),
+        });
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        showSpawnMenu(150, 200, canvas, []);
+        const offered = [...document.querySelectorAll('.canvas-spawn-button')].map(b => b.firstChild?.textContent);
+        expect(offered).toContain('◇');
+
         document.body.innerHTML = '';
     });
 });

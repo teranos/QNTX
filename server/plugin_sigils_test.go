@@ -446,7 +446,7 @@ func TestThePanelIsToldEachSigilAndWhoReachesIt(t *testing.T) {
 	assert.Equal(t, http.MethodGet, read.Method)
 	assert.Equal(t, "/api/stub/read", read.Path)
 	assert.Equal(t, []string{"competitor"}, read.Takes[0].GetOneOf())
-	for _, surface := range []string{"http", "mcp"} {
+	for _, surface := range []string{"http", "mcp", "a2a"} {
 		assert.Equal(t, reached{Levels: []string{}, Roles: []string{}}, read.Reach[surface],
 			"a plugin sigil no line opens is ROOT's only, over "+surface)
 	}
@@ -475,7 +475,7 @@ func TestASigilAPluginNoLongerHandsIsNotServed(t *testing.T) {
 }
 
 // A line naming a signum reaches its sigils wherever the plugin bound them,
-// over both surfaces. datapunt's line is the one in the table (ADR-039).
+// over every surface. datapunt's line is the one in the table (ADR-039).
 func TestASignumTheTableNamesIsReachedBySuper(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "datapunt"},
@@ -487,7 +487,7 @@ func TestASignumTheTableNamesIsReachedBySuper(t *testing.T) {
 	rows, refused := srv.pluginSigilRows("datapunt")
 	require.Empty(t, refused)
 	require.Len(t, rows, 2)
-	for _, surface := range []string{"http", "mcp"} {
+	for _, surface := range []string{"http", "mcp", "a2a"} {
 		assert.Equal(t, []string{"SUPER"}, rows[0].Reach[surface].Levels, "over "+surface)
 	}
 

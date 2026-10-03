@@ -34,6 +34,12 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 	s.answer("/.well-known/did.json", s.nodeDID.HandleDIDDocument)
 
+	// The A2A agent card, where an agent that has never seen the node looks.
+	s.answer(agentCardPath, s.HandleAgentCard)
+
+	// A2A over HTTP+JSON (server/a2a).
+	s.answer(a2aPrefix, s.a2aHTTP())
+
 	// The GitHub App's one webhook, for every event it is subscribed to.
 	s.answer(githubWebhookPrefix, s.HandleGitHubWebhook)
 

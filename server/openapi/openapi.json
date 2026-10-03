@@ -11,6 +11,11 @@
         "ANYONE"
       ]
     },
+    "/.well-known/agent-card.json": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/.well-known/did.json": {
       "x-qntx-reach": [
         "ANYONE"
@@ -24,6 +29,17 @@
     "/.well-known/oauth-protected-resource": {
       "x-qntx-reach": [
         "ANYONE"
+      ]
+    },
+    "/a2a/": {
+      "x-qntx-reach": [
+        "ROOT"
+      ],
+      "x-qntx-prefix": true
+    },
+    "/am/node": {
+      "x-qntx-reach": [
+        "ROOT"
       ]
     },
     "/am/statusline": {
@@ -439,6 +455,11 @@
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
+      ]
+    },
+    "/api/transcripts": {
+      "x-qntx-reach": [
+        "ROOT"
       ]
     },
     "/api/types": {
