@@ -17,7 +17,7 @@ export interface Signum {
   sigils: Sigil[];
   /**
    * The shapes this signum is held to, each by its name: "Staands will be
-   * Umami, one reference and not a blend." make parity prisma reads these.
+   * Umami, one reference and not a blend." The parity sigil reads these.
    */
   follows: Follows[];
 }
