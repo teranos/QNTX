@@ -84,7 +84,7 @@ describe('replacePluginElementType', () => {
 // symbol, read from the registry when it is said.
 describe('holderOf', () => {
     test('a built-in is named as the built-in it is', () => {
-        expect(holderOf('🧵')).toBe('the built-in Transcript');
+        expect(holderOf('⋈')).toBe('the built-in AX Query');
     });
 
     test('a plugin is named with the element it registered', () => {
