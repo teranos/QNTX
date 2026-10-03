@@ -445,11 +445,25 @@
 .gr-written .gr-said { display: flex; align-items: baseline; gap: 6px; }
 .gr-written .gr-burst { width: 12px; height: 12px; align-self: center; }
 .gr-written .gr-fact-name, .gr-written .gr-fact-note { font-size: 11px; }
+.gr-written .gr-fact-name { flex-shrink: 0; }
 .gr-written .gr-fact-note { min-width: 0; }
 .gr-unwell .gr-burst-rays { fill: var(--earth-clay); }
 .gr-unwell .gr-fact-name { color: var(--earth-clay); }
+.gr-stars .tr-said { white-space: pre-line; }
 .gr-stars .tr-said:empty { display: none; }
 @media (prefers-reduced-motion: reduce) { .gr-hung .gr-said { transition: none; } }
+
+/* Sky: each agent is a cloud, the ones that ran a session in chalk, the ones they sent out in the sky's own colour */
+.gr-flight { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; }
+.gr-agent { display: flex; flex-direction: column; align-items: center; gap: 2px; max-width: 128px; text-align: center; }
+.gr-agent-name { font-size: var(--font-size-xs, 10px); color: var(--earth-chalk); overflow-wrap: break-word; word-break: break-word; }
+.gr-cloudlet { display: block; }
+.gr-puff { stroke-width: 1; }
+.gr-puff-ring { fill: none; stroke-width: 0.8; }
+.gr-agent-ran .gr-puff { fill: var(--earth-chalk); stroke: var(--earth-ochre); }
+.gr-agent-ran .gr-puff-ring { stroke: var(--earth-ochre); }
+.gr-agent-sent .gr-puff { fill: var(--night-teal); stroke: var(--night-glow); }
+.gr-agent-sent .gr-puff-ring { stroke: var(--night-glow); opacity: 0.75; }
 
 /* What was counted, and the sessions under their place */
 .gr-told { font-size: 11px; overflow-wrap: break-word; word-break: break-word; }

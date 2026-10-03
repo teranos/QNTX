@@ -17,6 +17,9 @@
 // "The sessions live in the deeper layers, below rituals and rites."
 // "Scry should be the strata at the very top the nebula"
 
+// "this part is supposed to show things QNTX does for ground specifically"
+// "claude and other coding agents are in the sky"
+
 // Not drawn yet, a session's share of each embedding cluster: loom's ClusterBar.svelte at d512ffb2.
 
 // Not drawn yet, every session file on disk and its import state: loom's SessionList.svelte at d512ffb2.
@@ -27,7 +30,7 @@ import { apiJson } from './client/http';
 import { log, SEG } from './logger';
 import { Ground } from './sym';
 import { openTranscriptElement, when, type TranscriptRead, type Turn } from './components/element/transcript-element';
-import { cloudBank, comet, horizon, nebula, seam, starburst, starField } from './ground-scene';
+import { cloud, cloudBank, comet, horizon, nebula, seam, starburst, starField } from './ground-scene';
 
 const ELEMENT_ID = 'ground-element';
 
@@ -37,6 +40,15 @@ export interface Said {
     name: string;
     note?: string;
     symbol: string;
+}
+
+// What the node does for Ground, as am ground answers it (server/am_ground.go).
+export interface Does {
+    started: string;
+    left: number;
+    watches: Array<{ id: string; name: string; predicates?: string[] }>;
+    news: Array<{ id: string; name: string; note: string; symbol: string; waiting: boolean; at: string; on_row: boolean }>;
+    failed: Array<{ at: string; error: string; execution_id: string }>;
 }
 
 // ─── What a session is, read off what the node answers ────────
@@ -217,12 +229,29 @@ const SCRY_IS = 'Scry is local inference through llama.cpp with Metal, a plugin 
 // is written under one never reaches the next.
 const DROPS = [14, 104, 28, 118];
 
-// What hangs is short, and few hang, so each keeps room for its words at the
-// width of a phone. News, and what takes longer to say, is written under them.
-const HANGS_UP_TO = 22;
-const HUNG_AT_MOST = 6;
+// How long the node has been answering, in the words its own status line uses
+// (server/statusline_handlers.go shortDuration): two units, no decimal.
+export function upFor(started: string, now: number): string {
+    const minutes = Math.max(0, Math.floor((now - Date.parse(started)) / 60000));
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor(minutes / 60) % 24;
+    if (days > 0) return `${days}d${hours}h`;
+    if (hours > 0) return `${hours}h${minutes % 60}m`;
+    return `${minutes}m`;
+}
 
-// One thing the node says, as one star for as long as the node says it.
+// How many of what ci.watch said are written under the stars; the count of the rest is said.
+const WRITTEN_AT_MOST = 8;
+
+// One thing drawn as a star. Its key is where it came from, so the same thing
+// told again is the star it already was.
+interface Told {
+    key: string;
+    name: string;
+    note: string;
+    well: boolean;
+}
+
 interface Star {
     node: HTMLElement;
     name: HTMLElement;
@@ -237,40 +266,35 @@ function star(): Star {
     return { node, name, note };
 }
 
-// The row as stars. A thing said again is the star it already was, with its
-// words changed in place; only a thing newly said is a new star.
-function hang(hung: HTMLElement, written: HTMLElement, stars: Map<string, Star>, items: Said[]): void {
-    const said = new Set<string>();
-    const hanging: Star[] = [];
-    for (const item of items) {
-        // Two things under one name on one row are two stars.
-        let key = item.id ?? item.name;
-        while (said.has(key)) key += ' again';
-        said.add(key);
-        let one = stars.get(key);
+// What hangs on threads, and what is written under them. A thing told again
+// keeps its star, with its words changed in place; only a new thing is a new star.
+function hang(hung: HTMLElement, written: HTMLElement, stars: Map<string, Star>, hanging: Told[], under: Told[]): void {
+    const kept = new Set<string>();
+    const place = (told: Told, into: HTMLElement): HTMLElement => {
+        kept.add(told.key);
+        let one = stars.get(told.key);
         if (!one) {
             one = star();
-            stars.set(key, one);
+            stars.set(told.key, one);
         }
-        const note = item.note ?? '';
-        one.name.textContent = item.name;
-        one.note.textContent = note;
-        one.node.classList.toggle('gr-unwell', item.symbol !== '+');
-        const hangs = !item.id && hanging.length < HUNG_AT_MOST && item.name.length <= HANGS_UP_TO && note.length <= HANGS_UP_TO;
-        if (hangs) hanging.push(one);
-        else one.node.removeAttribute('style');
-        (hangs ? hung : written).appendChild(one.node);
-    }
+        one.name.textContent = told.name;
+        one.note.textContent = told.note;
+        one.node.classList.toggle('gr-unwell', !told.well);
+        into.appendChild(one.node);
+        return one.node;
+    };
+    hanging.forEach((told, i) => {
+        const node = place(told, hung);
+        node.style.left = `${((i + 0.5) / hanging.length) * 100}%`;
+        node.style.width = `min(150px, calc(${200 / hanging.length}% - 30px))`;
+        node.style.setProperty('--drop', `${DROPS[i % DROPS.length]}px`);
+    });
+    for (const told of under) place(told, written).removeAttribute('style');
     for (const [key, one] of stars) {
-        if (said.has(key)) continue;
+        if (kept.has(key)) continue;
         one.node.remove();
         stars.delete(key);
     }
-    hanging.forEach((one, i) => {
-        one.node.style.left = `${((i + 0.5) / hanging.length) * 100}%`;
-        one.node.style.width = `min(92px, calc(${200 / hanging.length}% - 30px))`;
-        one.node.style.setProperty('--drop', `${DROPS[i % DROPS.length]}px`);
-    });
 }
 
 function sessionRow(read: TranscriptRead, onChoose: (session: string) => void): HTMLElement {
@@ -345,6 +369,44 @@ function saySky(into: HTMLElement, reads: TranscriptRead[]): void {
     into.appendChild(make('div', 'gr-told', `${rows.toLocaleString('en')} rows came up through sky, in ${sessionsRead(reads.length)}.`));
 }
 
+// How wide an agent's cloud is drawn: wider the more it flew, by the root of the count.
+function cloudWide(count: number): number {
+    return Math.min(120, 52 + Math.round(Math.sqrt(count) * 14));
+}
+
+// One kind of agent as one cloud: what it is, and how often it flew.
+function clouds(flew: Array<[string, number]>, kind: 'ran' | 'sent', counted: (count: number) => string): HTMLElement {
+    const flight = make('div', 'gr-flight');
+    flew.forEach(([name, count], i) => {
+        const agent = make('div', `gr-agent gr-agent-${kind}`);
+        agent.append(cloud(cloudWide(count), i + (kind === 'ran' ? 31 : 53)), make('span', 'gr-agent-name', name), make('span', 'gr-count', counted(count)));
+        flight.appendChild(agent);
+    });
+    return flight;
+}
+
+// A session's model is what its SessionStart named and its effort what its last
+// Stop ran at; an agent sent out is a SubagentStart, by its type (server/transcripts.go).
+function sayAgents(into: HTMLElement, reads: TranscriptRead[]): void {
+    const ran = tally(reads.map(read => [read.model || 'model not said', read.effort].filter(Boolean).join(' · ')));
+    const sent = tally(reads.flatMap(read => read.turns
+        .filter(turn => turn.speaker === 'agent' && turn.text.startsWith('Start'))
+        .map(turn => turn.text.substring(5).trim() || 'agent not named')));
+    into.replaceChildren();
+    if (ran.length > 0) {
+        into.append(
+            make('div', 'gr-label', `Ran a session, in ${sessionsRead(reads.length)}:`),
+            clouds(ran, 'ran', count => (count === 1 ? '1 session' : `${count} sessions`)),
+        );
+    }
+    if (sent.length > 0) {
+        into.append(
+            make('div', 'gr-label', 'Sent out by them:'),
+            clouds(sent, 'sent', count => (count === 1 ? 'once' : `${count.toLocaleString('en')} times`)),
+        );
+    }
+}
+
 // A control's turn says its name and the hook it spoke on (server/transcripts.go
 // turnOf). Where it spoke about one thing, Ground names that after a colon
 // (ground source/stop.d unread-file-claim, source/notification.d ritual-halt).
@@ -366,10 +428,12 @@ function sayRuns(into: HTMLElement, reads: TranscriptRead[]): void {
     if (folded > 0) into.appendChild(make('div', 'gr-label', `${folded.toLocaleString('en')} more rows are folded into sigmas, and no turn is read back from one.`));
 }
 
-/** What the picture is handed once it stands: the row the node says, and the sessions it read. */
+/** What the picture is handed once it stands: what the node does for Ground, the row it says, and the sessions it read. */
 export interface GroundScene {
+    does(answer: Does): void;
+    undone(why: string): void;
     said(items: Said[]): void;
-    unsaid(why: string): void;
+    unsaid(): void;
     read(reads: TranscriptRead[], onChoose: (session: string) => void): void;
     unread(why: string): void;
 }
@@ -382,13 +446,13 @@ export function drawGround(body: HTMLElement): GroundScene {
     const scryLimit = limit(SCRY_IS);
     scry.body.append(inferring, scryLimit);
 
-    const stars = stratum('stars', 'Stars', 'QNTX', starField(420, 120, 7));
+    const stars = stratum('stars', 'Stars', 'QNTX: what it does for Ground', starField(420, 120, 7));
     const hung = make('div', 'gr-hung');
     const written = make('div', 'gr-written');
-    // What is said while no star hangs: that the row is being asked for, or why it was not said.
-    const unhung = make('div', 'tr-said', 'Asking QNTX what it says of itself…');
+    // What no star says: that QNTX is being asked, that it waits on nothing, or why it did not answer.
+    const unhung = make('div', 'tr-said');
     stars.body.prepend(hung);
-    stars.body.append(written, unhung, limit('QNTX says one thing of itself at a time on its status line, its uptime among them, and holds each up to five minutes. It keeps no count of the news it left for Ground.'));
+    stars.body.append(written, unhung, limit('What QNTX left is kept in memory, the newest 256 of it for everybody: a restart empties it, and the count begins again.'));
 
     const fall = stratum('comet gr-unreal', 'Comet', 'the ground binary, built by QNTX, landing on earth', comet());
     fall.section.prepend(starField(150, 30, 11));
@@ -396,8 +460,11 @@ export function drawGround(body: HTMLElement): GroundScene {
 
     const sky = stratum('sky', 'Sky', 'how we talk to QNTX and receive from it', cloudBank());
     const carried = make('div', 'gr-says');
+    const flying = make('div', 'gr-says');
     sky.body.append(
         carried,
+        flying,
+        limit('Ground runs as a Claude Code hook, so the agents here are the ones Claude Code ran.'),
         limit('One sky runs per tree, and Ground keeps each in its process table. Sky streams attestations, not that table, so how many skies there are is not known here.'),
         limit('What QNTX refused and what is still pending stay on the machine, as qntx_status and qntx_at. Sky ships both counts to Sentry, not to QNTX.'),
     );
@@ -421,16 +488,49 @@ export function drawGround(body: HTMLElement): GroundScene {
 
     body.replaceChildren(scry.section, stars.section, fall.section, sky.section, surface.section, under.section, rites.section, deep.section);
 
-    const hanging = new Map<string, Star>();
-    let drawn = '';
+    const lit = new Map<string, Star>();
+    // What the node does for Ground, as it last answered: null is not answered yet, a string is why not.
+    let done: Does | string | null = null;
+
+    const restar = () => {
+        const hanging: Told[] = [];
+        const under: Told[] = [];
+        const unsaid: string[] = [];
+        if (done === null) {
+            unsaid.push('Asking QNTX what it does for Ground…');
+        } else if (typeof done === 'string') {
+            unsaid.push(`QNTX did not say what it does for Ground: ${done}`);
+        } else {
+            if (done.started) hanging.push({ key: 'up', name: 'up', note: upFor(done.started, Date.now()), well: true });
+            for (const watch of done.watches) {
+                hanging.push({ key: `watch:${watch.id}`, name: watch.name, note: (watch.predicates ?? []).map(p => `on ${p}`).join(', '), well: true });
+            }
+            hanging.push({ key: 'left', name: 'left on the row', note: done.left === 1 ? '1 conclusion' : `${done.left.toLocaleString('en')} conclusions`, well: true });
+            for (const failure of done.failed) {
+                under.push({ key: `failed:${failure.execution_id}:${failure.at}`, name: 'ci.watch', note: `${failure.error} · ${when(failure.at)}`, well: false });
+            }
+            for (const news of done.news) {
+                under.push({ key: `news:${news.id}`, name: news.name, note: `${news.note} · ${when(news.at)}`, well: news.symbol === '+' });
+            }
+            if (under.length === 0) unsaid.push('Nothing of yours is waited on now, and no conclusion is held.');
+            if (under.length > WRITTEN_AT_MOST) unsaid.push(`and ${under.length - WRITTEN_AT_MOST} earlier`);
+        }
+        hang(hung, written, lit, hanging, under.slice(0, WRITTEN_AT_MOST));
+        unhung.textContent = unsaid.join('\n');
+    };
+    restar();
+
     return {
+        does: (answer) => {
+            done = answer;
+            restar();
+        },
+        undone: (why) => {
+            // What was answered before is not what the node says now: no star outlives its answer.
+            done = why;
+            restar();
+        },
         said: (items) => {
-            // The row is asked for every two seconds and mostly says the same.
-            const now = JSON.stringify(items);
-            if (now === drawn) return;
-            drawn = now;
-            unhung.textContent = '';
-            hang(hung, written, hanging, items);
             // The row names every plugin the node holds (server/statusline_handlers.go HandleStatusLine).
             const runs = items.find(item => item.name === 'scry');
             scry.section.classList.toggle('gr-unreal', !runs);
@@ -439,17 +539,14 @@ export function drawGround(body: HTMLElement): GroundScene {
                 ? 'The nebula itself is drawn by scry\'s own element, where Metal is.'
                 : `${SCRY_IS} This node's status line names no scry.`);
         },
-        unsaid: (why) => {
-            // What was said before is not what the node says now: no star outlives its row.
-            drawn = '';
-            hang(hung, written, hanging, []);
-            unhung.textContent = `QNTX did not say its status line: ${why}`;
+        unsaid: () => {
             scry.section.classList.add('gr-unreal');
             inferring.textContent = '';
             relimit(scryLimit, SCRY_IS);
         },
         read: (reads, onChoose) => {
             saySky(carried, reads);
+            sayAgents(flying, reads);
             sayRuns(runs, reads);
             const walked = reads.filter(read => walkOf(read) !== null || ritesOf(read).length > 0);
             walks.replaceChildren(...walked.map(read => walkRow(read, onChoose)));
@@ -469,25 +566,31 @@ export function drawGround(body: HTMLElement): GroundScene {
 
 // ─── Element ──────────────────────────────────────────────────
 
-// The node's own fastest frame lasts two seconds (server/statusline_carousel.go carouselFast).
-const ROW_EVERY_MS = 2000;
+// ci.watch says again what it waits on every few seconds (server/ci_pulse.go pickAdaptiveSleep).
+const ASK_EVERY_MS = 5000;
 
-// One Ground, so one follower of the row: a picture drawn again takes it over.
+// One Ground, so one follower of the node: a picture drawn again takes it over.
 let following: ReturnType<typeof setInterval> | null = null;
 
-function followRow(body: HTMLElement, scene: GroundScene): void {
+function followNode(body: HTMLElement, scene: GroundScene): void {
     const ask = () => {
+        apiJson<Does>('/am/ground')
+            .then(answer => scene.does(answer))
+            .catch((err: unknown) => {
+                log.warn(SEG.UI, '[GroundElement] the node did not say what it does for Ground', err);
+                scene.undone(err instanceof Error ? err.message : String(err));
+            });
         apiJson<{ items?: Said[] }>('/am/statusline?format=json')
             .then(answer => scene.said(answer.items ?? []))
             .catch((err: unknown) => {
                 log.warn(SEG.UI, '[GroundElement] the node did not say its status line', err);
-                scene.unsaid(err instanceof Error ? err.message : String(err));
+                scene.unsaid();
             });
     };
     if (following !== null) clearInterval(following);
     ask();
     // A window put away keeps its picture, and asks again once it is looked at.
-    following = setInterval(() => { if (body.isConnected && !document.hidden) ask(); }, ROW_EVERY_MS);
+    following = setInterval(() => { if (body.isConnected && !document.hidden) ask(); }, ASK_EVERY_MS);
 }
 
 export function createGroundElement(): Element {
@@ -501,7 +604,7 @@ export function createGroundElement(): Element {
             const body = document.createElement('div');
             body.className = 'ground';
             const scene = drawGround(body);
-            followRow(body, scene);
+            followNode(body, scene);
             apiJson<{ transcripts: TranscriptRead[] }>('/api/transcripts')
                 .then(answer => scene.read(answer.transcripts, openTranscriptElement))
                 .catch((err: unknown) => {

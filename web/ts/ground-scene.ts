@@ -149,6 +149,36 @@ export function cloudBank(): SVGSVGElement {
     return svg;
 }
 
+// "claude and other coding agents are in the sky"
+
+/** One cloud, for one agent in the sky: puffs on a level base, each drawn in rings, the smaller behind the larger. */
+export function cloud(wide: number, seed: number): SVGSVGElement {
+    const high = Math.round(wide * 0.5);
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('class', 'gr-cloudlet');
+    svg.setAttribute('viewBox', `0 0 ${wide} ${high}`);
+    svg.setAttribute('width', String(wide));
+    svg.setAttribute('height', String(high));
+    svg.setAttribute('aria-hidden', 'true');
+    const next = seeded(seed);
+    const base = high - 1;
+    const puffs: Array<{ cx: number; r: number }> = [];
+    for (let i = 0; i < 4; i++) {
+        const along = i / 3;
+        const middle = 1 - Math.abs(along * 2 - 1);
+        puffs.push({ cx: wide * (0.18 + 0.64 * along), r: wide * (0.13 + 0.05 * next()) * (1 + 0.55 * middle) });
+    }
+    puffs.sort((a, b) => a.r - b.r);
+    for (const puff of puffs) {
+        for (const ring of [1, 0.72, 0.46, 0.22]) {
+            const r = (puff.r * ring).toFixed(1);
+            const arc = `M ${(puff.cx - puff.r * ring).toFixed(1)} ${base} A ${r} ${r} 0 0 1 ${(puff.cx + puff.r * ring).toFixed(1)} ${base}`;
+            draw(svg, 'path', ring === 1 ? { class: 'gr-puff', d: `${arc} Z` } : { class: 'gr-puff-ring', d: arc });
+        }
+    }
+    return svg;
+}
+
 /** The horizon: three hills of contour lines, the far one first so the near ones stand before it. */
 export function horizon(): SVGSVGElement {
     const svg = plate(92, 'horizon');

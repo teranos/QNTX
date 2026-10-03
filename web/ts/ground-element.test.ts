@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { byPlace, drawGround, openingOf, placeOf, walkOf, type Said } from './ground-element';
+import { byPlace, drawGround, openingOf, placeOf, upFor, walkOf, type Does, type Said } from './ground-element';
 import type { TranscriptRead, Turn } from './components/element/transcript-element';
 
 let nth = 0;
@@ -25,6 +25,9 @@ function session(id: string, subjects: string[], turns: Turn[]): TranscriptRead 
 const held = session('s-1', ['user/QNTX:datapunt-owns-the-reference', 'user/QNTX:main', 'ground'], [
     turn('human', 'Build QNTX here'),
     turn('tool', 'make cli'),
+    turn('agent', 'Start Explore'),
+    turn('agent', 'Stop Explore'),
+    turn('agent', 'Start Explore'),
     turn('ground', 'no-comment-blocks on PreToolUse'),
     turn('assistant', 'QNTX builds here.'),
 ]);
@@ -37,13 +40,30 @@ const walked = session('s-2', ['grove', 'user/QNTX:datapunt-owns-the-reference',
 
 const row: Said[] = [
     { name: 'QNTX', note: 'SUPER', symbol: '+' },
-    { name: 'ci', note: 'watching datapunt-owns-the-reference 4 runs', symbol: '+' },
     { name: 'up', note: '3d4h', symbol: '+' },
-    { name: 'datapunt', note: '0.3.7', symbol: '!' },
+    { name: 'datapunt', note: '0.3.7', symbol: '+' },
 ];
+
+const does: Does = {
+    started: '2026-10-03T21:58:00Z',
+    left: 3,
+    watches: [
+        { id: 'standing-ci-pushed', name: 'a push landed on a branch with CI', predicates: ['immediate:ci-status'] },
+        { id: 'standing-dispatch-sent', name: 'a rite dispatched a workflow', predicates: ['immediate:dispatch'] },
+    ],
+    news: [
+        { id: 'p-2:watching', name: 'ci', note: 'watching main 9f3c1aa 2 runs', symbol: '+', waiting: true, at: '2026-10-03T22:10:00Z', on_row: true },
+        { id: 'p-1:162d82f', name: 'ci', note: 'failure main 162d82f 1/4', symbol: '!', waiting: false, at: '2026-10-03T22:05:00Z', on_row: false },
+    ],
+    failed: [],
+};
 
 function names(body: HTMLElement): string[] {
     return [...body.querySelectorAll('.gr-name b')].map(name => name.textContent ?? '');
+}
+
+function texts(body: HTMLElement, selector: string): string[] {
+    return [...body.querySelectorAll(selector)].map(el => el.textContent ?? '');
 }
 
 function drawn(): { body: HTMLElement; scene: ReturnType<typeof drawGround> } {
@@ -70,10 +90,10 @@ describe('Ground - Tim', () => {
     test('a session is under its place, with the branches it touched', () => {
         const { body, scene } = drawn();
         scene.read([held], () => {});
-        const place = body.querySelector('.gr-deep .gr-place')!;
+        const place = body.querySelector<HTMLElement>('.gr-deep .gr-place')!;
         expect(place.querySelector('.gr-place-name b')?.textContent).toBe('user/QNTX');
         expect(place.querySelector('.tr-opening')?.textContent).toBe('Build QNTX here');
-        expect([...place.querySelectorAll('.gr-under-line .gr-chip')].map(c => c.textContent)).toEqual(['datapunt-owns-the-reference', 'main']);
+        expect(texts(place, '.gr-under-line .gr-chip')).toEqual(['datapunt-owns-the-reference', 'main']);
     });
 
     // Tim: pressing a session chooses it.
@@ -86,13 +106,13 @@ describe('Ground - Tim', () => {
         expect(chosen).toEqual(['s-1', 's-2']);
     });
 
-    // Tim: what the node says of itself hangs as stars, each with its words.
-    test('what the node says hangs as stars', () => {
+    // Tim: the stars are what the node does for Ground, and nothing else the node says.
+    test('what QNTX does for Ground hangs as stars', () => {
         const { body, scene } = drawn();
+        scene.does(does);
         scene.said(row);
-        const hung = [...body.querySelectorAll('.gr-hung .gr-said')].map(s => s.querySelector('.gr-fact-name')?.textContent);
-        expect(hung).toEqual(['QNTX', 'up', 'datapunt']);
-        expect(body.querySelector('.gr-hung .gr-unwell .gr-fact-name')?.textContent).toBe('datapunt');
+        expect(texts(body, '.gr-hung .gr-fact-name')).toEqual(['up', 'a push landed on a branch with CI', 'a rite dispatched a workflow', 'left on the row']);
+        expect(texts(body, '.gr-hung .gr-fact-note').slice(1)).toEqual(['on immediate:ci-status', 'on immediate:dispatch', '3 conclusions']);
     });
 });
 
@@ -125,23 +145,36 @@ describe('Ground - Spike', () => {
         scene.said([...row, { name: 'scry', note: '0.4.2', symbol: '+' }]);
         expect(scry.classList.contains('gr-unreal')).toBe(false);
         expect(scry.querySelector('.gr-told')?.textContent).toBe('This node runs scry 0.4.2.');
+        scene.unsaid();
+        expect(scry.classList.contains('gr-unreal')).toBe(true);
     });
 
-    // Spike: a long thing said is written under the stars, and news is too.
-    test('what takes long to say is written, not hung', () => {
+    // "this part is supposed to show things QNTX does for ground specifically"
+    test('what ci.watch said is written under the stars, a failure as unwell', () => {
         const { body, scene } = drawn();
-        scene.said([...row, { id: 'immediate:ci-status:1', name: 'ci', note: 'success', symbol: '+' }]);
-        const written = [...body.querySelectorAll('.gr-written .gr-said')].map(s => s.querySelector('.gr-fact-note')?.textContent);
-        expect(written).toEqual(['watching datapunt-owns-the-reference 4 runs', 'success']);
+        scene.does({ ...does, failed: [{ at: '2026-10-03T22:00:00Z', error: 'ci.watch: stopped waiting on main', execution_id: 'rearm:p-0' }] });
+        const written = texts(body, '.gr-written .gr-fact-note');
+        expect(written).toHaveLength(3);
+        expect(written[0]).toContain('ci.watch: stopped waiting on main');
+        expect(written[1]).toContain('watching main 9f3c1aa 2 runs');
+        expect(texts(body, '.gr-written .gr-unwell .gr-fact-name')).toEqual(['ci.watch', 'ci']);
     });
 
-    // Spike: a node that did not say its row leaves no star of the last one hanging.
-    test('no star outlives its row', () => {
+    // Spike: a node that did not answer leaves no star of its last answer hanging.
+    test('no star outlives its answer', () => {
         const { body, scene } = drawn();
-        scene.said(row);
-        scene.unsaid('/am/statusline?format=json: HTTP 502');
+        scene.does(does);
+        scene.undone('/am/ground: HTTP 404');
         expect(body.querySelectorAll('.gr-said')).toHaveLength(0);
-        expect(body.querySelector('.gr-stars')?.textContent).toContain('HTTP 502');
+        expect(body.querySelector('.gr-stars')?.textContent).toContain('HTTP 404');
+    });
+
+    // Spike: the node's own words for how long: two units, no decimal.
+    test('uptime is said as the status line says it', () => {
+        const started = '2026-10-03T21:58:00Z';
+        expect(upFor(started, Date.parse('2026-10-03T22:05:30Z'))).toBe('7m');
+        expect(upFor(started, Date.parse('2026-10-04T01:03:00Z'))).toBe('3h5m');
+        expect(upFor(started, Date.parse('2026-10-07T01:59:00Z'))).toBe('3d4h');
     });
 
     // Spike: what Claude Code hands a session is not what a person said in it.
@@ -171,17 +204,39 @@ describe('Ground - Spike', () => {
 });
 
 describe('Ground - Jenny', () => {
-    // Jenny: a thing said again is the star it already was, a thing no longer said is gone.
-    test('a star said again is the same star', () => {
+    // Jenny: a thing told again is the star it already was, with its words changed in place.
+    test('a star told again is the same star', () => {
         const { body, scene } = drawn();
-        scene.said(row);
-        const up = [...body.querySelectorAll<HTMLElement>('.gr-hung .gr-said')][1];
-        scene.said([row[0], { name: 'up', note: '3d5h', symbol: '+' }]);
-        const hung = [...body.querySelectorAll<HTMLElement>('.gr-hung .gr-said')];
-        expect(hung).toHaveLength(2);
-        expect(hung[1]).toBe(up);
-        expect(up.querySelector('.gr-fact-note')?.textContent).toBe('3d5h');
-        expect(body.querySelectorAll('.gr-written .gr-said')).toHaveLength(0);
+        scene.does(does);
+        const before = [...body.querySelectorAll<HTMLElement>('.gr-hung .gr-said')];
+        scene.does({ ...does, left: 4, news: [does.news[1]] });
+        const after = [...body.querySelectorAll<HTMLElement>('.gr-hung .gr-said')];
+        expect(after).toHaveLength(4);
+        after.forEach((star, i) => expect(star).toBe(before[i]));
+        expect(after[3].querySelector('.gr-fact-note')?.textContent).toBe('4 conclusions');
+        expect(body.querySelectorAll('.gr-written .gr-said')).toHaveLength(1);
+    });
+
+    // Jenny: more was left than is written, and how much more is said.
+    test('what is not written is counted', () => {
+        const { body, scene } = drawn();
+        const many = Array.from({ length: 11 }, (_, i) => ({ ...does.news[1], id: `p-${i}` }));
+        scene.does({ ...does, news: many });
+        expect(body.querySelectorAll('.gr-written .gr-said')).toHaveLength(8);
+        expect(body.querySelector('.gr-stars')?.textContent).toContain('and 3 earlier');
+    });
+
+    // "claude and other coding agents are in the sky"
+    test('each agent is a cloud in the sky', () => {
+        const { body, scene } = drawn();
+        scene.read([held, walked], () => {});
+        const ran = body.querySelector<HTMLElement>('.gr-sky .gr-agent-ran')!;
+        expect(ran.querySelector('svg.gr-cloudlet')).not.toBeNull();
+        expect(ran.querySelector('.gr-agent-name')?.textContent).toBe('claude-opus-5-5 · xhigh');
+        expect(ran.querySelector('.gr-count')?.textContent).toBe('2 sessions');
+        const sent = body.querySelector<HTMLElement>('.gr-sky .gr-agent-sent')!;
+        expect(sent.querySelector('.gr-agent-name')?.textContent).toBe('Explore');
+        expect(sent.querySelector('.gr-count')?.textContent).toBe('2 times');
     });
 
     // Jenny: a session a ritual walked is drawn by its rites, and is not among the sessions a person held.
@@ -190,7 +245,7 @@ describe('Ground - Jenny', () => {
         scene.read([held, walked], () => {});
         expect(walkOf(walked)).toBe('grove');
         expect(walkOf(held)).toBeNull();
-        const walk = body.querySelector('.gr-rites .gr-walk')!;
+        const walk = body.querySelector<HTMLElement>('.gr-rites .gr-walk')!;
         expect(walk.querySelector('.gr-walk-head b')?.textContent).toBe('grove');
         expect([...walk.querySelectorAll('.gr-tile')].map(t => t.className)).toEqual(['gr-tile gr-verdict-advance', 'gr-tile gr-verdict-hold']);
         expect(walk.textContent).toContain('reached tested hold 1');
@@ -212,8 +267,7 @@ describe('Ground - Jenny', () => {
             turn('ground', 'unread-file-claim:b.go on Stop'),
             turn('ground', 'no-comment-blocks on PreToolUse'),
         ])], () => {});
-        const counted = [...body.querySelectorAll('.gr-surface .gr-counted span')].map(c => c.textContent);
-        expect(counted).toEqual(['unread-file-claim2', 'no-comment-blocks1']);
+        expect(texts(body, '.gr-surface .gr-counted span')).toEqual(['unread-file-claim2', 'no-comment-blocks1']);
     });
 
     // Jenny: only sessions a ritual walked were read, and that is said rather than an empty layer.
