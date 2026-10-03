@@ -11,3 +11,10 @@ openapi.json https://raw.githubusercontent.com/umami-software/docs/a50c0af47f874
 The schema says nothing of its models or columns; the API document does, of
 the shapes the API answers with. words says which of those speaks for which
 model, since Umami links them nowhere.
+
+index.d.ts https://raw.githubusercontent.com/umami-software/umami/ca661c7057984aa98ed4f7083d84dae2f65bfcb0/src/tracker/index.d.ts (the same commit)
+
+f2621a7aaf033504234333978acd36d582404b56525bce28e9ae62de470b3190  index.d.ts
+
+The browser tracker's types: what Umami sends, beside what it keeps. One
+reference, Umami, read from its record and its tracker.

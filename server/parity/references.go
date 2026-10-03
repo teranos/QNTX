@@ -21,11 +21,12 @@ import (
 // The references a signum can be held to, each pinned in a directory named for
 // the reference, its version and the commit it was taken at, with SOURCE
 // saying where it came from: umami is umami_v3.3.1_ca661c7, a2a is
-// a2a_v1.0.1_3303592, mcp is mcp_2026-07-28_5f5440b. A reference is read as it
-// is: a schema.prisma as Prisma, a .proto as the descriptors it compiles to, a
-// schema.json as JSON Schema.
+// a2a_v1.0.1_3303592, mcp is mcp_2026-07-28_5f5440b, umami-tracker is
+// umami-tracker_v3.3.1_ca661c7. A reference is read as it is: a schema.prisma
+// as Prisma, a .proto as the descriptors it compiles to, a schema.json as JSON
+// Schema, a .d.ts as the TypeScript types it declares.
 //
-//go:embed */schema.prisma */*.proto */schema.json */openapi.json */words
+//go:embed */schema.prisma */*.proto */schema.json */openapi.json */words */*.d.ts
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory
@@ -56,20 +57,36 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 	if err != nil {
 		return Schema{}, failed("%s did not read: %v", found[0], err)
 	}
-	var protos []string
+	var protos, declarations []string
+	prisma, jsonSchema := false, false
 	for _, file := range files {
-		if file.Name() == "schema.prisma" {
-			return prismaAt(found[0], file.Name())
-		}
-		if file.Name() == "schema.json" {
-			return jsonSchemaAt(path.Join(found[0], file.Name()))
-		}
-		if strings.HasSuffix(file.Name(), ".proto") {
-			protos = append(protos, file.Name())
+		switch name := file.Name(); {
+		case name == "schema.prisma":
+			prisma = true
+		case name == "schema.json":
+			jsonSchema = true
+		case strings.HasSuffix(name, ".d.ts"):
+			declarations = append(declarations, name)
+		case strings.HasSuffix(name, ".proto"):
+			protos = append(protos, name)
 		}
 	}
+	switch {
+	case prisma:
+		// A record and the types of what is sent to it are one reference:
+		// Umami's schema.prisma and its tracker's index.d.ts.
+		schema, refused := prismaAt(found[0], "schema.prisma")
+		if refused != nil {
+			return Schema{}, refused
+		}
+		return withDeclarations(schema, found[0], declarations)
+	case jsonSchema:
+		return jsonSchemaAt(path.Join(found[0], "schema.json"))
+	case len(declarations) > 0:
+		return withDeclarations(Schema{fits: tsFits}, found[0], declarations)
+	}
 	if len(protos) == 0 {
-		return Schema{}, failed("%s holds no schema.prisma, no .proto and no schema.json", found[0])
+		return Schema{}, failed("%s holds no schema.prisma, no .proto, no schema.json and no .d.ts", found[0])
 	}
 	return protoAt(found[0], protos)
 }
@@ -88,6 +105,37 @@ func prismaAt(dir, file string) (Schema, *protocol.Refusal) {
 		return Schema{}, failed("%v", err)
 	}
 	return Prisma(models), nil
+}
+
+// withDeclarations is a schema with the models of the .d.ts files beside it,
+// each column held to TypeScript's types and saying it was read there.
+func withDeclarations(schema Schema, dir string, files []string) (Schema, *protocol.Refusal) {
+	for _, file := range files {
+		declarations := path.Join(dir, file)
+		raw, err := pinned.ReadFile(declarations)
+		if err != nil {
+			return Schema{}, failed("%s did not read: %v", declarations, err)
+		}
+		models, err := ParseTypeScript(declarations, raw)
+		if err != nil {
+			return Schema{}, failed("%v", err)
+		}
+		for i := range models {
+			m := &models[i]
+			if m.Says != "" {
+				m.SaysFrom = file + " · " + m.Name
+			}
+			for j := range m.Columns {
+				c := &m.Columns[j]
+				c.fits = tsFits
+				if c.Says != "" {
+					c.SaysFrom = file + " · " + m.Name + "." + c.Name
+				}
+			}
+		}
+		schema.Models = append(schema.Models, models...)
+	}
+	return schema, nil
 }
 
 func jsonSchemaAt(schema string) (Schema, *protocol.Refusal) {

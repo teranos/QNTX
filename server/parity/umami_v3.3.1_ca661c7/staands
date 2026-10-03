@@ -77,6 +77,21 @@
   TwoFactorOtpUsed       0
   TwoFactorRateLimit     0
   AppSetting             0
+  TrackedProperties     33
+    hostname             0
+    id                   0
+    language             0
+    referrer           100  protocol.Arrival.referrer_domain, protocol.Arrival.referrer_path
+    screen               0
+    tag                  0
+    title                0
+    url                100  protocol.Arrival.path
+    website            100  protocol.Arrival.market, protocol.Arrival.slug
+  EventProperties       50
+    name               100  protocol.Arrival.event
+    data                 0  protocol.Arrival.params
+      EventData in the schema, and protocol.Arrival.params holds string
+  UmamiTracker           0
 
   out of spec
     protocol.Arrival follows no column with bot, browser, browser_version, city, country, device, language, operating_system, operating_system_version, query, region, screen

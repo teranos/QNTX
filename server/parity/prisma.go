@@ -43,6 +43,10 @@ type Column struct {
 	// SaysFrom is where Says was read, when not from the schema itself:
 	// openapi.json · WebsiteSession.screen.
 	SaysFrom string
+	// fits is, when the column is held to types of its own rather than its
+	// schema's, whether a field of a kind can be held in it: a TypeScript
+	// column beside a Prisma model.
+	fits func(protoreflect.Kind, Column) bool
 	// holds is, for JSON Schema, the types a value of it may be once every
 	// definition it refers to is read: what Type names, resolved.
 	holds []string
@@ -378,7 +382,11 @@ func Hold(signum *protocol.Signum, named, reference string, schema Schema) (Pari
 			continue
 		}
 		followedBy[c.GetColumn()] = append(followedBy[c.GetColumn()], c.GetField())
-		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), column, schema.fits)...)
+		fits := schema.fits
+		if column.fits != nil {
+			fits = column.fits
+		}
+		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), column, fits)...)
 	}
 	for message := range scope {
 		if _, ok := messages[message]; ok {
