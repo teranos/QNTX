@@ -44,6 +44,10 @@ message Transcript {
   repeated Turn turns = 5;
   // Events the store folded into sigmas (ADR-020), counted and not read.
   int64 folded = 6;
+  // The model the session started on, as its SessionStart says.
+  string model = 7;
+  // The effort its last Stop ran at, as that Stop's effort.level says.
+  string effort = 8;
 }
 
 // Turn is one thing said or done in a session, naming the attestation it was

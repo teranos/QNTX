@@ -80,6 +80,27 @@ func TestATranscriptIsTheSessionInOrder(t *testing.T) {
 	assert.Equal(t, "ground:payload:UserPromptSubmit:1", tr.Turns[0].Of)
 }
 
+// Tim: a session says the model it started on and the effort its last Stop ran at.
+func TestATranscriptSaysItsModelAndEffort(t *testing.T) {
+	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)
+	rows := append(aSession(at),
+		streamed("ground:payload:SessionStart:0", "SessionStart", "s-1", at.Add(-time.Second),
+			map[string]any{"source": "startup", "model": "claude-opus-5-5"}),
+		streamed("ground:payload:Stop:9", "Stop", "s-1", at.Add(9*time.Second),
+			map[string]any{"last_assistant_message": "done", "effort": map[string]any{"level": "xhigh"}}),
+		streamed("ground:payload:Stop:8", "Stop", "s-1", at.Add(8*time.Second),
+			map[string]any{"last_assistant_message": "earlier", "effort": map[string]any{"level": "high"}}),
+	)
+	got := transcriptsOf(rows, transcriptSessionLimit)
+	require.Len(t, got, 1)
+	assert.Equal(t, "claude-opus-5-5", got[0].Model)
+	assert.Equal(t, "xhigh", got[0].Effort, "the last Stop's effort, whatever order the rows were read in")
+
+	bare := transcriptsOf(aSession(at), transcriptSessionLimit)
+	assert.Empty(t, bare[0].Model)
+	assert.Empty(t, bare[0].Effort)
+}
+
 // Spike: an event with no session, or one a transcript does not read, is not
 // a turn; sessions come newest first and stop at the limit.
 func TestTranscriptsAreNewestFirstAndCut(t *testing.T) {

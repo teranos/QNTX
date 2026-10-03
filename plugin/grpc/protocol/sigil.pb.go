@@ -176,7 +176,11 @@ type Transcript struct {
 	Ended    string                 `protobuf:"bytes,4,opt,name=ended,proto3" json:"ended,omitempty"`
 	Turns    []*Turn                `protobuf:"bytes,5,rep,name=turns,proto3" json:"turns,omitempty"`
 	// Events the store folded into sigmas (ADR-020), counted and not read.
-	Folded        int64 `protobuf:"varint,6,opt,name=folded,proto3" json:"folded,omitempty"`
+	Folded int64 `protobuf:"varint,6,opt,name=folded,proto3" json:"folded,omitempty"`
+	// The model the session started on, as its SessionStart says.
+	Model string `protobuf:"bytes,7,opt,name=model,proto3" json:"model,omitempty"`
+	// The effort its last Stop ran at, as that Stop's effort.level says.
+	Effort        string `protobuf:"bytes,8,opt,name=effort,proto3" json:"effort,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -251,6 +255,20 @@ func (x *Transcript) GetFolded() int64 {
 		return x.Folded
 	}
 	return 0
+}
+
+func (x *Transcript) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *Transcript) GetEffort() string {
+	if x != nil {
+		return x.Effort
+	}
+	return ""
 }
 
 // Turn is one thing said or done in a session, naming the attestation it was
@@ -790,7 +808,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x04Node\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12&\n" +
-	"\x05signa\x18\x03 \x03(\v2\x10.protocol.SignumR\x05signa\"\xb0\x01\n" +
+	"\x05signa\x18\x03 \x03(\v2\x10.protocol.SignumR\x05signa\"\xde\x01\n" +
 	"\n" +
 	"Transcript\x12\x18\n" +
 	"\asession\x18\x01 \x01(\tR\asession\x12\x1a\n" +
@@ -798,7 +816,9 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\astarted\x18\x03 \x01(\tR\astarted\x12\x14\n" +
 	"\x05ended\x18\x04 \x01(\tR\x05ended\x12$\n" +
 	"\x05turns\x18\x05 \x03(\v2\x0e.protocol.TurnR\x05turns\x12\x16\n" +
-	"\x06folded\x18\x06 \x01(\x03R\x06folded\"T\n" +
+	"\x06folded\x18\x06 \x01(\x03R\x06folded\x12\x14\n" +
+	"\x05model\x18\a \x01(\tR\x05model\x12\x16\n" +
+	"\x06effort\x18\b \x01(\tR\x06effort\"T\n" +
 	"\x04Turn\x12\x0e\n" +
 	"\x02at\x18\x01 \x01(\tR\x02at\x12\x18\n" +
 	"\aspeaker\x18\x02 \x01(\tR\aspeaker\x12\x12\n" +

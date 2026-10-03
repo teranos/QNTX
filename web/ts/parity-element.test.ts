@@ -84,6 +84,20 @@ test('a refused reference says why beside the ones held', () => {
     expect(content.querySelectorAll('.parity-pill').length).toBe(1);
 });
 
+// Tim: pressing a row copies it, both sides as read.
+// "clicking a row should make it copy to clickboard"
+test('a pressed row is copied, both sides and why it departs', () => {
+    const seam = document.createElement('div');
+    const h = held();
+    const copied: string[] = [];
+    renderSeam(seam, h, h.clades[1], (text) => copied.push(text));
+    ([...seam.querySelectorAll('.parity-row')][2] as HTMLElement).click();
+    expect(copied).toEqual([
+        'inputSchema REQUIRED · A JSON Schema object defining the expected parameters for the tool.  ≠  Sigil.takes · What goes in.\n' +
+        'one value in the schema, and protocol.Sigil.takes is repeated',
+    ]);
+});
+
 // Words the schema does not have itself say where they were read.
 test('words read from beside the schema say where', () => {
     const seam = document.createElement('div');

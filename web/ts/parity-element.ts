@@ -87,10 +87,42 @@ function says(text: string, silence: string): HTMLElement {
     return text ? el('span', 'parity-says', text) : el('span', 'parity-says parity-silent', silence);
 }
 
+/** What one piece of a row says, each word of it apart from the next. */
+function spoken(node: Node): string {
+    if (!(node instanceof HTMLElement) || node.children.length === 0) return (node.textContent ?? '').trim();
+    return [...node.childNodes].map(spoken).filter(Boolean).join(' ');
+}
+
+/** A row as copied: their side, the mark, our side, then why it departs. */
+function rowText(row: HTMLElement): string {
+    const parts: string[] = [];
+    const departures: string[] = [];
+    for (const child of row.children) {
+        if (child.classList.contains('parity-departure')) {
+            departures.push(spoken(child));
+            continue;
+        }
+        parts.push(child.classList.contains('parity-side')
+            ? [...child.children].map(spoken).filter(Boolean).join(' · ')
+            : spoken(child));
+    }
+    return [parts.filter(Boolean).join('  '), ...departures].join('\n');
+}
+
+// "clicking a row should make it copy to clickboard"
+function toClipboard(text: string): void {
+    navigator.clipboard.writeText(text).catch((err: unknown) =>
+        log.error(SEG.UI, '[ParityElement] a row did not reach the clipboard:', err));
+}
+
 /** The seam of one model: its words and ours, then a row per column, then
- *  what of ours follows nothing. Exported for tests. */
-export function renderSeam(container: HTMLElement, held: Held, clade: HeldClade): void {
+ *  what of ours follows nothing. A pressed row is copied. Exported for tests. */
+export function renderSeam(container: HTMLElement, held: Held, clade: HeldClade, copy: (text: string) => void = toClipboard): void {
     container.innerHTML = '';
+    container.onclick = (e) => {
+        const row = (e.target as HTMLElement).closest('.parity-row') as HTMLElement | null;
+        if (row && container.contains(row)) copy(rowText(row));
+    };
 
     const head = el('div', 'parity-row parity-row-head');
     const theirs = el('div', 'parity-side');
