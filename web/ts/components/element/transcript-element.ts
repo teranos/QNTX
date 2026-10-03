@@ -91,7 +91,7 @@ export function renderAssistant(text: string): string {
     return out;
 }
 
-const SMALL = new Set(['tool', 'edit', 'read', 'search', 'write']);
+const SMALL = new Set(['tool', 'mcp', 'edit', 'read', 'search', 'write']);
 const MARKER = new Set(['session', 'compaction', 'agent', 'task', 'rite']);
 
 function weightOf(speaker: string): string {
