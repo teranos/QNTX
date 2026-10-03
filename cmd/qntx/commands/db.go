@@ -8,15 +8,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/syscap"
-	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/errors"
 )
 
 // DbCmd represents the db (database) command
 var DbCmd = &cobra.Command{
 	Use:   "db",
-	Short: sym.DB + " Manage QNTX database",
-	Long: sym.DB + ` db — Manage QNTX database operations
+	Short: "Manage QNTX database",
+	Long: `db — Manage QNTX database operations
 
 Manage database operations including statistics, storage telemetry, and diagnostics.
 
@@ -70,7 +69,7 @@ func runDbStats(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// Print database info
-	fmt.Printf("%s Database Statistics\n", sym.DB)
+	fmt.Printf("Database Statistics\n")
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 	fmt.Printf("Database Path:      %s\n", cfg.Storage.Sqlite.Path)
 

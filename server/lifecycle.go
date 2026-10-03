@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
@@ -59,7 +58,7 @@ func (s *QNTXServer) startBackgroundServices() {
 		s.daemon.Start()
 		if s.ticker != nil {
 			s.ticker.Start()
-			logger.AddPulseSymbol(s.logger).Debugw("Pulse ticker started")
+			s.logger.Debugw("Pulse ticker started")
 		}
 		s.logger.Debugw("Daemon started", "workers", s.daemon.Workers())
 	}

@@ -12,7 +12,7 @@ import (
 
 // "it just needs to fit with the rest of qntx"
 //
-// A mail QNTX draws is an element window, the way ≡ am is one: a title bar,
+// A mail QNTX draws is an element window, the way am is one: a title bar,
 // then sections of labelled rows. Every value is read from web/css when the
 // mail is drawn. Only tables and inline styles carry it, because those are what
 // every mail client lays out the same way.

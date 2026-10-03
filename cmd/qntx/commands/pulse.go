@@ -13,15 +13,14 @@ import (
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
-	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/errors"
 )
 
 // PulseCmd represents the pulse command - Pulse daemon for async job processing
 var PulseCmd = &cobra.Command{
 	Use:   "pulse",
-	Short: sym.Pulse + " Manage Pulse daemon (async job processor + scheduler)",
-	Long: sym.Pulse + ` Pulse daemon - continuous compute infrastructure.
+	Short: "Manage Pulse daemon (async job processor + scheduler)",
+	Long: `Pulse daemon - continuous compute infrastructure.
 
 The Pulse daemon provides:
 - Async job queue processing with worker pool
@@ -61,7 +60,7 @@ The daemon will:
 			return errors.Wrap(err, "the workers flag is not registered as an int")
 		}
 
-		fmt.Printf("%s Starting Pulse daemon with %d worker(s)...\n", sym.Pulse, workers)
+		fmt.Printf("Starting Pulse daemon with %d worker(s)...\n", workers)
 
 		// Load configuration
 		cfg, err := config.Load()
@@ -98,20 +97,20 @@ The daemon will:
 		ticker := schedule.NewTickerWithContext(ctx, scheduleStore, pool.GetQueue(), pool, nil, tickerCfg, logger.Logger)
 		ticker.Start()
 
-		fmt.Printf("%s Pulse daemon started\n", sym.Pulse)
+		fmt.Printf("Pulse daemon started\n")
 		fmt.Printf("  Workers: %d\n", workers)
 		fmt.Printf("  Poll interval: %v\n", poolCfg.PollInterval)
 		fmt.Printf("  Daily budget: $%.2f\n", cfg.Pulse.DailyBudgetUSD)
 		fmt.Printf("  Monthly budget: $%.2f\n", cfg.Pulse.MonthlyBudgetUSD)
 		fmt.Printf("  Scheduler interval: %v\n", tickerCfg.Interval)
-		fmt.Printf("\n%s Press Ctrl+C for graceful shutdown\n\n", sym.Pulse)
+		fmt.Printf("\nPress Ctrl+C for graceful shutdown\n\n")
 
 		// Wait for interrupt signal
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
 
-		fmt.Printf("\n%s Initiating GRACE shutdown...\n", sym.Pulse)
+		fmt.Printf("\nInitiating GRACE shutdown...\n")
 
 		// Stop components in reverse order of startup (each manages its own context)
 		ticker.Stop()
@@ -119,7 +118,7 @@ The daemon will:
 
 		cancel() // Clean up parent context
 
-		fmt.Printf("%s Pulse daemon stopped\n", sym.Pulse)
+		fmt.Printf("Pulse daemon stopped\n")
 		return nil
 	},
 }

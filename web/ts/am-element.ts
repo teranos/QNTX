@@ -1,7 +1,7 @@
 /**
  * ≡ — what the node is, and what it was told to be.
  *
- * `sym/symbols.go` calls `am` "Configuration — System settings and state".
+ * `am` is being: "am is the node, am is the server".
  * The node's build, the backends it was compiled against, the key it signs
  * with and the row its status line draws are all that: what the node is. They
  * sat on ⍟ because ⍟ was the only element there, and a person opening ⍟ to see

@@ -1,99 +1,20 @@
-// Package sym defines canonical symbols for QNTX SEG operations and system markers.
-// These symbols are stable across UI, CLI, and documentation.
+// Package sym names the QNTX segments.
+// "ATS and QNTX go, they own the segments, the two letter abbreviations"
 package sym
 
-// Primary SEG operators - these have UI components and commands
+// The segments.
 const (
-	I  = "⍟" // self - your vantage point into QNTX
-	AM = "≡" // am - configuration and system settings
-	IX = "⨳" // ix - ingest/import external data
-	AX = "⋈" // ax - expand/query, contextual surfacing
-	BY = "⌬" // by - actor/catalyst/origin (all forms: creator, source, user)
-	AT = "✦" // at - temporal marker/moment
-	SO = "⟶" // so - therefore/consequent action
-	SE = "⊨" // se - semantic search/entailment
+	I  = "i"  // self - your vantage point into QNTX
+	AM = "am" // being - the node, the server
+	IX = "ix" // ingest/import external data
+	AX = "ax" // expand/query, contextual surfacing
+	BY = "by" // actor/catalyst/origin (all forms: creator, source, user)
+	AT = "at" // temporal marker/moment
+	SO = "so" // therefore/consequent action
+	SE = "se" // semantic search/entailment
 
-	// Attestation building blocks (not UI elements)
-	// These are fundamental components of the attestation pattern:
 	// "subject IS predicate OF context BY actor AT time"
-	AS = "+" // as - assert/emit an attestation
-	IS = "=" // is
-	OF = "∈" // of - membership/belonging in attestations
-	// TODO: Consider alternative typeable symbols for OF, BY, AT
-
-	// Derived attestation types
-	// Attestation is one claim whole — its slots and its attributes together.
-	// The element for it drew "+" until "+" went back to being the subject it
-	// marks: a mark for one slot said the wrong thing on a thing made of all of
-	// them.
-	Attestation = "⎔" // attestation - one claim whole, slots and attributes together
-	Triplet     = "⫶" // triplet - grouped attestations sharing the same subject+predicate+context
-	Type        = "⊢" // type - an actor's judgment that a pattern deserves a name
-	Sigma       = "Σ" // sigma - distilled/summarized attestation (sum of many observations)
-
-	// System infrastructure symbols
-	Watcher    = "⏿" // Watcher: observer/monitor for attestation patterns
-	Pulse      = "꩜" // Pulse system: async jobs, rate limiting, budget management (always prefix logs)
-	PulseOpen  = "✿" // Graceful startup with orphaned job recovery
-	PulseClose = "❀" // Graceful shutdown with checkpoint preservation
-	DB         = "⊔" // Database/storage layer
-	Prose      = "▣" // Documentation and prose content
-	Doc        = "▤" // Document/file content (PDF, etc.)
-	Subcanvas  = "⌗" // Nested canvas (subcanvas workspace)
-	Parity     = "≍" // Parity: a signum held to a reference it follows
+	AS = "as" // assert/emit an attestation
+	IS = "is"
+	OF = "of" // membership/belonging in attestations
 )
-
-// SymbolToCommand maps symbols to their text command equivalents
-// for dual-mode acceptance (backwards compatibility)
-// Includes both primary SEG operators and attestation building blocks
-var SymbolToCommand = map[string]string{
-	// Primary SEG operators
-	I:  "i",
-	AM: "am",
-	IX: "ix",
-	AX: "ax",
-	BY: "by",
-	AT: "at",
-	SO: "so",
-	SE: "se",
-	// Attestation building blocks
-	AS: "as",
-	IS: "is",
-	OF: "of",
-}
-
-// CommandToSymbol maps text commands to their canonical symbols
-// for normalization and display purposes
-var CommandToSymbol = map[string]string{
-	// Primary SEG operators
-	"i":  I,
-	"am": AM,
-	"ix": IX,
-	"ax": AX,
-	"by": BY,
-	"at": AT,
-	"so": SO,
-	"se": SE,
-	// Attestation building blocks
-	"as": AS,
-	"is": IS,
-	"of": OF,
-}
-
-// CommandDescriptions provides human-readable explanations
-// for tooltip hover states
-var CommandDescriptions = map[string]string{
-	// Primary SEG operators
-	"i":  "Self — Your vantage point into QNTX",
-	"am": "Configuration — System settings and state",
-	"ix": "Ingest — Import external data",
-	"ax": "Expand — Query and surface related context",
-	"by": "Actor — Origin of action (creator/source/user)",
-	"at": "Temporal — Time marker/moment",
-	"so": "Therefore — Consequent action/trigger",
-	"se": "Semantic — Meaning-based search and entailment",
-	// Attestation building blocks
-	"as": "Assert — Emit an attestation",
-	"is": "",
-	"of": "Membership — Element-of/belonging in attestations",
-}

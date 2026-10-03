@@ -1,18 +1,9 @@
-/**
- * The canonical symbols, stable across UI, CLI and documentation.
- *
- * These are not a wire shape. Proto declares what the node and the browser send
- * each other (ADR-006); a bag of named constants is neither a message nor an
- * enum, and forcing it into one would describe it worse than this does.
- *
- * So it is written here and held to sym/symbols.go by sym.test.ts, which reads
- * the Go and fails if the two ever disagree. One place to change a symbol, and
- * a check that catches the other place being forgotten.
- */
+// The symbol: the one place a segment is mapped to a glyph.
+// "UI owns presentation, the symbols glyphs"
 
 // Primary SEG operators — these have UI components and commands.
 export const I = '⍟';          // self — your vantage point into QNTX
-export const AM = '≡';         // am — configuration and system settings
+export const AM = '≡';         // am — being: the node, the server
 export const IX = '⨳';         // ix — ingest/import external data
 export const AX = '⋈';         // ax — expand/query, contextual surfacing
 export const BY = '⌬';         // by — actor/catalyst/origin
@@ -46,22 +37,7 @@ export const Doc = '▤';        // document/file content
 export const Subcanvas = '⌗';  // nested canvas workspace
 export const Parity = '≍';     // a signum held to a reference it follows
 
-/** Symbol to its text command, for dual-mode acceptance. */
-export const SymbolToCommand: Record<string, string> = {
-    [I]: 'i',
-    [AM]: 'am',
-    [IX]: 'ix',
-    [AX]: 'ax',
-    [BY]: 'by',
-    [AT]: 'at',
-    [SO]: 'so',
-    [SE]: 'se',
-    [AS]: 'as',
-    [IS]: 'is',
-    [OF]: 'of',
-};
-
-/** Text command to its canonical symbol, for normalisation and display. */
+/** Segment to its glyph. */
 export const CommandToSymbol: Record<string, string> = {
     i: I,
     am: AM,
@@ -79,7 +55,7 @@ export const CommandToSymbol: Record<string, string> = {
 /** What each command means, for a tooltip. */
 export const CommandDescriptions: Record<string, string> = {
     i: 'Self — Your vantage point into QNTX',
-    am: 'Configuration — System settings and state',
+    am: 'Being — The node, the server',
     ix: 'Ingest — Import external data',
     ax: 'Expand — Query and surface related context',
     by: 'Actor — Origin of action (creator/source/user)',

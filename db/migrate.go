@@ -11,7 +11,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/errors"
 )
 
@@ -210,7 +209,6 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 
 	if logger != nil {
 		logger.Infow("Migrations complete",
-			"symbol", sym.DB,
 			"total_migrations", len(migrationFiles),
 		)
 	}

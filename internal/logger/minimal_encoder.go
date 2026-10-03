@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
 	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
@@ -174,7 +173,7 @@ func colorMessage(msg string) string {
 }
 
 // colorizeMessage parses a log message and applies context-aware colorization
-// to different components: job IDs, stage markers, symbols, etc.
+// to different components: job IDs, stage markers, etc.
 // Returns the fully colorized message string with embedded ANSI codes.
 func colorizeMessage(msg string) string {
 	// Pattern for bracketed contexts: [job:XXX], [stage], etc.
@@ -195,13 +194,6 @@ func colorizeMessage(msg string) string {
 		return gruvbox.orange
 	}
 
-	getSymbolColor := func() string {
-		if currentTheme == "everforest" {
-			return everforest.greenBright
-		}
-		return gruvbox.green
-	}
-
 	getBaseTextColor := func() string {
 		if currentTheme == "everforest" {
 			return everforest.fg
@@ -219,8 +211,6 @@ func colorizeMessage(msg string) string {
 		// Append text before bracket in base color
 		textBefore := msg[lastIndex:match[0]]
 		if textBefore != "" {
-			// Colorize symbols in text before bracket
-			textBefore = colorizeSymbols(textBefore, getSymbolColor())
 			result.WriteString(getBaseTextColor())
 			result.WriteString(textBefore)
 			result.WriteString(colorReset)
@@ -251,22 +241,12 @@ func colorizeMessage(msg string) string {
 	// Append remaining text
 	remaining := msg[lastIndex:]
 	if remaining != "" {
-		// Colorize symbols in remaining text
-		remaining = colorizeSymbols(remaining, getSymbolColor())
 		result.WriteString(getBaseTextColor())
 		result.WriteString(remaining)
 		result.WriteString(colorReset)
 	}
 
 	return result.String()
-}
-
-// colorizeSymbols replaces Pulse symbols with colorized versions
-func colorizeSymbols(text string, symbolColor string) string {
-	text = strings.ReplaceAll(text, sym.Pulse, symbolColor+sym.Pulse+colorReset)
-	text = strings.ReplaceAll(text, sym.PulseOpen, symbolColor+sym.PulseOpen+colorReset)
-	text = strings.ReplaceAll(text, sym.PulseClose, symbolColor+sym.PulseClose+colorReset)
-	return text
 }
 
 func colorID() string {

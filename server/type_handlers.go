@@ -11,7 +11,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/errors"
 )
 
@@ -216,7 +215,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.logger.Infow(sym.Type+" Type attestation created",
+	s.logger.Infow("Type attestation created",
 		"type", req.Name,
 		"label", req.Label,
 		"color", req.Color,

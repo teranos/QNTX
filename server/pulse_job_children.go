@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 )
@@ -19,7 +18,7 @@ func (s *QNTXServer) handleGetJobChildren(w http.ResponseWriter, r *http.Request
 
 	asyncJobID, err := execStore.GetAsyncJobIDForScheduledJob(scheduledJobID)
 	if err != nil {
-		logger.AddPulseSymbol(s.logger).Errorw("Failed to find async job for scheduled job",
+		s.logger.Errorw("Failed to find async job for scheduled job",
 			"scheduled_job_id", scheduledJobID,
 			"error", err)
 		writeWrappedError(w, s.logger, err, "failed to find async job for scheduled job", http.StatusInternalServerError)
@@ -39,7 +38,7 @@ func (s *QNTXServer) handleGetJobChildren(w http.ResponseWriter, r *http.Request
 	queue := async.NewQueue(s.pulseReadDB)
 	childJobs, err := queue.ListTasksByParent(asyncJobID)
 	if err != nil {
-		logger.AddPulseSymbol(s.logger).Errorw("Failed to fetch child jobs",
+		s.logger.Errorw("Failed to fetch child jobs",
 			"scheduled_job_id", scheduledJobID,
 			"async_job_id", asyncJobID,
 			"error", err)

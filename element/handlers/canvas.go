@@ -16,7 +16,6 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	elementstorage "github.com/teranos/QNTX/element/storage"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -674,7 +673,7 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, canvas *elemen
 			}
 			w.AxQuery = axWatcher.AxQuery
 		case "semantic":
-			// Semantic source → executable target: reuse the ⊨ element's semantic query
+			// Semantic source → executable target: reuse the se element's semantic query
 			seWatcherID := fmt.Sprintf("se-element-%s", edge.From)
 			seWatcher, err := store.Get(ctx, seWatcherID)
 			if err != nil {
@@ -751,16 +750,16 @@ func (h *CanvasHandler) reEnableDownstreamSEWatchers(ctx context.Context, compos
 }
 
 // elementSymbolToType maps element symbol to short type name for subscription logic.
-// Symbols come from the sym package or are stored as literal strings (e.g. "py").
+// The symbol is the one the browser stored on the element: the UI's glyph for ax, se and so.
 func elementSymbolToType(symbol string) string {
 	switch symbol {
 	case "py":
 		return "py"
-	case sym.AX: // ⋈
+	case "⋈":
 		return "ax"
-	case sym.SE: // ⊨ — semantic search element
+	case "⊨":
 		return "semantic"
-	case sym.SO: // ⟶ — prompt element uses SO symbol
+	case "⟶":
 		return "prompt"
 	default:
 		return symbol

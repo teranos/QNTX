@@ -76,7 +76,7 @@ func renderReport(r Report) (services.NodeMail, error) {
 
 // "it just needs to fit with the rest of qntx"
 //
-// The report is one window, drawn the way ≡ am draws the node: a section per
+// The report is one window, drawn the way am draws the node: a section per
 // part, labelled rows in each.
 
 func said(err string) services.MailRow {
@@ -138,7 +138,6 @@ func reportWindow(r Report, drawn map[string]bool) services.MailWindow {
 	sections = append(sections, failures)
 
 	return services.MailWindow{
-		Symbol:   "≡",
 		Title:    "QNTX week " + r.Window.Start.UTC().Format("2006-01-02 15:04") + " to " + r.Window.End.UTC().Format("2006-01-02 15:04") + " UTC",
 		Sections: sections,
 	}

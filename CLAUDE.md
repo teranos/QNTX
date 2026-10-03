@@ -12,6 +12,10 @@ A sigil handles a server capability, the reach table governs it with attestation
 `REACH is '/i/standing' of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION`
 `REACH is '/am/syscap' of ROOT`
 
+**Symbols:** inside the system it knows only about the sg and the ui know's not the sg except for the one place its mapped to a glyph, which is the symbol.
+
+"an sg is a segment like as is of by at am i"
+
 ## Testing
 
 `make test` runs both backend (Go) and frontend (TypeScript) tests. See [web/TESTING.md](web/TESTING.md) for frontend testing patterns.

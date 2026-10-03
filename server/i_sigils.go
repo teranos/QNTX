@@ -9,7 +9,7 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// I is ⍟'s own signum (ADR-039): the person asking, about themselves. Where
+// I is i's own signum (ADR-039): the person asking, about themselves. Where
 // they stand is its first sigils; what answers is server/auth's.
 
 func (s *QNTXServer) iSignum() sigil.Signum {
@@ -66,7 +66,7 @@ func (s *QNTXServer) iStep(ctx context.Context, sent sigil.Sent) (any, *protocol
 }
 
 // iAdmitted is who is asking. A node with no login has no person to answer
-// about, which is what its other ⍟ paths say too.
+// about, which is what its other i paths say too.
 func (s *QNTXServer) iAdmitted(ctx context.Context) (auth.Admission, *protocol.Refusal) {
 	if s.authHandler == nil {
 		return auth.Admission{}, &protocol.Refusal{Why: sigil.NotFound, Says: "this node has no login"}

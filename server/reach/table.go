@@ -65,7 +65,7 @@ REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANY
 # admitted at no gate, and has to reach this to turn themselves back on.
 REACH is '/i/disable' '/i/enable'                                         of ANYONE
 
-# ⍟'s own paths: who you are, and where you stand.
+# i's own paths: who you are, and where you stand.
 REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 REACH is '/i/picture'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION

@@ -488,7 +488,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// Who the node thinks is asking (ADR-031): the User the admission resolved,
 	// the accounts joined to it, the door it came in by, and the namespace it
 	// acts in. Whoever is logged in reaches it, and reaches nobody else.
-	// ⍟'s own path: an element's things are asked for on the element's own path,
+	// i's own path: an element's things are asked for on the element's own path,
 	// rather than beside the ceremony that admitted the person.
 	mux.answer("/i/", h.HandleTheUser)
 	// Their picture, as the node's own image: the page's CSP lets images come

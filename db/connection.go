@@ -21,7 +21,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/errors"
 )
 
@@ -43,7 +42,7 @@ const (
 // If log is provided, logs database operations; otherwise operates silently.
 func Open(path string, log *zap.SugaredLogger) (*sql.DB, error) {
 	if log != nil {
-		logger.AddDBSymbol(log).Debugw("Opening database", "path", path)
+		log.Debugw("Opening database", "path", path)
 	}
 
 	// Ensure parent directory exists (SQLite can create file, but not directories)
@@ -52,7 +51,7 @@ func Open(path string, log *zap.SugaredLogger) (*sql.DB, error) {
 			return nil, errors.Wrapf(err, "failed to create database directory: %s", dir)
 		}
 		if log != nil {
-			logger.AddDBSymbol(log).Debugw("Created database directory", "dir", dir)
+			log.Debugw("Created database directory", "dir", dir)
 		}
 	}
 
@@ -84,7 +83,7 @@ func Open(path string, log *zap.SugaredLogger) (*sql.DB, error) {
 	}
 
 	if log != nil {
-		logger.AddDBSymbol(log).Infow("Database opened successfully",
+		log.Infow("Database opened successfully",
 			"path", path,
 			"wal_mode", true,
 			"foreign_keys", true,
@@ -108,7 +107,7 @@ func OpenReadOnly(path string, log *zap.SugaredLogger) (*sql.DB, error) {
 	}
 
 	if log != nil {
-		logger.AddDBSymbol(log).Infow("Read-only database opened", "path", path)
+		log.Infow("Read-only database opened", "path", path)
 	}
 
 	return db, nil
