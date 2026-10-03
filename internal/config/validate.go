@@ -152,7 +152,7 @@ func (c *Config) Validate() error {
 				namespace, slug.Of(namespace))
 		}
 		if configuredDoor.RPID == "" {
-			return errors.Newf("auth.door.%s needs an rp_id — a door is a relying party of its own", namespace)
+			return errors.Newf("auth.door.%s needs an rp_id — a door is a relying party of its own, and origins %v are not one web origin to take its host from", namespace, configuredDoor.Origins)
 		}
 		if len(configuredDoor.Origins) == 0 {
 			return errors.Newf("auth.door.%s names no origins, so nothing reaches it", namespace)

@@ -76,7 +76,7 @@ type FetchConfig struct {
 
 // MailConfig configures the MailService: mail to a User on a plugin's behalf (ADR-041).
 type MailConfig struct {
-	From   string           `mapstructure:"from"` // The address every mail is sent from (e.g. "Garden <mail@garden.test>"). Empty = no mail is sent, and a send says why.
+	From   string           `mapstructure:"from"` // The address every mail is sent from (e.g. "Garden <mail@garden.test>"). Omitted = system@ auth.rp_id. Empty = no mail is sent, and a send says why.
 	SES    MailSESConfig    `mapstructure:"ses"`
 	Report MailReportConfig `mapstructure:"report"`
 }
@@ -103,7 +103,7 @@ type AuthConfig struct {
 	Enabled            bool                  `mapstructure:"enabled"`              // Enable biometric auth gate (default: false)
 	SessionExpiryHours int                   `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 168, seven days)
 	RPID               string                `mapstructure:"rp_id"`                // WebAuthn Relying Party ID — the domain (e.g. "qntx.example.com"). Empty = "localhost" fallback for dev. Required when server.bind_address is non-loopback and auth.enabled is true.
-	RPOrigins          []string              `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Empty = loopback URLs derived from server.port / server.frontend_port. These are the door onto "default", so an app's scheme ("qntx://door") belongs here as well; it is a return address, and the relying party never sees it.
+	RPOrigins          []string              `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Omitted = ["https://" + rp_id]. Empty, or rp_id empty or "localhost" = loopback URLs derived from server.port / server.frontend_port. These are the door onto "default", so an app's scheme ("qntx://door") belongs here as well; it is a return address, and the relying party never sees it.
 	RootIdentities     []string              `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way. Required when server.bind_address is non-loopback and auth.enabled is true.
 	BindingSigners     []string              `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
 	PublicOrigin       string                `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Empty = read off the request, which trusts X-Forwarded-Host.
@@ -119,7 +119,7 @@ type AuthConfig struct {
 // under it — the browser's rule, which is why one rp id can stand behind
 // several hostnames and a door with several origins is still one door.
 type DoorConfig struct {
-	RPID    string   `mapstructure:"rp_id"`   // WebAuthn Relying Party ID for this door — the domain (e.g. "garden.test").
+	RPID    string   `mapstructure:"rp_id"`   // WebAuthn Relying Party ID for this door — the domain (e.g. "garden.test"). Omitted with one web origin = that origin's host.
 	Origins []string `mapstructure:"origins"` // Full URLs a browser reaches this door at (e.g. ["https://portal.garden.test"]). Where the page is, never where the API answers. An app's own scheme ("clean://door") is an origin here too: a ceremony finished in Safari is sent back to it, and it is never a passkey origin, because no browser presents one for a scheme.
 	// Provider is this door's own OAuth clients, same shape as the node's.
 	// One client for the whole node means somebody arriving at a door sees a
