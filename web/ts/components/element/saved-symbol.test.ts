@@ -8,7 +8,7 @@
 
 import { describe, test, expect } from 'bun:test';
 import { getElementTypeBySavedSymbol, getElementTypeBySymbol } from './element-registry';
-import { AS, Attestation, Triplet } from '../../sym';
+import { AS, Attestation, Transcript, Triplet } from '../../sym';
 
 const anAttestation = JSON.stringify({
     id: 'AS-BATCH-CRAWLTIM-LEVIBATC-QU7JWN2F',
@@ -66,6 +66,13 @@ describe('what "+" does not claim', () => {
     test('"+" holding an object of something else is left the same way', () => {
         expect(getElementTypeBySavedSymbol(AS, JSON.stringify({ code: 'print(1)' })))
             .toBe(getElementTypeBySymbol(AS));
+    });
+});
+
+describe('a transcript saved before it moved to ⏦', () => {
+    test('🧵 is the transcript element', () => {
+        expect(getElementTypeBySavedSymbol('🧵', '2ed899af-e95e-53f2-bf39-e58440f09df4'))
+            .toBe(getElementTypeBySymbol(Transcript));
     });
 });
 
