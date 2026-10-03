@@ -139,7 +139,7 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 }
 
 // The gate of mcp: every sigil held to Tool by its shape, as mcp.go makes one.
-// name, description and annotations follow and conform; inputSchema follows
+// name, title, description and annotations follow and conform; inputSchema follows
 // takes and outputSchema gives, and both depart, since each is a list and the
 // schema one object.
 func TestParityHoldsEverySigilToMCP(t *testing.T) {
@@ -159,12 +159,12 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 		if tool == nil {
 			t.Fatalf("%s: no Tool clade", name)
 		}
-		if tool.Score() != 37 {
+		if tool.Score() != 50 {
 			t.Errorf("%s: Tool reads %d", name, tool.Score())
 		}
 		for _, item := range tool.Items {
 			switch item.Column {
-			case "name", "description", "annotations":
+			case "name", "title", "description", "annotations":
 				if !item.Conforms() {
 					t.Errorf("%s: %s does not conform: %+v", name, item.Column, item)
 				}

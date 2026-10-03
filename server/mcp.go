@@ -172,7 +172,9 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				schema["description"] = "What the route takes, as a JSON object: it arrives at the plugin whole. The plugin declares the route and names none of it."
 			}
 			tool := &mcp.Tool{
-				Name:        toolNameOf(held.signum, held.sigil),
+				Name: toolNameOf(held.signum, held.sigil),
+				// The tool as a person reads it: the signum and the sigil, in words.
+				Title:       held.signum + " " + sigil.GetName(),
 				Description: sigil.GetDoes(),
 				InputSchema: schema,
 				Annotations: annotationsOf(held.sigil),

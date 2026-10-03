@@ -26,6 +26,8 @@ func everySignumFollows() []*protocol.Follows {
 		{Reference: "mcp", Columns: []*protocol.Corresponds{
 			{Field: "protocol.Signum.name", Column: "Tool.name"},
 			{Field: "protocol.Sigil.name", Column: "Tool.name"},
+			{Field: "protocol.Signum.name", Column: "Tool.title"},
+			{Field: "protocol.Sigil.name", Column: "Tool.title"},
 			{Field: "protocol.Sigil.does", Column: "Tool.description"},
 			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema"},
 			{Field: "protocol.Sigil.gives", Column: "Tool.outputSchema"},
