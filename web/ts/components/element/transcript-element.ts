@@ -33,6 +33,8 @@ export interface TranscriptRead {
     ended: string;
     turns: Turn[];
     folded: number;
+    model: string;
+    effort: string;
 }
 
 // ─── Time spacers ─────────────────────────────────────────────

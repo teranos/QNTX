@@ -34,10 +34,14 @@ export function renderSessions(body: HTMLElement, reads: TranscriptRead[], onCho
         const at = document.createElement('span');
         at.className = 'tr-when';
         at.textContent = when(read.started);
+        // "Model and effort belong in Ground."
+        const ran = document.createElement('span');
+        ran.className = 'tr-ran';
+        ran.textContent = [read.model, read.effort].filter(Boolean).join(' · ');
         const opening = document.createElement('span');
         opening.className = 'tr-opening';
         opening.textContent = read.turns.find(t => t.speaker === 'human')?.text ?? read.session;
-        row.append(at, opening);
+        row.append(at, ran, opening);
         row.addEventListener('click', () => { onChoose(read.session); });
         body.appendChild(row);
     }

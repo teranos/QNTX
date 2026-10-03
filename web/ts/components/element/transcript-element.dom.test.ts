@@ -18,6 +18,8 @@ const read: TranscriptRead = {
     started: '2026-10-01T22:00:00Z',
     ended: '2026-10-02T01:00:06Z',
     folded: 0,
+    model: 'claude-opus-5-5',
+    effort: 'xhigh',
     turns: [
         { at: '2026-10-01T22:00:00Z', speaker: 'human', text: 'Build QNTX here', of: 'p-1' },
         { at: '2026-10-01T22:00:01Z', speaker: 'tool', text: 'make cli', of: 't-2' },
@@ -116,6 +118,7 @@ describe('Transcript - Tim', () => {
         renderSessions(body, [read], (id) => chosen.push(id));
         const row = body.querySelector<HTMLElement>('.tr-session')!;
         expect(row.textContent).toContain('Build QNTX here');
+        expect(row.querySelector('.tr-ran')?.textContent).toBe('claude-opus-5-5 · xhigh');
         row.click();
         expect(chosen).toEqual([read.session]);
     });

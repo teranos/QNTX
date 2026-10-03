@@ -58,6 +58,11 @@ type transcript struct {
 	// Events the store folded into sigmas (ADR-020): said, because no turn
 	// can be read back from a sigma.
 	Folded int `json:"folded"`
+	// The model its SessionStart names, and the effort.level its last Stop ran at.
+	Model  string `json:"model"`
+	Effort string `json:"effort"`
+
+	effortAt time.Time
 }
 
 func (s *QNTXServer) transcriptsSignum() sigil.Signum {
@@ -162,6 +167,7 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 			continue
 		}
 		t.Turns = append(t.Turns, turn)
+		ranOn(t, as)
 		for _, subject := range as.Subjects {
 			if !subjects[session][subject] {
 				subjects[session][subject] = true
@@ -196,6 +202,25 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 		out = out[:limit]
 	}
 	return out
+}
+
+// ranOn takes the model off a SessionStart and the effort off the latest Stop.
+func ranOn(t *transcript, as *types.As) {
+	switch as.Predicates[0] {
+	case "SessionStart":
+		if model := attrString(as.Attributes, "model"); model != "" {
+			t.Model = model
+		}
+	case "Stop":
+		effort, ok := as.Attributes["effort"].(map[string]any)
+		if !ok {
+			return
+		}
+		level := attrString(effort, "level")
+		if level != "" && !as.Timestamp.Before(t.effortAt) {
+			t.Effort, t.effortAt = level, as.Timestamp
+		}
+	}
 }
 
 // turnOf reads one event as a turn, with loom's speakers. A search names its
