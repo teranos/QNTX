@@ -1,6 +1,7 @@
 package server
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -36,6 +37,8 @@ type News struct {
 	// session is woken for it. What a built-in is doing, as against what it
 	// concluded.
 	Quiet bool
+	// AtMs is when it was left, stamped by the log.
+	AtMs int64
 }
 
 // newsLog holds recent news in memory. A restart empties it, which is correct:
@@ -43,9 +46,12 @@ type News struct {
 type newsLog struct {
 	mu    sync.Mutex
 	items []News
+	// left is how many conclusions were left for each addressee since this
+	// process began. A wait is not one: it is left again on every turn of its loop.
+	left map[string]int64
 }
 
-func newNewsLog() *newsLog { return &newsLog{} }
+func newNewsLog() *newsLog { return &newsLog{left: map[string]int64{}} }
 
 // leave puts one item on the row. The same id twice is the newer one once.
 func (l *newsLog) leave(n News) {
@@ -54,6 +60,10 @@ func (l *newsLog) leave(n News) {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	n.AtMs = time.Now().UnixMilli()
+	if !n.Quiet {
+		l.left[n.For]++
+	}
 	for i := range l.items {
 		if l.items[i].ID == n.ID {
 			l.items[i] = n
@@ -95,6 +105,25 @@ func (l *newsLog) since(caller string, nowMs int64) []News {
 		}
 	}
 	return out
+}
+
+// leftFor is everything the log still holds for one caller, newest first, on
+// the row or past its hold, and how many conclusions it left for them since
+// this process began. The log is bounded, so the count can pass what it holds.
+func (l *newsLog) leftFor(caller string) ([]News, int64) {
+	if l == nil || caller == "" {
+		return nil, 0
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := make([]News, 0, len(l.items))
+	for i := len(l.items) - 1; i >= 0; i-- {
+		if l.items[i].For == caller {
+			out = append(out, l.items[i])
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].AtMs > out[j].AtMs })
+	return out, l.left[caller]
 }
 
 // byID is one item for one caller, held or not.

@@ -26,6 +26,12 @@
         "ANYONE"
       ]
     },
+    "/am/ground": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
     "/am/statusline": {
       "x-qntx-reach": [
         "ROOT",

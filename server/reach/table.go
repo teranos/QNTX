@@ -123,6 +123,8 @@ REACH is '/api/staands/activity'                                          of ROO
 # What arrives on a socket is gated per attestation by mayRead, not here.
 REACH is '/ws' '/ws/llm'                                                  of ROOT SUPER
 REACH is '/am/version'                                                    of ROOT SUPER
+# What the node does in Ground's place, and what it left for whoever asks.
+REACH is '/am/ground'                                                     of ROOT SUPER
 REACH is '/am/syscap'                                                     of ROOT
 
 # A signum held to a reference it follows (the parity signum): "parity the
