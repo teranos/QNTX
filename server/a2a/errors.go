@@ -41,6 +41,9 @@ var mapped = map[string]struct {
 
 // Unsupported is UnsupportedOperationError: what an operation answers until it
 // is one the node does.
+//
+// Blocked on the agent runtime: "QNTX being the host for agents to run in
+// using the LLM provider".
 func Unsupported(op Operation) *Error {
 	return &Error{Name: "UnsupportedOperationError", Message: op.Name + " is not one this node does yet"}
 }

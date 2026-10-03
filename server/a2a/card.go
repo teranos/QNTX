@@ -83,6 +83,9 @@ func (c Card) Message() (protoreflect.Message, error) {
 		"version":             c.Version,
 		"supportedInterfaces": interfaces,
 		// What the node does not do is said as false (§3.3.4).
+		// Blocked on the agent runtime: "QNTX being the host for agents to run in
+		// using the LLM provider".
+		// streaming is a task's events as it runs, and no task runs.
 		"capabilities": map[string]any{"streaming": false, "pushNotifications": false, "extensions": extensions},
 		// The node's token is a bearer token (§3.1.11: the extended card is
 		// authenticated with a scheme the card declares).

@@ -26,6 +26,12 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "the A2A operations did not read from the pinned spec: "+err.Error())
 		}
 	}
+	// Blocked on the agent runtime: "QNTX being the host for agents to run in
+	// using the LLM provider".
+	// SendMessage, SendStreamingMessage, GetTask, ListTasks and CancelTask
+	// answer here because no agent runs in the node to take a message, work it
+	// as a task and keep that task. GetExtendedAgentCard answers here too, and
+	// is not blocked on it: no card declares capabilities.extendedAgentCard.
 	unsupported := func(_ context.Context, op a2a.Operation, _ proto.Message) (proto.Message, *a2a.Error) {
 		return nil, a2a.Unsupported(op)
 	}

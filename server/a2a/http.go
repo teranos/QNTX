@@ -62,6 +62,9 @@ func HTTP(operations []Operation, answer Answer, undelivered Undelivered) http.H
 		if op.Streams {
 			// A stream is Server-Sent Events (§11.7), and no operation here
 			// streams yet.
+			// Blocked on the agent runtime: "QNTX being the host for agents to run in
+			// using the LLM provider".
+			// A stream is a running task's events, and no task runs.
 			(&Error{Name: "InvalidAgentResponseError", Message: op.Name + " answered without a stream"}).write(w, undelivered)
 			return
 		}
