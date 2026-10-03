@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,23 +16,33 @@ import (
 // node does yet; SUPER is refused at the gate before any operation is asked.
 func TestA2AIsServedToRootAlone(t *testing.T) {
 	srv, tokens := pluginServingServer(t, "fake")
-	for _, route := range []struct{ method, path string }{
-		{http.MethodPost, "/a2a/message:send"},
-		{http.MethodPost, "/a2a/message:stream"},
-		{http.MethodGet, "/a2a/tasks/abc"},
-		{http.MethodGet, "/a2a/tasks"},
-		{http.MethodPost, "/a2a/tasks/abc:cancel"},
-		{http.MethodGet, "/a2a/extendedAgentCard"},
-		{http.MethodPost, "/a2a/garden/tasks/abc:cancel"},
+	// A SendMessageRequest that sets what the spec requires.
+	sent := `{"message": {"messageId": "m1", "role": "ROLE_USER", "parts": [{"text": "hi"}]}}`
+	asked := func(method, path, body, token string) *http.Request {
+		r := asBearer(method, path, token)
+		if body != "" {
+			r.Body = io.NopCloser(strings.NewReader(body))
+			r.ContentLength = int64(len(body))
+		}
+		return r
+	}
+	for _, route := range []struct{ method, path, body string }{
+		{http.MethodPost, "/a2a/message:send", sent},
+		{http.MethodPost, "/a2a/message:stream", sent},
+		{http.MethodGet, "/a2a/tasks/abc", ""},
+		{http.MethodGet, "/a2a/tasks", ""},
+		{http.MethodPost, "/a2a/tasks/abc:cancel", ""},
+		{http.MethodGet, "/a2a/extendedAgentCard", ""},
+		{http.MethodPost, "/a2a/garden/tasks/abc:cancel", ""},
 	} {
-		r := asBearer(route.method, route.path, tokens[auth.LevelRoot])
+		r := asked(route.method, route.path, route.body, tokens[auth.LevelRoot])
 		r.Header.Set("A2A-Version", "1.0")
 		w := httptest.NewRecorder()
 		srv.served.ServeHTTP(w, r)
 		assert.Equal(t, http.StatusBadRequest, w.Code, route.path+" for ROOT: "+w.Body.String())
 		assert.Contains(t, w.Body.String(), "UNSUPPORTED_OPERATION", route.path+" for ROOT")
 
-		r = asBearer(route.method, route.path, tokens[auth.LevelSuper])
+		r = asked(route.method, route.path, route.body, tokens[auth.LevelSuper])
 		r.Header.Set("A2A-Version", "1.0")
 		w = httptest.NewRecorder()
 		srv.served.ServeHTTP(w, r)

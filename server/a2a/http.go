@@ -50,6 +50,10 @@ func HTTP(operations []Operation, answer Answer, undelivered Undelivered) http.H
 			refused.write(w, undelivered)
 			return
 		}
+		if refused := lacking(op, request); refused != nil {
+			refused.write(w, undelivered)
+			return
+		}
 		response, refused := answer(r.Context(), op, request)
 		if refused != nil {
 			refused.write(w, undelivered)
@@ -88,6 +92,24 @@ func version(r *http.Request) *Error {
 		return nil
 	}
 	return &Error{Name: "VersionNotSupportedError", Message: "A2A-Version " + said + " is not supported; this node speaks " + Version}
+}
+
+// lacking is §3.3.2 and §5.7: a request that does not set what the spec
+// requires is a validation error, naming each field, before any operation is
+// asked. It is read in the version §3.6.2 already settled.
+func lacking(op Operation, request proto.Message) *Error {
+	missing := Missing(request.ProtoReflect())
+	if len(missing) == 0 {
+		return nil
+	}
+	name := string(op.request.Name())
+	fields := make([]string, 0, len(missing))
+	for _, path := range missing {
+		fields = append(fields, strings.TrimPrefix(path, name+"."))
+	}
+	refused := invalid(name + " lacks what the spec requires: " + strings.Join(fields, ", "))
+	refused.Lacking = fields
+	return refused
 }
 
 // match finds the operation a method and path name, and the path parameters,

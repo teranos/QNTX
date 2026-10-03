@@ -12,6 +12,9 @@ type Error struct {
 	// that is not one of A2A's own.
 	Name    string
 	Message string
+	// Lacking is each field a request does not set that the spec requires,
+	// by its path in the request, written as a google.rpc.BadRequest.
+	Lacking []string
 	// status and grpc are what an error that is not A2A's own maps to.
 	status int
 	grpc   string
@@ -61,6 +64,16 @@ func (e *Error) write(w http.ResponseWriter, undelivered Undelivered) {
 			"@type":  "type.googleapis.com/google.rpc.ErrorInfo",
 			"reason": m.reason,
 			"domain": "a2a-protocol.org",
+		})
+	}
+	if len(e.Lacking) > 0 {
+		violations := []map[string]any{}
+		for _, field := range e.Lacking {
+			violations = append(violations, map[string]any{"field": field, "description": "required by the spec, and not set"})
+		}
+		details = append(details, map[string]any{
+			"@type":           "type.googleapis.com/google.rpc.BadRequest",
+			"fieldViolations": violations,
 		})
 	}
 	if status == 0 {

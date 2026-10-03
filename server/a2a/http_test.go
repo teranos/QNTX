@@ -12,14 +12,18 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// One request per operation in scope, on the route §5.3 gives it.
-var asked = map[string]struct{ method, path string }{
-	"SendMessage":          {"POST", "/message:send"},
-	"SendStreamingMessage": {"POST", "/message:stream"},
-	"GetTask":              {"GET", "/tasks/abc"},
-	"ListTasks":            {"GET", "/tasks"},
-	"CancelTask":           {"POST", "/tasks/abc:cancel"},
-	"GetExtendedAgentCard": {"GET", "/extendedAgentCard"},
+// sent is a SendMessageRequest that sets what the spec requires.
+const sent = `{"message": {"messageId": "m1", "role": "ROLE_USER", "parts": [{"text": "hi"}]}}`
+
+// One request per operation in scope, on the route §5.3 gives it, with what
+// the spec requires of it.
+var asked = map[string]struct{ method, path, body string }{
+	"SendMessage":          {"POST", "/message:send", sent},
+	"SendStreamingMessage": {"POST", "/message:stream", sent},
+	"GetTask":              {"GET", "/tasks/abc", ""},
+	"ListTasks":            {"GET", "/tasks", ""},
+	"CancelTask":           {"POST", "/tasks/abc:cancel", ""},
+	"GetExtendedAgentCard": {"GET", "/extendedAgentCard", ""},
 }
 
 // status is a google.rpc.Status as §11.6 writes it.
@@ -29,9 +33,12 @@ type status struct {
 		Status  string `json:"status"`
 		Message string `json:"message"`
 		Details []struct {
-			Type   string `json:"@type"`
-			Reason string `json:"reason"`
-			Domain string `json:"domain"`
+			Type            string `json:"@type"`
+			Reason          string `json:"reason"`
+			Domain          string `json:"domain"`
+			FieldViolations []struct {
+				Field string `json:"field"`
+			} `json:"fieldViolations"`
 		} `json:"details"`
 	} `json:"error"`
 }
@@ -103,6 +110,37 @@ func TestABodyThatIsNotTheRequestIsInvalid(t *testing.T) {
 	}
 }
 
+// §3.3.2 and §5.7: a request that does not set what the spec requires is a
+// validation error naming each field, and no operation is asked.
+func TestARequestLackingWhatTheSpecRequiresIsInvalid(t *testing.T) {
+	for body, want := range map[string][]string{
+		`{}`:             {"message"},
+		`{"message":{}}`: {"message.message_id", "message.role", "message.parts"},
+	} {
+		reached := false
+		answer := func(_ context.Context, op Operation, _ proto.Message) (proto.Message, *Error) {
+			reached = true
+			return nil, Unsupported(op)
+		}
+		w, said := serve(t, answer, "POST", "/message:send", body, v1)
+		if reached || w.Code != http.StatusBadRequest || said.Error.Status != "INVALID_ARGUMENT" || len(said.Error.Details) != 1 {
+			t.Errorf("%s answered %d %s", body, w.Code, w.Body.String())
+			continue
+		}
+		var named []string
+		for _, v := range said.Error.Details[0].FieldViolations {
+			named = append(named, v.Field)
+		}
+		if strings.Join(named, " ") != strings.Join(want, " ") {
+			t.Errorf("%s named %v, not %v", body, named, want)
+		}
+	}
+	w, said := serve(t, unsupported, "POST", "/message:send", sent, v1)
+	if w.Code != http.StatusBadRequest || len(said.Error.Details) != 1 || said.Error.Details[0].Reason != "UNSUPPORTED_OPERATION" {
+		t.Errorf("a request with what the spec requires answered %d %s", w.Code, w.Body.String())
+	}
+}
+
 // Every operation in scope, with a tenant and without, reaches what answers,
 // with its path parameters on its request, and is UnsupportedOperationError
 // until the node does it.
@@ -120,7 +158,7 @@ func TestEveryOperationReachesTheAnswerAndIsUnsupported(t *testing.T) {
 				return nil, Unsupported(op)
 			}
 			route := asked[op.Name]
-			w, said := serve(t, answer, route.method, tenant+route.path, "", v1)
+			w, said := serve(t, answer, route.method, tenant+route.path, route.body, v1)
 			if reached != op.Name {
 				t.Errorf("%s %s reached %q", route.method, tenant+route.path, reached)
 				continue
