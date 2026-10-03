@@ -41,20 +41,21 @@ func (s *QNTXServer) cardBase(r *http.Request) a2a.Card {
 		Description: appcfg.GetString("node.description"),
 		Version:     version.VersionTag,
 		URL:         a2aURL(r),
-		MCP:         a2a.Interface{URL: nodeURL(r) + "/mcp", Version: mcpProtocolVersion},
 		Skills:      []a2a.Skill{},
 		Extensions:  []a2a.Extension{s.nodeExtension(r)},
 	}
 }
 
-// nodeExtension is the node's DID, its health as /health says it, and its
-// system capabilities as am syscap says them.
+// nodeExtension is the node's DID, its health as /health says it, its
+// system capabilities as am syscap says them, and where its MCP answers.
 func (s *QNTXServer) nodeExtension(r *http.Request) a2a.Extension {
 	params := map[string]any{}
 	if s.nodeDID != nil && s.nodeDID.DID != "" {
 		params["did"] = s.nodeDID.DID
 	}
 	_, params["health"] = s.health(r.Context())
+	// "it lets agents figure out MCP surface amongst other things"
+	params["mcp"] = map[string]any{"url": nodeURL(r) + "/mcp", "protocolVersion": mcpProtocolVersion}
 	// A Struct takes JSON's values, so the capabilities go through JSON.
 	if raw, err := json.Marshal(syscap.Get(s.store)); err == nil {
 		var capabilities map[string]any
@@ -64,7 +65,7 @@ func (s *QNTXServer) nodeExtension(r *http.Request) a2a.Extension {
 	}
 	return a2a.Extension{
 		URI:         nodeExtensionURI,
-		Description: "The node's DID, its health, and what this build can do.",
+		Description: "The node's DID, its health, what this build can do, and where its MCP answers.",
 		Params:      params,
 	}
 }

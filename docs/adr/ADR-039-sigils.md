@@ -34,4 +34,5 @@ Status: Proposed
 - params.did is the node's DID, as /.well-known/did.json serves it.
 - params.health is ok, degraded or down, as /health says it.
 - params.syscap is what am syscap answers.
+- params.mcp is where the node's MCP answers, and the MCP version it speaks. An AgentInterface is a way to speak A2A, so the MCP is said here.
 - It is not required: an agent that does not read it loses nothing else.

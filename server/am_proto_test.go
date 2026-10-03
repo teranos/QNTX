@@ -52,6 +52,16 @@ func TestAmCardIsTheCardTheAskerWouldGet(t *testing.T) {
 				ProtocolBinding string `json:"protocolBinding"`
 				ProtocolVersion string `json:"protocolVersion"`
 			} `json:"supportedInterfaces"`
+			Capabilities struct {
+				Extensions []struct {
+					Params struct {
+						MCP struct {
+							URL             string `json:"url"`
+							ProtocolVersion string `json:"protocolVersion"`
+						} `json:"mcp"`
+					} `json:"params"`
+				} `json:"extensions"`
+			} `json:"capabilities"`
 			Skills []struct {
 				Name string `json:"name"`
 			} `json:"skills"`
@@ -59,11 +69,11 @@ func TestAmCardIsTheCardTheAskerWouldGet(t *testing.T) {
 		Missing []string `json:"missing"`
 	}
 	require.NoError(t, json.Unmarshal(body, &got))
-	require.Len(t, got.Card.SupportedInterfaces, 2)
+	require.Len(t, got.Card.SupportedInterfaces, 1, "an interface is a way to speak A2A")
 	assert.Equal(t, "https://node.example/a2a", got.Card.SupportedInterfaces[0].URL)
-	assert.Equal(t, "https://node.example/mcp", got.Card.SupportedInterfaces[1].URL)
-	assert.Equal(t, "MCP", got.Card.SupportedInterfaces[1].ProtocolBinding)
-	assert.Equal(t, mcpProtocolVersion, got.Card.SupportedInterfaces[1].ProtocolVersion)
+	require.Len(t, got.Card.Capabilities.Extensions, 1)
+	assert.Equal(t, "https://node.example/mcp", got.Card.Capabilities.Extensions[0].Params.MCP.URL)
+	assert.Equal(t, mcpProtocolVersion, got.Card.Capabilities.Extensions[0].Params.MCP.ProtocolVersion)
 	assert.NotEmpty(t, got.Card.Skills)
 	assert.Contains(t, got.Missing, "AgentCard.name")
 	assert.NotContains(t, got.Missing, "AgentCard.skills[0].id")

@@ -41,7 +41,9 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 		assert.Contains(t, names(root), signum, "ROOT's card lacks "+signum)
 	}
 	assert.Equal(t, "https://node.example/a2a", root.URL)
-	assert.Equal(t, "https://node.example/mcp", root.MCP.URL)
+	mcpAt, _ := root.Extensions[0].Params["mcp"].(map[string]any)
+	assert.Equal(t, "https://node.example/mcp", mcpAt["url"], "the node extension says where the MCP answers")
+	assert.Equal(t, mcpProtocolVersion, mcpAt["protocolVersion"])
 
 	super := srv.a2aCard(askedAs(auth.LevelSuper))
 	assert.Contains(t, names(super), "staands", "SUPER's lines reach staands")
@@ -70,6 +72,13 @@ func TestTheCardSaysWhatItLacks(t *testing.T) {
 		assert.NotContains(t, missing, said, said+" is on the card")
 	}
 	assert.False(t, slices.ContainsFunc(missing, func(m string) bool { return m == "AgentCard.supported_interfaces[0].url" }))
+
+	// An interface is a way to speak A2A (§8.3.1): the node's MCP is not one.
+	interfaces := card.Get(card.Descriptor().Fields().ByName("supported_interfaces")).List()
+	for i := 0; i < interfaces.Len(); i++ {
+		entry := interfaces.Get(i).Message()
+		assert.Equal(t, "HTTP+JSON", entry.Get(entry.Descriptor().Fields().ByName("protocol_binding")).String(), "supported_interfaces[%d]", i)
+	}
 }
 
 // "it lets agents figure out MCP surface amongst other things": the card names

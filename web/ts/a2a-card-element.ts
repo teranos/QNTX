@@ -16,6 +16,7 @@ export interface AmCard {
         description?: string;
         version?: string;
         supportedInterfaces?: { url?: string; protocolBinding?: string; protocolVersion?: string }[];
+        capabilities?: { extensions?: { params?: { mcp?: { url?: string; protocolVersion?: string } } }[] };
         skills?: { name?: string }[];
     };
     missing: string[];
@@ -60,12 +61,15 @@ export function renderA2ACard(container: HTMLElement, am: AmCard): void {
     const card = am.card;
     const interfaces = (card.supportedInterfaces ?? [])
         .map((i) => `${i.url ?? ''} ${i.protocolBinding ?? ''} ${i.protocolVersion ?? ''}`);
+    // The node's MCP is not an interface: the node extension says where it answers.
+    const mcp = (card.capabilities?.extensions ?? []).map((e) => e.params?.mcp).find((m) => m?.url);
     const skills = (card.skills ?? []).map((s) => s.name ?? '').join(', ');
     container.append(
         row('Name:', said(card.name)),
         row('Description:', said(card.description)),
         row('Version:', said(card.version)),
         row('Interface:', interfaces.length > 0 ? lines(interfaces, '') : said(undefined)),
+        row('MCP:', said(mcp ? `${mcp.url} ${mcp.protocolVersion ?? ''}`.trim() : undefined)),
         row('Skills:', said(skills)),
         row('Missing:', am.missing.length > 0 ? lines(am.missing, 'status-unwell') : 'nothing'),
     );

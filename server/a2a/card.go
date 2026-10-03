@@ -36,13 +36,6 @@ type Extension struct {
 // Modes is the media types the node takes and gives: JSON, everywhere.
 var Modes = []string{"application/json"}
 
-// Interface is one more way the node is reached, beside the A2A binding.
-type Interface struct {
-	URL string
-	// Version is the protocol version spoken at URL.
-	Version string
-}
-
 // Card is what the node can say of itself to one caller. What it does not
 // have it leaves empty, and Missing says so; nothing here is made up to fill a
 // field the spec requires.
@@ -51,9 +44,7 @@ type Card struct {
 	Description string
 	Version     string
 	// URL is where the HTTP+JSON binding answers, for the interface entry.
-	URL string
-	// MCP is where the node's MCP answers, when the card says.
-	MCP        Interface
+	URL        string
 	Skills     []Skill
 	Extensions []Extension
 }
@@ -81,12 +72,10 @@ func (c Card) Message() (protoreflect.Message, error) {
 	for _, e := range c.Extensions {
 		extensions = append(extensions, map[string]any{"uri": e.URI, "description": e.Description, "required": false, "params": e.Params})
 	}
+	// An interface is a way to speak A2A (§8.3.1), so the node's MCP is not
+	// one: where it answers is said in the node extension.
 	interfaces := []map[string]any{
 		{"url": c.URL, "protocolBinding": "HTTP+JSON", "protocolVersion": Version},
-	}
-	// "it lets agents figure out MCP surface amongst other things"
-	if c.MCP.URL != "" {
-		interfaces = append(interfaces, map[string]any{"url": c.MCP.URL, "protocolBinding": "MCP", "protocolVersion": c.MCP.Version})
 	}
 	body, err := json.Marshal(map[string]any{
 		"name":                c.Name,
