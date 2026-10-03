@@ -60,6 +60,12 @@
     --age-fresh: #3f8a5c; /* Used minutes ago: neutral dark green */
     --age-old: #dc143c; /* Used months ago: crimson */
 
+    /* Earth, which Ground leans toward */
+    --earth-soil: #2a221b;
+    --earth-soil-hover: #3a2f25;
+    --earth-clay: #b9774f;
+    --earth-ochre: #c9a24a;
+
     /* Element Status Colors - dark-bg tints for lifecycle states */
     --element-status-idle-bg: rgba(30, 30, 35, 0.92);
     --element-status-idle-section-bg: var(--bg-tertiary);
