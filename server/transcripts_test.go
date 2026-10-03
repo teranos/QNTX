@@ -217,6 +217,19 @@ func TestAGroundedRowNoPredicateNamesIsATurn(t *testing.T) {
 	}
 }
 
+// Spike: an API error ends a turn where no Stop comes, and is said as the API said it.
+func TestAnAPIErrorIsATurnInItsOwnWords(t *testing.T) {
+	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)
+	rows := append(aSession(at), streamed("ground:payload:StopFailure:9", "StopFailure", "s-1", at.Add(9*time.Second),
+		map[string]any{"error": "server_error", "last_assistant_message": "API Error: Unable to connect to API (ENOTFOUND)"}))
+
+	read := transcriptsOf(rows, 10)
+	require.Len(t, read, 1)
+	last := read[0].Turns[len(read[0].Turns)-1]
+	assert.Equal(t, "error", last.Speaker)
+	assert.Equal(t, "server_error: API Error: Unable to connect to API (ENOTFOUND)", last.Text)
+}
+
 // "if SUPER cant access transcripts, make it so SUPER can access it"
 func TestTranscriptsAreRootsAndSupers(t *testing.T) {
 	compiled, err := reach.Reached()
