@@ -18,7 +18,6 @@ import (
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/errors"
@@ -590,7 +589,7 @@ func (s *QNTXServer) BroadcastPulseExecutionStarted(scheduledJobID, executionID,
 	}
 
 	s.broadcastMessage(msg)
-	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution started",
+	s.logger.Debugw("Broadcasted execution started",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 	)
@@ -610,7 +609,7 @@ func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, 
 	}
 
 	s.broadcastMessage(msg)
-	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution failed",
+	s.logger.Debugw("Broadcasted execution failed",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"error", errorMsg,
@@ -632,7 +631,7 @@ func (s *QNTXServer) BroadcastPulseExecutionCompleted(scheduledJobID, executionI
 	}
 
 	s.broadcastMessage(msg)
-	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution completed",
+	s.logger.Debugw("Broadcasted execution completed",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"async_job_id", asyncJobID,
@@ -650,7 +649,7 @@ func (s *QNTXServer) BroadcastPulseExecutionLogStream(scheduledJobID, executionI
 	}
 
 	s.broadcastMessage(msg)
-	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution log chunk",
+	s.logger.Debugw("Broadcasted execution log chunk",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"chunk_length", len(logChunk),

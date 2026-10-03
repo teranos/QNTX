@@ -35,7 +35,7 @@ type WatcherCreateRequest struct {
 	ActionData        string   `json:"action_data"`          // Python code or webhook URL (not required for semantic_match)
 	MaxFiresPerSecond int      `json:"max_fires_per_second,omitempty"`
 	Enabled           *bool    `json:"enabled,omitempty"`
-	// Semantic matching fields (for ⊨ elements)
+	// Semantic matching fields (for se elements)
 	SemanticQuery     string  `json:"semantic_query,omitempty"`
 	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`
 }

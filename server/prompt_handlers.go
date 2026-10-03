@@ -18,7 +18,6 @@ import (
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 )
@@ -235,7 +234,7 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	logger.AddAxSymbol(s.logger).Infow("Prompt execute request")
+	s.logger.Infow("Prompt execute request")
 
 	var req PromptExecuteRequest
 	if err := readJSON(w, r, &req); err != nil {
@@ -708,7 +707,7 @@ func (s *QNTXServer) HandlePromptList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.AddAxSymbol(s.logger).Infow("Prompt list request")
+	s.logger.Infow("Prompt list request")
 
 	store := s.held.ServedUniverse().Prompts()
 	prompts, err := store.ListPrompts(r.Context(), 100)
@@ -774,7 +773,7 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.AddAxSymbol(s.logger).Infow("Prompt save request")
+	s.logger.Infow("Prompt save request")
 
 	var req PromptSaveRequest
 	if err := readJSON(w, r, &req); err != nil {

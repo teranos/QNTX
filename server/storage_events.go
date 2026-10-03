@@ -8,7 +8,6 @@ import (
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
 	"go.uber.org/zap"
 )
@@ -161,7 +160,7 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 		logFields = append(logFields, "eviction_details", detailsMap)
 	}
 
-	logger.AddDBSymbol(p.logger).Debugw("Storage eviction", logFields...)
+	p.logger.Debugw("Storage eviction", logFields...)
 
 	measure.Count(measure.AttestationsEvicted, int64(deletionsCount))
 

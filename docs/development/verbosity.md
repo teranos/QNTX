@@ -119,24 +119,6 @@ Verbosity also maps to zap log levels via `logger.VerbosityToLevel()`:
 | 1 (-v)    | InfoLevel |
 | 2+ (-vv)  | DebugLevel |
 
-### Symbol-Aware Logging
-
-Use structured symbol logging instead of embedding symbols in messages:
-
-```go
-// Instead of:
-logger.Infow(sym.Pulse + " Job started", "job_id", id)
-
-// Use:
-logger.PulseInfow("Job started", "job_id", id)
-
-// Or with instance loggers:
-pulseLog := logger.AddPulseSymbol(s.logger)
-pulseLog.Infow("Job started", "job_id", id)
-```
-
-This keeps log messages clean and makes symbols queryable as structured fields.
-
 ## Level Definitions
 
 ### Level 0 (Default)

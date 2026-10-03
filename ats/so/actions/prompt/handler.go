@@ -136,7 +136,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		err = errors.WithDetail(err, fmt.Sprintf("Prompt ID: %s", payload.PromptID))
 		err = errors.WithDetail(err, fmt.Sprintf("Template length: %d bytes", len(payload.Template)))
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", HandlerName))
-		logger.AddAxSymbol(logger.Logger).Errorw("Frontmatter parsing failed",
+		logger.Logger.Errorw("Frontmatter parsing failed",
 			"error", err,
 			"template_length", len(payload.Template),
 			"job_id", job.ID,
@@ -153,7 +153,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		err = errors.WithDetail(err, fmt.Sprintf("Prompt ID: %s", payload.PromptID))
 		err = errors.WithDetail(err, fmt.Sprintf("Template body length: %d bytes", len(doc.Body)))
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", HandlerName))
-		logger.AddAxSymbol(logger.Logger).Errorw("Template parsing failed",
+		logger.Logger.Errorw("Template parsing failed",
 			"error", err,
 			"template_length", len(doc.Body),
 		)
@@ -253,7 +253,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 			err = errors.WithDetail(err, fmt.Sprintf("Duration: %dms", duration.Milliseconds()))
 			err = errors.WithDetail(err, fmt.Sprintf("Processing: %d of %d", i+1, len(result.Attestations)))
 			err = errors.WithDetail(err, fmt.Sprintf("Prompt length: %d chars", len(prompt)))
-			logger.AddAxSymbol(logger.Logger).Errorw("LLM call failed",
+			logger.Logger.Errorw("LLM call failed",
 				"error", err,
 				"attestation_id", as.ID,
 				"duration_ms", duration.Milliseconds(),
@@ -262,7 +262,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		}
 
 		// Log successful LLM call with duration and token usage
-		logger.AddAxSymbol(logger.Logger).Infow("LLM call completed",
+		logger.Logger.Infow("LLM call completed",
 			"attestation_id", as.ID,
 			"duration_ms", duration.Milliseconds(),
 			"prompt_tokens", resp.Usage.PromptTokens,

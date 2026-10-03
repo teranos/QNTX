@@ -78,7 +78,7 @@ func (h *Handler) HandleTheUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ⍟'s own path is a subtree, so anything under it that no line registered
+	// i's own path is a subtree, so anything under it that no line registered
 	// arrives here. The person is at the root of it and nowhere else — a route
 	// that answers whatever is asked of it is a surface nobody described.
 	if r.URL.Path != "/i/" && r.URL.Path != "/i" {

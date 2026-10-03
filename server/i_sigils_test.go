@@ -26,7 +26,7 @@ func TestStandingIsReadAndSteppedOnOnePath(t *testing.T) {
 }
 
 // A node with no login has no person to say where they stand, and says so
-// the way its other ⍟ paths do.
+// the way its other i paths do.
 func TestANodeWithNoLoginSaysSoWhenAskedWhereYouStand(t *testing.T) {
 	srv := servedForTest(t)
 

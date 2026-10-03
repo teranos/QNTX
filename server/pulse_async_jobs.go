@@ -3,7 +3,6 @@ package server
 import (
 	"net/http"
 
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 )
 
@@ -16,7 +15,7 @@ const (
 // HandlePulseJobs handles requests to /api/pulse/jobs
 // GET: List all async jobs (active, completed, failed)
 func (s *QNTXServer) HandlePulseJobs(w http.ResponseWriter, r *http.Request) {
-	logger.AddPulseSymbol(s.logger).Infow("Pulse list async jobs",
+	s.logger.Infow("Pulse list async jobs",
 		"method", r.Method,
 		"path", r.URL.Path,
 		"remote", r.RemoteAddr)
@@ -45,7 +44,7 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodGet) {
 			return
 		}
-		logger.AddPulseSymbol(s.logger).Infow("Pulse get children", "job_id", jobID)
+		s.logger.Infow("Pulse get children", "job_id", jobID)
 		s.handleGetJobChildren(w, r, jobID)
 		return
 	}
@@ -55,7 +54,7 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodGet) {
 			return
 		}
-		logger.AddPulseSymbol(s.logger).Infow("Pulse get stages", "job_id", jobID)
+		s.logger.Infow("Pulse get stages", "job_id", jobID)
 		s.handleGetJobStages(w, r, jobID)
 		return
 	}
@@ -65,7 +64,7 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodGet) {
 			return
 		}
-		logger.AddPulseSymbol(s.logger).Infow("Pulse get executions", "job_id", jobID)
+		s.logger.Infow("Pulse get executions", "job_id", jobID)
 		s.HandleJobExecutions(w, r, jobID)
 		return
 	}
@@ -76,7 +75,7 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		taskID := pathParts[2]
-		logger.AddPulseSymbol(s.logger).Infow("Pulse get task logs", "job_id", jobID, "task_id", taskID)
+		s.logger.Infow("Pulse get task logs", "job_id", jobID, "task_id", taskID)
 		s.handleGetTaskLogsForJob(w, r, jobID, taskID)
 		return
 	}

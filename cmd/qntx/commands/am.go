@@ -9,7 +9,6 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/errors"
 	"gopkg.in/yaml.v3"
 )
@@ -18,8 +17,8 @@ import (
 var AmCmd = &cobra.Command{
 	Use:     "config",
 	Aliases: []string{"am"},
-	Short:   sym.AM + " Manage QNTX core configuration",
-	Long: sym.AM + ` config — Manage QNTX core configuration
+	Short:   "Manage QNTX core configuration",
+	Long: `config — Manage QNTX core configuration
 
 Display and manage QNTX core configuration settings.
 

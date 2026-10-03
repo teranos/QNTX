@@ -9,7 +9,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/errors"
@@ -48,21 +47,21 @@ type RateLimiter interface {
 
 // pulseLogger wraps zap.SugaredLogger with special methods for Pulse operations
 // Uses different log levels to create visual distinction:
-// - DEBUG level → STARTING (✿ Opening operations)
-// - WARN level → CLOSING (❀ Closing operations)
+// - DEBUG level → STARTING (Opening operations)
+// - WARN level → CLOSING (Closing operations)
 // - INFO level → PULSE (general worker/daemon operations)
 type pulseLogger struct {
 	*zap.SugaredLogger
 }
 
-// Starting logs an Opening (✿) event - uses DEBUG level for "STARTING" appearance
+// Starting logs an Opening event - uses DEBUG level for "STARTING" appearance
 func (l pulseLogger) Starting(msg string, keysAndValues ...any) {
-	l.Debugw("✿ "+msg, keysAndValues...)
+	l.Debugw(msg, keysAndValues...)
 }
 
-// Closing logs a Closing (❀) event - uses WARN level for "CLOSING" appearance
+// Closing logs a Closing event - uses WARN level for "CLOSING" appearance
 func (l pulseLogger) Closing(msg string, keysAndValues ...any) {
-	l.Warnw("❀ "+msg, keysAndValues...)
+	l.Warnw(msg, keysAndValues...)
 }
 
 // Pulse logs general Pulse/worker operations - uses INFO level
@@ -182,7 +181,7 @@ func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *config.Conf
 }
 
 // Start begins processing jobs with the worker pool
-// ✿ Opening: Recover orphaned jobs before starting workers
+// Opening: Recover orphaned jobs before starting workers
 func (wp *WorkerPool) Start() {
 	wp.mu.Lock()
 
@@ -201,7 +200,7 @@ func (wp *WorkerPool) Start() {
 	wp.jobsProcessed = 0
 	wp.mu.Unlock()
 
-	// ✿ Opening: Graceful start - recover jobs orphaned by server crash
+	// Opening: Graceful start - recover jobs orphaned by server crash
 	// Workers start either way: a pool that refuses to run because of a stale
 	// row is worse than one running beside it. The failure is not quiet.
 	if err := wp.recoverOrphanedJobs(); err != nil {
@@ -225,7 +224,7 @@ func (wp *WorkerPool) Start() {
 // recoverOrphanedJobs finds jobs stuck in "running" state and re-queues them gradually
 // This handles ungraceful shutdowns (crash, kill -9, power loss)
 //
-// ✿ Opening Strategy:
+// Opening Strategy:
 // - Re-queue orphaned jobs gradually over 15 minutes (not all at once)
 // - Respects pulse budgets and rate limits during recovery
 // - Prevents system overload after crash
@@ -301,7 +300,7 @@ func (wp *WorkerPool) failOrphanedJob(job *Job) error {
 // - Phase 1 (0-10s): Jobs 2-10 at 1 job per second (9 jobs total)
 // - Phase 2 (10s-15min): Remaining jobs spread over 15 minutes
 // Stop gracefully stops the worker pool
-// ❀ Closing: Workers checkpoint and exit cleanly on context cancellation
+// Closing: Workers checkpoint and exit cleanly on context cancellation
 // Uses a configurable timeout (default 20s) to allow jobs to checkpoint without blocking indefinitely
 func (wp *WorkerPool) Stop() {
 	wp.cancel()
@@ -319,7 +318,7 @@ func (wp *WorkerPool) Stop() {
 	}
 	select {
 	case <-done:
-		wp.logger.Pulse("❀ WorkerPool.Stop() complete - all workers exited cleanly")
+		wp.logger.Pulse("WorkerPool.Stop() complete - all workers exited cleanly")
 	case <-time.After(timeout):
 		wp.logger.Closing("WorkerPool.Stop() timeout - workers may still be checkpointing", "timeout", timeout)
 		// Workers will continue checkpointing in background, but we return to avoid blocking shutdown
@@ -551,7 +550,7 @@ func (wp *WorkerPool) processNextJob() error {
 	if err := wp.executor.Execute(execCtx, job); err != nil {
 		execDur := time.Since(execStart)
 		wp.writeTaskLog(job.ID, job.HandlerName, "error", fmt.Sprintf("Failed after %dms: %s", execDur.Milliseconds(), err))
-		// ❀ Closing: Check if error is due to context cancellation
+		// Closing: Check if error is due to context cancellation
 		select {
 		case <-wp.ctx.Done():
 			// Context was cancelled - requeue job with checkpoint intact (don't fail it)
@@ -691,7 +690,7 @@ func (wp *WorkerPool) checkRateLimit(job *Job) (paused bool, err error) {
 		}
 		// Log rate limit status for visibility
 		callsInWindow, callsRemaining := wp.rateLimiter.Stats()
-		logger.AddPulseSymbol(wp.logger.SugaredLogger).Infow("Rate limit reached - job paused",
+		wp.logger.SugaredLogger.Infow("Rate limit reached - job paused",
 			"job_id", job.ID,
 			"calls_in_window", callsInWindow,
 			"calls_total", callsInWindow+callsRemaining,
@@ -723,7 +722,7 @@ func (wp *WorkerPool) checkBudget(job *Job) (paused bool, err error) {
 			if wp.poolConfig.PauseOnBudget {
 				action = "paused"
 			}
-			logger.AddPulseSymbol(wp.logger.SugaredLogger).Infow("Budget exceeded - job "+action,
+			wp.logger.SugaredLogger.Infow("Budget exceeded - job "+action,
 				"job_id", job.ID,
 				"estimated_cost", estimatedCost,
 				"daily_spend", status.DailySpend,

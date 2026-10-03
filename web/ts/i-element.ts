@@ -1,7 +1,7 @@
 /**
  * ⍟ — who is looking.
  *
- * `sym/symbols.go` calls `i` "Self — Your vantage point into QNTX". The
+ * `sym/README.md` calls `i` "Self — Your vantage point into QNTX". The
  * vantage is a person's, and this draws that person and nothing else: what the
  * node calls them, how they got in, where they act, and what is joined to
  * them. What the node itself is went to ≡, which is the sibling `am` names.

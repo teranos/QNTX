@@ -13,11 +13,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/util"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/errors"
 )
 
@@ -103,7 +101,7 @@ func NewTickerWithContext(ctx context.Context, store *Store, queue *async.Queue,
 		ctx:         tickerCtx,
 		cancel:      cancel,
 		logger:      log,
-		pulseLog:    logger.AddPulseSymbol(log),
+		pulseLog:    log,
 	}
 }
 
@@ -199,18 +197,6 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 		return // Single job started — wait for completion to log
 	}
 
-	// Build visual indicator based on work load
-	pulseIndicator := ""
-	if activeWork > 0 {
-		// Add more pulse symbols based on work load (1 symbol per 5 jobs, max 60 symbols)
-		numSymbols := (activeWork / 5) + 1 // 1-5 jobs = 1 symbol, 6-10 = 2, etc.
-		if numSymbols > 60 {
-			numSymbols = 60 // Cap at 60 symbols (300 jobs)
-		}
-		pulseIndicator = strings.Repeat(sym.Pulse+" ", numSymbols)
-		pulseIndicator = strings.TrimSpace(pulseIndicator) + " "
-	}
-
 	// A next run that will not parse is a log line, not a reason to stop
 	// ticking, so it reads as nothing scheduled and says why.
 	var nextRun time.Time
@@ -226,7 +212,7 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 
 	if nextRun.IsZero() {
 		if activeWork > 0 {
-			t.pulseLog.Infow(fmt.Sprintf("%sPulse - no scheduled executions, %d jobs active", pulseIndicator, activeWork))
+			t.pulseLog.Infow(fmt.Sprintf("Pulse - no scheduled executions, %d jobs active", activeWork))
 		} else {
 			t.pulseLog.Infow("Pulse - no scheduled executions")
 		}
@@ -239,7 +225,7 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 	}
 
 	// Build enhanced ticker message with system metrics
-	msg := fmt.Sprintf("%sPulse - next scheduled execution '%s' in %s", pulseIndicator, nextJob.HandlerName, timeUntil.Round(time.Second))
+	msg := fmt.Sprintf("Pulse - next scheduled execution '%s' in %s", nextJob.HandlerName, timeUntil.Round(time.Second))
 	if activeWork > 0 {
 		msg += fmt.Sprintf(", %d jobs active", activeWork)
 	}

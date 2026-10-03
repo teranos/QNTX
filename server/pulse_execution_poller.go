@@ -7,7 +7,6 @@ package server
 import (
 	"time"
 
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/schedule"
 )
 
@@ -30,7 +29,7 @@ func (s *QNTXServer) startPulseExecutionPoller() {
 		}
 	})
 
-	logger.AddPulseSymbol(s.logger).Debugw("Pulse execution poller started", "interval", "3s")
+	s.logger.Debugw("Pulse execution poller started", "interval", "3s")
 }
 
 // checkCompletedExecutions finds executions that completed since last check and broadcasts them
@@ -40,7 +39,7 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 	scheduleStore := s.held.ServedUniverse().Schedules()
 	jobs, err := scheduleStore.ListAllScheduledJobs()
 	if err != nil {
-		logger.AddPulseSymbol(s.logger).Debugw("Failed to list jobs for completion polling", "error", err)
+		s.logger.Debugw("Failed to list jobs for completion polling", "error", err)
 		return
 	}
 
@@ -58,7 +57,7 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 	execStore := s.held.ServedUniverse().Executions()
 	executions, err := execStore.ListRecentCompletions(*lastCheckTime, 100)
 	if err != nil {
-		logger.AddPulseSymbol(s.logger).Debugw("Failed to list recent completions", "error", err)
+		s.logger.Debugw("Failed to list recent completions", "error", err)
 		return
 	}
 

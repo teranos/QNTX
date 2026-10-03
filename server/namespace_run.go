@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/server/namespaces"
-	"github.com/teranos/QNTX/sym"
 )
 
 // startNamespace runs what a namespace starts for itself.
@@ -25,16 +24,16 @@ func (s *QNTXServer) startNamespace(u *namespaces.Universe) {
 		started := time.Now()
 		err := entry.sub.Start(u)
 		if err == nil {
-			s.logger.Debugw(sym.Type+" A namespace started a step",
+			s.logger.Debugw("A namespace started a step",
 				"namespace", u.Name(), "step", entry.sub.Name(), "took", time.Since(started))
 			continue
 		}
 		if entry.policy == SubsystemFatal {
-			s.logger.Errorw(sym.Type+" A namespace could not start",
+			s.logger.Errorw("A namespace could not start",
 				"namespace", u.Name(), "step", entry.sub.Name(), "error", err)
 			continue
 		}
-		s.logger.Warnw(sym.Type+" A namespace started without one of its steps",
+		s.logger.Warnw("A namespace started without one of its steps",
 			"namespace", u.Name(), "step", entry.sub.Name(), "error", err)
 	}
 }

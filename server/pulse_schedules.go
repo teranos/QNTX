@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/errors"
@@ -22,7 +21,7 @@ func (s *QNTXServer) HandlePulseSchedules(w http.ResponseWriter, r *http.Request
 		if r.Method == http.MethodPost {
 			endpoint = "create job"
 		}
-		logger.AddPulseSymbol(s.logger).Infow("Pulse "+endpoint,
+		s.logger.Infow("Pulse "+endpoint,
 			"method", r.Method,
 			"path", r.URL.Path,
 			"remote", r.RemoteAddr)
@@ -54,7 +53,7 @@ func (s *QNTXServer) HandlePulseSchedule(w http.ResponseWriter, r *http.Request)
 
 	// Check if this is a request for executions (schedule execution history)
 	if len(pathParts) > 1 && pathParts[1] == "executions" {
-		logger.AddPulseSymbol(s.logger).Infow("Pulse get executions", "schedule_id", jobID)
+		s.logger.Infow("Pulse get executions", "schedule_id", jobID)
 		s.HandleJobExecutions(w, r, jobID)
 		return
 	}
@@ -69,7 +68,7 @@ func (s *QNTXServer) HandlePulseSchedule(w http.ResponseWriter, r *http.Request)
 	case http.MethodDelete:
 		endpoint = "delete job"
 	}
-	logger.AddPulseSymbol(s.logger).Infow("Pulse "+endpoint, "job_id", jobID, "method", r.Method)
+	s.logger.Infow("Pulse "+endpoint, "job_id", jobID, "method", r.Method)
 
 	switch r.Method {
 	case http.MethodGet:
@@ -106,7 +105,7 @@ func (s *QNTXServer) handleListSchedules(w http.ResponseWriter, r *http.Request)
 
 // handleCreateSchedule creates a new schedule
 func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request) {
-	pulseLog := logger.AddPulseSymbol(s.logger)
+	pulseLog := s.logger
 
 	var req CreateScheduledJobRequest
 	if err := readJSON(w, r, &req); err != nil {
@@ -293,7 +292,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		logger.AddPulseSymbol(s.logger).Infow("Updated scheduled job state",
+		s.logger.Infow("Updated scheduled job state",
 			"job_id", jobID,
 			"new_state", *req.State)
 	}
@@ -310,7 +309,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		logger.AddPulseSymbol(s.logger).Infow("Updated scheduled job interval",
+		s.logger.Infow("Updated scheduled job interval",
 			"job_id", jobID,
 			"new_interval", *req.IntervalSeconds)
 	}
@@ -352,7 +351,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 			// sacred-error:handled — recorded in `cascade` and returned in the response.
 			s.logger.Warnw("Failed to cascade delete async job", "job_id", jobID, "async_job_id", asyncJobID, "error", err)
 		} else {
-			logger.AddPulseSymbol(s.logger).Infow("Cascade cancellation of job", "async_job_id", asyncJobID)
+			s.logger.Infow("Cascade cancellation of job", "async_job_id", asyncJobID)
 		}
 	}
 
@@ -363,7 +362,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	logger.AddPulseSymbol(s.logger).Infow("Deleted scheduled job",
+	s.logger.Infow("Deleted scheduled job",
 		"job_id", jobID,
 		"handler_name", job.HandlerName,
 		"interval_seconds", job.IntervalSeconds)

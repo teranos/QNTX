@@ -13,7 +13,6 @@ import (
 	pb "github.com/teranos/QNTX/element/proto"
 	elementstorage "github.com/teranos/QNTX/element/storage"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
-	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
 )
 
@@ -39,7 +38,7 @@ func TestCompileSubscriptions_AxToPy(t *testing.T) {
 
 	// Create AX and Py elements with correct symbols
 	items := []*elementstorage.CanvasElement{
-		{ID: "ax-element-1", Symbol: sym.AX, X: 100, Y: 100},
+		{ID: "ax-element-1", Symbol: "⋈", X: 100, Y: 100},
 		{ID: "py-element-1", Symbol: "py", X: 200, Y: 100},
 	}
 	for _, g := range items {
@@ -116,7 +115,7 @@ func TestCompileSubscriptions_PyToPrompt(t *testing.T) {
 	// Create Py and Prompt elements
 	items := []*elementstorage.CanvasElement{
 		{ID: "py-element-1", Symbol: "py", X: 100, Y: 100},
-		{ID: "prompt-element-1", Symbol: sym.SO, X: 200, Y: 100},
+		{ID: "prompt-element-1", Symbol: "⟶", X: 200, Y: 100},
 	}
 	for _, g := range items {
 		if err := handler.store.UpsertElement(ctx, g); err != nil {
@@ -268,7 +267,7 @@ func TestCompileSubscriptions_StaleEdgeCleanup(t *testing.T) {
 
 	// Create AX and two Py elements
 	items := []*elementstorage.CanvasElement{
-		{ID: "ax-1", Symbol: sym.AX, X: 100, Y: 100},
+		{ID: "ax-1", Symbol: "⋈", X: 100, Y: 100},
 		{ID: "py-a", Symbol: "py", X: 200, Y: 100},
 		{ID: "py-b", Symbol: "py", X: 300, Y: 100},
 	}

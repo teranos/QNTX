@@ -14,7 +14,6 @@ import (
 	pb "github.com/teranos/QNTX/element/proto"
 	elementstorage "github.com/teranos/QNTX/element/storage"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
-	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
 )
 
@@ -829,10 +828,10 @@ func TestElementSymbolToType(t *testing.T) {
 		expected string
 	}{
 		{"py", "py"},
-		{sym.AX, "ax"},       // ⋈ → ax
-		{sym.SE, "semantic"}, // ⊨ → semantic
-		{sym.SO, "prompt"},   // ⟶ → prompt
-		{"note", "note"},     // Unknown passes through
+		{"⋈", "ax"},
+		{"⊨", "semantic"},
+		{"⟶", "prompt"},
+		{"note", "note"}, // Unknown passes through
 		{"result", "result"},
 	}
 
@@ -865,12 +864,12 @@ func setupSEtoSE(t *testing.T) (*CanvasHandler, storage.Watchers, context.Contex
 
 	// Create SE₁ and SE₂ elements
 	if err := canvasStore.UpsertElement(ctx, &elementstorage.CanvasElement{
-		ID: "se-1", Symbol: sym.SE, X: 100, Y: 100,
+		ID: "se-1", Symbol: "⊨", X: 100, Y: 100,
 	}); err != nil {
 		t.Fatalf("UpsertElement SE₁ failed: %v", err)
 	}
 	if err := canvasStore.UpsertElement(ctx, &elementstorage.CanvasElement{
-		ID: "se-2", Symbol: sym.SE, X: 300, Y: 100,
+		ID: "se-2", Symbol: "⊨", X: 300, Y: 100,
 	}); err != nil {
 		t.Fatalf("UpsertElement SE₂ failed: %v", err)
 	}
@@ -1034,9 +1033,9 @@ func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
 
 	// Create SE₁, SE₂, and prompt elements
 	for _, g := range []*elementstorage.CanvasElement{
-		{ID: "se-1", Symbol: sym.SE, X: 100, Y: 100},
-		{ID: "se-2", Symbol: sym.SE, X: 300, Y: 100},
-		{ID: "prompt-1", Symbol: sym.SO, X: 500, Y: 100},
+		{ID: "se-1", Symbol: "⊨", X: 100, Y: 100},
+		{ID: "se-2", Symbol: "⊨", X: 300, Y: 100},
+		{ID: "prompt-1", Symbol: "⟶", X: 500, Y: 100},
 	} {
 		if err := canvasStore.UpsertElement(ctx, g); err != nil {
 			t.Fatalf("UpsertElement %s failed: %v", g.ID, err)

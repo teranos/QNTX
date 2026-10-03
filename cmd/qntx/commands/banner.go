@@ -5,7 +5,6 @@ import (
 
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/version"
-	"github.com/teranos/QNTX/sym"
 )
 
 // printStartupBanner prints the user-friendly startup message
@@ -13,8 +12,6 @@ func printStartupBanner(verbosity int, dbPath string, logPath string) {
 	// ANSI escape codes
 	cyan := "\033[36m"
 	green := "\033[32m"
-	blue := "\033[34m"
-	magenta := "\033[35m"
 	white := "\033[37m"
 	bgBlack := "\033[40m"
 	bold := "\033[1m"
@@ -37,8 +34,7 @@ func printStartupBanner(verbosity int, dbPath string, logPath string) {
 	fmt.Printf("   ║           %s%s%s██     ██  ██    %s                       ║\n", white, bold, bgBlack, reset+cyan+bold)
 	fmt.Printf("   ║           %s%s%s██    ██    ██   %s                       ║\n", white, bold, bgBlack, reset+cyan+bold)
 	fmt.Printf("   ║                                                   ║\n")
-	fmt.Printf("   ║   %s▣%s Attest  %s%s%s Pulse                          ║\n",
-		blue, reset+cyan+bold, magenta, sym.Pulse, reset+cyan+bold)
+	fmt.Printf("   ║   Attest  Pulse                                   ║\n")
 	fmt.Printf("   ║                                                   ║\n")
 	fmt.Printf("   ╚═══════════════════════════════════════════════════╝%s\n\n", reset)
 

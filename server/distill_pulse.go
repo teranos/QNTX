@@ -47,12 +47,12 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 	dur := time.Since(start)
 
 	if err != nil {
-		h.logger.Warnw("Σ Sigma failed", "error", err, "took_ms", dur.Milliseconds())
+		h.logger.Warnw("Sigma failed", "error", err, "took_ms", dur.Milliseconds())
 		return err
 	}
 
 	if distilled > 0 || sigmasCreated > 0 {
-		h.logger.Infow("Σ Sigma complete",
+		h.logger.Infow("Sigma complete",
 			"cutoff", cutoff,
 			"distilled", distilled,
 			"sigmas_created", sigmasCreated,
@@ -76,7 +76,7 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 func (h *distillHandler) embedSigmas() {
 	ids, err := h.server.embeddingStore.GetUnembeddedSigmaIDs()
 	if err != nil {
-		h.logger.Warnw("Σ failed to find unembedded sigmas", "error", err)
+		h.logger.Warnw("failed to find unembedded sigmas", "error", err)
 		return
 	}
 	if len(ids) == 0 {
@@ -85,7 +85,7 @@ func (h *distillHandler) embedSigmas() {
 
 	attestations, err := storage.GetAttestationsByIDs(h.server.held.ServedUniverse().Operational(), ids)
 	if err != nil {
-		h.logger.Warnw("Σ failed to fetch sigma attestations for embedding", "error", err, "count", len(ids))
+		h.logger.Warnw("failed to fetch sigma attestations for embedding", "error", err, "count", len(ids))
 		return
 	}
 
@@ -101,12 +101,12 @@ func (h *distillHandler) embedSigmas() {
 		storage.NotifyObserversSync(auth.NamespaceDefault, as)
 		embedded++
 		if embedded%100 == 0 {
-			h.logger.Infow("Σ embedding progress", "done", embedded, "total", len(attestations))
+			h.logger.Infow("embedding progress", "done", embedded, "total", len(attestations))
 		}
 	}
 
 	if embedded > 0 || skipped > 0 {
-		h.logger.Infow("Σ embed sigmas done", "embedded", embedded, "skipped_no_text", skipped)
+		h.logger.Infow("embed sigmas done", "embedded", embedded, "skipped_no_text", skipped)
 	}
 }
 

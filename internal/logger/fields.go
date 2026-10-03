@@ -59,7 +59,6 @@ const (
 	FieldHost    = "host"
 
 	// QNTX-specific
-	FieldSymbol      = "symbol"      // QNTX segment symbol (꩜, ✿, ❀, etc.)
 	FieldAttestation = "attestation" // Attestation ID
 	FieldPredicate   = "predicate"   // Ax predicate
 	FieldSubject     = "subject"     // Ax subject

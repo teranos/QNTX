@@ -6,11 +6,12 @@ Status: Done
 
 Every shape the node and the browser both speak is declared in a `.proto` and generated from there. The Context below describes the state this replaced.
 
-Two things it turned out proto has no honest home for, because they are not
-wire shapes and are held to their Go source by a test instead:
+One thing it turned out proto has no honest home for, because it is not a
+wire shape and is held to its Go source by a test instead:
 
-- `sym` — named symbol constants, in `web/ts/sym.ts`, checked by `sym.test.ts`
 - standing watcher ids, checked by `standing-watcher-id.test.ts`
+
+`web/ts/sym.ts` is the UI's own, not a copy of Go: the symbol, the one place a segment is mapped to a glyph.
 
 ## Context
 

@@ -1,6 +1,6 @@
 # Symbols
 
-Reference implementation: [`sym/symbols.go`](https://github.com/teranos/QNTX/blob/main/sym/symbols.go)
+Reference implementation: [`web/ts/sym.ts`](https://github.com/teranos/QNTX/blob/main/web/ts/sym.ts). The glyphs are the UI's; Go knows only the segments ([`sym/symbols.go`](https://github.com/teranos/QNTX/blob/main/sym/symbols.go)).
 
 ## SEG (Segment)
 
@@ -56,7 +56,7 @@ Infrastructure and lifecycle markers:
 
 | Symbol | Name | Purpose |
 |--------|------|---------|
-| `꩜` | Pulse | Async operations, always prefix Pulse-related logs. See [API](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json) |
+| `꩜` | Pulse | Async operations. See [API](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json) |
 | `✿` | PulseOpen | Graceful startup with orphaned job recovery. See [pulse/async/worker.go](https://github.com/teranos/QNTX/blob/main/pulse/async/worker.go) |
 | `❀` | PulseClose | Graceful shutdown with checkpoint preservation. See [GRACE](adr/ADR-036-GRACE.md) |
 | `⊔` | DB | Database/storage layer |

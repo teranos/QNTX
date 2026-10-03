@@ -64,7 +64,7 @@ type Watcher struct {
 	Filter  types.AxFilter `json:"filter"`
 	AxQuery string         `json:"ax_query,omitempty"` // Raw AX query string (alternative to Filter fields)
 
-	// Semantic matching — used by ⊨ elements for meaning-based search
+	// Semantic matching — used by se elements for meaning-based search
 	SemanticQuery     string  `json:"semantic_query,omitempty"`      // Natural language query for embedding comparison
 	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`  // Minimum similarity score (0-1) to fire
 	SemanticClusterID *int    `json:"semantic_cluster_id,omitempty"` // Cluster scope (nil = all clusters)
