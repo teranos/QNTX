@@ -28,6 +28,7 @@ func servingOne(db *sql.DB, store ats.AttestationStore) *namespaces.Held {
 		Aliases:     storage.NewAliasStore(db),
 		Queries:     storage.NewSQLQueryStore(db),
 		Operational: db,
+		Sqlite:      db,
 	})
 	if err != nil {
 		panic(err)
@@ -57,6 +58,7 @@ func oneNamespace(name string, store ats.AttestationStore) *namespaces.Universe 
 		Aliases:     &storage.AliasStore{},
 		Queries:     &storage.SQLQueryStore{},
 		Operational: &sql.DB{},
+		Sqlite:      &sql.DB{},
 	})
 	if err != nil {
 		panic(err)

@@ -165,6 +165,10 @@ type QNTXServer struct {
 	// Watcher engine for reactive attestation triggers
 	watcherEngine   *watcher.Engine
 	reloadCoalescer *watcherReloadCoalescer
+	// The watcher engine of each namespace that has started, by name. The
+	// default's is watcherEngine; every other namespace's is made as it starts.
+	engines   map[string]*watcher.Engine
+	enginesMu sync.Mutex
 
 	// Canvas state handlers
 	canvasHandler *handlers.CanvasHandler
@@ -392,18 +396,20 @@ func (s *QNTXServer) SetOnReady(fn func()) {
 
 // ReloadWatchers reloads the watcher engine's in-memory map from the database.
 func (s *QNTXServer) ReloadWatchers() error {
-	if s.watcherEngine == nil {
-		return nil
+	for name, engine := range s.allEngines() {
+		if err := engine.ReloadWatchers(); err != nil {
+			return errors.Wrapf(err, "failed to reload the watchers of %s", name)
+		}
 	}
-	return s.watcherEngine.ReloadWatchers()
+	return nil
 }
 
 // AddPythonProvider registers "py" element type and wires the gRPC PythonService executor.
 func (s *QNTXServer) AddPythonProvider(client protocol.PythonServiceClient) {
 	s.pythonClient = client
-	if s.watcherEngine != nil {
-		s.watcherEngine.AddElementType("py")
-		s.watcherEngine.SetPythonExecutor(&grpcPythonExecutor{client: client})
+	for _, engine := range s.allEngines() {
+		engine.AddElementType("py")
+		engine.SetPythonExecutor(&grpcPythonExecutor{client: client})
 	}
 }
 

@@ -457,6 +457,7 @@ func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error
 		Aliases:     storage.NewAliasStore(h.operational),
 		Queries:     landing.queries(),
 		Operational: h.operational,
+		Sqlite:      landing.db,
 	})
 }
 
@@ -698,6 +699,7 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 		Aliases:     storage.NewAliasStore(h.operational),
 		Queries:     h.landings[duckdbcgo.NamespaceDefault].queries(),
 		Operational: h.operational,
+		Sqlite:      h.landings[duckdbcgo.NamespaceDefault].db,
 	}
 	def, err := namespaces.NewUniverse(duckdbcgo.NamespaceDefault, made)
 	if err != nil {
@@ -708,6 +710,7 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 	made.Store = h.system
 	made.Canvas = nil
 	made.Queries = h.landings[duckdbcgo.NamespaceSystem].queries()
+	made.Sqlite = h.landings[duckdbcgo.NamespaceSystem].db
 	sys, err := namespaces.NewUniverse(duckdbcgo.NamespaceSystem, made)
 	if err != nil {
 		return nil, err

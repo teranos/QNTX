@@ -56,6 +56,8 @@ type Made struct {
 	// namespace, and moving the rows under the namespace is a change a caller
 	// does not see.
 	Operational *sql.DB
+	// "each namespace has their own sqlite"
+	Sqlite *sql.DB
 }
 
 // Universe is one namespace: its name, and what it is made of.
@@ -194,6 +196,14 @@ func (u *Universe) Operational() *sql.DB {
 		return nil
 	}
 	return u.made.Operational
+}
+
+// Sqlite is the sqlite this namespace has of its own.
+func (u *Universe) Sqlite() *sql.DB {
+	if u == nil {
+		return nil
+	}
+	return u.made.Sqlite
 }
 
 // Serving is the node's universes when it runs one: the default, made of what

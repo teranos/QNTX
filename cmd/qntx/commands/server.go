@@ -134,6 +134,7 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		Aliases:     storage.NewAliasStore(database),
 		Queries:     storage.NewSQLQueryStore(database),
 		Operational: database,
+		Sqlite:      database,
 	})
 	if backend, ok := rustStore.(interface {
 		Universes(dflt ats.AttestationStore) (*namespaces.Held, error)
