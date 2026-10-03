@@ -26,6 +26,8 @@ type node struct {
 	AllOf      []node          `json:"allOf"`
 	Properties json.RawMessage `json:"properties"`
 	Required   []string        `json:"required"`
+	// Title is what an OpenAPI schema is called, when it is.
+	Title string `json:"title"`
 	// Description is what the schema says of it.
 	Description string `json:"description"`
 }
@@ -137,6 +139,19 @@ func inOrder(raw json.RawMessage) ([]string, map[string]json.RawMessage, error) 
 	return keys, values, nil
 }
 
+// refName is the definition a $ref names: under a JSON Schema's $defs or an
+// OpenAPI description's components, its JSON Pointer escapes read.
+func refName(ref string) string {
+	name, ok := strings.CutPrefix(ref, defsRef)
+	if !ok {
+		name, ok = strings.CutPrefix(ref, componentsRef)
+	}
+	if !ok {
+		return ref
+	}
+	return strings.ReplaceAll(strings.ReplaceAll(name, "~1", "/"), "~0", "~")
+}
+
 // typeWords is what type says: one word, or a list of them.
 func typeWords(raw json.RawMessage) ([]string, error) {
 	if len(raw) == 0 {
@@ -157,7 +172,7 @@ func typeWords(raw json.RawMessage) ([]string, error) {
 // to, its branches, or any when it says nothing of it.
 func wordOf(n node) (string, error) {
 	if n.Ref != "" {
-		return strings.TrimPrefix(n.Ref, defsRef), nil
+		return refName(n.Ref), nil
 	}
 	types, err := typeWords(n.Type)
 	if err != nil {
@@ -196,13 +211,13 @@ func branches(nodes []node, sep string) (string, error) {
 // the schema says nothing of it.
 func typesOf(n node, defs map[string]node, reading []string) ([]string, error) {
 	if n.Ref != "" {
-		name, ok := strings.CutPrefix(n.Ref, defsRef)
-		if !ok {
-			return nil, errors.Newf("refers to %s, which is not under $defs", n.Ref)
+		name := refName(n.Ref)
+		if name == n.Ref {
+			return nil, errors.Newf("refers to %s, which is not under $defs or components", n.Ref)
 		}
 		def, ok := defs[name]
 		if !ok {
-			return nil, errors.Newf("refers to %s, which $defs does not have", n.Ref)
+			return nil, errors.Newf("refers to %s, which the schema does not have", n.Ref)
 		}
 		if slices.Contains(reading, name) {
 			return nil, errors.Newf("%s refers to itself through %s", name, strings.Join(reading, " → "))

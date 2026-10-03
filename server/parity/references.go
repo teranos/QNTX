@@ -21,12 +21,13 @@ import (
 // The references a signum can be held to, each pinned in a directory named for
 // the reference, its version and the commit it was taken at, with SOURCE
 // saying where it came from: umami is umami_v3.3.1_ca661c7, a2a is
-// a2a_v1.0.1_3303592, mcp is mcp_2026-07-28_5f5440b, umami-tracker is
-// umami-tracker_v3.3.1_ca661c7. A reference is read as it is: a schema.prisma
-// as Prisma, a .proto as the descriptors it compiles to, a schema.json as JSON
-// Schema, a .d.ts as the TypeScript types it declares.
+// a2a_v1.0.1_3303592, mcp is mcp_2026-07-28_5f5440b, github is
+// github_2026-03-10_7bdf5f0. A reference is read as it is: a schema.prisma as
+// Prisma, a .proto as the descriptors it compiles to, a schema.json as JSON
+// Schema, a .d.ts as the TypeScript types it declares, an openapi.json as the
+// operations and schemas of an OpenAPI description.
 //
-//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts
+//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory
@@ -37,13 +38,15 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 		return Schema{}, refused
 	}
 	var protos, declarations []string
-	prisma, jsonSchema := false, false
+	prisma, jsonSchema, openAPI := false, false, false
 	for _, name := range files {
 		switch {
 		case name == "schema.prisma":
 			prisma = true
 		case name == "schema.json":
 			jsonSchema = true
+		case name == "openapi.json":
+			openAPI = true
 		case strings.HasSuffix(name, ".d.ts"):
 			declarations = append(declarations, name)
 		case strings.HasSuffix(name, ".proto"):
@@ -61,11 +64,13 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 		return withDeclarations(schema, dir, declarations)
 	case jsonSchema:
 		return jsonSchemaAt(path.Join(dir, "schema.json"))
+	case openAPI:
+		return openAPIAt(path.Join(dir, "openapi.json"))
 	case len(declarations) > 0:
 		return withDeclarations(Schema{fits: tsFits}, dir, declarations)
 	}
 	if len(protos) == 0 {
-		return Schema{}, failed("%s holds no schema.prisma, no .proto, no schema.json and no .d.ts", dir)
+		return Schema{}, failed("%s holds no schema.prisma, no .proto, no schema.json, no .d.ts and no openapi.json", dir)
 	}
 	return protoAt(dir, protos)
 }
@@ -175,6 +180,18 @@ func jsonSchemaAt(schema string) (Schema, *protocol.Refusal) {
 		return Schema{}, failed("%s did not read: %v", schema, err)
 	}
 	read, err := ParseJSONSchema(schema, raw)
+	if err != nil {
+		return Schema{}, failed("%v", err)
+	}
+	return read, nil
+}
+
+func openAPIAt(description string) (Schema, *protocol.Refusal) {
+	raw, err := pinned.ReadFile(description)
+	if err != nil {
+		return Schema{}, failed("%s did not read: %v", description, err)
+	}
+	read, err := ParseOpenAPI(description, raw)
 	if err != nil {
 		return Schema{}, failed("%v", err)
 	}
