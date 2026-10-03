@@ -91,8 +91,6 @@ the whole of the warning that the node is about to stop being where you are.
 
 ---
 
-## Glyphs
+## Symbols
 
-Glyphs ⧉  are the universal UI primitive. Symbols (`sym` package) are the visual expression of a glyph — through a sym, a glyph can be expressed. The `sym` package will become a subpackage of `glyph/` (`glyph/sym`).
-
-See [GLOSSARY.md](../docs/GLOSSARY.md) for symbol definitions and [packages/glyphs/VISION.md](../packages/glyphs/VISION.md) for the architectural vision.
+The symbol is the UI's: the one place a segment is mapped to a glyph (see Symbols in [CLAUDE.md](../CLAUDE.md)).
