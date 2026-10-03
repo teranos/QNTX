@@ -157,6 +157,19 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 		if len(held.Required) != 0 {
 			t.Errorf("%s: required and unfollowed is %v", name, held.Required)
 		}
+		// "seeing prose from the specs themselves where they have it": theirs on
+		// the column, ours by field.
+		for _, item := range tool.Items {
+			if item.Column == "description" && !strings.HasPrefix(item.Says, "A human-readable description of the tool.") {
+				t.Errorf("%s: Tool.description says %q", name, item.Says)
+			}
+			if item.Column == "name" && !item.Required {
+				t.Errorf("%s: Tool.name is not required", name)
+			}
+		}
+		if held.Ours["protocol.Sigil.does"] != "What it is for, in words, for somebody who has never seen the code." {
+			t.Errorf("%s: Sigil.does says %q", name, held.Ours["protocol.Sigil.does"])
+		}
 		if len(held.Unfollowed["protocol.Sigil"]) != 0 {
 			t.Errorf("%s: Sigil unfollowed is %v", name, held.Unfollowed["protocol.Sigil"])
 		}
@@ -193,4 +206,33 @@ func TestParityHoldsTheNodeToAgentCard(t *testing.T) {
 		t.Errorf("required and unfollowed is %v", held.Required)
 	}
 	holds(t, signum, "hold", answer)
+}
+
+// follows is what the parity window offers to hold: every signum, what it
+// declares it follows, and what every signum follows by its shape.
+func TestParityFollowsIsEverySignumAndItsReferences(t *testing.T) {
+	signum := (&QNTXServer{}).paritySignum()
+	answer, refused := signum.Answers["follows"](context.Background(), nil)
+	if refused != nil {
+		t.Fatalf("follows refused: %s", refused.GetSays())
+	}
+	rows := answer.([]map[string]any)
+	byName := map[string]map[string]any{}
+	for _, row := range rows {
+		byName[row["signum"].(string)] = row
+	}
+	staands, ok := byName["staands"]
+	if !ok {
+		t.Fatalf("follows has no staands: %v", rows)
+	}
+	if strings.Join(staands["declares"].([]string), " ") != "umami" {
+		t.Errorf("staands declares %v", staands["declares"])
+	}
+	if strings.Join(staands["by_shape"].([]string), " ") != "a2a mcp" {
+		t.Errorf("by its shape staands follows %v", staands["by_shape"])
+	}
+	if len(byName["parity"]["declares"].([]string)) != 0 {
+		t.Errorf("parity declares %v", byName["parity"]["declares"])
+	}
+	holds(t, signum, "follows", answer)
 }

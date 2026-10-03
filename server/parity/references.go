@@ -21,11 +21,12 @@ import (
 // The references a signum can be held to, each pinned in a directory named for
 // the reference, its version and the commit it was taken at, with SOURCE
 // saying where it came from: umami is umami_v3.3.1_ca661c7, a2a is
-// a2a_v1.0.1_3303592, mcp is mcp_2026-07-28_5f5440b. A reference is read as it
-// is: a schema.prisma as Prisma, a .proto as the descriptors it compiles to, a
-// schema.json as JSON Schema.
+// a2a_v1.0.1_3303592, mcp is mcp_2026-07-28_5f5440b, umami-tracker is
+// umami-tracker_v3.3.1_ca661c7. A reference is read as it is: a schema.prisma
+// as Prisma, a .proto as the descriptors it compiles to, a schema.json as JSON
+// Schema, a .d.ts as the TypeScript types it declares.
 //
-//go:embed */schema.prisma */*.proto */schema.json
+//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory
@@ -35,32 +36,38 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 	if refused != nil {
 		return Schema{}, refused
 	}
-	var protos []string
-	for _, file := range files {
-		if file == "schema.prisma" {
-			return prismaAt(path.Join(dir, file))
+	var protos, declarations []string
+	prisma, jsonSchema := false, false
+	for _, name := range files {
+		switch {
+		case name == "schema.prisma":
+			prisma = true
+		case name == "schema.json":
+			jsonSchema = true
+		case strings.HasSuffix(name, ".d.ts"):
+			declarations = append(declarations, name)
+		case strings.HasSuffix(name, ".proto"):
+			protos = append(protos, name)
 		}
-		if file == "schema.json" {
-			return jsonSchemaAt(path.Join(dir, file))
+	}
+	switch {
+	case prisma:
+		// A record and the types of what is sent to it are one reference:
+		// Umami's schema.prisma and its tracker's index.d.ts.
+		schema, refused := prismaAt(dir, "schema.prisma")
+		if refused != nil {
+			return Schema{}, refused
 		}
-		if strings.HasSuffix(file, ".proto") {
-			protos = append(protos, file)
-		}
+		return withDeclarations(schema, dir, declarations)
+	case jsonSchema:
+		return jsonSchemaAt(path.Join(dir, "schema.json"))
+	case len(declarations) > 0:
+		return withDeclarations(Schema{fits: tsFits}, dir, declarations)
 	}
 	if len(protos) == 0 {
-		return Schema{}, failed("%s holds no schema.prisma, no .proto and no schema.json", dir)
+		return Schema{}, failed("%s holds no schema.prisma, no .proto, no schema.json and no .d.ts", dir)
 	}
-	compiled, refused := compileAt(dir, protos)
-	if refused != nil {
-		return Schema{}, refused
-	}
-	var models []Model
-	for _, file := range compiled {
-		models = append(models, messagesOf(file.Package(), file.Messages())...)
-	}
-	return Schema{Models: models, fits: func(kind protoreflect.Kind, column Column) bool {
-		return column.Type == kind.String()
-	}}, nil
+	return protoAt(dir, protos)
 }
 
 // Descriptors is the .proto files pinned for the reference named, as they
@@ -115,7 +122,8 @@ func pinnedAt(name string) (string, []string, *protocol.Refusal) {
 	return found[0], files, nil
 }
 
-func prismaAt(schema string) (Schema, *protocol.Refusal) {
+func prismaAt(dir, file string) (Schema, *protocol.Refusal) {
+	schema := path.Join(dir, file)
 	raw, err := pinned.ReadFile(schema)
 	if err != nil {
 		return Schema{}, failed("%s did not read: %v", schema, err)
@@ -124,7 +132,41 @@ func prismaAt(schema string) (Schema, *protocol.Refusal) {
 	if err != nil {
 		return Schema{}, failed("%v", err)
 	}
+	if err := wordsFromAPI(dir, models); err != nil {
+		return Schema{}, failed("%v", err)
+	}
 	return Prisma(models), nil
+}
+
+// withDeclarations is a schema with the models of the .d.ts files beside it,
+// each column held to TypeScript's types and saying it was read there.
+func withDeclarations(schema Schema, dir string, files []string) (Schema, *protocol.Refusal) {
+	for _, file := range files {
+		declarations := path.Join(dir, file)
+		raw, err := pinned.ReadFile(declarations)
+		if err != nil {
+			return Schema{}, failed("%s did not read: %v", declarations, err)
+		}
+		models, err := ParseTypeScript(declarations, raw)
+		if err != nil {
+			return Schema{}, failed("%v", err)
+		}
+		for i := range models {
+			m := &models[i]
+			if m.Says != "" {
+				m.SaysFrom = file + " · " + m.Name
+			}
+			for j := range m.Columns {
+				c := &m.Columns[j]
+				c.fits = tsFits
+				if c.Says != "" {
+					c.SaysFrom = file + " · " + m.Name + "." + c.Name
+				}
+			}
+		}
+		schema.Models = append(schema.Models, models...)
+	}
+	return schema, nil
 }
 
 func jsonSchemaAt(schema string) (Schema, *protocol.Refusal) {
@@ -139,10 +181,27 @@ func jsonSchemaAt(schema string) (Schema, *protocol.Refusal) {
 	return read, nil
 }
 
+// protoAt is the messages of the .proto files of dir as a reference.
+func protoAt(dir string, names []string) (Schema, *protocol.Refusal) {
+	files, refused := compileAt(dir, names)
+	if refused != nil {
+		return Schema{}, refused
+	}
+	var models []Model
+	for _, file := range files {
+		models = append(models, messagesOf(file.Package(), file.Messages())...)
+	}
+	return Schema{Models: models, fits: func(kind protoreflect.Kind, column Column) bool {
+		return column.Type == kind.String()
+	}}, nil
+}
+
 // compileAt compiles the .proto files of dir. What they import from google/api
 // is what this binary links of genproto; google/protobuf is protocompile's own.
 func compileAt(dir string, names []string) ([]protoreflect.FileDescriptor, *protocol.Refusal) {
 	compiler := protocompile.Compiler{
+		// The comments are what the spec says of its own messages and fields.
+		SourceInfoMode: protocompile.SourceInfoStandard,
 		Resolver: protocompile.WithStandardImports(protocompile.CompositeResolver{
 			&protocompile.SourceResolver{Accessor: func(name string) (io.ReadCloser, error) {
 				return pinned.Open(path.Join(dir, name))
@@ -176,7 +235,7 @@ func messagesOf(pkg protoreflect.FullName, messages protoreflect.MessageDescript
 		if message.IsMapEntry() {
 			continue
 		}
-		model := Model{Name: strings.TrimPrefix(string(message.FullName()), string(pkg)+".")}
+		model := Model{Name: strings.TrimPrefix(string(message.FullName()), string(pkg)+"."), Says: saysOf(message)}
 		fields := message.Fields()
 		for j := 0; j < fields.Len(); j++ {
 			field := fields.Get(j)
@@ -185,7 +244,7 @@ func messagesOf(pkg protoreflect.FullName, messages protoreflect.MessageDescript
 				kind = "map"
 			}
 			model.Columns = append(model.Columns, Column{
-				Name: string(field.Name()), Type: kind, List: field.IsList(), Required: Required(field),
+				Name: string(field.Name()), Type: kind, List: field.IsList(), Required: Required(field), Says: saysOf(field),
 			})
 		}
 		models = append(models, model)
@@ -195,9 +254,9 @@ func messagesOf(pkg protoreflect.FullName, messages protoreflect.MessageDescript
 }
 
 // Required reads google.api.field_behavior off a field: whether the reference
-// says a value must be there. The compiled options
-// carry the extension as bytes, so they are read again against the registry
-// this binary links, where field_behavior is known.
+// says a value must be there. The compiled options carry the extension as
+// bytes, so they are read again against the registry this binary links, where
+// field_behavior is known.
 func Required(field protoreflect.FieldDescriptor) bool {
 	raw, err := proto.Marshal(field.Options())
 	if err != nil {

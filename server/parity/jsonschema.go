@@ -26,6 +26,8 @@ type node struct {
 	AllOf      []node          `json:"allOf"`
 	Properties json.RawMessage `json:"properties"`
 	Required   []string        `json:"required"`
+	// Description is what the schema says of it.
+	Description string `json:"description"`
 }
 
 // defsRef is how a schema refers to one of its own definitions.
@@ -66,7 +68,7 @@ func ParseJSONSchema(path string, raw []byte) (Schema, error) {
 		if err != nil {
 			return Schema{}, errors.Wrapf(err, "the properties of %s in %s did not read", name, path)
 		}
-		model := Model{Name: name}
+		model := Model{Name: name, Says: def.Description}
 		for _, prop := range props {
 			var property node
 			if err := json.Unmarshal(propRaws[prop], &property); err != nil {
@@ -93,6 +95,7 @@ func ParseJSONSchema(path string, raw []byte) (Schema, error) {
 			}
 			model.Columns = append(model.Columns, Column{
 				Name: prop, Type: word, List: list, Required: slices.Contains(def.Required, prop), holds: holds,
+				Says: property.Description,
 			})
 		}
 		models = append(models, model)

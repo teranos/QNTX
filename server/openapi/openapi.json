@@ -309,6 +309,11 @@
         "SUPER"
       ]
     },
+    "/api/parity/follows": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/parity/hold": {
       "x-qntx-reach": [
         "ROOT"

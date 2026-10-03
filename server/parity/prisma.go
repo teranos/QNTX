@@ -38,6 +38,15 @@ type Column struct {
 	List bool
 	// Required is the reference saying a value must be there.
 	Required bool
+	// Says is what the reference says of it, in its own words, when it does.
+	Says string
+	// SaysFrom is where Says was read, when not from the schema itself:
+	// openapi.json · WebsiteSession.screen.
+	SaysFrom string
+	// fits is, when the column is held to types of its own rather than its
+	// schema's, whether a field of a kind can be held in it: a TypeScript
+	// column beside a Prisma model.
+	fits func(protoreflect.Kind, Column) bool
 	// holds is, for JSON Schema, the types a value of it may be once every
 	// definition it refers to is read: what Type names, resolved.
 	holds []string
@@ -47,8 +56,12 @@ type Column struct {
 // columns, in the order the schema has them. A Prisma relation is not a column
 // of the record, so it is left out.
 type Model struct {
-	Name    string
-	Columns []Column
+	Name string
+	// Says is what the reference says of the model, when it does.
+	Says string
+	// SaysFrom is where Says was read, when not from the schema itself.
+	SaysFrom string
+	Columns  []Column
 }
 
 // Schema is a reference as it is read: its models, and which column a field
@@ -68,17 +81,25 @@ func Prisma(models []Model) Schema {
 var prismaScalars = []string{"String", "Int", "BigInt", "Boolean", "DateTime", "Decimal", "Json", "Float", "Bytes"}
 
 // ParsePrisma reads the models of a schema.prisma; path is only where it says
-// the schema came from.
+// the schema came from. A /// line is Prisma's documentation comment, what the
+// schema says of the model or field below it.
 func ParsePrisma(path string, raw []byte) ([]Model, error) {
 	var models []Model
 	var cur *Model
+	var doc []string
 	for _, line := range strings.Split(string(raw), "\n") {
 		line = strings.TrimSpace(line)
+		if said, ok := strings.CutPrefix(line, "///"); ok {
+			doc = append(doc, said)
+			continue
+		}
+		says := words(strings.Join(doc, "\n"))
+		doc = nil
 		switch {
 		case cur == nil:
 			if name, ok := strings.CutPrefix(line, "model "); ok {
 				name, _, _ = strings.Cut(name, " ")
-				models = append(models, Model{Name: name})
+				models = append(models, Model{Name: name, Says: says})
 				cur = &models[len(models)-1]
 			}
 		case line == "}":
@@ -93,7 +114,7 @@ func ParsePrisma(path string, raw []byte) ([]Model, error) {
 			list := strings.HasSuffix(kind, "[]")
 			kind = strings.TrimSuffix(kind, "[]")
 			if slices.Contains(prismaScalars, kind) {
-				cur.Columns = append(cur.Columns, Column{Name: parts[0], Type: kind, List: list})
+				cur.Columns = append(cur.Columns, Column{Name: parts[0], Type: kind, List: list, Says: says})
 			}
 		}
 	}
@@ -151,11 +172,15 @@ func departs(field protoreflect.FieldDescriptor, name string, column Column, fit
 	return reasons
 }
 
-// Item is one column of a model: whether it is followed, and how it departs.
+// Item is one column of a model: whether it is followed, and how it departs,
+// with what the reference says of it and whether it requires it.
 type Item struct {
 	Column   string
 	Followed []string
 	Departs  []string
+	Says     string
+	SaysFrom string
+	Required bool
 }
 
 // Conforms is followed and departs in nothing.
@@ -171,13 +196,16 @@ func (i Item) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"column": i.Column, "score": score,
 		"followed": nonNil(i.Followed), "departs": nonNil(i.Departs),
+		"says": i.Says, "says_from": i.SaysFrom, "required": i.Required,
 	})
 }
 
-// Clade is one model and its columns.
+// Clade is one model and its columns, with what the reference says of it.
 type Clade struct {
-	Model string
-	Items []Item
+	Model    string
+	Says     string
+	SaysFrom string
+	Items    []Item
 }
 
 // MarshalJSON is a clade as the sigil gives it, with its score.
@@ -186,7 +214,7 @@ func (c Clade) MarshalJSON() ([]byte, error) {
 	if items == nil {
 		items = []Item{}
 	}
-	return json.Marshal(map[string]any{"model": c.Model, "score": c.Score(), "items": items})
+	return json.Marshal(map[string]any{"model": c.Model, "says": c.Says, "says_from": c.SaysFrom, "score": c.Score(), "items": items})
 }
 
 func nonNil(s []string) []string {
@@ -233,6 +261,9 @@ type Parity struct {
 	// Required is, of the models anything follows, each column the reference
 	// requires and nothing follows.
 	Required []string `json:"required"`
+	// Ours is what each message in scope and each of its fields says of
+	// itself, in its own .proto's words, by full name: protocol.Sigil.does.
+	Ours map[string]string `json:"ours"`
 }
 
 // inScope is the messages a sigil carries, and whole when no sigil is named and
@@ -351,7 +382,11 @@ func Hold(signum *protocol.Signum, named, reference string, schema Schema) (Pari
 			continue
 		}
 		followedBy[c.GetColumn()] = append(followedBy[c.GetColumn()], c.GetField())
-		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), column, schema.fits)...)
+		fits := schema.fits
+		if column.fits != nil {
+			fits = column.fits
+		}
+		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), column, fits)...)
 	}
 	for message := range scope {
 		if _, ok := messages[message]; ok {
@@ -374,12 +409,17 @@ func Hold(signum *protocol.Signum, named, reference string, schema Schema) (Pari
 		}
 		slices.Sort(p.Unfollowed[message])
 	}
+	said, err := ours(messages)
+	if err != nil {
+		return Parity{}, failed("%v", err)
+	}
+	p.Ours = said
 
 	for _, m := range models {
-		clade := Clade{Model: m.Name}
+		clade := Clade{Model: m.Name, Says: m.Says, SaysFrom: m.SaysFrom}
 		for _, c := range m.Columns {
 			key := m.Name + "." + c.Name
-			clade.Items = append(clade.Items, Item{Column: c.Name, Followed: followedBy[key], Departs: departures[key]})
+			clade.Items = append(clade.Items, Item{Column: c.Name, Followed: followedBy[key], Departs: departures[key], Says: c.Says, SaysFrom: c.SaysFrom, Required: c.Required})
 		}
 		p.Clades = append(p.Clades, clade)
 		if !clade.followed() {

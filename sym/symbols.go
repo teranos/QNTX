@@ -42,6 +42,7 @@ const (
 	Subcanvas  = "⌗" // Nested canvas (subcanvas workspace)
 	Transcript = "🧵" // One session Ground recorded, read as what was said and done
 	Ground     = "⏚" // The Ground element, aware of anything Ground
+	Parity     = "≍" // Parity: a signum held to a reference it follows
 )
 
 // SymbolToCommand maps symbols to their text command equivalents

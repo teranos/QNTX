@@ -3,3 +3,22 @@ Umami v3.3.1, the version staands follows.
 schema.prisma https://raw.githubusercontent.com/umami-software/umami/ca661c7057984aa98ed4f7083d84dae2f65bfcb0/prisma/schema.prisma (the commit v3.3.1 points to)
 
 b9f47294b09620aa2c44156dabcfb96168d1cdf881c9e712b6be27901b051b89  schema.prisma
+
+openapi.words.json is what Umami's API document says of its schemas and
+nothing else of it: nix/umami-words.nix fetches the document by its hash and
+keeps every schema's description and each property's, and make says writes it.
+
+openapi.json https://raw.githubusercontent.com/umami-software/docs/a50c0af47f8747d9b0cf99b59c4cbf3659407285/openapi.json (Umami's API document, info.version 3.3.1, last changed in 869e67c)
+
+09986e60be747a0b7bff3d57a61b91939bf74e8b02d180857384d2e11e3fa1e2  openapi.json
+
+The schema says nothing of its models or columns; the API document does, of
+the shapes the API answers with. words says which of those speaks for which
+model, since Umami links them nowhere.
+
+index.d.ts https://raw.githubusercontent.com/umami-software/umami/ca661c7057984aa98ed4f7083d84dae2f65bfcb0/src/tracker/index.d.ts (the same commit)
+
+f2621a7aaf033504234333978acd36d582404b56525bce28e9ae62de470b3190  index.d.ts
+
+The browser tracker's types: what Umami sends, beside what it keeps. One
+reference, Umami, read from its record and its tracker.

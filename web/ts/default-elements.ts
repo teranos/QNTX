@@ -24,6 +24,7 @@ import { createGitHubElement } from './github-element.ts';
 import { createGroundElement } from './ground-element.ts';
 import { createIElement } from './i-element.ts';
 import { createAmElement } from './am-element.ts';
+import { createParityElement } from './parity-element.ts';
 import { log, SEG } from './logger.ts';
 
 export { updateDatabaseStats, recordEviction } from './db-element';
@@ -107,6 +108,9 @@ export function registerDefaultElements(hasCanvas: boolean = true): void {
 
     // Handlers Panel Element — handler attestation management
     tray.add(createHandlersElement());
+
+    // ≍ — a signum held to a reference it follows, the seam in both sides' words
+    tray.add(createParityElement());
 
     // LLM Provider Element — provider selection (replaces ai-provider-window)
     tray.add(createLlmProviderElement());

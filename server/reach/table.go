@@ -129,7 +129,7 @@ REACH is '/am/card'                                                       of ROO
 
 # A signum held to a reference it follows (the parity signum): "parity the
 # sigil is what an Agent should deal with through MCP".
-REACH is '/api/parity/hold' '/api/parity/storage'                         of ROOT
+REACH is '/api/parity/hold' '/api/parity/storage' '/api/parity/follows'   of ROOT
 
 # What was said and done in each agent session Ground recorded (transcripts).
 REACH is '/api/transcripts'                                               of ROOT
