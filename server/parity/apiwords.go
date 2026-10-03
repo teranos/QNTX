@@ -10,9 +10,10 @@ import (
 )
 
 // A schema that says nothing of its own models may be spoken for by the
-// reference's API document: pinned beside it as openapi.json, with words
-// saying which of its schemas speaks for which model, since nothing in the
-// reference links them. A column the schema says nothing of takes the words
+// reference's API document: what it says of its schemas pinned beside it as
+// openapi.words.json (nix/umami-words.nix, from the document by its hash),
+// with words saying which of its schemas speaks for which model, since nothing
+// in the reference links them. A column the schema says nothing of takes the words
 // of the property of the same name, and says where they were read.
 
 // apiDocument is what an OpenAPI document says of its schemas.
@@ -28,19 +29,19 @@ type apiDocument struct {
 }
 
 // wordsFromAPI gives models the API document's words, where dir pins both an
-// openapi.json and the words that link its schemas to the models. A dir with
+// openapi.words.json and the words that link its schemas to the models. A dir with
 // neither is left as it is; one with one and not the other, or a line naming
 // what is not there, is the pin's to fix.
 func wordsFromAPI(dir string, models []Model) error {
 	links, linksErr := pinned.ReadFile(path.Join(dir, "words"))
-	raw, docErr := pinned.ReadFile(path.Join(dir, "openapi.json"))
+	raw, docErr := pinned.ReadFile(path.Join(dir, "openapi.words.json"))
 	switch {
 	case errors.Is(linksErr, fs.ErrNotExist) && errors.Is(docErr, fs.ErrNotExist):
 		return nil
 	case linksErr != nil:
-		return errors.Wrapf(linksErr, "%s pins openapi.json, and its words did not read", dir)
+		return errors.Wrapf(linksErr, "%s pins openapi.words.json, and its words did not read", dir)
 	case docErr != nil:
-		return errors.Wrapf(docErr, "%s pins words, and its openapi.json did not read", dir)
+		return errors.Wrapf(docErr, "%s pins words, and its openapi.words.json did not read: run make says", dir)
 	}
 	return applyAPIWords(dir, links, raw, models)
 }
@@ -50,7 +51,7 @@ func wordsFromAPI(dir string, models []Model) error {
 func applyAPIWords(dir string, links, raw []byte, models []Model) error {
 	var doc apiDocument
 	if err := json.Unmarshal(raw, &doc); err != nil {
-		return errors.Wrapf(err, "%s/openapi.json did not read", dir)
+		return errors.Wrapf(err, "%s/openapi.words.json did not read", dir)
 	}
 	at := map[string]*Model{}
 	for i := range models {

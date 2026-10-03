@@ -26,7 +26,7 @@ import (
 // as Prisma, a .proto as the descriptors it compiles to, a schema.json as JSON
 // Schema, a .d.ts as the TypeScript types it declares.
 //
-//go:embed */schema.prisma */*.proto */schema.json */openapi.json */words */*.d.ts
+//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory

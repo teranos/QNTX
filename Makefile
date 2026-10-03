@@ -41,9 +41,12 @@ parity: ## Report what a node keeps on its own disk and what the record keeps (A
 	@go run ./cmd/parity
 
 # The generated Go keeps no .proto comment, and the parity sigil gives what our
-# fields say of themselves beside what each spec says of its own.
-says: ## Write what the protocol's messages and fields say of themselves to server/parity/protocol.says.json
+# fields say of themselves beside what each spec says of its own. Umami's API
+# document is 1.4 MB and parity reads only its words, so nix fetches it by its
+# hash and keeps those.
+says: ## Write what the specs and our protocol say of themselves for the parity sigil
 	@go run ./cmd/says
+	@nix eval --raw -f nix/umami-words.nix > server/parity/umami_v3.3.1_ca661c7/openapi.words.json
 
 # git is the baseline, so there is no file to keep in step. What already stands
 # keeps standing; what this branch added is what answers. Exit 2 and not 1: a
