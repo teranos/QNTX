@@ -154,8 +154,8 @@ entity_actors_limit = 64
 # ════════════════════════════════════════════════════════════════
 
 [mail]
-# The address every mail is sent from. Empty sends nothing, and every
-# send says why.
+# The address every mail is sent from. Omitted, it is system@ the rp_id.
+# Empty sends nothing, and every send says why.
 # from = "Garden <mail@garden.test>"
 
 [mail.ses]
@@ -192,7 +192,9 @@ port = 8770
 
 # Allowed CORS origins for web UI access
 # Default: localhost and 127.0.0.1 (HTTP and HTTPS), plus the App, which is at
-# tauri://localhost on iOS and desktop and at tauri.localhost on Android
+# tauri://localhost on iOS and desktop and at tauri.localhost on Android.
+# The web origins of auth.rp_origins and of every door are allowed beside what
+# is written here; list only the origins that are not a door.
 allowed_origins = [
     "http://localhost",
     "https://localhost",
@@ -237,7 +239,8 @@ log_theme = "everforest"
 # deployment.
 #   rp_id      — single domain, no scheme, no port: "qntx.example.com"
 #   rp_origins — full URLs the browser will present: ["https://qntx.example.com"]
-# Empty rp_id falls back to "localhost"; empty rp_origins falls back to
+# Omitted rp_origins is https:// and the rp_id; written, it overrides that.
+# Empty rp_id falls back to "localhost", and then rp_origins falls back to
 # http://localhost:<server.port> [+ frontend_port]. Startup fails fast if
 # bind_address is non-loopback, auth.enabled is true, and rp_id is empty.
 # rp_id = "qntx.example.com"
@@ -276,7 +279,8 @@ log_theme = "everforest"
 # A passkey belongs to the domain it was made at, so a door is a relying party
 # of its own. rp_id must be a registrable domain suffix of every origin under
 # it — the browser's rule, which is why one rp_id stands behind several
-# hostnames and a door with several origins is still one door.
+# hostnames and a door with several origins is still one door. A door with
+# one origin and no rp_id has that origin's host as its rp_id.
 #
 # The key is the namespace's name lowercased, which is the whole of the slug —
 # the store keeps "Clean" and the door says "clean". TOML keys arrive
