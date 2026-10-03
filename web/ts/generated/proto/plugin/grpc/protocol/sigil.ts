@@ -30,8 +30,8 @@ export interface Signum {
 
 /**
  * Node is the node about itself: what it is called, what it is for, and the
- * signa it holds. am node answers it; the parity sigil holds it to A2A's
- * AgentCard. Mirrors server.amNode.
+ * signa it holds. It is what fills A2A's AgentCard, which am node answers, and
+ * the parity sigil holds it to that card.
  */
 export interface Node {
   name: string;

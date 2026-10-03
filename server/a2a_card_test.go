@@ -37,9 +37,11 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 	for _, skill := range root.Skills {
 		assert.Equal(t, skill.Name, skill.ID, "a skill's id is its signum")
 	}
-	for _, signum := range []string{"staands", "parity", "am", "reach"} {
+	for _, signum := range []string{"staands", "parity", "reach"} {
 		assert.Contains(t, names(root), signum, "ROOT's card lacks "+signum)
 	}
+	// "make am the card, not a skill on it"
+	assert.NotContains(t, names(root), amSignumName, "am is the card, not a skill on it")
 	assert.Equal(t, "https://node.example/a2a", root.URL)
 	mcpAt, _ := root.Extensions[0].Params["mcp"].(map[string]any)
 	assert.Equal(t, "https://node.example/mcp", mcpAt["url"], "the node extension says where the MCP answers")

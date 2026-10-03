@@ -467,7 +467,7 @@
   "protocol.LogEntry": "A single log line from a task execution.",
   "protocol.MailImage": "MailImage is an image a mail carries inline. Only image/png is accepted, and all of a mail's images together are held under a size cap.",
   "protocol.MailTemplate": "MailTemplate is what a mail is filled from. Each part is a Go template over the values a Send names: subject and text with text/template, html with html/template. A value a template names and the Send does not is a refusal, never an empty space in a mail that went out.",
-  "protocol.Node": "Node is the node about itself: what it is called, what it is for, and the signa it holds. am node answers it; the parity sigil holds it to A2A's AgentCard. Mirrors server.amNode.",
+  "protocol.Node": "Node is the node about itself: what it is called, what it is for, and the signa it holds. It is what fills A2A's AgentCard, which am node answers, and the parity sigil holds it to that card.",
   "protocol.Param": "A Param is one thing a sigil takes. It says nothing about how it travels: that is each surface's to decide.",
   "protocol.Param.kind": "What its value is: empty is text, \"count\" is a whole number, zero or more.",
   "protocol.Param.one_of": "Every value it takes, when it takes only some.",

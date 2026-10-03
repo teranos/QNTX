@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/a2a"
@@ -19,14 +18,6 @@ import (
 // what one item on the status line is doing. The status line itself answers
 // text for a terminal as well as JSON, so it stays a route.
 
-// amNode is what am node answers: protocol.Node, with the json tags the
-// answer is held to (ADR-006).
-type amNode struct {
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	Signa       []*protocol.Signum `json:"signa"`
-}
-
 // amFollowsAgentCard is which of the node's own facts fill A2A's AgentCard,
 // and nothing it does not have.
 func amFollowsAgentCard() *protocol.Follows {
@@ -38,10 +29,13 @@ func amFollowsAgentCard() *protocol.Follows {
 	}}
 }
 
+// amSignumName is am: being, the node, and the card that says it.
+const amSignumName = "am"
+
 func (s *QNTXServer) amSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name:    "am",
+			Name:    amSignumName,
 			Follows: []*protocol.Follows{amFollowsAgentCard()},
 			Sigils: []*protocol.Sigil{
 				{
@@ -57,23 +51,14 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/version"},
 				},
 				{
+					// "am node is the card too"
 					Name: "node",
-					Does: "What the node says of itself: what it is called and what it is for, as node.name and node.description in am.toml say, and every signum it serves.",
-					Gives: []*protocol.Field{
-						{Name: "name", Says: "What the node is called, or empty when it was not given a name."},
-						{Name: "description", Says: "What the node is for, or empty when it was not said."},
-						{Name: "signa", Says: "Every signum the node serves.", Message: "protocol.Signum"},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/node"},
-				},
-				{
-					Name: "card",
-					Does: "The A2A agent card the asker would be given, read through the pinned spec, and what it leaves empty that the spec requires.",
+					Does: "What the node says of itself, as the A2A agent card the asker would be given, read through the pinned spec, and what it leaves empty that the spec requires.",
 					Gives: []*protocol.Field{
 						{Name: "card", Says: "The card, as the pinned A2A spec shapes it.", Message: a2a.AgentCard},
 						{Name: "missing", Says: "Every field the card leaves empty that the spec requires, by its path."},
 					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/card"},
+					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/node"},
 				},
 				{
 					Name: "syscap",
@@ -103,7 +88,6 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 		Answers: map[string]sigil.Answer{
 			"version": func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return version.Get(), nil },
 			"node":    s.amNode,
-			"card":    s.amCard,
 			"syscap":  func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return syscap.Get(s.store), nil },
 			"item": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 				return s.statusLineHandler.item(ctx, sent["name"])
@@ -112,13 +96,13 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 	}
 }
 
-// amCard is what am card answers.
-type amCard struct {
+// amNode is what am node answers: the card, and what it lacks.
+type amNode struct {
 	Card    json.RawMessage `json:"card"`
 	Missing []string        `json:"missing"`
 }
 
-func (s *QNTXServer) amCard(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+func (s *QNTXServer) amNode(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
 	caller := sigil.Caller(ctx)
 	if caller == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the card names where its caller reached the node, and this asking carried no request"}
@@ -135,13 +119,5 @@ func (s *QNTXServer) amCard(ctx context.Context, _ sigil.Sent) (any, *protocol.R
 	if missing == nil {
 		missing = []string{}
 	}
-	return amCard{Card: body, Missing: missing}, nil
-}
-
-func (s *QNTXServer) amNode(context.Context, sigil.Sent) (any, *protocol.Refusal) {
-	node := amNode{Name: appcfg.GetString("node.name"), Description: appcfg.GetString("node.description"), Signa: []*protocol.Signum{}}
-	for _, signum := range s.checkedSigna() {
-		node.Signa = append(node.Signa, signum.Signum)
-	}
-	return node, nil
+	return amNode{Card: body, Missing: missing}, nil
 }

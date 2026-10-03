@@ -1,5 +1,5 @@
 /**
- * The A2A card the node would give a caller (am card), resting in ≡ as an italic A2A button.
+ * The A2A card the node would give a caller (am node), resting in ≡ as an italic A2A button.
  */
 
 import type { Element } from '@teranos/elements';
@@ -9,7 +9,7 @@ import { log, SEG } from './logger.ts';
 
 export const A2A_CARD_ID = 'a2a-card';
 
-/** What am card answers: the card, and what it leaves empty that the spec requires. */
+/** What am node answers: the card, and what it leaves empty that the spec requires. */
 export interface AmCard {
     card: {
         name?: string;
@@ -82,12 +82,12 @@ let refused: string | null = null;
 
 /** Settles once the node answered or refused; which is in answered or refused. */
 function ask(): Promise<void> {
-    asked ??= apiFetch('/am/card')
+    asked ??= apiFetch('/am/node')
         .then(async (response) => {
-            if (!response.ok) throw new Error(`/am/card answered ${response.status} ${response.statusText}`);
+            if (!response.ok) throw new Error(`/am/node answered ${response.status} ${response.statusText}`);
             const body = await response.json() as Partial<AmCard>;
             if (typeof body.card !== 'object' || body.card === null || !Array.isArray(body.missing)) {
-                throw new Error(`/am/card answered something that is not a card: ${JSON.stringify(body)}`);
+                throw new Error(`/am/node answered something that is not a card: ${JSON.stringify(body)}`);
             }
             answered = body as AmCard;
         })

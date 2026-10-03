@@ -33,7 +33,7 @@ var agentCardSigna = []string{"namespaces", "plugins", "staands", "i", "mail"}
 // field for: the node's DID, its health and what this build can do.
 const nodeExtensionURI = "https://github.com/teranos/QNTX/blob/main/docs/adr/ADR-039-sigils.md#the-node-extension-v1"
 
-// cardBase is the card without its skills: what am node says of the node, the
+// cardBase is the card without its skills: what am.toml says of the node, the
 // ways it is reached, and the node extension.
 func (s *QNTXServer) cardBase(r *http.Request) a2a.Card {
 	return a2a.Card{
@@ -82,6 +82,11 @@ func (s *QNTXServer) a2aCard(r *http.Request) a2a.Card {
 	card := s.cardBase(r)
 	admitted, known := auth.AdmissionFrom(r.Context())
 	for _, signum := range s.checkedSigna() {
+		// "make am the card, not a skill on it": am is being, what the card
+		// says of the node, and a skill is what that being can do.
+		if signum.GetName() == amSignumName {
+			continue
+		}
 		reached := false
 		for _, sigil := range signum.GetSigils() {
 			held := heldBy{signum: signum.GetName(), sigil: sigil}

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"slices"
 	"testing"
@@ -14,8 +13,8 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// am version and am node answer Go structs for their json tags, and proto
-// declares their shape (ADR-006): the two are held to the same fields here.
+// am version answers a Go struct for its json tags, and proto declares its
+// shape (ADR-006): the two are held to the same fields here.
 
 func TestAmVersionIsTheShapeProtoDeclares(t *testing.T) {
 	declared := fieldsOf(t, watcherProto, "VersionInfo")
@@ -25,23 +24,18 @@ func TestAmVersionIsTheShapeProtoDeclares(t *testing.T) {
 	}
 }
 
-func TestAmNodeIsTheShapeProtoDeclares(t *testing.T) {
-	declared := fieldsOf(t, "../plugin/grpc/protocol/sigil.proto", "Node")
-	tagged := jsonNamesOf(t, amNode{})
-	if !slices.Equal(declared, tagged) {
-		t.Errorf("Node declares %v, and amNode is tagged %v", declared, tagged)
-	}
-}
-
-// am card is the A2A card the asker would be given, read through the pinned
-// spec, and what it leaves empty that the spec requires.
-func TestAmCardIsTheCardTheAskerWouldGet(t *testing.T) {
+// "am node is the card too": am node is the A2A card the asker would be given,
+// read through the pinned spec, and what it leaves empty that the spec
+// requires. A node not given a name is not given one here either.
+func TestAmNodeIsTheCardTheAskerWouldGet(t *testing.T) {
 	srv, _ := pluginServingServer(t, "fake")
 	signum := srv.amSignum()
 	asked := askedAs(auth.LevelRoot)
-	answer, refused := signum.Answers["card"](sigil.WithCaller(asked.Context(), asked), nil)
+	answer, refused := signum.Answers["node"](sigil.WithCaller(asked.Context(), asked), nil)
 	require.Nil(t, refused)
-	holds(t, signum, "card", answer)
+	holds(t, signum, "node", answer)
+	_, card := signum.Answers["card"]
+	assert.False(t, card, "am card is am node")
 
 	body, err := json.Marshal(answer)
 	require.NoError(t, err)
@@ -79,30 +73,9 @@ func TestAmCardIsTheCardTheAskerWouldGet(t *testing.T) {
 	assert.NotContains(t, got.Missing, "AgentCard.skills[0].id")
 }
 
-func TestAmCardIsRootsAlone(t *testing.T) {
+func TestAmNodeIsRootsAlone(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"ROOT"}, compiled["/am/card"])
-}
-
-// am node says no name it was not given, and lists the signa it serves.
-func TestAmNodeGivesWhatItHas(t *testing.T) {
-	s := &QNTXServer{}
-	signum := s.amSignum()
-	answer, refused := signum.Answers["node"](context.Background(), nil)
-	if refused != nil {
-		t.Fatalf("node refused: %s", refused.GetSays())
-	}
-	node := answer.(amNode)
-	if node.Name != "" || node.Description != "" {
-		t.Errorf("a node with no name was given %q, %q", node.Name, node.Description)
-	}
-	var names []string
-	for _, held := range node.Signa {
-		names = append(names, held.GetName())
-	}
-	if !slices.Contains(names, "am") || !slices.Contains(names, "parity") {
-		t.Errorf("node lists %v", names)
-	}
-	holds(t, signum, "node", answer)
+	assert.Equal(t, []string{"ROOT"}, compiled["/am/node"])
+	assert.NotContains(t, compiled, "/am/card")
 }

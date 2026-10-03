@@ -9,7 +9,7 @@ Status: Proposed
 - A2A describes the node to other agents.
 - The A2A card says what the node is and how to reach it. MCP is one of those
   ways.
-- An a2a:<signum> line decides which skills a caller sees. am card shows the
+- An a2a:<signum> line decides which skills a caller sees. am node shows the
   card a caller would get.
 - The public card at /.well-known/agent-card.json is read by anyone. It shows
   the signa the node names for it, each requiring the bearer token, and is

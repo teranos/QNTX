@@ -114,7 +114,7 @@ func TestTheAnswerIsHandedTheCaller(t *testing.T) {
 			return nil, nil
 		},
 		Anyone: true,
-		Caller: httptest.NewRequest(http.MethodGet, "https://node.example/am/card", nil),
+		Caller: httptest.NewRequest(http.MethodGet, "https://node.example/am/node", nil),
 	}
 	asking.Ask(context.Background(), map[string]any{"market": "clean", "type": "page"})
 	require.Equal(t, "node.example", host)

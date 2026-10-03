@@ -9,7 +9,7 @@ import { renderA2ACard, a2aCardRow, A2A_CARD_ID, type AmCard } from './a2a-card-
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// What am card answered on a node with no [node] set, cut to two skills.
+// What am node answered on a node with no [node] set, cut to two skills.
 const answered: AmCard = {
     card: {
         version: 'v0.36.0',
