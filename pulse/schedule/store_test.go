@@ -146,6 +146,17 @@ func TestUpdateJobAfterExecution(t *testing.T) {
 	assert.WithinDuration(t, now, mustParse(t, retrieved.LastRunAt), 1*time.Second)
 	assert.Equal(t, executionID, retrieved.LastExecutionId)
 	assert.WithinDuration(t, nextRun, mustParse(t, retrieved.NextRunAt), 1*time.Second)
+
+	var tickAt, tickNext int64
+	var tickExecution string
+	err = db.QueryRow(`
+		SELECT at_ms, execution_id, next_run_at_ms
+		FROM schedule_ticks WHERE schedule_id = ?`, job.Id).
+		Scan(&tickAt, &tickExecution, &tickNext)
+	require.NoError(t, err)
+	assert.Equal(t, now.UnixMilli(), tickAt)
+	assert.Equal(t, executionID, tickExecution)
+	assert.Equal(t, nextRun.UnixMilli(), tickNext)
 }
 
 func TestJobTimeDrift(t *testing.T) {
@@ -157,7 +168,7 @@ func TestJobTimeDrift(t *testing.T) {
 
 	job := &Job{
 		Id:              "SPJ_drift_test",
-		IntervalSeconds: 3600,                         // 1 hour
+		IntervalSeconds: 3600,                                         // 1 hour
 		NextRunAt:       now.Add(-2 * time.Hour).Format(time.RFC3339), // Should have run 2 hours ago
 		State:           StateActive,
 	}
