@@ -2,15 +2,20 @@ package server
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
+	"go.uber.org/zap/zaptest"
 )
 
 const alice = "https://mastodon.example/@alice"
@@ -106,6 +111,99 @@ func TestAmGroundForNobody(t *testing.T) {
 	assert.Equal(t, int64(0), said["left"])
 	assert.Equal(t, "", said["started"])
 	assert.Len(t, said["watches"], 2)
+}
+
+// One usage reading as ug's status line posts it (ground ug/usage.d): the
+// window is the subject, the session the context, and ug is among the actors.
+func reading(id, window, session string, at time.Time, used float64) *types.As {
+	return &types.As{
+		ID:         id,
+		Subjects:   []string{window},
+		Predicates: []string{ugReadingPredicate},
+		Contexts:   []string{"session:" + session},
+		Actors:     []string{"did:key:alice", ugActor},
+		Timestamp:  at,
+		CreatedAt:  at,
+		Attributes: map[string]any{"used_percentage": used, "resets_at": float64(1791079800)},
+	}
+}
+
+// "this seems like a QNTX change from the backend side, have we tackled this yet?"
+func TestAmGroundSaysWhatUgPosted(t *testing.T) {
+	store, db := qntxtest.CreateTestStore(t)
+	now := time.Now().UTC().Truncate(time.Hour)
+	rows := []*types.As{
+		reading("r-1", "five_hour", "s-1", now.Add(-3*time.Hour), 4),
+		reading("r-2", "five_hour", "s-2", now.Add(-2*time.Hour), 9),
+		reading("r-3", "five_hour", "s-1", now.Add(-time.Hour), 13),
+		reading("r-4", "seven_day", "s-1", now.Add(-time.Hour), 61),
+		reading("r-old", "five_hour", "s-0", now.Add(-48*time.Hour), 80),
+		streamed("ground:payload:Stop:1", "Stop", "s-1", now.Add(-time.Hour), map[string]any{"last_assistant_message": "done"}),
+	}
+	for _, as := range rows {
+		require.NoError(t, store.CreateAttestation(as))
+	}
+	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
+	asked := httptest.NewRequest(http.MethodGet, "/am/ground", nil)
+
+	answer, refused := s.amGround(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+	require.Nil(t, refused)
+	holds(t, s.amSignum(), "ground", answer)
+	ug := answer.(map[string]any)["ug"].(map[string]any)
+
+	sessions := ug["sessions"].([]map[string]any)
+	require.Len(t, sessions, 2, "a reading two days old is outside the day, and a Stop is no reading")
+	assert.Equal(t, "s-1", sessions[0]["session"], "the session that posted last comes first")
+	assert.Equal(t, 3, sessions[0]["readings"])
+	assert.Equal(t, map[string]int{
+		now.Add(-3 * time.Hour).Format(hourBucket): 1,
+		now.Add(-time.Hour).Format(hourBucket):     2,
+	}, sessions[0]["over"])
+	assert.Equal(t, "s-2", sessions[1]["session"])
+
+	windows := ug["windows"].([]map[string]any)
+	require.Len(t, windows, 2)
+	assert.Equal(t, "five_hour", windows[0]["window"])
+	five := windows[0]["readings"].([]map[string]any)
+	require.Len(t, five, 3)
+	assert.Equal(t, 4.0, five[0]["used"], "a window's readings come oldest first")
+	assert.Equal(t, 13.0, five[2]["used"])
+}
+
+// Tim: the tmux bar asks in its own format, and that is what the node remembers.
+func TestTheRowRemembersWhenTmuxAsked(t *testing.T) {
+	h := newsRow(newNewsLog())
+	for _, format := range []string{FormatTmux, FormatTmux, FormatJSON} {
+		req := httptest.NewRequest(http.MethodGet, "/am/statusline?format="+format, nil)
+		req = req.WithContext(auth.WithAdmission(req.Context(), tokenCaller("did:key:alice")))
+		h.HandleStatusLine(httptest.NewRecorder(), req)
+	}
+
+	_, count, over, asked := h.tmux.of(alice)
+	require.True(t, asked)
+	assert.Equal(t, int64(2), count, "an ask in json is a browser's, not a bar's")
+	var byTheMinute int64
+	for _, n := range over {
+		byTheMinute += n
+	}
+	assert.Equal(t, int64(2), byTheMinute)
+
+	_, _, _, bobAsked := h.tmux.of("https://mastodon.example/@bob")
+	assert.False(t, bobAsked)
+}
+
+// Spike: the count is of the whole process, and the minutes are of the last hour.
+func TestAsksOlderThanAnHourAreLetGo(t *testing.T) {
+	a := newRowAsks()
+	at := time.Date(2026, 10, 3, 22, 0, 0, 0, time.UTC)
+	a.note(alice, at)
+	a.note(alice, at.Add(90*time.Minute))
+
+	lastMs, count, over, asked := a.of(alice)
+	require.True(t, asked)
+	assert.Equal(t, at.Add(90*time.Minute).UnixMilli(), lastMs)
+	assert.Equal(t, int64(2), count)
+	assert.Equal(t, map[string]int64{"2026-10-03T23:30": 1}, over)
 }
 
 func TestAmGroundIsRootsAndSupers(t *testing.T) {

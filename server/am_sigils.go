@@ -63,6 +63,7 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 						{Name: "watches", Says: "The standing watchers that reach ci.watch: each one's id, its name, and the predicates Ground attests that set it off."},
 						{Name: "news", Says: "What ci.watch said for the caller, newest first: each wait and each conclusion, when it was left, until when the status line carries it, and what the item holds in full."},
 						{Name: "failed", Says: "What ci.watch could not do in the last day, newest first: when, the exact error, and which run of it."},
+						{Name: "ug", Says: "What the node sees of ug: when the caller's tmux bar last asked for the status line, how often since this process began and by the minute over the last hour; each session whose status line posted a usage reading in the last day, with its first, its latest and its readings by the hour; and each window ug read, with what it read over that day."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/ground"},
 				},

@@ -133,6 +133,8 @@ type StatusLineHandler struct {
 	node StatusLineNode
 	// What built-ins left for the caller. Nil draws none.
 	news func() *newsLog
+	// When each person's tmux bar last asked for the row (statusline_asks.go).
+	tmux *rowAsks
 }
 
 // NewStatusLineHandler builds the handler behind /statusline.
@@ -149,6 +151,7 @@ func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 		carousel:        newCarousel(),
 		pluginCarousel:  newCarousel(),
 		node:            node,
+		tmux:            newRowAsks(),
 	}
 }
 
@@ -417,6 +420,10 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		h.noteWriteFailure(writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Symbol: SymbolWell}}))
 		return
+	}
+
+	if format == FormatTmux {
+		h.tmux.note(newsKey(admitted), time.Now())
 	}
 
 	// One plugin's own row, when that is what was asked for. A name the node
