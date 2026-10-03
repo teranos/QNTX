@@ -71,10 +71,14 @@ func (s *QNTXServer) Attestations() (int, bool) {
 // Watchers is how many this node has loaded, read from the engine rather than
 // counted in the store.
 func (s *QNTXServer) Watchers() int {
-	if s == nil || s.watcherEngine == nil {
+	if s == nil {
 		return 0
 	}
-	return len(s.watcherEngine.GetAllWatchers())
+	loaded := 0
+	for _, engine := range s.allEngines() {
+		loaded += len(engine.GetAllWatchers())
+	}
+	return loaded
 }
 
 // Schedules asks the store, which is why frames are produced only when drawn —

@@ -80,4 +80,5 @@ var namespaceSubsystems = []struct {
 	// a push into which reaches no built-in, and that is the failure that
 	// took a day to find.
 	{sub: standingSubsystem{}, policy: SubsystemFatal},
+	{sub: watcherEngineSubsystem{}, policy: SubsystemWarn},
 }

@@ -121,17 +121,23 @@ func watcherToResponse(w *storage.Watcher) WatcherResponse {
 	return resp
 }
 
-// watchedNamespace is the universe the watcher engine watches.
-//
-// There is one engine and it holds the served universe's watchers, so a match
-// is that namespace's content and is addressed to it. A second engine for a
-// second namespace would say a different name here and nothing else changes.
-func (s *QNTXServer) watchedNamespace() string {
-	return s.held.ServedUniverse().Name()
+// watcherMatchesIn is what an engine calls with a match: it goes to the
+// namespace the engine watches, which is the namespace it happened in.
+func (s *QNTXServer) watcherMatchesIn(in string, engine *watcher.Engine) func(string, *types.As, float32) {
+	return func(watcherID string, attestation *types.As, score float32) {
+		s.broadcastWatcherMatch(in, engine, watcherID, attestation, score)
+	}
+}
+
+// elementsFiredIn is what an engine calls when an element it fired reports.
+func (s *QNTXServer) elementsFiredIn(in string) func(string, string, string, error, []byte) {
+	return func(elementID, attestationID, status string, execErr error, result []byte) {
+		s.broadcastElementFired(in, elementID, attestationID, status, execErr, result)
+	}
 }
 
 // broadcastWatcherMatch sends a watcher match to the namespace it happened in.
-func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.As, score float32) {
+func (s *QNTXServer) broadcastWatcherMatch(in string, engine *watcher.Engine, watcherID string, attestation *types.As, score float32) {
 	msg := WatcherMatchMessage{
 		Type:        "watcher_match",
 		WatcherID:   watcherID,
@@ -143,7 +149,7 @@ func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.
 	// For meld-edge watchers, extract target element ID from action data
 	// so the frontend can route matches to the correct element
 	if strings.HasPrefix(watcherID, "meld-edge-") {
-		if w, exists := s.watcherEngine.GetWatcher(watcherID); exists {
+		if w, exists := engine.GetWatcher(watcherID); exists {
 			var actionData struct {
 				TargetElementID string `json:"target_element_id"`
 			}
@@ -160,7 +166,7 @@ func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.
 	req := &broadcastRequest{
 		reqType: "watcher_match",
 		payload: msg,
-		in:      s.watchedNamespace(),
+		in:      in,
 		about:   attestation,
 	}
 
@@ -181,7 +187,7 @@ func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.
 // broadcastWatcherError broadcasts a watcher error to all connected clients.
 // Used to send parsing errors, validation errors, etc. to the UI for immediate feedback.
 // Accepts an optional details slice for structured error context (from errors.GetAllDetails).
-func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, severity string, details ...string) {
+func (s *QNTXServer) broadcastWatcherError(in string, watcherID string, errorMsg string, severity string, details ...string) {
 	msg := WatcherErrorMessage{
 		Type:      "watcher_error",
 		WatcherID: watcherID,
@@ -195,7 +201,7 @@ func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, se
 	req := &broadcastRequest{
 		reqType: "watcher_error",
 		payload: msg,
-		in:      s.watchedNamespace(),
+		in:      in,
 	}
 
 	select {
@@ -214,7 +220,7 @@ func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, se
 }
 
 // broadcastElementFired broadcasts an element execution event to all connected clients
-func (s *QNTXServer) broadcastElementFired(elementID string, attestationID string, status string, execErr error, result []byte) {
+func (s *QNTXServer) broadcastElementFired(in string, elementID string, attestationID string, status string, execErr error, result []byte) {
 	msg := ElementFiredMessage{
 		Type:          "element_fired",
 		ElementID:     elementID,
@@ -233,7 +239,7 @@ func (s *QNTXServer) broadcastElementFired(elementID string, attestationID strin
 	req := &broadcastRequest{
 		reqType: "element_fired",
 		payload: msg,
-		in:      s.watchedNamespace(),
+		in:      in,
 	}
 
 	select {
@@ -282,11 +288,13 @@ func (s *QNTXServer) initWatcherEngine() error {
 	// dynamically when plugins declare python_provider=true during Initialize.
 	s.watcherEngine.SetAvailableElementTypes([]string{"prompt", "se"})
 
+	served := s.held.ServedUniverse().Name()
+
 	// Set broadcast callback for live results
-	s.watcherEngine.SetBroadcastCallback(s.broadcastWatcherMatch)
+	s.watcherEngine.SetBroadcastCallback(s.watcherMatchesIn(served, s.watcherEngine))
 
 	// Set element fired callback for meld-triggered execution feedback
-	s.watcherEngine.SetElementFiredCallback(s.broadcastElementFired)
+	s.watcherEngine.SetElementFiredCallback(s.elementsFiredIn(served))
 
 	// Wire plugin executor for plugin_execute action type
 	s.watcherEngine.SetPluginExecutor(&watcherPluginAdapter{server: s})
@@ -322,6 +330,7 @@ func (s *QNTXServer) initWatcherEngine() error {
 	if err := s.watcherEngine.Start(); err != nil {
 		return errors.Wrap(err, "failed to start watcher engine")
 	}
+	s.keepEngine(served, s.watcherEngine)
 
 	// Start dilation loop: adjusts watcher firing rates based on system memory pressure
 	go s.runDilationLoop()
@@ -419,15 +428,17 @@ func (s *QNTXServer) runDilationLoop() {
 		case <-s.ctx.Done():
 			return
 		case <-ticker.C:
-			if s.watcherEngine == nil {
+			engines := s.allEngines()
+			if len(engines) == 0 {
 				continue
 			}
 
 			d := async.CalculateDilation()
 			memPct, cpuPct := async.GetPressure()
-			prev := s.watcherEngine.Dilation()
-			if d != prev {
-				s.watcherEngine.SetDilation(d)
+			for _, engine := range engines {
+				if d != engine.Dilation() {
+					engine.SetDilation(d)
+				}
 			}
 
 			dist[d]++

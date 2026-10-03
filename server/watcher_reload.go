@@ -6,11 +6,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/errors"
 )
 
 // pendingUpsert captures the post-DB-write state needed for post-reload processing.
 type pendingUpsert struct {
+	// in is the namespace whose engine the watcher was written to.
+	in            string
 	watcherID     string
 	semanticQuery string
 	watcherQuery  string
@@ -73,25 +76,53 @@ func (c *watcherReloadCoalescer) flush() {
 		"pending_upserts", len(batch),
 	)
 
-	// Single reload for the entire batch
-	if err := s.watcherEngine.ReloadWatchers(); err != nil {
+	// One reload per namespace in the batch, each against its own engine.
+	byNamespace := map[string][]pendingUpsert{}
+	for _, p := range batch {
+		byNamespace[p.in] = append(byNamespace[p.in], p)
+	}
+	for in, pending := range byNamespace {
+		c.flushIn(in, pending)
+	}
+}
+
+// flushIn reloads one namespace's engine and runs the post-reload work of the
+// watchers written to it.
+func (c *watcherReloadCoalescer) flushIn(in string, batch []pendingUpsert) {
+	s := c.server
+
+	engine := s.engineIn(in)
+	if engine == nil {
+		s.logger.Errorw("A watcher was written to a namespace whose engine is gone",
+			"namespace", in,
+			"batch_size", len(batch),
+		)
+		for _, p := range batch {
+			s.broadcastWatcherError(in, p.watcherID, "no watcher engine runs in "+in, "error")
+		}
+		return
+	}
+
+	if err := engine.ReloadWatchers(); err != nil {
 		s.logger.Errorw("Failed to reload watchers (coalesced)",
+			"namespace", in,
 			"error", err,
 			"batch_size", len(batch),
 		)
 		// Broadcast error to each pending watcher
 		severity := extractErrorSeverity(err)
 		for _, p := range batch {
-			s.broadcastWatcherError(p.watcherID, err.Error(), severity, errors.GetAllDetails(err)...)
+			s.broadcastWatcherError(in, p.watcherID, err.Error(), severity, errors.GetAllDetails(err)...)
 		}
 		return
 	}
 
 	// Pre-flight: check if attestations are readable through Rust before spawning per-watcher queries.
 	type counter interface{ CountAttestations() (int, error) }
-	if c, ok := s.held.Served().(counter); ok {
+	if c, ok := s.held.Served().(counter); ok && in == s.held.ServedUniverse().Name() {
 		if _, err := c.CountAttestations(); err != nil {
 			s.logger.Errorw("Failed to count attestations — skipping historical queries for batch",
+				"namespace", in,
 				"error", err,
 				"batch_size", len(batch),
 			)
@@ -101,22 +132,22 @@ func (c *watcherReloadCoalescer) flush() {
 
 	// Post-reload processing for each watcher
 	for _, p := range batch {
-		c.postReload(p)
+		c.postReload(engine, p)
 	}
 }
 
 // postReload runs the per-watcher logic that was previously inline in handleWatcherUpsert
 // after the ReloadWatchers() call: compound suppression check, parse error broadcast,
 // and historical query dispatch.
-func (c *watcherReloadCoalescer) postReload(p pendingUpsert) {
+func (c *watcherReloadCoalescer) postReload(engine *watcher.Engine, p pendingUpsert) {
 	s := c.server
 
-	reloadedWatcher, exists := s.watcherEngine.GetWatcher(p.watcherID)
+	reloadedWatcher, exists := engine.GetWatcher(p.watcherID)
 	if !exists || reloadedWatcher == nil {
 		// SE watchers absent from engine may be compound-suppressed (SE→SE meld)
 		if strings.HasPrefix(p.watcherID, "se-element-") {
 			elementID := strings.TrimPrefix(p.watcherID, "se-element-")
-			compoundWatchers, err := s.watcherEngine.GetStore().FindCompoundWatchersForTarget(s.ctx, elementID)
+			compoundWatchers, err := engine.GetStore().FindCompoundWatchersForTarget(s.ctx, elementID)
 			if err == nil && len(compoundWatchers) > 0 {
 				s.logger.Infow("SE watcher suppressed by engine (compound target)",
 					"watcher_id", p.watcherID,
@@ -127,7 +158,7 @@ func (c *watcherReloadCoalescer) postReload(p pendingUpsert) {
 						cw.SemanticQuery = p.semanticQuery
 						cw.SemanticThreshold = p.threshold
 						cw.SemanticClusterID = p.clusterID
-						if err := s.watcherEngine.GetStore().Update(s.ctx, cw); err != nil {
+						if err := engine.GetStore().Update(s.ctx, cw); err != nil {
 							s.logger.Warnw("Failed to propagate query to compound watcher",
 								"compound_watcher_id", cw.ID,
 								"error", err)
@@ -138,7 +169,7 @@ func (c *watcherReloadCoalescer) postReload(p pendingUpsert) {
 				for _, cw := range compoundWatchers {
 					cwID := cw.ID
 					s.wg.Go("watcher.historicalCompound", func() {
-						if err := s.watcherEngine.QueryHistoricalMatches(cwID); err != nil {
+						if err := engine.QueryHistoricalMatches(cwID); err != nil {
 							s.logger.Errorw("Failed to query historical matches for compound watcher",
 								"watcher_id", cwID,
 								"error", err)
@@ -150,7 +181,7 @@ func (c *watcherReloadCoalescer) postReload(p pendingUpsert) {
 		}
 
 		// Watcher exists in DB but failed to load (likely parse error)
-		parseErr := s.watcherEngine.GetParseError(p.watcherID)
+		parseErr := engine.GetParseError(p.watcherID)
 		if parseErr != nil {
 			s.logger.Warnw("Watcher parse failed",
 				"watcher_id", p.watcherID,
@@ -158,14 +189,14 @@ func (c *watcherReloadCoalescer) postReload(p pendingUpsert) {
 				"error", parseErr,
 			)
 			severity := extractErrorSeverity(parseErr)
-			s.broadcastWatcherError(p.watcherID, parseErr.Error(), severity, errors.GetAllDetails(parseErr)...)
+			s.broadcastWatcherError(p.in, p.watcherID, parseErr.Error(), severity, errors.GetAllDetails(parseErr)...)
 		} else {
 			errMsg := "Failed to parse AX query - watcher not activated"
 			s.logger.Warnw("Watcher parse failed (no error details)",
 				"watcher_id", p.watcherID,
 				"query", p.watcherQuery,
 			)
-			s.broadcastWatcherError(p.watcherID, errMsg, "error",
+			s.broadcastWatcherError(p.in, p.watcherID, errMsg, "error",
 				fmt.Sprintf("Query: %s", p.watcherQuery),
 			)
 		}
@@ -174,7 +205,7 @@ func (c *watcherReloadCoalescer) postReload(p pendingUpsert) {
 
 	// Query historical matches for the watcher (in goroutine to avoid blocking)
 	s.wg.Go("watcher.historical", func() {
-		if err := s.watcherEngine.QueryHistoricalMatches(p.watcherID); err != nil {
+		if err := engine.QueryHistoricalMatches(p.watcherID); err != nil {
 			s.logger.Errorw("Failed to query historical matches",
 				"watcher_id", p.watcherID,
 				"error", err,

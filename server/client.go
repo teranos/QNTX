@@ -768,11 +768,20 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		"client_id", c.id,
 	)
 
-	// Validate watcher engine
-	if c.server.watcherEngine == nil {
-		c.server.logger.Warnw("Watcher engine not available",
+	// The engine of the namespace this socket stands in.
+	engine := c.server.engineIn(c.in)
+	if engine == nil {
+		c.server.logger.Warnw("No watcher engine runs in the namespace this socket stands in",
+			"namespace", c.in,
+			"watcher_id", msg.WatcherID,
 			"client_id", c.id,
 		)
+		c.sendJSON(map[string]any{
+			"type":       "watcher_error",
+			"watcher_id": msg.WatcherID,
+			"error":      "no watcher engine runs in " + c.in,
+			"severity":   "error",
+		})
 		return
 	}
 
@@ -813,7 +822,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	}
 
 	// Try to get existing watcher first
-	existing, err := c.server.watcherEngine.GetStore().Get(c.server.ctx, watcherID)
+	existing, err := engine.GetStore().Get(c.server.ctx, watcherID)
 
 	// A store that answers "no error" and hands back nothing has broken its
 	// own contract, and dereferencing that took the whole node down. Saying so
@@ -823,7 +832,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		c.server.logger.Errorw("The watcher store answered with neither a watcher nor an error",
 			"watcher_id", watcherID,
 			"client_id", c.id,
-			"store", fmt.Sprintf("%T", c.server.watcherEngine.GetStore()),
+			"store", fmt.Sprintf("%T", engine.GetStore()),
 		)
 		err = errors.Newf("watcher store returned no watcher and no error for %s", watcherID)
 	}
@@ -836,7 +845,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		watcher.LastFiredAt = existing.LastFiredAt
 		watcher.LastError = existing.LastError
 
-		if err := c.server.watcherEngine.GetStore().Update(c.server.ctx, watcher); err != nil {
+		if err := engine.GetStore().Update(c.server.ctx, watcher); err != nil {
 			c.server.logger.Errorw("Failed to update watcher",
 				"watcher_id", watcherID,
 				"error", err,
@@ -850,7 +859,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		)
 	} else {
 		// Create new watcher
-		if err := c.server.watcherEngine.GetStore().Create(c.server.ctx, watcher); err != nil {
+		if err := engine.GetStore().Create(c.server.ctx, watcher); err != nil {
 			c.server.logger.Errorw("Failed to create watcher",
 				"watcher_id", watcherID,
 				"error", err,
@@ -867,6 +876,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	// Defer reload + post-reload behind coalescing window to avoid O(N²) FFI
 	// calls when N elements reconnect simultaneously
 	c.server.reloadCoalescer.schedule(pendingUpsert{
+		in:            c.in,
 		watcherID:     watcherID,
 		semanticQuery: msg.SemanticQuery,
 		watcherQuery:  msg.WatcherQuery,

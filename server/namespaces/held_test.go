@@ -201,7 +201,7 @@ func TestAUniverseHoldsItsOwnWatchers(t *testing.T) {
 
 // "system namespace should have no canvas"
 func TestAUniverseMayHaveNoCanvas(t *testing.T) {
-	u, err := NewUniverse("system", Made{Store: nothing{}, Watchers: stubWatchers{}, Schedules: &schedule.Store{}, Embeddings: &storage.EmbeddingStore{}, Rich: &storage.BoundedStore{}, Executions: &schedule.ExecutionStore{}, Prompts: &prompt.PromptStore{}, Aliases: &storage.AliasStore{}, Queries: &storage.SQLQueryStore{}, Operational: &sql.DB{}})
+	u, err := NewUniverse("system", Made{Store: nothing{}, Watchers: stubWatchers{}, Schedules: &schedule.Store{}, Embeddings: &storage.EmbeddingStore{}, Rich: &storage.BoundedStore{}, Executions: &schedule.ExecutionStore{}, Prompts: &prompt.PromptStore{}, Aliases: &storage.AliasStore{}, Queries: &storage.SQLQueryStore{}, Operational: &sql.DB{}, Sqlite: &sql.DB{}})
 	if err != nil {
 		t.Fatalf("a universe with no canvas was refused: %v", err)
 	}
@@ -290,7 +290,7 @@ func mustMake(name string, store ats.AttestationStore, watchers storage.Watchers
 	if watchers == nil {
 		watchers = stubWatchers{}
 	}
-	u, err := NewUniverse(name, Made{Store: store, Watchers: watchers, Schedules: &schedule.Store{}, Canvas: &elementstorage.CanvasStore{}, Embeddings: &storage.EmbeddingStore{}, Rich: &storage.BoundedStore{}, Executions: &schedule.ExecutionStore{}, Prompts: &prompt.PromptStore{}, Aliases: &storage.AliasStore{}, Queries: &storage.SQLQueryStore{}, Operational: &sql.DB{}})
+	u, err := NewUniverse(name, Made{Store: store, Watchers: watchers, Schedules: &schedule.Store{}, Canvas: &elementstorage.CanvasStore{}, Embeddings: &storage.EmbeddingStore{}, Rich: &storage.BoundedStore{}, Executions: &schedule.ExecutionStore{}, Prompts: &prompt.PromptStore{}, Aliases: &storage.AliasStore{}, Queries: &storage.SQLQueryStore{}, Operational: &sql.DB{}, Sqlite: &sql.DB{}})
 	if err != nil {
 		panic(err)
 	}

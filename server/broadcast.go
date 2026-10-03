@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -683,16 +684,12 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 
-		wasNonEmpty := false
+		wasNonEmpty := map[string]bool{}
 		for {
 			select {
 			case <-s.ctx.Done():
 				return
 			case <-ticker.C:
-				if s.watcherEngine == nil {
-					continue
-				}
-
 				s.mu.RLock()
 				hasClients := len(s.clients) > 0
 				s.mu.RUnlock()
@@ -700,71 +697,79 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 					continue
 				}
 
-				stats, err := s.watcherEngine.GetQueueStore().Stats()
-				if err != nil {
-					continue
+				for in, engine := range s.allEngines() {
+					s.broadcastWatcherQueueIn(in, engine, wasNonEmpty)
 				}
-
-				if stats.TotalQueued == 0 && !wasNonEmpty {
-					continue
-				}
-
-				wasNonEmpty = stats.TotalQueued > 0
-
-				// Collect execution stats from ALL watchers (not just those with queue entries),
-				// and resolve target elements for meld-edge watchers.
-				allWatchers := s.watcherEngine.GetAllWatchers()
-				var targetElements map[string]string
-				var watcherStats map[string]WatcherBroadcastStats
-				for watcherID, w := range allWatchers {
-					// Meld-edge: resolve target element ID from action data
-					if strings.HasPrefix(watcherID, "meld-edge-") {
-						var actionData struct {
-							TargetElementID string `json:"target_element_id"`
-						}
-						if json.Unmarshal([]byte(w.ActionData), &actionData) == nil && actionData.TargetElementID != "" {
-							if targetElements == nil {
-								targetElements = make(map[string]string)
-							}
-							targetElements[watcherID] = actionData.TargetElementID
-						}
-					}
-
-					// Only include watchers that have fired or errored at least once
-					if w.FireCount == 0 && w.ErrorCount == 0 {
-						continue
-					}
-
-					if watcherStats == nil {
-						watcherStats = make(map[string]WatcherBroadcastStats)
-					}
-					var lastFired int64
-					if w.LastFiredAt != nil {
-						lastFired = w.LastFiredAt.Unix()
-					}
-					watcherStats[watcherID] = WatcherBroadcastStats{
-						FireCount:   w.FireCount,
-						ErrorCount:  w.ErrorCount,
-						LastFiredAt: lastFired,
-						LastError:   w.LastError,
-					}
-				}
-
-				msg := WatcherQueueStatusMessage{
-					Type:             "watcher_queue_status",
-					TotalQueued:      stats.TotalQueued,
-					PerWatcher:       stats.PerWatcher,
-					TargetElements:   targetElements,
-					WatcherStats:     watcherStats,
-					OldestAgeSeconds: stats.OldestAgeSeconds,
-					Timestamp:        time.Now().Unix(),
-				}
-				// Queued watchers, their fire counts and the elements they target
-				// are one namespace's, the same as the matches they produce.
-				s.broadcastIn(s.watchedNamespace(), msg)
 			}
 		}
 	})
+}
+
+// broadcastWatcherQueueIn sends one namespace's queue status to that namespace,
+// while its queue is non-empty and once more when it drains.
+func (s *QNTXServer) broadcastWatcherQueueIn(in string, engine *watcher.Engine, wasNonEmpty map[string]bool) {
+	stats, err := engine.GetQueueStore().Stats()
+	if err != nil {
+		return
+	}
+
+	if stats.TotalQueued == 0 && !wasNonEmpty[in] {
+		return
+	}
+
+	wasNonEmpty[in] = stats.TotalQueued > 0
+
+	// Collect execution stats from ALL watchers (not just those with queue entries),
+	// and resolve target elements for meld-edge watchers.
+	allWatchers := engine.GetAllWatchers()
+	var targetElements map[string]string
+	var watcherStats map[string]WatcherBroadcastStats
+	for watcherID, w := range allWatchers {
+		// Meld-edge: resolve target element ID from action data
+		if strings.HasPrefix(watcherID, "meld-edge-") {
+			var actionData struct {
+				TargetElementID string `json:"target_element_id"`
+			}
+			if json.Unmarshal([]byte(w.ActionData), &actionData) == nil && actionData.TargetElementID != "" {
+				if targetElements == nil {
+					targetElements = make(map[string]string)
+				}
+				targetElements[watcherID] = actionData.TargetElementID
+			}
+		}
+
+		// Only include watchers that have fired or errored at least once
+		if w.FireCount == 0 && w.ErrorCount == 0 {
+			continue
+		}
+
+		if watcherStats == nil {
+			watcherStats = make(map[string]WatcherBroadcastStats)
+		}
+		var lastFired int64
+		if w.LastFiredAt != nil {
+			lastFired = w.LastFiredAt.Unix()
+		}
+		watcherStats[watcherID] = WatcherBroadcastStats{
+			FireCount:   w.FireCount,
+			ErrorCount:  w.ErrorCount,
+			LastFiredAt: lastFired,
+			LastError:   w.LastError,
+		}
+	}
+
+	msg := WatcherQueueStatusMessage{
+		Type:             "watcher_queue_status",
+		TotalQueued:      stats.TotalQueued,
+		PerWatcher:       stats.PerWatcher,
+		TargetElements:   targetElements,
+		WatcherStats:     watcherStats,
+		OldestAgeSeconds: stats.OldestAgeSeconds,
+		Timestamp:        time.Now().Unix(),
+	}
+	// Queued watchers, their fire counts and the elements they target
+	// are one namespace's, the same as the matches they produce.
+	s.broadcastIn(in, msg)
 }
 
 // runBroadcastWorker is the dedicated worker goroutine that owns all client channel sends.

@@ -220,9 +220,9 @@ func (s *QNTXServer) Stop() error {
 		s.daemon.Stop()
 	}
 
-	// Stop watcher engine — drain loop stops, in-flight entries re-queued for next startup
-	if s.watcherEngine != nil {
-		s.watcherEngine.Stop()
+	// Stop every namespace's watcher engine — drain loops stop, in-flight entries re-queued for next startup
+	for _, engine := range s.allEngines() {
+		engine.Stop()
 	}
 	if s.watcherDB != nil {
 		sqlclose.Log(s.watcherDB.Close(), s.logger, "the watcher db")
