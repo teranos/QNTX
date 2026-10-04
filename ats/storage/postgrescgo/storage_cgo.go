@@ -14,7 +14,10 @@ package postgrescgo
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../../crates/ats-postgres/include
 #cgo linux LDFLAGS: -L${SRCDIR}/../../../target/release -lats_postgres -lpthread -ldl -lm
-#cgo darwin LDFLAGS: -L${SRCDIR}/../../../target/release -lats_postgres -lpthread -ldl -lm
+// A static library does not carry the frameworks its crates link: whoami, the
+// default user tokio-postgres connects as, reaches SystemConfiguration and
+// CoreFoundation through objc2-system-configuration.
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../../target/release -lats_postgres -lpthread -ldl -lm -framework SystemConfiguration -framework CoreFoundation
 
 #include "postgres_ffi.h"
 #include <stdlib.h>
