@@ -168,6 +168,32 @@
           installPhase = "true";
         };
 
+        # Build ats-postgres as static library for CGO linking. Peer of
+        # ats-duckdb-ffi; the client speaks the wire protocol itself, so there
+        # is no libpq to link.
+        ats-postgres-ffi = (pkgs.makeRustPlatform {
+          cargo = fenix.packages.${system}.stable.cargo;
+          rustc = fenix.packages.${system}.stable.rustc;
+        }).buildRustPackage {
+          pname = "ats-postgres-ffi";
+          version = self.rev or "dev";
+          src = ./.;
+
+          cargoDeps = crateSources;
+
+          cargoBuildFlags = [ "-p" "ats-postgres" "--features" "ffi" "--lib" ];
+          doCheck = false;
+
+          postBuild = ''
+            mkdir -p $out/lib $out/include
+            find target -name 'libats_postgres.a' -exec cp {} $out/lib/ \;
+            find target -name 'libats_postgres.so' -exec cp {} $out/lib/ \;
+            cp crates/ats-postgres/include/postgres_ffi.h $out/include/
+          '';
+
+          installPhase = "true";
+        };
+
         # Common preBuild hook for Go derivations: copy WASM module and Rust FFI libs
         goWasmPreBuild = ''
           export GOWORK=off  # Build without workspace (use go.mod only)
@@ -175,6 +201,7 @@
           mkdir -p target/release
           cp ${ats-sqlite-ffi}/lib/libats_sqlite.a target/release/
           cp ${ats-duckdb-ffi}/lib/libats_duckdb.a target/release/
+          cp ${ats-postgres-ffi}/lib/libats_postgres.a target/release/
         '';
 
         # Pre-commit hooks configuration
@@ -268,9 +295,10 @@
 
           # Build tags: rustsqlite (ADR-013), qntxwasm (wazero WASM module),
           # rustduckdb (ADR-024 parquet backend via ats-duckdb + duckdbcgo).
+          # rustpostgres (the postgres backend via ats-postgres + postgrescgo).
           # Without rustduckdb, backend = "parquet" in am.toml would validate
           # but the duckdbcgo wrapper wouldn't be compiled in.
-          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" ];
+          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" ];
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -366,6 +394,7 @@
           # without going through the full qntx binary build.
           ats-sqlite-ffi = ats-sqlite-ffi;
           ats-duckdb-ffi = ats-duckdb-ffi;
+          ats-postgres-ffi = ats-postgres-ffi;
 
           # Static documentation site with provenance and infrastructure docs
           # For CI builds with full provenance, pass additional args

@@ -22,11 +22,13 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, er
 		return nil, nil, "", nil, errors.Wrap(err, "failed to load config for openDatabase")
 	}
 	if !cfg.Said("storage.backend") {
-		return nil, nil, "", nil, errors.New("storage.backend is not said: am.toml names sqlite or parquet, and no store is opened on a guess")
+		return nil, nil, "", nil, errors.New("storage.backend is not said: am.toml names sqlite, parquet or postgres, and no store is opened on a guess")
 	}
 	switch cfg.Storage.Backend {
 	case "parquet":
 		return openParquetDatabase(cfg, dbPath)
+	case "postgres":
+		return openPostgresDatabase(cfg, dbPath)
 	case "sqlite":
 		return openSqliteDatabase(dbPath)
 	default:
