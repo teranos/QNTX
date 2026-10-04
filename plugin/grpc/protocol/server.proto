@@ -518,6 +518,7 @@ message StoredThing {
   bool rebuilt = 4;
   // The Go files that reach this thing with hand-written SQL.
   repeated string sites = 5;
+  bool postgres = 6;
 }
 
 // SignumFollowed is one signum, and the references it can be held to.
@@ -541,8 +542,8 @@ message ParityStorage {
   // What was read: source, the code this build was made from, and never this
   // node.
   string describes = 1;
-  // One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go
-  // files that reach it with SQL written by hand.
+  // One per thing, by name: sqlite, duckdb, postgres, rebuilt by a take-in,
+  // and the Go files that reach it with SQL written by hand.
   repeated StoredThing things = 2;
 }
 
