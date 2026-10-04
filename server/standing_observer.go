@@ -33,6 +33,8 @@ type standingObserver struct {
 	// not only the log, which is ROOT's to read.
 	noteFailure func(HandlerFailure)
 	logger      *zap.SugaredLogger
+	// namespace is the one this observer was registered for.
+	namespace string
 }
 
 func (o *standingObserver) failed(handler, why string, as *types.As) {
@@ -68,7 +70,7 @@ func (o *standingObserver) OnAttestationCreated(as *types.As) {
 			o.failed(action.HandlerName, "a push matched the standing row and no executor was wired to run it", as)
 			continue
 		}
-		if err := exec.ExecuteBuiltin(o.ctx, action.HandlerName, as); err != nil {
+		if err := exec.ExecuteBuiltin(withNamespace(o.ctx, o.namespace), action.HandlerName, as); err != nil {
 			// The executor has noted it for the row already; this is the log's copy.
 			o.logger.Warnw("A standing built-in failed",
 				"watcher_id", w.ID, "attestation_id", as.ID, "handler", action.HandlerName, "error", err)
@@ -100,6 +102,9 @@ func (standingSubsystem) Start(u *namespaces.Universe) error {
 			logger:      s.logger.Named("standing"),
 		}
 	}
-	storage.RegisterObserver(u.Name(), s.standing)
+	// One per namespace, so a built-in knows which namespace's store to read.
+	here := *s.standing
+	here.namespace = u.Name()
+	storage.RegisterObserver(u.Name(), &here)
 	return nil
 }
