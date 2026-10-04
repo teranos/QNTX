@@ -52,7 +52,7 @@ func vouch(t *testing.T, signer ed25519.PrivateKey, peerPub ed25519.PublicKey, p
 	if handle != "" {
 		b.Claim.Handle = &handle
 	}
-	b.SignatureHex = hex.EncodeToString(ed25519.Sign(signer, b.canonicalBytes()))
+	b.SignatureHex = hex.EncodeToString(ed25519.Sign(signer, b.CanonicalBytes()))
 	b.SignerPubkeyHex = hex.EncodeToString(signer.Public().(ed25519.PublicKey))
 	return b
 }

@@ -19,7 +19,7 @@ QNTX's identity system has four orthogonal layers, each with distinct properties
 | **User DID** | The person | Globally unique (ed25519 keypair) | Derived from biometrics via WebAuthn PRF | `did:key:z6Mk...` |
 
 A node was a server when this table was written. Since ADR-012 it is also a
-browser, and `server/nodedid/` cannot reach one.
+browser, and `internal/nodedid/` cannot reach one.
 
 User DID was written here before anything derived one. It is real since
 ADR-030's passkey gate: the browser asks the authenticator for a PRF output
@@ -27,11 +27,11 @@ and derives the key from it, so the same finger gives the same DID.
 
 Of the three, only ASUID has a generator. Subjects carry names a human supplies,
 checked by a write-time warning rather than derived. Node DID is minted in
-`server/nodedid/`.
+`internal/nodedid/`.
 
-Node DIDs already exist (`server/nodedid/`). This ADR defines the first two layers and commits to implementing them in Rust.
+Node DIDs already exist (`internal/nodedid/`). This ADR defines the first two layers and commits to implementing them in Rust.
 
-The third layer is described here and decided nowhere. `server/nodedid/store.go`
+The third layer is described here and decided nowhere. `internal/nodedid/store.go`
 holds one ed25519 keypair per node under `id = 'self'`, and no ADR specifies it.
 ADR-012 made that gap load-bearing by accepting the browser as a node.
 Tracked in #840.
@@ -116,4 +116,4 @@ non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
 - `teranos/vanity-id` v0.3.0 — prior art
 - ADR-005: WebAssembly Integration
 - ADR-012: Browser as First-Class Node — makes a browser a node, and so a signer
-- `server/nodedid/` — existing Node DID infrastructure
+- `internal/nodedid/` — existing Node DID infrastructure

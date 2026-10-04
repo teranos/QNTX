@@ -20,7 +20,7 @@ Exploratory. Nothing here is implemented. Every mechanism referenced below alrea
 
 1. **Browser custody (extend laye).** Chain transactions are bytes; `sign(bytes)` already exists. Solana works today curve-wise. Ethereum requires secp256k1 signing in the shared WASM core (`ats`/`ats-id` — the k256 crate is the usual Rust route). The key never leaves the tab, so this is self-custody with QNTX as the interface.
 
-2. **Node custody.** The node already holds a signing key (`server/nodedid/`) and signs bindings and door attestations with it. A node-held chain key makes the *deployment* an on-chain actor — useful for automated agents, treasury operations, paying for its own resources. This is custodial; it belongs behind namespace + scope the way tokens are.
+2. **Node custody.** The node already holds a signing key (`internal/nodedid/`) and signs bindings and door attestations with it. A node-held chain key makes the *deployment* an on-chain actor — useful for automated agents, treasury operations, paying for its own resources. This is custodial; it belongs behind namespace + scope the way tokens are.
 
 3. **External wallet as identity provider.** ADR-030's own move — "laye would just be another identity provider" — extends: MetaMask and Phantom satisfy the same three-operation contract. Binding an Ethereum address to the ROOT User is the existing binding ceremony with a new vocabulary: Sign-In With Ethereum (EIP-4361) and its Solana equivalent are precisely "the string in am.toml is whatever the provider calls the account." An address in `auth.root_identities` means logging into QNTX with a wallet signature. Spending keys stay in the user's wallet; QNTX never holds them.
 

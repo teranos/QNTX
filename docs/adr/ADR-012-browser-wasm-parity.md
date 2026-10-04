@@ -53,5 +53,5 @@ other way.
   parsing, attestation CRUD and query, and cosine similarity already do.
   What remains is a scoping decision, not a missing capability.
 - A node has a Node DID (ADR-010). A first-class browser therefore has one,
-  and `server/nodedid/` is server-side only. Where a browser's signer
+  and `internal/nodedid/` is server-side only. Where a browser's signer
   identity comes from is left to a later ADR.

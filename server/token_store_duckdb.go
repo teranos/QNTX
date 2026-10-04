@@ -29,3 +29,6 @@ func newTokenRecord(cfg *appcfg.Config) (auth.TokenRecordStore, bool, error) {
 	}
 	return store, true, nil
 }
+
+// Compile-time proof that this satisfies the contract the middleware holds.
+var _ auth.TokenStore = (*duckdbcgo.TokenStore)(nil)

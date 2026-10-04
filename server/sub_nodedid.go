@@ -6,7 +6,7 @@ import (
 	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )

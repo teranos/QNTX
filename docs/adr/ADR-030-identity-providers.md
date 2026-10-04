@@ -16,7 +16,7 @@ relaye ceases to exist. QNTX signs bindings with its own node DID and is the
 peer laye bootstraps from.
 
 The node DID is the anchor. A QNTX deployment signs bindings with
-`server/nodedid/`'s key and is its own root.
+`internal/nodedid/`'s key and is its own root.
 
 An identity provider gives QNTX web three operations:
 
