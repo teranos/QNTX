@@ -7,6 +7,9 @@ QNTX hosts agents.
 
 "an agent is itself"
 
+- In A2A's terms QNTX is the A2A Server: the endpoint, authentication and
+  authorization are the node's. Each agent it hosts is a card, reached by its
+  tenant (AgentInterface.tenant).
 - An agent has its own DID and attests as itself: `by` on what it writes is
   the agent.
 - What an agent may reach is its own lines in system, as any actor's are.
