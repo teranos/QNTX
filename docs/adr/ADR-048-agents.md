@@ -29,8 +29,9 @@ QNTX hosts agents.
 "It is the ROOT agent, one persistent session agent that is QNTX itself as
 expressed to ROOT."
 
-- Its identity is the node's own DID, the `'self'` row in system (ADR-026). It
-  is no new actor.
+"it gets its own did"
+
+- It has a DID of its own and attests as itself, as any agent does.
 - It is not one of the agents the node hosts. A ritual's performer is an agent
   of its own.
 
@@ -41,7 +42,7 @@ expressed to ROOT."
 - It is one session: `--resume` continues it, and Claude Code compacts its own
   context.
 - It reaches sigils through the node's own MCP, with a token of its own.
-- It runs with Ground, and for this instance Ground attests as the node's DID.
+- It runs with Ground.
 
 "ROOT is ROOT"
 
@@ -69,8 +70,8 @@ process. It starts it, resumes it and stops it.
 
 As ROOT, I open the node and say something to it. It answers as the node, and
 when I ask it to do something it does it itself: a sigil, or a command on the
-box. Each turn is attested by the node's DID, and tomorrow it is the same
-session, readable as a transcript.
+box. Each turn is attested by the ROOT agent's own DID, and tomorrow it is the
+same session, readable as a transcript.
 
 "for development purposes SUPER will be allowed temporarily, but SUPER needs to
 be removed before the work get's merged."
