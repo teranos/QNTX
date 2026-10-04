@@ -6,6 +6,5 @@ sha256-TLEy0bAjTvfla6LiuqoqVGvcPyQMMXtFFwFChgeakGo=  supabase/postgres
 
 That hash is the source's as Nix fetches it, the narHash flake.lock records.
 flake.nix takes the flake at that commit as an input and builds its
-psql_17/bin; Supabase's own cache serves it built
-(https://nix-postgres-artifacts.s3.amazonaws.com). It is the Postgres the free
-tier runs.
+postgresql_17: the server the free tier runs, the one psql_17 is built on,
+without psql_17's extensions.

@@ -442,10 +442,13 @@
           qntx-image-amd64 = mkQNTXImage "amd64";
           qntx-image-arm64 = mkQNTXImage "arm64";
         } // pkgs.lib.optionalAttrs (builtins.elem system [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ]) {
-          # The pinned Supabase Postgres, which make parity runs ats-postgres's
-          # migrations in. The systems are the ones its flake.nix builds for,
+          # The pinned Supabase Postgres server, which make parity runs
+          # ats-postgres's migrations in: postgresql_17, the server psql_17 is
+          # built on, without its extensions. ats-postgres uses none, and the
+          # extensions are what does not fit on a runner's disk when built
+          # from source. The systems are the ones its flake.nix builds for,
           # named here so that listing ours does not evaluate theirs.
-          postgres = supabase-postgres.packages.${system}."psql_17/bin";
+          postgres = supabase-postgres.packages.${system}.postgresql_17;
         };
 
         # Development shell with same tools

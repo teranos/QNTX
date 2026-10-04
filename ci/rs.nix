@@ -196,9 +196,10 @@ in
       ];
     };
 
-    # Postgres backend. The pinned Supabase Postgres comes from Supabase's own
-    # cache; every test here runs against a server of its own that
-    # scripts/with-postgres.sh starts from it, make parity's included.
+    # Postgres backend. The pinned Supabase Postgres server is built from
+    # Supabase's flake, with their cache as a substituter; every test here runs
+    # against a server of its own that scripts/with-postgres.sh starts from it,
+    # make parity's included.
     ats-postgres = {
       name = "Postgres Backend";
       runs-on = "ubuntu-latest";
