@@ -137,7 +137,15 @@ type DoorConfig struct {
 type ProviderConfig struct {
 	Google OAuthClientConfig `mapstructure:"google"` // Registered at console.cloud.google.com
 	Apple  AppleClientConfig `mapstructure:"apple"`  // Registered at developer.apple.com: a Services ID with Sign in with Apple enabled, and a Sign in with Apple key
-	GitHub OAuthClientConfig `mapstructure:"github"` // Registered at github.com/settings/apps
+	GitHub GitHubAppConfig   `mapstructure:"github"` // Registered at github.com/settings/apps
+}
+
+// GitHubAppConfig is the GitHub App: the OAuth client its ceremony spends, and
+// the private key that signs the JWT GitHub requires of a call the App makes
+// as itself (ADR-043). The referenced value is the .pem GitHub hands out.
+type GitHubAppConfig struct {
+	OAuthClientConfig `mapstructure:",squash"`
+	PrivateKeyRef     string `mapstructure:"private_key"` // ssm:// or env: reference to the .pem contents — a literal is rejected
 }
 
 // AppleClientConfig is what Apple hands an operator instead of a client
