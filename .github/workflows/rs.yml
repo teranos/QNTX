@@ -198,6 +198,7 @@
         "cmd/qntx/commands/database_parquet.go",
         "cmd/qntx/commands/landing_queries_test.go",
         "db/duckdb/migrations/**",
+        "cmd/parity/**",
         ".github/workflows/rs.yml"
       ]
     },

@@ -10,14 +10,14 @@ import (
 	"github.com/teranos/QNTX/server/parity"
 )
 
-// TestRecordSchema_Attestations: the crate builds the attestations prefix from
-// a constant, which the prefix scan cannot see; the record keeps attestations
-// because DuckDB's migration creates the table, and that is where this answer
+// TestDuckDBSchema_Attestations: the crate builds the attestations prefix from
+// a constant, which the prefix scan cannot see; DuckDB holds attestations
+// because its migration creates the table, and that is where this answer
 // comes from.
-func TestRecordSchema_Attestations(t *testing.T) {
-	tables, err := RecordSchema()
+func TestDuckDBSchema_Attestations(t *testing.T) {
+	tables, err := DuckDBSchema()
 	if err != nil {
-		t.Fatalf("RecordSchema: %v", err)
+		t.Fatalf("DuckDBSchema: %v", err)
 	}
 	if !tables["attestations"] {
 		t.Errorf("attestations missing from what ats-duckdb's migrations leave: %v", tables)

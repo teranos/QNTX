@@ -40,7 +40,7 @@ openapi: ## Write what the node serves, from the reach table and the handlers' o
 
 # "Make parity would just be for the storage backend specifically": a signum
 # held to a reference it follows is the parity sigil's (server/parity).
-parity: rust-sqlite ## Report what a node keeps on its own disk and what the record keeps (ADR-024, ADR-037)
+parity: rust-sqlite ## Report whether SQLite and DuckDB each hold every thing QNTX persists
 	@nix develop .#default --command cargo build --release -p ats-duckdb --features ffi --lib
 	@nix develop .#default --command env LD_LIBRARY_PATH=$(CURDIR)/target/release DYLD_LIBRARY_PATH=$(CURDIR)/target/release go run -tags rustduckdb ./cmd/parity
 

@@ -260,8 +260,8 @@ func spentAcross(reporters []RecordReporter) ([]Spend, error) {
 }
 
 // heldOnNode marks each reader the node keeps a table of. The answer is the
-// node's own schema, which is what make parity replays for its ON THE NODE
-// column, so the panel and parity read one source.
+// node's own schema, which is what make parity reads for its SQLITE column,
+// so the panel and parity read one source.
 func heldOnNode(db *sql.DB, spend []Spend) (err error) {
 	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type = 'table'`)
 	if err != nil {

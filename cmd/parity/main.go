@@ -1,5 +1,5 @@
-// Command parity prints, for every thing QNTX persists, whether a node keeps it
-// on its own disk and whether the record under the storage location keeps it.
+// Command parity prints, for every thing QNTX persists, whether SQLite and
+// DuckDB each hold it.
 //
 // "can it be made to lie less ?"
 //
@@ -25,8 +25,8 @@
 // be for the storage backend specifically", and "parity the sigil is what an
 // Agent should deal with through MCP".
 //
-// The output ranks nothing and scores nothing. Neither column is the baseline
-// the other is measured against, and a line reads the same either way.
+// The output ranks nothing and scores nothing. No column is the baseline the
+// others are measured against, and a line reads the same either way.
 //
 // No regex (see CLAUDE.md).
 package main
@@ -52,11 +52,9 @@ import (
 
 // Thing is something QNTX persists, and where it is kept.
 type Thing struct {
-	Name string
-	// Node is on a node's own disk, whatever the backend (ADR-037).
-	Node bool
-	// Record is under the storage location, and survives losing the host.
-	Record bool
+	Name   string
+	SQLite bool
+	DuckDB bool
 	// Rebuilt rows cascade from attestations, so a take-in rebuilds them.
 	Rebuilt bool
 	// Sites are the places in Go that reach this thing with hand-written SQL.
@@ -104,7 +102,7 @@ func Written(root string, things []Thing) ([]byte, error) {
 		}
 		sort.Strings(files)
 		files = slices.Compact(files)
-		stored = append(stored, parity.Stored{Name: t.Name, Node: t.Node, Record: t.Record, Rebuilt: t.Rebuilt, Sites: files})
+		stored = append(stored, parity.Stored{Name: t.Name, SQLite: t.SQLite, DuckDB: t.DuckDB, Rebuilt: t.Rebuilt, Sites: files})
 	}
 	body, err := json.MarshalIndent(stored, "", "  ")
 	if err != nil {
@@ -127,11 +125,11 @@ func Report(root, crateDir string) ([]Thing, error) {
 	if linked != pinned {
 		return nil, errors.Newf("the node links SQLite %s, %s pins %s", linked, pins, pinned)
 	}
-	parquetTables, err := RecordSchema()
+	duckdbTables, err := DuckDBSchema()
 	if err != nil {
 		return nil, err
 	}
-	// Most of the parquet backend is objects under a prefix, not tables
+	// Most of what ats-duckdb keeps is objects under a prefix, not tables
 	// (ADR-024:40-45). Without these the column could only ever describe
 	// attestations and the append-only logs.
 	objectPrefixes, err := ObjectPrefixes(filepath.Join(root, crateDir))
@@ -149,16 +147,16 @@ func Report(root, crateDir string) ([]Thing, error) {
 		return t
 	}
 	for name := range sqliteTables {
-		get(name).Node = true
+		get(name).SQLite = true
 	}
 	for name := range rebuilt {
 		get(name).Rebuilt = true
 	}
-	for name := range parquetTables {
-		get(name).Record = true
+	for name := range duckdbTables {
+		get(name).DuckDB = true
 	}
 	for name := range objectPrefixes {
-		get(name).Record = true
+		get(name).DuckDB = true
 	}
 
 	// Contracts add the things no backend holds yet. A contract whose name
@@ -358,8 +356,7 @@ func shadowOf(name string, virtual []string) bool {
 	return false
 }
 
-// Render draws the picture: one line per thing, a column for the node and one
-// for the record.
+// Render draws the picture: one line per thing, a column per engine.
 func Render(things []Thing) string {
 	width := len("access_tokens")
 	for _, t := range things {
@@ -369,9 +366,13 @@ func Render(things []Thing) string {
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "\n  %s  ON THE NODE | IN THE RECORD\n", strings.Repeat(" ", width))
+	fmt.Fprintf(&b, "\n  %-*s  SQLITE  DUCKDB\n", width, "")
 	for _, t := range things {
-		fmt.Fprintf(&b, "  %-*s  %-11s   %s\n", width, t.Name, mark(t.Node), recordMark(t))
+		line := fmt.Sprintf("  %-*s  %-6s  %-6s", width, t.Name, mark(t.SQLite), mark(t.DuckDB))
+		if t.Rebuilt {
+			line += "  rebuilt from attestations"
+		}
+		b.WriteString(strings.TrimRight(line, " ") + "\n")
 		for _, s := range t.Sites {
 			fmt.Fprintf(&b, "      %s:%d\n", s.File, s.Line)
 		}
@@ -385,13 +386,4 @@ func mark(present bool) string {
 		return "YES"
 	}
 	return "NO"
-}
-
-// recordMark is what the record keeps of a thing. A table the take-in rebuilds
-// is not in the record, and is not lost with the host either.
-func recordMark(t Thing) string {
-	if !t.Record && t.Rebuilt {
-		return "rebuilt from attestations"
-	}
-	return mark(t.Record)
 }

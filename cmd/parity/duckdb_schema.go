@@ -4,10 +4,10 @@ package main
 
 import "github.com/teranos/QNTX/ats/storage/duckdbcgo"
 
-// RecordSchema returns the tables DuckDB ends up with, applied by ats-duckdb's
+// DuckDBSchema returns the tables DuckDB ends up with, applied by ats-duckdb's
 // own runner in the DuckDB the node links, minus schema_migrations, the
 // runner's own bookkeeping.
-func RecordSchema() (map[string]bool, error) {
+func DuckDBSchema() (map[string]bool, error) {
 	tables, err := duckdbcgo.SchemaTables()
 	if err != nil {
 		return nil, err

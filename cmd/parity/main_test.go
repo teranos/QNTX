@@ -23,36 +23,35 @@ func TestShadowOf(t *testing.T) {
 	}
 }
 
-// TestRender_FourStates: all four combinations read off the picture, and NO/NO
-// draws a line instead of vanishing.
-func TestRender_FourStates(t *testing.T) {
+// TestRender_EachEngine: each engine's column reads off the picture, and a
+// line of NO is drawn instead of vanishing.
+func TestRender_EachEngine(t *testing.T) {
 	out := Render([]Thing{
-		{Name: "access_tokens", Node: false, Record: false},
-		{Name: "embeddings", Node: true, Record: false},
-		{Name: "attestations", Node: true, Record: true},
-		{Name: "future_thing", Node: false, Record: true},
+		{Name: "access_tokens"},
+		{Name: "embeddings", SQLite: true},
+		{Name: "attestations", SQLite: true, DuckDB: true},
+		{Name: "future_thing", DuckDB: true},
 	})
 
 	for _, want := range []string{
-		"access_tokens  NO            NO",
-		"embeddings     YES           NO",
-		"attestations   YES           YES",
-		"future_thing   NO            YES",
+		"access_tokens  NO      NO\n",
+		"embeddings     YES     NO\n",
+		"attestations   YES     YES\n",
+		"future_thing   NO      YES\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing line %q in:\n%s", want, out)
 		}
 	}
-	if !strings.Contains(out, "ON THE NODE | IN THE RECORD") {
+	if !strings.Contains(out, "SQLITE  DUCKDB") {
 		t.Errorf("missing header in:\n%s", out)
 	}
 }
 
-// TestRender_RebuiltIsNotNo: a table the take-in rebuilds from attestations is
-// not lost with the host, and NO in the record column would say it is.
-func TestRender_RebuiltIsNotNo(t *testing.T) {
-	out := Render([]Thing{{Name: "attestation_subjects", Node: true, Rebuilt: true}})
-	if !strings.Contains(out, "attestation_subjects  YES           rebuilt from attestations") {
+// TestRender_Rebuilt: a table whose rows cascade from attestations says so.
+func TestRender_Rebuilt(t *testing.T) {
+	out := Render([]Thing{{Name: "attestation_subjects", SQLite: true, Rebuilt: true}})
+	if !strings.Contains(out, "attestation_subjects  YES     NO      rebuilt from attestations") {
 		t.Errorf("rebuilt table not said so in:\n%s", out)
 	}
 }
@@ -79,13 +78,12 @@ func TestSQLiteSchema_RebuiltIsReadFromTheForeignKeys(t *testing.T) {
 }
 
 // TestRender_NoRankingNoScore: the picture states presence and nothing else.
-// A count of what is left makes one backend the baseline the other is measured
-// against, which is wrong in both directions — parquet is the reference
-// implementation for some things and SQLite for others.
+// A count of what is left makes one backend the baseline the others are
+// measured against, which is wrong in every direction.
 func TestRender_NoRankingNoScore(t *testing.T) {
 	out := strings.ToLower(Render([]Thing{
-		{Name: "attestations", Node: true, Record: true},
-		{Name: "attestation_subjects", Node: true, Rebuilt: true},
+		{Name: "attestations", SQLite: true, DuckDB: true},
+		{Name: "attestation_subjects", SQLite: true, Rebuilt: true},
 		{Name: "access_tokens"},
 	}))
 	for _, banned := range []string{" of ", "missing", "gap", "parity", "%"} {
