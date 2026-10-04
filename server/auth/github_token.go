@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/errors"
 )
 
@@ -25,19 +26,6 @@ const (
 // githubRefreshAhead is how long before expiry a token is refreshed rather
 // than spent: a call started on a token about to lapse lands after it has.
 const githubRefreshAhead = time.Minute
-
-// GitHubSecret is the credential a GITHUB token holds. Never listed.
-type GitHubSecret struct {
-	Token            string `json:"token"`
-	Refresh          string `json:"refresh,omitempty"`
-	ExpiresAt        *int64 `json:"expires_at,omitempty"`
-	RefreshExpiresAt *int64 `json:"refresh_expires_at,omitempty"`
-	// Client is the GitHub App the token was issued through; a refresh is
-	// spent with that one and no other.
-	Client string `json:"client,omitempty"`
-	Source string `json:"source"`
-	Login  string `json:"login,omitempty"`
-}
 
 // githubGrant is what GitHub's token endpoint answers, for a code and for a
 // refresh alike.
@@ -296,3 +284,6 @@ func (h *Handler) keepNodeGitHub(providerID string, acct account) {
 	}
 	h.logger.Infow("the node's GitHub is ROOT's", "canonical_id", acct.CanonicalID, "token", id)
 }
+
+// GitHubSecret is the credential a GITHUB token holds (access.GitHubSecret).
+type GitHubSecret = access.GitHubSecret

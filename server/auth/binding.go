@@ -3,38 +3,15 @@ package auth
 import (
 	"crypto/ed25519"
 	"encoding/hex"
-	"fmt"
 	"slices"
 	"sync"
 
+	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/errors"
 )
 
-// SignedBinding is laye's wire shape (crates/me). A binding says "this peer
-// key belongs to this account", and it is worth exactly as much as the key
-// that signed it.
-type SignedBinding struct {
-	Claim struct {
-		PeerPubkeyHex string  `json:"peer_pubkey_hex"`
-		Provider      string  `json:"provider"`
-		CanonicalID   string  `json:"canonical_id"`
-		Handle        *string `json:"handle"`
-		IssuedAt      uint64  `json:"issued_at"`
-	} `json:"claim"`
-	SignatureHex    string `json:"signature_hex"`
-	SignerPubkeyHex string `json:"signer_pubkey_hex"`
-}
-
-// canonicalBytes reproduces laye-binding/v1 from crates/me/src/lib.rs. Both
-// sides must render it identically or every signature fails.
-func (b SignedBinding) canonicalBytes() []byte {
-	handle := ""
-	if b.Claim.Handle != nil {
-		handle = *b.Claim.Handle
-	}
-	return []byte(fmt.Sprintf("laye-binding/v1|%s|%s|%s|%s|%d",
-		b.Claim.PeerPubkeyHex, b.Claim.Provider, b.Claim.CanonicalID, handle, b.Claim.IssuedAt))
-}
+// SignedBinding is laye's wire shape (access.SignedBinding).
+type SignedBinding = access.SignedBinding
 
 // verifyBinding is the anchor check. laye's own verify() reads the signing key
 // out of the message, which proves only that the message is self-consistent.
@@ -64,7 +41,7 @@ func verifyBinding(b SignedBinding, peerPubkey ed25519.PublicKey, trustedSigners
 	if err != nil {
 		return errors.Wrapf(err, "binding for %s has an unreadable signature", b.Claim.CanonicalID)
 	}
-	if !ed25519.Verify(ed25519.PublicKey(signer), b.canonicalBytes(), signature) {
+	if !ed25519.Verify(ed25519.PublicKey(signer), b.CanonicalBytes(), signature) {
 		return errors.Newf("binding for %s does not verify against its signer", b.Claim.CanonicalID)
 	}
 	return nil

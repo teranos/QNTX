@@ -38,7 +38,7 @@ func (h *Handler) joinPublic(acct account, door string) (User, error) {
 	// of what identifies one.
 	for _, u := range held {
 		if u.Level == LevelPublicRegistration && u.Namespace == door && u.Reaches(acct.CanonicalID) {
-			u, _ = u.withPicture(acct.CanonicalID, acct.Picture)
+			u, _ = u.WithPicture(acct.CanonicalID, acct.Picture)
 			return h.withAddress(u, acct.Handle)
 		}
 	}

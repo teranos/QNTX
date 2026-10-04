@@ -540,7 +540,7 @@ func (h *Handler) signBinding(ceremony, peerPubkeyHex, providerID string, acct a
 	if !isEd25519 {
 		return SignedBinding{}, errors.New("the node key's public half is not an ed25519 key; the binding cannot name its signer")
 	}
-	binding.SignatureHex = hex.EncodeToString(ed25519.Sign(h.nodeKey, binding.canonicalBytes()))
+	binding.SignatureHex = hex.EncodeToString(ed25519.Sign(h.nodeKey, binding.CanonicalBytes()))
 	binding.SignerPubkeyHex = hex.EncodeToString(pub)
 
 	// A cross-origin OAuth redirect severs window.opener, so the popup cannot

@@ -2,14 +2,13 @@ package auth
 
 import (
 	"context"
-	"crypto/ed25519"
-	"crypto/rand"
 	"encoding/hex"
 	"strings"
 	"time"
 
 	"github.com/ory/fosite"
 	fositeoauth2 "github.com/ory/fosite/handler/oauth2"
+	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/errors"
 )
 
@@ -18,12 +17,15 @@ import (
 // The flow in Go with fosite, its storage where tokens are stored now
 // (ADR-025). What the flow hands out is the token QNTX already hands out.
 
-// tokenPrefix marks a raw token as this node's (ADR-025:16).
-const tokenPrefix = "qntx_"
+// tokenPrefix and tokenSeedBytes are the raw token's shape, drawn in
+// internal/access where MintToken lives.
+const (
+	tokenPrefix    = access.TokenPrefix
+	tokenSeedBytes = access.TokenSeedBytes
+)
 
-// tokenSeedBytes is the length of the random half: 32 bytes, an ed25519 seed,
-// so the token has a public half worth naming.
-const tokenSeedBytes = ed25519.SeedSize
+// MintToken draws the raw token and the DID it names (access.MintToken).
+func MintToken() (raw, did string, err error) { return access.MintToken() }
 
 // TokenSession is what a fosite request carries about the token being issued.
 //
@@ -79,26 +81,6 @@ var _ fositeoauth2.AccessTokenStrategy = TokenStrategy{}
 // AccessTokenSignature is the form of a token that is ever stored.
 func (TokenStrategy) AccessTokenSignature(_ context.Context, token string) string {
 	return sha256Hex(token)
-}
-
-// MintToken draws the raw token and the DID it names: 32 random bytes,
-// hex-encoded, `qntx_` prefixed (ADR-025:16). The bytes are an ed25519 seed,
-// so the token has a public half worth naming and its holder can sign as it.
-//
-// The one place a token is drawn, whether the mint element asks the store or
-// fosite asks the strategy.
-func MintToken() (raw, did string, err error) {
-	seed := make([]byte, tokenSeedBytes)
-	if _, err := rand.Read(seed); err != nil {
-		return "", "", errors.Wrap(err, "failed to read a seed for an access token")
-	}
-	pub, isEd25519 := ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey)
-	if !isEd25519 {
-		return "", "", errors.Newf(
-			"an ed25519 seed produced a %T public half, so the token has no DID to be named by",
-			ed25519.NewKeyFromSeed(seed).Public())
-	}
-	return tokenPrefix + hex.EncodeToString(seed), EncodeDIDKey(pub), nil
 }
 
 // GenerateAccessToken mints the raw token, names it by its hash, and puts

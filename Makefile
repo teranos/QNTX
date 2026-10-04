@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -20,11 +20,7 @@ endef
 VERSION_TAG := $(shell git describe --tags --match 'v*' --dirty 2>/dev/null || echo dev)
 GO_LDFLAGS = -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(VERSION_TAG)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'"
 
-# Optional: KERN=1 make cli/dev to enable OCaml parser plugin
 BUILD_TAGS := rustsqlite,qntxwasm
-ifdef KERN
-BUILD_TAGS := $(BUILD_TAGS),kern
-endif
 
 cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM parser)
 	@echo "Building QNTX CLI with Rust optimizations (sqlite) and WASM (parser, fuzzy)..."
@@ -200,11 +196,6 @@ test-parquet: ## Run parquet backend tests (requires Nix for libduckdb)
 	@nix develop .#default --command go test -tags "rustsqlite,qntxwasm,rustduckdb" -short ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/
 	@nix develop .#default --command go build -tags "rustsqlite,qntxwasm,rustduckdb" ./...
 
-test-ocaml: ## Run OCaml plugin tests (kern)
-	@echo "Running OCaml tests..."
-	@cd qntx-plugins/kern && opam exec -- dune runtest
-	@echo "✓ OCaml tests complete"
-
 test-d: ## Run D plugin tests (ix-net)
 	@echo "Running D tests..."
 	@$(MAKE) -C qntx-plugins/ix-net test
@@ -285,7 +276,7 @@ endef
 
 # check-plugin-version DIR EXT VERSION_FILE
 # Fails the build if source files changed but version file didn't.
-# Usage: @$(call check-plugin-version,qntx-plugins/kern,.ml,qntx-plugins/kern/lib/version.ml)
+# Usage: @$(call check-plugin-version,qntx-plugins/ix-bin,d,qntx-plugins/ix-bin/source/ixbin/version_.d)
 define check-plugin-version
 	@git diff --name-only HEAD -- $(1)/ | grep -q '\.$(2)$$' && \
 	 ! git diff --name-only HEAD -- $(3) | grep -q . && \
@@ -337,11 +328,6 @@ meili-plugin: ## Build, install, and restart MeiliSearch plugin
 	$(call check-plugin-version,qntx-plugins/qntx-meili,rs,qntx-plugins/qntx-meili/Cargo.toml)
 	@$(MAKE) -C qntx-plugins/qntx-meili install PREFIX=$(PREFIX)
 	$(call restart-plugin,meili)
-
-kern-plugin: ## Build, install, and restart kern plugin (OCaml Ax parser)
-	$(call check-plugin-version,qntx-plugins/kern,ml,qntx-plugins/kern/lib/version.ml)
-	@$(MAKE) -C qntx-plugins/kern install PREFIX=$(PREFIX)
-	$(call restart-plugin,kern)
 
 llama-cpp-plugin: ## Build, install, and restart llama-cpp plugin (C++ local LLM)
 	$(call check-plugin-version,qntx-plugins/llama-cpp,cpp,qntx-plugins/llama-cpp/src/plugin.h)
