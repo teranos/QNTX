@@ -35,12 +35,22 @@ expressed to ROOT."
 
 "we cant just have any ai be the ROOT agent"
 
-- It is Claude Code, installed on the box and run by the node, on Opus 5.5 at
-  low effort. Only Claude can be it.
+- It is Claude Code, run by the node, on Opus 5.5 at low effort. Only Claude
+  can be it.
+- am.toml names it under `[agent.root]`: the model, the effort, and a
+  reference to the Claude plan token. A node that names no model has no ROOT
+  agent, and nothing stands in for the model named.
 - It is one session: `--resume` continues it, and Claude Code compacts its own
   context.
-- It reaches sigils through the node's own MCP, with a token of its own.
-- It runs with Ground.
+- Its key is derived from the node's own, so it is the same DID wherever the
+  node is rebuilt from its record, and nothing more is kept for it.
+- It reaches sigils through the node's own MCP, with a token of its own. The
+  token is ROOT's kind, which minting hands to nobody, and the node writes it
+  down for this agent alone.
+- `claude say` says something to it and answers with what it said back.
+- What it is told, what it reaches for and what it answers, it attests under
+  its session by its own DID, as the hook events a transcript is read from,
+  where whoever spoke to it stands.
 
 "ROOT is ROOT"
 
@@ -85,13 +95,14 @@ For the first story, in order. Each ends in something that can be checked.
 3. The node starts, resumes and stops the ROOT agent's one session.
 4. A way to say something to it, reached by ROOT, and by SUPER until the work
    merges. In the UI it is the Claude element.
-5. Ground on the box beside it, so its session reads as a transcript. Ground's
-   last release is behind its main, so this takes a Ground release.
-6. SUPER removed.
-7. The box upgraded.
+5. SUPER removed.
+6. The box upgraded.
 
 The node does not see the model traffic of an agent Claude Code runs.
 
 "for a later phase we make sure it always runs with ground"
+
+Ground's last release is behind its main, so Ground on the box takes a Ground
+release.
 
 "Upgrading the box is in scope"
