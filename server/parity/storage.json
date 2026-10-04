@@ -309,7 +309,7 @@
     "record": true,
     "rebuilt": false,
     "sites": [
-      "server/nodedid/store.go"
+      "internal/nodedid/store.go"
     ]
   },
   {

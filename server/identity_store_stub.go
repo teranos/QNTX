@@ -4,7 +4,7 @@ package server
 
 import (
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/errors"
 )
 

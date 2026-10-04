@@ -15,7 +15,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/errors"
 )
 
@@ -63,7 +63,7 @@ func (s *UserStore) Requests() ([]Asked, error) {
 
 // ByRoute resolves an auth.root_identities entry to the User it reaches. False
 // is nothing minted for it, which is not a failure.
-func (s *UserStore) ByRoute(route string) (auth.User, bool, error) {
+func (s *UserStore) ByRoute(route string) (access.User, bool, error) {
 	cRoute := C.CString(route)
 	defer C.free(unsafe.Pointer(cRoute))
 
@@ -73,25 +73,25 @@ func (s *UserStore) ByRoute(route string) (auth.User, bool, error) {
 	defer C.duckdb_users_result_free(result)
 
 	if !bool(result.success) {
-		return auth.User{}, false, failed(result.error_msg, "failed to resolve the User reached by %q", route)
+		return access.User{}, false, failed(result.error_msg, "failed to resolve the User reached by %q", route)
 	}
 
 	// The crate answers with the JSON literal null when no User holds the route.
-	var found *auth.User
+	var found *access.User
 	body := C.GoString(result.users_json)
 	if err := readBack([]byte(body), &found); err != nil {
-		return auth.User{}, false, errors.Wrapf(err,
+		return access.User{}, false, errors.Wrapf(err,
 			"failed to parse the User reached by %q from the parquet backend", route)
 	}
 	if found == nil {
-		return auth.User{}, false, nil
+		return access.User{}, false, nil
 	}
 	return *found, true, nil
 }
 
 // List returns every User. How many there are is what decides whether the next
 // admission mints the ROOT User.
-func (s *UserStore) List() ([]auth.User, error) {
+func (s *UserStore) List() ([]access.User, error) {
 	s.mu.Lock()
 	result := C.duckdb_users_list((*C.UserStore)(s.ptr))
 	s.mu.Unlock()
@@ -101,7 +101,7 @@ func (s *UserStore) List() ([]auth.User, error) {
 		return nil, failed(result.error_msg, "failed to list Users")
 	}
 
-	var users []auth.User
+	var users []access.User
 	if err := readBack([]byte(C.GoString(result.users_json)), &users); err != nil {
 		return nil, errors.Wrap(err, "failed to parse the User list from the parquet backend")
 	}
@@ -110,7 +110,7 @@ func (s *UserStore) List() ([]auth.User, error) {
 
 // Put writes a User whole, keys and accounts included, so a partial write
 // cannot leave one whose keys and accounts disagree.
-func (s *UserStore) Put(u auth.User) error {
+func (s *UserStore) Put(u access.User) error {
 	// A nil slice marshals as null, and the Rust side reads null as a type
 	// error rather than as an empty list — serde's default fills a field that
 	// is missing, not one that is there and null.
@@ -121,10 +121,10 @@ func (s *UserStore) Put(u auth.User) error {
 		u.PhoneNumbers = []string{}
 	}
 	if u.Keys == nil {
-		u.Keys = []auth.UserKey{}
+		u.Keys = []access.UserKey{}
 	}
 	if u.Accounts == nil {
-		u.Accounts = []auth.UserAccount{}
+		u.Accounts = []access.UserAccount{}
 	}
 
 	body, err := json.Marshal(u)
