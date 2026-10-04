@@ -1,18 +1,19 @@
-// Command parity prints, for every thing QNTX persists, whether SQLite and
-// DuckDB each hold it.
+// Command parity prints, for every thing QNTX persists, whether SQLite, DuckDB
+// and Postgres each hold it.
 //
 // "can it be made to lie less ?"
 //
 // A thing is something QNTX has to keep. It exists independently of any
-// backend: access tokens are a thing before either backend stores them, which
-// is why NO/NO is a line and not an absence. That line is the point of the
+// backend: access tokens are a thing before any backend stores them, which is
+// why a line of NO is a line and not an absence. That line is the point of the
 // tool — it is how a human sees work that has not been done yet.
 //
 // Two sources, both code:
 //
 //   - Schema. Each backend's migrations are applied by its own runner, in the
-//     engine the node links — ats-sqlite in SQLite, ats-duckdb in DuckDB — and
-//     the resulting table list read back. Final state, not the CREATE
+//     engine the node links — ats-sqlite in SQLite, ats-duckdb in DuckDB,
+//     ats-postgres in the pinned Supabase Postgres — and the resulting table
+//     list read back. Final state, not the CREATE
 //     statements along the way, so a rebuild's scratch table is never mistaken
 //     for a thing.
 //
@@ -52,9 +53,10 @@ import (
 
 // Thing is something QNTX persists, and where it is kept.
 type Thing struct {
-	Name   string
-	SQLite bool
-	DuckDB bool
+	Name     string
+	SQLite   bool
+	DuckDB   bool
+	Postgres bool
 	// Rebuilt rows cascade from attestations, so a take-in rebuilds them.
 	Rebuilt bool
 	// Sites are the places in Go that reach this thing with hand-written SQL.
@@ -102,7 +104,7 @@ func Written(root string, things []Thing) ([]byte, error) {
 		}
 		sort.Strings(files)
 		files = slices.Compact(files)
-		stored = append(stored, parity.Stored{Name: t.Name, SQLite: t.SQLite, DuckDB: t.DuckDB, Rebuilt: t.Rebuilt, Sites: files})
+		stored = append(stored, parity.Stored{Name: t.Name, SQLite: t.SQLite, DuckDB: t.DuckDB, Postgres: t.Postgres, Rebuilt: t.Rebuilt, Sites: files})
 	}
 	body, err := json.MarshalIndent(stored, "", "  ")
 	if err != nil {
@@ -128,6 +130,20 @@ func Report(root, crateDir string) ([]Thing, error) {
 	duckdbTables, err := DuckDBSchema()
 	if err != nil {
 		return nil, err
+	}
+	postgresTables, served, err := PostgresSchema()
+	if err != nil {
+		return nil, err
+	}
+	pinnedPostgres, err := parity.Pinned(pins, "postgres")
+	if err != nil {
+		return nil, err
+	}
+	// The server says its major and minor, and the pin is Supabase's release
+	// of them: 17.11 is held to 17.11.0.003.
+	served, _, _ = strings.Cut(served, " ")
+	if !strings.HasPrefix(pinnedPostgres+".", served+".") {
+		return nil, errors.Newf("the Postgres make parity ran is %s, %s pins %s", served, pins, pinnedPostgres)
 	}
 	// Most of what ats-duckdb keeps is objects under a prefix, not tables
 	// (ADR-024:40-45). Without these the column could only ever describe
@@ -157,6 +173,9 @@ func Report(root, crateDir string) ([]Thing, error) {
 	}
 	for name := range objectPrefixes {
 		get(name).DuckDB = true
+	}
+	for name := range postgresTables {
+		get(name).Postgres = true
 	}
 
 	// Contracts add the things no backend holds yet. A contract whose name
@@ -366,9 +385,9 @@ func Render(things []Thing) string {
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "\n  %-*s  SQLITE  DUCKDB\n", width, "")
+	fmt.Fprintf(&b, "\n  %-*s  SQLITE  DUCKDB  POSTGRES\n", width, "")
 	for _, t := range things {
-		line := fmt.Sprintf("  %-*s  %-6s  %-6s", width, t.Name, mark(t.SQLite), mark(t.DuckDB))
+		line := fmt.Sprintf("  %-*s  %-6s  %-6s  %-8s", width, t.Name, mark(t.SQLite), mark(t.DuckDB), mark(t.Postgres))
 		if t.Rebuilt {
 			line += "  rebuilt from attestations"
 		}

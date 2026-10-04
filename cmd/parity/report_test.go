@@ -1,4 +1,4 @@
-//go:build rustduckdb
+//go:build rustduckdb && rustpostgres
 
 package main
 

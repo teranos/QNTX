@@ -3329,6 +3329,7 @@ type StoredThing struct {
 	Rebuilt bool `protobuf:"varint,4,opt,name=rebuilt,proto3" json:"rebuilt,omitempty"`
 	// The Go files that reach this thing with hand-written SQL.
 	Sites         []string `protobuf:"bytes,5,rep,name=sites,proto3" json:"sites,omitempty"`
+	Postgres      bool     `protobuf:"varint,6,opt,name=postgres,proto3" json:"postgres,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3396,6 +3397,13 @@ func (x *StoredThing) GetSites() []string {
 		return x.Sites
 	}
 	return nil
+}
+
+func (x *StoredThing) GetPostgres() bool {
+	if x != nil {
+		return x.Postgres
+	}
+	return false
 }
 
 // SignumFollowed is one signum, and the references it can be held to.
@@ -3514,8 +3522,8 @@ type ParityStorage struct {
 	// What was read: source, the code this build was made from, and never this
 	// node.
 	Describes string `protobuf:"bytes,1,opt,name=describes,proto3" json:"describes,omitempty"`
-	// One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go
-	// files that reach it with SQL written by hand.
+	// One per thing, by name: sqlite, duckdb, postgres, rebuilt by a take-in,
+	// and the Go files that reach it with SQL written by hand.
 	Things        []*StoredThing `protobuf:"bytes,2,rep,name=things,proto3" json:"things,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3930,13 +3938,14 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\n" +
 	"namespaces\x18\x01 \x03(\v2\x13.protocol.NamespaceR\n" +
 	"namespaces\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\rR\x05count\"\x81\x01\n" +
+	"\x05count\x18\x02 \x01(\rR\x05count\"\x9d\x01\n" +
 	"\vStoredThing\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06sqlite\x18\x02 \x01(\bR\x06sqlite\x12\x16\n" +
 	"\x06duckdb\x18\x03 \x01(\bR\x06duckdb\x12\x18\n" +
 	"\arebuilt\x18\x04 \x01(\bR\arebuilt\x12\x14\n" +
-	"\x05sites\x18\x05 \x03(\tR\x05sites\"_\n" +
+	"\x05sites\x18\x05 \x03(\tR\x05sites\x12\x1a\n" +
+	"\bpostgres\x18\x06 \x01(\bR\bpostgres\"_\n" +
 	"\x0eSignumFollowed\x12\x16\n" +
 	"\x06signum\x18\x01 \x01(\tR\x06signum\x12\x1a\n" +
 	"\bdeclares\x18\x02 \x03(\tR\bdeclares\x12\x19\n" +

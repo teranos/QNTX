@@ -44,13 +44,20 @@ in
         "crates/ats/Cargo.toml"
         "crates/ats-sqlite/Cargo.toml"
         "crates/ats-duckdb/Cargo.toml"
+        "crates/ats-postgres/Cargo.toml"
         "crates/ats-wasm/Cargo.toml"
         "qntx-plugins/qntx-meili/Cargo.toml"
         "ats/storage/duckdbcgo/**"
         "cmd/qntx/commands/database_parquet.go"
         "cmd/qntx/commands/landing_queries_test.go"
         "db/duckdb/migrations/**"
+        "ats/storage/postgrescgo/**"
+        "cmd/qntx/commands/database_postgres.go"
+        "cmd/qntx/commands/database_postgres_test.go"
+        "db/postgres/migrations/**"
         "cmd/parity/**"
+        "scripts/with-postgres.sh"
+        "flake.lock"
         ".github/workflows/rs.yml"
       ];
     };
@@ -111,10 +118,11 @@ in
         # Same principle as fmt: the workspace, not a list. Crates whose tests
         # never ran in CI (laye-*, ats-id, qntx-proto, qntx-ffi-common) run
         # here now. ats-duckdb tests need libduckdb and run via the Makefile's
-        # parquet path; qntx-reduce is PyO3 and builds only via Nix.
+        # parquet path; ats-postgres tests need a Postgres and run in the job
+        # that has the pinned one; qntx-reduce is PyO3 and builds only via Nix.
         {
           name = "Test Rust libraries";
-          run = "cargo test --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin";
+          run = "cargo test --workspace --exclude ats-duckdb --exclude ats-postgres --exclude qntx-reduce-plugin";
         }
 
         {
@@ -183,6 +191,61 @@ in
           name = "Run Go CGO smoke test + performance floor";
           run = ''
             nix develop --command bash -c 'export LD_LIBRARY_PATH="$PWD/target/release:''${LD_LIBRARY_PATH:-}" && go test -tags rustduckdb -v -timeout 5m ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/ ./cmd/parity/'
+          '';
+        }
+      ];
+    };
+
+    # Postgres backend. The pinned Supabase Postgres comes from Supabase's own
+    # cache; every test here runs against a server of its own that
+    # scripts/with-postgres.sh starts from it, make parity's included.
+    ats-postgres = {
+      name = "Postgres Backend";
+      runs-on = "ubuntu-latest";
+
+      steps = [
+        checkout
+
+        (installNix // {
+          "with".extra_nix_config = installNix."with".extra_nix_config + ''
+            extra-substituters = https://nix-postgres-artifacts.s3.amazonaws.com
+            extra-trusted-public-keys = nix-postgres-artifacts:dGZlQOvKcNEjvT7QEAJbcV6b6uk7VF/hWMjhYleiaLI=
+          '';
+        })
+
+        cachix
+
+        # The three a node links, and the server make parity runs in.
+        {
+          name = "Build FFI static libs and the pinned Postgres via Nix";
+          run = ''
+            nix build .#ats-postgres-ffi --print-build-logs --out-link result-postgres-ffi
+            nix build .#ats-duckdb-ffi --print-build-logs --out-link result-duckdb
+            nix build .#ats-sqlite-ffi --print-build-logs --out-link result-sqlite
+            nix build .#postgres --print-build-logs --out-link result-postgres
+            ls -la result-postgres-ffi/lib/ result-duckdb/lib/ result-sqlite/lib/ result-postgres/bin/
+          '';
+        }
+
+        {
+          name = "Stage FFI libs for CGO";
+          run = ''
+            mkdir -p target/release
+            cp result-postgres-ffi/lib/libats_postgres.* target/release/
+            cp result-duckdb/lib/libats_duckdb.* target/release/
+            cp result-sqlite/lib/libats_sqlite.* target/release/
+          '';
+        }
+
+        {
+          name = "Test ats-postgres";
+          run = "scripts/with-postgres.sh result-postgres/bin nix develop --command cargo test --package ats-postgres";
+        }
+
+        {
+          name = "Test the Go side and make parity";
+          run = ''
+            scripts/with-postgres.sh result-postgres/bin nix develop --command bash -c 'export LD_LIBRARY_PATH="$PWD/target/release:''${LD_LIBRARY_PATH:-}" && go test -tags rustduckdb,rustpostgres -v -timeout 5m ./ats/storage/postgrescgo/... ./cmd/qntx/commands/ ./cmd/parity/'
           '';
         }
       ];

@@ -44,6 +44,47 @@
         }
       ]
     },
+    "ats-postgres": {
+      "name": "Postgres Backend",
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v26",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\nextra-substituters = https://nix-postgres-artifacts.s3.amazonaws.com\nextra-trusted-public-keys = nix-postgres-artifacts:dGZlQOvKcNEjvT7QEAJbcV6b6uk7VF/hWMjhYleiaLI=\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx"
+          }
+        },
+        {
+          "name": "Build FFI static libs and the pinned Postgres via Nix",
+          "run": "nix build .#ats-postgres-ffi --print-build-logs --out-link result-postgres-ffi\nnix build .#ats-duckdb-ffi --print-build-logs --out-link result-duckdb\nnix build .#ats-sqlite-ffi --print-build-logs --out-link result-sqlite\nnix build .#postgres --print-build-logs --out-link result-postgres\nls -la result-postgres-ffi/lib/ result-duckdb/lib/ result-sqlite/lib/ result-postgres/bin/\n"
+        },
+        {
+          "name": "Stage FFI libs for CGO",
+          "run": "mkdir -p target/release\ncp result-postgres-ffi/lib/libats_postgres.* target/release/\ncp result-duckdb/lib/libats_duckdb.* target/release/\ncp result-sqlite/lib/libats_sqlite.* target/release/\n"
+        },
+        {
+          "name": "Test ats-postgres",
+          "run": "scripts/with-postgres.sh result-postgres/bin nix develop --command cargo test --package ats-postgres"
+        },
+        {
+          "name": "Test the Go side and make parity",
+          "run": "scripts/with-postgres.sh result-postgres/bin nix develop --command bash -c 'export LD_LIBRARY_PATH=\"$PWD/target/release:${LD_LIBRARY_PATH:-}\" && go test -tags rustduckdb,rustpostgres -v -timeout 5m ./ats/storage/postgrescgo/... ./cmd/qntx/commands/ ./cmd/parity/'\n"
+        }
+      ]
+    },
     "ats-sqlite": {
       "container": {
         "credentials": {
@@ -80,7 +121,7 @@
         },
         {
           "name": "Test Rust libraries",
-          "run": "cargo test --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin"
+          "run": "cargo test --workspace --exclude ats-duckdb --exclude ats-postgres --exclude qntx-reduce-plugin"
         },
         {
           "name": "Build release with FFI",
@@ -192,13 +233,20 @@
         "crates/ats/Cargo.toml",
         "crates/ats-sqlite/Cargo.toml",
         "crates/ats-duckdb/Cargo.toml",
+        "crates/ats-postgres/Cargo.toml",
         "crates/ats-wasm/Cargo.toml",
         "qntx-plugins/qntx-meili/Cargo.toml",
         "ats/storage/duckdbcgo/**",
         "cmd/qntx/commands/database_parquet.go",
         "cmd/qntx/commands/landing_queries_test.go",
         "db/duckdb/migrations/**",
+        "ats/storage/postgrescgo/**",
+        "cmd/qntx/commands/database_postgres.go",
+        "cmd/qntx/commands/database_postgres_test.go",
+        "db/postgres/migrations/**",
         "cmd/parity/**",
+        "scripts/with-postgres.sh",
+        "flake.lock",
         ".github/workflows/rs.yml"
       ]
     },

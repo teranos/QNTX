@@ -719,6 +719,7 @@ export interface StoredThing {
   rebuilt: boolean;
   /** The Go files that reach this thing with hand-written SQL. */
   sites: string[];
+  postgres: boolean;
 }
 
 /** SignumFollowed is one signum, and the references it can be held to. */
@@ -745,8 +746,8 @@ export interface ParityStorage {
    */
   describes: string;
   /**
-   * One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go
-   * files that reach it with SQL written by hand.
+   * One per thing, by name: sqlite, duckdb, postgres, rebuilt by a take-in,
+   * and the Go files that reach it with SQL written by hand.
    */
   things: StoredThing[];
 }

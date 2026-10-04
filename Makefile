@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-spawn-write nil-writetest-web test-jsdom test test-suite test-parquet test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-spawn-write nil-writetest-web test-jsdom test test-suite test-parquet test-postgres test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -40,9 +40,11 @@ openapi: ## Write what the node serves, from the reach table and the handlers' o
 
 # "Make parity would just be for the storage backend specifically": a signum
 # held to a reference it follows is the parity sigil's (server/parity).
-parity: rust-sqlite ## Report whether SQLite and DuckDB each hold every thing QNTX persists
+parity: rust-sqlite ## Report whether SQLite, DuckDB and Postgres each hold every thing QNTX persists
+	@nix build .#postgres --out-link result-postgres
 	@nix develop .#default --command cargo build --release -p ats-duckdb --features ffi --lib
-	@nix develop .#default --command env LD_LIBRARY_PATH=$(CURDIR)/target/release DYLD_LIBRARY_PATH=$(CURDIR)/target/release go run -tags rustduckdb ./cmd/parity
+	@cargo build --release -p ats-postgres --features ffi --lib
+	@scripts/with-postgres.sh result-postgres/bin nix develop .#default --command env LD_LIBRARY_PATH=$(CURDIR)/target/release DYLD_LIBRARY_PATH=$(CURDIR)/target/release go run -tags rustduckdb,rustpostgres ./cmd/parity
 
 # The generated Go keeps no .proto comment, and the parity sigil gives what our
 # fields say of themselves beside what each spec says of its own. Umami's API
@@ -190,6 +192,7 @@ test-suite: ## The suite itself. Run `make test`, which reports a verdict.
 	@go run ./internal/tools/nilcheck
 	@go test -tags "rustsqlite,qntxwasm" -short ./...
 	@$(MAKE) --no-print-directory test-parquet
+	@$(MAKE) --no-print-directory test-postgres
 	@if [ ! -d "web/node_modules" ]; then \
 		cd web && bun install; \
 	fi
@@ -206,6 +209,16 @@ test-parquet: ## Run parquet backend tests (requires Nix for libduckdb)
 	@nix develop .#default --command cargo test -p ats-duckdb --lib --features ffi
 	@nix develop .#default --command go test -tags "rustsqlite,qntxwasm,rustduckdb" -short ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/ ./cmd/parity/
 	@nix develop .#default --command go build -tags "rustsqlite,qntxwasm,rustduckdb" ./...
+
+# The postgres backend runs against the pinned Supabase Postgres, a server of
+# its own per run (scripts/with-postgres.sh).
+test-postgres: rust-sqlite ## Run postgres backend tests against the pinned Supabase Postgres (requires Nix)
+	@command -v nix >/dev/null 2>&1 || { echo "  ⊘ nix not found — postgres backend tests skipped"; exit 0; }
+	@nix build .#postgres --out-link result-postgres
+	@nix develop .#default --command cargo build --release -p ats-duckdb --features ffi --lib
+	@cargo build --release -p ats-postgres --features ffi --lib
+	@scripts/with-postgres.sh result-postgres/bin cargo test -p ats-postgres
+	@scripts/with-postgres.sh result-postgres/bin nix develop .#default --command env LD_LIBRARY_PATH=$(CURDIR)/target/release DYLD_LIBRARY_PATH=$(CURDIR)/target/release go test -tags "rustsqlite,qntxwasm,rustduckdb,rustpostgres" -short ./ats/storage/postgrescgo/... ./cmd/qntx/commands/ ./cmd/parity/
 
 test-d: ## Run D plugin tests (ix-net)
 	@echo "Running D tests..."
