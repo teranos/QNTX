@@ -2087,6 +2087,56 @@ pub extern "C" fn duckdb_users_result_free(result: UsersResultC) {
     )
 }
 
+#[repr(C)]
+pub struct SchemaResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub tables_json: *mut c_char,
+}
+
+impl FfiResult for SchemaResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            tables_json: ptr::null_mut(),
+        }
+    }
+}
+
+/// The tables the migrations leave standing, as a JSON array of names. Caller
+/// frees with `duckdb_schema_result_free`.
+#[no_mangle]
+pub extern "C" fn duckdb_schema_tables() -> SchemaResultC {
+    qntx_ffi_common::guarded_result("duckdb_schema_tables", || {
+        let tables = match crate::migrate::schema_tables() {
+            Ok(tables) => tables,
+            Err(e) => return SchemaResultC::error(e.crosses("duckdb_schema_tables")),
+        };
+        match serde_json::to_string(&tables) {
+            Ok(json) => SchemaResultC {
+                success: true,
+                error_msg: ptr::null_mut(),
+                tables_json: cstring_new_or_empty(&json),
+            },
+            Err(e) => SchemaResultC::error(e.crosses("duckdb_schema_tables")),
+        }
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn duckdb_schema_result_free(result: SchemaResultC) {
+    qntx_ffi_common::guarded(
+        "duckdb_schema_result_free",
+        || unsafe {
+            free_cstring(result.error_msg);
+            free_cstring(result.tables_json);
+        },
+        |_| (),
+    )
+}
+
 #[no_mangle]
 pub extern "C" fn duckdb_namespaces_result_free(result: NamespacesResultC) {
     qntx_ffi_common::guarded(

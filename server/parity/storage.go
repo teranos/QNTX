@@ -15,11 +15,9 @@ import (
 
 // Stored is one thing QNTX persists, as make parity read it.
 type Stored struct {
-	Name string `json:"name"`
-	// Node is on a node's own disk, whatever the backend (ADR-037).
-	Node bool `json:"node"`
-	// Record is under the storage location, and survives losing the host.
-	Record bool `json:"record"`
+	Name   string `json:"name"`
+	SQLite bool   `json:"sqlite"`
+	DuckDB bool   `json:"duckdb"`
 	// Rebuilt rows cascade from attestations, so a take-in rebuilds them.
 	Rebuilt bool `json:"rebuilt"`
 	// Sites are the Go files that reach this thing with hand-written SQL. Files
