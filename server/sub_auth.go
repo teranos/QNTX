@@ -33,6 +33,13 @@ func setOperatorClients(h *auth.Handler, cfg *appcfg.Config, logger *zap.Sugared
 	setOperatorClient(logger, "Google", google.ClientID, google.ClientSecretRef, h.SetGoogleClient)
 	github := cfg.Auth.Provider.GitHub
 	setOperatorClient(logger, "GitHub", github.ClientID, github.ClientSecretRef, h.SetGitHubClient)
+	// The App's key is optional: without it the node logs in with GitHub and
+	// spends GitHub as ever, and only acting as the App itself is refused.
+	if github.PrivateKeyRef == "" {
+		h.SetGitHubApp("", "")
+	} else {
+		setOperatorClient(logger, "The GitHub App", github.ClientID, github.PrivateKeyRef, h.SetGitHubApp)
+	}
 
 	// Apple's secret is a signing key, and the exchange names whose it is;
 	// the handler takes all of that or takes Apple away.
