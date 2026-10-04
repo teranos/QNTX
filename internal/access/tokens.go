@@ -58,7 +58,9 @@ type Grant struct {
 // A SUPER token is not scoped: it is ROOT handing its own reach to a token it
 // made, and the kind that does pretty much everything does all of it.
 func (g Grant) Scoped() bool {
-	return g.Level != LevelSuper
+	// ROOT's own kind is the ROOT agent's token alone (ADR-048), and it is
+	// narrowed by no line either.
+	return g.Level != LevelSuper && g.Level != LevelRoot
 }
 
 // NewToken is what the caller asks for when minting one.

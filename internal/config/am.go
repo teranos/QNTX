@@ -17,7 +17,26 @@ type Config struct {
 	Distill      DistillConfig    `mapstructure:"distill"`
 	Sentry       SentryConfig     `mapstructure:"sentry"`
 	Node         NodeConfig       `mapstructure:"node"`
+	Agent        AgentConfig      `mapstructure:"agent"`
 	GroundDBPath string           `mapstructure:"ground_db_path"` // Path to Ground's database for deferred news delivery
+}
+
+// AgentConfig is the agents this node runs (ADR-048).
+type AgentConfig struct {
+	Root RootAgentConfig `mapstructure:"root"`
+}
+
+// RootAgentConfig names the ROOT agent: QNTX itself as ROOT talks to it, run
+// by the node as Claude Code. Nothing stands in for the model or the effort.
+type RootAgentConfig struct {
+	Model    string `mapstructure:"model"`  // The Claude model it is, by its full name.
+	Effort   string `mapstructure:"effort"` // The effort it runs at: low, medium, high, xhigh or max.
+	TokenRef string `mapstructure:"token"`  // ssm:// or env: reference to the Claude plan token — a literal is rejected
+}
+
+// Named reports whether am.toml names a ROOT agent at all.
+func (r RootAgentConfig) Named() bool {
+	return r.Model != "" || r.Effort != "" || r.TokenRef != ""
 }
 
 // NodeConfig is what the node says of itself, through am node. Empty says
