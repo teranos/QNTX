@@ -40,7 +40,7 @@
         },
         {
           "name": "Run Go CGO smoke test + performance floor",
-          "run": "nix develop --command bash -c 'export LD_LIBRARY_PATH=\"$PWD/target/release:${LD_LIBRARY_PATH:-}\" && go test -tags rustduckdb -v -timeout 5m ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/'\n"
+          "run": "nix develop --command bash -c 'export LD_LIBRARY_PATH=\"$PWD/target/release:${LD_LIBRARY_PATH:-}\" && go test -tags rustduckdb -v -timeout 5m ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/ ./cmd/parity/'\n"
         }
       ]
     },

@@ -10,9 +10,11 @@
 //
 // Two sources, both code:
 //
-//   - Schema. Migrations are replayed to their final state and the resulting
-//     table list read back. Final state, not the CREATE statements along the
-//     way, so a rebuild's scratch table is never mistaken for a thing.
+//   - Schema. Each backend's migrations are applied by its own runner, in the
+//     engine the node links — ats-sqlite in SQLite, ats-duckdb in DuckDB — and
+//     the resulting table list read back. Final state, not the CREATE
+//     statements along the way, so a rebuild's scratch table is never mistaken
+//     for a thing.
 //
 //   - Contracts. A Go interface declaring storage operations names a thing
 //     whether or not anything implements it. TokenStore in server/auth is the
@@ -41,8 +43,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/QNTX/internal/sqlclose"
@@ -68,11 +68,10 @@ type Thing struct {
 
 func main() {
 	root := flag.String("root", ".", "repository root to scan for storage contracts")
-	parquetDir := flag.String("parquet", "db/duckdb/migrations", "DuckDB/parquet migrations directory")
 	crateDir := flag.String("crate", "crates/ats-duckdb/src", "DuckDB backend crate, scanned for object prefixes")
 	flag.Parse()
 
-	things, err := Report(*root, *parquetDir, *crateDir)
+	things, err := Report(*root, *crateDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "parity: %v\n", err)
 		os.Exit(1)
@@ -115,7 +114,7 @@ func Written(root string, things []Thing) ([]byte, error) {
 }
 
 // Report derives every thing and its presence in each backend.
-func Report(root, parquetDir, crateDir string) ([]Thing, error) {
+func Report(root, crateDir string) ([]Thing, error) {
 	sqliteTables, rebuilt, linked, err := SQLiteSchema()
 	if err != nil {
 		return nil, err
@@ -128,7 +127,7 @@ func Report(root, parquetDir, crateDir string) ([]Thing, error) {
 	if linked != pinned {
 		return nil, errors.Newf("the node links SQLite %s, %s pins %s", linked, pins, pinned)
 	}
-	parquetTables, err := ReplaySchema(filepath.Join(root, parquetDir))
+	parquetTables, err := RecordSchema()
 	if err != nil {
 		return nil, err
 	}
@@ -207,12 +206,6 @@ func covered(contract string, present map[string]*Thing) bool {
 		}
 	}
 	return false
-}
-
-func init() {
-	// ReplaySchema's migrations build vector indexes, which need the vec0
-	// module registered before any connection opens.
-	sqlitevec.Auto()
 }
 
 // replays names each node opened, since database/sql keeps a driver for the
@@ -307,53 +300,6 @@ func cascadeOf(db *sql.DB, table, parent string) (_ bool, err error) {
 		return false, errors.Wrapf(err, "failed reading the foreign keys of %s", table)
 	}
 	return cascades, nil
-}
-
-// ReplaySchema runs the .sql files in dir, in filename order, against an
-// in-memory database and returns the tables left standing.
-//
-// DuckDB's migration runner lives in Rust (crates/ats-duckdb/src/migrate.rs),
-// so its migrations are replayed here rather than executed by their own engine.
-// The DDL is portable enough for SQLite to accept; anything it rejects fails
-// this command loudly instead of being guessed at. That SQLite is
-// mattn/go-sqlite3's, not the node's: a node's store runs its own migrations.
-func ReplaySchema(dir string) (_ map[string]bool, err error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read migrations from %s", dir)
-	}
-
-	var files []string
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
-			files = append(files, entry.Name())
-		}
-	}
-	sort.Strings(files)
-
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open in-memory SQLite replaying %s", dir)
-	}
-	defer func() { err = sqlclose.With(err, db.Close(), "the replay schema db") }()
-	db.SetMaxOpenConns(1)
-
-	for _, name := range files {
-		path := filepath.Join(dir, name)
-		body, err := os.ReadFile(path)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read migration %s", path)
-		}
-		if _, err := db.Exec(string(body)); err != nil {
-			// Matches the production runner: migrations named "optional"
-			// depend on extensions that may not be loaded (db/migrate.go).
-			if strings.Contains(name, "optional") {
-				continue
-			}
-			return nil, errors.Wrapf(err, "failed to execute migration %s", path)
-		}
-	}
-	return tableNames(db)
 }
 
 // tableNames reads the tables a database ended up with, minus the ones that

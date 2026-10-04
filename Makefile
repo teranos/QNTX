@@ -41,7 +41,8 @@ openapi: ## Write what the node serves, from the reach table and the handlers' o
 # "Make parity would just be for the storage backend specifically": a signum
 # held to a reference it follows is the parity sigil's (server/parity).
 parity: rust-sqlite ## Report what a node keeps on its own disk and what the record keeps (ADR-024, ADR-037)
-	@LD_LIBRARY_PATH=$(CURDIR)/target/release go run ./cmd/parity
+	@nix develop .#default --command cargo build --release -p ats-duckdb --features ffi --lib
+	@nix develop .#default --command env LD_LIBRARY_PATH=$(CURDIR)/target/release DYLD_LIBRARY_PATH=$(CURDIR)/target/release go run -tags rustduckdb ./cmd/parity
 
 # The generated Go keeps no .proto comment, and the parity sigil gives what our
 # fields say of themselves beside what each spec says of its own. Umami's API
@@ -193,7 +194,7 @@ test-parquet: ## Run parquet backend tests (requires Nix for libduckdb)
 	@command -v nix >/dev/null 2>&1 || { echo "  ⊘ nix not found — parquet backend tests skipped"; exit 0; }
 	@nix develop .#default --command cargo build --release -p ats-duckdb --features ffi --lib
 	@nix develop .#default --command cargo test -p ats-duckdb --lib --features ffi
-	@nix develop .#default --command go test -tags "rustsqlite,qntxwasm,rustduckdb" -short ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/
+	@nix develop .#default --command go test -tags "rustsqlite,qntxwasm,rustduckdb" -short ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/ ./cmd/parity/
 	@nix develop .#default --command go build -tags "rustsqlite,qntxwasm,rustduckdb" ./...
 
 test-d: ## Run D plugin tests (ix-net)

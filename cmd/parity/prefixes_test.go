@@ -120,12 +120,6 @@ func TestObjectPrefixes_ReadsTheRealCrate(t *testing.T) {
 			t.Errorf("%s missing from the real crate scan: %v", want, prefixes)
 		}
 	}
-	// The crate builds the attestations prefix from a constant, which this scan
-	// cannot see; the record keeps attestations because DuckDB's migration
-	// creates the table, and that is where this answer comes from.
-	if !replay(t, "../../db/duckdb/migrations")["attestations"] {
-		t.Error("attestations missing from the real DuckDB migrations")
-	}
 	for _, only := range []string{"ducks", "playground", "identity", "system"} {
 		if prefixes[only] {
 			t.Errorf("%s is named only by the crate's tests, and was read as a thing: %v", only, prefixes)
