@@ -326,12 +326,17 @@ func TestGitHubEveryRPCRouted(t *testing.T) {
 			route, found := githubRoutes[m.MethodName]
 			require.True(t, found, "no route for %s", m.MethodName)
 
-			s, seen := fakeGitHub(t, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+			s, seen := fakeGitHubAs(t, gardenApp{gardenTokens: gardenCreds, jwt: "the-apps-jwt"}, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 			var sent protoreflect.Message
 			dec := func(v any) error {
 				msg := v.(proto.Message).ProtoReflect()
 				fields := msg.Descriptor().Fields()
-				msg.Set(fields.ByName("namespace"), protoreflect.ValueOfString("garden"))
+				// A route that is the App's own names no namespace: the App is the node's.
+				if route.asApp {
+					assert.Nil(t, fields.ByName("namespace"), "%s is the App's own and names a namespace", msg.Descriptor().FullName())
+				} else {
+					msg.Set(fields.ByName("namespace"), protoreflect.ValueOfString("garden"))
+				}
 				for _, name := range route.pathFields() {
 					fd := fields.ByName(protoreflect.Name(name))
 					require.NotNil(t, fd, "path field %s is not in %s", name, msg.Descriptor().FullName())

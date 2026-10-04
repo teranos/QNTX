@@ -41,6 +41,7 @@ module Imported'modules = struct
   module Github_issues_issues = Github_issues_issues
   module Github_repos_repos = Github_repos_repos
   module Github_repos_contents = Github_repos_contents
+  module Github_apps_webhooks = Github_apps_webhooks
 end
 (**/**)
 module rec Protocol : sig
@@ -2158,6 +2159,28 @@ module rec Protocol : sig
     end
 
     val getARepositoryREADMEForADirectory : (module Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEForADirectoryRequest.t) * (module Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.t)
+    module ListDeliveriesForAnAppWebhook : sig
+      include Runtime'.Service.Rpc with type Request.t = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookRequest.t and type Response.t = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookResponse.t
+      module Request : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookRequest.t and type make_t = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookResponse.t and type make_t = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val listDeliveriesForAnAppWebhook : (module Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookRequest.t) * (module Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookResponse.t)
+    module RedeliverADeliveryForAnAppWebhook : sig
+      include Runtime'.Service.Rpc with type Request.t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest.t and type Response.t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse.t
+      module Request : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest.t and type make_t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse.t and type make_t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val redeliverADeliveryForAnAppWebhook : (module Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest.t) * (module Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse.t)
   end
 
 end = struct
@@ -4751,6 +4774,32 @@ end = struct
     let getARepositoryREADMEForADirectory =
       (module Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEForADirectoryRequest : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEForADirectoryRequest.t ),
       (module Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse : Runtime'.Spec.Message with type t = Imported'modules.Github_repos_contents.Protocol.GitHubGetARepositoryREADMEResponse.t )
+
+    module ListDeliveriesForAnAppWebhook = struct
+      let package_name = Some "protocol"
+      let service_name = "GitHubService"
+      let method_name = "ListDeliveriesForAnAppWebhook"
+      let name = "/protocol.GitHubService/ListDeliveriesForAnAppWebhook"
+      module Request = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookRequest
+      module Response = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookResponse
+    end
+
+    let listDeliveriesForAnAppWebhook =
+      (module Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookRequest : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookRequest.t ),
+      (module Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookResponse : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubListDeliveriesForAnAppWebhookResponse.t )
+
+    module RedeliverADeliveryForAnAppWebhook = struct
+      let package_name = Some "protocol"
+      let service_name = "GitHubService"
+      let method_name = "RedeliverADeliveryForAnAppWebhook"
+      let name = "/protocol.GitHubService/RedeliverADeliveryForAnAppWebhook"
+      module Request = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest
+      module Response = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse
+    end
+
+    let redeliverADeliveryForAnAppWebhook =
+      (module Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest.t ),
+      (module Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse.t )
 
   end
 

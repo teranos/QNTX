@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043
+// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10
+// Both are the App's own: GitHub takes them only with a JWT the App signs.
+
+// GET /app/hook/deliveries
+message GitHubListDeliveriesForAnAppWebhookRequest {
+  int64 per_page = 1;
+  string cursor = 2;
+  string status = 3;
+}
+
+message GitHubListDeliveriesForAnAppWebhookResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubAppsWebhooksHookDeliveryItem items = 3;
+  // "Refer to the `link` header for the next and previous page cursors."
+  string link = 4;
+}
+
+// POST /app/hook/deliveries/{delivery_id}/attempts
+message GitHubRedeliverADeliveryForAnAppWebhookRequest {
+  int64 delivery_id = 1;
+}
+
+message GitHubRedeliverADeliveryForAnAppWebhookResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// Simple webhook delivery
+message GitHubAppsWebhooksHookDeliveryItem {
+  int64 id = 1;
+  string guid = 2;
+  string delivered_at = 3;
+  bool redelivery = 4;
+  double duration = 5;
+  string status = 6;
+  int64 status_code = 7;
+  string event = 8;
+  string action = 9;
+  int64 installation_id = 10;
+  int64 repository_id = 11;
+  string throttled_at = 12;
+}
