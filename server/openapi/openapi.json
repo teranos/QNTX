@@ -26,6 +26,12 @@
         "ANYONE"
       ]
     },
+    "/am/ground": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
     "/am/statusline": {
       "x-qntx-reach": [
         "ROOT",
@@ -436,6 +442,12 @@
       ]
     },
     "/api/timeseries/usage": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/api/transcripts": {
       "x-qntx-reach": [
         "ROOT",
         "SUPER"

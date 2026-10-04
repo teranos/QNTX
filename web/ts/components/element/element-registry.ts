@@ -8,7 +8,7 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { AX, SO, SE, AS, Attestation, Sigma, Type, Triplet, Prose, Subcanvas } from '../../sym';
+import { AX, SO, SE, AS, Attestation, Sigma, Type, Triplet, Prose, Subcanvas, Transcript } from '../../sym';
 import { createAxElement } from './ax-element';
 import { createSemanticElement } from './semantic-element';
 import { createPyElement, PY_DEFAULT_CODE } from './py-element';
@@ -22,6 +22,7 @@ import { createTypeElement } from './type-element';
 import { createTripletElement } from './triplet-element';
 import { createResultElement } from './result-element';
 import { createThreadElement } from './thread-element';
+import { createTranscriptElement } from './transcript-element';
 
 export interface ElementTypeEntry {
     /** Symbol identifier (e.g., AX, 'py', SO, Prose) */
@@ -66,6 +67,7 @@ const ELEMENT_TYPES: ElementTypeEntry[] = [
     { symbol: Type,     className: 'canvas-type-element',        title: 'Type',        label: 'Type',      render: createTypeElement },
     { symbol: 'stream', className: 'canvas-stream-element',      title: 'Stream',      label: 'Stream',    render: (g) => createResultElement(g) },
     { symbol: '\u303D', className: 'canvas-thread-element',     title: 'Thread',      label: 'Thread',    render: createThreadElement },
+    { symbol: Transcript, className: 'canvas-transcript-element', title: 'Transcript', label: 'Transcript', render: createTranscriptElement },
 ];
 
 const _bySymbol = new Map(ELEMENT_TYPES.map(e => [e.symbol, e]));
@@ -160,6 +162,10 @@ export function getElementTypeBySymbol(symbol: string): ElementTypeEntry | undef
 export function getElementTypeBySavedSymbol(symbol: string, content?: string): ElementTypeEntry | undefined {
     if (symbol === AS && holdsAnAttestation(content)) {
         return _bySymbol.get(Attestation);
+    }
+    // A transcript placed before it moved from 🧵 to ⏦. Nothing else was 🧵.
+    if (symbol === '🧵') {
+        return _bySymbol.get(Transcript);
     }
     return _bySymbol.get(symbol);
 }

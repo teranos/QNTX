@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-ocaml test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin loom-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -196,11 +196,6 @@ test-parquet: ## Run parquet backend tests (requires Nix for libduckdb)
 	@nix develop .#default --command go test -tags "rustsqlite,qntxwasm,rustduckdb" -short ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/
 	@nix develop .#default --command go build -tags "rustsqlite,qntxwasm,rustduckdb" ./...
 
-test-ocaml: ## Run OCaml plugin tests (loom)
-	@echo "Running OCaml tests..."
-	@cd qntx-plugins/loom && opam exec -- dune runtest
-	@echo "✓ OCaml tests complete"
-
 test-d: ## Run D plugin tests (ix-net)
 	@echo "Running D tests..."
 	@$(MAKE) -C qntx-plugins/ix-net test
@@ -281,7 +276,7 @@ endef
 
 # check-plugin-version DIR EXT VERSION_FILE
 # Fails the build if source files changed but version file didn't.
-# Usage: @$(call check-plugin-version,qntx-plugins/loom,.ml,qntx-plugins/loom/lib/version.ml)
+# Usage: @$(call check-plugin-version,qntx-plugins/ix-bin,d,qntx-plugins/ix-bin/source/ixbin/version_.d)
 define check-plugin-version
 	@git diff --name-only HEAD -- $(1)/ | grep -q '\.$(2)$$' && \
 	 ! git diff --name-only HEAD -- $(3) | grep -q . && \
@@ -333,11 +328,6 @@ meili-plugin: ## Build, install, and restart MeiliSearch plugin
 	$(call check-plugin-version,qntx-plugins/qntx-meili,rs,qntx-plugins/qntx-meili/Cargo.toml)
 	@$(MAKE) -C qntx-plugins/qntx-meili install PREFIX=$(PREFIX)
 	$(call restart-plugin,meili)
-
-loom-plugin: ## Build, install, and restart loom plugin (OCaml)
-	$(call check-plugin-version,qntx-plugins/loom,ml,qntx-plugins/loom/lib/version.ml)
-	@$(MAKE) -C qntx-plugins/loom install PREFIX=$(PREFIX)
-	$(call restart-plugin,loom)
 
 llama-cpp-plugin: ## Build, install, and restart llama-cpp plugin (C++ local LLM)
 	$(call check-plugin-version,qntx-plugins/llama-cpp,cpp,qntx-plugins/llama-cpp/src/plugin.h)

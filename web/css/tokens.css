@@ -60,6 +60,41 @@
     --age-fresh: #3f8a5c; /* Used minutes ago: neutral dark green */
     --age-old: #dc143c; /* Used months ago: crimson */
 
+    /* Earth, which Ground leans toward */
+    --earth-soil: #2a221b;
+    --earth-soil-hover: #3a2f25;
+    --earth-clay: #b9774f;
+    --earth-ochre: #c9a24a;
+    --earth-chalk: #e6d8c3; /* What is written on the earth and the night */
+    --earth-dust: #a8957c; /* Written smaller, and what a limitation says */
+    --earth-loam: #1f1813; /* Under the soil */
+    --earth-peat: #1a1410; /* Under the loam */
+    --earth-bedrock: #15100c; /* The deepest layer */
+
+    /* Night, over the earth Ground stands on */
+    --night-void: #05081a; /* Past the stars, where the nebula is */
+    --night-glow: #7fb4c8; /* What a nebula is lit with */
+    --night-ink: #0a0f25;
+    --night-navy: #111b3f;
+    --night-haze: #35507a;
+    --night-teal: #1b4f63;
+    --star-gold: #e6cf9a;
+
+    /* Ground's own faces, the ones its book is typeset in (web/fonts/ground) */
+    --ground-serif: "TeX Gyre Schola", serif;
+    --ground-mono: "IBM Plex Mono", monospace;
+
+    /* An error's own colours, as the Sacred Error Axiom gives them (teranos/sacred-error ERROR.md) */
+    --sacred-ground: #2a0c0c;
+    --sacred-border: #4a1414;
+    --sacred-error: #ff6666;
+    --sacred-warn: #ffcc66;
+
+    /* What a rite found */
+    --rite-advance: #5f7a45;
+    --rite-hold: #a0812f;
+    --rite-halt: #9c4a2e;
+
     /* Element Status Colors - dark-bg tints for lifecycle states */
     --element-status-idle-bg: rgba(30, 30, 35, 0.92);
     --element-status-idle-section-bg: var(--bg-tertiary);
