@@ -619,129 +619,60 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	return as, nil
 }
 
+// rustQueryFilter is the filter as Rust reads it: time as Unix milliseconds,
+// and omitempty so nil slices are missing rather than null (Rust expects missing or []).
+type rustQueryFilter struct {
+	Subjects   []string `json:"subjects,omitempty"`
+	Predicates []string `json:"predicates,omitempty"`
+	Contexts   []string `json:"contexts,omitempty"`
+	Actors     []string `json:"actors,omitempty"`
+	Source     string   `json:"source,omitempty"`
+	TimeStart  *int64   `json:"time_start,omitempty"`
+	TimeEnd    *int64   `json:"time_end,omitempty"`
+	Limit      int      `json:"limit,omitempty"`
+}
+
+// unixMilli is a time pointer as Unix milliseconds, nil staying nil.
+func unixMilli(t *time.Time) *int64 {
+	if t == nil {
+		return nil
+	}
+	ms := t.UnixMilli()
+	return &ms
+}
+
 // GetAttestations retrieves attestations based on filters (implements ats.AttestationStore).
 func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
-	// Convert Go filter to Rust-compatible JSON format (no lock needed for serialization).
-	// omitempty prevents nil slices from marshaling as null (Rust expects missing or []).
-	rustFilter := struct {
-		Subjects   []string `json:"subjects,omitempty"`
-		Predicates []string `json:"predicates,omitempty"`
-		Contexts   []string `json:"contexts,omitempty"`
-		Actors     []string `json:"actors,omitempty"`
-		Source     string   `json:"source,omitempty"`
-		TimeStart  *int64   `json:"time_start,omitempty"`
-		TimeEnd    *int64   `json:"time_end,omitempty"`
-		Limit      int      `json:"limit,omitempty"`
-	}{
+	return rs.query(rustQueryFilter{
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
 		Actors:     filter.Actors,
 		Source:     filter.Source,
+		TimeStart:  unixMilli(filter.TimeStart),
+		TimeEnd:    unixMilli(filter.TimeEnd),
 		Limit:      filter.Limit,
-	}
-
-	// Convert time pointers to Unix milliseconds
-	if filter.TimeStart != nil {
-		ms := filter.TimeStart.UnixMilli()
-		rustFilter.TimeStart = &ms
-	}
-	if filter.TimeEnd != nil {
-		ms := filter.TimeEnd.UnixMilli()
-		rustFilter.TimeEnd = &ms
-	}
-
-	filterJSON, err := json.Marshal(rustFilter)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal filter")
-	}
-
-	cFilterJSON := C.CString(string(filterJSON))
-	defer C.free(unsafe.Pointer(cFilterJSON))
-
-	start := time.Now()
-	var result C.AttestationResultC
-	entry := rs.acquireReadConn()
-	if entry != nil {
-		result = C.read_conn_query(entry.conn, cFilterJSON)
-		rs.releaseReadConn(entry)
-	} else {
-		rs.muWrite.Lock()
-		if rs.store == nil {
-			rs.muWrite.Unlock()
-			return nil, errors.New("store is closed")
-		}
-		result = C.storage_query(rs.store, cFilterJSON)
-		rs.muWrite.Unlock()
-	}
-	var success bool
-	var errMsg, jsonStr string
-	success = bool(result.success)
-	if !success {
-		errMsg = C.GoString(result.error_msg)
-	} else if result.attestation_json != nil {
-		jsonStr = C.GoString(result.attestation_json)
-	}
-	C.attestation_result_free(result)
-	logSlowOp(start, "storage_query "+slowQueryKey(filter))
-
-	if !success {
-		return nil, errors.New(errMsg)
-	}
-
-	if jsonStr == "" {
-		return []*types.As{}, nil
-	}
-
-	// Parse JSON array of attestations (no lock needed)
-	var rustAttestations []json.RawMessage
-	if err := json.Unmarshal([]byte(jsonStr), &rustAttestations); err != nil {
-		return nil, errors.Wrap(err, "failed to parse attestation array")
-	}
-
-	// Convert each attestation from Rust JSON
-	attestations := make([]*types.As, 0, len(rustAttestations))
-	for _, rawAttestation := range rustAttestations {
-		as, err := fromRustJSON([]byte(rawAttestation))
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to convert attestation from Rust JSON")
-		}
-		attestations = append(attestations, as)
-	}
-
-	return attestations, nil
+	}, "storage_query "+slowQueryKey(filter))
 }
 
 // QueryFilter executes a full AxFilter query through Rust FFI.
 // Rust builds the SQL and executes it.
 func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
-	// Convert to Rust-compatible JSON: time as milliseconds, omit empty slices
-	rustFilter := struct {
-		Subjects   []string `json:"subjects,omitempty"`
-		Predicates []string `json:"predicates,omitempty"`
-		Contexts   []string `json:"contexts,omitempty"`
-		Actors     []string `json:"actors,omitempty"`
-		Source     string   `json:"source,omitempty"`
-		TimeStart  *int64   `json:"time_start,omitempty"`
-		TimeEnd    *int64   `json:"time_end,omitempty"`
-		Limit      int      `json:"limit,omitempty"`
-	}{
+	return rs.query(rustQueryFilter{
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
 		Actors:     filter.Actors,
+		TimeStart:  unixMilli(filter.TimeStart),
+		TimeEnd:    unixMilli(filter.TimeEnd),
 		Limit:      filter.Limit,
-	}
+	}, "query_filter")
+}
 
-	if filter.TimeStart != nil {
-		ms := filter.TimeStart.UnixMilli()
-		rustFilter.TimeStart = &ms
-	}
-	if filter.TimeEnd != nil {
-		ms := filter.TimeEnd.UnixMilli()
-		rustFilter.TimeEnd = &ms
-	}
-
+// query asks a read connection when one is free, else the store under the
+// write lock, and converts the attestations Rust answers with. slowKey names
+// the query in the slow-operation log.
+func (rs *RustStore) query(rustFilter rustQueryFilter, slowKey string) ([]*types.As, error) {
 	filterJSON, err := json.Marshal(rustFilter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal filter")
@@ -765,7 +696,6 @@ func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
 		result = C.storage_query(rs.store, cFilterJSON)
 		rs.muWrite.Unlock()
 	}
-
 	var success bool
 	var errMsg, jsonStr string
 	success = bool(result.success)
@@ -775,7 +705,7 @@ func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
 		jsonStr = C.GoString(result.attestation_json)
 	}
 	C.attestation_result_free(result)
-	logSlowOp(start, "query_filter")
+	logSlowOp(start, slowKey)
 
 	if !success {
 		return nil, errors.New(errMsg)
