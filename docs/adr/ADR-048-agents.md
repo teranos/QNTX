@@ -46,6 +46,16 @@ expressed to ROOT."
 - A ritual's performer, in place of `claude --bg` (teranos/ground RITUAL.md).
 - A2A: work sent to an agent the node hosts.
 
+## First: ROOT talks to QNTX
+
+As ROOT, I open the node and say something to it. It answers as the node, and
+when I ask it to do something it calls the sigil itself. Each turn is attested
+by the node's DID, and tomorrow it is the same session, readable as a
+transcript.
+
+"for development purposes SUPER will be allowed temporarily, but SUPER needs to
+be removed before the work get's merged."
+
 ## Not done
 
 One persistent session outlasts a model's context window, so what the host
