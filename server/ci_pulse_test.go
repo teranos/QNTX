@@ -433,3 +433,37 @@ func TestCIWatchSaysWhenNoRunCarriesTheName(t *testing.T) {
 		t.Errorf("an absent run drew %q", got[0].Item.Symbol)
 	}
 }
+
+// "that is a qntx responsibility"
+// A push whose commit no workflow ran on: ground-knows-what-died had no PR,
+// and each push of it was waited on for two hours and then called failed.
+func TestCIWatchSaysWhenAPushStartedNoRun(t *testing.T) {
+	gh := &scriptedGitHub{history: noHistory()}
+	news := newNewsLog()
+	h := handlerOver(gh, news)
+	// Waiting at all is the defect, so a wait that goes round is cut short.
+	waits := 0
+	h.sleep = func(ctx context.Context, d time.Duration) error {
+		waits++
+		if waits > 3 {
+			return context.Canceled
+		}
+		return nil
+	}
+	as := ciStatusAs("did:key:alice")
+	as.Timestamp = time.Now().Add(-2 * dispatchAppear)
+
+	if err := h.Execute(context.Background(), jobFor(t, as)); err != nil {
+		t.Fatalf("a push with no run was a failure: %v", err)
+	}
+	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
+	if len(got) != 1 {
+		t.Fatalf("news for alice: %d items, want 1: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Item.Note, "no CI run") || !strings.Contains(got[0].Item.Note, "sky-whisper") {
+		t.Errorf("note %q", got[0].Item.Note)
+	}
+	if !got[0].Quiet {
+		t.Error("no run is not a verdict, and no session is woken for it")
+	}
+}
