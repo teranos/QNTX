@@ -32,6 +32,7 @@ import { Ground } from './sym';
 import { openTranscriptElement, when, type TranscriptRead, type Turn } from './components/element/transcript-element';
 import { cloud, cloudBank, comet, core, horizon, nebula, seam, starburst, starField } from './ground-scene';
 import { labelsOf, renderSparkline, seenOver, seriesOf, type Window as Span } from './components/sparkline';
+import { apiError, sacredEntry, type SacredError } from './components/sacred';
 
 const ELEMENT_ID = 'ground-element';
 
@@ -48,7 +49,11 @@ export interface Does {
     started: string;
     left: number;
     watches: Array<{ id: string; name: string; predicates?: string[] }>;
-    news: Array<{ id: string; name: string; note: string; symbol: string; waiting: boolean; at: string; on_row: boolean }>;
+    news: Array<{
+        id: string; name: string; note: string; symbol: string; waiting: boolean; at: string; on_row: boolean;
+        // What a conclusion carries in full: each workflow the push started, and how it ended.
+        workflows?: Array<{ name: string; conclusion: string; url: string }>;
+    }>;
     failed: Array<{ at: string; error: string; execution_id: string }>;
     // What the node sees of ug. A node from before it saw any answers without it.
     ug?: Ug;
@@ -486,65 +491,75 @@ function saySky(into: HTMLElement, reads: TranscriptRead[]): void {
 // "AT THE BOTTOM OF THE GROUND ELEMENT IS FIERY RED ERROR RED FATAL RED HIGH ENTROPY MADNESS"
 // "BUT ITS SACRED"
 
-// One failure, whole: what failed, why in the words it came in, and where and when.
-interface Sacred {
-    key: string;
-    title: string;
-    why: string;
-    where: string;
-    at: string;
+// One failure, as the Sacred Error it is drawn through, and the session it happened in when it happened in one.
+interface Failed {
+    error: SacredError;
     session: string;
-    fatal: boolean;
 }
 
 // What failed inside the sessions read: an API error that ended a turn, said as
-// the API said it (server/transcripts.go turnOf), and a rite that halted.
-function errorsIn(reads: TranscriptRead[]): Sacred[] {
-    const found: Sacred[] = [];
+// the API said it, and a rite that halted, with the code it read.
+function errorsIn(reads: TranscriptRead[]): Failed[] {
+    const found: Failed[] = [];
     for (const read of reads) {
-        const where = [walkOf(read), placeOf(read).place, read.session.substring(0, 8)].filter(Boolean).join(' · ');
+        const context = {
+            surface: `session ${read.session.substring(0, 8)}`,
+            region: [walkOf(read), placeOf(read).place].filter(Boolean).join(' · ') || undefined,
+        };
         for (const turn of read.turns) {
             if (turn.speaker === 'error') {
-                const colon = turn.text.indexOf(': ');
-                found.push({
-                    key: turn.of, where, at: turn.at, session: read.session, fatal: true,
-                    title: colon < 0 ? turn.text : turn.text.substring(0, colon),
-                    why: colon < 0 ? '' : turn.text.substring(colon + 2),
-                });
-            } else if (turn.speaker === 'rite' && turn.text.split(' ')[1] === 'halt') {
-                found.push({ key: turn.of, title: `rite ${turn.text}`, why: '', where, at: turn.at, session: read.session, fatal: false });
+                found.push({ session: read.session, error: apiError(turn.of, turn.at, turn.text, context) });
+                continue;
             }
+            const said = turn.text.split(' ');
+            if (turn.speaker !== 'rite' || said[1] !== 'halt') continue;
+            found.push({
+                session: read.session,
+                error: { id: turn.of, severity: 'error', context, title: `rite ${said[0]} halted`, why: said.length > 2 ? `code ${said[2]}` : '', at: turn.at },
+            });
         }
     }
     return found;
 }
 
-// What failed on the node's side of Ground: ci.watch itself, and a push or a run it concluded unwell.
-function errorsOf(done: Does): Sacred[] {
+// What failed on the node's side of Ground: ci.watch itself, and a push or a
+// run it concluded unwell, with each workflow that did not succeed.
+function errorsOf(done: Does): Failed[] {
     const failed = done.failed.map(failure => ({
-        key: `failed:${failure.execution_id}:${failure.at}`, title: 'ci.watch failed', why: failure.error,
-        where: failure.execution_id, at: failure.at, session: '', fatal: false,
+        session: '',
+        error: {
+            id: `failed:${failure.execution_id}:${failure.at}`, severity: 'error' as const,
+            context: { surface: 'QNTX', region: `ci.watch ${failure.execution_id}` },
+            title: 'ci.watch failed', why: failure.error, at: failure.at,
+        },
     }));
     const unwell = done.news.filter(news => !news.waiting && news.symbol !== '+').map(news => ({
-        key: `news:${news.id}`, title: `${news.name} ${news.note}`, why: '',
-        where: 'left on the row', at: news.at, session: '', fatal: false,
+        session: '',
+        error: {
+            id: `news:${news.id}`, severity: 'error' as const,
+            context: { surface: 'QNTX', region: 'left on the status line' },
+            title: `${news.name} ${news.note}`,
+            why: (news.workflows ?? [])
+                .filter(workflow => workflow.conclusion !== 'success' && workflow.conclusion !== 'skipped')
+                .map(workflow => `${workflow.name}: ${workflow.conclusion} ${workflow.url}`).join('\n'),
+            at: news.at,
+        },
     }));
     return [...failed, ...unwell];
 }
 
-// One error drawn whole, never shortened: what it is, why, and where and when.
-function errorBlock(error: Sacred, onChoose: (session: string) => void): HTMLElement {
-    const block = make(error.session ? 'button' : 'div', error.fatal ? 'gr-err gr-err-fatal' : 'gr-err');
-    const said = (label: string, text: string, as: string) => {
-        const line = make('span', 'gr-err-line');
-        line.append(make('span', 'gr-err-label', label), make('span', as, text));
-        block.appendChild(line);
-    };
-    said('error:', error.title, 'gr-err-title');
-    if (error.why) said('why:', error.why, 'gr-err-why');
-    said('at:', `${error.where} · ${when(error.at)}`, 'gr-err-at');
-    if (error.session) block.addEventListener('click', () => { onChoose(error.session); });
-    return block;
+// One failure in the core: when it happened, the session to open when it has
+// one, and the failure itself through the one render (components/sacred.ts).
+function errorEntry(failed: Failed, onChoose: (session: string) => void): HTMLElement {
+    const entry = sacredEntry(failed.error);
+    const head = make('div', 'gr-err-when', when(failed.error.at));
+    if (failed.session) {
+        const open = make('button', 'gr-err-open', `open session ${failed.session.substring(0, 8)}`);
+        open.addEventListener('click', () => { onChoose(failed.session); });
+        head.appendChild(open);
+    }
+    entry.prepend(head);
+    return entry;
 }
 
 // How wide an agent's cloud is drawn: wider the more it flew, by the root of the count.
@@ -683,7 +698,7 @@ export function drawGround(body: HTMLElement): GroundScene {
         sacred,
         unburnt,
         limit('Ground writes its own errors as immediate:exec-result rows, the same row an exec\'s result is, and nothing typed tells one from the other: no transcript reads them. Each also goes to Sentry.'),
-        limit('A tool that failed reaches QNTX as PostToolUseFailure, and no transcript reads it. The render here is this element\'s own: QNTX\'s web UI does not depend on sacred-error, whose render is the one an error is owed.'),
+        limit('A tool that failed reaches QNTX as PostToolUseFailure, and no transcript reads it. No row here names a severity, so each is drawn as an error.'),
     );
     fire.section.appendChild(core());
 
@@ -724,18 +739,30 @@ export function drawGround(body: HTMLElement): GroundScene {
 
     // What failed, in the sessions read and on the node's own side, newest
     // first. It is drawn again only when what failed changed.
-    let failedInSessions: Sacred[] | null = null;
+    let failedInSessions: Failed[] | null = null;
     let choose: (session: string) => void = () => {};
-    let burnt = '';
+    const burning = new Map<string, HTMLElement>();
     const burn = () => {
         if (failedInSessions === null && done === null) return;
         const onTheNode = done !== null && typeof done !== 'string' ? errorsOf(done) : [];
-        const all = [...(failedInSessions ?? []), ...onTheNode].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+        const all = [...(failedInSessions ?? []), ...onTheNode].sort((a, b) => Date.parse(b.error.at) - Date.parse(a.error.at));
         unburnt.textContent = all.length === 0 ? 'Nothing read here failed: no API error, no halted rite, no failed run.' : '';
-        const keys = all.map(error => error.key).join('\n');
-        if (keys === burnt) return;
-        burnt = keys;
-        sacred.replaceChildren(...all.map(error => errorBlock(error, choose)));
+        // One failure is one node for as long as it is read: a new read moves it, and builds nothing again.
+        const kept = new Set<string>();
+        all.forEach((failed, i) => {
+            kept.add(failed.error.id);
+            let entry = burning.get(failed.error.id);
+            if (!entry) {
+                entry = errorEntry(failed, session => { choose(session); });
+                burning.set(failed.error.id, entry);
+            }
+            if (sacred.children[i] !== entry) sacred.insertBefore(entry, sacred.children[i] ?? null);
+        });
+        for (const [id, entry] of burning) {
+            if (kept.has(id)) continue;
+            entry.remove();
+            burning.delete(id);
+        }
     };
 
     // The underground: what the node sees of ug, as lines over time.

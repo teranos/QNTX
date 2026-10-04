@@ -74,6 +74,11 @@ if (USE_JSDOM) {
     globalThis.AbortController = window.AbortController;
     // @ts-ignore
     globalThis.AbortSignal = window.AbortSignal;
+    // A custom element is defined on this window, and what it fires is this window's.
+    // @ts-ignore
+    globalThis.customElements = window.customElements;
+    // @ts-ignore
+    globalThis.CustomEvent = window.CustomEvent;
 
     // requestAnimationFrame — pretendToBeVisual provides it, but ensure globalThis has it
     if (!globalThis.requestAnimationFrame) {
@@ -122,6 +127,10 @@ if (USE_JSDOM) {
     globalThis.localStorage = window.localStorage;
     // @ts-ignore
     globalThis.MutationObserver = window.MutationObserver;
+    // @ts-ignore
+    globalThis.customElements = window.customElements;
+    // @ts-ignore
+    globalThis.CustomEvent = window.CustomEvent;
     // @ts-ignore
     if (!globalThis.CSS) {
         // @ts-ignore

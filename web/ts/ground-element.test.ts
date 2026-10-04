@@ -275,25 +275,47 @@ describe('Ground - the core', () => {
         turn('error', `server_error: ${said}`, 'ground:payload:StopFailure:9'),
     ]);
 
+    // What the one render drew of each failure in the core: its title, and every line it says why and where in.
+    const blocks = (body: HTMLElement) => [...body.querySelectorAll<HTMLElement>('.gr-core sacred-error')];
+    const titles = (body: HTMLElement) => blocks(body).map(block => block.shadowRoot?.querySelector('.title')?.textContent);
+    const whys = (body: HTMLElement) => blocks(body).flatMap(block => [...(block.shadowRoot?.querySelectorAll('.why') ?? [])].map(why => why.textContent));
+
     // "BUT ITS SACRED"
-    test('what failed is said whole', () => {
+    test('what failed is said whole, through the one render', () => {
         const { body, scene } = drawn();
         const chosen: string[] = [];
         scene.read([held, failing], id => chosen.push(id));
         scene.does({ ...does, failed: [{ at: '2026-10-03T22:00:00Z', error: 'ci.watch: stopped waiting on main@162d82f: context canceled', execution_id: 'rearm:p-0' }] });
 
-        const titles = texts(body, '.gr-core .gr-err-title');
-        expect(titles).toContain('server_error');
-        expect(titles).toContain('rite built halt 2');
-        expect(titles).toContain('ci.watch failed');
-        expect(titles).toContain('ci failure main 162d82f 1/4');
-        expect(texts(body, '.gr-core .gr-err-why')).toContain(said);
-        expect(texts(body, '.gr-core .gr-err-why')).toContain('ci.watch: stopped waiting on main@162d82f: context canceled');
+        expect(titles(body)).toContain('server_error');
+        expect(titles(body)).toContain('rite built halted');
+        expect(titles(body)).toContain('ci.watch failed');
+        expect(titles(body)).toContain('ci failure main 162d82f 1/4');
+        expect(whys(body)).toContain(said);
+        expect(whys(body)).toContain('code 2');
+        expect(whys(body)).toContain('ci.watch: stopped waiting on main@162d82f: context canceled');
 
-        const fatal = body.querySelector<HTMLElement>('.gr-core .gr-err-fatal')!;
-        expect(fatal.querySelector('.gr-err-title')?.textContent).toBe('server_error');
-        fatal.click();
+        const opens = [...body.querySelectorAll<HTMLElement>('.gr-core .gr-err-open')];
+        expect(opens.map(open => open.textContent)).toEqual(['open session s-9', 'open session s-9']);
+        opens[0].click();
         expect(chosen).toEqual(['s-9']);
+    });
+
+    // "YES, TAKE SACRED-ERROR'S OWN RENDER"
+    test('a failure dismissed is hidden, and the core brings it back', () => {
+        const { body, scene } = drawn();
+        scene.read([failing], () => {});
+        const block = blocks(body)[0];
+        const back = block.parentElement!.querySelector<HTMLElement>('.sacred-back')!;
+        expect(back.hidden).toBe(true);
+
+        block.shadowRoot!.querySelector<HTMLElement>('.dismiss')!.click();
+        expect(block.hidden).toBe(true);
+        expect(back.hidden).toBe(false);
+
+        back.click();
+        expect(block.hidden).toBe(false);
+        expect(back.hidden).toBe(true);
     });
 
     // Spike: nothing failing is said, not left as an empty fire.
@@ -301,19 +323,19 @@ describe('Ground - the core', () => {
         const { body, scene } = drawn();
         scene.read([held], () => {});
         scene.does({ ...does, news: [does.news[0]] });
-        expect(body.querySelectorAll('.gr-core .gr-err')).toHaveLength(0);
+        expect(blocks(body)).toHaveLength(0);
         expect(body.querySelector('.gr-core')?.textContent).toContain('Nothing read here failed');
     });
 
-    // Jenny: an error told again is the block it already was.
+    // Jenny: a failure read again is the node it already was.
     test('what failed is not drawn again while nothing new fails', () => {
         const { body, scene } = drawn();
         scene.read([failing], () => {});
-        const before = [...body.querySelectorAll('.gr-core .gr-err')];
+        const before = [...body.querySelectorAll('.gr-core .sacred-entry')];
         scene.does({ ...does, news: [does.news[0]] });
-        const after = [...body.querySelectorAll('.gr-core .gr-err')];
+        const after = [...body.querySelectorAll('.gr-core .sacred-entry')];
         expect(after).toHaveLength(2);
-        after.forEach((block, i) => expect(block).toBe(before[i]));
+        after.forEach((entry, i) => expect(entry).toBe(before[i]));
     });
 });
 

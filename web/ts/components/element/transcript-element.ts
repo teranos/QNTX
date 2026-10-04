@@ -14,6 +14,7 @@ import { apiJson } from '../../client';
 import { escapeHtml } from '../../html-utils';
 import { log, SEG } from '../../logger';
 import { Transcript as TranscriptSym } from '../../sym';
+import { apiError, sacredEntry } from '../sacred';
 import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';
 
@@ -119,6 +120,12 @@ function turnRow(turn: Turn, selection: Selection): HTMLElement {
     const speaker = document.createElement('span');
     speaker.className = 'tr-speaker';
     speaker.textContent = `[${turn.speaker}]`;
+    if (turn.speaker === 'error') {
+        // An API error is drawn through the one render an error has (components/sacred.ts).
+        row.append(speaker, sacredEntry(apiError(turn.of, turn.at, turn.text, { surface: 'transcript', region: turn.of })));
+        selection.pressable(row, [turn]);
+        return row;
+    }
     const text = document.createElement('span');
     text.className = 'tr-text';
     if (turn.speaker === 'assistant') text.innerHTML = renderAssistant(turn.text);
