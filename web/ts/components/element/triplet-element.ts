@@ -10,7 +10,7 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
+import { wireExpandToWindow, canvasPlaced, preventDrag, createSymbolSpan, settleSymbolSpan, renderSparkline } from '@teranos/elements';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Triplet, AX } from '../../sym';
 import { renderTriple } from './attestation-triple';
@@ -20,7 +20,7 @@ import { log, SEG } from '../../logger';
 import { spawnOnCanvasDragging } from './spawn-on-canvas';
 import { renderPager } from '../pager';
 import { el } from '../../html-utils';
-import { renderSparkline, windowOf, seriesOf, labelsOf, formatIn, bucketStart, type Window } from '../sparkline';
+import { windowOf, seriesOf, labelsOf, formatIn, bucketStart, type Window } from '../sparkline';
 
 // Quiet blue-grey — lighter, subtle blue touch, easy on the eyes
 const TRIPLET = '#96a4b0';

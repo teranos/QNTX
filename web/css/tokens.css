@@ -49,6 +49,11 @@
     --accent-on-dark: #7dba8a; /* Accent/links on dark backgrounds */
     --accent-on-dark-hover: #9acca5; /* Accent hover on dark backgrounds */
 
+    /* @teranos/elements sparkline: its colours are the package's names, QNTX's values */
+    --elements-sparkline-stroke: #64748b;
+    --elements-sparkline-whole-stroke: #94a3b8;
+    --elements-sparkline-mute: var(--text-on-dark-tertiary);
+
     /* Status Colors */
     --color-success: #22c65e;
     --color-error: #e44747;

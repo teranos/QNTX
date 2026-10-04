@@ -4,7 +4,8 @@ import { Sigma, Watcher } from './sym';
 import { spawnSigmaAsWindow } from './components/element/sigma-element';
 import { getWatchersByPredicate, refresh as refreshWatcherPredicates, onWatcherPredicatesChanged, eyeStyle } from './watcher-predicates';
 import type { Element } from '@teranos/elements';
-import { renderSparkline, windowOf, seriesOf, labelsOf, seenOver, lastOf, formatIn } from './components/sparkline';
+import { renderSparkline } from '@teranos/elements';
+import { windowOf, seriesOf, labelsOf, seenOver, lastOf, formatIn } from './components/sparkline';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 
 let panelElement: HTMLElement | null = null;
