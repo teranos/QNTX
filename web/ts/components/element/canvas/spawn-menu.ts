@@ -201,6 +201,14 @@ export function showSpawnMenu(
     const nodes: FloatNode[] = [];
     const totalHeight = (entries.length - 1) * ELEMENT_SPACING;
 
+    // The list is centred on the press. Near a screen edge, a phone's above all,
+    // that centre moves in so every entry stays on screen.
+    const halfSpan = totalHeight / 2 + ELEMENT_SPACING;
+    if (window.innerHeight > halfSpan * 2) {
+        const top = Math.min(Math.max(mouseY, halfSpan), window.innerHeight - halfSpan);
+        menu.style.top = `${top}px`;
+    }
+
     for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
         const baseY = i * ELEMENT_SPACING - totalHeight / 2;
@@ -216,12 +224,16 @@ export function showSpawnMenu(
         reveal.innerHTML = buildContextReveal(entry);
         btn.appendChild(reveal);
 
-        const onBtnMouseDown = (e: MouseEvent) => {
+        // Pointer, not mouse: a finger's tap reaches the button as a pointerdown, while
+        // the mousedown that follows it lands on the canvas beneath. preventDefault keeps
+        // that mousedown from also placing the element where the menu was.
+        const onBtnPointerDown = (e: PointerEvent) => {
+            e.preventDefault();
             e.stopPropagation();
-            btn.removeEventListener('mousedown', onBtnMouseDown);
+            btn.removeEventListener('pointerdown', onBtnPointerDown);
             selectEntry(entry, btn);
         };
-        btn.addEventListener('mousedown', onBtnMouseDown);
+        btn.addEventListener('pointerdown', onBtnPointerDown);
         menu.appendChild(btn);
 
         nodes.push({ el: btn, entry, baseY, driftPhase: Math.random() * Math.PI * 2 });
