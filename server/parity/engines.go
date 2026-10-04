@@ -12,7 +12,7 @@ import (
 //
 // A storage engine is pinned the way a reference is: a directory named for the
 // engine, its version and the commit it was taken at, with SOURCE saying where
-// it came from. sqlite is sqlite_3.46.0_96c92ab, duckdb is duckdb_1.4.3_d1dc88f.
+// it came from. The directory name is the one place the version is written.
 // No schema sits beside SOURCE, so the embed above never carries these and the
 // parity sigil holds no signum to them.
 

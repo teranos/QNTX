@@ -2,36 +2,38 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/teranos/QNTX/server/parity"
 )
 
-// TestDuckDBIsHeldToItsPin holds EXPECTED_DUCKDB_VERSION to
-// server/parity/duckdb_<version>_<rev>. ats-duckdb refuses to open against any
-// libduckdb but that one, so the constant is the version the node links.
-func TestDuckDBIsHeldToItsPin(t *testing.T) {
-	pinned, err := parity.Pinned("../../server/parity", "duckdb")
+// TestTheDuckDBCrateIsHeldToItsPin: cargo cannot read the pin, so the duckdb
+// crate's version is the one place the DuckDB version is written again.
+// ats-duckdb's build.rs gives the rest of the crate the pin itself.
+func TestTheDuckDBCrateIsHeldToItsPin(t *testing.T) {
+	root := filepath.Join("..", "..")
+	pinned, err := parity.Pinned(filepath.Join(root, filepath.Dir(parity.StorageFile)), "duckdb")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	const path = "../../crates/ats-duckdb/src/lib.rs"
+	path := filepath.Join(root, "crates", "ats-duckdb", "Cargo.toml")
 	body, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("failed to read %s: %v", path, err)
 	}
-	const opener = `const EXPECTED_DUCKDB_VERSION: &str = "`
+	const opener = `duckdb = { version = "=`
 	_, rest, ok := strings.Cut(string(body), opener)
 	if !ok {
-		t.Fatalf("%s declares no EXPECTED_DUCKDB_VERSION", path)
+		t.Fatalf("%s names no duckdb crate version", path)
 	}
-	expected, _, ok := strings.Cut(rest, `"`)
+	crate, _, ok := strings.Cut(rest, `"`)
 	if !ok {
-		t.Fatalf("EXPECTED_DUCKDB_VERSION in %s does not close", path)
+		t.Fatalf("the duckdb crate version in %s does not close", path)
 	}
-	if strings.TrimPrefix(expected, "v") != pinned {
-		t.Errorf("ats-duckdb expects DuckDB %s, the pin is %s", expected, pinned)
+	if crate != pinned {
+		t.Errorf("%s asks for the duckdb crate at %s, the pin is %s", path, crate, pinned)
 	}
 }

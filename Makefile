@@ -40,8 +40,8 @@ openapi: ## Write what the node serves, from the reach table and the handlers' o
 
 # "Make parity would just be for the storage backend specifically": a signum
 # held to a reference it follows is the parity sigil's (server/parity).
-parity: ## Report what a node keeps on its own disk and what the record keeps (ADR-024, ADR-037)
-	@go run ./cmd/parity
+parity: rust-sqlite ## Report what a node keeps on its own disk and what the record keeps (ADR-024, ADR-037)
+	@LD_LIBRARY_PATH=$(CURDIR)/target/release go run ./cmd/parity
 
 # The generated Go keeps no .proto comment, and the parity sigil gives what our
 # fields say of themselves beside what each spec says of its own. Umami's API

@@ -4,8 +4,8 @@
   inputs = {
     # Pinned to a revision, not a branch, and the revision is chosen for glibc.
     #
-    # This rev carries glibc 2.40 and DuckDB 1.4.3. Both numbers are load-bearing
-    # and they are not independent:
+    # This rev carries glibc 2.40 and the DuckDB server/parity pins. Both numbers
+    # are load-bearing and they are not independent:
     #
     #   * libduckdb-sys generates its bindings against one DuckDB release, so the
     #     C library is not a free variable. `assert_library_version` fails the
@@ -55,7 +55,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        # DuckDB 1.4.3 — matches the duckdb crate at 1.4.3, and is built against
+        # The DuckDB server/parity pins — matches the duckdb crate, and is built against
         # a glibc the deployment box can load. See the nixpkgs input's comment
         # for why those two facts are the same decision.
         duckdbPinned = pkgs.duckdb;
@@ -148,7 +148,7 @@
           cargoBuildFlags = [ "-p" "ats-duckdb" "--features" "ffi" "--lib" ];
           doCheck = false;
 
-          # libduckdb 1.5.4, pinned to match the bindings — dynamic link, no
+          # libduckdb as server/parity pins it, matching the bindings — dynamic link, no
           # source compile.
           buildInputs = [ duckdbPinned ];
 

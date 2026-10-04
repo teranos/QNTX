@@ -132,7 +132,7 @@ func TestRender_RebuiltIsNotNo(t *testing.T) {
 // TestSQLiteSchema_RebuiltIsReadFromTheForeignKeys: the four junction tables
 // cascade from attestations in the real schema, and nothing else does.
 func TestSQLiteSchema_RebuiltIsReadFromTheForeignKeys(t *testing.T) {
-	tables, rebuilt, err := SQLiteSchema()
+	tables, rebuilt, _, err := SQLiteSchema()
 	if err != nil {
 		t.Fatalf("SQLiteSchema: %v", err)
 	}

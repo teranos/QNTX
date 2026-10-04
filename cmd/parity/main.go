@@ -34,25 +34,21 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
-	qntxdb "github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
+	"github.com/teranos/QNTX/db/rustdriver"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/errors"
 )
-
-func init() {
-	// Migrations that build vector indexes need the vec0 module registered
-	// before any connection opens, same as production.
-	sqlitevec.Auto()
-}
 
 // Thing is something QNTX persists, and where it is kept.
 type Thing struct {
@@ -120,9 +116,17 @@ func Written(root string, things []Thing) ([]byte, error) {
 
 // Report derives every thing and its presence in each backend.
 func Report(root, parquetDir, crateDir string) ([]Thing, error) {
-	sqliteTables, rebuilt, err := SQLiteSchema()
+	sqliteTables, rebuilt, linked, err := SQLiteSchema()
 	if err != nil {
 		return nil, err
+	}
+	pins := filepath.Join(root, filepath.Dir(parity.StorageFile))
+	pinned, err := parity.Pinned(pins, "sqlite")
+	if err != nil {
+		return nil, err
+	}
+	if linked != pinned {
+		return nil, errors.Newf("the node links SQLite %s, %s pins %s", linked, pins, pinned)
 	}
 	parquetTables, err := ReplaySchema(filepath.Join(root, parquetDir))
 	if err != nil {
@@ -205,32 +209,65 @@ func covered(contract string, present map[string]*Thing) bool {
 	return false
 }
 
-// SQLiteSchema returns the tables SQLite ends up with, by running the real
-// migration runner against an in-memory database and reading the schema back.
-// This is the same code path production takes, so the answer is not a reading
-// of the migrations — it is the migrations' result.
-func SQLiteSchema() (_ map[string]bool, rebuilt map[string]bool, err error) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to open in-memory SQLite for schema replay")
-	}
-	defer func() { err = sqlclose.With(err, db.Close(), "the sqlite schema db") }()
-	// Each :memory: connection is its own database; a second pooled connection
-	// would see an empty schema.
-	db.SetMaxOpenConns(1)
+func init() {
+	// ReplaySchema's migrations build vector indexes, which need the vec0
+	// module registered before any connection opens.
+	sqlitevec.Auto()
+}
 
-	if err := qntxdb.Migrate(db, nil); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to replay SQLite migrations")
+// replays names each node opened, since database/sql keeps a driver for the
+// life of the process.
+var replays atomic.Int64
+
+// SQLiteSchema returns the tables SQLite ends up with, and the SQLite that
+// answered, by opening a node's store and reading the schema back. The store
+// is ats-sqlite's: its migrations, run by its runner, in the SQLite the node
+// links. So the answer is not a reading of the migrations — it is the
+// migrations' result on the node.
+func SQLiteSchema() (_ map[string]bool, rebuilt map[string]bool, version string, err error) {
+	// One directory for every store this process opens: ats-sqlite's flight
+	// recorder writes beside the first store it is given, for the life of the
+	// process, so that directory outlives each store.
+	dir := filepath.Join(os.TempDir(), "qntx-parity")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, nil, "", errors.Wrapf(err, "failed to make %s for the node's store", dir)
+	}
+	replay := replays.Add(1)
+	path := filepath.Join(dir, fmt.Sprintf("node-%d-%d.db", os.Getpid(), replay))
+	defer func() {
+		for _, file := range []string{path, path + "-wal", path + "-shm"} {
+			if rmErr := os.Remove(file); rmErr != nil && !os.IsNotExist(rmErr) && err == nil {
+				err = errors.Wrapf(rmErr, "failed to remove %s", file)
+			}
+		}
+	}()
+
+	store, err := sqlitecgo.NewFileStore(path)
+	if err != nil {
+		return nil, nil, "", errors.Wrapf(err, "failed to open the node's store at %s", path)
+	}
+	defer func() { err = sqlclose.With(err, store.Close(), "the node's store at "+path) }()
+
+	driver := fmt.Sprintf("rustsqlite-parity-%d", replay)
+	rustdriver.RegisterNamed(driver, "parity", store.StorePtr(), store.ReadConnPtr(), store.Mu(), store.MuRead())
+	db, err := sql.Open(driver, path)
+	if err != nil {
+		return nil, nil, "", errors.Wrapf(err, "failed to open %s through %s", path, driver)
+	}
+	defer func() { err = sqlclose.With(err, db.Close(), "the node's db at "+path) }()
+
+	if err := db.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
+		return nil, nil, "", errors.Wrapf(err, "failed to ask %s which SQLite it is", path)
 	}
 	tables, err := tableNames(db)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	rebuilt, err = cascadesFrom(db, tables, "attestations")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
-	return tables, rebuilt, nil
+	return tables, rebuilt, version, nil
 }
 
 // cascadesFrom is every table whose rows are deleted with a row of parent,
@@ -278,7 +315,8 @@ func cascadeOf(db *sql.DB, table, parent string) (_ bool, err error) {
 // DuckDB's migration runner lives in Rust (crates/ats-duckdb/src/migrate.rs),
 // so its migrations are replayed here rather than executed by their own engine.
 // The DDL is portable enough for SQLite to accept; anything it rejects fails
-// this command loudly instead of being guessed at.
+// this command loudly instead of being guessed at. That SQLite is
+// mattn/go-sqlite3's, not the node's: a node's store runs its own migrations.
 func ReplaySchema(dir string) (_ map[string]bool, err error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
