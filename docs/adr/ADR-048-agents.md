@@ -34,31 +34,51 @@ expressed to ROOT."
 - It is not one of the agents the node hosts. A ritual's performer is an agent
   of its own.
 
+"we cant just have any ai be the ROOT agent"
+
+- It is Claude Code, installed on the box and run by the node, on Opus 5.5 at
+  low effort. Only Claude can be it.
+- It is one session: `--resume` continues it, and Claude Code compacts its own
+  context.
+- It reaches sigils through the node's own MCP, with a token of its own.
+- It runs with Ground, and for this instance Ground attests as the node's DID.
+
+"ROOT is ROOT"
+
+"i want to be able to do anything"
+
+- It is privileged, and it has hands on the box as well as sigils: a package
+  installed, an address reached, a plugin developed against the node it is.
+
+"anything that can talk to the ROOT agent can say anything to it"
+
+- Who may talk to it is the whole of what guards it.
+
 ## The loop
 
-"loop belongs on node, agreed."
-
-- The loop that calls the model and runs what it asks for is the node's. A
-  provider plugin does inference and nothing else (ADR-014).
+The loop is Claude Code's, not the node's: "accepted." The node hosts the
+process. It starts it, resumes it and stops it.
 
 ## First uses
 
-- A ritual's performer, in place of `claude --bg` (teranos/ground RITUAL.md).
+- A ritual's performer, in place of `claude --bg` on the operator's machine
+  (teranos/ground RITUAL.md): the same runner, on the box.
 - A2A: work sent to an agent the node hosts.
 
 ## First: ROOT talks to QNTX
 
 As ROOT, I open the node and say something to it. It answers as the node, and
-when I ask it to do something it calls the sigil itself. Each turn is attested
-by the node's DID, and tomorrow it is the same session, readable as a
-transcript.
+when I ask it to do something it does it itself: a sigil, or a command on the
+box. Each turn is attested by the node's DID, and tomorrow it is the same
+session, readable as a transcript.
 
 "for development purposes SUPER will be allowed temporarily, but SUPER needs to
 be removed before the work get's merged."
 
 ## Not done
 
-One persistent session outlasts a model's context window, so what the host
-agent is given each turn has to be chosen from its session.
+The node does not see the model traffic of an agent Claude Code runs.
 
-"this would need to be solved later, but at high prio"
+"for a later phase we make sure it always runs with ground"
+
+"Upgrading the box is in scope"
