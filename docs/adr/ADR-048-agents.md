@@ -29,6 +29,11 @@ QNTX hosts agents.
 "It is the ROOT agent, one persistent session agent that is QNTX itself as
 expressed to ROOT."
 
+- Its identity is the node's own DID, the `'self'` row in system (ADR-026). It
+  is no new actor.
+- It is not one of the agents the node hosts. A ritual's performer is an agent
+  of its own.
+
 ## The loop
 
 "loop belongs on node, agreed."
@@ -40,3 +45,10 @@ expressed to ROOT."
 
 - A ritual's performer, in place of `claude --bg` (teranos/ground RITUAL.md).
 - A2A: work sent to an agent the node hosts.
+
+## Not done
+
+One persistent session outlasts a model's context window, so what the host
+agent is given each turn has to be chosen from its session.
+
+"this would need to be solved later, but at high prio"
