@@ -21,3 +21,22 @@ QNTX hosts agents.
 - An agent stands in a namespace, and nothing crosses (ADR-026).
 - To A2A an agent is a card, and its skills are the signa it reaches
   (ADR-039).
+
+## The host agent
+
+"the host agent is QNTX as ROOT would talk to it."
+
+"It is the ROOT agent, one persistent session agent that is QNTX itself as
+expressed to ROOT."
+
+## The loop
+
+"loop belongs on node, agreed."
+
+- The loop that calls the model and runs what it asks for is the node's. A
+  provider plugin does inference and nothing else (ADR-014).
+
+## First uses
+
+- A ritual's performer, in place of `claude --bg` (teranos/ground RITUAL.md).
+- A2A: work sent to an agent the node hosts.
