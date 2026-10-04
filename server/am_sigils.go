@@ -83,12 +83,26 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 					Gives: []*protocol.Field{{Name: "name", Says: "The item, and whatever it carries in full."}},
 					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: "/am/statusline/{name}"},
 				},
+				{
+					Name: "ground",
+					Does: "What this node does for Ground, for whoever asks: the pushes and dispatched runs it waits on in their place, what it concluded, and how many conclusions it left on the status line since it began.",
+					Gives: []*protocol.Field{
+						{Name: "started", Says: "When this process began answering, as RFC 3339. What it left before then went with the process that left it."},
+						{Name: "left", Says: "How many conclusions it left on the status line for the caller since then."},
+						{Name: "watches", Says: "The standing watchers that reach ci.watch: each one's id, its name, and the predicates Ground attests that set it off."},
+						{Name: "news", Says: "What ci.watch said for the caller, newest first: each wait and each conclusion, when it was left, until when the status line carries it, and what the item holds in full."},
+						{Name: "failed", Says: "What ci.watch could not do in the last day, newest first: when, the exact error, and which run of it."},
+						{Name: "ug", Says: "What the node sees of ug: when the caller's tmux bar last asked for the status line, how often since this process began and by the minute over the last hour; each session whose status line posted a usage reading in the last day, with its first, its latest and its readings by the hour; and each window ug read, with what it read over that day."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/ground"},
+				},
 			},
 		},
 		Answers: map[string]sigil.Answer{
 			"version": func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return version.Get(), nil },
 			"node":    s.amNode,
 			"syscap":  func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return syscap.Get(s.store), nil },
+			"ground":  s.amGround,
 			"item": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 				return s.statusLineHandler.item(ctx, sent["name"])
 			},

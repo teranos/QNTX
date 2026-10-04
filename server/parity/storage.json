@@ -1,8 +1,8 @@
 [
   {
     "name": "access_tokens",
-    "node": true,
-    "record": true,
+    "sqlite": true,
+    "duckdb": true,
     "rebuilt": false,
     "sites": [
       "server/auth/tokens_table.go"
@@ -10,8 +10,8 @@
   },
   {
     "name": "ai_model_usage",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ai/tracker/usage_tracker.go",
@@ -20,8 +20,8 @@
   },
   {
     "name": "aliases",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/storage/alias_store.go"
@@ -29,8 +29,8 @@
   },
   {
     "name": "async_ix_jobs",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "plugin/grpc/pulse_handler.go",
@@ -39,8 +39,8 @@
   },
   {
     "name": "attestation_actors",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": true,
     "sites": [
       "ats/storage/query_builder.go",
@@ -50,8 +50,8 @@
   },
   {
     "name": "attestation_contexts",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": true,
     "sites": [
       "ats/storage/query_builder.go",
@@ -61,8 +61,8 @@
   },
   {
     "name": "attestation_predicates",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": true,
     "sites": [
       "ats/storage/query_builder.go",
@@ -72,8 +72,8 @@
   },
   {
     "name": "attestation_subjects",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": true,
     "sites": [
       "ats/storage/query_builder.go",
@@ -83,8 +83,8 @@
   },
   {
     "name": "attestations",
-    "node": true,
-    "record": true,
+    "sqlite": true,
+    "duckdb": true,
     "rebuilt": false,
     "sites": [
       "ats/so/actions/prompt/store.go",
@@ -107,8 +107,8 @@
   },
   {
     "name": "auth_sessions",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "server/auth/sessions.go"
@@ -116,8 +116,8 @@
   },
   {
     "name": "canvas_access",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "element/storage/canvases.go"
@@ -125,8 +125,8 @@
   },
   {
     "name": "canvas_compositions",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "element/storage/canvas_store.go",
@@ -135,8 +135,8 @@
   },
   {
     "name": "canvas_elements",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/watcher/engine_execute.go",
@@ -146,8 +146,8 @@
   },
   {
     "name": "canvas_invitations",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "element/storage/canvases.go"
@@ -155,8 +155,8 @@
   },
   {
     "name": "canvas_owners",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "element/storage/canvases.go"
@@ -164,8 +164,8 @@
   },
   {
     "name": "canvases",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "element/storage/canvases.go"
@@ -173,8 +173,8 @@
   },
   {
     "name": "cluster_centroids",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/storage/embedding_store.go"
@@ -182,8 +182,8 @@
   },
   {
     "name": "cluster_events",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/storage/embedding_store.go"
@@ -191,8 +191,8 @@
   },
   {
     "name": "cluster_runs",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/storage/embedding_store.go"
@@ -200,8 +200,8 @@
   },
   {
     "name": "cluster_snapshots",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/storage/embedding_store.go"
@@ -209,8 +209,8 @@
   },
   {
     "name": "clusters",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/storage/embedding_cluster_membership.go",
@@ -219,8 +219,8 @@
   },
   {
     "name": "composition_edge_cursors",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/watcher/engine_execute.go",
@@ -229,8 +229,8 @@
   },
   {
     "name": "composition_edges",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "element/storage/canvas_store.go",
@@ -239,8 +239,8 @@
   },
   {
     "name": "embedding_projections",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/storage/embedding_store.go"
@@ -248,8 +248,8 @@
   },
   {
     "name": "embeddings",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/storage/embedding_cluster_membership.go",
@@ -260,43 +260,43 @@
   },
   {
     "name": "enforcement_actor_context",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": []
   },
   {
     "name": "enforcement_actor_contexts",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": []
   },
   {
     "name": "enforcement_entity_actors",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": []
   },
   {
     "name": "enforcement_entity_actors_detail",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": []
   },
   {
     "name": "job_checkpoints",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": []
   },
   {
     "name": "minimized_windows",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "element/storage/canvas_store.go",
@@ -305,17 +305,17 @@
   },
   {
     "name": "node_identity",
-    "node": true,
-    "record": true,
+    "sqlite": true,
+    "duckdb": true,
     "rebuilt": false,
     "sites": [
-      "server/nodedid/store.go"
+      "internal/nodedid/store.go"
     ]
   },
   {
     "name": "pulse_executions",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "pulse/schedule/execution_store.go",
@@ -325,15 +325,15 @@
   },
   {
     "name": "schedule_ticks",
-    "node": false,
-    "record": true,
+    "sqlite": false,
+    "duckdb": true,
     "rebuilt": false,
     "sites": []
   },
   {
     "name": "scheduled_pulse_jobs",
-    "node": true,
-    "record": true,
+    "sqlite": true,
+    "duckdb": true,
     "rebuilt": false,
     "sites": [
       "plugin/grpc/schedules.go",
@@ -343,8 +343,8 @@
   },
   {
     "name": "storage_events",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "cmd/qntx/commands/db.go",
@@ -354,8 +354,8 @@
   },
   {
     "name": "task_logs",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "plugin/grpc/pulse_handler.go",
@@ -366,8 +366,8 @@
   },
   {
     "name": "users",
-    "node": true,
-    "record": true,
+    "sqlite": true,
+    "duckdb": true,
     "rebuilt": false,
     "sites": [
       "server/auth/users_table.go"
@@ -375,15 +375,15 @@
   },
   {
     "name": "vec_embeddings",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": []
   },
   {
     "name": "watcher_execution_queue",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "ats/watcher/queue_store.go"
@@ -391,8 +391,8 @@
   },
   {
     "name": "watcher_fires",
-    "node": true,
-    "record": true,
+    "sqlite": true,
+    "duckdb": true,
     "rebuilt": false,
     "sites": [
       "ats/storage/watcher_store.go"
@@ -400,8 +400,8 @@
   },
   {
     "name": "watchers",
-    "node": true,
-    "record": true,
+    "sqlite": true,
+    "duckdb": true,
     "rebuilt": false,
     "sites": [
       "ats/storage/watcher_store.go"
@@ -409,8 +409,8 @@
   },
   {
     "name": "webauthn_credential_owners",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "server/auth/credentials.go"
@@ -418,8 +418,8 @@
   },
   {
     "name": "webauthn_credentials",
-    "node": true,
-    "record": false,
+    "sqlite": true,
+    "duckdb": false,
     "rebuilt": false,
     "sites": [
       "server/auth/credentials.go"

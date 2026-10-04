@@ -17,7 +17,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/errors"
 )
 

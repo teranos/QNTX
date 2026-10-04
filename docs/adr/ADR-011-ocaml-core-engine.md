@@ -1,7 +1,9 @@
 # ADR-011: OCaml Core Engine (kern)
 
 ## Status
-Proposed — parser proven (PR #688), layered architecture emerging
+Withdrawn 2026-10-03. kern is removed from the repository.
+
+"KERN CAN GO"
 
 ## Context
 

@@ -5,7 +5,7 @@ package server
 import (
 	"github.com/teranos/QNTX/ats/storage/duckdbcgo"
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/errors"
 )
 

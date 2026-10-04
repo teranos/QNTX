@@ -197,10 +197,25 @@ func validateProviders(at string, p ProviderConfig) error {
 	if err := validateOAuthClient(at+".google", p.Google.ClientID, p.Google.ClientSecretRef); err != nil {
 		return err
 	}
-	if err := validateOAuthClient(at+".github", p.GitHub.ClientID, p.GitHub.ClientSecretRef); err != nil {
+	if err := validateGitHubApp(at+".github", p.GitHub); err != nil {
 		return err
 	}
 	return validateAppleClient(at+".apple", p.Apple)
+}
+
+// validateGitHubApp holds the key to the App it signs for: the JWT names the
+// App by its client_id.
+func validateGitHubApp(at string, g GitHubAppConfig) error {
+	if err := validateOAuthClient(at, g.ClientID, g.ClientSecretRef); err != nil {
+		return err
+	}
+	if g.PrivateKeyRef != "" && g.ClientID == "" {
+		return errors.Newf("%s.private_key needs the App's client_id", at)
+	}
+	if err := secretref.Validate(g.PrivateKeyRef); err != nil {
+		return errors.Wrapf(err, "%s.private_key is invalid", at)
+	}
+	return nil
 }
 
 // validateAppleClient holds Apple to all four or nothing. The secret is minted

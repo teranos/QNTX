@@ -1,5 +1,5 @@
-// Command parity prints, for every thing QNTX persists, whether a node keeps it
-// on its own disk and whether the record under the storage location keeps it.
+// Command parity prints, for every thing QNTX persists, whether SQLite and
+// DuckDB each hold it.
 //
 // "can it be made to lie less ?"
 //
@@ -10,9 +10,11 @@
 //
 // Two sources, both code:
 //
-//   - Schema. Migrations are replayed to their final state and the resulting
-//     table list read back. Final state, not the CREATE statements along the
-//     way, so a rebuild's scratch table is never mistaken for a thing.
+//   - Schema. Each backend's migrations are applied by its own runner, in the
+//     engine the node links — ats-sqlite in SQLite, ats-duckdb in DuckDB — and
+//     the resulting table list read back. Final state, not the CREATE
+//     statements along the way, so a rebuild's scratch table is never mistaken
+//     for a thing.
 //
 //   - Contracts. A Go interface declaring storage operations names a thing
 //     whether or not anything implements it. TokenStore in server/auth is the
@@ -23,8 +25,8 @@
 // be for the storage backend specifically", and "parity the sigil is what an
 // Agent should deal with through MCP".
 //
-// The output ranks nothing and scores nothing. Neither column is the baseline
-// the other is measured against, and a line reads the same either way.
+// The output ranks nothing and scores nothing. No column is the baseline the
+// others are measured against, and a line reads the same either way.
 //
 // No regex (see CLAUDE.md).
 package main
@@ -34,33 +36,25 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
+	"sync/atomic"
 
-	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
-	_ "github.com/mattn/go-sqlite3"
-	qntxdb "github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
+	"github.com/teranos/QNTX/db/rustdriver"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/errors"
 )
 
-func init() {
-	// Migrations that build vector indexes need the vec0 module registered
-	// before any connection opens, same as production.
-	sqlitevec.Auto()
-}
-
 // Thing is something QNTX persists, and where it is kept.
 type Thing struct {
-	Name string
-	// Node is on a node's own disk, whatever the backend (ADR-037).
-	Node bool
-	// Record is under the storage location, and survives losing the host.
-	Record bool
+	Name   string
+	SQLite bool
+	DuckDB bool
 	// Rebuilt rows cascade from attestations, so a take-in rebuilds them.
 	Rebuilt bool
 	// Sites are the places in Go that reach this thing with hand-written SQL.
@@ -72,11 +66,10 @@ type Thing struct {
 
 func main() {
 	root := flag.String("root", ".", "repository root to scan for storage contracts")
-	parquetDir := flag.String("parquet", "db/duckdb/migrations", "DuckDB/parquet migrations directory")
 	crateDir := flag.String("crate", "crates/ats-duckdb/src", "DuckDB backend crate, scanned for object prefixes")
 	flag.Parse()
 
-	things, err := Report(*root, *parquetDir, *crateDir)
+	things, err := Report(*root, *crateDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "parity: %v\n", err)
 		os.Exit(1)
@@ -109,7 +102,7 @@ func Written(root string, things []Thing) ([]byte, error) {
 		}
 		sort.Strings(files)
 		files = slices.Compact(files)
-		stored = append(stored, parity.Stored{Name: t.Name, Node: t.Node, Record: t.Record, Rebuilt: t.Rebuilt, Sites: files})
+		stored = append(stored, parity.Stored{Name: t.Name, SQLite: t.SQLite, DuckDB: t.DuckDB, Rebuilt: t.Rebuilt, Sites: files})
 	}
 	body, err := json.MarshalIndent(stored, "", "  ")
 	if err != nil {
@@ -119,16 +112,24 @@ func Written(root string, things []Thing) ([]byte, error) {
 }
 
 // Report derives every thing and its presence in each backend.
-func Report(root, parquetDir, crateDir string) ([]Thing, error) {
-	sqliteTables, rebuilt, err := SQLiteSchema()
+func Report(root, crateDir string) ([]Thing, error) {
+	sqliteTables, rebuilt, linked, err := SQLiteSchema()
 	if err != nil {
 		return nil, err
 	}
-	parquetTables, err := ReplaySchema(filepath.Join(root, parquetDir))
+	pins := filepath.Join(root, filepath.Dir(parity.StorageFile))
+	pinned, err := parity.Pinned(pins, "sqlite")
 	if err != nil {
 		return nil, err
 	}
-	// Most of the parquet backend is objects under a prefix, not tables
+	if linked != pinned {
+		return nil, errors.Newf("the node links SQLite %s, %s pins %s", linked, pins, pinned)
+	}
+	duckdbTables, err := DuckDBSchema()
+	if err != nil {
+		return nil, err
+	}
+	// Most of what ats-duckdb keeps is objects under a prefix, not tables
 	// (ADR-024:40-45). Without these the column could only ever describe
 	// attestations and the append-only logs.
 	objectPrefixes, err := ObjectPrefixes(filepath.Join(root, crateDir))
@@ -146,16 +147,16 @@ func Report(root, parquetDir, crateDir string) ([]Thing, error) {
 		return t
 	}
 	for name := range sqliteTables {
-		get(name).Node = true
+		get(name).SQLite = true
 	}
 	for name := range rebuilt {
 		get(name).Rebuilt = true
 	}
-	for name := range parquetTables {
-		get(name).Record = true
+	for name := range duckdbTables {
+		get(name).DuckDB = true
 	}
 	for name := range objectPrefixes {
-		get(name).Record = true
+		get(name).DuckDB = true
 	}
 
 	// Contracts add the things no backend holds yet. A contract whose name
@@ -205,32 +206,59 @@ func covered(contract string, present map[string]*Thing) bool {
 	return false
 }
 
-// SQLiteSchema returns the tables SQLite ends up with, by running the real
-// migration runner against an in-memory database and reading the schema back.
-// This is the same code path production takes, so the answer is not a reading
-// of the migrations — it is the migrations' result.
-func SQLiteSchema() (_ map[string]bool, rebuilt map[string]bool, err error) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to open in-memory SQLite for schema replay")
-	}
-	defer func() { err = sqlclose.With(err, db.Close(), "the sqlite schema db") }()
-	// Each :memory: connection is its own database; a second pooled connection
-	// would see an empty schema.
-	db.SetMaxOpenConns(1)
+// replays names each node opened, since database/sql keeps a driver for the
+// life of the process.
+var replays atomic.Int64
 
-	if err := qntxdb.Migrate(db, nil); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to replay SQLite migrations")
+// SQLiteSchema returns the tables SQLite ends up with, and the SQLite that
+// answered, by opening a node's store and reading the schema back. The store
+// is ats-sqlite's: its migrations, run by its runner, in the SQLite the node
+// links. So the answer is not a reading of the migrations — it is the
+// migrations' result on the node.
+func SQLiteSchema() (_ map[string]bool, rebuilt map[string]bool, version string, err error) {
+	// One directory for every store this process opens: ats-sqlite's flight
+	// recorder writes beside the first store it is given, for the life of the
+	// process, so that directory outlives each store.
+	dir := filepath.Join(os.TempDir(), "qntx-parity")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, nil, "", errors.Wrapf(err, "failed to make %s for the node's store", dir)
+	}
+	replay := replays.Add(1)
+	path := filepath.Join(dir, fmt.Sprintf("node-%d-%d.db", os.Getpid(), replay))
+	defer func() {
+		for _, file := range []string{path, path + "-wal", path + "-shm"} {
+			if rmErr := os.Remove(file); rmErr != nil && !os.IsNotExist(rmErr) && err == nil {
+				err = errors.Wrapf(rmErr, "failed to remove %s", file)
+			}
+		}
+	}()
+
+	store, err := sqlitecgo.NewFileStore(path)
+	if err != nil {
+		return nil, nil, "", errors.Wrapf(err, "failed to open the node's store at %s", path)
+	}
+	defer func() { err = sqlclose.With(err, store.Close(), "the node's store at "+path) }()
+
+	driver := fmt.Sprintf("rustsqlite-parity-%d", replay)
+	rustdriver.RegisterNamed(driver, "parity", store.StorePtr(), store.ReadConnPtr(), store.Mu(), store.MuRead())
+	db, err := sql.Open(driver, path)
+	if err != nil {
+		return nil, nil, "", errors.Wrapf(err, "failed to open %s through %s", path, driver)
+	}
+	defer func() { err = sqlclose.With(err, db.Close(), "the node's db at "+path) }()
+
+	if err := db.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
+		return nil, nil, "", errors.Wrapf(err, "failed to ask %s which SQLite it is", path)
 	}
 	tables, err := tableNames(db)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	rebuilt, err = cascadesFrom(db, tables, "attestations")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
-	return tables, rebuilt, nil
+	return tables, rebuilt, version, nil
 }
 
 // cascadesFrom is every table whose rows are deleted with a row of parent,
@@ -270,52 +298,6 @@ func cascadeOf(db *sql.DB, table, parent string) (_ bool, err error) {
 		return false, errors.Wrapf(err, "failed reading the foreign keys of %s", table)
 	}
 	return cascades, nil
-}
-
-// ReplaySchema runs the .sql files in dir, in filename order, against an
-// in-memory database and returns the tables left standing.
-//
-// DuckDB's migration runner lives in Rust (crates/ats-duckdb/src/migrate.rs),
-// so its migrations are replayed here rather than executed by their own engine.
-// The DDL is portable enough for SQLite to accept; anything it rejects fails
-// this command loudly instead of being guessed at.
-func ReplaySchema(dir string) (_ map[string]bool, err error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read migrations from %s", dir)
-	}
-
-	var files []string
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
-			files = append(files, entry.Name())
-		}
-	}
-	sort.Strings(files)
-
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open in-memory SQLite replaying %s", dir)
-	}
-	defer func() { err = sqlclose.With(err, db.Close(), "the replay schema db") }()
-	db.SetMaxOpenConns(1)
-
-	for _, name := range files {
-		path := filepath.Join(dir, name)
-		body, err := os.ReadFile(path)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read migration %s", path)
-		}
-		if _, err := db.Exec(string(body)); err != nil {
-			// Matches the production runner: migrations named "optional"
-			// depend on extensions that may not be loaded (db/migrate.go).
-			if strings.Contains(name, "optional") {
-				continue
-			}
-			return nil, errors.Wrapf(err, "failed to execute migration %s", path)
-		}
-	}
-	return tableNames(db)
 }
 
 // tableNames reads the tables a database ended up with, minus the ones that
@@ -374,8 +356,7 @@ func shadowOf(name string, virtual []string) bool {
 	return false
 }
 
-// Render draws the picture: one line per thing, a column for the node and one
-// for the record.
+// Render draws the picture: one line per thing, a column per engine.
 func Render(things []Thing) string {
 	width := len("access_tokens")
 	for _, t := range things {
@@ -385,9 +366,13 @@ func Render(things []Thing) string {
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "\n  %s  ON THE NODE | IN THE RECORD\n", strings.Repeat(" ", width))
+	fmt.Fprintf(&b, "\n  %-*s  SQLITE  DUCKDB\n", width, "")
 	for _, t := range things {
-		fmt.Fprintf(&b, "  %-*s  %-11s   %s\n", width, t.Name, mark(t.Node), recordMark(t))
+		line := fmt.Sprintf("  %-*s  %-6s  %-6s", width, t.Name, mark(t.SQLite), mark(t.DuckDB))
+		if t.Rebuilt {
+			line += "  rebuilt from attestations"
+		}
+		b.WriteString(strings.TrimRight(line, " ") + "\n")
 		for _, s := range t.Sites {
 			fmt.Fprintf(&b, "      %s:%d\n", s.File, s.Line)
 		}
@@ -401,13 +386,4 @@ func mark(present bool) string {
 		return "YES"
 	}
 	return "NO"
-}
-
-// recordMark is what the record keeps of a thing. A table the take-in rebuilds
-// is not in the record, and is not lost with the host either.
-func recordMark(t Thing) string {
-	if !t.Record && t.Rebuilt {
-		return "rebuilt from attestations"
-	}
-	return mark(t.Record)
 }

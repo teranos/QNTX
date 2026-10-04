@@ -37,6 +37,12 @@
       ],
       "x-qntx-prefix": true
     },
+    "/am/ground": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
     "/am/node": {
       "x-qntx-reach": [
         "ROOT"
@@ -459,7 +465,8 @@
     },
     "/api/transcripts": {
       "x-qntx-reach": [
-        "ROOT"
+        "ROOT",
+        "SUPER"
       ]
     },
     "/api/types": {

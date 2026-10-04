@@ -117,7 +117,12 @@ func (c *Client) deadline(err error) {
 // readPump handles reading messages from the WebSocket connection
 func (c *Client) readPump() {
 	defer func() {
-		c.server.unregister <- c
+		// The hub ends with the context, and Stop has already taken every
+		// client out of s.clients: past that there is nobody to unregister with.
+		select {
+		case c.server.unregister <- c:
+		case <-c.server.ctx.Done():
+		}
 		sqlclose.Log(c.conn.Close(), c.server.logger, "the websocket")
 	}()
 

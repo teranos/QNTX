@@ -19,14 +19,14 @@ import (
 	"unsafe"
 
 	"github.com/google/uuid"
-	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/errors"
 )
 
 // Defined once in server/auth, where Caller carries a namespace.
 const (
-	NamespaceSystem  = auth.NamespaceSystem
-	NamespaceDefault = auth.NamespaceDefault
+	NamespaceSystem  = access.NamespaceSystem
+	NamespaceDefault = access.NamespaceDefault
 )
 
 // TokenStore is the parquet-backend implementation of auth.TokenStore
@@ -46,7 +46,7 @@ type TokenStore struct {
 //
 // One shape rather than two: the operational db holds the same token this
 // writes (ADR-037), and a take-in compares them field by field.
-type tokenRecord = auth.TokenRecord
+type tokenRecord = access.TokenRecord
 
 // tokenSummary is what comes back from a list: the same record without the
 // hash. Mirrors TokenSummary in the crate.
@@ -105,7 +105,7 @@ func (s *TokenStore) Close() {
 // Records is every token whole, hashes included — what the operational db is
 // rebuilt from after host loss (ADR-037). List strips the hash, which is right
 // for an API answer and wrong for a table keyed by it.
-func (s *TokenStore) Records() ([]auth.TokenRecord, error) {
+func (s *TokenStore) Records() ([]access.TokenRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -118,7 +118,7 @@ func (s *TokenStore) Records() ([]auth.TokenRecord, error) {
 		return nil, nil
 	}
 
-	var held []auth.TokenRecord
+	var held []access.TokenRecord
 	if err := readBack([]byte(C.GoString(result.tokens_json)), &held); err != nil {
 		return nil, errors.Wrap(err, "the token records did not parse")
 	}
@@ -128,7 +128,7 @@ func (s *TokenStore) Records() ([]auth.TokenRecord, error) {
 // PutRecord writes one token whole, replacing what was there. The table writes
 // first and this second, so a token is in the operational db before it is in
 // the record.
-func (s *TokenStore) PutRecord(held auth.TokenRecord) error {
+func (s *TokenStore) PutRecord(held access.TokenRecord) error {
 	body, err := json.Marshal(held)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize access token %s (%s)", held.ID, held.Label)
@@ -160,12 +160,12 @@ func (s *TokenStore) Requests() ([]Asked, error) {
 
 // Create issues a token. The raw value is returned once and never stored —
 // only its hash reaches the backend, so a leaked store yields nothing usable.
-func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
-	raw, did, err := auth.MintToken()
+func (s *TokenStore) Create(spec access.NewToken) (string, string, error) {
+	raw, did, err := access.MintToken()
 	if err != nil {
 		return "", "", err
 	}
-	id, err := s.put(auth.IssuedToken{
+	id, err := s.put(access.IssuedToken{
 		Hash:                hashToken(raw),
 		DID:                 did,
 		Label:               spec.Label,
@@ -185,12 +185,12 @@ func (s *TokenStore) Create(spec auth.NewToken) (string, string, error) {
 // Issue writes down a token the flow already minted (ADR-025): the strategy
 // drew the raw and named its DID, and only the hash and the DID arrive here.
 // The same record Create writes, less the return address a client alone has.
-func (s *TokenStore) Issue(spec auth.IssuedToken) (string, error) {
+func (s *TokenStore) Issue(spec access.IssuedToken) (string, error) {
 	return s.put(spec, "")
 }
 
 // put is the one write a token record gets, whichever hand minted the raw.
-func (s *TokenStore) put(spec auth.IssuedToken, returnAddress string) (string, error) {
+func (s *TokenStore) put(spec access.IssuedToken, returnAddress string) (string, error) {
 	id := uuid.NewString()
 
 	record := tokenRecord{
@@ -246,7 +246,7 @@ func (s *TokenStore) put(spec auth.IssuedToken, returnAddress string) (string, e
 // the only safe reading of "the store did not answer" is that the credential
 // is not good — a store that fails open is a store that authenticates
 // everyone the moment it breaks.
-func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
+func (s *TokenStore) Lookup(hash string) (access.Grant, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -256,14 +256,14 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 	result := C.duckdb_tokens_resolve((*C.TokenStore)(s.ptr), cHash, C.int64_t(time.Now().UTC().UnixMilli()))
 	defer C.duckdb_tokens_result_free(result)
 	if !bool(result.success) || result.tokens_json == nil {
-		return auth.Grant{}, false
+		return access.Grant{}, false
 	}
 
 	// A live token serializes as an object; `null` is the store saying no such
 	// token, which is an answer rather than a failure.
 	var resolved *tokenSummary
 	if err := readBack([]byte(C.GoString(result.tokens_json)), &resolved); err != nil || resolved == nil {
-		return auth.Grant{}, false
+		return access.Grant{}, false
 	}
 	return grantOf(*resolved), true
 }
@@ -272,7 +272,7 @@ func (s *TokenStore) Lookup(hash string) (auth.Grant, bool) {
 // it is live, and whether the store holds it at all. Lookup drops a spent
 // token entirely, which cannot tell a refresh token presented twice from one
 // nobody ever issued — and the first revokes everything it led to.
-func (s *TokenStore) LookupSpent(hash string) (auth.Grant, bool, bool) {
+func (s *TokenStore) LookupSpent(hash string) (access.Grant, bool, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -282,26 +282,26 @@ func (s *TokenStore) LookupSpent(hash string) (auth.Grant, bool, bool) {
 	result := C.duckdb_tokens_standing((*C.TokenStore)(s.ptr), cHash, C.int64_t(time.Now().UTC().UnixMilli()))
 	defer C.duckdb_tokens_result_free(result)
 	if !bool(result.success) || result.tokens_json == nil {
-		return auth.Grant{}, false, false
+		return access.Grant{}, false, false
 	}
 
 	var standing *tokenStanding
 	if err := readBack([]byte(C.GoString(result.tokens_json)), &standing); err != nil || standing == nil {
-		return auth.Grant{}, false, false
+		return access.Grant{}, false, false
 	}
 	return grantOf(standing.Token), standing.Live, true
 }
 
 // grantOf is a stored summary as the middleware and the flow read it.
-func grantOf(found tokenSummary) auth.Grant {
-	return auth.Grant{
+func grantOf(found tokenSummary) access.Grant {
+	return access.Grant{
 		ID:                  found.ID,
 		Label:               found.Label,
 		DID:                 found.DID,
 		MintedBy:            found.MintedBy,
 		MintedByUser:        found.MintedByUser,
 		MintedByDisplayName: found.MintedByDisplayName,
-		Level:               auth.Level(found.Level),
+		Level:               access.Level(found.Level),
 		Namespaces:          found.Namespaces,
 		ReturnAddress:       found.ReturnAddress,
 		ClientDID:           found.ClientDID,
@@ -310,7 +310,7 @@ func grantOf(found tokenSummary) auth.Grant {
 }
 
 // List returns every token without raw values or hashes.
-func (s *TokenStore) List() ([]auth.TokenInfo, error) {
+func (s *TokenStore) List() ([]access.TokenInfo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -326,16 +326,16 @@ func (s *TokenStore) List() ([]auth.TokenInfo, error) {
 		return nil, errors.Wrap(err, "failed to parse the access token list from the parquet backend")
 	}
 
-	out := make([]auth.TokenInfo, 0, len(summaries))
+	out := make([]access.TokenInfo, 0, len(summaries))
 	for _, s := range summaries {
-		out = append(out, auth.TokenInfo{
+		out = append(out, access.TokenInfo{
 			ID:                  s.ID,
 			Label:               s.Label,
 			DID:                 s.DID,
 			MintedBy:            s.MintedBy,
 			MintedByUser:        s.MintedByUser,
 			MintedByDisplayName: s.MintedByDisplayName,
-			Level:               auth.Level(s.Level),
+			Level:               access.Level(s.Level),
 			Namespaces:          s.Namespaces,
 			ReturnAddress:       s.ReturnAddress,
 			ClientDID:           s.ClientDID,
@@ -416,6 +416,3 @@ func optionalRFC3339(ms *int64) *string {
 	formatted := millisToRFC3339(ms)
 	return &formatted
 }
-
-// Compile-time proof that this satisfies the contract the middleware holds.
-var _ auth.TokenStore = (*TokenStore)(nil)

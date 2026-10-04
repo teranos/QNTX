@@ -54,6 +54,24 @@ func TestTheWebhooksPathIsUnderGitHub(t *testing.T) {
 	}
 }
 
+func TestAVTagLandingOnQNTXIsKnown(t *testing.T) {
+	for raw, tag := range map[string]string{
+		`{"ref":"refs/tags/v0.37.1","repository":{"full_name":"teranos/QNTX"}}`:                "v0.37.1",
+		`{"ref":"refs/tags/v0.37.1","deleted":true,"repository":{"full_name":"teranos/QNTX"}}`: "",
+		`{"ref":"refs/tags/branch-main-latest","repository":{"full_name":"teranos/QNTX"}}`:     "",
+		`{"ref":"refs/heads/main","repository":{"full_name":"teranos/QNTX"}}`:                  "",
+		`{"ref":"refs/tags/v1.0.0","repository":{"full_name":"teranos/datapunt"}}`:             "",
+	} {
+		var p gitHubPush
+		if err := json.Unmarshal([]byte(raw), &p); err != nil {
+			t.Fatal(err)
+		}
+		if got := p.tagLanded(); got != tag {
+			t.Errorf("%s: landed %q", raw, got)
+		}
+	}
+}
+
 func TestAPushMovesTheBuildsItsRepoAndBranchFeed(t *testing.T) {
 	b := pluginBuild{
 		name:   "datapunt",

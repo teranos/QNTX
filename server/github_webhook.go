@@ -55,6 +55,7 @@ const githubWebhookBody = 25 << 20
 type gitHubPush struct {
 	Ref        string `json:"ref"`
 	After      string `json:"after"`
+	Deleted    bool   `json:"deleted"`
 	Repository struct {
 		FullName string `json:"full_name"`
 	} `json:"repository"`
@@ -145,6 +146,9 @@ func (s *QNTXServer) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request)
 	if err := json.Unmarshal(body, &push); err != nil {
 		writeError(w, http.StatusBadRequest, "the push is not readable JSON: "+err.Error())
 		return
+	}
+	if tag := push.tagLanded(); tag != "" {
+		s.dispatchApp(tag)
 	}
 	names := s.buildsMovedBy(push)
 	respond(w, s.logger, http.StatusOK, map[string][]string{"building": names})

@@ -20,12 +20,16 @@ import (
 // Derived from what Ground already streams into the namespace the caller stands
 // in, and nothing is written to make them.
 
+// What this cannot read: a session Ground never streamed, or streamed only in
+// part. Loom read those from the files Claude Code writes under
+// ~/.claude/projects (qntx-plugins/loom/lib/jsonl_reader.ml at d512ffb2).
+
 // transcriptPredicates are the hook events a session is found by. Each is asked
 // for on its own: a store's filter may AND predicates rather than OR them.
 var transcriptPredicates = []string{
 	"UserPromptSubmit", "Stop", "PreToolUse",
 	"SessionStart", "SessionEnd", "PreCompact",
-	"SubagentStart", "SubagentStop", "TaskCompleted",
+	"SubagentStart", "SubagentStop", "TaskCompleted", "StopFailure",
 	"GroundedUserPromptSubmit", "GroundedPreToolUse", "GroundedPostToolUse", "GroundedStop",
 	"ritual:rite",
 }
@@ -73,7 +77,7 @@ func (s *QNTXServer) transcriptsSignum() sigil.Signum {
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "read",
-					Does: "Every session Ground recorded here, newest first, as turns: what the person asked, what the agent answered, the tools it reached for, what Ground's controls said, and what a rite found.",
+					Does: "Every session Ground recorded here, newest first, as turns: what the person asked, what the agent answered, the tools it reached for, what Ground's controls said, what a rite found, and an API error in the words it came in.",
 					Takes: []*protocol.Param{
 						{Name: "session", Says: "One session, by its id."},
 						{Name: "limit", Kind: sigil.Count, Says: "How many sessions, newest first."},
@@ -247,6 +251,11 @@ func turnOf(as *types.As) (transcriptTurn, bool) {
 		turn.Speaker, turn.Text = "agent", strings.TrimPrefix(predicate, "Subagent")+" "+attr("agent_type")
 	case "TaskCompleted":
 		turn.Speaker, turn.Text = "task", attr("task_subject")
+	case "StopFailure":
+		// "the mic needs to speak its exact error"
+		// The API's error ended the turn. It is said in the words it came in:
+		// which error, then what Claude Code wrote of it, whole.
+		turn.Speaker, turn.Text = "error", attr("error")+": "+attr("last_assistant_message")
 	case "ritual:rite":
 		turn.Speaker, turn.Text = "rite", riteSaid(as.Attributes)
 	default:

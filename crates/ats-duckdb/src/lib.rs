@@ -208,7 +208,7 @@ pub(crate) fn resolve_credentials_again(
 /// parameter. Paired with `CAST(? AS VARCHAR[])` in SQL to reconstitute the
 /// LIST<VARCHAR> column value.
 ///
-/// Why not Value::List: duckdb-rs 1.4.3 exposes `Value::List` on the read
+/// Why not Value::List: duckdb-rs at the pinned version exposes `Value::List` on the read
 /// path (queries return it) but does not support binding it as a query
 /// parameter — attempting to do so raises "binding List parameters is not yet
 /// supported". JSON round-trip via CAST is the current workaround.
@@ -266,20 +266,20 @@ pub struct QueryFilter {
 /// Attestation store backed by DuckDB against Parquet files at `location`.
 /// The DuckDB release `libduckdb-sys` generated its bindings against.
 ///
-/// This is not a preference. The duckdb crate at 1.4.3 was built against
-/// DuckDB v1.4.3, and the process links libduckdb dynamically — so if the
+/// This is not a preference. The duckdb crate was built against the DuckDB
+/// release of the same number, and the process links libduckdb dynamically — so if the
 /// library on the host is a different release, the bindings describe an ABI
 /// that is not there. That failure is silent at compile and link time.
 ///
-/// `flake.nix` pins libduckdb to this version through its nixpkgs revision.
-/// Changing any one of the three — this constant, the crate version in
-/// Cargo.toml, the flake revision — without the others is the bug this guards
-/// against.
+/// The version is server/parity/duckdb_<version>_<rev>'s; build.rs reads it
+/// from there. `flake.nix` pins libduckdb to it through its nixpkgs revision.
+/// Changing any one of the three — the pin, the crate version in Cargo.toml,
+/// the flake revision — without the others is the bug this guards against.
 ///
-/// Why 1.4.3 rather than something newer: the nixpkgs revision carrying a
+/// Why the pinned version rather than something newer: the nixpkgs revision carrying a
 /// later DuckDB also carries a glibc newer than the deployment target's, and
 /// libduckdb then cannot load there. See flake.nix.
-const EXPECTED_DUCKDB_VERSION: &str = "v1.4.3";
+const EXPECTED_DUCKDB_VERSION: &str = concat!("v", env!("QNTX_DUCKDB_PIN"));
 
 /// Compare the linked library against [`EXPECTED_DUCKDB_VERSION`].
 ///
@@ -705,7 +705,7 @@ impl DuckdbStore {
     /// Each list filter (subjects, predicates, contexts, actors) becomes
     /// `list_has_any(<col>, CAST(? AS VARCHAR[]))` with the parameter bound as
     /// a JSON-serialized string — same shape as the write path, forced by
-    /// duckdb-rs 1.4.3 not supporting `Value::List` as a bind parameter
+    /// duckdb-rs at the pinned version not supporting `Value::List` as a bind parameter
     /// (see `str_list_json` doc comment).
     ///
     /// Semantics match `ats.AttestationFilter` (Go, `ats/store.go:69-79`):

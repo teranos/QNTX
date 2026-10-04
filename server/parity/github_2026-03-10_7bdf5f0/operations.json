@@ -1,6 +1,14 @@
 [
   {
     "method": "get",
+    "path": "/app/hook/deliveries"
+  },
+  {
+    "method": "post",
+    "path": "/app/hook/deliveries/{delivery_id}/attempts"
+  },
+  {
+    "method": "get",
     "path": "/issues"
   },
   {

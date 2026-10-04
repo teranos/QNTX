@@ -46,6 +46,17 @@ const StandingDispatchSent = "standing-dispatch-sent"
 // accepted and what sky streams here. One spelling, shared with the handler.
 const DispatchSentPredicate = "immediate:dispatch"
 
+// StandingQuoteClaimed watches for ground attesting the quoted spans a write
+// carried. The handler it names asks each span of the namespace's prompts.
+const StandingQuoteClaimed = "standing-quote-claimed"
+
+// QuoteClaimedPredicate is what ground's PostToolUse writes and sky streams
+// here. One spelling, shared with the handler.
+const QuoteClaimedPredicate = "quote:claimed"
+
+// QuoteProvenanceHandlerName is the built-in the row above reaches.
+const QuoteProvenanceHandlerName = "quote.provenance"
+
 // standing is the table. Unexported and copied on the way out: a caller that
 // could reach the rows could edit what every node is born with.
 var standing = []storage.Watcher{
@@ -80,6 +91,17 @@ var standing = []storage.Watcher{
 		Filter:            types.AxFilter{Predicates: []string{DispatchSentPredicate}},
 		ActionType:        storage.ActionTypeBuiltinExecute,
 		ActionData:        `{"handler_name":"` + CIWatchHandlerName + `"}`,
+		MaxFiresPerSecond: 10,
+		Enabled:           true,
+	},
+	{
+		ID:   StandingQuoteClaimed,
+		Name: "a write carried quoted spans",
+		// The write passed on the laptop; whether anybody said the words is
+		// asked here, of the prompts this namespace holds.
+		Filter:            types.AxFilter{Predicates: []string{QuoteClaimedPredicate}},
+		ActionType:        storage.ActionTypeBuiltinExecute,
+		ActionData:        `{"handler_name":"` + QuoteProvenanceHandlerName + `"}`,
 		MaxFiresPerSecond: 10,
 		Enabled:           true,
 	},

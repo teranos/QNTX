@@ -188,6 +188,33 @@ describe('Transcript - Jenny', () => {
         expect(copied).toEqual(['[tool] make cli\n[tool] make test\n[tool] git push']);
     });
 
+    // "YES, TAKE SACRED-ERROR'S OWN RENDER"
+    test('an API error is a turn drawn through the one render, pressed like any turn', () => {
+        const body = document.createElement('div');
+        const copied: string[] = [];
+        const said = 'server_error: API Error: Unable to connect to API (ENOTFOUND)';
+        renderTranscript(body, session(turnsOf(['human', 'Build QNTX here'], ['error', said])), (text) => copied.push(text));
+        const row = body.querySelector<HTMLElement>('.tr-sp-error')!;
+        const block = row.querySelector<HTMLElement>('sacred-error')!;
+        const drawn = block.shadowRoot!;
+
+        expect(drawn.querySelector('.title')?.textContent).toBe('server_error');
+        expect([...drawn.querySelectorAll('.why')].map(why => why.textContent))
+            .toEqual(['API Error: Unable to connect to API (ENOTFOUND)', 'transcript · a-1']);
+
+        drawn.querySelector<HTMLElement>('.dismiss')!.click();
+        expect(block.hidden).toBe(true);
+        expect(row.classList.contains('tr-selected')).toBe(false);
+
+        row.querySelector<HTMLElement>('.sacred-back')!.click();
+        expect(block.hidden).toBe(false);
+        expect(row.classList.contains('tr-selected')).toBe(false);
+
+        block.click();
+        block.click();
+        expect(copied).toEqual([`[error] ${said}`]);
+    });
+
     // Jenny: hovering a chip lists its turns in sequence, each one pressable alone.
     test('hovering a chip lists its turns, and one of them is selected alone', async () => {
         const body = document.createElement('div');

@@ -67,10 +67,10 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 				},
 				{
 					Name: "storage",
-					Does: "For every thing QNTX persists, whether a node keeps it on its own disk and whether the record under the storage location keeps it, as make parity read the source this build was made from. It says nothing of this node's own stores.",
+					Does: "For every thing QNTX persists, whether SQLite and DuckDB each hold it, as make parity read the source this build was made from. It says nothing of this node's own stores.",
 					Gives: []*protocol.Field{
 						{Name: "describes", Says: "What was read: source, the code this build was made from, and never this node."},
-						{Name: "things", Says: "One per thing, by name: on the node, in the record, rebuilt by a take-in, and the Go files that reach it with SQL written by hand."},
+						{Name: "things", Says: "One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go files that reach it with SQL written by hand."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/storage"},
 				},

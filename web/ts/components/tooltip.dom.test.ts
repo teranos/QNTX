@@ -9,7 +9,7 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { renderDoughnut, CHART_COLORS } from './doughnut';
-import { renderSparkline, wireLineTooltips, stepAt } from './sparkline';
+import { renderSparkline, wireLineTooltips } from '@teranos/elements';
 import { SAID_TIMING } from './said';
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -42,14 +42,8 @@ describe('said in tooltip form', () => {
         return line;
     };
 
-    test('the step under the pointer, along the line', () => {
-        const line = aLine();
-        expect(stepAt(line, 2)).toBe('2026-09-29 10 · 1');
-        expect(stepAt(line, 98)).toBe('2026-09-29 12 · 4');
-    });
-
     test('pointing at a line says the moment under the pointer, and follows it', async () => {
-        wireLineTooltips();
+        wireLineTooltips(document, SAID_TIMING);
         const line = aLine();
         point(line, 'pointerover', 2);
         point(line, 'pointerenter', 2);
@@ -57,20 +51,6 @@ describe('said in tooltip form', () => {
         expect(said()).toBe('2026-09-29 10 · 1');
         point(line, 'pointermove', 98);
         expect(said()).toBe('2026-09-29 12 · 4');
-    });
-
-    test('a longer hover grows the same element into the whole line, named', async () => {
-        wireLineTooltips();
-        const line = aLine();
-        point(line, 'pointerover', 50);
-        point(line, 'pointerenter', 50);
-        await wait(60);
-        const [tip] = tooltips();
-        expect(tip!.dataset.expanded).toBe('true');
-        expect(tip!.querySelector('.sparkline-whole svg polyline')).not.toBeNull();
-        const moments = tip!.querySelector('.sparkline-whole-moments')!.textContent;
-        expect(moments).toContain('2026-09-29 12 · 4');
-        expect(moments).not.toContain('2026-09-29 11 · 0');
     });
 
     test('pointing at a segment says its entry, a longer hover the whole legend', async () => {

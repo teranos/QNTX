@@ -1,32 +1,22 @@
 package embeddings
 
-import "time"
+import (
+	"time"
+
+	"github.com/teranos/QNTX/plugin/embedding"
+)
 
 // ClusterNoise is the label assigned to points not belonging to any cluster.
 // HDBSCAN convention: -1 means noise/outlier.
 const ClusterNoise = -1
 
-// ModelInfo contains information about the loaded embedding model
-type ModelInfo struct {
-	Name              string `json:"name"`
-	Dimensions        int    `json:"dimensions"`
-	MaxSequenceLength int    `json:"max_sequence_length"`
-}
-
-// EmbeddingResult represents the result of embedding a single text
-type EmbeddingResult struct {
-	Text        string    `json:"text"`
-	Embedding   []float32 `json:"embedding"`
-	Tokens      int       `json:"tokens"`
-	InferenceMS float64   `json:"inference_ms"`
-}
-
-// BatchEmbeddingResult represents the result of embedding multiple texts
-type BatchEmbeddingResult struct {
-	Embeddings       []EmbeddingResult `json:"embeddings"`
-	TotalTokens      int               `json:"total_tokens"`
-	TotalInferenceMS float64           `json:"total_inference_ms"`
-}
+// The results the embedding service answers with live in plugin/embedding,
+// which plugins import without importing the server.
+type (
+	ModelInfo            = embedding.ModelInfo
+	EmbeddingResult      = embedding.EmbeddingResult
+	BatchEmbeddingResult = embedding.BatchEmbeddingResult
+)
 
 // ClusterResult holds the output of HDBSCAN clustering.
 type ClusterResult struct {

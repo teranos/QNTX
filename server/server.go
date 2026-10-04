@@ -26,7 +26,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/namespaces"
-	"github.com/teranos/QNTX/server/nodedid"
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"

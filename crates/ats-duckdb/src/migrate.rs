@@ -28,6 +28,22 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// The tables the migrations leave standing, applied by this runner in the
+/// DuckDB this crate links. make parity reads its IN THE RECORD column from
+/// here rather than replaying the migrations in another engine.
+pub fn schema_tables() -> Result<Vec<String>> {
+    let conn = Connection::open_in_memory()?;
+    crate::assert_library_version(&conn)?;
+    migrate(&conn)?;
+    let mut statement = conn.prepare(
+        "SELECT table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE' ORDER BY table_name",
+    )?;
+    let tables = statement
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(tables)
+}
+
 fn apply_migration(conn: &Connection, version: &str, sql: &str) -> Result<()> {
     if is_migration_applied(conn, version)? {
         return Ok(());
@@ -75,6 +91,16 @@ fn record_migration(conn: &Connection, version: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn schema_tables_are_what_the_migrations_leave() {
+        let tables = schema_tables().unwrap();
+        assert!(tables.contains(&"attestations".to_string()), "{tables:?}");
+        assert!(
+            tables.contains(&"schema_migrations".to_string()),
+            "{tables:?}"
+        );
+    }
 
     #[test]
     fn migrate_creates_schema_migrations() {

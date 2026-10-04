@@ -619,103 +619,46 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	return as, nil
 }
 
+// rustQueryFilter is the filter as Rust reads it: time as Unix milliseconds,
+// and omitempty so nil slices are missing rather than null (Rust expects missing or []).
+type rustQueryFilter struct {
+	Subjects   []string `json:"subjects,omitempty"`
+	Predicates []string `json:"predicates,omitempty"`
+	Contexts   []string `json:"contexts,omitempty"`
+	Actors     []string `json:"actors,omitempty"`
+	Source     string   `json:"source,omitempty"`
+	TimeStart  *int64   `json:"time_start,omitempty"`
+	TimeEnd    *int64   `json:"time_end,omitempty"`
+	Limit      int      `json:"limit,omitempty"`
+}
+
+// unixMilli is a time pointer as Unix milliseconds, nil staying nil.
+func unixMilli(t *time.Time) *int64 {
+	if t == nil {
+		return nil
+	}
+	ms := t.UnixMilli()
+	return &ms
+}
+
 // GetAttestations retrieves attestations based on filters (implements ats.AttestationStore).
 func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
-	// Convert Go filter to Rust-compatible JSON format (no lock needed for serialization).
-	// omitempty prevents nil slices from marshaling as null (Rust expects missing or []).
-	rustFilter := struct {
-		Subjects   []string `json:"subjects,omitempty"`
-		Predicates []string `json:"predicates,omitempty"`
-		Contexts   []string `json:"contexts,omitempty"`
-		Actors     []string `json:"actors,omitempty"`
-		Source     string   `json:"source,omitempty"`
-		TimeStart  *int64   `json:"time_start,omitempty"`
-		TimeEnd    *int64   `json:"time_end,omitempty"`
-		Limit      int      `json:"limit,omitempty"`
-	}{
+	return rs.query(rustQueryFilter{
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
 		Actors:     filter.Actors,
 		Source:     filter.Source,
+		TimeStart:  unixMilli(filter.TimeStart),
+		TimeEnd:    unixMilli(filter.TimeEnd),
 		Limit:      filter.Limit,
-	}
-
-	// Convert time pointers to Unix milliseconds
-	if filter.TimeStart != nil {
-		ms := filter.TimeStart.UnixMilli()
-		rustFilter.TimeStart = &ms
-	}
-	if filter.TimeEnd != nil {
-		ms := filter.TimeEnd.UnixMilli()
-		rustFilter.TimeEnd = &ms
-	}
-
-	filterJSON, err := json.Marshal(rustFilter)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal filter")
-	}
-
-	cFilterJSON := C.CString(string(filterJSON))
-	defer C.free(unsafe.Pointer(cFilterJSON))
-
-	start := time.Now()
-	var result C.AttestationResultC
-	entry := rs.acquireReadConn()
-	if entry != nil {
-		result = C.read_conn_query(entry.conn, cFilterJSON)
-		rs.releaseReadConn(entry)
-	} else {
-		rs.muWrite.Lock()
-		if rs.store == nil {
-			rs.muWrite.Unlock()
-			return nil, errors.New("store is closed")
-		}
-		result = C.storage_query(rs.store, cFilterJSON)
-		rs.muWrite.Unlock()
-	}
-	var success bool
-	var errMsg, jsonStr string
-	success = bool(result.success)
-	if !success {
-		errMsg = C.GoString(result.error_msg)
-	} else if result.attestation_json != nil {
-		jsonStr = C.GoString(result.attestation_json)
-	}
-	C.attestation_result_free(result)
-	logSlowOp(start, "storage_query "+slowQueryKey(filter))
-
-	if !success {
-		return nil, errors.New(errMsg)
-	}
-
-	if jsonStr == "" {
-		return []*types.As{}, nil
-	}
-
-	// Parse JSON array of attestations (no lock needed)
-	var rustAttestations []json.RawMessage
-	if err := json.Unmarshal([]byte(jsonStr), &rustAttestations); err != nil {
-		return nil, errors.Wrap(err, "failed to parse attestation array")
-	}
-
-	// Convert each attestation from Rust JSON
-	attestations := make([]*types.As, 0, len(rustAttestations))
-	for _, rawAttestation := range rustAttestations {
-		as, err := fromRustJSON([]byte(rawAttestation))
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to convert attestation from Rust JSON")
-		}
-		attestations = append(attestations, as)
-	}
-
-	return attestations, nil
+	}, "storage_query "+slowQueryKey(filter), false)
 }
 
 // QueryFilter executes a full AxFilter query through Rust FFI.
 // Rust builds the SQL and executes it.
 func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
-	return rs.queryFilter(filter, false)
+	return rs.query(axAsRust(filter), "query_filter", false)
 }
 
 // QueryFilterResolved executes the whole ax read path in Rust: alias expansion,
@@ -728,37 +671,26 @@ func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
 // GetAttestations, whose callers — the REST API, the watcher engine — read
 // unresolved rows and must keep doing so.
 func (rs *RustStore) QueryFilterResolved(filter types.AxFilter) ([]*types.As, error) {
-	return rs.queryFilter(filter, true)
+	return rs.query(axAsRust(filter), "query_filter_resolved", true)
 }
 
-func (rs *RustStore) queryFilter(filter types.AxFilter, resolved bool) ([]*types.As, error) {
-	// Convert to Rust-compatible JSON: time as milliseconds, omit empty slices
-	rustFilter := struct {
-		Subjects   []string `json:"subjects,omitempty"`
-		Predicates []string `json:"predicates,omitempty"`
-		Contexts   []string `json:"contexts,omitempty"`
-		Actors     []string `json:"actors,omitempty"`
-		Source     string   `json:"source,omitempty"`
-		TimeStart  *int64   `json:"time_start,omitempty"`
-		TimeEnd    *int64   `json:"time_end,omitempty"`
-		Limit      int      `json:"limit,omitempty"`
-	}{
+// axAsRust is an AxFilter as Rust reads it.
+func axAsRust(filter types.AxFilter) rustQueryFilter {
+	return rustQueryFilter{
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
 		Actors:     filter.Actors,
+		TimeStart:  unixMilli(filter.TimeStart),
+		TimeEnd:    unixMilli(filter.TimeEnd),
 		Limit:      filter.Limit,
 	}
+}
 
-	if filter.TimeStart != nil {
-		ms := filter.TimeStart.UnixMilli()
-		rustFilter.TimeStart = &ms
-	}
-	if filter.TimeEnd != nil {
-		ms := filter.TimeEnd.UnixMilli()
-		rustFilter.TimeEnd = &ms
-	}
-
+// query asks a read connection when one is free, else the store under the
+// write lock, and converts the attestations Rust answers with. slowKey names
+// the query in the slow-operation log, and resolved asks Rust for the whole ax read path.
+func (rs *RustStore) query(rustFilter rustQueryFilter, slowKey string, resolved bool) ([]*types.As, error) {
 	filterJSON, err := json.Marshal(rustFilter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal filter")
@@ -790,7 +722,6 @@ func (rs *RustStore) queryFilter(filter types.AxFilter, resolved bool) ([]*types
 		}
 		rs.muWrite.Unlock()
 	}
-
 	var success bool
 	var errMsg, jsonStr string
 	success = bool(result.success)
@@ -800,11 +731,7 @@ func (rs *RustStore) queryFilter(filter types.AxFilter, resolved bool) ([]*types
 		jsonStr = C.GoString(result.attestation_json)
 	}
 	C.attestation_result_free(result)
-	if resolved {
-		logSlowOp(start, "query_filter_resolved")
-	} else {
-		logSlowOp(start, "query_filter")
-	}
+	logSlowOp(start, slowKey)
 
 	if !success {
 		return nil, errors.New(errMsg)
@@ -927,78 +854,24 @@ func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
 
 // GetAllPredicates returns all distinct predicates via Rust FFI.
 func (rs *RustStore) GetAllPredicates() ([]string, error) {
-	var result C.StringArrayResultC
-	entry := rs.acquireReadConn()
-	if entry != nil {
-		result = C.read_conn_predicates(entry.conn)
-		rs.releaseReadConn(entry)
-	} else {
-		rs.muWrite.Lock()
-		if rs.store == nil {
-			rs.muWrite.Unlock()
-			return nil, errors.New("store is closed")
-		}
-		result = C.storage_predicates(rs.store)
-		rs.muWrite.Unlock()
-	}
-	var success bool
-	var errMsg string
-	success = bool(result.success)
-	if !success {
-		errMsg = C.GoString(result.error_msg)
-	}
-
-	var values []string
-	if success && result.strings_len > 0 {
-		cStrings := unsafe.Slice(result.strings, result.strings_len)
-		values = make([]string, result.strings_len)
-		for i, cs := range cStrings {
-			values[i] = C.GoString(cs)
-		}
-	}
-	C.string_array_result_free(result)
-
-	if !success {
-		return nil, errors.Newf("failed to get predicates: %s", errMsg)
+	values, err := rs.readStrings(
+		func(conn *C.ReadConn) C.StringArrayResultC { return C.read_conn_predicates(conn) },
+		func(store *C.SqliteStore) C.StringArrayResultC { return C.storage_predicates(store) },
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get predicates")
 	}
 	return values, nil
 }
 
 // GetAllContexts returns all distinct contexts via Rust FFI.
 func (rs *RustStore) GetAllContexts() ([]string, error) {
-	var result C.StringArrayResultC
-	entry := rs.acquireReadConn()
-	if entry != nil {
-		result = C.read_conn_contexts(entry.conn)
-		rs.releaseReadConn(entry)
-	} else {
-		rs.muWrite.Lock()
-		if rs.store == nil {
-			rs.muWrite.Unlock()
-			return nil, errors.New("store is closed")
-		}
-		result = C.storage_contexts(rs.store)
-		rs.muWrite.Unlock()
-	}
-	var success bool
-	var errMsg string
-	success = bool(result.success)
-	if !success {
-		errMsg = C.GoString(result.error_msg)
-	}
-
-	var values []string
-	if success && result.strings_len > 0 {
-		cStrings := unsafe.Slice(result.strings, result.strings_len)
-		values = make([]string, result.strings_len)
-		for i, cs := range cStrings {
-			values[i] = C.GoString(cs)
-		}
-	}
-	C.string_array_result_free(result)
-
-	if !success {
-		return nil, errors.Newf("failed to get contexts: %s", errMsg)
+	values, err := rs.readStrings(
+		func(conn *C.ReadConn) C.StringArrayResultC { return C.read_conn_contexts(conn) },
+		func(store *C.SqliteStore) C.StringArrayResultC { return C.storage_contexts(store) },
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get contexts")
 	}
 	return values, nil
 }
@@ -1006,10 +879,26 @@ func (rs *RustStore) GetAllContexts() ([]string, error) {
 // IntegrityCheck runs PRAGMA integrity_check via Rust FFI.
 // A healthy database returns []string{"ok"}.
 func (rs *RustStore) IntegrityCheck() ([]string, error) {
+	values, err := rs.readStrings(
+		func(conn *C.ReadConn) C.StringArrayResultC { return C.read_conn_integrity_check(conn) },
+		func(store *C.SqliteStore) C.StringArrayResultC { return C.storage_integrity_check(store) },
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "integrity check failed")
+	}
+	return values, nil
+}
+
+// readStrings asks a read connection when one is free, else the store under
+// the write lock, and copies the string array Rust answers with.
+func (rs *RustStore) readStrings(
+	onConn func(*C.ReadConn) C.StringArrayResultC,
+	onStore func(*C.SqliteStore) C.StringArrayResultC,
+) ([]string, error) {
 	var result C.StringArrayResultC
 	entry := rs.acquireReadConn()
 	if entry != nil {
-		result = C.read_conn_integrity_check(entry.conn)
+		result = onConn(entry.conn)
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
@@ -1017,28 +906,21 @@ func (rs *RustStore) IntegrityCheck() ([]string, error) {
 			rs.muWrite.Unlock()
 			return nil, errors.New("store is closed")
 		}
-		result = C.storage_integrity_check(rs.store)
+		result = onStore(rs.store)
 		rs.muWrite.Unlock()
 	}
-	var success bool
-	var errMsg string
-	success = bool(result.success)
-	if !success {
-		errMsg = C.GoString(result.error_msg)
-	}
+	defer C.string_array_result_free(result)
 
+	if !bool(result.success) {
+		return nil, errors.New(C.GoString(result.error_msg))
+	}
 	var values []string
-	if success && result.strings_len > 0 {
+	if result.strings_len > 0 {
 		cStrings := unsafe.Slice(result.strings, result.strings_len)
 		values = make([]string, result.strings_len)
 		for i, cs := range cStrings {
 			values[i] = C.GoString(cs)
 		}
-	}
-	C.string_array_result_free(result)
-
-	if !success {
-		return nil, errors.Newf("integrity check failed: %s", errMsg)
 	}
 	return values, nil
 }

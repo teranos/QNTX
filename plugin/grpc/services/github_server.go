@@ -36,6 +36,17 @@ type GitHubCredentials interface {
 	Token(ctx context.Context, namespace string) (token, key string, err error)
 }
 
+// GitHubApp is a node that holds the App's private key (ADR-043). A route that
+// is the App's own spends what it signs, never a namespace's token.
+type GitHubApp interface {
+	// AppToken is a JWT the App's private key signs. An error refuses the call.
+	AppToken() (string, error)
+}
+
+// githubAppKey names the App's own credential, so its rate limit is kept apart
+// from every namespace's.
+const githubAppKey = "app"
+
 // GitHubLimit is GitHub's rate-limit state for one credential, as GitHub last reported it.
 type GitHubLimit struct {
 	Limit     int64
@@ -173,6 +184,8 @@ type githubRoute struct {
 	// slashed are path parameters that are a path in a repository: each
 	// segment is escaped and the slashes between them stay slashes.
 	slashed []string
+	// asApp is a route GitHub takes only from the App itself, with its JWT.
+	asApp bool
 }
 
 // pathFields are the request fields named in the path template, in order.
@@ -214,14 +227,9 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 	}
 
 	msg := req.ProtoReflect()
-	namespace := msg.Get(msg.Descriptor().Fields().ByName("namespace")).String()
-	token, key, err := s.creds.Token(ctx, namespace)
+	token, key, namespace, err := s.credential(ctx, route, msg)
 	if err != nil {
-		githubFail(resp, fmt.Sprintf("no GitHub credential for namespace %q: %v", namespace, err))
-		return key, false
-	}
-	if token == "" {
-		githubFail(resp, fmt.Sprintf("namespace %q has an empty GitHub token", namespace))
+		githubFail(resp, err.Error())
 		return key, false
 	}
 
@@ -301,8 +309,38 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 		githubFail(resp, fmt.Sprintf("failed to decode GitHub %s %s answer (%d): %v", route.method, path, httpResp.StatusCode, err))
 		return key, false
 	}
+	// A list GitHub pages by cursor says where the next page is in this header.
+	if fd := resp.ProtoReflect().Descriptor().Fields().ByName("link"); fd != nil {
+		resp.ProtoReflect().Set(fd, protoreflect.ValueOfString(httpResp.Header.Get("Link")))
+	}
 	githubSucceed(resp)
 	return key, true
+}
+
+// credential is what a call spends and the key its rate limit is kept under:
+// the App's JWT for a route that is the App's own, else the token of the
+// namespace the request names, which is returned for the logs.
+func (s *GitHubServer) credential(ctx context.Context, route githubRoute, msg protoreflect.Message) (token, key, namespace string, err error) {
+	if route.asApp {
+		app, ok := s.creds.(GitHubApp)
+		if !ok {
+			return "", githubAppKey, "", errors.New("this node cannot act as the GitHub App: am.toml's [auth.provider.github] names no private_key")
+		}
+		token, err := app.AppToken()
+		if err != nil {
+			return "", githubAppKey, "", errors.Wrap(err, "the GitHub App's JWT was not signed")
+		}
+		return token, githubAppKey, "", nil
+	}
+	namespace = msg.Get(msg.Descriptor().Fields().ByName("namespace")).String()
+	token, key, err = s.creds.Token(ctx, namespace)
+	if err != nil {
+		return "", key, namespace, errors.Newf("no GitHub credential for namespace %q: %v", namespace, err)
+	}
+	if token == "" {
+		return "", key, namespace, errors.Newf("namespace %q has an empty GitHub token", namespace)
+	}
+	return token, key, namespace, nil
 }
 
 // githubPath fills the route's path template from the request. A path

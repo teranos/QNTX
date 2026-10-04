@@ -50,6 +50,7 @@ in
         "cmd/qntx/commands/database_parquet.go"
         "cmd/qntx/commands/landing_queries_test.go"
         "db/duckdb/migrations/**"
+        "cmd/parity/**"
         ".github/workflows/rs.yml"
       ];
     };
@@ -181,7 +182,7 @@ in
         {
           name = "Run Go CGO smoke test + performance floor";
           run = ''
-            nix develop --command bash -c 'export LD_LIBRARY_PATH="$PWD/target/release:''${LD_LIBRARY_PATH:-}" && go test -tags rustduckdb -v -timeout 5m ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/'
+            nix develop --command bash -c 'export LD_LIBRARY_PATH="$PWD/target/release:''${LD_LIBRARY_PATH:-}" && go test -tags rustduckdb -v -timeout 5m ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/ ./cmd/parity/'
           '';
         }
       ];

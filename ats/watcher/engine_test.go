@@ -771,7 +771,7 @@ func TestEngine_ExecutePlugin(t *testing.T) {
 	// Create plugin_execute watcher
 	store := storage.NewWatcherStore(db)
 	actionData, _ := json.Marshal(watcher.PluginExecuteAction{
-		PluginName:  "qntx-loom",
+		PluginName:  "qntx-kern",
 		HandlerName: "stitch",
 	})
 	w := &storage.Watcher{
@@ -803,8 +803,8 @@ func TestEngine_ExecutePlugin(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	if gotPlugin != "qntx-loom" {
-		t.Errorf("expected plugin qntx-loom, got %q", gotPlugin)
+	if gotPlugin != "qntx-kern" {
+		t.Errorf("expected plugin qntx-kern, got %q", gotPlugin)
 	}
 	if gotHandler != "stitch" {
 		t.Errorf("expected handler stitch, got %q", gotHandler)
@@ -945,7 +945,7 @@ func TestEngine_AttributeFilter_ContainsNestedPath(t *testing.T) {
 	}))
 
 	store := storage.NewWatcherStore(db)
-	actionData, _ := json.Marshal(watcher.PluginExecuteAction{PluginName: "loom", HandlerName: "stitch"})
+	actionData, _ := json.Marshal(watcher.PluginExecuteAction{PluginName: "kern", HandlerName: "stitch"})
 	w := &storage.Watcher{
 		ID:                "attr-contains-test",
 		Name:              "Attr Contains Nested Test",

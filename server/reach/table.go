@@ -126,6 +126,8 @@ REACH is '/api/staands/activity'                                          of ROO
 # What arrives on a socket is gated per attestation by mayRead, not here.
 REACH is '/ws' '/ws/llm'                                                  of ROOT SUPER
 REACH is '/am/version'                                                    of ROOT SUPER
+# What the node does in Ground's place, and what it left for whoever asks.
+REACH is '/am/ground'                                                     of ROOT SUPER
 REACH is '/am/syscap'                                                     of ROOT
 REACH is '/am/node'                                                       of ROOT
 
@@ -134,7 +136,7 @@ REACH is '/am/node'                                                       of ROO
 REACH is '/api/parity/hold' '/api/parity/storage' '/api/parity/follows'   of ROOT
 
 # What was said and done in each agent session Ground recorded (transcripts).
-REACH is '/api/transcripts'                                               of ROOT
+REACH is '/api/transcripts'                                               of ROOT SUPER
 
 # A2A over HTTP+JSON, one line for every operation: a route like
 # /tasks/{id}:cancel is no pattern the mux reads. "A2A is ROOT's alone for the

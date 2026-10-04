@@ -424,6 +424,18 @@ void duckdb_namespaces_result_free(NamespacesResultC result);
 void duckdb_watchers_result_free(WatchersResultC result);
 void duckdb_schedules_result_free(SchedulesResultC result);
 
+/* Schema: the tables the migrations leave standing, as a JSON array of
+ * names, applied by ats-duckdb's runner in the DuckDB it links. Free with
+ * duckdb_schema_result_free. */
+typedef struct {
+    bool  success;
+    char *error_msg;
+    char *tables_json;
+} SchemaResultC;
+
+SchemaResultC duckdb_schema_tables(void);
+void duckdb_schema_result_free(SchemaResultC result);
+
 /* Utilities */
 const char *duckdb_storage_version(void);
 

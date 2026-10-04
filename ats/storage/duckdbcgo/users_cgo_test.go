@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/internal/access"
 )
 
 // A User written through the FFI is read back whole: what Tim de Facile said
@@ -17,13 +17,13 @@ func TestAUserRoundTripsWhole(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(store.Close)
 
-	tim := auth.User{
+	tim := access.User{
 		ID:             "US-TIM-1",
 		DisplayName:    "Tim de Facile",
 		EmailAddresses: []string{"tim@example.com"},
 		PhoneNumbers:   []string{"+31612345678", "0201234567"},
-		Level:          auth.LevelRoot,
-		Keys:           []auth.UserKey{{DID: "did:key:zTim", Origin: auth.OriginBrowser}},
+		Level:          access.LevelRoot,
+		Keys:           []access.UserKey{{DID: "did:key:zTim", Origin: access.OriginBrowser}},
 		CreatedAt:      1,
 	}
 	require.NoError(t, store.Put(tim))
@@ -43,10 +43,10 @@ func TestAUserWhoSaidNothingRoundTrips(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(store.Close)
 
-	require.NoError(t, store.Put(auth.User{
+	require.NoError(t, store.Put(access.User{
 		ID:        "US-QUIET-1",
-		Level:     auth.LevelRoot,
-		Keys:      []auth.UserKey{{DID: "did:key:zQuiet", Origin: auth.OriginBrowser}},
+		Level:     access.LevelRoot,
+		Keys:      []access.UserKey{{DID: "did:key:zQuiet", Origin: access.OriginBrowser}},
 		CreatedAt: 1,
 	}))
 

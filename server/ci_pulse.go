@@ -273,6 +273,12 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 			h.leave(as, addressee, caller, repo, branch, sha, runs, pushedAt)
 			return nil
 		}
+		// A push no workflow runs on lists no run, and waiting on it was two
+		// hours and then a failure. Not there a minute on is not coming.
+		if len(runs) == 0 && time.Since(pushedAt) >= dispatchAppear {
+			h.leaveNoRun(as, addressee, repo, branch, shortSha)
+			return nil
+		}
 		if time.Now().After(deadline) {
 			return errors.Newf("ci.watch: %s@%s on %s did not conclude within %s", branch, sha, repo, ciWatchCeiling)
 		}
@@ -501,6 +507,20 @@ func (h *ciWatchHandler) leaveDispatch(as types.As, addressee, caller, repo, tok
 		},
 		UntilMs: time.Now().Add(newsHold).UnixMilli(),
 	})
+}
+
+// leaveNoRun says on the row that the push started no run. Quiet: it is not a
+// verdict, and no session is woken for it.
+func (h *ciWatchHandler) leaveNoRun(as types.As, addressee, repo, branch, shortSha string) {
+	h.news.leave(News{
+		ID:      as.ID + ":" + shortSha + ":no-run",
+		For:     addressee,
+		Item:    StatusItem{Name: "ci", Note: "no CI run for " + branch + " " + shortSha, Symbol: SymbolWell},
+		UntilMs: time.Now().Add(newsHold).UnixMilli(),
+		Quiet:   true,
+	})
+	h.logger.Infow("ci.watch: the push started no run",
+		"repo", repo, "branch", branch, "sha", shortSha, "for", addressee)
 }
 
 // runsFor is every run github has for this commit, none yet included.
