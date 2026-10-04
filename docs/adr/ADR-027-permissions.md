@@ -22,8 +22,7 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
   thing being emptied. It is the one place data does leave.
 - A login is a session with the node and stands (ADR-031); reach into namespaces
   is a granted relation.
-- **ROOT** goes beyond QNTX. The ROOT agent is privileged on the machine the
-  node runs on, with hands there as well as sigils (ADR-048).
+- **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
 - Visibility is per-namespace.
 - Which levels reach which route is one table: `server/reach`. A path no line
   names is ROOT's and nobody else's.

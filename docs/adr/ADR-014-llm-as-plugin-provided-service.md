@@ -42,8 +42,6 @@ Future (Option B): plugins enqueue background LLM work as Pulse jobs instead of 
 
 Weave creation belongs in core, not in individual providers. Core sees all LLM traffic; providers only do inference.
 
-An agent Claude Code runs is not LLM traffic through core: its model calls go from Claude Code to Anthropic. What the node sees of it is what Ground streams (ADR-048).
-
 ## Provider resolution
 
 The server owns provider resolution — the UI never references plugin names. `/ws/llm` proxies WebSocket connections to the active LLM provider, and `resolveProvider` falls back to the default registered provider when the configured name is stale or missing.

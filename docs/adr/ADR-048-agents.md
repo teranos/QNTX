@@ -29,8 +29,6 @@ QNTX hosts agents.
 "It is the ROOT agent, one persistent session agent that is QNTX itself as
 expressed to ROOT."
 
-"it gets its own did"
-
 - It has a DID of its own and attests as itself, as any agent does.
 - It is not one of the agents the node hosts. A ritual's performer is an agent
   of its own.
@@ -77,6 +75,19 @@ same session, readable as a transcript.
 be removed before the work get's merged."
 
 ## Not done
+
+For the first story, in order. Each ends in something that can be checked.
+
+1. Claude Code on the box, installed by `apply.sh`, answering on Opus 5.5 at
+   low effort with the token the box holds in SSM.
+2. The ROOT agent's own DID, and its token for the node's MCP.
+3. The node starts, resumes and stops the ROOT agent's one session.
+4. A way to say something to it, reached by ROOT, and by SUPER until the work
+   merges.
+5. Ground on the box beside it, so its session reads as a transcript. Ground's
+   last release is behind its main, so this takes a Ground release.
+6. SUPER removed.
+7. The box upgraded.
 
 The node does not see the model traffic of an agent Claude Code runs.
 

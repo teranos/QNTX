@@ -52,5 +52,3 @@ To a connector the namespace does not exist: it is offered no namespace tool, an
 "the conenctor, to the connector, the namespace should be invisible"
 
 The server is stateless, so a tool is served under the context of the request that carried it and acts as the caller in front of it rather than as whoever opened the session.
-
-The ROOT agent is a caller too: Claude Code on the box, reaching the node's MCP with a token of its own (ADR-048).
