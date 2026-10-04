@@ -14,6 +14,7 @@ run:
     - rustsqlite
     - qntxwasm
     - rustduckdb
+    - rustpostgres
   # A test discarding a return is exercising a path, not losing a failure.
   tests: false
 

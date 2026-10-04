@@ -20,7 +20,7 @@
 # ════════════════════════════════════════════════════════════════
 
 [storage]
-# Accepted values: "sqlite" (default) or "parquet".
+# Accepted values: "sqlite" (default), "parquet" or "postgres".
 backend = "sqlite"
 
 # ── SQLite backend ──────────────────────────────────────────────
@@ -51,6 +51,17 @@ entity_actors_limit = 64
 #
 # [storage.parquet]
 # location = "s3://bucket/prefix"
+
+# ── Postgres backend ────────────────────────────────────────────
+# Uncomment when backend = "postgres": the record attestations are
+# sent to, Supabase Postgres on its free tier. url names the
+# connection string (ssm:// or env:), since it carries the password.
+# ca is the certificate the server is verified against; omitted,
+# the connection is in the clear.
+#
+# [storage.postgres]
+# url = "env:QNTX_POSTGRES_URL"
+# ca = "supabase-ca.crt"
 
 # ════════════════════════════════════════════════════════════════
 # Attestation Distillation (ADR-020)

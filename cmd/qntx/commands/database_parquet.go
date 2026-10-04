@@ -39,13 +39,6 @@ import (
 // immutable files; neither is somewhere SQLite can hold a mutable row.
 const operationalDBPath = "qntx-operational.db"
 
-// sendInterval is how often a landing file sends what it holds to the record,
-// and so the most a lost host loses. A crashed process loses nothing: the
-// rows wait in the landing file for the next send.
-//
-// "let's go for 6h"
-const sendInterval = 6 * time.Hour
-
 // unsentInterval is how often the count of what a landing file has not yet
 // sent goes to Sentry, so the climb between sends is seen and not only its top.
 const unsentInterval = time.Minute
