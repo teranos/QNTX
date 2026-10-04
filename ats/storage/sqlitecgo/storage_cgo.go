@@ -898,78 +898,24 @@ func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
 
 // GetAllPredicates returns all distinct predicates via Rust FFI.
 func (rs *RustStore) GetAllPredicates() ([]string, error) {
-	var result C.StringArrayResultC
-	entry := rs.acquireReadConn()
-	if entry != nil {
-		result = C.read_conn_predicates(entry.conn)
-		rs.releaseReadConn(entry)
-	} else {
-		rs.muWrite.Lock()
-		if rs.store == nil {
-			rs.muWrite.Unlock()
-			return nil, errors.New("store is closed")
-		}
-		result = C.storage_predicates(rs.store)
-		rs.muWrite.Unlock()
-	}
-	var success bool
-	var errMsg string
-	success = bool(result.success)
-	if !success {
-		errMsg = C.GoString(result.error_msg)
-	}
-
-	var values []string
-	if success && result.strings_len > 0 {
-		cStrings := unsafe.Slice(result.strings, result.strings_len)
-		values = make([]string, result.strings_len)
-		for i, cs := range cStrings {
-			values[i] = C.GoString(cs)
-		}
-	}
-	C.string_array_result_free(result)
-
-	if !success {
-		return nil, errors.Newf("failed to get predicates: %s", errMsg)
+	values, err := rs.readStrings(
+		func(conn *C.ReadConn) C.StringArrayResultC { return C.read_conn_predicates(conn) },
+		func(store *C.SqliteStore) C.StringArrayResultC { return C.storage_predicates(store) },
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get predicates")
 	}
 	return values, nil
 }
 
 // GetAllContexts returns all distinct contexts via Rust FFI.
 func (rs *RustStore) GetAllContexts() ([]string, error) {
-	var result C.StringArrayResultC
-	entry := rs.acquireReadConn()
-	if entry != nil {
-		result = C.read_conn_contexts(entry.conn)
-		rs.releaseReadConn(entry)
-	} else {
-		rs.muWrite.Lock()
-		if rs.store == nil {
-			rs.muWrite.Unlock()
-			return nil, errors.New("store is closed")
-		}
-		result = C.storage_contexts(rs.store)
-		rs.muWrite.Unlock()
-	}
-	var success bool
-	var errMsg string
-	success = bool(result.success)
-	if !success {
-		errMsg = C.GoString(result.error_msg)
-	}
-
-	var values []string
-	if success && result.strings_len > 0 {
-		cStrings := unsafe.Slice(result.strings, result.strings_len)
-		values = make([]string, result.strings_len)
-		for i, cs := range cStrings {
-			values[i] = C.GoString(cs)
-		}
-	}
-	C.string_array_result_free(result)
-
-	if !success {
-		return nil, errors.Newf("failed to get contexts: %s", errMsg)
+	values, err := rs.readStrings(
+		func(conn *C.ReadConn) C.StringArrayResultC { return C.read_conn_contexts(conn) },
+		func(store *C.SqliteStore) C.StringArrayResultC { return C.storage_contexts(store) },
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get contexts")
 	}
 	return values, nil
 }
@@ -977,10 +923,26 @@ func (rs *RustStore) GetAllContexts() ([]string, error) {
 // IntegrityCheck runs PRAGMA integrity_check via Rust FFI.
 // A healthy database returns []string{"ok"}.
 func (rs *RustStore) IntegrityCheck() ([]string, error) {
+	values, err := rs.readStrings(
+		func(conn *C.ReadConn) C.StringArrayResultC { return C.read_conn_integrity_check(conn) },
+		func(store *C.SqliteStore) C.StringArrayResultC { return C.storage_integrity_check(store) },
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "integrity check failed")
+	}
+	return values, nil
+}
+
+// readStrings asks a read connection when one is free, else the store under
+// the write lock, and copies the string array Rust answers with.
+func (rs *RustStore) readStrings(
+	onConn func(*C.ReadConn) C.StringArrayResultC,
+	onStore func(*C.SqliteStore) C.StringArrayResultC,
+) ([]string, error) {
 	var result C.StringArrayResultC
 	entry := rs.acquireReadConn()
 	if entry != nil {
-		result = C.read_conn_integrity_check(entry.conn)
+		result = onConn(entry.conn)
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
@@ -988,28 +950,21 @@ func (rs *RustStore) IntegrityCheck() ([]string, error) {
 			rs.muWrite.Unlock()
 			return nil, errors.New("store is closed")
 		}
-		result = C.storage_integrity_check(rs.store)
+		result = onStore(rs.store)
 		rs.muWrite.Unlock()
 	}
-	var success bool
-	var errMsg string
-	success = bool(result.success)
-	if !success {
-		errMsg = C.GoString(result.error_msg)
-	}
+	defer C.string_array_result_free(result)
 
+	if !bool(result.success) {
+		return nil, errors.New(C.GoString(result.error_msg))
+	}
 	var values []string
-	if success && result.strings_len > 0 {
+	if result.strings_len > 0 {
 		cStrings := unsafe.Slice(result.strings, result.strings_len)
 		values = make([]string, result.strings_len)
 		for i, cs := range cStrings {
 			values[i] = C.GoString(cs)
 		}
-	}
-	C.string_array_result_free(result)
-
-	if !success {
-		return nil, errors.Newf("integrity check failed: %s", errMsg)
 	}
 	return values, nil
 }
