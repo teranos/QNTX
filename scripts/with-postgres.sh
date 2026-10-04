@@ -11,7 +11,10 @@ if [ $# -lt 2 ]; then
     echo "usage: $0 <postgres bin dir> <command...>" >&2
     exit 2
 fi
-bin=$1
+# Absolute: initdb finds its share directory from where it was run, and the
+# server it starts reads those files from its own data directory, where a
+# relative path no longer resolves.
+bin=$(cd "$1" && pwd)
 shift
 
 dir=$(mktemp -d)
