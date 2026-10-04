@@ -269,7 +269,7 @@
     merge_action                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.merge_action
     merge_method                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.merge_method
     sha                                                                                                 100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.sha
-  387 at 100 not shown, all shows them
+  390 at 100 not shown, all shows them
 
   out of spec
     protocol.GitHubApproveAWorkflowRunForAForkPullRequestRequest follows no column with namespace

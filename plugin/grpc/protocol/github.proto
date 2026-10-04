@@ -22,6 +22,7 @@ import "plugin/grpc/protocol/github_orgs_orgs.proto";
 import "plugin/grpc/protocol/github_issues_issues.proto";
 import "plugin/grpc/protocol/github_repos_repos.proto";
 import "plugin/grpc/protocol/github_repos_contents.proto";
+import "plugin/grpc/protocol/github_apps_webhooks.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -413,6 +414,11 @@ service GitHubService {
   rpc GetARepositoryREADME(GitHubGetARepositoryREADMERequest) returns (GitHubGetARepositoryREADMEResponse);
   // https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
   rpc GetARepositoryREADMEForADirectory(GitHubGetARepositoryREADMEForADirectoryRequest) returns (GitHubGetARepositoryREADMEResponse);
+
+  // https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#list-deliveries-for-an-app-webhook
+  rpc ListDeliveriesForAnAppWebhook(GitHubListDeliveriesForAnAppWebhookRequest) returns (GitHubListDeliveriesForAnAppWebhookResponse);
+  // https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
+  rpc RedeliverADeliveryForAnAppWebhook(GitHubRedeliverADeliveryForAnAppWebhookRequest) returns (GitHubRedeliverADeliveryForAnAppWebhookResponse);
 }
 
 message GitHubRateLimitRequest {

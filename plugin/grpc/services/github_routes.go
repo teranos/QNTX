@@ -377,6 +377,10 @@ var githubRoutes = map[string]githubRoute{
 	"GetARepositoryREADME": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme", query: []string{"ref"}},
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
 	"GetARepositoryREADMEForADirectory": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme/{dir}", query: []string{"ref"}, slashed: []string{"dir"}},
+	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#list-deliveries-for-an-app-webhook
+	"ListDeliveriesForAnAppWebhook": {method: http.MethodGet, path: "/app/hook/deliveries", query: []string{"per_page", "cursor", "status"}, asApp: true},
+	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
+	"RedeliverADeliveryForAnAppWebhook": {method: http.MethodPost, path: "/app/hook/deliveries/{delivery_id}/attempts", asApp: true},
 }
 
 func (s *GitHubServer) GetTheCombinedStatusForASpecificReference(ctx context.Context, req *protocol.GitHubGetTheCombinedStatusForASpecificReferenceRequest) (*protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse, error) {
@@ -1105,4 +1109,12 @@ func (s *GitHubServer) GetARepositoryREADME(ctx context.Context, req *protocol.G
 
 func (s *GitHubServer) GetARepositoryREADMEForADirectory(ctx context.Context, req *protocol.GitHubGetARepositoryREADMEForADirectoryRequest) (*protocol.GitHubGetARepositoryREADMEResponse, error) {
 	return githubAnswer(s, ctx, "GetARepositoryREADMEForADirectory", req, &protocol.GitHubGetARepositoryREADMEResponse{})
+}
+
+func (s *GitHubServer) ListDeliveriesForAnAppWebhook(ctx context.Context, req *protocol.GitHubListDeliveriesForAnAppWebhookRequest) (*protocol.GitHubListDeliveriesForAnAppWebhookResponse, error) {
+	return githubAnswer(s, ctx, "ListDeliveriesForAnAppWebhook", req, &protocol.GitHubListDeliveriesForAnAppWebhookResponse{})
+}
+
+func (s *GitHubServer) RedeliverADeliveryForAnAppWebhook(ctx context.Context, req *protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest) (*protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse, error) {
+	return githubAnswer(s, ctx, "RedeliverADeliveryForAnAppWebhook", req, &protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse{})
 }

@@ -31,6 +31,14 @@ func (c gitHubCredentials) Token(ctx context.Context, namespace string) (string,
 	return c.s.authHandler.GitHubToken(ctx, namespace)
 }
 
+// AppToken is the JWT the App signs, for what GitHub takes only from the App.
+func (c gitHubCredentials) AppToken() (string, error) {
+	if c.s.authHandler == nil {
+		return "", errors.New("this node has no login, so it holds no GitHub App")
+	}
+	return c.s.authHandler.GitHubAppToken()
+}
+
 // gitHubService is the node's GitHubService, made the first time it is asked for.
 func (s *QNTXServer) gitHubService() *services.GitHubServer {
 	s.githubOnce.Do(func() {

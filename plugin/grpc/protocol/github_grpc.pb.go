@@ -202,6 +202,8 @@ const (
 	GitHubService_GetRepositoryContent_FullMethodName                                           = "/protocol.GitHubService/GetRepositoryContent"
 	GitHubService_GetARepositoryREADME_FullMethodName                                           = "/protocol.GitHubService/GetARepositoryREADME"
 	GitHubService_GetARepositoryREADMEForADirectory_FullMethodName                              = "/protocol.GitHubService/GetARepositoryREADMEForADirectory"
+	GitHubService_ListDeliveriesForAnAppWebhook_FullMethodName                                  = "/protocol.GitHubService/ListDeliveriesForAnAppWebhook"
+	GitHubService_RedeliverADeliveryForAnAppWebhook_FullMethodName                              = "/protocol.GitHubService/RedeliverADeliveryForAnAppWebhook"
 )
 
 // GitHubServiceClient is the client API for GitHubService service.
@@ -576,6 +578,10 @@ type GitHubServiceClient interface {
 	GetARepositoryREADME(ctx context.Context, in *GitHubGetARepositoryREADMERequest, opts ...grpc.CallOption) (*GitHubGetARepositoryREADMEResponse, error)
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
 	GetARepositoryREADMEForADirectory(ctx context.Context, in *GitHubGetARepositoryREADMEForADirectoryRequest, opts ...grpc.CallOption) (*GitHubGetARepositoryREADMEResponse, error)
+	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#list-deliveries-for-an-app-webhook
+	ListDeliveriesForAnAppWebhook(ctx context.Context, in *GitHubListDeliveriesForAnAppWebhookRequest, opts ...grpc.CallOption) (*GitHubListDeliveriesForAnAppWebhookResponse, error)
+	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
+	RedeliverADeliveryForAnAppWebhook(ctx context.Context, in *GitHubRedeliverADeliveryForAnAppWebhookRequest, opts ...grpc.CallOption) (*GitHubRedeliverADeliveryForAnAppWebhookResponse, error)
 }
 
 type gitHubServiceClient struct {
@@ -2416,6 +2422,26 @@ func (c *gitHubServiceClient) GetARepositoryREADMEForADirectory(ctx context.Cont
 	return out, nil
 }
 
+func (c *gitHubServiceClient) ListDeliveriesForAnAppWebhook(ctx context.Context, in *GitHubListDeliveriesForAnAppWebhookRequest, opts ...grpc.CallOption) (*GitHubListDeliveriesForAnAppWebhookResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GitHubListDeliveriesForAnAppWebhookResponse)
+	err := c.cc.Invoke(ctx, GitHubService_ListDeliveriesForAnAppWebhook_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitHubServiceClient) RedeliverADeliveryForAnAppWebhook(ctx context.Context, in *GitHubRedeliverADeliveryForAnAppWebhookRequest, opts ...grpc.CallOption) (*GitHubRedeliverADeliveryForAnAppWebhookResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GitHubRedeliverADeliveryForAnAppWebhookResponse)
+	err := c.cc.Invoke(ctx, GitHubService_RedeliverADeliveryForAnAppWebhook_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GitHubServiceServer is the server API for GitHubService service.
 // All implementations must embed UnimplementedGitHubServiceServer
 // for forward compatibility.
@@ -2788,6 +2814,10 @@ type GitHubServiceServer interface {
 	GetARepositoryREADME(context.Context, *GitHubGetARepositoryREADMERequest) (*GitHubGetARepositoryREADMEResponse, error)
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
 	GetARepositoryREADMEForADirectory(context.Context, *GitHubGetARepositoryREADMEForADirectoryRequest) (*GitHubGetARepositoryREADMEResponse, error)
+	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#list-deliveries-for-an-app-webhook
+	ListDeliveriesForAnAppWebhook(context.Context, *GitHubListDeliveriesForAnAppWebhookRequest) (*GitHubListDeliveriesForAnAppWebhookResponse, error)
+	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
+	RedeliverADeliveryForAnAppWebhook(context.Context, *GitHubRedeliverADeliveryForAnAppWebhookRequest) (*GitHubRedeliverADeliveryForAnAppWebhookResponse, error)
 	mustEmbedUnimplementedGitHubServiceServer()
 }
 
@@ -3346,6 +3376,12 @@ func (UnimplementedGitHubServiceServer) GetARepositoryREADME(context.Context, *G
 }
 func (UnimplementedGitHubServiceServer) GetARepositoryREADMEForADirectory(context.Context, *GitHubGetARepositoryREADMEForADirectoryRequest) (*GitHubGetARepositoryREADMEResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetARepositoryREADMEForADirectory not implemented")
+}
+func (UnimplementedGitHubServiceServer) ListDeliveriesForAnAppWebhook(context.Context, *GitHubListDeliveriesForAnAppWebhookRequest) (*GitHubListDeliveriesForAnAppWebhookResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDeliveriesForAnAppWebhook not implemented")
+}
+func (UnimplementedGitHubServiceServer) RedeliverADeliveryForAnAppWebhook(context.Context, *GitHubRedeliverADeliveryForAnAppWebhookRequest) (*GitHubRedeliverADeliveryForAnAppWebhookResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RedeliverADeliveryForAnAppWebhook not implemented")
 }
 func (UnimplementedGitHubServiceServer) mustEmbedUnimplementedGitHubServiceServer() {}
 func (UnimplementedGitHubServiceServer) testEmbeddedByValue()                       {}
@@ -6662,6 +6698,42 @@ func _GitHubService_GetARepositoryREADMEForADirectory_Handler(srv interface{}, c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitHubService_ListDeliveriesForAnAppWebhook_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GitHubListDeliveriesForAnAppWebhookRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitHubServiceServer).ListDeliveriesForAnAppWebhook(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitHubService_ListDeliveriesForAnAppWebhook_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitHubServiceServer).ListDeliveriesForAnAppWebhook(ctx, req.(*GitHubListDeliveriesForAnAppWebhookRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitHubService_RedeliverADeliveryForAnAppWebhook_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GitHubRedeliverADeliveryForAnAppWebhookRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitHubServiceServer).RedeliverADeliveryForAnAppWebhook(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitHubService_RedeliverADeliveryForAnAppWebhook_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitHubServiceServer).RedeliverADeliveryForAnAppWebhook(ctx, req.(*GitHubRedeliverADeliveryForAnAppWebhookRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GitHubService_ServiceDesc is the grpc.ServiceDesc for GitHubService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -7400,6 +7472,14 @@ var GitHubService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetARepositoryREADMEForADirectory",
 			Handler:    _GitHubService_GetARepositoryREADMEForADirectory_Handler,
+		},
+		{
+			MethodName: "ListDeliveriesForAnAppWebhook",
+			Handler:    _GitHubService_ListDeliveriesForAnAppWebhook_Handler,
+		},
+		{
+			MethodName: "RedeliverADeliveryForAnAppWebhook",
+			Handler:    _GitHubService_RedeliverADeliveryForAnAppWebhook_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

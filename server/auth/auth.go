@@ -53,8 +53,11 @@ type Handler struct {
 	// node configured for no Apple.
 	apple *OperatorClient
 	// auth.provider.github, the same way as Google.
-	github  *OperatorClient
-	nodeKey ed25519.PrivateKey // the node DID key; this node signs bindings with it
+	github *OperatorClient
+	// auth.provider.github's private_key with its client_id, resolved: the App
+	// acting as itself. Nil on a node whose am.toml names no key.
+	githubApp *OperatorClient
+	nodeKey   ed25519.PrivateKey // the node DID key; this node signs bindings with it
 	// auth.public_origin: where this node answers, which a ceremony's
 	// redirect_uri is built from. Empty falls back to loopbackOrigin.
 	configuredOrigin string

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"path/filepath"
@@ -172,8 +173,15 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill
 		// long-lived WebSocket connections (graph, sync).
 	}
+	listener, err := net.Listen("tcp", s.httpServer.Addr)
+	if err != nil {
+		return errors.Wrapf(err, "failed to listen on %s", s.httpServer.Addr)
+	}
 	s.logger.Debugw(fmt.Sprintf("HTTP server listening on %s:%d", s.bindAddress, actualPort))
-	return s.httpServer.ListenAndServe()
+	// Listening already, so what GitHub sends again waits at the socket rather
+	// than being refused before Serve takes it.
+	s.wg.Go("github.deliveriesCatchUp", s.CatchUpDeliveries)
+	return s.httpServer.Serve(listener)
 }
 
 // monitorBrowserConnection warns if no clients connect within 5 seconds

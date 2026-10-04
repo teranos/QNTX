@@ -33,6 +33,13 @@ Status: Proposed
 
 The plugin element is the only place a plugin is added, configured and enabled.
 
+The App's own credentials are the operator's, and they are in am.toml under
+`[auth.provider.github]`, each secret an `ssm://` or `env:` reference, as
+Google's and Apple's are. `client_id` and `client_secret` are what the OAuth
+ceremony spends. `private_key` is the App's private key, PEM, which signs the
+JWT GitHub requires of a call made as the App itself, such as listing and
+redelivering the webhook's deliveries.
+
 "qntx has the concept of tokens"
 
 "it would not be an attestation"
