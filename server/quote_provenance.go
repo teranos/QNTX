@@ -74,6 +74,55 @@ func withinCorrections(text, span string, budget int) bool {
 	return false
 }
 
+// degreeOf is how many corrections separate the span from the nearest stretch
+// of any prompt. With nothing to compare against, every character is one.
+func degreeOf(span string, said []string) int {
+	best := len(span)
+	for _, p := range said {
+		if d := nearestCorrections(p, span); d < best {
+			best = d
+		}
+	}
+	return best
+}
+
+// nearestCorrections is the fewest corrections that make span any stretch of
+// text: the table withinCorrections walks, kept to its smallest end.
+func nearestCorrections(text, span string) int {
+	m := len(span)
+	if m == 0 {
+		return 0
+	}
+	prev := make([]int, m+1)
+	cur := make([]int, m+1)
+	for i := range prev {
+		prev[i] = i
+	}
+	best := m
+	for t := 0; t < len(text); t++ {
+		c := text[t]
+		cur[0] = 0
+		for i := 1; i <= m; i++ {
+			d := prev[i-1]
+			if c != span[i-1] {
+				d++
+			}
+			if prev[i]+1 < d {
+				d = prev[i] + 1
+			}
+			if cur[i-1]+1 < d {
+				d = cur[i-1] + 1
+			}
+			cur[i] = d
+		}
+		if cur[m] < best {
+			best = cur[m]
+		}
+		prev, cur = cur, prev
+	}
+	return best
+}
+
 // verdictOf is the nearest any prompt comes to the span: verbatim, inside the
 // correction budget, inside the warn budget only, or not near at all.
 func verdictOf(span string, said []string) quoteVerdict {

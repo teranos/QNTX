@@ -71,6 +71,14 @@ func TestQuoteProvenanceSaysWhatHasNoSource(t *testing.T) {
 	if len(unsourced) != 1 || unsourced[0] != "nobody ever typed these words" {
 		t.Errorf("unsourced = %v", unsourced)
 	}
+	// To what degree: the corrections to the nearest prompt, over the span's length.
+	if !strings.Contains(held[0].Item.Note, "corrections over 29 characters") {
+		t.Errorf("the note does not say to what degree: %q", held[0].Item.Note)
+	}
+	degrees, _ := held[0].Detail["degrees"].([]quoteDegree)
+	if len(degrees) != 1 || degrees[0].Span != "nobody ever typed these words" || degrees[0].Length != 29 || degrees[0].Corrections <= 0 {
+		t.Errorf("degrees = %+v", degrees)
+	}
 }
 
 func TestQuoteProvenanceSourcedLeavesNothing(t *testing.T) {

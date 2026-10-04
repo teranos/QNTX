@@ -48,6 +48,30 @@ func TestWithinCorrections(t *testing.T) {
 	}
 }
 
+// "and qntx will tell ground after the fact about miscompliance and to what degree"
+// The degree is the corrections between the span and the nearest stretch of
+// any prompt; verbatim is zero.
+func TestQuoteDegree(t *testing.T) {
+	said := []string{"nothing near", "this is what the user actually typed ok!"}
+	cases := []struct {
+		span string
+		want int
+	}{
+		{"what the user actually typed", 0},
+		{"This is what the user actuaIIy typed ok?", 4},
+		{"This is what the user actuaIIy tiped ok?", 5},
+		{"This is What the User actuaIIy tiped ok?", 7},
+	}
+	for _, c := range cases {
+		if got := degreeOf(c.span, said); got != c.want {
+			t.Errorf("degreeOf(%q) = %d, want %d", c.span, got, c.want)
+		}
+	}
+	if got := degreeOf("abc", nil); got != 3 {
+		t.Errorf("no prompt at all is every character corrected: %d", got)
+	}
+}
+
 func TestQuoteVerdict(t *testing.T) {
 	said := []string{"nothing near", "this is what the user actually typed ok!"}
 	cases := []struct {

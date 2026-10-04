@@ -32,9 +32,22 @@ func withNamespace(ctx context.Context, namespace string) context.Context {
 	return context.WithValue(ctx, namespaceKey{}, namespace)
 }
 
+// namespaceOf is the namespace carried, or the empty string when none was,
+// which the caller refuses out loud.
 func namespaceOf(ctx context.Context) string {
-	ns, _ := ctx.Value(namespaceKey{}).(string)
+	ns, ok := ctx.Value(namespaceKey{}).(string)
+	if !ok {
+		return ""
+	}
 	return ns
+}
+
+// quoteDegree is one span that did not comply, and by how much.
+type quoteDegree struct {
+	Span        string `json:"span"`
+	Verdict     string `json:"verdict"`
+	Corrections int    `json:"corrections"`
+	Length      int    `json:"length"`
 }
 
 type quoteHandler struct {
@@ -70,18 +83,24 @@ func (h *quoteHandler) Execute(ctx context.Context, job *async.Job) error {
 	}
 
 	var unsourced, stretched []string
+	var degrees []quoteDegree
 	for _, span := range spans {
-		switch verdictOf(span, said) {
+		v := verdictOf(span, said)
+		switch v {
 		case quoteUnsourced:
 			unsourced = append(unsourced, span)
 		case quoteStretched:
 			stretched = append(stretched, span)
+		default:
+			continue
 		}
+		degrees = append(degrees, quoteDegree{Span: span, Verdict: v.String(),
+			Corrections: degreeOf(span, said), Length: len(span)})
 	}
-	if len(unsourced) == 0 && len(stretched) == 0 {
+	if len(degrees) == 0 {
 		return nil
 	}
-	h.leave(as, namespace, unsourced, stretched, len(said))
+	h.leave(as, namespace, unsourced, stretched, degrees, len(said))
 	return nil
 }
 
@@ -89,7 +108,7 @@ func (h *quoteHandler) Execute(ctx context.Context, job *async.Job) error {
 // every span whole.
 const quoteNoteSpan = 80
 
-func (h *quoteHandler) leave(as types.As, namespace string, unsourced, stretched []string, read int) {
+func (h *quoteHandler) leave(as types.As, namespace string, unsourced, stretched []string, degrees []quoteDegree, read int) {
 	caller := as.Actors[0]
 	addressee := caller
 	if h.mintedBy != nil {
@@ -105,7 +124,8 @@ func (h *quoteHandler) leave(as types.As, namespace string, unsourced, stretched
 	if len(shown) > quoteNoteSpan {
 		shown = shown[:quoteNoteSpan]
 	}
-	note := word + ": \"" + shown + "\""
+	note := word + ": \"" + shown + "\", " + strconv.Itoa(degrees[0].Corrections) +
+		" corrections over " + strconv.Itoa(degrees[0].Length) + " characters"
 	if more > 0 {
 		note += " and " + strconv.Itoa(more) + " more"
 	}
@@ -118,6 +138,7 @@ func (h *quoteHandler) leave(as types.As, namespace string, unsourced, stretched
 			"file_path":    attrString(as.Attributes, "file_path"),
 			"unsourced":    unsourced,
 			"stretched":    stretched,
+			"degrees":      degrees,
 			"prompts_read": read,
 			"namespace":    namespace,
 			"caller":       caller,
