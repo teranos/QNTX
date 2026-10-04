@@ -22,7 +22,8 @@ import { setupState, claimNode } from './setup.ts';
 import { signedIn, openDoor } from './signin.ts';
 import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
-import { wireLineTooltips } from './components/sparkline';
+import { wireLineTooltips } from '@teranos/elements';
+import { SAID_TIMING } from './components/said';
 import { initNamespacesBar } from './namespaces-bar.ts';
 import { person, type Person } from './self-person.ts';
 import { setOpenCanvas, setStanding } from './standing.ts';
@@ -406,7 +407,7 @@ async function init(): Promise<void> {
     initSystemDrawer();
     // A tally is shown only in the tooltip, wherever a line is drawn: pointing
     // says the one value, a longer hover the bigger picture, in tooltip form.
-    wireLineTooltips();
+    wireLineTooltips(document, SAID_TIMING);
     // Root only, and the node is what says so — it answers 403 below SUPER and
     // 501 where namespaces do not exist, so no bar is grown either way.
     initNamespacesBar();

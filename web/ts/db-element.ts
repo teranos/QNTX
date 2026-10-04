@@ -1,7 +1,8 @@
 import { sendMessage } from './client';
 import { log, SEG } from './logger';
 import { escapeHtml } from './html-utils';
-import { renderSparkline, renderSparklines, windowOf, seriesOf, labelsOf, seenOver, formatIn, type Seen, type Window } from './components/sparkline';
+import { renderSparkline } from '@teranos/elements';
+import { renderSparklines, windowOf, seriesOf, labelsOf, seenOver, formatIn, type Seen, type Window } from './components/sparkline';
 import { DB, Watcher } from './sym';
 import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, getPredicateBreakdown, type PredicateDetail } from './eviction-chart';
 import { getWatchersByPredicate, setDilation, eyeStyle } from './watcher-predicates';

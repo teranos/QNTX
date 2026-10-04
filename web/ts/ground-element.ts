@@ -25,13 +25,13 @@
 // Not drawn yet, every session file on disk and its import state: loom's SessionList.svelte at d512ffb2.
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { tray, renderSparkline } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { log, SEG } from './logger';
 import { Ground } from './sym';
 import { openTranscriptElement, when, type TranscriptRead, type Turn } from './components/element/transcript-element';
 import { cloud, cloudBank, comet, core, horizon, nebula, seam, starburst, starField } from './ground-scene';
-import { labelsOf, renderSparkline, seenOver, seriesOf, type Window as Span } from './components/sparkline';
+import { labelsOf, seenOver, seriesOf, type Window as Span } from './components/sparkline';
 import { apiError, sacredEntry, type SacredError } from './components/sacred';
 
 const ELEMENT_ID = 'ground-element';
