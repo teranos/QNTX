@@ -93,6 +93,9 @@ func init() {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to start Sentry log shipping: %v\n", err)
 		}
 
+		// After every output is on, so one count decides for all of them.
+		logger.CollectRepeats()
+
 		// The numbers ride the same client. Started unconditionally: with no
 		// client the meter is a no-op, and a call site that has to ask whether
 		// metrics are on is a call site that will one day ask wrong.
