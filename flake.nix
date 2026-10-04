@@ -38,16 +38,22 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # The Postgres the Supabase free tier runs, server/parity/postgres_<version>_<rev>.
+    # Nothing follows ours: it is their build, so their cache serves it.
+    supabase-postgres.url = "github:supabase/postgres/e60902168c6f9b4030151d61d0fd741b52eaafd3";
   };
 
   # Binary cache configuration
   nixConfig = {
-    extra-substituters = [ "https://qntx.cachix.org" ];
-    extra-trusted-public-keys = [ "qntx.cachix.org-1:sL1EkSS5871D3ycLjHzuD+/zNddU9G38HGt3qQotAtg=" ];
+    extra-substituters = [ "https://qntx.cachix.org" "https://nix-postgres-artifacts.s3.amazonaws.com" ];
+    extra-trusted-public-keys = [
+      "qntx.cachix.org-1:sL1EkSS5871D3ycLjHzuD+/zNddU9G38HGt3qQotAtg="
+      "nix-postgres-artifacts:dGZlQOvKcNEjvT7QEAJbcV6b6uk7VF/hWMjhYleiaLI="
+    ];
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix, supabase-postgres }:
     {
       # Shared vendorHash imported from single source of truth
       rootVendorHash = import ./nix/vendor-hash.nix;
@@ -406,6 +412,10 @@
           qntx-image = QNTXImage;
           qntx-image-amd64 = mkQNTXImage "amd64";
           qntx-image-arm64 = mkQNTXImage "arm64";
+        } // pkgs.lib.optionalAttrs (supabase-postgres.packages ? ${system}) {
+          # The pinned Supabase Postgres, which make parity runs ats-postgres's
+          # migrations in. Supabase builds it for the systems it lists.
+          postgres = supabase-postgres.packages.${system}."psql_17/bin";
         };
 
         # Development shell with same tools

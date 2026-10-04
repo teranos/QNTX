@@ -19,9 +19,20 @@ import (
 // Pinned is the version of the engine named, from the one directory under dir
 // pinned for it.
 func Pinned(dir, engine string) (string, error) {
+	version, _, err := pin(dir, engine)
+	return version, err
+}
+
+// PinnedAt is the commit the engine named was taken at, as its pin names it.
+func PinnedAt(dir, engine string) (string, error) {
+	_, rev, err := pin(dir, engine)
+	return rev, err
+}
+
+func pin(dir, engine string) (version, rev string, err error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to read the pins under %s", dir)
+		return "", "", errors.Wrapf(err, "failed to read the pins under %s", dir)
 	}
 	var found []string
 	for _, entry := range entries {
@@ -32,21 +43,22 @@ func Pinned(dir, engine string) (string, error) {
 		if !ok || name != engine {
 			continue
 		}
-		version, _, ok := strings.Cut(rest, "_")
-		if !ok {
-			return "", errors.Newf("%s names no commit: a pin is %s_<version>_<rev>", entry.Name(), engine)
+		v, r, ok := strings.Cut(rest, "_")
+		if !ok || r == "" {
+			return "", "", errors.Newf("%s names no commit: a pin is %s_<version>_<rev>", entry.Name(), engine)
 		}
 		if _, err := os.Stat(dir + "/" + entry.Name() + "/SOURCE"); err != nil {
-			return "", errors.Wrapf(err, "%s under %s has no SOURCE", entry.Name(), dir)
+			return "", "", errors.Wrapf(err, "%s under %s has no SOURCE", entry.Name(), dir)
 		}
-		found = append(found, version)
+		version, rev = v, r
+		found = append(found, entry.Name())
 	}
 	switch len(found) {
 	case 0:
-		return "", errors.Newf("%s is not pinned under %s", engine, dir)
+		return "", "", errors.Newf("%s is not pinned under %s", engine, dir)
 	case 1:
-		return found[0], nil
+		return version, rev, nil
 	default:
-		return "", errors.Newf("%s is pinned more than once under %s: %s", engine, dir, strings.Join(found, ", "))
+		return "", "", errors.Newf("%s is pinned more than once under %s: %s", engine, dir, strings.Join(found, ", "))
 	}
 }
