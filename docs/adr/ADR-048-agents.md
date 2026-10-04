@@ -78,12 +78,13 @@ be removed before the work get's merged."
 
 For the first story, in order. Each ends in something that can be checked.
 
-1. Claude Code on the box, installed by `apply.sh`, answering on Opus 5.5 at
-   low effort with the token the box holds in SSM.
+1. Claude Code on the node, answering on Opus 5.5 at low effort with the token
+   the box holds in SSM. Which Claude Code is pinned in parity, and the node
+   fetches that binary itself: none is carried in a QNTX release.
 2. The ROOT agent's own DID, and its token for the node's MCP.
 3. The node starts, resumes and stops the ROOT agent's one session.
 4. A way to say something to it, reached by ROOT, and by SUPER until the work
-   merges.
+   merges. In the UI it is the Claude element.
 5. Ground on the box beside it, so its session reads as a transcript. Ground's
    last release is behind its main, so this takes a Ground release.
 6. SUPER removed.
