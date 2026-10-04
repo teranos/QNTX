@@ -52,7 +52,6 @@ in
   on = {
     push.branches = [ "main" ];
     pull_request.paths = [
-      "qntx-plugins/kern/**"
       "qntx-plugins/loom/**"
       "plugin/grpc/ocaml/**"
       ".github/workflows/ocaml.yml"
@@ -60,11 +59,6 @@ in
   };
 
   jobs = {
-    build-kern = plugin {
-      buildName = "Build kern plugin";
-      path = "./qntx-plugins/kern";
-    };
-
     build-loom = plugin {
       buildName = "Build loom plugin (with tests)";
       path = "./qntx-plugins/loom";

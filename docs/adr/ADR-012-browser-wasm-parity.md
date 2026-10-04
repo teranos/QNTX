@@ -3,6 +3,7 @@
 ## Status
 
 Accepted (revised 2026-08-09)
+The kern (OCaml) half is withdrawn with ADR-011.
 Date: 2026-03-15
 
 ## Context
