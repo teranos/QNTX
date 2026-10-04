@@ -1,0 +1,10 @@
+DuckDB 1.4.3
+
+https://github.com/duckdb/duckdb/tree/d1dc88f950d456d72493df452dabdcd13aa413dd (the commit nixpkgs builds as 1.4.3)
+
+sha256-zYiyY/8mYCyKuSQYNxepGbZPVgdCgULLmhZlWAAW0QA=  duckdb
+
+That hash is the one nixpkgs fetches the source by, in
+pkgs/by-name/du/duckdb/versions.json at fb7944c166a3b630f177938e478f0378e64ce108,
+the nixpkgs flake.nix pins. Nix builds libduckdb from it, ats-duckdb links it,
+and EXPECTED_DUCKDB_VERSION in crates/ats-duckdb/src/lib.rs refuses any other.

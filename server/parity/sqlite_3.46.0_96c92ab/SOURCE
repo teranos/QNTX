@@ -5,4 +5,6 @@ sqlite3.c https://www.sqlite.org/2024/sqlite-amalgamation-3460000.zip (SQLITE_SO
 c01235302fe80da901fb70c7622c39147e29d9f29b7f6eb746b23517f320c90d  sqlite3.c
 
 The same file is bundled in libsqlite3-sys 0.30.1, the crate Cargo.lock pins
-by 2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149.
+by 2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149. flake.nix
+fetches every crate by its Cargo.lock checksum (crateSources), so Nix builds
+ats-sqlite from this file and no other.
