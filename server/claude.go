@@ -108,6 +108,7 @@ func (s *QNTXServer) claudeSignum() sigil.Signum {
 		Signum: &protocol.Signum{
 			Name:        "claude",
 			Description: "The ROOT agent: Claude Code, run by the node as itself.",
+			Tags:        []string{"agent", "claude", "root"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "say",
