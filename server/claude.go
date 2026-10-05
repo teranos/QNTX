@@ -233,10 +233,12 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Claude plan token am.toml names did not resolve: " + err.Error()}
 	}
-	session, resumes, err := agent.session()
+	session, kept, err := agent.session()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	// Pi may have started the session: Claude Code resumes only what it holds.
+	resumes := kept && claudecode.Holds(agent.home, session)
 
 	agent.answering.Store(&turnInSession{session: session})
 	defer agent.answering.Store(nil)
@@ -285,7 +287,7 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 		write(writes.rowsOf(claudecode.Message{Type: "result", Subtype: "no_result", IsError: true, Result: err.Error()}, time.Now()))
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Claude Code did not answer: " + err.Error()}
 	}
-	if !resumes {
+	if !kept {
 		if err := agent.keep(session); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "it answered, and the session it answered in was not kept: " + err.Error()}
 		}

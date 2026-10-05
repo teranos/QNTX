@@ -345,6 +345,16 @@
         "ROOT"
       ]
     },
+    "/api/pi": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/pi/say": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/plugins": {
       "x-qntx-reach": [
         "ROOT",

@@ -225,6 +225,13 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	return Answer{}, errors.Newf("Claude Code ended with no result, saying: %s", said)
 }
 
+// Holds reports whether Claude Code under home keeps the session: it writes
+// each one it ran to projects/<its working directory>/<session>.jsonl.
+func Holds(home, session string) bool {
+	kept, err := filepath.Glob(filepath.Join(home, "claude", "projects", "*", session+".jsonl"))
+	return err == nil && len(kept) > 0
+}
+
 // writeMCP writes the servers the session reaches into its home, each bearer
 // named by the variable it is read from, and gives those variables set.
 func (s Said) writeMCP() (string, []string, error) {

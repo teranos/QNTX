@@ -181,8 +181,10 @@ export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: 
         .then(is => {
             who.textContent = [is.did, is.model, is.effort, is.not_ready].filter(Boolean).join('  ');
             who.title = is.allow.length > 0 ? `Allowed without being asked: ${is.allow.join(', ')}` : 'Nothing is allowed without being asked';
+            // A harness with no permission modes, Pi, has nothing to choose here.
+            mode.hidden = is.permission_modes.length === 0;
             // am.toml that gives no mode leaves the choice here, and none is made for the speaker.
-            if (!is.permission_mode) mode.appendChild(choice('', 'permission mode'));
+            if (!is.permission_mode && !mode.hidden) mode.appendChild(choice('', 'permission mode'));
             for (const name of is.permission_modes) mode.appendChild(choice(name, name));
             mode.value = is.permission_mode;
             reading = is.session;

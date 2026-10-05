@@ -64,6 +64,8 @@ var storeWriters = map[string]string{
 	"nodeRecord": "the node's GitHub settings (ADR-043), what the node knows of itself. " +
 		"Reached from the github sigils, which the reach table gives to ROOT",
 
+	"piSay": "the ROOT agent's session in its other harness, the same record claudeSay " +
+		"writes (ADR-048). Reached from the pi sigils, which the reach table gives to ROOT",
 	"claudeSay": "the ROOT agent's session, which is the node's own record whoever spoke " +
 		"to it (ADR-048). Reached from the claude sigils, which the reach table gives to ROOT",
 

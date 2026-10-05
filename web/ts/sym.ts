@@ -39,6 +39,7 @@ export const Transcript = '⏦'; // one session Ground recorded, read as what wa
 export const Ground = '⏚';      // the Ground element, aware of anything Ground
 export const Parity = '≍';     // a signum held to a reference it follows
 export const Claude = '✻';     // the ROOT agent: Claude Code, run by the node as itself
+export const Pi = 'π';         // the ROOT agent in Pi, its other harness
 
 /** Segment to its glyph. */
 export const CommandToSymbol: Record<string, string> = {
