@@ -125,3 +125,45 @@ func TestRootAgentNamedByHalfIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// The other harness it runs in: the model Pi runs, at what thinking, and the
+// gateway plugin every model call goes through.
+func TestRootAgentPiLoads(t *testing.T) {
+	path := writeConfig(t, `
+[agent.root]
+model  = "claude-opus-5-5"
+effort = "low"
+
+[agent.root.pi]
+model    = "anthropic/claude-sonnet-4.6"
+thinking = "low"
+gateway  = "openrouter-qntx"
+`)
+	cfg, err := LoadFromFile(path)
+	if err != nil {
+		t.Fatalf("LoadFromFile = %v", err)
+	}
+	pi := cfg.Agent.Root.Pi
+	if !pi.Named() || pi.Model != "anthropic/claude-sonnet-4.6" || pi.Thinking != "low" || pi.Gateway != "openrouter-qntx" {
+		t.Errorf("Pi loaded as %+v", pi)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate = %v, want nil", err)
+	}
+}
+
+// Pi named by half, or at a thinking level it does not have, is refused.
+func TestRootAgentPiNamedByHalfIsRefused(t *testing.T) {
+	for want, body := range map[string]string{
+		"both or neither":        "[agent.root.pi]\nmodel = \"m\"\n",
+		"agent.root.pi.thinking": "[agent.root.pi]\nmodel = \"m\"\ngateway = \"g\"\nthinking = \"loud\"\n",
+	} {
+		cfg, err := LoadFromFile(writeConfig(t, "[agent.root]\nmodel = \"claude-opus-5-5\"\neffort = \"low\"\n"+body))
+		if err != nil {
+			t.Fatalf("LoadFromFile = %v", err)
+		}
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("Validate = %v, want it to say %s", err, want)
+		}
+	}
+}

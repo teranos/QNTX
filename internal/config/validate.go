@@ -91,6 +91,14 @@ func (c *Config) Validate() error {
 		if root.Mode != "" && !slices.Contains(PermissionModes, root.Mode) {
 			return errors.Newf("agent.root.permission_mode must be one of [%s], got %q", strings.Join(PermissionModes, ", "), root.Mode)
 		}
+		if pi := root.Pi; pi.Named() {
+			if pi.Model == "" || pi.Gateway == "" {
+				return errors.New("agent.root.pi names a model and the gateway plugin its calls go through, both or neither")
+			}
+			if pi.Thinking != "" && !slices.Contains(ThinkingLevels, pi.Thinking) {
+				return errors.Newf("agent.root.pi.thinking must be one of [%s], got %q", strings.Join(ThinkingLevels, ", "), pi.Thinking)
+			}
+		}
 	}
 
 	// Plugin access tokens are references, never secrets. am.toml ships as a

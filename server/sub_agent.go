@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/teranos/QNTX/internal/claudecode"
+	"github.com/teranos/QNTX/internal/pi"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -17,17 +18,26 @@ type agentSubsystem struct{}
 
 func (agentSubsystem) Name() string { return "agent" }
 
-// claudeCodeHeld is the pinned Claude Code on this node: fetched once at
-// start, and asked for by whatever runs it.
-type claudeCodeHeld struct {
+// harnessHeld is a pinned harness on this node, Claude Code or Pi: fetched
+// once at start, and asked for by whatever runs it.
+type harnessHeld struct {
+	name    string
 	fetched chan struct{}
 	path    string
 	err     error
 }
 
+// called is the harness's name, for a sentence about it.
+func (h *harnessHeld) called() string {
+	if h.name == "" {
+		return "Claude Code"
+	}
+	return h.name
+}
+
 // Path is where the pinned binary is, or why this node has none. It waits for
 // a fetch still going, and no longer than whoever asks.
-func (h *claudeCodeHeld) Path(ctx context.Context) (string, error) {
+func (h *harnessHeld) Path(ctx context.Context) (string, error) {
 	// What has arrived is said first: a select between two things that are
 	// both ready picks either.
 	if path, arrived, err := h.Now(); arrived {
@@ -37,13 +47,13 @@ func (h *claudeCodeHeld) Path(ctx context.Context) (string, error) {
 	case <-h.fetched:
 		return h.path, h.err
 	case <-ctx.Done():
-		return "", errors.Wrap(ctx.Err(), "Claude Code is still being fetched")
+		return "", errors.Wrapf(ctx.Err(), "%s is still being fetched", h.called())
 	}
 }
 
 // Now is where the pinned binary is if the fetch has ended, without waiting
 // on one still going.
-func (h *claudeCodeHeld) Now() (path string, arrived bool, err error) {
+func (h *harnessHeld) Now() (path string, arrived bool, err error) {
 	select {
 	case <-h.fetched:
 		return h.path, true, h.err
@@ -54,8 +64,8 @@ func (h *claudeCodeHeld) Now() (path string, arrived bool, err error) {
 
 // holdClaudeCode fetches what pin names into dir, off the boot's own time: the
 // binary is hundreds of megabytes and the node serves while it arrives.
-func holdClaudeCode(ctx context.Context, pin claudecode.Pin, dir string, spawn func(string, func()), logger *zap.SugaredLogger) *claudeCodeHeld {
-	held := &claudeCodeHeld{fetched: make(chan struct{})}
+func holdClaudeCode(ctx context.Context, pin claudecode.Pin, dir string, spawn func(string, func()), logger *zap.SugaredLogger) *harnessHeld {
+	held := &harnessHeld{name: "Claude Code", fetched: make(chan struct{})}
 	spawn("agent.claudeCode", func() {
 		defer close(held.fetched)
 		held.path, held.err = pin.Ensure(ctx, dir)
@@ -65,6 +75,26 @@ func holdClaudeCode(ctx context.Context, pin claudecode.Pin, dir string, spawn f
 			return
 		}
 		logger.Infow("Claude Code is on this node", "version", pin.Version, "path", held.path)
+	})
+	return held
+}
+
+// holdPi builds the pinned Pi with the machine's nix, off the boot's own time:
+// a build Nix does not hold yet takes minutes, and the node serves meanwhile.
+func holdPi(ctx context.Context, flake string, spawn func(string, func()), logger *zap.SugaredLogger) *harnessHeld {
+	held := &harnessHeld{name: "Pi", fetched: make(chan struct{})}
+	spawn("agent.pi", func() {
+		defer close(held.fetched)
+		nix, err := pi.Nix()
+		if err == nil {
+			held.path, err = pi.Ensure(ctx, nix, flake)
+		}
+		held.err = err
+		if err != nil {
+			logger.Errorw("Pi was not built, so the ROOT agent runs in Claude Code alone", "flake", flake, "error", err)
+			return
+		}
+		logger.Infow("Pi is on this node", "version", pi.PinnedVersion, "path", held.path)
 	})
 	return held
 }
@@ -95,6 +125,9 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 		return err
 	}
 	s.claudeCode = holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger)
+	if s.deps.cfg.Agent.Root.Pi.Named() {
+		s.pi = holdPi(s.ctx, pi.PinnedFlake, s.wg.Go, s.logger)
+	}
 
 	home, err := rootAgentHome()
 	if err != nil {

@@ -78,6 +78,32 @@ expressed to ROOT."
 The loop is Claude Code's, not the node's: "accepted." The node hosts the
 process. It starts it, resumes it and stops it.
 
+## Its harnesses
+
+"IS BECAUSE I WANT TO EXPECT THAT IT WILL HAPPEN THAT I RUN OUT"
+
+"AND HAVE A FALLBACK"
+
+"NOT BE ENTIRELY DEPENDENT ON ONE HARNESS"
+
+"IF PI DOESNT WORK, WE PAY MONEY FOR BEDROCK"
+
+"IT MEANS WE ALSO NEED A PI ELEMENT"
+
+- It runs in Claude Code or in Pi (earendil-works/pi). What is said in the
+  Claude element runs in Claude Code, and what is said in the Pi element runs
+  in Pi.
+- Either way it is one session, under its own DID: what it is told, reaches
+  for and answers is written down the same, whichever harness answered.
+- Pi reaches the node's MCP with the agent's own token, and its model calls go
+  to the provider am.toml names under `[agent.root.pi]`.
+- The node gets Pi as it gets Claude Code, pinned by the build and nothing
+  installed by hand: a revision of Pi's flake, built by the box's Nix.
+- Pi asks before no tool call and has no sandbox, so on the box its hands are
+  root's with nothing between.
+- Each harness keeps its own context. What was said in one is in the session,
+  and is not in the other's memory.
+
 ## First uses
 
 - A ritual's performer, in place of `claude --bg` on the operator's machine
@@ -145,3 +171,6 @@ Ground's last release is behind its main, so Ground on the box takes a Ground
 release.
 
 "Upgrading the box is in scope"
+
+A turn that Claude Code cannot answer because the plan is spent is not handed
+to Pi by itself: what Claude Code answers then has not been seen.

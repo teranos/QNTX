@@ -35,7 +35,8 @@ const claudeAnswered = `{"type":"system","subtype":"init","session_id":"s-1","mo
 `
 
 // claudeStandIn is a program standing in for Claude Code: each run writes down
-// how it was run, under ran/<n>, and prints the stream.
+// how it was run, under ran/<n>, and prints the stream. A session it starts it
+// keeps where Claude Code keeps one.
 func claudeStandIn(t *testing.T, stream string) (binary, ran string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -48,6 +49,13 @@ func claudeStandIn(t *testing.T, stream string) (binary, ran string) {
 		"mkdir '" + ran + "'/$n\n" +
 		"for arg in \"$@\"; do printf '%s\\n' \"$arg\"; done > '" + ran + "'/$n/args\n" +
 		"env > '" + ran + "'/$n/env\n" +
+		"prev=''\n" +
+		"for arg in \"$@\"; do\n" +
+		"  if [ \"$prev\" = '--session-id' ] && [ -n \"$CLAUDE_CONFIG_DIR\" ]; then\n" +
+		"    mkdir -p \"$CLAUDE_CONFIG_DIR/projects/work\" && : > \"$CLAUDE_CONFIG_DIR/projects/work/$arg.jsonl\"\n" +
+		"  fi\n" +
+		"  prev=\"$arg\"\n" +
+		"done\n" +
 		"cat '" + canned + "'\n"
 	binary = filepath.Join(dir, "claude")
 	require.NoError(t, os.WriteFile(binary, []byte(script), 0o755))
@@ -106,7 +114,7 @@ func runningTheRootAgent(t *testing.T, named appcfg.RootAgentConfig) (s *QNTXSer
 		held:       held,
 		logger:     zaptest.NewLogger(t).Sugar(),
 		deps:       &serverDependencies{cfg: &appcfg.Config{Agent: appcfg.AgentConfig{Root: named}}},
-		claudeCode: &claudeCodeHeld{fetched: fetched, path: binary},
+		claudeCode: &harnessHeld{fetched: fetched, path: binary},
 		rootAgent:  agent,
 		ctx:        context.Background(),
 		ownURL:     "http://127.0.0.1:8770",

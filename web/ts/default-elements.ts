@@ -23,6 +23,7 @@ import { createMailElement } from './mail-element.ts';
 import { createGitHubElement } from './github-element.ts';
 import { createGroundElement } from './ground-element.ts';
 import { createClaudeElement } from './claude-element.ts';
+import { createPiElement } from './pi-element.ts';
 import { createIElement } from './i-element.ts';
 import { createAmElement } from './am-element.ts';
 import { createParityElement } from './parity-element.ts';
@@ -77,6 +78,7 @@ export function registerDefaultElements(hasCanvas: boolean = true): void {
 
     // ✻ — the ROOT agent: said to, and read as the session it continues (ADR-048)
     tray.add(createClaudeElement());
+    tray.add(createPiElement());
 
     // Usage & Cost Chart Element
     // TODO(future): Budget alerting with notifications
