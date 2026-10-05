@@ -266,3 +266,17 @@ body.disconnected #sigma-status .status-dot {
         animation: none;
     }
 }
+
+/* Touch: iOS zooms the page into any focused input under 16px, and this is
+   the phone's main input. The grab bar is the phone's drawer control:
+   finger-sized, and the drag is ours, not the browser's. */
+@media (pointer: coarse) {
+    #drawer-search-input {
+        font-size: 16px;
+    }
+
+    #system-drawer .drawer-grab-bar {
+        height: 24px;
+        touch-action: none;
+    }
+}

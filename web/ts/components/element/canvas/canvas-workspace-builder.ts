@@ -443,10 +443,18 @@ export function buildCanvasWorkspace(
     contentLayer.style.height = '100%';
     container.appendChild(contentLayer);
 
+    let longPressOpened = false;
+
     // Right-click opens spawn menu — suppressed if already open or placing
     // Context-aware: right-click on element symbol shows thread actions, background shows element types
     container.addEventListener('contextmenu', (e) => {
         e.preventDefault();
+        // The press that a long-press already answered: Android and Chromium fire
+        // contextmenu on it too, which would reach the menu's own dismiss.
+        if (longPressOpened) {
+            e.stopPropagation();
+            return;
+        }
         if (isPlacementActive() || isSpawnMenuOpen()) return;
         const target = e.target as HTMLElement;
         // Find the actual symbol span — walk up from click target or search within element
@@ -455,6 +463,44 @@ export function buildCanvasWorkspace(
             ?? elementEl?.querySelector('.symbol') as HTMLElement | null;
         showSpawnMenu(e.clientX, e.clientY, contentLayer, items, canvasId, symbolEl);
     });
+
+    // Long-press opens the same menu on touch: iOS Safari never fires contextmenu,
+    // so without this an iPhone cannot spawn from the canvas.
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    let longPressX = 0;
+    let longPressY = 0;
+    const cancelLongPress = () => {
+        if (longPressTimer !== null) clearTimeout(longPressTimer);
+        longPressTimer = null;
+    };
+    container.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'touch' || !e.isPrimary) return;
+        cancelLongPress();
+        longPressOpened = false;
+        longPressX = e.clientX;
+        longPressY = e.clientY;
+        const target = e.target as HTMLElement;
+        longPressTimer = setTimeout(() => {
+            longPressTimer = null;
+            if (isPlacementActive() || isSpawnMenuOpen()) return;
+            const elementEl = target.closest('.canvas-element') as HTMLElement | null;
+            const symbolEl = target.closest('.symbol') as HTMLElement | null
+                ?? elementEl?.querySelector('.symbol') as HTMLElement | null;
+            longPressOpened = true;
+            showSpawnMenu(longPressX, longPressY, contentLayer, items, canvasId, symbolEl);
+        }, 500);
+    });
+    container.addEventListener('pointermove', (e) => {
+        if (longPressTimer === null) return;
+        if (Math.hypot(e.clientX - longPressX, e.clientY - longPressY) > 10) cancelLongPress();
+    });
+    // Lifting the finger that opened the menu: the browser follows with a mousedown
+    // and click, which the menu reads as a press outside it and closes.
+    container.addEventListener('touchend', (e) => {
+        if (longPressOpened) e.preventDefault();
+    });
+    container.addEventListener('pointerup', cancelLongPress);
+    container.addEventListener('pointercancel', cancelLongPress);
 
     // Prevent dblclick from bubbling past workspace boundary (stops re-morph on parent subcanvas)
     container.addEventListener('dblclick', (e) => { e.stopPropagation(); });

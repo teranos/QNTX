@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev quickdev-web publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -34,6 +34,11 @@ cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM 
 # Doesn't need ATS or wasm"
 quickdev: ## Build QuickDev, as bin/qntx-quickdev: no ATS, no WASM, loopback only
 	@go build -tags quickdev $(GO_LDFLAGS) -o bin/qntx-quickdev ./cmd/qntx
+
+# The UI QuickDev serves, built without the browser WASM: run
+# `bin/qntx-quickdev server` first, then this.
+quickdev-web: ## Serve the web UI for QuickDev on :8820, without WASM
+	@cd web && bun install && QNTX_WEB_WASM=none bun run dev
 
 openapi: ## Write what the node serves, from the reach table and the handlers' own prose
 	@go run ./cmd/openapi

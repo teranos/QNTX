@@ -135,7 +135,7 @@ const ProseSymbol = "▣"
 //
 // "a new canvas, should always start with a prefilled Note element"
 func firstNote(name, byName string) string {
-	return name + " canvas element.\nCreated by: " + byName + "\n\nright click to add elements to the canvas.\n"
+	return name + " canvas element.\nCreated by: " + byName + "\n\nright click or long-press to add elements to the canvas.\n"
 }
 
 // CreateCanvas makes a canvas of a kind under a name, holding its first

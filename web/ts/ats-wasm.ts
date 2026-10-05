@@ -102,6 +102,10 @@ async function ensureInit(): Promise<void> {
  * }
  */
 export function parseQuery(input: string): ParseResult {
+    // A build without WASM (QNTX_WEB_WASM=none) has no parser to call.
+    if (typeof wasm.parse_query !== 'function') {
+        return { ok: false, error: 'this UI was built without the ats WASM, which parses queries' };
+    }
     const json = wasm.parse_query(input);
     const parsed = JSON.parse(json);
 
