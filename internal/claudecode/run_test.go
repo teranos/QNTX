@@ -60,7 +60,7 @@ func TestSaidStartsASessionAndAnswers(t *testing.T) {
 	home := t.TempDir()
 	said := Said{
 		Binary: binary, Home: home, Session: "s-1", Says: "what does uname -s print?",
-		Model: "claude-opus-5-5", Effort: "low", Token: "the-plan-token", System: "You are the ROOT agent.",
+		Model: "claude-opus-5-5", Effort: "low", Mode: "dontAsk", Token: "the-plan-token", System: "You are the ROOT agent.",
 	}
 
 	var seen []string
@@ -85,7 +85,7 @@ func TestSaidStartsASessionAndAnswers(t *testing.T) {
 		{"--model", "claude-opus-5-5"},
 		{"--effort", "low"},
 		{"--output-format", "stream-json"},
-		{"--permission-mode", "bypassPermissions"},
+		{"--permission-mode", "dontAsk"},
 		{"--append-system-prompt", "You are the ROOT agent."},
 	} {
 		at := slices.Index(args, pair[0])
@@ -98,6 +98,9 @@ func TestSaidStartsASessionAndAnswers(t *testing.T) {
 	}
 	if slices.Contains(args, "--resume") {
 		t.Errorf("a session that starts here was resumed: %v", args)
+	}
+	if slices.Contains(args, "--allowedTools") {
+		t.Errorf("a session that was allowed nothing was run with tools allowed: %v", args)
 	}
 
 	env := linesOf(t, filepath.Join(ran, "env"))
@@ -116,9 +119,52 @@ func TestSaidStartsASessionAndAnswers(t *testing.T) {
 	}
 }
 
+// Nobody is there to be asked, so what a session may do is what it was allowed
+// by name, and what it reached for beyond that is said with the answer.
+func TestASessionMayDoWhatItWasAllowedAndTheRestIsSaid(t *testing.T) {
+	stream := `{"type":"system","subtype":"init","session_id":"s-1","model":"m"}
+{"type":"result","subtype":"success","session_id":"s-1","is_error":false,"result":"I could not write the file.","permission_denials":[{"tool_name":"Write","tool_use_id":"toolu_1","tool_input":{"file_path":"/etc/x"}},{"tool_name":"Write","tool_use_id":"toolu_2","tool_input":{}},{"tool_name":"WebFetch","tool_use_id":"toolu_3","tool_input":{}}]}
+`
+	binary, ran := standIn(t, stream, 0, "")
+	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "write it", Model: "m", Effort: "low", Mode: "dontAsk",
+		Allow: []string{"Bash", "Read", "mcp__qntx"}}
+	answer, err := said.Run(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	args := linesOf(t, filepath.Join(ran, "args"))
+	at := slices.Index(args, "--allowedTools")
+	if at < 0 || args[at+1] != "Bash,Read,mcp__qntx" {
+		t.Errorf("it was not allowed what it was given by name: %v", args)
+	}
+	if !slices.Equal(answer.Denied, []string{"Write", "WebFetch"}) {
+		t.Errorf("what it was refused is %v, want each tool once", answer.Denied)
+	}
+}
+
+// Which permission mode a session runs in is its caller's to name, and it is
+// handed to Claude Code as named. One that names none is not run.
+func TestTheModeNamedIsTheModeRunIn(t *testing.T) {
+	binary, ran := standIn(t, answered, 0, "")
+	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "plan"}
+	if _, err := said.Run(context.Background(), nil); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	args := linesOf(t, filepath.Join(ran, "args"))
+	at := slices.Index(args, "--permission-mode")
+	if at < 0 || args[at+1] != "plan" {
+		t.Errorf("it was not run in the mode named: %v", args)
+	}
+
+	said.Mode = ""
+	if _, err := said.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), "permission mode") {
+		t.Errorf("a session that names no permission mode was run: %v", err)
+	}
+}
+
 func TestSaidResumesASessionThatExists(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Resumes: true, Says: "and again", Model: "m", Effort: "low"}
+	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Resumes: true, Says: "and again", Model: "m", Effort: "low", Mode: "dontAsk"}
 	if _, err := said.Run(context.Background(), nil); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -134,7 +180,7 @@ func TestSaidResumesASessionThatExists(t *testing.T) {
 
 func TestARunWithNoResultSaysWhatClaudeCodeSaid(t *testing.T) {
 	binary, _ := standIn(t, "", 1, "No conversation found with session ID: s-1")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Resumes: true, Says: "hello", Model: "m", Effort: "low"}
+	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Resumes: true, Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
 	_, err := said.Run(context.Background(), nil)
 	if err == nil {
 		t.Fatal("a run that printed no result was taken as answered")
@@ -149,7 +195,7 @@ func TestAnErrorResultIsAnAnswerThatSaysSo(t *testing.T) {
 {"type":"result","subtype":"error_during_execution","session_id":"s-1","is_error":true,"result":"API Error: 529 overloaded"}
 `
 	binary, _ := standIn(t, stream, 1, "")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low"}
+	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
 	answer, err := said.Run(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("an error Claude Code reported as its result is an answer, not a failed run: %v", err)
@@ -163,7 +209,7 @@ func TestAnMCPServerIsNamedWithoutItsSecret(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	home := t.TempDir()
 	said := Said{
-		Binary: binary, Home: home, Session: "s-1", Says: "hello", Model: "m", Effort: "low",
+		Binary: binary, Home: home, Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk",
 		MCP: []MCPServer{{Name: "qntx", URL: "http://127.0.0.1:8770/mcp", Bearer: "qntx_secret"}},
 	}
 	if _, err := said.Run(context.Background(), nil); err != nil {
@@ -195,7 +241,7 @@ func TestALineLongerThanABufferIsStillRead(t *testing.T) {
 {"type":"result","subtype":"success","session_id":"s-1","is_error":false,"result":"done"}
 `
 	binary, _ := standIn(t, stream, 0, "")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low"}
+	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
 	var texts []string
 	answer, err := said.Run(context.Background(), func(m Message) {
 		for _, block := range m.Blocks() {

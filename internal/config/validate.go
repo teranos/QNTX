@@ -1,6 +1,7 @@
 package config
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/teranos/QNTX/internal/secretref"
@@ -86,6 +87,9 @@ func (c *Config) Validate() error {
 		}
 		if err := secretref.Validate(root.TokenRef); err != nil {
 			return errors.Wrap(err, "agent.root.token is invalid")
+		}
+		if root.Mode != "" && !slices.Contains(PermissionModes, root.Mode) {
+			return errors.Newf("agent.root.permission_mode must be one of [%s], got %q", strings.Join(PermissionModes, ", "), root.Mode)
 		}
 	}
 

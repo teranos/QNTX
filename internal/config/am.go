@@ -32,12 +32,21 @@ type RootAgentConfig struct {
 	Model    string `mapstructure:"model"`  // The Claude model it is, by its full name.
 	Effort   string `mapstructure:"effort"` // The effort it runs at: low, medium, high, xhigh or max.
 	TokenRef string `mapstructure:"token"`  // ssm:// or env: reference to the Claude plan token — a literal is rejected
+	// Mode is the permission mode it runs in when whoever speaks to it names
+	// none, and Allow the tools it may use without being asked, by Claude
+	// Code's own names for them.
+	Mode  string   `mapstructure:"permission_mode"`
+	Allow []string `mapstructure:"allow"`
 }
 
 // Named reports whether am.toml names a ROOT agent at all.
 func (r RootAgentConfig) Named() bool {
-	return r.Model != "" || r.Effort != "" || r.TokenRef != ""
+	return r.Model != "" || r.Effort != "" || r.TokenRef != "" || r.Mode != "" || len(r.Allow) > 0
 }
+
+// PermissionModes is every permission mode Claude Code runs in, as its own
+// --permission-mode names them.
+var PermissionModes = []string{"acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk", "plan"}
 
 // NodeConfig is what the node says of itself, through am node. Empty says
 // nothing: no name is made up for a node that was not given one.

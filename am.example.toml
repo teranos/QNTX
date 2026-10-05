@@ -101,6 +101,13 @@ entity_actors_limit = 64
 # The Claude plan token `claude setup-token` prints, by reference.
 # token = 'ssm:///q/box/claude/oauth-token'
 
+# The permission mode it runs in when whoever speaks to it names none: one of
+# acceptEdits, auto, bypassPermissions, manual, dontAsk, plan.
+# permission_mode = 'dontAsk'
+
+# The tools it may use without being asked, by Claude Code's names for them.
+# allow = ['mcp__qntx', 'Read']
+
 [sentry]
 # The project logs and metrics are shipped to. Empty is off, and
 # nothing else in this section is read. A DSN is an ingest key — it

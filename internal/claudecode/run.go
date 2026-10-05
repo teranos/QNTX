@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -35,6 +36,12 @@ type Said struct {
 	// System is what this agent additionally is, appended to what Claude Code is.
 	System string
 	MCP    []MCPServer
+	// Mode is the permission mode the session runs in, as Claude Code names
+	// them. Whoever says it names it: nothing here picks one.
+	Mode string
+	// Allow is the tools the session may use without being asked, each by
+	// Claude Code's own name for it.
+	Allow []string
 }
 
 // MCPServer is one MCP server the session reaches over HTTP, and the bearer it
@@ -64,6 +71,9 @@ type Message struct {
 	IsError bool    `json:"is_error"`
 	CostUSD float64 `json:"total_cost_usd"`
 	TookMS  int64   `json:"duration_ms"`
+	Denials []struct {
+		Tool string `json:"tool_name"`
+	} `json:"permission_denials"`
 }
 
 // Block is one part of what a message carries: text, a tool reached for, or
@@ -100,6 +110,8 @@ type Answer struct {
 	Version string
 	CostUSD float64
 	Took    time.Duration
+	// Denied is each tool the session reached for and was not allowed, once.
+	Denied []string
 }
 
 // stderrKept is how much of what Claude Code wrote to stderr an error carries.
@@ -109,6 +121,9 @@ const stderrKept = 4096
 // each as it arrives. A run that prints no result is an error carrying what
 // Claude Code wrote to stderr.
 func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
+	if s.Mode == "" {
+		return Answer{}, errors.New("no permission mode was named for the session, and none is assumed")
+	}
 	config, work := filepath.Join(s.Home, "claude"), filepath.Join(s.Home, "work")
 	for _, dir := range []string{config, work} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -117,7 +132,10 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	}
 
 	args := []string{"-p", s.Says, "--output-format", "stream-json", "--verbose",
-		"--model", s.Model, "--effort", s.Effort, "--permission-mode", "bypassPermissions"}
+		"--model", s.Model, "--effort", s.Effort, "--permission-mode", s.Mode}
+	if len(s.Allow) > 0 {
+		args = append(args, "--allowedTools", strings.Join(s.Allow, ","))
+	}
 	if s.Resumes {
 		args = append(args, "--resume", s.Session)
 	} else {
@@ -171,6 +189,11 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 					answer.Text, answer.IsError, answer.Subtype = m.Result, m.IsError, m.Subtype
 					answer.Session, answer.CostUSD = m.SessionID, m.CostUSD
 					answer.Took = time.Duration(m.TookMS) * time.Millisecond
+					for _, denial := range m.Denials {
+						if !slices.Contains(answer.Denied, denial.Tool) {
+							answer.Denied = append(answer.Denied, denial.Tool)
+						}
+					}
 				}
 				if each != nil {
 					each(m)

@@ -28,6 +28,48 @@ token  = "ssm:///q/box/claude/oauth-token"
 	}
 }
 
+// What it runs in when whoever speaks to it names no mode, and the tools it
+// may use without being asked, are am.toml's to say.
+func TestRootAgentPermissionsLoad(t *testing.T) {
+	path := writeConfig(t, `
+[agent.root]
+model           = "claude-opus-5-5"
+effort          = "low"
+permission_mode = "dontAsk"
+allow           = ["mcp__qntx", "Bash", "Read"]
+`)
+	cfg, err := LoadFromFile(path)
+	if err != nil {
+		t.Fatalf("LoadFromFile = %v", err)
+	}
+	root := cfg.Agent.Root
+	if root.Mode != "dontAsk" || len(root.Allow) != 3 || root.Allow[0] != "mcp__qntx" {
+		t.Errorf("the ROOT agent's permissions loaded as mode %q, allow %v", root.Mode, root.Allow)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate = %v, want nil", err)
+	}
+}
+
+// A mode Claude Code does not have is a typo, and a typo that loaded would be
+// an agent that fails at the first thing said to it.
+func TestRootAgentModeClaudeCodeDoesNotHaveIsRefused(t *testing.T) {
+	path := writeConfig(t, `
+[agent.root]
+model           = "claude-opus-5-5"
+effort          = "low"
+permission_mode = "everything"
+`)
+	cfg, err := LoadFromFile(path)
+	if err != nil {
+		t.Fatalf("LoadFromFile = %v", err)
+	}
+	err = cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "agent.root.permission_mode") || !strings.Contains(err.Error(), "dontAsk") {
+		t.Errorf("Validate = %v, want it to name the field and the modes there are", err)
+	}
+}
+
 // A node that names no ROOT agent has none, and that is valid.
 func TestNoRootAgentIsValid(t *testing.T) {
 	cfg, err := LoadFromFile(writeConfig(t, ``))
