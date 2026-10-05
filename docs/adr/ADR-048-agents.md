@@ -109,16 +109,21 @@ utilizing"
 - On GitHub the ROOT agent is the node's App (ADR-043), whose bot user is what
   a push and a pull request are seen as. The ROOT agent is the node, and the
   node is already its own root identity there.
-- A commit is authored as that bot and signed with the agent's own key: it is
-  the agent's by its DID, whoever carried the push.
+- A commit's author is the agent itself: the ROOT agent of the node, at the
+  address its DID is at the host the node answers on. It is the agent's by its
+  DID, whoever carried the push.
 - It holds no GitHub token (ADR-043). Its git asks the node for a credential
-  when it pushes, and the node mints one as the App's installation, short
-  lived.
+  when it pushes (`github credential`), and the node mints one as the App's
+  installation: for that repository alone, and short lived.
 - What GitHub answers over its API, a pull request opened or a run read, it
   asks of GitHubService through sigils, as a plugin asks over gRPC.
 
-Not there: the App reads contents and cannot write them, the node mints no
-installation token, and GitHubService is reached by plugins alone.
+"I want to get into a position where i can use the Claude Element to prepare
+PR's againt QNTX"
+
+Not there: the App reads contents and cannot write them, GitHubService is
+reached by plugins alone, and where the agent runs has none of what building
+QNTX takes.
 
 ## Not done
 

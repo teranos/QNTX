@@ -252,13 +252,17 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 			}
 		}
 	}
+	itsGit, err := s.gitEnvironment(agent)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent's git was not set up, so nothing was said to it: " + err.Error()}
+	}
 	told, err := writes.told(sent["says"], spokenBy(caller), time.Now())
 	write([]*types.As{told}, err)
 
 	said := claudecode.Said{
 		Binary: binary, Home: agent.home, Session: session, Resumes: resumes,
 		Says: sent["says"], Model: named.Model, Effort: named.Effort, Token: plan,
-		System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow,
+		System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: itsGit,
 	}
 	if s.ownURL != "" {
 		said.MCP = []claudecode.MCPServer{{Name: rootAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}

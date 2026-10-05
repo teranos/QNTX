@@ -125,6 +125,7 @@ func init() {
 	// CodeCmd now provided by code domain plugin
 	rootCmd.AddCommand(commands.DbCmd)
 	rootCmd.AddCommand(commands.ElementCmd)
+	rootCmd.AddCommand(commands.GitCmd)
 	rootCmd.AddCommand(commands.HandlerCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.ServerCmd)

@@ -42,6 +42,9 @@ type Said struct {
 	// Allow is the tools the session may use without being asked, each by
 	// Claude Code's own name for it.
 	Allow []string
+	// Env is what the session's environment holds beyond what this sets, each
+	// NAME=value. What the session runs inherits it.
+	Env []string
 }
 
 // MCPServer is one MCP server the session reaches over HTTP, and the bearer it
@@ -145,6 +148,7 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 		args = append(args, "--append-system-prompt", s.System)
 	}
 	env := append(os.Environ(), "CLAUDE_CONFIG_DIR="+config, "DISABLE_AUTOUPDATER=1")
+	env = append(env, s.Env...)
 	if s.Token != "" {
 		env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+s.Token)
 	}
