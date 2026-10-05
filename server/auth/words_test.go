@@ -16,7 +16,7 @@ func wordsFor(t *testing.T, words []WordLine, held ...string) Admission {
 	h.roles.(*memRoles).words = words
 	a := Holding(Admitted(LevelPublicRegistration, "garden"), held...)
 	a.Identity = googleAccount
-	a.words = h.WordsOf(a.roles)
+	a = Saying(a, h.WordsOf(a.Roles()))
 	return a
 }
 

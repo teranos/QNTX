@@ -132,9 +132,9 @@ func TestReachesPutTogetherAdmitWhoeverEitherAdmits(t *testing.T) {
 func TestAReachAdmitsWhoTheGateWould(t *testing.T) {
 	analysts := Also(LevelSuper).AndRoles("ANALYST")
 
-	assert.True(t, analysts.Admits(Admission{level: LevelRoot}), "ROOT reaches everything")
-	assert.True(t, analysts.Admits(Admission{level: LevelSuper}))
-	assert.True(t, analysts.Admits(Admission{level: LevelAttestor, roles: []string{"ANALYST"}}))
-	assert.False(t, analysts.Admits(Admission{level: LevelAttestor, roles: []string{"WORKER"}}))
-	assert.False(t, Reach{}.Admits(Admission{level: LevelSuper}), "an empty reach let somebody beside ROOT in")
+	assert.True(t, analysts.Admits(Admitted(LevelRoot)), "ROOT reaches everything")
+	assert.True(t, analysts.Admits(Admitted(LevelSuper)))
+	assert.True(t, analysts.Admits(Holding(Admitted(LevelAttestor), "ANALYST")))
+	assert.False(t, analysts.Admits(Holding(Admitted(LevelAttestor), "WORKER")))
+	assert.False(t, Reach{}.Admits(Admitted(LevelSuper)), "an empty reach let somebody beside ROOT in")
 }

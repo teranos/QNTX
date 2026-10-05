@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	elementstorage "github.com/teranos/QNTX/element/storage"
+	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/plugin/grpc/services"
-	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 )
 
@@ -60,7 +60,7 @@ type canvasView struct {
 	Mine       bool         `json:"mine"`
 }
 
-func (h *CanvasHandler) view(c elementstorage.Canvas, admitted auth.Admission) canvasView {
+func (h *CanvasHandler) view(c elementstorage.Canvas, admitted admission.Admission) canvasView {
 	v := canvasView{Canvas: c, OwnerViews: []PersonView{}}
 	for _, id := range c.Owners {
 		if h.people != nil {
@@ -93,7 +93,7 @@ func (h *CanvasHandler) HandleCanvases(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	admitted, _ := auth.AdmissionFrom(r.Context())
+	admitted, _ := admission.AdmissionFrom(r.Context())
 	rest := strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, "/api/canvases"), "/")
 	parts := strings.Split(rest, "/")
 
@@ -111,7 +111,7 @@ func (h *CanvasHandler) HandleCanvases(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *CanvasHandler) listCanvases(w http.ResponseWriter, r *http.Request, store *elementstorage.CanvasStore, admitted auth.Admission) {
+func (h *CanvasHandler) listCanvases(w http.ResponseWriter, r *http.Request, store *elementstorage.CanvasStore, admitted admission.Admission) {
 	all, err := store.Canvases(r.Context())
 	if err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
@@ -126,7 +126,7 @@ func (h *CanvasHandler) listCanvases(w http.ResponseWriter, r *http.Request, sto
 	h.writeJSON(w, views)
 }
 
-func (h *CanvasHandler) createCanvas(w http.ResponseWriter, r *http.Request, store *elementstorage.CanvasStore, admitted auth.Admission) {
+func (h *CanvasHandler) createCanvas(w http.ResponseWriter, r *http.Request, store *elementstorage.CanvasStore, admitted admission.Admission) {
 	var body struct {
 		Name string `json:"name"`
 		Kind string `json:"kind"`
@@ -186,7 +186,7 @@ func (h *CanvasHandler) writeCreateError(w http.ResponseWriter, err error) {
 }
 
 // oneCanvas is everything done to a canvas by id.
-func (h *CanvasHandler) oneCanvas(w http.ResponseWriter, r *http.Request, store *elementstorage.CanvasStore, admitted auth.Admission, id string, parts []string) {
+func (h *CanvasHandler) oneCanvas(w http.ResponseWriter, r *http.Request, store *elementstorage.CanvasStore, admitted admission.Admission, id string, parts []string) {
 	canvas, err := store.Canvas(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, elementstorage.ErrNoSuchCanvas) {
@@ -304,7 +304,7 @@ func (h *CanvasHandler) userInBody(r *http.Request) (string, error) {
 }
 
 // invite mails a User an invitation to own this canvas.
-func (h *CanvasHandler) invite(w http.ResponseWriter, r *http.Request, store *elementstorage.CanvasStore, admitted auth.Admission, canvas elementstorage.Canvas) {
+func (h *CanvasHandler) invite(w http.ResponseWriter, r *http.Request, store *elementstorage.CanvasStore, admitted admission.Admission, canvas elementstorage.Canvas) {
 	if h.people == nil || h.mailer == nil || h.inviteLink == nil {
 		h.writeError(w, errors.New("this node keeps no Users to invite, or sends no mail"), http.StatusNotImplemented)
 		return
@@ -356,7 +356,7 @@ func (h *CanvasHandler) invite(w http.ResponseWriter, r *http.Request, store *el
 }
 
 // acceptInvitation is the invitee saying yes, and the inviter hearing it.
-func (h *CanvasHandler) acceptInvitation(w http.ResponseWriter, r *http.Request, store *elementstorage.CanvasStore, admitted auth.Admission) {
+func (h *CanvasHandler) acceptInvitation(w http.ResponseWriter, r *http.Request, store *elementstorage.CanvasStore, admitted admission.Admission) {
 	var body struct {
 		Token string `json:"token"`
 	}
