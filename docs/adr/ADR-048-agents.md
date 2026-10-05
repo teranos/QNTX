@@ -63,6 +63,15 @@ expressed to ROOT."
 
 - Who may talk to it is the whole of what guards it.
 
+"make sure --permission-mode is configurable in the Claude Element"
+
+- The permission mode a turn runs in is named by whoever speaks, and the
+  Claude element offers every mode Claude Code has.
+- am.toml gives the mode used when none is named (`permission_mode`) and the
+  tools it may use without being asked (`allow`), by Claude Code's own names.
+- Claude Code refuses `bypassPermissions` to a process run as root, which is
+  how the node runs on the box. Its hands there are what `allow` names.
+
 ## The loop
 
 The loop is Claude Code's, not the node's: "accepted." The node hosts the

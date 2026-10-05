@@ -63,10 +63,13 @@ func claudeCodeDir() (string, error) {
 	return filepath.Join(home, ".qntx", "claude-code"), nil
 }
 
-func (agentSubsystem) Init(s *QNTXServer) error {
+func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	if !s.deps.cfg.Agent.Root.Named() {
 		return nil
 	}
+	// The node serves without its agent, so why there is none is kept for
+	// whoever speaks to it.
+	defer func() { s.noRootAgent = err }()
 	pin, err := claudecode.Pinned()
 	if err != nil {
 		return errors.Wrap(err, "the Claude Code this build pins did not read")

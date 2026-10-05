@@ -22,6 +22,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/errors"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -246,6 +247,23 @@ func TestANodeThatNamesNoRootAgentHasNoneToSpeakTo(t *testing.T) {
 	_, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.GetWhy())
+}
+
+// One that am.toml names and that did not start says why, in the words the
+// start failed in.
+func TestARootAgentThatDidNotStartSaysWhy(t *testing.T) {
+	s, _ := runningTheRootAgent(t, opusLow)
+	s.rootAgent, s.noRootAgent = nil, errors.New("the ROOT agent's token tok-1 is switched off")
+
+	_, refused := saying(s, sigil.Sent{"says": "hello"})
+	require.NotNil(t, refused)
+	assert.Equal(t, sigil.Failed, refused.GetWhy())
+	assert.Contains(t, refused.GetSays(), "tok-1 is switched off")
+
+	asked := httptest.NewRequest(http.MethodGet, "/api/claude", nil)
+	_, refused = s.claudeAm(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "tok-1 is switched off")
 }
 
 // The agent says who it is and how it runs, which is what the Claude element

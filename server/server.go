@@ -52,6 +52,7 @@ type QNTXServer struct {
 	nodeDID             *nodedid.Handler      // node's decentralized identity
 	claudeCode          *claudeCodeHeld       // The pinned Claude Code this node fetched; nil when am.toml names no agent (ADR-048)
 	rootAgent           *rootAgent            // The ROOT agent this node runs; nil when am.toml names none (ADR-048)
+	noRootAgent         error                 // Why the ROOT agent am.toml names did not start, for whoever speaks to it
 	ownURL              string                // Where this node answers on its own machine; empty until it listens
 	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
 	budgetTracker       *budget.Tracker       // Budget tracking for Pulse daemon

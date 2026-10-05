@@ -162,6 +162,15 @@ func spokenBy(caller *http.Request) string {
 	return admitted.Identity
 }
 
+// thereIsNoRootAgent is why this node has no ROOT agent to speak to: am.toml
+// names none, or the one it names did not start.
+func (s *QNTXServer) thereIsNoRootAgent() *protocol.Refusal {
+	if s.noRootAgent != nil {
+		return &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent am.toml names did not start: " + s.noRootAgent.Error()}
+	}
+	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no ROOT agent ([agent.root]), so there is none to speak to"}
+}
+
 func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	caller := sigil.Caller(ctx)
 	if caller == nil {
@@ -169,7 +178,7 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 	}
 	agent := s.rootAgent
 	if agent == nil {
-		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no ROOT agent ([agent.root]), so there is none to speak to"}
+		return nil, s.thereIsNoRootAgent()
 	}
 	named := s.deps.cfg.Agent.Root
 	mode := sent["permission_mode"]
@@ -266,7 +275,7 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 func (s *QNTXServer) claudeAm(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
 	agent := s.rootAgent
 	if agent == nil {
-		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no ROOT agent ([agent.root])"}
+		return nil, s.thereIsNoRootAgent()
 	}
 	named := s.deps.cfg.Agent.Root
 	is := map[string]any{
