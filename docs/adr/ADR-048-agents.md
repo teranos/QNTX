@@ -8,19 +8,20 @@ QNTX hosts agents.
 "an agent is itself"
 
 - In A2A's terms QNTX is the A2A Server: the endpoint, authentication and
-  authorization are the node's. Each agent it hosts is a card, reached by its
-  tenant (AgentInterface.tenant).
+  authorization are the node's. Each agent it hosts is described by an Agent
+  Card and reached by its tenant (AgentInterface.tenant).
 - An agent has its own DID and attests as itself: `by` on what it writes is
   the agent.
 - What an agent may reach is its own lines in system, as any actor's are.
 - An agent's work outlives the request that brought it, and every call it
   makes carries its own credential. The credential of whoever sent the work
   never reaches what the agent calls (ADR-038).
-- A Task has two actors: who sent it, and the agent doing it. Who may see the
-  Task is the sender's admission; what the agent touches is the agent's.
+- A Task's messages have two roles, user and agent: the user is who sent it,
+  the agent is the one doing it. Who may see the Task is the sender's
+  admission; what the agent touches is the agent's.
 - An agent stands in a namespace, and nothing crosses (ADR-026).
-- To A2A an agent is a card, and its skills are the signa it reaches
-  (ADR-039).
+- To A2A an agent is described by its Agent Card, and its skills are what it
+  can perform (ADR-039).
 
 ## The host agent
 

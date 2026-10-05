@@ -28,7 +28,8 @@ module rec Protocol : sig
   (**
 {%html:
 <p>A Signum holds the sigils of one subject: watchers is a signum, and list,
-create, read, update and delete are its sigils. To A2A a signum is a skill.</p>
+create, read, update and delete are its sigils. On the Agent Card a signum
+is described as an AgentSkill.</p>
 <p>What the node does, in the shape that crosses a boundary (ADR-039). The
 browser reads these to name a sigil in a reach line, and a plugin hands the
 node a Signum to say what it can do.</p>

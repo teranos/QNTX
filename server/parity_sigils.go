@@ -16,7 +16,8 @@ import (
 // held to the reference as the node pins it.
 
 // everySignumFollows is what every signum follows by its shape alone, declared
-// once and not signum by signum: "To A2A a signum is a skill" (sigil.proto),
+// once and not signum by signum: "On the Agent Card a signum is described as
+// an AgentSkill" (sigil.proto),
 // and to MCP "a tool is one sigil" (mcp.go).
 func everySignumFollows() []*protocol.Follows {
 	return []*protocol.Follows{

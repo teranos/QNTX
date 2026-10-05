@@ -82,8 +82,8 @@ func (s *QNTXServer) a2aCard(r *http.Request) a2a.Card {
 	card := s.cardBase(r)
 	admitted, known := auth.AdmissionFrom(r.Context())
 	for _, signum := range s.checkedSigna() {
-		// "make am the card, not a skill on it": am is being, what the card
-		// says of the node, and a skill is what that being can do.
+		// "make am the card, not a skill on it": the Agent Card describes the
+		// node, and a skill is a capability the node can perform.
 		if signum.GetName() == amSignumName {
 			continue
 		}

@@ -22,7 +22,8 @@ const (
 )
 
 // A Signum holds the sigils of one subject: watchers is a signum, and list,
-// create, read, update and delete are its sigils. To A2A a signum is a skill.
+// create, read, update and delete are its sigils. On the Agent Card a signum
+// is described as an AgentSkill.
 type Signum struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Name   string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`

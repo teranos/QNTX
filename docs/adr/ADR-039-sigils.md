@@ -7,15 +7,17 @@ Status: Proposed
   goes in, what comes out and how it refuses.
 - The HTTP API and MCP are surfaces of a sigil. Both do the same thing.
 - A2A describes the node to other agents.
-- The A2A card says what the node is and how to reach it. MCP is one of those
-  ways.
+- The Agent Card describes the node's identity, capabilities, skills, service
+  endpoint and authentication requirements. The node's MCP is not one of its
+  interfaces.
 - An a2a:<signum> line decides which skills a caller sees. am node shows the
   card a caller would get.
 - The public card at /.well-known/agent-card.json is read by anyone. It shows
   the signa the node names for it, each requiring the bearer token, and is
   refused whole while it lacks a field the spec requires.
 - A signum holds the sigils of one subject: watchers is a signum, and list,
-  create, read, update and delete are its sigils. To A2A a signum is a skill.
+  create, read, update and delete are its sigils. On the Agent Card a signum is
+  described as an AgentSkill.
 - Their shape is proto and nothing else. What is not a shape, the function that
   answers, lives in server/sigil.
 - Reach lines name sigils and signa, per surface where that matters. The const
@@ -34,5 +36,5 @@ Status: Proposed
 - params.did is the node's DID, as /.well-known/did.json serves it.
 - params.health is ok, degraded or down, as /health says it.
 - params.syscap is what am syscap answers.
-- params.mcp is where the node's MCP answers, and the MCP version it speaks. An AgentInterface is a way to speak A2A, so the MCP is said here.
+- params.mcp is where the node's MCP answers, and the MCP version it speaks. An AgentInterface declares a URL, transport and protocol version for interacting with the agent (a2a.proto line 334), so the MCP is said here.
 - It is not required: an agent that does not read it loses nothing else.

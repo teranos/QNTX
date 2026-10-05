@@ -494,7 +494,7 @@
   "protocol.Sigil.gives": "What comes out, by field.",
   "protocol.Sigil.http": "Where it answers on the HTTP API.",
   "protocol.Sigil.takes": "What goes in.",
-  "protocol.Signum": "A Signum holds the sigils of one subject: watchers is a signum, and list, create, read, update and delete are its sigils. To A2A a signum is a skill.",
+  "protocol.Signum": "A Signum holds the sigils of one subject: watchers is a signum, and list, create, read, update and delete are its sigils. On the Agent Card a signum is described as an AgentSkill.",
   "protocol.Signum.description": "What it is for, in words, and the words it is found by. To A2A these are a skill's description and tags.",
   "protocol.Signum.follows": "The shapes this signum is held to, each by its name: \"Staands will be Umami, one reference and not a blend.\" The parity sigil reads these.",
   "protocol.StageInfo": "A stage with its tasks.",

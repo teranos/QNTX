@@ -14,7 +14,8 @@ import (
 // AgentCard is lf.a2a.v1.AgentCard, the message a card is held to.
 const AgentCard = "lf.a2a.v1.AgentCard"
 
-// Skill is one signum as A2A sees it: "To A2A a signum is a skill" (ADR-039).
+// Skill is one signum as A2A sees it: "On the Agent Card a signum is
+// described as an AgentSkill" (ADR-039).
 type Skill struct {
 	ID          string
 	Name        string
@@ -72,8 +73,9 @@ func (c Card) Message() (protoreflect.Message, error) {
 	for _, e := range c.Extensions {
 		extensions = append(extensions, map[string]any{"uri": e.URI, "description": e.Description, "required": false, "params": e.Params})
 	}
-	// An interface is a way to speak A2A (§8.3.1), so the node's MCP is not
-	// one: where it answers is said in the node extension.
+	// An AgentInterface declares a URL, transport and protocol version for
+	// interacting with the agent (a2a.proto line 334), so the node's MCP is
+	// said in the node extension.
 	interfaces := []map[string]any{
 		{"url": c.URL, "protocolBinding": "HTTP+JSON", "protocolVersion": Version},
 	}

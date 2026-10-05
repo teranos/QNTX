@@ -12,7 +12,8 @@ option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 // reach is governed at runtime and a plugin comes and goes while the node runs.
 
 // A Signum holds the sigils of one subject: watchers is a signum, and list,
-// create, read, update and delete are its sigils. To A2A a signum is a skill.
+// create, read, update and delete are its sigils. On the Agent Card a signum
+// is described as an AgentSkill.
 message Signum {
   string name = 1;
   repeated Sigil sigils = 2;

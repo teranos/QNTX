@@ -29,7 +29,7 @@ func amFollowsAgentCard() *protocol.Follows {
 	}}
 }
 
-// amSignumName is am: being, the node, and the card that says it.
+// amSignumName is am: being, the node, and the Agent Card that describes it.
 const amSignumName = "am"
 
 func (s *QNTXServer) amSignum() sigil.Signum {
@@ -51,7 +51,8 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/version"},
 				},
 				{
-					// "am node is the card too"
+					// "am node same thing": am node answers the Agent Card the
+					// asker would be given.
 					Name: "node",
 					Does: "What the node says of itself, as the A2A agent card the asker would be given, read through the pinned spec, and what it leaves empty that the spec requires.",
 					Gives: []*protocol.Field{

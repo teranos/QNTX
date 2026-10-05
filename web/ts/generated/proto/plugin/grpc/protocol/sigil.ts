@@ -10,7 +10,8 @@ export const protobufPackage = "protocol";
 
 /**
  * A Signum holds the sigils of one subject: watchers is a signum, and list,
- * create, read, update and delete are its sigils. To A2A a signum is a skill.
+ * create, read, update and delete are its sigils. On the Agent Card a signum
+ * is described as an AgentSkill.
  */
 export interface Signum {
   name: string;
