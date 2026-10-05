@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -91,16 +90,17 @@ func TestWhatIsSaidToPiIsAnsweredByPi(t *testing.T) {
 	assert.Equal(t, "http://127.0.0.1:8770/api/openrouter-qntx/v1", models.Providers["qntx"].BaseURL)
 }
 
-// Claude Code and Pi answer in one session, written down as the agent, and it
-// reads whole whichever harness answered.
-func TestClaudeCodeAndPiAreOneSession(t *testing.T) {
+// "WHY ISNT PI SEPARATE"
+// One agent in two sessions: each harness's is its own, both signed by the
+// agent's DID, and each element reads only its own.
+func TestClaudeCodeAndPiAreTwoSessionsOfOneAgent(t *testing.T) {
 	s, _, _ := runningPiToo(t)
 
-	first, refused := saying(s, sigil.Sent{"says": "remember 7"})
+	inClaude, refused := saying(s, sigil.Sent{"says": "remember 7"})
 	require.Nil(t, refused)
-	second, refused := sayingToPi(s, sigil.Sent{"says": "how long has the box been up?"})
+	inPi, refused := sayingToPi(s, sigil.Sent{"says": "how long has the box been up?"})
 	require.Nil(t, refused)
-	assert.Equal(t, first["session"], second["session"])
+	assert.NotEqual(t, inClaude["session"], inPi["session"])
 
 	system, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	require.NoError(t, err)
@@ -108,34 +108,45 @@ func TestClaudeCodeAndPiAreOneSession(t *testing.T) {
 		require.NoError(t, signing.Verify(row))
 		assert.Equal(t, s.rootAgent.did, row.SignerDID)
 	}
-	said := sessionSaid(t, s)
-	assert.Contains(t, said, [2]string{"human", "remember 7"})
-	assert.Contains(t, said, [2]string{"session", "Start pi"})
-	assert.Contains(t, said, [2]string{"assistant", "Up 3 days."})
-	// Pi's bash reads as the command it ran, as Claude Code's Bash does.
-	var piRan int
-	for _, turn := range said {
-		if turn == [2]string{"tool", "uptime"} {
-			piRan++
-		}
-	}
-	assert.Equal(t, 2, piRan, "one uptime from each harness")
+
+	claudeSaid := sessionSaid(t, s)
+	assert.Contains(t, claudeSaid, [2]string{"human", "remember 7"})
+	assert.NotContains(t, claudeSaid, [2]string{"session", "Start pi"})
+
+	piSaid := piSessionSaid(t, s)
+	assert.Equal(t, [][2]string{
+		{"human", "how long has the box been up?"},
+		{"session", "Start pi"},
+		{"tool", "uptime"},
+		{"assistant", "Up 3 days."},
+	}, piSaid, "Pi's bash reads as the command it ran, as Claude Code's Bash does")
 }
 
-// Pi does not wait on Claude Code: spoken to first, it starts the session, and
-// Claude Code starts its own side of it rather than resuming what it never held.
-func TestPiSpokenToFirstStartsTheSession(t *testing.T) {
-	s, claudeRan, _ := runningPiToo(t)
+// Each session hears one thing at a time, and the two answer beside each
+// other: Pi answers while Claude Code is in a turn.
+func TestPiAnswersWhileClaudeCodeIsInATurn(t *testing.T) {
+	s, _, _ := runningPiToo(t)
+	s.rootAgent.turn <- struct{}{}
+	defer func() { <-s.rootAgent.turn }()
 
-	first, refused := sayingToPi(s, sigil.Sent{"says": "hello"})
+	answer, refused := sayingToPi(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
-	second, refused := saying(s, sigil.Sent{"says": "and you?"})
-	require.Nil(t, refused)
-	assert.Equal(t, first["session"], second["session"])
+	assert.Equal(t, "Up 3 days.", answer["answer"])
+}
 
-	args := ranWith(t, claudeRan, "0", "args")
-	assert.Equal(t, first["session"], after(args, "--session-id"))
-	assert.False(t, slices.Contains(args, "--resume"), "Claude Code resumed a session it never held")
+// piSessionSaid is the agent's session in Pi as pi session reads it.
+func piSessionSaid(t *testing.T, s *QNTXServer) [][2]string {
+	t.Helper()
+	asked := httptest.NewRequest(http.MethodGet, "/api/pi/session", nil)
+	answer, refused := s.piSession(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+	require.Nil(t, refused)
+	holds(t, s.piSignum(), "session", answer)
+	read, _ := answer.(map[string]any)["transcript"].(transcript)
+	var said [][2]string
+	for _, turn := range read.Turns {
+		said = append(said, [2]string{turn.Speaker, turn.Text})
+	}
+	return said
 }
 
 // A node whose am.toml names no Pi has none to speak to, and says where to

@@ -93,8 +93,11 @@ process. It starts it, resumes it and stops it.
 - It runs in Claude Code or in Pi (earendil-works/pi). What is said in the
   Claude element runs in Claude Code, and what is said in the Pi element runs
   in Pi.
-- Either way it is one session, under its own DID: what it is told, reaches
-  for and answers is written down the same, whichever harness answered.
+"WHY ISNT PI SEPARATE"
+
+- It is one agent in two sessions, one in each harness, under one DID and
+  one token. Each element reads its own harness's session, and the two answer
+  at the same time.
 - Pi reaches the node's MCP with the agent's own token, and its model calls go
   to the provider am.toml names under `[agent.root.pi]`.
 - The node gets Pi as it gets Claude Code, pinned by the build and nothing
