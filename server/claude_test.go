@@ -99,8 +99,11 @@ func runningTheRootAgent(t *testing.T, named appcfg.RootAgentConfig) (s *QNTXSer
 
 	t.Setenv("QNTX_TEST_PLAN_TOKEN", "the-plan-token")
 	named.TokenRef = "env:QNTX_TEST_PLAN_TOKEN"
+	held := servingOne(db, store)
+	system, _ := createTestStore(t)
+	held.SetSystem(oneNamespace("system", &handed{AttestationStore: system}))
 	s = &QNTXServer{
-		held:       servingOne(db, store),
+		held:       held,
 		logger:     zaptest.NewLogger(t).Sugar(),
 		deps:       &serverDependencies{cfg: &appcfg.Config{Agent: appcfg.AgentConfig{Root: named}}},
 		claudeCode: &claudeCodeHeld{fetched: fetched, path: binary},
@@ -171,16 +174,17 @@ func TestTheRootAgentContinuesItsOneSession(t *testing.T) {
 	assert.NotContains(t, again, "--session-id")
 }
 
-// Its session is its own to write down: every row is signed by its DID, and
-// reads back as a transcript where its caller stands.
+// Its session is its own to write down: every row is signed by its DID, in
+// system, which is where the node keeps its own record.
 func TestTheRootAgentsSessionReadsAsATranscriptItSigned(t *testing.T) {
 	s, _ := runningTheRootAgent(t, opusLow)
-	answer, refused := saying(s, sigil.Sent{"says": "how long has the box been up?"})
+	_, refused := saying(s, sigil.Sent{"says": "how long has the box been up?"})
 	require.Nil(t, refused)
-	session, _ := answer["session"].(string)
 
-	wrote, kept := s.held.Served().(*handed)
-	require.True(t, kept, "the store the node serves is not the one this test handed it")
+	system, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	wrote, kept := system.(*handed)
+	require.True(t, kept, "the system store is not the one this test handed it")
 	require.Len(t, wrote.rows, 4)
 	for _, row := range wrote.rows {
 		assert.Equal(t, s.rootAgent.did, row.SignerDID, "%s is not signed by the agent", row.Predicates[0])
@@ -188,20 +192,55 @@ func TestTheRootAgentsSessionReadsAsATranscriptItSigned(t *testing.T) {
 		assert.Equal(t, []string{s.rootAgent.did}, row.Actors)
 		require.NoError(t, signing.Verify(row))
 	}
+	served, _ := s.held.Served().(*handed)
+	assert.Empty(t, served.rows, "a row of the session was written where its speaker stands")
 
-	rows, err := s.held.Served().GetAttestations(ats.AttestationFilter{Contexts: []string{"session:" + session}, Limit: 20})
-	require.NoError(t, err)
-
-	var said [][2]string
-	for _, turn := range transcriptsOf(rows, 1)[0].Turns {
-		said = append(said, [2]string{turn.Speaker, turn.Text})
-	}
 	assert.Equal(t, [][2]string{
 		{"human", "how long has the box been up?"},
 		{"session", "Start startup"},
 		{"tool", "uptime"},
 		{"assistant", "Up 3 days."},
-	}, said)
+	}, sessionSaid(t, s))
+}
+
+// "In my mental model, the ROOT agent is the same session"
+// Spoken to from two namespaces, it is one session, read whole by either.
+func TestTheRootAgentIsOneSessionWhereverItsSpeakersStand(t *testing.T) {
+	s, _ := runningTheRootAgent(t, opusLow)
+	from := func(namespace, says string) {
+		root := auth.Admitted(auth.LevelRoot, namespace)
+		root.Identity = "https://example.org/" + namespace
+		asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
+		asked = asked.WithContext(auth.WithAdmission(asked.Context(), root))
+		_, refused := s.claudeSay(sigil.WithCaller(context.Background(), asked), sigil.Sent{"says": says})
+		require.Nil(t, refused)
+	}
+	from("default", "from the browser")
+	from("elsewhere", "from the phone")
+
+	var told []string
+	for _, turn := range sessionSaid(t, s) {
+		if turn[0] == "human" {
+			told = append(told, turn[1])
+		}
+	}
+	assert.Equal(t, []string{"from the browser", "from the phone"}, told)
+}
+
+// sessionSaid is the agent's session as claude session reads it: each turn's
+// speaker and text.
+func sessionSaid(t *testing.T, s *QNTXServer) [][2]string {
+	t.Helper()
+	asked := httptest.NewRequest(http.MethodGet, "/api/claude/session", nil)
+	answer, refused := s.claudeSession(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+	require.Nil(t, refused)
+	holds(t, s.claudeSignum(), "session", answer)
+	read, _ := answer.(map[string]any)["transcript"].(transcript)
+	var said [][2]string
+	for _, turn := range read.Turns {
+		said = append(said, [2]string{turn.Speaker, turn.Text})
+	}
+	return said
 }
 
 // "make sure --permission-mode is configurable in the Claude Element"
@@ -233,7 +272,7 @@ func TestWhoSpokeToTheRootAgentIsWrittenDown(t *testing.T) {
 	require.Nil(t, refused)
 	session, _ := answer.(map[string]any)["session"].(string)
 
-	told, err := s.held.Served().GetAttestations(ats.AttestationFilter{
+	told, err := s.held.TheNodesOwnRecords().GetAttestations(ats.AttestationFilter{
 		Contexts: []string{"session:" + session}, Predicates: []string{"UserPromptSubmit"}, Limit: 5})
 	require.NoError(t, err)
 	require.Len(t, told, 1)

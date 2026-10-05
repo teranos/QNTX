@@ -3,7 +3,7 @@
 Date: 2026-10-04
 Status: Proposed
 
-QNTX hosts agents.
+QNTX hosts agents for use by ROOT.
 
 "an agent is itself"
 
@@ -19,13 +19,14 @@ QNTX hosts agents.
 - A Task's messages have two roles, user and agent: the user is who sent it,
   the agent is the one doing it. Who may see the Task is the sender's
   admission; what the agent touches is the agent's.
-- An agent stands in a namespace, and nothing crosses (ADR-026).
+- The ROOT agent is ROOT, and no namespace holds it: its session is the node's
+  own record, in system, whoever spoke to it and wherever they stand.
 - To A2A an agent is described by its Agent Card, and its skills are what it
   can perform (ADR-039).
 
 ## The host agent
 
-"the host agent is QNTX as ROOT would talk to it."
+"the ROOT host agent is QNTX as ROOT would talk to it."
 
 "It is the ROOT agent, one persistent session agent that is QNTX itself as
 expressed to ROOT."
@@ -50,8 +51,7 @@ expressed to ROOT."
   down for this agent alone.
 - `claude say` says something to it and answers with what it said back.
 - What it is told, what it reaches for and what it answers, it attests under
-  its session by its own DID, as the hook events a transcript is read from,
-  where whoever spoke to it stands.
+  its session by its own DID, as the hook events a transcript is read from.
 
 "ROOT is ROOT"
 

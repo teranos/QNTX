@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/sigil"
 )
 
@@ -124,8 +125,16 @@ func (s *QNTXServer) transcriptsRead(ctx context.Context, sent sigil.Sent) (any,
 			sessions = append(sessions, t.Session)
 		}
 	}
-	// A session is read whole, by its context. Ground names a control's row
-	// Grounded and the event, for any event, so no list of predicates holds them all.
+	read, refused := sessionsIn(store, sessions, limit)
+	if refused != nil {
+		return nil, refused
+	}
+	return map[string]any{"transcripts": read}, nil
+}
+
+// sessionsIn reads each session whole, by its context. Ground names a control's
+// row Grounded and the event, for any event, so no list of predicates holds them all.
+func sessionsIn(store namespaces.Reading, sessions []string, limit int) ([]transcript, *protocol.Refusal) {
 	var events []*types.As
 	for _, session := range sessions {
 		found, err := store.GetAttestations(ats.AttestationFilter{Contexts: []string{"session:" + session}, Limit: maxTranscriptRead})
@@ -134,7 +143,7 @@ func (s *QNTXServer) transcriptsRead(ctx context.Context, sent sigil.Sent) (any,
 		}
 		events = append(events, found...)
 	}
-	return map[string]any{"transcripts": transcriptsOf(events, limit)}, nil
+	return transcriptsOf(events, limit), nil
 }
 
 // transcriptsOf is the events as sessions, newest first, the first limit of them.

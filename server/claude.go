@@ -115,7 +115,7 @@ func (s *QNTXServer) claudeSignum() sigil.Signum {
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "say",
-					Does: "Says something to the ROOT agent and gives what it answered. It is one session that continues, written down by the agent as it goes and read with transcripts read.",
+					Does: "Says something to the ROOT agent and gives what it answered. It is one session that continues, written down by the agent as it goes and read with claude session.",
 					Takes: []*protocol.Param{
 						{Name: "says", Required: true, Says: "What is said to it."},
 						{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "The permission mode Claude Code runs this in. Not sent, it is the one am.toml gives."},
@@ -152,9 +152,17 @@ func (s *QNTXServer) claudeSignum() sigil.Signum {
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/claude"},
 				},
+				{
+					Name: "session",
+					Does: "The ROOT agent's one session, whole: everything said to it by whoever said it, as a transcript.",
+					Gives: []*protocol.Field{
+						{Name: "transcript", Says: "Its session as turns, each naming the attestation it was read from. Empty before anything was said to it.", Message: "protocol.Transcript"},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/claude/session"},
+				},
 			},
 		},
-		Answers: map[string]sigil.Answer{"say": s.claudeSay, "am": s.claudeAm},
+		Answers: map[string]sigil.Answer{"say": s.claudeSay, "am": s.claudeAm, "session": s.claudeSession},
 	}
 }
 
@@ -185,7 +193,7 @@ func (s *QNTXServer) thereIsNoRootAgent() *protocol.Refusal {
 func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	caller := sigil.Caller(ctx)
 	if caller == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to the ROOT agent is written where its caller stands, and this asking carried no request"}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to the ROOT agent is written down with who said it, and this asking carried no request"}
 	}
 	agent := s.rootAgent
 	if agent == nil {
@@ -205,9 +213,9 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "permission_mode",
 			Says: "no permission mode was named, and am.toml gives none under [agent.root]"}
 	}
-	store, err := s.storeFor(caller)
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no namespace to write the session in: " + err.Error()}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no system to write the ROOT agent's session in: " + err.Error()}
 	}
 
 	select {
@@ -293,6 +301,39 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 		"permission_mode": mode, "denied": denied,
 		"cost_usd": answer.CostUSD, "took_ms": answer.Took.Milliseconds(), "unwritten": unwritten,
 	}, nil
+}
+
+// claudeSession reads the session from where it is written, so whoever may
+// talk to it reads all of it, wherever they stand.
+func (s *QNTXServer) claudeSession(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	agent := s.rootAgent
+	if agent == nil {
+		return nil, s.thereIsNoRootAgent()
+	}
+	session, resumes, err := agent.session()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	if going := agent.answering.Load(); going != nil {
+		session, resumes = going.session, true
+	}
+	none := transcript{Subjects: []string{}, Turns: []transcriptTurn{}}
+	if !resumes {
+		return map[string]any{"transcript": none}, nil
+	}
+	system, err := s.held.Read(auth.NamespaceSystem)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no system to read the ROOT agent's session from: " + err.Error()}
+	}
+	read, refused := sessionsIn(system, []string{session}, 1)
+	if refused != nil {
+		return nil, refused
+	}
+	if len(read) == 0 {
+		none.Session = session
+		return map[string]any{"transcript": none}, nil
+	}
+	return map[string]any{"transcript": read[0]}, nil
 }
 
 func (s *QNTXServer) claudeAm(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {

@@ -45,7 +45,7 @@ export interface ClaudeSaid {
 export interface RootAgent {
     am(): Promise<ClaudeAm>;
     say(says: string, mode: string): Promise<ClaudeSaid>;
-    read(session: string): Promise<TranscriptRead | undefined>;
+    read(): Promise<TranscriptRead | undefined>;
 }
 
 const theNode: RootAgent = {
@@ -55,8 +55,9 @@ const theNode: RootAgent = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mode ? { says, permission_mode: mode } : { says }),
     }),
-    read: (session) => apiJson<{ transcripts: TranscriptRead[] }>(`/api/transcripts?session=${encodeURIComponent(session)}`)
-        .then(answer => answer.transcripts[0]),
+    // Its one session, read whole wherever whoever reads it stands.
+    read: () => apiJson<{ transcript: TranscriptRead }>('/api/claude/session')
+        .then(answer => answer.transcript),
 };
 
 // How often a turn that is going is read again.
@@ -116,7 +117,7 @@ export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: 
         failed.replaceChildren(sacredEntry(apiError(`claude-${Date.now()}`, new Date().toISOString(), said, { surface: 'claude', region: what })));
     };
 
-    const read = (id: string): Promise<void> => node.read(id)
+    const read = (): Promise<void> => node.read()
         .then(answer => {
             if (!answer) return;
             renderTranscript(session, answer, (text) => {
@@ -144,7 +145,7 @@ export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: 
         following = setInterval(() => {
             node.am()
                 .then(is => {
-                    if (is.session) { reading = is.session; void read(reading); }
+                    if (is.session) { reading = is.session; void read(); }
                     if (!is.answering && !sending) settle();
                 })
                 .catch((err: unknown) => { fails('follow', err); if (!sending) settle(); });
@@ -165,7 +166,7 @@ export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: 
                 reading = answer.session;
                 if (answer.denied.length > 0) denied.textContent = `It reached for ${answer.denied.join(', ')} and was not allowed.`;
                 if (answer.unwritten) fails('session', new Error(`a row of the session was not written down: ${answer.unwritten}`));
-                return read(reading);
+                return read();
             })
             // What was typed stays in the box: a refusal does not cost the words.
             .catch((err: unknown) => fails('say', err))
@@ -185,7 +186,7 @@ export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: 
             for (const name of is.permission_modes) mode.appendChild(choice(name, name));
             mode.value = is.permission_mode;
             reading = is.session;
-            if (reading) void read(reading);
+            if (reading) void read();
             else session.textContent = 'Nothing has been said to it yet.';
             if (is.answering) { hold(true); follow(); }
         })

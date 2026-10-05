@@ -175,6 +175,11 @@
         "ROOT"
       ]
     },
+    "/api/claude/session": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/crash-test": {
       "x-qntx-reach": [
         "ROOT"
