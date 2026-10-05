@@ -17,6 +17,9 @@ type sessionWriter struct {
 	session string
 	// resumed is whether the session existed before this run.
 	resumed bool
+	// effort is the effort the node ran this turn at, said on how it ended as
+	// a transcript reads it.
+	effort string
 }
 
 // agentSubject is what an agent's rows are about: where it works.
@@ -102,7 +105,11 @@ func (w sessionWriter) rowsOf(m claudecode.Message, at time.Time) ([]*types.As, 
 			return nil, err
 		}
 	case m.Type == "result":
-		if err := add("Stop", map[string]any{"last_assistant_message": m.Result}); err != nil {
+		attrs := map[string]any{"last_assistant_message": m.Result}
+		if w.effort != "" {
+			attrs["effort"] = map[string]any{"level": w.effort}
+		}
+		if err := add("Stop", attrs); err != nil {
 			return nil, err
 		}
 	}

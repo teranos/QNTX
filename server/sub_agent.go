@@ -28,11 +28,27 @@ type claudeCodeHeld struct {
 // Path is where the pinned binary is, or why this node has none. It waits for
 // a fetch still going, and no longer than whoever asks.
 func (h *claudeCodeHeld) Path(ctx context.Context) (string, error) {
+	// What has arrived is said first: a select between two things that are
+	// both ready picks either.
+	if path, arrived, err := h.Now(); arrived {
+		return path, err
+	}
 	select {
 	case <-h.fetched:
 		return h.path, h.err
 	case <-ctx.Done():
 		return "", errors.Wrap(ctx.Err(), "Claude Code is still being fetched")
+	}
+}
+
+// Now is where the pinned binary is if the fetch has ended, without waiting
+// on one still going.
+func (h *claudeCodeHeld) Now() (path string, arrived bool, err error) {
+	select {
+	case <-h.fetched:
+		return h.path, true, h.err
+	default:
+		return "", false, nil
 	}
 }
 

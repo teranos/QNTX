@@ -136,6 +136,30 @@ func TestWhereTheNodeAnswersOnItsOwnMachine(t *testing.T) {
 	assert.Equal(t, "http://10.0.0.5:8770", ownURLOf("10.0.0.5", 8770))
 }
 
+// What is fetched already is said at once and every time, however little
+// patience whoever asks has: on the box it was said to be still arriving.
+func TestAClaudeCodeAlreadyFetchedIsNeverSaidToBeArriving(t *testing.T) {
+	fetched := make(chan struct{})
+	close(fetched)
+	held := &claudeCodeHeld{fetched: fetched, path: "/kept/claude"}
+	gone, cancel := context.WithCancel(context.Background())
+	cancel()
+	for range 200 {
+		path, arrived, err := held.Now()
+		require.NoError(t, err)
+		require.True(t, arrived)
+		require.Equal(t, "/kept/claude", path)
+
+		path, err = held.Path(gone)
+		require.NoError(t, err)
+		require.Equal(t, "/kept/claude", path)
+	}
+
+	_, arrived, err := (&claudeCodeHeld{fetched: make(chan struct{})}).Now()
+	require.NoError(t, err)
+	assert.False(t, arrived)
+}
+
 // A node whose am.toml names no agent fetches nothing.
 func TestANodeThatNamesNoAgentFetchesNoClaudeCode(t *testing.T) {
 	s := &QNTXServer{deps: &serverDependencies{cfg: &appcfg.Config{}}, logger: zaptest.NewLogger(t).Sugar()}

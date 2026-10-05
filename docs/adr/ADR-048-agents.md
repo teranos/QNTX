@@ -97,15 +97,10 @@ be removed before the work get's merged."
 
 For the first story, in order. Each ends in something that can be checked.
 
-1. Claude Code on the node, answering on Opus 5.5 at low effort with the token
-   the box holds in SSM. Which Claude Code is pinned in parity, and the node
-   fetches that binary itself: none is carried in a QNTX release.
-2. The ROOT agent's own DID, and its token for the node's MCP.
-3. The node starts, resumes and stops the ROOT agent's one session.
-4. A way to say something to it, reached by ROOT, and by SUPER until the work
-   merges. In the UI it is the Claude element.
-5. SUPER removed.
-6. The box upgraded.
+1. ROOT says something to it in the Claude element. What answered on the box
+   so far was said as SUPER, over the HTTP API.
+2. SUPER removed.
+3. The box upgraded.
 
 The node does not see the model traffic of an agent Claude Code runs.
 

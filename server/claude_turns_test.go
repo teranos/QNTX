@@ -24,7 +24,7 @@ func streamedMessage(t *testing.T, line string) claudecode.Message {
 func TestAnAgentsSessionReadsAsATranscript(t *testing.T) {
 	const did = "did:key:zAgent"
 	at := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
-	writes := sessionWriter{did: did, session: "s-1"}
+	writes := sessionWriter{did: did, session: "s-1", effort: "low"}
 
 	var rows []*types.As
 	told, err := writes.told("what does uname -s print?", "tim", at)
@@ -50,6 +50,8 @@ func TestAnAgentsSessionReadsAsATranscript(t *testing.T) {
 	read := transcriptsOf(rows, 10)
 	require.Len(t, read, 1)
 	assert.Equal(t, "claude-opus-5-5", read[0].Model)
+	// On the box the session read with no effort at all.
+	assert.Equal(t, "low", read[0].Effort)
 	var said [][2]string
 	for _, turn := range read[0].Turns {
 		said = append(said, [2]string{turn.Speaker, turn.Text})

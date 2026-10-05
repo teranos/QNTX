@@ -232,7 +232,7 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 
 	// The session is the agent's to write down, signed as itself. A row that
 	// does not land is said with the answer and never stops the turn.
-	writes := sessionWriter{did: agent.did, session: session, resumed: resumes}
+	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: named.Effort}
 	unwritten := ""
 	write := func(rows []*types.As, err error) {
 		if err == nil {
@@ -313,11 +313,12 @@ func (s *QNTXServer) claudeAm(ctx context.Context, _ sigil.Sent) (any, *protocol
 		is["answering"], is["session"] = true, going.session
 	}
 	// Asked without waiting: a fetch still going is said, not sat through.
-	now, cancel := context.WithCancel(ctx)
-	cancel()
-	if path, err := s.claudeCode.Path(now); err != nil {
+	switch path, arrived, err := s.claudeCode.Now(); {
+	case !arrived:
+		is["not_ready"] = "Claude Code is still being fetched"
+	case err != nil:
 		is["not_ready"] = err.Error()
-	} else {
+	default:
 		is["claude_code"] = path
 	}
 	return is, nil
