@@ -181,7 +181,7 @@ export function personSection(who: Person | null, refused: string): string {
     return `
             <div class="element-section">
                 <h3 class="element-section-title">Who you are</h3>
-                ${who.becoming_by ? row('Being:', `ROOT is being this User, as ${who.becoming_by}`) : ''}
+                ${who.becoming_by ? row('Being:', `ROOT (${who.becoming_by}) is being this User`) : ''}
                 ${row('Name:', who.name || who.user)}
                 ${row('Level:', who.level)}
                 ${row('Via:', who.via)}

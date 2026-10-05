@@ -93,7 +93,7 @@ test('a name that is markup does not become markup', () => {
 // ROOT being somebody reads as such, and is offered the way back.
 test('ROOT being a User says so, and offers the way back', () => {
     const being = tim({ level: 'PUBLIC_REGISTRATION', becoming_by: 'US-USER-ROOT0001' });
-    expect(personSection(being, '')).toContain('ROOT is being this User');
+    expect(personSection(being, '')).toContain('ROOT (US-USER-ROOT0001) is being this User');
     expect(personUnbecome(being)?.textContent).toContain('Back to ROOT');
     expect(personUnbecome(tim())).toBeNull();
 });

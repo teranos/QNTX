@@ -74,7 +74,9 @@ function renderI(): void {
     sections.push(personSection(iPerson, iPersonRefusal));
 
     // The person's own key, beside the person rather than beside the node's.
-    if (iOwnerDID !== null) {
+    // It is the passkey owner the node holds, which is ROOT's, so ROOT being
+    // somebody else is not shown it as theirs.
+    if (iOwnerDID !== null && !iPerson?.becoming_by) {
         const value = iOwnerDID
             ? `<span class="element-did">${escapeHtml(iOwnerDID)}</span>`
             : `<span class="status-unwell">${iRegistered ? '⚠ passkey registered, no identity established' : 'no passkey registered'}</span>`;
