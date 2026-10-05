@@ -715,6 +715,11 @@
         "PUBLIC_REGISTRATION"
       ]
     },
+    "/i/unbecome": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/mcp": {
       "x-qntx-reach": [
         "ROOT",

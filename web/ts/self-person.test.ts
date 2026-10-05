@@ -4,7 +4,7 @@
  */
 
 import { test, expect } from 'bun:test';
-import { personSection, type Person } from './self-person';
+import { personSection, personUnbecome, type Person } from './self-person';
 
 function tim(over: Partial<Person> = {}): Person {
     return {
@@ -88,4 +88,12 @@ test('a name that is markup does not become markup', () => {
     const html = personSection(tim({ name: '<script>x</script>' }), '');
 
     expect(html).not.toContain('<script>');
+});
+
+// ROOT being somebody reads as such, and is offered the way back.
+test('ROOT being a User says so, and offers the way back', () => {
+    const being = tim({ level: 'PUBLIC_REGISTRATION', becoming_by: 'US-USER-ROOT0001' });
+    expect(personSection(being, '')).toContain('ROOT is being this User');
+    expect(personUnbecome(being)?.textContent).toContain('Back to ROOT');
+    expect(personUnbecome(tim())).toBeNull();
 });
