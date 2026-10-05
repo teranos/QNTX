@@ -7,6 +7,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/errors"
 )
 
 // What carries a push from this node (ADR-048, Its git): a token the node
@@ -37,9 +38,10 @@ func githubCredentialSigil() *protocol.Sigil {
 
 func (s *QNTXServer) githubCredential(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	minted, err := s.gitHubService().InstallationToken(ctx, sent["owner"], sent["repo"])
-	switch err := err.(type) {
-	case nil:
-	case services.NoInstallation:
+	var notInstalled services.NoInstallation
+	switch {
+	case err == nil:
+	case errors.As(err, &notInstalled):
 		// GitHub answers 404 both where the App is not installed and where
 		// there is no such repository: its words are given as they came.
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "repo", Says: err.Error()}

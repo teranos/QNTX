@@ -8,6 +8,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/errors"
 )
 
 // GitHubService through sigils (ADR-048, Its git): what a plugin asks over
@@ -42,25 +43,32 @@ func githubAskSigils() []*protocol.Sigil {
 func (s *QNTXServer) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	operation := sent["operation"]
 	raw, err := s.gitHubService().Ask(services.AsInstallation(ctx), operation, []byte(sent["request"]))
-	switch err := err.(type) {
-	case nil:
-	case services.NoSuchOperation:
+	var noSuch services.NoSuchOperation
+	var notTaken services.NotWhatItTakes
+	switch {
+	case err == nil:
+	case errors.As(err, &noSuch):
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "operation", Says: err.Error() + "; github operations lists what it has"}
-	case services.NotWhatItTakes:
+	case errors.As(err, &notTaken):
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "request", Says: err.Error()}
 	default:
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 
-	var answered map[string]any
-	if err := json.Unmarshal(raw, &answered); err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what " + operation + " answered did not read: " + err.Error()}
-	}
 	// success and error are GitHubService's own: a failure is the refusal, and
 	// what is given is GitHub's answer alone.
-	if succeeded, _ := answered["success"].(bool); !succeeded {
-		said, _ := answered["error"].(string)
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: operation + ": " + said}
+	var said struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+	}
+	var answered map[string]any
+	for _, into := range []any{&said, &answered} {
+		if err := json.Unmarshal(raw, into); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what " + operation + " answered did not read: " + err.Error()}
+		}
+	}
+	if !said.Success {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: operation + ": " + said.Error}
 	}
 	delete(answered, "success")
 	delete(answered, "error")
