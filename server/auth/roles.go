@@ -332,7 +332,7 @@ func (h *Handler) MayGrantRoles(a Admission) bool {
 	if a.Grant != nil {
 		return a.Grant.Level == LevelSuper && h.levelOf(a.Grant.MintedBy) == LevelRoot
 	}
-	return a.level == LevelRoot
+	return a.IsRoot()
 }
 
 // MayGrant reports whether an admission may grant one role, given who the
@@ -350,15 +350,7 @@ func (h *Handler) MayGrant(a Admission, namespace string, granters []string) boo
 	if len(granters) == 0 || !slices.Contains(a.Namespaces, namespace) {
 		return false
 	}
-	if slices.Contains(granters, string(a.level)) {
-		return true
-	}
-	for _, held := range a.roles {
-		if slices.Contains(granters, held) {
-			return true
-		}
-	}
-	return false
+	return a.NamedBy(granters)
 }
 
 // IsRoot reports whether an actor on a line is ROOT: a root identity from

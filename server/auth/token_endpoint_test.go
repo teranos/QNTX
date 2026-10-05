@@ -144,7 +144,7 @@ func TestTheCodeIsExchangedForTheTokenTheStoreWrites(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+answer.AccessToken)
 	admission, admitted := h.admissionOf(h.presented(req))
 	require.True(t, admitted, "the issued token is not admitted as a bearer")
-	assert.Equal(t, LevelRoot, admission.level)
+	assert.Equal(t, string(LevelRoot), admission.LevelName())
 	assert.Equal(t, mastodonAccount, admission.Identity)
 	assert.Equal(t, []string{NamespaceDefault}, admission.Namespaces)
 	assert.Nil(t, admission.Grant, "the token was admitted as a token rather than as the person")

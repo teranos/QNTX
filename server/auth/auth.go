@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/ory/fosite"
+	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -249,12 +250,12 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 			h.rejectSwitchedOff(w, r, admitted, by)
 			return
 		}
-		if !reach.reaches(admitted.level, admitted.roles) {
-			h.rejectOutOfReach(w, r, admitted.level, route, reach)
+		if !reach.Admits(admitted) {
+			h.rejectOutOfReach(w, r, admitted, route, reach)
 			return
 		}
 		measure.Count(measure.Admitted, 1,
-			measure.String(measure.AttrLevel, string(admitted.level)),
+			measure.String(measure.AttrLevel, admitted.LevelName()),
 			measure.String(measure.AttrRoute, route),
 		)
 		next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
@@ -311,7 +312,6 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// What kind of token this is was decided when it was minted, so it is
 		// read off the record rather than settled here for all of them.
 		admitted := Admission{
-			level:      grant.Level,
 			Namespaces: grant.Namespaces,
 			Identity:   grant.MintedBy,
 			// Recorded at minting, so a bearer names the person it speaks for
@@ -323,12 +323,12 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// A token holds roles by its label, its name, so a grant is one kind of
 		// line whether it names a person or a program. In every namespace the
 		// token names, and in system.
+		var roles []string
 		for _, namespace := range grant.Namespaces {
-			admitted.roles = append(admitted.roles, h.RolesOfToken(grant.Label, namespace)...)
+			roles = append(roles, h.RolesOfToken(grant.Label, namespace)...)
 		}
-		admitted.seesSystem = len(h.RolesOfToken(grant.Label, NamespaceSystem)) > 0
-		admitted.words = h.WordsOf(admitted.roles)
-		return admitted, true
+		seesSystem := len(h.RolesOfToken(grant.Label, NamespaceSystem)) > 0
+		return admission.Granted(admitted, grant.Level, roles, seesSystem, h.WordsOf(roles)), true
 	}
 
 	identity, ok := p.Admitted()
@@ -349,7 +349,6 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		return Admission{}, false
 	}
 	admitted := Admission{
-		level:    level,
 		Identity: identity,
 		// Carried on the session since login, so this costs nothing.
 		UserID:      p.UserID,
@@ -367,9 +366,8 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	// What the person holds where they act, and whether they hold anything in
 	// system. Read from the lines ROOT wrote; a node with no reader holds
 	// nobody to anything, which is what nothing granted means.
-	admitted.roles, admitted.seesSystem = h.holdingsOf(identity, p.Namespace)
-	admitted.words = h.WordsOf(admitted.roles)
-	return admitted, true
+	roles, seesSystem := h.holdingsOf(identity, p.Namespace)
+	return admission.Granted(admitted, level, roles, seesSystem, h.WordsOf(roles)), true
 }
 
 // admittedAsThePerson is what a person's own session would be admitted as,
@@ -377,7 +375,6 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 // an admission a token's, narrowed by lines, and this one is not.
 func (h *Handler) admittedAsThePerson(grant Grant) Admission {
 	admitted := Admission{
-		level:       h.levelOf(grant.MintedBy),
 		Namespaces:  grant.Namespaces,
 		Identity:    grant.MintedBy,
 		UserID:      grant.MintedByUser,
@@ -386,9 +383,8 @@ func (h *Handler) admittedAsThePerson(grant Grant) Admission {
 		TokenDID:    grant.DID,
 		TokenLabel:  grant.Label,
 	}
-	admitted.roles, admitted.seesSystem = h.holdingsOf(grant.MintedBy, namespaceOf(grant))
-	admitted.words = h.WordsOf(admitted.roles)
-	return admitted
+	roles, seesSystem := h.holdingsOf(grant.MintedBy, namespaceOf(grant))
+	return admission.Granted(admitted, h.levelOf(grant.MintedBy), roles, seesSystem, h.WordsOf(roles))
 }
 
 // holdingsOf is the roles an identity's User holds in a namespace, and
@@ -663,14 +659,14 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 // line granted them this route.
 
 // 403 and not 401: presenting the credential again changes nothing.
-func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, level Level, route string, reach Reach) {
+func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, admitted Admission, route string, reach Reach) {
 	h.logger.Infow("Route refused",
 		"path", r.URL.Path,
-		"level", string(level),
+		"level", admitted.LevelName(),
 		"reaches", reach.Beyond())
 	measure.Count(measure.Refused, 1,
 		measure.String(measure.AttrOutcome, "out-of-reach"),
-		measure.String(measure.AttrLevel, string(level)),
+		measure.String(measure.AttrLevel, admitted.LevelName()),
 		measure.String(measure.AttrRoute, route),
 	)
 	h.writeError(w, http.StatusForbidden, "this route is not yours")

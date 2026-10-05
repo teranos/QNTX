@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -310,7 +310,7 @@ func HeadersFor(ctx context.Context) []*protocol.HTTPHeader { return askerFrom(c
 
 // askerFrom is who the node admitted, as the headers a plugin reads it by.
 func askerFrom(ctx context.Context) []*protocol.HTTPHeader {
-	admitted, gated := auth.AdmissionFrom(ctx)
+	admitted, gated := admission.AdmissionFrom(ctx)
 	if !gated {
 		return nil
 	}

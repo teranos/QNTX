@@ -15,7 +15,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/watcher"
 	elementstorage "github.com/teranos/QNTX/element/storage"
-	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -110,7 +110,7 @@ func (h *CanvasHandler) canvasNamed(r *http.Request, store *elementstorage.Canva
 // mayAct is whether the caller may act on a canvas: its owners may, those
 // granted the namespace's canvas may, and ROOT and SUPER own every one.
 func (h *CanvasHandler) mayAct(r *http.Request, canvas elementstorage.Canvas) bool {
-	admitted, gated := auth.AdmissionFrom(r.Context())
+	admitted, gated := admission.AdmissionFrom(r.Context())
 	if !gated || admitted.OwnsEveryCanvas() {
 		return true
 	}
@@ -176,7 +176,7 @@ func (h *CanvasHandler) HandleCanvas(w http.ResponseWriter, r *http.Request) {
 			h.writeError(w, errors.New("name is required"), http.StatusBadRequest)
 			return
 		}
-		admitted, gated := auth.AdmissionFrom(r.Context())
+		admitted, gated := admission.AdmissionFrom(r.Context())
 		if gated && !admitted.OwnsEveryCanvas() {
 			h.writeError(w, errors.New("only ROOT, or SUPER here, creates the namespace's canvas"), http.StatusForbidden)
 			return
