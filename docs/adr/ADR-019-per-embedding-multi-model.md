@@ -148,7 +148,7 @@ Search("similar to X", model="MiniLM-L6-v2")
 - `embed(&self)` with per-model write locks
 - `EmbedRequest.model`, `BatchEmbedRequest.model`, `ModelInfoRequest.model` fields in proto
 - Config parses `models` key as JSON array of paths, falls back to `model_path`/`model_name`
-- Go/TS/OCaml proto regenerated, QNTX builds and tests pass
+- Go/TS proto regenerated, QNTX builds and tests pass
 - Health endpoint and `/api/cyrnel/models` list all loaded models
 
 ### Phase 2: Schema + Storage ✅
