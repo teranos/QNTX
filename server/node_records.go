@@ -40,15 +40,22 @@ func (s *QNTXServer) nodeRecords() NodeRecords { return NodeRecords{s: s} }
 
 // newest is the newest line per predicate about subject.
 func (r NodeRecords) newest(subject string) (map[string]*types.As, error) {
-	if r.s.held == nil {
-		return nil, errors.New("this node holds no store to keep its records in")
+	return newestLines(r.s, subject, "records")
+}
+
+// newestLines is the newest line per predicate about subject, read where the
+// node keeps its own lines. kept names what the node keeps there, for the error
+// when it holds no store.
+func newestLines(s *QNTXServer, subject, kept string) (map[string]*types.As, error) {
+	if s.held == nil {
+		return nil, errors.Newf("this node holds no store to keep its %s in", kept)
 	}
 	// Read where nodeRecord writes: system, or default on a backend with none.
 	where := auth.NamespaceDefault
-	if r.s.held.KeepsSystem() {
+	if s.held.KeepsSystem() {
 		where = auth.NamespaceSystem
 	}
-	reading, err := r.s.held.Read(where)
+	reading, err := s.held.Read(where)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read the %s lines in %s", subject, where)
 	}
