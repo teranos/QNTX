@@ -8,8 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/internal/access"
+	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -306,7 +307,7 @@ func TestAsker_TheNodeSaysWhoIsAsking(t *testing.T) {
 	mux := http.NewServeMux()
 	proxy.RegisterHTTP(mux)
 
-	admitted := auth.Admitted(auth.LevelAttestor)
+	admitted := admission.Admitted(access.LevelAttestor)
 	admitted.Identity = "did:key:z6MkTim"
 	admitted.UserID = "US-TIM-7K4M3B9X"
 
@@ -316,7 +317,7 @@ func TestAsker_TheNodeSaysWhoIsAsking(t *testing.T) {
 	req.Header.Set("X-Qntx-Asker-Level", "ROOT")
 	req.Header.Set("X-Qntx-Namespace", "Forged")
 	req.Header.Set("X-Qntx-Store-Token", "forged")
-	req = req.WithContext(auth.WithAdmission(req.Context(), admitted))
+	req = req.WithContext(admission.WithAdmission(req.Context(), admitted))
 
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
@@ -330,7 +331,7 @@ func TestAsker_TheNodeSaysWhoIsAsking(t *testing.T) {
 	// The call the node opened for the request is what the plugin is handed.
 	req = httptest.NewRequest("POST", "/api/mock/who", nil)
 	req.Header.Set("X-Qntx-Store-Token", "forged")
-	req = req.WithContext(WithCall(auth.WithAdmission(req.Context(), admitted), "node-token", "Clean"))
+	req = req.WithContext(WithCall(admission.WithAdmission(req.Context(), admitted), "node-token", "Clean"))
 	mux.ServeHTTP(httptest.NewRecorder(), req)
 	assert.Equal(t, []string{"node-token"}, storeToken)
 	assert.Equal(t, []string{"Clean"}, namespace)

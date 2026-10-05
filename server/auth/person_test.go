@@ -177,11 +177,7 @@ func TestAUserTheStoreDoesNotHoldIsAnError(t *testing.T) {
 	h.users = &memUsers{}
 
 	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
-	req = req.WithContext(WithAdmission(req.Context(), Admission{
-		level:    LevelRoot,
-		Identity: mastodonAccount,
-		UserID:   "US-GONE",
-	}))
+	req = req.WithContext(WithAdmission(req.Context(), rootAs(mastodonAccount, "US-GONE")))
 
 	rec := httptest.NewRecorder()
 	h.HandleTheUser(rec, req)
@@ -196,11 +192,7 @@ func TestAStoreThatWillNotAnswerIsSaidRatherThanDrawnBlank(t *testing.T) {
 	h.users = brokenUsers{}
 
 	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
-	req = req.WithContext(WithAdmission(req.Context(), Admission{
-		level:    LevelRoot,
-		Identity: mastodonAccount,
-		UserID:   "US-TIM",
-	}))
+	req = req.WithContext(WithAdmission(req.Context(), rootAs(mastodonAccount, "US-TIM")))
 
 	rec := httptest.NewRecorder()
 	h.HandleTheUser(rec, req)
@@ -222,4 +214,12 @@ func TestAStrangerNeverReachesTheirOwnUser(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	assert.Equal(t, "no session", body["error"])
+}
+
+// rootAs is a ROOT admission for one identity and the User it reaches.
+func rootAs(identity, userID string) Admission {
+	a := Admitted(LevelRoot)
+	a.Identity = identity
+	a.UserID = userID
+	return a
 }
