@@ -139,8 +139,8 @@ REACH is '/api/parity/hold' '/api/parity/storage' '/api/parity/follows'   of ROO
 REACH is '/api/transcripts'                                               of ROOT SUPER
 
 # The ROOT agent (the claude signum, ADR-048). Who may talk to it is the whole
-# of what guards it. SUPER is here while it is built, and goes before it merges.
-REACH is '/api/claude' '/api/claude/say'                                  of ROOT SUPER
+# of what guards it, and that is ROOT.
+REACH is '/api/claude' '/api/claude/say'                                  of ROOT
 
 # A2A over HTTP+JSON, one line for every operation: a route like
 # /tasks/{id}:cancel is no pattern the mux reads. "A2A is ROOT's alone for the

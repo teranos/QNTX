@@ -167,14 +167,12 @@
     },
     "/api/claude": {
       "x-qntx-reach": [
-        "ROOT",
-        "SUPER"
+        "ROOT"
       ]
     },
     "/api/claude/say": {
       "x-qntx-reach": [
-        "ROOT",
-        "SUPER"
+        "ROOT"
       ]
     },
     "/api/crash-test": {

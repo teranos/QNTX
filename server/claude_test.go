@@ -349,13 +349,13 @@ func TestTheClaudeSignumSaysWhatItHolds(t *testing.T) {
 	require.NoError(t, s.claudeSignum().Check())
 }
 
-// "The only guard is who may talk to it. That is ROOT, and SUPER during
-// development, removed before the work merges."
+// "remove SUPER"
+// The only guard is who may talk to it, and that is ROOT.
 func TestWhoMayTalkToTheRootAgent(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
 	s, _ := runningTheRootAgent(t, opusLow)
 	for _, held := range s.claudeSignum().GetSigils() {
-		assert.Equal(t, []string{"ROOT", "SUPER"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
+		assert.Equal(t, []string{"ROOT"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
 	}
 }

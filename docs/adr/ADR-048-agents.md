@@ -94,12 +94,15 @@ same session, readable as a transcript.
 "for development purposes SUPER will be allowed temporarily, but SUPER needs to
 be removed before the work get's merged."
 
+"remove SUPER"
+
+Its reach line names ROOT and nobody else.
+
 ## Not done
 
-For the first story, in order. Each ends in something that can be checked.
+For the first story. It ends in something that can be checked.
 
-1. SUPER removed.
-2. The box upgraded.
+1. The box upgraded.
 
 The node does not see the model traffic of an agent Claude Code runs.
 
