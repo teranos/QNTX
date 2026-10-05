@@ -187,6 +187,11 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 	if agent == nil {
 		return nil, s.thereIsNoRootAgent()
 	}
+	// Its token is ROOT's kind, and it would be asking from inside the turn
+	// it then waits on.
+	if spokenBy(caller) == agent.did {
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: "the ROOT agent does not speak to itself: it is in the turn that asked"}
+	}
 	named := s.deps.cfg.Agent.Root
 	mode := sent["permission_mode"]
 	if mode == "" {

@@ -240,6 +240,23 @@ func TestWhoSpokeToTheRootAgentIsWrittenDown(t *testing.T) {
 	assert.Equal(t, "https://github.com/tim", told[0].Attributes["said_by"])
 }
 
+// Its token is ROOT's kind, so the gate would let it speak to itself, from
+// inside the turn it would then wait on. It is told no.
+func TestTheRootAgentDoesNotSpeakToItself(t *testing.T) {
+	s, ran := runningTheRootAgent(t, opusLow)
+	itself := auth.Admitted(auth.LevelRoot)
+	itself.Grant = &auth.Grant{DID: s.rootAgent.did}
+	asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
+	asked = asked.WithContext(auth.WithAdmission(asked.Context(), itself))
+
+	_, refused := s.claudeSay(sigil.WithCaller(context.Background(), asked), sigil.Sent{"says": "hello me"})
+	require.NotNil(t, refused)
+	assert.Equal(t, sigil.NotAllowed, refused.GetWhy())
+	runs, err := os.ReadDir(ran)
+	require.NoError(t, err)
+	assert.Empty(t, runs, "Claude Code was run for what the agent said to itself")
+}
+
 // A node whose am.toml names no ROOT agent has none to speak to.
 func TestANodeThatNamesNoRootAgentHasNoneToSpeakTo(t *testing.T) {
 	s, _ := runningTheRootAgent(t, opusLow)
