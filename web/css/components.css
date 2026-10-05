@@ -384,6 +384,18 @@
 .tr-seam-compaction { border-bottom: 2px solid rgba(255, 171, 0, 0.6); }
 .tr-warp-view { position: absolute; left: 0; width: 100%; border: 1px solid var(--accent-on-dark); background: rgba(125, 186, 138, 0.08); pointer-events: none; }
 
+/* Claude element: the ROOT agent's session, drawn as a transcript, over where something is said to it */
+.claude { display: flex; flex-direction: column; width: 520px; height: 640px; max-width: 100%; max-height: 100%; min-height: 0; padding: 0; text-align: left; font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-on-dark); }
+.claude-who { padding: 3px 6px; border-bottom: 1px solid var(--border-on-dark); color: var(--text-on-dark-secondary); font-size: var(--font-size-xs, 10px); overflow-wrap: break-word; word-break: break-word; flex-shrink: 0; }
+.claude-session { flex: 1; color: var(--text-on-dark-tertiary); }
+.claude-session .tr-head { display: none; }
+.claude-status { padding: 0 6px; color: var(--element-status-running-text); font-size: var(--font-size-xs, 10px); flex-shrink: 0; }
+.claude-denied { padding: 0 6px; color: var(--color-warning); font-size: var(--font-size-xs, 10px); flex-shrink: 0; }
+.claude-failed { padding: 0 6px; flex-shrink: 0; }
+.claude-say { display: flex; gap: 4px; align-items: stretch; padding: 4px 6px; border-top: 1px solid var(--border-on-dark); flex-shrink: 0; }
+.claude-mode { background: var(--bg-almost-black); color: var(--text-on-dark-secondary); border: 1px solid var(--border-on-dark); font: inherit; font-size: var(--font-size-xs, 10px); }
+.claude-says { flex: 1; min-width: 0; resize: none; background: var(--bg-almost-black); color: var(--text-on-dark); border: 1px solid var(--border-on-dark); font: inherit; padding: 2px 4px; }
+
 /* Ground's own faces, the ones its book is typeset in (teranos/ground doc/fonts), worn by the Ground element alone */
 @font-face { font-family: "TeX Gyre Schola"; src: url("../fonts/ground/texgyreschola-regular.otf") format("opentype"); font-weight: normal; font-style: normal; font-display: block; }
 @font-face { font-family: "TeX Gyre Schola"; src: url("../fonts/ground/texgyreschola-bold.otf") format("opentype"); font-weight: bold; font-style: normal; font-display: block; }

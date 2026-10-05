@@ -290,6 +290,28 @@ func TestTheRootAgentSaysWhoItIs(t *testing.T) {
 	assert.Equal(t, answer["session"], after.(map[string]any)["session"])
 }
 
+// While it is answering, it says so and in which session, so what it is doing
+// can be read as it does it, from the first thing ever said to it.
+func TestTheRootAgentSaysWhenItIsAnswering(t *testing.T) {
+	s, _ := runningTheRootAgent(t, opusLow)
+	asked := httptest.NewRequest(http.MethodGet, "/api/claude", nil)
+	am := func() map[string]any {
+		is, refused := s.claudeAm(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+		require.Nil(t, refused)
+		return is.(map[string]any)
+	}
+	assert.Equal(t, false, am()["answering"])
+
+	s.rootAgent.answering.Store(&turnInSession{session: "s-first"})
+	during := am()
+	assert.Equal(t, true, during["answering"])
+	assert.Equal(t, "s-first", during["session"])
+
+	_, refused := saying(s, sigil.Sent{"says": "hello"})
+	require.Nil(t, refused)
+	assert.Equal(t, false, am()["answering"], "a turn that ended is still said to be going")
+}
+
 // Its DID is its own: derived from the node's key, and not the node's.
 func TestTheRootAgentIsItself(t *testing.T) {
 	seed := make([]byte, ed25519.SeedSize)

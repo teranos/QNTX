@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,7 +42,12 @@ type rootAgent struct {
 	// turn holds one value while it is being spoken to: it is one session, and
 	// what is said to it is heard one at a time.
 	turn chan struct{}
+	// answering is the turn it is in, and nil between turns.
+	answering atomic.Pointer[turnInSession]
 }
+
+// turnInSession is a turn going on, by the session it is in.
+type turnInSession struct{ session string }
 
 // theRootAgent is the ROOT agent of the node holding this key, working in home.
 func theRootAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {
@@ -136,6 +142,7 @@ func (s *QNTXServer) claudeSignum() sigil.Signum {
 						{Name: "permission_modes", Says: "Every permission mode Claude Code has."},
 						{Name: "allow", Says: "The tools it may use without being asked."},
 						{Name: "session", Says: "The session it continues, or empty before anything was said to it."},
+						{Name: "answering", Says: "Whether it is in a turn now."},
 						{Name: "claude_code", Says: "Where the Claude Code it runs on is, or empty when the node has none."},
 						{Name: "not_ready", Says: "Why it cannot be spoken to, when it cannot."},
 					},
@@ -214,6 +221,9 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 
+	agent.answering.Store(&turnInSession{session: session})
+	defer agent.answering.Store(nil)
+
 	// The session is the agent's to write down, signed as itself. A row that
 	// does not land is said with the answer and never stops the turn.
 	writes := sessionWriter{did: agent.did, session: session, resumed: resumes}
@@ -281,7 +291,7 @@ func (s *QNTXServer) claudeAm(ctx context.Context, _ sigil.Sent) (any, *protocol
 	is := map[string]any{
 		"did": agent.did, "model": named.Model, "effort": named.Effort,
 		"permission_mode": named.Mode, "permission_modes": appcfg.PermissionModes,
-		"allow": named.Allow, "session": "", "claude_code": "", "not_ready": "",
+		"allow": named.Allow, "session": "", "answering": false, "claude_code": "", "not_ready": "",
 	}
 	if is["allow"] == nil {
 		is["allow"] = []string{}
@@ -291,6 +301,10 @@ func (s *QNTXServer) claudeAm(ctx context.Context, _ sigil.Sent) (any, *protocol
 		is["not_ready"] = err.Error()
 	} else if resumes {
 		is["session"] = session
+	}
+	// A first turn is in a session not kept yet, and is read all the same.
+	if going := agent.answering.Load(); going != nil {
+		is["answering"], is["session"] = true, going.session
 	}
 	// Asked without waiting: a fetch still going is said, not sat through.
 	now, cancel := context.WithCancel(ctx)
