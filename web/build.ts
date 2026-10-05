@@ -10,7 +10,7 @@
  * - Binary size and structure
  */
 
-import { cp, mkdir, readdir, rm } from "fs/promises";
+import { cp, mkdir, readdir, rm, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
 import { Database } from "bun:sqlite";
@@ -46,6 +46,13 @@ const red = "\x1b[91m"; // Bright red for errors
 const reset = "\x1b[0m";
 const dim = "\x1b[2m";
 
+// QNTX_WEB_WASM=none builds the UI without the browser WASM (make ats, make laye):
+// a QuickDev session can see the UI without a Rust toolchain. Each missing module
+// is a stand-in whose init() throws, which the UI already meets as a WASM that
+// failed to load. Only on asking — a build that drops sign-in by itself must not ship.
+const WITHOUT_WASM = process.env.QNTX_WEB_WASM === "none";
+const standIns: string[] = [];
+
 console.log(`${peach}Building QNTX Web UI...${reset}`);
 console.log(`${dim}   Source: ${sourceDir}${reset}`);
 console.log(`${dim}   Output: ${outputDir}${reset}`);
@@ -63,6 +70,16 @@ try {
   await mkdir(outputDir, { recursive: true });
 
   // Bundle TypeScript with Bun
+  if (WITHOUT_WASM) {
+    for (const name of ["ats_wasm.js", "laye_p2p.js"]) {
+      const file = join(sourceDir, "wasm", name);
+      if (existsSync(file)) continue;
+      await writeFile(file, `export default function init() { return Promise.reject(new Error(${JSON.stringify(`built without ${name} (QNTX_WEB_WASM=none); make ats laye builds it`)})); }\n`);
+      standIns.push(file);
+      console.log(`${lightPeach}   Without ${name}: its init() refuses${reset}`);
+    }
+  }
+
   console.log(`${darkPeach}Bundling JavaScript...${reset}`);
   const result = await Bun.build({
     entrypoints: [join(sourceDir, "ts", "main.ts")],
@@ -73,6 +90,8 @@ try {
     external: [], // Bundle everything, don't externalize anything
     throw: false, // Return errors in result.logs instead of throwing
   });
+  // A stand-in left behind would pass for the real module on the next build.
+  for (const file of standIns) await rm(file);
 
   if (!result.success) {
     console.error(`\n${red}${'='.repeat(80)}${reset}`);
@@ -190,7 +209,7 @@ try {
       }
     }
 
-    if (copiedCount === 0) {
+    if (copiedCount === 0 && !WITHOUT_WASM) {
       console.error(`\n${red}${'='.repeat(80)}${reset}`);
       console.error(`${red}███ FATAL BUILD ERROR: No WASM files found ███${reset}`);
       console.error(`${red}${'='.repeat(80)}${reset}`);
