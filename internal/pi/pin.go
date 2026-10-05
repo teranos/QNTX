@@ -3,6 +3,7 @@ package pi
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,9 +12,14 @@ import (
 	"github.com/teranos/errors"
 )
 
+// pinnedFlake is the pin's one place: CI builds the same file into the cache.
+//
+//go:embed pinned-flake
+var pinnedFlake string
+
 // PinnedFlake is the Pi this build runs: v1.0.3 of earendil-works/pi, by its
 // commit, as its own flake builds it.
-const PinnedFlake = "github:earendil-works/pi/d78dc83d633229d12f8b79631384c4c2717c399f#pi"
+var PinnedFlake = strings.TrimSpace(pinnedFlake)
 
 // PinnedVersion is the release that commit is.
 const PinnedVersion = "1.0.3"
@@ -41,8 +47,9 @@ func Ensure(ctx context.Context, nix, flake, link string) (string, error) {
 	}
 	// link roots Pi: the box collects its Nix store at every deploy.
 	// An uncached evaluation cannot name derivations that collection deleted.
+	// No job builds here: Pi comes from the cache CI fills, never at the node's expense.
 	cmd := exec.CommandContext(ctx, nix, "--extra-experimental-features", "nix-command flakes",
-		"build", "--no-eval-cache", "--out-link", link, "--print-out-paths", flake)
+		"build", "--no-eval-cache", "--max-jobs", "0", "--out-link", link, "--print-out-paths", flake)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
