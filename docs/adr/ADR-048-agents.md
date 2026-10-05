@@ -104,6 +104,12 @@ process. It starts it, resumes it and stops it.
 - Each harness keeps its own context. What was said in one is in the session,
   and is not in the other's memory.
 
+"LETS SAY FOR DEVELOPMENT WEE USE"
+
+- In Pi it runs the model am.toml names, which need not be Claude: during
+  development, `openai/gpt-oss-120b` through OpenRouter. In Claude Code only
+  Claude can be it.
+
 ## First uses
 
 - A ritual's performer, in place of `claude --bg` on the operator's machine
