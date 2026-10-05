@@ -116,14 +116,15 @@ utilizing"
   when it pushes (`github credential`), and the node mints one as the App's
   installation: for that repository alone, and short lived.
 - What GitHub answers over its API, a pull request opened or a run read, it
-  asks of GitHubService through sigils, as a plugin asks over gRPC.
+  asks of GitHubService through sigils (`github ask`, with `github operations`
+  for what can be asked), as a plugin asks over gRPC. It is spent as the App's
+  installation where the repository is.
 
 "I want to get into a position where i can use the Claude Element to prepare
 PR's againt QNTX"
 
-Not there: the App reads contents and cannot write them, GitHubService is
-reached by plugins alone, and where the agent runs has none of what building
-QNTX takes.
+Not there: the App reads contents and cannot write them, and where the agent
+runs has none of what building QNTX takes.
 
 ## Not done
 
