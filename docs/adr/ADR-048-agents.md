@@ -98,10 +98,8 @@ be removed before the work get's merged."
 
 For the first story, in order. Each ends in something that can be checked.
 
-1. ROOT says something to it in the Claude element. What answered on the box
-   so far was said as SUPER, over the HTTP API.
-2. SUPER removed.
-3. The box upgraded.
+1. SUPER removed.
+2. The box upgraded.
 
 The node does not see the model traffic of an agent Claude Code runs.
 
