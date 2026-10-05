@@ -36,24 +36,29 @@ func appHoldingServer(t *testing.T, contents string) (*QNTXServer, *[]askedOfGit
 	github := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		*asked = append(*asked, askedOfGitHub{Route: r.Method + " " + r.URL.Path, Body: string(body)})
-		// What the App signs is a JWT, and a JWT's header starts ey.
-		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ey") {
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(map[string]string{"message": "A JSON web token could not be decoded"})
-			return
+		presented := r.Header.Get("Authorization")
+		refuse := func(status int, message string) {
+			w.WriteHeader(status)
+			_ = json.NewEncoder(w).Encode(map[string]string{"message": message})
 		}
-		switch r.Method + " " + r.URL.Path {
-		case "GET /repos/teranos/QNTX/installation":
+		// What is the App's own is taken with what the App signs: a JWT, whose
+		// header starts ey. Anything else is taken with the token it minted.
+		ownedByTheApp := strings.HasSuffix(r.URL.Path, "/installation") || strings.HasPrefix(r.URL.Path, "/app/")
+		switch {
+		case ownedByTheApp && !strings.HasPrefix(presented, "Bearer ey"):
+			refuse(http.StatusUnauthorized, "A JSON web token could not be decoded")
+		case !ownedByTheApp && presented != "Bearer ghs_minted":
+			refuse(http.StatusUnauthorized, "Bad credentials")
+		case r.Method+" "+r.URL.Path == "GET /repos/teranos/QNTX/installation":
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": 7, "app_slug": "the-app"})
-		case "POST /app/installations/7/access_tokens":
+		case r.Method+" "+r.URL.Path == "POST /app/installations/7/access_tokens":
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"token": "ghs_minted", "expires_at": "2026-10-05T10:20:00Z",
+				"token": "ghs_minted", "expires_at": "2099-01-01T00:00:00Z",
 				"permissions": map[string]string{"contents": contents, "metadata": "read"},
 			})
 		default:
-			w.WriteHeader(http.StatusNotFound)
-			_ = json.NewEncoder(w).Encode(map[string]string{"message": "Not Found"})
+			refuse(http.StatusNotFound, "Not Found")
 		}
 	}))
 	t.Cleanup(github.Close)
@@ -72,7 +77,7 @@ func TestTheNodeMintsAGitCredentialForOneRepository(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "x-access-token", credential["username"])
 	assert.Equal(t, "ghs_minted", credential["password"])
-	assert.Equal(t, "2026-10-05T10:20:00Z", credential["expires_at"])
+	assert.Equal(t, "2099-01-01T00:00:00Z", credential["expires_at"])
 	assert.Equal(t, "the-app", credential["app"])
 	assert.Equal(t, "write", credential["contents"])
 	holds(t, s.githubSignum(), "credential", got)

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/sigil"
 )
 
@@ -35,34 +36,21 @@ func githubCredentialSigil() *protocol.Sigil {
 }
 
 func (s *QNTXServer) githubCredential(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	owner, repo := sent["owner"], sent["repo"]
-	gh := s.gitHubService()
-
-	under, err := gh.GetARepositoryInstallationForTheAuthenticatedApp(ctx,
-		&protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest{Owner: owner, Repo: repo})
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "GitHub was not asked which installation " + owner + "/" + repo + " is under: " + err.Error()}
-	}
-	if !under.GetSuccess() {
+	minted, err := s.gitHubService().InstallationToken(ctx, sent["owner"], sent["repo"])
+	switch err := err.(type) {
+	case nil:
+	case services.NoInstallation:
 		// GitHub answers 404 both where the App is not installed and where
 		// there is no such repository: its words are given as they came.
-		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "repo",
-			Says: "no installation of the App was found for " + owner + "/" + repo + ": " + under.GetError()}
-	}
-
-	minted, err := gh.CreateAnInstallationAccessTokenForAnApp(ctx,
-		&protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest{InstallationId: under.GetId(), Repositories: []string{repo}})
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "GitHub was not asked for a token for " + owner + "/" + repo + ": " + err.Error()}
-	}
-	if !minted.GetSuccess() {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "GitHub minted no token for " + owner + "/" + repo + ": " + minted.GetError()}
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "repo", Says: err.Error()}
+	default:
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return map[string]any{
 		"username":   gitCredentialUser,
-		"password":   minted.GetToken(),
-		"expires_at": minted.GetExpiresAt(),
-		"app":        under.GetAppSlug(),
-		"contents":   minted.GetPermissions().GetContents(),
+		"password":   minted.Token,
+		"expires_at": minted.ExpiresAt,
+		"app":        minted.App,
+		"contents":   minted.Contents,
 	}, nil
 }

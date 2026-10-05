@@ -163,6 +163,8 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/runner"},
 				},
 				githubCredentialSigil(),
+				githubAskSigils()[0],
+				githubAskSigils()[1],
 			},
 		},
 		Answers: map[string]sigil.Answer{
@@ -172,6 +174,8 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 			"webhook":      s.githubWebhook,
 			"webhook_path": s.githubWebhookPath,
 			"credential":   s.githubCredential,
+			"ask":          s.githubAsk,
+			"operations":   s.githubOperations,
 		},
 	}
 }
