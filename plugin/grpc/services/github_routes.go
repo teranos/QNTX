@@ -381,6 +381,11 @@ var githubRoutes = map[string]githubRoute{
 	"ListDeliveriesForAnAppWebhook": {method: http.MethodGet, path: "/app/hook/deliveries", query: []string{"per_page", "cursor", "status"}, asApp: true},
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
 	"RedeliverADeliveryForAnAppWebhook": {method: http.MethodPost, path: "/app/hook/deliveries/{delivery_id}/attempts", asApp: true},
+
+	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#get-a-repository-installation-for-the-authenticated-app
+	"GetARepositoryInstallationForTheAuthenticatedApp": {method: http.MethodGet, path: "/repos/{owner}/{repo}/installation", asApp: true},
+	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#create-an-installation-access-token-for-an-app
+	"CreateAnInstallationAccessTokenForAnApp": {method: http.MethodPost, path: "/app/installations/{installation_id}/access_tokens", body: []string{"repositories", "repository_ids", "permissions"}, asApp: true},
 }
 
 func (s *GitHubServer) GetTheCombinedStatusForASpecificReference(ctx context.Context, req *protocol.GitHubGetTheCombinedStatusForASpecificReferenceRequest) (*protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse, error) {
@@ -1117,4 +1122,12 @@ func (s *GitHubServer) ListDeliveriesForAnAppWebhook(ctx context.Context, req *p
 
 func (s *GitHubServer) RedeliverADeliveryForAnAppWebhook(ctx context.Context, req *protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest) (*protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse, error) {
 	return githubAnswer(s, ctx, "RedeliverADeliveryForAnAppWebhook", req, &protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse{})
+}
+
+func (s *GitHubServer) GetARepositoryInstallationForTheAuthenticatedApp(ctx context.Context, req *protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest) (*protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse, error) {
+	return githubAnswer(s, ctx, "GetARepositoryInstallationForTheAuthenticatedApp", req, &protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse{})
+}
+
+func (s *GitHubServer) CreateAnInstallationAccessTokenForAnApp(ctx context.Context, req *protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest) (*protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse, error) {
+	return githubAnswer(s, ctx, "CreateAnInstallationAccessTokenForAnApp", req, &protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse{})
 }

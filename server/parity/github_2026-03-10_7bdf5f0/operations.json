@@ -8,6 +8,10 @@
     "path": "/app/hook/deliveries/{delivery_id}/attempts"
   },
   {
+    "method": "post",
+    "path": "/app/installations/{installation_id}/access_tokens"
+  },
+  {
     "method": "get",
     "path": "/issues"
   },
@@ -438,6 +442,10 @@
   {
     "method": "put",
     "path": "/repos/{owner}/{repo}/immutable-releases"
+  },
+  {
+    "method": "get",
+    "path": "/repos/{owner}/{repo}/installation"
   },
   {
     "method": "get",

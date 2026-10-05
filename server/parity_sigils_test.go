@@ -48,7 +48,16 @@ func TestParityHoldsGitHubAsRecorded(t *testing.T) {
 	if !ok {
 		t.Fatalf("answer is %T, not parity.Parity", answer)
 	}
-	want, err := os.ReadFile(filepath.Join("parity", "github_2026-03-10_7bdf5f0", "github"))
+	recorded := filepath.Join("parity", "github_2026-03-10_7bdf5f0", "github")
+	// A message added to GitHubService changes what is held: QNTX_RECORD_PARITY=1
+	// writes what hold gives now, to be read in the diff before it is kept.
+	if os.Getenv("QNTX_RECORD_PARITY") == "1" {
+		if err := os.WriteFile(recorded, []byte(held.Render(false)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(recorded)
 	if err != nil {
 		t.Fatal(err)
 	}

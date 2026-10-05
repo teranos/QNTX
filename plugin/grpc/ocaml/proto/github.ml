@@ -42,6 +42,7 @@ module Imported'modules = struct
   module Github_repos_repos = Github_repos_repos
   module Github_repos_contents = Github_repos_contents
   module Github_apps_webhooks = Github_apps_webhooks
+  module Github_apps_apps = Github_apps_apps
 end
 (**/**)
 module rec Protocol : sig
@@ -2181,6 +2182,28 @@ module rec Protocol : sig
     end
 
     val redeliverADeliveryForAnAppWebhook : (module Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest.t) * (module Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse.t)
+    module GetARepositoryInstallationForTheAuthenticatedApp : sig
+      include Runtime'.Service.Rpc with type Request.t = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest.t and type Response.t = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.t
+      module Request : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest.t and type make_t = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.t and type make_t = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val getARepositoryInstallationForTheAuthenticatedApp : (module Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest.t) * (module Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.t)
+    module CreateAnInstallationAccessTokenForAnApp : sig
+      include Runtime'.Service.Rpc with type Request.t = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest.t and type Response.t = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse.t
+      module Request : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest.t and type make_t = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse.t and type make_t = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val createAnInstallationAccessTokenForAnApp : (module Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest.t) * (module Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse.t)
   end
 
 end = struct
@@ -4800,6 +4823,32 @@ end = struct
     let redeliverADeliveryForAnAppWebhook =
       (module Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest.t ),
       (module Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_webhooks.Protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse.t )
+
+    module GetARepositoryInstallationForTheAuthenticatedApp = struct
+      let package_name = Some "protocol"
+      let service_name = "GitHubService"
+      let method_name = "GetARepositoryInstallationForTheAuthenticatedApp"
+      let name = "/protocol.GitHubService/GetARepositoryInstallationForTheAuthenticatedApp"
+      module Request = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest
+      module Response = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse
+    end
+
+    let getARepositoryInstallationForTheAuthenticatedApp =
+      (module Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest.t ),
+      (module Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.t )
+
+    module CreateAnInstallationAccessTokenForAnApp = struct
+      let package_name = Some "protocol"
+      let service_name = "GitHubService"
+      let method_name = "CreateAnInstallationAccessTokenForAnApp"
+      let name = "/protocol.GitHubService/CreateAnInstallationAccessTokenForAnApp"
+      module Request = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest
+      module Response = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse
+    end
+
+    let createAnInstallationAccessTokenForAnApp =
+      (module Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest.t ),
+      (module Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse : Runtime'.Spec.Message with type t = Imported'modules.Github_apps_apps.Protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse.t )
 
   end
 
