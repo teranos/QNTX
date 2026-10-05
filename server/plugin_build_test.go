@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -205,5 +206,18 @@ func TestBuildOfRefusesAnIncompleteBuild(t *testing.T) {
 		if _, _, err := buildOf(grpcplugin.PluginRecord{Name: "p", Config: config}); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
+	}
+}
+
+// A deploy stops the node, and a build it cut off is not a build that failed:
+// it is not kept as one, so the next start builds it.
+func TestABuildStoppedWithTheNodeIsNotAFailure(t *testing.T) {
+	running, stop := context.WithCancel(context.Background())
+	if stoppedWithTheNode(running) {
+		t.Fatal("a build in a running node reads as stopped with it")
+	}
+	stop()
+	if !stoppedWithTheNode(running) {
+		t.Fatal("a build in a node that stopped does not read as stopped with it")
 	}
 }

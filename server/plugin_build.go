@@ -319,6 +319,13 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 	state := PluginBuildState{Revs: revs, At: time.Now()}
 	changed, digest, err := s.buildPlugin(ctx, b, revs)
 	state.Changed, state.Digest = changed, digest
+	if err != nil && stoppedWithTheNode(ctx) {
+		// Not a failure of the build: the next start builds it.
+		logger.Infow("A plugin's build stopped with the node, and the next start builds it", "plugin", b.name, "revs", revs)
+		state.Error = "the build stopped with the node: " + err.Error()
+		s.builds.set(b.name, state)
+		return
+	}
 	if err != nil {
 		state.Error = err.Error()
 		logger.Warnw("A plugin was not built", "plugin", b.name, "revs", revs, "error", err)
@@ -339,6 +346,13 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 	if changed {
 		s.buildLanded(b.name)
 	}
+}
+
+// stoppedWithTheNode reports whether a build ended because the node is
+// stopping. A deploy stops the node, and a build cut off by it says nothing
+// about the plugin.
+func stoppedWithTheNode(ctx context.Context) bool {
+	return ctx.Err() != nil
 }
 
 // buildRev is the commit source's branch points at now, or the last commit
