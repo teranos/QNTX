@@ -22,12 +22,12 @@ func (s *QNTXServer) piSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        "pi",
-			Description: "The ROOT agent in Pi: the same agent and session as in Claude Code, in its other harness.",
+			Description: "The ROOT agent in Pi: the same agent as in Claude Code, in its other harness and a session of its own.",
 			Tags:        []string{"agent", "pi", "root"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "say",
-					Does: "Says something to the ROOT agent in Pi and gives what it answered. It is the one session Claude Code answers in too, read with claude session.",
+					Does: "Says something to the ROOT agent in Pi and gives what it answered. It is its session in Pi, beside the one in Claude Code, read with pi session.",
 					Takes: []*protocol.Param{
 						{Name: "says", Required: true, Says: "What is said to it."},
 					},
@@ -52,17 +52,25 @@ func (s *QNTXServer) piSignum() sigil.Signum {
 						{Name: "model", Says: "The model am.toml names for Pi."},
 						{Name: "thinking", Says: "The thinking level am.toml names for Pi."},
 						{Name: "gateway", Says: "The plugin every model call Pi makes goes through."},
-						{Name: "session", Says: "The session it continues, or empty before anything was said to it."},
-						{Name: "answering", Says: "Whether it is in a turn now, in either harness."},
+						{Name: "session", Says: "The session it continues in Pi, or empty before anything was said to it there."},
+						{Name: "answering", Says: "Whether it is in a turn in Pi now."},
 						{Name: "pi", Says: "Where the Pi it runs is, or empty when the node has none yet."},
 						{Name: "pi_version", Says: "The Pi this build pins."},
 						{Name: "not_ready", Says: "Why it cannot be spoken to in Pi, when it cannot."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/pi"},
 				},
+				{
+					Name: "session",
+					Does: "The ROOT agent's session in Pi, whole: everything said to it there, as a transcript.",
+					Gives: []*protocol.Field{
+						{Name: "transcript", Says: "Its session in Pi as turns, each naming the attestation it was read from. Empty before anything was said to it there.", Message: "protocol.Transcript"},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/pi/session"},
+				},
 			},
 		},
-		Answers: map[string]sigil.Answer{"say": s.piSay, "am": s.piAm},
+		Answers: map[string]sigil.Answer{"say": s.piSay, "am": s.piAm, "session": s.piSession},
 	}
 }
 
@@ -93,8 +101,8 @@ func (s *QNTXServer) piSay(ctx context.Context, sent sigil.Sent) (any, *protocol
 	}
 
 	select {
-	case agent.turn <- struct{}{}:
-		defer func() { <-agent.turn }()
+	case agent.piTurn <- struct{}{}:
+		defer func() { <-agent.piTurn }()
 	case <-ctx.Done():
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent was still answering somebody else when this caller left"}
 	}
@@ -103,13 +111,13 @@ func (s *QNTXServer) piSay(ctx context.Context, sent sigil.Sent) (any, *protocol
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no Pi to run: " + err.Error()}
 	}
-	session, kept, err := agent.session()
+	session, kept, err := agent.sessionIn(piSessionFile)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 
-	agent.answering.Store(&turnInSession{session: session})
-	defer agent.answering.Store(nil)
+	agent.piAnswering.Store(&turnInSession{session: session})
+	defer agent.piAnswering.Store(nil)
 
 	writes := sessionWriter{did: agent.did, session: session, resumed: kept, effort: named.Thinking}
 	unwritten := ""
@@ -145,7 +153,7 @@ func (s *QNTXServer) piSay(ctx context.Context, sent sigil.Sent) (any, *protocol
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Pi did not answer: " + err.Error()}
 	}
 	if !kept {
-		if err := agent.keep(session); err != nil {
+		if err := agent.keepIn(piSessionFile, session); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "it answered, and the session it answered in was not kept: " + err.Error()}
 		}
 	}
@@ -184,13 +192,13 @@ func (s *QNTXServer) piAm(ctx context.Context, _ sigil.Sent) (any, *protocol.Ref
 		"did": agent.did, "model": named.Model, "thinking": named.Thinking, "gateway": named.Gateway,
 		"session": "", "answering": false, "pi": "", "pi_version": pi.PinnedVersion, "not_ready": "",
 	}
-	session, kept, err := agent.session()
+	session, kept, err := agent.sessionIn(piSessionFile)
 	if err != nil {
 		is["not_ready"] = err.Error()
 	} else if kept {
 		is["session"] = session
 	}
-	if going := agent.answering.Load(); going != nil {
+	if going := agent.piAnswering.Load(); going != nil {
 		is["answering"], is["session"] = true, going.session
 	}
 	switch path, arrived, err := s.pi.Now(); {
@@ -202,4 +210,13 @@ func (s *QNTXServer) piAm(ctx context.Context, _ sigil.Sent) (any, *protocol.Ref
 		is["pi"] = path
 	}
 	return is, nil
+}
+
+// piSession reads the agent's session in Pi from where it is written.
+func (s *QNTXServer) piSession(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	agent := s.rootAgent
+	if agent == nil || !s.deps.cfg.Agent.Root.Pi.Named() {
+		return nil, s.thereIsNoPi()
+	}
+	return s.readAgentSession(agent, piSessionFile, agent.piAnswering.Load())
 }

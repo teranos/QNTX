@@ -39,12 +39,22 @@ type rootAgent struct {
 	// token is its own, and what it presents at the node's MCP.
 	token string
 	home  string
-	// turn holds one value while it is being spoken to: it is one session, and
-	// what is said to it is heard one at a time.
+	// turn holds one value while it is being spoken to in Claude Code: a
+	// session hears what is said to it one at a time.
 	turn chan struct{}
 	// answering is the turn it is in, and nil between turns.
 	answering atomic.Pointer[turnInSession]
+	// piTurn and piAnswering are the same of its session in Pi, which answers
+	// beside the one in Claude Code (ADR-048).
+	piTurn      chan struct{}
+	piAnswering atomic.Pointer[turnInSession]
 }
+
+// The file each harness's session is kept in, under the agent's home.
+const (
+	claudeSessionFile = "session"
+	piSessionFile     = "pi-session"
+)
 
 // turnInSession is a turn going on, by the session it is in.
 type turnInSession struct{ session string }
@@ -59,7 +69,8 @@ func theRootAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &rootAgent{did: did, signer: signing.NewSigner(key, did), token: token, home: home, turn: make(chan struct{}, 1)}, nil
+	return &rootAgent{did: did, signer: signing.NewSigner(key, did), token: token, home: home,
+		turn: make(chan struct{}, 1), piTurn: make(chan struct{}, 1)}, nil
 }
 
 // rootAgentHome is where a node keeps its ROOT agent: its Claude Code
@@ -72,25 +83,35 @@ func rootAgentHome() (string, error) {
 	return filepath.Join(home, ".qntx", "agents", "root"), nil
 }
 
-// session is the one session it continues, and whether Claude Code holds it
+// session is the session it continues in Claude Code, and whether it was kept
 // already. Before anything was said to it, it is a new id.
-func (a *rootAgent) session() (id string, resumes bool, err error) {
-	kept, err := os.ReadFile(filepath.Join(a.home, "session"))
+func (a *rootAgent) session() (id string, kept bool, err error) {
+	return a.sessionIn(claudeSessionFile)
+}
+
+// keep writes down the session it continues in Claude Code from here on.
+func (a *rootAgent) keep(id string) error {
+	return a.keepIn(claudeSessionFile, id)
+}
+
+// sessionIn is the session file keeps, or a new id when it keeps none yet.
+func (a *rootAgent) sessionIn(file string) (id string, kept bool, err error) {
+	held, err := os.ReadFile(filepath.Join(a.home, file))
 	if os.IsNotExist(err) {
 		return uuid.NewString(), false, nil
 	}
 	if err != nil {
-		return "", false, errors.Wrap(err, "the ROOT agent's session did not read")
+		return "", false, errors.Wrapf(err, "the ROOT agent's session in %s did not read", file)
 	}
-	return strings.TrimSpace(string(kept)), true, nil
+	return strings.TrimSpace(string(held)), true, nil
 }
 
-// keep writes down the session it continues from here on.
-func (a *rootAgent) keep(id string) error {
+// keepIn writes id down in file as the session continued from here on.
+func (a *rootAgent) keepIn(file, id string) error {
 	if err := os.MkdirAll(a.home, 0o700); err != nil {
 		return errors.Wrapf(err, "could not create %s", a.home)
 	}
-	path := filepath.Join(a.home, "session")
+	path := filepath.Join(a.home, file)
 	return errors.Wrapf(os.WriteFile(path, []byte(id+"\n"), 0o600), "could not write %s", path)
 }
 
@@ -312,13 +333,23 @@ func (s *QNTXServer) claudeSession(ctx context.Context, _ sigil.Sent) (any, *pro
 	if agent == nil {
 		return nil, s.thereIsNoRootAgent()
 	}
-	session, resumes, err := agent.session()
+	return s.readAgentSession(agent, claudeSessionFile, agent.answering.Load())
+}
+
+// readAgentSession reads the session file keeps, or the one a turn going is in.
+func (s *QNTXServer) readAgentSession(agent *rootAgent, file string, going *turnInSession) (any, *protocol.Refusal) {
+	session, kept, err := agent.sessionIn(file)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	if going := agent.answering.Load(); going != nil {
-		session, resumes = going.session, true
+	if going != nil {
+		session, kept = going.session, true
 	}
+	return s.sessionTranscript(session, kept)
+}
+
+// sessionTranscript is session read whole, or empty before it was kept.
+func (s *QNTXServer) sessionTranscript(session string, resumes bool) (any, *protocol.Refusal) {
 	none := transcript{Subjects: []string{}, Turns: []transcriptTurn{}}
 	if !resumes {
 		return map[string]any{"transcript": none}, nil

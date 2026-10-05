@@ -177,9 +177,8 @@ func (w sessionWriter) rowsOf(m claudecode.Message, at time.Time) ([]*types.As, 
 // events Claude Code's are written as: Pi starting, each tool it reached for,
 // and how the turn ended.
 func (w sessionWriter) rowsOfPi(e pi.Event, at time.Time) ([]*types.As, error) {
-	if e.Message != nil && e.Message.Timestamp > 0 {
-		at = time.UnixMilli(e.Message.Timestamp)
-	}
+	// At when the node read it: most of Pi's records carry no time, and two
+	// clocks in one session misorder it.
 	switch {
 	case e.Type == "session":
 		row, err := w.row("SessionStart", at, map[string]any{"source": "pi"})

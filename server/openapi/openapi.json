@@ -355,6 +355,11 @@
         "ROOT"
       ]
     },
+    "/api/pi/session": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/plugins": {
       "x-qntx-reach": [
         "ROOT",
