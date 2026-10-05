@@ -238,7 +238,9 @@ func (s *QNTXServer) BuildMoved() {
 		sacred.Go("plugin.build."+b.name, func() {
 			s.building.Lock()
 			defer s.building.Unlock()
+			s.keepStoreAlive(s.lifetime(), b.name, logger)
 			s.buildIfMoved(s.lifetime(), b, logger)
+			s.keepStoreAlive(s.lifetime(), b.name, logger)
 		})
 	}
 }
