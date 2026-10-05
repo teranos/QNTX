@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
@@ -14,7 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/internal/claudecode"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/internal/sacred"
+	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -78,6 +81,59 @@ func TestAskingForClaudeCodeEndsWithTheAsker(t *testing.T) {
 	cancel()
 	_, err := held.Path(gone)
 	require.Error(t, err)
+}
+
+// The node names its ROOT agent at start, and writes its token down where the
+// gate reads tokens: what the agent presents is admitted as ROOT's kind, and
+// acts as the agent's own DID (ADR-048).
+func TestTheNodeNamesItsRootAgentAndTheGateKnowsIt(t *testing.T) {
+	_, db := createTestStore(t)
+	tokens, _, err := auth.OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	h, err := auth.New(db, "localhost", nil, 8770, 8820, 24, zaptest.NewLogger(t).Sugar(),
+		func(next http.HandlerFunc) http.HandlerFunc { return next },
+		tokens, nil, false, []string{rootAccount}, nil)
+	require.NoError(t, err)
+	node := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
+	s := &QNTXServer{authHandler: h, nodeDID: &nodedid.Handler{PrivateKey: node}, logger: zaptest.NewLogger(t).Sugar()}
+
+	require.NoError(t, s.nameRootAgent(t.TempDir()))
+	require.NotNil(t, s.rootAgent)
+
+	var admitted auth.Admission
+	gated := h.Middleware("/mcp", auth.Reach{}, func(w http.ResponseWriter, r *http.Request) {
+		admitted, _ = auth.AdmissionFrom(r.Context())
+		w.WriteHeader(http.StatusOK)
+	})
+	asked := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	asked.Header.Set("Authorization", "Bearer "+s.rootAgent.token)
+	answered := httptest.NewRecorder()
+	gated.ServeHTTP(answered, asked)
+
+	require.Equal(t, http.StatusOK, answered.Code)
+	assert.True(t, admitted.IsRoot())
+	assert.Equal(t, s.rootAgent.did, admitted.ActsAs())
+
+	// A second start finds the token held, and holds it once.
+	require.NoError(t, s.nameRootAgent(t.TempDir()))
+}
+
+// A node with no login has no gate to know the agent, and names it all the same.
+func TestANodeWithNoLoginStillNamesItsRootAgent(t *testing.T) {
+	node := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
+	s := &QNTXServer{nodeDID: &nodedid.Handler{PrivateKey: node}, logger: zaptest.NewLogger(t).Sugar()}
+	require.NoError(t, s.nameRootAgent(t.TempDir()))
+	require.NotNil(t, s.rootAgent)
+	assert.NotEmpty(t, s.rootAgent.did)
+}
+
+// Where the node answers on its own machine is where its agent reaches it.
+func TestWhereTheNodeAnswersOnItsOwnMachine(t *testing.T) {
+	assert.Equal(t, "http://127.0.0.1:8770", ownURLOf("0.0.0.0", 8770))
+	assert.Equal(t, "http://127.0.0.1:8770", ownURLOf("", 8770))
+	assert.Equal(t, "http://127.0.0.1:8770", ownURLOf("127.0.0.1", 8770))
+	assert.Equal(t, "http://[::1]:8770", ownURLOf("::", 8770))
+	assert.Equal(t, "http://10.0.0.5:8770", ownURLOf("10.0.0.5", 8770))
 }
 
 // A node whose am.toml names no agent fetches nothing.

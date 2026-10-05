@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/teranos/QNTX/internal/claudecode"
 	"github.com/teranos/errors"
@@ -74,5 +76,40 @@ func (agentSubsystem) Init(s *QNTXServer) error {
 		return err
 	}
 	s.claudeCode = holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger)
+
+	home, err := rootAgentHome()
+	if err != nil {
+		return err
+	}
+	return s.nameRootAgent(home)
+}
+
+// nameRootAgent makes the ROOT agent this node's: a key of its own from the
+// node's, and its token written down where the gate reads tokens. A node with
+// no login has no gate to tell.
+func (s *QNTXServer) nameRootAgent(home string) error {
+	agent, err := theRootAgent(s.nodeDID.PrivateKey, home)
+	if err != nil {
+		return errors.Wrap(err, "the ROOT agent has no key of its own")
+	}
+	if s.authHandler != nil {
+		if err := s.authHandler.HoldRootAgent(agent.token, agent.did); err != nil {
+			return errors.Wrap(err, "the ROOT agent's token is not held, so it would reach none of the node's sigils")
+		}
+	}
+	s.rootAgent = agent
+	s.logger.Infow("The ROOT agent is this node's", "did", agent.did, "home", home)
 	return nil
+}
+
+// ownURLOf is where a node bound to bind answers on its own machine: an
+// address that means every interface is reached on loopback.
+func ownURLOf(bind string, port int) string {
+	switch bind {
+	case "", "0.0.0.0":
+		bind = "127.0.0.1"
+	case "::":
+		bind = "::1"
+	}
+	return "http://" + net.JoinHostPort(bind, strconv.Itoa(port))
 }

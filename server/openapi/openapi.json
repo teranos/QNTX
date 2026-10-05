@@ -165,6 +165,18 @@
       ],
       "x-qntx-prefix": true
     },
+    "/api/claude": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/api/claude/say": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
     "/api/crash-test": {
       "x-qntx-reach": [
         "ROOT"

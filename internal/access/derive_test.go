@@ -62,6 +62,32 @@ func TestADerivedTokenIsATokenWithItsOwnDID(t *testing.T) {
 	}
 }
 
+// What holds a derived token signs as its DID: the key is the one the token
+// is the seed of.
+func TestADerivedKeySignsAsTheDerivedTokensDID(t *testing.T) {
+	node := keyFrom(t, 7)
+	_, did, err := DeriveToken(node, "agent:root")
+	if err != nil {
+		t.Fatalf("DeriveToken: %v", err)
+	}
+	key, err := DeriveKey(node, "agent:root")
+	if err != nil {
+		t.Fatalf("DeriveKey: %v", err)
+	}
+	pub, ok := key.Public().(ed25519.PublicKey)
+	if !ok || EncodeDIDKey(pub) != did {
+		t.Fatalf("the derived key is not the derived token's")
+	}
+	signed := ed25519.Sign(key, []byte("said"))
+	named, err := DecodeUserDID(did)
+	if err != nil {
+		t.Fatalf("DecodeUserDID: %v", err)
+	}
+	if !ed25519.Verify(named, []byte("said"), signed) {
+		t.Errorf("what the derived key signed does not verify under the derived DID")
+	}
+}
+
 // What it is derived for and what it is derived from both decide it.
 func TestADerivedTokenIsItsPurposesAndItsKeys(t *testing.T) {
 	root, rootDID, err := DeriveToken(keyFrom(t, 7), "agent:root")
