@@ -50,6 +50,7 @@ type QNTXServer struct {
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes
 	nodeDID             *nodedid.Handler      // node's decentralized identity
+	claudeCode          *claudeCodeHeld       // The pinned Claude Code this node fetched; nil when am.toml names no agent (ADR-048)
 	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
 	budgetTracker       *budget.Tracker       // Budget tracking for Pulse daemon
 	daemon              *async.WorkerPool     // Background job processor (daemon)
