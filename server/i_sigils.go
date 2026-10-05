@@ -16,7 +16,9 @@ func (s *QNTXServer) iSignum() sigil.Signum {
 	stood := []*protocol.Field{{Name: "namespace", Says: "Where the person now stands. Never empty."}}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "i",
+			Name:        "i",
+			Description: "The person asking: the namespace they stand in, and a step to another.",
+			Tags:        []string{"identity", "standing", "namespace"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:  "standing",

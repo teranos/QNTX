@@ -51,6 +51,7 @@ parity: rust-sqlite ## Report whether SQLite and DuckDB each hold every thing QN
 says: ## Write what the specs and our protocol say of themselves for the parity sigil
 	@go run ./cmd/says
 	@nix eval --raw -f nix/references/umami.nix > server/parity/umami_v3.3.1_ca661c7/openapi.words.json
+	@nix eval --raw -f nix/references/a2a.nix > server/parity/a2a_v1.0.1_3303592/specification.md
 	@nix eval --raw -f nix/references/github.nix | jq . > server/parity/github_2026-03-10_7bdf5f0/openapi.json
 
 # git is the baseline, so there is no file to keep in step. What already stands

@@ -29,7 +29,9 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 	}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "plugins",
+			Name:        "plugins",
+			Description: "The plugins this node runs: what each serves and how healthy it is; added from a repository after it is checked, enabled, disabled, paused, resumed and restarted.",
+			Tags:        []string{"plugins", "extensions", "health"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "list",

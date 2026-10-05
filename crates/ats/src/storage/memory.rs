@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::attestation::{Attestation, AxFilter, AxResult, AxSummary};
 use crate::storage::error::{StoreError, StoreResult};
-use crate::storage::traits::{AttestationStore, QueryStore, StorageStats};
+use crate::storage::traits::{AliasStore, AttestationStore, QueryStore, StorageStats};
 
 /// In-memory attestation store.
 ///
@@ -18,6 +18,11 @@ use crate::storage::traits::{AttestationStore, QueryStore, StorageStats};
 #[derive(Debug, Default)]
 pub struct MemoryStore {
     attestations: HashMap<String, Attestation>,
+    /// Alias rows keyed by the case-folded `(alias, target)` pair, valued by the
+    /// pair as it was written. The key gives the `COLLATE NOCASE` primary key
+    /// the `aliases` table has; the value preserves original case, as the table
+    /// does.
+    aliases: HashMap<(String, String), (String, String)>,
 }
 
 impl MemoryStore {
@@ -25,6 +30,7 @@ impl MemoryStore {
     pub fn new() -> Self {
         Self {
             attestations: HashMap::new(),
+            aliases: HashMap::new(),
         }
     }
 
@@ -161,6 +167,91 @@ impl QueryStore for MemoryStore {
             unique_actors: self.actors()?.len(),
         })
     }
+}
+
+impl AliasStore for MemoryStore {
+    fn resolve_alias(&self, identifier: &str) -> StoreResult<Vec<String>> {
+        let needle = identifier.to_lowercase();
+
+        let mut out: Vec<String> = self
+            .aliases
+            .iter()
+            .filter(|((alias, _), _)| *alias == needle)
+            .map(|(_, (_, target))| target.clone())
+            .collect();
+
+        // The identifier itself always resolves, aliased or not.
+        out.push(identifier.to_string());
+
+        out.sort();
+        out.dedup();
+        Ok(out)
+    }
+
+    fn create_alias(&mut self, alias: &str, target: &str, _created_by: &str) -> StoreResult<()> {
+        validate_alias_pair(alias, target)?;
+
+        let forward = (alias.to_lowercase(), target.to_lowercase());
+        let reverse = (target.to_lowercase(), alias.to_lowercase());
+
+        // Matches INSERT OR IGNORE: an existing pair keeps the case it was
+        // first written with.
+        self.aliases
+            .entry(forward)
+            .or_insert_with(|| (alias.to_string(), target.to_string()));
+        self.aliases
+            .entry(reverse)
+            .or_insert_with(|| (target.to_string(), alias.to_string()));
+
+        Ok(())
+    }
+
+    fn remove_alias(&mut self, alias: &str, target: &str) -> StoreResult<()> {
+        validate_alias_endpoints(alias, target)?;
+
+        self.aliases
+            .remove(&(alias.to_lowercase(), target.to_lowercase()));
+        self.aliases
+            .remove(&(target.to_lowercase(), alias.to_lowercase()));
+
+        Ok(())
+    }
+
+    fn all_aliases(&self) -> StoreResult<HashMap<String, Vec<String>>> {
+        let mut out: HashMap<String, Vec<String>> = HashMap::new();
+        for (alias, target) in self.aliases.values() {
+            out.entry(alias.clone()).or_default().push(target.clone());
+        }
+        for targets in out.values_mut() {
+            targets.sort();
+        }
+        Ok(out)
+    }
+}
+
+/// Both endpoints must name something.
+fn validate_alias_endpoints(alias: &str, target: &str) -> StoreResult<()> {
+    if alias.is_empty() {
+        return Err(StoreError::InvalidData("alias cannot be empty".to_string()));
+    }
+    if target.is_empty() {
+        return Err(StoreError::InvalidData(
+            "target cannot be empty".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// As above, and the two must be different identifiers — an alias from a name
+/// to itself carries no information, and case does not make it different.
+fn validate_alias_pair(alias: &str, target: &str) -> StoreResult<()> {
+    validate_alias_endpoints(alias, target)?;
+    if alias.eq_ignore_ascii_case(target) {
+        return Err(StoreError::InvalidData(format!(
+            "alias and target cannot be identical: {alias} and {target}"
+        )));
+    }
+    Ok(())
 }
 
 /// Check if an attestation matches the given filter.

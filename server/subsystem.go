@@ -46,6 +46,9 @@ var subsystems = []subsystemEntry{
 	// nothing to admit anyone into.
 	{sub: storeProofSubsystem{}, policy: SubsystemFatal},
 	{sub: authSubsystem{}, policy: SubsystemFatal},
+	// A node that cannot get the Claude Code it pins still serves everything
+	// else, and says so to whoever speaks to an agent.
+	{sub: agentSubsystem{}, policy: SubsystemWarn},
 	{sub: pluginServicesSubsystem{}, policy: SubsystemWarn},
 	{sub: tickerSubsystem{}, policy: SubsystemFatal},
 	{sub: watcherSubsystem{}, policy: SubsystemWarn},

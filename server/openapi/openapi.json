@@ -11,6 +11,11 @@
         "ANYONE"
       ]
     },
+    "/.well-known/agent-card.json": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/.well-known/did.json": {
       "x-qntx-reach": [
         "ANYONE"
@@ -26,10 +31,21 @@
         "ANYONE"
       ]
     },
+    "/a2a/": {
+      "x-qntx-reach": [
+        "ROOT"
+      ],
+      "x-qntx-prefix": true
+    },
     "/am/ground": {
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
+      ]
+    },
+    "/am/node": {
+      "x-qntx-reach": [
+        "ROOT"
       ]
     },
     "/am/statusline": {
@@ -148,6 +164,21 @@
         "PUBLIC_REGISTRATION"
       ],
       "x-qntx-prefix": true
+    },
+    "/api/claude": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/claude/say": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/claude/session": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
     },
     "/api/crash-test": {
       "x-qntx-reach": [

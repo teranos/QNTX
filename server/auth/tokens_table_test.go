@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/errors"
 
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
@@ -134,6 +135,59 @@ func TestOpeningTakesInTheTokensTheRecordHoldsAndTheTableLacks(t *testing.T) {
 
 	_, live := table.Lookup("abc")
 	assert.True(t, live, "a token taken in from the record does not authorize")
+}
+
+// strictTokens is a record that takes a list only as a list, as the one behind
+// the table on parquet does: null where a sequence belongs is refused there.
+type strictTokens struct {
+	countingTokens
+	refuse bool
+}
+
+func (r *strictTokens) PutRecord(t TokenRecord) error {
+	if r.refuse {
+		return errors.New("the record is not answering")
+	}
+	if t.Namespaces == nil || t.ScopeRead == nil || t.ScopeWrite == nil {
+		return errors.Newf("invalid type: null, expected a sequence (access token %s)", t.Label)
+	}
+	return r.countingTokens.PutRecord(t)
+}
+
+// A token issued with no namespaces named acts in every one the node serves,
+// and that is an empty list in the record, never a missing one. The ROOT
+// agent's token is issued this way (ADR-048).
+func TestATokenIssuedWithNoNamespacesReachesTheRecordWhole(t *testing.T) {
+	record := &strictTokens{}
+	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), record)
+	require.NoError(t, err)
+
+	everywhere := aToken("abc", "root-agent")
+	everywhere.Namespaces = nil
+	_, err = table.Issue(everywhere)
+	require.NoError(t, err)
+
+	require.Len(t, record.held, 1)
+	assert.Equal(t, []string{}, record.held[0].Namespaces)
+}
+
+// A token whose record write failed is in the table alone, and the next open
+// writes it to the record: the table is the truth.
+func TestOpeningWritesBackATokenTheRecordLacks(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	record := &strictTokens{refuse: true}
+	first, _, err := OpenTokenTable(db, record)
+	require.NoError(t, err)
+	_, err = first.Issue(aToken("abc", "one"))
+	require.Error(t, err)
+	require.Empty(t, record.held)
+
+	record.refuse = false
+	_, done, err := OpenTokenTable(db, record)
+	require.NoError(t, err)
+	assert.Equal(t, 1, done.WrittenBack)
+	require.Len(t, record.held, 1)
+	assert.Equal(t, "abc", record.held[0].Hash)
 }
 
 // "we need to keep users in mem"

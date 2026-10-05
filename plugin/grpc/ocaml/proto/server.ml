@@ -794,6 +794,48 @@ Namespaces exist only under parquet, and sigma only under sqlite.</p>
 
   (**
 {%html:
+<p>VersionInfo is which build is running, as am version answers it.
+Mirrors version.Info.</p>
+%}
+  *)
+  and VersionInfo : sig
+    type t = {
+      commit_hash:string;
+      build_time:string;
+      version:string;
+      go_version:string;
+      platform:string;
+    }
+    val make: ?commit_hash:string -> ?build_time:string -> ?version:string -> ?go_version:string -> ?platform:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?commit_hash:string -> ?build_time:string -> ?version:string -> ?go_version:string -> ?platform:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
 <p>LLMStreamMessage is one chunk of streamed model output.
 Mirrors server.LLMStreamMessage.</p>
 %}
@@ -2771,6 +2813,83 @@ Namespaces exist only under parquet, and sigma only under sqlite.</p>
       fun { type'; store; storage_backend; storage_optimized; storage_version; parser_backend; parser_optimized; parser_version; parser_size } -> serialize type' store storage_backend storage_optimized storage_version parser_backend parser_optimized parser_version parser_size
     let from_json_exn =
       let constructor type' store storage_backend storage_optimized storage_version parser_backend parser_optimized parser_version parser_size = { type'; store; storage_backend; storage_optimized; storage_version; parser_backend; parser_optimized; parser_version; parser_size } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and VersionInfo : sig
+    type t = {
+      commit_hash:string;
+      build_time:string;
+      version:string;
+      go_version:string;
+      platform:string;
+    }
+    val make: ?commit_hash:string -> ?build_time:string -> ?version:string -> ?go_version:string -> ?platform:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?commit_hash:string -> ?build_time:string -> ?version:string -> ?go_version:string -> ?platform:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = VersionInfo
+    let name () = ".protocol.VersionInfo"
+    type t = {
+      commit_hash:string;
+      build_time:string;
+      version:string;
+      go_version:string;
+      platform:string;
+    }
+    type make_t = ?commit_hash:string -> ?build_time:string -> ?version:string -> ?go_version:string -> ?platform:string -> unit -> t
+    let make ?(commit_hash = {||}) ?(build_time = {||}) ?(version = {||}) ?(go_version = {||}) ?(platform = {||}) () = { commit_hash; build_time; version; go_version; platform }
+    let merge =
+    let merge_commit_hash = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "commit_hash", "commitHash"), string, ({||})) ) in
+    let merge_build_time = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "build_time", "buildTime"), string, ({||})) ) in
+    let merge_version = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "version", "version"), string, ({||})) ) in
+    let merge_go_version = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "go_version", "goVersion"), string, ({||})) ) in
+    let merge_platform = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "platform", "platform"), string, ({||})) ) in
+    fun t1 t2 -> {
+    	commit_hash = (merge_commit_hash t1.commit_hash t2.commit_hash);
+    	build_time = (merge_build_time t1.build_time t2.build_time);
+    	version = (merge_version t1.version t2.version);
+    	go_version = (merge_go_version t1.go_version t2.go_version);
+    	platform = (merge_platform t1.platform t2.platform);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "commit_hash", "commitHash"), string, ({||})) ^:: basic ((2, "build_time", "buildTime"), string, ({||})) ^:: basic ((3, "version", "version"), string, ({||})) ^:: basic ((4, "go_version", "goVersion"), string, ({||})) ^:: basic ((5, "platform", "platform"), string, ({||})) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { commit_hash; build_time; version; go_version; platform } -> serialize writer commit_hash build_time version go_version platform
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor commit_hash build_time version go_version platform = { commit_hash; build_time; version; go_version; platform } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { commit_hash; build_time; version; go_version; platform } -> serialize commit_hash build_time version go_version platform
+    let from_json_exn =
+      let constructor commit_hash build_time version go_version platform = { commit_hash; build_time; version; go_version; platform } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

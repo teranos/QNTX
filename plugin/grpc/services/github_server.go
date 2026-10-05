@@ -67,9 +67,10 @@ type GitHubServer struct {
 	logger  *zap.SugaredLogger
 	client  *http.Client
 
-	mu      sync.Mutex
-	baseURL string
-	limits  map[string]GitHubLimit // By credential key.
+	mu            sync.Mutex
+	baseURL       string
+	limits        map[string]GitHubLimit       // By credential key.
+	installations map[string]InstallationToken // By owner/repo: what the App minted and is still good.
 }
 
 // NewGitHubServer creates the GitHub service. enabled is asked on every call.
@@ -92,8 +93,9 @@ func NewGitHubServer(creds GitHubCredentials, enabled func() bool, logger *zap.S
 				return nil
 			},
 		},
-		baseURL: "https://api.github.com",
-		limits:  map[string]GitHubLimit{},
+		baseURL:       "https://api.github.com",
+		limits:        map[string]GitHubLimit{},
+		installations: map[string]InstallationToken{},
 	}
 }
 
@@ -186,6 +188,9 @@ type githubRoute struct {
 	slashed []string
 	// asApp is a route GitHub takes only from the App itself, with its JWT.
 	asApp bool
+	// mints is a route whose answer is a credential. It is the node's own to
+	// ask: whoever asks GitHubService by name is not handed one.
+	mints bool
 }
 
 // pathFields are the request fields named in the path template, in order.
@@ -280,6 +285,9 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 	}
 	defer func() { sqlclose.Log(httpResp.Body.Close(), s.logger, "the GitHub response body") }()
 	s.recordHeaders(key, httpResp.Header)
+	if status, wanted := ctx.Value(githubStatus{}).(*int); wanted {
+		*status = httpResp.StatusCode
+	}
 
 	raw, err := io.ReadAll(httpResp.Body)
 	if err != nil {
@@ -331,6 +339,10 @@ func (s *GitHubServer) credential(ctx context.Context, route githubRoute, msg pr
 			return "", githubAppKey, "", errors.Wrap(err, "the GitHub App's JWT was not signed")
 		}
 		return token, githubAppKey, "", nil
+	}
+	if ctx.Value(githubAsInstallation{}) != nil {
+		token, key, err = s.asInstallation(ctx, msg)
+		return token, key, "", err
 	}
 	namespace = msg.Get(msg.Descriptor().Fields().ByName("namespace")).String()
 	token, key, err = s.creds.Token(ctx, namespace)

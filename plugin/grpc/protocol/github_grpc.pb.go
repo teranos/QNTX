@@ -204,6 +204,8 @@ const (
 	GitHubService_GetARepositoryREADMEForADirectory_FullMethodName                              = "/protocol.GitHubService/GetARepositoryREADMEForADirectory"
 	GitHubService_ListDeliveriesForAnAppWebhook_FullMethodName                                  = "/protocol.GitHubService/ListDeliveriesForAnAppWebhook"
 	GitHubService_RedeliverADeliveryForAnAppWebhook_FullMethodName                              = "/protocol.GitHubService/RedeliverADeliveryForAnAppWebhook"
+	GitHubService_GetARepositoryInstallationForTheAuthenticatedApp_FullMethodName               = "/protocol.GitHubService/GetARepositoryInstallationForTheAuthenticatedApp"
+	GitHubService_CreateAnInstallationAccessTokenForAnApp_FullMethodName                        = "/protocol.GitHubService/CreateAnInstallationAccessTokenForAnApp"
 )
 
 // GitHubServiceClient is the client API for GitHubService service.
@@ -582,6 +584,10 @@ type GitHubServiceClient interface {
 	ListDeliveriesForAnAppWebhook(ctx context.Context, in *GitHubListDeliveriesForAnAppWebhookRequest, opts ...grpc.CallOption) (*GitHubListDeliveriesForAnAppWebhookResponse, error)
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
 	RedeliverADeliveryForAnAppWebhook(ctx context.Context, in *GitHubRedeliverADeliveryForAnAppWebhookRequest, opts ...grpc.CallOption) (*GitHubRedeliverADeliveryForAnAppWebhookResponse, error)
+	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#get-a-repository-installation-for-the-authenticated-app
+	GetARepositoryInstallationForTheAuthenticatedApp(ctx context.Context, in *GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest, opts ...grpc.CallOption) (*GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse, error)
+	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#create-an-installation-access-token-for-an-app
+	CreateAnInstallationAccessTokenForAnApp(ctx context.Context, in *GitHubCreateAnInstallationAccessTokenForAnAppRequest, opts ...grpc.CallOption) (*GitHubCreateAnInstallationAccessTokenForAnAppResponse, error)
 }
 
 type gitHubServiceClient struct {
@@ -2442,6 +2448,26 @@ func (c *gitHubServiceClient) RedeliverADeliveryForAnAppWebhook(ctx context.Cont
 	return out, nil
 }
 
+func (c *gitHubServiceClient) GetARepositoryInstallationForTheAuthenticatedApp(ctx context.Context, in *GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest, opts ...grpc.CallOption) (*GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse)
+	err := c.cc.Invoke(ctx, GitHubService_GetARepositoryInstallationForTheAuthenticatedApp_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitHubServiceClient) CreateAnInstallationAccessTokenForAnApp(ctx context.Context, in *GitHubCreateAnInstallationAccessTokenForAnAppRequest, opts ...grpc.CallOption) (*GitHubCreateAnInstallationAccessTokenForAnAppResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GitHubCreateAnInstallationAccessTokenForAnAppResponse)
+	err := c.cc.Invoke(ctx, GitHubService_CreateAnInstallationAccessTokenForAnApp_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GitHubServiceServer is the server API for GitHubService service.
 // All implementations must embed UnimplementedGitHubServiceServer
 // for forward compatibility.
@@ -2818,6 +2844,10 @@ type GitHubServiceServer interface {
 	ListDeliveriesForAnAppWebhook(context.Context, *GitHubListDeliveriesForAnAppWebhookRequest) (*GitHubListDeliveriesForAnAppWebhookResponse, error)
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
 	RedeliverADeliveryForAnAppWebhook(context.Context, *GitHubRedeliverADeliveryForAnAppWebhookRequest) (*GitHubRedeliverADeliveryForAnAppWebhookResponse, error)
+	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#get-a-repository-installation-for-the-authenticated-app
+	GetARepositoryInstallationForTheAuthenticatedApp(context.Context, *GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest) (*GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse, error)
+	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#create-an-installation-access-token-for-an-app
+	CreateAnInstallationAccessTokenForAnApp(context.Context, *GitHubCreateAnInstallationAccessTokenForAnAppRequest) (*GitHubCreateAnInstallationAccessTokenForAnAppResponse, error)
 	mustEmbedUnimplementedGitHubServiceServer()
 }
 
@@ -3382,6 +3412,12 @@ func (UnimplementedGitHubServiceServer) ListDeliveriesForAnAppWebhook(context.Co
 }
 func (UnimplementedGitHubServiceServer) RedeliverADeliveryForAnAppWebhook(context.Context, *GitHubRedeliverADeliveryForAnAppWebhookRequest) (*GitHubRedeliverADeliveryForAnAppWebhookResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RedeliverADeliveryForAnAppWebhook not implemented")
+}
+func (UnimplementedGitHubServiceServer) GetARepositoryInstallationForTheAuthenticatedApp(context.Context, *GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest) (*GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetARepositoryInstallationForTheAuthenticatedApp not implemented")
+}
+func (UnimplementedGitHubServiceServer) CreateAnInstallationAccessTokenForAnApp(context.Context, *GitHubCreateAnInstallationAccessTokenForAnAppRequest) (*GitHubCreateAnInstallationAccessTokenForAnAppResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateAnInstallationAccessTokenForAnApp not implemented")
 }
 func (UnimplementedGitHubServiceServer) mustEmbedUnimplementedGitHubServiceServer() {}
 func (UnimplementedGitHubServiceServer) testEmbeddedByValue()                       {}
@@ -6734,6 +6770,42 @@ func _GitHubService_RedeliverADeliveryForAnAppWebhook_Handler(srv interface{}, c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitHubService_GetARepositoryInstallationForTheAuthenticatedApp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitHubServiceServer).GetARepositoryInstallationForTheAuthenticatedApp(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitHubService_GetARepositoryInstallationForTheAuthenticatedApp_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitHubServiceServer).GetARepositoryInstallationForTheAuthenticatedApp(ctx, req.(*GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitHubService_CreateAnInstallationAccessTokenForAnApp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GitHubCreateAnInstallationAccessTokenForAnAppRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitHubServiceServer).CreateAnInstallationAccessTokenForAnApp(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitHubService_CreateAnInstallationAccessTokenForAnApp_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitHubServiceServer).CreateAnInstallationAccessTokenForAnApp(ctx, req.(*GitHubCreateAnInstallationAccessTokenForAnAppRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GitHubService_ServiceDesc is the grpc.ServiceDesc for GitHubService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -7480,6 +7552,14 @@ var GitHubService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RedeliverADeliveryForAnAppWebhook",
 			Handler:    _GitHubService_RedeliverADeliveryForAnAppWebhook_Handler,
+		},
+		{
+			MethodName: "GetARepositoryInstallationForTheAuthenticatedApp",
+			Handler:    _GitHubService_GetARepositoryInstallationForTheAuthenticatedApp_Handler,
+		},
+		{
+			MethodName: "CreateAnInstallationAccessTokenForAnApp",
+			Handler:    _GitHubService_CreateAnInstallationAccessTokenForAnApp_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

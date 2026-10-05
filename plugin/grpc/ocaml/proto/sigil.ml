@@ -28,7 +28,8 @@ module rec Protocol : sig
   (**
 {%html:
 <p>A Signum holds the sigils of one subject: watchers is a signum, and list,
-create, read, update and delete are its sigils. To A2A a signum is a skill.</p>
+create, read, update and delete are its sigils. On the Agent Card a signum
+is described as an AgentSkill.</p>
 <p>What the node does, in the shape that crosses a boundary (ADR-039). The
 browser reads these to name a sigil in a reach line, and a plugin hands the
 node a Signum to say what it can do.</p>
@@ -44,12 +45,21 @@ reach is governed at runtime and a plugin comes and goes while the node runs.</p
       (**
 {%html:
 <p>The shapes this signum is held to, each by its name: &quot;Staands will be
-Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
+Umami, one reference and not a blend.&quot; The parity sigil reads these.</p>
 %}
       *)
 
+      description:string;
+      (**
+{%html:
+<p>What it is for, in words, and the words it is found by. To A2A these are
+a skill's description and tags.</p>
+%}
+      *)
+
+      tags:string list;
     }
-    val make: ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> unit -> t
+    val make: ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> ?description:string -> ?tags:string list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -68,7 +78,152 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> unit -> t
+    type make_t = ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> ?description:string -> ?tags:string list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>Node is the node about itself: what it is called, what it is for, and the
+signa it holds. It is what fills A2A's AgentCard, which am node answers, and
+the parity sigil holds it to that card.</p>
+%}
+  *)
+  and Node : sig
+    type t = {
+      name:string;
+      description:string;
+      signa:Signum.t list;
+    }
+    val make: ?name:string -> ?description:string -> ?signa:Signum.t list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?name:string -> ?description:string -> ?signa:Signum.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>Transcript is one agent session Ground recorded, derived from its hook
+events: transcripts read answers these. Mirrors server.transcript.</p>
+%}
+  *)
+  and Transcript : sig
+    type t = {
+      session:string;
+      subjects:string list;
+      started:string;
+      ended:string;
+      turns:Turn.t list;
+      folded:int;
+      (**
+{%html:
+<p>Events the store folded into sigmas (ADR-020), counted and not read.</p>
+%}
+      *)
+
+      model:string;
+      (**
+{%html:
+<p>The model the session started on, as its SessionStart says.</p>
+%}
+      *)
+
+      effort:string;
+      (**
+{%html:
+<p>The effort its last Stop ran at, as that Stop's effort.level says.</p>
+%}
+      *)
+
+    }
+    val make: ?session:string -> ?subjects:string list -> ?started:string -> ?ended:string -> ?turns:Turn.t list -> ?folded:int -> ?model:string -> ?effort:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?session:string -> ?subjects:string list -> ?started:string -> ?ended:string -> ?turns:Turn.t list -> ?folded:int -> ?model:string -> ?effort:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>Turn is one thing said or done in a session, naming the attestation it was
+read from. Mirrors server.transcriptTurn.</p>
+%}
+  *)
+  and Turn : sig
+    type t = {
+      at:string;
+      speaker:string;
+      text:string;
+      of':string;
+    }
+    val make: ?at:string -> ?speaker:string -> ?text:string -> ?of':string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?at:string -> ?speaker:string -> ?text:string -> ?of':string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -427,12 +582,21 @@ end = struct
       (**
 {%html:
 <p>The shapes this signum is held to, each by its name: &quot;Staands will be
-Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
+Umami, one reference and not a blend.&quot; The parity sigil reads these.</p>
 %}
       *)
 
+      description:string;
+      (**
+{%html:
+<p>What it is for, in words, and the words it is found by. To A2A these are
+a skill's description and tags.</p>
+%}
+      *)
+
+      tags:string list;
     }
-    val make: ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> unit -> t
+    val make: ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> ?description:string -> ?tags:string list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -451,7 +615,7 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> unit -> t
+    type make_t = ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> ?description:string -> ?tags:string list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -464,33 +628,288 @@ Umami, one reference and not a blend.&quot; make parity prisma reads these.</p>
       name:string;
       sigils:Sigil.t list;
       follows:Follows.t list;
+      description:string;
+      tags:string list;
     }
-    type make_t = ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> unit -> t
-    let make ?(name = {||}) ?(sigils = []) ?(follows = []) () = { name; sigils; follows }
+    type make_t = ?name:string -> ?sigils:Sigil.t list -> ?follows:Follows.t list -> ?description:string -> ?tags:string list -> unit -> t
+    let make ?(name = {||}) ?(sigils = []) ?(follows = []) ?(description = {||}) ?(tags = []) () = { name; sigils; follows; description; tags }
     let merge =
     let merge_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ) in
     let merge_sigils = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "sigils", "sigils"), (message (module Sigil)), not_packed) ) in
     let merge_follows = Runtime'.Merge.merge Runtime'.Spec.( repeated ((3, "follows", "follows"), (message (module Follows)), not_packed) ) in
+    let merge_description = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "description", "description"), string, ({||})) ) in
+    let merge_tags = Runtime'.Merge.merge Runtime'.Spec.( repeated ((5, "tags", "tags"), string, not_packed) ) in
     fun t1 t2 -> {
     	name = (merge_name t1.name t2.name);
     	sigils = (merge_sigils t1.sigils t2.sigils);
     	follows = (merge_follows t1.follows t2.follows);
+    	description = (merge_description t1.description t2.description);
+    	tags = (merge_tags t1.tags t2.tags);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ^:: repeated ((2, "sigils", "sigils"), (message (module Sigil)), not_packed) ^:: repeated ((3, "follows", "follows"), (message (module Follows)), not_packed) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ^:: repeated ((2, "sigils", "sigils"), (message (module Sigil)), not_packed) ^:: repeated ((3, "follows", "follows"), (message (module Follows)), not_packed) ^:: basic ((4, "description", "description"), string, ({||})) ^:: repeated ((5, "tags", "tags"), string, not_packed) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { name; sigils; follows } -> serialize writer name sigils follows
+      fun writer { name; sigils; follows; description; tags } -> serialize writer name sigils follows description tags
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor name sigils follows = { name; sigils; follows } in
+      let constructor name sigils follows description tags = { name; sigils; follows; description; tags } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { name; sigils; follows } -> serialize name sigils follows
+      fun { name; sigils; follows; description; tags } -> serialize name sigils follows description tags
     let from_json_exn =
-      let constructor name sigils follows = { name; sigils; follows } in
+      let constructor name sigils follows description tags = { name; sigils; follows; description; tags } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and Node : sig
+    type t = {
+      name:string;
+      description:string;
+      signa:Signum.t list;
+    }
+    val make: ?name:string -> ?description:string -> ?signa:Signum.t list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?name:string -> ?description:string -> ?signa:Signum.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = Node
+    let name () = ".protocol.Node"
+    type t = {
+      name:string;
+      description:string;
+      signa:Signum.t list;
+    }
+    type make_t = ?name:string -> ?description:string -> ?signa:Signum.t list -> unit -> t
+    let make ?(name = {||}) ?(description = {||}) ?(signa = []) () = { name; description; signa }
+    let merge =
+    let merge_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ) in
+    let merge_description = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "description", "description"), string, ({||})) ) in
+    let merge_signa = Runtime'.Merge.merge Runtime'.Spec.( repeated ((3, "signa", "signa"), (message (module Signum)), not_packed) ) in
+    fun t1 t2 -> {
+    	name = (merge_name t1.name t2.name);
+    	description = (merge_description t1.description t2.description);
+    	signa = (merge_signa t1.signa t2.signa);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ^:: basic ((2, "description", "description"), string, ({||})) ^:: repeated ((3, "signa", "signa"), (message (module Signum)), not_packed) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { name; description; signa } -> serialize writer name description signa
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor name description signa = { name; description; signa } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { name; description; signa } -> serialize name description signa
+    let from_json_exn =
+      let constructor name description signa = { name; description; signa } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and Transcript : sig
+    type t = {
+      session:string;
+      subjects:string list;
+      started:string;
+      ended:string;
+      turns:Turn.t list;
+      folded:int;
+      (**
+{%html:
+<p>Events the store folded into sigmas (ADR-020), counted and not read.</p>
+%}
+      *)
+
+      model:string;
+      (**
+{%html:
+<p>The model the session started on, as its SessionStart says.</p>
+%}
+      *)
+
+      effort:string;
+      (**
+{%html:
+<p>The effort its last Stop ran at, as that Stop's effort.level says.</p>
+%}
+      *)
+
+    }
+    val make: ?session:string -> ?subjects:string list -> ?started:string -> ?ended:string -> ?turns:Turn.t list -> ?folded:int -> ?model:string -> ?effort:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?session:string -> ?subjects:string list -> ?started:string -> ?ended:string -> ?turns:Turn.t list -> ?folded:int -> ?model:string -> ?effort:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = Transcript
+    let name () = ".protocol.Transcript"
+    type t = {
+      session:string;
+      subjects:string list;
+      started:string;
+      ended:string;
+      turns:Turn.t list;
+      folded:int;
+      model:string;
+      effort:string;
+    }
+    type make_t = ?session:string -> ?subjects:string list -> ?started:string -> ?ended:string -> ?turns:Turn.t list -> ?folded:int -> ?model:string -> ?effort:string -> unit -> t
+    let make ?(session = {||}) ?(subjects = []) ?(started = {||}) ?(ended = {||}) ?(turns = []) ?(folded = 0) ?(model = {||}) ?(effort = {||}) () = { session; subjects; started; ended; turns; folded; model; effort }
+    let merge =
+    let merge_session = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "session", "session"), string, ({||})) ) in
+    let merge_subjects = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "subjects", "subjects"), string, not_packed) ) in
+    let merge_started = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "started", "started"), string, ({||})) ) in
+    let merge_ended = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "ended", "ended"), string, ({||})) ) in
+    let merge_turns = Runtime'.Merge.merge Runtime'.Spec.( repeated ((5, "turns", "turns"), (message (module Turn)), not_packed) ) in
+    let merge_folded = Runtime'.Merge.merge Runtime'.Spec.( basic ((6, "folded", "folded"), int64_int, (0)) ) in
+    let merge_model = Runtime'.Merge.merge Runtime'.Spec.( basic ((7, "model", "model"), string, ({||})) ) in
+    let merge_effort = Runtime'.Merge.merge Runtime'.Spec.( basic ((8, "effort", "effort"), string, ({||})) ) in
+    fun t1 t2 -> {
+    	session = (merge_session t1.session t2.session);
+    	subjects = (merge_subjects t1.subjects t2.subjects);
+    	started = (merge_started t1.started t2.started);
+    	ended = (merge_ended t1.ended t2.ended);
+    	turns = (merge_turns t1.turns t2.turns);
+    	folded = (merge_folded t1.folded t2.folded);
+    	model = (merge_model t1.model t2.model);
+    	effort = (merge_effort t1.effort t2.effort);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "session", "session"), string, ({||})) ^:: repeated ((2, "subjects", "subjects"), string, not_packed) ^:: basic ((3, "started", "started"), string, ({||})) ^:: basic ((4, "ended", "ended"), string, ({||})) ^:: repeated ((5, "turns", "turns"), (message (module Turn)), not_packed) ^:: basic ((6, "folded", "folded"), int64_int, (0)) ^:: basic ((7, "model", "model"), string, ({||})) ^:: basic ((8, "effort", "effort"), string, ({||})) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { session; subjects; started; ended; turns; folded; model; effort } -> serialize writer session subjects started ended turns folded model effort
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor session subjects started ended turns folded model effort = { session; subjects; started; ended; turns; folded; model; effort } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { session; subjects; started; ended; turns; folded; model; effort } -> serialize session subjects started ended turns folded model effort
+    let from_json_exn =
+      let constructor session subjects started ended turns folded model effort = { session; subjects; started; ended; turns; folded; model; effort } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and Turn : sig
+    type t = {
+      at:string;
+      speaker:string;
+      text:string;
+      of':string;
+    }
+    val make: ?at:string -> ?speaker:string -> ?text:string -> ?of':string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?at:string -> ?speaker:string -> ?text:string -> ?of':string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = Turn
+    let name () = ".protocol.Turn"
+    type t = {
+      at:string;
+      speaker:string;
+      text:string;
+      of':string;
+    }
+    type make_t = ?at:string -> ?speaker:string -> ?text:string -> ?of':string -> unit -> t
+    let make ?(at = {||}) ?(speaker = {||}) ?(text = {||}) ?(of' = {||}) () = { at; speaker; text; of' }
+    let merge =
+    let merge_at = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "at", "at"), string, ({||})) ) in
+    let merge_speaker = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "speaker", "speaker"), string, ({||})) ) in
+    let merge_text = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "text", "text"), string, ({||})) ) in
+    let merge_of' = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "of", "of"), string, ({||})) ) in
+    fun t1 t2 -> {
+    	at = (merge_at t1.at t2.at);
+    	speaker = (merge_speaker t1.speaker t2.speaker);
+    	text = (merge_text t1.text t2.text);
+    	of' = (merge_of' t1.of' t2.of');
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "at", "at"), string, ({||})) ^:: basic ((2, "speaker", "speaker"), string, ({||})) ^:: basic ((3, "text", "text"), string, ({||})) ^:: basic ((4, "of", "of"), string, ({||})) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { at; speaker; text; of' } -> serialize writer at speaker text of'
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor at speaker text of' = { at; speaker; text; of' } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { at; speaker; text; of' } -> serialize at speaker text of'
+    let from_json_exn =
+      let constructor at speaker text of' = { at; speaker; text; of' } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

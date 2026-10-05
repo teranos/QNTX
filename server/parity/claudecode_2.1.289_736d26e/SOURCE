@@ -1,0 +1,10 @@
+Claude Code
+
+manifest.json https://downloads.claude.ai/claude-code-releases/2.1.289/manifest.json (commit 736d26eef42d1e3017e07e6d5bd0970b8c3a068f, built 2026-10-03T19:38:35Z)
+
+0fac4e2ae412434d3443e603154198ff8705dfd64f65d949a3004d82759274ba  manifest.json
+
+Anthropic's own manifest for this version: the sha256 and the size of its
+binary on each platform. A node fetches the binary it runs from the same host
+and keeps it only when its hash is the one written here (internal/claudecode).
+No binary is carried in a QNTX release.

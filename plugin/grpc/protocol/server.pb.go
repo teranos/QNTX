@@ -1020,6 +1020,84 @@ func (x *SystemCapabilitiesMessage) GetParserSize() string {
 	return ""
 }
 
+// VersionInfo is which build is running, as am version answers it.
+// Mirrors version.Info.
+type VersionInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CommitHash    string                 `protobuf:"bytes,1,opt,name=commit_hash,json=commitHash,proto3" json:"commit_hash,omitempty"`
+	BuildTime     string                 `protobuf:"bytes,2,opt,name=build_time,json=buildTime,proto3" json:"build_time,omitempty"`
+	Version       string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
+	GoVersion     string                 `protobuf:"bytes,4,opt,name=go_version,json=goVersion,proto3" json:"go_version,omitempty"`
+	Platform      string                 `protobuf:"bytes,5,opt,name=platform,proto3" json:"platform,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VersionInfo) Reset() {
+	*x = VersionInfo{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VersionInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VersionInfo) ProtoMessage() {}
+
+func (x *VersionInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VersionInfo.ProtoReflect.Descriptor instead.
+func (*VersionInfo) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *VersionInfo) GetCommitHash() string {
+	if x != nil {
+		return x.CommitHash
+	}
+	return ""
+}
+
+func (x *VersionInfo) GetBuildTime() string {
+	if x != nil {
+		return x.BuildTime
+	}
+	return ""
+}
+
+func (x *VersionInfo) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *VersionInfo) GetGoVersion() string {
+	if x != nil {
+		return x.GoVersion
+	}
+	return ""
+}
+
+func (x *VersionInfo) GetPlatform() string {
+	if x != nil {
+		return x.Platform
+	}
+	return ""
+}
+
 // LLMStreamMessage is one chunk of streamed model output.
 // Mirrors server.LLMStreamMessage.
 type LLMStreamMessage struct {
@@ -1043,7 +1121,7 @@ type LLMStreamMessage struct {
 
 func (x *LLMStreamMessage) Reset() {
 	*x = LLMStreamMessage{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1055,7 +1133,7 @@ func (x *LLMStreamMessage) String() string {
 func (*LLMStreamMessage) ProtoMessage() {}
 
 func (x *LLMStreamMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1068,7 +1146,7 @@ func (x *LLMStreamMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LLMStreamMessage.ProtoReflect.Descriptor instead.
 func (*LLMStreamMessage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{9}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *LLMStreamMessage) GetType() string {
@@ -1167,7 +1245,7 @@ type LLMTokenCandidate struct {
 
 func (x *LLMTokenCandidate) Reset() {
 	*x = LLMTokenCandidate{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1179,7 +1257,7 @@ func (x *LLMTokenCandidate) String() string {
 func (*LLMTokenCandidate) ProtoMessage() {}
 
 func (x *LLMTokenCandidate) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1192,7 +1270,7 @@ func (x *LLMTokenCandidate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LLMTokenCandidate.ProtoReflect.Descriptor instead.
 func (*LLMTokenCandidate) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{10}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *LLMTokenCandidate) GetId() int32 {
@@ -1231,7 +1309,7 @@ type SamplerStageSignal struct {
 
 func (x *SamplerStageSignal) Reset() {
 	*x = SamplerStageSignal{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1243,7 +1321,7 @@ func (x *SamplerStageSignal) String() string {
 func (*SamplerStageSignal) ProtoMessage() {}
 
 func (x *SamplerStageSignal) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1256,7 +1334,7 @@ func (x *SamplerStageSignal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SamplerStageSignal.ProtoReflect.Descriptor instead.
 func (*SamplerStageSignal) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{11}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SamplerStageSignal) GetName() string {
@@ -1311,7 +1389,7 @@ type LLMTokenSignal struct {
 
 func (x *LLMTokenSignal) Reset() {
 	*x = LLMTokenSignal{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1323,7 +1401,7 @@ func (x *LLMTokenSignal) String() string {
 func (*LLMTokenSignal) ProtoMessage() {}
 
 func (x *LLMTokenSignal) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1336,7 +1414,7 @@ func (x *LLMTokenSignal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LLMTokenSignal.ProtoReflect.Descriptor instead.
 func (*LLMTokenSignal) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{12}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *LLMTokenSignal) GetConfidence() float32 {
@@ -1399,7 +1477,7 @@ type WatcherFire struct {
 
 func (x *WatcherFire) Reset() {
 	*x = WatcherFire{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[13]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1411,7 +1489,7 @@ func (x *WatcherFire) String() string {
 func (*WatcherFire) ProtoMessage() {}
 
 func (x *WatcherFire) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[13]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1424,7 +1502,7 @@ func (x *WatcherFire) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatcherFire.ProtoReflect.Descriptor instead.
 func (*WatcherFire) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{13}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *WatcherFire) GetAtMs() int64 {
@@ -1500,7 +1578,7 @@ type WatcherResponse struct {
 
 func (x *WatcherResponse) Reset() {
 	*x = WatcherResponse{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[14]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1512,7 +1590,7 @@ func (x *WatcherResponse) String() string {
 func (*WatcherResponse) ProtoMessage() {}
 
 func (x *WatcherResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[14]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1525,7 +1603,7 @@ func (x *WatcherResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatcherResponse.ProtoReflect.Descriptor instead.
 func (*WatcherResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{14}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *WatcherResponse) GetId() string {
@@ -1702,7 +1780,7 @@ type PulseExecutionStartedMessage struct {
 
 func (x *PulseExecutionStartedMessage) Reset() {
 	*x = PulseExecutionStartedMessage{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[15]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1714,7 +1792,7 @@ func (x *PulseExecutionStartedMessage) String() string {
 func (*PulseExecutionStartedMessage) ProtoMessage() {}
 
 func (x *PulseExecutionStartedMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[15]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1727,7 +1805,7 @@ func (x *PulseExecutionStartedMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PulseExecutionStartedMessage.ProtoReflect.Descriptor instead.
 func (*PulseExecutionStartedMessage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{15}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PulseExecutionStartedMessage) GetType() string {
@@ -1781,7 +1859,7 @@ type PulseExecutionFailedMessage struct {
 
 func (x *PulseExecutionFailedMessage) Reset() {
 	*x = PulseExecutionFailedMessage{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[16]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1793,7 +1871,7 @@ func (x *PulseExecutionFailedMessage) String() string {
 func (*PulseExecutionFailedMessage) ProtoMessage() {}
 
 func (x *PulseExecutionFailedMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[16]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1806,7 +1884,7 @@ func (x *PulseExecutionFailedMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PulseExecutionFailedMessage.ProtoReflect.Descriptor instead.
 func (*PulseExecutionFailedMessage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{16}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PulseExecutionFailedMessage) GetType() string {
@@ -1881,7 +1959,7 @@ type PulseExecutionCompletedMessage struct {
 
 func (x *PulseExecutionCompletedMessage) Reset() {
 	*x = PulseExecutionCompletedMessage{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[17]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1893,7 +1971,7 @@ func (x *PulseExecutionCompletedMessage) String() string {
 func (*PulseExecutionCompletedMessage) ProtoMessage() {}
 
 func (x *PulseExecutionCompletedMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[17]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1906,7 +1984,7 @@ func (x *PulseExecutionCompletedMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PulseExecutionCompletedMessage.ProtoReflect.Descriptor instead.
 func (*PulseExecutionCompletedMessage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{17}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PulseExecutionCompletedMessage) GetType() string {
@@ -1978,7 +2056,7 @@ type PulseExecutionLogStreamMessage struct {
 
 func (x *PulseExecutionLogStreamMessage) Reset() {
 	*x = PulseExecutionLogStreamMessage{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[18]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1990,7 +2068,7 @@ func (x *PulseExecutionLogStreamMessage) String() string {
 func (*PulseExecutionLogStreamMessage) ProtoMessage() {}
 
 func (x *PulseExecutionLogStreamMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[18]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2003,7 +2081,7 @@ func (x *PulseExecutionLogStreamMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PulseExecutionLogStreamMessage.ProtoReflect.Descriptor instead.
 func (*PulseExecutionLogStreamMessage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{18}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PulseExecutionLogStreamMessage) GetType() string {
@@ -2054,7 +2132,7 @@ type WatcherBroadcastStats struct {
 
 func (x *WatcherBroadcastStats) Reset() {
 	*x = WatcherBroadcastStats{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[19]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2066,7 +2144,7 @@ func (x *WatcherBroadcastStats) String() string {
 func (*WatcherBroadcastStats) ProtoMessage() {}
 
 func (x *WatcherBroadcastStats) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[19]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2079,7 +2157,7 @@ func (x *WatcherBroadcastStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatcherBroadcastStats.ProtoReflect.Descriptor instead.
 func (*WatcherBroadcastStats) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{19}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *WatcherBroadcastStats) GetFireCount() int64 {
@@ -2129,7 +2207,7 @@ type WatcherQueueStatusMessage struct {
 
 func (x *WatcherQueueStatusMessage) Reset() {
 	*x = WatcherQueueStatusMessage{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[20]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2141,7 +2219,7 @@ func (x *WatcherQueueStatusMessage) String() string {
 func (*WatcherQueueStatusMessage) ProtoMessage() {}
 
 func (x *WatcherQueueStatusMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[20]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2154,7 +2232,7 @@ func (x *WatcherQueueStatusMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatcherQueueStatusMessage.ProtoReflect.Descriptor instead.
 func (*WatcherQueueStatusMessage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{20}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *WatcherQueueStatusMessage) GetType() string {
@@ -2349,7 +2427,16 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x10parser_optimized\x18\a \x01(\bR\x0fparserOptimized\x12%\n" +
 	"\x0eparser_version\x18\b \x01(\tR\rparserVersion\x12\x1f\n" +
 	"\vparser_size\x18\t \x01(\tR\n" +
-	"parserSize\"\x83\x04\n" +
+	"parserSize\"\xa2\x01\n" +
+	"\vVersionInfo\x12\x1f\n" +
+	"\vcommit_hash\x18\x01 \x01(\tR\n" +
+	"commitHash\x12\x1d\n" +
+	"\n" +
+	"build_time\x18\x02 \x01(\tR\tbuildTime\x12\x18\n" +
+	"\aversion\x18\x03 \x01(\tR\aversion\x12\x1d\n" +
+	"\n" +
+	"go_version\x18\x04 \x01(\tR\tgoVersion\x12\x1a\n" +
+	"\bplatform\x18\x05 \x01(\tR\bplatform\"\x83\x04\n" +
 	"\x10LLMStreamMessage\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x15\n" +
 	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12\x1c\n" +
@@ -2518,7 +2605,7 @@ func file_plugin_grpc_protocol_server_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_server_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*DaemonStatusMessage)(nil),            // 0: protocol.DaemonStatusMessage
 	(*AsyncJobProgress)(nil),               // 1: protocol.AsyncJobProgress
@@ -2529,42 +2616,43 @@ var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*RichSearchMatch)(nil),                // 6: protocol.RichSearchMatch
 	(*RichSearchResultsMessage)(nil),       // 7: protocol.RichSearchResultsMessage
 	(*SystemCapabilitiesMessage)(nil),      // 8: protocol.SystemCapabilitiesMessage
-	(*LLMStreamMessage)(nil),               // 9: protocol.LLMStreamMessage
-	(*LLMTokenCandidate)(nil),              // 10: protocol.LLMTokenCandidate
-	(*SamplerStageSignal)(nil),             // 11: protocol.SamplerStageSignal
-	(*LLMTokenSignal)(nil),                 // 12: protocol.LLMTokenSignal
-	(*WatcherFire)(nil),                    // 13: protocol.WatcherFire
-	(*WatcherResponse)(nil),                // 14: protocol.WatcherResponse
-	(*PulseExecutionStartedMessage)(nil),   // 15: protocol.PulseExecutionStartedMessage
-	(*PulseExecutionFailedMessage)(nil),    // 16: protocol.PulseExecutionFailedMessage
-	(*PulseExecutionCompletedMessage)(nil), // 17: protocol.PulseExecutionCompletedMessage
-	(*PulseExecutionLogStreamMessage)(nil), // 18: protocol.PulseExecutionLogStreamMessage
-	(*WatcherBroadcastStats)(nil),          // 19: protocol.WatcherBroadcastStats
-	(*WatcherQueueStatusMessage)(nil),      // 20: protocol.WatcherQueueStatusMessage
-	nil,                                    // 21: protocol.JobUpdateMessage.MetadataEntry
-	nil,                                    // 22: protocol.RichSearchMatch.AttributesEntry
-	nil,                                    // 23: protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	nil,                                    // 24: protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	nil,                                    // 25: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	(*Attestation)(nil),                    // 26: protocol.Attestation
+	(*VersionInfo)(nil),                    // 9: protocol.VersionInfo
+	(*LLMStreamMessage)(nil),               // 10: protocol.LLMStreamMessage
+	(*LLMTokenCandidate)(nil),              // 11: protocol.LLMTokenCandidate
+	(*SamplerStageSignal)(nil),             // 12: protocol.SamplerStageSignal
+	(*LLMTokenSignal)(nil),                 // 13: protocol.LLMTokenSignal
+	(*WatcherFire)(nil),                    // 14: protocol.WatcherFire
+	(*WatcherResponse)(nil),                // 15: protocol.WatcherResponse
+	(*PulseExecutionStartedMessage)(nil),   // 16: protocol.PulseExecutionStartedMessage
+	(*PulseExecutionFailedMessage)(nil),    // 17: protocol.PulseExecutionFailedMessage
+	(*PulseExecutionCompletedMessage)(nil), // 18: protocol.PulseExecutionCompletedMessage
+	(*PulseExecutionLogStreamMessage)(nil), // 19: protocol.PulseExecutionLogStreamMessage
+	(*WatcherBroadcastStats)(nil),          // 20: protocol.WatcherBroadcastStats
+	(*WatcherQueueStatusMessage)(nil),      // 21: protocol.WatcherQueueStatusMessage
+	nil,                                    // 22: protocol.JobUpdateMessage.MetadataEntry
+	nil,                                    // 23: protocol.RichSearchMatch.AttributesEntry
+	nil,                                    // 24: protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	nil,                                    // 25: protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	nil,                                    // 26: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	(*Attestation)(nil),                    // 27: protocol.Attestation
 }
 var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
 	1,  // 0: protocol.AsyncJob.progress:type_name -> protocol.AsyncJobProgress
 	2,  // 1: protocol.AsyncJob.pulse_state:type_name -> protocol.AsyncJobPulseState
 	3,  // 2: protocol.JobUpdateMessage.job:type_name -> protocol.AsyncJob
-	21, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
-	22, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
+	22, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
+	23, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
 	6,  // 5: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
-	12, // 6: protocol.LLMStreamMessage.signal:type_name -> protocol.LLMTokenSignal
-	10, // 7: protocol.SamplerStageSignal.top_k:type_name -> protocol.LLMTokenCandidate
-	10, // 8: protocol.LLMTokenSignal.top_k:type_name -> protocol.LLMTokenCandidate
-	11, // 9: protocol.LLMTokenSignal.sampler_stages:type_name -> protocol.SamplerStageSignal
-	26, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
-	13, // 11: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
-	23, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	24, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	25, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	19, // 15: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
+	13, // 6: protocol.LLMStreamMessage.signal:type_name -> protocol.LLMTokenSignal
+	11, // 7: protocol.SamplerStageSignal.top_k:type_name -> protocol.LLMTokenCandidate
+	11, // 8: protocol.LLMTokenSignal.top_k:type_name -> protocol.LLMTokenCandidate
+	12, // 9: protocol.LLMTokenSignal.sampler_stages:type_name -> protocol.SamplerStageSignal
+	27, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
+	14, // 11: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
+	24, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	25, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	26, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	20, // 15: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
 	16, // [16:16] is the sub-list for method output_type
 	16, // [16:16] is the sub-list for method input_type
 	16, // [16:16] is the sub-list for extension type_name
@@ -2581,17 +2669,17 @@ func file_plugin_grpc_protocol_server_proto_init() {
 	file_plugin_grpc_protocol_server_proto_msgTypes[1].OneofWrappers = []any{}
 	file_plugin_grpc_protocol_server_proto_msgTypes[2].OneofWrappers = []any{}
 	file_plugin_grpc_protocol_server_proto_msgTypes[3].OneofWrappers = []any{}
-	file_plugin_grpc_protocol_server_proto_msgTypes[9].OneofWrappers = []any{}
-	file_plugin_grpc_protocol_server_proto_msgTypes[13].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_server_proto_msgTypes[10].OneofWrappers = []any{}
 	file_plugin_grpc_protocol_server_proto_msgTypes[14].OneofWrappers = []any{}
-	file_plugin_grpc_protocol_server_proto_msgTypes[19].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_server_proto_msgTypes[15].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_server_proto_msgTypes[20].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_server_proto_rawDesc), len(file_plugin_grpc_protocol_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -72,6 +72,7 @@
 //! # }
 //! ```
 
+pub mod alias;
 pub mod bounded;
 pub mod distill;
 pub mod enforcement;

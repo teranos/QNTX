@@ -48,7 +48,16 @@ func TestParityHoldsGitHubAsRecorded(t *testing.T) {
 	if !ok {
 		t.Fatalf("answer is %T, not parity.Parity", answer)
 	}
-	want, err := os.ReadFile(filepath.Join("parity", "github_2026-03-10_7bdf5f0", "github"))
+	recorded := filepath.Join("parity", "github_2026-03-10_7bdf5f0", "github")
+	// A message added to GitHubService changes what is held: QNTX_RECORD_PARITY=1
+	// writes what hold gives now, to be read in the diff before it is kept.
+	if os.Getenv("QNTX_RECORD_PARITY") == "1" {
+		if err := os.WriteFile(recorded, []byte(held.Render(false)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(recorded)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,8 +109,8 @@ func TestParityStorageIsWhatMakeParityWrote(t *testing.T) {
 	holds(t, signum, "storage", answer)
 }
 
-// The gate of a2a: any signum held to AgentSkill by its shape. name follows,
-// and id, description and tags, which the spec requires, follow nothing.
+// The gate of a2a: any signum held to AgentSkill by its shape. id, name,
+// description and tags follow, and nothing the spec requires is left.
 func TestParityHoldsEverySignumToA2A(t *testing.T) {
 	signum := (&QNTXServer{}).paritySignum()
 	for _, name := range []string{"staands", "parity"} {
@@ -119,16 +128,15 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 		if skill == nil {
 			t.Fatalf("%s: no AgentSkill clade", name)
 		}
-		if skill.Score() != 12 {
+		if skill.Score() != 50 {
 			t.Errorf("%s: AgentSkill reads %d", name, skill.Score())
 		}
 		for _, item := range skill.Items {
-			if item.Column == "name" && !item.Conforms() {
-				t.Errorf("%s: name does not conform: %+v", name, item)
+			if (item.Column == "id" || item.Column == "name" || item.Column == "description" || item.Column == "tags") && !item.Conforms() {
+				t.Errorf("%s: %s does not conform: %+v", name, item.Column, item)
 			}
 		}
-		want := []string{"AgentSkill.id", "AgentSkill.description", "AgentSkill.tags"}
-		if strings.Join(held.Required, " ") != strings.Join(want, " ") {
+		if len(held.Required) != 0 {
 			t.Errorf("%s: required and unfollowed is %v", name, held.Required)
 		}
 		if strings.Join(held.Unfollowed["protocol.Signum"], " ") != "follows sigils" {
@@ -199,6 +207,36 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 		}
 		holds(t, signum, "hold", answer)
 	}
+}
+
+// The gate of 4a: the node held to AgentCard, by what am declares of itself.
+// name, description, version and skills follow; what an A2A binding would
+// fill does not, and is said to be required.
+func TestParityHoldsTheNodeToAgentCard(t *testing.T) {
+	signum := (&QNTXServer{}).paritySignum()
+	answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": "am"})
+	if refused != nil {
+		t.Fatalf("hold refused am: %s", refused.GetSays())
+	}
+	held := answer.(parity.Parity)
+	if held.Reference != "a2a" {
+		t.Fatalf("am was held to %s", held.Reference)
+	}
+	scores := map[string]int{}
+	for _, c := range held.Clades {
+		scores[c.Model] = c.Score()
+	}
+	if scores["AgentCard"] != 28 || scores["AgentSkill"] != 50 {
+		t.Errorf("AgentCard reads %d and AgentSkill %d", scores["AgentCard"], scores["AgentSkill"])
+	}
+	want := []string{
+		"AgentCard.supported_interfaces", "AgentCard.capabilities",
+		"AgentCard.default_input_modes", "AgentCard.default_output_modes",
+	}
+	if strings.Join(held.Required, " ") != strings.Join(want, " ") {
+		t.Errorf("required and unfollowed is %v", held.Required)
+	}
+	holds(t, signum, "hold", answer)
 }
 
 // follows is what the parity window offers to hold: every signum, what it

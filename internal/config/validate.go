@@ -1,6 +1,7 @@
 package config
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/teranos/QNTX/internal/secretref"
@@ -73,6 +74,23 @@ func (c *Config) Validate() error {
 	}
 	if c.Pulse.CostPerScoreUSD < 0 {
 		return errors.Newf("pulse.cost_per_score_usd must be >= 0, got %f", c.Pulse.CostPerScoreUSD)
+	}
+
+	// The ROOT agent is named whole or not at all (ADR-048): a model nothing
+	// named would be a model something chose for it.
+	if root := c.Agent.Root; root.Named() {
+		if root.Model == "" {
+			return errors.New("agent.root.model is required: the ROOT agent is the model am.toml names, and nothing stands in for it")
+		}
+		if root.Effort == "" {
+			return errors.New("agent.root.effort is required: the ROOT agent runs at the effort am.toml names")
+		}
+		if err := secretref.Validate(root.TokenRef); err != nil {
+			return errors.Wrap(err, "agent.root.token is invalid")
+		}
+		if root.Mode != "" && !slices.Contains(PermissionModes, root.Mode) {
+			return errors.Newf("agent.root.permission_mode must be one of [%s], got %q", strings.Join(PermissionModes, ", "), root.Mode)
+		}
 	}
 
 	// Plugin access tokens are references, never secrets. am.toml ships as a
