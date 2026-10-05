@@ -86,8 +86,12 @@ func holdPi(ctx context.Context, flake string, spawn func(string, func()), logge
 	spawn("agent.pi", func() {
 		defer close(held.fetched)
 		nix, err := pi.Nix()
+		var home string
 		if err == nil {
-			held.path, err = pi.Ensure(ctx, nix, flake)
+			home, err = os.UserHomeDir()
+		}
+		if err == nil {
+			held.path, err = pi.Ensure(ctx, nix, flake, filepath.Join(home, ".qntx", "pi", "result"))
 		}
 		held.err = err
 		if err != nil {

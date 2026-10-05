@@ -40,7 +40,8 @@ func TestEnsureBuildsThePinnedPi(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "store-pi-1.0.3")
 	nix, ran := nixStandIn(t, out, true, 0)
 
-	binary, err := Ensure(context.Background(), nix, PinnedFlake)
+	link := filepath.Join(t.TempDir(), "pi", "result")
+	binary, err := Ensure(context.Background(), nix, PinnedFlake, link)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,8 +49,13 @@ func TestEnsureBuildsThePinnedPi(t *testing.T) {
 		t.Fatalf("binary = %s", binary)
 	}
 	args := linesOf(t, ran)
-	if !slices.Contains(args, PinnedFlake) || !slices.Contains(args, "--no-link") || !slices.Contains(args, "nix-command flakes") {
+	if !slices.Contains(args, PinnedFlake) || !slices.Contains(args, "nix-command flakes") {
 		t.Fatalf("nix ran with %v", args)
+	}
+	// The box collects its Nix store at every deploy: Pi is rooted, and no
+	// cached evaluation names what a collection deleted.
+	if after(args, "--out-link") != link || !slices.Contains(args, "--no-eval-cache") || slices.Contains(args, "--no-link") {
+		t.Fatalf("nix ran with %v, Pi unrooted or evaluated from cache", args)
 	}
 	if !strings.Contains(PinnedFlake, "d78dc83d633229d12f8b79631384c4c2717c399f") {
 		t.Fatalf("the pin is not a commit: %s", PinnedFlake)
@@ -60,11 +66,11 @@ func TestEnsureBuildsThePinnedPi(t *testing.T) {
 // runnable says what it built.
 func TestEnsureSaysWhyThereIsNoPi(t *testing.T) {
 	nix, _ := nixStandIn(t, filepath.Join(t.TempDir(), "x"), false, 1)
-	if _, err := Ensure(context.Background(), nix, PinnedFlake); err == nil || !strings.Contains(err.Error(), "cannot build") {
+	if _, err := Ensure(context.Background(), nix, PinnedFlake, filepath.Join(t.TempDir(), "result")); err == nil || !strings.Contains(err.Error(), "cannot build") {
 		t.Fatalf("err = %v", err)
 	}
 	nix, _ = nixStandIn(t, filepath.Join(t.TempDir(), "empty"), false, 0)
-	if _, err := Ensure(context.Background(), nix, PinnedFlake); err == nil || !strings.Contains(err.Error(), "holds no bin/pi") {
+	if _, err := Ensure(context.Background(), nix, PinnedFlake, filepath.Join(t.TempDir(), "result")); err == nil || !strings.Contains(err.Error(), "holds no bin/pi") {
 		t.Fatalf("err = %v", err)
 	}
 }

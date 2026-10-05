@@ -35,9 +35,14 @@ func Nix() (string, error) {
 
 // Ensure builds the pinned Pi with nix and answers where its binary is. A
 // build Nix already holds answers at once.
-func Ensure(ctx context.Context, nix, flake string) (string, error) {
+func Ensure(ctx context.Context, nix, flake, link string) (string, error) {
+	if err := os.MkdirAll(filepath.Dir(link), 0o700); err != nil {
+		return "", errors.Wrapf(err, "could not create %s", filepath.Dir(link))
+	}
+	// link roots Pi: the box collects its Nix store at every deploy.
+	// An uncached evaluation cannot name derivations that collection deleted.
 	cmd := exec.CommandContext(ctx, nix, "--extra-experimental-features", "nix-command flakes",
-		"build", "--no-link", "--print-out-paths", flake)
+		"build", "--no-eval-cache", "--out-link", link, "--print-out-paths", flake)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
