@@ -10,9 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/measure"
@@ -56,37 +54,7 @@ func pluginSearchPaths() []string {
 
 // newest is the newest PLUGIN line per plugin.
 func (r PluginRecords) newest() (map[string]*types.As, error) {
-	if r.s.held == nil {
-		return nil, errors.New("this node holds no store to keep its plugins in")
-	}
-	// Read where pluginLine writes: system, or default on a backend with none.
-	where := auth.NamespaceDefault
-	if r.s.held.KeepsSystem() {
-		where = auth.NamespaceSystem
-	}
-	reading, err := r.s.held.Read(where)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read the %s lines in %s", pluginSubject, where)
-	}
-	found, err := reading.GetAttestations(ats.AttestationFilter{
-		Subjects: []string{pluginSubject},
-		Limit:    storage.MaxAttestationLimit,
-	})
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read the %s lines in %s", pluginSubject, where)
-	}
-	newest := map[string]*types.As{}
-	for _, as := range found {
-		if len(as.Predicates) == 0 {
-			continue
-		}
-		name := as.Predicates[0]
-		if held, ok := newest[name]; ok && !as.Timestamp.After(held.Timestamp) {
-			continue
-		}
-		newest[name] = as
-	}
-	return newest, nil
+	return newestLines(r.s, pluginSubject, "plugins")
 }
 
 // pluginLine writes one plugin whole, as a new line.

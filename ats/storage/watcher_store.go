@@ -170,76 +170,17 @@ func validateWatcher(w *Watcher) error {
 
 // Create creates a new watcher
 func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
-	if err := validateWatcher(w); err != nil {
-		return err
-	}
-
-	now := time.Now()
-	w.CreatedAt = now
-	w.UpdatedAt = now
-
-	subjectsJSON, err := json.Marshal(w.Filter.Subjects)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal subjects")
-	}
-	predicatesJSON, err := json.Marshal(w.Filter.Predicates)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal predicates")
-	}
-	contextsJSON, err := json.Marshal(w.Filter.Contexts)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal contexts")
-	}
-	actorsJSON, err := json.Marshal(w.Filter.Actors)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal actors")
-	}
-
-	var timeStart, timeEnd *string
-	if w.Filter.TimeStart != nil {
-		s := w.Filter.TimeStart.Format(time.RFC3339Nano)
-		timeStart = &s
-	}
-	if w.Filter.TimeEnd != nil {
-		s := w.Filter.TimeEnd.Format(time.RFC3339Nano)
-		timeEnd = &s
-	}
-
-	attrFiltersText, err := marshalAttributeFilters(w.AttributeFilters)
-	if err != nil {
-		return errors.Wrapf(err, "watcher %s", w.ID)
-	}
-	attrFiltersJSON := nullIfEmpty(attrFiltersText)
-
-	_, err = ws.db.ExecContext(ctx, `
-		INSERT INTO watchers (
-			id, name,
-			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
-			semantic_query, semantic_threshold, semantic_cluster_id,
-			upstream_semantic_query, upstream_semantic_threshold,
-			attribute_filters,
-			action_type, action_data,
-			max_fires_per_second, enabled,
-			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		w.ID, w.Name,
-		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
-		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
-		nullIfEmpty(w.UpstreamSemanticQuery), nullIfZero(w.UpstreamSemanticThreshold),
-		attrFiltersJSON,
-		w.ActionType, w.ActionData,
-		w.MaxFiresPerSecond, w.Enabled,
-		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
-	)
-	if err != nil {
-		return errors.Wrap(err, "failed to create watcher")
-	}
-	return nil
+	return ws.insert(ctx, w, "INSERT", "create")
 }
 
 // CreateOrReplace creates a watcher or replaces it if one with the same ID exists.
 // Unlike Create, this is idempotent — safe for concurrent calls.
 func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
+	return ws.insert(ctx, w, "INSERT OR REPLACE", "create or replace")
+}
+
+// insert writes w with the given INSERT verb; what names the write in its error.
+func (ws *WatcherStore) insert(ctx context.Context, w *Watcher, verb, what string) error {
 	if err := validateWatcher(w); err != nil {
 		return err
 	}
@@ -282,7 +223,7 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 	attrFiltersJSON := nullIfEmpty(attrFiltersText)
 
 	_, err = ws.db.ExecContext(ctx, `
-		INSERT OR REPLACE INTO watchers (
+		`+verb+` INTO watchers (
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
@@ -302,7 +243,7 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
 	)
 	if err != nil {
-		return errors.Wrap(err, "failed to create or replace watcher")
+		return errors.Wrap(err, "failed to "+what+" watcher")
 	}
 	return nil
 }
