@@ -57,6 +57,10 @@ func TestEnsureBuildsThePinnedPi(t *testing.T) {
 	if after(args, "--out-link") != link || !slices.Contains(args, "--no-eval-cache") || slices.Contains(args, "--no-link") {
 		t.Fatalf("nix ran with %v, Pi unrooted or evaluated from cache", args)
 	}
+	// Pi comes from the cache CI fills, and is never built on the node.
+	if after(args, "--max-jobs") != "0" {
+		t.Fatalf("nix ran with %v, free to build Pi on the node", args)
+	}
 	if !strings.Contains(PinnedFlake, "d78dc83d633229d12f8b79631384c4c2717c399f") {
 		t.Fatalf("the pin is not a commit: %s", PinnedFlake)
 	}
