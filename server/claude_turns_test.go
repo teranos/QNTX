@@ -65,6 +65,50 @@ func TestAnAgentsSessionReadsAsATranscript(t *testing.T) {
 	}, said)
 }
 
+// On the box a token the agent was handed went into a command, and the command
+// into its transcript as it was. What it writes down names a secret by its
+// kind and never carries it, wherever in a turn it appears.
+func TestWhatAnAgentWritesDownCarriesNoSecret(t *testing.T) {
+	writes := sessionWriter{did: "did:key:zAgent", session: "s-1"}
+	at := time.Date(2026, 10, 5, 10, 0, 0, 0, time.UTC)
+	const github = "ghs_2308579_eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJ4In0.c2lnbmF0dXJl"
+	const nodes = "qntx_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+	told, err := writes.told("use "+github+" to push", "tim", at)
+	require.NoError(t, err)
+	reached, err := writes.rowsOf(streamedMessage(t, `{"type":"assistant","session_id":"s-1","message":{"content":[`+
+		`{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"cat > /tmp/cred <<'EOF'\n`+github+`\nEOF\ncurl -H 'Authorization: Bearer `+nodes+`' x"}},`+
+		`{"type":"tool_use","id":"toolu_2","name":"Write","input":{"file_path":"/tmp/`+github+`"}}]}}`), at)
+	require.NoError(t, err)
+	answered, err := writes.rowsOf(streamedMessage(t, `{"type":"result","subtype":"success","session_id":"s-1","is_error":false,"result":"the token is `+github+`"}`), at)
+	require.NoError(t, err)
+
+	rows := append(append([]*types.As{told}, reached...), answered...)
+	require.Len(t, rows, 4)
+	for _, row := range rows {
+		written, err := json.Marshal(row.Attributes)
+		require.NoError(t, err)
+		assert.NotContains(t, string(written), "eyJhbGci", "%s carries the GitHub token", row.Predicates[0])
+		assert.NotContains(t, string(written), "0123456789abcdef", "%s carries the node's token", row.Predicates[0])
+	}
+	// It still says what was there, and what was done with it.
+	assert.Equal(t, "use ghs_…(masked) to push", told.Attributes["prompt"])
+	assert.Contains(t, reached[0].Attributes["command"], "cat > /tmp/cred <<'EOF'\nghs_…(masked)\nEOF")
+	assert.Contains(t, reached[0].Attributes["command"], "Bearer qntx_…(masked)'")
+}
+
+// A name that only starts like a token is left as it is.
+func TestWhatOnlyLooksLikeASecretIsWrittenAsItIs(t *testing.T) {
+	for _, plain := range []string{
+		"ls qntx_operational.db qntx_plugins/",
+		"grep ghs_ notes.txt",
+		"export QNTX_TOKEN_FILE=~/.qntx/token",
+		"sk-ant- is how its tokens start",
+	} {
+		assert.Equal(t, plain, masked(plain))
+	}
+}
+
 // A turn Claude Code reports as failed is said as the error it was.
 func TestAnAgentsFailedTurnIsAnErrorTurn(t *testing.T) {
 	writes := sessionWriter{did: "did:key:zAgent", session: "s-1", resumed: true}

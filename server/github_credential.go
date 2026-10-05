@@ -1,58 +1,65 @@
 package server
 
 import (
-	"context"
+	"encoding/json"
 	"net/http"
 
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
-	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/errors"
 )
 
 // What carries a push from this node (ADR-048, Its git): a token the node
 // mints as the GitHub App, for one repository, when git asks for it.
 
+// A route and no sigil, and no tool (routeTool): on the box the agent took the
+// sigil as a tool, and the token went into its context and into a command.
+// What asks here is git's credential helper (qntx git credential).
+const githubCredentialPath = githubPath + "/credential"
+
 // gitCredentialUser is the username GitHub takes an installation token under
 // over HTTPS.
 const gitCredentialUser = "x-access-token"
 
-func githubCredentialSigil() *protocol.Sigil {
-	return &protocol.Sigil{
-		Name: "credential",
-		Does: "Mints what carries a push to one repository: a short-lived token of the App's installation there, narrowed to that repository. It is what git is handed when it asks, and nothing keeps it.",
-		Takes: []*protocol.Param{
-			{Name: "owner", Required: true, Says: "The account the repository is under."},
-			{Name: "repo", Required: true, Says: "The repository."},
-		},
-		Gives: []*protocol.Field{
-			{Name: "username", Says: "The username git presents with the token."},
-			{Name: "password", Says: "The token, as git's password."},
-			{Name: "expires_at", Says: "When GitHub stops taking it."},
-			{Name: "app", Says: "The App whose installation it is of."},
-			{Name: "contents", Says: "What the token may do with the repository's contents: write carries a push, read does not."},
-		},
-		Http: &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/credential"},
+// HandleGitHubCredential mints a short-lived token of the App's installation
+// where one repository is, narrowed to it, and says what it may do with
+// contents: one that only reads them is refused by GitHub on a push.
+func (s *QNTXServer) HandleGitHubCredential(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, githubCredentialPath+" answers POST, and this was "+r.Method)
+		return
 	}
-}
+	var asked struct {
+		Owner string `json:"owner"`
+		Repo  string `json:"repo"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&asked); err != nil {
+		writeError(w, http.StatusBadRequest, "what was sent is not a JSON object naming owner and repo: "+err.Error())
+		return
+	}
+	if asked.Owner == "" || asked.Repo == "" {
+		writeError(w, http.StatusBadRequest, "a credential is minted for one repository, and this named owner "+
+			`"`+asked.Owner+`" and repo "`+asked.Repo+`"`)
+		return
+	}
 
-func (s *QNTXServer) githubCredential(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	minted, err := s.gitHubService().InstallationToken(ctx, sent["owner"], sent["repo"])
+	minted, err := s.gitHubService().InstallationToken(r.Context(), asked.Owner, asked.Repo)
 	var notInstalled services.NoInstallation
 	switch {
 	case err == nil:
 	case errors.As(err, &notInstalled):
 		// GitHub answers 404 both where the App is not installed and where
 		// there is no such repository: its words are given as they came.
-		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "repo", Says: err.Error()}
+		writeError(w, http.StatusNotFound, err.Error())
+		return
 	default:
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
-	return map[string]any{
+	respond(w, s.logger, http.StatusOK, map[string]any{
 		"username":   gitCredentialUser,
 		"password":   minted.Token,
 		"expires_at": minted.ExpiresAt,
 		"app":        minted.App,
 		"contents":   minted.Contents,
-	}, nil
+	})
 }

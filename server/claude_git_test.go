@@ -47,6 +47,17 @@ func TestTheRootAgentHasAGitUserOfItsOwn(t *testing.T) {
 	assert.Equal(t, "true", gitSays(t, config, "credential.https://github.com.useHttpPath"))
 }
 
+// On the box it was not told how its git works, asked for a credential as a
+// tool and carried the token by hand. It is told: its git asks the node, a
+// credential is never its to handle, and GitHub's API is one tool.
+func TestTheRootAgentIsToldHowItsGitWorks(t *testing.T) {
+	s, _ := runningTheRootAgent(t, opusLow)
+	told := s.rootAgent.isSaidToBe()
+	assert.Contains(t, told, "your git asks the node")
+	assert.Contains(t, told, "Never ask for, read, print or store a GitHub credential")
+	assert.Contains(t, told, "github_ask")
+}
+
 // git itself, reading the configuration the node writes, runs the helper it
 // names with the node's address, says which repository it is reaching, and
 // takes what the helper hands back.

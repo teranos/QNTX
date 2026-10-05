@@ -385,7 +385,7 @@ var githubRoutes = map[string]githubRoute{
 	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#get-a-repository-installation-for-the-authenticated-app
 	"GetARepositoryInstallationForTheAuthenticatedApp": {method: http.MethodGet, path: "/repos/{owner}/{repo}/installation", asApp: true},
 	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#create-an-installation-access-token-for-an-app
-	"CreateAnInstallationAccessTokenForAnApp": {method: http.MethodPost, path: "/app/installations/{installation_id}/access_tokens", body: []string{"repositories", "repository_ids", "permissions"}, asApp: true},
+	"CreateAnInstallationAccessTokenForAnApp": {method: http.MethodPost, path: "/app/installations/{installation_id}/access_tokens", body: []string{"repositories", "repository_ids", "permissions"}, asApp: true, mints: true},
 }
 
 func (s *GitHubServer) GetTheCombinedStatusForASpecificReference(ctx context.Context, req *protocol.GitHubGetTheCombinedStatusForASpecificReferenceRequest) (*protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse, error) {

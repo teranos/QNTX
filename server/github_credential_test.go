@@ -14,7 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/QNTX/server/reach"
 )
 
 // askedOfGitHub is one thing the stand-in for GitHub was asked.
@@ -71,16 +71,13 @@ func appHoldingServer(t *testing.T, contents string) (*QNTXServer, *[]askedOfGit
 func TestTheNodeMintsAGitCredentialForOneRepository(t *testing.T) {
 	s, asked := appHoldingServer(t, "write")
 
-	got, refused := answer(t, s, "credential", sigil.Sent{"owner": "teranos", "repo": "QNTX"})
-	require.Nil(t, refused)
-	credential, ok := got.(map[string]any)
-	require.True(t, ok)
+	status, credential := gitAsks(t, s, `{"owner": "teranos", "repo": "QNTX"}`)
+	require.Equal(t, http.StatusOK, status, "the node said %v", credential)
 	assert.Equal(t, "x-access-token", credential["username"])
 	assert.Equal(t, "ghs_minted", credential["password"])
 	assert.Equal(t, "2099-01-01T00:00:00Z", credential["expires_at"])
 	assert.Equal(t, "the-app", credential["app"])
 	assert.Equal(t, "write", credential["contents"])
-	holds(t, s.githubSignum(), "credential", got)
 
 	require.Len(t, *asked, 2)
 	assert.Equal(t, "GET /repos/teranos/QNTX/installation", (*asked)[0].Route)
@@ -89,30 +86,60 @@ func TestTheNodeMintsAGitCredentialForOneRepository(t *testing.T) {
 	assert.JSONEq(t, `{"repositories": ["QNTX"]}`, (*asked)[1].Body)
 }
 
+// gitAsks is what git's credential helper asks the node, and what it answers.
+func gitAsks(t *testing.T, s *QNTXServer, body string) (int, map[string]any) {
+	t.Helper()
+	answered := httptest.NewRecorder()
+	s.HandleGitHubCredential(answered, httptest.NewRequest(http.MethodPost, githubCredentialPath, strings.NewReader(body)))
+	var said map[string]any
+	require.NoError(t, json.Unmarshal(answered.Body.Bytes(), &said), "the node answered %s", answered.Body.String())
+	return answered.Code, said
+}
+
+// On the box the agent took the credential as a tool, and the token went into
+// its context and from there into a command its transcript kept. It is handed
+// to git and offered to no model: it is no sigil, and its route is no tool.
+func TestTheGitCredentialIsNoTool(t *testing.T) {
+	s, _ := appHoldingServer(t, "write")
+	for _, held := range s.githubSignum().GetSigils() {
+		assert.NotEqual(t, githubCredentialPath, held.GetHttp().GetPath(), "%s answers where the credential is minted", held.GetName())
+	}
+	assert.False(t, routeTool(reach.Route{Path: githubCredentialPath}))
+	assert.True(t, routeTool(reach.Route{Path: "/api/dev"}), "no route is a tool any more")
+}
+
 // An App that only reads contents still mints, and the credential says so: a
 // push it carries is refused by GitHub, and this is where the reason is read.
 func TestAGitCredentialSaysWhetherItMayWriteContents(t *testing.T) {
 	s, _ := appHoldingServer(t, "read")
-	got, refused := answer(t, s, "credential", sigil.Sent{"owner": "teranos", "repo": "QNTX"})
-	require.Nil(t, refused)
-	assert.Equal(t, "read", got.(map[string]any)["contents"])
+	status, credential := gitAsks(t, s, `{"owner": "teranos", "repo": "QNTX"}`)
+	require.Equal(t, http.StatusOK, status)
+	assert.Equal(t, "read", credential["contents"])
 }
 
 // Where the App is not installed there is no credential, in GitHub's words.
 func TestNoGitCredentialWhereTheAppIsNotInstalled(t *testing.T) {
 	s, asked := appHoldingServer(t, "write")
-	_, refused := answer(t, s, "credential", sigil.Sent{"owner": "elsewhere", "repo": "thing"})
-	require.NotNil(t, refused)
-	assert.Equal(t, sigil.NotFound, refused.GetWhy())
-	assert.Contains(t, refused.GetSays(), "elsewhere/thing")
-	assert.Contains(t, refused.GetSays(), "Not Found")
+	status, said := gitAsks(t, s, `{"owner": "elsewhere", "repo": "thing"}`)
+	assert.Equal(t, http.StatusNotFound, status)
+	assert.Contains(t, said["error"], "elsewhere/thing")
+	assert.Contains(t, said["error"], "Not Found")
 	assert.Len(t, *asked, 1, "a token was asked for where no installation was found")
 }
 
 // A node that holds no App's key mints nothing, and says which key is missing.
 func TestNoGitCredentialWithoutTheAppsKey(t *testing.T) {
 	s := githubKnowingServer(t)
-	_, refused := answer(t, s, "credential", sigil.Sent{"owner": "teranos", "repo": "QNTX"})
-	require.NotNil(t, refused)
-	assert.Contains(t, refused.GetSays(), "private_key")
+	status, said := gitAsks(t, s, `{"owner": "teranos", "repo": "QNTX"}`)
+	assert.Equal(t, http.StatusInternalServerError, status)
+	assert.Contains(t, said["error"], "private_key")
+}
+
+// What names no repository is asked nothing of GitHub.
+func TestNoGitCredentialForNoRepository(t *testing.T) {
+	s, asked := appHoldingServer(t, "write")
+	status, said := gitAsks(t, s, `{"owner": "teranos"}`)
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Contains(t, said["error"], "one repository")
+	assert.Empty(t, *asked)
 }

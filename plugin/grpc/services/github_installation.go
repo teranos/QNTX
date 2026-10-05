@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"net/http"
 	"slices"
 	"time"
 
@@ -17,6 +18,10 @@ import (
 // where the repository is, and GitHubService is asked by operation name.
 
 type githubAsInstallation struct{}
+
+// githubStatus is where a caller asks to be told the status GitHub answered
+// with: a *int in the context, left as it is when GitHub did not answer.
+type githubStatus struct{}
 
 // AsInstallation is ctx for a call spent as the App's installation where the
 // repository the call names is, in place of a namespace's token.
@@ -62,13 +67,19 @@ func (s *GitHubServer) InstallationToken(ctx context.Context, owner, repo string
 		return held, nil
 	}
 
-	under, err := s.GetARepositoryInstallationForTheAuthenticatedApp(ctx,
+	// Only GitHub answering 404 is the App not being installed there. A node
+	// that cannot sign as the App, and a GitHub that did not answer, are not.
+	answeredWith := 0
+	under, err := s.GetARepositoryInstallationForTheAuthenticatedApp(context.WithValue(ctx, githubStatus{}, &answeredWith),
 		&protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest{Owner: owner, Repo: repo})
 	if err != nil {
 		return InstallationToken{}, errors.Wrapf(err, "GitHub was not asked which installation %s is under", key)
 	}
-	if !under.GetSuccess() {
+	if !under.GetSuccess() && answeredWith == http.StatusNotFound {
 		return InstallationToken{}, NoInstallation{Owner: owner, Repo: repo, Said: under.GetError()}
+	}
+	if !under.GetSuccess() {
+		return InstallationToken{}, errors.Newf("which installation %s is under was not learned: %s", key, under.GetError())
 	}
 	answered, err := s.CreateAnInstallationAccessTokenForAnApp(ctx,
 		&protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest{InstallationId: under.GetId(), Repositories: []string{repo}})
@@ -138,8 +149,12 @@ func githubService() protoreflect.ServiceDescriptor {
 // does not have, and a field the operation does not take, are an error.
 func (s *GitHubServer) Ask(ctx context.Context, operation string, request []byte) ([]byte, error) {
 	method := githubService().Methods().ByName(protoreflect.Name(operation))
-	if _, routed := githubRoutes[operation]; method == nil || !routed {
+	route, routed := githubRoutes[operation]
+	if method == nil || !routed {
 		return nil, NoSuchOperation{Operation: operation}
+	}
+	if route.mints {
+		return nil, NotWhatItTakes{Operation: operation, Why: "what it answers is a credential, which is the node's own to ask for and is handed to nobody by name"}
 	}
 	takes, err := protoregistry.GlobalTypes.FindMessageByName(method.Input().FullName())
 	if err != nil {
@@ -178,7 +193,7 @@ func GitHubOperations() []GitHubOperation {
 	for i := 0; i < methods.Len(); i++ {
 		method := methods.Get(i)
 		route, routed := githubRoutes[string(method.Name())]
-		if !routed {
+		if !routed || route.mints {
 			continue
 		}
 		takes := []string{}

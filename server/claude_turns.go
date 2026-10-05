@@ -2,10 +2,12 @@ package server
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/internal/claudecode"
 	"github.com/teranos/errors"
 )
@@ -25,10 +27,64 @@ type sessionWriter struct {
 // agentSubject is what an agent's rows are about: where it works.
 const agentSubject = "qntx/root-agent"
 
+// secretShapes is how the secrets an agent comes to hold start: GitHub's
+// tokens, the node's own, and a Claude plan token. A run of body at least
+// least long after the start is taken for the secret.
+var secretShapes = []struct {
+	starts string
+	body   func(byte) bool
+	least  int
+}{
+	{"ghs_", tokenByte, 20}, {"ghp_", tokenByte, 20}, {"gho_", tokenByte, 20},
+	{"ghu_", tokenByte, 20}, {"ghr_", tokenByte, 20}, {"github_pat_", tokenByte, 20},
+	{"sk-ant-", tokenByte, 20},
+	{access.TokenPrefix, hexByte, 2 * access.TokenSeedBytes},
+}
+
+func tokenByte(c byte) bool {
+	return hexByte(c) || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '-' || c == '.'
+}
+
+func hexByte(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+// masked is text with every secret in it named by how it starts and not
+// carried. A session is written down to be read, and a row is kept: what an
+// agent was handed and put in a command does not belong in either.
+func masked(text string) string {
+	for _, shape := range secretShapes {
+		from := 0
+		for {
+			at := strings.Index(text[from:], shape.starts)
+			if at < 0 {
+				break
+			}
+			body := from + at + len(shape.starts)
+			end := body
+			for end < len(text) && shape.body(text[end]) {
+				end++
+			}
+			if end-body < shape.least {
+				from = body
+				continue
+			}
+			text = text[:body] + "…(masked)" + text[end:]
+			from = body
+		}
+	}
+	return text
+}
+
 func (w sessionWriter) row(predicate string, at time.Time, attrs map[string]any) (*types.As, error) {
 	id, err := identity.GenerateASUID("AS", agentSubject, predicate, w.session)
 	if err != nil {
 		return nil, errors.Wrapf(err, "no id for the %s of session %s", predicate, w.session)
+	}
+	for name, value := range attrs {
+		if said, isText := value.(string); isText {
+			attrs[name] = masked(said)
+		}
 	}
 	return &types.As{
 		ID:         id,

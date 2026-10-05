@@ -113,8 +113,13 @@ utilizing"
   address its DID is at the host the node answers on. It is the agent's by its
   DID, whoever carried the push.
 - It holds no GitHub token (ADR-043). Its git asks the node for a credential
-  when it pushes (`github credential`), and the node mints one as the App's
-  installation: for that repository alone, and short lived.
+  when it pushes, and the node mints one as the App's installation: for that
+  repository alone, and short lived.
+- A credential is handed to git and offered to no model: where it is minted
+  is a route and no sigil, and no tool. A sigil is a tool to whoever reaches
+  it, and the agent reaches everything.
+- What it writes down of its session names a secret by how it starts and
+  does not carry it.
 - What GitHub answers over its API, a pull request opened or a run read, it
   asks of GitHubService through sigils (`github ask`, with `github operations`
   for what can be asked), as a plugin asks over gRPC. It is spent as the App's

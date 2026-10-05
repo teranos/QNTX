@@ -119,6 +119,27 @@ func TestACallAsTheInstallationWhereTheAppIsNotInstalledIsRefused(t *testing.T) 
 	assert.Equal(t, []string{"GET /repos/elsewhere/thing/installation"}, routesOf(seen))
 }
 
+// A node that cannot sign as the App is not an App that is not installed, and
+// neither is a GitHub that answers anything but 404: each is said as it is.
+func TestOnlyGitHubsNotFoundIsTheAppNotInstalled(t *testing.T) {
+	keyless, _ := fakeGitHub(t, answerJSON(200, `{}`))
+	_, err := keyless.InstallationToken(context.Background(), "teranos", "QNTX")
+	require.Error(t, err)
+	assert.NotErrorAs(t, err, &NoInstallation{})
+	assert.Contains(t, err.Error(), "private_key")
+
+	down, _ := fakeGitHubAs(t, gardenApp{gardenTokens: gardenCreds, jwt: "the-apps-jwt"}, answerJSON(502, `{"message": "Bad Gateway"}`))
+	_, err = down.InstallationToken(context.Background(), "teranos", "QNTX")
+	require.Error(t, err)
+	assert.NotErrorAs(t, err, &NoInstallation{})
+	assert.Contains(t, err.Error(), "502")
+
+	absent, _ := fakeGitHubAs(t, gardenApp{gardenTokens: gardenCreds, jwt: "the-apps-jwt"}, answerJSON(404, `{"message": "Not Found"}`))
+	_, err = absent.InstallationToken(context.Background(), "teranos", "QNTX")
+	require.Error(t, err)
+	assert.ErrorAs(t, err, &NoInstallation{})
+}
+
 // GitHubService is asked by the name of an operation and what it takes, as
 // JSON, by whatever reaches it without a compiled request in hand.
 func TestGitHubServiceIsAskedByOperationName(t *testing.T) {
@@ -154,6 +175,23 @@ func TestGitHubServiceSaysWhatItWasAskedThatItDoesNotHave(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "tittle")
 	assert.Empty(t, *seen)
+}
+
+// On the box the agent asked for a credential as a tool, and the token went
+// into its context and from there into its transcript. What answers with a
+// credential is the node's own to ask: it is not asked by name, and not listed.
+func TestWhatAnswersWithACredentialIsNotAskedByName(t *testing.T) {
+	s, seen := fakeGitHubAs(t, gardenApp{gardenTokens: gardenCreds, jwt: "the-apps-jwt"},
+		installedOn(time.Now().Add(time.Hour), answerJSON(200, `{}`)))
+
+	_, err := s.Ask(AsInstallation(context.Background()), "CreateAnInstallationAccessTokenForAnApp", []byte(`{"installation_id": 7}`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "credential")
+	assert.Empty(t, *seen)
+
+	for _, op := range GitHubOperations() {
+		assert.NotEqual(t, "CreateAnInstallationAccessTokenForAnApp", op.Name)
+	}
 }
 
 // What can be asked is listed, each with where it goes on GitHub and what it takes.

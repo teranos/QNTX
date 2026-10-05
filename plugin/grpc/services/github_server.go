@@ -188,6 +188,9 @@ type githubRoute struct {
 	slashed []string
 	// asApp is a route GitHub takes only from the App itself, with its JWT.
 	asApp bool
+	// mints is a route whose answer is a credential. It is the node's own to
+	// ask: whoever asks GitHubService by name is not handed one.
+	mints bool
 }
 
 // pathFields are the request fields named in the path template, in order.
@@ -282,6 +285,9 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 	}
 	defer func() { sqlclose.Log(httpResp.Body.Close(), s.logger, "the GitHub response body") }()
 	s.recordHeaders(key, httpResp.Header)
+	if status, wanted := ctx.Value(githubStatus{}).(*int); wanted {
+		*status = httpResp.StatusCode
+	}
 
 	raw, err := io.ReadAll(httpResp.Body)
 	if err != nil {
