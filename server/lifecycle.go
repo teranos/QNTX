@@ -170,7 +170,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		// The node's own mux. Anything registered on http.DefaultServeMux —
 		// net/http/pprof's init, or a route someone forgot to declare — is not
 		// on this one and answers 404.
-		Handler:           s.served,
+		Handler:           strictTransport(s.served),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill
