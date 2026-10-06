@@ -54,7 +54,7 @@ func serve(t *testing.T, answer Answer, method, path, body string, header map[st
 		r.Header.Set(k, v)
 	}
 	w := httptest.NewRecorder()
-	HTTP(operations, answer, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }).ServeHTTP(w, r)
+	HTTP(operations, garden, answer, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }).ServeHTTP(w, r)
 	var said status
 	_ = json.Unmarshal(w.Body.Bytes(), &said)
 	return w, said
@@ -65,6 +65,9 @@ func unsupported(_ context.Context, op Operation, _ proto.Message) (proto.Messag
 }
 
 var v1 = map[string]string{"A2A-Version": "1.0"}
+
+// garden is the one tenant an agent is served at here.
+func garden(tenant string) bool { return tenant == "garden" }
 
 // §3.6.2: an empty A2A-Version is 0.3, which this node does not speak, and the
 // refusal is VersionNotSupportedError as §11.6 writes an A2A error.
@@ -210,6 +213,25 @@ func TestWhatIsNoOperationIsNotFound(t *testing.T) {
 		w, said := serve(t, unsupported, r.method, r.path, "", v1)
 		if w.Code != http.StatusNotFound || said.Error.Status != "NOT_FOUND" {
 			t.Errorf("%s %s answered %d %s", r.method, r.path, w.Code, w.Body.String())
+		}
+	}
+}
+
+// §3.3.2: a tenant no agent is served at does not exist, and answers as a path
+// no operation answers, word for word, with nothing asked of what answers.
+func TestATenantNoAgentIsServedAtIsNotFound(t *testing.T) {
+	reached := false
+	answer := func(_ context.Context, op Operation, _ proto.Message) (proto.Message, *Error) {
+		reached = true
+		return nil, Unsupported(op)
+	}
+	for name, route := range asked {
+		w, said := serve(t, answer, route.method, "/orchard"+route.path, route.body, v1)
+		if reached || w.Code != http.StatusNotFound || said.Error.Status != "NOT_FOUND" {
+			t.Errorf("%s at /orchard answered %d %s", name, w.Code, w.Body.String())
+		}
+		if want := route.method + " /orchard" + route.path + " is no A2A operation"; said.Error.Message != want {
+			t.Errorf("%s at /orchard said %q, not %q", name, said.Error.Message, want)
 		}
 	}
 }

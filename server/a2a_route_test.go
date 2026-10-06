@@ -12,8 +12,9 @@ import (
 )
 
 // The binding is served at /a2a/ behind its reach line: ROOT reaches every
-// operation in scope, with a tenant and without, and is told it is not one the
-// node does yet; SUPER is refused at the gate before any operation is asked.
+// operation in scope and is told it is not one the node does yet, and a tenant
+// no agent is served at is not found (§3.3.2); SUPER is refused at the gate
+// before any operation is asked.
 func TestA2AIsServedToRootAlone(t *testing.T) {
 	srv, tokens := pluginServingServer(t, "fake")
 	// A SendMessageRequest that sets what the spec requires.
@@ -35,12 +36,18 @@ func TestA2AIsServedToRootAlone(t *testing.T) {
 		{http.MethodGet, "/a2a/extendedAgentCard", ""},
 		{http.MethodPost, "/a2a/garden/tasks/abc:cancel", ""},
 	} {
+		tenant := strings.HasPrefix(route.path, "/a2a/garden/")
 		r := asked(route.method, route.path, route.body, tokens[auth.LevelRoot])
 		r.Header.Set("A2A-Version", "1.0")
 		w := httptest.NewRecorder()
 		srv.served.ServeHTTP(w, r)
-		assert.Equal(t, http.StatusBadRequest, w.Code, route.path+" for ROOT: "+w.Body.String())
-		assert.Contains(t, w.Body.String(), "UNSUPPORTED_OPERATION", route.path+" for ROOT")
+		if tenant {
+			assert.Equal(t, http.StatusNotFound, w.Code, route.path+" for ROOT: "+w.Body.String())
+			assert.Contains(t, w.Body.String(), "is no A2A operation", route.path+" for ROOT")
+		} else {
+			assert.Equal(t, http.StatusBadRequest, w.Code, route.path+" for ROOT: "+w.Body.String())
+			assert.Contains(t, w.Body.String(), "UNSUPPORTED_OPERATION", route.path+" for ROOT")
+		}
 
 		r = asked(route.method, route.path, route.body, tokens[auth.LevelSuper])
 		r.Header.Set("A2A-Version", "1.0")
