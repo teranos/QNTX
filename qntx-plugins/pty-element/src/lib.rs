@@ -200,13 +200,6 @@ impl DomainPluginService for PTYElementService {
         Ok(Response::new(ElementDefResponse { elements }))
     }
 
-    async fn parse_ax_query(
-        &self,
-        _request: Request<ParseAxQueryRequest>,
-    ) -> Result<Response<ParseAxQueryResponse>, Status> {
-        Err(Status::unimplemented("ParseAxQuery is handled by kern"))
-    }
-
     async fn execute_job(
         &self,
         _request: Request<ExecuteJobRequest>,

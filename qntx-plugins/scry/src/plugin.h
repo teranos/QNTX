@@ -15,7 +15,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.37.10"
+#define PLUGIN_VERSION "0.37.11"
 
 // Forward declarations
 struct llama_model;
@@ -254,9 +254,6 @@ public:
                             const protocol::ExecuteJobRequest* req,
                             protocol::ExecuteJobResponse* resp) override;
 
-    grpc::Status ParseAxQuery(grpc::ServerContext* ctx,
-                              const protocol::ParseAxQueryRequest* req,
-                              protocol::ParseAxQueryResponse* resp) override;
 
     InferenceEngine& engine() { return engine_; }
     MetalRenderer& renderer() { return *renderer_; }

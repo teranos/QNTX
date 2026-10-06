@@ -1617,104 +1617,6 @@ func (x *ElementDef) GetModulePath() string {
 	return ""
 }
 
-// ParseAxQueryRequest is sent to a parser plugin to parse an Ax query string.
-type ParseAxQueryRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ParseAxQueryRequest) Reset() {
-	*x = ParseAxQueryRequest{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[19]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ParseAxQueryRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ParseAxQueryRequest) ProtoMessage() {}
-
-func (x *ParseAxQueryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[19]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ParseAxQueryRequest.ProtoReflect.Descriptor instead.
-func (*ParseAxQueryRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{19}
-}
-
-func (x *ParseAxQueryRequest) GetQuery() string {
-	if x != nil {
-		return x.Query
-	}
-	return ""
-}
-
-// ParseAxQueryResponse contains the parsed result as JSON matching rustAxQuery shape.
-type ParseAxQueryResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Result        []byte                 `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"` // JSON AST (same shape as ats Rust parser output)
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`   // Parse error message, empty on success
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ParseAxQueryResponse) Reset() {
-	*x = ParseAxQueryResponse{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[20]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ParseAxQueryResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ParseAxQueryResponse) ProtoMessage() {}
-
-func (x *ParseAxQueryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[20]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ParseAxQueryResponse.ProtoReflect.Descriptor instead.
-func (*ParseAxQueryResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{20}
-}
-
-func (x *ParseAxQueryResponse) GetResult() []byte {
-	if x != nil {
-		return x.Result
-	}
-	return nil
-}
-
-func (x *ParseAxQueryResponse) GetError() string {
-	if x != nil {
-		return x.Error
-	}
-	return ""
-}
-
 var File_plugin_grpc_protocol_domain_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
@@ -1867,12 +1769,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\rdefault_width\x18\x06 \x01(\x05R\fdefaultWidth\x12%\n" +
 	"\x0edefault_height\x18\a \x01(\x05R\rdefaultHeight\x12\x1f\n" +
 	"\vmodule_path\x18\b \x01(\tR\n" +
-	"modulePath\"+\n" +
-	"\x13ParseAxQueryRequest\x12\x14\n" +
-	"\x05query\x18\x01 \x01(\tR\x05query\"D\n" +
-	"\x14ParseAxQueryResponse\x12\x16\n" +
-	"\x06result\x18\x01 \x01(\fR\x06result\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error2\xa2\x05\n" +
+	"modulePath2\xd3\x04\n" +
 	"\x13DomainPluginService\x127\n" +
 	"\bMetadata\x12\x0f.protocol.Empty\x1a\x1a.protocol.MetadataResponse\x12G\n" +
 	"\n" +
@@ -1885,8 +1782,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fConfigSchema\x12\x0f.protocol.Empty\x1a\x1e.protocol.ConfigSchemaResponse\x12A\n" +
 	"\x10RegisterElements\x12\x0f.protocol.Empty\x1a\x1c.protocol.ElementDefResponse\x12G\n" +
 	"\n" +
-	"ExecuteJob\x12\x1b.protocol.ExecuteJobRequest\x1a\x1c.protocol.ExecuteJobResponse\x12M\n" +
-	"\fParseAxQuery\x12\x1d.protocol.ParseAxQueryRequest\x1a\x1e.protocol.ParseAxQueryResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"ExecuteJob\x12\x1b.protocol.ExecuteJobRequest\x1a\x1c.protocol.ExecuteJobResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_domain_proto_rawDescOnce sync.Once
@@ -1901,7 +1797,7 @@ func file_plugin_grpc_protocol_domain_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_domain_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(WebSocketMessage_Type)(0),   // 0: protocol.WebSocketMessage.Type
 	(*Empty)(nil),                // 1: protocol.Empty
@@ -1923,26 +1819,24 @@ var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(*JobLogEntry)(nil),          // 17: protocol.JobLogEntry
 	(*ElementDefResponse)(nil),   // 18: protocol.ElementDefResponse
 	(*ElementDef)(nil),           // 19: protocol.ElementDef
-	(*ParseAxQueryRequest)(nil),  // 20: protocol.ParseAxQueryRequest
-	(*ParseAxQueryResponse)(nil), // 21: protocol.ParseAxQueryResponse
-	nil,                          // 22: protocol.InitializeRequest.ConfigEntry
-	nil,                          // 23: protocol.WebSocketMessage.HeadersEntry
-	nil,                          // 24: protocol.HealthResponse.DetailsEntry
-	nil,                          // 25: protocol.ConfigSchemaResponse.FieldsEntry
-	(*Signum)(nil),               // 26: protocol.Signum
+	nil,                          // 20: protocol.InitializeRequest.ConfigEntry
+	nil,                          // 21: protocol.WebSocketMessage.HeadersEntry
+	nil,                          // 22: protocol.HealthResponse.DetailsEntry
+	nil,                          // 23: protocol.ConfigSchemaResponse.FieldsEntry
+	(*Signum)(nil),               // 24: protocol.Signum
 }
 var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
-	22, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
+	20, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
 	6,  // 1: protocol.HTTPRequest.headers:type_name -> protocol.HTTPHeader
 	6,  // 2: protocol.HTTPResponse.headers:type_name -> protocol.HTTPHeader
 	0,  // 3: protocol.WebSocketMessage.type:type_name -> protocol.WebSocketMessage.Type
-	23, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
-	24, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
-	25, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
+	21, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
+	22, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
+	23, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
 	11, // 7: protocol.InitializeResponse.schedules:type_name -> protocol.ScheduleInfo
 	14, // 8: protocol.InitializeResponse.watchers:type_name -> protocol.WatcherRegistration
 	13, // 9: protocol.InitializeResponse.http_routes:type_name -> protocol.RouteInfo
-	26, // 10: protocol.InitializeResponse.signa:type_name -> protocol.Signum
+	24, // 10: protocol.InitializeResponse.signa:type_name -> protocol.Signum
 	17, // 11: protocol.ExecuteJobResponse.log_entries:type_name -> protocol.JobLogEntry
 	19, // 12: protocol.ElementDefResponse.elements:type_name -> protocol.ElementDef
 	10, // 13: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
@@ -1955,19 +1849,17 @@ var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
 	1,  // 20: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
 	1,  // 21: protocol.DomainPluginService.RegisterElements:input_type -> protocol.Empty
 	15, // 22: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
-	20, // 23: protocol.DomainPluginService.ParseAxQuery:input_type -> protocol.ParseAxQueryRequest
-	2,  // 24: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
-	12, // 25: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
-	1,  // 26: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
-	5,  // 27: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
-	7,  // 28: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
-	8,  // 29: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
-	9,  // 30: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
-	18, // 31: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
-	16, // 32: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
-	21, // 33: protocol.DomainPluginService.ParseAxQuery:output_type -> protocol.ParseAxQueryResponse
-	24, // [24:34] is the sub-list for method output_type
-	14, // [14:24] is the sub-list for method input_type
+	2,  // 23: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
+	12, // 24: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
+	1,  // 25: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
+	5,  // 26: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
+	7,  // 27: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
+	8,  // 28: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
+	9,  // 29: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
+	18, // 30: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
+	16, // 31: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
+	23, // [23:32] is the sub-list for method output_type
+	14, // [14:23] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name
 	14, // [14:14] is the sub-list for extension extendee
 	0,  // [0:14] is the sub-list for field type_name
@@ -1986,7 +1878,7 @@ func file_plugin_grpc_protocol_domain_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_domain_proto_rawDesc), len(file_plugin_grpc_protocol_domain_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   25,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

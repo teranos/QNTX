@@ -3,7 +3,7 @@ use qntx_grpc::plugin::proto::domain_plugin_service_server::DomainPluginService;
 use qntx_grpc::plugin::proto::{
     ConfigSchemaResponse, ElementDefResponse, Empty, ExecuteJobRequest, ExecuteJobResponse,
     HealthResponse, HttpRequest, HttpResponse, InitializeRequest, InitializeResponse,
-    MetadataResponse, ParseAxQueryRequest, ParseAxQueryResponse, WebSocketMessage,
+    MetadataResponse, WebSocketMessage,
 };
 use std::sync::Arc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -194,10 +194,4 @@ impl DomainPluginService for MeiliPluginService {
         Ok(Response::new(ElementDefResponse { elements: vec![] }))
     }
 
-    async fn parse_ax_query(
-        &self,
-        _request: Request<ParseAxQueryRequest>,
-    ) -> Result<Response<ParseAxQueryResponse>, Status> {
-        Err(Status::unimplemented("No Ax query parsing"))
-    }
 }
