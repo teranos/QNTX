@@ -380,6 +380,20 @@
 .claude-failed { padding: 0 6px; flex-shrink: 0; }
 .claude-say { display: flex; gap: 4px; align-items: stretch; padding: 4px 6px; border-top: 1px solid var(--border-on-dark); flex-shrink: 0; }
 .claude-mode { background: var(--bg-almost-black); color: var(--text-on-dark-secondary); border: 1px solid var(--border-on-dark); font: inherit; font-size: var(--font-size-xs, 10px); }
+/* The Claude element in Claude's own colours: Clay, Ivory and Slate, from Anthropic's media resources */
+.claude-brand { --claude-clay: #D97757; --claude-ivory: #FAF9F5; --claude-slate: #151514; background: var(--claude-slate); color: var(--claude-ivory); }
+.claude-head { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-bottom: 1px solid var(--claude-clay); flex-shrink: 0; }
+.claude-head .claude-who { padding: 0; border-bottom: none; flex: 1; min-width: 0; }
+.claude-spark { width: 16px; height: 16px; flex: none; color: var(--claude-clay); }
+.claude-brand:has(.claude-status:not(:empty)) .claude-spark { animation: claude-spark-turn 2.4s linear infinite; }
+@keyframes claude-spark-turn { to { transform: rotate(360deg); } }
+.claude-brand .claude-status { color: var(--claude-clay); }
+.claude-brand .tr-sp-assistant .tr-speaker { color: var(--claude-clay); }
+.claude-brand .tr-sp-human .tr-speaker { color: var(--claude-ivory); }
+.claude-brand .claude-say { border-top-color: var(--claude-clay); }
+.claude-brand .claude-says:focus { outline: 1px solid var(--claude-clay); outline-offset: -1px; }
+.claude-brand .claude-send { background: var(--claude-clay); border-color: var(--claude-clay); color: var(--claude-slate); }
+.claude-brand .claude-send:disabled { opacity: 0.5; }
 .claude-says { flex: 1; min-width: 0; resize: none; background: var(--bg-almost-black); color: var(--text-on-dark); border: 1px solid var(--border-on-dark); font: inherit; padding: 2px 4px; }
 
 /* Ground's own faces, the ones its book is typeset in (teranos/ground doc/fonts), worn by the Ground element alone */

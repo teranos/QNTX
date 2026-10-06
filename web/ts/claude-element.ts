@@ -7,6 +7,7 @@ import { preventDrag, tray } from '@teranos/elements';
 import { apiJson } from './client';
 import { log, SEG } from './logger.ts';
 import { Claude } from './sym';
+import { spark } from './claude-spark';
 import { apiError, sacredEntry } from './components/sacred';
 import { renderTranscript, type TranscriptRead } from './components/element/transcript-element';
 
@@ -207,8 +208,13 @@ export function createClaudeElement(): Element {
         title: 'Claude',
         symbol: Claude,
         renderContent: () => {
-            const body = part('div', 'content-area claude');
+            const body = part('div', 'content-area claude claude-brand');
             drawClaude(body);
+            // The Spark heads who answers, and turns while it answers.
+            const who = body.querySelector<HTMLElement>('.claude-who')!;
+            const head = part('div', 'claude-head');
+            who.replaceWith(head);
+            head.append(spark(), who);
             return body;
         },
     };
