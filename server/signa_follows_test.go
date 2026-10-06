@@ -6,17 +6,28 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/server/parity"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
-// resolvesTo is the message a full name names, or nil.
+// resolvesTo is the message a full name names, or nil: QNTX's own, or one the
+// pinned A2A spec declares, which a card is read through.
 func resolvesTo(name string) protoreflect.MessageDescriptor {
 	found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(name))
-	if err != nil {
+	if err == nil {
+		return found.Descriptor()
+	}
+	files, refused := parity.Descriptors("a2a")
+	if refused != nil {
 		return nil
 	}
-	return found.Descriptor()
+	for _, file := range files {
+		if declared := file.Messages().ByName(protoreflect.FullName(name).Name()); declared != nil && string(declared.FullName()) == name {
+			return declared
+		}
+	}
+	return nil
 }
 
 // A field that says which message it carries names one that exists, on every

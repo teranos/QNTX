@@ -1,4 +1,4 @@
-A2A v1.0.1, the protocol a signum is a skill of.
+A2A v1.0.1, on whose Agent Card a signum is described as an AgentSkill.
 
 a2a.proto https://raw.githubusercontent.com/a2aproject/A2A/3303592588e388e62e0f69f701af531d2f4e3991/specification/a2a.proto (the commit v1.0.1 points to)
 
@@ -6,3 +6,11 @@ e195bf96ab630c69797851970203e1b2b6b19528f2e9803b7d904b91a5104016  a2a.proto
 
 Its google/api imports are read from google.golang.org/genproto/googleapis/api
 as go.mod pins it, and google/protobuf from protocompile's standard imports.
+
+specification.md https://raw.githubusercontent.com/a2aproject/A2A/3303592588e388e62e0f69f701af531d2f4e3991/docs/specification.md (the same commit)
+
+627ccfe6ffb1be2c56811c3dcc18780deb419f41cdc98248095c939b2d9dc9cb  specification.md
+
+The document: §5.3 Method Mapping Reference is what server/a2a's tests hold
+the operations read from a2a.proto to. nix/references/a2a.nix fetches it by
+its hash, and make says writes it.

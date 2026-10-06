@@ -652,13 +652,31 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 		TimeStart:  unixMilli(filter.TimeStart),
 		TimeEnd:    unixMilli(filter.TimeEnd),
 		Limit:      filter.Limit,
-	}, "storage_query "+slowQueryKey(filter))
+	}, "storage_query "+slowQueryKey(filter), false)
 }
 
 // QueryFilter executes a full AxFilter query through Rust FFI.
 // Rust builds the SQL and executes it.
 func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
-	return rs.query(rustQueryFilter{
+	return rs.query(axAsRust(filter), "query_filter", false)
+}
+
+// QueryFilterResolved executes the whole ax read path in Rust: alias expansion,
+// cartesian claim expansion, classification, and resolution. Returns the
+// surviving attestations in resolution order.
+//
+// This is what AxExecutor assembles in Go by driving the same Rust code across
+// the wazero boundary a step at a time. It is a separate FFI entry point from
+// QueryFilter because QueryFilter's C functions are shared with
+// GetAttestations, whose callers — the REST API, the watcher engine — read
+// unresolved rows and must keep doing so.
+func (rs *RustStore) QueryFilterResolved(filter types.AxFilter) ([]*types.As, error) {
+	return rs.query(axAsRust(filter), "query_filter_resolved", true)
+}
+
+// axAsRust is an AxFilter as Rust reads it.
+func axAsRust(filter types.AxFilter) rustQueryFilter {
+	return rustQueryFilter{
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
@@ -666,13 +684,13 @@ func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
 		TimeStart:  unixMilli(filter.TimeStart),
 		TimeEnd:    unixMilli(filter.TimeEnd),
 		Limit:      filter.Limit,
-	}, "query_filter")
+	}
 }
 
 // query asks a read connection when one is free, else the store under the
 // write lock, and converts the attestations Rust answers with. slowKey names
-// the query in the slow-operation log.
-func (rs *RustStore) query(rustFilter rustQueryFilter, slowKey string) ([]*types.As, error) {
+// the query in the slow-operation log, and resolved asks Rust for the whole ax read path.
+func (rs *RustStore) query(rustFilter rustQueryFilter, slowKey string, resolved bool) ([]*types.As, error) {
 	filterJSON, err := json.Marshal(rustFilter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal filter")
@@ -685,7 +703,11 @@ func (rs *RustStore) query(rustFilter rustQueryFilter, slowKey string) ([]*types
 	var result C.AttestationResultC
 	entry := rs.acquireReadConn()
 	if entry != nil {
-		result = C.read_conn_query(entry.conn, cFilterJSON)
+		if resolved {
+			result = C.read_conn_query_resolved(entry.conn, cFilterJSON)
+		} else {
+			result = C.read_conn_query(entry.conn, cFilterJSON)
+		}
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
@@ -693,7 +715,11 @@ func (rs *RustStore) query(rustFilter rustQueryFilter, slowKey string) ([]*types
 			rs.muWrite.Unlock()
 			return nil, errors.New("store is closed")
 		}
-		result = C.storage_query(rs.store, cFilterJSON)
+		if resolved {
+			result = C.storage_query_resolved(rs.store, cFilterJSON)
+		} else {
+			result = C.storage_query(rs.store, cFilterJSON)
+		}
 		rs.muWrite.Unlock()
 	}
 	var success bool

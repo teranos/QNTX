@@ -29,7 +29,9 @@ func (s *QNTXServer) namespacesSignum() sigil.Signum {
 	named := []*protocol.Field{{Name: "name", Says: "The namespace acted on."}}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "namespaces",
+			Name:        "namespaces",
+			Description: "The namespaces the node keeps, who owns each and whether it is switched on: listed, made, switched off and on, ended, and default emptied.",
+			Tags:        []string{"namespaces", "tenancy", "ownership"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "list",

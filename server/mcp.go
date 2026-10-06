@@ -47,9 +47,10 @@ type operation struct {
 }
 
 // routeTool is whether a served route is a tool: not a socket, which a call
-// cannot hold open, not a path sigils answer, and not the MCP endpoint itself.
+// cannot hold open, not a path sigils answer, not the MCP endpoint itself, and
+// not what answers with a credential, which no model is handed.
 func routeTool(route reach.Route) bool {
-	return !route.Socket && !route.Gates && route.Path != "/mcp" && route.Path != "/mcp/"
+	return !route.Socket && !route.Gates && route.Path != "/mcp" && route.Path != "/mcp/" && route.Path != githubCredentialPath
 }
 
 // declaredBy is a plugin's path whose plugin serves a signum of its own: the

@@ -1,0 +1,150 @@
+syntax = "proto3";
+
+package protocol;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043, ADR-048
+// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10
+// Both are the App's own: GitHub takes them only with a JWT the App signs.
+
+// GET /repos/{owner}/{repo}/installation
+message GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest {
+  string owner = 1;
+  string repo = 2;
+}
+
+message GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse {
+  bool success = 1;
+  string error = 2;
+  int64 id = 3;
+  // Any of Simple User or Enterprise.
+  google.protobuf.Struct account = 4;
+  string repository_selection = 5;
+  string access_tokens_url = 6;
+  string repositories_url = 7;
+  string html_url = 8;
+  int64 app_id = 9;
+  string client_id = 10;
+  int64 target_id = 11;
+  string target_type = 12;
+  GitHubAppsAppsAppPermissions permissions = 13;
+  repeated string events = 14;
+  string created_at = 15;
+  string updated_at = 16;
+  string single_file_name = 17;
+  bool has_multiple_single_files = 18;
+  repeated string single_file_paths = 19;
+  string app_slug = 20;
+  GitHubAppsAppsSimpleUser suspended_by = 21;
+  string suspended_at = 22;
+  string contact_email = 23;
+}
+
+// POST /app/installations/{installation_id}/access_tokens
+message GitHubCreateAnInstallationAccessTokenForAnAppRequest {
+  int64 installation_id = 1;
+  repeated string repositories = 2;
+  repeated int64 repository_ids = 3;
+  GitHubAppsAppsAppPermissions permissions = 4;
+}
+
+message GitHubCreateAnInstallationAccessTokenForAnAppResponse {
+  bool success = 1;
+  string error = 2;
+  string token = 3;
+  string expires_at = 4;
+  GitHubAppsAppsAppPermissions permissions = 5;
+  string repository_selection = 6;
+  repeated google.protobuf.Struct repositories = 7;
+  string single_file = 8;
+  bool has_multiple_single_files = 9;
+  repeated string single_file_paths = 10;
+}
+
+// App Permissions
+message GitHubAppsAppsAppPermissions {
+  string actions = 1;
+  string administration = 2;
+  string artifact_metadata = 3;
+  string attestations = 4;
+  string checks = 5;
+  string code_quality = 6;
+  string codespaces = 7;
+  string contents = 8;
+  string dependabot_secrets = 9;
+  string deployments = 10;
+  string discussions = 11;
+  string environments = 12;
+  string issues = 13;
+  string merge_queues = 14;
+  string metadata = 15;
+  string packages = 16;
+  string pages = 17;
+  string pull_requests = 18;
+  string repository_custom_properties = 19;
+  string repository_hooks = 20;
+  string repository_projects = 21;
+  string secret_scanning_alerts = 22;
+  string secrets = 23;
+  string security_events = 24;
+  string single_file = 25;
+  string statuses = 26;
+  string vulnerability_alerts = 27;
+  string workflows = 28;
+  string custom_properties_for_organizations = 29;
+  string members = 30;
+  string organization_administration = 31;
+  string organization_custom_roles = 32;
+  string organization_custom_org_roles = 33;
+  string organization_custom_properties = 34;
+  string organization_copilot_seat_management = 35;
+  string organization_copilot_agent_settings = 36;
+  string organization_announcement_banners = 37;
+  string organization_events = 38;
+  string organization_hooks = 39;
+  string organization_personal_access_tokens = 40;
+  string organization_personal_access_token_requests = 41;
+  string organization_plan = 42;
+  string organization_projects = 43;
+  string organization_packages = 44;
+  string organization_secrets = 45;
+  string organization_self_hosted_runners = 46;
+  string organization_user_blocking = 47;
+  string email_addresses = 48;
+  string followers = 49;
+  string git_ssh_keys = 50;
+  string gpg_keys = 51;
+  string interaction_limits = 52;
+  string profile = 53;
+  string starring = 54;
+  string enterprise_custom_properties_for_organizations = 55;
+}
+
+// Simple User
+message GitHubAppsAppsSimpleUser {
+  string name = 1;
+  string email = 2;
+  string login = 3;
+  int64 id = 4;
+  string node_id = 5;
+  string avatar_url = 6;
+  string gravatar_id = 7;
+  string url = 8;
+  string html_url = 9;
+  string followers_url = 10;
+  string following_url = 11;
+  string gists_url = 12;
+  string starred_url = 13;
+  string subscriptions_url = 14;
+  string organizations_url = 15;
+  string repos_url = 16;
+  string events_url = 17;
+  string received_events_url = 18;
+  string type = 19;
+  bool site_admin = 20;
+  string starred_at = 21;
+  string user_view_type = 22;
+}

@@ -10,7 +10,8 @@ export const protobufPackage = "protocol";
 
 /**
  * A Signum holds the sigils of one subject: watchers is a signum, and list,
- * create, read, update and delete are its sigils. To A2A a signum is a skill.
+ * create, read, update and delete are its sigils. On the Agent Card a signum
+ * is described as an AgentSkill.
  */
 export interface Signum {
   name: string;
@@ -20,6 +21,23 @@ export interface Signum {
    * Umami, one reference and not a blend." The parity sigil reads these.
    */
   follows: Follows[];
+  /**
+   * What it is for, in words, and the words it is found by. To A2A these are
+   * a skill's description and tags.
+   */
+  description: string;
+  tags: string[];
+}
+
+/**
+ * Node is the node about itself: what it is called, what it is for, and the
+ * signa it holds. It is what fills A2A's AgentCard, which am node answers, and
+ * the parity sigil holds it to that card.
+ */
+export interface Node {
+  name: string;
+  description: string;
+  signa: Signum[];
 }
 
 /**

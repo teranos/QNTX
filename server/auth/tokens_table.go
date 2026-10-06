@@ -95,6 +95,21 @@ func OpenTokenTable(db *sql.DB, record TokenRecordStore) (*TokenTable, TookIn, e
 		}
 		done.WrittenBack++
 	}
+	// A token whose record write failed when it was issued is in the table
+	// alone, and the record lacking it disagrees as much as one that differs.
+	theirs := map[string]bool{}
+	for _, one := range recorded {
+		theirs[one.Hash] = true
+	}
+	for _, mine := range held {
+		if theirs[mine.Hash] {
+			continue
+		}
+		if err := record.PutRecord(mine); err != nil {
+			return nil, done, errors.Wrapf(err, "access token %s in the table, which the record lacks, was not written to it", mine.ID)
+		}
+		done.WrittenBack++
+	}
 	return t, done, nil
 }
 
@@ -283,8 +298,10 @@ func (t *TokenTable) change(id string, apply func(*TokenRecord)) error {
 	return nil
 }
 
-// put writes the table, then the record.
+// put writes the table, then the record. Both are handed the token whole: the
+// record takes a list only as a list.
 func (t *TokenTable) put(held TokenRecord) error {
+	held = wholeToken(held)
 	if err := t.write(held); err != nil {
 		return err
 	}

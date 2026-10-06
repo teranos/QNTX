@@ -162,6 +162,8 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 					Gives: []*protocol.Field{{Name: "runner", Says: "The runner as the Actions section shows it."}},
 					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/runner"},
 				},
+				githubAskSigils()[0],
+				githubAskSigils()[1],
 			},
 		},
 		Answers: map[string]sigil.Answer{
@@ -170,6 +172,8 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 			"runner":       s.githubRunner,
 			"webhook":      s.githubWebhook,
 			"webhook_path": s.githubWebhookPath,
+			"ask":          s.githubAsk,
+			"operations":   s.githubOperations,
 		},
 	}
 }

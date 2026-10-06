@@ -67,6 +67,49 @@ func TestGitHubRedeliverPostsTheDeliverysAttempt(t *testing.T) {
 	assert.Equal(t, "Bearer the-apps-jwt", (*seen)[0].Header.Get("Authorization"))
 }
 
+// Which installation of the App a repository is under is the App's own to ask.
+func TestGitHubAppAsksWhichInstallationARepositoryIsUnder(t *testing.T) {
+	s, seen := fakeGitHubAs(t, gardenApp{gardenTokens: gardenCreds, jwt: "the-apps-jwt"}, answerJSON(200,
+		`{"id": 7, "app_id": 3, "app_slug": "the-app", "target_type": "User",
+		  "repository_selection": "all", "permissions": {"contents": "read", "pull_requests": "write"}}`))
+
+	resp, err := s.GetARepositoryInstallationForTheAuthenticatedApp(context.Background(),
+		&protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest{Owner: "teranos", Repo: "QNTX"})
+	require.NoError(t, err)
+	require.True(t, resp.Success, resp.Error)
+
+	require.Len(t, *seen, 1)
+	assert.Equal(t, http.MethodGet, (*seen)[0].Method)
+	assert.Equal(t, "/repos/teranos/QNTX/installation", (*seen)[0].Path)
+	assert.Equal(t, "Bearer the-apps-jwt", (*seen)[0].Header.Get("Authorization"))
+	assert.Equal(t, int64(7), resp.Id)
+	assert.Equal(t, "the-app", resp.AppSlug)
+	assert.Equal(t, "read", resp.Permissions.Contents)
+}
+
+// The App mints a token for one installation, narrowed to the repositories
+// named: what an agent's push is carried by (ADR-048).
+func TestGitHubAppMintsAnInstallationTokenForTheRepositoriesNamed(t *testing.T) {
+	s, seen := fakeGitHubAs(t, gardenApp{gardenTokens: gardenCreds, jwt: "the-apps-jwt"}, answerJSON(201,
+		`{"token": "ghs_minted", "expires_at": "2026-10-05T10:20:00Z", "repository_selection": "selected",
+		  "permissions": {"contents": "write", "metadata": "read"}}`))
+
+	resp, err := s.CreateAnInstallationAccessTokenForAnApp(context.Background(),
+		&protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest{InstallationId: 7, Repositories: []string{"QNTX"}})
+	require.NoError(t, err)
+	require.True(t, resp.Success, resp.Error)
+
+	require.Len(t, *seen, 1)
+	got := (*seen)[0]
+	assert.Equal(t, http.MethodPost, got.Method)
+	assert.Equal(t, "/app/installations/7/access_tokens", got.Path)
+	assert.Equal(t, "Bearer the-apps-jwt", got.Header.Get("Authorization"))
+	assert.JSONEq(t, `{"repositories": ["QNTX"]}`, got.Body)
+	assert.Equal(t, "ghs_minted", resp.Token)
+	assert.Equal(t, "2026-10-05T10:20:00Z", resp.ExpiresAt)
+	assert.Equal(t, "write", resp.Permissions.Contents)
+}
+
 // A node whose am.toml names no private_key cannot act as the App, and says so
 // instead of spending a namespace's token where GitHub would refuse it.
 func TestGitHubAppRouteWithoutTheAppsKeyIsRefused(t *testing.T) {

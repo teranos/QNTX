@@ -84,6 +84,30 @@ entity_actors_limit = 64
 # The numbers the node emits are named in internal/measure.
 # ════════════════════════════════════════════════════════════════
 
+[node]
+# What the node says of itself, through am node, and what the parity sigil
+# holds to A2A's AgentCard.
+# Default: "" (says nothing)
+# name = "the-node"
+# description = "What this node is for."
+
+[agent.root]
+# The ROOT agent (ADR-048): QNTX itself as ROOT talks to it, run as Claude Code.
+# Named whole or not at all. Default: none, and the node has no ROOT agent.
+# model = 'claude-opus-5-5'
+
+# effort = 'low'
+
+# The Claude plan token `claude setup-token` prints, by reference.
+# token = 'ssm:///q/box/claude/oauth-token'
+
+# The permission mode it runs in when whoever speaks to it names none: one of
+# acceptEdits, auto, bypassPermissions, manual, dontAsk, plan.
+# permission_mode = 'dontAsk'
+
+# The tools it may use without being asked, by Claude Code's names for them.
+# allow = ['mcp__qntx', 'Read']
+
 [sentry]
 # The project logs and metrics are shipped to. Empty is off, and
 # nothing else in this section is read. A DSN is an ingest key — it

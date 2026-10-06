@@ -12,13 +12,27 @@ option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 // reach is governed at runtime and a plugin comes and goes while the node runs.
 
 // A Signum holds the sigils of one subject: watchers is a signum, and list,
-// create, read, update and delete are its sigils. To A2A a signum is a skill.
+// create, read, update and delete are its sigils. On the Agent Card a signum
+// is described as an AgentSkill.
 message Signum {
   string name = 1;
   repeated Sigil sigils = 2;
   // The shapes this signum is held to, each by its name: "Staands will be
   // Umami, one reference and not a blend." The parity sigil reads these.
   repeated Follows follows = 3;
+  // What it is for, in words, and the words it is found by. To A2A these are
+  // a skill's description and tags.
+  string description = 4;
+  repeated string tags = 5;
+}
+
+// Node is the node about itself: what it is called, what it is for, and the
+// signa it holds. It is what fills A2A's AgentCard, which am node answers, and
+// the parity sigil holds it to that card.
+message Node {
+  string name = 1;
+  string description = 2;
+  repeated Signum signa = 3;
 }
 
 // Transcript is one agent session Ground recorded, derived from its hook

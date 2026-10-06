@@ -64,6 +64,9 @@ var storeWriters = map[string]string{
 	"nodeRecord": "the node's GitHub settings (ADR-043), what the node knows of itself. " +
 		"Reached from the github sigils, which the reach table gives to ROOT",
 
+	"claudeSay": "the ROOT agent's session, which is the node's own record whoever spoke " +
+		"to it (ADR-048). Reached from the claude sigils, which the reach table gives to ROOT",
+
 	"systemAttestor": "what the node writes about itself at the door. The /auth/… routes " +
 		"are ANYONE because logging in cannot ask you to be logged in, so no admission " +
 		"stands behind this one. The closed predicate vocabulary in server/auth does",
@@ -154,7 +157,7 @@ func asksToWrite(body *ast.BlockStmt) bool {
 // below. That is the whole of how this stays true when something new is added:
 // it is a claim somebody makes in the open, or it is a thing a namespace has.
 var nodeReaders = map[string]string{
-	"handlers.go:HandleHealth":                    "the health of the file underneath, which is the node's to answer",
+	"handlers.go:health":                          "the health of the file underneath, which is the node's to answer",
 	"operational_watchdog.go:askOperationalStore": "the same ping on a tick, so a node that has stopped answering says so",
 	"operational_watchdog.go:operationalPool":     "where the connections to the node's own file are while a ping waits on it",
 	"lifecycle.go:Stop":                           "shutdown compares the pulse read connection with the node's own",

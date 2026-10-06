@@ -213,7 +213,7 @@ var File_plugin_grpc_protocol_github_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_github_proto_rawDesc = "" +
 	"\n" +
-	"!plugin/grpc/protocol/github.proto\x12\bprotocol\x1a2plugin/grpc/protocol/github_commits_statuses.proto\x1a2plugin/grpc/protocol/github_commits_comments.proto\x1a1plugin/grpc/protocol/github_commits_commits.proto\x1a3plugin/grpc/protocol/github_branches_branches.proto\x1a7plugin/grpc/protocol/github_pulls_review_requests.proto\x1a/plugin/grpc/protocol/github_pulls_reviews.proto\x1a0plugin/grpc/protocol/github_pulls_comments.proto\x1a-plugin/grpc/protocol/github_pulls_pulls.proto\x1a3plugin/grpc/protocol/github_actions_workflows.proto\x1a7plugin/grpc/protocol/github_actions_workflow_jobs.proto\x1a3plugin/grpc/protocol/github_actions_artifacts.proto\x1a7plugin/grpc/protocol/github_actions_workflow_runs.proto\x1a-plugin/grpc/protocol/github_checks_runs.proto\x1a/plugin/grpc/protocol/github_checks_suites.proto\x1a1plugin/grpc/protocol/github_issues_comments.proto\x1a.plugin/grpc/protocol/github_orgs_members.proto\x1a+plugin/grpc/protocol/github_orgs_orgs.proto\x1a/plugin/grpc/protocol/github_issues_issues.proto\x1a-plugin/grpc/protocol/github_repos_repos.proto\x1a0plugin/grpc/protocol/github_repos_contents.proto\x1a/plugin/grpc/protocol/github_apps_webhooks.proto\"m\n" +
+	"!plugin/grpc/protocol/github.proto\x12\bprotocol\x1a2plugin/grpc/protocol/github_commits_statuses.proto\x1a2plugin/grpc/protocol/github_commits_comments.proto\x1a1plugin/grpc/protocol/github_commits_commits.proto\x1a3plugin/grpc/protocol/github_branches_branches.proto\x1a7plugin/grpc/protocol/github_pulls_review_requests.proto\x1a/plugin/grpc/protocol/github_pulls_reviews.proto\x1a0plugin/grpc/protocol/github_pulls_comments.proto\x1a-plugin/grpc/protocol/github_pulls_pulls.proto\x1a3plugin/grpc/protocol/github_actions_workflows.proto\x1a7plugin/grpc/protocol/github_actions_workflow_jobs.proto\x1a3plugin/grpc/protocol/github_actions_artifacts.proto\x1a7plugin/grpc/protocol/github_actions_workflow_runs.proto\x1a-plugin/grpc/protocol/github_checks_runs.proto\x1a/plugin/grpc/protocol/github_checks_suites.proto\x1a1plugin/grpc/protocol/github_issues_comments.proto\x1a.plugin/grpc/protocol/github_orgs_members.proto\x1a+plugin/grpc/protocol/github_orgs_orgs.proto\x1a/plugin/grpc/protocol/github_issues_issues.proto\x1a-plugin/grpc/protocol/github_repos_repos.proto\x1a0plugin/grpc/protocol/github_repos_contents.proto\x1a/plugin/grpc/protocol/github_apps_webhooks.proto\x1a+plugin/grpc/protocol/github_apps_apps.proto\"m\n" +
 	"\x16GitHubRateLimitRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x16\n" +
@@ -231,7 +231,7 @@ const file_plugin_grpc_protocol_github_proto_rawDesc = "" +
 	"\tresources\x18\x03 \x03(\v20.protocol.GitHubRateLimitResponse.ResourcesEntryR\tresources\x1aR\n" +
 	"\x0eResourcesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12*\n" +
-	"\x05value\x18\x02 \x01(\v2\x14.protocol.GitHubRateR\x05value:\x028\x012\x95\xc8\x01\n" +
+	"\x05value\x18\x02 \x01(\v2\x14.protocol.GitHubRateR\x05value:\x028\x012\x8a\xcb\x01\n" +
 	"\rGitHubService\x12P\n" +
 	"\tRateLimit\x12 .protocol.GitHubRateLimitRequest\x1a!.protocol.GitHubRateLimitResponse\x12\xb0\x01\n" +
 	")GetTheCombinedStatusForASpecificReference\x12@.protocol.GitHubGetTheCombinedStatusForASpecificReferenceRequest\x1aA.protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse\x12\x92\x01\n" +
@@ -420,7 +420,9 @@ const file_plugin_grpc_protocol_github_proto_rawDesc = "" +
 	"\x14GetARepositoryREADME\x12+.protocol.GitHubGetARepositoryREADMERequest\x1a,.protocol.GitHubGetARepositoryREADMEResponse\x12\x8b\x01\n" +
 	"!GetARepositoryREADMEForADirectory\x128.protocol.GitHubGetARepositoryREADMEForADirectoryRequest\x1a,.protocol.GitHubGetARepositoryREADMEResponse\x12\x8c\x01\n" +
 	"\x1dListDeliveriesForAnAppWebhook\x124.protocol.GitHubListDeliveriesForAnAppWebhookRequest\x1a5.protocol.GitHubListDeliveriesForAnAppWebhookResponse\x12\x98\x01\n" +
-	"!RedeliverADeliveryForAnAppWebhook\x128.protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest\x1a9.protocol.GitHubRedeliverADeliveryForAnAppWebhookResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"!RedeliverADeliveryForAnAppWebhook\x128.protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest\x1a9.protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse\x12\xc5\x01\n" +
+	"0GetARepositoryInstallationForTheAuthenticatedApp\x12G.protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest\x1aH.protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse\x12\xaa\x01\n" +
+	"'CreateAnInstallationAccessTokenForAnApp\x12>.protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest\x1a?.protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_github_proto_rawDescOnce sync.Once
@@ -624,140 +626,144 @@ var file_plugin_grpc_protocol_github_proto_goTypes = []any{
 	(*GitHubGetARepositoryREADMEForADirectoryRequest)(nil),                               // 185: protocol.GitHubGetARepositoryREADMEForADirectoryRequest
 	(*GitHubListDeliveriesForAnAppWebhookRequest)(nil),                                   // 186: protocol.GitHubListDeliveriesForAnAppWebhookRequest
 	(*GitHubRedeliverADeliveryForAnAppWebhookRequest)(nil),                               // 187: protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest
-	(*GitHubGetTheCombinedStatusForASpecificReferenceResponse)(nil),                      // 188: protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse
-	(*GitHubListCommitStatusesForAReferenceResponse)(nil),                                // 189: protocol.GitHubListCommitStatusesForAReferenceResponse
-	(*GitHubCreateACommitStatusResponse)(nil),                                            // 190: protocol.GitHubCreateACommitStatusResponse
-	(*GitHubListCommitCommentsForARepositoryResponse)(nil),                               // 191: protocol.GitHubListCommitCommentsForARepositoryResponse
-	(*GitHubGetACommitCommentResponse)(nil),                                              // 192: protocol.GitHubGetACommitCommentResponse
-	(*GitHubDeleteACommitCommentResponse)(nil),                                           // 193: protocol.GitHubDeleteACommitCommentResponse
-	(*GitHubListCommitsResponse)(nil),                                                    // 194: protocol.GitHubListCommitsResponse
-	(*GitHubListBranchesForHEADCommitResponse)(nil),                                      // 195: protocol.GitHubListBranchesForHEADCommitResponse
-	(*GitHubListPullRequestsAssociatedWithACommitResponse)(nil),                          // 196: protocol.GitHubListPullRequestsAssociatedWithACommitResponse
-	(*GitHubGetACommitResponse)(nil),                                                     // 197: protocol.GitHubGetACommitResponse
-	(*GitHubCompareTwoCommitsResponse)(nil),                                              // 198: protocol.GitHubCompareTwoCommitsResponse
-	(*GitHubListBranchesResponse)(nil),                                                   // 199: protocol.GitHubListBranchesResponse
-	(*GitHubGetABranchResponse)(nil),                                                     // 200: protocol.GitHubGetABranchResponse
-	(*GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse)(nil),                       // 201: protocol.GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse
-	(*GitHubMergeABranchResponse)(nil),                                                   // 202: protocol.GitHubMergeABranchResponse
-	(*GitHubGetAllRequestedReviewersForAPullRequestResponse)(nil),                        // 203: protocol.GitHubGetAllRequestedReviewersForAPullRequestResponse
-	(*GitHubRequestReviewersForAPullRequestResponse)(nil),                                // 204: protocol.GitHubRequestReviewersForAPullRequestResponse
-	(*GitHubListReviewsForAPullRequestResponse)(nil),                                     // 205: protocol.GitHubListReviewsForAPullRequestResponse
-	(*GitHubCreateAReviewForAPullRequestResponse)(nil),                                   // 206: protocol.GitHubCreateAReviewForAPullRequestResponse
-	(*GitHubListCommentsForAPullRequestReviewResponse)(nil),                              // 207: protocol.GitHubListCommentsForAPullRequestReviewResponse
-	(*GitHubListReviewCommentsInARepositoryResponse)(nil),                                // 208: protocol.GitHubListReviewCommentsInARepositoryResponse
-	(*GitHubGetAReviewCommentForAPullRequestResponse)(nil),                               // 209: protocol.GitHubGetAReviewCommentForAPullRequestResponse
-	(*GitHubDeleteAReviewCommentForAPullRequestResponse)(nil),                            // 210: protocol.GitHubDeleteAReviewCommentForAPullRequestResponse
-	(*GitHubListPullRequestsResponse)(nil),                                               // 211: protocol.GitHubListPullRequestsResponse
-	(*GitHubCreateAPullRequestResponse)(nil),                                             // 212: protocol.GitHubCreateAPullRequestResponse
-	(*GitHubListCommitsOnAPullRequestResponse)(nil),                                      // 213: protocol.GitHubListCommitsOnAPullRequestResponse
-	(*GitHubListPullRequestsFilesResponse)(nil),                                          // 214: protocol.GitHubListPullRequestsFilesResponse
-	(*GitHubCheckIfAPullRequestHasBeenMergedResponse)(nil),                               // 215: protocol.GitHubCheckIfAPullRequestHasBeenMergedResponse
-	(*GitHubMergeAPullRequestResponse)(nil),                                              // 216: protocol.GitHubMergeAPullRequestResponse
-	(*GitHubMergeAPullRequestAsynchronouslyResponse)(nil),                                // 217: protocol.GitHubMergeAPullRequestAsynchronouslyResponse
-	(*GitHubUpdateAPullRequestBranchResponse)(nil),                                       // 218: protocol.GitHubUpdateAPullRequestBranchResponse
-	(*GitHubListRepositoryWorkflowsResponse)(nil),                                        // 219: protocol.GitHubListRepositoryWorkflowsResponse
-	(*GitHubGetAWorkflowResponse)(nil),                                                   // 220: protocol.GitHubGetAWorkflowResponse
-	(*GitHubDisableAWorkflowResponse)(nil),                                               // 221: protocol.GitHubDisableAWorkflowResponse
-	(*GitHubCreateAWorkflowDispatchEventResponse)(nil),                                   // 222: protocol.GitHubCreateAWorkflowDispatchEventResponse
-	(*GitHubEnableAWorkflowResponse)(nil),                                                // 223: protocol.GitHubEnableAWorkflowResponse
-	(*GitHubGetWorkflowUsageResponse)(nil),                                               // 224: protocol.GitHubGetWorkflowUsageResponse
-	(*GitHubGetAJobForAWorkflowRunResponse)(nil),                                         // 225: protocol.GitHubGetAJobForAWorkflowRunResponse
-	(*GitHubDownloadJobLogsForAWorkflowRunResponse)(nil),                                 // 226: protocol.GitHubDownloadJobLogsForAWorkflowRunResponse
-	(*GitHubListJobsForAWorkflowRunAttemptResponse)(nil),                                 // 227: protocol.GitHubListJobsForAWorkflowRunAttemptResponse
-	(*GitHubListArtifactsForARepositoryResponse)(nil),                                    // 228: protocol.GitHubListArtifactsForARepositoryResponse
-	(*GitHubGetAnArtifactResponse)(nil),                                                  // 229: protocol.GitHubGetAnArtifactResponse
-	(*GitHubDeleteAnArtifactResponse)(nil),                                               // 230: protocol.GitHubDeleteAnArtifactResponse
-	(*GitHubDownloadAnArtifactResponse)(nil),                                             // 231: protocol.GitHubDownloadAnArtifactResponse
-	(*GitHubReRunAJobFromAWorkflowRunResponse)(nil),                                      // 232: protocol.GitHubReRunAJobFromAWorkflowRunResponse
-	(*GitHubListWorkflowRunsForARepositoryResponse)(nil),                                 // 233: protocol.GitHubListWorkflowRunsForARepositoryResponse
-	(*GitHubGetAWorkflowRunResponse)(nil),                                                // 234: protocol.GitHubGetAWorkflowRunResponse
-	(*GitHubDeleteAWorkflowRunResponse)(nil),                                             // 235: protocol.GitHubDeleteAWorkflowRunResponse
-	(*GitHubGetTheReviewHistoryForAWorkflowRunResponse)(nil),                             // 236: protocol.GitHubGetTheReviewHistoryForAWorkflowRunResponse
-	(*GitHubApproveAWorkflowRunForAForkPullRequestResponse)(nil),                         // 237: protocol.GitHubApproveAWorkflowRunForAForkPullRequestResponse
-	(*GitHubDownloadWorkflowRunAttemptLogsResponse)(nil),                                 // 238: protocol.GitHubDownloadWorkflowRunAttemptLogsResponse
-	(*GitHubCancelAWorkflowRunResponse)(nil),                                             // 239: protocol.GitHubCancelAWorkflowRunResponse
-	(*GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunResponse)(nil),           // 240: protocol.GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunResponse
-	(*GitHubForceCancelAWorkflowRunResponse)(nil),                                        // 241: protocol.GitHubForceCancelAWorkflowRunResponse
-	(*GitHubDownloadWorkflowRunLogsResponse)(nil),                                        // 242: protocol.GitHubDownloadWorkflowRunLogsResponse
-	(*GitHubDeleteWorkflowRunLogsResponse)(nil),                                          // 243: protocol.GitHubDeleteWorkflowRunLogsResponse
-	(*GitHubGetPendingDeploymentsForAWorkflowRunResponse)(nil),                           // 244: protocol.GitHubGetPendingDeploymentsForAWorkflowRunResponse
-	(*GitHubReviewPendingDeploymentsForAWorkflowRunResponse)(nil),                        // 245: protocol.GitHubReviewPendingDeploymentsForAWorkflowRunResponse
-	(*GitHubReRunAWorkflowResponse)(nil),                                                 // 246: protocol.GitHubReRunAWorkflowResponse
-	(*GitHubReRunFailedJobsFromAWorkflowRunResponse)(nil),                                // 247: protocol.GitHubReRunFailedJobsFromAWorkflowRunResponse
-	(*GitHubGetWorkflowRunUsageResponse)(nil),                                            // 248: protocol.GitHubGetWorkflowRunUsageResponse
-	(*GitHubCreateACheckRunResponse)(nil),                                                // 249: protocol.GitHubCreateACheckRunResponse
-	(*GitHubListCheckRunAnnotationsResponse)(nil),                                        // 250: protocol.GitHubListCheckRunAnnotationsResponse
-	(*GitHubRerequestACheckRunResponse)(nil),                                             // 251: protocol.GitHubRerequestACheckRunResponse
-	(*GitHubListCheckRunsInACheckSuiteResponse)(nil),                                     // 252: protocol.GitHubListCheckRunsInACheckSuiteResponse
-	(*GitHubCreateACheckSuiteResponse)(nil),                                              // 253: protocol.GitHubCreateACheckSuiteResponse
-	(*GitHubUpdateRepositoryPreferencesForCheckSuitesResponse)(nil),                      // 254: protocol.GitHubUpdateRepositoryPreferencesForCheckSuitesResponse
-	(*GitHubRerequestACheckSuiteResponse)(nil),                                           // 255: protocol.GitHubRerequestACheckSuiteResponse
-	(*GitHubListCheckSuitesForAGitReferenceResponse)(nil),                                // 256: protocol.GitHubListCheckSuitesForAGitReferenceResponse
-	(*GitHubListIssueCommentsForARepositoryResponse)(nil),                                // 257: protocol.GitHubListIssueCommentsForARepositoryResponse
-	(*GitHubGetAnIssueCommentResponse)(nil),                                              // 258: protocol.GitHubGetAnIssueCommentResponse
-	(*GitHubDeleteAnIssueCommentResponse)(nil),                                           // 259: protocol.GitHubDeleteAnIssueCommentResponse
-	(*GitHubUnpinAnIssueCommentResponse)(nil),                                            // 260: protocol.GitHubUnpinAnIssueCommentResponse
-	(*GitHubListFailedOrganizationInvitationsResponse)(nil),                              // 261: protocol.GitHubListFailedOrganizationInvitationsResponse
-	(*GitHubCreateAnOrganizationInvitationResponse)(nil),                                 // 262: protocol.GitHubCreateAnOrganizationInvitationResponse
-	(*GitHubCancelAnOrganizationInvitationResponse)(nil),                                 // 263: protocol.GitHubCancelAnOrganizationInvitationResponse
-	(*GitHubListOrganizationInvitationTeamsResponse)(nil),                                // 264: protocol.GitHubListOrganizationInvitationTeamsResponse
-	(*GitHubListOrganizationMembersResponse)(nil),                                        // 265: protocol.GitHubListOrganizationMembersResponse
-	(*GitHubCheckOrganizationMembershipForAUserResponse)(nil),                            // 266: protocol.GitHubCheckOrganizationMembershipForAUserResponse
-	(*GitHubRemoveAnOrganizationMemberResponse)(nil),                                     // 267: protocol.GitHubRemoveAnOrganizationMemberResponse
-	(*GitHubGetOrganizationMembershipForAUserResponse)(nil),                              // 268: protocol.GitHubGetOrganizationMembershipForAUserResponse
-	(*GitHubRemoveOrganizationMembershipForAUserResponse)(nil),                           // 269: protocol.GitHubRemoveOrganizationMembershipForAUserResponse
-	(*GitHubCheckPublicOrganizationMembershipForAUserResponse)(nil),                      // 270: protocol.GitHubCheckPublicOrganizationMembershipForAUserResponse
-	(*GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserResponse)(nil),         // 271: protocol.GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserResponse
-	(*GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserResponse)(nil),      // 272: protocol.GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserResponse
-	(*GitHubListOrganizationMembershipsForTheAuthenticatedUserResponse)(nil),             // 273: protocol.GitHubListOrganizationMembershipsForTheAuthenticatedUserResponse
-	(*GitHubListOrganizationsResponse)(nil),                                              // 274: protocol.GitHubListOrganizationsResponse
-	(*GitHubGetAnOrganizationResponse)(nil),                                              // 275: protocol.GitHubGetAnOrganizationResponse
-	(*GitHubDeleteAnOrganizationResponse)(nil),                                           // 276: protocol.GitHubDeleteAnOrganizationResponse
-	(*GitHubListAppInstallationsForAnOrganizationResponse)(nil),                          // 277: protocol.GitHubListAppInstallationsForAnOrganizationResponse
-	(*GitHubGetImmutableReleasesSettingsForAnOrganizationResponse)(nil),                  // 278: protocol.GitHubGetImmutableReleasesSettingsForAnOrganizationResponse
-	(*GitHubSetImmutableReleasesSettingsForAnOrganizationResponse)(nil),                  // 279: protocol.GitHubSetImmutableReleasesSettingsForAnOrganizationResponse
-	(*GitHubListSelectedRepositoriesForImmutableReleasesEnforcementResponse)(nil),        // 280: protocol.GitHubListSelectedRepositoriesForImmutableReleasesEnforcementResponse
-	(*GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementResponse)(nil),         // 281: protocol.GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementResponse
-	(*GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse)(nil),  // 282: protocol.GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse
-	(*GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse)(nil), // 283: protocol.GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse
-	(*GitHubEnableOrDisableASecurityFeatureForAnOrganizationResponse)(nil),               // 284: protocol.GitHubEnableOrDisableASecurityFeatureForAnOrganizationResponse
-	(*GitHubListIssuesAssignedToTheAuthenticatedUserResponse)(nil),                       // 285: protocol.GitHubListIssuesAssignedToTheAuthenticatedUserResponse
-	(*GitHubCreateAnIssueResponse)(nil),                                                  // 286: protocol.GitHubCreateAnIssueResponse
-	(*GitHubUpdateAnIssueResponse)(nil),                                                  // 287: protocol.GitHubUpdateAnIssueResponse
-	(*GitHubLockAnIssueResponse)(nil),                                                    // 288: protocol.GitHubLockAnIssueResponse
-	(*GitHubUnlockAnIssueResponse)(nil),                                                  // 289: protocol.GitHubUnlockAnIssueResponse
-	(*GitHubListIssueSuggestionsResponse)(nil),                                           // 290: protocol.GitHubListIssueSuggestionsResponse
-	(*GitHubApproveAnIssueSuggestionResponse)(nil),                                       // 291: protocol.GitHubApproveAnIssueSuggestionResponse
-	(*GitHubListOrganizationRepositoriesResponse)(nil),                                   // 292: protocol.GitHubListOrganizationRepositoriesResponse
-	(*GitHubCreateAnOrganizationRepositoryResponse)(nil),                                 // 293: protocol.GitHubCreateAnOrganizationRepositoryResponse
-	(*GitHubDeleteARepositoryResponse)(nil),                                              // 294: protocol.GitHubDeleteARepositoryResponse
-	(*GitHubListRepositoryActivitiesResponse)(nil),                                       // 295: protocol.GitHubListRepositoryActivitiesResponse
-	(*GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryResponse)(nil),       // 296: protocol.GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryResponse
-	(*GitHubEnableDependabotSecurityUpdatesResponse)(nil),                                // 297: protocol.GitHubEnableDependabotSecurityUpdatesResponse
-	(*GitHubDisableDependabotSecurityUpdatesResponse)(nil),                               // 298: protocol.GitHubDisableDependabotSecurityUpdatesResponse
-	(*GitHubListCODEOWNERSErrorsResponse)(nil),                                           // 299: protocol.GitHubListCODEOWNERSErrorsResponse
-	(*GitHubListRepositoryContributorsResponse)(nil),                                     // 300: protocol.GitHubListRepositoryContributorsResponse
-	(*GitHubCreateARepositoryDispatchEventResponse)(nil),                                 // 301: protocol.GitHubCreateARepositoryDispatchEventResponse
-	(*GitHubGetTheHashAlgorithmForARepositoryResponse)(nil),                              // 302: protocol.GitHubGetTheHashAlgorithmForARepositoryResponse
-	(*GitHubCheckIfImmutableReleasesAreEnabledForARepositoryResponse)(nil),               // 303: protocol.GitHubCheckIfImmutableReleasesAreEnabledForARepositoryResponse
-	(*GitHubEnableImmutableReleasesResponse)(nil),                                        // 304: protocol.GitHubEnableImmutableReleasesResponse
-	(*GitHubDisableImmutableReleasesResponse)(nil),                                       // 305: protocol.GitHubDisableImmutableReleasesResponse
-	(*GitHubListRepositoryLanguagesResponse)(nil),                                        // 306: protocol.GitHubListRepositoryLanguagesResponse
-	(*GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryResponse)(nil),    // 307: protocol.GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryResponse
-	(*GitHubEnablePrivateVulnerabilityReportingForARepositoryResponse)(nil),              // 308: protocol.GitHubEnablePrivateVulnerabilityReportingForARepositoryResponse
-	(*GitHubDisablePrivateVulnerabilityReportingForARepositoryResponse)(nil),             // 309: protocol.GitHubDisablePrivateVulnerabilityReportingForARepositoryResponse
-	(*GitHubListRepositoryTagsResponse)(nil),                                             // 310: protocol.GitHubListRepositoryTagsResponse
-	(*GitHubListRepositoryTeamsResponse)(nil),                                            // 311: protocol.GitHubListRepositoryTeamsResponse
-	(*GitHubGetAllRepositoryTopicsResponse)(nil),                                         // 312: protocol.GitHubGetAllRepositoryTopicsResponse
-	(*GitHubTransferARepositoryResponse)(nil),                                            // 313: protocol.GitHubTransferARepositoryResponse
-	(*GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryResponse)(nil),             // 314: protocol.GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryResponse
-	(*GitHubEnableVulnerabilityAlertsResponse)(nil),                                      // 315: protocol.GitHubEnableVulnerabilityAlertsResponse
-	(*GitHubDisableVulnerabilityAlertsResponse)(nil),                                     // 316: protocol.GitHubDisableVulnerabilityAlertsResponse
-	(*GitHubListRepositoriesForTheAuthenticatedUserResponse)(nil),                        // 317: protocol.GitHubListRepositoriesForTheAuthenticatedUserResponse
-	(*GitHubGetRepositoryContentResponse)(nil),                                           // 318: protocol.GitHubGetRepositoryContentResponse
-	(*GitHubGetARepositoryREADMEResponse)(nil),                                           // 319: protocol.GitHubGetARepositoryREADMEResponse
-	(*GitHubListDeliveriesForAnAppWebhookResponse)(nil),                                  // 320: protocol.GitHubListDeliveriesForAnAppWebhookResponse
-	(*GitHubRedeliverADeliveryForAnAppWebhookResponse)(nil),                              // 321: protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse
+	(*GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest)(nil),                // 188: protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest
+	(*GitHubCreateAnInstallationAccessTokenForAnAppRequest)(nil),                         // 189: protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest
+	(*GitHubGetTheCombinedStatusForASpecificReferenceResponse)(nil),                      // 190: protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse
+	(*GitHubListCommitStatusesForAReferenceResponse)(nil),                                // 191: protocol.GitHubListCommitStatusesForAReferenceResponse
+	(*GitHubCreateACommitStatusResponse)(nil),                                            // 192: protocol.GitHubCreateACommitStatusResponse
+	(*GitHubListCommitCommentsForARepositoryResponse)(nil),                               // 193: protocol.GitHubListCommitCommentsForARepositoryResponse
+	(*GitHubGetACommitCommentResponse)(nil),                                              // 194: protocol.GitHubGetACommitCommentResponse
+	(*GitHubDeleteACommitCommentResponse)(nil),                                           // 195: protocol.GitHubDeleteACommitCommentResponse
+	(*GitHubListCommitsResponse)(nil),                                                    // 196: protocol.GitHubListCommitsResponse
+	(*GitHubListBranchesForHEADCommitResponse)(nil),                                      // 197: protocol.GitHubListBranchesForHEADCommitResponse
+	(*GitHubListPullRequestsAssociatedWithACommitResponse)(nil),                          // 198: protocol.GitHubListPullRequestsAssociatedWithACommitResponse
+	(*GitHubGetACommitResponse)(nil),                                                     // 199: protocol.GitHubGetACommitResponse
+	(*GitHubCompareTwoCommitsResponse)(nil),                                              // 200: protocol.GitHubCompareTwoCommitsResponse
+	(*GitHubListBranchesResponse)(nil),                                                   // 201: protocol.GitHubListBranchesResponse
+	(*GitHubGetABranchResponse)(nil),                                                     // 202: protocol.GitHubGetABranchResponse
+	(*GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse)(nil),                       // 203: protocol.GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse
+	(*GitHubMergeABranchResponse)(nil),                                                   // 204: protocol.GitHubMergeABranchResponse
+	(*GitHubGetAllRequestedReviewersForAPullRequestResponse)(nil),                        // 205: protocol.GitHubGetAllRequestedReviewersForAPullRequestResponse
+	(*GitHubRequestReviewersForAPullRequestResponse)(nil),                                // 206: protocol.GitHubRequestReviewersForAPullRequestResponse
+	(*GitHubListReviewsForAPullRequestResponse)(nil),                                     // 207: protocol.GitHubListReviewsForAPullRequestResponse
+	(*GitHubCreateAReviewForAPullRequestResponse)(nil),                                   // 208: protocol.GitHubCreateAReviewForAPullRequestResponse
+	(*GitHubListCommentsForAPullRequestReviewResponse)(nil),                              // 209: protocol.GitHubListCommentsForAPullRequestReviewResponse
+	(*GitHubListReviewCommentsInARepositoryResponse)(nil),                                // 210: protocol.GitHubListReviewCommentsInARepositoryResponse
+	(*GitHubGetAReviewCommentForAPullRequestResponse)(nil),                               // 211: protocol.GitHubGetAReviewCommentForAPullRequestResponse
+	(*GitHubDeleteAReviewCommentForAPullRequestResponse)(nil),                            // 212: protocol.GitHubDeleteAReviewCommentForAPullRequestResponse
+	(*GitHubListPullRequestsResponse)(nil),                                               // 213: protocol.GitHubListPullRequestsResponse
+	(*GitHubCreateAPullRequestResponse)(nil),                                             // 214: protocol.GitHubCreateAPullRequestResponse
+	(*GitHubListCommitsOnAPullRequestResponse)(nil),                                      // 215: protocol.GitHubListCommitsOnAPullRequestResponse
+	(*GitHubListPullRequestsFilesResponse)(nil),                                          // 216: protocol.GitHubListPullRequestsFilesResponse
+	(*GitHubCheckIfAPullRequestHasBeenMergedResponse)(nil),                               // 217: protocol.GitHubCheckIfAPullRequestHasBeenMergedResponse
+	(*GitHubMergeAPullRequestResponse)(nil),                                              // 218: protocol.GitHubMergeAPullRequestResponse
+	(*GitHubMergeAPullRequestAsynchronouslyResponse)(nil),                                // 219: protocol.GitHubMergeAPullRequestAsynchronouslyResponse
+	(*GitHubUpdateAPullRequestBranchResponse)(nil),                                       // 220: protocol.GitHubUpdateAPullRequestBranchResponse
+	(*GitHubListRepositoryWorkflowsResponse)(nil),                                        // 221: protocol.GitHubListRepositoryWorkflowsResponse
+	(*GitHubGetAWorkflowResponse)(nil),                                                   // 222: protocol.GitHubGetAWorkflowResponse
+	(*GitHubDisableAWorkflowResponse)(nil),                                               // 223: protocol.GitHubDisableAWorkflowResponse
+	(*GitHubCreateAWorkflowDispatchEventResponse)(nil),                                   // 224: protocol.GitHubCreateAWorkflowDispatchEventResponse
+	(*GitHubEnableAWorkflowResponse)(nil),                                                // 225: protocol.GitHubEnableAWorkflowResponse
+	(*GitHubGetWorkflowUsageResponse)(nil),                                               // 226: protocol.GitHubGetWorkflowUsageResponse
+	(*GitHubGetAJobForAWorkflowRunResponse)(nil),                                         // 227: protocol.GitHubGetAJobForAWorkflowRunResponse
+	(*GitHubDownloadJobLogsForAWorkflowRunResponse)(nil),                                 // 228: protocol.GitHubDownloadJobLogsForAWorkflowRunResponse
+	(*GitHubListJobsForAWorkflowRunAttemptResponse)(nil),                                 // 229: protocol.GitHubListJobsForAWorkflowRunAttemptResponse
+	(*GitHubListArtifactsForARepositoryResponse)(nil),                                    // 230: protocol.GitHubListArtifactsForARepositoryResponse
+	(*GitHubGetAnArtifactResponse)(nil),                                                  // 231: protocol.GitHubGetAnArtifactResponse
+	(*GitHubDeleteAnArtifactResponse)(nil),                                               // 232: protocol.GitHubDeleteAnArtifactResponse
+	(*GitHubDownloadAnArtifactResponse)(nil),                                             // 233: protocol.GitHubDownloadAnArtifactResponse
+	(*GitHubReRunAJobFromAWorkflowRunResponse)(nil),                                      // 234: protocol.GitHubReRunAJobFromAWorkflowRunResponse
+	(*GitHubListWorkflowRunsForARepositoryResponse)(nil),                                 // 235: protocol.GitHubListWorkflowRunsForARepositoryResponse
+	(*GitHubGetAWorkflowRunResponse)(nil),                                                // 236: protocol.GitHubGetAWorkflowRunResponse
+	(*GitHubDeleteAWorkflowRunResponse)(nil),                                             // 237: protocol.GitHubDeleteAWorkflowRunResponse
+	(*GitHubGetTheReviewHistoryForAWorkflowRunResponse)(nil),                             // 238: protocol.GitHubGetTheReviewHistoryForAWorkflowRunResponse
+	(*GitHubApproveAWorkflowRunForAForkPullRequestResponse)(nil),                         // 239: protocol.GitHubApproveAWorkflowRunForAForkPullRequestResponse
+	(*GitHubDownloadWorkflowRunAttemptLogsResponse)(nil),                                 // 240: protocol.GitHubDownloadWorkflowRunAttemptLogsResponse
+	(*GitHubCancelAWorkflowRunResponse)(nil),                                             // 241: protocol.GitHubCancelAWorkflowRunResponse
+	(*GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunResponse)(nil),           // 242: protocol.GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunResponse
+	(*GitHubForceCancelAWorkflowRunResponse)(nil),                                        // 243: protocol.GitHubForceCancelAWorkflowRunResponse
+	(*GitHubDownloadWorkflowRunLogsResponse)(nil),                                        // 244: protocol.GitHubDownloadWorkflowRunLogsResponse
+	(*GitHubDeleteWorkflowRunLogsResponse)(nil),                                          // 245: protocol.GitHubDeleteWorkflowRunLogsResponse
+	(*GitHubGetPendingDeploymentsForAWorkflowRunResponse)(nil),                           // 246: protocol.GitHubGetPendingDeploymentsForAWorkflowRunResponse
+	(*GitHubReviewPendingDeploymentsForAWorkflowRunResponse)(nil),                        // 247: protocol.GitHubReviewPendingDeploymentsForAWorkflowRunResponse
+	(*GitHubReRunAWorkflowResponse)(nil),                                                 // 248: protocol.GitHubReRunAWorkflowResponse
+	(*GitHubReRunFailedJobsFromAWorkflowRunResponse)(nil),                                // 249: protocol.GitHubReRunFailedJobsFromAWorkflowRunResponse
+	(*GitHubGetWorkflowRunUsageResponse)(nil),                                            // 250: protocol.GitHubGetWorkflowRunUsageResponse
+	(*GitHubCreateACheckRunResponse)(nil),                                                // 251: protocol.GitHubCreateACheckRunResponse
+	(*GitHubListCheckRunAnnotationsResponse)(nil),                                        // 252: protocol.GitHubListCheckRunAnnotationsResponse
+	(*GitHubRerequestACheckRunResponse)(nil),                                             // 253: protocol.GitHubRerequestACheckRunResponse
+	(*GitHubListCheckRunsInACheckSuiteResponse)(nil),                                     // 254: protocol.GitHubListCheckRunsInACheckSuiteResponse
+	(*GitHubCreateACheckSuiteResponse)(nil),                                              // 255: protocol.GitHubCreateACheckSuiteResponse
+	(*GitHubUpdateRepositoryPreferencesForCheckSuitesResponse)(nil),                      // 256: protocol.GitHubUpdateRepositoryPreferencesForCheckSuitesResponse
+	(*GitHubRerequestACheckSuiteResponse)(nil),                                           // 257: protocol.GitHubRerequestACheckSuiteResponse
+	(*GitHubListCheckSuitesForAGitReferenceResponse)(nil),                                // 258: protocol.GitHubListCheckSuitesForAGitReferenceResponse
+	(*GitHubListIssueCommentsForARepositoryResponse)(nil),                                // 259: protocol.GitHubListIssueCommentsForARepositoryResponse
+	(*GitHubGetAnIssueCommentResponse)(nil),                                              // 260: protocol.GitHubGetAnIssueCommentResponse
+	(*GitHubDeleteAnIssueCommentResponse)(nil),                                           // 261: protocol.GitHubDeleteAnIssueCommentResponse
+	(*GitHubUnpinAnIssueCommentResponse)(nil),                                            // 262: protocol.GitHubUnpinAnIssueCommentResponse
+	(*GitHubListFailedOrganizationInvitationsResponse)(nil),                              // 263: protocol.GitHubListFailedOrganizationInvitationsResponse
+	(*GitHubCreateAnOrganizationInvitationResponse)(nil),                                 // 264: protocol.GitHubCreateAnOrganizationInvitationResponse
+	(*GitHubCancelAnOrganizationInvitationResponse)(nil),                                 // 265: protocol.GitHubCancelAnOrganizationInvitationResponse
+	(*GitHubListOrganizationInvitationTeamsResponse)(nil),                                // 266: protocol.GitHubListOrganizationInvitationTeamsResponse
+	(*GitHubListOrganizationMembersResponse)(nil),                                        // 267: protocol.GitHubListOrganizationMembersResponse
+	(*GitHubCheckOrganizationMembershipForAUserResponse)(nil),                            // 268: protocol.GitHubCheckOrganizationMembershipForAUserResponse
+	(*GitHubRemoveAnOrganizationMemberResponse)(nil),                                     // 269: protocol.GitHubRemoveAnOrganizationMemberResponse
+	(*GitHubGetOrganizationMembershipForAUserResponse)(nil),                              // 270: protocol.GitHubGetOrganizationMembershipForAUserResponse
+	(*GitHubRemoveOrganizationMembershipForAUserResponse)(nil),                           // 271: protocol.GitHubRemoveOrganizationMembershipForAUserResponse
+	(*GitHubCheckPublicOrganizationMembershipForAUserResponse)(nil),                      // 272: protocol.GitHubCheckPublicOrganizationMembershipForAUserResponse
+	(*GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserResponse)(nil),         // 273: protocol.GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserResponse
+	(*GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserResponse)(nil),      // 274: protocol.GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserResponse
+	(*GitHubListOrganizationMembershipsForTheAuthenticatedUserResponse)(nil),             // 275: protocol.GitHubListOrganizationMembershipsForTheAuthenticatedUserResponse
+	(*GitHubListOrganizationsResponse)(nil),                                              // 276: protocol.GitHubListOrganizationsResponse
+	(*GitHubGetAnOrganizationResponse)(nil),                                              // 277: protocol.GitHubGetAnOrganizationResponse
+	(*GitHubDeleteAnOrganizationResponse)(nil),                                           // 278: protocol.GitHubDeleteAnOrganizationResponse
+	(*GitHubListAppInstallationsForAnOrganizationResponse)(nil),                          // 279: protocol.GitHubListAppInstallationsForAnOrganizationResponse
+	(*GitHubGetImmutableReleasesSettingsForAnOrganizationResponse)(nil),                  // 280: protocol.GitHubGetImmutableReleasesSettingsForAnOrganizationResponse
+	(*GitHubSetImmutableReleasesSettingsForAnOrganizationResponse)(nil),                  // 281: protocol.GitHubSetImmutableReleasesSettingsForAnOrganizationResponse
+	(*GitHubListSelectedRepositoriesForImmutableReleasesEnforcementResponse)(nil),        // 282: protocol.GitHubListSelectedRepositoriesForImmutableReleasesEnforcementResponse
+	(*GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementResponse)(nil),         // 283: protocol.GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementResponse
+	(*GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse)(nil),  // 284: protocol.GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse
+	(*GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse)(nil), // 285: protocol.GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse
+	(*GitHubEnableOrDisableASecurityFeatureForAnOrganizationResponse)(nil),               // 286: protocol.GitHubEnableOrDisableASecurityFeatureForAnOrganizationResponse
+	(*GitHubListIssuesAssignedToTheAuthenticatedUserResponse)(nil),                       // 287: protocol.GitHubListIssuesAssignedToTheAuthenticatedUserResponse
+	(*GitHubCreateAnIssueResponse)(nil),                                                  // 288: protocol.GitHubCreateAnIssueResponse
+	(*GitHubUpdateAnIssueResponse)(nil),                                                  // 289: protocol.GitHubUpdateAnIssueResponse
+	(*GitHubLockAnIssueResponse)(nil),                                                    // 290: protocol.GitHubLockAnIssueResponse
+	(*GitHubUnlockAnIssueResponse)(nil),                                                  // 291: protocol.GitHubUnlockAnIssueResponse
+	(*GitHubListIssueSuggestionsResponse)(nil),                                           // 292: protocol.GitHubListIssueSuggestionsResponse
+	(*GitHubApproveAnIssueSuggestionResponse)(nil),                                       // 293: protocol.GitHubApproveAnIssueSuggestionResponse
+	(*GitHubListOrganizationRepositoriesResponse)(nil),                                   // 294: protocol.GitHubListOrganizationRepositoriesResponse
+	(*GitHubCreateAnOrganizationRepositoryResponse)(nil),                                 // 295: protocol.GitHubCreateAnOrganizationRepositoryResponse
+	(*GitHubDeleteARepositoryResponse)(nil),                                              // 296: protocol.GitHubDeleteARepositoryResponse
+	(*GitHubListRepositoryActivitiesResponse)(nil),                                       // 297: protocol.GitHubListRepositoryActivitiesResponse
+	(*GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryResponse)(nil),       // 298: protocol.GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryResponse
+	(*GitHubEnableDependabotSecurityUpdatesResponse)(nil),                                // 299: protocol.GitHubEnableDependabotSecurityUpdatesResponse
+	(*GitHubDisableDependabotSecurityUpdatesResponse)(nil),                               // 300: protocol.GitHubDisableDependabotSecurityUpdatesResponse
+	(*GitHubListCODEOWNERSErrorsResponse)(nil),                                           // 301: protocol.GitHubListCODEOWNERSErrorsResponse
+	(*GitHubListRepositoryContributorsResponse)(nil),                                     // 302: protocol.GitHubListRepositoryContributorsResponse
+	(*GitHubCreateARepositoryDispatchEventResponse)(nil),                                 // 303: protocol.GitHubCreateARepositoryDispatchEventResponse
+	(*GitHubGetTheHashAlgorithmForARepositoryResponse)(nil),                              // 304: protocol.GitHubGetTheHashAlgorithmForARepositoryResponse
+	(*GitHubCheckIfImmutableReleasesAreEnabledForARepositoryResponse)(nil),               // 305: protocol.GitHubCheckIfImmutableReleasesAreEnabledForARepositoryResponse
+	(*GitHubEnableImmutableReleasesResponse)(nil),                                        // 306: protocol.GitHubEnableImmutableReleasesResponse
+	(*GitHubDisableImmutableReleasesResponse)(nil),                                       // 307: protocol.GitHubDisableImmutableReleasesResponse
+	(*GitHubListRepositoryLanguagesResponse)(nil),                                        // 308: protocol.GitHubListRepositoryLanguagesResponse
+	(*GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryResponse)(nil),    // 309: protocol.GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryResponse
+	(*GitHubEnablePrivateVulnerabilityReportingForARepositoryResponse)(nil),              // 310: protocol.GitHubEnablePrivateVulnerabilityReportingForARepositoryResponse
+	(*GitHubDisablePrivateVulnerabilityReportingForARepositoryResponse)(nil),             // 311: protocol.GitHubDisablePrivateVulnerabilityReportingForARepositoryResponse
+	(*GitHubListRepositoryTagsResponse)(nil),                                             // 312: protocol.GitHubListRepositoryTagsResponse
+	(*GitHubListRepositoryTeamsResponse)(nil),                                            // 313: protocol.GitHubListRepositoryTeamsResponse
+	(*GitHubGetAllRepositoryTopicsResponse)(nil),                                         // 314: protocol.GitHubGetAllRepositoryTopicsResponse
+	(*GitHubTransferARepositoryResponse)(nil),                                            // 315: protocol.GitHubTransferARepositoryResponse
+	(*GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryResponse)(nil),             // 316: protocol.GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryResponse
+	(*GitHubEnableVulnerabilityAlertsResponse)(nil),                                      // 317: protocol.GitHubEnableVulnerabilityAlertsResponse
+	(*GitHubDisableVulnerabilityAlertsResponse)(nil),                                     // 318: protocol.GitHubDisableVulnerabilityAlertsResponse
+	(*GitHubListRepositoriesForTheAuthenticatedUserResponse)(nil),                        // 319: protocol.GitHubListRepositoriesForTheAuthenticatedUserResponse
+	(*GitHubGetRepositoryContentResponse)(nil),                                           // 320: protocol.GitHubGetRepositoryContentResponse
+	(*GitHubGetARepositoryREADMEResponse)(nil),                                           // 321: protocol.GitHubGetARepositoryREADMEResponse
+	(*GitHubListDeliveriesForAnAppWebhookResponse)(nil),                                  // 322: protocol.GitHubListDeliveriesForAnAppWebhookResponse
+	(*GitHubRedeliverADeliveryForAnAppWebhookResponse)(nil),                              // 323: protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse
+	(*GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse)(nil),               // 324: protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse
+	(*GitHubCreateAnInstallationAccessTokenForAnAppResponse)(nil),                        // 325: protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse
 }
 var file_plugin_grpc_protocol_github_proto_depIdxs = []int32{
 	3,   // 0: protocol.GitHubRateLimitResponse.resources:type_name -> protocol.GitHubRateLimitResponse.ResourcesEntry
@@ -947,193 +953,197 @@ var file_plugin_grpc_protocol_github_proto_depIdxs = []int32{
 	185, // 184: protocol.GitHubService.GetARepositoryREADMEForADirectory:input_type -> protocol.GitHubGetARepositoryREADMEForADirectoryRequest
 	186, // 185: protocol.GitHubService.ListDeliveriesForAnAppWebhook:input_type -> protocol.GitHubListDeliveriesForAnAppWebhookRequest
 	187, // 186: protocol.GitHubService.RedeliverADeliveryForAnAppWebhook:input_type -> protocol.GitHubRedeliverADeliveryForAnAppWebhookRequest
-	2,   // 187: protocol.GitHubService.RateLimit:output_type -> protocol.GitHubRateLimitResponse
-	188, // 188: protocol.GitHubService.GetTheCombinedStatusForASpecificReference:output_type -> protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse
-	189, // 189: protocol.GitHubService.ListCommitStatusesForAReference:output_type -> protocol.GitHubListCommitStatusesForAReferenceResponse
-	190, // 190: protocol.GitHubService.CreateACommitStatus:output_type -> protocol.GitHubCreateACommitStatusResponse
-	191, // 191: protocol.GitHubService.ListCommitCommentsForARepository:output_type -> protocol.GitHubListCommitCommentsForARepositoryResponse
-	192, // 192: protocol.GitHubService.GetACommitComment:output_type -> protocol.GitHubGetACommitCommentResponse
-	192, // 193: protocol.GitHubService.UpdateACommitComment:output_type -> protocol.GitHubGetACommitCommentResponse
-	193, // 194: protocol.GitHubService.DeleteACommitComment:output_type -> protocol.GitHubDeleteACommitCommentResponse
-	191, // 195: protocol.GitHubService.ListCommitComments:output_type -> protocol.GitHubListCommitCommentsForARepositoryResponse
-	192, // 196: protocol.GitHubService.CreateACommitComment:output_type -> protocol.GitHubGetACommitCommentResponse
-	194, // 197: protocol.GitHubService.ListCommits:output_type -> protocol.GitHubListCommitsResponse
-	195, // 198: protocol.GitHubService.ListBranchesForHEADCommit:output_type -> protocol.GitHubListBranchesForHEADCommitResponse
-	196, // 199: protocol.GitHubService.ListPullRequestsAssociatedWithACommit:output_type -> protocol.GitHubListPullRequestsAssociatedWithACommitResponse
-	197, // 200: protocol.GitHubService.GetACommit:output_type -> protocol.GitHubGetACommitResponse
-	198, // 201: protocol.GitHubService.CompareTwoCommits:output_type -> protocol.GitHubCompareTwoCommitsResponse
-	199, // 202: protocol.GitHubService.ListBranches:output_type -> protocol.GitHubListBranchesResponse
-	200, // 203: protocol.GitHubService.GetABranch:output_type -> protocol.GitHubGetABranchResponse
-	200, // 204: protocol.GitHubService.RenameABranch:output_type -> protocol.GitHubGetABranchResponse
-	201, // 205: protocol.GitHubService.SyncAForkBranchWithTheUpstreamRepository:output_type -> protocol.GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse
-	202, // 206: protocol.GitHubService.MergeABranch:output_type -> protocol.GitHubMergeABranchResponse
-	203, // 207: protocol.GitHubService.GetAllRequestedReviewersForAPullRequest:output_type -> protocol.GitHubGetAllRequestedReviewersForAPullRequestResponse
-	204, // 208: protocol.GitHubService.RequestReviewersForAPullRequest:output_type -> protocol.GitHubRequestReviewersForAPullRequestResponse
-	204, // 209: protocol.GitHubService.RemoveRequestedReviewersFromAPullRequest:output_type -> protocol.GitHubRequestReviewersForAPullRequestResponse
-	205, // 210: protocol.GitHubService.ListReviewsForAPullRequest:output_type -> protocol.GitHubListReviewsForAPullRequestResponse
-	206, // 211: protocol.GitHubService.CreateAReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
-	206, // 212: protocol.GitHubService.GetAReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
-	206, // 213: protocol.GitHubService.UpdateAReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
-	206, // 214: protocol.GitHubService.DeleteAPendingReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
-	207, // 215: protocol.GitHubService.ListCommentsForAPullRequestReview:output_type -> protocol.GitHubListCommentsForAPullRequestReviewResponse
-	206, // 216: protocol.GitHubService.DismissAReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
-	206, // 217: protocol.GitHubService.SubmitAReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
-	208, // 218: protocol.GitHubService.ListReviewCommentsInARepository:output_type -> protocol.GitHubListReviewCommentsInARepositoryResponse
-	209, // 219: protocol.GitHubService.GetAReviewCommentForAPullRequest:output_type -> protocol.GitHubGetAReviewCommentForAPullRequestResponse
-	209, // 220: protocol.GitHubService.UpdateAReviewCommentForAPullRequest:output_type -> protocol.GitHubGetAReviewCommentForAPullRequestResponse
-	210, // 221: protocol.GitHubService.DeleteAReviewCommentForAPullRequest:output_type -> protocol.GitHubDeleteAReviewCommentForAPullRequestResponse
-	208, // 222: protocol.GitHubService.ListReviewCommentsOnAPullRequest:output_type -> protocol.GitHubListReviewCommentsInARepositoryResponse
-	209, // 223: protocol.GitHubService.CreateAReviewCommentForAPullRequest:output_type -> protocol.GitHubGetAReviewCommentForAPullRequestResponse
-	209, // 224: protocol.GitHubService.CreateAReplyForAReviewComment:output_type -> protocol.GitHubGetAReviewCommentForAPullRequestResponse
-	211, // 225: protocol.GitHubService.ListPullRequests:output_type -> protocol.GitHubListPullRequestsResponse
-	212, // 226: protocol.GitHubService.CreateAPullRequest:output_type -> protocol.GitHubCreateAPullRequestResponse
-	212, // 227: protocol.GitHubService.GetAPullRequest:output_type -> protocol.GitHubCreateAPullRequestResponse
-	212, // 228: protocol.GitHubService.UpdateAPullRequest:output_type -> protocol.GitHubCreateAPullRequestResponse
-	213, // 229: protocol.GitHubService.ListCommitsOnAPullRequest:output_type -> protocol.GitHubListCommitsOnAPullRequestResponse
-	214, // 230: protocol.GitHubService.ListPullRequestsFiles:output_type -> protocol.GitHubListPullRequestsFilesResponse
-	215, // 231: protocol.GitHubService.CheckIfAPullRequestHasBeenMerged:output_type -> protocol.GitHubCheckIfAPullRequestHasBeenMergedResponse
-	216, // 232: protocol.GitHubService.MergeAPullRequest:output_type -> protocol.GitHubMergeAPullRequestResponse
-	217, // 233: protocol.GitHubService.MergeAPullRequestAsynchronously:output_type -> protocol.GitHubMergeAPullRequestAsynchronouslyResponse
-	217, // 234: protocol.GitHubService.GetTheResultOfAnAsynchronousMerge:output_type -> protocol.GitHubMergeAPullRequestAsynchronouslyResponse
-	218, // 235: protocol.GitHubService.UpdateAPullRequestBranch:output_type -> protocol.GitHubUpdateAPullRequestBranchResponse
-	219, // 236: protocol.GitHubService.ListRepositoryWorkflows:output_type -> protocol.GitHubListRepositoryWorkflowsResponse
-	220, // 237: protocol.GitHubService.GetAWorkflow:output_type -> protocol.GitHubGetAWorkflowResponse
-	221, // 238: protocol.GitHubService.DisableAWorkflow:output_type -> protocol.GitHubDisableAWorkflowResponse
-	222, // 239: protocol.GitHubService.CreateAWorkflowDispatchEvent:output_type -> protocol.GitHubCreateAWorkflowDispatchEventResponse
-	223, // 240: protocol.GitHubService.EnableAWorkflow:output_type -> protocol.GitHubEnableAWorkflowResponse
-	224, // 241: protocol.GitHubService.GetWorkflowUsage:output_type -> protocol.GitHubGetWorkflowUsageResponse
-	225, // 242: protocol.GitHubService.GetAJobForAWorkflowRun:output_type -> protocol.GitHubGetAJobForAWorkflowRunResponse
-	226, // 243: protocol.GitHubService.DownloadJobLogsForAWorkflowRun:output_type -> protocol.GitHubDownloadJobLogsForAWorkflowRunResponse
-	227, // 244: protocol.GitHubService.ListJobsForAWorkflowRunAttempt:output_type -> protocol.GitHubListJobsForAWorkflowRunAttemptResponse
-	227, // 245: protocol.GitHubService.ListJobsForAWorkflowRun:output_type -> protocol.GitHubListJobsForAWorkflowRunAttemptResponse
-	228, // 246: protocol.GitHubService.ListArtifactsForARepository:output_type -> protocol.GitHubListArtifactsForARepositoryResponse
-	229, // 247: protocol.GitHubService.GetAnArtifact:output_type -> protocol.GitHubGetAnArtifactResponse
-	230, // 248: protocol.GitHubService.DeleteAnArtifact:output_type -> protocol.GitHubDeleteAnArtifactResponse
-	231, // 249: protocol.GitHubService.DownloadAnArtifact:output_type -> protocol.GitHubDownloadAnArtifactResponse
-	228, // 250: protocol.GitHubService.ListWorkflowRunArtifacts:output_type -> protocol.GitHubListArtifactsForARepositoryResponse
-	232, // 251: protocol.GitHubService.ReRunAJobFromAWorkflowRun:output_type -> protocol.GitHubReRunAJobFromAWorkflowRunResponse
-	233, // 252: protocol.GitHubService.ListWorkflowRunsForARepository:output_type -> protocol.GitHubListWorkflowRunsForARepositoryResponse
-	234, // 253: protocol.GitHubService.GetAWorkflowRun:output_type -> protocol.GitHubGetAWorkflowRunResponse
-	235, // 254: protocol.GitHubService.DeleteAWorkflowRun:output_type -> protocol.GitHubDeleteAWorkflowRunResponse
-	236, // 255: protocol.GitHubService.GetTheReviewHistoryForAWorkflowRun:output_type -> protocol.GitHubGetTheReviewHistoryForAWorkflowRunResponse
-	237, // 256: protocol.GitHubService.ApproveAWorkflowRunForAForkPullRequest:output_type -> protocol.GitHubApproveAWorkflowRunForAForkPullRequestResponse
-	234, // 257: protocol.GitHubService.GetAWorkflowRunAttempt:output_type -> protocol.GitHubGetAWorkflowRunResponse
-	238, // 258: protocol.GitHubService.DownloadWorkflowRunAttemptLogs:output_type -> protocol.GitHubDownloadWorkflowRunAttemptLogsResponse
-	239, // 259: protocol.GitHubService.CancelAWorkflowRun:output_type -> protocol.GitHubCancelAWorkflowRunResponse
-	240, // 260: protocol.GitHubService.ReviewCustomDeploymentProtectionRulesForAWorkflowRun:output_type -> protocol.GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunResponse
-	241, // 261: protocol.GitHubService.ForceCancelAWorkflowRun:output_type -> protocol.GitHubForceCancelAWorkflowRunResponse
-	242, // 262: protocol.GitHubService.DownloadWorkflowRunLogs:output_type -> protocol.GitHubDownloadWorkflowRunLogsResponse
-	243, // 263: protocol.GitHubService.DeleteWorkflowRunLogs:output_type -> protocol.GitHubDeleteWorkflowRunLogsResponse
-	244, // 264: protocol.GitHubService.GetPendingDeploymentsForAWorkflowRun:output_type -> protocol.GitHubGetPendingDeploymentsForAWorkflowRunResponse
-	245, // 265: protocol.GitHubService.ReviewPendingDeploymentsForAWorkflowRun:output_type -> protocol.GitHubReviewPendingDeploymentsForAWorkflowRunResponse
-	246, // 266: protocol.GitHubService.ReRunAWorkflow:output_type -> protocol.GitHubReRunAWorkflowResponse
-	247, // 267: protocol.GitHubService.ReRunFailedJobsFromAWorkflowRun:output_type -> protocol.GitHubReRunFailedJobsFromAWorkflowRunResponse
-	248, // 268: protocol.GitHubService.GetWorkflowRunUsage:output_type -> protocol.GitHubGetWorkflowRunUsageResponse
-	233, // 269: protocol.GitHubService.ListWorkflowRunsForAWorkflow:output_type -> protocol.GitHubListWorkflowRunsForARepositoryResponse
-	249, // 270: protocol.GitHubService.CreateACheckRun:output_type -> protocol.GitHubCreateACheckRunResponse
-	249, // 271: protocol.GitHubService.GetACheckRun:output_type -> protocol.GitHubCreateACheckRunResponse
-	249, // 272: protocol.GitHubService.UpdateACheckRun:output_type -> protocol.GitHubCreateACheckRunResponse
-	250, // 273: protocol.GitHubService.ListCheckRunAnnotations:output_type -> protocol.GitHubListCheckRunAnnotationsResponse
-	251, // 274: protocol.GitHubService.RerequestACheckRun:output_type -> protocol.GitHubRerequestACheckRunResponse
-	252, // 275: protocol.GitHubService.ListCheckRunsInACheckSuite:output_type -> protocol.GitHubListCheckRunsInACheckSuiteResponse
-	252, // 276: protocol.GitHubService.ListCheckRunsForAGitReference:output_type -> protocol.GitHubListCheckRunsInACheckSuiteResponse
-	253, // 277: protocol.GitHubService.CreateACheckSuite:output_type -> protocol.GitHubCreateACheckSuiteResponse
-	254, // 278: protocol.GitHubService.UpdateRepositoryPreferencesForCheckSuites:output_type -> protocol.GitHubUpdateRepositoryPreferencesForCheckSuitesResponse
-	253, // 279: protocol.GitHubService.GetACheckSuite:output_type -> protocol.GitHubCreateACheckSuiteResponse
-	255, // 280: protocol.GitHubService.RerequestACheckSuite:output_type -> protocol.GitHubRerequestACheckSuiteResponse
-	256, // 281: protocol.GitHubService.ListCheckSuitesForAGitReference:output_type -> protocol.GitHubListCheckSuitesForAGitReferenceResponse
-	257, // 282: protocol.GitHubService.ListIssueCommentsForARepository:output_type -> protocol.GitHubListIssueCommentsForARepositoryResponse
-	258, // 283: protocol.GitHubService.GetAnIssueComment:output_type -> protocol.GitHubGetAnIssueCommentResponse
-	258, // 284: protocol.GitHubService.UpdateAnIssueComment:output_type -> protocol.GitHubGetAnIssueCommentResponse
-	259, // 285: protocol.GitHubService.DeleteAnIssueComment:output_type -> protocol.GitHubDeleteAnIssueCommentResponse
-	258, // 286: protocol.GitHubService.PinAnIssueComment:output_type -> protocol.GitHubGetAnIssueCommentResponse
-	260, // 287: protocol.GitHubService.UnpinAnIssueComment:output_type -> protocol.GitHubUnpinAnIssueCommentResponse
-	257, // 288: protocol.GitHubService.ListIssueComments:output_type -> protocol.GitHubListIssueCommentsForARepositoryResponse
-	258, // 289: protocol.GitHubService.CreateAnIssueComment:output_type -> protocol.GitHubGetAnIssueCommentResponse
-	261, // 290: protocol.GitHubService.ListFailedOrganizationInvitations:output_type -> protocol.GitHubListFailedOrganizationInvitationsResponse
-	261, // 291: protocol.GitHubService.ListPendingOrganizationInvitations:output_type -> protocol.GitHubListFailedOrganizationInvitationsResponse
-	262, // 292: protocol.GitHubService.CreateAnOrganizationInvitation:output_type -> protocol.GitHubCreateAnOrganizationInvitationResponse
-	263, // 293: protocol.GitHubService.CancelAnOrganizationInvitation:output_type -> protocol.GitHubCancelAnOrganizationInvitationResponse
-	264, // 294: protocol.GitHubService.ListOrganizationInvitationTeams:output_type -> protocol.GitHubListOrganizationInvitationTeamsResponse
-	265, // 295: protocol.GitHubService.ListOrganizationMembers:output_type -> protocol.GitHubListOrganizationMembersResponse
-	266, // 296: protocol.GitHubService.CheckOrganizationMembershipForAUser:output_type -> protocol.GitHubCheckOrganizationMembershipForAUserResponse
-	267, // 297: protocol.GitHubService.RemoveAnOrganizationMember:output_type -> protocol.GitHubRemoveAnOrganizationMemberResponse
-	268, // 298: protocol.GitHubService.GetOrganizationMembershipForAUser:output_type -> protocol.GitHubGetOrganizationMembershipForAUserResponse
-	268, // 299: protocol.GitHubService.SetOrganizationMembershipForAUser:output_type -> protocol.GitHubGetOrganizationMembershipForAUserResponse
-	269, // 300: protocol.GitHubService.RemoveOrganizationMembershipForAUser:output_type -> protocol.GitHubRemoveOrganizationMembershipForAUserResponse
-	265, // 301: protocol.GitHubService.ListPublicOrganizationMembers:output_type -> protocol.GitHubListOrganizationMembersResponse
-	270, // 302: protocol.GitHubService.CheckPublicOrganizationMembershipForAUser:output_type -> protocol.GitHubCheckPublicOrganizationMembershipForAUserResponse
-	271, // 303: protocol.GitHubService.SetPublicOrganizationMembershipForTheAuthenticatedUser:output_type -> protocol.GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserResponse
-	272, // 304: protocol.GitHubService.RemovePublicOrganizationMembershipForTheAuthenticatedUser:output_type -> protocol.GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserResponse
-	273, // 305: protocol.GitHubService.ListOrganizationMembershipsForTheAuthenticatedUser:output_type -> protocol.GitHubListOrganizationMembershipsForTheAuthenticatedUserResponse
-	268, // 306: protocol.GitHubService.GetAnOrganizationMembershipForTheAuthenticatedUser:output_type -> protocol.GitHubGetOrganizationMembershipForAUserResponse
-	268, // 307: protocol.GitHubService.UpdateAnOrganizationMembershipForTheAuthenticatedUser:output_type -> protocol.GitHubGetOrganizationMembershipForAUserResponse
-	274, // 308: protocol.GitHubService.ListOrganizations:output_type -> protocol.GitHubListOrganizationsResponse
-	275, // 309: protocol.GitHubService.GetAnOrganization:output_type -> protocol.GitHubGetAnOrganizationResponse
-	275, // 310: protocol.GitHubService.UpdateAnOrganization:output_type -> protocol.GitHubGetAnOrganizationResponse
-	276, // 311: protocol.GitHubService.DeleteAnOrganization:output_type -> protocol.GitHubDeleteAnOrganizationResponse
-	277, // 312: protocol.GitHubService.ListAppInstallationsForAnOrganization:output_type -> protocol.GitHubListAppInstallationsForAnOrganizationResponse
-	278, // 313: protocol.GitHubService.GetImmutableReleasesSettingsForAnOrganization:output_type -> protocol.GitHubGetImmutableReleasesSettingsForAnOrganizationResponse
-	279, // 314: protocol.GitHubService.SetImmutableReleasesSettingsForAnOrganization:output_type -> protocol.GitHubSetImmutableReleasesSettingsForAnOrganizationResponse
-	280, // 315: protocol.GitHubService.ListSelectedRepositoriesForImmutableReleasesEnforcement:output_type -> protocol.GitHubListSelectedRepositoriesForImmutableReleasesEnforcementResponse
-	281, // 316: protocol.GitHubService.SetSelectedRepositoriesForImmutableReleasesEnforcement:output_type -> protocol.GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementResponse
-	282, // 317: protocol.GitHubService.EnableASelectedRepositoryForImmutableReleasesInAnOrganization:output_type -> protocol.GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse
-	283, // 318: protocol.GitHubService.DisableASelectedRepositoryForImmutableReleasesInAnOrganization:output_type -> protocol.GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse
-	284, // 319: protocol.GitHubService.EnableOrDisableASecurityFeatureForAnOrganization:output_type -> protocol.GitHubEnableOrDisableASecurityFeatureForAnOrganizationResponse
-	274, // 320: protocol.GitHubService.ListOrganizationsForTheAuthenticatedUser:output_type -> protocol.GitHubListOrganizationsResponse
-	274, // 321: protocol.GitHubService.ListOrganizationsForAUser:output_type -> protocol.GitHubListOrganizationsResponse
-	285, // 322: protocol.GitHubService.ListIssuesAssignedToTheAuthenticatedUser:output_type -> protocol.GitHubListIssuesAssignedToTheAuthenticatedUserResponse
-	285, // 323: protocol.GitHubService.ListOrganizationIssuesAssignedToTheAuthenticatedUser:output_type -> protocol.GitHubListIssuesAssignedToTheAuthenticatedUserResponse
-	285, // 324: protocol.GitHubService.ListRepositoryIssues:output_type -> protocol.GitHubListIssuesAssignedToTheAuthenticatedUserResponse
-	286, // 325: protocol.GitHubService.CreateAnIssue:output_type -> protocol.GitHubCreateAnIssueResponse
-	286, // 326: protocol.GitHubService.GetAnIssue:output_type -> protocol.GitHubCreateAnIssueResponse
-	287, // 327: protocol.GitHubService.UpdateAnIssue:output_type -> protocol.GitHubUpdateAnIssueResponse
-	288, // 328: protocol.GitHubService.LockAnIssue:output_type -> protocol.GitHubLockAnIssueResponse
-	289, // 329: protocol.GitHubService.UnlockAnIssue:output_type -> protocol.GitHubUnlockAnIssueResponse
-	290, // 330: protocol.GitHubService.ListIssueSuggestions:output_type -> protocol.GitHubListIssueSuggestionsResponse
-	291, // 331: protocol.GitHubService.ApproveAnIssueSuggestion:output_type -> protocol.GitHubApproveAnIssueSuggestionResponse
-	291, // 332: protocol.GitHubService.DismissAnIssueSuggestion:output_type -> protocol.GitHubApproveAnIssueSuggestionResponse
-	285, // 333: protocol.GitHubService.ListUserAccountIssuesAssignedToTheAuthenticatedUser:output_type -> protocol.GitHubListIssuesAssignedToTheAuthenticatedUserResponse
-	292, // 334: protocol.GitHubService.ListOrganizationRepositories:output_type -> protocol.GitHubListOrganizationRepositoriesResponse
-	293, // 335: protocol.GitHubService.CreateAnOrganizationRepository:output_type -> protocol.GitHubCreateAnOrganizationRepositoryResponse
-	293, // 336: protocol.GitHubService.GetARepository:output_type -> protocol.GitHubCreateAnOrganizationRepositoryResponse
-	293, // 337: protocol.GitHubService.UpdateARepository:output_type -> protocol.GitHubCreateAnOrganizationRepositoryResponse
-	294, // 338: protocol.GitHubService.DeleteARepository:output_type -> protocol.GitHubDeleteARepositoryResponse
-	295, // 339: protocol.GitHubService.ListRepositoryActivities:output_type -> protocol.GitHubListRepositoryActivitiesResponse
-	296, // 340: protocol.GitHubService.CheckIfDependabotSecurityUpdatesAreEnabledForARepository:output_type -> protocol.GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryResponse
-	297, // 341: protocol.GitHubService.EnableDependabotSecurityUpdates:output_type -> protocol.GitHubEnableDependabotSecurityUpdatesResponse
-	298, // 342: protocol.GitHubService.DisableDependabotSecurityUpdates:output_type -> protocol.GitHubDisableDependabotSecurityUpdatesResponse
-	299, // 343: protocol.GitHubService.ListCODEOWNERSErrors:output_type -> protocol.GitHubListCODEOWNERSErrorsResponse
-	300, // 344: protocol.GitHubService.ListRepositoryContributors:output_type -> protocol.GitHubListRepositoryContributorsResponse
-	301, // 345: protocol.GitHubService.CreateARepositoryDispatchEvent:output_type -> protocol.GitHubCreateARepositoryDispatchEventResponse
-	302, // 346: protocol.GitHubService.GetTheHashAlgorithmForARepository:output_type -> protocol.GitHubGetTheHashAlgorithmForARepositoryResponse
-	303, // 347: protocol.GitHubService.CheckIfImmutableReleasesAreEnabledForARepository:output_type -> protocol.GitHubCheckIfImmutableReleasesAreEnabledForARepositoryResponse
-	304, // 348: protocol.GitHubService.EnableImmutableReleases:output_type -> protocol.GitHubEnableImmutableReleasesResponse
-	305, // 349: protocol.GitHubService.DisableImmutableReleases:output_type -> protocol.GitHubDisableImmutableReleasesResponse
-	306, // 350: protocol.GitHubService.ListRepositoryLanguages:output_type -> protocol.GitHubListRepositoryLanguagesResponse
-	307, // 351: protocol.GitHubService.CheckIfPrivateVulnerabilityReportingIsEnabledForARepository:output_type -> protocol.GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryResponse
-	308, // 352: protocol.GitHubService.EnablePrivateVulnerabilityReportingForARepository:output_type -> protocol.GitHubEnablePrivateVulnerabilityReportingForARepositoryResponse
-	309, // 353: protocol.GitHubService.DisablePrivateVulnerabilityReportingForARepository:output_type -> protocol.GitHubDisablePrivateVulnerabilityReportingForARepositoryResponse
-	310, // 354: protocol.GitHubService.ListRepositoryTags:output_type -> protocol.GitHubListRepositoryTagsResponse
-	311, // 355: protocol.GitHubService.ListRepositoryTeams:output_type -> protocol.GitHubListRepositoryTeamsResponse
-	312, // 356: protocol.GitHubService.GetAllRepositoryTopics:output_type -> protocol.GitHubGetAllRepositoryTopicsResponse
-	312, // 357: protocol.GitHubService.ReplaceAllRepositoryTopics:output_type -> protocol.GitHubGetAllRepositoryTopicsResponse
-	313, // 358: protocol.GitHubService.TransferARepository:output_type -> protocol.GitHubTransferARepositoryResponse
-	314, // 359: protocol.GitHubService.CheckIfVulnerabilityAlertsAreEnabledForARepository:output_type -> protocol.GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryResponse
-	315, // 360: protocol.GitHubService.EnableVulnerabilityAlerts:output_type -> protocol.GitHubEnableVulnerabilityAlertsResponse
-	316, // 361: protocol.GitHubService.DisableVulnerabilityAlerts:output_type -> protocol.GitHubDisableVulnerabilityAlertsResponse
-	293, // 362: protocol.GitHubService.CreateARepositoryUsingATemplate:output_type -> protocol.GitHubCreateAnOrganizationRepositoryResponse
-	292, // 363: protocol.GitHubService.ListPublicRepositories:output_type -> protocol.GitHubListOrganizationRepositoriesResponse
-	317, // 364: protocol.GitHubService.ListRepositoriesForTheAuthenticatedUser:output_type -> protocol.GitHubListRepositoriesForTheAuthenticatedUserResponse
-	293, // 365: protocol.GitHubService.CreateARepositoryForTheAuthenticatedUser:output_type -> protocol.GitHubCreateAnOrganizationRepositoryResponse
-	292, // 366: protocol.GitHubService.ListRepositoriesForAUser:output_type -> protocol.GitHubListOrganizationRepositoriesResponse
-	318, // 367: protocol.GitHubService.GetRepositoryContent:output_type -> protocol.GitHubGetRepositoryContentResponse
-	319, // 368: protocol.GitHubService.GetARepositoryREADME:output_type -> protocol.GitHubGetARepositoryREADMEResponse
-	319, // 369: protocol.GitHubService.GetARepositoryREADMEForADirectory:output_type -> protocol.GitHubGetARepositoryREADMEResponse
-	320, // 370: protocol.GitHubService.ListDeliveriesForAnAppWebhook:output_type -> protocol.GitHubListDeliveriesForAnAppWebhookResponse
-	321, // 371: protocol.GitHubService.RedeliverADeliveryForAnAppWebhook:output_type -> protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse
-	187, // [187:372] is the sub-list for method output_type
-	2,   // [2:187] is the sub-list for method input_type
+	188, // 187: protocol.GitHubService.GetARepositoryInstallationForTheAuthenticatedApp:input_type -> protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest
+	189, // 188: protocol.GitHubService.CreateAnInstallationAccessTokenForAnApp:input_type -> protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest
+	2,   // 189: protocol.GitHubService.RateLimit:output_type -> protocol.GitHubRateLimitResponse
+	190, // 190: protocol.GitHubService.GetTheCombinedStatusForASpecificReference:output_type -> protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse
+	191, // 191: protocol.GitHubService.ListCommitStatusesForAReference:output_type -> protocol.GitHubListCommitStatusesForAReferenceResponse
+	192, // 192: protocol.GitHubService.CreateACommitStatus:output_type -> protocol.GitHubCreateACommitStatusResponse
+	193, // 193: protocol.GitHubService.ListCommitCommentsForARepository:output_type -> protocol.GitHubListCommitCommentsForARepositoryResponse
+	194, // 194: protocol.GitHubService.GetACommitComment:output_type -> protocol.GitHubGetACommitCommentResponse
+	194, // 195: protocol.GitHubService.UpdateACommitComment:output_type -> protocol.GitHubGetACommitCommentResponse
+	195, // 196: protocol.GitHubService.DeleteACommitComment:output_type -> protocol.GitHubDeleteACommitCommentResponse
+	193, // 197: protocol.GitHubService.ListCommitComments:output_type -> protocol.GitHubListCommitCommentsForARepositoryResponse
+	194, // 198: protocol.GitHubService.CreateACommitComment:output_type -> protocol.GitHubGetACommitCommentResponse
+	196, // 199: protocol.GitHubService.ListCommits:output_type -> protocol.GitHubListCommitsResponse
+	197, // 200: protocol.GitHubService.ListBranchesForHEADCommit:output_type -> protocol.GitHubListBranchesForHEADCommitResponse
+	198, // 201: protocol.GitHubService.ListPullRequestsAssociatedWithACommit:output_type -> protocol.GitHubListPullRequestsAssociatedWithACommitResponse
+	199, // 202: protocol.GitHubService.GetACommit:output_type -> protocol.GitHubGetACommitResponse
+	200, // 203: protocol.GitHubService.CompareTwoCommits:output_type -> protocol.GitHubCompareTwoCommitsResponse
+	201, // 204: protocol.GitHubService.ListBranches:output_type -> protocol.GitHubListBranchesResponse
+	202, // 205: protocol.GitHubService.GetABranch:output_type -> protocol.GitHubGetABranchResponse
+	202, // 206: protocol.GitHubService.RenameABranch:output_type -> protocol.GitHubGetABranchResponse
+	203, // 207: protocol.GitHubService.SyncAForkBranchWithTheUpstreamRepository:output_type -> protocol.GitHubSyncAForkBranchWithTheUpstreamRepositoryResponse
+	204, // 208: protocol.GitHubService.MergeABranch:output_type -> protocol.GitHubMergeABranchResponse
+	205, // 209: protocol.GitHubService.GetAllRequestedReviewersForAPullRequest:output_type -> protocol.GitHubGetAllRequestedReviewersForAPullRequestResponse
+	206, // 210: protocol.GitHubService.RequestReviewersForAPullRequest:output_type -> protocol.GitHubRequestReviewersForAPullRequestResponse
+	206, // 211: protocol.GitHubService.RemoveRequestedReviewersFromAPullRequest:output_type -> protocol.GitHubRequestReviewersForAPullRequestResponse
+	207, // 212: protocol.GitHubService.ListReviewsForAPullRequest:output_type -> protocol.GitHubListReviewsForAPullRequestResponse
+	208, // 213: protocol.GitHubService.CreateAReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
+	208, // 214: protocol.GitHubService.GetAReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
+	208, // 215: protocol.GitHubService.UpdateAReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
+	208, // 216: protocol.GitHubService.DeleteAPendingReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
+	209, // 217: protocol.GitHubService.ListCommentsForAPullRequestReview:output_type -> protocol.GitHubListCommentsForAPullRequestReviewResponse
+	208, // 218: protocol.GitHubService.DismissAReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
+	208, // 219: protocol.GitHubService.SubmitAReviewForAPullRequest:output_type -> protocol.GitHubCreateAReviewForAPullRequestResponse
+	210, // 220: protocol.GitHubService.ListReviewCommentsInARepository:output_type -> protocol.GitHubListReviewCommentsInARepositoryResponse
+	211, // 221: protocol.GitHubService.GetAReviewCommentForAPullRequest:output_type -> protocol.GitHubGetAReviewCommentForAPullRequestResponse
+	211, // 222: protocol.GitHubService.UpdateAReviewCommentForAPullRequest:output_type -> protocol.GitHubGetAReviewCommentForAPullRequestResponse
+	212, // 223: protocol.GitHubService.DeleteAReviewCommentForAPullRequest:output_type -> protocol.GitHubDeleteAReviewCommentForAPullRequestResponse
+	210, // 224: protocol.GitHubService.ListReviewCommentsOnAPullRequest:output_type -> protocol.GitHubListReviewCommentsInARepositoryResponse
+	211, // 225: protocol.GitHubService.CreateAReviewCommentForAPullRequest:output_type -> protocol.GitHubGetAReviewCommentForAPullRequestResponse
+	211, // 226: protocol.GitHubService.CreateAReplyForAReviewComment:output_type -> protocol.GitHubGetAReviewCommentForAPullRequestResponse
+	213, // 227: protocol.GitHubService.ListPullRequests:output_type -> protocol.GitHubListPullRequestsResponse
+	214, // 228: protocol.GitHubService.CreateAPullRequest:output_type -> protocol.GitHubCreateAPullRequestResponse
+	214, // 229: protocol.GitHubService.GetAPullRequest:output_type -> protocol.GitHubCreateAPullRequestResponse
+	214, // 230: protocol.GitHubService.UpdateAPullRequest:output_type -> protocol.GitHubCreateAPullRequestResponse
+	215, // 231: protocol.GitHubService.ListCommitsOnAPullRequest:output_type -> protocol.GitHubListCommitsOnAPullRequestResponse
+	216, // 232: protocol.GitHubService.ListPullRequestsFiles:output_type -> protocol.GitHubListPullRequestsFilesResponse
+	217, // 233: protocol.GitHubService.CheckIfAPullRequestHasBeenMerged:output_type -> protocol.GitHubCheckIfAPullRequestHasBeenMergedResponse
+	218, // 234: protocol.GitHubService.MergeAPullRequest:output_type -> protocol.GitHubMergeAPullRequestResponse
+	219, // 235: protocol.GitHubService.MergeAPullRequestAsynchronously:output_type -> protocol.GitHubMergeAPullRequestAsynchronouslyResponse
+	219, // 236: protocol.GitHubService.GetTheResultOfAnAsynchronousMerge:output_type -> protocol.GitHubMergeAPullRequestAsynchronouslyResponse
+	220, // 237: protocol.GitHubService.UpdateAPullRequestBranch:output_type -> protocol.GitHubUpdateAPullRequestBranchResponse
+	221, // 238: protocol.GitHubService.ListRepositoryWorkflows:output_type -> protocol.GitHubListRepositoryWorkflowsResponse
+	222, // 239: protocol.GitHubService.GetAWorkflow:output_type -> protocol.GitHubGetAWorkflowResponse
+	223, // 240: protocol.GitHubService.DisableAWorkflow:output_type -> protocol.GitHubDisableAWorkflowResponse
+	224, // 241: protocol.GitHubService.CreateAWorkflowDispatchEvent:output_type -> protocol.GitHubCreateAWorkflowDispatchEventResponse
+	225, // 242: protocol.GitHubService.EnableAWorkflow:output_type -> protocol.GitHubEnableAWorkflowResponse
+	226, // 243: protocol.GitHubService.GetWorkflowUsage:output_type -> protocol.GitHubGetWorkflowUsageResponse
+	227, // 244: protocol.GitHubService.GetAJobForAWorkflowRun:output_type -> protocol.GitHubGetAJobForAWorkflowRunResponse
+	228, // 245: protocol.GitHubService.DownloadJobLogsForAWorkflowRun:output_type -> protocol.GitHubDownloadJobLogsForAWorkflowRunResponse
+	229, // 246: protocol.GitHubService.ListJobsForAWorkflowRunAttempt:output_type -> protocol.GitHubListJobsForAWorkflowRunAttemptResponse
+	229, // 247: protocol.GitHubService.ListJobsForAWorkflowRun:output_type -> protocol.GitHubListJobsForAWorkflowRunAttemptResponse
+	230, // 248: protocol.GitHubService.ListArtifactsForARepository:output_type -> protocol.GitHubListArtifactsForARepositoryResponse
+	231, // 249: protocol.GitHubService.GetAnArtifact:output_type -> protocol.GitHubGetAnArtifactResponse
+	232, // 250: protocol.GitHubService.DeleteAnArtifact:output_type -> protocol.GitHubDeleteAnArtifactResponse
+	233, // 251: protocol.GitHubService.DownloadAnArtifact:output_type -> protocol.GitHubDownloadAnArtifactResponse
+	230, // 252: protocol.GitHubService.ListWorkflowRunArtifacts:output_type -> protocol.GitHubListArtifactsForARepositoryResponse
+	234, // 253: protocol.GitHubService.ReRunAJobFromAWorkflowRun:output_type -> protocol.GitHubReRunAJobFromAWorkflowRunResponse
+	235, // 254: protocol.GitHubService.ListWorkflowRunsForARepository:output_type -> protocol.GitHubListWorkflowRunsForARepositoryResponse
+	236, // 255: protocol.GitHubService.GetAWorkflowRun:output_type -> protocol.GitHubGetAWorkflowRunResponse
+	237, // 256: protocol.GitHubService.DeleteAWorkflowRun:output_type -> protocol.GitHubDeleteAWorkflowRunResponse
+	238, // 257: protocol.GitHubService.GetTheReviewHistoryForAWorkflowRun:output_type -> protocol.GitHubGetTheReviewHistoryForAWorkflowRunResponse
+	239, // 258: protocol.GitHubService.ApproveAWorkflowRunForAForkPullRequest:output_type -> protocol.GitHubApproveAWorkflowRunForAForkPullRequestResponse
+	236, // 259: protocol.GitHubService.GetAWorkflowRunAttempt:output_type -> protocol.GitHubGetAWorkflowRunResponse
+	240, // 260: protocol.GitHubService.DownloadWorkflowRunAttemptLogs:output_type -> protocol.GitHubDownloadWorkflowRunAttemptLogsResponse
+	241, // 261: protocol.GitHubService.CancelAWorkflowRun:output_type -> protocol.GitHubCancelAWorkflowRunResponse
+	242, // 262: protocol.GitHubService.ReviewCustomDeploymentProtectionRulesForAWorkflowRun:output_type -> protocol.GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunResponse
+	243, // 263: protocol.GitHubService.ForceCancelAWorkflowRun:output_type -> protocol.GitHubForceCancelAWorkflowRunResponse
+	244, // 264: protocol.GitHubService.DownloadWorkflowRunLogs:output_type -> protocol.GitHubDownloadWorkflowRunLogsResponse
+	245, // 265: protocol.GitHubService.DeleteWorkflowRunLogs:output_type -> protocol.GitHubDeleteWorkflowRunLogsResponse
+	246, // 266: protocol.GitHubService.GetPendingDeploymentsForAWorkflowRun:output_type -> protocol.GitHubGetPendingDeploymentsForAWorkflowRunResponse
+	247, // 267: protocol.GitHubService.ReviewPendingDeploymentsForAWorkflowRun:output_type -> protocol.GitHubReviewPendingDeploymentsForAWorkflowRunResponse
+	248, // 268: protocol.GitHubService.ReRunAWorkflow:output_type -> protocol.GitHubReRunAWorkflowResponse
+	249, // 269: protocol.GitHubService.ReRunFailedJobsFromAWorkflowRun:output_type -> protocol.GitHubReRunFailedJobsFromAWorkflowRunResponse
+	250, // 270: protocol.GitHubService.GetWorkflowRunUsage:output_type -> protocol.GitHubGetWorkflowRunUsageResponse
+	235, // 271: protocol.GitHubService.ListWorkflowRunsForAWorkflow:output_type -> protocol.GitHubListWorkflowRunsForARepositoryResponse
+	251, // 272: protocol.GitHubService.CreateACheckRun:output_type -> protocol.GitHubCreateACheckRunResponse
+	251, // 273: protocol.GitHubService.GetACheckRun:output_type -> protocol.GitHubCreateACheckRunResponse
+	251, // 274: protocol.GitHubService.UpdateACheckRun:output_type -> protocol.GitHubCreateACheckRunResponse
+	252, // 275: protocol.GitHubService.ListCheckRunAnnotations:output_type -> protocol.GitHubListCheckRunAnnotationsResponse
+	253, // 276: protocol.GitHubService.RerequestACheckRun:output_type -> protocol.GitHubRerequestACheckRunResponse
+	254, // 277: protocol.GitHubService.ListCheckRunsInACheckSuite:output_type -> protocol.GitHubListCheckRunsInACheckSuiteResponse
+	254, // 278: protocol.GitHubService.ListCheckRunsForAGitReference:output_type -> protocol.GitHubListCheckRunsInACheckSuiteResponse
+	255, // 279: protocol.GitHubService.CreateACheckSuite:output_type -> protocol.GitHubCreateACheckSuiteResponse
+	256, // 280: protocol.GitHubService.UpdateRepositoryPreferencesForCheckSuites:output_type -> protocol.GitHubUpdateRepositoryPreferencesForCheckSuitesResponse
+	255, // 281: protocol.GitHubService.GetACheckSuite:output_type -> protocol.GitHubCreateACheckSuiteResponse
+	257, // 282: protocol.GitHubService.RerequestACheckSuite:output_type -> protocol.GitHubRerequestACheckSuiteResponse
+	258, // 283: protocol.GitHubService.ListCheckSuitesForAGitReference:output_type -> protocol.GitHubListCheckSuitesForAGitReferenceResponse
+	259, // 284: protocol.GitHubService.ListIssueCommentsForARepository:output_type -> protocol.GitHubListIssueCommentsForARepositoryResponse
+	260, // 285: protocol.GitHubService.GetAnIssueComment:output_type -> protocol.GitHubGetAnIssueCommentResponse
+	260, // 286: protocol.GitHubService.UpdateAnIssueComment:output_type -> protocol.GitHubGetAnIssueCommentResponse
+	261, // 287: protocol.GitHubService.DeleteAnIssueComment:output_type -> protocol.GitHubDeleteAnIssueCommentResponse
+	260, // 288: protocol.GitHubService.PinAnIssueComment:output_type -> protocol.GitHubGetAnIssueCommentResponse
+	262, // 289: protocol.GitHubService.UnpinAnIssueComment:output_type -> protocol.GitHubUnpinAnIssueCommentResponse
+	259, // 290: protocol.GitHubService.ListIssueComments:output_type -> protocol.GitHubListIssueCommentsForARepositoryResponse
+	260, // 291: protocol.GitHubService.CreateAnIssueComment:output_type -> protocol.GitHubGetAnIssueCommentResponse
+	263, // 292: protocol.GitHubService.ListFailedOrganizationInvitations:output_type -> protocol.GitHubListFailedOrganizationInvitationsResponse
+	263, // 293: protocol.GitHubService.ListPendingOrganizationInvitations:output_type -> protocol.GitHubListFailedOrganizationInvitationsResponse
+	264, // 294: protocol.GitHubService.CreateAnOrganizationInvitation:output_type -> protocol.GitHubCreateAnOrganizationInvitationResponse
+	265, // 295: protocol.GitHubService.CancelAnOrganizationInvitation:output_type -> protocol.GitHubCancelAnOrganizationInvitationResponse
+	266, // 296: protocol.GitHubService.ListOrganizationInvitationTeams:output_type -> protocol.GitHubListOrganizationInvitationTeamsResponse
+	267, // 297: protocol.GitHubService.ListOrganizationMembers:output_type -> protocol.GitHubListOrganizationMembersResponse
+	268, // 298: protocol.GitHubService.CheckOrganizationMembershipForAUser:output_type -> protocol.GitHubCheckOrganizationMembershipForAUserResponse
+	269, // 299: protocol.GitHubService.RemoveAnOrganizationMember:output_type -> protocol.GitHubRemoveAnOrganizationMemberResponse
+	270, // 300: protocol.GitHubService.GetOrganizationMembershipForAUser:output_type -> protocol.GitHubGetOrganizationMembershipForAUserResponse
+	270, // 301: protocol.GitHubService.SetOrganizationMembershipForAUser:output_type -> protocol.GitHubGetOrganizationMembershipForAUserResponse
+	271, // 302: protocol.GitHubService.RemoveOrganizationMembershipForAUser:output_type -> protocol.GitHubRemoveOrganizationMembershipForAUserResponse
+	267, // 303: protocol.GitHubService.ListPublicOrganizationMembers:output_type -> protocol.GitHubListOrganizationMembersResponse
+	272, // 304: protocol.GitHubService.CheckPublicOrganizationMembershipForAUser:output_type -> protocol.GitHubCheckPublicOrganizationMembershipForAUserResponse
+	273, // 305: protocol.GitHubService.SetPublicOrganizationMembershipForTheAuthenticatedUser:output_type -> protocol.GitHubSetPublicOrganizationMembershipForTheAuthenticatedUserResponse
+	274, // 306: protocol.GitHubService.RemovePublicOrganizationMembershipForTheAuthenticatedUser:output_type -> protocol.GitHubRemovePublicOrganizationMembershipForTheAuthenticatedUserResponse
+	275, // 307: protocol.GitHubService.ListOrganizationMembershipsForTheAuthenticatedUser:output_type -> protocol.GitHubListOrganizationMembershipsForTheAuthenticatedUserResponse
+	270, // 308: protocol.GitHubService.GetAnOrganizationMembershipForTheAuthenticatedUser:output_type -> protocol.GitHubGetOrganizationMembershipForAUserResponse
+	270, // 309: protocol.GitHubService.UpdateAnOrganizationMembershipForTheAuthenticatedUser:output_type -> protocol.GitHubGetOrganizationMembershipForAUserResponse
+	276, // 310: protocol.GitHubService.ListOrganizations:output_type -> protocol.GitHubListOrganizationsResponse
+	277, // 311: protocol.GitHubService.GetAnOrganization:output_type -> protocol.GitHubGetAnOrganizationResponse
+	277, // 312: protocol.GitHubService.UpdateAnOrganization:output_type -> protocol.GitHubGetAnOrganizationResponse
+	278, // 313: protocol.GitHubService.DeleteAnOrganization:output_type -> protocol.GitHubDeleteAnOrganizationResponse
+	279, // 314: protocol.GitHubService.ListAppInstallationsForAnOrganization:output_type -> protocol.GitHubListAppInstallationsForAnOrganizationResponse
+	280, // 315: protocol.GitHubService.GetImmutableReleasesSettingsForAnOrganization:output_type -> protocol.GitHubGetImmutableReleasesSettingsForAnOrganizationResponse
+	281, // 316: protocol.GitHubService.SetImmutableReleasesSettingsForAnOrganization:output_type -> protocol.GitHubSetImmutableReleasesSettingsForAnOrganizationResponse
+	282, // 317: protocol.GitHubService.ListSelectedRepositoriesForImmutableReleasesEnforcement:output_type -> protocol.GitHubListSelectedRepositoriesForImmutableReleasesEnforcementResponse
+	283, // 318: protocol.GitHubService.SetSelectedRepositoriesForImmutableReleasesEnforcement:output_type -> protocol.GitHubSetSelectedRepositoriesForImmutableReleasesEnforcementResponse
+	284, // 319: protocol.GitHubService.EnableASelectedRepositoryForImmutableReleasesInAnOrganization:output_type -> protocol.GitHubEnableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse
+	285, // 320: protocol.GitHubService.DisableASelectedRepositoryForImmutableReleasesInAnOrganization:output_type -> protocol.GitHubDisableASelectedRepositoryForImmutableReleasesInAnOrganizationResponse
+	286, // 321: protocol.GitHubService.EnableOrDisableASecurityFeatureForAnOrganization:output_type -> protocol.GitHubEnableOrDisableASecurityFeatureForAnOrganizationResponse
+	276, // 322: protocol.GitHubService.ListOrganizationsForTheAuthenticatedUser:output_type -> protocol.GitHubListOrganizationsResponse
+	276, // 323: protocol.GitHubService.ListOrganizationsForAUser:output_type -> protocol.GitHubListOrganizationsResponse
+	287, // 324: protocol.GitHubService.ListIssuesAssignedToTheAuthenticatedUser:output_type -> protocol.GitHubListIssuesAssignedToTheAuthenticatedUserResponse
+	287, // 325: protocol.GitHubService.ListOrganizationIssuesAssignedToTheAuthenticatedUser:output_type -> protocol.GitHubListIssuesAssignedToTheAuthenticatedUserResponse
+	287, // 326: protocol.GitHubService.ListRepositoryIssues:output_type -> protocol.GitHubListIssuesAssignedToTheAuthenticatedUserResponse
+	288, // 327: protocol.GitHubService.CreateAnIssue:output_type -> protocol.GitHubCreateAnIssueResponse
+	288, // 328: protocol.GitHubService.GetAnIssue:output_type -> protocol.GitHubCreateAnIssueResponse
+	289, // 329: protocol.GitHubService.UpdateAnIssue:output_type -> protocol.GitHubUpdateAnIssueResponse
+	290, // 330: protocol.GitHubService.LockAnIssue:output_type -> protocol.GitHubLockAnIssueResponse
+	291, // 331: protocol.GitHubService.UnlockAnIssue:output_type -> protocol.GitHubUnlockAnIssueResponse
+	292, // 332: protocol.GitHubService.ListIssueSuggestions:output_type -> protocol.GitHubListIssueSuggestionsResponse
+	293, // 333: protocol.GitHubService.ApproveAnIssueSuggestion:output_type -> protocol.GitHubApproveAnIssueSuggestionResponse
+	293, // 334: protocol.GitHubService.DismissAnIssueSuggestion:output_type -> protocol.GitHubApproveAnIssueSuggestionResponse
+	287, // 335: protocol.GitHubService.ListUserAccountIssuesAssignedToTheAuthenticatedUser:output_type -> protocol.GitHubListIssuesAssignedToTheAuthenticatedUserResponse
+	294, // 336: protocol.GitHubService.ListOrganizationRepositories:output_type -> protocol.GitHubListOrganizationRepositoriesResponse
+	295, // 337: protocol.GitHubService.CreateAnOrganizationRepository:output_type -> protocol.GitHubCreateAnOrganizationRepositoryResponse
+	295, // 338: protocol.GitHubService.GetARepository:output_type -> protocol.GitHubCreateAnOrganizationRepositoryResponse
+	295, // 339: protocol.GitHubService.UpdateARepository:output_type -> protocol.GitHubCreateAnOrganizationRepositoryResponse
+	296, // 340: protocol.GitHubService.DeleteARepository:output_type -> protocol.GitHubDeleteARepositoryResponse
+	297, // 341: protocol.GitHubService.ListRepositoryActivities:output_type -> protocol.GitHubListRepositoryActivitiesResponse
+	298, // 342: protocol.GitHubService.CheckIfDependabotSecurityUpdatesAreEnabledForARepository:output_type -> protocol.GitHubCheckIfDependabotSecurityUpdatesAreEnabledForARepositoryResponse
+	299, // 343: protocol.GitHubService.EnableDependabotSecurityUpdates:output_type -> protocol.GitHubEnableDependabotSecurityUpdatesResponse
+	300, // 344: protocol.GitHubService.DisableDependabotSecurityUpdates:output_type -> protocol.GitHubDisableDependabotSecurityUpdatesResponse
+	301, // 345: protocol.GitHubService.ListCODEOWNERSErrors:output_type -> protocol.GitHubListCODEOWNERSErrorsResponse
+	302, // 346: protocol.GitHubService.ListRepositoryContributors:output_type -> protocol.GitHubListRepositoryContributorsResponse
+	303, // 347: protocol.GitHubService.CreateARepositoryDispatchEvent:output_type -> protocol.GitHubCreateARepositoryDispatchEventResponse
+	304, // 348: protocol.GitHubService.GetTheHashAlgorithmForARepository:output_type -> protocol.GitHubGetTheHashAlgorithmForARepositoryResponse
+	305, // 349: protocol.GitHubService.CheckIfImmutableReleasesAreEnabledForARepository:output_type -> protocol.GitHubCheckIfImmutableReleasesAreEnabledForARepositoryResponse
+	306, // 350: protocol.GitHubService.EnableImmutableReleases:output_type -> protocol.GitHubEnableImmutableReleasesResponse
+	307, // 351: protocol.GitHubService.DisableImmutableReleases:output_type -> protocol.GitHubDisableImmutableReleasesResponse
+	308, // 352: protocol.GitHubService.ListRepositoryLanguages:output_type -> protocol.GitHubListRepositoryLanguagesResponse
+	309, // 353: protocol.GitHubService.CheckIfPrivateVulnerabilityReportingIsEnabledForARepository:output_type -> protocol.GitHubCheckIfPrivateVulnerabilityReportingIsEnabledForARepositoryResponse
+	310, // 354: protocol.GitHubService.EnablePrivateVulnerabilityReportingForARepository:output_type -> protocol.GitHubEnablePrivateVulnerabilityReportingForARepositoryResponse
+	311, // 355: protocol.GitHubService.DisablePrivateVulnerabilityReportingForARepository:output_type -> protocol.GitHubDisablePrivateVulnerabilityReportingForARepositoryResponse
+	312, // 356: protocol.GitHubService.ListRepositoryTags:output_type -> protocol.GitHubListRepositoryTagsResponse
+	313, // 357: protocol.GitHubService.ListRepositoryTeams:output_type -> protocol.GitHubListRepositoryTeamsResponse
+	314, // 358: protocol.GitHubService.GetAllRepositoryTopics:output_type -> protocol.GitHubGetAllRepositoryTopicsResponse
+	314, // 359: protocol.GitHubService.ReplaceAllRepositoryTopics:output_type -> protocol.GitHubGetAllRepositoryTopicsResponse
+	315, // 360: protocol.GitHubService.TransferARepository:output_type -> protocol.GitHubTransferARepositoryResponse
+	316, // 361: protocol.GitHubService.CheckIfVulnerabilityAlertsAreEnabledForARepository:output_type -> protocol.GitHubCheckIfVulnerabilityAlertsAreEnabledForARepositoryResponse
+	317, // 362: protocol.GitHubService.EnableVulnerabilityAlerts:output_type -> protocol.GitHubEnableVulnerabilityAlertsResponse
+	318, // 363: protocol.GitHubService.DisableVulnerabilityAlerts:output_type -> protocol.GitHubDisableVulnerabilityAlertsResponse
+	295, // 364: protocol.GitHubService.CreateARepositoryUsingATemplate:output_type -> protocol.GitHubCreateAnOrganizationRepositoryResponse
+	294, // 365: protocol.GitHubService.ListPublicRepositories:output_type -> protocol.GitHubListOrganizationRepositoriesResponse
+	319, // 366: protocol.GitHubService.ListRepositoriesForTheAuthenticatedUser:output_type -> protocol.GitHubListRepositoriesForTheAuthenticatedUserResponse
+	295, // 367: protocol.GitHubService.CreateARepositoryForTheAuthenticatedUser:output_type -> protocol.GitHubCreateAnOrganizationRepositoryResponse
+	294, // 368: protocol.GitHubService.ListRepositoriesForAUser:output_type -> protocol.GitHubListOrganizationRepositoriesResponse
+	320, // 369: protocol.GitHubService.GetRepositoryContent:output_type -> protocol.GitHubGetRepositoryContentResponse
+	321, // 370: protocol.GitHubService.GetARepositoryREADME:output_type -> protocol.GitHubGetARepositoryREADMEResponse
+	321, // 371: protocol.GitHubService.GetARepositoryREADMEForADirectory:output_type -> protocol.GitHubGetARepositoryREADMEResponse
+	322, // 372: protocol.GitHubService.ListDeliveriesForAnAppWebhook:output_type -> protocol.GitHubListDeliveriesForAnAppWebhookResponse
+	323, // 373: protocol.GitHubService.RedeliverADeliveryForAnAppWebhook:output_type -> protocol.GitHubRedeliverADeliveryForAnAppWebhookResponse
+	324, // 374: protocol.GitHubService.GetARepositoryInstallationForTheAuthenticatedApp:output_type -> protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse
+	325, // 375: protocol.GitHubService.CreateAnInstallationAccessTokenForAnApp:output_type -> protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse
+	189, // [189:376] is the sub-list for method output_type
+	2,   // [2:189] is the sub-list for method input_type
 	2,   // [2:2] is the sub-list for extension type_name
 	2,   // [2:2] is the sub-list for extension extendee
 	0,   // [0:2] is the sub-list for field type_name
@@ -1165,6 +1175,7 @@ func file_plugin_grpc_protocol_github_proto_init() {
 	file_plugin_grpc_protocol_github_repos_repos_proto_init()
 	file_plugin_grpc_protocol_github_repos_contents_proto_init()
 	file_plugin_grpc_protocol_github_apps_webhooks_proto_init()
+	file_plugin_grpc_protocol_github_apps_apps_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

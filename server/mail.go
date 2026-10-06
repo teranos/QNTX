@@ -84,7 +84,9 @@ func (s *QNTXServer) nodeDIDOrUnknown() string {
 func (s *QNTXServer) mailSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "mail",
+			Name:        "mail",
+			Description: "Mail the node sends on plugins' behalf: every mail sent or refused, one mail whole, the templates mail is filled from, the account it goes through, and the weekly report to ROOT.",
+			Tags:        []string{"mail", "templates", "report"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "sent",

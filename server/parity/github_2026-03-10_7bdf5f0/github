@@ -1,62 +1,62 @@
 
   github follows github
   app-permissions                                                                                        98
-    actions                                                                                             100  protocol.GitHubOrgsOrgsAppPermissions.actions
-    administration                                                                                      100  protocol.GitHubOrgsOrgsAppPermissions.administration
-    artifact_metadata                                                                                   100  protocol.GitHubOrgsOrgsAppPermissions.artifact_metadata
-    attestations                                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.attestations
-    checks                                                                                              100  protocol.GitHubOrgsOrgsAppPermissions.checks
-    code_quality                                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.code_quality
-    codespaces                                                                                          100  protocol.GitHubOrgsOrgsAppPermissions.codespaces
-    contents                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.contents
-    custom_properties_for_organizations                                                                 100  protocol.GitHubOrgsOrgsAppPermissions.custom_properties_for_organizations
-    dependabot_secrets                                                                                  100  protocol.GitHubOrgsOrgsAppPermissions.dependabot_secrets
-    deployments                                                                                         100  protocol.GitHubOrgsOrgsAppPermissions.deployments
-    discussions                                                                                         100  protocol.GitHubOrgsOrgsAppPermissions.discussions
-    email_addresses                                                                                     100  protocol.GitHubOrgsOrgsAppPermissions.email_addresses
-    enterprise_custom_properties_for_organizations                                                      100  protocol.GitHubOrgsOrgsAppPermissions.enterprise_custom_properties_for_organizations
-    environments                                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.environments
-    followers                                                                                           100  protocol.GitHubOrgsOrgsAppPermissions.followers
-    git_ssh_keys                                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.git_ssh_keys
-    gpg_keys                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.gpg_keys
-    interaction_limits                                                                                  100  protocol.GitHubOrgsOrgsAppPermissions.interaction_limits
-    issues                                                                                              100  protocol.GitHubOrgsOrgsAppPermissions.issues
-    members                                                                                             100  protocol.GitHubOrgsOrgsAppPermissions.members
-    merge_queues                                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.merge_queues
-    metadata                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.metadata
-    organization_administration                                                                         100  protocol.GitHubOrgsOrgsAppPermissions.organization_administration
-    organization_announcement_banners                                                                   100  protocol.GitHubOrgsOrgsAppPermissions.organization_announcement_banners
-    organization_copilot_agent_settings                                                                 100  protocol.GitHubOrgsOrgsAppPermissions.organization_copilot_agent_settings
-    organization_copilot_seat_management                                                                100  protocol.GitHubOrgsOrgsAppPermissions.organization_copilot_seat_management
-    organization_custom_org_roles                                                                       100  protocol.GitHubOrgsOrgsAppPermissions.organization_custom_org_roles
-    organization_custom_properties                                                                      100  protocol.GitHubOrgsOrgsAppPermissions.organization_custom_properties
-    organization_custom_roles                                                                           100  protocol.GitHubOrgsOrgsAppPermissions.organization_custom_roles
-    organization_events                                                                                 100  protocol.GitHubOrgsOrgsAppPermissions.organization_events
+    actions                                                                                             100  protocol.GitHubAppsAppsAppPermissions.actions, protocol.GitHubOrgsOrgsAppPermissions.actions
+    administration                                                                                      100  protocol.GitHubAppsAppsAppPermissions.administration, protocol.GitHubOrgsOrgsAppPermissions.administration
+    artifact_metadata                                                                                   100  protocol.GitHubAppsAppsAppPermissions.artifact_metadata, protocol.GitHubOrgsOrgsAppPermissions.artifact_metadata
+    attestations                                                                                        100  protocol.GitHubAppsAppsAppPermissions.attestations, protocol.GitHubOrgsOrgsAppPermissions.attestations
+    checks                                                                                              100  protocol.GitHubAppsAppsAppPermissions.checks, protocol.GitHubOrgsOrgsAppPermissions.checks
+    code_quality                                                                                        100  protocol.GitHubAppsAppsAppPermissions.code_quality, protocol.GitHubOrgsOrgsAppPermissions.code_quality
+    codespaces                                                                                          100  protocol.GitHubAppsAppsAppPermissions.codespaces, protocol.GitHubOrgsOrgsAppPermissions.codespaces
+    contents                                                                                            100  protocol.GitHubAppsAppsAppPermissions.contents, protocol.GitHubOrgsOrgsAppPermissions.contents
+    custom_properties_for_organizations                                                                 100  protocol.GitHubAppsAppsAppPermissions.custom_properties_for_organizations, protocol.GitHubOrgsOrgsAppPermissions.custom_properties_for_organizations
+    dependabot_secrets                                                                                  100  protocol.GitHubAppsAppsAppPermissions.dependabot_secrets, protocol.GitHubOrgsOrgsAppPermissions.dependabot_secrets
+    deployments                                                                                         100  protocol.GitHubAppsAppsAppPermissions.deployments, protocol.GitHubOrgsOrgsAppPermissions.deployments
+    discussions                                                                                         100  protocol.GitHubAppsAppsAppPermissions.discussions, protocol.GitHubOrgsOrgsAppPermissions.discussions
+    email_addresses                                                                                     100  protocol.GitHubAppsAppsAppPermissions.email_addresses, protocol.GitHubOrgsOrgsAppPermissions.email_addresses
+    enterprise_custom_properties_for_organizations                                                      100  protocol.GitHubAppsAppsAppPermissions.enterprise_custom_properties_for_organizations, protocol.GitHubOrgsOrgsAppPermissions.enterprise_custom_properties_for_organizations
+    environments                                                                                        100  protocol.GitHubAppsAppsAppPermissions.environments, protocol.GitHubOrgsOrgsAppPermissions.environments
+    followers                                                                                           100  protocol.GitHubAppsAppsAppPermissions.followers, protocol.GitHubOrgsOrgsAppPermissions.followers
+    git_ssh_keys                                                                                        100  protocol.GitHubAppsAppsAppPermissions.git_ssh_keys, protocol.GitHubOrgsOrgsAppPermissions.git_ssh_keys
+    gpg_keys                                                                                            100  protocol.GitHubAppsAppsAppPermissions.gpg_keys, protocol.GitHubOrgsOrgsAppPermissions.gpg_keys
+    interaction_limits                                                                                  100  protocol.GitHubAppsAppsAppPermissions.interaction_limits, protocol.GitHubOrgsOrgsAppPermissions.interaction_limits
+    issues                                                                                              100  protocol.GitHubAppsAppsAppPermissions.issues, protocol.GitHubOrgsOrgsAppPermissions.issues
+    members                                                                                             100  protocol.GitHubAppsAppsAppPermissions.members, protocol.GitHubOrgsOrgsAppPermissions.members
+    merge_queues                                                                                        100  protocol.GitHubAppsAppsAppPermissions.merge_queues, protocol.GitHubOrgsOrgsAppPermissions.merge_queues
+    metadata                                                                                            100  protocol.GitHubAppsAppsAppPermissions.metadata, protocol.GitHubOrgsOrgsAppPermissions.metadata
+    organization_administration                                                                         100  protocol.GitHubAppsAppsAppPermissions.organization_administration, protocol.GitHubOrgsOrgsAppPermissions.organization_administration
+    organization_announcement_banners                                                                   100  protocol.GitHubAppsAppsAppPermissions.organization_announcement_banners, protocol.GitHubOrgsOrgsAppPermissions.organization_announcement_banners
+    organization_copilot_agent_settings                                                                 100  protocol.GitHubAppsAppsAppPermissions.organization_copilot_agent_settings, protocol.GitHubOrgsOrgsAppPermissions.organization_copilot_agent_settings
+    organization_copilot_seat_management                                                                100  protocol.GitHubAppsAppsAppPermissions.organization_copilot_seat_management, protocol.GitHubOrgsOrgsAppPermissions.organization_copilot_seat_management
+    organization_custom_org_roles                                                                       100  protocol.GitHubAppsAppsAppPermissions.organization_custom_org_roles, protocol.GitHubOrgsOrgsAppPermissions.organization_custom_org_roles
+    organization_custom_properties                                                                      100  protocol.GitHubAppsAppsAppPermissions.organization_custom_properties, protocol.GitHubOrgsOrgsAppPermissions.organization_custom_properties
+    organization_custom_roles                                                                           100  protocol.GitHubAppsAppsAppPermissions.organization_custom_roles, protocol.GitHubOrgsOrgsAppPermissions.organization_custom_roles
+    organization_events                                                                                 100  protocol.GitHubAppsAppsAppPermissions.organization_events, protocol.GitHubOrgsOrgsAppPermissions.organization_events
     organization_external_properties_for_repos                                                            0
-    organization_hooks                                                                                  100  protocol.GitHubOrgsOrgsAppPermissions.organization_hooks
-    organization_packages                                                                               100  protocol.GitHubOrgsOrgsAppPermissions.organization_packages
-    organization_personal_access_token_requests                                                         100  protocol.GitHubOrgsOrgsAppPermissions.organization_personal_access_token_requests
-    organization_personal_access_tokens                                                                 100  protocol.GitHubOrgsOrgsAppPermissions.organization_personal_access_tokens
-    organization_plan                                                                                   100  protocol.GitHubOrgsOrgsAppPermissions.organization_plan
-    organization_projects                                                                               100  protocol.GitHubOrgsOrgsAppPermissions.organization_projects
-    organization_secrets                                                                                100  protocol.GitHubOrgsOrgsAppPermissions.organization_secrets
-    organization_self_hosted_runners                                                                    100  protocol.GitHubOrgsOrgsAppPermissions.organization_self_hosted_runners
-    organization_user_blocking                                                                          100  protocol.GitHubOrgsOrgsAppPermissions.organization_user_blocking
-    packages                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.packages
-    pages                                                                                               100  protocol.GitHubOrgsOrgsAppPermissions.pages
-    profile                                                                                             100  protocol.GitHubOrgsOrgsAppPermissions.profile
-    pull_requests                                                                                       100  protocol.GitHubOrgsOrgsAppPermissions.pull_requests
-    repository_custom_properties                                                                        100  protocol.GitHubOrgsOrgsAppPermissions.repository_custom_properties
-    repository_hooks                                                                                    100  protocol.GitHubOrgsOrgsAppPermissions.repository_hooks
-    repository_projects                                                                                 100  protocol.GitHubOrgsOrgsAppPermissions.repository_projects
-    secret_scanning_alerts                                                                              100  protocol.GitHubOrgsOrgsAppPermissions.secret_scanning_alerts
-    secrets                                                                                             100  protocol.GitHubOrgsOrgsAppPermissions.secrets
-    security_events                                                                                     100  protocol.GitHubOrgsOrgsAppPermissions.security_events
-    single_file                                                                                         100  protocol.GitHubOrgsOrgsAppPermissions.single_file
-    starring                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.starring
-    statuses                                                                                            100  protocol.GitHubOrgsOrgsAppPermissions.statuses
-    vulnerability_alerts                                                                                100  protocol.GitHubOrgsOrgsAppPermissions.vulnerability_alerts
-    workflows                                                                                           100  protocol.GitHubOrgsOrgsAppPermissions.workflows
+    organization_hooks                                                                                  100  protocol.GitHubAppsAppsAppPermissions.organization_hooks, protocol.GitHubOrgsOrgsAppPermissions.organization_hooks
+    organization_packages                                                                               100  protocol.GitHubAppsAppsAppPermissions.organization_packages, protocol.GitHubOrgsOrgsAppPermissions.organization_packages
+    organization_personal_access_token_requests                                                         100  protocol.GitHubAppsAppsAppPermissions.organization_personal_access_token_requests, protocol.GitHubOrgsOrgsAppPermissions.organization_personal_access_token_requests
+    organization_personal_access_tokens                                                                 100  protocol.GitHubAppsAppsAppPermissions.organization_personal_access_tokens, protocol.GitHubOrgsOrgsAppPermissions.organization_personal_access_tokens
+    organization_plan                                                                                   100  protocol.GitHubAppsAppsAppPermissions.organization_plan, protocol.GitHubOrgsOrgsAppPermissions.organization_plan
+    organization_projects                                                                               100  protocol.GitHubAppsAppsAppPermissions.organization_projects, protocol.GitHubOrgsOrgsAppPermissions.organization_projects
+    organization_secrets                                                                                100  protocol.GitHubAppsAppsAppPermissions.organization_secrets, protocol.GitHubOrgsOrgsAppPermissions.organization_secrets
+    organization_self_hosted_runners                                                                    100  protocol.GitHubAppsAppsAppPermissions.organization_self_hosted_runners, protocol.GitHubOrgsOrgsAppPermissions.organization_self_hosted_runners
+    organization_user_blocking                                                                          100  protocol.GitHubAppsAppsAppPermissions.organization_user_blocking, protocol.GitHubOrgsOrgsAppPermissions.organization_user_blocking
+    packages                                                                                            100  protocol.GitHubAppsAppsAppPermissions.packages, protocol.GitHubOrgsOrgsAppPermissions.packages
+    pages                                                                                               100  protocol.GitHubAppsAppsAppPermissions.pages, protocol.GitHubOrgsOrgsAppPermissions.pages
+    profile                                                                                             100  protocol.GitHubAppsAppsAppPermissions.profile, protocol.GitHubOrgsOrgsAppPermissions.profile
+    pull_requests                                                                                       100  protocol.GitHubAppsAppsAppPermissions.pull_requests, protocol.GitHubOrgsOrgsAppPermissions.pull_requests
+    repository_custom_properties                                                                        100  protocol.GitHubAppsAppsAppPermissions.repository_custom_properties, protocol.GitHubOrgsOrgsAppPermissions.repository_custom_properties
+    repository_hooks                                                                                    100  protocol.GitHubAppsAppsAppPermissions.repository_hooks, protocol.GitHubOrgsOrgsAppPermissions.repository_hooks
+    repository_projects                                                                                 100  protocol.GitHubAppsAppsAppPermissions.repository_projects, protocol.GitHubOrgsOrgsAppPermissions.repository_projects
+    secret_scanning_alerts                                                                              100  protocol.GitHubAppsAppsAppPermissions.secret_scanning_alerts, protocol.GitHubOrgsOrgsAppPermissions.secret_scanning_alerts
+    secrets                                                                                             100  protocol.GitHubAppsAppsAppPermissions.secrets, protocol.GitHubOrgsOrgsAppPermissions.secrets
+    security_events                                                                                     100  protocol.GitHubAppsAppsAppPermissions.security_events, protocol.GitHubOrgsOrgsAppPermissions.security_events
+    single_file                                                                                         100  protocol.GitHubAppsAppsAppPermissions.single_file, protocol.GitHubOrgsOrgsAppPermissions.single_file
+    starring                                                                                            100  protocol.GitHubAppsAppsAppPermissions.starring, protocol.GitHubOrgsOrgsAppPermissions.starring
+    statuses                                                                                            100  protocol.GitHubAppsAppsAppPermissions.statuses, protocol.GitHubOrgsOrgsAppPermissions.statuses
+    vulnerability_alerts                                                                                100  protocol.GitHubAppsAppsAppPermissions.vulnerability_alerts, protocol.GitHubOrgsOrgsAppPermissions.vulnerability_alerts
+    workflows                                                                                           100  protocol.GitHubAppsAppsAppPermissions.workflows, protocol.GitHubOrgsOrgsAppPermissions.workflows
   content-file                                                                                           78
     _links                                                                                                0
     content                                                                                             100  protocol.GitHubGetARepositoryREADMEResponse.content
@@ -269,7 +269,7 @@
     merge_action                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.merge_action
     merge_method                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.merge_method
     sha                                                                                                 100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.sha
-  390 at 100 not shown, all shows them
+  393 at 100 not shown, all shows them
 
   out of spec
     protocol.GitHubApproveAWorkflowRunForAForkPullRequestRequest follows no column with namespace
@@ -307,6 +307,7 @@
     protocol.GitHubCreateAReviewForAPullRequestResponse follows no column with error, success
     protocol.GitHubCreateAWorkflowDispatchEventRequest follows no column with namespace
     protocol.GitHubCreateAWorkflowDispatchEventResponse follows no column with error, success
+    protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse follows no column with error, success
     protocol.GitHubCreateAnIssueCommentRequest follows no column with namespace
     protocol.GitHubCreateAnIssueRequest follows no column with namespace
     protocol.GitHubCreateAnIssueResponse follows no column with error, success
@@ -354,6 +355,7 @@
     protocol.GitHubGetAJobForAWorkflowRunRequest follows no column with namespace
     protocol.GitHubGetAJobForAWorkflowRunResponse follows no column with error, success
     protocol.GitHubGetAPullRequestRequest follows no column with namespace
+    protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse follows no column with error, success
     protocol.GitHubGetARepositoryREADMEForADirectoryRequest follows no column with namespace
     protocol.GitHubGetARepositoryREADMERequest follows no column with namespace
     protocol.GitHubGetARepositoryREADMEResponse follows no column with error, success

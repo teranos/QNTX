@@ -17,6 +17,7 @@ import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
 import type { StatusItem } from './brow.ts';
+import { a2aCardRow } from './a2a-card-element.ts';
 import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
 
 // What the node has said about itself. Null is nothing asked yet, which draws
@@ -170,6 +171,8 @@ function renderAm(): void {
             ${sections.join('\n')}
         </div>
     `;
+    // The A2A card rests here as a button; the same one every redraw.
+    amElement.firstElementChild?.appendChild(a2aCardRow());
 }
 
 /** ≡ in the tray: a window, the same form as ⍟. */

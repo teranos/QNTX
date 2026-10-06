@@ -2,22 +2,41 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/syscap"
+	"github.com/teranos/errors"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // Am is the node about itself (ADR-039): which build runs, what it can do, and
 // what one item on the status line is doing. The status line itself answers
 // text for a terminal as well as JSON, so it stays a route.
 
+// amFollowsAgentCard is which of the node's own facts fill A2A's AgentCard,
+// and nothing it does not have.
+func amFollowsAgentCard() *protocol.Follows {
+	return &protocol.Follows{Reference: "a2a", Columns: []*protocol.Corresponds{
+		{Field: "protocol.Node.name", Column: "AgentCard.name"},
+		{Field: "protocol.Node.description", Column: "AgentCard.description"},
+		{Field: "protocol.VersionInfo.version", Column: "AgentCard.version"},
+		{Field: "protocol.Node.signa", Column: "AgentCard.skills"},
+	}}
+}
+
+// amSignumName is am: being, the node, and the Agent Card that describes it.
+const amSignumName = "am"
+
 func (s *QNTXServer) amSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "am",
+			Name:    amSignumName,
+			Follows: []*protocol.Follows{amFollowsAgentCard()},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "version",
@@ -30,6 +49,17 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 						{Name: "platform", Says: "The OS and architecture."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/version"},
+				},
+				{
+					// "am node same thing": am node answers the Agent Card the
+					// asker would be given.
+					Name: "node",
+					Does: "What the node says of itself, as the A2A agent card the asker would be given, read through the pinned spec, and what it leaves empty that the spec requires.",
+					Gives: []*protocol.Field{
+						{Name: "card", Says: "The card, as the pinned A2A spec shapes it.", Message: a2a.AgentCard},
+						{Name: "missing", Says: "Every field the card leaves empty that the spec requires, by its path."},
+					},
+					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/node"},
 				},
 				{
 					Name: "syscap",
@@ -71,6 +101,7 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 		},
 		Answers: map[string]sigil.Answer{
 			"version": func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return version.Get(), nil },
+			"node":    s.amNode,
 			"syscap":  func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return syscap.Get(s.store), nil },
 			"ground":  s.amGround,
 			"item": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -78,4 +109,30 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 			},
 		},
 	}
+}
+
+// amNode is what am node answers: the card, and what it lacks.
+type amNode struct {
+	Card    json.RawMessage `json:"card"`
+	Missing []string        `json:"missing"`
+}
+
+func (s *QNTXServer) amNode(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	caller := sigil.Caller(ctx)
+	if caller == nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the card names where its caller reached the node, and this asking carried no request"}
+	}
+	card, err := s.a2aCard(caller).Message()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	body, err := protojson.Marshal(card.Interface())
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrap(err, "the card did not marshal").Error()}
+	}
+	missing := a2a.Missing(card)
+	if missing == nil {
+		missing = []string{}
+	}
+	return amNode{Card: body, Missing: missing}, nil
 }
