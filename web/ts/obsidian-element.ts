@@ -254,9 +254,10 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
                 if (b.at) list.appendChild(pick(`${b.at}  this folder`, () => { binding = { ...b, path: b.at }; draw(); }, 'obsidian-pick obsidian-here'));
                 for (const dir of dirs) {
                     const row = div('obsidian-subdir');
+                    // ▸ opens it, as in the vault's own tree, and the name chooses it.
                     row.append(
-                        pick(dir.slice(dir.lastIndexOf('/') + 1), () => { binding = { ...b, path: dir }; draw(); }),
                         pick('▸', () => { binding = { ...b, at: dir }; draw(); }, 'obsidian-into'),
+                        pick(dir.slice(dir.lastIndexOf('/') + 1), () => { binding = { ...b, path: dir }; draw(); }),
                     );
                     list.appendChild(row);
                 }

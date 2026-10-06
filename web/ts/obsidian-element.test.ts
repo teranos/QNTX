@@ -130,7 +130,9 @@ describe('a folder is bound by clicking', () => {
         click(container, 'clean');
         await flush();
         // A folder is chosen by its name, or opened by ▸ to choose inside it.
-        container.querySelectorAll<HTMLButtonElement>('.obsidian-into')[1].click();
+        const docs = container.querySelectorAll('.obsidian-subdir')[1];
+        expect(docs.firstElementChild?.textContent).toBe('▸');
+        docs.querySelector<HTMLButtonElement>('.obsidian-into')!.click();
         await flush();
         click(container, 'adr');
         expect(container.querySelector('.obsidian-panel')?.textContent).toContain('abcd-nl/clean@main:docs/adr=Course Material');

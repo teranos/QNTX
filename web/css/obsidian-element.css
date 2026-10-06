@@ -1,13 +1,21 @@
 /* Obsidian element (ADR-049): a vault's folders, and what each bound one is now. */
 
+/* Its own ground, and as wide as the window: what does not fit wraps, never
+   scrolls sideways out of sight. */
 .obsidian-element-content {
     display: flex;
     flex-direction: column;
     gap: var(--gap);
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    white-space: normal;
     padding: var(--panel-padding-md);
     font-family: var(--font-mono);
     font-size: var(--font-size-md);
     color: var(--text-on-dark);
+    background: var(--bg-secondary);
 }
 
 .obsidian-setup-not-built,
@@ -181,21 +189,34 @@
 
 .obsidian-subdir {
     display: flex;
-    justify-content: space-between;
-    gap: 6px;
+    align-items: baseline;
+    gap: 2px;
 }
 
 .obsidian-into {
-    padding: 2px 6px;
+    width: 16px;
+    padding: 2px 0;
+    text-align: center;
     color: var(--text-on-dark-tertiary);
 }
 
+/* An error is shown whole: every line of it, wrapped, nothing cut. */
 .obsidian-refused {
     color: var(--sacred-error);
     background: var(--sacred-ground);
     padding: 4px 6px;
     border-radius: var(--border-radius);
+    white-space: pre-wrap;
     overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.obsidian-panel,
+.obsidian-list,
+.obsidian-tree,
+.obsidian-tree ul,
+.obsidian-tree li {
+    min-width: 0;
 }
 
 .obsidian-record {
