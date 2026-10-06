@@ -683,7 +683,7 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, admit
 // it can act on. Without the slash, because that is the URL a connector is given.
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp"} {
+	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp", "/a2a/"} {
 		if strings.HasPrefix(path, asked) {
 			return true
 		}
