@@ -80,6 +80,20 @@ func TestAnUnauthenticatedA2ACallIsToldWhereToAuthenticate(t *testing.T) {
 
 	require.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
 	assert.Equal(t, `Bearer resource_metadata="`+nodeOrigin+protectedResourcePath+`"`, w.Header().Get("WWW-Authenticate"))
+
+	// §11.6: "HTTP error responses use the google.rpc.Status JSON representation".
+	var said struct {
+		Error struct {
+			Code    int    `json:"code"`
+			Status  string `json:"status"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &said), w.Body.String())
+	assert.Equal(t, http.StatusUnauthorized, said.Error.Code)
+	assert.Equal(t, "UNAUTHENTICATED", said.Error.Status)
+	assert.NotEmpty(t, said.Error.Message)
+	assert.Equal(t, "application/a2a+json", w.Header().Get("Content-Type"))
 }
 
 // The documents are read, never written.

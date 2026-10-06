@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/ed25519"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -649,7 +650,7 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 		// A client that has never seen this node starts here.
 		w.Header().Set("WWW-Authenticate",
 			`Bearer resource_metadata="`+h.publicOrigin()+protectedResourcePath+`"`)
-		h.writeError(w, http.StatusUnauthorized, said)
+		h.refuse(w, r, http.StatusUnauthorized, said)
 		return
 	}
 	http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.String()), http.StatusSeeOther)
@@ -669,7 +670,34 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, admit
 		measure.String(measure.AttrLevel, admitted.LevelName()),
 		measure.String(measure.AttrRoute, route),
 	)
-	h.writeError(w, http.StatusForbidden, "this route is not yours")
+	h.refuse(w, r, http.StatusForbidden, "this route is not yours")
+}
+
+// a2aPrefix is where A2A is served, whose errors are google.rpc.Status (A2A
+// §11.6) wherever they are written.
+const a2aPrefix = "/a2a/"
+
+// a2aStatus is the google.rpc.Status code §3.3.2 gives an authentication and an
+// authorization error.
+var a2aStatus = map[int]string{http.StatusUnauthorized: "UNAUTHENTICATED", http.StatusForbidden: "PERMISSION_DENIED"}
+
+// refuse writes a refusal at the gate: as A2A writes an error on its own path,
+// "HTTP error responses use the google.rpc.Status JSON representation" (A2A
+// §11.6), and as every other refusal here elsewhere.
+func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, message string) {
+	if !strings.HasPrefix(r.URL.Path, a2aPrefix) {
+		h.writeError(w, status, message)
+		return
+	}
+	w.Header().Set("Content-Type", "application/a2a+json")
+	w.WriteHeader(status)
+	refused := map[string]any{"error": map[string]any{
+		"code": status, "status": a2aStatus[status], "message": message, "details": []any{},
+	}}
+	if err := json.NewEncoder(w).Encode(refused); err != nil {
+		h.logger.Errorw("An A2A refusal failed to send after its status was written",
+			"status", status, "path", r.URL.Path, "intended_error", message, "error", err)
+	}
 }
 
 // An element's own paths are asked for and never navigated to, so they answer a
@@ -683,7 +711,7 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, admit
 // it can act on. Without the slash, because that is the URL a connector is given.
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp", "/a2a/"} {
+	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp", a2aPrefix} {
 		if strings.HasPrefix(path, asked) {
 			return true
 		}
