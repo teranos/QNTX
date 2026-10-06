@@ -142,6 +142,7 @@ REACH is '/api/transcripts'                                               of ROO
 REACH is '/api/vault'                                                     of ROOT
 REACH is '/api/vault/dirs' '/api/vault/states' '/api/vault/bind'          of ROOT
 REACH is '/api/vault/unbind' '/api/vault/disable' '/api/vault/enable'     of ROOT
+REACH is '/api/vault/send'                                                of ROOT
 REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROOT
 
 # The ROOT agent (the claude signum, ADR-048). Who may talk to it is the whole

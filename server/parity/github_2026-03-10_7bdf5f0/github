@@ -78,6 +78,15 @@
   content-symlink                                                                                         0
   content-symlink._links                                                                                  0
   enterprise                                                                                              0
+  file-commit.commit                                                                                      0
+  file-commit.commit.author                                                                               0
+  file-commit.commit.committer                                                                            0
+  file-commit.commit.parents                                                                              0
+  file-commit.commit.tree                                                                                 0
+  file-commit.commit.verification                                                                         0
+  file-commit.content                                                                                     0
+  file-commit.content._links                                                                              0
+  git-ref.object                                                                                          0
   integration                                                                                            92
     client_id                                                                                           100  protocol.GitHubBranchesBranchesGitHubApp.client_id
     created_at                                                                                          100  protocol.GitHubBranchesBranchesGitHubApp.created_at
@@ -192,6 +201,17 @@
   POST /repos/{owner}/{repo}/check-runs.output.annotations                                                0
   POST /repos/{owner}/{repo}/check-runs.output.images                                                     0
   GET /repos/{owner}/{repo}/commits/{ref}/check-runs 200                                                  0
+  DELETE /repos/{owner}/{repo}/contents/{path}                                                           75
+    owner                                                                                               100  protocol.GitHubDeleteAFileRequest.owner
+    repo                                                                                                100  protocol.GitHubDeleteAFileRequest.repo
+    path                                                                                                100  protocol.GitHubDeleteAFileRequest.path
+    author                                                                                                0
+    branch                                                                                              100  protocol.GitHubDeleteAFileRequest.branch
+    committer                                                                                             0
+    message                                                                                             100  protocol.GitHubDeleteAFileRequest.message
+    sha                                                                                                 100  protocol.GitHubDeleteAFileRequest.sha
+  DELETE /repos/{owner}/{repo}/contents/{path}.author                                                     0
+  DELETE /repos/{owner}/{repo}/contents/{path}.committer                                                  0
   GET /repos/{owner}/{repo}/contents/{path} 200                                                          78
     _links                                                                                                0
     content                                                                                             100  protocol.GitHubGetRepositoryContentResponse.content
@@ -207,6 +227,18 @@
     target                                                                                                0
     type                                                                                                100  protocol.GitHubGetRepositoryContentResponse.type
     url                                                                                                 100  protocol.GitHubGetRepositoryContentResponse.url
+  PUT /repos/{owner}/{repo}/contents/{path}                                                              77
+    owner                                                                                               100  protocol.GitHubCreateOrUpdateFileContentsRequest.owner
+    repo                                                                                                100  protocol.GitHubCreateOrUpdateFileContentsRequest.repo
+    path                                                                                                100  protocol.GitHubCreateOrUpdateFileContentsRequest.path
+    author                                                                                                0
+    branch                                                                                              100  protocol.GitHubCreateOrUpdateFileContentsRequest.branch
+    committer                                                                                             0
+    content                                                                                             100  protocol.GitHubCreateOrUpdateFileContentsRequest.content
+    message                                                                                             100  protocol.GitHubCreateOrUpdateFileContentsRequest.message
+    sha                                                                                                 100  protocol.GitHubCreateOrUpdateFileContentsRequest.sha
+  PUT /repos/{owner}/{repo}/contents/{path}.author                                                        0
+  PUT /repos/{owner}/{repo}/contents/{path}.committer                                                     0
   POST /repos/{owner}/{repo}/issues                                                                      80
     owner                                                                                               100  protocol.GitHubCreateAnIssueRequest.owner
     repo                                                                                                100  protocol.GitHubCreateAnIssueRequest.repo
@@ -270,7 +302,7 @@
     merge_action                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.merge_action
     merge_method                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.merge_method
     sha                                                                                                 100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.sha
-  396 at 100 not shown, all shows them
+  399 at 100 not shown, all shows them
 
   out of spec
     protocol.GitHubApproveAWorkflowRunForAForkPullRequestRequest follows no column with namespace
@@ -299,6 +331,8 @@
     protocol.GitHubCreateACommitStatusResponse follows no column with error, success
     protocol.GitHubCreateAPullRequestRequest follows no column with namespace
     protocol.GitHubCreateAPullRequestResponse follows no column with error, success
+    protocol.GitHubCreateAReferenceRequest follows no column with namespace
+    protocol.GitHubCreateAReferenceResponse follows no column with error, success
     protocol.GitHubCreateAReplyForAReviewCommentRequest follows no column with namespace
     protocol.GitHubCreateARepositoryDispatchEventRequest follows no column with namespace
     protocol.GitHubCreateARepositoryForTheAuthenticatedUserRequest follows no column with namespace
@@ -316,7 +350,11 @@
     protocol.GitHubCreateAnOrganizationInvitationResponse follows no column with error, success
     protocol.GitHubCreateAnOrganizationRepositoryRequest follows no column with namespace
     protocol.GitHubCreateAnOrganizationRepositoryResponse follows no column with error, success
+    protocol.GitHubCreateOrUpdateFileContentsRequest follows no column with namespace
+    protocol.GitHubCreateOrUpdateFileContentsResponse follows no column with error, success
     protocol.GitHubDeleteACommitCommentRequest follows no column with namespace
+    protocol.GitHubDeleteAFileRequest follows no column with namespace
+    protocol.GitHubDeleteAFileResponse follows no column with error, success
     protocol.GitHubDeleteAPendingReviewForAPullRequestRequest follows no column with namespace
     protocol.GitHubDeleteARepositoryRequest follows no column with namespace
     protocol.GitHubDeleteAReviewCommentForAPullRequestRequest follows no column with namespace

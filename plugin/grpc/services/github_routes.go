@@ -377,6 +377,13 @@ var githubRoutes = map[string]githubRoute{
 	"GetARepositoryREADME": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme", query: []string{"ref"}},
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
 	"GetARepositoryREADMEForADirectory": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme/{dir}", query: []string{"ref"}, slashed: []string{"dir"}},
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#create-or-update-file-contents
+	"CreateOrUpdateFileContents": {method: http.MethodPut, path: "/repos/{owner}/{repo}/contents/{path}", body: []string{"message", "content", "sha", "branch"}, slashed: []string{"path"}},
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#delete-a-file
+	"DeleteAFile": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/contents/{path}", body: []string{"message", "sha", "branch"}, slashed: []string{"path"}},
+
+	// https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#create-a-reference
+	"CreateAReference": {method: http.MethodPost, path: "/repos/{owner}/{repo}/git/refs", body: []string{"ref", "sha"}},
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#list-deliveries-for-an-app-webhook
 	"ListDeliveriesForAnAppWebhook": {method: http.MethodGet, path: "/app/hook/deliveries", query: []string{"per_page", "cursor", "status"}, asApp: true},
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
@@ -1119,6 +1126,18 @@ func (s *GitHubServer) GetARepositoryREADME(ctx context.Context, req *protocol.G
 
 func (s *GitHubServer) GetARepositoryREADMEForADirectory(ctx context.Context, req *protocol.GitHubGetARepositoryREADMEForADirectoryRequest) (*protocol.GitHubGetARepositoryREADMEResponse, error) {
 	return githubAnswer(s, ctx, "GetARepositoryREADMEForADirectory", req, &protocol.GitHubGetARepositoryREADMEResponse{})
+}
+
+func (s *GitHubServer) CreateOrUpdateFileContents(ctx context.Context, req *protocol.GitHubCreateOrUpdateFileContentsRequest) (*protocol.GitHubCreateOrUpdateFileContentsResponse, error) {
+	return githubAnswer(s, ctx, "CreateOrUpdateFileContents", req, &protocol.GitHubCreateOrUpdateFileContentsResponse{})
+}
+
+func (s *GitHubServer) DeleteAFile(ctx context.Context, req *protocol.GitHubDeleteAFileRequest) (*protocol.GitHubDeleteAFileResponse, error) {
+	return githubAnswer(s, ctx, "DeleteAFile", req, &protocol.GitHubDeleteAFileResponse{})
+}
+
+func (s *GitHubServer) CreateAReference(ctx context.Context, req *protocol.GitHubCreateAReferenceRequest) (*protocol.GitHubCreateAReferenceResponse, error) {
+	return githubAnswer(s, ctx, "CreateAReference", req, &protocol.GitHubCreateAReferenceResponse{})
 }
 
 func (s *GitHubServer) ListDeliveriesForAnAppWebhook(ctx context.Context, req *protocol.GitHubListDeliveriesForAnAppWebhookRequest) (*protocol.GitHubListDeliveriesForAnAppWebhookResponse, error) {

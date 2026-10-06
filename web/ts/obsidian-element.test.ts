@@ -110,8 +110,8 @@ describe('a folder is bound by clicking', () => {
         answers = {
             '/api/vault/owners': { owners: [{ login: 'abcd-nl', type: 'Organization', installation: 7 }, { login: 'abcd', type: 'User', installation: 8 }] },
             '/api/vault/repos?installation=7': { repos: ['abcd-nl/clean'] },
-            '/api/vault/subdirs?repo=abcd-nl%2Fclean&path=': { dirs: ['cdr', 'docs'] },
-            '/api/vault/subdirs?repo=abcd-nl%2Fclean&path=docs': { dirs: ['docs/adr'] },
+            '/api/vault/subdirs?repo=abcd-nl%2Fclean&path=': { dirs: ['cdr', 'docs'], branch: 'trunk' },
+            '/api/vault/subdirs?repo=abcd-nl%2Fclean&path=docs': { dirs: ['docs/adr'], branch: 'trunk' },
         };
         let sent: unknown = null;
         answer = (path, init) => {
@@ -134,8 +134,10 @@ describe('a folder is bound by clicking', () => {
         expect(docs.firstElementChild?.textContent).toBe('▸');
         docs.querySelector<HTMLButtonElement>('.obsidian-into')!.click();
         await flush();
+        // "concept of default branch, not main or master"
+        expect(container.querySelector('.obsidian-list')?.textContent).toContain('on trunk, its default branch');
         click(container, 'adr');
-        expect(container.querySelector('.obsidian-panel')?.textContent).toContain('abcd-nl/clean@main:docs/adr=Course Material');
+        expect(container.querySelector('.obsidian-panel')?.textContent).toContain('abcd-nl/clean@trunk:docs/adr=Course Material');
 
         click(container, 'Confirm');
         await flush();
@@ -219,6 +221,57 @@ describe('a bound folder is disabled and enabled', () => {
             { path: '/api/vault/disable', body: { name: 'abcd', place: 'ABCD' } },
             { path: '/api/vault/enable', body: { name: 'abcd', place: 'Course Material' } },
         ]);
+    });
+});
+
+describe('a bound folder sends to a branch only when told to', () => {
+    // "i dont want that to be automatically opted in,"
+    // "and i want to set what the name of the branch would be in the obsidian element in the binding."
+    test('a folder that sends nothing is told to, with the branch named, by two presses', async () => {
+        let sent: unknown = null;
+        answer = (path, init) => {
+            sent = { path, body: JSON.parse(String(init?.body)) };
+            return Promise.resolve(new Response('{}'));
+        };
+        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
+            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '', branch: '', pull: '' },
+        ] });
+        row(container, 'ABCD').querySelector<HTMLButtonElement>('.obsidian-name')!.click();
+        expect(container.querySelector('.obsidian-sending')?.textContent).toContain('Sends nothing back.');
+        container.querySelector<HTMLInputElement>('.obsidian-branch')!.value = 'obsidian-abcd';
+        click(container, 'Send to this branch');
+        await flush();
+        expect(sent).toBeNull();
+        click(container, 'Confirm again to send');
+        await flush();
+        expect(sent).toEqual({ path: '/api/vault/send', body: { name: 'abcd', place: 'ABCD', branch: 'obsidian-abcd' } });
+    });
+
+    test('a folder that sends says where, links its pull request, and is stopped', async () => {
+        let sent: unknown = null;
+        answer = (path, init) => {
+            sent = { path, body: JSON.parse(String(init?.body)) };
+            return Promise.resolve(new Response('{}'));
+        };
+        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
+            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'changes', why: '', branch: 'obsidian-abcd', pull: 'https://github.com/abcd-nl/clean/pull/1' },
+        ] });
+        expect(row(container, 'ABCD').classList.contains('obsidian-row-changes')).toBe(true);
+        expect(row(container, 'ABCD').title).toBe('PR has changes (obsidian-abcd)');
+        row(container, 'ABCD').querySelector<HTMLButtonElement>('.obsidian-name')!.click();
+        expect(container.querySelector('.obsidian-sending')?.textContent).toContain('Sends the vault\'s changes to obsidian-abcd');
+        expect(container.querySelector<HTMLAnchorElement>('.obsidian-pull')?.href).toBe('https://github.com/abcd-nl/clean/pull/1');
+        click(container, 'Stop sending');
+        await flush();
+        expect(sent).toEqual({ path: '/api/vault/send', body: { name: 'abcd', place: 'ABCD', branch: '' } });
+    });
+
+    test('one whose branch holds nothing more says so', () => {
+        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
+            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'unchanged', why: '', branch: 'obsidian-abcd', pull: '' },
+        ] });
+        expect(row(container, 'ABCD').classList.contains('obsidian-row-unchanged')).toBe(true);
+        expect(row(container, 'ABCD').title).toBe('PR has no changes (obsidian-abcd)');
     });
 });
 

@@ -22,8 +22,32 @@ import (
 	"github.com/teranos/errors"
 )
 
-// vaultBranch is the branch a vault's folder is bound to.
-const vaultBranch = "main"
+// "concept of default branch, not main or master"
+
+// repoDefaultBranch is the branch owner/repo names its default, as GitHub says it now.
+func (s *QNTXServer) repoDefaultBranch(ctx context.Context, owner, repo string) (string, error) {
+	answered, err := s.gitHubService().GetARepository(services.AsInstallation(ctx),
+		&protocol.GitHubGetARepositoryRequest{Owner: owner, Repo: repo})
+	if err != nil {
+		return "", errors.Wrapf(err, "the default branch of %s/%s was not asked", owner, repo)
+	}
+	if !answered.GetSuccess() {
+		return "", errors.New(answered.GetError())
+	}
+	if answered.GetDefaultBranch() == "" {
+		return "", errors.Newf("GitHub named no default branch for %s/%s", owner, repo)
+	}
+	return answered.GetDefaultBranch(), nil
+}
+
+// ownerRepo reads owner/repo.
+func ownerRepo(said string) (string, string, *protocol.Refusal) {
+	owner, repo, ok := strings.Cut(said, "/")
+	if !ok || owner == "" || repo == "" || strings.Contains(repo, "/") {
+		return "", "", &protocol.Refusal{Why: sigil.Invalid, Param: "repo", Says: said + " names no repository: owner/repo"}
+	}
+	return owner, repo, nil
+}
 
 // githubPage is as many as GitHub gives on one page.
 const githubPage = 100
@@ -185,15 +209,19 @@ func (s *QNTXServer) repoDirs(ctx context.Context, owner, repo, branch, path str
 }
 
 func (s *QNTXServer) vaultSubdirs(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	owner, repo, ok := strings.Cut(sent["repo"], "/")
-	if !ok || owner == "" || repo == "" || strings.Contains(repo, "/") {
-		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "repo", Says: sent["repo"] + " names no repository: owner/repo"}
+	owner, repo, refused := ownerRepo(sent["repo"])
+	if refused != nil {
+		return nil, refused
 	}
-	dirs, err := s.repoDirs(ctx, owner, repo, vaultBranch, sent["path"])
+	branch, err := s.repoDefaultBranch(ctx, owner, repo)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return map[string]any{"dirs": dirs}, nil
+	dirs, err := s.repoDirs(ctx, owner, repo, branch, sent["path"])
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	return map[string]any{"dirs": dirs, "branch": branch}, nil
 }
 
 func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -209,7 +237,15 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	if !there {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is no folder of " + vault.Name + " at " + vault.Path}
 	}
-	folder := sent["repo"] + "@" + vaultBranch + ":" + sent["path"] + "=" + place
+	owner, repo, refused := ownerRepo(sent["repo"])
+	if refused != nil {
+		return nil, refused
+	}
+	branch, err := s.repoDefaultBranch(ctx, owner, repo)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	folder := sent["repo"] + "@" + branch + ":" + sent["path"] + "=" + place
 	folders, err := vaultFoldersOf(append(slices.Clone(vault.Folders), folder))
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Says: err.Error()}
@@ -240,6 +276,7 @@ func (s *QNTXServer) vaultUnbind(ctx context.Context, sent sigil.Sent) (any, *pr
 	}
 	vault.Folders = kept
 	vault.Disabled = slices.DeleteFunc(vault.Disabled, func(p string) bool { return p == place })
+	delete(vault.Sends, place)
 	if err := s.nodeRecords().SetVault(actorOf(ctx), vault); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
@@ -284,6 +321,9 @@ type vaultFolderState struct {
 	Place  string `json:"place"`
 	State  string `json:"state"`
 	Why    string `json:"why"`
+	// Branch is the branch the folder sends to, and Pull its open pull request.
+	Branch string `json:"branch"`
+	Pull   string `json:"pull"`
 }
 
 // "what should a valid binding show? that its active, green dot,"
@@ -291,7 +331,40 @@ const (
 	vaultActive   = "active"
 	vaultDisabled = "disabled"
 	vaultInvalid  = "invalid"
+	// A folder that sends: its branch holds what the default branch does not, or nothing more.
+	vaultChanges   = "changes"
+	vaultUnchanged = "unchanged"
 )
+
+// "it should show red, and have you redo the binding"
+
+// foldersState is what an enabled folder whose place is on the box is now.
+func (s *QNTXServer) foldersState(ctx context.Context, vault Vault, source buildSource, place string, state *vaultFolderState) {
+	defaultBranch, err := s.repoDefaultBranch(ctx, source.Owner, source.Repo)
+	if err != nil {
+		state.State, state.Why = vaultInvalid, err.Error()
+		return
+	}
+	if defaultBranch != source.Branch {
+		state.State, state.Why = vaultInvalid, "the default branch of "+source.Owner+"/"+source.Repo+" is now "+defaultBranch+", not "+source.Branch+": bind "+place+" again"
+		return
+	}
+	if _, err := s.repoDirs(ctx, source.Owner, source.Repo, source.Branch, source.Path); err != nil {
+		state.State, state.Why = vaultInvalid, err.Error()
+		return
+	}
+	branch, sends := vault.Sends[place]
+	if !sends {
+		return
+	}
+	state.Branch = branch
+	sendsNow, pull, err := s.sendState(ctx, source, branch)
+	if err != nil {
+		state.State, state.Why = vaultInvalid, err.Error()
+		return
+	}
+	state.State, state.Pull = sendsNow, pull
+}
 
 func (s *QNTXServer) vaultStates(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	vault, refused := s.vaultNamed(sent["name"])
@@ -323,9 +396,7 @@ func (s *QNTXServer) vaultStates(ctx context.Context, sent sigil.Sent) (any, *pr
 			// Disabled does nothing, so nothing is asked of GitHub for it.
 			state.State = vaultDisabled
 		default:
-			if _, err := s.repoDirs(ctx, source.Owner, source.Repo, source.Branch, source.Path); err != nil {
-				state.State, state.Why = vaultInvalid, err.Error()
-			}
+			s.foldersState(ctx, vault, source, place, &state)
 		}
 		states = append(states, state)
 	}

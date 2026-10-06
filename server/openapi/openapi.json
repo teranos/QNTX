@@ -545,6 +545,11 @@
         "ROOT"
       ]
     },
+    "/api/vault/send": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/vault/states": {
       "x-qntx-reach": [
         "ROOT"

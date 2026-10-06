@@ -26,8 +26,22 @@ export interface Vault {
 export interface FolderState {
     folder: string;
     place: string;
-    state: 'active' | 'disabled' | 'invalid';
+    /** changes and unchanged are a folder that sends: its branch holds what the default branch does not, or nothing more. */
+    state: 'active' | 'disabled' | 'invalid' | 'changes' | 'unchanged';
     why: string;
+    /** The branch the folder sends to, and its open pull request; empty when it sends nothing. */
+    branch: string;
+    pull: string;
+}
+
+/** What a state says when hovered. */
+export function stateSays(state: FolderState): string {
+    switch (state.state) {
+        case 'invalid': return `Invalid: ${state.why}`;
+        case 'changes': return `PR has changes (${state.branch})`;
+        case 'unchanged': return `PR has no changes (${state.branch})`;
+        default: return state.state;
+    }
 }
 
 /** A user or organization the App is installed on, as /api/vault/owners gives it. */
@@ -70,6 +84,8 @@ interface Binding {
     at: string;
     /** The repository folder chosen. */
     path?: string;
+    /** The repository's default branch, as the node read it with its folders. */
+    branch?: string;
 }
 
 /** Everything the element shows of one vault. */
@@ -147,7 +163,7 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
             const state = byPlace.get(place);
             if (state) {
                 // The row is its state's colour, and its dot says nothing until hovered.
-                const says = state.state === 'invalid' ? `Invalid: ${state.why}` : state.state;
+                const says = stateSays(state);
                 row.classList.add(`obsidian-row-${state.state}`);
                 row.title = says;
                 const dot = div(`obsidian-state obsidian-state-${state.state}`);
@@ -162,6 +178,50 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
             ul.appendChild(li);
         }
         return ul;
+    };
+
+    // "i dont want that to be automatically opted in,"
+    // "and i want to set what the name of the branch would be in the obsidian element in the binding."
+    const sending = (place: string, state: FolderState): HTMLDivElement => {
+        const s = div('obsidian-sending');
+        const send = (branch: string) => async () => {
+            const response = await apiFetch('/api/vault/send', jsonBody('POST', { name: view.vault.name, place, branch }));
+            if (!response.ok) throw new Error(await refusal(response));
+            await reload();
+        };
+        if (state.branch) {
+            const says = div('obsidian-folder', `Sends the vault's changes to ${state.branch}`);
+            s.appendChild(says);
+            if (state.pull) {
+                const link = document.createElement('a');
+                link.className = 'obsidian-pull';
+                link.href = state.pull;
+                link.target = '_blank';
+                link.rel = 'noopener';
+                link.textContent = state.pull;
+                s.appendChild(link);
+            }
+            const stop = new Button({ label: 'Stop sending', variant: 'secondary', onClick: send('') });
+            s.appendChild(stop.element);
+            return s;
+        }
+        s.appendChild(div('obsidian-folder', "Sends nothing back. To send the vault's changes to a branch, with a pull request kept open:"));
+        const row = div('obsidian-actions');
+        const name = document.createElement('input');
+        name.type = 'text';
+        name.className = 'input obsidian-branch';
+        name.placeholder = `obsidian-${view.vault.name}`;
+        name.autocomplete = 'off';
+        name.spellcheck = false;
+        const start = new Button({
+            label: 'Send to this branch',
+            variant: 'primary',
+            confirmation: { label: 'Confirm again to send' },
+            onClick: async () => send(name.value.trim())(),
+        });
+        row.append(name, start.element);
+        s.appendChild(row);
+        return s;
     };
 
     const panel = (place: string): HTMLDivElement => {
@@ -194,6 +254,7 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
             const actions = div('obsidian-actions');
             actions.append(toggle.element, unbind.element);
             p.appendChild(actions);
+            p.appendChild(sending(place, state));
             return p;
         }
         const refused = clash(place);
@@ -215,7 +276,7 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
         const list = div('obsidian-list');
         p.appendChild(list);
         if (b.path !== undefined) {
-            p.append(div('obsidian-folder', `${b.repo}@main:${b.path}=${place}`));
+            p.append(div('obsidian-folder', `${b.repo}@${b.branch}:${b.path}=${place}`));
             const confirm = new Button({
                 label: 'Confirm',
                 variant: 'primary',
@@ -252,19 +313,20 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
                     list.appendChild(pick(repo.slice(repo.indexOf('/') + 1), () => { binding = { owner: b.owner, repo, at: '' }; draw(); }));
                 }
             } else {
-                const { dirs } = await apiJson<{ dirs: string[] }>(query('/api/vault/subdirs', { repo: b.repo, path: b.at }));
+                const { dirs, branch } = await apiJson<{ dirs: string[]; branch: string }>(query('/api/vault/subdirs', { repo: b.repo, path: b.at }));
                 list.innerHTML = '';
-                if (b.at) list.appendChild(pick(`${b.at}  this folder`, () => { binding = { ...b, path: b.at }; draw(); }, 'obsidian-pick obsidian-here'));
+                list.appendChild(div('obsidian-folder', `on ${branch}, its default branch`));
+                if (b.at) list.appendChild(pick(`${b.at}  this folder`, () => { binding = { ...b, branch, path: b.at }; draw(); }, 'obsidian-pick obsidian-here'));
                 for (const dir of dirs) {
                     const row = div('obsidian-subdir');
                     // ▸ opens it, as in the vault's own tree, and the name chooses it.
                     row.append(
                         pick('▸', () => { binding = { ...b, at: dir }; draw(); }, 'obsidian-into'),
-                        pick(dir.slice(dir.lastIndexOf('/') + 1), () => { binding = { ...b, path: dir }; draw(); }),
+                        pick(dir.slice(dir.lastIndexOf('/') + 1), () => { binding = { ...b, branch, path: dir }; draw(); }),
                     );
                     list.appendChild(row);
                 }
-                if (dirs.length === 0 && !b.at) list.appendChild(div('obsidian-folder', `${b.repo} has no folder on main.`));
+                if (dirs.length === 0 && !b.at) list.appendChild(div('obsidian-folder', `${b.repo} has no folder on ${branch}.`));
             }
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);

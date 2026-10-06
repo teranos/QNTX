@@ -33,6 +33,9 @@ type Vault struct {
 	Folders []string `json:"folders"`
 	// Disabled is each place whose folder is still bound and does nothing.
 	Disabled []string `json:"disabled"`
+	// Sends is, by place, the branch the vault's changes there are committed
+	// to. A place not in it sends nothing: it is opted into, never assumed.
+	Sends map[string]string `json:"sends"`
 }
 
 // texts is a line's attribute that is a list of text.
@@ -118,6 +121,16 @@ func (r NodeRecords) Vaults() ([]Vault, error) {
 		if vault.Disabled, err = texts(as.Attributes, "disabled", vaultSubject, as.ID, name); err != nil {
 			return nil, err
 		}
+		vault.Sends = map[string]string{}
+		if sends, ok := as.Attributes["sends"].(map[string]any); ok {
+			for place, branch := range sends {
+				text, ok := branch.(string)
+				if !ok {
+					return nil, errors.Newf("%s line %s about %s: the branch %s sends to is %v, not text", vaultSubject, as.ID, name, place, branch)
+				}
+				vault.Sends[place] = text
+			}
+		}
 		vaults = append(vaults, vault)
 	}
 	slices.SortFunc(vaults, func(a, b Vault) int { return strings.Compare(a.Name, b.Name) })
@@ -130,7 +143,16 @@ func (r NodeRecords) SetVault(actor string, vault Vault) error {
 		"path":     vault.Path,
 		"folders":  anyOf(vault.Folders),
 		"disabled": anyOf(vault.Disabled),
+		"sends":    sendsOf(vault.Sends),
 	})
+}
+
+func sendsOf(sends map[string]string) map[string]any {
+	out := make(map[string]any, len(sends))
+	for place, branch := range sends {
+		out[place] = branch
+	}
+	return out
 }
 
 func (s *QNTXServer) vaultSignum() sigil.Signum {
@@ -177,17 +199,20 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 				},
 				{
 					Name: "subdirs",
-					Does: "The folders directly inside one folder of a repository, on main, asked as the App's installation where the repository is.",
+					Does: "The folders directly inside one folder of a repository, on its default branch, asked as the App's installation where the repository is.",
 					Takes: []*protocol.Param{
 						{Name: "repo", Required: true, Says: "The repository, as owner/repo."},
 						{Name: "path", Says: "The folder, from the repository's top. Its top when not sent."},
 					},
-					Gives: []*protocol.Field{{Name: "dirs", Says: "Each folder's path from the repository's top."}},
+					Gives: []*protocol.Field{
+						{Name: "dirs", Says: "Each folder's path from the repository's top."},
+						{Name: "branch", Says: "The repository's default branch, which the folders are read on and a folder is bound to."},
+					},
 					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/subdirs"},
 				},
 				{
 					Name: "bind",
-					Does: "Binds a folder of a vault to a folder of a repository on main, beside the folders it holds. Refused when the vault's folder is not on the box, and when it is another bound folder's, or holds one, or is inside one.",
+					Does: "Binds a folder of a vault to a folder of a repository on its default branch, beside the folders it holds. Refused when the vault's folder is not on the box, and when it is another bound folder's, or holds one, or is inside one.",
 					Takes: []*protocol.Param{
 						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
 						{Name: "place", Required: true, Says: "The vault's folder, by its place in the vault, as dirs gives it."},
@@ -228,10 +253,21 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/enable"},
 				},
 				{
+					Name: "send",
+					Does: "Sends what a bound folder holds in the vault to a branch of its repository, the branch named, with a pull request into the default branch kept open; or stops sending when no branch is named. A folder sends nothing until it is told to.",
+					Takes: []*protocol.Param{
+						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
+						{Name: "place", Required: true, Says: "The vault's folder, by its place in the vault."},
+						{Name: "branch", Says: "The branch to send to; not the default branch. None stops sending."},
+					},
+					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
+					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/send"},
+				},
+				{
 					Name:  "states",
-					Does:  "What each folder a vault holds is now: active, disabled, or invalid and why. A folder is invalid when its folder in the vault is not on the box, or its repository's folder is not on its branch, or the App cannot reach the repository.",
+					Does:  "What each folder a vault holds is now: active, disabled, or invalid and why; one that sends is changes or unchanged. A folder is invalid when its folder in the vault is not on the box, its repository's default branch is no longer the one it was bound to, its repository's folder is not on that branch, or the App cannot reach the repository.",
 					Takes: []*protocol.Param{{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."}},
-					Gives: []*protocol.Field{{Name: "folders", Says: "One per folder: the folder as owner/repo@branch:path=place, its place, its state (active, disabled or invalid), and why when invalid."}},
+					Gives: []*protocol.Field{{Name: "folders", Says: "One per folder: the folder as owner/repo@branch:path=place, its place, its state (active, disabled, invalid, changes or unchanged), why when invalid, the branch it sends to, and its open pull request."}},
 					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/states"},
 				},
 			},
@@ -240,7 +276,7 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 			"list": s.vaultList, "set": s.vaultSet,
 			"dirs": s.vaultDirs, "owners": s.vaultOwners, "repos": s.vaultRepos, "subdirs": s.vaultSubdirs,
 			"bind": s.vaultBind, "unbind": s.vaultUnbind, "states": s.vaultStates,
-			"disable": s.vaultDisable, "enable": s.vaultEnable,
+			"disable": s.vaultDisable, "enable": s.vaultEnable, "send": s.vaultSend,
 		},
 	}
 }
@@ -269,14 +305,23 @@ func (s *QNTXServer) vaultSet(ctx context.Context, sent sigil.Sent) (any, *proto
 	if refused != nil && refused.GetWhy() != sigil.NotFound {
 		return nil, refused
 	}
+	sends := map[string]string{}
 	if refused == nil {
+		held := func(place string) bool {
+			return slices.ContainsFunc(folders, func(f string) bool { return strings.HasSuffix(f, "="+place) })
+		}
 		for _, place := range was.Disabled {
-			if slices.ContainsFunc(folders, func(f string) bool { return strings.HasSuffix(f, "="+place) }) {
+			if held(place) {
 				disabled = append(disabled, place)
 			}
 		}
+		for place, branch := range was.Sends {
+			if held(place) {
+				sends[place] = branch
+			}
+		}
 	}
-	if err := s.nodeRecords().SetVault(actorOf(ctx), Vault{Name: name, Path: filepath.Clean(path), Folders: folders, Disabled: disabled}); err != nil {
+	if err := s.nodeRecords().SetVault(actorOf(ctx), Vault{Name: name, Path: filepath.Clean(path), Folders: folders, Disabled: disabled, Sends: sends}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return s.vaultList(ctx, sent)

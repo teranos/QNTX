@@ -424,7 +424,15 @@
     "path": "/repos/{owner}/{repo}/compare/{basehead}"
   },
   {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/contents/{path}"
+  },
+  {
     "method": "get",
+    "path": "/repos/{owner}/{repo}/contents/{path}"
+  },
+  {
+    "method": "put",
     "path": "/repos/{owner}/{repo}/contents/{path}"
   },
   {
@@ -434,6 +442,10 @@
   {
     "method": "post",
     "path": "/repos/{owner}/{repo}/dispatches"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/git/refs"
   },
   {
     "method": "get",

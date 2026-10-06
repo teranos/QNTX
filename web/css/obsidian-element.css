@@ -133,6 +133,55 @@
     color: var(--sacred-error);
 }
 
+/* A folder that sends: its branch holds nothing more than the default, or changes waiting in a PR. */
+.obsidian-state-unchanged {
+    color: var(--color-success);
+}
+
+.obsidian-row.obsidian-row-unchanged {
+    background: var(--element-status-success-section-bg);
+}
+
+.obsidian-row-unchanged .obsidian-name {
+    color: var(--element-status-success-text);
+}
+
+.obsidian-state-changes {
+    color: var(--element-status-warning-text);
+}
+
+.obsidian-row.obsidian-row-changes {
+    background: var(--element-status-warning-section-bg);
+}
+
+.obsidian-row-changes .obsidian-name {
+    color: var(--element-status-warning-text);
+}
+
+.obsidian-row-unchanged:hover,
+.obsidian-row-changes:hover {
+    filter: brightness(1.25);
+}
+
+.obsidian-sending {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-on-dark);
+}
+
+.obsidian-branch {
+    flex: 1 1 12em;
+    min-width: 0;
+    font: inherit;
+}
+
+.obsidian-pull {
+    color: var(--accent-on-dark);
+    overflow-wrap: anywhere;
+}
+
 /* Disabled is still bound, and does nothing. */
 .obsidian-state-disabled {
     color: var(--text-on-dark-tertiary);

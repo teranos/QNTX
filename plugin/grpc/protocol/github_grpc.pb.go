@@ -202,6 +202,9 @@ const (
 	GitHubService_GetRepositoryContent_FullMethodName                                           = "/protocol.GitHubService/GetRepositoryContent"
 	GitHubService_GetARepositoryREADME_FullMethodName                                           = "/protocol.GitHubService/GetARepositoryREADME"
 	GitHubService_GetARepositoryREADMEForADirectory_FullMethodName                              = "/protocol.GitHubService/GetARepositoryREADMEForADirectory"
+	GitHubService_CreateOrUpdateFileContents_FullMethodName                                     = "/protocol.GitHubService/CreateOrUpdateFileContents"
+	GitHubService_DeleteAFile_FullMethodName                                                    = "/protocol.GitHubService/DeleteAFile"
+	GitHubService_CreateAReference_FullMethodName                                               = "/protocol.GitHubService/CreateAReference"
 	GitHubService_ListDeliveriesForAnAppWebhook_FullMethodName                                  = "/protocol.GitHubService/ListDeliveriesForAnAppWebhook"
 	GitHubService_RedeliverADeliveryForAnAppWebhook_FullMethodName                              = "/protocol.GitHubService/RedeliverADeliveryForAnAppWebhook"
 	GitHubService_GetARepositoryInstallationForTheAuthenticatedApp_FullMethodName               = "/protocol.GitHubService/GetARepositoryInstallationForTheAuthenticatedApp"
@@ -582,6 +585,12 @@ type GitHubServiceClient interface {
 	GetARepositoryREADME(ctx context.Context, in *GitHubGetARepositoryREADMERequest, opts ...grpc.CallOption) (*GitHubGetARepositoryREADMEResponse, error)
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
 	GetARepositoryREADMEForADirectory(ctx context.Context, in *GitHubGetARepositoryREADMEForADirectoryRequest, opts ...grpc.CallOption) (*GitHubGetARepositoryREADMEResponse, error)
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#create-or-update-file-contents
+	CreateOrUpdateFileContents(ctx context.Context, in *GitHubCreateOrUpdateFileContentsRequest, opts ...grpc.CallOption) (*GitHubCreateOrUpdateFileContentsResponse, error)
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#delete-a-file
+	DeleteAFile(ctx context.Context, in *GitHubDeleteAFileRequest, opts ...grpc.CallOption) (*GitHubDeleteAFileResponse, error)
+	// https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#create-a-reference
+	CreateAReference(ctx context.Context, in *GitHubCreateAReferenceRequest, opts ...grpc.CallOption) (*GitHubCreateAReferenceResponse, error)
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#list-deliveries-for-an-app-webhook
 	ListDeliveriesForAnAppWebhook(ctx context.Context, in *GitHubListDeliveriesForAnAppWebhookRequest, opts ...grpc.CallOption) (*GitHubListDeliveriesForAnAppWebhookResponse, error)
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
@@ -2434,6 +2443,36 @@ func (c *gitHubServiceClient) GetARepositoryREADMEForADirectory(ctx context.Cont
 	return out, nil
 }
 
+func (c *gitHubServiceClient) CreateOrUpdateFileContents(ctx context.Context, in *GitHubCreateOrUpdateFileContentsRequest, opts ...grpc.CallOption) (*GitHubCreateOrUpdateFileContentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GitHubCreateOrUpdateFileContentsResponse)
+	err := c.cc.Invoke(ctx, GitHubService_CreateOrUpdateFileContents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitHubServiceClient) DeleteAFile(ctx context.Context, in *GitHubDeleteAFileRequest, opts ...grpc.CallOption) (*GitHubDeleteAFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GitHubDeleteAFileResponse)
+	err := c.cc.Invoke(ctx, GitHubService_DeleteAFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitHubServiceClient) CreateAReference(ctx context.Context, in *GitHubCreateAReferenceRequest, opts ...grpc.CallOption) (*GitHubCreateAReferenceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GitHubCreateAReferenceResponse)
+	err := c.cc.Invoke(ctx, GitHubService_CreateAReference_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gitHubServiceClient) ListDeliveriesForAnAppWebhook(ctx context.Context, in *GitHubListDeliveriesForAnAppWebhookRequest, opts ...grpc.CallOption) (*GitHubListDeliveriesForAnAppWebhookResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GitHubListDeliveriesForAnAppWebhookResponse)
@@ -2866,6 +2905,12 @@ type GitHubServiceServer interface {
 	GetARepositoryREADME(context.Context, *GitHubGetARepositoryREADMERequest) (*GitHubGetARepositoryREADMEResponse, error)
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
 	GetARepositoryREADMEForADirectory(context.Context, *GitHubGetARepositoryREADMEForADirectoryRequest) (*GitHubGetARepositoryREADMEResponse, error)
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#create-or-update-file-contents
+	CreateOrUpdateFileContents(context.Context, *GitHubCreateOrUpdateFileContentsRequest) (*GitHubCreateOrUpdateFileContentsResponse, error)
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#delete-a-file
+	DeleteAFile(context.Context, *GitHubDeleteAFileRequest) (*GitHubDeleteAFileResponse, error)
+	// https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#create-a-reference
+	CreateAReference(context.Context, *GitHubCreateAReferenceRequest) (*GitHubCreateAReferenceResponse, error)
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#list-deliveries-for-an-app-webhook
 	ListDeliveriesForAnAppWebhook(context.Context, *GitHubListDeliveriesForAnAppWebhookRequest) (*GitHubListDeliveriesForAnAppWebhookResponse, error)
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
@@ -3436,6 +3481,15 @@ func (UnimplementedGitHubServiceServer) GetARepositoryREADME(context.Context, *G
 }
 func (UnimplementedGitHubServiceServer) GetARepositoryREADMEForADirectory(context.Context, *GitHubGetARepositoryREADMEForADirectoryRequest) (*GitHubGetARepositoryREADMEResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetARepositoryREADMEForADirectory not implemented")
+}
+func (UnimplementedGitHubServiceServer) CreateOrUpdateFileContents(context.Context, *GitHubCreateOrUpdateFileContentsRequest) (*GitHubCreateOrUpdateFileContentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateOrUpdateFileContents not implemented")
+}
+func (UnimplementedGitHubServiceServer) DeleteAFile(context.Context, *GitHubDeleteAFileRequest) (*GitHubDeleteAFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAFile not implemented")
+}
+func (UnimplementedGitHubServiceServer) CreateAReference(context.Context, *GitHubCreateAReferenceRequest) (*GitHubCreateAReferenceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateAReference not implemented")
 }
 func (UnimplementedGitHubServiceServer) ListDeliveriesForAnAppWebhook(context.Context, *GitHubListDeliveriesForAnAppWebhookRequest) (*GitHubListDeliveriesForAnAppWebhookResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListDeliveriesForAnAppWebhook not implemented")
@@ -6770,6 +6824,60 @@ func _GitHubService_GetARepositoryREADMEForADirectory_Handler(srv interface{}, c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitHubService_CreateOrUpdateFileContents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GitHubCreateOrUpdateFileContentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitHubServiceServer).CreateOrUpdateFileContents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitHubService_CreateOrUpdateFileContents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitHubServiceServer).CreateOrUpdateFileContents(ctx, req.(*GitHubCreateOrUpdateFileContentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitHubService_DeleteAFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GitHubDeleteAFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitHubServiceServer).DeleteAFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitHubService_DeleteAFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitHubServiceServer).DeleteAFile(ctx, req.(*GitHubDeleteAFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitHubService_CreateAReference_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GitHubCreateAReferenceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitHubServiceServer).CreateAReference(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitHubService_CreateAReference_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitHubServiceServer).CreateAReference(ctx, req.(*GitHubCreateAReferenceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GitHubService_ListDeliveriesForAnAppWebhook_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GitHubListDeliveriesForAnAppWebhookRequest)
 	if err := dec(in); err != nil {
@@ -7616,6 +7724,18 @@ var GitHubService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetARepositoryREADMEForADirectory",
 			Handler:    _GitHubService_GetARepositoryREADMEForADirectory_Handler,
+		},
+		{
+			MethodName: "CreateOrUpdateFileContents",
+			Handler:    _GitHubService_CreateOrUpdateFileContents_Handler,
+		},
+		{
+			MethodName: "DeleteAFile",
+			Handler:    _GitHubService_DeleteAFile_Handler,
+		},
+		{
+			MethodName: "CreateAReference",
+			Handler:    _GitHubService_CreateAReference_Handler,
 		},
 		{
 			MethodName: "ListDeliveriesForAnAppWebhook",

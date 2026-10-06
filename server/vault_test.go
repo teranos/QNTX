@@ -4,13 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -107,7 +105,7 @@ func TestAPlaceMayHoldASpace(t *testing.T) {
 	assert.Equal(t, []string{"abcd-nl/clean@main:cdr=Course Material"}, folders)
 }
 
-// mainNotes is what docs/adr of abcd-nl/clean holds on main, by path.
+// mainNotes is what docs/adr of abcd-nl/clean holds on main, by path: stand's main.
 var mainNotes map[string]string
 
 // vaultBindingServer is a node holding the App and the vault abcd, whose
@@ -121,6 +119,10 @@ func vaultBindingServer(t *testing.T) (*QNTXServer, Vault) {
 		"docs/adr/old/ADR-000.md": "# ADR-000\n",
 		"docs/adr/diagram.png":    "not a note",
 	}
+	stand = &standInRepo{defaultBranch: "main", branches: map[string]map[string]string{"main": mainNotes}}
+	vaultLookedMu.Lock()
+	vaultLookedAt = map[string]vaultLooked{}
+	vaultLookedMu.Unlock()
 	// A filling runs before what started it returns, so a test reads what it wrote.
 	goFill = func(_ string, fn func()) { fn() }
 	seenDir, keptSeen := t.TempDir(), vaultsSeenDir
@@ -160,30 +162,7 @@ func vaultBindingServer(t *testing.T) (*QNTXServer, Vault) {
 			give([]any{map[string]any{"type": "file", "path": "cdr/CDR-001.md"}})
 		case r.URL.Path == "/repos/abcd-nl/clean/contents/cdr/CDR-001.md":
 			give(map[string]any{"type": "file", "path": "cdr/CDR-001.md"})
-		case strings.HasPrefix(r.URL.Path, "/repos/abcd-nl/clean/contents/docs/adr") && r.URL.Query().Get("ref") == "main":
-			// docs/adr on main is mainNotes: a note is given with its content, a folder lists what is directly in it.
-			asked := strings.TrimPrefix(r.URL.Path, "/repos/abcd-nl/clean/contents/")
-			if content, held := mainNotes[asked]; held {
-				give(map[string]any{"type": "file", "name": path.Base(asked), "path": asked, "sha": gitBlobSHA([]byte(content)),
-					"encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))})
-				return
-			}
-			entries, listed := []any{}, map[string]bool{}
-			for held, content := range mainNotes {
-				rest, inside := strings.CutPrefix(held, asked+"/")
-				if !inside {
-					continue
-				}
-				if dir, _, deeper := strings.Cut(rest, "/"); deeper {
-					if !listed[dir] {
-						listed[dir] = true
-						entries = append(entries, map[string]any{"type": "dir", "name": dir, "path": asked + "/" + dir})
-					}
-					continue
-				}
-				entries = append(entries, map[string]any{"type": "file", "name": rest, "path": held, "sha": gitBlobSHA([]byte(content))})
-			}
-			give(entries)
+		case stand.serve(w, r):
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			give(map[string]string{"message": "Not Found"})
