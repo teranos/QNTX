@@ -218,6 +218,7 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	if err := s.nodeRecords().SetVault(actorOf(ctx), vault); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	s.fillPlaceSoon(vault.Name, filepath.ToSlash(filepath.Clean(place)))
 	return s.vaultList(ctx, sent)
 }
 
@@ -270,6 +271,9 @@ func (s *QNTXServer) vaultSwitch(ctx context.Context, sent sigil.Sent, disable b
 	}
 	if err := s.nodeRecords().SetVault(actorOf(ctx), vault); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	if !disable {
+		s.fillPlaceSoon(vault.Name, place)
 	}
 	return s.vaultList(ctx, sent)
 }

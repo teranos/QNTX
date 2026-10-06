@@ -4,17 +4,20 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 )
@@ -104,12 +107,23 @@ func TestAPlaceMayHoldASpace(t *testing.T) {
 	assert.Equal(t, []string{"abcd-nl/clean@main:cdr=Course Material"}, folders)
 }
 
+// mainNotes is what docs/adr of abcd-nl/clean holds on main, by path.
+var mainNotes map[string]string
+
 // vaultBindingServer is a node holding the App and the vault abcd, whose
 // GitHub is a stand-in: the App installed on abcd-nl, reaching abcd-nl/clean,
 // whose main holds cdr and docs/adr.
 func vaultBindingServer(t *testing.T) (*QNTXServer, Vault) {
 	t.Helper()
 	s := githubKnowingServer(t)
+	mainNotes = map[string]string{
+		"docs/adr/ADR-001.md":     "# ADR-001\n\nAs main has it.\n",
+		"docs/adr/old/ADR-000.md": "# ADR-000\n",
+		"docs/adr/diagram.png":    "not a note",
+	}
+	// A filling runs before what started it returns, so a test reads what it wrote.
+	goFill = func(_ string, fn func()) { fn() }
+	t.Cleanup(func() { goFill = sacred.Go })
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	s.authHandler.SetGitHubApp("Iv23li-the-app", string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})))
@@ -142,10 +156,32 @@ func vaultBindingServer(t *testing.T) (*QNTXServer, Vault) {
 			give([]any{map[string]any{"type": "dir", "path": "docs/adr"}})
 		case r.URL.Path == "/repos/abcd-nl/clean/contents/cdr" && r.URL.Query().Get("ref") == "main":
 			give([]any{map[string]any{"type": "file", "path": "cdr/CDR-001.md"}})
-		case r.URL.Path == "/repos/abcd-nl/clean/contents/docs/adr" && r.URL.Query().Get("ref") == "main":
-			give([]any{map[string]any{"type": "file", "path": "docs/adr/ADR-001.md"}})
 		case r.URL.Path == "/repos/abcd-nl/clean/contents/cdr/CDR-001.md":
 			give(map[string]any{"type": "file", "path": "cdr/CDR-001.md"})
+		case strings.HasPrefix(r.URL.Path, "/repos/abcd-nl/clean/contents/docs/adr") && r.URL.Query().Get("ref") == "main":
+			// docs/adr on main is mainNotes: a note is given with its content, a folder lists what is directly in it.
+			asked := strings.TrimPrefix(r.URL.Path, "/repos/abcd-nl/clean/contents/")
+			if content, held := mainNotes[asked]; held {
+				give(map[string]any{"type": "file", "name": path.Base(asked), "path": asked, "sha": gitBlobSHA([]byte(content)),
+					"encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))})
+				return
+			}
+			entries, listed := []any{}, map[string]bool{}
+			for held, content := range mainNotes {
+				rest, inside := strings.CutPrefix(held, asked+"/")
+				if !inside {
+					continue
+				}
+				if dir, _, deeper := strings.Cut(rest, "/"); deeper {
+					if !listed[dir] {
+						listed[dir] = true
+						entries = append(entries, map[string]any{"type": "dir", "name": dir, "path": asked + "/" + dir})
+					}
+					continue
+				}
+				entries = append(entries, map[string]any{"type": "file", "name": rest, "path": held, "sha": gitBlobSHA([]byte(content))})
+			}
+			give(entries)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			give(map[string]string{"message": "Not Found"})

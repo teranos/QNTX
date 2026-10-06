@@ -128,13 +128,16 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
         for (const place of childrenOf(parent)) {
             const li = document.createElement('li');
             const kids = childrenOf(place).length > 0;
+            // "all per dir bdingings to repo need to be visible at all times"
+            const holdsBound = [...byPlace.keys()].some(bound => bound.startsWith(place + '/'));
+            const opened = holdsBound || expanded.has(place);
             const row = div('obsidian-row' + (open === place ? ' open' : ''));
             row.dataset.place = place;
-            const twist = pick(kids ? (expanded.has(place) ? '▾' : '▸') : '', () => {
+            const twist = pick(kids ? (opened ? '▾' : '▸') : '', () => {
                 if (expanded.has(place)) expanded.delete(place); else expanded.add(place);
                 draw();
             }, 'obsidian-twist');
-            twist.disabled = !kids;
+            twist.disabled = !kids || holdsBound;
             const name = pick(place.slice(place.lastIndexOf('/') + 1), () => {
                 open = open === place ? null : place;
                 binding = null;
@@ -155,7 +158,7 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
             }
             li.appendChild(row);
             if (open === place) li.appendChild(panel(place));
-            if (kids && expanded.has(place)) li.appendChild(level(place));
+            if (kids && opened) li.appendChild(level(place));
             ul.appendChild(li);
         }
         return ul;

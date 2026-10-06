@@ -156,6 +156,21 @@ describe('a folder is bound by clicking', () => {
     });
 });
 
+describe('a binding is always in sight', () => {
+    // "and if there is a binding, i expect it to not be collapsed and hidden, all per dir bdingings to repo need to be visible at all times"
+    test('the folders holding a bound one are open, and stay open', () => {
+        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD/lttr'] }, dirs, states: [
+            { folder: 'abcd-nl/clean@main:cdr=ABCD/lttr', place: 'ABCD/lttr', state: 'active', why: '' },
+        ] as never[] });
+        expect(row(container, 'ABCD/lttr')).toBeTruthy();
+        const twist = row(container, 'ABCD').querySelector<HTMLButtonElement>('.obsidian-twist')!;
+        expect(twist.textContent).toBe('▾');
+        expect(twist.disabled).toBe(true);
+        twist.click();
+        expect(row(container, 'ABCD/lttr')).toBeTruthy();
+    });
+});
+
 describe('a bound folder is unbound', () => {
     // "and if expanded, there should be a two stage button to allow me to unbind as well."
     test('opened, it is unbound with two presses', async () => {
