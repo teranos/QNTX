@@ -65,6 +65,23 @@ func TestAnUnauthenticatedMCPCallIsToldWhereToAuthenticate(t *testing.T) {
 	}
 }
 
+// §3.3.2: an A2A server "MUST reject requests with invalid or missing
+// authentication credentials" and "SHOULD include authentication challenge
+// information in the error response". A client asking in the media type §11.1
+// gives is told at a 401, not sent to the login page.
+func TestAnUnauthenticatedA2ACallIsToldWhereToAuthenticate(t *testing.T) {
+	h, _, _ := authorizingHandler(t)
+	guarded := h.Middleware("/a2a/", Also(), func(http.ResponseWriter, *http.Request) {})
+
+	asked := httptest.NewRequest(http.MethodPost, "/a2a/message:send", nil)
+	asked.Header.Set("Accept", "application/a2a+json")
+	w := httptest.NewRecorder()
+	guarded(w, asked)
+
+	require.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
+	assert.Equal(t, `Bearer resource_metadata="`+nodeOrigin+protectedResourcePath+`"`, w.Header().Get("WWW-Authenticate"))
+}
+
 // The documents are read, never written.
 func TestTheDiscoveryDocumentsAnswerOnlyAGet(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
