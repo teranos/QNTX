@@ -1,11 +1,13 @@
 /**
- * Obsidian element — the vaults the node keeps, and the folders each holds (ADR-049).
+ * Obsidian element — a vault's folders, each bound by clicking to a folder of a
+ * repository, and what each bound folder is now (ADR-049).
  */
 
 import { describe, test, expect, mock, afterEach } from 'bun:test';
 
 const noAnswer = () => Promise.resolve(new Response());
 let answer: (path: string, init?: RequestInit) => Promise<Response> = noAnswer;
+let answers: Record<string, unknown> = {};
 mock.module('./client', () => ({
     connectivity: {
         get state() { return 'online' as const; },
@@ -19,7 +21,9 @@ mock.module('./client', () => ({
         setWebSocketConnected: () => {},
     },
     apiFetch: (path: string, init?: RequestInit) => answer(path, init),
-    apiJson: () => Promise.resolve({}),
+    apiJson: (path: string) => {
+        return path in answers ? Promise.resolve(answers[path]) : Promise.reject(new Error(`nothing answers ${path}`));
+    },
     backendUrl: () => 'http://localhost',
     backendWsUrl: () => 'ws://localhost',
     backendPath: (path: string) => 'http://localhost' + path,
@@ -29,10 +33,11 @@ mock.module('./client', () => ({
     unregisterHandler: () => {},
 }));
 
-const { renderVaults, renderNewVault, createObsidianElement, SETUP_NOT_BUILT } = await import('./obsidian-element');
+const { renderVault, load, createObsidianElement, SETUP_NOT_BUILT } = await import('./obsidian-element');
 
 afterEach(() => {
     answer = noAnswer;
+    answers = {};
     document.body.innerHTML = '';
 });
 
@@ -42,9 +47,27 @@ const flush = async () => {
 
 const reload = () => Promise.resolve();
 
+const vault = { name: 'abcd', path: '/var/lib/obsidian/abcd', folders: [] as string[] };
+const dirs = ['ABCD', 'ABCD/lttr', 'Course Material'];
+
+function shown(view = { vault, dirs, states: [] as never[] }) {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    renderVault(container, view, reload);
+    return container;
+}
+
+const row = (container: HTMLElement, place: string) => container.querySelector<HTMLElement>(`.obsidian-row[data-place="${place}"]`)!;
+const click = (container: HTMLElement, text: string) => {
+    const button = [...container.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.startsWith(text));
+    if (!button) throw new Error(`no button ${text} among ${[...container.querySelectorAll('button')].map(b => b.textContent).join(', ')}`);
+    button.click();
+};
+
 describe('setting a vault up is not built yet', () => {
     // 1.0.0 blocker (#1091): said in the element, not left for somebody to find out.
     test('the element says so, and names the issue', () => {
+        answers = { '/api/vault': { vaults: [] } };
         const body = createObsidianElement().renderContent();
         expect(body.querySelector('.obsidian-setup-not-built')?.textContent).toBe(SETUP_NOT_BUILT);
         expect(SETUP_NOT_BUILT).toContain('#1091');
@@ -52,46 +75,95 @@ describe('setting a vault up is not built yet', () => {
     });
 });
 
-describe('ROOT names the folders a vault holds', () => {
-    test('a vault shows its path and its folders, one per line', () => {
-        const container = document.createElement('div');
-        renderVaults(container, [{ name: 'notes', path: '/var/lib/obsidian/notes', folders: ['abcd-nl/clean@main:cdr=ABCD/clean/cdr', 'abcd-nl/clean@main:docs=ABCD/clean/docs'] }], reload);
-        expect(container.querySelector('.element-section-title')?.textContent).toBe('notes');
-        expect(container.querySelector<HTMLInputElement>('.obsidian-path')?.value).toBe('/var/lib/obsidian/notes');
-        expect(container.querySelector<HTMLTextAreaElement>('.obsidian-folders')?.value).toBe('abcd-nl/clean@main:cdr=ABCD/clean/cdr\nabcd-nl/clean@main:docs=ABCD/clean/docs');
+describe('the vault is its folders', () => {
+    test('the top folders show, and a folder opens to show its own', () => {
+        const container = shown();
+        expect(row(container, 'ABCD')).toBeTruthy();
+        expect(row(container, 'Course Material')).toBeTruthy();
+        expect(row(container, 'ABCD/lttr')).toBeFalsy();
+        row(container, 'ABCD').querySelector<HTMLButtonElement>('.obsidian-twist')!.click();
+        expect(row(container, 'ABCD/lttr')).toBeTruthy();
     });
 
-    test('no vault is said, not left blank', () => {
+    test('each vault is asked for its folders and their states', async () => {
+        answers = {
+            '/api/vault': { vaults: [vault] },
+            '/api/vault/dirs?name=abcd': { dirs },
+            '/api/vault/states?name=abcd': { folders: [] },
+        };
         const container = document.createElement('div');
-        renderVaults(container, [], reload);
+        await load(container);
+        expect(container.querySelector('.obsidian-vault-name')?.textContent).toBe('abcd');
+        expect(row(container, 'Course Material')).toBeTruthy();
+    });
+
+    test('no vault is said, not left blank', async () => {
+        answers = { '/api/vault': { vaults: [] } };
+        const container = document.createElement('div');
+        await load(container);
         expect(container.textContent).toContain('The node keeps no vault yet.');
     });
+});
 
-    test('saving sends the vault whole, its folders apart by spaces', async () => {
+describe('a folder is bound by clicking', () => {
+    test('owner, repository, folder, and two presses of Confirm', async () => {
+        answers = {
+            '/api/vault/owners': { owners: [{ login: 'abcd-nl', type: 'Organization', installation: 7 }, { login: 'abcd', type: 'User', installation: 8 }] },
+            '/api/vault/repos?installation=7': { repos: ['abcd-nl/clean'] },
+            '/api/vault/subdirs?repo=abcd-nl%2Fclean&path=': { dirs: ['cdr', 'docs'] },
+            '/api/vault/subdirs?repo=abcd-nl%2Fclean&path=docs': { dirs: ['docs/adr'] },
+        };
         let sent: unknown = null;
         answer = (path, init) => {
             sent = { path, body: JSON.parse(String(init?.body)) };
             return Promise.resolve(new Response('{}'));
         };
-        const container = document.createElement('div');
-        document.body.appendChild(container);
-        renderVaults(container, [{ name: 'notes', path: '/var/lib/obsidian/notes', folders: [] }], reload);
-        container.querySelector<HTMLTextAreaElement>('.obsidian-folders')!.value = 'abcd-nl/clean@main:cdr=ABCD/clean/cdr\nabcd-nl/clean@main:docs=ABCD/clean/docs';
-        container.querySelector<HTMLButtonElement>('.element-actions button')!.click();
+        const container = shown();
+
+        row(container, 'Course Material').querySelector<HTMLButtonElement>('.obsidian-name')!.click();
+        click(container, 'Bind to repository md folder');
         await flush();
-        expect(sent).toEqual({ path: '/api/vault', body: { name: 'notes', path: '/var/lib/obsidian/notes', folders: 'abcd-nl/clean@main:cdr=ABCD/clean/cdr abcd-nl/clean@main:docs=ABCD/clean/docs' } });
+        expect(container.querySelector('.obsidian-list')?.textContent).toContain('abcd-nl  org');
+        expect(container.querySelector('.obsidian-list')?.textContent).toContain('abcd  user');
+        click(container, 'abcd-nl');
+        await flush();
+        click(container, 'clean');
+        await flush();
+        // A folder is chosen by its name, or opened by ▸ to choose inside it.
+        container.querySelectorAll<HTMLButtonElement>('.obsidian-into')[1].click();
+        await flush();
+        click(container, 'adr');
+        expect(container.querySelector('.obsidian-panel')?.textContent).toContain('abcd-nl/clean@main:docs/adr=Course Material');
+
+        click(container, 'Confirm');
+        await flush();
+        expect(sent).toBeNull();
+        click(container, 'Confirm again to bind');
+        await flush();
+        expect(sent).toEqual({ path: '/api/vault/bind', body: { name: 'abcd', place: 'Course Material', repo: 'abcd-nl/clean', path: 'docs/adr' } });
     });
 
-    test('a folder the node refuses shows the node\'s words beside the button', async () => {
-        answer = () => Promise.resolve(new Response(JSON.stringify({ id: 'ERR-1', error: '"abcd-nl/clean@main" names no file: owner/repo@branch:path', timestamp: 0 }), { status: 400 }));
-        const container = document.createElement('div');
-        document.body.appendChild(container);
-        renderNewVault(container, reload);
-        container.querySelector<HTMLInputElement>('.obsidian-name')!.value = 'notes';
-        container.querySelector<HTMLInputElement>('.obsidian-path')!.value = '/var/lib/obsidian/notes';
-        container.querySelector<HTMLTextAreaElement>('.obsidian-folders')!.value = 'abcd-nl/clean@main';
-        container.querySelector<HTMLButtonElement>('.element-actions button')!.click();
-        await flush();
-        expect(container.querySelector('.qntx-btn-error-box')?.textContent).toContain('names no file');
+    test('a folder inside a bound one is not offered for binding, and says why', () => {
+        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
+            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '' },
+        ] as never[] });
+        row(container, 'ABCD').querySelector<HTMLButtonElement>('.obsidian-twist')!.click();
+        row(container, 'ABCD/lttr').querySelector<HTMLButtonElement>('.obsidian-name')!.click();
+        expect(container.querySelector('.obsidian-refused')?.textContent).toBe('ABCD and ABCD/lttr are one place in the vault, or one holds the other');
+        expect(container.textContent).not.toContain('Bind to repository md folder');
+    });
+});
+
+describe('a bound folder says what it is now', () => {
+    // "what should a valid binding show? that its active, green dot,"
+    test('active, or invalid and why, beside the folder it is bound to', () => {
+        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD', 'abcd-nl/clean@main:gone=Course Material'] }, dirs, states: [
+            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '' },
+            { folder: 'abcd-nl/clean@main:gone=Course Material', place: 'Course Material', state: 'invalid', why: 'GitHub GET /repos/abcd-nl/clean/contents/gone answered 404: Not Found' },
+        ] as never[] });
+        expect(row(container, 'ABCD').querySelector('.obsidian-state-active')?.textContent).toBe('active');
+        expect(row(container, 'ABCD').querySelector('.obsidian-bound')?.textContent).toBe('⇄ abcd-nl/clean@main:cdr');
+        expect(row(container, 'Course Material').querySelector('.obsidian-state-invalid')?.textContent).toContain('404: Not Found');
+        expect(container.querySelector('.obsidian-record')?.textContent).toContain('abcd-nl/clean@main:gone=Course Material');
     });
 });

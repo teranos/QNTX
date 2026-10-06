@@ -8,8 +8,16 @@
     "path": "/app/hook/deliveries/{delivery_id}/attempts"
   },
   {
+    "method": "get",
+    "path": "/app/installations"
+  },
+  {
     "method": "post",
     "path": "/app/installations/{installation_id}/access_tokens"
+  },
+  {
+    "method": "get",
+    "path": "/installation/repositories"
   },
   {
     "method": "get",

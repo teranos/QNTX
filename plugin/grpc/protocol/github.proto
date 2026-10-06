@@ -425,6 +425,11 @@ service GitHubService {
   rpc GetARepositoryInstallationForTheAuthenticatedApp(GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest) returns (GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse);
   // https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#create-an-installation-access-token-for-an-app
   rpc CreateAnInstallationAccessTokenForAnApp(GitHubCreateAnInstallationAccessTokenForAnAppRequest) returns (GitHubCreateAnInstallationAccessTokenForAnAppResponse);
+  // https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#list-installations-for-the-authenticated-app
+  rpc ListInstallationsForTheAuthenticatedApp(GitHubListInstallationsForTheAuthenticatedAppRequest) returns (GitHubListInstallationsForTheAuthenticatedAppResponse);
+
+  // https://docs.github.com/en/rest/apps/installations?apiVersion=2026-03-10#list-repositories-accessible-to-the-app-installation
+  rpc ListRepositoriesAccessibleToTheAppInstallation(GitHubListRepositoriesAccessibleToTheAppInstallationRequest) returns (GitHubListRepositoriesAccessibleToTheAppInstallationResponse);
 }
 
 message GitHubRateLimitRequest {

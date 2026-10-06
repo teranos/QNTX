@@ -1,13 +1,10 @@
 /**
- * Obsidian Element — the vaults the node keeps a copy of, and the folders of
- * repositories each holds (ADR-049).
+ * Obsidian Element — a vault's folders, each bindable to a folder of a
+ * repository, and what each bound folder is now (ADR-049).
  */
 
 // "you would think there would be a Obsidian Element to make it a bit easier"
 // "and i guess i want to do the docs tracking in that Element as well"
-
-// Plain window in the tray, for ROOT. One section per vault, and below them a
-// vault said whole. Asked on open and after each press; nothing polls.
 
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
@@ -25,6 +22,21 @@ export interface Vault {
     folders: string[];
 }
 
+/** What one bound folder is now, as /api/vault/states gives it. */
+export interface FolderState {
+    folder: string;
+    place: string;
+    state: 'active' | 'invalid';
+    why: string;
+}
+
+/** A user or organization the App is installed on, as /api/vault/owners gives it. */
+export interface Owner {
+    login: string;
+    type: string;
+    installation: number;
+}
+
 const ELEMENT_ID = 'obsidian-element';
 
 // "the real story should not have to depend on having claude already setup in the system"
@@ -32,134 +44,228 @@ const ELEMENT_ID = 'obsidian-element';
 /** 1.0.0 BLOCKER (#1091): what the element says while a vault is set up by hand. */
 export const SETUP_NOT_BUILT = 'Setting up a vault here is not built yet: signing in to Obsidian Sync, choosing a vault and keeping it syncing (#1091, 1.0.0 blocker).';
 
-function section(title: string): HTMLDivElement {
-    const div = document.createElement('div');
-    div.className = 'element-section';
-    const h = document.createElement('h3');
-    h.className = 'element-section-title';
-    h.textContent = title;
-    div.appendChild(h);
-    return div;
+function div(className: string, text = ''): HTMLDivElement {
+    const d = document.createElement('div');
+    d.className = className;
+    d.textContent = text;
+    return d;
 }
 
-function row(label: string, value: HTMLElement): HTMLDivElement {
-    const div = document.createElement('div');
-    div.className = 'element-row';
-    const l = document.createElement('span');
-    l.className = 'label';
-    l.textContent = label;
-    const v = document.createElement('span');
-    v.className = 'element-value';
-    v.appendChild(value);
-    div.append(l, v);
-    return div;
+function pick(text: string, onClick: () => void, className = 'obsidian-pick'): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = className;
+    b.textContent = text;
+    b.addEventListener('click', onClick);
+    return b;
 }
 
-function said(text: string, className = 'element-loading'): HTMLDivElement {
-    const div = document.createElement('div');
-    div.className = className;
-    div.textContent = text;
-    return div;
+const query = (path: string, params: Record<string, string>) => `${path}?${new URLSearchParams(params).toString()}`;
+
+/** A folder of a repository a vault's folder is being bound to, as far as it has been chosen. */
+interface Binding {
+    owner?: Owner;
+    repo?: string;
+    /** The repository folder whose folders are listed, '' being its top. */
+    at: string;
+    /** The repository folder chosen. */
+    path?: string;
 }
 
-function input(className: string, value: string, placeholder: string): HTMLInputElement {
-    const box = document.createElement('input');
-    box.type = 'text';
-    box.className = `input ${className}`;
-    box.value = value;
-    box.placeholder = placeholder;
-    box.autocomplete = 'off';
-    box.spellcheck = false;
-    return box;
+/** Everything the element shows of one vault. */
+export interface View {
+    vault: Vault;
+    dirs: string[];
+    states: FolderState[];
 }
 
-/** A vault's folders, one per line, as the node reads them: owner/repo@branch:path=place. */
-function foldersBox(folders: string[]): HTMLTextAreaElement {
-    const box = document.createElement('textarea');
-    box.className = 'input obsidian-folders';
-    box.rows = Math.max(3, folders.length + 1);
-    box.value = folders.join('\n');
-    box.placeholder = 'owner/repo@branch:path=place in the vault, one per line';
-    box.spellcheck = false;
-    return box;
-}
+// "normal view, just the directory listing"
+// "left click a dir: - Bind to repository md folder - gh user or orgs, click
+// one - see repos, click one - see subdirs, click one"
 
-/** Say one vault whole. A refusal is thrown in the node's words, for the button to show. */
-async function setVault(name: string, path: string, folders: string): Promise<void> {
-    const response = await apiFetch('/api/vault', jsonBody('POST', {
-        name: name.trim(),
-        path: path.trim(),
-        // The node reads folders apart by whitespace (strings.Fields), so a line is a folder.
-        folders: folders.split('\n').join(' '),
-    }));
-    if (!response.ok) throw new Error(await refusal(response));
-}
-
-/** Exported for tests: one section per vault, its path and the folders it holds, each changeable. */
-export function renderVaults(container: HTMLElement, vaults: Vault[], reload: () => Promise<void>): void {
+/** Exported for tests: the vault's folders as a tree, each bound one marked with its state. */
+export function renderVault(container: HTMLElement, view: View, reload: () => Promise<void>): void {
     container.innerHTML = '';
-    if (vaults.length === 0) {
-        container.appendChild(said('The node keeps no vault yet.'));
-    }
-    for (const vault of vaults) {
-        const s = section(vault.name);
-        s.classList.add('obsidian-vault');
-        const path = input('obsidian-path', vault.path, '/var/lib/obsidian/<vault>');
-        const folders = foldersBox(vault.folders);
-        s.append(row('Path:', path), row('Folders:', folders));
-        if (vault.folders.length === 0) s.appendChild(said('It holds no folder of any repository yet.'));
-        const actions = document.createElement('div');
-        actions.className = 'element-actions';
-        const save = new Button({
-            label: 'Save',
-            variant: 'primary',
-            onClick: async () => {
-                await setVault(vault.name, path.value, folders.value);
-                await reload();
-            },
-        });
-        actions.appendChild(save.element);
-        s.appendChild(actions);
-        container.appendChild(s);
-    }
-}
+    const header = div('obsidian-vault');
+    header.append(div('obsidian-vault-name', view.vault.name), div('obsidian-vault-path', view.vault.path));
+    container.appendChild(header);
 
-/** Exported for tests: a vault said whole, by name. */
-export function renderNewVault(container: HTMLElement, reload: () => Promise<void>): void {
-    container.innerHTML = '';
-    const s = section('Another vault');
-    const name = input('obsidian-name', '', 'its name in Obsidian Sync');
-    const path = input('obsidian-path', '', '/var/lib/obsidian/<vault>');
-    const folders = foldersBox([]);
-    s.append(row('Name:', name), row('Path:', path), row('Folders:', folders));
-    const actions = document.createElement('div');
-    actions.className = 'element-actions';
-    const add = new Button({
-        label: 'Keep this vault',
-        variant: 'ghost',
-        onClick: async () => {
-            await setVault(name.value, path.value, folders.value);
-            await reload();
-        },
+    const byPlace = new Map(view.states.map(s => [s.place, s]));
+    const expanded = new Set<string>();
+    let open: string | null = null;
+    let binding: Binding | null = null;
+
+    const tree = div('obsidian-tree');
+    const record = div('obsidian-record');
+    container.append(tree, record);
+
+    const childrenOf = (place: string) => view.dirs.filter(d => {
+        if (place === '') return !d.includes('/');
+        return d.startsWith(place + '/') && !d.slice(place.length + 1).includes('/');
     });
-    actions.appendChild(add.element);
-    s.appendChild(actions);
-    container.appendChild(s);
+
+    // The node's own refusal (server/vault.go): no place is another's or inside it.
+    const clash = (place: string): string | null => {
+        for (const other of byPlace.keys()) {
+            if (other !== place && (place.startsWith(other + '/') || other.startsWith(place + '/'))) {
+                return `${other} and ${place} are one place in the vault, or one holds the other`;
+            }
+        }
+        return null;
+    };
+
+    const draw = () => {
+        tree.innerHTML = '';
+        tree.appendChild(level(''));
+        record.innerHTML = '';
+        record.appendChild(div('obsidian-record-title', 'What the node keeps'));
+        if (view.vault.folders.length === 0) record.appendChild(div('obsidian-folder', 'No folder is bound yet.'));
+        for (const folder of view.vault.folders) record.appendChild(div('obsidian-folder', folder));
+    };
+
+    const level = (parent: string): HTMLUListElement => {
+        const ul = document.createElement('ul');
+        for (const place of childrenOf(parent)) {
+            const li = document.createElement('li');
+            const kids = childrenOf(place).length > 0;
+            const row = div('obsidian-row' + (open === place ? ' open' : ''));
+            row.dataset.place = place;
+            const twist = pick(kids ? (expanded.has(place) ? '▾' : '▸') : '', () => {
+                if (expanded.has(place)) expanded.delete(place); else expanded.add(place);
+                draw();
+            }, 'obsidian-twist');
+            twist.disabled = !kids;
+            const name = pick(place.slice(place.lastIndexOf('/') + 1), () => {
+                open = open === place ? null : place;
+                binding = null;
+                draw();
+            }, 'obsidian-name');
+            row.append(twist, name);
+            const state = byPlace.get(place);
+            if (state) {
+                const ends = state.folder.slice(0, state.folder.lastIndexOf('='));
+                row.append(div('obsidian-bound', `⇄ ${ends}`), div(`obsidian-state obsidian-state-${state.state}`,
+                    state.state === 'active' ? 'active' : `Invalid: ${state.why}`));
+            }
+            li.appendChild(row);
+            if (open === place) li.appendChild(panel(place));
+            if (kids && expanded.has(place)) li.appendChild(level(place));
+            ul.appendChild(li);
+        }
+        return ul;
+    };
+
+    const panel = (place: string): HTMLDivElement => {
+        const p = div('obsidian-panel');
+        const state = byPlace.get(place);
+        if (state) {
+            p.append(div('obsidian-folder', state.folder));
+            return p;
+        }
+        const refused = clash(place);
+        if (refused) {
+            p.append(div('obsidian-refused', refused));
+            return p;
+        }
+        if (!binding) {
+            p.append(pick('Bind to repository md folder', () => { binding = { at: '' }; draw(); }, 'obsidian-action'));
+            return p;
+        }
+        const b = binding;
+        const crumbs = div('obsidian-crumbs');
+        crumbs.append(`${place} ⇄ `, b.owner ? pick(b.owner.login, () => { binding = { owner: b.owner, at: '' }; draw(); }, 'obsidian-crumb') : '…');
+        if (b.repo) crumbs.append(' / ', pick(b.repo.slice(b.repo.indexOf('/') + 1), () => { binding = { owner: b.owner, repo: b.repo, at: '' }; draw(); }, 'obsidian-crumb'));
+        if (b.at) crumbs.append(` : ${b.at}`);
+        p.appendChild(crumbs);
+
+        const list = div('obsidian-list');
+        p.appendChild(list);
+        if (b.path !== undefined) {
+            p.append(div('obsidian-folder', `${b.repo}@main:${b.path}=${place}`));
+            const confirm = new Button({
+                label: 'Confirm',
+                variant: 'primary',
+                confirmation: { label: 'Confirm again to bind' },
+                onClick: async () => {
+                    const response = await apiFetch('/api/vault/bind', jsonBody('POST', { name: view.vault.name, place, repo: b.repo, path: b.path }));
+                    if (!response.ok) throw new Error(await refusal(response));
+                    await reload();
+                },
+            });
+            p.appendChild(confirm.element);
+        } else {
+            void fill(list, b, place);
+        }
+        p.appendChild(pick('Cancel', () => { open = null; binding = null; draw(); }, 'obsidian-cancel'));
+        return p;
+    };
+
+    // Each step asks the node, as the App, for what can be clicked next.
+    const fill = async (list: HTMLElement, b: Binding, place: string) => {
+        list.appendChild(div('element-loading', 'Asking GitHub…'));
+        try {
+            if (!b.owner) {
+                const { owners } = await apiJson<{ owners: Owner[] }>('/api/vault/owners');
+                list.innerHTML = '';
+                for (const owner of owners) {
+                    const kind = owner.type === 'Organization' ? 'org' : 'user';
+                    list.appendChild(pick(`${owner.login}  ${kind}`, () => { binding = { owner, at: '' }; draw(); }));
+                }
+            } else if (!b.repo) {
+                const { repos } = await apiJson<{ repos: string[] }>(query('/api/vault/repos', { installation: String(b.owner.installation) }));
+                list.innerHTML = '';
+                for (const repo of repos) {
+                    list.appendChild(pick(repo.slice(repo.indexOf('/') + 1), () => { binding = { owner: b.owner, repo, at: '' }; draw(); }));
+                }
+            } else {
+                const { dirs } = await apiJson<{ dirs: string[] }>(query('/api/vault/subdirs', { repo: b.repo, path: b.at }));
+                list.innerHTML = '';
+                if (b.at) list.appendChild(pick(`${b.at}  this folder`, () => { binding = { ...b, path: b.at }; draw(); }, 'obsidian-pick obsidian-here'));
+                for (const dir of dirs) {
+                    const row = div('obsidian-subdir');
+                    row.append(
+                        pick(dir.slice(dir.lastIndexOf('/') + 1), () => { binding = { ...b, path: dir }; draw(); }),
+                        pick('▸', () => { binding = { ...b, at: dir }; draw(); }, 'obsidian-into'),
+                    );
+                    list.appendChild(row);
+                }
+                if (dirs.length === 0 && !b.at) list.appendChild(div('obsidian-folder', `${b.repo} has no folder on main.`));
+            }
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error(SEG.UI, `[ObsidianElement] binding ${place}: ${message}`, err);
+            list.innerHTML = '';
+            list.appendChild(div('obsidian-refused', message));
+        }
+    };
+
+    draw();
 }
 
-/** Exported for tests: ask the node once and draw the vaults from its answer. */
-export async function load(vaults: HTMLElement, more: HTMLElement): Promise<void> {
-    const reload = () => load(vaults, more);
+/** Exported for tests: ask the node once and draw each vault from its answers. */
+export async function load(container: HTMLElement): Promise<void> {
+    const reload = () => load(container);
     try {
-        const answer = await apiJson<{ vaults: Vault[] }>('/api/vault');
-        renderVaults(vaults, answer.vaults, reload);
-        renderNewVault(more, reload);
+        const { vaults } = await apiJson<{ vaults: Vault[] }>('/api/vault');
+        container.innerHTML = '';
+        if (vaults.length === 0) {
+            container.appendChild(div('element-loading', 'The node keeps no vault yet.'));
+            return;
+        }
+        for (const vault of vaults) {
+            const [{ dirs }, { folders }] = await Promise.all([
+                apiJson<{ dirs: string[] }>(query('/api/vault/dirs', { name: vault.name })),
+                apiJson<{ folders: FolderState[] }>(query('/api/vault/states', { name: vault.name })),
+            ]);
+            const section = div('obsidian-vault-section');
+            container.appendChild(section);
+            renderVault(section, { vault, dirs, states: folders }, reload);
+        }
     } catch (err: unknown) {
         const message = `the node did not say its vaults: ${err instanceof Error ? err.message : String(err)}`;
         log.error(SEG.UI, `[ObsidianElement] ${message}`, err);
-        vaults.innerHTML = '';
-        vaults.appendChild(said(message, 'element-error'));
-        more.innerHTML = '';
+        container.innerHTML = '';
+        container.appendChild(div('element-error', message));
     }
 }
 
@@ -169,20 +275,11 @@ export function createObsidianElement(): Element {
         title: 'Obsidian',
         symbol: '◆',
         renderContent: () => {
-            const content = document.createElement('div');
-            content.className = 'obsidian-element-content';
-            content.style.display = 'flex';
-            content.style.flexDirection = 'column';
-            content.style.gap = '8px';
-            content.style.padding = '12px';
-
-            const vaults = document.createElement('div');
-            const more = document.createElement('div');
-            vaults.appendChild(said('Loading the node’s vaults…'));
-            const blocker = said(SETUP_NOT_BUILT, 'obsidian-setup-not-built');
-            content.append(blocker, vaults, more);
-
-            void load(vaults, more);
+            const content = div('obsidian-element-content');
+            const vaults = div('obsidian-vaults');
+            vaults.appendChild(div('element-loading', 'Loading the node’s vaults…'));
+            content.append(div('obsidian-setup-not-built', SETUP_NOT_BUILT), vaults);
+            void load(vaults);
             return content;
         },
     };

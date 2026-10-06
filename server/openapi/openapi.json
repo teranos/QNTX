@@ -515,6 +515,36 @@
         "ROOT"
       ]
     },
+    "/api/vault/bind": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/dirs": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/owners": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/repos": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/states": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/subdirs": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/watchers": {
       "x-qntx-reach": [
         "ROOT",

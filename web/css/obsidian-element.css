@@ -1,0 +1,173 @@
+/* Obsidian element (ADR-049): a vault's folders, and what each bound one is now. */
+
+.obsidian-element-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+    padding: var(--panel-padding-md);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-md);
+    color: var(--text-on-dark);
+}
+
+.obsidian-setup-not-built,
+.obsidian-vault-path,
+.obsidian-record-title,
+.obsidian-cancel {
+    color: var(--text-on-dark-tertiary);
+    font-size: var(--font-size-sm);
+}
+
+.obsidian-vault {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    color: var(--text-on-dark-emphasis);
+}
+
+.obsidian-tree ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.obsidian-tree ul ul {
+    padding-left: 16px;
+}
+
+.obsidian-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+    padding: 1px 4px;
+    border-radius: var(--border-radius);
+}
+
+.obsidian-row:hover {
+    background: var(--bg-dark-hover);
+}
+
+.obsidian-row.open {
+    background: var(--bg-dark-light);
+}
+
+.obsidian-twist,
+.obsidian-name,
+.obsidian-pick,
+.obsidian-into,
+.obsidian-crumb,
+.obsidian-action,
+.obsidian-cancel {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.obsidian-twist {
+    width: 12px;
+    color: var(--text-on-dark-tertiary);
+}
+
+.obsidian-twist:disabled {
+    cursor: default;
+}
+
+.obsidian-name {
+    overflow-wrap: anywhere;
+}
+
+.obsidian-bound,
+.obsidian-folder,
+.obsidian-crumbs {
+    color: var(--text-on-dark-secondary);
+    font-size: var(--font-size-sm);
+    overflow-wrap: anywhere;
+}
+
+.obsidian-state {
+    font-size: var(--font-size-sm);
+}
+
+.obsidian-state::before {
+    content: '●';
+    margin-right: 4px;
+}
+
+/* An active binding is a green dot. */
+.obsidian-state-active {
+    color: var(--color-success);
+}
+
+.obsidian-state-invalid {
+    color: var(--sacred-error);
+}
+
+.obsidian-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 4px 0 8px 18px;
+    padding: 6px 10px;
+    border-left: 2px solid var(--border-on-dark);
+    font-size: var(--font-size-sm);
+}
+
+.obsidian-action,
+.obsidian-crumb,
+.obsidian-here {
+    color: var(--accent-on-dark);
+}
+
+.obsidian-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.obsidian-pick {
+    padding: 2px 4px;
+    border-radius: var(--border-radius);
+}
+
+.obsidian-pick:hover,
+.obsidian-into:hover {
+    background: var(--bg-dark-hover);
+}
+
+.obsidian-subdir {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.obsidian-into {
+    padding: 2px 6px;
+    color: var(--text-on-dark-tertiary);
+}
+
+.obsidian-refused {
+    color: var(--sacred-error);
+    background: var(--sacred-ground);
+    padding: 4px 6px;
+    border-radius: var(--border-radius);
+    overflow-wrap: anywhere;
+}
+
+.obsidian-record {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-on-dark);
+}
+
+.obsidian-record-title {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}

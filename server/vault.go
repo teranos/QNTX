@@ -40,9 +40,15 @@ type Vault struct {
 // vaultFolders reads folders separated by spaces, each a build's input, = and
 // its place in the vault. One that does not read refuses them all.
 func vaultFolders(said string) ([]string, error) {
+	return vaultFoldersOf(strings.Fields(said))
+}
+
+// vaultFoldersOf reads folders one by one, so a place may hold a space, as a
+// vault's folders do.
+func vaultFoldersOf(fields []string) ([]string, error) {
 	folders := []string{}
 	var places []string
-	for _, field := range strings.Fields(said) {
+	for _, field := range fields {
 		repo, place, ok := strings.Cut(field, "=")
 		if !ok || place == "" {
 			return nil, errors.Newf("%q names no place in the vault: owner/repo@branch:path=place", field)
@@ -128,9 +134,62 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
 					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath},
 				},
+				{
+					Name:  "dirs",
+					Does:  "Every folder of a vault's copy on the box, by its place in the vault. Obsidian's own folders, the ones starting with a dot, are left out.",
+					Takes: []*protocol.Param{{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."}},
+					Gives: []*protocol.Field{{Name: "dirs", Says: "Each folder's place in the vault, folders apart by /."}},
+					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/dirs"},
+				},
+				{
+					Name:  "owners",
+					Does:  "Each GitHub user and organization the node's GitHub App is installed on: where a vault's folder can be bound.",
+					Gives: []*protocol.Field{{Name: "owners", Says: "One per installation: its login, whether it is a User or an Organization, and the installation's id."}},
+					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/owners"},
+				},
+				{
+					Name:  "repos",
+					Does:  "Each repository one installation of the GitHub App reaches, as the installation itself is answered.",
+					Takes: []*protocol.Param{{Name: "installation", Required: true, Kind: sigil.Count, Says: "The installation's id, as owners gives it."}},
+					Gives: []*protocol.Field{{Name: "repos", Says: "Each repository as owner/repo."}},
+					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/repos"},
+				},
+				{
+					Name: "subdirs",
+					Does: "The folders directly inside one folder of a repository, on main, asked as the App's installation where the repository is.",
+					Takes: []*protocol.Param{
+						{Name: "repo", Required: true, Says: "The repository, as owner/repo."},
+						{Name: "path", Says: "The folder, from the repository's top. Its top when not sent."},
+					},
+					Gives: []*protocol.Field{{Name: "dirs", Says: "Each folder's path from the repository's top."}},
+					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/subdirs"},
+				},
+				{
+					Name: "bind",
+					Does: "Binds a folder of a vault to a folder of a repository on main, beside the folders it holds. Refused when the vault's folder is not on the box, and when it is another bound folder's, or holds one, or is inside one.",
+					Takes: []*protocol.Param{
+						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
+						{Name: "place", Required: true, Says: "The vault's folder, by its place in the vault, as dirs gives it."},
+						{Name: "repo", Required: true, Says: "The repository, as owner/repo."},
+						{Name: "path", Required: true, Says: "The repository's folder, from its top, as subdirs gives it."},
+					},
+					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
+					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/bind"},
+				},
+				{
+					Name:  "states",
+					Does:  "What each folder a vault holds is now: active, or invalid and why. A folder is invalid when its folder in the vault is not on the box, or its repository's folder is not on its branch, or the App cannot reach the repository.",
+					Takes: []*protocol.Param{{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."}},
+					Gives: []*protocol.Field{{Name: "folders", Says: "One per folder: the folder as owner/repo@branch:path=place, its place, its state (active or invalid), and why when invalid."}},
+					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/states"},
+				},
 			},
 		},
-		Answers: map[string]sigil.Answer{"list": s.vaultList, "set": s.vaultSet},
+		Answers: map[string]sigil.Answer{
+			"list": s.vaultList, "set": s.vaultSet,
+			"dirs": s.vaultDirs, "owners": s.vaultOwners, "repos": s.vaultRepos, "subdirs": s.vaultSubdirs,
+			"bind": s.vaultBind, "states": s.vaultStates,
+		},
 	}
 }
 

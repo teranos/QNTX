@@ -140,6 +140,8 @@ REACH is '/api/transcripts'                                               of ROO
 
 # The Obsidian vaults the node keeps a copy of, and the folders each holds (ADR-049).
 REACH is '/api/vault'                                                     of ROOT
+REACH is '/api/vault/dirs' '/api/vault/states' '/api/vault/bind'          of ROOT
+REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROOT
 
 # The ROOT agent (the claude signum, ADR-048). Who may talk to it is the whole
 # of what guards it, and that is ROOT.

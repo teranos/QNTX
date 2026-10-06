@@ -386,6 +386,11 @@ var githubRoutes = map[string]githubRoute{
 	"GetARepositoryInstallationForTheAuthenticatedApp": {method: http.MethodGet, path: "/repos/{owner}/{repo}/installation", asApp: true},
 	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#create-an-installation-access-token-for-an-app
 	"CreateAnInstallationAccessTokenForAnApp": {method: http.MethodPost, path: "/app/installations/{installation_id}/access_tokens", body: []string{"repositories", "repository_ids", "permissions"}, asApp: true, mints: true},
+	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#list-installations-for-the-authenticated-app
+	"ListInstallationsForTheAuthenticatedApp": {method: http.MethodGet, path: "/app/installations", query: []string{"per_page", "page", "since", "outdated"}, asApp: true},
+
+	// https://docs.github.com/en/rest/apps/installations?apiVersion=2026-03-10#list-repositories-accessible-to-the-app-installation
+	"ListRepositoriesAccessibleToTheAppInstallation": {method: http.MethodGet, path: "/installation/repositories", query: []string{"per_page", "page"}},
 }
 
 func (s *GitHubServer) GetTheCombinedStatusForASpecificReference(ctx context.Context, req *protocol.GitHubGetTheCombinedStatusForASpecificReferenceRequest) (*protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse, error) {
@@ -1130,4 +1135,12 @@ func (s *GitHubServer) GetARepositoryInstallationForTheAuthenticatedApp(ctx cont
 
 func (s *GitHubServer) CreateAnInstallationAccessTokenForAnApp(ctx context.Context, req *protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest) (*protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse, error) {
 	return githubAnswer(s, ctx, "CreateAnInstallationAccessTokenForAnApp", req, &protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse{})
+}
+
+func (s *GitHubServer) ListInstallationsForTheAuthenticatedApp(ctx context.Context, req *protocol.GitHubListInstallationsForTheAuthenticatedAppRequest) (*protocol.GitHubListInstallationsForTheAuthenticatedAppResponse, error) {
+	return githubAnswer(s, ctx, "ListInstallationsForTheAuthenticatedApp", req, &protocol.GitHubListInstallationsForTheAuthenticatedAppResponse{})
+}
+
+func (s *GitHubServer) ListRepositoriesAccessibleToTheAppInstallation(ctx context.Context, req *protocol.GitHubListRepositoriesAccessibleToTheAppInstallationRequest) (*protocol.GitHubListRepositoriesAccessibleToTheAppInstallationResponse, error) {
+	return githubAnswer(s, ctx, "ListRepositoriesAccessibleToTheAppInstallation", req, &protocol.GitHubListRepositoriesAccessibleToTheAppInstallationResponse{})
 }

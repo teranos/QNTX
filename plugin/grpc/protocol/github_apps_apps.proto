@@ -64,6 +64,65 @@ message GitHubCreateAnInstallationAccessTokenForAnAppResponse {
   repeated string single_file_paths = 10;
 }
 
+// GET /app/installations
+message GitHubListInstallationsForTheAuthenticatedAppRequest {
+  int64 per_page = 1;
+  int64 page = 2;
+  string since = 3;
+  string outdated = 4;
+}
+
+message GitHubListInstallationsForTheAuthenticatedAppResponse {
+  bool success = 1;
+  string error = 2;
+  repeated GitHubAppsAppsInstallation items = 3;
+}
+
+// Installation
+message GitHubAppsAppsInstallation {
+  int64 id = 1;
+  // Any of Simple User or Enterprise.
+  google.protobuf.Struct account = 2;
+  string repository_selection = 3;
+  string access_tokens_url = 4;
+  string repositories_url = 5;
+  string html_url = 6;
+  int64 app_id = 7;
+  string client_id = 8;
+  int64 target_id = 9;
+  string target_type = 10;
+  GitHubAppsAppsAppPermissions permissions = 11;
+  repeated string events = 12;
+  string created_at = 13;
+  string updated_at = 14;
+  string single_file_name = 15;
+  bool has_multiple_single_files = 16;
+  repeated string single_file_paths = 17;
+  string app_slug = 18;
+  GitHubAppsAppsSimpleUser suspended_by = 19;
+  string suspended_at = 20;
+  string contact_email = 21;
+}
+
+// https://docs.github.com/en/rest/apps/installations?apiVersion=2026-03-10
+// Taken with a token of the installation itself, not the App's JWT.
+
+// GET /installation/repositories
+message GitHubListRepositoriesAccessibleToTheAppInstallationRequest {
+  string namespace = 1;
+  int64 per_page = 2;
+  int64 page = 3;
+}
+
+message GitHubListRepositoriesAccessibleToTheAppInstallationResponse {
+  bool success = 1;
+  string error = 2;
+  int64 total_count = 3;
+  // Repository
+  repeated google.protobuf.Struct repositories = 4;
+  string repository_selection = 5;
+}
+
 // App Permissions
 message GitHubAppsAppsAppPermissions {
   string actions = 1;

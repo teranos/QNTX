@@ -481,6 +481,479 @@ func (x *GitHubCreateAnInstallationAccessTokenForAnAppResponse) GetSingleFilePat
 	return nil
 }
 
+// GET /app/installations
+type GitHubListInstallationsForTheAuthenticatedAppRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PerPage       int64                  `protobuf:"varint,1,opt,name=per_page,json=perPage,proto3" json:"per_page,omitempty"`
+	Page          int64                  `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`
+	Since         string                 `protobuf:"bytes,3,opt,name=since,proto3" json:"since,omitempty"`
+	Outdated      string                 `protobuf:"bytes,4,opt,name=outdated,proto3" json:"outdated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppRequest) Reset() {
+	*x = GitHubListInstallationsForTheAuthenticatedAppRequest{}
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubListInstallationsForTheAuthenticatedAppRequest) ProtoMessage() {}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubListInstallationsForTheAuthenticatedAppRequest.ProtoReflect.Descriptor instead.
+func (*GitHubListInstallationsForTheAuthenticatedAppRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_github_apps_apps_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppRequest) GetPerPage() int64 {
+	if x != nil {
+		return x.PerPage
+	}
+	return 0
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppRequest) GetPage() int64 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppRequest) GetSince() string {
+	if x != nil {
+		return x.Since
+	}
+	return ""
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppRequest) GetOutdated() string {
+	if x != nil {
+		return x.Outdated
+	}
+	return ""
+}
+
+type GitHubListInstallationsForTheAuthenticatedAppResponse struct {
+	state         protoimpl.MessageState        `protogen:"open.v1"`
+	Success       bool                          `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error         string                        `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	Items         []*GitHubAppsAppsInstallation `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppResponse) Reset() {
+	*x = GitHubListInstallationsForTheAuthenticatedAppResponse{}
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubListInstallationsForTheAuthenticatedAppResponse) ProtoMessage() {}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubListInstallationsForTheAuthenticatedAppResponse.ProtoReflect.Descriptor instead.
+func (*GitHubListInstallationsForTheAuthenticatedAppResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_github_apps_apps_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *GitHubListInstallationsForTheAuthenticatedAppResponse) GetItems() []*GitHubAppsAppsInstallation {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+// Installation
+type GitHubAppsAppsInstallation struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Any of Simple User or Enterprise.
+	Account                *structpb.Struct              `protobuf:"bytes,2,opt,name=account,proto3" json:"account,omitempty"`
+	RepositorySelection    string                        `protobuf:"bytes,3,opt,name=repository_selection,json=repositorySelection,proto3" json:"repository_selection,omitempty"`
+	AccessTokensUrl        string                        `protobuf:"bytes,4,opt,name=access_tokens_url,json=accessTokensUrl,proto3" json:"access_tokens_url,omitempty"`
+	RepositoriesUrl        string                        `protobuf:"bytes,5,opt,name=repositories_url,json=repositoriesUrl,proto3" json:"repositories_url,omitempty"`
+	HtmlUrl                string                        `protobuf:"bytes,6,opt,name=html_url,json=htmlUrl,proto3" json:"html_url,omitempty"`
+	AppId                  int64                         `protobuf:"varint,7,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	ClientId               string                        `protobuf:"bytes,8,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	TargetId               int64                         `protobuf:"varint,9,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
+	TargetType             string                        `protobuf:"bytes,10,opt,name=target_type,json=targetType,proto3" json:"target_type,omitempty"`
+	Permissions            *GitHubAppsAppsAppPermissions `protobuf:"bytes,11,opt,name=permissions,proto3" json:"permissions,omitempty"`
+	Events                 []string                      `protobuf:"bytes,12,rep,name=events,proto3" json:"events,omitempty"`
+	CreatedAt              string                        `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt              string                        `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	SingleFileName         string                        `protobuf:"bytes,15,opt,name=single_file_name,json=singleFileName,proto3" json:"single_file_name,omitempty"`
+	HasMultipleSingleFiles bool                          `protobuf:"varint,16,opt,name=has_multiple_single_files,json=hasMultipleSingleFiles,proto3" json:"has_multiple_single_files,omitempty"`
+	SingleFilePaths        []string                      `protobuf:"bytes,17,rep,name=single_file_paths,json=singleFilePaths,proto3" json:"single_file_paths,omitempty"`
+	AppSlug                string                        `protobuf:"bytes,18,opt,name=app_slug,json=appSlug,proto3" json:"app_slug,omitempty"`
+	SuspendedBy            *GitHubAppsAppsSimpleUser     `protobuf:"bytes,19,opt,name=suspended_by,json=suspendedBy,proto3" json:"suspended_by,omitempty"`
+	SuspendedAt            string                        `protobuf:"bytes,20,opt,name=suspended_at,json=suspendedAt,proto3" json:"suspended_at,omitempty"`
+	ContactEmail           string                        `protobuf:"bytes,21,opt,name=contact_email,json=contactEmail,proto3" json:"contact_email,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *GitHubAppsAppsInstallation) Reset() {
+	*x = GitHubAppsAppsInstallation{}
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubAppsAppsInstallation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubAppsAppsInstallation) ProtoMessage() {}
+
+func (x *GitHubAppsAppsInstallation) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubAppsAppsInstallation.ProtoReflect.Descriptor instead.
+func (*GitHubAppsAppsInstallation) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_github_apps_apps_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GitHubAppsAppsInstallation) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *GitHubAppsAppsInstallation) GetAccount() *structpb.Struct {
+	if x != nil {
+		return x.Account
+	}
+	return nil
+}
+
+func (x *GitHubAppsAppsInstallation) GetRepositorySelection() string {
+	if x != nil {
+		return x.RepositorySelection
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetAccessTokensUrl() string {
+	if x != nil {
+		return x.AccessTokensUrl
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetRepositoriesUrl() string {
+	if x != nil {
+		return x.RepositoriesUrl
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetHtmlUrl() string {
+	if x != nil {
+		return x.HtmlUrl
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetAppId() int64 {
+	if x != nil {
+		return x.AppId
+	}
+	return 0
+}
+
+func (x *GitHubAppsAppsInstallation) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetTargetId() int64 {
+	if x != nil {
+		return x.TargetId
+	}
+	return 0
+}
+
+func (x *GitHubAppsAppsInstallation) GetTargetType() string {
+	if x != nil {
+		return x.TargetType
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetPermissions() *GitHubAppsAppsAppPermissions {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
+}
+
+func (x *GitHubAppsAppsInstallation) GetEvents() []string {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
+func (x *GitHubAppsAppsInstallation) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetSingleFileName() string {
+	if x != nil {
+		return x.SingleFileName
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetHasMultipleSingleFiles() bool {
+	if x != nil {
+		return x.HasMultipleSingleFiles
+	}
+	return false
+}
+
+func (x *GitHubAppsAppsInstallation) GetSingleFilePaths() []string {
+	if x != nil {
+		return x.SingleFilePaths
+	}
+	return nil
+}
+
+func (x *GitHubAppsAppsInstallation) GetAppSlug() string {
+	if x != nil {
+		return x.AppSlug
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetSuspendedBy() *GitHubAppsAppsSimpleUser {
+	if x != nil {
+		return x.SuspendedBy
+	}
+	return nil
+}
+
+func (x *GitHubAppsAppsInstallation) GetSuspendedAt() string {
+	if x != nil {
+		return x.SuspendedAt
+	}
+	return ""
+}
+
+func (x *GitHubAppsAppsInstallation) GetContactEmail() string {
+	if x != nil {
+		return x.ContactEmail
+	}
+	return ""
+}
+
+// GET /installation/repositories
+type GitHubListRepositoriesAccessibleToTheAppInstallationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	PerPage       int64                  `protobuf:"varint,2,opt,name=per_page,json=perPage,proto3" json:"per_page,omitempty"`
+	Page          int64                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationRequest) Reset() {
+	*x = GitHubListRepositoriesAccessibleToTheAppInstallationRequest{}
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubListRepositoriesAccessibleToTheAppInstallationRequest) ProtoMessage() {}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubListRepositoriesAccessibleToTheAppInstallationRequest.ProtoReflect.Descriptor instead.
+func (*GitHubListRepositoriesAccessibleToTheAppInstallationRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_github_apps_apps_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationRequest) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationRequest) GetPerPage() int64 {
+	if x != nil {
+		return x.PerPage
+	}
+	return 0
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationRequest) GetPage() int64 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+type GitHubListRepositoriesAccessibleToTheAppInstallationResponse struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Success    bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error      string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	TotalCount int64                  `protobuf:"varint,3,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	// Repository
+	Repositories        []*structpb.Struct `protobuf:"bytes,4,rep,name=repositories,proto3" json:"repositories,omitempty"`
+	RepositorySelection string             `protobuf:"bytes,5,opt,name=repository_selection,json=repositorySelection,proto3" json:"repository_selection,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationResponse) Reset() {
+	*x = GitHubListRepositoriesAccessibleToTheAppInstallationResponse{}
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubListRepositoriesAccessibleToTheAppInstallationResponse) ProtoMessage() {}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubListRepositoriesAccessibleToTheAppInstallationResponse.ProtoReflect.Descriptor instead.
+func (*GitHubListRepositoriesAccessibleToTheAppInstallationResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_github_apps_apps_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationResponse) GetTotalCount() int64 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationResponse) GetRepositories() []*structpb.Struct {
+	if x != nil {
+		return x.Repositories
+	}
+	return nil
+}
+
+func (x *GitHubListRepositoriesAccessibleToTheAppInstallationResponse) GetRepositorySelection() string {
+	if x != nil {
+		return x.RepositorySelection
+	}
+	return ""
+}
+
 // App Permissions
 type GitHubAppsAppsAppPermissions struct {
 	state                                      protoimpl.MessageState `protogen:"open.v1"`
@@ -545,7 +1018,7 @@ type GitHubAppsAppsAppPermissions struct {
 
 func (x *GitHubAppsAppsAppPermissions) Reset() {
 	*x = GitHubAppsAppsAppPermissions{}
-	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -557,7 +1030,7 @@ func (x *GitHubAppsAppsAppPermissions) String() string {
 func (*GitHubAppsAppsAppPermissions) ProtoMessage() {}
 
 func (x *GitHubAppsAppsAppPermissions) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -570,7 +1043,7 @@ func (x *GitHubAppsAppsAppPermissions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitHubAppsAppsAppPermissions.ProtoReflect.Descriptor instead.
 func (*GitHubAppsAppsAppPermissions) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_github_apps_apps_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_github_apps_apps_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GitHubAppsAppsAppPermissions) GetActions() string {
@@ -989,7 +1462,7 @@ type GitHubAppsAppsSimpleUser struct {
 
 func (x *GitHubAppsAppsSimpleUser) Reset() {
 	*x = GitHubAppsAppsSimpleUser{}
-	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1001,7 +1474,7 @@ func (x *GitHubAppsAppsSimpleUser) String() string {
 func (*GitHubAppsAppsSimpleUser) ProtoMessage() {}
 
 func (x *GitHubAppsAppsSimpleUser) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1014,7 +1487,7 @@ func (x *GitHubAppsAppsSimpleUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitHubAppsAppsSimpleUser.ProtoReflect.Descriptor instead.
 func (*GitHubAppsAppsSimpleUser) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_github_apps_apps_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_github_apps_apps_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GitHubAppsAppsSimpleUser) GetName() string {
@@ -1225,7 +1698,53 @@ const file_plugin_grpc_protocol_github_apps_apps_proto_rawDesc = "" +
 	"singleFile\x129\n" +
 	"\x19has_multiple_single_files\x18\t \x01(\bR\x16hasMultipleSingleFiles\x12*\n" +
 	"\x11single_file_paths\x18\n" +
-	" \x03(\tR\x0fsingleFilePaths\"\x98\x14\n" +
+	" \x03(\tR\x0fsingleFilePaths\"\x97\x01\n" +
+	"4GitHubListInstallationsForTheAuthenticatedAppRequest\x12\x19\n" +
+	"\bper_page\x18\x01 \x01(\x03R\aperPage\x12\x12\n" +
+	"\x04page\x18\x02 \x01(\x03R\x04page\x12\x14\n" +
+	"\x05since\x18\x03 \x01(\tR\x05since\x12\x1a\n" +
+	"\boutdated\x18\x04 \x01(\tR\boutdated\"\xa3\x01\n" +
+	"5GitHubListInstallationsForTheAuthenticatedAppResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x12:\n" +
+	"\x05items\x18\x03 \x03(\v2$.protocol.GitHubAppsAppsInstallationR\x05items\"\xd1\x06\n" +
+	"\x1aGitHubAppsAppsInstallation\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x121\n" +
+	"\aaccount\x18\x02 \x01(\v2\x17.google.protobuf.StructR\aaccount\x121\n" +
+	"\x14repository_selection\x18\x03 \x01(\tR\x13repositorySelection\x12*\n" +
+	"\x11access_tokens_url\x18\x04 \x01(\tR\x0faccessTokensUrl\x12)\n" +
+	"\x10repositories_url\x18\x05 \x01(\tR\x0frepositoriesUrl\x12\x19\n" +
+	"\bhtml_url\x18\x06 \x01(\tR\ahtmlUrl\x12\x15\n" +
+	"\x06app_id\x18\a \x01(\x03R\x05appId\x12\x1b\n" +
+	"\tclient_id\x18\b \x01(\tR\bclientId\x12\x1b\n" +
+	"\ttarget_id\x18\t \x01(\x03R\btargetId\x12\x1f\n" +
+	"\vtarget_type\x18\n" +
+	" \x01(\tR\n" +
+	"targetType\x12H\n" +
+	"\vpermissions\x18\v \x01(\v2&.protocol.GitHubAppsAppsAppPermissionsR\vpermissions\x12\x16\n" +
+	"\x06events\x18\f \x03(\tR\x06events\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\r \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x0e \x01(\tR\tupdatedAt\x12(\n" +
+	"\x10single_file_name\x18\x0f \x01(\tR\x0esingleFileName\x129\n" +
+	"\x19has_multiple_single_files\x18\x10 \x01(\bR\x16hasMultipleSingleFiles\x12*\n" +
+	"\x11single_file_paths\x18\x11 \x03(\tR\x0fsingleFilePaths\x12\x19\n" +
+	"\bapp_slug\x18\x12 \x01(\tR\aappSlug\x12E\n" +
+	"\fsuspended_by\x18\x13 \x01(\v2\".protocol.GitHubAppsAppsSimpleUserR\vsuspendedBy\x12!\n" +
+	"\fsuspended_at\x18\x14 \x01(\tR\vsuspendedAt\x12#\n" +
+	"\rcontact_email\x18\x15 \x01(\tR\fcontactEmail\"\x8a\x01\n" +
+	";GitHubListRepositoriesAccessibleToTheAppInstallationRequest\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x19\n" +
+	"\bper_page\x18\x02 \x01(\x03R\aperPage\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x03R\x04page\"\xff\x01\n" +
+	"<GitHubListRepositoriesAccessibleToTheAppInstallationResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x12\x1f\n" +
+	"\vtotal_count\x18\x03 \x01(\x03R\n" +
+	"totalCount\x12;\n" +
+	"\frepositories\x18\x04 \x03(\v2\x17.google.protobuf.StructR\frepositories\x121\n" +
+	"\x14repository_selection\x18\x05 \x01(\tR\x13repositorySelection\"\x98\x14\n" +
 	"\x1cGitHubAppsAppsAppPermissions\x12\x18\n" +
 	"\aactions\x18\x01 \x01(\tR\aactions\x12&\n" +
 	"\x0eadministration\x18\x02 \x01(\tR\x0eadministration\x12+\n" +
@@ -1330,28 +1849,38 @@ func file_plugin_grpc_protocol_github_apps_apps_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_github_apps_apps_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_plugin_grpc_protocol_github_apps_apps_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_plugin_grpc_protocol_github_apps_apps_proto_goTypes = []any{
 	(*GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest)(nil),  // 0: protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest
 	(*GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse)(nil), // 1: protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse
 	(*GitHubCreateAnInstallationAccessTokenForAnAppRequest)(nil),           // 2: protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest
 	(*GitHubCreateAnInstallationAccessTokenForAnAppResponse)(nil),          // 3: protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse
-	(*GitHubAppsAppsAppPermissions)(nil),                                   // 4: protocol.GitHubAppsAppsAppPermissions
-	(*GitHubAppsAppsSimpleUser)(nil),                                       // 5: protocol.GitHubAppsAppsSimpleUser
-	(*structpb.Struct)(nil),                                                // 6: google.protobuf.Struct
+	(*GitHubListInstallationsForTheAuthenticatedAppRequest)(nil),           // 4: protocol.GitHubListInstallationsForTheAuthenticatedAppRequest
+	(*GitHubListInstallationsForTheAuthenticatedAppResponse)(nil),          // 5: protocol.GitHubListInstallationsForTheAuthenticatedAppResponse
+	(*GitHubAppsAppsInstallation)(nil),                                     // 6: protocol.GitHubAppsAppsInstallation
+	(*GitHubListRepositoriesAccessibleToTheAppInstallationRequest)(nil),    // 7: protocol.GitHubListRepositoriesAccessibleToTheAppInstallationRequest
+	(*GitHubListRepositoriesAccessibleToTheAppInstallationResponse)(nil),   // 8: protocol.GitHubListRepositoriesAccessibleToTheAppInstallationResponse
+	(*GitHubAppsAppsAppPermissions)(nil),                                   // 9: protocol.GitHubAppsAppsAppPermissions
+	(*GitHubAppsAppsSimpleUser)(nil),                                       // 10: protocol.GitHubAppsAppsSimpleUser
+	(*structpb.Struct)(nil),                                                // 11: google.protobuf.Struct
 }
 var file_plugin_grpc_protocol_github_apps_apps_proto_depIdxs = []int32{
-	6, // 0: protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.account:type_name -> google.protobuf.Struct
-	4, // 1: protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.permissions:type_name -> protocol.GitHubAppsAppsAppPermissions
-	5, // 2: protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.suspended_by:type_name -> protocol.GitHubAppsAppsSimpleUser
-	4, // 3: protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest.permissions:type_name -> protocol.GitHubAppsAppsAppPermissions
-	4, // 4: protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse.permissions:type_name -> protocol.GitHubAppsAppsAppPermissions
-	6, // 5: protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse.repositories:type_name -> google.protobuf.Struct
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	11, // 0: protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.account:type_name -> google.protobuf.Struct
+	9,  // 1: protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.permissions:type_name -> protocol.GitHubAppsAppsAppPermissions
+	10, // 2: protocol.GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse.suspended_by:type_name -> protocol.GitHubAppsAppsSimpleUser
+	9,  // 3: protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest.permissions:type_name -> protocol.GitHubAppsAppsAppPermissions
+	9,  // 4: protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse.permissions:type_name -> protocol.GitHubAppsAppsAppPermissions
+	11, // 5: protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse.repositories:type_name -> google.protobuf.Struct
+	6,  // 6: protocol.GitHubListInstallationsForTheAuthenticatedAppResponse.items:type_name -> protocol.GitHubAppsAppsInstallation
+	11, // 7: protocol.GitHubAppsAppsInstallation.account:type_name -> google.protobuf.Struct
+	9,  // 8: protocol.GitHubAppsAppsInstallation.permissions:type_name -> protocol.GitHubAppsAppsAppPermissions
+	10, // 9: protocol.GitHubAppsAppsInstallation.suspended_by:type_name -> protocol.GitHubAppsAppsSimpleUser
+	11, // 10: protocol.GitHubListRepositoriesAccessibleToTheAppInstallationResponse.repositories:type_name -> google.protobuf.Struct
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_github_apps_apps_proto_init() }
@@ -1365,7 +1894,7 @@ func file_plugin_grpc_protocol_github_apps_apps_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_github_apps_apps_proto_rawDesc), len(file_plugin_grpc_protocol_github_apps_apps_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

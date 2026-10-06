@@ -163,6 +163,7 @@
     url                                                                                                 100  protocol.GitHubIssuesIssuesReactionRollup.url, protocol.GitHubCommitsCommentsReactionRollup.url, protocol.GitHubPullsCommentsReactionRollup.url, protocol.GitHubIssuesCommentsReactionRollup.url, protocol.GitHubPullsReviewsReactionRollup.url
   review-custom-gates-comment-required                                                                    0
   review-custom-gates-state-required                                                                      0
+  GET /installation/repositories 200.repositories                                                         0
   GET /repos/{owner}/{repo}/actions/runs/{run_id}/artifacts 200                                           0
   POST /repos/{owner}/{repo}/actions/runs/{run_id}/deployment_protection_rule                            50
     owner                                                                                               100  protocol.GitHubReviewCustomDeploymentProtectionRulesForAWorkflowRunRequest.owner
@@ -269,7 +270,7 @@
     merge_action                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.merge_action
     merge_method                                                                                        100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.merge_method
     sha                                                                                                 100  protocol.GitHubMergeAPullRequestAsynchronouslyRequest.sha
-  393 at 100 not shown, all shows them
+  396 at 100 not shown, all shows them
 
   out of spec
     protocol.GitHubApproveAWorkflowRunForAForkPullRequestRequest follows no column with namespace
@@ -439,6 +440,8 @@
     protocol.GitHubListPullRequestsAssociatedWithACommitRequest follows no column with namespace
     protocol.GitHubListPullRequestsFilesRequest follows no column with namespace
     protocol.GitHubListPullRequestsRequest follows no column with namespace
+    protocol.GitHubListRepositoriesAccessibleToTheAppInstallationRequest follows no column with namespace
+    protocol.GitHubListRepositoriesAccessibleToTheAppInstallationResponse follows no column with error, success
     protocol.GitHubListRepositoriesForAUserRequest follows no column with namespace
     protocol.GitHubListRepositoriesForTheAuthenticatedUserRequest follows no column with namespace
     protocol.GitHubListRepositoryActivitiesRequest follows no column with namespace

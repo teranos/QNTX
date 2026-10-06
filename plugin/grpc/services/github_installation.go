@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -101,6 +102,43 @@ func (s *GitHubServer) InstallationToken(ctx context.Context, owner, repo string
 	s.installations[key] = token
 	s.mu.Unlock()
 	return token, nil
+}
+
+type githubInstallationID struct{}
+
+// AsInstallationOf is ctx for a call spent as one installation of the App,
+// named by its id, over every repository it holds: what that installation
+// reaches, asked without naming a repository.
+func AsInstallationOf(ctx context.Context, installationID int64) context.Context {
+	return context.WithValue(ctx, githubInstallationID{}, installationID)
+}
+
+// installationTokenOf is a token of the installation over all it holds. One
+// minted before and still good is given again.
+func (s *GitHubServer) installationTokenOf(ctx context.Context, installationID int64) (string, string, error) {
+	key := "installation#" + strconv.FormatInt(installationID, 10)
+	s.mu.Lock()
+	held, minted := s.installations[key]
+	s.mu.Unlock()
+	if minted && time.Until(held.until) > githubInstallationSkew {
+		return held.Token, key, nil
+	}
+	answered, err := s.CreateAnInstallationAccessTokenForAnApp(ctx,
+		&protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest{InstallationId: installationID})
+	if err != nil {
+		return "", key, errors.Wrapf(err, "GitHub was not asked for a token of installation %d", installationID)
+	}
+	if !answered.GetSuccess() {
+		return "", key, errors.Newf("GitHub minted no token of installation %d: %s", installationID, answered.GetError())
+	}
+	until, err := time.Parse(time.RFC3339, answered.GetExpiresAt())
+	if err != nil {
+		return "", key, errors.Wrapf(err, "GitHub minted a token of installation %d and when it expires (%q) did not read", installationID, answered.GetExpiresAt())
+	}
+	s.mu.Lock()
+	s.installations[key] = InstallationToken{Token: answered.GetToken(), ExpiresAt: answered.GetExpiresAt(), Contents: answered.GetPermissions().GetContents(), until: until}
+	s.mu.Unlock()
+	return answered.GetToken(), key, nil
 }
 
 // asInstallation is what a call marked AsInstallation spends: the token of the
