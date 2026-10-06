@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -55,5 +56,15 @@ func TestA2AIsServedToRootAlone(t *testing.T) {
 		srv.served.ServeHTTP(w, r)
 		assert.Equal(t, http.StatusForbidden, w.Code, route.path+" for SUPER: "+w.Body.String())
 		assert.False(t, strings.Contains(w.Body.String(), "UNSUPPORTED_OPERATION"), route.path+" for SUPER reached an operation")
+		// §11.6: the gate's refusal is a google.rpc.Status too.
+		var said struct {
+			Error struct {
+				Code   int    `json:"code"`
+				Status string `json:"status"`
+			} `json:"error"`
+		}
+		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &said), route.path+" for SUPER: "+w.Body.String())
+		assert.Equal(t, http.StatusForbidden, said.Error.Code, route.path+" for SUPER")
+		assert.Equal(t, "PERMISSION_DENIED", said.Error.Status, route.path+" for SUPER")
 	}
 }
