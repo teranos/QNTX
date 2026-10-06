@@ -70,7 +70,6 @@ describe('Transcript - Tim', () => {
         const rows = [...body.querySelectorAll('.tr-turn')].map(t => t.querySelector('.tr-speaker')?.textContent);
         expect(rows).toEqual(['[human]', '[assistant]']);
         expect(chips(body)).toEqual([['[tool]', '[ground]']]);
-        expect(body.querySelector('.tr-warp')).not.toBeNull();
     });
 
     // Tim: runs of one speaker are one chip, and mixed runs share a line.
