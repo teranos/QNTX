@@ -126,8 +126,8 @@ func TestClaudeCodeAndPiAreTwoSessionsOfOneAgent(t *testing.T) {
 // other: Pi answers while Claude Code is in a turn.
 func TestPiAnswersWhileClaudeCodeIsInATurn(t *testing.T) {
 	s, _, _ := runningPiToo(t)
-	s.rootAgent.turn <- struct{}{}
-	defer func() { <-s.rootAgent.turn }()
+	s.rootAgent.claude.turn <- struct{}{}
+	defer func() { <-s.rootAgent.claude.turn }()
 
 	answer, refused := sayingToPi(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)

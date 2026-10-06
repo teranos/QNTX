@@ -8,11 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/teranos/QNTX/ats/signing"
-	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/internal/claudecode"
 	appcfg "github.com/teranos/QNTX/internal/config"
@@ -39,15 +37,25 @@ type rootAgent struct {
 	// token is its own, and what it presents at the node's MCP.
 	token string
 	home  string
-	// turn holds one value while it is being spoken to in Claude Code: a
-	// session hears what is said to it one at a time.
+	// claude and pi are its session in each harness, which answer beside each
+	// other (ADR-048).
+	claude, pi *inHarness
+}
+
+// inHarness is the ROOT agent's session in one harness: where it is kept, and
+// the turn it is in.
+type inHarness struct {
+	// file is where the session is kept, under the agent's home.
+	file string
+	// turn holds one value while it is being spoken to: a session hears what
+	// is said to it one at a time.
 	turn chan struct{}
 	// answering is the turn it is in, and nil between turns.
 	answering atomic.Pointer[turnInSession]
-	// piTurn and piAnswering are the same of its session in Pi, which answers
-	// beside the one in Claude Code (ADR-048).
-	piTurn      chan struct{}
-	piAnswering atomic.Pointer[turnInSession]
+}
+
+func keptIn(file string) *inHarness {
+	return &inHarness{file: file, turn: make(chan struct{}, 1)}
 }
 
 // The file each harness's session is kept in, under the agent's home.
@@ -70,7 +78,7 @@ func theRootAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {
 		return nil, err
 	}
 	return &rootAgent{did: did, signer: signing.NewSigner(key, did), token: token, home: home,
-		turn: make(chan struct{}, 1), piTurn: make(chan struct{}, 1)}, nil
+		claude: keptIn(claudeSessionFile), pi: keptIn(piSessionFile)}, nil
 }
 
 // rootAgentHome is where a node keeps its ROOT agent: its Claude Code
@@ -81,17 +89,6 @@ func rootAgentHome() (string, error) {
 		return "", errors.Wrap(err, "failed to resolve the home directory the ROOT agent is kept under")
 	}
 	return filepath.Join(home, ".qntx", "agents", "root"), nil
-}
-
-// session is the session it continues in Claude Code, and whether it was kept
-// already. Before anything was said to it, it is a new id.
-func (a *rootAgent) session() (id string, kept bool, err error) {
-	return a.sessionIn(claudeSessionFile)
-}
-
-// keep writes down the session it continues in Claude Code from here on.
-func (a *rootAgent) keep(id string) error {
-	return a.keepIn(claudeSessionFile, id)
 }
 
 // sessionIn is the session file keeps, or a new id when it keeps none yet.
@@ -220,11 +217,6 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 	if agent == nil {
 		return nil, s.thereIsNoRootAgent()
 	}
-	// Its token is ROOT's kind, and it would be asking from inside the turn
-	// it then waits on.
-	if spokenBy(caller) == agent.did {
-		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: "the ROOT agent does not speak to itself: it is in the turn that asked"}
-	}
 	named := s.deps.cfg.Agent.Root
 	mode := sent["permission_mode"]
 	if mode == "" {
@@ -234,96 +226,47 @@ func (s *QNTXServer) claudeSay(ctx context.Context, sent sigil.Sent) (any, *prot
 		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "permission_mode",
 			Says: "no permission mode was named, and am.toml gives none under [agent.root]"}
 	}
-	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no system to write the ROOT agent's session in: " + err.Error()}
-	}
 
-	select {
-	case agent.turn <- struct{}{}:
-		defer func() { <-agent.turn }()
-	case <-ctx.Done():
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent was still answering somebody else when this caller left"}
-	}
-
-	binary, err := s.claudeCode.Path(ctx)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no Claude Code to run: " + err.Error()}
-	}
-	plan, err := secretref.Resolve(ctx, named.TokenRef)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Claude plan token am.toml names did not resolve: " + err.Error()}
-	}
-	session, kept, err := agent.session()
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-	}
-	// Pi may have started the session: Claude Code resumes only what it holds.
-	resumes := kept && claudecode.Holds(agent.home, session)
-
-	agent.answering.Store(&turnInSession{session: session})
-	defer agent.answering.Store(nil)
-
-	// The session is the agent's to write down, signed as itself. A row that
-	// does not land is said with the answer and never stops the turn.
-	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: named.Effort}
-	unwritten := ""
-	write := func(rows []*types.As, err error) {
-		if err == nil {
-			for _, row := range rows {
-				if err = agent.signer.Sign(row); err != nil {
-					break
-				}
-				if err = store.CreateAttestation(row); err != nil {
-					break
-				}
+	var binary, plan string
+	return s.sayInHarness(ctx, caller, agent, sent["says"], aTurn{
+		in: agent.claude, called: "Claude Code", effort: named.Effort,
+		ready: func(ctx context.Context, session string, kept bool) (bool, *protocol.Refusal) {
+			var err error
+			if binary, err = s.claudeCode.Path(ctx); err != nil {
+				return false, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no Claude Code to run: " + err.Error()}
 			}
-		}
-		if err != nil {
-			s.logger.Errorw("a row of the ROOT agent's session was not written", "session", session, "error", err)
-			if unwritten == "" {
-				unwritten = err.Error()
+			if plan, err = secretref.Resolve(ctx, named.TokenRef); err != nil {
+				return false, &protocol.Refusal{Why: sigil.Failed, Says: "the Claude plan token am.toml names did not resolve: " + err.Error()}
 			}
-		}
-	}
-	itsGit, err := s.gitEnvironment(agent)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent's git was not set up, so nothing was said to it: " + err.Error()}
-	}
-	told, err := writes.told(sent["says"], spokenBy(caller), time.Now())
-	write([]*types.As{told}, err)
-
-	said := claudecode.Said{
-		Binary: binary, Home: agent.home, Session: session, Resumes: resumes,
-		Says: sent["says"], Model: named.Model, Effort: named.Effort, Token: plan,
-		System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: itsGit,
-	}
-	if s.ownURL != "" {
-		said.MCP = []claudecode.MCPServer{{Name: rootAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
-	}
-	// Under the node's own context and not the caller's: a caller that leaves
-	// does not stop what it asked for halfway.
-	answer, err := said.Run(s.ctx, func(m claudecode.Message) { write(writes.rowsOf(m, time.Now())) })
-	if err != nil {
-		write(writes.rowsOf(claudecode.Message{Type: "result", Subtype: "no_result", IsError: true, Result: err.Error()}, time.Now()))
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Claude Code did not answer: " + err.Error()}
-	}
-	if !kept {
-		if err := agent.keep(session); err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "it answered, and the session it answered in was not kept: " + err.Error()}
-		}
-	}
-
-	denied := answer.Denied
-	if denied == nil {
-		denied = []string{}
-	}
-	return map[string]any{
-		"answer": answer.Text, "is_error": answer.IsError, "subtype": answer.Subtype,
-		"session": session, "model": answer.Model, "claude_code": answer.Version,
-		"permission_mode": mode, "denied": denied,
-		"cost_usd": answer.CostUSD, "took_ms": answer.Took.Milliseconds(), "unwritten": unwritten,
-	}, nil
+			// Pi may have started the session: Claude Code resumes only what it holds.
+			return kept && claudecode.Holds(agent.home, session), nil
+		},
+		run: func(t turnRun) (map[string]any, error) {
+			said := claudecode.Said{
+				Binary: binary, Home: agent.home, Session: t.session, Resumes: t.resumes,
+				Says: t.says, Model: named.Model, Effort: named.Effort, Token: plan,
+				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
+			}
+			if s.ownURL != "" {
+				said.MCP = []claudecode.MCPServer{{Name: rootAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
+			}
+			answer, err := said.Run(s.ctx, func(m claudecode.Message) { t.write(t.writes.rowsOf(m, t.now())) })
+			if err != nil {
+				t.write(t.writes.rowsOf(claudecode.Message{Type: "result", Subtype: "no_result", IsError: true, Result: err.Error()}, t.now()))
+				return nil, err
+			}
+			denied := answer.Denied
+			if denied == nil {
+				denied = []string{}
+			}
+			return map[string]any{
+				"answer": answer.Text, "is_error": answer.IsError, "subtype": answer.Subtype,
+				"session": t.session, "model": answer.Model, "claude_code": answer.Version,
+				"permission_mode": mode, "denied": denied,
+				"cost_usd": answer.CostUSD, "took_ms": answer.Took.Milliseconds(),
+			}, nil
+		},
+	})
 }
 
 // claudeSession reads the session from where it is written, so whoever may
@@ -333,16 +276,16 @@ func (s *QNTXServer) claudeSession(ctx context.Context, _ sigil.Sent) (any, *pro
 	if agent == nil {
 		return nil, s.thereIsNoRootAgent()
 	}
-	return s.readAgentSession(agent, claudeSessionFile, agent.answering.Load())
+	return s.readAgentSession(agent, agent.claude)
 }
 
-// readAgentSession reads the session file keeps, or the one a turn going is in.
-func (s *QNTXServer) readAgentSession(agent *rootAgent, file string, going *turnInSession) (any, *protocol.Refusal) {
-	session, kept, err := agent.sessionIn(file)
+// readAgentSession reads the session in keeps, or the one a turn going is in.
+func (s *QNTXServer) readAgentSession(agent *rootAgent, in *inHarness) (any, *protocol.Refusal) {
+	session, kept, err := agent.sessionIn(in.file)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	if going != nil {
+	if going := in.answering.Load(); going != nil {
 		session, kept = going.session, true
 	}
 	return s.sessionTranscript(session, kept)
@@ -383,14 +326,14 @@ func (s *QNTXServer) claudeAm(ctx context.Context, _ sigil.Sent) (any, *protocol
 	if is["allow"] == nil {
 		is["allow"] = []string{}
 	}
-	session, resumes, err := agent.session()
+	session, resumes, err := agent.sessionIn(agent.claude.file)
 	if err != nil {
 		is["not_ready"] = err.Error()
 	} else if resumes {
 		is["session"] = session
 	}
 	// A first turn is in a session not kept yet, and is read all the same.
-	if going := agent.answering.Load(); going != nil {
+	if going := agent.claude.answering.Load(); going != nil {
 		is["answering"], is["session"] = true, going.session
 	}
 	// Asked without waiting: a fetch still going is said, not sat through.
