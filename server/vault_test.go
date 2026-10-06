@@ -230,6 +230,49 @@ func TestABindingIsRefusedWhereANoteWouldBeTwoFolders(t *testing.T) {
 	assert.Equal(t, "name", refused.GetParam())
 }
 
+// A folder unbound is no longer held, and the others stay as they were.
+func TestABoundFolderIsUnbound(t *testing.T) {
+	s, vault := vaultBindingServer(t)
+	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material", "abcd-nl/clean@main:cdr=ABCD"}
+	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
+
+	_, refused := askVault(t, s, "unbind", sigil.Sent{"name": "abcd", "place": "Course Material"})
+	require.Nil(t, refused, "%v", refused)
+	vaults, err := s.nodeRecords().Vaults()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"abcd-nl/clean@main:cdr=ABCD"}, vaults[0].Folders)
+
+	_, refused = askVault(t, s, "unbind", sigil.Sent{"name": "abcd", "place": "Course Material"})
+	require.NotNil(t, refused)
+	assert.Equal(t, "place", refused.GetParam())
+}
+
+// "and another button to simply disable it, but the bind is still there, it just doesnt do anything"
+func TestADisabledFolderStaysBound(t *testing.T) {
+	s, vault := vaultBindingServer(t)
+	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
+
+	_, refused := askVault(t, s, "disable", sigil.Sent{"name": "abcd", "place": "Course Material"})
+	require.Nil(t, refused, "%v", refused)
+	vaults, err := s.nodeRecords().Vaults()
+	require.NoError(t, err)
+	assert.Equal(t, vault.Folders, vaults[0].Folders)
+	assert.Equal(t, []string{"Course Material"}, vaults[0].Disabled)
+	got, refused := askVault(t, s, "states", sigil.Sent{"name": "abcd"})
+	require.Nil(t, refused, "%v", refused)
+	assert.Equal(t, vaultDisabled, got.(map[string]any)["folders"].([]vaultFolderState)[0].State)
+
+	_, refused = askVault(t, s, "enable", sigil.Sent{"name": "abcd", "place": "Course Material"})
+	require.Nil(t, refused, "%v", refused)
+	got, _ = askVault(t, s, "states", sigil.Sent{"name": "abcd"})
+	assert.Equal(t, vaultActive, got.(map[string]any)["folders"].([]vaultFolderState)[0].State)
+
+	_, refused = askVault(t, s, "disable", sigil.Sent{"name": "abcd", "place": "ABCD"})
+	require.NotNil(t, refused)
+	assert.Equal(t, "place", refused.GetParam())
+}
+
 // "what should a valid binding show? that its active, green dot,"
 // A folder is invalid, and says why, when either end is not there.
 func TestEachBoundFolderSaysWhetherItIsActive(t *testing.T) {

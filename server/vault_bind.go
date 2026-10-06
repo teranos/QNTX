@@ -200,6 +200,59 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	return s.vaultList(ctx, sent)
 }
 
+// "and if expanded, there should be a two stage button to allow me to unbind as well."
+func (s *QNTXServer) vaultUnbind(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	vault, refused := s.vaultNamed(sent["name"])
+	if refused != nil {
+		return nil, refused
+	}
+	place := sent["place"]
+	kept := []string{}
+	for _, folder := range vault.Folders {
+		if _, at, _ := strings.Cut(folder, "="); at != place {
+			kept = append(kept, folder)
+		}
+	}
+	if len(kept) == len(vault.Folders) {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "place", Says: place + " of " + vault.Name + " is bound to no folder of a repository"}
+	}
+	vault.Folders = kept
+	vault.Disabled = slices.DeleteFunc(vault.Disabled, func(p string) bool { return p == place })
+	if err := s.nodeRecords().SetVault(actorOf(ctx), vault); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	return s.vaultList(ctx, sent)
+}
+
+// "and another button to simply disable it, but the bind is still there, it just doesnt do anything"
+func (s *QNTXServer) vaultDisable(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	return s.vaultSwitch(ctx, sent, true)
+}
+
+func (s *QNTXServer) vaultEnable(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	return s.vaultSwitch(ctx, sent, false)
+}
+
+// vaultSwitch disables or enables the folder bound at a place, which stays bound either way.
+func (s *QNTXServer) vaultSwitch(ctx context.Context, sent sigil.Sent, disable bool) (any, *protocol.Refusal) {
+	vault, refused := s.vaultNamed(sent["name"])
+	if refused != nil {
+		return nil, refused
+	}
+	place := sent["place"]
+	if !slices.ContainsFunc(vault.Folders, func(f string) bool { _, at, _ := strings.Cut(f, "="); return at == place }) {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "place", Says: place + " of " + vault.Name + " is bound to no folder of a repository"}
+	}
+	vault.Disabled = slices.DeleteFunc(vault.Disabled, func(p string) bool { return p == place })
+	if disable {
+		vault.Disabled = append(vault.Disabled, place)
+	}
+	if err := s.nodeRecords().SetVault(actorOf(ctx), vault); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	return s.vaultList(ctx, sent)
+}
+
 // vaultFolderState is what one folder a vault holds is now.
 type vaultFolderState struct {
 	Folder string `json:"folder"`
@@ -210,8 +263,9 @@ type vaultFolderState struct {
 
 // "what should a valid binding show? that its active, green dot,"
 const (
-	vaultActive  = "active"
-	vaultInvalid = "invalid"
+	vaultActive   = "active"
+	vaultDisabled = "disabled"
+	vaultInvalid  = "invalid"
 )
 
 func (s *QNTXServer) vaultStates(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -229,6 +283,9 @@ func (s *QNTXServer) vaultStates(ctx context.Context, sent sigil.Sent) (any, *pr
 			state.State, state.Why = vaultInvalid, err.Error()
 		case !vaultHasDir(vault, place):
 			state.State, state.Why = vaultInvalid, place+" is no folder of "+vault.Name+" at "+vault.Path
+		case slices.Contains(vault.Disabled, place):
+			// Disabled does nothing, so nothing is asked of GitHub for it.
+			state.State = vaultDisabled
 		default:
 			if _, err := s.repoDirs(ctx, source.Owner, source.Repo, source.Branch, source.Path); err != nil {
 				state.State, state.Why = vaultInvalid, err.Error()

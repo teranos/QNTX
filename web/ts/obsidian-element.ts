@@ -26,7 +26,7 @@ export interface Vault {
 export interface FolderState {
     folder: string;
     place: string;
-    state: 'active' | 'invalid';
+    state: 'active' | 'disabled' | 'invalid';
     why: string;
 }
 
@@ -143,9 +143,15 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
             row.append(twist, name);
             const state = byPlace.get(place);
             if (state) {
+                // The row is its state's colour, and its dot says nothing until hovered.
+                const says = state.state === 'invalid' ? `Invalid: ${state.why}` : state.state;
+                row.classList.add(`obsidian-row-${state.state}`);
+                row.title = says;
+                const dot = div(`obsidian-state obsidian-state-${state.state}`);
+                dot.setAttribute('role', 'img');
+                dot.setAttribute('aria-label', says);
                 const ends = state.folder.slice(0, state.folder.lastIndexOf('='));
-                row.append(div('obsidian-bound', `⇄ ${ends}`), div(`obsidian-state obsidian-state-${state.state}`,
-                    state.state === 'active' ? 'active' : `Invalid: ${state.why}`));
+                row.append(div('obsidian-bound', `⇄ ${ends}`), dot);
             }
             li.appendChild(row);
             if (open === place) li.appendChild(panel(place));
@@ -160,6 +166,31 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
         const state = byPlace.get(place);
         if (state) {
             p.append(div('obsidian-folder', state.folder));
+            // "and if expanded, there should be a two stage button to allow me to unbind as well."
+            const unbind = new Button({
+                label: 'Unbind',
+                variant: 'danger',
+                confirmation: { label: 'Confirm again to unbind' },
+                onClick: async () => {
+                    const response = await apiFetch('/api/vault/unbind', jsonBody('POST', { name: view.vault.name, place }));
+                    if (!response.ok) throw new Error(await refusal(response));
+                    await reload();
+                },
+            });
+            // "and another button to simply disable it, but the bind is still there, it just doesnt do anything"
+            const disabled = state.state === 'disabled';
+            const toggle = new Button({
+                label: disabled ? 'Enable' : 'Disable',
+                variant: 'secondary',
+                onClick: async () => {
+                    const response = await apiFetch(`/api/vault/${disabled ? 'enable' : 'disable'}`, jsonBody('POST', { name: view.vault.name, place }));
+                    if (!response.ok) throw new Error(await refusal(response));
+                    await reload();
+                },
+            });
+            const actions = div('obsidian-actions');
+            actions.append(toggle.element, unbind.element);
+            p.appendChild(actions);
             return p;
         }
         const refused = clash(place);

@@ -525,6 +525,16 @@
         "ROOT"
       ]
     },
+    "/api/vault/disable": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/enable": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/vault/owners": {
       "x-qntx-reach": [
         "ROOT"
@@ -541,6 +551,11 @@
       ]
     },
     "/api/vault/subdirs": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/unbind": {
       "x-qntx-reach": [
         "ROOT"
       ]

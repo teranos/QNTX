@@ -31,6 +31,33 @@ type Vault struct {
 	Name    string   `json:"name"`
 	Path    string   `json:"path"`
 	Folders []string `json:"folders"`
+	// Disabled is each place whose folder is still bound and does nothing.
+	Disabled []string `json:"disabled"`
+}
+
+// texts is a line's attribute that is a list of text.
+func texts(as map[string]any, attribute, subject, id, name string) ([]string, error) {
+	out := []string{}
+	held, ok := as[attribute].([]any)
+	if !ok {
+		return out, nil
+	}
+	for _, item := range held {
+		text, ok := item.(string)
+		if !ok {
+			return nil, errors.Newf("%s line %s about %s: one of %s is %v, not text", subject, id, name, attribute, item)
+		}
+		out = append(out, text)
+	}
+	return out, nil
+}
+
+func anyOf(items []string) []any {
+	out := make([]any, len(items))
+	for i, item := range items {
+		out[i] = item
+	}
+	return out
 }
 
 // "So, we could do the Same for Obsidian"
@@ -81,18 +108,15 @@ func (r NodeRecords) Vaults() ([]Vault, error) {
 	}
 	vaults := make([]Vault, 0, len(newest))
 	for name, as := range newest {
-		vault := Vault{Name: name, Folders: []string{}}
+		vault := Vault{Name: name}
 		if path, ok := as.Attributes["path"].(string); ok {
 			vault.Path = path
 		}
-		if held, ok := as.Attributes["folders"].([]any); ok {
-			for _, folder := range held {
-				text, ok := folder.(string)
-				if !ok {
-					return nil, errors.Newf("%s line %s about %s: a folder is %v, not text", vaultSubject, as.ID, name, folder)
-				}
-				vault.Folders = append(vault.Folders, text)
-			}
+		if vault.Folders, err = texts(as.Attributes, "folders", vaultSubject, as.ID, name); err != nil {
+			return nil, err
+		}
+		if vault.Disabled, err = texts(as.Attributes, "disabled", vaultSubject, as.ID, name); err != nil {
+			return nil, err
 		}
 		vaults = append(vaults, vault)
 	}
@@ -102,13 +126,10 @@ func (r NodeRecords) Vaults() ([]Vault, error) {
 
 // SetVault writes a vault whole.
 func (r NodeRecords) SetVault(actor string, vault Vault) error {
-	folders := make([]any, len(vault.Folders))
-	for i, folder := range vault.Folders {
-		folders[i] = folder
-	}
 	return r.nodeRecord(actor, vaultSubject, vault.Name, "_", map[string]any{
-		"path":    vault.Path,
-		"folders": folders,
+		"path":     vault.Path,
+		"folders":  anyOf(vault.Folders),
+		"disabled": anyOf(vault.Disabled),
 	})
 }
 
@@ -177,10 +198,40 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/bind"},
 				},
 				{
+					Name: "unbind",
+					Does: "Unbinds a folder of a vault: the vault no longer holds the folder of a repository bound there. Nothing in the vault's copy or the repository is touched.",
+					Takes: []*protocol.Param{
+						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
+						{Name: "place", Required: true, Says: "The vault's folder, by its place in the vault."},
+					},
+					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
+					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/unbind"},
+				},
+				{
+					Name: "disable",
+					Does: "Disables a bound folder of a vault: it stays bound and does nothing until it is enabled.",
+					Takes: []*protocol.Param{
+						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
+						{Name: "place", Required: true, Says: "The vault's folder, by its place in the vault."},
+					},
+					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
+					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/disable"},
+				},
+				{
+					Name: "enable",
+					Does: "Enables a disabled bound folder of a vault again.",
+					Takes: []*protocol.Param{
+						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
+						{Name: "place", Required: true, Says: "The vault's folder, by its place in the vault."},
+					},
+					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
+					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/enable"},
+				},
+				{
 					Name:  "states",
-					Does:  "What each folder a vault holds is now: active, or invalid and why. A folder is invalid when its folder in the vault is not on the box, or its repository's folder is not on its branch, or the App cannot reach the repository.",
+					Does:  "What each folder a vault holds is now: active, disabled, or invalid and why. A folder is invalid when its folder in the vault is not on the box, or its repository's folder is not on its branch, or the App cannot reach the repository.",
 					Takes: []*protocol.Param{{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."}},
-					Gives: []*protocol.Field{{Name: "folders", Says: "One per folder: the folder as owner/repo@branch:path=place, its place, its state (active or invalid), and why when invalid."}},
+					Gives: []*protocol.Field{{Name: "folders", Says: "One per folder: the folder as owner/repo@branch:path=place, its place, its state (active, disabled or invalid), and why when invalid."}},
 					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/states"},
 				},
 			},
@@ -188,7 +239,8 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 		Answers: map[string]sigil.Answer{
 			"list": s.vaultList, "set": s.vaultSet,
 			"dirs": s.vaultDirs, "owners": s.vaultOwners, "repos": s.vaultRepos, "subdirs": s.vaultSubdirs,
-			"bind": s.vaultBind, "states": s.vaultStates,
+			"bind": s.vaultBind, "unbind": s.vaultUnbind, "states": s.vaultStates,
+			"disable": s.vaultDisable, "enable": s.vaultEnable,
 		},
 	}
 }
@@ -211,7 +263,16 @@ func (s *QNTXServer) vaultSet(ctx context.Context, sent sigil.Sent) (any, *proto
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "folders", Says: err.Error()}
 	}
-	if err := s.nodeRecords().SetVault(actorOf(ctx), Vault{Name: name, Path: filepath.Clean(path), Folders: folders}); err != nil {
+	// A place said again keeps being disabled; one no longer said is not.
+	disabled := []string{}
+	if was, refused := s.vaultNamed(name); refused == nil {
+		for _, place := range was.Disabled {
+			if slices.ContainsFunc(folders, func(f string) bool { return strings.HasSuffix(f, "="+place) }) {
+				disabled = append(disabled, place)
+			}
+		}
+	}
+	if err := s.nodeRecords().SetVault(actorOf(ctx), Vault{Name: name, Path: filepath.Clean(path), Folders: folders, Disabled: disabled}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return s.vaultList(ctx, sent)

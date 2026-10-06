@@ -77,8 +77,9 @@
     cursor: default;
 }
 
+/* A name breaks only when it is wider than the row, not to make room for its state. */
 .obsidian-name {
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
 }
 
 .obsidian-bound,
@@ -90,12 +91,12 @@
 }
 
 .obsidian-state {
-    font-size: var(--font-size-sm);
+    font-size: 8px;
+    cursor: help;
 }
 
 .obsidian-state::before {
     content: '●';
-    margin-right: 4px;
 }
 
 /* An active binding is a green dot. */
@@ -105,6 +106,44 @@
 
 .obsidian-state-invalid {
     color: var(--sacred-error);
+}
+
+/* A bound row is its state's colour. */
+.obsidian-row.obsidian-row-active {
+    background: var(--element-status-success-section-bg);
+}
+
+.obsidian-row-active .obsidian-name {
+    color: var(--element-status-success-text);
+}
+
+.obsidian-row.obsidian-row-invalid {
+    background: var(--sacred-ground);
+}
+
+.obsidian-row-invalid .obsidian-name {
+    color: var(--sacred-error);
+}
+
+/* Disabled is still bound, and does nothing. */
+.obsidian-state-disabled {
+    color: var(--text-on-dark-tertiary);
+}
+
+.obsidian-row.obsidian-row-disabled .obsidian-name,
+.obsidian-row-disabled .obsidian-bound {
+    color: var(--text-on-dark-tertiary);
+}
+
+.obsidian-row-active:hover,
+.obsidian-row-invalid:hover {
+    filter: brightness(1.25);
+}
+
+.obsidian-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .obsidian-panel {
