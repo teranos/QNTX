@@ -70,10 +70,18 @@ func vaultDirsAt(root string) ([]string, error) {
 	return dirs, nil
 }
 
-// vaultHasDir says whether place is a folder of the vault's copy.
-func vaultHasDir(vault Vault, place string) bool {
-	info, err := os.Stat(filepath.Join(vault.Path, filepath.FromSlash(place)))
-	return err == nil && info.IsDir()
+// vaultHasDir says whether place is a folder of the vault's copy. Only its not
+// being there is no; a copy that could not be read is the error, as it was.
+func vaultHasDir(vault Vault, place string) (bool, error) {
+	at := filepath.Join(vault.Path, filepath.FromSlash(place))
+	info, err := os.Stat(at)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, errors.Wrapf(err, "whether %s is a folder of %s was not read", at, vault.Name)
+	}
+	return info.IsDir(), nil
 }
 
 func (s *QNTXServer) vaultDirs(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -98,8 +106,11 @@ type vaultOwner struct {
 func (s *QNTXServer) vaultOwners(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
 	owners := []vaultOwner{}
 	for page := int64(1); ; page++ {
-		answered, _ := s.gitHubService().ListInstallationsForTheAuthenticatedApp(ctx,
+		answered, err := s.gitHubService().ListInstallationsForTheAuthenticatedApp(ctx,
 			&protocol.GitHubListInstallationsForTheAuthenticatedAppRequest{PerPage: githubPage, Page: page})
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "where the App is installed was not asked: " + err.Error()}
+		}
 		if !answered.GetSuccess() {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "where the App is installed was not learned: " + answered.GetError()}
 		}
@@ -126,8 +137,11 @@ func (s *QNTXServer) vaultRepos(ctx context.Context, sent sigil.Sent) (any, *pro
 	}
 	repos := []string{}
 	for page := int64(1); ; page++ {
-		answered, _ := s.gitHubService().ListRepositoriesAccessibleToTheAppInstallation(services.AsInstallationOf(ctx, id),
+		answered, err := s.gitHubService().ListRepositoriesAccessibleToTheAppInstallation(services.AsInstallationOf(ctx, id),
 			&protocol.GitHubListRepositoriesAccessibleToTheAppInstallationRequest{PerPage: githubPage, Page: page})
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what installation " + sent["installation"] + " reaches was not asked: " + err.Error()}
+		}
 		if !answered.GetSuccess() {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what installation " + sent["installation"] + " reaches was not learned: " + answered.GetError()}
 		}
@@ -149,8 +163,11 @@ func (s *QNTXServer) repoDirs(ctx context.Context, owner, repo, branch, path str
 		// GitHub lists a repository's top at ".".
 		path = "."
 	}
-	answered, _ := s.gitHubService().GetRepositoryContent(services.AsInstallation(ctx),
+	answered, err := s.gitHubService().GetRepositoryContent(services.AsInstallation(ctx),
 		&protocol.GitHubGetRepositoryContentRequest{Owner: owner, Repo: repo, Path: path, Ref: branch})
+	if err != nil {
+		return nil, errors.Wrapf(err, "%s of %s/%s on %s was not asked", path, owner, repo, branch)
+	}
 	if !answered.GetSuccess() {
 		return nil, errors.New(answered.GetError())
 	}
@@ -185,7 +202,11 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 		return nil, refused
 	}
 	place := sent["place"]
-	if !vaultHasDir(vault, place) {
+	there, err := vaultHasDir(vault, place)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	if !there {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is no folder of " + vault.Name + " at " + vault.Path}
 	}
 	folder := sent["repo"] + "@" + vaultBranch + ":" + sent["path"] + "=" + place
@@ -275,13 +296,24 @@ func (s *QNTXServer) vaultStates(ctx context.Context, sent sigil.Sent) (any, *pr
 	}
 	states := []vaultFolderState{}
 	for _, folder := range vault.Folders {
-		repo, place, _ := strings.Cut(folder, "=")
+		repo, place, named := strings.Cut(folder, "=")
 		state := vaultFolderState{Folder: folder, Place: place, State: vaultActive}
+		if !named {
+			state.State, state.Why = vaultInvalid, folder+" names no place in the vault: owner/repo@branch:path=place"
+			states = append(states, state)
+			continue
+		}
 		source, err := parseBuildSource(repo, true)
+		if err != nil {
+			state.State, state.Why = vaultInvalid, err.Error()
+			states = append(states, state)
+			continue
+		}
+		there, err := vaultHasDir(vault, place)
 		switch {
 		case err != nil:
 			state.State, state.Why = vaultInvalid, err.Error()
-		case !vaultHasDir(vault, place):
+		case !there:
 			state.State, state.Why = vaultInvalid, place+" is no folder of "+vault.Name+" at "+vault.Path
 		case slices.Contains(vault.Disabled, place):
 			// Disabled does nothing, so nothing is asked of GitHub for it.

@@ -265,7 +265,11 @@ func (s *QNTXServer) vaultSet(ctx context.Context, sent sigil.Sent) (any, *proto
 	}
 	// A place said again keeps being disabled; one no longer said is not.
 	disabled := []string{}
-	if was, refused := s.vaultNamed(name); refused == nil {
+	was, refused := s.vaultNamed(name)
+	if refused != nil && refused.GetWhy() != sigil.NotFound {
+		return nil, refused
+	}
+	if refused == nil {
 		for _, place := range was.Disabled {
 			if slices.ContainsFunc(folders, func(f string) bool { return strings.HasSuffix(f, "="+place) }) {
 				disabled = append(disabled, place)
