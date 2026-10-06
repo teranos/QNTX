@@ -22,7 +22,7 @@ const vaultSubject = "VAULT"
 const vaultPath = "/api/vault"
 
 // Vault is one vault as the node keeps it: where its copy is on the box, and
-// each folder it holds, as owner/repo@branch:path.
+// each folder it holds as owner/repo@branch:path=place, place being in the vault.
 type Vault struct {
 	Name    string   `json:"name"`
 	Path    string   `json:"path"`
@@ -31,16 +31,34 @@ type Vault struct {
 
 // "So, we could do the Same for Obsidian"
 
-// vaultFolders reads folders the way a build's inputs are read: separated by
-// spaces, each owner/repo@branch:path, and refused whole when one does not read.
+// "name both ends"
+
+// vaultFolders reads folders separated by spaces, each a build's input, = and
+// its place in the vault. One that does not read refuses them all.
 func vaultFolders(said string) ([]string, error) {
 	folders := []string{}
+	var places []string
 	for _, field := range strings.Fields(said) {
-		source, err := parseBuildSource(field, true)
+		repo, place, ok := strings.Cut(field, "=")
+		if !ok || place == "" {
+			return nil, errors.Newf("%q names no place in the vault: owner/repo@branch:path=place", field)
+		}
+		source, err := parseBuildSource(repo, true)
 		if err != nil {
 			return nil, err
 		}
-		folders = append(folders, source.String())
+		if filepath.IsAbs(place) || !filepath.IsLocal(place) {
+			return nil, errors.Newf("%q is no place inside the vault", place)
+		}
+		place = filepath.ToSlash(filepath.Clean(place))
+		// A note is one folder's, so no place is another's or inside it.
+		for _, other := range places {
+			if place == other || strings.HasPrefix(place, other+"/") || strings.HasPrefix(other, place+"/") {
+				return nil, errors.Newf("%s and %s are one place in the vault, or one holds the other", other, place)
+			}
+		}
+		places = append(places, place)
+		folders = append(folders, source.String()+"="+place)
 	}
 	return folders, nil
 }
@@ -92,16 +110,16 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 				{
 					Name:  "list",
 					Does:  "Every Obsidian vault the node keeps a copy of: where the copy is on the box, and the folders of repositories it holds.",
-					Gives: []*protocol.Field{{Name: "vaults", Says: "One per vault: its name, its path on the box, and its folders as owner/repo@branch:path."}},
+					Gives: []*protocol.Field{{Name: "vaults", Says: "One per vault: its name, its path on the box, and its folders as owner/repo@branch:path=place."}},
 					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath},
 				},
 				{
 					Name: "set",
-					Does: "Say a vault whole: where its copy is on the box, and the folders of repositories it holds. Refused when a folder names no repository, branch or path.",
+					Does: "Say a vault whole: where its copy is on the box, and the folders of repositories it holds, each with where in the vault it is. Refused when a folder names no repository, branch, path or place, when a place leaves the vault, and when two places are one or one holds the other.",
 					Takes: []*protocol.Param{
 						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
 						{Name: "path", Required: true, Says: "Where the vault's copy is on the box: an absolute path."},
-						{Name: "folders", Says: "Each folder the vault holds as owner/repo@branch:path, separated by spaces. None when not sent."},
+						{Name: "folders", Says: "Each folder the vault holds as owner/repo@branch:path=place, the place being where in the vault it is, separated by spaces. None when not sent."},
 					},
 					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
 					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath},

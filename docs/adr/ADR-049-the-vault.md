@@ -83,3 +83,11 @@ side has seen the other:
 As datapunt's inputs are named on its plugin record, `owner/repo@branch:path`
 (ADR-002), the vault's folders are named on a record on the node, and the
 folder itself carries nothing.
+
+"name both ends"
+
+- A folder is `owner/repo@branch:path=place`, the place being where in the
+  vault it is. A place is inside the vault, and no place is another's or
+  holds another, so a note is one folder's.
+
+"and Clean Business will mostly be steered from the Obsidian"

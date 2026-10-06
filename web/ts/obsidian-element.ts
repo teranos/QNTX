@@ -21,7 +21,7 @@ import { log, SEG } from './logger';
 export interface Vault {
     name: string;
     path: string;
-    /** Each folder it holds, as owner/repo@branch:path. */
+    /** Each folder it holds, as owner/repo@branch:path=place, place being where in the vault it is. */
     folders: string[];
 }
 
@@ -68,13 +68,13 @@ function input(className: string, value: string, placeholder: string): HTMLInput
     return box;
 }
 
-/** A vault's folders, one per line, as the node reads them: owner/repo@branch:path. */
+/** A vault's folders, one per line, as the node reads them: owner/repo@branch:path=place. */
 function foldersBox(folders: string[]): HTMLTextAreaElement {
     const box = document.createElement('textarea');
     box.className = 'input obsidian-folders';
     box.rows = Math.max(3, folders.length + 1);
     box.value = folders.join('\n');
-    box.placeholder = 'owner/repo@branch:path, one per line';
+    box.placeholder = 'owner/repo@branch:path=place in the vault, one per line';
     box.spellcheck = false;
     return box;
 }

@@ -45,10 +45,10 @@ const reload = () => Promise.resolve();
 describe('ROOT names the folders a vault holds', () => {
     test('a vault shows its path and its folders, one per line', () => {
         const container = document.createElement('div');
-        renderVaults(container, [{ name: 'notes', path: '/var/lib/obsidian/notes', folders: ['abcd-nl/clean@main:cdr', 'abcd-nl/clean@main:docs'] }], reload);
+        renderVaults(container, [{ name: 'notes', path: '/var/lib/obsidian/notes', folders: ['abcd-nl/clean@main:cdr=ABCD/clean/cdr', 'abcd-nl/clean@main:docs=ABCD/clean/docs'] }], reload);
         expect(container.querySelector('.element-section-title')?.textContent).toBe('notes');
         expect(container.querySelector<HTMLInputElement>('.obsidian-path')?.value).toBe('/var/lib/obsidian/notes');
-        expect(container.querySelector<HTMLTextAreaElement>('.obsidian-folders')?.value).toBe('abcd-nl/clean@main:cdr\nabcd-nl/clean@main:docs');
+        expect(container.querySelector<HTMLTextAreaElement>('.obsidian-folders')?.value).toBe('abcd-nl/clean@main:cdr=ABCD/clean/cdr\nabcd-nl/clean@main:docs=ABCD/clean/docs');
     });
 
     test('no vault is said, not left blank', () => {
@@ -66,10 +66,10 @@ describe('ROOT names the folders a vault holds', () => {
         const container = document.createElement('div');
         document.body.appendChild(container);
         renderVaults(container, [{ name: 'notes', path: '/var/lib/obsidian/notes', folders: [] }], reload);
-        container.querySelector<HTMLTextAreaElement>('.obsidian-folders')!.value = 'abcd-nl/clean@main:cdr\nabcd-nl/clean@main:docs';
+        container.querySelector<HTMLTextAreaElement>('.obsidian-folders')!.value = 'abcd-nl/clean@main:cdr=ABCD/clean/cdr\nabcd-nl/clean@main:docs=ABCD/clean/docs';
         container.querySelector<HTMLButtonElement>('.element-actions button')!.click();
         await flush();
-        expect(sent).toEqual({ path: '/api/vault', body: { name: 'notes', path: '/var/lib/obsidian/notes', folders: 'abcd-nl/clean@main:cdr abcd-nl/clean@main:docs' } });
+        expect(sent).toEqual({ path: '/api/vault', body: { name: 'notes', path: '/var/lib/obsidian/notes', folders: 'abcd-nl/clean@main:cdr=ABCD/clean/cdr abcd-nl/clean@main:docs=ABCD/clean/docs' } });
     });
 
     test('a folder the node refuses shows the node\'s words beside the button', async () => {
