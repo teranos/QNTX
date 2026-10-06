@@ -16,6 +16,10 @@ import (
 	"github.com/teranos/errors"
 )
 
+// 1.0.0 BLOCKER (#1091): a vault is set up on the box by hand, outside the node.
+
+// The node has to sign in to Sync, list the vaults and keep one syncing itself.
+
 // A VAULT line's predicate is the vault's name.
 const vaultSubject = "VAULT"
 

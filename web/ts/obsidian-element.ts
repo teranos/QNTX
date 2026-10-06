@@ -27,6 +27,11 @@ export interface Vault {
 
 const ELEMENT_ID = 'obsidian-element';
 
+// "the real story should not have to depend on having claude already setup in the system"
+
+/** 1.0.0 BLOCKER (#1091): what the element says while a vault is set up by hand. */
+export const SETUP_NOT_BUILT = 'Setting up a vault here is not built yet: signing in to Obsidian Sync, choosing a vault and keeping it syncing (#1091, 1.0.0 blocker).';
+
 function section(title: string): HTMLDivElement {
     const div = document.createElement('div');
     div.className = 'element-section';
@@ -174,7 +179,8 @@ export function createObsidianElement(): Element {
             const vaults = document.createElement('div');
             const more = document.createElement('div');
             vaults.appendChild(said('Loading the node’s vaults…'));
-            content.append(vaults, more);
+            const blocker = said(SETUP_NOT_BUILT, 'obsidian-setup-not-built');
+            content.append(blocker, vaults, more);
 
             void load(vaults, more);
             return content;

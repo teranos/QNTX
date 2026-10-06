@@ -29,7 +29,7 @@ mock.module('./client', () => ({
     unregisterHandler: () => {},
 }));
 
-const { renderVaults, renderNewVault } = await import('./obsidian-element');
+const { renderVaults, renderNewVault, createObsidianElement, SETUP_NOT_BUILT } = await import('./obsidian-element');
 
 afterEach(() => {
     answer = noAnswer;
@@ -41,6 +41,16 @@ const flush = async () => {
 };
 
 const reload = () => Promise.resolve();
+
+describe('setting a vault up is not built yet', () => {
+    // 1.0.0 blocker (#1091): said in the element, not left for somebody to find out.
+    test('the element says so, and names the issue', () => {
+        const body = createObsidianElement().renderContent();
+        expect(body.querySelector('.obsidian-setup-not-built')?.textContent).toBe(SETUP_NOT_BUILT);
+        expect(SETUP_NOT_BUILT).toContain('#1091');
+        expect(SETUP_NOT_BUILT).toContain('1.0.0 blocker');
+    });
+});
 
 describe('ROOT names the folders a vault holds', () => {
     test('a vault shows its path and its folders, one per line', () => {
