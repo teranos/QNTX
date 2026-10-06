@@ -20,6 +20,9 @@ import (
 
 // The node has to sign in to Sync, list the vaults and keep one syncing itself.
 
+// IMPLEMENTME: Phase 7 (ADR-049), notes known to QNTX as attestations. A note is
+// a file in the vault's copy and nothing more; the node attests none of it.
+
 // A VAULT line's predicate is the vault's name.
 const vaultSubject = "VAULT"
 
