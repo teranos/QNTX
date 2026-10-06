@@ -366,7 +366,7 @@ func TestTheRootAgentSaysWhenItIsAnswering(t *testing.T) {
 	}
 	assert.Equal(t, false, am()["answering"])
 
-	s.rootAgent.answering.Store(&turnInSession{session: "s-first"})
+	s.rootAgent.claude.answering.Store(&turnInSession{session: "s-first"})
 	during := am()
 	assert.Equal(t, true, during["answering"])
 	assert.Equal(t, "s-first", during["session"])
