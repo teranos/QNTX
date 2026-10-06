@@ -123,7 +123,9 @@ func vaultBindingServer(t *testing.T) (*QNTXServer, Vault) {
 	}
 	// A filling runs before what started it returns, so a test reads what it wrote.
 	goFill = func(_ string, fn func()) { fn() }
-	t.Cleanup(func() { goFill = sacred.Go })
+	seenDir, keptSeen := t.TempDir(), vaultsSeenDir
+	vaultsSeenDir = func() (string, error) { return seenDir, nil }
+	t.Cleanup(func() { goFill, vaultsSeenDir = sacred.Go, keptSeen })
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	s.authHandler.SetGitHubApp("Iv23li-the-app", string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})))

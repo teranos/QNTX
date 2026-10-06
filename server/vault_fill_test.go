@@ -113,6 +113,28 @@ func TestAPushElsewhereLeavesTheVault(t *testing.T) {
 	assert.Equal(t, "# ADR-001\n\nAs main has it.\n", readNote(t, vault, "Course Material/ADR-001.md"))
 }
 
+// "Should it be deleted there too?"
+
+// "yes"
+
+// A note main had and has no more is gone from the vault; one main never had stays.
+func TestANoteGoneFromMainIsGoneFromTheVault(t *testing.T) {
+	s, vault := vaultBindingServer(t)
+	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
+	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "only here.md"), []byte("mine\n"), 0o644))
+	s.fillVault(t.Context(), "abcd", everyFolder)
+
+	delete(mainNotes, "docs/adr/old/ADR-000.md")
+	filled := s.fillVault(t.Context(), "abcd", everyFolder)
+	require.Len(t, filled, 1)
+	require.NoError(t, filled[0].Refused)
+	assert.Equal(t, []string{"Course Material/old/ADR-000.md"}, filled[0].Removed)
+	assert.NoFileExists(t, filepath.Join(vault.Path, "Course Material", "old", "ADR-000.md"))
+	assert.Equal(t, mainNotes["docs/adr/ADR-001.md"], readNote(t, vault, "Course Material/ADR-001.md"))
+	assert.Equal(t, "mine\n", readNote(t, vault, "Course Material/only here.md"))
+}
+
 // A folder that could not be filled says why, and writes nothing.
 func TestAFolderNotFilledSaysWhy(t *testing.T) {
 	s, vault := vaultBindingServer(t)
