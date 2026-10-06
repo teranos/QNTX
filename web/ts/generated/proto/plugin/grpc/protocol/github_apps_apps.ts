@@ -62,6 +62,62 @@ export interface GitHubCreateAnInstallationAccessTokenForAnAppResponse {
   single_file_paths: string[];
 }
 
+/** GET /app/installations */
+export interface GitHubListInstallationsForTheAuthenticatedAppRequest {
+  per_page: number;
+  page: number;
+  since: string;
+  outdated: string;
+}
+
+export interface GitHubListInstallationsForTheAuthenticatedAppResponse {
+  success: boolean;
+  error: string;
+  items: GitHubAppsAppsInstallation[];
+}
+
+/** Installation */
+export interface GitHubAppsAppsInstallation {
+  id: number;
+  /** Any of Simple User or Enterprise. */
+  account: { [key: string]: any } | undefined;
+  repository_selection: string;
+  access_tokens_url: string;
+  repositories_url: string;
+  html_url: string;
+  app_id: number;
+  client_id: string;
+  target_id: number;
+  target_type: string;
+  permissions: GitHubAppsAppsAppPermissions | undefined;
+  events: string[];
+  created_at: string;
+  updated_at: string;
+  single_file_name: string;
+  has_multiple_single_files: boolean;
+  single_file_paths: string[];
+  app_slug: string;
+  suspended_by: GitHubAppsAppsSimpleUser | undefined;
+  suspended_at: string;
+  contact_email: string;
+}
+
+/** GET /installation/repositories */
+export interface GitHubListRepositoriesAccessibleToTheAppInstallationRequest {
+  namespace: string;
+  per_page: number;
+  page: number;
+}
+
+export interface GitHubListRepositoriesAccessibleToTheAppInstallationResponse {
+  success: boolean;
+  error: string;
+  total_count: number;
+  /** Repository */
+  repositories: { [key: string]: any }[];
+  repository_selection: string;
+}
+
 /** App Permissions */
 export interface GitHubAppsAppsAppPermissions {
   actions: string;

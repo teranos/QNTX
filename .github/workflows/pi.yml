@@ -1,0 +1,41 @@
+{
+  "jobs": {
+    "build": {
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v26",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx"
+          }
+        },
+        {
+          "name": "Build the pinned Pi into the cache",
+          "run": "FLAKE=\"$(tr -d '[:space:]' < internal/pi/pinned-flake)\"\necho \"Building $FLAKE\"\nnix build \"$FLAKE\" --print-build-logs --print-out-paths --no-link | cachix push qntx\n"
+        }
+      ]
+    }
+  },
+  "name": "Pi",
+  "on": {
+    "push": {
+      "paths": [
+        "internal/pi/pinned-flake"
+      ]
+    },
+    "workflow_dispatch": null
+  }
+}

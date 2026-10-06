@@ -64,8 +64,9 @@ var storeWriters = map[string]string{
 	"nodeRecord": "the node's GitHub settings (ADR-043), what the node knows of itself. " +
 		"Reached from the github sigils, which the reach table gives to ROOT",
 
-	"claudeSay": "the ROOT agent's session, which is the node's own record whoever spoke " +
-		"to it (ADR-048). Reached from the claude sigils, which the reach table gives to ROOT",
+	"sayInHarness": "the ROOT agent's session in each of its harnesses, which is the node's own " +
+		"record whoever spoke to it (ADR-048). Reached from the claude and pi sigils, which the " +
+		"reach table gives to ROOT",
 
 	"systemAttestor": "what the node writes about itself at the door. The /auth/… routes " +
 		"are ANYONE because logging in cannot ask you to be logged in, so no admission " +

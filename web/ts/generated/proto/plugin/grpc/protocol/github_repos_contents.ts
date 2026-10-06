@@ -50,6 +50,47 @@ export interface GitHubGetRepositoryContentResponse {
   download_url: string;
 }
 
+/** PUT /repos/{owner}/{repo}/contents/{path} */
+export interface GitHubCreateOrUpdateFileContentsRequest {
+  namespace: string;
+  owner: string;
+  repo: string;
+  path: string;
+  message: string;
+  content: string;
+  sha: string;
+  branch: string;
+}
+
+export interface GitHubCreateOrUpdateFileContentsResponse {
+  success: boolean;
+  error: string;
+  /** File Commit: content */
+  content:
+    | { [key: string]: any }
+    | undefined;
+  /** File Commit: commit */
+  commit: { [key: string]: any } | undefined;
+}
+
+/** DELETE /repos/{owner}/{repo}/contents/{path} */
+export interface GitHubDeleteAFileRequest {
+  namespace: string;
+  owner: string;
+  repo: string;
+  path: string;
+  message: string;
+  sha: string;
+  branch: string;
+}
+
+export interface GitHubDeleteAFileResponse {
+  success: boolean;
+  error: string;
+  /** File Commit: commit */
+  commit: { [key: string]: any } | undefined;
+}
+
 /** GET /repos/{owner}/{repo}/readme */
 export interface GitHubGetARepositoryREADMERequest {
   namespace: string;

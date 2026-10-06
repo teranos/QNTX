@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protocol;
 
+import "google/protobuf/struct.proto";
+
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
 // ADR-043
@@ -45,6 +47,45 @@ message GitHubGetRepositoryContentResponse {
   string git_url = 12;
   string html_url = 13;
   string download_url = 14;
+}
+
+// PUT /repos/{owner}/{repo}/contents/{path}
+message GitHubCreateOrUpdateFileContentsRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string path = 4;
+  string message = 5;
+  string content = 6;
+  string sha = 7;
+  string branch = 8;
+}
+
+message GitHubCreateOrUpdateFileContentsResponse {
+  bool success = 1;
+  string error = 2;
+  // File Commit: content
+  google.protobuf.Struct content = 3;
+  // File Commit: commit
+  google.protobuf.Struct commit = 4;
+}
+
+// DELETE /repos/{owner}/{repo}/contents/{path}
+message GitHubDeleteAFileRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string path = 4;
+  string message = 5;
+  string sha = 6;
+  string branch = 7;
+}
+
+message GitHubDeleteAFileResponse {
+  bool success = 1;
+  string error = 2;
+  // File Commit: commit
+  google.protobuf.Struct commit = 3;
 }
 
 // GET /repos/{owner}/{repo}/readme

@@ -24,6 +24,7 @@ import "plugin/grpc/protocol/github_repos_repos.proto";
 import "plugin/grpc/protocol/github_repos_contents.proto";
 import "plugin/grpc/protocol/github_apps_webhooks.proto";
 import "plugin/grpc/protocol/github_apps_apps.proto";
+import "plugin/grpc/protocol/github_git_refs.proto";
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
@@ -415,6 +416,13 @@ service GitHubService {
   rpc GetARepositoryREADME(GitHubGetARepositoryREADMERequest) returns (GitHubGetARepositoryREADMEResponse);
   // https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
   rpc GetARepositoryREADMEForADirectory(GitHubGetARepositoryREADMEForADirectoryRequest) returns (GitHubGetARepositoryREADMEResponse);
+  // https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#create-or-update-file-contents
+  rpc CreateOrUpdateFileContents(GitHubCreateOrUpdateFileContentsRequest) returns (GitHubCreateOrUpdateFileContentsResponse);
+  // https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#delete-a-file
+  rpc DeleteAFile(GitHubDeleteAFileRequest) returns (GitHubDeleteAFileResponse);
+
+  // https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#create-a-reference
+  rpc CreateAReference(GitHubCreateAReferenceRequest) returns (GitHubCreateAReferenceResponse);
 
   // https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#list-deliveries-for-an-app-webhook
   rpc ListDeliveriesForAnAppWebhook(GitHubListDeliveriesForAnAppWebhookRequest) returns (GitHubListDeliveriesForAnAppWebhookResponse);
@@ -425,6 +433,11 @@ service GitHubService {
   rpc GetARepositoryInstallationForTheAuthenticatedApp(GitHubGetARepositoryInstallationForTheAuthenticatedAppRequest) returns (GitHubGetARepositoryInstallationForTheAuthenticatedAppResponse);
   // https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#create-an-installation-access-token-for-an-app
   rpc CreateAnInstallationAccessTokenForAnApp(GitHubCreateAnInstallationAccessTokenForAnAppRequest) returns (GitHubCreateAnInstallationAccessTokenForAnAppResponse);
+  // https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#list-installations-for-the-authenticated-app
+  rpc ListInstallationsForTheAuthenticatedApp(GitHubListInstallationsForTheAuthenticatedAppRequest) returns (GitHubListInstallationsForTheAuthenticatedAppResponse);
+
+  // https://docs.github.com/en/rest/apps/installations?apiVersion=2026-03-10#list-repositories-accessible-to-the-app-installation
+  rpc ListRepositoriesAccessibleToTheAppInstallation(GitHubListRepositoriesAccessibleToTheAppInstallationRequest) returns (GitHubListRepositoriesAccessibleToTheAppInstallationResponse);
 }
 
 message GitHubRateLimitRequest {

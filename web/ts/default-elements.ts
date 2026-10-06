@@ -21,8 +21,10 @@ import { createUsersElement } from './users-element.ts';
 import { createMarketElement } from './market-element.ts';
 import { createMailElement } from './mail-element.ts';
 import { createGitHubElement } from './github-element.ts';
+import { createObsidianElement } from './obsidian-element.ts';
 import { createGroundElement } from './ground-element.ts';
 import { createClaudeElement } from './claude-element.ts';
+import { createPiElement } from './pi-element.ts';
 import { createIElement } from './i-element.ts';
 import { createAmElement } from './am-element.ts';
 import { createParityElement } from './parity-element.ts';
@@ -72,11 +74,15 @@ export function registerDefaultElements(hasCanvas: boolean = true): void {
     // GitHub Element — the node's GitHub and its Actions runner, opened from ⍟ (ADR-043)
     tray.add(createGitHubElement());
 
+    // Obsidian Element — the vaults the node keeps, and the folders each holds (ADR-049)
+    tray.add(createObsidianElement());
+
     // Ground Element — aware of anything Ground; the sessions it recorded, each opened as a Transcript
     tray.add(createGroundElement());
 
     // ✻ — the ROOT agent: said to, and read as the session it continues (ADR-048)
     tray.add(createClaudeElement());
+    tray.add(createPiElement());
 
     // Usage & Cost Chart Element
     // TODO(future): Budget alerting with notifications

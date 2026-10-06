@@ -85,6 +85,18 @@ func (p gitHubPush) touched(path string) bool {
 	return false
 }
 
+// touchedUnder is whether the push changed anything inside folder.
+func (p gitHubPush) touchedUnder(folder string) bool {
+	for _, c := range p.Commits {
+		for _, changed := range slices.Concat(c.Added, c.Removed, c.Modified) {
+			if strings.HasPrefix(changed, folder+"/") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // moves is whether the push moves a source of b.
 func (p gitHubPush) moves(b pluginBuild) bool {
 	for _, source := range b.sources() {
@@ -151,7 +163,8 @@ func (s *QNTXServer) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request)
 		s.dispatchApp(tag)
 	}
 	names := s.buildsMovedBy(push)
-	respond(w, s.logger, http.StatusOK, map[string][]string{"building": names})
+	filling := s.vaultsMovedBy(push)
+	respond(w, s.logger, http.StatusOK, map[string][]string{"building": names, "filling": filling})
 }
 
 // buildsMovedBy starts the build of every enabled plugin push moves, and names them.

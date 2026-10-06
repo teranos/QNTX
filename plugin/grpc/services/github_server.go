@@ -340,6 +340,10 @@ func (s *GitHubServer) credential(ctx context.Context, route githubRoute, msg pr
 		}
 		return token, githubAppKey, "", nil
 	}
+	if id, of := ctx.Value(githubInstallationID{}).(int64); of {
+		token, key, err = s.installationTokenOf(ctx, id)
+		return token, key, "", err
+	}
 	if ctx.Value(githubAsInstallation{}) != nil {
 		token, key, err = s.asInstallation(ctx, msg)
 		return token, key, "", err

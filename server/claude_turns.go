@@ -9,6 +9,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/internal/claudecode"
+	"github.com/teranos/QNTX/internal/pi"
 	"github.com/teranos/errors"
 )
 
@@ -170,4 +171,52 @@ func (w sessionWriter) rowsOf(m claudecode.Message, at time.Time) ([]*types.As, 
 		}
 	}
 	return rows, nil
+}
+
+// rowsOfPi is what one record of Pi's stream says happened, as the same hook
+// events Claude Code's are written as: Pi starting, each tool it reached for,
+// and how the turn ended.
+func (w sessionWriter) rowsOfPi(e pi.Event, at time.Time) ([]*types.As, error) {
+	// At when the node read it: most of Pi's records carry no time, and two
+	// clocks in one session misorder it.
+	switch {
+	case e.Type == "session":
+		row, err := w.row("SessionStart", at, map[string]any{"source": "pi"})
+		return []*types.As{row}, err
+	case e.Type == "tool_execution_start":
+		var input struct {
+			Path    string `json:"path"`
+			Command string `json:"command"`
+		}
+		if len(e.Args) > 0 {
+			if err := json.Unmarshal(e.Args, &input); err != nil {
+				return nil, errors.Wrapf(err, "the arguments of %s did not read", e.ToolName)
+			}
+		}
+		attrs := map[string]any{"tool_name": e.ToolName, "tool_use_id": e.ToolCallID}
+		if input.Path != "" {
+			attrs["file_path"] = input.Path
+		}
+		if input.Command != "" {
+			attrs["command"] = input.Command
+		}
+		row, err := w.row("PreToolUse", at, attrs)
+		return []*types.As{row}, err
+	case e.Type == "message_end" && e.Message != nil && e.Message.Role == "assistant":
+		m := e.Message
+		switch m.StopReason {
+		case "toolUse":
+			return nil, nil
+		case "error", "aborted":
+			row, err := w.row("StopFailure", at, map[string]any{"error": m.StopReason, "last_assistant_message": m.ErrorMessage})
+			return []*types.As{row}, err
+		}
+		attrs := map[string]any{"last_assistant_message": m.Text()}
+		if w.effort != "" {
+			attrs["effort"] = map[string]any{"level": w.effort}
+		}
+		row, err := w.row("Stop", at, attrs)
+		return []*types.As{row}, err
+	}
+	return nil, nil
 }

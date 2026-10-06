@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package protocol;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ADR-043, ADR-049
+// https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10
+
+// POST /repos/{owner}/{repo}/git/refs
+message GitHubCreateAReferenceRequest {
+  string namespace = 1;
+  string owner = 2;
+  string repo = 3;
+  string ref = 4;
+  string sha = 5;
+}
+
+message GitHubCreateAReferenceResponse {
+  bool success = 1;
+  string error = 2;
+  string ref = 3;
+  string node_id = 4;
+  string url = 5;
+  google.protobuf.Struct object = 6;
+}

@@ -19,10 +19,31 @@ QNTX hosts agents for use by ROOT.
 - A Task's messages have two roles, user and agent: the user is who sent it,
   the agent is the one doing it. Who may see the Task is the sender's
   admission; what the agent touches is the agent's.
-- The ROOT agent is ROOT, and no namespace holds it: its session is the node's
-  own record, in system, whoever spoke to it and wherever they stand.
+- ROOT's agents are ROOT, and no namespace holds them: their sessions are the
+  node's own record, in system, whoever spoke to them and wherever they stand.
 - To A2A an agent is described by its Agent Card, and its skills are what it
   can perform (ADR-039).
+
+## An agent per model
+
+"I feel like Opus and Fable are two distinct identities"
+
+"each model would be its own agent session, independent of each other but still
+reachable by each other."
+
+- An agent is one model in one place: its own DID, its own session, its own
+  context. Two models are two agents, and so is one model in two places.
+- They reach each other, each an A2A Server to the others and their A2A
+  Client.
+
+"So the first persistent Agent swarm is really three, or four if we include
+something we run on Pi"
+
+- ROOT's are Opus, Fable and Sonnet in Claude Code, and the one in Pi.
+
+"So a conversation I have with Mistral as ROOT is one long Mistral conversation"
+
+- Each of ROOT's agents is one session with ROOT, and it continues.
 
 ## The host agent
 
@@ -37,15 +58,16 @@ expressed to ROOT."
 
 "we cant just have any ai be the ROOT agent"
 
-- It is Claude Code, run by the node, on Opus 5.5 at low effort. Only Claude
-  can be it.
-- am.toml names it under `[agent.root]`: the model, the effort, and a
+- In Claude Code it is Claude, run by the node: Opus, Fable and Sonnet, each a
+  ROOT agent of its own. Only Claude runs there.
+- am.toml names each under `[agent.root]`: its model, its effort, and a
   reference to the Claude plan token. A node that names no model has no ROOT
   agent, and nothing stands in for the model named.
 - It is one session: `--resume` continues it, and Claude Code compacts its own
   context.
-- Its key is derived from the node's own, so it is the same DID wherever the
-  node is rebuilt from its record, and nothing more is kept for it.
+- Its key is derived from the node's own, for its model, so it is the same DID
+  wherever the node is rebuilt from its record, and nothing more is kept for
+  it.
 - It reaches sigils through the node's own MCP, with a token of its own. The
   token is ROOT's kind, which minting hands to nobody, and the node writes it
   down for this agent alone.
@@ -77,6 +99,72 @@ expressed to ROOT."
 
 The loop is Claude Code's, not the node's: "accepted." The node hosts the
 process. It starts it, resumes it and stops it.
+
+## Its harnesses
+
+"IS BECAUSE I WANT TO EXPECT THAT IT WILL HAPPEN THAT I RUN OUT"
+
+"AND HAVE A FALLBACK"
+
+"NOT BE ENTIRELY DEPENDENT ON ONE HARNESS"
+
+"IF PI DOESNT WORK, WE PAY MONEY FOR BEDROCK"
+
+"IT MEANS WE ALSO NEED A PI ELEMENT"
+
+- It runs in Claude Code or in Pi (earendil-works/pi). What is said in the
+  Claude element runs in Claude Code, and what is said in the Pi element runs
+  in Pi.
+"WHY ISNT PI SEPARATE"
+
+- The one in Pi is an agent of its own: its own DID, its own token, its own
+  session. Each element reads its own agent's session, and they answer at the
+  same time.
+- Pi reaches the node's MCP with the agent's own token, and its model calls go
+  to the provider am.toml names under `[agent.root.pi]`.
+- The node gets Pi as it gets Claude Code, pinned by the build and nothing
+  installed by hand: a revision of Pi's flake, built by the box's Nix.
+- Pi asks before no tool call and has no sandbox, so on the box its hands are
+  root's with nothing between.
+- Each agent keeps its own context. What was said to one is in its session,
+  and is not in another's memory.
+
+"LETS SAY FOR DEVELOPMENT WEE USE"
+
+- In Pi it runs the model am.toml names, which need not be Claude: during
+  development, `openai/gpt-oss-120b` through OpenRouter. In Claude Code only
+  Claude can be it.
+
+## The namespace agent
+
+"an agent session for a particular namespace, different concept from the ROOT
+host agent"
+
+"The shared namespace agent, opted into"
+
+"The Namespace agent is a common Agent of the Namespace it’s opted into. That
+means the one who sets it up knows it’s shared amongst anyone who has REACH on
+it."
+
+- It is an agent the node hosts, reached over A2A by its tenant, and the
+  tenant is its namespace. It stands in that namespace and nothing crosses
+  (ADR-026).
+- Who may see its Tasks is REACH on its namespace: A2A's "Project or workspace
+  membership (project-based authorization)" (§13.1).
+- A namespace opts into a model, and its agent is that model there: a
+  namespace's Sonnet and ROOT's Sonnet are two agents.
+
+"The one who set’s it up does, they provide their own Subscription or API key"
+
+- Every model call it makes is on that credential, whoever with REACH spoke to
+  it.
+
+"Namespaces shouldn’t be catalogued"
+
+- Its card is not at /.well-known/agent-card.json and is in no list. It is
+  given to who has REACH on its namespace, A2A's "Direct Configuration" (§8.2).
+- To who has no REACH, a namespace with an agent answers as one that does not
+  exist (§3.3.2).
 
 ## First uses
 
@@ -136,6 +224,8 @@ runs has none of what building QNTX takes.
 For the first story. It ends in something that can be checked.
 
 1. The box upgraded.
+2. An agent per model. The node derives one DID for the ROOT agent
+   (`agent:root`) and gives it one session in each harness.
 
 The node does not see the model traffic of an agent Claude Code runs.
 
@@ -145,3 +235,6 @@ Ground's last release is behind its main, so Ground on the box takes a Ground
 release.
 
 "Upgrading the box is in scope"
+
+A turn that Claude Code cannot answer because the plan is spent is not handed
+to Pi by itself: what Claude Code answers then has not been seen.

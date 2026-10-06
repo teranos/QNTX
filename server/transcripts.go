@@ -278,18 +278,19 @@ func turnOf(as *types.As) (transcriptTurn, bool) {
 	return turn, true
 }
 
-// toolTurn is a tool call as loom labelled it.
+// toolTurn is a tool call as loom labelled it. Claude Code names its tools
+// Bash and Read, and Pi bash and read: they are one tool to a transcript.
 func toolTurn(tool, path, command string) (string, string) {
-	switch tool {
-	case "Bash":
+	switch strings.ToLower(tool) {
+	case "bash":
 		return "tool", command
-	case "Edit", "MultiEdit", "NotebookEdit":
+	case "edit", "multiedit", "notebookedit":
 		return "edit", path
-	case "Write":
+	case "write":
 		return "write", path
-	case "Read":
+	case "read":
 		return "read", path
-	case "Grep", "Glob":
+	case "grep", "glob", "find", "ls":
 		return "search", tool
 	}
 	if strings.HasPrefix(tool, "mcp__") {

@@ -8,8 +8,16 @@
     "path": "/app/hook/deliveries/{delivery_id}/attempts"
   },
   {
+    "method": "get",
+    "path": "/app/installations"
+  },
+  {
     "method": "post",
     "path": "/app/installations/{installation_id}/access_tokens"
+  },
+  {
+    "method": "get",
+    "path": "/installation/repositories"
   },
   {
     "method": "get",
@@ -416,7 +424,15 @@
     "path": "/repos/{owner}/{repo}/compare/{basehead}"
   },
   {
+    "method": "delete",
+    "path": "/repos/{owner}/{repo}/contents/{path}"
+  },
+  {
     "method": "get",
+    "path": "/repos/{owner}/{repo}/contents/{path}"
+  },
+  {
+    "method": "put",
     "path": "/repos/{owner}/{repo}/contents/{path}"
   },
   {
@@ -426,6 +442,10 @@
   {
     "method": "post",
     "path": "/repos/{owner}/{repo}/dispatches"
+  },
+  {
+    "method": "post",
+    "path": "/repos/{owner}/{repo}/git/refs"
   },
   {
     "method": "get",

@@ -16,6 +16,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/element/handlers"
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -26,7 +27,6 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/namespaces"
-	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -50,7 +50,7 @@ type QNTXServer struct {
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes
 	nodeDID             *nodedid.Handler      // node's decentralized identity
-	claudeCode          *claudeCodeHeld       // The pinned Claude Code this node fetched; nil when am.toml names no agent (ADR-048)
+	harnessBinaries     harnessesHeld         // Each harness the ROOT agent runs in, as this node holds its binary, by the harness's name (ADR-048)
 	rootAgent           *rootAgent            // The ROOT agent this node runs; nil when am.toml names none (ADR-048)
 	noRootAgent         error                 // Why the ROOT agent am.toml names did not start, for whoever speaks to it
 	ownURL              string                // Where this node answers on its own machine; empty until it listens

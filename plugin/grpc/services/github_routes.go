@@ -377,6 +377,13 @@ var githubRoutes = map[string]githubRoute{
 	"GetARepositoryREADME": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme", query: []string{"ref"}},
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
 	"GetARepositoryREADMEForADirectory": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme/{dir}", query: []string{"ref"}, slashed: []string{"dir"}},
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#create-or-update-file-contents
+	"CreateOrUpdateFileContents": {method: http.MethodPut, path: "/repos/{owner}/{repo}/contents/{path}", body: []string{"message", "content", "sha", "branch"}, slashed: []string{"path"}},
+	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#delete-a-file
+	"DeleteAFile": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/contents/{path}", body: []string{"message", "sha", "branch"}, slashed: []string{"path"}},
+
+	// https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#create-a-reference
+	"CreateAReference": {method: http.MethodPost, path: "/repos/{owner}/{repo}/git/refs", body: []string{"ref", "sha"}},
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#list-deliveries-for-an-app-webhook
 	"ListDeliveriesForAnAppWebhook": {method: http.MethodGet, path: "/app/hook/deliveries", query: []string{"per_page", "cursor", "status"}, asApp: true},
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
@@ -386,6 +393,11 @@ var githubRoutes = map[string]githubRoute{
 	"GetARepositoryInstallationForTheAuthenticatedApp": {method: http.MethodGet, path: "/repos/{owner}/{repo}/installation", asApp: true},
 	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#create-an-installation-access-token-for-an-app
 	"CreateAnInstallationAccessTokenForAnApp": {method: http.MethodPost, path: "/app/installations/{installation_id}/access_tokens", body: []string{"repositories", "repository_ids", "permissions"}, asApp: true, mints: true},
+	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#list-installations-for-the-authenticated-app
+	"ListInstallationsForTheAuthenticatedApp": {method: http.MethodGet, path: "/app/installations", query: []string{"per_page", "page", "since", "outdated"}, asApp: true},
+
+	// https://docs.github.com/en/rest/apps/installations?apiVersion=2026-03-10#list-repositories-accessible-to-the-app-installation
+	"ListRepositoriesAccessibleToTheAppInstallation": {method: http.MethodGet, path: "/installation/repositories", query: []string{"per_page", "page"}},
 }
 
 func (s *GitHubServer) GetTheCombinedStatusForASpecificReference(ctx context.Context, req *protocol.GitHubGetTheCombinedStatusForASpecificReferenceRequest) (*protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse, error) {
@@ -1116,6 +1128,18 @@ func (s *GitHubServer) GetARepositoryREADMEForADirectory(ctx context.Context, re
 	return githubAnswer(s, ctx, "GetARepositoryREADMEForADirectory", req, &protocol.GitHubGetARepositoryREADMEResponse{})
 }
 
+func (s *GitHubServer) CreateOrUpdateFileContents(ctx context.Context, req *protocol.GitHubCreateOrUpdateFileContentsRequest) (*protocol.GitHubCreateOrUpdateFileContentsResponse, error) {
+	return githubAnswer(s, ctx, "CreateOrUpdateFileContents", req, &protocol.GitHubCreateOrUpdateFileContentsResponse{})
+}
+
+func (s *GitHubServer) DeleteAFile(ctx context.Context, req *protocol.GitHubDeleteAFileRequest) (*protocol.GitHubDeleteAFileResponse, error) {
+	return githubAnswer(s, ctx, "DeleteAFile", req, &protocol.GitHubDeleteAFileResponse{})
+}
+
+func (s *GitHubServer) CreateAReference(ctx context.Context, req *protocol.GitHubCreateAReferenceRequest) (*protocol.GitHubCreateAReferenceResponse, error) {
+	return githubAnswer(s, ctx, "CreateAReference", req, &protocol.GitHubCreateAReferenceResponse{})
+}
+
 func (s *GitHubServer) ListDeliveriesForAnAppWebhook(ctx context.Context, req *protocol.GitHubListDeliveriesForAnAppWebhookRequest) (*protocol.GitHubListDeliveriesForAnAppWebhookResponse, error) {
 	return githubAnswer(s, ctx, "ListDeliveriesForAnAppWebhook", req, &protocol.GitHubListDeliveriesForAnAppWebhookResponse{})
 }
@@ -1130,4 +1154,12 @@ func (s *GitHubServer) GetARepositoryInstallationForTheAuthenticatedApp(ctx cont
 
 func (s *GitHubServer) CreateAnInstallationAccessTokenForAnApp(ctx context.Context, req *protocol.GitHubCreateAnInstallationAccessTokenForAnAppRequest) (*protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse, error) {
 	return githubAnswer(s, ctx, "CreateAnInstallationAccessTokenForAnApp", req, &protocol.GitHubCreateAnInstallationAccessTokenForAnAppResponse{})
+}
+
+func (s *GitHubServer) ListInstallationsForTheAuthenticatedApp(ctx context.Context, req *protocol.GitHubListInstallationsForTheAuthenticatedAppRequest) (*protocol.GitHubListInstallationsForTheAuthenticatedAppResponse, error) {
+	return githubAnswer(s, ctx, "ListInstallationsForTheAuthenticatedApp", req, &protocol.GitHubListInstallationsForTheAuthenticatedAppResponse{})
+}
+
+func (s *GitHubServer) ListRepositoriesAccessibleToTheAppInstallation(ctx context.Context, req *protocol.GitHubListRepositoriesAccessibleToTheAppInstallationRequest) (*protocol.GitHubListRepositoriesAccessibleToTheAppInstallationResponse, error) {
+	return githubAnswer(s, ctx, "ListRepositoriesAccessibleToTheAppInstallation", req, &protocol.GitHubListRepositoriesAccessibleToTheAppInstallationResponse{})
 }

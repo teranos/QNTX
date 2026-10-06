@@ -138,9 +138,17 @@ REACH is '/api/parity/hold' '/api/parity/storage' '/api/parity/follows'   of ROO
 # What was said and done in each agent session Ground recorded (transcripts).
 REACH is '/api/transcripts'                                               of ROOT SUPER
 
+# The Obsidian vaults the node keeps a copy of, and the folders each holds (ADR-049).
+REACH is '/api/vault'                                                     of ROOT
+REACH is '/api/vault/dirs' '/api/vault/states' '/api/vault/bind'          of ROOT
+REACH is '/api/vault/unbind' '/api/vault/disable' '/api/vault/enable'     of ROOT
+REACH is '/api/vault/send'                                                of ROOT
+REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROOT
+
 # The ROOT agent (the claude signum, ADR-048). Who may talk to it is the whole
 # of what guards it, and that is ROOT.
 REACH is '/api/claude' '/api/claude/say' '/api/claude/session'            of ROOT
+REACH is '/api/pi' '/api/pi/say' '/api/pi/session'                        of ROOT
 
 # A2A over HTTP+JSON, one line for every operation: a route like
 # /tasks/{id}:cancel is no pattern the mux reads. "A2A is ROOT's alone for the

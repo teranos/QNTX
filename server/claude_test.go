@@ -35,7 +35,8 @@ const claudeAnswered = `{"type":"system","subtype":"init","session_id":"s-1","mo
 `
 
 // claudeStandIn is a program standing in for Claude Code: each run writes down
-// how it was run, under ran/<n>, and prints the stream.
+// how it was run, under ran/<n>, and prints the stream. A session it starts it
+// keeps where Claude Code keeps one.
 func claudeStandIn(t *testing.T, stream string) (binary, ran string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -48,6 +49,13 @@ func claudeStandIn(t *testing.T, stream string) (binary, ran string) {
 		"mkdir '" + ran + "'/$n\n" +
 		"for arg in \"$@\"; do printf '%s\\n' \"$arg\"; done > '" + ran + "'/$n/args\n" +
 		"env > '" + ran + "'/$n/env\n" +
+		"prev=''\n" +
+		"for arg in \"$@\"; do\n" +
+		"  if [ \"$prev\" = '--session-id' ] && [ -n \"$CLAUDE_CONFIG_DIR\" ]; then\n" +
+		"    mkdir -p \"$CLAUDE_CONFIG_DIR/projects/work\" && : > \"$CLAUDE_CONFIG_DIR/projects/work/$arg.jsonl\"\n" +
+		"  fi\n" +
+		"  prev=\"$arg\"\n" +
+		"done\n" +
 		"cat '" + canned + "'\n"
 	binary = filepath.Join(dir, "claude")
 	require.NoError(t, os.WriteFile(binary, []byte(script), 0o755))
@@ -103,20 +111,20 @@ func runningTheRootAgent(t *testing.T, named appcfg.RootAgentConfig) (s *QNTXSer
 	system, _ := createTestStore(t)
 	held.SetSystem(oneNamespace("system", &handed{AttestationStore: system}))
 	s = &QNTXServer{
-		held:       held,
-		logger:     zaptest.NewLogger(t).Sugar(),
-		deps:       &serverDependencies{cfg: &appcfg.Config{Agent: appcfg.AgentConfig{Root: named}}},
-		claudeCode: &claudeCodeHeld{fetched: fetched, path: binary},
-		rootAgent:  agent,
-		ctx:        context.Background(),
-		ownURL:     "http://127.0.0.1:8770",
+		held:      held,
+		logger:    zaptest.NewLogger(t).Sugar(),
+		deps:      &serverDependencies{cfg: &appcfg.Config{Agent: appcfg.AgentConfig{Root: named}}},
+		rootAgent: agent,
+		ctx:       context.Background(),
+		ownURL:    "http://127.0.0.1:8770",
 	}
+	s.holdHarness("claude", &harnessHeld{fetched: fetched, path: binary})
 	return s, ran
 }
 
 func saying(s *QNTXServer, sent sigil.Sent) (map[string]any, *protocol.Refusal) {
 	asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
-	answer, refused := s.claudeSay(sigil.WithCaller(context.Background(), asked), sent)
+	answer, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.claudeHarness(), sent)
 	if refused != nil {
 		return nil, refused
 	}
@@ -139,7 +147,7 @@ func TestWhatIsSaidToTheRootAgentIsAnsweredByClaudeCode(t *testing.T) {
 	assert.Equal(t, "claude-opus-5-5", answer["model"])
 	assert.Equal(t, "dontAsk", answer["permission_mode"])
 	assert.Equal(t, []string{"Write"}, answer["denied"])
-	holds(t, s.claudeSignum(), "say", answer)
+	holds(t, s.harnessSignum(s.claudeHarness()), "say", answer)
 
 	args := ranWith(t, ran, "0", "args")
 	assert.Equal(t, "how long has the box been up?", after(args, "-p"))
@@ -212,7 +220,7 @@ func TestTheRootAgentIsOneSessionWhereverItsSpeakersStand(t *testing.T) {
 		root.Identity = "https://example.org/" + namespace
 		asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
 		asked = asked.WithContext(auth.WithAdmission(asked.Context(), root))
-		_, refused := s.claudeSay(sigil.WithCaller(context.Background(), asked), sigil.Sent{"says": says})
+		_, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.claudeHarness(), sigil.Sent{"says": says})
 		require.Nil(t, refused)
 	}
 	from("default", "from the browser")
@@ -231,10 +239,9 @@ func TestTheRootAgentIsOneSessionWhereverItsSpeakersStand(t *testing.T) {
 // speaker and text.
 func sessionSaid(t *testing.T, s *QNTXServer) [][2]string {
 	t.Helper()
-	asked := httptest.NewRequest(http.MethodGet, "/api/claude/session", nil)
-	answer, refused := s.claudeSession(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+	answer, refused := s.harnessSession(s.claudeHarness())
 	require.Nil(t, refused)
-	holds(t, s.claudeSignum(), "session", answer)
+	holds(t, s.harnessSignum(s.claudeHarness()), "session", answer)
 	read, _ := answer.(map[string]any)["transcript"].(transcript)
 	var said [][2]string
 	for _, turn := range read.Turns {
@@ -268,7 +275,7 @@ func TestWhoSpokeToTheRootAgentIsWrittenDown(t *testing.T) {
 	asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
 	asked = asked.WithContext(auth.WithAdmission(asked.Context(), root))
 
-	answer, refused := s.claudeSay(sigil.WithCaller(context.Background(), asked), sigil.Sent{"says": "hello"})
+	answer, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.claudeHarness(), sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
 	session, _ := answer.(map[string]any)["session"].(string)
 
@@ -288,7 +295,7 @@ func TestTheRootAgentDoesNotSpeakToItself(t *testing.T) {
 	asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
 	asked = asked.WithContext(auth.WithAdmission(asked.Context(), itself))
 
-	_, refused := s.claudeSay(sigil.WithCaller(context.Background(), asked), sigil.Sent{"says": "hello me"})
+	_, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.claudeHarness(), sigil.Sent{"says": "hello me"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotAllowed, refused.GetWhy())
 	runs, err := os.ReadDir(ran)
@@ -316,8 +323,7 @@ func TestARootAgentThatDidNotStartSaysWhy(t *testing.T) {
 	assert.Equal(t, sigil.Failed, refused.GetWhy())
 	assert.Contains(t, refused.GetSays(), "tok-1 is switched off")
 
-	asked := httptest.NewRequest(http.MethodGet, "/api/claude", nil)
-	_, refused = s.claudeAm(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+	_, refused = s.harnessAm(s.claudeHarness())
 	require.NotNil(t, refused)
 	assert.Contains(t, refused.GetSays(), "tok-1 is switched off")
 }
@@ -326,9 +332,8 @@ func TestARootAgentThatDidNotStartSaysWhy(t *testing.T) {
 // draws before anything is said.
 func TestTheRootAgentSaysWhoItIs(t *testing.T) {
 	s, _ := runningTheRootAgent(t, opusLow)
-	asked := httptest.NewRequest(http.MethodGet, "/api/claude", nil)
 
-	before, refused := s.claudeAm(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+	before, refused := s.harnessAm(s.claudeHarness())
 	require.Nil(t, refused)
 	is := before.(map[string]any)
 	assert.Equal(t, s.rootAgent.did, is["did"])
@@ -337,11 +342,11 @@ func TestTheRootAgentSaysWhoItIs(t *testing.T) {
 	assert.Equal(t, "dontAsk", is["permission_mode"])
 	assert.Equal(t, appcfg.PermissionModes, is["permission_modes"])
 	assert.Equal(t, "", is["session"])
-	holds(t, s.claudeSignum(), "am", is)
+	holds(t, s.harnessSignum(s.claudeHarness()), "am", is)
 
 	answer, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
-	after, refused := s.claudeAm(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+	after, refused := s.harnessAm(s.claudeHarness())
 	require.Nil(t, refused)
 	assert.Equal(t, answer["session"], after.(map[string]any)["session"])
 }
@@ -350,15 +355,14 @@ func TestTheRootAgentSaysWhoItIs(t *testing.T) {
 // can be read as it does it, from the first thing ever said to it.
 func TestTheRootAgentSaysWhenItIsAnswering(t *testing.T) {
 	s, _ := runningTheRootAgent(t, opusLow)
-	asked := httptest.NewRequest(http.MethodGet, "/api/claude", nil)
 	am := func() map[string]any {
-		is, refused := s.claudeAm(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+		is, refused := s.harnessAm(s.claudeHarness())
 		require.Nil(t, refused)
 		return is.(map[string]any)
 	}
 	assert.Equal(t, false, am()["answering"])
 
-	s.rootAgent.answering.Store(&turnInSession{session: "s-first"})
+	s.rootAgent.in(s.claudeHarness()).answering.Store(&turnInSession{session: "s-first"})
 	during := am()
 	assert.Equal(t, true, during["answering"])
 	assert.Equal(t, "s-first", during["session"])
@@ -385,7 +389,7 @@ func TestTheRootAgentIsItself(t *testing.T) {
 
 func TestTheClaudeSignumSaysWhatItHolds(t *testing.T) {
 	s, _ := runningTheRootAgent(t, opusLow)
-	require.NoError(t, s.claudeSignum().Check())
+	require.NoError(t, s.harnessSignum(s.claudeHarness()).Check())
 }
 
 // "remove SUPER"
@@ -394,7 +398,7 @@ func TestWhoMayTalkToTheRootAgent(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
 	s, _ := runningTheRootAgent(t, opusLow)
-	for _, held := range s.claudeSignum().GetSigils() {
+	for _, held := range s.harnessSignum(s.claudeHarness()).GetSigils() {
 		assert.Equal(t, []string{"ROOT"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
 	}
 }

@@ -76,7 +76,7 @@ func TestAClaudeCodeThatIsNotThePinnedOneIsNotHeld(t *testing.T) {
 
 // Asking does not wait past the asker's own patience for a fetch still going.
 func TestAskingForClaudeCodeEndsWithTheAsker(t *testing.T) {
-	held := &claudeCodeHeld{fetched: make(chan struct{})}
+	held := &harnessHeld{fetched: make(chan struct{})}
 	gone, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err := held.Path(gone)
@@ -141,7 +141,7 @@ func TestWhereTheNodeAnswersOnItsOwnMachine(t *testing.T) {
 func TestAClaudeCodeAlreadyFetchedIsNeverSaidToBeArriving(t *testing.T) {
 	fetched := make(chan struct{})
 	close(fetched)
-	held := &claudeCodeHeld{fetched: fetched, path: "/kept/claude"}
+	held := &harnessHeld{fetched: fetched, path: "/kept/claude"}
 	gone, cancel := context.WithCancel(context.Background())
 	cancel()
 	for range 200 {
@@ -155,7 +155,7 @@ func TestAClaudeCodeAlreadyFetchedIsNeverSaidToBeArriving(t *testing.T) {
 		require.Equal(t, "/kept/claude", path)
 	}
 
-	_, arrived, err := (&claudeCodeHeld{fetched: make(chan struct{})}).Now()
+	_, arrived, err := (&harnessHeld{fetched: make(chan struct{})}).Now()
 	require.NoError(t, err)
 	assert.False(t, arrived)
 }
@@ -164,5 +164,5 @@ func TestAClaudeCodeAlreadyFetchedIsNeverSaidToBeArriving(t *testing.T) {
 func TestANodeThatNamesNoAgentFetchesNoClaudeCode(t *testing.T) {
 	s := &QNTXServer{deps: &serverDependencies{cfg: &appcfg.Config{}}, logger: zaptest.NewLogger(t).Sugar()}
 	require.NoError(t, agentSubsystem{}.Init(s))
-	assert.Nil(t, s.claudeCode)
+	assert.Nil(t, s.harnessHeldBy("claude"))
 }

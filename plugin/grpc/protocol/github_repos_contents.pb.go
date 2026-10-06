@@ -9,6 +9,7 @@ package protocol
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -356,6 +357,331 @@ func (x *GitHubGetRepositoryContentResponse) GetDownloadUrl() string {
 	return ""
 }
 
+// PUT /repos/{owner}/{repo}/contents/{path}
+type GitHubCreateOrUpdateFileContentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Owner         string                 `protobuf:"bytes,2,opt,name=owner,proto3" json:"owner,omitempty"`
+	Repo          string                 `protobuf:"bytes,3,opt,name=repo,proto3" json:"repo,omitempty"`
+	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	Content       string                 `protobuf:"bytes,6,opt,name=content,proto3" json:"content,omitempty"`
+	Sha           string                 `protobuf:"bytes,7,opt,name=sha,proto3" json:"sha,omitempty"`
+	Branch        string                 `protobuf:"bytes,8,opt,name=branch,proto3" json:"branch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) Reset() {
+	*x = GitHubCreateOrUpdateFileContentsRequest{}
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubCreateOrUpdateFileContentsRequest) ProtoMessage() {}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubCreateOrUpdateFileContentsRequest.ProtoReflect.Descriptor instead.
+func (*GitHubCreateOrUpdateFileContentsRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) GetSha() string {
+	if x != nil {
+		return x.Sha
+	}
+	return ""
+}
+
+func (x *GitHubCreateOrUpdateFileContentsRequest) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
+type GitHubCreateOrUpdateFileContentsResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Success bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error   string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	// File Commit: content
+	Content *structpb.Struct `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
+	// File Commit: commit
+	Commit        *structpb.Struct `protobuf:"bytes,4,opt,name=commit,proto3" json:"commit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubCreateOrUpdateFileContentsResponse) Reset() {
+	*x = GitHubCreateOrUpdateFileContentsResponse{}
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubCreateOrUpdateFileContentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubCreateOrUpdateFileContentsResponse) ProtoMessage() {}
+
+func (x *GitHubCreateOrUpdateFileContentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubCreateOrUpdateFileContentsResponse.ProtoReflect.Descriptor instead.
+func (*GitHubCreateOrUpdateFileContentsResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GitHubCreateOrUpdateFileContentsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *GitHubCreateOrUpdateFileContentsResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *GitHubCreateOrUpdateFileContentsResponse) GetContent() *structpb.Struct {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *GitHubCreateOrUpdateFileContentsResponse) GetCommit() *structpb.Struct {
+	if x != nil {
+		return x.Commit
+	}
+	return nil
+}
+
+// DELETE /repos/{owner}/{repo}/contents/{path}
+type GitHubDeleteAFileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Owner         string                 `protobuf:"bytes,2,opt,name=owner,proto3" json:"owner,omitempty"`
+	Repo          string                 `protobuf:"bytes,3,opt,name=repo,proto3" json:"repo,omitempty"`
+	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	Sha           string                 `protobuf:"bytes,6,opt,name=sha,proto3" json:"sha,omitempty"`
+	Branch        string                 `protobuf:"bytes,7,opt,name=branch,proto3" json:"branch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubDeleteAFileRequest) Reset() {
+	*x = GitHubDeleteAFileRequest{}
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubDeleteAFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubDeleteAFileRequest) ProtoMessage() {}
+
+func (x *GitHubDeleteAFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubDeleteAFileRequest.ProtoReflect.Descriptor instead.
+func (*GitHubDeleteAFileRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GitHubDeleteAFileRequest) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *GitHubDeleteAFileRequest) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *GitHubDeleteAFileRequest) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *GitHubDeleteAFileRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *GitHubDeleteAFileRequest) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *GitHubDeleteAFileRequest) GetSha() string {
+	if x != nil {
+		return x.Sha
+	}
+	return ""
+}
+
+func (x *GitHubDeleteAFileRequest) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
+type GitHubDeleteAFileResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Success bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error   string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	// File Commit: commit
+	Commit        *structpb.Struct `protobuf:"bytes,3,opt,name=commit,proto3" json:"commit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubDeleteAFileResponse) Reset() {
+	*x = GitHubDeleteAFileResponse{}
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubDeleteAFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubDeleteAFileResponse) ProtoMessage() {}
+
+func (x *GitHubDeleteAFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubDeleteAFileResponse.ProtoReflect.Descriptor instead.
+func (*GitHubDeleteAFileResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GitHubDeleteAFileResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *GitHubDeleteAFileResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *GitHubDeleteAFileResponse) GetCommit() *structpb.Struct {
+	if x != nil {
+		return x.Commit
+	}
+	return nil
+}
+
 // GET /repos/{owner}/{repo}/readme
 type GitHubGetARepositoryREADMERequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -369,7 +695,7 @@ type GitHubGetARepositoryREADMERequest struct {
 
 func (x *GitHubGetARepositoryREADMERequest) Reset() {
 	*x = GitHubGetARepositoryREADMERequest{}
-	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -381,7 +707,7 @@ func (x *GitHubGetARepositoryREADMERequest) String() string {
 func (*GitHubGetARepositoryREADMERequest) ProtoMessage() {}
 
 func (x *GitHubGetARepositoryREADMERequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -394,7 +720,7 @@ func (x *GitHubGetARepositoryREADMERequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GitHubGetARepositoryREADMERequest.ProtoReflect.Descriptor instead.
 func (*GitHubGetARepositoryREADMERequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{3}
+	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GitHubGetARepositoryREADMERequest) GetNamespace() string {
@@ -440,7 +766,7 @@ type GitHubGetARepositoryREADMEForADirectoryRequest struct {
 
 func (x *GitHubGetARepositoryREADMEForADirectoryRequest) Reset() {
 	*x = GitHubGetARepositoryREADMEForADirectoryRequest{}
-	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -452,7 +778,7 @@ func (x *GitHubGetARepositoryREADMEForADirectoryRequest) String() string {
 func (*GitHubGetARepositoryREADMEForADirectoryRequest) ProtoMessage() {}
 
 func (x *GitHubGetARepositoryREADMEForADirectoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -465,7 +791,7 @@ func (x *GitHubGetARepositoryREADMEForADirectoryRequest) ProtoReflect() protoref
 
 // Deprecated: Use GitHubGetARepositoryREADMEForADirectoryRequest.ProtoReflect.Descriptor instead.
 func (*GitHubGetARepositoryREADMEForADirectoryRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GitHubGetARepositoryREADMEForADirectoryRequest) GetNamespace() string {
@@ -524,7 +850,7 @@ type GitHubGetARepositoryREADMEResponse struct {
 
 func (x *GitHubGetARepositoryREADMEResponse) Reset() {
 	*x = GitHubGetARepositoryREADMEResponse{}
-	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -536,7 +862,7 @@ func (x *GitHubGetARepositoryREADMEResponse) String() string {
 func (*GitHubGetARepositoryREADMEResponse) ProtoMessage() {}
 
 func (x *GitHubGetARepositoryREADMEResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -549,7 +875,7 @@ func (x *GitHubGetARepositoryREADMEResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GitHubGetARepositoryREADMEResponse.ProtoReflect.Descriptor instead.
 func (*GitHubGetARepositoryREADMEResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GitHubGetARepositoryREADMEResponse) GetSuccess() bool {
@@ -647,7 +973,7 @@ var File_plugin_grpc_protocol_github_repos_contents_proto protoreflect.FileDescr
 
 const file_plugin_grpc_protocol_github_repos_contents_proto_rawDesc = "" +
 	"\n" +
-	"0plugin/grpc/protocol/github_repos_contents.proto\x12\bprotocol\"\xe5\x01\n" +
+	"0plugin/grpc/protocol/github_repos_contents.proto\x12\bprotocol\x1a\x1cgoogle/protobuf/struct.proto\"\xe5\x01\n" +
 	"\x18GitHubReposContentsEntry\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x12\n" +
@@ -679,7 +1005,33 @@ const file_plugin_grpc_protocol_github_repos_contents_proto_rawDesc = "" +
 	"\x03url\x18\v \x01(\tR\x03url\x12\x17\n" +
 	"\agit_url\x18\f \x01(\tR\x06gitUrl\x12\x19\n" +
 	"\bhtml_url\x18\r \x01(\tR\ahtmlUrl\x12!\n" +
-	"\fdownload_url\x18\x0e \x01(\tR\vdownloadUrl\"}\n" +
+	"\fdownload_url\x18\x0e \x01(\tR\vdownloadUrl\"\xe3\x01\n" +
+	"'GitHubCreateOrUpdateFileContentsRequest\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x14\n" +
+	"\x05owner\x18\x02 \x01(\tR\x05owner\x12\x12\n" +
+	"\x04repo\x18\x03 \x01(\tR\x04repo\x12\x12\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\x12\x18\n" +
+	"\acontent\x18\x06 \x01(\tR\acontent\x12\x10\n" +
+	"\x03sha\x18\a \x01(\tR\x03sha\x12\x16\n" +
+	"\x06branch\x18\b \x01(\tR\x06branch\"\xbe\x01\n" +
+	"(GitHubCreateOrUpdateFileContentsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x121\n" +
+	"\acontent\x18\x03 \x01(\v2\x17.google.protobuf.StructR\acontent\x12/\n" +
+	"\x06commit\x18\x04 \x01(\v2\x17.google.protobuf.StructR\x06commit\"\xba\x01\n" +
+	"\x18GitHubDeleteAFileRequest\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x14\n" +
+	"\x05owner\x18\x02 \x01(\tR\x05owner\x12\x12\n" +
+	"\x04repo\x18\x03 \x01(\tR\x04repo\x12\x12\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\x12\x10\n" +
+	"\x03sha\x18\x06 \x01(\tR\x03sha\x12\x16\n" +
+	"\x06branch\x18\a \x01(\tR\x06branch\"|\n" +
+	"\x19GitHubDeleteAFileResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x12/\n" +
+	"\x06commit\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x06commit\"}\n" +
 	"!GitHubGetARepositoryREADMERequest\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x14\n" +
 	"\x05owner\x18\x02 \x01(\tR\x05owner\x12\x12\n" +
@@ -719,22 +1071,30 @@ func file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP() []byte 
 	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_plugin_grpc_protocol_github_repos_contents_proto_goTypes = []any{
 	(*GitHubReposContentsEntry)(nil),                       // 0: protocol.GitHubReposContentsEntry
 	(*GitHubGetRepositoryContentRequest)(nil),              // 1: protocol.GitHubGetRepositoryContentRequest
 	(*GitHubGetRepositoryContentResponse)(nil),             // 2: protocol.GitHubGetRepositoryContentResponse
-	(*GitHubGetARepositoryREADMERequest)(nil),              // 3: protocol.GitHubGetARepositoryREADMERequest
-	(*GitHubGetARepositoryREADMEForADirectoryRequest)(nil), // 4: protocol.GitHubGetARepositoryREADMEForADirectoryRequest
-	(*GitHubGetARepositoryREADMEResponse)(nil),             // 5: protocol.GitHubGetARepositoryREADMEResponse
+	(*GitHubCreateOrUpdateFileContentsRequest)(nil),        // 3: protocol.GitHubCreateOrUpdateFileContentsRequest
+	(*GitHubCreateOrUpdateFileContentsResponse)(nil),       // 4: protocol.GitHubCreateOrUpdateFileContentsResponse
+	(*GitHubDeleteAFileRequest)(nil),                       // 5: protocol.GitHubDeleteAFileRequest
+	(*GitHubDeleteAFileResponse)(nil),                      // 6: protocol.GitHubDeleteAFileResponse
+	(*GitHubGetARepositoryREADMERequest)(nil),              // 7: protocol.GitHubGetARepositoryREADMERequest
+	(*GitHubGetARepositoryREADMEForADirectoryRequest)(nil), // 8: protocol.GitHubGetARepositoryREADMEForADirectoryRequest
+	(*GitHubGetARepositoryREADMEResponse)(nil),             // 9: protocol.GitHubGetARepositoryREADMEResponse
+	(*structpb.Struct)(nil),                                // 10: google.protobuf.Struct
 }
 var file_plugin_grpc_protocol_github_repos_contents_proto_depIdxs = []int32{
-	0, // 0: protocol.GitHubGetRepositoryContentResponse.items:type_name -> protocol.GitHubReposContentsEntry
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0,  // 0: protocol.GitHubGetRepositoryContentResponse.items:type_name -> protocol.GitHubReposContentsEntry
+	10, // 1: protocol.GitHubCreateOrUpdateFileContentsResponse.content:type_name -> google.protobuf.Struct
+	10, // 2: protocol.GitHubCreateOrUpdateFileContentsResponse.commit:type_name -> google.protobuf.Struct
+	10, // 3: protocol.GitHubDeleteAFileResponse.commit:type_name -> google.protobuf.Struct
+	4,  // [4:4] is the sub-list for method output_type
+	4,  // [4:4] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_github_repos_contents_proto_init() }
@@ -748,7 +1108,7 @@ func file_plugin_grpc_protocol_github_repos_contents_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_github_repos_contents_proto_rawDesc), len(file_plugin_grpc_protocol_github_repos_contents_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

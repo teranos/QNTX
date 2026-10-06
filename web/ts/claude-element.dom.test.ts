@@ -7,7 +7,8 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { drawClaude, type ClaudeAm, type ClaudeSaid, type RootAgent } from './claude-element';
+import { createPiElement } from './pi-element';
+import { createClaudeElement, drawClaude, type ClaudeAm, type ClaudeSaid, type RootAgent } from './claude-element';
 import type { TranscriptRead } from './components/element/transcript-element';
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -96,6 +97,19 @@ describe('Claude - Tim', () => {
         expect(who).toContain('claude-opus-5-5');
         expect(who).toContain('low');
         stop();
+    });
+
+    // "I WANT THE CLAUDE ELEMENT TO FEEL MORE DISTINCTLY CLAUDE"
+    test('the Claude element is headed by the Spark, and the Pi element is not', () => {
+        const claude = createClaudeElement().renderContent!() as HTMLElement;
+        const head = claude.querySelector('.claude-head')!;
+        expect(head.querySelector('.claude-spark')).not.toBeNull();
+        expect(head.querySelector('.claude-who')).not.toBeNull();
+        expect(claude.classList.contains('claude-brand')).toBe(true);
+
+        const pi = createPiElement().renderContent!() as HTMLElement;
+        expect(pi.querySelector('.claude-spark')).toBeNull();
+        expect(pi.classList.contains('claude-brand')).toBe(false);
     });
 
     // "make sure --permission-mode is configurable in the Claude Element"

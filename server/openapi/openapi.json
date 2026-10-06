@@ -345,6 +345,21 @@
         "ROOT"
       ]
     },
+    "/api/pi": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/pi/say": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/pi/session": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/plugins": {
       "x-qntx-reach": [
         "ROOT",
@@ -494,6 +509,61 @@
         "ROOT"
       ],
       "x-qntx-prefix": true
+    },
+    "/api/vault": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/bind": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/dirs": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/disable": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/enable": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/owners": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/repos": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/send": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/states": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/subdirs": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vault/unbind": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
     },
     "/api/watchers": {
       "x-qntx-reach": [

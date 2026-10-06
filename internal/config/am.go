@@ -37,7 +37,28 @@ type RootAgentConfig struct {
 	// Code's own names for them.
 	Mode  string   `mapstructure:"permission_mode"`
 	Allow []string `mapstructure:"allow"`
+	// Pi is the other harness it runs in, from the Pi element (ADR-048).
+	Pi PiConfig `mapstructure:"pi"`
 }
+
+// PiConfig names how the ROOT agent runs in Pi. A node that names no model
+// runs it in Claude Code alone.
+type PiConfig struct {
+	Model    string `mapstructure:"model"`    // The model, by the id the gateway knows it as.
+	Thinking string `mapstructure:"thinking"` // off, minimal, low, medium, high, xhigh or max.
+	// Gateway is the plugin whose /v1 answers OpenAI's chat completions, and
+	// which every model call Pi makes goes through.
+	Gateway string `mapstructure:"gateway"`
+}
+
+// Named reports whether am.toml names Pi for the ROOT agent.
+func (p PiConfig) Named() bool {
+	return p.Model != "" || p.Gateway != ""
+}
+
+// ThinkingLevels is every thinking level Pi runs at, as its own --thinking
+// names them.
+var ThinkingLevels = []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"}
 
 // Named reports whether am.toml names a ROOT agent at all.
 func (r RootAgentConfig) Named() bool {

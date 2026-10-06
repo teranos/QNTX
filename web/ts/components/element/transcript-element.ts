@@ -247,89 +247,12 @@ class Selection {
     }
 }
 
-// ─── Warp ─────────────────────────────────────────────────────
-
-const GAP_MS = 12 * 60 * 60 * 1000;
-const GAP_WEIGHT = 3;
-
-// Loom's warp, as the transcript's own scrollbar: one segment per turn, a gap
-// past twelve hours weighs three, the wheel zooms, a press or a drag scrolls.
-export function warpFor(turns: Turn[], column: HTMLElement): HTMLElement {
-    const warp = document.createElement('div');
-    warp.className = 'tr-warp';
-    const lanes = document.createElement('div');
-    lanes.className = 'tr-warp-lanes';
-    warp.appendChild(lanes);
-
-    const items: Array<{ weight: number; turn?: Turn }> = [];
-    for (let i = 0; i < turns.length; i++) {
-        if (i > 0 && Date.parse(turns[i].at) - Date.parse(turns[i - 1].at) > GAP_MS) items.push({ weight: GAP_WEIGHT });
-        items.push({ weight: 1, turn: turns[i] });
-    }
-    const total = items.reduce((s, i) => s + i.weight, 0) || 1;
-    for (const item of items) {
-        const seg = document.createElement('div');
-        seg.style.height = `${(item.weight / total) * 100}%`;
-        if (!item.turn) {
-            seg.className = 'tr-warp-seg tr-warp-gap';
-        } else {
-            const seam = item.turn.speaker === 'session' || item.turn.speaker === 'compaction' ? ` tr-seam-${item.turn.speaker}` : '';
-            seg.className = `tr-warp-seg tr-sp-${item.turn.speaker}${seam}`;
-            if (item.turn.speaker === 'tool') seg.textContent = '◆';
-            if (item.turn.speaker === 'ground') seg.textContent = '●';
-        }
-        lanes.appendChild(seg);
-    }
-
-    const view = document.createElement('div');
-    view.className = 'tr-warp-view';
-    warp.appendChild(view);
-
-    let zoom = 1;
-    let scrollFraction = 0;
-    let viewHeight = 100;
-    const laneTranslate = () => ((50 - viewHeight / 2) - scrollFraction * (zoom * 100 - viewHeight)) / zoom;
-    const draw = () => {
-        viewHeight = (column.clientHeight / (column.scrollHeight || 1)) * 100;
-        scrollFraction = column.scrollTop / (column.scrollHeight - column.clientHeight || 1);
-        lanes.style.height = `${zoom * 100}%`;
-        lanes.style.transform = `translateY(${laneTranslate()}%)`;
-        view.style.display = viewHeight < 100 ? '' : 'none';
-        view.style.top = `${50 - (viewHeight * zoom) / 2}%`;
-        view.style.height = `${viewHeight * zoom}%`;
-    };
-    const scrollTo = (e: PointerEvent, smooth: boolean) => {
-        const rect = warp.getBoundingClientRect();
-        const clickFrac = (e.clientY - rect.top) / (rect.height || 1);
-        const contentFrac = (clickFrac - (laneTranslate() / 100) * zoom) / zoom;
-        const target = Math.max(0, Math.min(1, contentFrac)) * (column.scrollHeight - column.clientHeight);
-        column.scrollTo({ top: target, behavior: smooth ? 'smooth' : 'instant' });
-    };
-    let dragging = false;
-    warp.addEventListener('pointerdown', (e) => {
-        dragging = true;
-        warp.setPointerCapture?.(e.pointerId);
-        scrollTo(e, true);
-    });
-    warp.addEventListener('pointermove', (e) => { if (dragging) scrollTo(e, false); });
-    warp.addEventListener('pointerup', () => { dragging = false; });
-    warp.addEventListener('wheel', (e) => {
-        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-        e.preventDefault();
-        zoom = Math.max(1, Math.min(10, zoom + (e.deltaY > 0 ? 0.3 : -0.3)));
-        draw();
-    }, { passive: false });
-    column.addEventListener('scroll', draw);
-    requestAnimationFrame(draw);
-    return warp;
-}
-
 // ─── Views ────────────────────────────────────────────────────
 
 /**
- * One session drawn into body: its turns in order, the gaps between them, and
- * the warp. A run of what was done is one line of chips; copy is handed what a
- * press on the selection copies.
+ * One session drawn into body: its turns in order and the gaps between them,
+ * scrolled by the browser's own scrollbar. A run of what was done is one line
+ * of chips; copy is handed what a press on the selection copies.
  */
 export function renderTranscript(body: HTMLElement, read: TranscriptRead, copy: (text: string) => void): void {
     body.replaceChildren();
@@ -379,7 +302,7 @@ export function renderTranscript(body: HTMLElement, read: TranscriptRead, copy: 
         run.push(turn);
     }
     endLine();
-    rows.append(column, warpFor(read.turns, column));
+    rows.append(column);
     body.append(head, rows);
 }
 

@@ -336,8 +336,7 @@
 .tr-when { color: var(--text-secondary); font-size: var(--font-size-xs, 10px); white-space: nowrap; }
 .tr-head { padding: 3px 6px; border-bottom: 1px solid var(--border-on-dark); color: var(--text-on-dark-secondary); white-space: pre; flex-shrink: 0; }
 .tr-body { display: flex; flex: 1; min-height: 0; }
-.tr-col { flex: 1; overflow-y: auto; scrollbar-width: none; padding: 2px 0; }
-.tr-col::-webkit-scrollbar { display: none; }
+.tr-col { flex: 1; overflow-y: auto; padding: 2px 0; }
 .tr-spacer { margin: 0 6px; border-left: 1px dashed var(--border-on-dark); border-right: 1px dashed var(--border-on-dark); }
 .tr-turn { cursor: pointer; padding: 0 6px; overflow-wrap: break-word; word-break: break-word; }
 .tr-speaker { font-weight: 500; font-size: var(--font-size-xs, 10px); margin-right: 4px; }
@@ -363,16 +362,6 @@
 .tr-marker .tr-text { color: var(--text-secondary); font-size: 10px; }
 .tr-code { background: var(--bg-almost-black); border: 1px solid var(--border-on-dark); padding: 3px 6px; margin: 2px 0; font-size: 11px; white-space: pre-wrap; }
 .tr-inline-code { background: var(--bg-almost-black); padding: 0 3px; color: var(--text-on-dark-secondary); }
-.tr-warp { width: 14px; flex-shrink: 0; position: relative; overflow: hidden; cursor: pointer; background: var(--bg-almost-black); border-left: 1px solid var(--bg-secondary); }
-.tr-warp-lanes { display: flex; flex-direction: column; width: 100%; height: 100%; will-change: transform; }
-.tr-warp-seg { flex-shrink: 0; opacity: 0.7; display: flex; align-items: center; justify-content: center; font-size: 6px; line-height: 1; background: var(--bg-secondary); }
-.tr-warp-gap { background: var(--bg-almost-black); }
-.tr-warp-seg.tr-sp-human { background: var(--accent-on-dark); }
-.tr-warp-seg.tr-sp-assistant { background: var(--element-status-running-text); }
-.tr-warp-seg.tr-sp-ground { color: var(--color-error); }
-.tr-warp-seg.tr-sp-tool { color: var(--color-warning); }
-.tr-warp-seg.tr-sp-rite { background: var(--color-scheduled); }
-.tr-warp-seg.tr-sp-error { background: var(--sacred-error); }
 
 /* An error through its one render (teranos/sacred-error), placed in the flow of
  * a log by its host: the render fixes itself only at a cursor a failure carries. */
@@ -380,9 +369,6 @@
 .sacred-entry sacred-error { position: static; z-index: auto; }
 .sacred-back { align-self: flex-start; padding: 2px 6px; font: inherit; font-size: var(--font-size-xs, 10px); text-align: left; color: var(--text-on-dark-secondary); background: none; border: 1px dashed var(--sacred-border); cursor: pointer; overflow-wrap: break-word; word-break: break-word; }
 .tr-error .tr-speaker { color: var(--sacred-error); }
-.tr-seam-session { border-bottom: 2px solid rgba(125, 186, 138, 0.6); }
-.tr-seam-compaction { border-bottom: 2px solid rgba(255, 171, 0, 0.6); }
-.tr-warp-view { position: absolute; left: 0; width: 100%; border: 1px solid var(--accent-on-dark); background: rgba(125, 186, 138, 0.08); pointer-events: none; }
 
 /* Claude element: the ROOT agent's session, drawn as a transcript, over where something is said to it */
 .claude { display: flex; flex-direction: column; width: 520px; height: 640px; max-width: 100%; max-height: 100%; min-height: 0; padding: 0; text-align: left; font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-on-dark); }
@@ -394,6 +380,20 @@
 .claude-failed { padding: 0 6px; flex-shrink: 0; }
 .claude-say { display: flex; gap: 4px; align-items: stretch; padding: 4px 6px; border-top: 1px solid var(--border-on-dark); flex-shrink: 0; }
 .claude-mode { background: var(--bg-almost-black); color: var(--text-on-dark-secondary); border: 1px solid var(--border-on-dark); font: inherit; font-size: var(--font-size-xs, 10px); }
+/* The Claude element in Claude's own colours: Clay, Ivory and Slate, from Anthropic's media resources */
+.claude-brand { --claude-clay: #D97757; --claude-ivory: #FAF9F5; --claude-slate: #151514; background: var(--claude-slate); color: var(--claude-ivory); }
+.claude-head { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-bottom: 1px solid var(--claude-clay); flex-shrink: 0; }
+.claude-head .claude-who { padding: 0; border-bottom: none; flex: 1; min-width: 0; }
+.claude-spark { width: 16px; height: 16px; flex: none; color: var(--claude-clay); }
+.claude-brand:has(.claude-status:not(:empty)) .claude-spark { animation: claude-spark-turn 2.4s linear infinite; }
+@keyframes claude-spark-turn { to { transform: rotate(360deg); } }
+.claude-brand .claude-status { color: var(--claude-clay); }
+.claude-brand .tr-sp-assistant .tr-speaker { color: var(--claude-clay); }
+.claude-brand .tr-sp-human .tr-speaker { color: var(--claude-ivory); }
+.claude-brand .claude-say { border-top-color: var(--claude-clay); }
+.claude-brand .claude-says:focus { outline: 1px solid var(--claude-clay); outline-offset: -1px; }
+.claude-brand .claude-send { background: var(--claude-clay); border-color: var(--claude-clay); color: var(--claude-slate); }
+.claude-brand .claude-send:disabled { opacity: 0.5; }
 .claude-says { flex: 1; min-width: 0; resize: none; background: var(--bg-almost-black); color: var(--text-on-dark); border: 1px solid var(--border-on-dark); font: inherit; padding: 2px 4px; }
 
 /* Ground's own faces, the ones its book is typeset in (teranos/ground doc/fonts), worn by the Ground element alone */
