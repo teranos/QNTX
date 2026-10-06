@@ -113,6 +113,35 @@ process. It starts it, resumes it and stops it.
   development, `openai/gpt-oss-120b` through OpenRouter. In Claude Code only
   Claude can be it.
 
+## The namespace agent
+
+"an agent session for a particular namespace, different concept from the ROOT
+host agent"
+
+"The shared namespace agent, opted into"
+
+"The Namespace agent is a common Agent of the Namespace it’s opted into. That
+means the one who sets it up knows it’s shared amongst anyone who has REACH on
+it."
+
+- It is an agent the node hosts, reached over A2A by its tenant, and the
+  tenant is its namespace. It stands in that namespace and nothing crosses
+  (ADR-026).
+- Who may see its Tasks is REACH on its namespace: A2A's "Project or workspace
+  membership (project-based authorization)" (§13.1).
+
+"The one who set’s it up does, they provide their own Subscription or API key"
+
+- Every model call it makes is on that credential, whoever with REACH spoke to
+  it.
+
+"Namespaces shouldn’t be catalogued"
+
+- Its card is not at /.well-known/agent-card.json and is in no list. It is
+  given to who has REACH on its namespace, A2A's "Direct Configuration" (§8.2).
+- To who has no REACH, a namespace with an agent answers as one that does not
+  exist (§3.3.2).
+
 ## First uses
 
 - A ritual's performer, in place of `claude --bg` on the operator's machine
