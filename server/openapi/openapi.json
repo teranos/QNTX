@@ -510,6 +510,11 @@
       ],
       "x-qntx-prefix": true
     },
+    "/api/vault": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/watchers": {
       "x-qntx-reach": [
         "ROOT",

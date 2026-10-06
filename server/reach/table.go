@@ -138,6 +138,9 @@ REACH is '/api/parity/hold' '/api/parity/storage' '/api/parity/follows'   of ROO
 # What was said and done in each agent session Ground recorded (transcripts).
 REACH is '/api/transcripts'                                               of ROOT SUPER
 
+# The Obsidian vaults the node keeps a copy of, and the folders each holds (ADR-049).
+REACH is '/api/vault'                                                     of ROOT
+
 # The ROOT agent (the claude signum, ADR-048). Who may talk to it is the whole
 # of what guards it, and that is ROOT.
 REACH is '/api/claude' '/api/claude/say' '/api/claude/session'            of ROOT
