@@ -34,5 +34,7 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 			s.logger.Errorw("An A2A response was not delivered", "what", what, "error", err)
 		}
 	}
-	return http.StripPrefix(a2aPrefix[:len(a2aPrefix)-1], a2a.HTTP(operations, unsupported, undelivered)).ServeHTTP
+	// The node's card names no tenant, so no agent is served at one.
+	none := func(string) bool { return false }
+	return http.StripPrefix(a2aPrefix[:len(a2aPrefix)-1], a2a.HTTP(operations, none, unsupported, undelivered)).ServeHTTP
 }

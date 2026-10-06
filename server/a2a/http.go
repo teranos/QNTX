@@ -32,11 +32,21 @@ type Answer func(ctx context.Context, op Operation, request proto.Message) (prot
 // no trace anywhere else.
 type Undelivered func(what string, err error)
 
+// Served is whether an agent is served at tenant (AgentInterface.tenant).
+type Served func(tenant string) bool
+
 // HTTP serves the operations on their routes, relative to wherever it is
 // mounted. Every request is read the same way before any operation answers.
-func HTTP(operations []Operation, answer Answer, undelivered Undelivered) http.Handler {
+func HTTP(operations []Operation, served Served, answer Answer, undelivered Undelivered) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		op, params, found := match(operations, r.Method, r.URL.Path)
+		// A tenant no agent is served at is a resource that does not exist, and
+		// answers as no operation does: "MUST return a not found error when a
+		// requested resource does not exist", and "SHOULD NOT distinguish
+		// between 'does not exist' and 'not authorized'" (§3.3.2).
+		if tenant, named := params["tenant"]; found && named && !served(tenant) {
+			found = false
+		}
 		if !found {
 			notFound(r.Method+" "+r.URL.Path+" is no A2A operation").write(w, undelivered)
 			return
