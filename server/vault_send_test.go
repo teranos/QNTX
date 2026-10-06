@@ -151,3 +151,13 @@ func TestABindingWhoseDefaultBranchMovedIsInvalid(t *testing.T) {
 	assert.Equal(t, vaultInvalid, state.State)
 	assert.Equal(t, "the default branch of abcd-nl/clean is now trunk, not main: bind Course Material again", state.Why)
 }
+
+// "oh, require it to be a dir in the repo , not in its root"
+func TestAFolderIsBoundToAFolderInsideTheRepository(t *testing.T) {
+	s, _ := vaultBindingServer(t)
+	for _, top := range []string{"", ".", "/", "./", "../x"} {
+		_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": top})
+		require.NotNil(t, refused, "%q", top)
+		assert.Equal(t, "path", refused.GetParam(), "%q", top)
+	}
+}

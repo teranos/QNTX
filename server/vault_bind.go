@@ -11,6 +11,7 @@ import (
 	"context"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -70,17 +71,17 @@ func (s *QNTXServer) vaultNamed(name string) (Vault, *protocol.Refusal) {
 // starting with a dot is Obsidian's own (.obsidian, .trash), and so is all in it.
 func vaultDirsAt(root string) ([]string, error) {
 	dirs := []string{}
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(root, func(at string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if path == root || !d.IsDir() {
+		if at == root || !d.IsDir() {
 			return nil
 		}
 		if strings.HasPrefix(d.Name(), ".") {
 			return filepath.SkipDir
 		}
-		place, err := filepath.Rel(root, path)
+		place, err := filepath.Rel(root, at)
 		if err != nil {
 			return err
 		}
@@ -180,23 +181,23 @@ func (s *QNTXServer) vaultRepos(ctx context.Context, sent sigil.Sent) (any, *pro
 	return map[string]any{"repos": repos}, nil
 }
 
-// repoDirs is the folders directly inside path of owner/repo on branch, or why
-// they are not: GitHub's own words, or path being a file.
-func (s *QNTXServer) repoDirs(ctx context.Context, owner, repo, branch, path string) ([]string, error) {
-	if path == "" {
+// repoDirs is the folders directly inside dir of owner/repo on branch, or why
+// they are not: GitHub's own words, or dir being a file.
+func (s *QNTXServer) repoDirs(ctx context.Context, owner, repo, branch, dir string) ([]string, error) {
+	if dir == "" {
 		// GitHub lists a repository's top at ".".
-		path = "."
+		dir = "."
 	}
 	answered, err := s.gitHubService().GetRepositoryContent(services.AsInstallation(ctx),
-		&protocol.GitHubGetRepositoryContentRequest{Owner: owner, Repo: repo, Path: path, Ref: branch})
+		&protocol.GitHubGetRepositoryContentRequest{Owner: owner, Repo: repo, Path: dir, Ref: branch})
 	if err != nil {
-		return nil, errors.Wrapf(err, "%s of %s/%s on %s was not asked", path, owner, repo, branch)
+		return nil, errors.Wrapf(err, "%s of %s/%s on %s was not asked", dir, owner, repo, branch)
 	}
 	if !answered.GetSuccess() {
 		return nil, errors.New(answered.GetError())
 	}
 	if answered.GetType() == "file" {
-		return nil, errors.Newf("%s is a file of %s/%s on %s, not a folder", path, owner, repo, branch)
+		return nil, errors.Newf("%s is a file of %s/%s on %s, not a folder", dir, owner, repo, branch)
 	}
 	dirs := []string{}
 	for _, entry := range answered.GetItems() {
@@ -240,6 +241,10 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	owner, repo, refused := ownerRepo(sent["repo"])
 	if refused != nil {
 		return nil, refused
+	}
+	// "oh, require it to be a dir in the repo , not in its root"
+	if dir := path.Clean(sent["path"]); dir == "." || dir == "/" || strings.HasPrefix(dir, "../") || strings.HasPrefix(dir, "/") {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "path", Says: sent["path"] + " is not a folder inside " + sent["repo"] + "; a vault's folder is bound to one, never to the repository's top"}
 	}
 	branch, err := s.repoDefaultBranch(ctx, owner, repo)
 	if err != nil {

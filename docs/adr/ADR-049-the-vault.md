@@ -117,3 +117,7 @@ folder itself carries nothing.
 "it should show red, and have you redo the binding"
 
 - When the default branch is another, the binding is red until it is bound again.
+
+"oh, require it to be a dir in the repo , not in its root"
+
+- A folder is bound to a folder inside the repository, never to its top.
