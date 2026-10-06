@@ -91,3 +91,29 @@ folder itself carries nothing.
   holds another, so a note is one folder's.
 
 "and Clean Business will mostly be steered from the Obsidian"
+
+## What reaches the vault
+
+- Only notes: `.md` files. What else the repository's folder holds stays there.
+- Asked whether a note deleted on main is deleted from the vault too:
+
+"yes"
+
+- A note main had and has no more is removed from the vault. A note main
+  never had is the vault's own and stays.
+
+## What reaches the repository
+
+"i dont want that to be automatically opted in,"
+
+"and i want to set what the name of the branch would be in the obsidian element in the binding."
+
+- A bound folder sends nothing until a branch is named for it in the element.
+
+"concept of default branch, not main or master"
+
+- A folder is bound to its repository's default branch, as GitHub names it.
+
+"it should show red, and have you redo the binding"
+
+- When the default branch is another, the binding is red until it is bound again.

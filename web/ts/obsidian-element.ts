@@ -6,6 +6,9 @@
 // "you would think there would be a Obsidian Element to make it a bit easier"
 // "and i guess i want to do the docs tracking in that Element as well"
 
+// IMPLEMENTME: the vault's theme. The box syncs it (.obsidian/appearance.json names
+// Blackbird, its CSS under .obsidian/themes); the element does not read it yet.
+
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { apiFetch, apiJson } from './client';
