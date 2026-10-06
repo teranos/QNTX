@@ -193,5 +193,4 @@ impl DomainPluginService for MeiliPluginService {
     ) -> Result<Response<ElementDefResponse>, Status> {
         Ok(Response::new(ElementDefResponse { elements: vec![] }))
     }
-
 }
