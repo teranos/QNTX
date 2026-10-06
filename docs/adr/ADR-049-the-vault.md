@@ -51,6 +51,24 @@ every device through Sync.
 - Sync is end-to-end encrypted, and the box is one of the ends: the vault is
   readable there, by the node and by the ROOT agent (ADR-048).
 
+"but you make a good point about ROOT agent"
+
+"just make it do everything essentially"
+
+- The ROOT agent sets the vault up on the box and keeps it syncing: `ob login`,
+  `ob sync-setup`, `ob sync --continuous`. Each takes its answers as flags
+  (`--email`, `--password`, `--mfa`, `--vault`, `--path`), so none of it waits
+  on a prompt.
+
+## The Obsidian element
+
+"you would think there would be a Obsidian Element to make it a bit easier"
+
+"and i guess i want to do the docs tracking in that Element as well"
+
+- The vault is set up, and the folders it holds are named, from an element in
+  the tray.
+
 ## When both sides changed
 
 The same note changed in the vault and on the repository's main before either
