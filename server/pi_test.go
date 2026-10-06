@@ -42,13 +42,13 @@ func runningPiToo(t *testing.T) (s *QNTXServer, claudeRan, piRan string) {
 	binary, piRan := claudeStandIn(t, piAnswered)
 	fetched := make(chan struct{})
 	close(fetched)
-	s.pi = &harnessHeld{name: "Pi", fetched: fetched, path: binary}
+	s.holdHarness("pi", &harnessHeld{name: "Pi", fetched: fetched, path: binary})
 	return s, claudeRan, piRan
 }
 
 func sayingToPi(s *QNTXServer, sent sigil.Sent) (map[string]any, *protocol.Refusal) {
 	asked := httptest.NewRequest(http.MethodPost, "/api/pi/say", nil)
-	answer, refused := s.piSay(sigil.WithCaller(context.Background(), asked), sent)
+	answer, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.piHarness(), sent)
 	if refused != nil {
 		return nil, refused
 	}
@@ -66,7 +66,7 @@ func TestWhatIsSaidToPiIsAnsweredByPi(t *testing.T) {
 	assert.Equal(t, "Up 3 days.", answer["answer"])
 	assert.Equal(t, false, answer["is_error"])
 	assert.Equal(t, "anthropic/claude-sonnet-4.6", answer["model"])
-	holds(t, s.piSignum(), "say", answer)
+	holds(t, s.harnessSignum(s.piHarness()), "say", answer)
 
 	args := ranWith(t, ran, "0", "args")
 	assert.Equal(t, "json", after(args, "--mode"))
@@ -126,8 +126,8 @@ func TestClaudeCodeAndPiAreTwoSessionsOfOneAgent(t *testing.T) {
 // other: Pi answers while Claude Code is in a turn.
 func TestPiAnswersWhileClaudeCodeIsInATurn(t *testing.T) {
 	s, _, _ := runningPiToo(t)
-	s.rootAgent.claude.turn <- struct{}{}
-	defer func() { <-s.rootAgent.claude.turn }()
+	s.rootAgent.in(s.claudeHarness()).turn <- struct{}{}
+	defer func() { <-s.rootAgent.in(s.claudeHarness()).turn }()
 
 	answer, refused := sayingToPi(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
@@ -137,10 +137,9 @@ func TestPiAnswersWhileClaudeCodeIsInATurn(t *testing.T) {
 // piSessionSaid is the agent's session in Pi as pi session reads it.
 func piSessionSaid(t *testing.T, s *QNTXServer) [][2]string {
 	t.Helper()
-	asked := httptest.NewRequest(http.MethodGet, "/api/pi/session", nil)
-	answer, refused := s.piSession(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+	answer, refused := s.harnessSession(s.piHarness())
 	require.Nil(t, refused)
-	holds(t, s.piSignum(), "session", answer)
+	holds(t, s.harnessSignum(s.piHarness()), "session", answer)
 	read, _ := answer.(map[string]any)["transcript"].(transcript)
 	var said [][2]string
 	for _, turn := range read.Turns {
@@ -162,16 +161,15 @@ func TestANodeThatNamesNoPiHasNoneToSpeakTo(t *testing.T) {
 // Pi says who answers in it and how it is run, which the Pi element draws.
 func TestPiSaysWhoItIs(t *testing.T) {
 	s, _, _ := runningPiToo(t)
-	asked := httptest.NewRequest(http.MethodGet, "/api/pi", nil)
-	is, refused := s.piAm(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
+	is, refused := s.harnessAm(s.piHarness())
 	require.Nil(t, refused)
 	am := is.(map[string]any)
 	assert.Equal(t, s.rootAgent.did, am["did"])
 	assert.Equal(t, "anthropic/claude-sonnet-4.6", am["model"])
 	assert.Equal(t, "openrouter-qntx", am["gateway"])
 	assert.Equal(t, pi.PinnedVersion, am["pi_version"])
-	holds(t, s.piSignum(), "am", am)
-	require.NoError(t, s.piSignum().Check())
+	holds(t, s.harnessSignum(s.piHarness()), "am", am)
+	require.NoError(t, s.harnessSignum(s.piHarness()).Check())
 }
 
 // Only ROOT talks to it, in Pi as in Claude Code.
@@ -179,7 +177,7 @@ func TestOnlyRootTalksToItInPi(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
 	s, _, _ := runningPiToo(t)
-	for _, held := range s.piSignum().GetSigils() {
+	for _, held := range s.harnessSignum(s.piHarness()).GetSigils() {
 		assert.Equal(t, []string{"ROOT"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
 	}
 }

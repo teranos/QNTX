@@ -128,9 +128,9 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	if err != nil {
 		return err
 	}
-	s.claudeCode = holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger)
+	s.holdHarness("claude", holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger))
 	if s.deps.cfg.Agent.Root.Pi.Named() {
-		s.pi = holdPi(s.ctx, pi.PinnedFlake, s.wg.Go, s.logger)
+		s.holdHarness("pi", holdPi(s.ctx, pi.PinnedFlake, s.wg.Go, s.logger))
 	}
 
 	home, err := rootAgentHome()

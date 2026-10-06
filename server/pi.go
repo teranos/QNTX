@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"net/http"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/pi"
@@ -16,59 +15,49 @@ import (
 // piGatewayProvider is what Pi calls the node's gateway among its providers.
 const piGatewayProvider = "qntx"
 
-func (s *QNTXServer) piSignum() sigil.Signum {
-	return sigil.Signum{
-		Signum: &protocol.Signum{
-			Name:        "pi",
-			Description: "The ROOT agent in Pi: the same agent as in Claude Code, in its other harness and a session of its own.",
-			Tags:        []string{"agent", "pi", "root"},
-			Sigils: []*protocol.Sigil{
-				{
-					Name: "say",
-					Does: "Says something to the ROOT agent in Pi and gives what it answered. It is its session in Pi, beside the one in Claude Code, read with pi session.",
-					Takes: []*protocol.Param{
-						{Name: "says", Required: true, Says: "What is said to it."},
-					},
-					Gives: []*protocol.Field{
-						{Name: "answer", Says: "What it answered."},
-						{Name: "is_error", Says: "Whether the turn ended in error, in the answer's words."},
-						{Name: "stop", Says: "Why Pi says the turn stopped."},
-						{Name: "session", Says: "The session it was said in."},
-						{Name: "model", Says: "The model that answered."},
-						{Name: "pi_version", Says: "The Pi that ran."},
-						{Name: "cost_usd", Says: "What Pi says the turn's model calls cost."},
-						{Name: "took_ms", Says: "How long the turn took."},
-						{Name: "unwritten", Says: "Why a row of the session was not written down, when one was not."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodPost, Path: "/api/pi/say"},
-				},
-				{
-					Name: "am",
-					Does: "Who the ROOT agent is in Pi and how the node runs it there.",
-					Gives: []*protocol.Field{
-						{Name: "did", Says: "Its own DID, which signs what it writes down."},
-						{Name: "model", Says: "The model am.toml names for Pi."},
-						{Name: "thinking", Says: "The thinking level am.toml names for Pi."},
-						{Name: "gateway", Says: "The plugin every model call Pi makes goes through."},
-						{Name: "session", Says: "The session it continues in Pi, or empty before anything was said to it there."},
-						{Name: "answering", Says: "Whether it is in a turn in Pi now."},
-						{Name: "pi", Says: "Where the Pi it runs is, or empty when the node has none yet."},
-						{Name: "pi_version", Says: "The Pi this build pins."},
-						{Name: "not_ready", Says: "Why it cannot be spoken to in Pi, when it cannot."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/pi"},
-				},
-				{
-					Name: "session",
-					Does: "The ROOT agent's session in Pi, whole: everything said to it there, as a transcript.",
-					Gives: []*protocol.Field{
-						{Name: "transcript", Says: "Its session in Pi as turns, each naming the attestation it was read from. Empty before anything was said to it there.", Message: "protocol.Transcript"},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/pi/session"},
-				},
-			},
+// piHarness is the ROOT agent in Pi.
+func (s *QNTXServer) piHarness() *harness {
+	named := func() appcfg.PiConfig { return s.deps.cfg.Agent.Root.Pi }
+	return &harness{
+		name: "pi", called: "Pi", file: piSessionFile,
+		description:    "The ROOT agent in Pi: the same agent as in Claude Code, in its other harness and a session of its own.",
+		sayDoes:        "Says something to the ROOT agent in Pi and gives what it answered. It is its session in Pi, beside the one in Claude Code, read with pi session.",
+		amDoes:         "Who the ROOT agent is in Pi and how the node runs it there.",
+		sessionDoes:    "The ROOT agent's session in Pi, whole: everything said to it there, as a transcript.",
+		transcriptSays: "Its session in Pi as turns, each naming the attestation it was read from. Empty before anything was said to it there.",
+		sayGives: []*protocol.Field{
+			{Name: "answer", Says: "What it answered."},
+			{Name: "is_error", Says: "Whether the turn ended in error, in the answer's words."},
+			{Name: "stop", Says: "Why Pi says the turn stopped."},
+			{Name: "session", Says: "The session it was said in."},
+			{Name: "model", Says: "The model that answered."},
+			{Name: "pi_version", Says: "The Pi that ran."},
+			{Name: "cost_usd", Says: "What Pi says the turn's model calls cost."},
+			{Name: "took_ms", Says: "How long the turn took."},
+			{Name: "unwritten", Says: "Why a row of the session was not written down, when one was not."},
 		},
-		Answers: map[string]sigil.Answer{"say": s.piSay, "am": s.piAm, "session": s.piSession},
+		amGives: []*protocol.Field{
+			{Name: "did", Says: "Its own DID, which signs what it writes down."},
+			{Name: "model", Says: "The model am.toml names for Pi."},
+			{Name: "thinking", Says: "The thinking level am.toml names for Pi."},
+			{Name: "gateway", Says: "The plugin every model call Pi makes goes through."},
+			{Name: "session", Says: "The session it continues in Pi, or empty before anything was said to it there."},
+			{Name: "answering", Says: "Whether it is in a turn in Pi now."},
+			{Name: "pi", Says: "Where the Pi it runs is, or empty when the node has none yet."},
+			{Name: "pi_version", Says: "The Pi this build pins."},
+			{Name: "not_ready", Says: "Why it cannot be spoken to in Pi, when it cannot."},
+		},
+		named:    func() bool { return named().Named() },
+		absent:   s.thereIsNoPi,
+		pathKey:  "pi",
+		fetching: "Pi is still being built",
+		part: func(_ context.Context, _ sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal) {
+			return s.piPart(named(), agent), nil
+		},
+		am: func(is map[string]any) {
+			pin := named()
+			is["model"], is["thinking"], is["gateway"], is["pi_version"] = pin.Model, pin.Thinking, pin.Gateway, pi.PinnedVersion
+		},
 	}
 }
 
@@ -80,23 +69,14 @@ func (s *QNTXServer) thereIsNoPi() *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the ROOT agent ([agent.root.pi]), so it runs in Claude Code alone"}
 }
 
-func (s *QNTXServer) piSay(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	caller := sigil.Caller(ctx)
-	if caller == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to the ROOT agent is written down with who said it, and this asking carried no request"}
-	}
-	agent := s.rootAgent
-	named := s.deps.cfg.Agent.Root.Pi
-	if agent == nil || !named.Named() || s.pi == nil {
-		return nil, s.thereIsNoPi()
-	}
-
+// piPart is Pi's part of one turn.
+func (s *QNTXServer) piPart(named appcfg.PiConfig, agent *rootAgent) aTurn {
 	var binary string
-	return s.sayInHarness(ctx, caller, agent, sent["says"], aTurn{
-		in: agent.pi, called: "Pi", effort: named.Thinking,
+	return aTurn{
+		effort: named.Thinking,
 		ready: func(ctx context.Context, _ string, kept bool) (bool, *protocol.Refusal) {
 			var err error
-			if binary, err = s.pi.Path(ctx); err != nil {
+			if binary, err = s.harnessHeldBy("pi").Path(ctx); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no Pi to run: " + err.Error()}
 			}
 			return kept, nil
@@ -114,7 +94,7 @@ func (s *QNTXServer) piSay(ctx context.Context, sent sigil.Sent) (any, *protocol
 				"cost_usd": answer.CostUSD, "took_ms": answer.Took.Milliseconds(),
 			}, nil
 		},
-	})
+	}
 }
 
 // piSaid is how one turn is run in Pi: the node's MCP and its gateway, each
@@ -133,43 +113,4 @@ func (s *QNTXServer) piSaid(agent *rootAgent, named appcfg.PiConfig, binary, ses
 		}
 	}
 	return said
-}
-
-func (s *QNTXServer) piAm(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
-	agent := s.rootAgent
-	named := s.deps.cfg.Agent.Root.Pi
-	if agent == nil || !named.Named() || s.pi == nil {
-		return nil, s.thereIsNoPi()
-	}
-	is := map[string]any{
-		"did": agent.did, "model": named.Model, "thinking": named.Thinking, "gateway": named.Gateway,
-		"session": "", "answering": false, "pi": "", "pi_version": pi.PinnedVersion, "not_ready": "",
-	}
-	session, kept, err := agent.sessionIn(agent.pi.file)
-	if err != nil {
-		is["not_ready"] = err.Error()
-	} else if kept {
-		is["session"] = session
-	}
-	if going := agent.pi.answering.Load(); going != nil {
-		is["answering"], is["session"] = true, going.session
-	}
-	switch path, arrived, err := s.pi.Now(); {
-	case !arrived:
-		is["not_ready"] = "Pi is still being built"
-	case err != nil:
-		is["not_ready"] = err.Error()
-	default:
-		is["pi"] = path
-	}
-	return is, nil
-}
-
-// piSession reads the agent's session in Pi from where it is written.
-func (s *QNTXServer) piSession(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
-	agent := s.rootAgent
-	if agent == nil || !s.deps.cfg.Agent.Root.Pi.Named() {
-		return nil, s.thereIsNoPi()
-	}
-	return s.readAgentSession(agent, agent.pi)
 }

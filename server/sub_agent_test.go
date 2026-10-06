@@ -164,5 +164,5 @@ func TestAClaudeCodeAlreadyFetchedIsNeverSaidToBeArriving(t *testing.T) {
 func TestANodeThatNamesNoAgentFetchesNoClaudeCode(t *testing.T) {
 	s := &QNTXServer{deps: &serverDependencies{cfg: &appcfg.Config{}}, logger: zaptest.NewLogger(t).Sugar()}
 	require.NoError(t, agentSubsystem{}.Init(s))
-	assert.Nil(t, s.claudeCode)
+	assert.Nil(t, s.harnessHeldBy("claude"))
 }
