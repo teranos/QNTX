@@ -289,6 +289,15 @@ func (s *QNTXServer) pullHeld(ctx context.Context, source buildSource, branch, v
 type vaultLooked struct {
 	notes  map[string]string
 	failed time.Time
+	// refused is why the last send failed, said whole wherever the folder's state is.
+	refused string
+}
+
+// lastRefused is why the last send of folder to branch failed, or empty.
+func lastRefused(vault, folder, branch string) string {
+	vaultLookedMu.Lock()
+	defer vaultLookedMu.Unlock()
+	return vaultLookedAt[vault+"\x00"+folder+"\x00"+branch].refused
 }
 
 var (
@@ -341,7 +350,7 @@ func (s *QNTXServer) sendVault(ctx context.Context, name string, only func(place
 		sent := s.sendVaultFolder(ctx, vault, folder, branch, notes)
 		record := vaultLooked{notes: now}
 		if sent.Refused != nil {
-			record.failed = time.Now()
+			record.failed, record.refused = time.Now(), sent.Refused.Error()
 			logger.Errorw("A vault's folder was not sent to its branch", "vault", vault.Name, "folder", folder, "branch", branch,
 				"committed", sent.Committed, "removed", sent.Removed, "error", sent.Refused)
 		} else {

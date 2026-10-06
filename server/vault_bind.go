@@ -358,6 +358,11 @@ func (s *QNTXServer) foldersState(ctx context.Context, vault Vault, source build
 		return
 	}
 	state.Branch = branch
+	// A send that failed is what the folder is, until one does not.
+	if refused := lastRefused(vault.Name, state.Folder, branch); refused != "" {
+		state.State, state.Why = vaultInvalid, refused
+		return
+	}
 	sendsNow, pull, err := s.sendState(ctx, source, branch)
 	if err != nil {
 		state.State, state.Why = vaultInvalid, err.Error()

@@ -20,6 +20,8 @@ type standInRepo struct {
 	branches      map[string]map[string]string
 	pulls         []map[string]any
 	commits       []string
+	// refuseRef is a branch GitHub will not make, as it will not beside one under it.
+	refuseRef string
 }
 
 // stand is the repository the stand-in GitHub of vaultBindingServer holds.
@@ -54,6 +56,10 @@ func (repo *standInRepo) serve(w http.ResponseWriter, r *http.Request) bool {
 		give(http.StatusOK, map[string]any{"name": branch, "commit": map[string]any{"sha": "sha-of-" + branch}})
 	case rest == "/git/refs" && r.Method == http.MethodPost:
 		branch := strings.TrimPrefix(sent["ref"], "refs/heads/")
+		if branch == repo.refuseRef {
+			give(http.StatusUnprocessableEntity, map[string]string{"message": "Reference update failed"})
+			break
+		}
 		if _, held := repo.branches[branch]; held {
 			give(http.StatusUnprocessableEntity, map[string]string{"message": "Reference already exists"})
 			break

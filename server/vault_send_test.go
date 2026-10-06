@@ -103,6 +103,24 @@ func TestABranchToSendToIsOneGitTakesAndNotTheDefault(t *testing.T) {
 	assert.Equal(t, "place", refused.GetParam())
 }
 
+// A send that failed is the folder's state, red and in GitHub's words.
+func TestASendThatFailedIsWhatTheFolderIs(t *testing.T) {
+	s, _ := vaultBindingServer(t)
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
+	require.Nil(t, refused, "%v", refused)
+	// A branch under docs/ makes docs a folder of branches, which no branch can be named.
+	stand.branches["docs/watcher-dx"] = map[string]string{}
+	stand.refuseRef = "docs"
+
+	_, refused = askVault(t, s, "send", sigil.Sent{"name": "abcd", "place": "Course Material", "branch": "docs"})
+	require.Nil(t, refused, "%v", refused)
+	got, _ := askVault(t, s, "states", sigil.Sent{"name": "abcd"})
+	state := got.(map[string]any)["folders"].([]vaultFolderState)[0]
+	assert.Equal(t, vaultInvalid, state.State)
+	assert.Contains(t, state.Why, "Reference update failed")
+	assert.Equal(t, "docs", state.Branch)
+}
+
 // "concept of default branch, not main or master"
 func TestAFolderIsBoundToItsRepositorysDefaultBranch(t *testing.T) {
 	s, _ := vaultBindingServer(t)
