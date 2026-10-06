@@ -21,3 +21,5 @@ make ats
 # go and typescript, fast tests during development.
 make test
 ```
+
+Works with: [https://nixos.org/](Nix) [https://obsidian.md/](Obsidian), [https://sentry.io/](Sentry), [https://aws.amazon.com/](AWS), [https://github.com/](GitHub), [https://claude.com/product/claude-code](Claude), [https://typesafe.ai/blog/introducing-system-one-models-and-jev](Jev), [https://pi.dev/](Pi), [https://openrouter.ai/](openrouter), [https://duckdb.org/](DuckDB), [https://github.com/teranos/ground](ground), [https://github.com/teranos/elements](elements)
