@@ -25,7 +25,7 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 `Grant` fuses who the caller is with what they may do. A credential says who, a policy says what,
 and they are edited apart, change the policy and every credential under it changes at once, untouched.
 
-### TOKATTEST — a token attests as itself
+### TOKATTEST — a token that attests as itself
 
 ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
 
@@ -40,7 +40,7 @@ ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
 - The list shows the DID, the namespaces and the predicates. It fetches all four
   today and draws none.
 
-"each token is its own actor in the predicate by"
+"each token is its own actor in the actor by"
 
 Its own, which says whose it is rather than how many there are. Two actors can
 make contradictory claims about the same subject and both are valid
