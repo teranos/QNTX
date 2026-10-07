@@ -2,7 +2,7 @@
 
 ## Whose words
 
-A line in quote marks is the owner's, written by them, and decided.
+A line in quote marks that a real human has decided. 
 
 A `>` blockquote is not. Neither is anything unquoted. Both are written by
 whoever drafted the document, and stay in flight until a quoted line settles
