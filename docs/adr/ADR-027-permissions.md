@@ -40,12 +40,7 @@ ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
 - The list shows the DID, the namespaces and the predicates. It fetches all four
   today and draws none.
 
-"each token is its own actor in the actor by"
-
-Its own, which says whose it is rather than how many there are. Two actors can
-make contradictory claims about the same subject and both are valid
-(docs/attestation.md), so the token's DID leads and what a caller names stands
-after it.
+"each token is its own actor in the sg: by"
 
 A node opens a namespace on the first request that names it, so a token is
 minted for any namespace its minter is admitted to. A token reaching several
