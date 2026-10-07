@@ -85,6 +85,8 @@ folder itself carries nothing.
 
 - A folder is `owner/repo@branch:path=place`, the place being where in the
   vault it is. A place is inside the vault, and no place is another's or
+  holds another, so a note is one folder's.
+
 
 ## What reaches the vault
 
