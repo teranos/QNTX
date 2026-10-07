@@ -6,8 +6,7 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 ## Statements
 
 - SUPER creates namespaces and disables them. Only a SUPER User owns one, and ownership is  recorded on the namespace (ADR-031).
-- The system and default namespace is not visible at all below SUPER. The default namespace is visible, as the
-  default project.
+- The system and default namespaces are not visible at all below SUPER. The default namespace is the default project.
 - Data never leaves. A newer record supersedes an older one, and both stay.
 - A disabled namespace refuses reads. Re-enabling it opens the same bytes again.
 - The system and default namespaces cannot be deleted, and cannot be disabled either. A disabled
