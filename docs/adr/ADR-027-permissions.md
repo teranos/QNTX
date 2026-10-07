@@ -25,12 +25,6 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 `Grant` fuses who the caller is with what they may do. A credential says who, a policy says what,
 and they are edited apart, change the policy and every credential under it changes at once, untouched.
 
-The token record keeps identity and loses scope. Minting asks for a label, and
-`515bedc5` removed the scope boxes because every answer was the same answer —
-this is why they do not come back.
-
-## Phases
-
 ### TOKATTEST — a token attests as itself
 
 ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
