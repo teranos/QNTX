@@ -5,7 +5,8 @@
 "Quotation marks indicate that a real human has ever said it verbatim."
 "Meaning it's fully decided. it's settled." 
 
-"The Quoted text is the only place it is settled, rephrasing it is eti"
+"The Quoted text is the only place it is settled, 
+rephrasing it is entirely banned in favour of simple ref's"
 
 A `>` block-quote is not. 
 Neither is anything unquoted. 
