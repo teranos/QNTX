@@ -2,7 +2,8 @@
 
 ## Whose words
 
-"Quotation marks indicate that a real human has ever said it verbatim." 
+"Quotation marks indicate that a real human has ever said it verbatim."
+"Meaning it's fully decided. it's sett" 
 
 A `>` blockquote is not. Neither is anything unquoted. Both are written by
 whoever drafted the document, and stay in flight until a quoted line settles
