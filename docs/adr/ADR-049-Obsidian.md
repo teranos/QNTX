@@ -1,9 +1,9 @@
 # ADR-049: Obsidian
 
 Date: 2026-10-06
-Status: Developed in 
+Status: Developed in pr #1094 
 
-"i want to integrate better with their sync service if possible, and have
+"i want to integrate better with Obsidian's sync service if possible, and have
 Obsidian be a QNTX thing, I would rather have that than to reinvent everything
 Obsidian does, i tried that before actually, and i got somehwere, but truth be
 told is that Obsidian is really good at what it is"
