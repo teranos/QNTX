@@ -93,7 +93,7 @@ folder itself carries nothing.
 - Only notes: `.md` files. What else the repository's folder holds stays there.
 - Asked whether a note deleted on main is deleted from the vault too:
 
-"yes"
+"yes", "main wins"
 
 - A note main had and has no more is removed from the vault. A note main
   never had is the vault's own and stays.
