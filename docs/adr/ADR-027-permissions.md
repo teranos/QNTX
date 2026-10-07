@@ -18,12 +18,6 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - Which levels reach which route is one table: `server/reach`. 
 - A role is lines (attestations) in system, not a level compiled into the binary (ADR-034).
 
-"the trick is, that default is the only nukable namespace, but it keeps coming back"
-
-"consider it additive when i say that i want the same to apply for namespace deletion as well"
-
-"that you need to stand in system for it and you also need to be root for it"
-
 ## The credential does not carry the permission
 
 "i want to be able to change it at will"
