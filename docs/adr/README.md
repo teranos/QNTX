@@ -2,7 +2,7 @@
 
 ## Whose words
 
-A line in quote marks that a real human has decided. 
+Q marks that a real human has decided. 
 
 A `>` blockquote is not. Neither is anything unquoted. Both are written by
 whoever drafted the document, and stay in flight until a quoted line settles
