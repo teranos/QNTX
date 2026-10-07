@@ -23,14 +23,12 @@ of some sorts is made,"
 
 "3. QNTX receives webhooks on most events github dispatches"
 
-"4. Similar to how we rebuild datapunt on CUE changes"
-
-"5. And the persistent branch is obsidian-[nameofvault] and it always contains
+"4. And the persistent branch is obsidian-[nameofvault] and it always contains
 the abcdsync diff, and people may merge it at times"
 
-"6. And QNTX ensures changes flow back into the Obsidian Vault as well"
+"5. And QNTX ensures changes flow back into the Obsidian Vault as well"
 
-"7. The Obsidian Vault is available to the ROOT agent on the machine"
+"6. The Obsidian Vault is available to the ROOT agent on the machine"
 
 - A repository's docs are edited from any device the vault is on, the phone
   included, and the repository takes what is merged from `obsidian-<vault>`.
