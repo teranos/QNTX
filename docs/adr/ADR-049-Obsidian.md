@@ -1,7 +1,7 @@
 # ADR-049: Obsidian
 
 Date: 2026-10-06
-Status: Proposed
+Status: Developed in 
 
 "i want to integrate better with their sync service if possible, and have
 Obsidian be a QNTX thing, I would rather have that than to reinvent everything
