@@ -11,11 +11,6 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - A disabled namespace refuses reads. Re-enabling starts it again.
 - The system and default namespaces cannot be deleted, and cannot be disabled either. 
 - A disabled system namespace is a node that cannot read who anybody is.
-- A  and drains it into default. Data never leaves, so a delete moves what a namespace held rather than ending it.
-  It is ROOT's, and reached from system, the same as nuking.
-- Nuking empties a namespace without ending it, and default is the only one it applies to. It is
-  ROOT's, and it is reached from system: you stand in the node to empty the project, never in the
-  thing being emptied. It is the one place data does leave.
 - A login is a session with the node and stands (ADR-031); reach into namespaces
   is a granted relation.
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
