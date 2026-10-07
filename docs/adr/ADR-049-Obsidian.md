@@ -5,8 +5,8 @@ Status: Developed in pr #1094
 
 "i want to integrate better with Obsidian's sync service if possible, and have
 Obsidian be a QNTX thing, I would rather have that than to reinvent everything
-Obsidian does, i tried that before actually, and i got somehwere, but truth be
-told is that Obsidian is really good at what it is"
+Obsidian does, i tried that before actually, and i got somewhere, but truth be
+told is that Obsidian is really good at what it is and I like"
 
 "i dont mind continuing the 3 dollars per month, their sync service is great,
 it never fails me"
