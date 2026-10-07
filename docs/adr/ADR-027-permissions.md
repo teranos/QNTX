@@ -44,7 +44,7 @@ ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
 
 A node opens a namespace on the first request that names it, so a token is
 minted for any namespace its minter is admitted to. A token reaching several
-says which one a request is; a write lands somewhere definite or nowhere. 
+says which one a request is; a write lands somewhere definite or nowhere. `TODO: find an example or source the claim by `
 
 ### 27-2 — ground
 
