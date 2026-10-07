@@ -9,8 +9,7 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - The system and default namespaces are not visible at all below SUPER. The default namespace is the default project.
 - Data never leaves. A newer record supersedes an older one, and both stay.
 - A disabled namespace refuses reads. Re-enabling starts it again.
-- The system and default namespaces cannot be deleted, and cannot be disabled either. A disabled
-  system is a node that cannot read who anybody is — including whether you are the SUPER who would
+- The system and default namespaces cannot be deleted, and cannot be disabled either. A disabled system namespace is a node that cannot read who anybody is — including whether you are the SUPER who would
   turn it back on.
 - Deleting a namespace takes everything inside it — attestations, watchers, all of it — and drains
   it into default. Data never leaves, so a delete moves what a namespace held rather than ending it.
