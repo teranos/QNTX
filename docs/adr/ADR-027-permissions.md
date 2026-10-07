@@ -16,7 +16,7 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
 - Visibility is per-namespace.
 - Which levels reach which route is one table: `server/reach`. 
-- A role is lines in system, not a level in the binary (ADR-034).
+- A role is lines (attestations) in system, not a level compiled into the binary (ADR-034).
 
 "the trick is, that default is the only nukable namespace, but it keeps coming back"
 
