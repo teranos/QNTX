@@ -23,8 +23,7 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 "i want to be able to change it at will"
 
 `Grant` fuses who the caller is with what they may do. A credential says who, a policy says what,
-and they are edited apart, change the policy and every credential under it
-changes at once, untouched.
+and they are edited apart, change the policy and every credential under it changes at once, untouched.
 
 The token record keeps identity and loses scope. Minting asks for a label, and
 `515bedc5` removed the scope boxes because every answer was the same answer —
