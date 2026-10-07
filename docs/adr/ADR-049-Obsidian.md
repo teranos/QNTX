@@ -35,7 +35,7 @@ the abcdsync diff, and people may merge it at times"
 - An Obsidian plugin runs inside the app on every device and can call the
   node; Sync keeps doing the syncing.
 
-## On the box
+## On-Prem
 
 Obsidian Headless (`obsidian-headless`, open beta, Node.js 22 or later) is
 Obsidian's own client for Sync without the app: `ob login`, `ob sync-setup`,
