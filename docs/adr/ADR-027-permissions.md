@@ -56,6 +56,8 @@ takes a cwd, `evaluatePermission` takes a cwd and a command, `CheckFn` takes a
 cwd and an input, and the actor on every attestation it emits is the literal
 `ground`.
 
+``
+
 ### 27-3 — every part of QNTX behind it
 
 ## Not conformed
