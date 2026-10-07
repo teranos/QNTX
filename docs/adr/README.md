@@ -2,11 +2,16 @@
 
 ## Whose words
 
-A line in quote marks is the owner's, written by them, and decided.
+"Quotation marks indicate that a real human has ever said it verbatim."
+"Meaning it's fully decided. it's settled." 
 
-A `>` blockquote is not. Neither is anything unquoted. Both are written by
-whoever drafted the document, and stay in flight until a quoted line settles
-them — nothing downstream should read either as a decision that was made.
+"The Quoted text is the one source of truth, 
+rephrasing it is entirely banned in favour of simple ref's"
 
-An ADR that expands a quoted definition has added something nobody decided.
-Remove the expansion rather than arguing with it.
+A `>` block-quote is not. 
+Neither is anything unquoted. 
+Both are written by whatever drafted it, 
+and stay in flight until 
+a quoted line settles it with higher authority.
+
+

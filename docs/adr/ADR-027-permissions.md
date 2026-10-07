@@ -5,51 +5,27 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 
 ## Statements
 
-- SUPER creates namespaces and disables them. Only a SUPER User owns one, and ownership is
-  recorded on the namespace (ADR-031).
-- The system namespace is not visible at all below SUPER. The default namespace is visible, as the
-  default project.
+- SUPER creates namespaces and disables them. Only a SUPER User owns one, and ownership is  recorded on the namespace (ADR-031).
+- The system and default namespaces are not visible at all below SUPER. The default namespace is the default project.
 - Data never leaves. A newer record supersedes an older one, and both stay.
-- A disabled namespace refuses reads. Re-enabling it opens the same bytes again.
-- The system and default namespaces cannot be deleted, and cannot be disabled either. A disabled
-  system is a node that cannot read who anybody is — including whether you are the SUPER who would
-  turn it back on.
-- Deleting a namespace takes everything inside it — attestations, watchers, all of it — and drains
-  it into default. Data never leaves, so a delete moves what a namespace held rather than ending it.
-  It is ROOT's, and reached from system, the same as nuking.
-- Nuking empties a namespace without ending it, and default is the only one it applies to. It is
-  ROOT's, and it is reached from system: you stand in the node to empty the project, never in the
-  thing being emptied. It is the one place data does leave.
+- A disabled namespace refuses reads. Re-enabling starts it again.
+- The system and default namespaces cannot be deleted, and cannot be disabled either. 
+- A disabled system namespace is a node that cannot read who anybody is.
 - A login is a session with the node and stands (ADR-031); reach into namespaces
   is a granted relation.
 - **ROOT** goes beyond QNTX. It is a level of access you want on dev and not on prod.
 - Visibility is per-namespace.
-- Which levels reach which route is one table: `server/reach`. A path no line
-  names is ROOT's and nobody else's.
-- A role is lines in system, not a level in the binary (ADR-034).
-
-"the trick is, that default is the only nukable namespace, but it keeps coming back"
-
-"consider it additive when i say that i want the same to apply for namespace deletion as well"
-
-"that you need to stand in system for it and you also need to be root for it"
+- Which levels reach which route is one table: `server/reach`. 
+- A role is lines (attestations) in system, not a level compiled into the binary (ADR-034).
 
 ## The credential does not carry the permission
 
 "i want to be able to change it at will"
 
-`Grant` fuses who the caller is with what they may do, so changing what a token
-may do means minting a different one. A credential says who, a policy says what,
-and they are edited apart — change the policy and every credential under it
-changes at once, untouched.
+`Grant` fuses who the caller is with what they may do. A credential says who, a policy says what,
+and they are edited apart, change the policy and every credential under it changes at once, untouched.
 
-The token record keeps identity and loses scope. Minting asks for a label, and
-`515bedc5` removed the scope boxes because every answer was the same answer —
-this is why they do not come back.
-
-## Phases
-
-### TOKATTEST — a token attests as itself
+### TOKATTEST — a token that attests as itself
 
 ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
 
@@ -64,16 +40,11 @@ ATTESTOR is a token that can attest, minted by the User that owns it (ADR-031).
 - The list shows the DID, the namespaces and the predicates. It fetches all four
   today and draws none.
 
-"each token is its own actor in the predicate by"
-
-Its own, which says whose it is rather than how many there are. Two actors can
-make contradictory claims about the same subject and both are valid
-(docs/attestation.md), so the token's DID leads and what a caller names stands
-after it.
+"each token is its own actor in the sg: by"
 
 A node opens a namespace on the first request that names it, so a token is
 minted for any namespace its minter is admitted to. A token reaching several
-says which one a request is; a write lands somewhere definite or nowhere.
+says which one a request is; a write lands somewhere definite or nowhere. `TODO: find an example or source the claim by pointing at the code`
 
 ### 27-2 — ground
 
@@ -84,6 +55,8 @@ Blocked on: nothing in ground's evaluation path takes an actor. `scopeMatches`
 takes a cwd, `evaluatePermission` takes a cwd and a command, `CheckFn` takes a
 cwd and an input, and the actor on every attestation it emits is the literal
 `ground`.
+
+`TODO: So, this part is actually not done yet, but also needs to wait until the box builds ground like it does datapunt`
 
 ### 27-3 — every part of QNTX behind it
 
