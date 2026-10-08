@@ -27,6 +27,25 @@ test('a person is offered to add to their own record', () => {
     expect(container.textContent).toContain('no mail reaches this User');
 });
 
+// "the infinite row of switch of is pissing me off as well, should be in the User themselves"
+test('the switch is in the User: off for a User who is on, on for one who is off', () => {
+    const on = document.createElement('div');
+    renderUser(on, root(), false, () => {}, true);
+    expect(on.textContent).toContain('Switch off');
+    expect(on.textContent).not.toContain('Switch on');
+
+    const off = document.createElement('div');
+    renderUser(off, { ...root(), disabled_by: 'US-USER-ROOT0001' }, false, () => {}, true);
+    expect(off.textContent).toContain('Switch on');
+    expect(off.textContent).not.toContain('Switch off');
+});
+
+test('a token reading a User is offered no switch', () => {
+    const container = document.createElement('div');
+    renderUser(container, root(), false, () => {}, false);
+    expect(container.textContent).not.toContain('Switch');
+});
+
 test("nobody is offered to add to another User's record", () => {
     const container = document.createElement('div');
     renderUser(container, root(), false);

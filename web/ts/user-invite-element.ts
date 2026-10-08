@@ -120,7 +120,8 @@ export function renderInvite(content: HTMLElement, providers: ProviderDescriptio
 
     const showSame = () => {
         const address = email.value.trim();
-        sameRow.hidden = !pressed || !address;
+        // display, not hidden: the row's own display: flex outranks hidden.
+        sameRow.style.display = pressed && address ? 'flex' : 'none';
         if (pressed) sameText.textContent = `${address} is their ${pressed.label} account`;
         if (same.checked) account.value = address;
         account.disabled = same.checked;

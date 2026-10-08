@@ -5,14 +5,12 @@
 // "could you create a ts Users glyph to let us do the minimal management of users as ROOT ?"
 
 // Plain window, reached from the Self element. Lists every User as the record
-// holds them, and the switch on each: off carries ROOT's name so the person
-// cannot switch it back; on is on whoever switched it off. The minimal
-// management is seeing everyone and the one act on a person.
+// holds them; pressing a name opens that User, where the switch on them is.
 
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createDangerButton, createGhostButton, createPrimaryButton } from './components/button';
+import { createGhostButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
 import { openUserElement } from './user-element';
@@ -44,11 +42,6 @@ const UNNAMED = '—';
 
 async function fetchUsers(): Promise<UserRecord[]> {
     return await apiJson<UserRecord[]>('/auth/users');
-}
-
-/** Flips the switch on one User. The node's refusal is the error. */
-async function flip(id: string, verb: 'disable' | 'enable'): Promise<void> {
-    await apiJson<{ status: string }>(`/auth/users/${encodeURIComponent(id)}/${verb}`, { method: 'POST' });
 }
 
 /** What to call a User: their name, root for the ROOT User, and a dash for
@@ -112,10 +105,9 @@ export function reachedBy(u: UserRecord): { shown: string; whole: string } {
     return { shown: parts.join(', '), whole: routes.join('\n') };
 }
 
-/** Exported for tests: which control a row offers is the switch itself.
- *  `switches` is whether the viewer may switch anybody: a session may, a token
- *  may not, and a row does not offer a token what a token cannot do. */
-export function renderList(container: HTMLElement, users: UserRecord[], switches = true): void {
+/** Exported for tests: every User, a row each. A row is a way in to the
+ *  User and nothing else. */
+export function renderList(container: HTMLElement, users: UserRecord[]): void {
     container.innerHTML = '';
 
     if (users.length === 0) {
@@ -139,7 +131,6 @@ export function renderList(container: HTMLElement, users: UserRecord[], switches
         <th>Phone</th>
         <th>Created</th>
         <th>Status</th>
-        ${switches ? '<th></th>' : ''}
     </tr>`;
     table.appendChild(thead);
 
@@ -166,36 +157,14 @@ export function renderList(container: HTMLElement, users: UserRecord[], switches
         tr.appendChild(cell(fmt(u.created_at), 'element-time'));
         tr.appendChild(statusPill(u));
 
-        if (switches) {
-            const action = document.createElement('td');
-            action.className = 'element-actions';
-            if (u.disabled_by) {
-                const on = createPrimaryButton('Switch on', async () => {
-                    await flip(u.id, 'enable');
-                    await refreshList(container);
-                });
-                action.appendChild(on.element);
-            } else {
-                const off = createDangerButton('Switch off', 'Confirm switch off', async () => {
-                    await flip(u.id, 'disable');
-                    await refreshList(container);
-                });
-                action.appendChild(off.element);
-            }
-            tr.appendChild(action);
-        }
-
         tbody.appendChild(tr);
     }
     table.appendChild(tbody);
     container.appendChild(table);
 }
 
-// Who is looking decides what the rows offer: a session switches, a token
-// only reads.
 async function refreshList(container: HTMLElement): Promise<void> {
-    const [users, who] = await Promise.all([fetchUsers(), person()]);
-    renderList(container, users, who.via !== 'token');
+    renderList(container, await fetchUsers());
 }
 
 // "as root, i press the + and i can create a new user, like how i would create a new oauth token"

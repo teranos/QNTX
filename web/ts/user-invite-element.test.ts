@@ -55,6 +55,12 @@ describe('Tim, as ROOT, invites a friend', () => {
         expect(container.textContent).toContain('Send invitation');
     });
 
+    test('the offer is out of sight until there is an address and a provider to offer', () => {
+        renderInvite(container, PROVIDERS);
+        const row = container.querySelector<HTMLInputElement>('input[name="same"]')!.closest('label')!;
+        expect(row.style.display).toBe('none');
+    });
+
     test('the friend\'s gmail is offered as their Google account', () => {
         renderInvite(container, PROVIDERS);
         rows().find(r => r.dataset.provider === 'google')!.click();
@@ -63,6 +69,7 @@ describe('Tim, as ROOT, invites a friend', () => {
         email.dispatchEvent(new Event('input'));
 
         const same = container.querySelector<HTMLInputElement>('input[name="same"]')!;
+        expect(same.closest('label')!.style.display).toBe('flex');
         expect(same.closest('label')!.textContent).toContain('Google');
         same.click();
 

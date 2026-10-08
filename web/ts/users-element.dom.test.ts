@@ -23,7 +23,7 @@ describe('Users element rows', () => {
         document.body.appendChild(container);
     });
 
-    test('Tim de Facile is on, with what he said and an offer to switch him off', () => {
+    test('Tim de Facile is on, with what he said, and the row offers no switch', () => {
         renderList(container, [{
             id: 'US-TIM-1',
             display_name: 'Tim de Facile',
@@ -36,11 +36,10 @@ describe('Users element rows', () => {
         expect(container.textContent).toContain('Tim de Facile');
         expect(container.textContent).toContain('tim@example.com');
         expect(container.textContent).toContain('+31612345678, 0201234567');
-        expect(container.textContent).toContain('Switch off');
-        expect(container.textContent).not.toContain('Switch on');
+        expect(container.textContent).not.toContain('Switch');
     });
 
-    test('a User ROOT switched off says so, and by whom, and offers to switch on', () => {
+    test('a User ROOT switched off says so, and by whom', () => {
         renderList(container, [{
             id: 'US-TIM-1',
             display_name: 'Tim de Facile',
@@ -51,8 +50,7 @@ describe('Users element rows', () => {
 
         expect(container.textContent).toContain('off');
         expect(container.textContent).toContain('by US-ROOT-1');
-        expect(container.textContent).toContain('Switch on');
-        expect(container.textContent).not.toContain('Switch off');
+        expect(container.textContent).not.toContain('Switch');
     });
 
     test('the ROOT User is root without saying so, and a quiet User is a dash', () => {

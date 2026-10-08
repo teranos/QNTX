@@ -32,11 +32,10 @@ test('created reads as the day it was, in UTC', () => {
     expect(fmt(0)).toBe('—');
 });
 
-// A token lists and reads and switches nobody, so a row does not offer it
-// the switch.
-test('a token is not offered the switch', () => {
+// "the infinite row of switch of is pissing me off as well, should be in the User themselves"
+test('the list switches nobody: the switch is in the User', () => {
     const container = document.createElement('div');
-    renderList(container, [root()], false);
+    renderList(container, [root()]);
     expect(container.querySelector('button')).toBeNull();
     expect(container.querySelectorAll('th').length).toBe(8);
 });
