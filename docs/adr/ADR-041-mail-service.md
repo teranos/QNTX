@@ -1,7 +1,7 @@
 # ADR-041: MailService
 
 Date: 2026-09-24
-Status: almost done
+Status: almost done actually
 
 - A plugin calls it over gRPC, and the plugin provides the template.
 - It is served the way FetchService is: core does the outbound act for the
