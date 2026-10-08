@@ -27,9 +27,7 @@ Disabling a namespace refuses reads by all non-owners and writes for everyone.
 
 Namespaces don't mix and mesh. They are their own universes.
 
-A USER does not see what namespace or project
-something belongs to. It just is, and it is not load-bearing within a namespace.
-
+A USER does not see what namespace or project something belongs to. 
 A watcher in namespace A does not fire on an attestation in namespace B. They are not the same
 world.
 
