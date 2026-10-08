@@ -91,7 +91,9 @@ func (s *QNTXServer) claudeLogin(ctx context.Context, h *harness, sent sigil.Sen
 
 	// A sign-in begun over one not finished ends the first: one URL is live.
 	if pending, cancel := agent.signingIn.take(); pending != nil {
-		pending.Abandon()
+		if err := pending.Abandon(); err != nil {
+			s.logger.Warnw("the sign-in begun before was not ended cleanly", "agent", agent.did, "error", err)
+		}
 		cancel()
 	}
 	// Under the node's own context, not the caller's: the caller leaves, and
@@ -111,7 +113,9 @@ func (s *QNTXServer) claudeLogin(ctx context.Context, h *harness, sent sigil.Sen
 		agent.signingIn.mu.Lock()
 		defer agent.signingIn.mu.Unlock()
 		if agent.signingIn.pending == in {
-			in.Abandon()
+			if err := in.Abandon(); err != nil {
+				s.logger.Warnw("a sign-in nobody finished was not ended cleanly", "agent", agent.did, "error", err)
+			}
 			agent.signingIn.pending, agent.signingIn.cancel = nil, nil
 		}
 	}()

@@ -102,8 +102,11 @@ func (s SignIn) Begin(ctx context.Context) (*SigningIn, error) {
 		}
 	}
 	if in.URL == "" {
-		in.Abandon()
-		return nil, errors.Newf("Claude Code printed no sign-in URL, saying: %s", in.said())
+		said := in.said()
+		if err := in.Abandon(); err != nil {
+			return nil, errors.Wrapf(err, "Claude Code printed no sign-in URL, saying: %s", said)
+		}
+		return nil, errors.Newf("Claude Code printed no sign-in URL, saying: %s", said)
 	}
 	return in, nil
 }
@@ -118,24 +121,38 @@ func (in *SigningIn) Finish(code string) error {
 	if _, err := io.WriteString(in.stdin, code+"\n"); err != nil {
 		return errors.Wrap(err, "the code was not handed to Claude Code")
 	}
-	_ = in.stdin.Close()
+	if err := in.stdin.Close(); err != nil {
+		return errors.Wrap(err, "the code was handed to Claude Code and its stdin did not close")
+	}
 	// What it prints after the code is read to the end so it can end.
-	_, _ = io.Copy(io.Discard, in.stdout)
+	if _, err := io.Copy(io.Discard, in.stdout); err != nil {
+		return errors.Wrap(err, "what Claude Code printed after the code was cut short")
+	}
 	if err := in.cmd.Wait(); err != nil {
 		return errors.Wrapf(err, "Claude Code refused the code, saying: %s", in.said())
 	}
 	return nil
 }
 
-// Abandon ends a sign-in nobody finished.
-func (in *SigningIn) Abandon() {
+// Abandon ends a sign-in nobody finished. The process being gone already, or
+// ending because it was killed here, is the ending asked for and no error.
+func (in *SigningIn) Abandon() error {
+	var failed error
 	in.once.Do(func() {
-		_ = in.stdin.Close()
-		if in.cmd.Process != nil {
-			_ = in.cmd.Process.Kill()
+		if err := in.stdin.Close(); err != nil {
+			failed = errors.Wrap(err, "the sign-in's stdin did not close")
 		}
-		_ = in.cmd.Wait()
+		if in.cmd.Process != nil {
+			if err := in.cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+				failed = errors.Wrap(err, "the sign-in's process was not killed")
+			}
+		}
+		var exit *exec.ExitError
+		if err := in.cmd.Wait(); err != nil && !errors.As(err, &exit) {
+			failed = errors.Wrap(err, "the sign-in's process was not waited for")
+		}
 	})
+	return failed
 }
 
 // said is the tail of what Claude Code wrote to stderr.
