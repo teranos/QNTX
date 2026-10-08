@@ -20,8 +20,7 @@ proves you have access to that identity.
 
 ### Reach is granted
 
-A User reaches a namespace through a permission granted and struck from the
-root side 
+A User can reaches a namespace through a permission granted and struck by ROOT 
 
 a relation between the User and the namespace (ADR-031).
 Disabling a namespace refuses reads. A login is a session with the node and
