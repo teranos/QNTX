@@ -71,7 +71,9 @@ func namespaced(admitted auth.Admission, path string) bool {
 	if admitted.ClientDID == "" {
 		return false
 	}
-	return path == "/i/" || path == "/i/standing" || strings.HasPrefix(path, "/api/namespaces")
+	// A namespace's keys are a person's and a model's never (ADR-051).
+	return path == "/i/" || path == "/i/standing" || strings.HasPrefix(path, "/api/namespaces") ||
+		path == keysPath || strings.HasPrefix(path, keysPath+"/")
 }
 
 // toolName is the route in the characters a tool name allows, after the

@@ -145,6 +145,11 @@ REACH is '/api/vault/unbind' '/api/vault/disable' '/api/vault/enable'     of ROO
 REACH is '/api/vault/send'                                                of ROOT
 REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROOT
 
+# A namespace's keys (ADR-051): who among these sets them is the handler's,
+# ROOT, SUPER and the namespace's owner. No TOKEN, because a model never lists,
+# sets or reads a key; the handler refuses a token or a connector at any level.
+REACH is '/api/keys' '/api/keys/drop'                                     of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
+
 # The ROOT agent (the claude signum, ADR-048). Who may talk to it is the whole
 # of what guards it, and that is ROOT.
 REACH is '/api/claude' '/api/claude/say' '/api/claude/session'            of ROOT

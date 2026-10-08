@@ -276,6 +276,22 @@
       ],
       "x-qntx-prefix": true
     },
+    "/api/keys": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
+      ]
+    },
+    "/api/keys/drop": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION"
+      ]
+    },
     "/api/mail": {
       "x-qntx-reach": [
         "ROOT"

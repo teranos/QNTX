@@ -17,6 +17,7 @@ import { log, SEG } from './logger.ts';
 import { createGhostButton } from './components/button.ts';
 import { person, personSection, personSwitch, type Person } from './self-person.ts';
 import { openTokensElement } from './tokens-element.ts';
+import { openKeysElement } from './keys-element.ts';
 import { openRolesElement } from './roles-element.ts';
 import { openUsersElement } from './users-element.ts';
 import { openMarketElement } from './market-element.ts';
@@ -103,6 +104,15 @@ function renderI(): void {
         openTokensElement();
     });
     actions.appendChild(tokensBtn.element);
+
+    // The keys of the namespace the person stands in (ADR-051).
+    if (iPerson) {
+        const standing = iPerson.standing;
+        const keysBtn = createGhostButton(`⚷ Keys of ${standing}`, async () => {
+            openKeysElement(standing);
+        });
+        actions.appendChild(keysBtn.element);
+    }
 
     // Every User is ROOT's to see and to switch (ADR-031). The table refuses
     // anyone else at /auth/users, so nobody else is offered the way there.

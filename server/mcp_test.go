@@ -194,7 +194,7 @@ func TestAConnectorIsOfferedNoNamespaceTool(t *testing.T) {
 	}
 	toPerson, toConnector := offered(person), offered(connector)
 
-	for _, namespaced := range []string{"i_standing", "i_step", "http_i_", "namespaces_list", "namespaces_delete"} {
+	for _, namespaced := range []string{"i_standing", "i_step", "http_i_", "namespaces_list", "namespaces_delete", "keys_list", "keys_set", "keys_drop"} {
 		assert.True(t, toPerson[namespaced], namespaced+" is not offered to the person")
 		assert.False(t, toConnector[namespaced], namespaced+" is offered to a connector")
 	}

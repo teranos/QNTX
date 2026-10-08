@@ -113,6 +113,13 @@ func (a Admission) OwnsEveryCanvas() bool {
 	return a.level == access.LevelRoot || a.level == access.LevelSuper
 }
 
+// CrossesNamespaces reports whether this admission stands above namespaces:
+// SUPER crosses them and ROOT goes beyond QNTX (ADR-027). What a namespace's
+// owner may do in their own, these may do in any.
+func (a Admission) CrossesNamespaces() bool {
+	return a.level == access.LevelRoot || a.level == access.LevelSuper
+}
+
 // MayEndNamespaces reports whether this admission may delete a namespace: ROOT
 // alone, the same as nuking default (ADR-027).
 func (a Admission) MayEndNamespaces() bool {

@@ -16,6 +16,7 @@ import { createPulseElement } from './pulse-panel.ts';
 import { createHandlersElement } from './handlers-panel.ts';
 import { createLlmProviderElement } from './llm-provider-element.ts';
 import { createTokensElement } from './tokens-element.ts';
+import { createKeysElement } from './keys-element.ts';
 import { createRolesElement } from './roles-element.ts';
 import { createUsersElement } from './users-element.ts';
 import { createMarketElement } from './market-element.ts';
@@ -60,6 +61,8 @@ export function registerDefaultElements(hasCanvas: boolean = true): void {
 
     // Access Tokens Element — opened from ⍟ (ADR-025)
     tray.add(createTokensElement());
+    // Keys Element — a namespace's keys, opened from ⍟ (ADR-051)
+    tray.add(createKeysElement());
     tray.add(createUsersElement());
 
     // Roles Element — every role the lines name, opened from ⍟ (ADR-034)
