@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/internal/agentenv"
 	"github.com/teranos/errors"
 )
 
@@ -147,7 +148,7 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	if s.System != "" {
 		args = append(args, "--append-system-prompt", s.System)
 	}
-	env := append(os.Environ(), "CLAUDE_CONFIG_DIR="+config, "DISABLE_AUTOUPDATER=1")
+	env := append(agentenv.Carried(), "CLAUDE_CONFIG_DIR="+config, "DISABLE_AUTOUPDATER=1")
 	env = append(env, s.Env...)
 	if s.Token != "" {
 		env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+s.Token)

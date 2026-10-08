@@ -402,3 +402,18 @@ func TestWhoMayTalkToTheRootAgent(t *testing.T) {
 		assert.Equal(t, []string{"ROOT"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
 	}
 }
+
+// "every call it makes carries its own credential": what the node resolves
+// from its own environment, the plan token's env: reference here, is handed to
+// Claude Code as the agent's credential and is not in its environment beside it.
+func TestATurnInClaudeCodeCarriesOnlyItsOwnCredential(t *testing.T) {
+	t.Setenv("QNTX_NODE_SECRET", "the node's")
+	s, ran := runningTheRootAgent(t, opusLow)
+	_, refused := saying(s, sigil.Sent{"says": "hello"})
+	require.Nil(t, refused)
+
+	env := ranWith(t, ran, "0", "env")
+	assert.Contains(t, env, "CLAUDE_CODE_OAUTH_TOKEN=the-plan-token")
+	assert.NotContains(t, env, "QNTX_TEST_PLAN_TOKEN=the-plan-token")
+	assert.NotContains(t, env, "QNTX_NODE_SECRET=the node's")
+}
