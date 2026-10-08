@@ -36,6 +36,14 @@ type harness struct {
 	part func(ctx context.Context, sent sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal)
 	// am says what is the harness's own of the agent in it.
 	am func(is map[string]any)
+	// also is what this harness has beyond say, am and session.
+	also []harnessSigil
+}
+
+// harnessSigil is one sigil a harness has of its own, and what answers it.
+type harnessSigil struct {
+	sigil  *protocol.Sigil
+	answer sigil.Answer
 }
 
 // harnesses is every harness the ROOT agent runs in.
@@ -55,12 +63,22 @@ func (s *QNTXServer) harnessSigna() []sigil.Signum {
 // harnessSignum is a harness's say, am and session.
 func (s *QNTXServer) harnessSignum(h *harness) sigil.Signum {
 	at := "/api/" + h.name
+	answers := map[string]sigil.Answer{
+		"say":     func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.harnessSay(ctx, h, sent) },
+		"am":      func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.harnessAm(h) },
+		"session": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.harnessSession(h) },
+	}
+	var also []*protocol.Sigil
+	for _, own := range h.also {
+		also = append(also, own.sigil)
+		answers[own.sigil.GetName()] = own.answer
+	}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        h.name,
 			Description: h.description,
 			Tags:        []string{"agent", h.name, "root"},
-			Sigils: []*protocol.Sigil{
+			Sigils: append([]*protocol.Sigil{
 				{
 					Name:  "say",
 					Does:  h.sayDoes,
@@ -82,13 +100,9 @@ func (s *QNTXServer) harnessSignum(h *harness) sigil.Signum {
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: at + "/session"},
 				},
-			},
+			}, also...),
 		},
-		Answers: map[string]sigil.Answer{
-			"say":     func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.harnessSay(ctx, h, sent) },
-			"am":      func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.harnessAm(h) },
-			"session": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.harnessSession(h) },
-		},
+		Answers: answers,
 	}
 }
 

@@ -42,6 +42,8 @@ type rootAgent struct {
 	// answer beside each other (ADR-048).
 	sessions   map[string]*inHarness
 	sessionsMu sync.Mutex
+	// signingIn is its sign-in to Claude Code begun and not finished.
+	signingIn signingIn
 }
 
 // in is the agent's session in h.
@@ -143,7 +145,7 @@ func (a *rootAgent) isSaidToBe() string {
 // claudeHarness is the ROOT agent in Claude Code.
 func (s *QNTXServer) claudeHarness() *harness {
 	named := func() appcfg.RootAgentConfig { return s.deps.cfg.Agent.Root }
-	return &harness{
+	h := &harness{
 		name: "claude", called: "Claude Code", file: claudeSessionFile,
 		description:    "The ROOT agent: Claude Code, run by the node as itself.",
 		sayDoes:        "Says something to the ROOT agent and gives what it answered. It is one session that continues, written down by the agent as it goes and read with claude session.",
@@ -177,6 +179,8 @@ func (s *QNTXServer) claudeHarness() *harness {
 			{Name: "answering", Says: "Whether it is in a turn now."},
 			{Name: "claude_code", Says: "Where the Claude Code it runs on is, or empty when the node has none."},
 			{Name: "not_ready", Says: "Why it cannot be spoken to, when it cannot."},
+			{Name: "signed_in", Says: "Whether Claude Code says it is signed in, by claude login."},
+			{Name: "auth_method", Says: "How it is signed in, as Claude Code names it, or empty when it is not."},
 		},
 		// am.toml naming the ROOT agent names it in Claude Code.
 		named:    func() bool { return true },
@@ -194,8 +198,17 @@ func (s *QNTXServer) claudeHarness() *harness {
 			}
 			is["model"], is["effort"], is["permission_mode"] = root.Model, root.Effort, root.Mode
 			is["permission_modes"], is["allow"] = appcfg.PermissionModes, allow
+			// Asked of Claude Code itself, when the node holds one.
+			is["signed_in"], is["auth_method"] = false, ""
+			if binary, arrived, err := s.harnessHeldBy("claude").Now(); arrived && err == nil && s.rootAgent != nil {
+				if status, err := s.claudeStatus(s.ctx, binary, s.rootAgent.home); err == nil {
+					is["signed_in"], is["auth_method"] = status.SignedIn, status.AuthMethod
+				}
+			}
 		},
 	}
+	h.also = []harnessSigil{s.loginSigil(h)}
+	return h
 }
 
 // spokenBy is who said it, as the node admitted them: a token by its DID, a
@@ -244,6 +257,18 @@ func (s *QNTXServer) claudePart(named appcfg.RootAgentConfig, sent sigil.Sent, a
 			}
 			if plan, err = secretref.Resolve(ctx, named.TokenRef); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "the Claude plan token am.toml names did not resolve: " + err.Error()}
+			}
+			// No plan token named is Claude Code on its own sign-in, which has
+			// to have happened: a turn with no credential at all is not run.
+			if plan == "" {
+				status, err := s.claudeStatus(ctx, binary, agent.home)
+				if err != nil {
+					return false, &protocol.Refusal{Why: sigil.Failed, Says: "Claude Code did not say whether the agent is signed in: " + err.Error()}
+				}
+				if !status.SignedIn {
+					return false, &protocol.Refusal{Why: sigil.Failed,
+						Says: "the agent has no Claude credential: am.toml names no plan token under [agent.root], and it is not signed in; sign it in with claude login"}
+				}
 			}
 			// Pi may have started the session: Claude Code resumes only what it holds.
 			return kept && claudecode.Holds(agent.home, session), nil
