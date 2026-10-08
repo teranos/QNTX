@@ -238,3 +238,20 @@ release.
 
 A turn that Claude Code cannot answer because the plan is spent is not handed
 to Pi by itself: what Claude Code answers then has not been seen.
+
+## Under ground
+
+"to get ground setup for the ROOT agent"
+
+"which is for A2A agents to receive a coment first, or be known that they run under ground before they do A2A shut"
+
+"another thing i want is that rituals run on the box from now on, not locally on my machine per se."
+
+- Comet is ADR-050: the box's own ground, the readiness of a hosted agent, and
+  a ritual's performer on the box.
+- The namespace agent: its own DID derived from the node's key for that
+  namespace and model, its own home, session and token, signed in through
+  claude login (ADR-051), a sandbox around the turn, and one test of the whole
+  claim: it fails to reach the node's environment, its config, another
+  namespace, the box's AWS role and its own credential file, and its model
+  call succeeds on its own sign-in. Its story is docs/stories.
