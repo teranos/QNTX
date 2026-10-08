@@ -6,6 +6,8 @@ import (
 	"crypto/hkdf"
 	"crypto/sha256"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -537,6 +539,18 @@ func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
+	// Asked before fosite reads the code, which spends its PKCE record, so a
+	// refused target spends nothing.
+	if err := r.ParseForm(); err != nil {
+		provider.WriteAccessError(ctx, w, nil, errors.WithStack(fosite.ErrInvalidRequest.WithHintf("the form did not read: %v", err)))
+		return
+	}
+	if err := h.targetsThisNode(r.PostForm); err != nil {
+		h.logger.Infow("Token request refused",
+			"client", r.PostFormValue("client_id"), "resource", r.PostForm["resource"], "error", err)
+		provider.WriteAccessError(ctx, w, nil, err)
+		return
+	}
 	// The session handed in is replaced by the one the code carries, which is
 	// the person who said yes. It is a TokenSession so the strategy has
 	// somewhere to put the DID either way.
@@ -596,6 +610,12 @@ func (h *Handler) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		err := errors.WithStack(fosite.ErrInvalidRequest.WithHint("PKCE is required: the request carries no code_challenge"))
 		h.logger.Infow("Authorize request refused",
 			"client", request.GetClient().GetID(), "reason", "no code_challenge")
+		provider.WriteAuthorizeError(ctx, w, request, err)
+		return
+	}
+	if err := h.targetsThisNode(request.GetRequestForm()); err != nil {
+		h.logger.Infow("Authorize request refused",
+			"client", request.GetClient().GetID(), "resource", request.GetRequestForm()["resource"], "error", err)
 		provider.WriteAuthorizeError(ctx, w, request, err)
 		return
 	}
@@ -683,6 +703,40 @@ func (h *Handler) handleAuthorizeDone(w http.ResponseWriter, r *http.Request) {
 		"admitted_as", held.identity, "client", client.DID, "label", client.Label,
 		"return_address", client.ReturnAddress)
 	provider.WriteAuthorizeResponse(ctx, w, parked.request, response)
+}
+
+// "MCP servers MUST only accept tokens specifically intended for themselves"
+// (MCP 2026-07-28, Authorization Security Considerations). The node accepts
+// only tokens in its own table, so it is the intended recipient of every one
+// of them once it mints none for anyone else: a request naming another
+// resource (RFC 8707) is refused, and one naming none is for this node.
+
+// invalidTarget is RFC 8707 §2's error for a resource the node does not issue
+// tokens for.
+var invalidTarget = &fosite.RFC6749Error{
+	ErrorField:       "invalid_target",
+	DescriptionField: "The requested resource is invalid, missing, unknown, or malformed.",
+	CodeField:        http.StatusBadRequest,
+}
+
+// targetsThisNode is whether every resource a request names is this node: its
+// public origin, or a path under it such as /mcp. Scheme and host are compared
+// without case, which MCP says implementations SHOULD accept.
+func (h *Handler) targetsThisNode(form url.Values) error {
+	origin, err := url.Parse(h.publicOrigin())
+	if err != nil {
+		return errors.WithStack(fosite.ErrServerError.WithHintf("the node's own origin %q does not read as a URI", h.publicOrigin()))
+	}
+	for _, resource := range form["resource"] {
+		named, err := url.Parse(resource)
+		if err != nil || !named.IsAbs() || named.Fragment != "" || strings.Contains(resource, "#") {
+			return errors.WithStack(invalidTarget.WithHintf("resource %q is not an absolute URI without a fragment", resource))
+		}
+		if !strings.EqualFold(named.Scheme, origin.Scheme) || !strings.EqualFold(named.Host, origin.Host) {
+			return errors.WithStack(invalidTarget.WithHintf("resource %q is not this node, which is %s", resource, h.publicOrigin()))
+		}
+	}
+	return nil
 }
 
 // sweepAuthorizing drops parked requests nobody finished, and the codes

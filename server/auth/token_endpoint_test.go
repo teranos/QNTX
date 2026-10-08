@@ -487,3 +487,32 @@ func TestTheTokenEndpointAnswersOnlyAPost(t *testing.T) {
 	h.handleToken(w, httptest.NewRequest(http.MethodGet, tokenPath, nil))
 	assert.Equal(t, http.StatusMethodNotAllowed, w.Code)
 }
+
+// A token request naming another resource gets no token, and the code is not
+// spent: the same code, asked for this node, is.
+func TestATokenForAnotherResourceIsNotMinted(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	code, verifier := codeFor(t, h, did)
+	secret := clientSecret(t, store, did)
+
+	form := url.Values{}
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", code)
+	form.Set("redirect_uri", appReturn)
+	form.Set("code_verifier", verifier)
+	form.Set("resource", "https://other.example/mcp")
+	elsewhere := httptest.NewRequest(http.MethodPost, tokenPath, strings.NewReader(form.Encode()))
+	elsewhere.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	elsewhere.SetBasicAuth(url.QueryEscape(did), url.QueryEscape(secret))
+	w := httptest.NewRecorder()
+	h.handleToken(w, elsewhere)
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "invalid_target")
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Len(t, listed, 1, "a token was written for another resource")
+
+	here := httptest.NewRecorder()
+	h.handleToken(here, exchangeRequest(did, secret, code, verifier))
+	assert.Equal(t, http.StatusOK, here.Code, here.Body.String())
+}

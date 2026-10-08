@@ -292,3 +292,51 @@ func TestTheFaceIsToldTheDoorOrNothing(t *testing.T) {
 	h.handleJourney(told, stranger)
 	assert.JSONEq(t, `{}`, told.Body.String())
 }
+
+// "MCP servers MUST only accept tokens specifically intended for themselves":
+// a client asking for another resource is refused to its own return address,
+// before anyone is sent home, and nothing is minted for it.
+func TestARequestForAnotherResourceIsRefused(t *testing.T) {
+	h, _, did := authorizingHandler(t)
+	_, challenge := pkcePair()
+
+	asked := authorizeRequest(did, appReturn, challenge)
+	q := asked.URL.Query()
+	q.Set("resource", "https://other.example/mcp")
+	asked = httptest.NewRequest(http.MethodGet, authorizePath+"?"+q.Encode(), nil)
+
+	w := httptest.NewRecorder()
+	h.handleAuthorize(w, asked)
+	require.Equal(t, http.StatusSeeOther, w.Code, w.Body.String())
+	sent, err := url.Parse(w.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, "app.example", sent.Host)
+	assert.Equal(t, "invalid_target", sent.Query().Get("error"))
+	assert.Empty(t, sent.Query().Get("code"))
+	_, opened := h.homewards.Load(homewardCookieValue(w))
+	assert.False(t, opened, "a journey was opened for another resource")
+}
+
+// This node is its origin and any path under it, its scheme and host in any
+// case, and a request naming no resource is for this node.
+func TestThisNodeIsTheResource(t *testing.T) {
+	h, _, _ := authorizingHandler(t)
+	for _, named := range [][]string{
+		nil,
+		{nodeOrigin},
+		{nodeOrigin + "/mcp"},
+		{"HTTPS://API.NODE.TEST/mcp"},
+	} {
+		assert.NoError(t, h.targetsThisNode(url.Values{"resource": named}), "%v", named)
+	}
+	for _, named := range [][]string{
+		{"https://other.example"},
+		{"http://api.node.test/mcp"},
+		{"https://api.node.test.other.example"},
+		{"api.node.test"},
+		{nodeOrigin + "/mcp#fragment"},
+		{nodeOrigin + "/mcp", "https://other.example"},
+	} {
+		assert.Error(t, h.targetsThisNode(url.Values{"resource": named}), "%v", named)
+	}
+}
