@@ -39,9 +39,7 @@ The `system` namespace is the node: `node_identity`, the row keyed `'self'`.
 
 "system namespace should have no canvas"
 
-"default namespace has a default canvas, whihc is the current canvas i am working with."
-
-"and for every other namespace the canvas needs to be explicitly created and named."
+"For non- every other namespace the canvas needs to be explicitly created and named."
 
 "watcher should be per namespace"
 
