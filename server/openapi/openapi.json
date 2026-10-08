@@ -644,6 +644,18 @@
         "ANYONE"
       ]
     },
+    "/auth/invitations": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/auth/invitations/": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ],
+      "x-qntx-prefix": true
+    },
     "/auth/laye/challenge": {
       "x-qntx-reach": [
         "ANYONE"

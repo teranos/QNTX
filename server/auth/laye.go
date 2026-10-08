@@ -69,6 +69,9 @@ type layeVerifyRequest struct {
 	Signature string          `json:"signature"`
 	Challenge string          `json:"challenge"`
 	Bindings  []SignedBinding `json:"bindings"`
+	// The token from the link ROOT's invitation mailed, carried by the
+	// friend's first sign-in.
+	Invitation string `json:"invitation,omitempty"`
 }
 
 func (h *Handler) handleLayeChallenge(w http.ResponseWriter, r *http.Request) {
@@ -155,6 +158,27 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	// forgetting to configure it closes the door rather than opening it.
 	vouched := h.proves(peerPubkey, req.Bindings)
 	admitted, matched, ok := h.admits(req.DID, vouched)
+	// A friend ROOT invited, arriving with the link and the account ROOT
+	// named. Their User is made here, and the rest is the listed path.
+	if !ok && req.Invitation != "" {
+		admitted, matched, ok, err = h.acceptInvitation(req.Invitation, vouched)
+		if err != nil {
+			h.logger.Errorw("laye login: the invitation was not answered", "did", req.DID, "error", err)
+			h.writeError(w, http.StatusServiceUnavailable, "the invitation was not answered: "+err.Error())
+			return
+		}
+		if !ok {
+			h.logger.Infow("laye login refused: the invitation does not admit what was presented",
+				"did", req.DID, "bindings_presented", len(req.Bindings))
+			h.attest(PredicateRefused, req.DID, map[string]any{
+				"provider":           "laye",
+				"bindings_presented": len(req.Bindings),
+				"reason":             "the invitation is cancelled, used, or names another account",
+			})
+			h.writeError(w, http.StatusForbidden, "this invitation is for another account, or no longer open")
+			return
+		}
+	}
 	if !ok {
 		// Nothing presented is listed, which is not the end of it. Anyone who
 		// can click the register button for a provider gets to register: the

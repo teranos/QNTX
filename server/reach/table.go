@@ -87,6 +87,11 @@ REACH is '/g/'                                                            of ANY
 # alone, gated by the handler and not by this line.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT SUPER
 REACH is '/auth/users' '/auth/users/'                                     of ROOT SUPER
+# ROOT invites a friend (ADR-031). The list and the invite are ROOT's, gated by
+# the handler; the link the friend was mailed is read by whoever holds it,
+# before they hold any session, and the cancel is ROOT's session's.
+REACH is '/auth/invitations'                                              of ROOT SUPER
+REACH is '/auth/invitations/'                                             of ANYONE
 
 REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
 # The standing guard is the handler's, not this line's.

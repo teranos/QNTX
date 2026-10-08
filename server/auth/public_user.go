@@ -77,12 +77,10 @@ func (h *Handler) joinPublic(acct account, door string) (User, error) {
 	return written, nil
 }
 
-// publicLevelOf is the rung of somebody the deployment never listed.
-//
-// A public registration is admitted by the User record existing, and the User
-// record exists because a provider vouched at a door once. Nothing is asserted
-// here: no User, no rung, and the caller refuses on the empty answer.
-func (h *Handler) publicLevelOf(route string) Level {
+// userLevelOf is the rung of somebody am.toml never listed, read off the User
+// a route reaches: a friend ROOT invited, SUPER (ADR-031), or a public
+// registration. No User, no rung, and the caller refuses on the empty answer.
+func (h *Handler) userLevelOf(route string) Level {
 	if h.users == nil || route == "" {
 		return ""
 	}
@@ -94,10 +92,21 @@ func (h *Handler) publicLevelOf(route string) Level {
 			"route", route, "error", err)
 		return ""
 	}
-	if !found || u.Level != LevelPublicRegistration {
+	if !found {
 		return ""
 	}
-	return LevelPublicRegistration
+	switch u.Level {
+	case LevelSuper, LevelPublicRegistration:
+		return u.Level
+	}
+	return ""
+}
+
+// invited reports whether a route is an account a friend ROOT invited proved:
+// a User at SUPER holds it. A public registration came in at a door and is
+// admitted there.
+func (h *Handler) invited(route string) bool {
+	return h.userLevelOf(route) == LevelSuper
 }
 
 // admitPublic logs somebody in who is on no list at all.
