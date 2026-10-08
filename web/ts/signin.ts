@@ -16,6 +16,7 @@ import { holdSession, dropSession } from './client/session';
 import { inApp, homeInSheet, APP_DOOR } from './app-door';
 import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
+import { heldInvitation, invited, letGoOfInvitation, onlyInvited } from './invitation';
 import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, tokenMark, relayed, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself, sentBy } from './door';
 import { log, SEG } from './logger';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
@@ -309,6 +310,18 @@ export function openDoor(): Promise<void> {
                 log.warn(SEG.UI, '[Door] could not list what this node accepts:', e);
                 return;
             }
+            // "so, if ROOT selected Mastodon, the invited user only sees the mastodon link"
+            const invitation = heldInvitation();
+            if (invitation) {
+                try {
+                    const inv = await invited(invitation);
+                    providers = onlyInvited(providers, inv);
+                    say(`you are invited: sign in with ${inv.provider} as ${inv.account}`);
+                } catch (e) {
+                    letGoOfInvitation();
+                    stumbled('reading your invitation', e);
+                }
+            }
             if (providers.length === 0) return;
 
             try {
@@ -316,7 +329,10 @@ export function openDoor(): Promise<void> {
                 host.replaceChildren();
                 say('signing in...');
                 nameYourself();
-                await standOnADevice(await layeLogin());
+                const half = await layeLogin(heldInvitation());
+                // The node made the User the invitation was for; the link is spent.
+                letGoOfInvitation();
+                await standOnADevice(half);
                 await through();
             } catch (e) {
                 stumbled('linking an account', e);

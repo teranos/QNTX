@@ -7,7 +7,7 @@
 // "if ROOT knows that the friend has gmail, in most cases they will just enter the friends gmail, and the userstory just shows ROOT the option to alo pick that mail address as the mail of the google identity"
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { renderInvite } from './user-invite-element.ts';
+import { renderInvite, renderCancel } from './user-invite-element.ts';
 import { renderInviteLink } from './users-element.ts';
 import type { ProviderDescription } from './ceremony.ts';
 
@@ -67,5 +67,37 @@ describe('Tim, as ROOT, invites a friend', () => {
         same.click();
 
         expect(container.querySelector<HTMLInputElement>('input[name="account"]')!.value).toBe('ada@gmail.com');
+    });
+});
+
+// "the MAIL ROOT received has a button for cancelling the invitation"
+
+describe('Tim, as ROOT, opens the cancel in his copy of the mail', () => {
+    let container: HTMLElement;
+    const ada = { id: 'inv1', email: 'ada@gmail.com', provider: 'google', account: 'ada@gmail.com', invited_by: 'US-TIM', created_at: 1 };
+
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        container = document.createElement('div');
+        document.body.appendChild(container);
+    });
+
+    test('an open invitation says who it is for and offers to cancel it', () => {
+        renderCancel(container, ada);
+        expect(container.textContent).toContain('ada@gmail.com');
+        expect(container.textContent).toContain('google');
+        expect(container.textContent).toContain('Cancel the invitation');
+    });
+
+    test('a used invitation offers nothing to cancel', () => {
+        renderCancel(container, { ...ada, accepted_by: 'US-ADA' });
+        expect(container.textContent).toContain('already accepted');
+        expect(container.textContent).not.toContain('Cancel the invitation');
+    });
+
+    test('a cancelled one says so', () => {
+        renderCancel(container, { ...ada, cancelled_at: 2 });
+        expect(container.textContent).toContain('already cancelled');
+        expect(container.textContent).not.toContain('Cancel the invitation');
     });
 });

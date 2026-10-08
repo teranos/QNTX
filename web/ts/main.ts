@@ -300,6 +300,16 @@ async function init(): Promise<void> {
         history.replaceState(null, '', cleaned.toString());
     }
 
+    // "the MAIL ROOT received has a button for cancelling the invitation"
+    const cancelling = new URLSearchParams(location.search).get('invitation-cancel');
+    if (cancelling && who) {
+        const { openInvitationCancel } = await import('./user-invite-element.ts');
+        openInvitationCancel(cancelling);
+        const cleaned = new URL(location.href);
+        cleaned.searchParams.delete('invitation-cancel');
+        history.replaceState(null, '', cleaned.toString());
+    }
+
     // The canvases this person may act on where they stand, and which one the
     // page is built for: the one remembered, or the namespace's own, or none.
     // "i expect to not see any canvas if a namespace has none"

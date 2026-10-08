@@ -11,7 +11,7 @@
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createPrimaryButton } from './components/button';
+import { createDangerButton, createPrimaryButton } from './components/button';
 import { fetchProviders, type ProviderDescription } from './ceremony';
 import { log, SEG } from './logger';
 
@@ -185,6 +185,85 @@ function inviteElement(): Element {
             return content;
         },
     };
+}
+
+// "the MAIL ROOT received has a button for cancelling the invitation"
+
+/** One invitation, as the node lists it. */
+export interface InvitationRecord {
+    id: string;
+    email: string;
+    provider: string;
+    account: string;
+    invited_by: string;
+    created_at: number;
+    cancelled_at?: number;
+    accepted_by?: string;
+    accepted_at?: number;
+}
+
+const CANCEL_ID = 'invitation-cancel-element';
+
+/** Exported for tests: the invitation the mail's button names, and its cancel
+ *  while it is open. */
+export function renderCancel(content: HTMLElement, inv: InvitationRecord): void {
+    content.innerHTML = '';
+    content.style.display = 'flex';
+    content.style.flexDirection = 'column';
+    content.style.gap = '10px';
+    content.style.padding = '12px';
+    content.style.fontFamily = 'var(--font-mono)';
+
+    const what = document.createElement('div');
+    what.style.wordBreak = 'break-word';
+    what.textContent = `Invitation to ${inv.email}, to sign in with ${inv.provider} as ${inv.account}`;
+    content.appendChild(what);
+
+    const state = document.createElement('div');
+    if (inv.accepted_by) {
+        state.textContent = `already accepted by ${inv.accepted_by}`;
+        content.appendChild(state);
+        return;
+    }
+    if (inv.cancelled_at) {
+        state.textContent = 'already cancelled';
+        content.appendChild(state);
+        return;
+    }
+    const cancel = createDangerButton('Cancel the invitation', 'Confirm cancel', async () => {
+        await apiJson<unknown>(`/auth/invitations/${encodeURIComponent(inv.id)}/cancel`, { method: 'POST' });
+        renderCancel(content, { ...inv, cancelled_at: Date.now() });
+    });
+    content.appendChild(cancel.element);
+}
+
+/** Opens the cancel for the invitation the mail's button names. */
+export function openInvitationCancel(id: string): void {
+    if (tray.has(CANCEL_ID)) tray.remove(CANCEL_ID);
+    tray.add({
+        id: CANCEL_ID,
+        title: 'Invitation',
+        symbol: '⚇',
+        onClose: () => { tray.remove(CANCEL_ID); },
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.innerHTML = '<div class="element-loading">reading the invitation…</div>';
+            apiJson<InvitationRecord[]>('/auth/invitations').then(held => {
+                const inv = held.find(i => i.id === id);
+                if (!inv) throw new Error(`the node holds no invitation ${id}`);
+                renderCancel(content, inv);
+            }).catch((err: unknown) => {
+                log.error(SEG.UI, '[InvitationCancel] the invitation was not read', err);
+                content.innerHTML = '';
+                const errBox = document.createElement('div');
+                errBox.className = 'element-error';
+                errBox.textContent = err instanceof Error ? err.message : String(err);
+                content.appendChild(errBox);
+            });
+            return content;
+        },
+    });
+    tray.open(CANCEL_ID);
 }
 
 /**
