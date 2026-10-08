@@ -170,6 +170,11 @@
         "ROOT"
       ]
     },
+    "/api/claude/login": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/claude/say": {
       "x-qntx-reach": [
         "ROOT"
