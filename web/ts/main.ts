@@ -20,6 +20,7 @@ import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
 import { setupState, claimNode } from './setup.ts';
 import { signedIn, openDoor } from './signin.ts';
+import { heldInvitation } from './invitation.ts';
 import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { wireLineTooltips } from '@teranos/elements';
@@ -194,12 +195,16 @@ async function init(): Promise<void> {
     // this page cannot read, so the redirect marks itself: without this a
     // browser already signed in here draws no door and nothing finishes.
     const homeward = () => new URLSearchParams(location.search).has('homeward');
+    // Holding an invitation, from its link or back from the provider with it:
+    // the friend signs in as the account it names, whatever session this
+    // browser already holds.
+    const invited = () => heldInvitation() !== '';
 
     // A claimed node is the only one with a door to stand at, and it says
     // nothing about how it is configured — so being claimed is the question.
     if (owned.governed && !owned.claimed) {
         await claimNode(owned);
-    } else if (owned.claimed && (!holdsSession || relayed() || homeward())) {
+    } else if (owned.claimed && (!holdsSession || relayed() || homeward() || invited())) {
         // Relayed, the session is the dev server's rather than this browser's.
         // Walking straight in on someone else's credential without the door
         // ever standing is the one case where being let in says nothing.
