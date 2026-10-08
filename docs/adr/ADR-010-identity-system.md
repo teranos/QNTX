@@ -3,10 +3,6 @@
 Date: 2026-03-06
 Status: Completed, except Vanity ID generation, which is won't-do.
 
-## Context
-
-QNTX used `teranos/vanity-id` (Go, v0.3.0) for all ID generation — attestation IDs, subject names, job IDs. The library was imported in 25+ files. It worked, but it was a single Go module that couldn't run in the browser, and it conflated two fundamentally different concerns: human-readable names and unique attestation identity.
-
 ## Decision
 
 QNTX's identity system has four orthogonal layers, each with distinct properties:
