@@ -180,7 +180,7 @@ Status: Proposed
 
 ## Not done
 
-- The sand record and its element.
+- The sand on the node, configured by a person.
 - The Darwin build on the box, end to end, with the stubs from S3.
 - A hook per repository.
 - aarch64-linux from the box.
