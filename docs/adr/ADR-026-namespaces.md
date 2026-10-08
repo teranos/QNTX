@@ -56,19 +56,11 @@ DIDs don't nest.
 
 ### `by` is the signer
 
-`by` is the signer. It was never the namespace.
-
-### Edges carry their own origin
-
-Edges get their own origin field.
+`by` is the signer. 
 
 ### Foreign attribution goes to attributes
 
 Attribution on an ingested claim becomes provenance in attributes.
-
-## Won't do
-
-Namespaces on SQLite. If it happens it is its own ADR and its own scope.
 
 ## Not done
 
