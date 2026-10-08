@@ -1,6 +1,6 @@
 [package]
 name = "qntx-pty-element"
-version = "0.1.14"
+version = "0.1.15"
 edition.workspace = true
 description = "QNTX gRPC plugin for persistent terminal elements (PTY)"
 license.workspace = true

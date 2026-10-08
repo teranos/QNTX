@@ -12,7 +12,7 @@
 #include "domain.grpc.pb.h"
 #include "llm.grpc.pb.h"
 
-#define PLUGIN_VERSION "0.3.4"
+#define PLUGIN_VERSION "0.3.5"
 
 // Forward declarations
 struct llama_model;
@@ -148,9 +148,6 @@ public:
                             const protocol::ExecuteJobRequest* req,
                             protocol::ExecuteJobResponse* resp) override;
 
-    grpc::Status ParseAxQuery(grpc::ServerContext* ctx,
-                              const protocol::ParseAxQueryRequest* req,
-                              protocol::ParseAxQueryResponse* resp) override;
 
     // Get engine by model name. Returns nullptr if not found.
     InferenceEngine* get_engine(const std::string& model_name);
