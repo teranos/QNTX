@@ -73,5 +73,5 @@ other schedule has none.
 
 - Attestations and observers are per namespace.
 
-Reach is a granted relation (ADR-031). What grants and strikes it is unbuilt;
-disabling a namespace refuses reads, and a login stands.
+- Reach is a granted relation (ADR-031). What grants and strikes it is unbuilt;
+- disabling a namespace refuses reads, and a login stands.
