@@ -40,6 +40,28 @@ test('the list switches nobody: the switch is in the User', () => {
     expect(container.querySelectorAll('th').length).toBe(8);
 });
 
+// "but why dont i see my outgoing invitations in the same list, and a way for me to open the would-be-user"
+test('an open invitation is a row of its own, invited, among the Users', () => {
+    const container = document.createElement('div');
+    const open = {
+        id: 'inv1', email: 'ada@gmail.com', display_name: 'Ada',
+        accounts: [{ provider: 'google', account: 'ada@gmail.com' }],
+        invited_by: 'US-USER-Y3BNGXYR', created_at: 1789342756348,
+    };
+    renderList(container, [root()], [
+        open,
+        { ...open, id: 'inv2', display_name: 'Bob', cancelled_at: 2 },
+        { ...open, id: 'inv3', display_name: 'Cy', accepted_by: 'US-CY' },
+    ]);
+    const rows = Array.from(container.querySelectorAll('tbody tr')).map(r => r.textContent ?? '');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain('Ada');
+    expect(rows[0]).toContain('invited');
+    expect(rows[0]).toContain('ada@gmail.com');
+    expect(rows.join()).not.toContain('Bob');
+    expect(rows.join()).not.toContain('Cy');
+});
+
 test('one of a thing is not plural, and none is a dash', () => {
     const one = { ...root(), accounts: (root().accounts ?? []).slice(0, 1), keys: (root().keys ?? []).slice(0, 1) };
     expect(reachedBy(one).shown).toBe('1 account, 1 key');

@@ -14,7 +14,7 @@ import { createGhostButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
 import { openUserElement } from './user-element';
-import { openUserInviteElement } from './user-invite-element';
+import { openInvitationCancel, openUserInviteElement, type InvitationRecord } from './user-invite-element';
 
 /** One User, as the record holds them. Nothing here is a secret: a key is a
  *  DID and an account is what a provider calls it. */
@@ -107,7 +107,7 @@ export function reachedBy(u: UserRecord): { shown: string; whole: string } {
 
 /** Exported for tests: every User, a row each. A row is a way in to the
  *  User and nothing else. */
-export function renderList(container: HTMLElement, users: UserRecord[]): void {
+export function renderList(container: HTMLElement, users: UserRecord[], invitations: InvitationRecord[] = []): void {
     container.innerHTML = '';
 
     if (users.length === 0) {
@@ -135,6 +135,11 @@ export function renderList(container: HTMLElement, users: UserRecord[]): void {
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
+    // "but why dont i see my outgoing invitations in the same list, and a way for me to open the would-be-user"
+    for (const inv of invitations) {
+        if (inv.cancelled_at || inv.accepted_by) continue;
+        tbody.appendChild(invitationRow(inv));
+    }
     for (const u of users) {
         const tr = document.createElement('tr');
 
@@ -163,8 +168,46 @@ export function renderList(container: HTMLElement, users: UserRecord[]): void {
     container.appendChild(table);
 }
 
+/** An open invitation, as the would-be User it is. Pressing the name opens
+ *  it, with its cancel. */
+function invitationRow(inv: InvitationRecord): HTMLTableRowElement {
+    const tr = document.createElement('tr');
+    const name = cell(inv.display_name || UNNAMED);
+    name.title = inv.id;
+    name.style.cursor = 'pointer';
+    name.addEventListener('click', () => { openInvitationCancel(inv.id); });
+    tr.appendChild(name);
+    tr.appendChild(cell('invited'));
+    tr.appendChild(cell('—'));
+    const routes = cell(inv.accounts.map(a => a.provider).join(', '), 'element-time');
+    routes.title = inv.accounts.map(a => `${a.provider}: ${a.account}`).join('\n');
+    tr.appendChild(routes);
+    tr.appendChild(cell(inv.email));
+    tr.appendChild(cell('—'));
+    tr.appendChild(cell(fmt(inv.created_at), 'element-time'));
+    const status = document.createElement('td');
+    const pill = document.createElement('span');
+    pill.className = 'element-pill';
+    pill.textContent = 'invited';
+    status.appendChild(pill);
+    tr.appendChild(status);
+    return tr;
+}
+
+/** The invitations ROOT sent. A node that will not list them still lists its
+ *  Users. */
+async function fetchInvitations(): Promise<InvitationRecord[]> {
+    try {
+        return await apiJson<InvitationRecord[]>('/auth/invitations');
+    } catch (err: unknown) {
+        log.error(SEG.UI, '[UsersElement] the node did not list its invitations', err);
+        return [];
+    }
+}
+
 async function refreshList(container: HTMLElement): Promise<void> {
-    renderList(container, await fetchUsers());
+    const [users, invitations] = await Promise.all([fetchUsers(), fetchInvitations()]);
+    renderList(container, users, invitations);
 }
 
 // "as root, i press the + and i can create a new user, like how i would create a new oauth token"
