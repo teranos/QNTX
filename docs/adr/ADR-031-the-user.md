@@ -105,7 +105,9 @@ root Element for User management and overview
 
 GDPR delete, PR 911
 
-Creating Users manually as root
+Creating Users manually as root: an invitation ROOT sends to an address, with
+a cancel on ROOT's copy; a SUPER User made the moment the friend proves an
+account; the login reading SUPER off that User. The story is docs/stories.
 
 ROOT switching a person off. The record and the gate are ready for it, and no
 route lets ROOT flip anyone but themselves yet.

@@ -59,7 +59,16 @@ reading every key:
   each and when, a field for a name and one for a value, save, drop. A value is
   never shown again.
 
+## Claude is a sign-in
+
+"there is no need to make someone mint an api key for claude"
+
+- A claude login sigil runs the sign-in under the agent's config dir, hands
+  the URL out, takes the code in, and claude am says whether the agent is
+  signed in. No key of this ADR's kind exists for Claude.
+
 ## Not done
 
+- claude login.
 - The namespace agent that receives them (ADR-048, ADR-050).
 - REACH on a namespace, which would widen who sets them past the owner.

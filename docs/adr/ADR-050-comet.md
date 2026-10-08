@@ -109,9 +109,9 @@ Status: Proposed
 
 "How the node holds private controls, It should be somewhat doable in the UI"
 
-- A user's preferences are a record on the node in the user's namespace, as a
-  vault is a VAULT line (server/vault.go) and a plugin is its record (ADR-002).
-  The Ground element edits it.
+- Not a text box of pbt, and never a record a model can write: the first
+  build of that was discarded on 2026-10-08. A person configures controls;
+  the model is on the enforced side of them and never designs its own.
 - A project's controls come from its repository at a rev, as plugin_build.go
   fetches a build's sources.
 

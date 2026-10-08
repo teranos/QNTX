@@ -249,3 +249,9 @@ to Pi by itself: what Claude Code answers then has not been seen.
 
 - Comet is ADR-050: the box's own ground, the readiness of a hosted agent, and
   a ritual's performer on the box.
+- The namespace agent: its own DID derived from the node's key for that
+  namespace and model, its own home, session and token, signed in through
+  claude login (ADR-051), a sandbox around the turn, and one test of the whole
+  claim: it fails to reach the node's environment, its config, another
+  namespace, the box's AWS role and its own credential file, and its model
+  call succeeds on its own sign-in. Its story is docs/stories.
