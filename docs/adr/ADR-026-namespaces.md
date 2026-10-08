@@ -31,9 +31,9 @@ A USER does not see what namespace or project something belongs to.
 A watcher in namespace A does not fire on an attestation in namespace B. 
 They are not the same world.
 
-### Nothing crosses
+#### Nothing crosses
 
-Things don't cross namespaces. A canvas lives in one namespace and only that one.
+Only ROOT cross namespaces. A canvas lives in one namespace and only that one.
 
 The system namespace is the node: `node_identity`, the row keyed `'self'`.
 
