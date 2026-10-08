@@ -279,6 +279,42 @@ func TestTheFriendCarriesTheNameRootGave(t *testing.T) {
 		inviting(h, rootSession, `{"display_name":"root","email":"bob@gmail.com","accounts":[{"provider":"google","account":"bob@gmail.com"}]}`).Code)
 }
 
+// "When the invited account already has a public-registration User, should accepting the invitation raise that existing User to SUPER"
+
+// "yes"
+
+// Ada registered at two public doors before she was invited. The invitation
+// raises one of those Users to SUPER, and every later lookup of her account
+// finds that one.
+func TestAnInvitationRaisesAPublicRegistration(t *testing.T) {
+	h, store, rootSession, box, signer := invitingHandler(t)
+	root := store.held[0]
+	for _, door := range []string{"clean", "garden"} {
+		require.NoError(t, store.Put(User{
+			ID: "US-ADA-" + door, Level: LevelPublicRegistration, Namespace: door,
+			Accounts: []UserAccount{{Provider: "google", CanonicalID: "google:110", Handle: "ada@gmail.com"}},
+		}))
+	}
+	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaAnywhere).Code)
+	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
+
+	browser := newBrowser(t)
+	rec := friendArrives(t, h, browser, token, []SignedBinding{
+		vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:110", "ada@gmail.com"),
+	})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Len(t, store.held, 3, "a second User was made for an account that already had one")
+
+	raised, found, err := store.ByRoute("google:110")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, LevelSuper, raised.Level)
+	assert.Empty(t, raised.Namespace, "SUPER acts in every namespace, not at one door")
+	assert.Equal(t, root.ID, raised.CreatedBy)
+	assert.Equal(t, "Ada", raised.DisplayName)
+	assert.Equal(t, LevelSuper, h.levelOf("google:110"))
+}
+
 // Another account at the provider is not the one ROOT named.
 func TestAnotherAccountIsNotApplicable(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)

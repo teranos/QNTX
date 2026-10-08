@@ -255,9 +255,14 @@ export function openDoor(): Promise<void> {
                 say('');
                 return;
             }
+            say('');
+            // "i think on this screen we dont need to actyually see the fingerprint, just the available provider for given user"
+            if (heldInvitation()) {
+                void offer();
+                return;
+            }
             const print = fingerprint(() => { print.disabled = true; void press(print); });
             stand.append(print);
-            say('');
             // Sent here by a client, the face names it: the app that sent the
             // person is not the origin they are looking at, and nothing else
             // in front of them says who will hold the token.

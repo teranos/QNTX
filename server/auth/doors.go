@@ -277,6 +277,20 @@ func (h *Handler) returnableTo(r *http.Request) string {
 	return came
 }
 
+// onPage is the page on a door's origin a ceremony returns to: the path it
+// began on, where the friend's invitation is held.
+func onPage(origin, page string) string {
+	if origin == "" || page == "" {
+		return origin
+	}
+	// Only a path. Whatever could name another host, or carry a query or a
+	// fragment, returns to the origin alone.
+	if !strings.HasPrefix(page, "/") || strings.HasPrefix(page, "//") || strings.ContainsAny(page, "?#\\") {
+		return origin
+	}
+	return origin + page
+}
+
 // originOf is the scheme and host of a URL, which is what an origin is. The
 // default referrer policy already sends only that much across sites; a browser
 // configured to send the whole URL has the rest cut off here.

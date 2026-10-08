@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -536,26 +537,32 @@ func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (strin
 	h.creating.Lock()
 	defer h.creating.Unlock()
 
-	_, held, err := h.users.ByRoute(route)
+	existing, held, err := h.users.ByRoute(route)
 	if err != nil {
 		return "", nil, false, errors.Wrapf(err, "failed to read whether %s already reaches a User", route)
 	}
-	if held {
-		return "", nil, false, errors.Newf("%s already reaches a User, so invitation %s makes nobody", route, inv.ID)
+	if held && existing.Level != LevelPublicRegistration {
+		return "", nil, false, errors.Newf("%s already reaches User %s at %s, so invitation %s makes nobody", route, existing.ID, existing.Level, inv.ID)
 	}
 
-	u := withRoute(User{
-		Level:          LevelSuper,
-		CreatedBy:      inv.InvitedBy,
-		DisplayName:    inv.DisplayName,
-		CreatedAt:      time.Now().UTC().UnixMilli(),
-		EmailAddresses: []string{inv.Email},
-	}, route, matched)
-	u.ID, err = identity.GenerateUserID("user")
-	if err != nil {
-		return "", nil, false, errors.Wrapf(err, "failed to generate a User id for %s", route)
+	now := time.Now().UTC().UnixMilli()
+	var u User
+	if held {
+		u = raised(existing, inv, route, matched)
+	} else {
+		u = withRoute(User{
+			Level:          LevelSuper,
+			CreatedBy:      inv.InvitedBy,
+			DisplayName:    inv.DisplayName,
+			CreatedAt:      now,
+			EmailAddresses: []string{inv.Email},
+		}, route, matched)
+		u.ID, err = identity.GenerateUserID("user")
+		if err != nil {
+			return "", nil, false, errors.Wrapf(err, "failed to generate a User id for %s", route)
+		}
 	}
-	spent, err := h.invitations.accept(inv.ID, u.ID, u.CreatedAt)
+	spent, err := h.invitations.accept(inv.ID, u.ID, now)
 	if err != nil {
 		return "", nil, false, err
 	}
@@ -565,11 +572,40 @@ func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (strin
 	if err := h.users.Put(u); err != nil {
 		return "", nil, false, errors.Wrapf(err, "invitation %s was spent and the User for %s was not written", inv.ID, route)
 	}
-	h.logger.Infow("User created from an invitation", "user", u.ID, "route", route, "invitation", inv.ID, "by", inv.InvitedBy)
+	h.logger.Infow("User made SUPER by an invitation", "user", u.ID, "route", route, "invitation", inv.ID, "by", inv.InvitedBy, "was", existing.Level)
 	h.attest(PredicateUserCreated, route, map[string]any{
 		"user": u.ID, "invitation": inv.ID, "level": string(u.Level), "by": inv.InvitedBy, "email": inv.Email,
 	})
 	return route, matched, true, nil
+}
+
+// "When the invited account already has a public-registration User, should accepting the invitation raise that existing User to SUPER"
+
+// "yes"
+
+// raised is a public registration made SUPER by ROOT's invitation: no longer
+// at one door, made by ROOT, and holding what the provider just vouched.
+func raised(u User, inv Invitation, route string, matched *SignedBinding) User {
+	u.Level = LevelSuper
+	u.Namespace = ""
+	u.CreatedBy = inv.InvitedBy
+	if u.DisplayName == "" {
+		u.DisplayName = inv.DisplayName
+	}
+	if !slices.Contains(u.EmailAddresses, inv.Email) {
+		u.EmailAddresses = append(u.EmailAddresses, inv.Email)
+	}
+	for i, a := range u.Accounts {
+		if a.CanonicalID != route {
+			continue
+		}
+		if a.Provider == "" {
+			a.Provider = matched.Claim.Provider
+		}
+		a.Binding = matched
+		u.Accounts[i] = a
+	}
+	return u
 }
 
 func htmlEscape(s string) string {

@@ -347,7 +347,7 @@ func (h *Handler) handleBindingGo(w http.ResponseWriter, r *http.Request) {
 		state:         st,
 		redirectURI:   redirectURI,
 		door:          arrivedAtDoor,
-		returnTo:      h.returnableTo(r),
+		returnTo:      onPage(h.returnableTo(r), q.Get("page")),
 	})
 	if err != nil {
 		h.renderCeremonyPage(w, http.StatusInternalServerError, false, "The ceremony was not recorded")
