@@ -187,7 +187,7 @@ function invitationRow(inv: InvitationRecord): HTMLTableRowElement {
     tr.appendChild(cell(fmt(inv.created_at), 'element-time'));
     const status = document.createElement('td');
     const pill = document.createElement('span');
-    pill.className = 'element-pill';
+    pill.className = 'element-pill element-pill-invited';
     pill.textContent = 'invited';
     status.appendChild(pill);
     tr.appendChild(status);
