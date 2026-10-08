@@ -22,7 +22,7 @@ proves you have access to that identity.
 
 A User can reach a namespace through REACH granted and struck by ROOT, [[ADR-031-the-user]] 
 
-Disabling a namespace refuses reads. 
+Disabling a namespace refuses reads and writes . 
 ### Namespaces are their own universes
 
 Namespaces don't mix and mesh. They are their own universes.
