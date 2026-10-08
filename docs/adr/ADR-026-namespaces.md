@@ -20,11 +20,10 @@ proves you have access to that identity.
 
 ### Reach is granted
 
-A User can reach a namespace through REACH granted and struck by ROOT, [[]] 
+A User can reach a namespace through REACH granted and struck by ROOT, [[ADR-031-the-user]] 
 
 a relation between the User and the namespace (ADR-031).
-Disabling a namespace refuses reads. A login is a session with the node and
-stands regardless.
+Disabling a namespace refuses reads. A login is a session with the node andstands regardless.
 
 ### Namespaces are their own universes
 
