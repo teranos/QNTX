@@ -17,9 +17,7 @@ proves you have access to that identity.
 "`system` and `default` are namespaces that come into being during the [[ADR-033-first-time-setup]]"
 ### A namespace is enabled or disabled
 
-Data never leaves. A newer record supersedes an older one, and both stay.
-
-A namespace is created enabled and can be disabled. A disabled namespace refuses
+A namespace is created disabl and can be disabled. A disabled namespace refuses
 reads. Enabling it again opens the same bytes.
 
 ### Reach is granted
