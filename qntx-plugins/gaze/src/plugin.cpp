@@ -371,9 +371,3 @@ grpc::Status GazePlugin::ExecuteJob(grpc::ServerContext* ctx,
     return grpc::Status::OK;
 }
 
-grpc::Status GazePlugin::ParseAxQuery(grpc::ServerContext* ctx,
-                                       const protocol::ParseAxQueryRequest* req,
-                                       protocol::ParseAxQueryResponse* resp) {
-    resp->set_error("gaze does not parse Ax queries");
-    return grpc::Status::OK;
-}

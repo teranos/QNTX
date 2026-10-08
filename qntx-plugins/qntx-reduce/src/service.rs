@@ -2,8 +2,7 @@ use crate::handlers::{HandlerContext, ReduceState};
 use crate::proto::{
     domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, ElementDefResponse,
     Empty, ExecuteJobRequest, ExecuteJobResponse, HealthResponse, HttpRequest, HttpResponse,
-    InitializeRequest, InitializeResponse, MetadataResponse, ParseAxQueryRequest,
-    ParseAxQueryResponse, WebSocketMessage,
+    InitializeRequest, InitializeResponse, MetadataResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -196,13 +195,6 @@ impl DomainPluginService for ReducePluginService {
         Ok(Response::new(ConfigSchemaResponse {
             fields: HashMap::new(),
         }))
-    }
-
-    async fn parse_ax_query(
-        &self,
-        _request: Request<ParseAxQueryRequest>,
-    ) -> Result<Response<ParseAxQueryResponse>, Status> {
-        Err(Status::unimplemented("ParseAxQuery is handled by kern"))
     }
 
     async fn execute_job(
