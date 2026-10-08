@@ -16,7 +16,7 @@ proves you have access to that identity.
 
 "`system` and `default` are namespaces that come into being during the [[ADR-033-first-time-setup]]"
 
-"A namespace is created disabled and can be enabled."
+"A namespace is created disabled and can be enabled by one of it's owners."
 
 ### Reach is granted
 
