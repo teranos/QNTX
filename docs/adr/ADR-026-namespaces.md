@@ -45,16 +45,10 @@ The `system` namespace is the node: `node_identity`, the row keyed `'self'`.
 "schedules should be per namespace"
 
 "not all namespaces need watchers enabled."
-
 "not all namespaces need schedules enabled."
 
 "not all namespaces need to have access to all plugins"
-
 "not all plugins need to have access to all namespaces"
-
-### A project is a namespace
-
-A project is a namespace. A USER does not see the concept — they experience being part of a project.
 
 ### Namespaces are flat
 
