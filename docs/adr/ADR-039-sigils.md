@@ -38,3 +38,17 @@ Status: Proposed
 - params.syscap is what am syscap answers.
 - params.mcp is where the node's MCP answers, and the MCP version it speaks. An AgentInterface declares a URL, transport and protocol version for interacting with the agent (a2a.proto line 334), so the MCP is said here.
 - It is not required: an agent that does not read it loses nothing else.
+
+## The old surface
+
+"and have more of the old api surface be properly sigil"
+
+- server/mcp.go offers every served route no sigil answers as an `http_<path>`
+  tool that takes a method, a path, a query and a body, and says nothing of
+  what the route takes or answers. A ROOT connector is shown 57 of them:
+  embeddings 13, canvas 11, pulse 5, auth tokens and users 4, watchers 3, and
+  attestations, files, types, prose, prompt, python execute, semantic search,
+  element config, plugin config and logs, openrouter proxy, am statusline, i
+  picture, a2a, debug, dev, crash test.
+- server/a2a_card.go builds a card's skills from signa alone, so none of
+  these is reached over A2A until it is a sigil.
