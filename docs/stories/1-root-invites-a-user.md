@@ -2,6 +2,8 @@
 
 As ROOT i open the Users element, that's where the invitation user story for ROOT begins
 
+as root, i press the + and i can create a new user, like how i would create a new oauth token
+
 As ROOT i send an invite link to a friend, i enter their e-mail address
 
 A mail actually goes out to both me and my friend
