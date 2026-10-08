@@ -16,7 +16,7 @@ import { holdSession, dropSession } from './client/session';
 import { inApp, homeInSheet, APP_DOOR } from './app-door';
 import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
-import { heldInvitation, invited, letGoOfInvitation, onlyInvited } from './invitation';
+import { heldInvitation, invited, letGoOfInvitation, onlyInvited, signsInWith } from './invitation';
 import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, tokenMark, relayed, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself, sentBy } from './door';
 import { log, SEG } from './logger';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
@@ -316,7 +316,7 @@ export function openDoor(): Promise<void> {
                 try {
                     const inv = await invited(invitation);
                     providers = onlyInvited(providers, inv);
-                    say(`you are invited: sign in with ${inv.provider} as ${inv.account}`);
+                    say(`you are invited: sign in with ${signsInWith(inv)}`);
                 } catch (e) {
                     letGoOfInvitation();
                     stumbled('reading your invitation', e);

@@ -121,7 +121,13 @@ func newBrowser(t *testing.T) ed25519.PrivateKey {
 	return browser
 }
 
-const adaInvite = `{"email":"ada@gmail.com","provider":"google","account":"ada@gmail.com"}`
+const adaInvite = `{"email":"ada@gmail.com","accounts":[{"provider":"google","account":"ada@gmail.com"}]}`
+
+// "if both google and apple, then we set both, and  if set then we set the mail address of that provider"
+
+// "or the username"
+const adaAnywhere = `{"display_name":"Ada","email":"ada@gmail.com","accounts":[` +
+	`{"provider":"google","account":"ada@gmail.com"},{"provider":"github","account":"adalovelace"}]}`
 
 // ROOT invites Ada: a mail goes to Ada with the link, and one to ROOT with
 // the cancel.
@@ -148,12 +154,12 @@ func TestTheLinksOpenOnThePageRootInvitedFrom(t *testing.T) {
 	h.ownOrigins = []string{invitePage}
 	branch := invitePage + "/branch/root-invites-a-user/"
 
-	rec := inviting(h, rootSession, `{"email":"ada@gmail.com","provider":"google","account":"ada@gmail.com","page":"`+branch+`"}`)
+	rec := inviting(h, rootSession, `{"email":"ada@gmail.com","accounts":[{"provider":"google","account":"ada@gmail.com"}],"page":"`+branch+`"}`)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 	assert.Contains(t, box.sent[0].mail.HTML, invitePage+"/branch/root-invites-a-user/?invitation=")
 	assert.Contains(t, box.sent[1].mail.HTML, invitePage+"/branch/root-invites-a-user/?invitation-cancel=")
 
-	rec = inviting(h, rootSession, `{"email":"ada@gmail.com","provider":"google","account":"ada@gmail.com","page":"https://elsewhere.example/"}`)
+	rec = inviting(h, rootSession, `{"email":"ada@gmail.com","accounts":[{"provider":"google","account":"ada@gmail.com"}],"page":"https://elsewhere.example/"}`)
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 	assert.Len(t, box.sent, 2)
 }
@@ -166,35 +172,58 @@ func TestOnlyRootInvites(t *testing.T) {
 	adaSession, err := h.sessions.create("google:110", ada)
 	require.NoError(t, err)
 
-	rec := inviting(h, adaSession, `{"email":"bob@gmail.com","provider":"google","account":"bob@gmail.com"}`)
+	rec := inviting(h, adaSession, `{"email":"bob@gmail.com","accounts":[{"provider":"google","account":"bob@gmail.com"}]}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 	assert.Empty(t, box.sent)
 }
 
-// An invitation names an address, a provider and the account there.
-func TestAnInvitationNamesAllThree(t *testing.T) {
+// An invitation names an address, and at least one provider with the account
+// there.
+func TestAnInvitationNamesAnAddressAndAnAccount(t *testing.T) {
 	h, _, rootSession, box, _ := invitingHandler(t)
 	for _, body := range []string{
-		`{"provider":"google","account":"ada@gmail.com"}`,
-		`{"email":"ada@gmail.com","account":"ada@gmail.com"}`,
-		`{"email":"ada@gmail.com","provider":"google"}`,
+		`{"accounts":[{"provider":"google","account":"ada@gmail.com"}]}`,
+		`{"email":"ada@gmail.com","accounts":[]}`,
+		`{"email":"ada@gmail.com","accounts":[{"account":"ada@gmail.com"}]}`,
+		`{"email":"ada@gmail.com","accounts":[{"provider":"google"}]}`,
+		`{"email":"ada@gmail.com","accounts":[{"provider":"google","account":"a"},{"provider":"google","account":"b"}]}`,
 	} {
 		assert.Equal(t, http.StatusBadRequest, inviting(h, rootSession, body).Code, body)
 	}
 	assert.Empty(t, box.sent)
 }
 
-// The link says which provider the friend signs in with, and only that one.
-func TestTheLinkNamesOneProvider(t *testing.T) {
+// The link says which providers the friend signs in with, and only those.
+func TestTheLinkNamesTheProvidersRootSet(t *testing.T) {
 	h, _, rootSession, box, _ := invitingHandler(t)
-	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaInvite).Code)
+	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaAnywhere).Code)
 	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
 
 	rec := onInvitation(h, "", http.MethodGet, "/auth/invitations/"+token)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	var seen map[string]string
+	var seen struct {
+		Accounts []InvitationAccount `json:"accounts"`
+	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &seen))
-	assert.Equal(t, "google", seen["provider"])
+	assert.Equal(t, []InvitationAccount{
+		{Provider: "github", Account: "adalovelace"},
+		{Provider: "google", Account: "ada@gmail.com"},
+	}, seen.Accounts)
+}
+
+// With Google and GitHub set, either one admits her: GitHub by the username.
+func TestEitherProviderRootSetAdmitsTheFriend(t *testing.T) {
+	h, store, rootSession, box, signer := invitingHandler(t)
+	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaAnywhere).Code)
+	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
+
+	browser := newBrowser(t)
+	rec := friendArrives(t, h, browser, token, []SignedBinding{
+		vouch(t, signer, browser.Public().(ed25519.PublicKey), "github", "github:42", "adalovelace"),
+	})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Len(t, store.held, 2)
+	assert.True(t, store.held[1].Reaches("github:42"))
 }
 
 // Ada signs in with the Google account ROOT named, and is a User: SUPER, made
@@ -228,6 +257,26 @@ func TestTheFriendSignsInWithTheAccountRootNamed(t *testing.T) {
 	// And the next time she signs in she needs no link: the account is hers.
 	_, _, ok := h.admits(EncodeDIDKey(browser.Public().(ed25519.PublicKey)), []SignedBinding{vouched})
 	assert.True(t, ok, "Ada's own account did not admit her without the invitation")
+}
+
+// "and i want to set Name"
+func TestTheFriendCarriesTheNameRootGave(t *testing.T) {
+	h, store, rootSession, box, signer := invitingHandler(t)
+	rec := inviting(h, rootSession, adaAnywhere)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	assert.Contains(t, box.sent[1].mail.Text, "Ada")
+	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
+
+	browser := newBrowser(t)
+	arrived := friendArrives(t, h, browser, token, []SignedBinding{
+		vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:110", "ada@gmail.com"),
+	})
+	require.Equal(t, http.StatusOK, arrived.Code, arrived.Body.String())
+	assert.Equal(t, "Ada", store.held[1].DisplayName)
+
+	// root is the one name no other User may take.
+	assert.Equal(t, http.StatusBadRequest,
+		inviting(h, rootSession, `{"display_name":"root","email":"bob@gmail.com","accounts":[{"provider":"google","account":"bob@gmail.com"}]}`).Code)
 }
 
 // Another account at the provider is not the one ROOT named.

@@ -107,7 +107,7 @@ type Handler struct {
 	inviteMailer InvitationMailer
 	invitePage   string
 	logger       *zap.SugaredLogger
-	corsWrap func(http.HandlerFunc) http.HandlerFunc
+	corsWrap     func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —

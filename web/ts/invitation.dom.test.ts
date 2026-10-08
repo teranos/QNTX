@@ -8,7 +8,7 @@
 // "so, if ROOT selected Mastodon, the invited user only sees the mastodon link, and only the mastodon acc specified by ROOT would be applicable"
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { heldInvitation, letGoOfInvitation, onlyInvited } from './invitation.ts';
+import { heldInvitation, letGoOfInvitation, onlyInvited, signsInWith } from './invitation.ts';
 import type { ProviderDescription } from './ceremony.ts';
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -32,10 +32,14 @@ describe('Ada arrives with the link ROOT mailed her', () => {
         window.history.replaceState(null, '', '/');
     });
 
-    test('she sees only the provider ROOT selected', () => {
-        const offered = [provider('google'), provider('apple'), provider('mastodon')];
-        const seen = onlyInvited(offered, { token: 't', provider: 'mastodon', account: '@ada@mastodon.example' });
-        expect(seen.map(p => p.id)).toEqual(['mastodon']);
+    test('she sees only the providers ROOT set', () => {
+        const offered = [provider('google'), provider('apple'), provider('mastodon'), provider('github')];
+        const inv = { token: 't', accounts: [
+            { provider: 'mastodon', account: '@ada@mastodon.example' },
+            { provider: 'github', account: 'adalovelace' },
+        ] };
+        expect(onlyInvited(offered, inv).map(p => p.id)).toEqual(['mastodon', 'github']);
+        expect(signsInWith(inv)).toBe('mastodon as @ada@mastodon.example or github as adalovelace');
     });
 
     test('the link is taken off the address and kept across the provider\'s round trip', () => {

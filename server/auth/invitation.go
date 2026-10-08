@@ -35,18 +35,29 @@ const (
 	PredicateUserCreated         = "identity:created"
 )
 
-// Invitation is one friend ROOT invited: where the mail went, which provider
-// they sign in with, and the account there that is theirs.
+// "if both google and apple, then we set both, and  if set then we set the mail address of that provider"
+
+// "or the username"
+
+// InvitationAccount is one provider the friend may sign in with, and the
+// account there that is theirs: an address, or a username.
+type InvitationAccount struct {
+	Provider string `json:"provider"`
+	Account  string `json:"account"`
+}
+
+// Invitation is one friend ROOT invited: their name, where the mail went, and
+// every provider they may sign in with.
 type Invitation struct {
-	ID          string `json:"id"`
-	Email       string `json:"email"`
-	Provider    string `json:"provider"`
-	Account     string `json:"account"`
-	InvitedBy   string `json:"invited_by"`
-	CreatedAt   int64  `json:"created_at"`
-	CancelledAt int64  `json:"cancelled_at,omitempty"`
-	AcceptedBy  string `json:"accepted_by,omitempty"`
-	AcceptedAt  int64  `json:"accepted_at,omitempty"`
+	ID          string              `json:"id"`
+	Email       string              `json:"email"`
+	DisplayName string              `json:"display_name,omitempty"`
+	Accounts    []InvitationAccount `json:"accounts"`
+	InvitedBy   string              `json:"invited_by"`
+	CreatedAt   int64               `json:"created_at"`
+	CancelledAt int64               `json:"cancelled_at,omitempty"`
+	AcceptedBy  string              `json:"accepted_by,omitempty"`
+	AcceptedAt  int64               `json:"accepted_at,omitempty"`
 }
 
 // open is whether the link still admits anybody.
@@ -54,16 +65,32 @@ func (inv Invitation) open() bool {
 	return inv.CancelledAt == 0 && inv.AcceptedBy == ""
 }
 
-// names is whether a binding is the account ROOT entered: the same provider,
-// and the account by its canonical id or by the handle the provider vouched.
+// names is whether a binding is one of the accounts ROOT entered: the same
+// provider, and the account by its canonical id or by the handle the provider
+// vouched.
 func (inv Invitation) names(b SignedBinding) bool {
-	if b.Claim.Provider != inv.Provider {
-		return false
+	for _, a := range inv.Accounts {
+		if b.Claim.Provider != a.Provider {
+			continue
+		}
+		if strings.EqualFold(b.Claim.CanonicalID, a.Account) {
+			return true
+		}
+		if b.Claim.Handle != nil && strings.EqualFold(*b.Claim.Handle, a.Account) {
+			return true
+		}
 	}
-	if strings.EqualFold(b.Claim.CanonicalID, inv.Account) {
-		return true
+	return false
+}
+
+// signsInWith is the accounts as a person reads them, each provider with its
+// account, joined by or.
+func (inv Invitation) signsInWith() string {
+	said := make([]string, 0, len(inv.Accounts))
+	for _, a := range inv.Accounts {
+		said = append(said, a.Provider+" as "+a.Account)
 	}
-	return b.Claim.Handle != nil && strings.EqualFold(*b.Claim.Handle, inv.Account)
+	return strings.Join(said, " or ")
 }
 
 // InvitationMailer sends what the node mails in its own name (ADR-042): to a
@@ -90,45 +117,86 @@ func newInvitationTable(db *sql.DB) *invitationTable {
 	return &invitationTable{db: db}
 }
 
-const invitationColumns = `id, email, provider, account, invited_by, created_at,
+const invitationColumns = `id, email, display_name, invited_by, created_at,
 	COALESCE(cancelled_at, 0), COALESCE(accepted_by, ''), COALESCE(accepted_at, 0)`
 
 func scanInvitation(row interface{ Scan(...any) error }) (Invitation, error) {
 	var inv Invitation
-	err := row.Scan(&inv.ID, &inv.Email, &inv.Provider, &inv.Account, &inv.InvitedBy, &inv.CreatedAt,
+	err := row.Scan(&inv.ID, &inv.Email, &inv.DisplayName, &inv.InvitedBy, &inv.CreatedAt,
 		&inv.CancelledAt, &inv.AcceptedBy, &inv.AcceptedAt)
 	return inv, err
 }
 
-// put writes an invitation under the hash of its token, never the token.
-func (t *invitationTable) put(inv Invitation, token string) error {
-	_, err := t.db.Exec(`INSERT INTO invitations (id, token_hash, email, provider, account, invited_by, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		inv.ID, hashOf(token), inv.Email, inv.Provider, inv.Account, inv.InvitedBy, inv.CreatedAt)
-	return errors.Wrapf(err, "failed to write invitation %s for %s", inv.ID, inv.Email)
+// put writes an invitation under the hash of its token, never the token, and
+// its accounts with it, in one transaction.
+func (t *invitationTable) put(inv Invitation, token string) (err error) {
+	tx, err := t.db.Begin()
+	if err != nil {
+		return errors.Wrapf(err, "failed to begin writing invitation %s", inv.ID)
+	}
+	defer func() {
+		if err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				err = errors.WithSecondaryError(err, rollbackErr)
+			}
+		}
+	}()
+	if _, err = tx.Exec(`INSERT INTO invitations (id, token_hash, email, display_name, invited_by, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		inv.ID, hashOf(token), inv.Email, inv.DisplayName, inv.InvitedBy, inv.CreatedAt); err != nil {
+		return errors.Wrapf(err, "failed to write invitation %s for %s", inv.ID, inv.Email)
+	}
+	for _, a := range inv.Accounts {
+		if _, err = tx.Exec(`INSERT INTO invitation_accounts (invitation_id, provider, account) VALUES (?, ?, ?)`,
+			inv.ID, a.Provider, a.Account); err != nil {
+			return errors.Wrapf(err, "failed to write %s as %s on invitation %s", a.Provider, a.Account, inv.ID)
+		}
+	}
+	return errors.Wrapf(tx.Commit(), "failed to commit invitation %s", inv.ID)
+}
+
+// withAccounts reads the accounts an invitation names, by provider.
+func (t *invitationTable) withAccounts(inv Invitation) (_ Invitation, err error) {
+	rows, err := t.db.Query(`SELECT provider, account FROM invitation_accounts WHERE invitation_id = ? ORDER BY provider`, inv.ID)
+	if err != nil {
+		return inv, errors.Wrapf(err, "failed to read the accounts of invitation %s", inv.ID)
+	}
+	defer func() {
+		if closeErr := rows.Close(); err == nil && closeErr != nil {
+			err = errors.Wrapf(closeErr, "failed to close the accounts read of invitation %s", inv.ID)
+		}
+	}()
+	inv.Accounts = []InvitationAccount{}
+	for rows.Next() {
+		var a InvitationAccount
+		if err := rows.Scan(&a.Provider, &a.Account); err != nil {
+			return inv, errors.Wrapf(err, "failed to scan an account of invitation %s", inv.ID)
+		}
+		inv.Accounts = append(inv.Accounts, a)
+	}
+	return inv, errors.Wrapf(rows.Err(), "the accounts of invitation %s stopped answering", inv.ID)
+}
+
+// one is the invitation a query names, with its accounts. False is none.
+func (t *invitationTable) one(where string, arg any) (Invitation, bool, error) {
+	inv, err := scanInvitation(t.db.QueryRow(`SELECT `+invitationColumns+` FROM invitations WHERE `+where+` = ?`, arg))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Invitation{}, false, nil
+	}
+	if err != nil {
+		return Invitation{}, false, errors.Wrapf(err, "failed to read an invitation by %s", where)
+	}
+	inv, err = t.withAccounts(inv)
+	return inv, err == nil, err
 }
 
 // byToken is the invitation a link's token names. False is none.
 func (t *invitationTable) byToken(token string) (Invitation, bool, error) {
-	inv, err := scanInvitation(t.db.QueryRow(`SELECT `+invitationColumns+` FROM invitations WHERE token_hash = ?`, hashOf(token)))
-	if errors.Is(err, sql.ErrNoRows) {
-		return Invitation{}, false, nil
-	}
-	if err != nil {
-		return Invitation{}, false, errors.Wrap(err, "failed to read an invitation by its token")
-	}
-	return inv, true, nil
+	return t.one("token_hash", hashOf(token))
 }
 
 func (t *invitationTable) byID(id string) (Invitation, bool, error) {
-	inv, err := scanInvitation(t.db.QueryRow(`SELECT `+invitationColumns+` FROM invitations WHERE id = ?`, id))
-	if errors.Is(err, sql.ErrNoRows) {
-		return Invitation{}, false, nil
-	}
-	if err != nil {
-		return Invitation{}, false, errors.Wrapf(err, "failed to read invitation %s", id)
-	}
-	return inv, true, nil
+	return t.one("id", id)
 }
 
 func (t *invitationTable) list() (held []Invitation, err error) {
@@ -151,6 +219,11 @@ func (t *invitationTable) list() (held []Invitation, err error) {
 	}
 	if err := rows.Err(); err != nil {
 		return nil, errors.Wrap(err, "the invitations table stopped answering")
+	}
+	for i := range held {
+		if held[i], err = t.withAccounts(held[i]); err != nil {
+			return nil, err
+		}
 	}
 	return held, nil
 }
@@ -223,29 +296,51 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		return
 	}
 	var body struct {
-		Email    string `json:"email"`
-		Provider string `json:"provider"`
-		Account  string `json:"account"`
+		DisplayName string              `json:"display_name"`
+		Email       string              `json:"email"`
+		Accounts    []InvitationAccount `json:"accounts"`
 		// The page ROOT invited from, which the links open on.
 		Page string `json:"page"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
-		h.writeError(w, http.StatusBadRequest, "the body is not a JSON object of email, provider and account")
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body); err != nil {
+		h.writeError(w, http.StatusBadRequest, "the body is not a JSON object of display_name, email and accounts")
 		return
 	}
+	name := strings.TrimSpace(body.DisplayName)
 	email := strings.TrimSpace(body.Email)
-	provider := strings.TrimSpace(body.Provider)
-	account := strings.TrimSpace(body.Account)
-	switch {
-	case email == "" || !strings.Contains(email, "@") || strings.ContainsFunc(email, unicode.IsSpace):
+	if email == "" || !strings.Contains(email, "@") || strings.ContainsFunc(email, unicode.IsSpace) {
 		h.writeError(w, http.StatusBadRequest, "email is the friend's e-mail address")
 		return
-	case provider == "":
-		h.writeError(w, http.StatusBadRequest, "provider is the one the friend signs in with")
+	}
+	if strings.ContainsFunc(name, unicode.IsControl) {
+		h.writeError(w, http.StatusBadRequest, "display_name is one line of text")
 		return
-	case account == "" || strings.ContainsFunc(account, unicode.IsControl):
-		h.writeError(w, http.StatusBadRequest, "account is the friend's account at "+provider)
+	}
+	if refusal, bad := refuseName(User{}, name); bad {
+		h.writeError(w, http.StatusBadRequest, refusal)
 		return
+	}
+	if len(body.Accounts) == 0 {
+		h.writeError(w, http.StatusBadRequest, "accounts names at least one provider the friend signs in with")
+		return
+	}
+	accounts := make([]InvitationAccount, 0, len(body.Accounts))
+	seen := map[string]bool{}
+	for _, a := range body.Accounts {
+		a.Provider, a.Account = strings.TrimSpace(a.Provider), strings.TrimSpace(a.Account)
+		switch {
+		case a.Provider == "":
+			h.writeError(w, http.StatusBadRequest, "every account names its provider")
+			return
+		case a.Account == "" || strings.ContainsFunc(a.Account, unicode.IsControl):
+			h.writeError(w, http.StatusBadRequest, "the account at "+a.Provider+" is the friend's address or username there")
+			return
+		case seen[a.Provider]:
+			h.writeError(w, http.StatusBadRequest, a.Provider+" is named twice")
+			return
+		}
+		seen[a.Provider] = true
+		accounts = append(accounts, a)
 	}
 	page, ok := h.ownPage(body.Page)
 	if !ok {
@@ -264,7 +359,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		return
 	}
 	inv := Invitation{
-		ID: id, Email: email, Provider: provider, Account: account,
+		ID: id, Email: email, DisplayName: name, Accounts: accounts,
 		InvitedBy: p.UserID, CreatedAt: time.Now().UTC().UnixMilli(),
 	}
 	if err := h.invitations.put(inv, token); err != nil {
@@ -272,13 +367,18 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		return
 	}
 	h.attest(PredicateInvited, route, map[string]any{
-		"invitation": id, "email": email, "provider": provider, "account": account, "by": p.UserID,
+		"invitation": id, "email": email, "display_name": name, "accounts": accounts, "by": p.UserID,
 	})
 
 	inviter := p.DisplayName
 	if inviter == "" {
 		inviter = RootName
 	}
+	invitee := email
+	if name != "" {
+		invitee = name + " (" + email + ")"
+	}
+	signsIn := inv.signsInWith()
 	link := page + "/?invitation=" + url.QueryEscape(token)
 	cancel := page + "/?invitation-cancel=" + url.QueryEscape(id)
 
@@ -287,10 +387,10 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 	if _, _, err := h.inviteMailer.SendAsNodeTo(r.Context(), services.MailRecipient{ID: "invitation:" + id, Email: email}, services.NodeMail{
 		Name:    "invitation",
 		Subject: inviter + " invites you to QNTX",
-		Text: inviter + " invites you to QNTX.\n\nSign in with " + provider + " as " + account + ":\n" + link + "\n\n" +
+		Text: inviter + " invites you to QNTX.\n\nSign in with " + signsIn + ":\n" + link + "\n\n" +
 			"No password is set at QNTX.\n",
 		HTML: "<p>" + htmlEscape(inviter) + " invites you to QNTX.</p>" +
-			"<p>Sign in with " + htmlEscape(provider) + " as <b>" + htmlEscape(account) + "</b>.</p>" +
+			"<p>Sign in with <b>" + htmlEscape(signsIn) + "</b>.</p>" +
 			"<p><a href=\"" + htmlEscape(link) + "\">Accept the invitation</a></p>" +
 			"<p>No password is set at QNTX.</p>",
 	}); err != nil {
@@ -301,10 +401,10 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 
 	if _, _, err := h.inviteMailer.SendAsNode(r.Context(), p.UserID, services.NodeMail{
 		Name:    "invitation-sent",
-		Subject: "You invited " + email,
-		Text: "You invited " + email + " to sign in with " + provider + " as " + account + ".\n\n" +
+		Subject: "You invited " + invitee,
+		Text: "You invited " + invitee + " to sign in with " + signsIn + ".\n\n" +
 			"Cancel the invitation:\n" + cancel + "\n",
-		HTML: "<p>You invited <b>" + htmlEscape(email) + "</b> to sign in with " + htmlEscape(provider) + " as <b>" + htmlEscape(account) + "</b>.</p>" +
+		HTML: "<p>You invited <b>" + htmlEscape(invitee) + "</b> to sign in with " + htmlEscape(signsIn) + ".</p>" +
 			"<p><a href=\"" + htmlEscape(cancel) + "\">Cancel the invitation</a></p>",
 	}); err != nil {
 		h.logger.Errorw("invitation sent to the friend, ROOT's copy not sent", "invitation", id, "user", p.UserID, "error", err)
@@ -312,7 +412,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		return
 	}
 
-	h.logger.Infow("friend invited", "invitation", id, "email", email, "provider", provider, "by", p.UserID)
+	h.logger.Infow("friend invited", "invitation", id, "email", email, "signs_in_with", signsIn, "by", p.UserID)
 	h.writeJSON(w, http.StatusCreated, inv)
 }
 
@@ -357,8 +457,8 @@ func (h *Handler) handleInvitation(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// invitationSeen is what the link shows the friend: the provider and the
-// account ROOT named there.
+// invitationSeen is what the link shows the friend: the providers and the
+// account ROOT named at each.
 func (h *Handler) invitationSeen(w http.ResponseWriter, token string) {
 	inv, found, err := h.invitations.byToken(token)
 	if err != nil {
@@ -373,7 +473,7 @@ func (h *Handler) invitationSeen(w http.ResponseWriter, token string) {
 		h.writeError(w, http.StatusGone, "this invitation was cancelled or already used")
 		return
 	}
-	h.writeJSON(w, http.StatusOK, map[string]string{"provider": inv.Provider, "account": inv.Account})
+	h.writeJSON(w, http.StatusOK, map[string]any{"accounts": inv.Accounts})
 }
 
 func (h *Handler) cancelInvitation(w http.ResponseWriter, p Presented, id string) {
@@ -428,7 +528,7 @@ func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (strin
 	}
 	if matched == nil {
 		h.logger.Infow("invitation refused: no binding is the account ROOT named",
-			"invitation", inv.ID, "provider", inv.Provider, "account", inv.Account, "bindings", len(vouched))
+			"invitation", inv.ID, "signs_in_with", inv.signsInWith(), "bindings", len(vouched))
 		return "", nil, false, nil
 	}
 	route := matched.Claim.CanonicalID
@@ -447,6 +547,7 @@ func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (strin
 	u := withRoute(User{
 		Level:          LevelSuper,
 		CreatedBy:      inv.InvitedBy,
+		DisplayName:    inv.DisplayName,
 		CreatedAt:      time.Now().UTC().UnixMilli(),
 		EmailAddresses: []string{inv.Email},
 	}, route, matched)

@@ -14,11 +14,10 @@ import { log, SEG } from './logger';
 const PARAM = 'invitation';
 const KEY = 'qntx_invitation';
 
-/** What the link signs in with: the provider, and the account ROOT named there. */
+/** What the link signs in with: each provider, and the account ROOT named there. */
 export interface Invited {
     token: string;
-    provider: string;
-    account: string;
+    accounts: { provider: string; account: string }[];
 }
 
 /**
@@ -63,11 +62,16 @@ export async function invited(token: string): Promise<Invited> {
         const said = (await response.text()).trim();
         throw new Error(said || `the node did not answer for this invitation (${response.status} ${response.statusText})`);
     }
-    const { provider, account } = await response.json() as { provider: string; account: string };
-    return { token, provider, account };
+    const { accounts } = await response.json() as Pick<Invited, 'accounts'>;
+    return { token, accounts };
 }
 
-/** The one provider the invitation signs in with, out of what the node offers. */
+/** The providers the invitation signs in with, out of what the node offers. */
 export function onlyInvited(providers: ProviderDescription[], inv: Invited): ProviderDescription[] {
-    return providers.filter(p => p.id === inv.provider);
+    return providers.filter(p => inv.accounts.some(a => a.provider === p.id));
+}
+
+/** What the door says the link signs in with. */
+export function signsInWith(inv: Invited): string {
+    return inv.accounts.map(a => `${a.provider} as ${a.account}`).join(' or ');
 }
