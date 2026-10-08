@@ -12,7 +12,7 @@ proves you have access to that identity.
 
 "Creating a namespace, makes that user the owner of one."
 
-"`system` and `default` are namespaces that "
+"`system` and `default` are namespaces that come into being during the [[ADR-033-first-time-setup]]"
 
 "A namespace is defined by it's `ns.toml`"
 
