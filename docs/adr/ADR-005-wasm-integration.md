@@ -12,7 +12,7 @@ QNTX has multiple Rust components integrated into a Go server via CGO. The visio
 All shared computation moves to Rust crates compiled to WebAssembly, running on:
 - **Go server**: wazero (pure Go, no CGO)
 - **Browser**: wasm-bindgen (native WebAssembly API)
-- **Tauri desktop**: embedded webview (same as browser) or native Rust (no WASM overhead)
+- **Tauri App**: Phone 
 
 ### Architecture
 
