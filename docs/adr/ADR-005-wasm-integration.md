@@ -61,6 +61,6 @@ Any logic that both browser and server need: parsing, fuzzy search, classificati
 
 ## References
 
-- [[ADR-010: Identity system (ASUID generation via WASM)
+- [[ADR-010-identity-system]]: (ASUID generation via WASM)
 - wazero: https://wazero.io/
 - [Issue #387](https://github.com/teranos/QNTX/issues/387): Parser design flaws exposed during WASM integration
