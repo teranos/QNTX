@@ -42,6 +42,7 @@ func (h *Handler) usersCollection(w http.ResponseWriter, r *http.Request, _ Pres
 //	POST /auth/users/{id}/disable
 //	POST /auth/users/{id}/enable
 //	POST /auth/users/{id}/name
+//	POST /auth/users/{id}/become
 func (h *Handler) handleUserByID(w http.ResponseWriter, r *http.Request, p Presented) {
 	if h.users == nil {
 		h.writeError(w, http.StatusServiceUnavailable, "this node keeps no Users")
@@ -65,6 +66,8 @@ func (h *Handler) handleUserByID(w http.ResponseWriter, r *http.Request, p Prese
 		h.switchUser(w, r, p, id, false)
 	case "name":
 		h.nameUser(w, r, p, id)
+	case "become":
+		h.become(w, r, p, id)
 	default:
 		h.writeError(w, http.StatusNotFound, "no such verb on a User: "+verb)
 	}

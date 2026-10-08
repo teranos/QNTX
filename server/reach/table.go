@@ -68,6 +68,10 @@ REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANY
 # admitted at no gate, and has to reach this to turn themselves back on.
 REACH is '/i/disable' '/i/enable'                                         of ANYONE
 
+# ROOT being itself again (ADR-031). Gated by the handler, which answers the
+# one session that is being a User and nobody else.
+REACH is '/i/unbecome'                                                    of ANYONE
+
 # i's own paths: who you are, and where you stand.
 REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
 REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
