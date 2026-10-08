@@ -154,10 +154,10 @@ func (h *Handler) levelOf(identity string) Level {
 	if slices.Contains(h.identities.roots(), identity) {
 		return LevelRoot
 	}
-	// Somebody who walked up to a door and made themselves. The node holds a
-	// User for them because a provider vouched once, and the rung is read off
+	// Somebody ROOT named, or somebody who walked up to a door and made
+	// themselves. The node holds a User for them, and the rung is read off
 	// that User — still a level with provenance, from a different record.
-	return h.publicLevelOf(identity)
+	return h.userLevelOf(identity)
 }
 
 // proves returns the bindings that verifiably say this key holds an account,
@@ -190,6 +190,13 @@ func (h *Handler) admits(did string, vouched []SignedBinding) (string, *SignedBi
 	}
 	for _, binding := range vouched {
 		if slices.Contains(h.identities.roots(), binding.Claim.CanonicalID) {
+			return binding.Claim.CanonicalID, &binding, true
+		}
+	}
+	// A person ROOT named is admitted by the account named, which a provider
+	// has to vouch for: a key alone names nobody but ROOT (ADR-030).
+	for _, binding := range vouched {
+		if h.named(binding.Claim.CanonicalID) {
 			return binding.Claim.CanonicalID, &binding, true
 		}
 	}

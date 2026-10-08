@@ -24,6 +24,9 @@ const (
 	// this carries the act: who flipped it, and when.
 	PredicateUserDisabled = "identity:disabled"
 	PredicateUserEnabled  = "identity:enabled"
+	// ROOT named a person: a User made for an account before it proved
+	// itself, so proving it is logging in as them (ADR-031).
+	PredicateUserCreated = "identity:created"
 )
 
 // Predicates for a role somebody holds. A role is an attestation and not a Go

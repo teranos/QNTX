@@ -63,9 +63,12 @@ func (h *Handler) joinUser(route string, matched *SignedBinding, layeDID string)
 
 	// What the provider showed at this login, over whatever it showed last.
 	u, pictured := u.WithPicture(route, h.pictureFor(matched))
+	// An account ROOT named was written before any provider spoke for it.
+	// The first time one does, what it said is kept, as every account's is.
+	u, bound := withBinding(u, route, matched)
 
 	// The browser this login came from is one more place the User is reachable.
-	if u.HoldsKey(layeDID) && !pictured {
+	if u.HoldsKey(layeDID) && !pictured && !bound {
 		return u, nil
 	}
 	if !u.HoldsKey(layeDID) {
@@ -180,6 +183,29 @@ func (h *Handler) reachRoot(route string, matched *SignedBinding) (User, error) 
 	// the node has an owner.
 	h.attest(PredicateClaimed, u.ID, map[string]any{"route": route, "level": string(u.Level)})
 	return u, nil
+}
+
+// withBinding keeps what a provider said for an account the User holds with
+// nothing said yet. False is nothing to keep.
+func withBinding(u User, route string, matched *SignedBinding) (User, bool) {
+	if matched == nil {
+		return u, false
+	}
+	for i, a := range u.Accounts {
+		if a.CanonicalID != route || a.Binding != nil {
+			continue
+		}
+		if a.Provider == "" {
+			a.Provider = matched.Claim.Provider
+		}
+		if a.Handle == "" && matched.Claim.Handle != nil {
+			a.Handle = *matched.Claim.Handle
+		}
+		a.Binding = matched
+		u.Accounts[i] = a
+		return u, true
+	}
+	return u, false
 }
 
 // withRoute writes a route onto a User as the key or the account it is.
