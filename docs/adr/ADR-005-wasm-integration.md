@@ -5,7 +5,7 @@ Status: Accepted
 
 ## Context
 
-QNTX has multiple Rust components integrated into a Go server via CGO. The vision includes running entirely in the browser (offline-first), on mobile, and as a Tauri desktop app — all sharing the same core logic.
+QNTX has multiple Rust components integrated into a Go server via CGO. The vision includes running entirely in the browser (offline-first) nd on mobile,  sharing the same core logic.
 
 ## Decision
 
