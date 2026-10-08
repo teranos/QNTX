@@ -35,11 +35,11 @@ They are not the same world.
 
 A canvas lives in one namespace and only that one.
 
-The system namespace is the node: `node_identity`, the row keyed `'self'`.
+The `system` namespace is the node: `node_identity`, the row keyed `'self'`.
 
 "system namespace should have no canvas"
 
-"default namespace has default canvas, whihc is the current canvas i am working with."
+"default namespace has a default canvas, whihc is the current canvas i am working with."
 
 "and for every other namespace the canvas needs to be explicitly created and named."
 
