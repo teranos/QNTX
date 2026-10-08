@@ -148,9 +148,11 @@ func newestKeys(store ats.AttestationStore, namespace string) (map[string]*types
 	return newest, nil
 }
 
+// keyDropped is whether a line says its key was dropped. A line without the
+// attribute set a key.
 func keyDropped(as *types.As) bool {
-	dropped, _ := as.Attributes["dropped"].(bool)
-	return dropped
+	dropped, said := as.Attributes["dropped"].(bool)
+	return said && dropped
 }
 
 // writeKey writes one KEY line about name.
@@ -210,7 +212,10 @@ func listedKeys(store ats.AttestationStore, namespace string) ([]keyListed, erro
 		if keyDropped(as) {
 			continue
 		}
-		setBy, _ := as.Attributes["set_by"].(string)
+		setBy, said := as.Attributes["set_by"].(string)
+		if !said {
+			return nil, errors.Newf("%s line %s about %s in %s names nobody who set it", keySubject, as.ID, name, namespace)
+		}
 		keys = append(keys, keyListed{Name: name, SetBy: setBy, SetAt: as.Timestamp.UTC().Format(time.RFC3339)})
 	}
 	slices.SortFunc(keys, func(a, b keyListed) int { return strings.Compare(a.Name, b.Name) })
