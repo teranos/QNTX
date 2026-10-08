@@ -95,8 +95,8 @@ func tokenIn(t *testing.T, body, marker string) string {
 	return rest
 }
 
-// The friend arrives through laye carrying the invitation they were sent.
-func friendArrives(t *testing.T, h *Handler, browser ed25519.PrivateKey, invitation string, bindings []SignedBinding) *httptest.ResponseRecorder {
+// The invitee arrives through laye carrying the invitation they were sent.
+func inviteeArrives(t *testing.T, h *Handler, browser ed25519.PrivateKey, invitation string, bindings []SignedBinding) *httptest.ResponseRecorder {
 	t.Helper()
 	challenge, err := h.layeChallenges.issue()
 	require.NoError(t, err)
@@ -131,7 +131,7 @@ const adaAnywhere = `{"display_name":"Ada","email":"ada@gmail.com","accounts":[`
 
 // ROOT invites Ada: a mail goes to Ada with the link, and one to ROOT with
 // the cancel.
-func TestRootInvitesAFriendAndBothAreMailed(t *testing.T) {
+func TestRootInvitesAndBothAreMailed(t *testing.T) {
 	h, store, rootSession, box, _ := invitingHandler(t)
 	root := store.held[0]
 
@@ -139,9 +139,9 @@ func TestRootInvitesAFriendAndBothAreMailed(t *testing.T) {
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 
 	require.Len(t, box.sent, 2)
-	friend, rootCopy := box.sent[0], box.sent[1]
-	assert.Equal(t, "ada@gmail.com", friend.to)
-	assert.Contains(t, friend.mail.HTML, invitePage+"/?invitation=")
+	invitee, rootCopy := box.sent[0], box.sent[1]
+	assert.Equal(t, "ada@gmail.com", invitee.to)
+	assert.Contains(t, invitee.mail.HTML, invitePage+"/?invitation=")
 	assert.Equal(t, root.ID, rootCopy.userID)
 	assert.Contains(t, rootCopy.mail.HTML, invitePage+"/?invitation-cancel=")
 	assert.Contains(t, rootCopy.mail.Text, "ada@gmail.com")
@@ -167,7 +167,7 @@ func TestTheLinksOpenOnThePageRootInvitedFrom(t *testing.T) {
 // Only ROOT invites.
 func TestOnlyRootInvites(t *testing.T) {
 	h, store, _, box, _ := invitingHandler(t)
-	ada := User{ID: "US-ADA-1", Level: LevelSuper, Accounts: []UserAccount{{Provider: "google", CanonicalID: "google:110"}}}
+	ada := User{ID: "US-ADA-1", Level: LevelUser, Accounts: []UserAccount{{Provider: "google", CanonicalID: "google:110"}}}
 	require.NoError(t, store.Put(ada))
 	adaSession, err := h.sessions.create("google:110", ada)
 	require.NoError(t, err)
@@ -193,7 +193,7 @@ func TestAnInvitationNamesAnAddressAndAnAccount(t *testing.T) {
 	assert.Empty(t, box.sent)
 }
 
-// The link says which providers the friend signs in with, and only those.
+// The link says which providers the invitee signs in with, and only those.
 func TestTheLinkNamesTheProvidersRootSet(t *testing.T) {
 	h, _, rootSession, box, _ := invitingHandler(t)
 	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaAnywhere).Code)
@@ -212,13 +212,13 @@ func TestTheLinkNamesTheProvidersRootSet(t *testing.T) {
 }
 
 // With Google and GitHub set, either one admits her: GitHub by the username.
-func TestEitherProviderRootSetAdmitsTheFriend(t *testing.T) {
+func TestEitherProviderRootSetAdmitsTheInvitee(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)
 	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaAnywhere).Code)
 	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
 
 	browser := newBrowser(t)
-	rec := friendArrives(t, h, browser, token, []SignedBinding{
+	rec := inviteeArrives(t, h, browser, token, []SignedBinding{
 		vouch(t, signer, browser.Public().(ed25519.PublicKey), "github", "github:42", "adalovelace"),
 	})
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -226,9 +226,9 @@ func TestEitherProviderRootSetAdmitsTheFriend(t *testing.T) {
 	assert.True(t, store.held[1].Reaches("github:42"))
 }
 
-// Ada signs in with the Google account ROOT named, and is a User: SUPER, made
+// Ada signs in with the Google account ROOT named, and is a User: USER, made
 // by ROOT, holding that account and the address she was invited at.
-func TestTheFriendSignsInWithTheAccountRootNamed(t *testing.T) {
+func TestTheInviteeSignsInWithTheAccountRootNamed(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)
 	root := store.held[0]
 	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaInvite).Code)
@@ -236,20 +236,20 @@ func TestTheFriendSignsInWithTheAccountRootNamed(t *testing.T) {
 
 	browser := newBrowser(t)
 	vouched := vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:110", "ada@gmail.com")
-	rec := friendArrives(t, h, browser, token, []SignedBinding{vouched})
+	rec := inviteeArrives(t, h, browser, token, []SignedBinding{vouched})
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), `"next":"enrol"`)
 
 	require.Len(t, store.held, 2)
 	ada := store.held[1]
-	assert.Equal(t, LevelSuper, ada.Level)
+	assert.Equal(t, LevelUser, ada.Level)
 	assert.Equal(t, root.ID, ada.CreatedBy)
 	assert.Equal(t, []string{"ada@gmail.com"}, ada.EmailAddresses)
 	assert.True(t, ada.Reaches("google:110"))
-	assert.Equal(t, LevelSuper, h.levelOf("google:110"))
+	assert.Equal(t, LevelUser, h.levelOf("google:110"))
 
 	// Spent: the link admits nobody a second time.
-	again := friendArrives(t, h, newBrowser(t), token, []SignedBinding{
+	again := inviteeArrives(t, h, newBrowser(t), token, []SignedBinding{
 		vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:110", "ada@gmail.com"),
 	})
 	assert.NotEqual(t, http.StatusOK, again.Code)
@@ -260,7 +260,7 @@ func TestTheFriendSignsInWithTheAccountRootNamed(t *testing.T) {
 }
 
 // "and i want to set Name"
-func TestTheFriendCarriesTheNameRootGave(t *testing.T) {
+func TestTheInviteeCarriesTheNameRootGave(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)
 	rec := inviting(h, rootSession, adaAnywhere)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
@@ -268,7 +268,7 @@ func TestTheFriendCarriesTheNameRootGave(t *testing.T) {
 	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
 
 	browser := newBrowser(t)
-	arrived := friendArrives(t, h, browser, token, []SignedBinding{
+	arrived := inviteeArrives(t, h, browser, token, []SignedBinding{
 		vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:110", "ada@gmail.com"),
 	})
 	require.Equal(t, http.StatusOK, arrived.Code, arrived.Body.String())
@@ -283,8 +283,10 @@ func TestTheFriendCarriesTheNameRootGave(t *testing.T) {
 
 // "yes"
 
+// "instead of SUPER, lets just mke a new level called USER"
+
 // Ada registered at two public doors before she was invited. The invitation
-// raises one of those Users to SUPER, and every later lookup of her account
+// raises one of those Users to USER, and every later lookup of her account
 // finds that one.
 func TestAnInvitationRaisesAPublicRegistration(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)
@@ -299,7 +301,7 @@ func TestAnInvitationRaisesAPublicRegistration(t *testing.T) {
 	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
 
 	browser := newBrowser(t)
-	rec := friendArrives(t, h, browser, token, []SignedBinding{
+	rec := inviteeArrives(t, h, browser, token, []SignedBinding{
 		vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:110", "ada@gmail.com"),
 	})
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -308,11 +310,11 @@ func TestAnInvitationRaisesAPublicRegistration(t *testing.T) {
 	raised, found, err := store.ByRoute("google:110")
 	require.NoError(t, err)
 	require.True(t, found)
-	assert.Equal(t, LevelSuper, raised.Level)
-	assert.Empty(t, raised.Namespace, "SUPER acts in every namespace, not at one door")
+	assert.Equal(t, LevelUser, raised.Level)
+	assert.Empty(t, raised.Namespace, "a USER belongs to no door")
 	assert.Equal(t, root.ID, raised.CreatedBy)
 	assert.Equal(t, "Ada", raised.DisplayName)
-	assert.Equal(t, LevelSuper, h.levelOf("google:110"))
+	assert.Equal(t, LevelUser, h.levelOf("google:110"))
 }
 
 // Another account at the provider is not the one ROOT named.
@@ -326,7 +328,7 @@ func TestAnotherAccountIsNotApplicable(t *testing.T) {
 		vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:999", "bob@gmail.com"),
 		vouch(t, signer, browser.Public().(ed25519.PublicKey), "apple", "apple:110", "ada@gmail.com"),
 	} {
-		rec := friendArrives(t, h, browser, token, []SignedBinding{b})
+		rec := inviteeArrives(t, h, browser, token, []SignedBinding{b})
 		assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 	}
 	assert.Len(t, store.held, 1)
@@ -344,7 +346,7 @@ func TestRootCancelsTheInvitation(t *testing.T) {
 
 	assert.Equal(t, http.StatusGone, onInvitation(h, "", http.MethodGet, "/auth/invitations/"+token).Code)
 	browser := newBrowser(t)
-	arrived := friendArrives(t, h, browser, token, []SignedBinding{
+	arrived := inviteeArrives(t, h, browser, token, []SignedBinding{
 		vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:110", "ada@gmail.com"),
 	})
 	assert.Equal(t, http.StatusForbidden, arrived.Code, arrived.Body.String())

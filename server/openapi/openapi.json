@@ -84,7 +84,8 @@
         "ROOT",
         "SUPER",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ]
     },
     "/api/canvas/compositions": {
@@ -92,7 +93,8 @@
         "ROOT",
         "SUPER",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ]
     },
     "/api/canvas/compositions/": {
@@ -100,7 +102,8 @@
         "ROOT",
         "SUPER",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ],
       "x-qntx-prefix": true
     },
@@ -109,7 +112,8 @@
         "ROOT",
         "SUPER",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ]
     },
     "/api/canvas/elements/": {
@@ -117,7 +121,8 @@
         "ROOT",
         "SUPER",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ],
       "x-qntx-prefix": true
     },
@@ -136,7 +141,8 @@
         "ROOT",
         "SUPER",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ]
     },
     "/api/canvas/minimized-windows/": {
@@ -144,7 +150,8 @@
         "ROOT",
         "SUPER",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ],
       "x-qntx-prefix": true
     },
@@ -153,7 +160,8 @@
         "ROOT",
         "SUPER",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ]
     },
     "/api/canvases/": {
@@ -161,7 +169,8 @@
         "ROOT",
         "SUPER",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ],
       "x-qntx-prefix": true
     },
@@ -765,7 +774,8 @@
         "SUPER",
         "TOKEN",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ],
       "x-qntx-prefix": true
     },
@@ -785,7 +795,8 @@
         "SUPER",
         "TOKEN",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ]
     },
     "/i/standing": {
@@ -794,7 +805,8 @@
         "SUPER",
         "TOKEN",
         "ATTESTOR",
-        "PUBLIC_REGISTRATION"
+        "PUBLIC_REGISTRATION",
+        "USER"
       ]
     },
     "/i/unbecome": {

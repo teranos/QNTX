@@ -70,7 +70,7 @@ type layeVerifyRequest struct {
 	Challenge string          `json:"challenge"`
 	Bindings  []SignedBinding `json:"bindings"`
 	// The token from the link ROOT's invitation mailed, carried by the
-	// friend's first sign-in.
+	// invitee's first sign-in.
 	Invitation string `json:"invitation,omitempty"`
 }
 
@@ -158,7 +158,7 @@ func (h *Handler) handleLayeVerify(w http.ResponseWriter, r *http.Request) {
 	// forgetting to configure it closes the door rather than opening it.
 	vouched := h.proves(peerPubkey, req.Bindings)
 	admitted, matched, ok := h.admits(req.DID, vouched)
-	// A friend ROOT invited, arriving with the link and the account ROOT
+	// The invitee, arriving with the link and the account ROOT
 	// named. Their User is made here, and the rest is the listed path.
 	if !ok && req.Invitation != "" {
 		admitted, matched, ok, err = h.acceptInvitation(req.Invitation, vouched)

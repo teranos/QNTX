@@ -278,7 +278,7 @@ func (h *Handler) returnableTo(r *http.Request) string {
 }
 
 // onPage is the page on a door's origin a ceremony returns to: the path it
-// began on, where the friend's invitation is held.
+// began on, where the invitee's invitation is held.
 func onPage(origin, page string) string {
 	if origin == "" || page == "" {
 		return origin

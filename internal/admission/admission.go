@@ -96,7 +96,13 @@ func (a Admission) LevelName() string {
 // logging in and being attested. A role held where they act is what reaches
 // further, and it is a line ROOT wrote.
 func (a Admission) ReachesAStore() bool {
-	return a.level != access.LevelPublicRegistration || len(a.roles) > 0
+	return !reachesNothingAlone(a.level) || len(a.roles) > 0
+}
+
+// reachesNothingAlone is the rungs that reach no store without a line:
+// PUBLIC_REGISTRATION and USER.
+func reachesNothingAlone(level Level) bool {
+	return level == access.LevelPublicRegistration || level == access.LevelUser
 }
 
 // MaySeeSystem reports whether the system namespace is visible to this
@@ -132,7 +138,7 @@ func (a Admission) belowTheLadder() bool {
 	if a.Grant != nil {
 		return a.Grant.Scoped()
 	}
-	return a.level == access.LevelPublicRegistration
+	return reachesNothingAlone(a.level)
 }
 
 // MayRead reports whether this admission may read attestations with a

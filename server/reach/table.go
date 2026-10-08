@@ -73,9 +73,9 @@ REACH is '/i/disable' '/i/enable'                                         of ANY
 REACH is '/i/unbecome'                                                    of ANYONE
 
 # i's own paths: who you are, and where you stand.
-REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
-REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
-REACH is '/i/picture'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION
+REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
+REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
+REACH is '/i/picture'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 
 # First-time setup: the ways in this node offers, and claiming it.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
@@ -190,12 +190,12 @@ REACH is '/api/watchers/queue/stats'                                      of ROO
 REACH is '/api/element-config'                                              of ROOT
 # "the canvas becomes reachable to whoever the namespace is for": which canvas
 # a caller may act on is the canvas's owners' to say (element/handlers).
-REACH is '/api/canvas'                                                    of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
-REACH is '/api/canvases' '/api/canvases/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
-REACH is '/api/canvas/elements' '/api/canvas/elements/'                   of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
-REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
-REACH is '/api/canvas/minimized-windows'                                  of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
-REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION
+REACH is '/api/canvas'                                                    of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
+REACH is '/api/canvases' '/api/canvases/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
+REACH is '/api/canvas/elements' '/api/canvas/elements/'                   of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
+REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
+REACH is '/api/canvas/minimized-windows'                                  of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
+REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
 REACH is '/api/canvas/export' '/api/canvas/export-dom'                    of ROOT
 REACH is '/api/files' '/api/files/'                                       of ROOT
 REACH is '/api/python/execute'                                            of ROOT
@@ -263,6 +263,7 @@ var levels = map[auth.Level]bool{
 	auth.LevelToken:              true,
 	auth.LevelAttestor:           true,
 	auth.LevelPublicRegistration: true,
+	auth.LevelUser:               true,
 }
 
 // runtimeLevels is every level a runtime line may name, and only on a plugin's
@@ -273,6 +274,7 @@ var runtimeLevels = map[auth.Level]bool{
 	auth.LevelToken:              true,
 	auth.LevelAttestor:           true,
 	auth.LevelPublicRegistration: true,
+	auth.LevelUser:               true,
 	anyone:                       true,
 }
 

@@ -26,10 +26,7 @@ import (
 
 // "so, if ROOT selected Mastodon, the invited user only sees the mastodon link, and only the mastodon acc specified by ROOT would be applicable"
 
-// ADR-031:
-// "There is one ROOT User. A SUPER User is created by it and by nobody else."
-
-// Attested when ROOT invites, cancels, and when the friend proves the account.
+// Attested when ROOT invites, cancels, and when the invitee proves the account.
 const (
 	PredicateInvited             = "identity:invited"
 	PredicateInvitationCancelled = "identity:invitation-cancelled"
@@ -40,14 +37,14 @@ const (
 
 // "or the username"
 
-// InvitationAccount is one provider the friend may sign in with, and the
+// InvitationAccount is one provider the invitee may sign in with, and the
 // account there that is theirs: an address, or a username.
 type InvitationAccount struct {
 	Provider string `json:"provider"`
 	Account  string `json:"account"`
 }
 
-// Invitation is one friend ROOT invited: their name, where the mail went, and
+// Invitation is one person ROOT invited: their name, where the mail went, and
 // every provider they may sign in with.
 type Invitation struct {
 	ID          string              `json:"id"`
@@ -265,7 +262,7 @@ func randomHex(n int) (string, error) {
 }
 
 // invitationsCollection answers GET /auth/invitations, every invitation, and
-// POST, ROOT inviting a friend.
+// POST, ROOT inviting someone.
 func (h *Handler) invitationsCollection(w http.ResponseWriter, r *http.Request, p Presented) {
 	if h.invitations == nil || h.users == nil {
 		h.writeError(w, http.StatusServiceUnavailable, "this node keeps no Users, so it invites nobody")
@@ -289,7 +286,7 @@ func (h *Handler) invitationsCollection(w http.ResponseWriter, r *http.Request, 
 func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 	route, _ := p.Admitted()
 	if h.levelOf(route) != LevelRoot {
-		h.writeError(w, http.StatusForbidden, "a friend is invited by ROOT")
+		h.writeError(w, http.StatusForbidden, "an invitation is sent by ROOT")
 		return
 	}
 	if h.inviteMailer == nil {
@@ -310,7 +307,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 	name := strings.TrimSpace(body.DisplayName)
 	email := strings.TrimSpace(body.Email)
 	if email == "" || !strings.Contains(email, "@") || strings.ContainsFunc(email, unicode.IsSpace) {
-		h.writeError(w, http.StatusBadRequest, "email is the friend's e-mail address")
+		h.writeError(w, http.StatusBadRequest, "email is the invitee's e-mail address")
 		return
 	}
 	if strings.ContainsFunc(name, unicode.IsControl) {
@@ -322,7 +319,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		return
 	}
 	if len(body.Accounts) == 0 {
-		h.writeError(w, http.StatusBadRequest, "accounts names at least one provider the friend signs in with")
+		h.writeError(w, http.StatusBadRequest, "accounts names at least one provider the invitee signs in with")
 		return
 	}
 	accounts := make([]InvitationAccount, 0, len(body.Accounts))
@@ -334,7 +331,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 			h.writeError(w, http.StatusBadRequest, "every account names its provider")
 			return
 		case a.Account == "" || strings.ContainsFunc(a.Account, unicode.IsControl):
-			h.writeError(w, http.StatusBadRequest, "the account at "+a.Provider+" is the friend's address or username there")
+			h.writeError(w, http.StatusBadRequest, "the account at "+a.Provider+" is the invitee's address or username there")
 			return
 		case seen[a.Provider]:
 			h.writeError(w, http.StatusBadRequest, a.Provider+" is named twice")
@@ -383,7 +380,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 	link := page + "/?invitation=" + url.QueryEscape(token)
 	cancel := page + "/?invitation-cancel=" + url.QueryEscape(id)
 
-	// The friend holds no User yet: the mail goes to the address, recorded
+	// The invitee holds no User yet: the mail goes to the address, recorded
 	// under the invitation.
 	if _, _, err := h.inviteMailer.SendAsNodeTo(r.Context(), services.MailRecipient{ID: "invitation:" + id, Email: email}, services.NodeMail{
 		Name:    "invitation",
@@ -395,7 +392,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 			"<p><a href=\"" + htmlEscape(link) + "\">Accept the invitation</a></p>" +
 			"<p>No password is set at QNTX.</p>",
 	}); err != nil {
-		h.logger.Errorw("invitation written, friend's mail not sent", "invitation", id, "email", email, "error", err)
+		h.logger.Errorw("invitation written, invitee's mail not sent", "invitation", id, "email", email, "error", err)
 		h.writeError(w, http.StatusBadGateway, "the invitation "+id+" was written and the mail to "+email+" was not sent: "+err.Error())
 		return
 	}
@@ -408,12 +405,12 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		HTML: "<p>You invited <b>" + htmlEscape(invitee) + "</b> to sign in with " + htmlEscape(signsIn) + ".</p>" +
 			"<p><a href=\"" + htmlEscape(cancel) + "\">Cancel the invitation</a></p>",
 	}); err != nil {
-		h.logger.Errorw("invitation sent to the friend, ROOT's copy not sent", "invitation", id, "user", p.UserID, "error", err)
+		h.logger.Errorw("invitation sent to the invitee, ROOT's copy not sent", "invitation", id, "user", p.UserID, "error", err)
 		h.writeError(w, http.StatusBadGateway, "the invitation went to "+email+" and your copy with the cancel was not sent: "+err.Error())
 		return
 	}
 
-	h.logger.Infow("friend invited", "invitation", id, "email", email, "signs_in_with", signsIn, "by", p.UserID)
+	h.logger.Infow("invited", "invitation", id, "email", email, "signs_in_with", signsIn, "by", p.UserID)
 	h.writeJSON(w, http.StatusCreated, inv)
 }
 
@@ -458,7 +455,7 @@ func (h *Handler) handleInvitation(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// invitationSeen is what the link shows the friend: the providers and the
+// invitationSeen is what the link shows the invitee: the providers and the
 // account ROOT named at each.
 func (h *Handler) invitationSeen(w http.ResponseWriter, token string) {
 	inv, found, err := h.invitations.byToken(token)
@@ -506,9 +503,9 @@ func (h *Handler) cancelInvitation(w http.ResponseWriter, p Presented, id string
 	h.writeJSON(w, http.StatusOK, map[string]string{"invitation": id, "email": inv.Email, "status": "cancelled"})
 }
 
-// acceptInvitation is the friend arriving with the link and the account ROOT
-// named, vouched by that provider: their User is made, SUPER and made by
-// ROOT, and the invitation is spent. False with no error admits nobody.
+// acceptInvitation is the link arriving with the account ROOT named, vouched by
+// that provider: the User is made, USER and made by ROOT, and the invitation
+// is spent. False with no error admits nobody.
 func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (string, *SignedBinding, bool, error) {
 	if h.invitations == nil || h.users == nil || token == "" {
 		return "", nil, false, nil
@@ -551,7 +548,7 @@ func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (strin
 		u = raised(existing, inv, route, matched)
 	} else {
 		u = withRoute(User{
-			Level:          LevelSuper,
+			Level:          LevelUser,
 			CreatedBy:      inv.InvitedBy,
 			DisplayName:    inv.DisplayName,
 			CreatedAt:      now,
@@ -572,7 +569,7 @@ func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (strin
 	if err := h.users.Put(u); err != nil {
 		return "", nil, false, errors.Wrapf(err, "invitation %s was spent and the User for %s was not written", inv.ID, route)
 	}
-	h.logger.Infow("User made SUPER by an invitation", "user", u.ID, "route", route, "invitation", inv.ID, "by", inv.InvitedBy, "was", existing.Level)
+	h.logger.Infow("User made USER by an invitation", "user", u.ID, "route", route, "invitation", inv.ID, "by", inv.InvitedBy, "was", existing.Level)
 	h.attest(PredicateUserCreated, route, map[string]any{
 		"user": u.ID, "invitation": inv.ID, "level": string(u.Level), "by": inv.InvitedBy, "email": inv.Email,
 	})
@@ -583,10 +580,12 @@ func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (strin
 
 // "yes"
 
-// raised is a public registration made SUPER by ROOT's invitation: no longer
+// "instead of SUPER, lets just mke a new level called USER"
+
+// raised is a public registration made USER by ROOT's invitation: no longer
 // at one door, made by ROOT, and holding what the provider just vouched.
 func raised(u User, inv Invitation, route string, matched *SignedBinding) User {
-	u.Level = LevelSuper
+	u.Level = LevelUser
 	u.Namespace = ""
 	u.CreatedBy = inv.InvitedBy
 	if u.DisplayName == "" {

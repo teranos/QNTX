@@ -154,7 +154,7 @@ func (h *Handler) levelOf(identity string) Level {
 	if slices.Contains(h.identities.roots(), identity) {
 		return LevelRoot
 	}
-	// A friend ROOT invited, or somebody who walked up to a door and made
+	// A USER, or somebody who walked up to a door and made
 	// themselves. The rung is read off their User — still a level with
 	// provenance, from a different record.
 	return h.userLevelOf(identity)
@@ -193,7 +193,7 @@ func (h *Handler) admits(did string, vouched []SignedBinding) (string, *SignedBi
 			return binding.Claim.CanonicalID, &binding, true
 		}
 	}
-	// A friend ROOT invited signs in by the account they proved, which a
+	// A USER signs in by the account they proved, which a
 	// provider has to vouch for again: a key alone names nobody but ROOT.
 	for _, binding := range vouched {
 		if h.invited(binding.Claim.CanonicalID) {

@@ -27,6 +27,9 @@ const (
 	// themselves. Every other User the node holds was put there by somebody.
 	// This rung logs in and is attested, and that is the whole of it.
 	LevelPublicRegistration Level = "PUBLIC_REGISTRATION"
+	// LevelUser is the normal user. It reaches no store and sees no system on
+	// its own, and belongs to no door.
+	LevelUser Level = "USER"
 	// LevelOAuth is a kind and not a rung. A client is a door (ADR-025): an
 	// app the node lets in on a person's say-so. Its DID is the client id and
 	// its raw value the client secret. It authenticates at the token endpoint

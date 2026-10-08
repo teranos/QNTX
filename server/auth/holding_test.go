@@ -58,6 +58,18 @@ func TestAPublicRegistrationHoldingARoleReachesWhatTheRoleReaches(t *testing.T) 
 	assert.False(t, seen.MaySeeSystem(), "a role held in garden sees system")
 }
 
+// "that friend is not supposed to see all the namesspaces and go into system"
+
+// A USER holding nothing reaches no store, sees no system, and reads only
+// what it wrote.
+func TestAUserHoldingNothingReachesNothing(t *testing.T) {
+	user := Admitted(LevelUser)
+	assert.False(t, user.ReachesAStore())
+	assert.False(t, user.MaySeeSystem())
+	assert.False(t, user.OwnsEveryCanvas())
+	assert.True(t, user.OwnOnly())
+}
+
 // One holding nothing is refused as before: the line names WORKER, and this
 // person is not one.
 func TestAPublicRegistrationHoldingNothingIsRefusedAsBefore(t *testing.T) {
