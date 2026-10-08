@@ -106,6 +106,6 @@ non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
 ## References
 
 - `teranos/vanity-id` v0.3.0 — prior art
-- [[ADR-005: WebAssembly Integration
-- ADR-012: Browser as First-Class Node — makes a browser a node, and so a signer
+- [[ADR-005-wasm-integration]]: WebAssembly Integration
+- [[ADR-012-browser-wasm-parity]]: Browser as First-Class Node — makes a browser a node, and so a signer
 - `internal/nodedid/` — existing Node DID infrastructure
