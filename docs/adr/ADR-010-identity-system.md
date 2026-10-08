@@ -97,9 +97,6 @@ non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
 - **Clean separation.** Vanity IDs (names) and ASUIDs (identity) are no longer conflated in one library.
 - **Single implementation.** Rust crate replaces external Go module, runs on all platforms.
 
-### Negative
-
-- **Migration cost.** 25+ Go files were updated across multiple PRs.
 
 ### Neutral
 
@@ -109,6 +106,6 @@ non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
 ## References
 
 - `teranos/vanity-id` v0.3.0 — prior art
-- ADR-005: WebAssembly Integration
+- [[ADR-005: WebAssembly Integration
 - ADR-012: Browser as First-Class Node — makes a browser a node, and so a signer
 - `internal/nodedid/` — existing Node DID infrastructure
