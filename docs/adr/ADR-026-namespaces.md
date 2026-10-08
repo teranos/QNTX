@@ -33,7 +33,7 @@ They are not the same world.
 
 #### Nothing crosses
 
-Only ROOT cross namespaces. A canvas lives in one namespace and only that one.
+A canvas lives in one namespace and only that one.
 
 The system namespace is the node: `node_identity`, the row keyed `'self'`.
 
