@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-12
-**Related:** ADR-010 (Identity System), ADR-012 (Browser WASM Parity), ADR-014 (plugin-provided service), ADR-025 (Access Tokens), ADR-026 (Namespaces), ADR-027 (Permissions)
+**Related:** [[ADR-010-identity-system]] (Identity System), ADR-012 (Browser WASM Parity), ADR-014 (plugin-provided service), ADR-025 (Access Tokens), ADR-026 (Namespaces), ADR-027 (Permissions)
 
 ## Decision
 
