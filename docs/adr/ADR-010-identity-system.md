@@ -3,10 +3,6 @@
 Date: 2026-03-06
 Status: Completed, except Vanity ID generation, which is won't-do.
 
-## Context
-
-QNTX used `teranos/vanity-id` (Go, v0.3.0) for all ID generation — attestation IDs, subject names, job IDs. The library was imported in 25+ files. It worked, but it was a single Go module that couldn't run in the browser, and it conflated two fundamentally different concerns: human-readable names and unique attestation identity.
-
 ## Decision
 
 QNTX's identity system has four orthogonal layers, each with distinct properties:
@@ -21,8 +17,7 @@ QNTX's identity system has four orthogonal layers, each with distinct properties
 A node was a server when this table was written. Since ADR-012 it is also a
 browser, and `internal/nodedid/` cannot reach one.
 
-User DID was written here before anything derived one. It is real since
-ADR-030's passkey gate: the browser asks the authenticator for a PRF output
+User DID was written here before anything derived one. It is real since [[ADR-030-identity-providers]] passkey gate: the browser asks the authenticator for a PRF output
 and derives the key from it, so the same finger gives the same DID.
 
 Of the three, only ASUID has a generator. Subjects carry names a human supplies,
@@ -102,9 +97,6 @@ non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
 - **Clean separation.** Vanity IDs (names) and ASUIDs (identity) are no longer conflated in one library.
 - **Single implementation.** Rust crate replaces external Go module, runs on all platforms.
 
-### Negative
-
-- **Migration cost.** 25+ Go files were updated across multiple PRs.
 
 ### Neutral
 
@@ -114,6 +106,6 @@ non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
 ## References
 
 - `teranos/vanity-id` v0.3.0 — prior art
-- ADR-005: WebAssembly Integration
-- ADR-012: Browser as First-Class Node — makes a browser a node, and so a signer
+- [[ADR-005-wasm-integration]]: WebAssembly Integration
+- [[ADR-012-browser-wasm-parity]]: Browser as First-Class Node — makes a browser a node, and so a signer
 - `internal/nodedid/` — existing Node DID infrastructure
