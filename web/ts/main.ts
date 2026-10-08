@@ -138,19 +138,6 @@ function handleVersion(data: VersionMessage): void {
 }
 
 
-/**
- * Resting dot size for this device.
- *
- * Tablet dots are the largest: browsing the tray is a thumb slide, and the dot
- * must be hittable. Phones sit between tablet and desktop. Breakpoints match the
- * ones in web/css/element/states/dot.css.
- */
-function restingDotSize(): { minWidth: number; minHeight: number } {
-    if (window.matchMedia('(max-width: 768px)').matches) return { minWidth: 13, minHeight: 13 };
-    if (window.matchMedia('(max-width: 900px)').matches) return { minWidth: 15, minHeight: 15 };
-    return { minWidth: 10, minHeight: 10 };
-}
-
 // Initialize the application
 // WebSocket connects immediately — storage, WASM, and canvas sync run in parallel.
 async function init(): Promise<void> {
@@ -450,10 +437,8 @@ async function init(): Promise<void> {
             findCompositionByElement: (elementId) => findCompositionByElement(elementId),
             flushSync: () => canvasSyncQueue.flush(),
         },
-        // Touch devices get a bigger resting dot so it stays findable with a thumb.
-        // This used to live in @media rules in web/css/element/states/dot.css, where it
-        // was overwritten by the inline size the proximity engine writes every frame.
-        dotGeometry: restingDotSize(),
+        // The resting dot's size is the package's own since 1.12.0: 13px on a
+        // phone, 15px up to 900px, 10px above, the sizes this passed.
     });
 
 
