@@ -12,10 +12,11 @@
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createDangerButton, createPrimaryButton } from './components/button';
+import { createDangerButton, createGhostButton, createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
 import { openUserElement } from './user-element';
+import { openUserInviteElement } from './user-invite-element';
 
 /** One User, as the record holds them. Nothing here is a secret: a key is a
  *  DID and an account is what a provider calls it. */
@@ -197,6 +198,34 @@ async function refreshList(container: HTMLElement): Promise<void> {
     renderList(container, users, who.via !== 'token');
 }
 
+// "as root, i press the + and i can create a new user, like how i would create a new oauth token"
+
+/** Exported for tests: the way to the invite element, the + Access Tokens has. */
+export function renderInviteLink(container: HTMLElement, invited?: () => void): void {
+    container.innerHTML = '';
+    container.style.padding = '8px 0';
+
+    const invite = createGhostButton('+', async () => {
+        openUserInviteElement(invited);
+    });
+    invite.element.title = 'invite a user';
+    invite.element.setAttribute('aria-label', 'Invite a user');
+    invite.element.style.fontSize = '16px';
+    invite.element.style.lineHeight = '1';
+    invite.element.style.padding = '4px 10px';
+    container.appendChild(invite.element);
+
+    // Inviting is a session's act, the way switching a person is.
+    person().then(who => {
+        if (who.via !== 'token') return;
+        const why = 'only a session invites a user, and this page reaches the node as a token';
+        invite.setDisabled(true, why);
+        container.title = why;
+    }).catch((err: unknown) => {
+        log.error(SEG.UI, '[UsersElement] the node did not say who is looking', err);
+    });
+}
+
 export function createUsersElement(): Element {
     return {
         id: ELEMENT_ID,
@@ -213,6 +242,12 @@ export function createUsersElement(): Element {
             const listContainer = document.createElement('div');
             listContainer.className = 'users-list';
             listContainer.innerHTML = '<div class="element-loading">Loading Users…</div>';
+
+            const inviteContainer = document.createElement('div');
+            inviteContainer.className = 'users-invite-link';
+            renderInviteLink(inviteContainer, () => { void refreshList(listContainer); });
+
+            content.appendChild(inviteContainer);
             content.appendChild(listContainer);
 
             refreshList(listContainer).catch((err: unknown) => {
