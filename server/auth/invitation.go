@@ -226,6 +226,8 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		Email    string `json:"email"`
 		Provider string `json:"provider"`
 		Account  string `json:"account"`
+		// The page ROOT invited from, which the links open on.
+		Page string `json:"page"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
 		h.writeError(w, http.StatusBadRequest, "the body is not a JSON object of email, provider and account")
@@ -243,6 +245,11 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		return
 	case account == "" || strings.ContainsFunc(account, unicode.IsControl):
 		h.writeError(w, http.StatusBadRequest, "account is the friend's account at "+provider)
+		return
+	}
+	page, ok := h.ownPage(body.Page)
+	if !ok {
+		h.writeError(w, http.StatusBadRequest, "page "+body.Page+" is not on an origin in auth.rp_origins")
 		return
 	}
 
@@ -272,8 +279,8 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 	if inviter == "" {
 		inviter = RootName
 	}
-	link := h.invitePage + "/?invitation=" + url.QueryEscape(token)
-	cancel := h.invitePage + "/?invitation-cancel=" + url.QueryEscape(id)
+	link := page + "/?invitation=" + url.QueryEscape(token)
+	cancel := page + "/?invitation-cancel=" + url.QueryEscape(id)
 
 	// The friend holds no User yet: the mail goes to the address, recorded
 	// under the invitation.
@@ -307,6 +314,26 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 
 	h.logger.Infow("friend invited", "invitation", id, "email", email, "provider", provider, "by", p.UserID)
 	h.writeJSON(w, http.StatusCreated, inv)
+}
+
+// ownPage is the page the links open on: the one ROOT invited from when its
+// origin is in auth.rp_origins, so a link only ever leads to this node, and
+// the first rp_origin when ROOT named none.
+func (h *Handler) ownPage(asked string) (string, bool) {
+	if asked == "" {
+		return h.invitePage, true
+	}
+	u, err := url.Parse(asked)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", false
+	}
+	origin := u.Scheme + "://" + u.Host
+	for _, own := range h.ownOrigins {
+		if strings.TrimSuffix(own, "/") == origin {
+			return origin + strings.TrimSuffix(u.EscapedPath(), "/"), true
+		}
+	}
+	return "", false
 }
 
 // handleInvitation routes one invitation: GET /auth/invitations/{token} to

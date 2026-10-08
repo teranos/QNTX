@@ -141,6 +141,23 @@ func TestRootInvitesAFriendAndBothAreMailed(t *testing.T) {
 	assert.Contains(t, rootCopy.mail.Text, "ada@gmail.com")
 }
 
+// The links open on the page ROOT invited from, when that page is this node's
+// own: a branch's page at /branch/<name> is. Any other origin is not.
+func TestTheLinksOpenOnThePageRootInvitedFrom(t *testing.T) {
+	h, _, rootSession, box, _ := invitingHandler(t)
+	h.ownOrigins = []string{invitePage}
+	branch := invitePage + "/branch/root-invites-a-user/"
+
+	rec := inviting(h, rootSession, `{"email":"ada@gmail.com","provider":"google","account":"ada@gmail.com","page":"`+branch+`"}`)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	assert.Contains(t, box.sent[0].mail.HTML, invitePage+"/branch/root-invites-a-user/?invitation=")
+	assert.Contains(t, box.sent[1].mail.HTML, invitePage+"/branch/root-invites-a-user/?invitation-cancel=")
+
+	rec = inviting(h, rootSession, `{"email":"ada@gmail.com","provider":"google","account":"ada@gmail.com","page":"https://elsewhere.example/"}`)
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Len(t, box.sent, 2)
+}
+
 // Only ROOT invites.
 func TestOnlyRootInvites(t *testing.T) {
 	h, store, _, box, _ := invitingHandler(t)

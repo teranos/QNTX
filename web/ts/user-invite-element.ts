@@ -25,7 +25,8 @@ async function sendInvitation(email: string, provider: string, account: string):
     await apiJson<unknown>('/auth/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, provider, account }),
+        // The page this is sent from is where the links open, a branch's included.
+        body: JSON.stringify({ email, provider, account, page: window.location.origin + window.location.pathname }),
     });
 }
 
