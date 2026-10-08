@@ -22,12 +22,12 @@ proves you have access to that identity.
 
 A User can reach a namespace through REACH granted and struck by ROOT, [[ADR-031-the-user]] 
 
-Disabling a namespace refuses reads by all non-owners and wri 
+Disabling a namespace refuses reads by all non-owners and writes for everyone. 
 ### Namespaces are their own universes
 
 Namespaces don't mix and mesh. They are their own universes.
 
-Namespaces have nothing to do with the attestation. A USER does not see what namespace or project
+A USER does not see what namespace or project
 something belongs to. It just is, and it is not load-bearing within a namespace.
 
 A watcher in namespace A does not fire on an attestation in namespace B. They are not the same
