@@ -162,6 +162,51 @@ func (s *sessionStore) invalidate(token string) {
 	s.forget(token)
 }
 
+// endUser ends every session of one User, wherever it was made.
+func (s *sessionStore) endUser(userID string) {
+	s.sessions.Range(func(key, value any) bool {
+		if sess, isSession := value.(*session); isSession && sess.userID == userID {
+			s.sessions.Delete(key)
+		}
+		return true
+	})
+	if s.db == nil {
+		return
+	}
+	if _, err := s.db.Exec(`DELETE FROM auth_sessions WHERE user_id = ?`, userID); err != nil {
+		s.logger.Warnw("a User's sessions were not removed from the db", "user", userID, "error", err)
+	}
+}
+
+// liveHash reports whether the session a hash names is still live.
+func (s *sessionStore) liveHash(hash string) bool {
+	now := time.Now()
+	live := false
+	s.sessions.Range(func(key, value any) bool {
+		token, isToken := key.(string)
+		sess, isSession := value.(*session)
+		if isToken && isSession && hashOf(token) == hash {
+			live = !now.After(sess.expiresAt)
+			return false
+		}
+		return true
+	})
+	if live || s.db == nil {
+		return live
+	}
+	var expires int64
+	err := s.db.QueryRow(`SELECT expires_at FROM auth_sessions WHERE hash = ?`, hash).Scan(&expires)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			// Not knowing is not ended: a becoming is not undone on a read that failed.
+			s.logger.Warnw("whether a session is live was not read from the db", "error", err)
+			return true
+		}
+		return false
+	}
+	return !now.After(time.Unix(expires, 0))
+}
+
 func (s *sessionStore) sweep() {
 	now := time.Now()
 	s.sessions.Range(func(key, value any) bool {

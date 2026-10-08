@@ -58,6 +58,9 @@ type Person struct {
 	// Keys is the did:key of every browser and device that reaches this User.
 	// The DIDs alone: a DID is a public key, and nothing else here is one.
 	Keys []string `json:"keys"`
+	// BecomingBy is the ROOT User being this User, when this is ROOT's session
+	// being them (ADR-031), and empty otherwise.
+	BecomingBy string `json:"becoming_by,omitempty"`
 }
 
 // What Via says. A session is a person at a keyboard; a token is a machine
@@ -104,7 +107,9 @@ func (h *Handler) HandleTheUser(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, status, err.Error())
 		return
 	}
-	h.writeJSON(w, http.StatusOK, personOf(u, admitted))
+	who := personOf(u, admitted)
+	who.BecomingBy = h.presented(r).BecomingBy
+	h.writeJSON(w, http.StatusOK, who)
 }
 
 // theUser is the User an admission resolved to, and the status to answer with

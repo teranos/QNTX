@@ -318,7 +318,10 @@ export function renderCeremony(
                 const going = backendPath('/auth/binding/go')
                     + '?provider=' + encodeURIComponent(picked.id)
                     + '&peer_pubkey_hex=' + encodeURIComponent(peerPubkeyHex())
-                    + (typedHost ? '&host=' + encodeURIComponent(typedHost) : '');
+                    + (typedHost ? '&host=' + encodeURIComponent(typedHost) : '')
+                    // The page to come back to: a branch is served under a
+                    // path of the door's origin, and its invitation with it.
+                    + '&page=' + encodeURIComponent(window.location.pathname);
                 // The app's page is at a scheme: no browser session to consent
                 // with, and no Referer for the node to send anyone back by. So
                 // the door is named and the ceremony runs in the sheet iOS

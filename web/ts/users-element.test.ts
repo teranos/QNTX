@@ -32,13 +32,34 @@ test('created reads as the day it was, in UTC', () => {
     expect(fmt(0)).toBe('—');
 });
 
-// A token lists and reads and switches nobody, so a row does not offer it
-// the switch.
-test('a token is not offered the switch', () => {
+// "the infinite row of switch of is pissing me off as well, should be in the User themselves"
+test('the list switches nobody: the switch is in the User', () => {
     const container = document.createElement('div');
-    renderList(container, [root()], false);
+    renderList(container, [root()]);
     expect(container.querySelector('button')).toBeNull();
     expect(container.querySelectorAll('th').length).toBe(8);
+});
+
+// "but why dont i see my outgoing invitations in the same list, and a way for me to open the would-be-user"
+test('an open invitation is a row of its own, invited, among the Users', () => {
+    const container = document.createElement('div');
+    const open = {
+        id: 'inv1', email: 'ada@gmail.com', display_name: 'Ada',
+        accounts: [{ provider: 'google', account: 'ada@gmail.com' }],
+        invited_by: 'US-USER-Y3BNGXYR', created_at: 1789342756348,
+    };
+    renderList(container, [root()], [
+        open,
+        { ...open, id: 'inv2', display_name: 'Bob', cancelled_at: 2 },
+        { ...open, id: 'inv3', display_name: 'Cy', accepted_by: 'US-CY' },
+    ]);
+    const rows = Array.from(container.querySelectorAll('tbody tr')).map(r => r.textContent ?? '');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain('Ada');
+    expect(rows[0]).toContain('invited');
+    expect(rows[0]).toContain('ada@gmail.com');
+    expect(rows.join()).not.toContain('Bob');
+    expect(rows.join()).not.toContain('Cy');
 });
 
 test('one of a thing is not plural, and none is a dash', () => {

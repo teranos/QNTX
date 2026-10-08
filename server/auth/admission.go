@@ -22,6 +22,7 @@ const (
 	LevelToken              = access.LevelToken
 	LevelAttestor           = access.LevelAttestor
 	LevelPublicRegistration = access.LevelPublicRegistration
+	LevelUser               = access.LevelUser
 	LevelOAuth              = access.LevelOAuth
 	LevelRefresh            = access.LevelRefresh
 	LevelGitHub             = access.LevelGitHub

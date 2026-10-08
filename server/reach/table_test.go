@@ -79,7 +79,7 @@ func TestTheCanvasIsReachedByWhoeverTheNamespaceIsFor(t *testing.T) {
 		row, said := granted[path]
 		require.True(t, said, path+" is granted to nobody at all")
 		assert.False(t, row.anyone, path+" is served without asking who is calling")
-		assert.Equal(t, []auth.Level{auth.LevelSuper, auth.LevelAttestor, auth.LevelPublicRegistration}, row.reach.Beyond(),
+		assert.Equal(t, []auth.Level{auth.LevelSuper, auth.LevelAttestor, auth.LevelPublicRegistration, auth.LevelUser}, row.reach.Beyond(),
 			path+" lets in the wrong levels besides ROOT")
 	}
 }
@@ -120,7 +120,7 @@ func TestWhoeverIsLoggedInReachesTheirOwnUser(t *testing.T) {
 	require.True(t, said, "/i/ is granted to nobody at all")
 	assert.False(t, row.anyone, "/i/ answers a stranger")
 	assert.ElementsMatch(t,
-		[]auth.Level{auth.LevelSuper, auth.LevelToken, auth.LevelAttestor, auth.LevelPublicRegistration},
+		[]auth.Level{auth.LevelSuper, auth.LevelToken, auth.LevelAttestor, auth.LevelPublicRegistration, auth.LevelUser},
 		row.reach.Beyond(),
 		"ROOT reaches everything; every other rung that logs in has to be named")
 }

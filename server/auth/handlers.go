@@ -503,6 +503,10 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		h.attest(PredicateLoggedOut, who, map[string]any{"by": "logout"})
 	}
 	h.sessions.invalidate(p.sessionToken)
+	// Logging out of a session that is being a User is no longer being them.
+	if p.BecomingBy != "" {
+		h.unbecomeTheEnded()
+	}
 
 	h.clearSessionCookie(w)
 

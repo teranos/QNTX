@@ -41,6 +41,7 @@ type Handler struct {
 	// two nodes on one location still race, and nothing arbitrates that.
 	creating       sync.Mutex
 	sessions       *sessionStore
+	becomings      becomings
 	layeChallenges layeChallenges
 	bindingFlows   bindingFlows
 	pendingLogins  pendingLogins
@@ -100,9 +101,14 @@ type Handler struct {
 	// Every door this node answers, by the origin that reaches it.
 	// The node's own relying party is the door onto default and is always in
 	// here; am.toml adds the rest.
-	doors    doors
-	logger   *zap.SugaredLogger
-	corsWrap func(http.HandlerFunc) http.HandlerFunc
+	doors doors
+	// The friends ROOT invited (ADR-031), what the mail goes out with, and
+	// the page the links open on. Nil invitations is a node with no db.
+	invitations  *invitationTable
+	inviteMailer InvitationMailer
+	invitePage   string
+	logger       *zap.SugaredLogger
+	corsWrap     func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —
@@ -143,6 +149,7 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		ownOrigins:     rpOrigins,
 		creds:          newCredentialStore(db, logger),
 		sessions:       newSessionStore(sessionExpiryHours).kept(db, logger),
+		invitations:    newInvitationTable(db),
 		tokens:         tokens,
 		users:          users,
 		secureCookies:  secureCookies,
@@ -151,6 +158,9 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		corsWrap:       corsWrap,
 	}
 	h.SetIdentities(rootIdentities, bindingSigners)
+	if err := h.becomings.kept(db, logger); err != nil {
+		return nil, err
+	}
 	// The node's own relying party is the door onto default, open before
 	// am.toml names any other. SetDoors with nothing to add cannot fail — it
 	// only reads what webauthn.New already accepted above.
@@ -249,6 +259,10 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 		}
 		if by != "" {
 			h.rejectSwitchedOff(w, r, admitted, by)
+			return
+		}
+		if by, refused := h.notThemselves(p, admitted.UserID); refused {
+			h.rejectBecome(w, r, admitted.UserID, by)
 			return
 		}
 		if !reach.Admits(admitted) {
@@ -503,6 +517,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// to reach the switch to turn themselves back on.
 	mux.answer("/i/disable", h.HandleDisable)
 	mux.answer("/i/enable", h.HandleEnable)
+	// ROOT being itself again (ADR-031), from the session that is being a User.
+	mux.answer("/i/unbecome", h.HandleUnbecome)
 	// Where the person is standing is the i signum's (ADR-039), answered from
 	// Standing and Step in package server.
 	// Tokens and Users: the table admits ROOT and SUPER, and a read is served
@@ -512,6 +528,10 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer("/auth/tokens/", h.readOrSession(h.handleTokenByID))
 	mux.answer("/auth/users", h.readOrSession(h.usersCollection))
 	mux.answer("/auth/users/", h.readOrSession(h.handleUserByID))
+	// ROOT inviting a friend: the list and the invite are ROOT's, the link
+	// is anyone's who holds it, and the cancel is ROOT's session's.
+	mux.answer("/auth/invitations", h.readOrSession(h.invitationsCollection))
+	mux.answer("/auth/invitations/", h.handleInvitation)
 	return mux.on
 }
 
@@ -595,6 +615,10 @@ func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 			h.rejectSwitchedOff(w, r, who, by)
 			return
 		}
+		if by, refused := h.notThemselves(p, p.UserID); refused {
+			h.rejectBecome(w, r, p.UserID, by)
+			return
+		}
 		next(w, r, p)
 	}
 }
@@ -610,6 +634,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 			select {
 			case <-ticker.C:
 				h.sessions.sweep()
+				h.unbecomeTheEnded()
 				// Challenges, ceremonies and uncollected bindings are all
 				// written by unauthenticated callers and expire on read, which
 				// is never for anything abandoned.

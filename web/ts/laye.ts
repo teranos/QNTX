@@ -265,7 +265,9 @@ export async function collectedBinding(ticket?: string): Promise<SignedBinding |
     return binding;
 }
 
-export async function login(): Promise<HalfAdmission> {
+/** `invitation` is the token from the link ROOT's invitation mailed, carried by
+ *  the friend's first sign-in (ADR-031). */
+export async function login(invitation = ''): Promise<HalfAdmission> {
     await initialize();
 
     const challengeResponse = await apiFetch('/auth/laye/challenge');
@@ -294,7 +296,10 @@ export async function login(): Promise<HalfAdmission> {
         headers: { 'Content-Type': 'application/json' },
         // The bindings ride along: the server decides which signer it trusts,
         // so presenting them is not the same as being believed.
-        body: JSON.stringify({ did: did(), challenge, signature: base64url(signature), bindings: held }),
+        body: JSON.stringify({
+            did: did(), challenge, signature: base64url(signature), bindings: held,
+            ...(invitation ? { invitation } : {}),
+        }),
     });
     if (!verifyResponse.ok) {
         throw new LayeLoginRefused(verifyResponse.status, await verifyResponse.text());
