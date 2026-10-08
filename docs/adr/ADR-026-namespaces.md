@@ -15,11 +15,8 @@ proves you have access to that identity.
 "A namespace is defined and configured by it's `ns.toml`"
 
 "`system` and `default` are namespaces that come into being during the [[ADR-033-first-time-setup]]"
-### A namespace is enabled or disabled
 
 "A namespace is created disabled and can be enabled."
-
-A disabled namespace refuses reads. Enabling it again opens the same bytes.
 
 ### Reach is granted
 
