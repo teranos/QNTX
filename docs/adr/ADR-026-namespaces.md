@@ -10,7 +10,7 @@ Status: Half-implemented. See Not done.
 A namespace is a name. An identity inside QNTX owns it. A DID outside QNTX
 proves you have access to that identity.
 
-An owner holds many.
+An owner can 
 
 "Creating a namespace, makes the writer the owner of one."
 
