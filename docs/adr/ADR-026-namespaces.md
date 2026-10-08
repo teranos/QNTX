@@ -64,25 +64,14 @@ Attribution on an ingested claim becomes provenance in attributes.
 
 ## Not done
 
-Nothing consults the enabled state. `ns.toml` carries it, and no read path
-asks.
-
-`list()` still globs for objects, so a prefix holding data and no `ns.toml` is
-listed as a namespace nobody defined. The ones written before `ns.toml` are
-those.
-
-Clicking a namespace highlights a tile in the namespaces bar. A session acts in
-the namespace its person stands in, which `i step` moves.
-
-The canvas is one for the node, in `qntx-operational.db`.
 
 Schedules are one table for the node. A schedule created during a sigil call
 keeps its creator's namespace, and each run carries it to the plugin. Every
 other schedule has none.
 
-Embeddings are one store for the node.
+- Embeddings are one store for the node.
 
-Attestations and observers are per namespace.
+- Attestations and observers are per namespace.
 
 Reach is a granted relation (ADR-031). What grants and strikes it is unbuilt;
 disabling a namespace refuses reads, and a login stands.
