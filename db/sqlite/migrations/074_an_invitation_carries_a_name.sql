@@ -1,14 +1,13 @@
+-- "As ROOT i send an invite link to a friend, i enter their e-mail address"
+--
 -- "and i want to set Name"
 --
 -- "if both google and apple, then we set both, and  if set then we set the mail address of that provider"
 --
 -- "or the username"
 --
--- An invitation names the friend, and every provider they may sign in with,
--- each with the account there that is theirs. 073 held one provider and one
--- account; it held only the invitations ROOT sent while trying the first shape.
-DROP TABLE invitations;
-
+-- One row per invitation, keyed by the hash of the link's token, never the
+-- token: a copy of the db is not a way in. The id is what ROOT's cancel names.
 CREATE TABLE invitations (
     id TEXT PRIMARY KEY CHECK (id <> ''),
     token_hash TEXT NOT NULL UNIQUE CHECK (token_hash <> ''),
@@ -21,6 +20,7 @@ CREATE TABLE invitations (
     accepted_at INTEGER
 );
 
+-- Every provider the friend may sign in with, and the account there.
 CREATE TABLE invitation_accounts (
     invitation_id TEXT NOT NULL REFERENCES invitations(id),
     provider TEXT NOT NULL CHECK (provider <> ''),
