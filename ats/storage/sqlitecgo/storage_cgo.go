@@ -629,8 +629,8 @@ type rustQueryFilter struct {
 	Source     string   `json:"source,omitempty"`
 	TimeStart  *int64   `json:"time_start,omitempty"`
 	TimeEnd    *int64   `json:"time_end,omitempty"`
-	// Limit always goes: a limit of 0 is 0 rows, and leaving it out would be
-	// Rust's None, which is no limit at all.
+	// Limit always goes: a limit of 0 is 0 rows, and Rust refuses a filter
+	// that leaves it out.
 	Limit int `json:"limit"`
 }
 

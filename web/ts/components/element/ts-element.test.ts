@@ -39,6 +39,7 @@ mock.module('../../state/sync-state', () => ({
 mock.module('../../ats-wasm', () => ({
     putAttestation: async () => {},
     queryAttestations: async () => [],
+    EVERY_ROW: 2147483647,
     parseQuery: () => ({ ok: true, query: {} }),
     generateASUID: () => ({ full: 'AS-TEST-MOCK-QNTX-XXXXXXXX', short: 'AS-TEST-MOCK-QNTX-XXXX' }),
 }));

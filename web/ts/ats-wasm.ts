@@ -150,13 +150,16 @@ export async function existsAttestation(id: string): Promise<boolean> {
     return await wasm.exists_attestation(id);
 }
 
+/** The limit that reads every row, said; Rust's `EVERY_ROW`. */
+export const EVERY_ROW = 2147483647;
+
 /**
  * Query attestations from IndexedDB using an AxFilter.
- * Returns matching attestations in proto format.
+ * Returns matching attestations in proto format. A limit of 0 is 0 rows.
  */
-export async function queryAttestations(filter: AxQuery): Promise<Attestation[]> {
+export async function queryAttestations(filter: AxQuery, limit: number): Promise<Attestation[]> {
     await ensureInit();
-    const json = await wasm.query_attestations(JSON.stringify(filter));
+    const json = await wasm.query_attestations(JSON.stringify({ ...filter, limit }));
     return JSON.parse(json);
 }
 

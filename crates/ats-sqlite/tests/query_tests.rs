@@ -9,7 +9,7 @@
 
 use ats::{
     storage::{AttestationStore, QueryStore},
-    AttestationBuilder, AxFilter,
+    AttestationBuilder, AxFilter, EVERY_ROW,
 };
 use ats_sqlite::SqliteStore;
 
@@ -70,6 +70,7 @@ fn test_query_by_subject() {
 
     let filter = AxFilter {
         subjects: vec!["ALICE".to_string()],
+        limit: EVERY_ROW,
         ..Default::default()
     };
 
@@ -118,6 +119,7 @@ fn test_query_by_predicate() {
 
     let filter = AxFilter {
         predicates: vec!["knows".to_string()],
+        limit: EVERY_ROW,
         ..Default::default()
     };
 
@@ -166,6 +168,7 @@ fn test_query_by_context() {
 
     let filter = AxFilter {
         contexts: vec!["work".to_string()],
+        limit: EVERY_ROW,
         ..Default::default()
     };
 
@@ -211,6 +214,7 @@ fn test_query_by_actor() {
 
     let filter = AxFilter {
         actors: vec!["human:bob".to_string()],
+        limit: EVERY_ROW,
         ..Default::default()
     };
 
@@ -260,6 +264,7 @@ fn test_query_by_time_range() {
     let filter = AxFilter {
         time_start: Some(1500),
         time_end: Some(2500),
+        limit: EVERY_ROW,
         ..Default::default()
     };
 
@@ -304,12 +309,38 @@ fn test_query_with_limit() {
         .unwrap();
 
     let filter = AxFilter {
-        limit: Some(2),
+        limit: 2,
         ..Default::default()
     };
 
     let result = store.query(&filter).unwrap();
     assert_eq!(result.attestations.len(), 2);
+}
+
+// "zero means zero"
+#[test]
+fn test_query_limit_zero_is_zero_rows() {
+    let mut store = SqliteStore::in_memory().unwrap();
+    store
+        .put(create_attestation(
+            "AS-1",
+            "ALICE",
+            "knows",
+            "work",
+            "human:bob",
+            1000,
+        ))
+        .unwrap();
+
+    let result = store.query(&AxFilter::default()).unwrap();
+    assert!(result.attestations.is_empty());
+}
+
+// "nil is nil"
+#[test]
+fn test_filter_naming_no_limit_is_refused() {
+    let refused = serde_json::from_str::<AxFilter>(r#"{"subjects":["ALICE"]}"#);
+    assert!(refused.is_err());
 }
 
 #[test]
@@ -361,6 +392,7 @@ fn test_query_combined_filters() {
         subjects: vec!["ALICE".to_string()],
         predicates: vec!["knows".to_string()],
         contexts: vec!["work".to_string()],
+        limit: EVERY_ROW,
         ..Default::default()
     };
 
@@ -370,7 +402,7 @@ fn test_query_combined_filters() {
 }
 
 #[test]
-fn test_query_empty_filter_returns_all() {
+fn test_query_every_row_returns_all() {
     let mut store = SqliteStore::in_memory().unwrap();
 
     store
@@ -394,7 +426,10 @@ fn test_query_empty_filter_returns_all() {
         ))
         .unwrap();
 
-    let filter = AxFilter::default();
+    let filter = AxFilter {
+        limit: EVERY_ROW,
+        ..Default::default()
+    };
 
     let result = store.query(&filter).unwrap();
     assert_eq!(result.attestations.len(), 2);
@@ -435,7 +470,10 @@ fn test_query_summary() {
         ))
         .unwrap();
 
-    let filter = AxFilter::default();
+    let filter = AxFilter {
+        limit: EVERY_ROW,
+        ..Default::default()
+    };
     let result = store.query(&filter).unwrap();
 
     assert_eq!(result.summary.total_attestations, 3);
@@ -694,6 +732,7 @@ fn test_query_with_multiple_values_in_filter() {
 
     let filter = AxFilter {
         subjects: vec!["ALICE".to_string(), "BOB".to_string()],
+        limit: EVERY_ROW,
         ..Default::default()
     };
 
