@@ -318,12 +318,46 @@ func readRust(path, rel string, hits found) error {
 		if strings.Contains(text, ".unwrap_or") {
 			hits.add("fallback", rel, i+1)
 		}
+		if testsAgainstNothingRust(text) {
+			hits.add("nil", rel, i+1)
+		}
 	}
 	return nil
 }
 
-// testsAgainstNothing is a comparison with nil, the empty string or zero, or a
-// length against 0 or 1. An error being there is not a value being empty.
+// rustNothing is how a Rust line tests a value against nothing.
+var rustNothing = []string{".is_none()", ".is_some()", ".is_empty()", ` == ""`, ` != ""`}
+
+// rustZero is how a Rust line tests a value against zero, the zero ending
+// there: `== 0.5` is not a test against nothing.
+var rustZero = []string{" == 0", " != 0", " > 0", " <= 0"}
+
+func testsAgainstNothingRust(text string) bool {
+	for _, test := range rustNothing {
+		if strings.Contains(text, test) {
+			return true
+		}
+	}
+	for _, test := range rustZero {
+		rest := text
+		for {
+			at := strings.Index(rest, test)
+			if at < 0 {
+				break
+			}
+			rest = rest[at+len(test):]
+			// The line's end is a space past it, which ends a number too.
+			if !strings.ContainsAny((rest + " ")[:1], "0123456789._xbo") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// testsAgainstNothing is a comparison with nil, the empty string or zero, a
+// length against 0 or 1, or zero set apart from what is above it. An error
+// being there is not a value being empty.
 func testsAgainstNothing(b *ast.BinaryExpr) bool {
 	switch b.Op {
 	case token.EQL, token.NEQ:
@@ -331,8 +365,10 @@ func testsAgainstNothing(b *ast.BinaryExpr) bool {
 			return false
 		}
 		return nothing(b.X) || nothing(b.Y) || lengthAgainst(b, "0")
-	case token.GTR, token.LSS, token.GEQ, token.LEQ:
-		return lengthAgainst(b, "0") || lengthAgainst(b, "1")
+	case token.GTR, token.LEQ:
+		return lengthAgainst(b, "0") || lengthAgainst(b, "1") || nothing(b.Y)
+	case token.LSS, token.GEQ:
+		return lengthAgainst(b, "0") || lengthAgainst(b, "1") || nothing(b.X)
 	}
 	return false
 }
