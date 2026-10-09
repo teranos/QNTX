@@ -8,6 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 )
 
 // A v* tag landing on appSource dispatches the app's build.
@@ -34,7 +35,7 @@ func (s *QNTXServer) dispatchApp(tag string) {
 	repo := appOwner + "/" + appRepo
 	sacred.Go("app.dispatch."+tag, func() {
 		said, _ := s.gitHubService().CreateAWorkflowDispatchEvent(s.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
-			Owner: appOwner, Repo: appRepo, WorkflowId: appWorkflow, Ref: appRef,
+			Namespace: auth.NamespaceSystem, Owner: appOwner, Repo: appRepo, WorkflowId: appWorkflow, Ref: appRef,
 		})
 		if !said.Success {
 			logger.Errorw("A tag landed and the app's build was not dispatched", "tag", tag, "repo", repo, "workflow", appWorkflow, "error", said.Error)
