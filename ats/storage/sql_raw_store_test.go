@@ -56,7 +56,7 @@ func TestSQLRawStoreKeepsAndReadsBack(t *testing.T) {
 	if _, err := store.GetAttestation("AS-quickdev-ffffffffffff"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("a miss answered %v", err)
 	}
-	found, err := store.GetAttestations(ats.AttestationFilter{Subjects: []string{"PLUGIN"}, Predicates: []string{"github"}})
+	found, err := store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, Subjects: []string{"PLUGIN"}, Predicates: []string{"github"}})
 	if err != nil || len(found) != 1 {
 		t.Errorf("the filter found %d, %v", len(found), err)
 	}

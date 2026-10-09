@@ -7,6 +7,7 @@ import (
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/errors"
 )
@@ -569,6 +570,11 @@ func scanWatcherFields(scan func(dest ...any) error) (*Watcher, error) {
 	}
 
 	w.ActionType = ActionType(actionType)
+
+	// What a watcher reads when it looks back is every row its structure
+	// matches; its attributes are matched after. An ax query replaces this
+	// with the limit it parses to.
+	w.Filter.Limit = ats.EveryRow
 
 	// Parse JSON arrays
 	if subjectsJSON.Valid {

@@ -666,11 +666,9 @@ func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Wa
 
 // attestationFilter converts a watcher's AX filter into the store's filter.
 // Format and SoActions are display concerns and have no bearing on what is read.
+// The limit goes as the watcher says it; the store holds a stated limit to its
+// ceiling and gives every row to ats.EveryRow.
 func attestationFilter(f types.AxFilter) ats.AttestationFilter {
-	limit := f.Limit
-	if limit > storage.MaxAttestationLimit {
-		limit = storage.MaxAttestationLimit
-	}
 	return ats.AttestationFilter{
 		Subjects:   f.Subjects,
 		Predicates: f.Predicates,
@@ -678,7 +676,7 @@ func attestationFilter(f types.AxFilter) ats.AttestationFilter {
 		Actors:     f.Actors,
 		TimeStart:  f.TimeStart,
 		TimeEnd:    f.TimeEnd,
-		Limit:      limit,
+		Limit:      f.Limit,
 	}
 }
 
