@@ -28,7 +28,7 @@ export const Sigma = 'Σ';      // distilled attestation, the sum of many observ
 
 // System infrastructure.
 export const Watcher = '⏿';    // observer/monitor for attestation patterns
-export const Pulse = '꩜';      // async jobs, rate limiting, budget — always prefix logs
+export const Pulse = '꩜';      // async jobs, rate limiting — always prefix logs
 export const PulseOpen = '✿';  // graceful startup with orphaned job recovery
 export const PulseClose = '❀'; // graceful shutdown with checkpoint preservation
 export const DB = '⊔';         // database/storage layer

@@ -98,30 +98,34 @@ func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Reques
 	// Read scope narrows the query rather than refusing it. A token scoped to
 	// one predicate that asks for everything gets its one predicate — asking
 	// broadly is not an attempt to overreach, and a filter is the honest answer.
+	// A read nobody admitted is a handler wired past the gate, and it is not
+	// read unnarrowed.
 	admitted, admittedOK := auth.AdmissionFrom(r.Context())
+	if !admittedOK {
+		writeError(w, http.StatusInternalServerError, "this route was served without a gate")
+		return
+	}
 	var narrowAfter []string
-	if admittedOK {
-		if scope, narrowed := admitted.ReadScope(); narrowed {
-			predicates, atTheStore := narrowToScope(filter.Predicates, scope)
-			if atTheStore {
-				filter.Predicates = predicates
-				if len(filter.Predicates) == 0 {
-					w.Header().Set("X-QNTX-More", "false")
-					respond(w, s.logger, http.StatusOK, []any{})
-					return
-				}
-			} else {
-				// The limit is the store's, so it counts rows before this
-				// narrowing rather than after: a page can come back short.
-				narrowAfter = scope
+	if scope, narrowed := admitted.ReadScope(); narrowed {
+		predicates, atTheStore := narrowToScope(filter.Predicates, scope)
+		if atTheStore {
+			filter.Predicates = predicates
+			if len(filter.Predicates) == 0 {
+				w.Header().Set("X-QNTX-More", "false")
+				respond(w, s.logger, http.StatusOK, []any{})
+				return
 			}
+		} else {
+			// The limit is the store's, so it counts rows before this
+			// narrowing rather than after: a page can come back short.
+			narrowAfter = scope
 		}
-		// Below the ladder a read is what this person wrote and nothing else,
-		// unless a READ line said `all`. The actor the node put on their
-		// writes is the one asked for.
-		if admitted.OwnOnly() {
-			filter.Actors = []string{admitted.ActsAs()}
-		}
+	}
+	// Below the ladder a read is what this person wrote and nothing else,
+	// unless a READ line said `all`. The actor the node put on their
+	// writes is the one asked for.
+	if admitted.OwnOnly() {
+		filter.Actors = []string{admitted.ActsAs()}
 	}
 
 	start, end, timeErr := parseTemporalParams(q.Get("since"), q.Get("until"), q.Get("on"))

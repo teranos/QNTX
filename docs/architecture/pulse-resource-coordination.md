@@ -1,7 +1,7 @@
 # Pulse Multi-Process Resource Coordination
 
 **Status:** Design Proposal (Issue #50)
-**Related:** pulse/budget package, pulse/async worker pool
+**Related:** pulse/async worker pool
 
 ## Problem
 
@@ -248,9 +248,8 @@ alert_on_hog = true              # Send alerts when hogs detected
 
 1. Add SystemResourceMonitor to pulse package (initially returns dummy values)
 2. Implement nvidia-smi parsing for GPU (Linux only, graceful fallback on Mac)
-3. Add adaptive quota logic to Tracker.CheckBudget()
-4. Add system load check to worker.processJobs() with exponential backoff
-5. Add configuration flags: max_system_gpu_percent, backpressure_threshold
+3. Add system load check to worker.processJobs() with exponential backoff
+4. Add configuration flags: max_system_gpu_percent, backpressure_threshold
 
 ## Benefits
 

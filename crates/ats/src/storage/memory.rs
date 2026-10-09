@@ -95,10 +95,7 @@ impl QueryStore for MemoryStore {
             .cloned()
             .collect();
 
-        // Apply limit
-        if let Some(limit) = filter.limit {
-            matching.truncate(limit);
-        }
+        matching.truncate(filter.limit);
 
         // Build summary
         let summary = build_summary(&matching);
@@ -346,7 +343,7 @@ fn build_summary(attestations: &[Attestation]) -> AxSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::attestation::AttestationBuilder;
+    use crate::attestation::{AttestationBuilder, EVERY_ROW};
 
     fn test_attestation(id: &str) -> Attestation {
         AttestationBuilder::new()
@@ -465,6 +462,7 @@ mod tests {
 
         let filter = AxFilter {
             subjects: vec!["ALICE".to_string()],
+            limit: EVERY_ROW,
             ..Default::default()
         };
 

@@ -192,13 +192,7 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 	}
 	query += " ORDER BY timestamp DESC"
 
-	if filter.Limit > 0 {
-		limit := filter.Limit
-		if limit > MaxAttestationLimit {
-			limit = MaxAttestationLimit
-		}
-		query += fmt.Sprintf(" LIMIT %d", limit)
-	}
+	query += limitClause(filter.Limit)
 
 	rows, err := s.db.QueryContext(ctx, query, qb.args...)
 	if err != nil {

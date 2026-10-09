@@ -21,7 +21,7 @@ func (bs *BoundedStore) FlushEnforcement() error {
 	allSubjects := []string{}
 
 	// Query all attestations to collect dimensions
-	all, err := rbs.rust.GetAttestations(ats.AttestationFilter{})
+	all, err := rbs.rust.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow})
 	if err != nil {
 		return errors.Wrap(err, "failed to list attestations for enforcement flush")
 	}

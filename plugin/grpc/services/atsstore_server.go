@@ -279,8 +279,13 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 		}, nil
 	}
 
-	// Convert protobuf filter to ats.AttestationFilter
-	filter := protoToFilter(req.Filter)
+	filter, err := protoToFilter(req.Filter)
+	if err != nil {
+		return &protocol.GetAttestationsResponse{ //nolint:nilerr // the refusal travels in the response payload
+			Success: false,
+			Error:   err.Error(),
+		}, nil
+	}
 
 	// Query attestations
 	attestations, err := store.GetAttestations(filter)
@@ -333,7 +338,10 @@ func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequ
 		return ctx.Err()
 	}
 
-	filter := protoToFilter(req.Filter)
+	filter, err := protoToFilter(req.Filter)
+	if err != nil {
+		return err
+	}
 
 	attestations, err := store.GetAttestations(filter)
 	if err != nil {
@@ -415,13 +423,15 @@ func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*ty
 	}, nil
 }
 
-func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
-	limit := 0
-	if proto.Limit != nil {
-		limit = int(*proto.Limit)
+// protoToFilter is a plugin's filter as the store reads it. A query names how
+// many rows it wants, every row being ats.EveryRow; one naming no limit is
+// refused rather than handed every row or none.
+func protoToFilter(proto *protocol.AttestationFilter) (ats.AttestationFilter, error) {
+	if proto.Limit == nil {
+		return ats.AttestationFilter{}, errors.New("a query names how many rows it wants, and this one named no limit; every row is ats.EveryRow")
 	}
 	filter := ats.AttestationFilter{
-		Limit:      limit,
+		Limit:      int(*proto.Limit),
 		Actors:     proto.Actors,
 		Subjects:   proto.Subjects,
 		Predicates: proto.Predicates,
@@ -438,5 +448,5 @@ func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
 		filter.TimeEnd = &t
 	}
 
-	return filter
+	return filter, nil
 }

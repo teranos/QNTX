@@ -22,26 +22,6 @@ export interface DaemonStatusMessage {
   queued_jobs: number;
   /** 0–100 */
   load_percent: number;
-  /** Spend on this node, and what it is allowed. */
-  budget_daily: number;
-  budget_weekly: number;
-  budget_monthly: number;
-  budget_daily_limit: number;
-  budget_weekly_limit: number;
-  budget_monthly_limit: number;
-  /**
-   * Aggregate spend: this node plus non-stale peers, which is what CheckBudget
-   * enforces. Falls back to local spend when no peers are configured.
-   */
-  budget_daily_aggregate: number;
-  budget_weekly_aggregate: number;
-  budget_monthly_aggregate: number;
-  /** Non-stale peers counted in the aggregate */
-  peer_count: number;
-  /** Cluster limits, averaged across nodes. Zero means not configured. */
-  cluster_daily_limit: number;
-  cluster_weekly_limit: number;
-  cluster_monthly_limit: number;
   /** running, draining, stopped */
   server_state: string;
   /** Unix seconds */
@@ -58,17 +38,14 @@ export interface AsyncJobProgress {
   total?: number | undefined;
 }
 
-/** AsyncJobPulseState is the rate limit and budget state carried with a job. */
+/** AsyncJobPulseState is the rate limit state carried with a job. */
 export interface AsyncJobPulseState {
   calls_this_minute?: number | undefined;
   calls_remaining?: number | undefined;
-  spend_today?: number | undefined;
-  spend_this_month?: number | undefined;
-  budget_remaining?: number | undefined;
   is_paused?:
     | boolean
     | undefined;
-  /** budget_exceeded, rate_limit, user_requested */
+  /** rate_limited, user_requested */
   pause_reason?: string | undefined;
 }
 
@@ -95,8 +72,6 @@ export interface AsyncJob {
   /** queued, running, paused, completed, failed, cancelled */
   status: string;
   progress?: AsyncJobProgress | undefined;
-  cost_estimate?: number | undefined;
-  cost_actual?: number | undefined;
   pulse_state?: AsyncJobPulseState | undefined;
   error?:
     | string

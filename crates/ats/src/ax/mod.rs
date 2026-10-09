@@ -256,7 +256,7 @@ fn to_expandable(a: &Attestation) -> ExpandAttestation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::attestation::AttestationBuilder;
+    use crate::attestation::{AttestationBuilder, EVERY_ROW};
     use crate::classify::ConflictType;
     use crate::storage::{AttestationStore, MemoryStore};
 
@@ -483,6 +483,7 @@ mod tests {
 
         let filter = AxFilter {
             subjects: vec!["ALICE".to_string()],
+            limit: EVERY_ROW,
             ..Default::default()
         };
 
@@ -498,6 +499,7 @@ mod tests {
 
         let filter = AxFilter {
             predicates: vec!["is_dev".to_string()],
+            limit: EVERY_ROW,
             ..Default::default()
         };
 
@@ -519,7 +521,7 @@ mod tests {
             time_start: Some(NOW - 1000),
             time_end: Some(NOW),
             source: Some("cli".to_string()),
-            limit: Some(7),
+            limit: 7,
             ..Default::default()
         };
 
@@ -528,7 +530,7 @@ mod tests {
         assert_eq!(expanded.time_start, Some(NOW - 1000));
         assert_eq!(expanded.time_end, Some(NOW));
         assert_eq!(expanded.source, Some("cli".to_string()));
-        assert_eq!(expanded.limit, Some(7));
+        assert_eq!(expanded.limit, 7);
     }
 
     #[test]
@@ -538,7 +540,14 @@ mod tests {
             .create_alias("ALICE", "alice@example.com", "test")
             .unwrap();
 
-        let expanded = expand_aliases(&store, &AxFilter::default()).unwrap();
+        let expanded = expand_aliases(
+            &store,
+            &AxFilter {
+                limit: EVERY_ROW,
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
         assert!(expanded.subjects.is_empty());
         assert!(expanded.contexts.is_empty());
@@ -567,6 +576,7 @@ mod tests {
 
         let filter = AxFilter {
             subjects: vec!["ALICE".to_string()],
+            limit: EVERY_ROW,
             ..Default::default()
         };
 
@@ -606,6 +616,7 @@ mod tests {
 
         let filter = AxFilter {
             subjects: vec!["ALICE".to_string()],
+            limit: EVERY_ROW,
             ..Default::default()
         };
 

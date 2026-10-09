@@ -19,6 +19,7 @@ func TypesSaid(store AttestationStore, names ...string) types.Says {
 	found, err := store.GetAttestations(AttestationFilter{
 		Subjects:   names,
 		Predicates: []string{"type"},
+		Limit:      EveryRow,
 	})
 	if err != nil {
 		return types.SaysNothing

@@ -1,4 +1,4 @@
-package budget
+package ratelimit
 
 import (
 	"sync"

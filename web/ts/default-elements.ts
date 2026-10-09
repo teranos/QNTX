@@ -7,7 +7,6 @@
 
 import { tray } from '@teranos/elements';
 import { createCanvasElement } from './components/element/canvas/canvas-element';
-import { createChartElement } from './components/element/chart-element';
 import { createDbElement } from './db-element';
 import { createEmbeddingsElement } from './embeddings-element';
 import { createSigmaPanel } from './sigma-panel';
@@ -84,32 +83,6 @@ export function registerDefaultElements(hasCanvas: boolean = true): void {
     tray.add(createClaudeElement());
     tray.add(createPiElement());
 
-    // Usage & Cost Chart Element
-    // TODO(future): Budget alerting with notifications
-    // Implement cost threshold monitoring with user notifications:
-    // - Config: User-defined budget limits (daily/weekly/monthly)
-    // - Detection: Check total cost vs. budget in chart render
-    // - Notification: Toast alert when threshold crossed
-    // - Persistence: Store alert state to avoid repeat notifications
-    // - UX: Clear visual indication of budget status in chart
-    tray.add(createChartElement(
-        'usage-chart',
-        'Usage & Costs',
-        '/api/timeseries/usage',
-        {
-            primaryField: 'cost',
-            secondaryField: 'requests',
-            primaryLabel: 'Cost',
-            secondaryLabel: 'Requests',
-            primaryColor: '#4ade80',
-            secondaryColor: '#60a5fa',
-            chartType: 'area',
-            formatValue: (v) => `$${v.toFixed(2)}`,
-            defaultRange: 'month'
-        },
-        '$'
-    ));
-
     // Pulse Panel Element — scheduled jobs dashboard
     tray.add(createPulseElement());
 
@@ -131,7 +104,6 @@ export function registerDefaultElements(hasCanvas: boolean = true): void {
         embeddings: 'Embedding service status',
         i: 'Who is looking',
         am: 'What the node is',
-        usage: 'API usage and costs',
         plugins: 'Domain plugin panel',
         llm: 'LLM provider selection'
     });

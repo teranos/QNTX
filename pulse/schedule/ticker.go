@@ -528,8 +528,7 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 		handlerName,
 		sourceURL,
 		payload,
-		0,   // Total operations unknown
-		0.0, // Cost calculated during execution
+		0, // Total operations unknown
 		fmt.Sprintf("pulse:%s", scheduled.Id),
 	)
 	if err != nil {

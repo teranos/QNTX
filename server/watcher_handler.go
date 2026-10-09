@@ -278,8 +278,8 @@ func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Requ
 		Enabled:           true,
 	}
 
-	if req.MaxFiresPerSecond > 0 {
-		watcher.MaxFiresPerSecond = req.MaxFiresPerSecond
+	if req.MaxFiresPerSecond != nil {
+		watcher.MaxFiresPerSecond = *req.MaxFiresPerSecond
 	}
 	if req.Enabled != nil {
 		watcher.Enabled = *req.Enabled
@@ -364,8 +364,8 @@ func (h *WatcherHandler) handleUpdateWatcher(w http.ResponseWriter, r *http.Requ
 	if req.ActionData != "" {
 		existing.ActionData = req.ActionData
 	}
-	if req.MaxFiresPerSecond > 0 {
-		existing.MaxFiresPerSecond = req.MaxFiresPerSecond
+	if req.MaxFiresPerSecond != nil {
+		existing.MaxFiresPerSecond = *req.MaxFiresPerSecond
 	}
 	if req.Enabled != nil {
 		existing.Enabled = *req.Enabled

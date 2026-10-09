@@ -24,33 +24,16 @@ const (
 // DaemonStatusMessage represents daemon status update sent to clients.
 // Mirrors server.DaemonStatusMessage.
 type DaemonStatusMessage struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Type        string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`        // "daemon_status"
-	Running     bool                   `protobuf:"varint,2,opt,name=running,proto3" json:"running,omitempty"` // Is the daemon running
-	ActiveJobs  int32                  `protobuf:"varint,3,opt,name=active_jobs,json=activeJobs,proto3" json:"active_jobs,omitempty"`
-	QueuedJobs  int32                  `protobuf:"varint,4,opt,name=queued_jobs,json=queuedJobs,proto3" json:"queued_jobs,omitempty"`
-	LoadPercent float64                `protobuf:"fixed64,5,opt,name=load_percent,json=loadPercent,proto3" json:"load_percent,omitempty"` // 0–100
-	// Spend on this node, and what it is allowed.
-	BudgetDaily        float64 `protobuf:"fixed64,6,opt,name=budget_daily,json=budgetDaily,proto3" json:"budget_daily,omitempty"`
-	BudgetWeekly       float64 `protobuf:"fixed64,7,opt,name=budget_weekly,json=budgetWeekly,proto3" json:"budget_weekly,omitempty"`
-	BudgetMonthly      float64 `protobuf:"fixed64,8,opt,name=budget_monthly,json=budgetMonthly,proto3" json:"budget_monthly,omitempty"`
-	BudgetDailyLimit   float64 `protobuf:"fixed64,9,opt,name=budget_daily_limit,json=budgetDailyLimit,proto3" json:"budget_daily_limit,omitempty"`
-	BudgetWeeklyLimit  float64 `protobuf:"fixed64,10,opt,name=budget_weekly_limit,json=budgetWeeklyLimit,proto3" json:"budget_weekly_limit,omitempty"`
-	BudgetMonthlyLimit float64 `protobuf:"fixed64,11,opt,name=budget_monthly_limit,json=budgetMonthlyLimit,proto3" json:"budget_monthly_limit,omitempty"`
-	// Aggregate spend: this node plus non-stale peers, which is what CheckBudget
-	// enforces. Falls back to local spend when no peers are configured.
-	BudgetDailyAggregate   float64 `protobuf:"fixed64,12,opt,name=budget_daily_aggregate,json=budgetDailyAggregate,proto3" json:"budget_daily_aggregate,omitempty"`
-	BudgetWeeklyAggregate  float64 `protobuf:"fixed64,13,opt,name=budget_weekly_aggregate,json=budgetWeeklyAggregate,proto3" json:"budget_weekly_aggregate,omitempty"`
-	BudgetMonthlyAggregate float64 `protobuf:"fixed64,14,opt,name=budget_monthly_aggregate,json=budgetMonthlyAggregate,proto3" json:"budget_monthly_aggregate,omitempty"`
-	PeerCount              int32   `protobuf:"varint,15,opt,name=peer_count,json=peerCount,proto3" json:"peer_count,omitempty"` // Non-stale peers counted in the aggregate
-	// Cluster limits, averaged across nodes. Zero means not configured.
-	ClusterDailyLimit   float64 `protobuf:"fixed64,16,opt,name=cluster_daily_limit,json=clusterDailyLimit,proto3" json:"cluster_daily_limit,omitempty"`
-	ClusterWeeklyLimit  float64 `protobuf:"fixed64,17,opt,name=cluster_weekly_limit,json=clusterWeeklyLimit,proto3" json:"cluster_weekly_limit,omitempty"`
-	ClusterMonthlyLimit float64 `protobuf:"fixed64,18,opt,name=cluster_monthly_limit,json=clusterMonthlyLimit,proto3" json:"cluster_monthly_limit,omitempty"`
-	ServerState         string  `protobuf:"bytes,19,opt,name=server_state,json=serverState,proto3" json:"server_state,omitempty"` // running, draining, stopped
-	Timestamp           int64   `protobuf:"varint,20,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                       // Unix seconds
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`        // "daemon_status"
+	Running       bool                   `protobuf:"varint,2,opt,name=running,proto3" json:"running,omitempty"` // Is the daemon running
+	ActiveJobs    int32                  `protobuf:"varint,3,opt,name=active_jobs,json=activeJobs,proto3" json:"active_jobs,omitempty"`
+	QueuedJobs    int32                  `protobuf:"varint,4,opt,name=queued_jobs,json=queuedJobs,proto3" json:"queued_jobs,omitempty"`
+	LoadPercent   float64                `protobuf:"fixed64,5,opt,name=load_percent,json=loadPercent,proto3" json:"load_percent,omitempty"` // 0–100
+	ServerState   string                 `protobuf:"bytes,19,opt,name=server_state,json=serverState,proto3" json:"server_state,omitempty"`  // running, draining, stopped
+	Timestamp     int64                  `protobuf:"varint,20,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                        // Unix seconds
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DaemonStatusMessage) Reset() {
@@ -114,97 +97,6 @@ func (x *DaemonStatusMessage) GetQueuedJobs() int32 {
 func (x *DaemonStatusMessage) GetLoadPercent() float64 {
 	if x != nil {
 		return x.LoadPercent
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetBudgetDaily() float64 {
-	if x != nil {
-		return x.BudgetDaily
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetBudgetWeekly() float64 {
-	if x != nil {
-		return x.BudgetWeekly
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetBudgetMonthly() float64 {
-	if x != nil {
-		return x.BudgetMonthly
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetBudgetDailyLimit() float64 {
-	if x != nil {
-		return x.BudgetDailyLimit
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetBudgetWeeklyLimit() float64 {
-	if x != nil {
-		return x.BudgetWeeklyLimit
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetBudgetMonthlyLimit() float64 {
-	if x != nil {
-		return x.BudgetMonthlyLimit
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetBudgetDailyAggregate() float64 {
-	if x != nil {
-		return x.BudgetDailyAggregate
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetBudgetWeeklyAggregate() float64 {
-	if x != nil {
-		return x.BudgetWeeklyAggregate
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetBudgetMonthlyAggregate() float64 {
-	if x != nil {
-		return x.BudgetMonthlyAggregate
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetPeerCount() int32 {
-	if x != nil {
-		return x.PeerCount
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetClusterDailyLimit() float64 {
-	if x != nil {
-		return x.ClusterDailyLimit
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetClusterWeeklyLimit() float64 {
-	if x != nil {
-		return x.ClusterWeeklyLimit
-	}
-	return 0
-}
-
-func (x *DaemonStatusMessage) GetClusterMonthlyLimit() float64 {
-	if x != nil {
-		return x.ClusterMonthlyLimit
 	}
 	return 0
 }
@@ -276,16 +168,13 @@ func (x *AsyncJobProgress) GetTotal() int32 {
 	return 0
 }
 
-// AsyncJobPulseState is the rate limit and budget state carried with a job.
+// AsyncJobPulseState is the rate limit state carried with a job.
 type AsyncJobPulseState struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	CallsThisMinute *int32                 `protobuf:"varint,1,opt,name=calls_this_minute,json=callsThisMinute,proto3,oneof" json:"calls_this_minute,omitempty"`
 	CallsRemaining  *int32                 `protobuf:"varint,2,opt,name=calls_remaining,json=callsRemaining,proto3,oneof" json:"calls_remaining,omitempty"`
-	SpendToday      *float64               `protobuf:"fixed64,3,opt,name=spend_today,json=spendToday,proto3,oneof" json:"spend_today,omitempty"`
-	SpendThisMonth  *float64               `protobuf:"fixed64,4,opt,name=spend_this_month,json=spendThisMonth,proto3,oneof" json:"spend_this_month,omitempty"`
-	BudgetRemaining *float64               `protobuf:"fixed64,5,opt,name=budget_remaining,json=budgetRemaining,proto3,oneof" json:"budget_remaining,omitempty"`
 	IsPaused        *bool                  `protobuf:"varint,6,opt,name=is_paused,json=isPaused,proto3,oneof" json:"is_paused,omitempty"`
-	PauseReason     *string                `protobuf:"bytes,7,opt,name=pause_reason,json=pauseReason,proto3,oneof" json:"pause_reason,omitempty"` // budget_exceeded, rate_limit, user_requested
+	PauseReason     *string                `protobuf:"bytes,7,opt,name=pause_reason,json=pauseReason,proto3,oneof" json:"pause_reason,omitempty"` // rate_limited, user_requested
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -334,27 +223,6 @@ func (x *AsyncJobPulseState) GetCallsRemaining() int32 {
 	return 0
 }
 
-func (x *AsyncJobPulseState) GetSpendToday() float64 {
-	if x != nil && x.SpendToday != nil {
-		return *x.SpendToday
-	}
-	return 0
-}
-
-func (x *AsyncJobPulseState) GetSpendThisMonth() float64 {
-	if x != nil && x.SpendThisMonth != nil {
-		return *x.SpendThisMonth
-	}
-	return 0
-}
-
-func (x *AsyncJobPulseState) GetBudgetRemaining() float64 {
-	if x != nil && x.BudgetRemaining != nil {
-		return *x.BudgetRemaining
-	}
-	return 0
-}
-
 func (x *AsyncJobPulseState) GetIsPaused() bool {
 	if x != nil && x.IsPaused != nil {
 		return *x.IsPaused
@@ -385,8 +253,6 @@ type AsyncJob struct {
 	Source        string                 `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`                              // For deduplication and logging
 	Status        string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`                              // queued, running, paused, completed, failed, cancelled
 	Progress      *AsyncJobProgress      `protobuf:"bytes,6,opt,name=progress,proto3,oneof" json:"progress,omitempty"`
-	CostEstimate  *float64               `protobuf:"fixed64,7,opt,name=cost_estimate,json=costEstimate,proto3,oneof" json:"cost_estimate,omitempty"`
-	CostActual    *float64               `protobuf:"fixed64,8,opt,name=cost_actual,json=costActual,proto3,oneof" json:"cost_actual,omitempty"`
 	PulseState    *AsyncJobPulseState    `protobuf:"bytes,9,opt,name=pulse_state,json=pulseState,proto3,oneof" json:"pulse_state,omitempty"`
 	Error         *string                `protobuf:"bytes,10,opt,name=error,proto3,oneof" json:"error,omitempty"`
 	ErrorDetails  []string               `protobuf:"bytes,11,rep,name=error_details,json=errorDetails,proto3" json:"error_details,omitempty"`          // Structured context from the error chain
@@ -471,20 +337,6 @@ func (x *AsyncJob) GetProgress() *AsyncJobProgress {
 		return x.Progress
 	}
 	return nil
-}
-
-func (x *AsyncJob) GetCostEstimate() float64 {
-	if x != nil && x.CostEstimate != nil {
-		return *x.CostEstimate
-	}
-	return 0
-}
-
-func (x *AsyncJob) GetCostActual() float64 {
-	if x != nil && x.CostActual != nil {
-		return *x.CostActual
-	}
-	return 0
 }
 
 func (x *AsyncJob) GetPulseState() *AsyncJobPulseState {
@@ -2541,7 +2393,7 @@ var File_plugin_grpc_protocol_server_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\n" +
-	"!plugin/grpc/protocol/server.proto\x12\bprotocol\x1a#plugin/grpc/protocol/atsstore.proto\"\xc5\x06\n" +
+	"!plugin/grpc/protocol/server.proto\x12\bprotocol\x1a#plugin/grpc/protocol/atsstore.proto\"\xf4\x03\n" +
 	"\x13DaemonStatusMessage\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x18\n" +
 	"\arunning\x18\x02 \x01(\bR\arunning\x12\x1f\n" +
@@ -2550,85 +2402,58 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\vqueued_jobs\x18\x04 \x01(\x05R\n" +
 	"queuedJobs\x12!\n" +
 	"\fload_percent\x18\x05 \x01(\x01R\vloadPercent\x12!\n" +
-	"\fbudget_daily\x18\x06 \x01(\x01R\vbudgetDaily\x12#\n" +
-	"\rbudget_weekly\x18\a \x01(\x01R\fbudgetWeekly\x12%\n" +
-	"\x0ebudget_monthly\x18\b \x01(\x01R\rbudgetMonthly\x12,\n" +
-	"\x12budget_daily_limit\x18\t \x01(\x01R\x10budgetDailyLimit\x12.\n" +
-	"\x13budget_weekly_limit\x18\n" +
-	" \x01(\x01R\x11budgetWeeklyLimit\x120\n" +
-	"\x14budget_monthly_limit\x18\v \x01(\x01R\x12budgetMonthlyLimit\x124\n" +
-	"\x16budget_daily_aggregate\x18\f \x01(\x01R\x14budgetDailyAggregate\x126\n" +
-	"\x17budget_weekly_aggregate\x18\r \x01(\x01R\x15budgetWeeklyAggregate\x128\n" +
-	"\x18budget_monthly_aggregate\x18\x0e \x01(\x01R\x16budgetMonthlyAggregate\x12\x1d\n" +
-	"\n" +
-	"peer_count\x18\x0f \x01(\x05R\tpeerCount\x12.\n" +
-	"\x13cluster_daily_limit\x18\x10 \x01(\x01R\x11clusterDailyLimit\x120\n" +
-	"\x14cluster_weekly_limit\x18\x11 \x01(\x01R\x12clusterWeeklyLimit\x122\n" +
-	"\x15cluster_monthly_limit\x18\x12 \x01(\x01R\x13clusterMonthlyLimit\x12!\n" +
 	"\fserver_state\x18\x13 \x01(\tR\vserverState\x12\x1c\n" +
-	"\ttimestamp\x18\x14 \x01(\x03R\ttimestamp\"b\n" +
+	"\ttimestamp\x18\x14 \x01(\x03R\ttimestampJ\x04\b\x06\x10\x13R\fbudget_dailyR\rbudget_weeklyR\x0ebudget_monthlyR\x12budget_daily_limitR\x13budget_weekly_limitR\x14budget_monthly_limitR\x16budget_daily_aggregateR\x17budget_weekly_aggregateR\x18budget_monthly_aggregateR\n" +
+	"peer_countR\x13cluster_daily_limitR\x14cluster_weekly_limitR\x15cluster_monthly_limit\"b\n" +
 	"\x10AsyncJobProgress\x12\x1d\n" +
 	"\acurrent\x18\x01 \x01(\x05H\x00R\acurrent\x88\x01\x01\x12\x19\n" +
 	"\x05total\x18\x02 \x01(\x05H\x01R\x05total\x88\x01\x01B\n" +
 	"\n" +
 	"\b_currentB\b\n" +
-	"\x06_total\"\xc5\x03\n" +
+	"\x06_total\"\xc9\x02\n" +
 	"\x12AsyncJobPulseState\x12/\n" +
 	"\x11calls_this_minute\x18\x01 \x01(\x05H\x00R\x0fcallsThisMinute\x88\x01\x01\x12,\n" +
-	"\x0fcalls_remaining\x18\x02 \x01(\x05H\x01R\x0ecallsRemaining\x88\x01\x01\x12$\n" +
-	"\vspend_today\x18\x03 \x01(\x01H\x02R\n" +
-	"spendToday\x88\x01\x01\x12-\n" +
-	"\x10spend_this_month\x18\x04 \x01(\x01H\x03R\x0espendThisMonth\x88\x01\x01\x12.\n" +
-	"\x10budget_remaining\x18\x05 \x01(\x01H\x04R\x0fbudgetRemaining\x88\x01\x01\x12 \n" +
-	"\tis_paused\x18\x06 \x01(\bH\x05R\bisPaused\x88\x01\x01\x12&\n" +
-	"\fpause_reason\x18\a \x01(\tH\x06R\vpauseReason\x88\x01\x01B\x14\n" +
+	"\x0fcalls_remaining\x18\x02 \x01(\x05H\x01R\x0ecallsRemaining\x88\x01\x01\x12 \n" +
+	"\tis_paused\x18\x06 \x01(\bH\x02R\bisPaused\x88\x01\x01\x12&\n" +
+	"\fpause_reason\x18\a \x01(\tH\x03R\vpauseReason\x88\x01\x01B\x14\n" +
 	"\x12_calls_this_minuteB\x12\n" +
-	"\x10_calls_remainingB\x0e\n" +
-	"\f_spend_todayB\x13\n" +
-	"\x11_spend_this_monthB\x13\n" +
-	"\x11_budget_remainingB\f\n" +
+	"\x10_calls_remainingB\f\n" +
 	"\n" +
 	"_is_pausedB\x0f\n" +
-	"\r_pause_reason\"\xcc\x06\n" +
+	"\r_pause_reasonJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\vspend_todayR\x10spend_this_monthR\x10budget_remaining\"\x82\x06\n" +
 	"\bAsyncJob\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x1d\n" +
 	"\apayload\x18\x03 \x01(\tH\x00R\apayload\x88\x01\x01\x12\x16\n" +
 	"\x06source\x18\x04 \x01(\tR\x06source\x12\x16\n" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12;\n" +
-	"\bprogress\x18\x06 \x01(\v2\x1a.protocol.AsyncJobProgressH\x01R\bprogress\x88\x01\x01\x12(\n" +
-	"\rcost_estimate\x18\a \x01(\x01H\x02R\fcostEstimate\x88\x01\x01\x12$\n" +
-	"\vcost_actual\x18\b \x01(\x01H\x03R\n" +
-	"costActual\x88\x01\x01\x12B\n" +
-	"\vpulse_state\x18\t \x01(\v2\x1c.protocol.AsyncJobPulseStateH\x04R\n" +
+	"\bprogress\x18\x06 \x01(\v2\x1a.protocol.AsyncJobProgressH\x01R\bprogress\x88\x01\x01\x12B\n" +
+	"\vpulse_state\x18\t \x01(\v2\x1c.protocol.AsyncJobPulseStateH\x02R\n" +
 	"pulseState\x88\x01\x01\x12\x19\n" +
 	"\x05error\x18\n" +
-	" \x01(\tH\x05R\x05error\x88\x01\x01\x12#\n" +
+	" \x01(\tH\x03R\x05error\x88\x01\x01\x12#\n" +
 	"\rerror_details\x18\v \x03(\tR\ferrorDetails\x12*\n" +
-	"\x0eplugin_version\x18\f \x01(\tH\x06R\rpluginVersion\x88\x01\x01\x12'\n" +
-	"\rparent_job_id\x18\r \x01(\tH\aR\vparentJobId\x88\x01\x01\x12$\n" +
-	"\vretry_count\x18\x0e \x01(\x05H\bR\n" +
+	"\x0eplugin_version\x18\f \x01(\tH\x04R\rpluginVersion\x88\x01\x01\x12'\n" +
+	"\rparent_job_id\x18\r \x01(\tH\x05R\vparentJobId\x88\x01\x01\x12$\n" +
+	"\vretry_count\x18\x0e \x01(\x05H\x06R\n" +
 	"retryCount\x88\x01\x01\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\x0f \x01(\tR\tcreatedAt\x12\"\n" +
 	"\n" +
-	"started_at\x18\x10 \x01(\tH\tR\tstartedAt\x88\x01\x01\x12&\n" +
-	"\fcompleted_at\x18\x11 \x01(\tH\n" +
-	"R\vcompletedAt\x88\x01\x01\x12\x1d\n" +
+	"started_at\x18\x10 \x01(\tH\aR\tstartedAt\x88\x01\x01\x12&\n" +
+	"\fcompleted_at\x18\x11 \x01(\tH\bR\vcompletedAt\x88\x01\x01\x12\x1d\n" +
 	"\n" +
 	"updated_at\x18\x12 \x01(\tR\tupdatedAtB\n" +
 	"\n" +
 	"\b_payloadB\v\n" +
-	"\t_progressB\x10\n" +
-	"\x0e_cost_estimateB\x0e\n" +
-	"\f_cost_actualB\x0e\n" +
+	"\t_progressB\x0e\n" +
 	"\f_pulse_stateB\b\n" +
 	"\x06_errorB\x11\n" +
 	"\x0f_plugin_versionB\x10\n" +
 	"\x0e_parent_job_idB\x0e\n" +
 	"\f_retry_countB\r\n" +
 	"\v_started_atB\x0f\n" +
-	"\r_completed_at\"\xcf\x01\n" +
+	"\r_completed_atJ\x04\b\a\x10\bJ\x04\b\b\x10\tR\rcost_estimateR\vcost_actual\"\xcf\x01\n" +
 	"\x10JobUpdateMessage\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12$\n" +
 	"\x03job\x18\x02 \x01(\v2\x12.protocol.AsyncJobR\x03job\x12D\n" +

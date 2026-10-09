@@ -22,12 +22,6 @@ func TestServerInitialization(t *testing.T) {
 	if server.nodeDB == nil {
 		t.Error("Database not initialized")
 	}
-	if server.usageTracker == nil {
-		t.Error("Usage tracker not initialized")
-	}
-	if server.budgetTracker == nil {
-		t.Error("Budget tracker not initialized")
-	}
 	if server.daemon == nil {
 		t.Error("Daemon not initialized")
 	}

@@ -34,7 +34,7 @@ That's **Pulse (꩜)**: Continuous execution
 
 - You're in the async/scheduled execution domain
 - State management involves job queues, intervals, execution history
-- Performance concerns: rate limiting, budget tracking, retries
+- Performance concerns: rate limiting, retries
 
 When you see `⋈`:
 That's ax, think: to ask

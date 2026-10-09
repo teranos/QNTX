@@ -185,10 +185,11 @@ func (t *TokenTable) Issue(spec IssuedToken) (string, error) {
 		ScopeWrite: []string{},
 		CreatedAt:  time.Now().UTC().UnixMilli(),
 	}
-	if spec.ExpiresAt != nil {
-		ms := spec.ExpiresAt.UTC().UnixMilli()
-		held.ExpiresAt = &ms
+	if spec.ExpiresAt == nil {
+		return "", errors.Newf("token %q says nothing of when it ends; one that does not end says never", spec.Label)
 	}
+	ms := spec.ExpiresAt.UTC().UnixMilli()
+	held.ExpiresAt = &ms
 	if err := t.put(held); err != nil {
 		return "", err
 	}

@@ -125,7 +125,7 @@ func TestAnExpiringGitHubTokenIsRefreshedBeforeItIsSpent(t *testing.T) {
 	h := &Handler{logger: zap.NewNop().Sugar(), tokens: table}
 	h.SetGitHubClient("client-id", "client-secret")
 
-	token, key, err := h.GitHubToken(context.Background(), "")
+	token, key, err := h.GitHubToken(context.Background(), NamespaceSystem)
 	require.NoError(t, err)
 	assert.Equal(t, "ghu_new", token)
 	assert.NotEmpty(t, key)
@@ -149,6 +149,21 @@ func TestANamespaceWithNoGitHubIsRefused(t *testing.T) {
 	_, _, err = h.GitHubToken(context.Background(), "clean")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "clean")
+}
+
+// "nil is nil"
+
+// Naming no namespace is naming none, and none spends no GitHub token: the
+// system namespace's is reached by naming system.
+func TestNamingNoNamespaceSpendsNoGitHubToken(t *testing.T) {
+	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), &countingTokens{})
+	require.NoError(t, err)
+	_, err = table.KeepGitHub(NamespaceSystem, "github:1", GitHubSecret{Token: "ghu_node", Source: GitHubSourceOAuth})
+	require.NoError(t, err)
+	h := &Handler{logger: zap.NewNop().Sugar(), tokens: table}
+
+	_, _, err = h.GitHubToken(context.Background(), "")
+	require.Error(t, err, "an unnamed namespace was handed the system namespace's GitHub token")
 }
 
 // The App's webhook secret exists once ROOT generates it, and generating again

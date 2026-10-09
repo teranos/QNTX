@@ -141,9 +141,9 @@ func TestRace_ConcurrentBroadcastAndChannelClose(t *testing.T) {
 	}
 }
 
-// TestRace_UsageBroadcastDuringClientDisconnect tests the race
-// in broadcastUsageUpdate where the lock is released before broadcast.
-func TestRace_UsageBroadcastDuringClientDisconnect(t *testing.T) {
+// TestRace_DaemonStatusBroadcastDuringClientDisconnect tests the race
+// in broadcastDaemonStatus where the lock is released before broadcast.
+func TestRace_DaemonStatusBroadcastDuringClientDisconnect(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
 	srv, err := NewQNTXServer(db, servingOne(db, store), ":memory:", 0)
@@ -170,12 +170,12 @@ func TestRace_UsageBroadcastDuringClientDisconnect(t *testing.T) {
 
 		var wg sync.WaitGroup
 
-		// Goroutine 1: Trigger usage broadcasts
+		// Goroutine 1: Trigger daemon status broadcasts
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 50; i++ {
-				srv.broadcastUsageUpdate()
+				srv.broadcastDaemonStatus()
 				time.Sleep(100 * time.Microsecond)
 			}
 		}()

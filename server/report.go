@@ -294,7 +294,7 @@ func startsOf(store namespaces.Reading, node string, w sentryread.Window) (int, 
 		Subjects:   []string{node},
 		TimeStart:  &w.Start,
 		TimeEnd:    &w.End,
-		Limit:      storage.MaxAttestationLimit,
+		Limit:      ats.EveryRow,
 	})
 	if err != nil {
 		return 0, "the starts could not be read: " + err.Error()

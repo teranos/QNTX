@@ -64,9 +64,6 @@ Always shows source in UI to debug precedence issues.
 
 ### Package Relationships
 
-#### ai/tracker → pulse/budget
-The `ai/tracker` records API calls and feeds data to `pulse/budget` for centralized budget management.
-
 #### Web UI ↔ Backend
 Uses both REST API and WebSocket:
 - REST for CRUD operations

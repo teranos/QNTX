@@ -17,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -52,6 +53,9 @@ func (w *windowLimiter) usage() (current, max int) {
 
 // wait blocks until a slot is available in the window, or ctx is cancelled.
 func (w *windowLimiter) wait(ctx context.Context) error {
+	if w.maxReqs <= 0 {
+		return errors.Newf("fetch allows %d requests per window, so none is made", w.maxReqs)
+	}
 	for {
 		w.mu.Lock()
 		now := time.Now()
@@ -185,19 +189,12 @@ func (s *FetchServer) storeFor(token string) (ats.AttestationStore, error) {
 	return nil, err
 }
 
+// NewFetchServer takes the fetch config as said: its defaults are am.toml's
+// (config.SetDefaults), and a 0 is 0 — no requests in a window, no pulse.
 func NewFetchServer(store ats.AttestationStore, authToken string, cfg appcfg.FetchConfig, logger *zap.SugaredLogger) *FetchServer {
 	maxReqs := cfg.MaxRequestsPerWindow
-	if maxReqs <= 0 {
-		maxReqs = 100
-	}
 	windowSecs := cfg.WindowSeconds
-	if windowSecs <= 0 {
-		windowSecs = 300
-	}
 	pulseSecs := cfg.PulseIntervalSeconds
-	if pulseSecs <= 0 {
-		pulseSecs = 30
-	}
 
 	s := &FetchServer{
 		store:     store,
@@ -211,7 +208,10 @@ func NewFetchServer(store ats.AttestationStore, authToken string, cfg appcfg.Fet
 		globalLimiter: newWindowLimiter(maxReqs, time.Duration(windowSecs)*time.Second),
 		stopPulse:     make(chan struct{}),
 	}
-	go s.pulseLoop(time.Duration(pulseSecs) * time.Second)
+	// An interval of 0 is no ticking.
+	if pulseSecs > 0 {
+		go s.pulseLoop(time.Duration(pulseSecs) * time.Second)
+	}
 	return s
 }
 

@@ -11,6 +11,9 @@ import (
 	"github.com/teranos/errors"
 )
 
+// tokenNeverEnds is what a mint says for a token that does not end.
+const tokenNeverEnds = "never"
+
 // mintable resolves what kind of token was asked for. Minting names the kind,
 // and these three are the kinds it names.
 func mintable(asked string) (Level, bool) {
@@ -44,7 +47,7 @@ func returnable(address string) error {
 
 // handleCreateToken issues a new access token for the calling passkey session.
 // POST /auth/tokens
-// Body: {"label": "<name>", "expires_at": "<RFC3339>?"}
+// Body: {"label": "<name>", "expires_at": "<RFC3339>" or "never"}
 // Response: {"id","label","token","created_at","expires_at"} — token is the
 // raw value, returned exactly once.
 func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Presented) {
@@ -58,8 +61,8 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	}
 
 	var req struct {
-		Label     string  `json:"label"`
-		ExpiresAt *string `json:"expires_at,omitempty"`
+		Label     string `json:"label"`
+		ExpiresAt string `json:"expires_at"`
 		// Which kind of token to mint.
 		Level      string   `json:"level"`
 		Namespaces []string `json:"namespaces,omitempty"`
@@ -148,11 +151,14 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		}
 	}
 
-	var expiresAt *time.Time
-	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
-		t, err := time.Parse(time.RFC3339, *req.ExpiresAt)
+	// A token says when it ends: a moment, or never, named.
+	said := strings.TrimSpace(req.ExpiresAt)
+	expiresAt := NeverEnds()
+	if said != tokenNeverEnds {
+		t, err := time.Parse(time.RFC3339, said)
 		if err != nil {
-			h.writeError(w, http.StatusBadRequest, "expires_at must be RFC3339")
+			h.writeError(w, http.StatusBadRequest,
+				"expires_at is when the token ends, as RFC3339, or "+tokenNeverEnds+" for one that does not; this said "+strconv.Quote(said))
 			return
 		}
 		expiresAt = &t
@@ -202,9 +208,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	if returnAddress != "" {
 		resp["return_address"] = returnAddress
 	}
-	if expiresAt != nil {
-		resp["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
-	}
+	resp["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
 	h.writeJSON(w, http.StatusOK, resp)
 }
 

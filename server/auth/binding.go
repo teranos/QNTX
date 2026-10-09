@@ -96,13 +96,17 @@ func (h *Handler) stillAdmitted(identity string) bool {
 // verifies against a signer still in auth.binding_signers. stillAdmitted is
 // handed a string and can only ask the list; this is handed what the string
 // stood on and asks the whole question again. A half-admission with no
-// binding was its own proof, a did:key route, and the list is all there is.
+// is its own proof only when it is the key that signed, a did:key route, and
+// the list is all there is. An account carrying no binding proves nothing.
 func (h *Handler) stillProven(half halfAdmission) error {
 	if !h.stillAdmitted(half.identity) {
 		return errors.Newf("%s is no longer listed in auth.root_identities", half.identity)
 	}
-	if half.binding == nil {
+	if half.identity == half.did {
 		return nil
+	}
+	if half.binding == nil {
+		return errors.Newf("the half-admission for %s carries no binding, and an account is not its own proof", half.identity)
 	}
 	if half.binding.Claim.CanonicalID != half.identity {
 		return errors.Newf("the binding carried is for %s, not %s", half.binding.Claim.CanonicalID, half.identity)
@@ -117,14 +121,18 @@ func (h *Handler) stillProven(half halfAdmission) error {
 // heldBindingStillCounts asks again about the binding a User's account was
 // reached by (ADR-031): its signer is still in auth.binding_signers, its
 // signature still verifies, and the key it is about is one this User holds.
-// An account with no binding kept is a record from before they were, and
-// there is nothing to ask. Asked where the User is already read — when a
-// passkey answers — because a per-request read of the User store is a list
-// of every User per request.
+// A key the User holds is its own route. An account with no binding kept, or
+// none at all, is nothing proven, and a sign-in writes the binding (joinUser).
 func (h *Handler) heldBindingStillCounts(u User, route string) error {
+	if u.HoldsKey(route) {
+		return nil
+	}
 	for _, a := range u.Accounts {
-		if a.CanonicalID != route || a.Binding == nil {
+		if a.CanonicalID != route {
 			continue
+		}
+		if a.Binding == nil {
+			return errors.Newf("no binding is kept for %s; sign in with %s again", route, a.Provider)
 		}
 		claimed, err := hex.DecodeString(a.Binding.Claim.PeerPubkeyHex)
 		if err != nil {
@@ -138,7 +146,7 @@ func (h *Handler) heldBindingStillCounts(u User, route string) error {
 		}
 		return verifyBinding(*a.Binding, ed25519.PublicKey(claimed), h.identities.trustedSigners())
 	}
-	return nil
+	return errors.Newf("User %q holds no account or key %s", u.ID, route)
 }
 
 // levelOf is how much an identity is admitted at, read from what admits it.

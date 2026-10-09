@@ -44,6 +44,7 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 	// Query all type attestations through the store (Rust FFI)
 	filter := ats.AttestationFilter{
 		Predicates: []string{"type"},
+		Limit:      ats.EveryRow,
 	}
 	allTypes, err := s.held.Served().GetAttestations(filter)
 	if err != nil {

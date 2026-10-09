@@ -26,8 +26,8 @@ the plugin's ConfigSchema does not name it and does not validate it. The
 plugin element is where it is written, as every record key is (ADR-043).
 
 At Initialize the node mints such a plugin a token of its own, reaching the
-store of that namespace at the ATS store service and the fetch service. The
-shared token stays what it is for every plugin whose record names none. A new
+store of that namespace at the ATS store service and the fetch service. A
+record naming none stands nowhere and is handed no token (ADR-027). A new
 token is minted at each Initialize, so a record that moved a plugin moves
 where it reads and writes, and the token before it reaches nothing.
 

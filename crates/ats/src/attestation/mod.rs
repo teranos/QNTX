@@ -20,4 +20,6 @@
 
 mod types;
 
-pub use types::{Attestation, AttestationBuilder, AxFilter, AxResult, AxSummary, Conflict};
+pub use types::{
+    Attestation, AttestationBuilder, AxFilter, AxResult, AxSummary, Conflict, EVERY_ROW,
+};

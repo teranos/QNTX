@@ -169,7 +169,7 @@ func TestTheTranscriptsSigilReadsWhereTheCallerStands(t *testing.T) {
 	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
 	signum := s.transcriptsSignum()
 	require.NoError(t, signum.Check())
-	asked := httptest.NewRequest(http.MethodGet, "/api/transcripts", nil)
+	asked := rootRequest(httptest.NewRequest(http.MethodGet, "/api/transcripts", nil))
 
 	answer, refused := signum.Answers["read"](sigil.WithCaller(context.Background(), asked), sigil.Sent{})
 	require.Nil(t, refused)
@@ -198,7 +198,7 @@ func TestAGroundedRowNoPredicateNamesIsATurn(t *testing.T) {
 		require.NoError(t, store.CreateAttestation(as))
 	}
 	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
-	asked := httptest.NewRequest(http.MethodGet, "/api/transcripts", nil)
+	asked := rootRequest(httptest.NewRequest(http.MethodGet, "/api/transcripts", nil))
 
 	for _, sent := range []sigil.Sent{{}, {"session": "s-1"}} {
 		answer, refused := s.transcriptsRead(sigil.WithCaller(context.Background(), asked), sent)

@@ -102,10 +102,13 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 	defer func() { err = sqlclose.With(err, database.Close(), "the server database") }()
 	bootLog.Infow("openDatabase complete", "took", time.Since(dbStart))
 
-	// Resolve log path from config
+	// A config that does not load is not served from as if it said nothing.
 	cfg, err := config.Load()
 	if err != nil {
-		cfg = &config.Config{}
+		return errors.Wrap(err, "the config did not load, so the node does not start")
+	}
+	if err := server.RefuseUnsaidGate(); err != nil {
+		return err
 	}
 	logPath := cfg.GetLogPath(serverPort)
 

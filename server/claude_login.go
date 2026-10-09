@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/claudecode"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 )
@@ -84,6 +85,11 @@ func (s *QNTXServer) claudeLogin(ctx context.Context, h *harness, sent sigil.Sen
 	if refused != nil {
 		return nil, refused
 	}
+	return s.loginAgent(ctx, h, agent, sent)
+}
+
+// loginAgent signs one agent in to Claude Code, or finishes the sign-in begun.
+func (s *QNTXServer) loginAgent(ctx context.Context, h *harness, agent *rootAgent, sent sigil.Sent) (any, *protocol.Refusal) {
 	binary, err := s.harnessHeldBy(h.name).Path(ctx)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no Claude Code to sign in to: " + err.Error()}
@@ -127,7 +133,7 @@ func (s *QNTXServer) claudeLogin(ctx context.Context, h *harness, sent sigil.Sen
 	agent.signingIn.pending, agent.signingIn.cancel = in, cancel
 	agent.signingIn.mu.Unlock()
 	// A window that closes with no code leaves nothing pending.
-	go func() {
+	sacred.Go("claude.login.window", func() {
 		<-window.Done()
 		agent.signingIn.mu.Lock()
 		defer agent.signingIn.mu.Unlock()
@@ -135,7 +141,7 @@ func (s *QNTXServer) claudeLogin(ctx context.Context, h *harness, sent sigil.Sen
 			agent.signingIn.unended = in.Abandon()
 			agent.signingIn.pending, agent.signingIn.cancel = nil, nil
 		}
-	}()
+	})
 	return s.signedIn(ctx, binary, agent.home, in.URL)
 }
 

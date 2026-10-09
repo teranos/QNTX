@@ -60,17 +60,15 @@ type (
 
 // ChildJobInfo represents a child job summary
 type ChildJobInfo struct {
-	ID           string  `json:"id"`
-	HandlerName  string  `json:"handler_name"`
-	Source       string  `json:"source"`
-	Status       string  `json:"status"`
-	ProgressPct  float64 `json:"progress_pct,omitempty"`
-	CostEstimate float64 `json:"cost_estimate,omitempty"`
-	CostActual   float64 `json:"cost_actual,omitempty"`
-	Error        string  `json:"error,omitempty"`
-	CreatedAt    string  `json:"created_at"`
-	StartedAt    *string `json:"started_at,omitempty"`
-	CompletedAt  *string `json:"completed_at,omitempty"`
+	ID          string  `json:"id"`
+	HandlerName string  `json:"handler_name"`
+	Source      string  `json:"source"`
+	Status      string  `json:"status"`
+	ProgressPct float64 `json:"progress_pct,omitempty"`
+	Error       string  `json:"error,omitempty"`
+	CreatedAt   string  `json:"created_at"`
+	StartedAt   *string `json:"started_at,omitempty"`
+	CompletedAt *string `json:"completed_at,omitempty"`
 }
 
 // JobChildrenResponse represents the response for GET /api/pulse/jobs/:id/children
