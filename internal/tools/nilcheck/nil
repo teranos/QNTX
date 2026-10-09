@@ -1,9 +1,11 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3410 in 434 files.
+# 3414 in 435 files.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
 # ats/types/attestation.go: +1, NamesItsActor refuses a command naming no actor: one check every store's generate path calls, where four filled one in.
+# server/attestation_handlers.go: +1, the node authors what its caller named nobody for.
+# server/quote_removal.go: 7, from 82e8e8cf unbaselined: refusals of no actor, namespace or span, nothing removed ends the run, a count for the note, the daemon check its siblings hold.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -255,7 +257,7 @@
 7	server/am_ground.go
 2	server/am_sigils.go
 1	server/answers.go
-30	server/attestation_handlers.go
+31	server/attestation_handlers.go
 5	server/auth/apple.go
 11	server/auth/arrive.go
 3	server/auth/atproto.go
@@ -305,7 +307,7 @@
 20	server/broadcast.go
 4	server/builtin_executor.go
 2	server/checkpoint_pulse.go
-30	server/ci_pulse.go
+29	server/ci_pulse.go
 13	server/claude.go
 3	server/claude_git.go
 4	server/claude_login.go
@@ -390,7 +392,8 @@
 1	server/pulse_types.go
 2	server/python_handlers.go
 4	server/quote_provenance.go
-13	server/quote_watch.go
+7	server/quote_removal.go
+12	server/quote_watch.go
 2	server/ratelimit.go
 6	server/reach/open.go
 9	server/reach/table.go
@@ -425,7 +428,7 @@
 8	server/sub_auth.go
 6	server/sub_canvas.go
 9	server/sub_embedding.go
-4	server/sub_plugins.go
+2	server/sub_plugins.go
 1	server/sub_store_proof.go
 2	server/sub_ticker.go
 1	server/syscap/parser_qntx.go

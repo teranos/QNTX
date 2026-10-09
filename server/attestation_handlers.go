@@ -507,6 +507,12 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 			actors = append([]string{admitted.Identity}, req.Actors...)
 		}
 	}
+	// "the node"
+	//
+	// authors what its caller named nobody for.
+	if len(actors) == 0 {
+		actors = []string{s.nodeActor()}
+	}
 
 	// Roles are kept where the node keeps what it knows about itself, whatever
 	// namespace the writer is in. Writing there is not seeing there: this is

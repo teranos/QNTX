@@ -79,10 +79,8 @@ func (h *quoteRemovalHandler) Execute(ctx context.Context, job *async.Job) error
 func (h *quoteRemovalHandler) leave(as types.As, namespace, commit string, removed []quoteRemoved, read int) {
 	caller := as.Actors[0]
 	addressee := caller
-	if h.mintedBy != nil {
-		if who, ok := h.mintedBy(caller); ok {
-			addressee = who
-		}
+	if who, ok := h.mintedBy(caller); ok {
+		addressee = who
 	}
 	shown := removed[0].Span
 	if len(shown) > quoteNoteSpan {
@@ -116,9 +114,6 @@ func (h *quoteRemovalHandler) leave(as types.As, namespace, commit string, remov
 func (s *QNTXServer) setupQuoteRemoval() {
 	if s.daemon == nil {
 		return
-	}
-	if s.news == nil {
-		s.news = newNewsLog()
 	}
 	s.daemon.Registry().Register(&quoteRemovalHandler{
 		prompts:  s.namespacePrompts,

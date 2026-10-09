@@ -97,10 +97,10 @@ type Job struct {
 	UserID    string `json:"user_id,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
 
-	CreatedAt     time.Time       `json:"created_at"`
-	StartedAt     *time.Time      `json:"started_at,omitempty"`
-	CompletedAt   *time.Time      `json:"completed_at,omitempty"`
-	UpdatedAt     time.Time       `json:"updated_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // NewJobWithPayload creates a new generic job with handler name and typed payload.

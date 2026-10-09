@@ -62,7 +62,6 @@ func hasChecksumColumn(db *sql.DB) (found bool, err error) {
 	return found, nil
 }
 
-
 // Migrate runs all pending migrations.
 // If logger is provided, logs migration progress; otherwise operates silently.
 func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {

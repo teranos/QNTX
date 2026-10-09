@@ -157,7 +157,7 @@ func TestJobTimeDrift(t *testing.T) {
 
 	job := &Job{
 		Id:              "SPJ_drift_test",
-		IntervalSeconds: 3600,                         // 1 hour
+		IntervalSeconds: 3600,                                         // 1 hour
 		NextRunAt:       now.Add(-2 * time.Hour).Format(time.RFC3339), // Should have run 2 hours ago
 		State:           StateActive,
 	}

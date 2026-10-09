@@ -22,12 +22,6 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	s.pluginHandler.sigils = s.pluginSigilRows
 	s.pluginHandler.records = s.pluginRecords().Plugins
 	grpcplugin.SetPluginRecords(s.pluginRecords())
-	if s.handlerFailures == nil {
-		s.handlerFailures = newHandlerFailureLog()
-	}
-	if s.news == nil {
-		s.news = newNewsLog()
-	}
 	s.statusLineHandler = NewStatusLineHandler(pluginRegistry, s.logger, s.pluginHealth,
 		// Fetched per request: the backend supplies the watcher store after
 		// this handler is built.

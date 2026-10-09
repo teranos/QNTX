@@ -28,13 +28,13 @@ func newWatcherStore(t *testing.T, location string) *WatcherStore {
 
 func declaration(id string) WatcherRecord {
 	return WatcherRecord{
-		ID:                id,
-		Name:              "watcher " + id,
-		ActionType:        "webhook",
-		ActionData:        "http://127.0.0.1:1/hook",
-		AxQuery:           "thing:happened",
-		MaxFiresPerSecond: 8,
-		Enabled:           true,
+		ID:                   id,
+		Name:                 "watcher " + id,
+		ActionType:           "webhook",
+		ActionData:           "http://127.0.0.1:1/hook",
+		AxQuery:              "thing:happened",
+		MaxFiresPerSecond:    8,
+		Enabled:              true,
 		CreatedAt:            1_700_000_000_000,
 		UpdatedAt:            1_700_000_000_000,
 		FilterJSON:           `{"predicates":["thing:happened"]}`,

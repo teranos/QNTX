@@ -42,14 +42,14 @@ type Report struct {
 	Node   string
 	Window sentryread.Window
 
-	Attestations    []namespaceCount
-	AttestationsErr string
+	Attestations     []namespaceCount
+	AttestationsErr  string
 	Registrations    []namespaceCount
 	RegistrationsErr string
-	Restarts    int
-	RestartsErr string
-	Failures    []async.HandlerFailures
-	FailuresErr string
+	Restarts         int
+	RestartsErr      string
+	Failures         []async.HandlerFailures
+	FailuresErr      string
 
 	// Why Sentry was not asked at all, when it was not.
 	SentryErr string

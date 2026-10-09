@@ -312,9 +312,9 @@ func depthUnder(work, path string) int {
 
 // RunnerStats is what the GitHub element shows of the runner, read off its directory.
 type RunnerStats struct {
-	Path       string       `json:"path"`
-	Name       string       `json:"name"`
-	GitHubURL  string       `json:"github_url"`
+	Path       string   `json:"path"`
+	Name       string   `json:"name"`
+	GitHubURL  string   `json:"github_url"`
 	Workspaces []string `json:"workspaces"`
 	// Jobs is when each job the runner ran was last written, oldest first.
 	Jobs  []time.Time  `json:"jobs"`
