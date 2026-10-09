@@ -57,6 +57,18 @@ const QuoteClaimedPredicate = "quote:claimed"
 // QuoteProvenanceHandlerName is the built-in the row above reaches.
 const QuoteProvenanceHandlerName = "quote.provenance"
 
+// StandingQuoteRemoved watches for ground attesting the quoted spans a commit
+// took out and put back nowhere. The handler it names asks which of them the
+// person said.
+const StandingQuoteRemoved = "standing-quote-removed"
+
+// QuoteRemovedPredicate is what ground writes after a commit and sky streams
+// here. One spelling, shared with the handler.
+const QuoteRemovedPredicate = "quote:removed"
+
+// QuoteRemovalHandlerName is the built-in the row above reaches.
+const QuoteRemovalHandlerName = "quote.removal"
+
 // standing is the table. Unexported and copied on the way out: a caller that
 // could reach the rows could edit what every node is born with.
 var standing = []storage.Watcher{
@@ -102,6 +114,17 @@ var standing = []storage.Watcher{
 		Filter:            types.AxFilter{Predicates: []string{QuoteClaimedPredicate}},
 		ActionType:        storage.ActionTypeBuiltinExecute,
 		ActionData:        `{"handler_name":"` + QuoteProvenanceHandlerName + `"}`,
+		MaxFiresPerSecond: 10,
+		Enabled:           true,
+	},
+	{
+		ID:   StandingQuoteRemoved,
+		Name: "a commit took quoted spans out",
+		// The commit landed on the laptop; whether what it took out was the
+		// person's words is asked here, of the prompts this namespace holds.
+		Filter:            types.AxFilter{Predicates: []string{QuoteRemovedPredicate}},
+		ActionType:        storage.ActionTypeBuiltinExecute,
+		ActionData:        `{"handler_name":"` + QuoteRemovalHandlerName + `"}`,
 		MaxFiresPerSecond: 10,
 		Enabled:           true,
 	},

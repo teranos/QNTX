@@ -635,7 +635,7 @@ func TestGetDaemon(t *testing.T) {
 	handlers := registry.Names()
 	for _, h := range handlers {
 		if h != "distill" && h != "wal-checkpoint" && h != watcher.CIWatchHandlerName && h != reportHandlerName &&
-			h != watcher.QuoteProvenanceHandlerName {
+			h != watcher.QuoteProvenanceHandlerName && h != watcher.QuoteRemovalHandlerName {
 			t.Errorf("Unexpected handler registered: %s", h)
 		}
 	}

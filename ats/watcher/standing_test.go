@@ -28,6 +28,10 @@ var whyStanding = map[string]string{
 		"hook that held the write for up to twelve seconds, against every prompt on the laptop; " +
 		"the write now passes, and the claim is asked of the prompts this namespace holds, here, " +
 		"and what has no source goes back the way a push's verdict does",
+	StandingQuoteRemoved: "the person's quotes were taken out of their code and documentation, " +
+		"and replaced with words nobody said. A commit's removed quotes are asked of the " +
+		"prompts this namespace holds, here, and each one the person said goes back the way " +
+		"a push's verdict does",
 }
 
 func TestEveryStandingWatcherSaysWhy(t *testing.T) {
