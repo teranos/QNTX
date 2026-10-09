@@ -182,22 +182,29 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			}
 			// A declared route's answer is the plugin's own and is not held to
 			// what it gives on the plugin path, so it is not promised here.
-			given := promise{}
+			var given promise
 			if !signum.Declared {
-				given = givenAsSchema(held.sigil)
+				promised, err := givenAsSchema(held.sigil)
+				if err != nil {
+					// answeredOf states every answer's schema before a signum is
+					// served, so a checked sigil never fails here; one that did
+					// would promise what cannot be held, and is not offered.
+					continue
+				}
+				given = promised
 			}
-			if given.made {
+			if given.says {
 				tool.OutputSchema = given.schema
 			}
 			server.AddTool(tool, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				if result := takenAsSaid(schema, toolNameOf(held.signum, held.sigil), req.Params.Arguments); result != nil {
-					return result, nil
-				}
 				args := map[string]any{}
 				if len(req.Params.Arguments) > 0 {
 					if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 						return refused("the arguments to %s did not read: %v", held.sigil.GetName(), err), nil
 					}
+				}
+				if refusal, taken := takenAsSaid(schema, toolNameOf(held.signum, held.sigil), args); !taken {
+					return refusal, nil
 				}
 				if s.served == nil {
 					return refused("the node is not serving, so %s cannot be asked", held.sigil.GetName()), nil
@@ -236,17 +243,16 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			Description: describe(path, prefix),
 			InputSchema: calledThroughSchema,
 		}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if result := takenAsSaid(calledThroughSchema, toolName(path), req.Params.Arguments); result != nil {
-				return result, nil
-			}
 			var in calledThrough
 			if len(req.Params.Arguments) > 0 {
 				if err := json.Unmarshal(req.Params.Arguments, &in); err != nil {
 					return refused("the arguments to %s did not read: %v", toolName(path), err), nil
 				}
 			}
-			if in.Method == "" {
-				return refused("%s needs a method: nothing says which methods %s answers", toolName(path), path), nil
+			// Nothing says which methods a route answers, so the method is one
+			// the schema names, and none is refused.
+			if refusal, taken := takenAsSaid(calledThroughSchema, toolName(path), in); !taken {
+				return refusal, nil
 			}
 			op := operation{Path: path, Method: strings.ToUpper(in.Method), Prefix: prefix}
 			return callThrough(ctx, s.served, r, op, in), nil
@@ -255,17 +261,18 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 	return server
 }
 
-// takenAsSaid holds a call's arguments to the inputSchema its tool says, before
-// anything is asked: what a tool says it takes is what it takes over MCP. Nil
-// is held; a tool error says what is not. No arguments are an empty object.
-func takenAsSaid(schema map[string]any, tool string, arguments json.RawMessage) *mcp.CallToolResult {
-	if len(arguments) == 0 || string(arguments) == "null" {
-		arguments = json.RawMessage("{}")
+// takenAsSaid holds a call's arguments, as they were read, to the inputSchema
+// its tool says, before anything is asked: what a tool says it takes is what
+// it takes over MCP. When they are not held, the tool error says why.
+func takenAsSaid(schema map[string]any, tool string, arguments any) (*mcp.CallToolResult, bool) {
+	sent, err := json.Marshal(arguments)
+	if err != nil {
+		return refused("the arguments to %s do not marshal: %v", tool, err), false
 	}
-	if err := heldTo(schema, arguments); err != nil {
-		return refused("%s (arguments): %s does not take what was sent: %v", sigil.Invalid, tool, err)
+	if err := heldTo(schema, sent); err != nil {
+		return refused("%s (arguments): %s does not take what was sent: %v", sigil.Invalid, tool, err), false
 	}
-	return nil
+	return nil, true
 }
 
 // describe is the route a tool calls. Nothing else is known of it until a

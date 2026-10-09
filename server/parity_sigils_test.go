@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -78,7 +79,7 @@ func TestParityHoldRefuses(t *testing.T) {
 		"follows nothing":     {sigil.Sent{"signum": "parity"}, "signum", sigil.NotFound},
 		"not a reference":     {sigil.Sent{"signum": "staands", "reference": "matomo"}, "reference", sigil.NotFound},
 		"no such sigil":       {sigil.Sent{"signum": "staands", "sigil": "nosuch"}, "sigil", sigil.NotFound},
-		"a sigil of no shape": {sigil.Sent{"signum": "staands", "sigil": "create"}, "sigil", sigil.Invalid},
+		"a sigil of no shape": {sigil.Sent{"signum": "am", "sigil": "ground"}, "sigil", sigil.Invalid},
 	} {
 		_, refused := hold(context.Background(), c.sent)
 		if refused == nil || refused.GetParam() != c.param || refused.GetWhy() != c.why {
@@ -194,7 +195,9 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 		if held.Ours["protocol.Sigil.does"] != "What it is for, in words, for somebody who has never seen the code." {
 			t.Errorf("%s: Sigil.does says %q", name, held.Ours["protocol.Sigil.does"])
 		}
-		if len(held.Unfollowed["protocol.Sigil"]) != 0 {
+		// answer names the message outputSchema is made from, through the
+		// fields given, and no column of MCP is a message's name.
+		if !slices.Equal(held.Unfollowed["protocol.Sigil"], []string{"answer"}) {
 			t.Errorf("%s: Sigil unfollowed is %v", name, held.Unfollowed["protocol.Sigil"])
 		}
 		holds(t, signum, "hold", answer)

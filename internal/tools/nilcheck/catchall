@@ -92,7 +92,7 @@
 1	server/lifecycle.go
 1	server/mcp.go
 1	server/parity/engines.go
-2	server/parity/prisma.go
+1	server/parity/prisma.go
 1	server/parity/references.go
 1	server/parity_sigils.go
 2	server/plugin_config_handlers.go

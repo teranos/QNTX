@@ -20,11 +20,10 @@ func (s *QNTXServer) piHarness() *harness {
 	named := func() appcfg.PiConfig { return s.deps.cfg.Agent.Root.Pi }
 	return &harness{
 		name: "pi", called: "Pi", file: piSessionFile,
-		description:    "The ROOT agent in Pi: the same agent as in Claude Code, in its other harness and a session of its own.",
-		sayDoes:        "Says something to the ROOT agent in Pi and gives what it answered. It is its session in Pi, beside the one in Claude Code, read with pi session.",
-		amDoes:         "Who the ROOT agent is in Pi and how the node runs it there.",
-		sessionDoes:    "The ROOT agent's session in Pi, whole: everything said to it there, as a transcript.",
-		transcriptSays: "Its session in Pi as turns, each naming the attestation it was read from. Empty before anything was said to it there.",
+		description: "The ROOT agent in Pi: the same agent as in Claude Code, in its other harness and a session of its own.",
+		sayDoes:     "Says something to the ROOT agent in Pi and gives what it answered. It is its session in Pi, beside the one in Claude Code, read with pi session.",
+		amDoes:      "Who the ROOT agent is in Pi and how the node runs it there.",
+		sessionDoes: "The ROOT agent's session in Pi, whole: everything said to it there, as a transcript.",
 		sayGives: []*protocol.Field{
 			{Name: "answer", Says: "What it answered."},
 			{Name: "is_error", Says: "Whether the turn ended in error, in the answer's words."},

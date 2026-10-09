@@ -124,7 +124,7 @@ func (s *QNTXServer) vaultDirs(_ context.Context, sent sigil.Sent) (any, *protoc
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return map[string]any{"dirs": dirs}, nil
+	return &protocol.VaultDirs{Dirs: dirs}, nil
 }
 
 // vaultOwner is one user or organization the App is installed on.
@@ -184,7 +184,7 @@ func (s *QNTXServer) vaultRepos(ctx context.Context, sent sigil.Sent) (any, *pro
 		}
 	}
 	slices.Sort(repos)
-	return map[string]any{"repos": repos}, nil
+	return &protocol.VaultRepos{Repos: repos}, nil
 }
 
 // repoDirs is the folders directly inside dir of owner/repo on branch, or why
@@ -228,7 +228,7 @@ func (s *QNTXServer) vaultSubdirs(ctx context.Context, sent sigil.Sent) (any, *p
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return map[string]any{"dirs": dirs, "branch": branch}, nil
+	return &protocol.VaultSubdirs{Dirs: dirs, Branch: branch}, nil
 }
 
 func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {

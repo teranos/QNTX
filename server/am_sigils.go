@@ -39,16 +39,10 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 			Follows: []*protocol.Follows{amFollowsAgentCard()},
 			Sigils: []*protocol.Sigil{
 				{
-					Name: "version",
-					Does: "Which build is running, in full: the whole commit, not the seven characters the connect frame sends.",
-					Gives: []*protocol.Field{
-						{Name: "version", Says: "The version tag."},
-						{Name: "commit_hash", Says: "The whole commit."},
-						{Name: "build_time", Says: "When it was built."},
-						{Name: "go_version", Says: "The Go it was built with."},
-						{Name: "platform", Says: "The OS and architecture."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/version"},
+					Name:   "version",
+					Does:   "Which build is running, in full: the whole commit, not the seven characters the connect frame sends.",
+					Answer: "protocol.VersionInfo",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/am/version"},
 				},
 				{
 					// "am node same thing": am node answers the Agent Card the
@@ -62,20 +56,10 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/node"},
 				},
 				{
-					Name: "syscap",
-					Does: "What this build can do: the storage backend and the parser it was built against. What the connect frame pushes, asked for.",
-					Gives: []*protocol.Field{
-						{Name: "type", Says: "system_capabilities."},
-						{Name: "store", Says: "The store this node was started with."},
-						{Name: "storage_backend", Says: "rust or go: which storage implementation is active."},
-						{Name: "storage_optimized", Says: "Whether it is the Rust SQLite one."},
-						{Name: "storage_version", Says: "The ats-sqlite library's version."},
-						{Name: "parser_backend", Says: "wasm or go: which parser implementation is active."},
-						{Name: "parser_optimized", Says: "Whether it is ats through WASM."},
-						{Name: "parser_version", Says: "The ats version, through WASM."},
-						{Name: "parser_size", Says: "The WASM module's size."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/syscap"},
+					Name:   "syscap",
+					Does:   "What this build can do: the storage backend and the parser it was built against. What the connect frame pushes, asked for.",
+					Answer: "protocol.SystemCapabilitiesMessage",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/am/syscap"},
 				},
 				{
 					Name:  "item",
@@ -100,10 +84,12 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 			},
 		},
 		Answers: map[string]sigil.Answer{
-			"version": func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return version.Get(), nil },
+			"version": func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return versionInfo(version.Get()), nil },
 			"node":    s.amNode,
-			"syscap":  func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return syscap.Get(s.store), nil },
-			"ground":  s.amGround,
+			"syscap": func(context.Context, sigil.Sent) (any, *protocol.Refusal) {
+				return capabilities(syscap.Get(s.store)), nil
+			},
+			"ground": s.amGround,
 			"item": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 				return s.statusLineHandler.item(ctx, sent["name"])
 			},
@@ -135,4 +121,18 @@ func (s *QNTXServer) amNode(ctx context.Context, _ sigil.Sent) (any, *protocol.R
 		missing = []string{}
 	}
 	return amNode{Card: body, Missing: missing}, nil
+}
+
+// versionInfo is the build as am version answers it.
+func versionInfo(v version.Info) *protocol.VersionInfo {
+	return &protocol.VersionInfo{CommitHash: v.CommitHash, BuildTime: v.BuildTime, Version: v.Version, GoVersion: v.GoVersion, Platform: v.Platform}
+}
+
+// capabilities is what this build can do, as am syscap answers it.
+func capabilities(m syscap.Message) *protocol.SystemCapabilitiesMessage {
+	return &protocol.SystemCapabilitiesMessage{
+		Type: m.Type, Store: m.Store,
+		StorageBackend: m.StorageBackend, StorageOptimized: m.StorageOptimized, StorageVersion: m.StorageVersion,
+		ParserBackend: m.ParserBackend, ParserOptimized: m.ParserOptimized, ParserVersion: m.ParserVersion, ParserSize: m.ParserSize,
+	}
 }

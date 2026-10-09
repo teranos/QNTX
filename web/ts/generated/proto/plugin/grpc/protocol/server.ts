@@ -188,7 +188,7 @@ export interface RichSearchResultsMessage {
  * Mirrors syscap.Message.
  */
 export interface SystemCapabilitiesMessage {
-  /** "system_capabilities" */
+  /** system_capabilities. */
   type: string;
   /**
    * store is which store the node keeps (ADR-023) — sqlite or parquet.
@@ -196,19 +196,19 @@ export interface SystemCapabilitiesMessage {
    * Namespaces exist only under parquet, and sigma only under sqlite.
    */
   store: string;
-  /** rust or go */
+  /** rust or go: which storage implementation is active. */
   storage_backend: string;
-  /** Rust SQLite rather than the Go fallback */
+  /** Whether it is the Rust SQLite one. */
   storage_optimized: boolean;
-  /** ats-sqlite library version */
+  /** The ats-sqlite library's version. */
   storage_version: string;
-  /** wasm or go */
+  /** wasm or go: which parser implementation is active. */
   parser_backend: string;
-  /** ats via WASM rather than the Go parser */
+  /** Whether it is ats through WASM. */
   parser_optimized: boolean;
-  /** ats version when using WASM */
+  /** The ats version, through WASM. */
   parser_version: string;
-  /** WASM module size, e.g. "89KB" */
+  /** The WASM module's size. */
   parser_size: string;
 }
 
@@ -217,10 +217,15 @@ export interface SystemCapabilitiesMessage {
  * Mirrors version.Info.
  */
 export interface VersionInfo {
+  /** The whole commit. */
   commit_hash: string;
+  /** When it was built. */
   build_time: string;
+  /** The version tag. */
   version: string;
+  /** The Go it was built with. */
   go_version: string;
+  /** The OS and architecture. */
   platform: string;
 }
 
@@ -479,4 +484,39 @@ export interface WatcherQueueStatusMessage_TargetElementsEntry {
 export interface WatcherQueueStatusMessage_WatcherStatsEntry {
   key: string;
   value: WatcherBroadcastStats | undefined;
+}
+
+/** ReachWritten is what reach grant and reach revoke answer. */
+export interface ReachWritten {
+  /** The attestation the line was written as. */
+  id: string;
+}
+
+/** NamespaceActedOn is what namespaces disable, enable, delete and nuke answer. */
+export interface NamespaceActedOn {
+  /** The namespace acted on. */
+  name: string;
+}
+
+/** VaultDirs is what vault dirs answers. */
+export interface VaultDirs {
+  /** Each folder's place in the vault, folders apart by /. */
+  dirs: string[];
+}
+
+/** VaultRepos is what vault repos answers. */
+export interface VaultRepos {
+  /** Each repository as owner/repo. */
+  repos: string[];
+}
+
+/** VaultSubdirs is what vault subdirs answers. */
+export interface VaultSubdirs {
+  /** Each folder's path from the repository's top. */
+  dirs: string[];
+  /**
+   * The repository's default branch, which the folders are read on and a
+   * folder is bound to.
+   */
+  branch: string;
 }

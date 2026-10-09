@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/types"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	"go.uber.org/zap/zaptest"
@@ -173,24 +174,16 @@ func TestTheTranscriptsSigilReadsWhereTheCallerStands(t *testing.T) {
 	answer, refused := signum.Answers["read"](sigil.WithCaller(context.Background(), asked), sigil.Sent{})
 	require.Nil(t, refused)
 	holds(t, signum, "read", answer)
-	all := answer.(map[string]any)["transcripts"].([]transcript)
+	all := answer.(*protocol.Transcripts).GetTranscripts()
 	require.Len(t, all, 2)
-	assert.Equal(t, "s-2", all[0].Session)
-	assert.Len(t, all[1].Turns, 7)
+	assert.Equal(t, "s-2", all[0].GetSession())
+	assert.Len(t, all[1].GetTurns(), 7)
 
 	answer, refused = signum.Answers["read"](sigil.WithCaller(context.Background(), asked), sigil.Sent{"session": "s-1"})
 	require.Nil(t, refused)
-	one := answer.(map[string]any)["transcripts"].([]transcript)
+	one := answer.(*protocol.Transcripts).GetTranscripts()
 	require.Len(t, one, 1)
-	assert.Equal(t, "s-1", one[0].Session)
-}
-
-// transcripts read answers Go structs for their json tags, and proto declares
-// their shape (ADR-006): the two are held to the same fields here.
-func TestATranscriptIsTheShapeProtoDeclares(t *testing.T) {
-	const declared = "../plugin/grpc/protocol/sigil.proto"
-	assert.Equal(t, fieldsOf(t, declared, "Transcript"), jsonNamesOf(t, transcript{}))
-	assert.Equal(t, fieldsOf(t, declared, "Turn"), jsonNamesOf(t, transcriptTurn{}))
+	assert.Equal(t, "s-1", one[0].GetSession())
 }
 
 // Spike: Ground names a control's row Grounded and the event, for any event.
@@ -210,10 +203,10 @@ func TestAGroundedRowNoPredicateNamesIsATurn(t *testing.T) {
 	for _, sent := range []sigil.Sent{{}, {"session": "s-1"}} {
 		answer, refused := s.transcriptsRead(sigil.WithCaller(context.Background(), asked), sent)
 		require.Nil(t, refused)
-		read := answer.(map[string]any)["transcripts"].([]transcript)
+		read := answer.(*protocol.Transcripts).GetTranscripts()
 		require.Len(t, read, 1)
-		last := read[0].Turns[len(read[0].Turns)-1]
-		assert.Equal(t, "no-kill on PermissionDeny", last.Text, "asked with %v", sent)
+		turns := read[0].GetTurns()
+		assert.Equal(t, "no-kill on PermissionDeny", turns[len(turns)-1].GetText(), "asked with %v", sent)
 	}
 }
 

@@ -366,3 +366,19 @@ export interface ElementDef {
    */
   module_path: string;
 }
+
+/**
+ * PluginAction is what plugins pause, resume, restart, enable and disable
+ * answer.
+ */
+export interface PluginAction {
+  /** The plugin acted on. */
+  name: string;
+  /**
+   * Its state after the action. A restart says restarting: the outcome is seen
+   * in its health.
+   */
+  state: string;
+  /** The action taken. */
+  action: string;
+}

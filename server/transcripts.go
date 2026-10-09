@@ -45,29 +45,40 @@ const (
 // transcriptTurn is one thing said or done in a session: who, what, when, and
 // the attestation it was read from.
 type transcriptTurn struct {
-	At      string `json:"at"`
-	Speaker string `json:"speaker"`
-	Text    string `json:"text"`
-	Of      string `json:"of"`
+	At      string
+	Speaker string
+	Text    string
+	Of      string
 
 	when time.Time
 }
 
-// transcript is one session, every turn in the order it happened.
+// transcript is one session, every turn in the order it happened, as it is
+// read; what is answered is protocol.Transcript.
 type transcript struct {
-	Session  string           `json:"session"`
-	Subjects []string         `json:"subjects"`
-	Started  string           `json:"started"`
-	Ended    string           `json:"ended"`
-	Turns    []transcriptTurn `json:"turns"`
+	Session  string
+	Subjects []string
+	Started  string
+	Ended    string
+	Turns    []transcriptTurn
 	// Events the store folded into sigmas (ADR-020): said, because no turn
 	// can be read back from a sigma.
-	Folded int `json:"folded"`
+	Folded int
 	// The model its SessionStart names, and the effort.level its last Stop ran at.
-	Model  string `json:"model"`
-	Effort string `json:"effort"`
+	Model  string
+	Effort string
 
 	effortAt time.Time
+}
+
+// message is the session as it is answered.
+func (t transcript) message() *protocol.Transcript {
+	turns := make([]*protocol.Turn, 0, len(t.Turns))
+	for _, turn := range t.Turns {
+		turns = append(turns, &protocol.Turn{At: turn.At, Speaker: turn.Speaker, Text: turn.Text, Of: turn.Of})
+	}
+	return &protocol.Transcript{Session: t.Session, Subjects: t.Subjects, Started: t.Started, Ended: t.Ended,
+		Turns: turns, Folded: uint32(t.Folded), Model: t.Model, Effort: t.Effort}
 }
 
 func (s *QNTXServer) transcriptsSignum() sigil.Signum {
@@ -83,10 +94,8 @@ func (s *QNTXServer) transcriptsSignum() sigil.Signum {
 						{Name: "session", Says: "One session, by its id."},
 						{Name: "limit", Kind: sigil.Count, Says: "How many sessions, newest first."},
 					},
-					Gives: []*protocol.Field{
-						{Name: "transcripts", Says: "Each session: its id, the subjects it was about, when it started and ended, and its turns, each naming the attestation it was read from.", Message: "protocol.Transcript"},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/transcripts"},
+					Answer: "protocol.Transcripts",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/transcripts"},
 				},
 			},
 		},
@@ -129,7 +138,11 @@ func (s *QNTXServer) transcriptsRead(ctx context.Context, sent sigil.Sent) (any,
 	if refused != nil {
 		return nil, refused
 	}
-	return map[string]any{"transcripts": read}, nil
+	answer := &protocol.Transcripts{Transcripts: make([]*protocol.Transcript, 0, len(read))}
+	for _, t := range read {
+		answer.Transcripts = append(answer.Transcripts, t.message())
+	}
+	return answer, nil
 }
 
 // sessionsIn reads each session whole, by its context. Ground names a control's

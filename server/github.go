@@ -132,27 +132,24 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: githubPath},
 				},
 				{
-					Name: "webhook",
-					Does: "Generate the App's webhook secret, replacing the one before, and open the webhook's path. It is shown this once, to set in the App's settings.",
-					Gives: []*protocol.Field{
-						{Name: "secret", Says: "The secret, for the App's webhook settings."},
-						{Name: "url", Says: "The whole URL to paste into the App's webhook settings."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/webhook"},
+					Name:   "webhook",
+					Does:   "Generate the App's webhook secret, replacing the one before, and open the webhook's path. It is shown this once, to set in the App's settings.",
+					Answer: "protocol.GitHubWebhook",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/webhook"},
 				},
 				{
-					Name:  "webhook_path",
-					Does:  "Set where the App's webhook URL points on this node, under " + githubWebhookPrefix + ". The secret stays as it is.",
-					Takes: []*protocol.Param{{Name: "path", Required: true, Says: "A path under " + githubWebhookPrefix + "."}},
-					Gives: []*protocol.Field{{Name: "url", Says: "The whole URL to paste into the App's webhook settings now."}},
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/webhook/path"},
+					Name:   "webhook_path",
+					Does:   "Set where the App's webhook URL points on this node, under " + githubWebhookPrefix + ". The secret stays as it is.",
+					Takes:  []*protocol.Param{{Name: "path", Required: true, Says: "A path under " + githubWebhookPrefix + "."}},
+					Answer: "protocol.GitHubWebhookPath",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/webhook/path"},
 				},
 				{
-					Name:  "node",
-					Does:  "Turn GitHub on or off for the node entirely.",
-					Takes: []*protocol.Param{enabled},
-					Gives: []*protocol.Field{{Name: "enabled", Says: "Whether GitHub is on for the node now."}},
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/node"},
+					Name:   "node",
+					Does:   "Turn GitHub on or off for the node entirely.",
+					Takes:  []*protocol.Param{enabled},
+					Answer: "protocol.GitHubNode",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/node"},
 				},
 				{
 					Name: "runner",
@@ -250,7 +247,7 @@ func (s *QNTXServer) githubNode(ctx context.Context, sent sigil.Sent) (any, *pro
 	if err := s.nodeRecords().SetGitHub(actorOf(ctx), settings); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return map[string]bool{"enabled": on}, nil
+	return &protocol.GitHubNode{Enabled: on}, nil
 }
 
 func (s *QNTXServer) githubRunner(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -291,7 +288,7 @@ func (s *QNTXServer) githubWebhook(ctx context.Context, _ sigil.Sent) (any, *pro
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return map[string]string{"secret": secret, "url": s.webhookURL(settings.WebhookPath)}, nil
+	return &protocol.GitHubWebhook{Secret: secret, Url: s.webhookURL(settings.WebhookPath)}, nil
 }
 
 func (s *QNTXServer) githubWebhookPath(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -307,7 +304,7 @@ func (s *QNTXServer) githubWebhookPath(ctx context.Context, sent sigil.Sent) (an
 	if err := s.nodeRecords().SetGitHub(actorOf(ctx), settings); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return map[string]string{"url": s.webhookURL(path)}, nil
+	return &protocol.GitHubWebhookPath{Url: s.webhookURL(path)}, nil
 }
 
 // runnerStatus is the runner as the Actions section shows it.

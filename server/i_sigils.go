@@ -13,7 +13,6 @@ import (
 // they stand is its first sigils; what answers is server/auth's.
 
 func (s *QNTXServer) iSignum() sigil.Signum {
-	stood := []*protocol.Field{{Name: "namespace", Says: "Where the person now stands. Never empty."}}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        "i",
@@ -21,18 +20,18 @@ func (s *QNTXServer) iSignum() sigil.Signum {
 			Tags:        []string{"identity", "standing", "namespace"},
 			Sigils: []*protocol.Sigil{
 				{
-					Name:  "standing",
-					Does:  "Where the person asking stands: the namespace their writes land in and the namespaces bar draws.",
-					Gives: stood,
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: "/i/standing"},
+					Name:   "standing",
+					Does:   "Where the person asking stands: the namespace their writes land in and the namespaces bar draws.",
+					Answer: "protocol.Standing",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/i/standing"},
 				},
 				{
 					Name: "step",
 					Does: "Move the person asking to a namespace. A person whose admission reaches one namespace stays in that one.",
 					Takes: []*protocol.Param{{Name: "namespace", Required: true,
 						Says: "The namespace to stand in. One the node serves and has not switched off."}},
-					Gives: stood,
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: "/i/standing"},
+					Answer: "protocol.Standing",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/i/standing"},
 				},
 			},
 		},
@@ -52,7 +51,7 @@ func (s *QNTXServer) iStanding(ctx context.Context, _ sigil.Sent) (any, *protoco
 	if err != nil {
 		return nil, refusedAs(status, err)
 	}
-	return map[string]string{"namespace": namespace}, nil
+	return &protocol.Standing{Namespace: namespace}, nil
 }
 
 func (s *QNTXServer) iStep(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -64,7 +63,7 @@ func (s *QNTXServer) iStep(ctx context.Context, sent sigil.Sent) (any, *protocol
 	if err != nil {
 		return nil, refusedAs(status, err)
 	}
-	return map[string]string{"namespace": namespace}, nil
+	return &protocol.Standing{Namespace: namespace}, nil
 }
 
 // iAdmitted is who is asking. A node with no login has no person to answer

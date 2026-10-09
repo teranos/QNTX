@@ -335,3 +335,14 @@ message ElementDef {
   string module_path = 8;
 }
 
+// PluginAction is what plugins pause, resume, restart, enable and disable
+// answer.
+message PluginAction {
+  // The plugin acted on.
+  string name = 1;
+  // Its state after the action. A restart says restarting: the outcome is seen
+  // in its health.
+  string state = 2;
+  // The action taken.
+  string action = 3;
+}

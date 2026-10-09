@@ -26,7 +26,6 @@ type listNamespacesResponse struct {
 
 func (s *QNTXServer) namespacesSignum() sigil.Signum {
 	name := &protocol.Param{Name: "name", Required: true, Says: "The namespace, by its name."}
-	named := []*protocol.Field{{Name: "name", Says: "The namespace acted on."}}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        "namespaces",
@@ -54,41 +53,45 @@ func (s *QNTXServer) namespacesSignum() sigil.Signum {
 					Http: &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces"},
 				},
 				{
-					Name:  "disable",
-					Does:  "Switch a namespace off. Not system or default, and not the one the caller stands in.",
-					Takes: []*protocol.Param{name},
-					Gives: named,
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces/{name}/disable"},
+					Name:   "disable",
+					Does:   "Switch a namespace off. Not system or default, and not the one the caller stands in.",
+					Takes:  []*protocol.Param{name},
+					Answer: "protocol.NamespaceActedOn",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces/{name}/disable"},
 				},
 				{
-					Name:  "enable",
-					Does:  "Switch a namespace back on.",
-					Takes: []*protocol.Param{name},
-					Gives: named,
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces/{name}/enable"},
+					Name:   "enable",
+					Does:   "Switch a namespace back on.",
+					Takes:  []*protocol.Param{name},
+					Answer: "protocol.NamespaceActedOn",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces/{name}/enable"},
 				},
 				{
-					Name:  "delete",
-					Does:  "End a switched-off namespace, draining what it held into default. ROOT's, standing in system.",
-					Takes: []*protocol.Param{name},
-					Gives: named,
-					Http:  &protocol.Endpoint{Method: http.MethodDelete, Path: "/api/namespaces/{name}"},
+					Name:   "delete",
+					Does:   "End a switched-off namespace, draining what it held into default. ROOT's, standing in system.",
+					Takes:  []*protocol.Param{name},
+					Answer: "protocol.NamespaceActedOn",
+					Http:   &protocol.Endpoint{Method: http.MethodDelete, Path: "/api/namespaces/{name}"},
 				},
 				{
-					Name:  "nuke",
-					Does:  "Empty default without ending it: the one place data leaves. Reached standing in system.",
-					Gives: named,
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces/default/nuke"},
+					Name:   "nuke",
+					Does:   "Empty default without ending it: the one place data leaves. Reached standing in system.",
+					Answer: "protocol.NamespaceActedOn",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces/default/nuke"},
 				},
 			},
 		},
 		Answers: map[string]sigil.Answer{
-			"list":         s.namespacesList,
-			"create":       s.namespacesCreate,
-			"disable":      func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.namespacesSwitch(ctx, sent["name"], false) },
-			"enable":       func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.namespacesSwitch(ctx, sent["name"], true) },
-			"delete":       s.namespacesDelete,
-			"nuke":         s.namespacesNuke,
+			"list":   s.namespacesList,
+			"create": s.namespacesCreate,
+			"disable": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+				return s.namespacesSwitch(ctx, sent["name"], false)
+			},
+			"enable": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+				return s.namespacesSwitch(ctx, sent["name"], true)
+			},
+			"delete": s.namespacesDelete,
+			"nuke":   s.namespacesNuke,
 		},
 	}
 }
@@ -155,7 +158,7 @@ func (s *QNTXServer) namespacesSwitch(ctx context.Context, name string, enabled 
 	// switched off. Dropped either way: re-enabling reopens it on the next call.
 	s.held.Forget(name)
 	s.logger.Infow("namespace switched", "namespace", name, "enabled", enabled, "by", askedBy(ctx))
-	return map[string]string{"name": name}, nil
+	return &protocol.NamespaceActedOn{Name: name}, nil
 }
 
 // namespacesDelete ends one, draining what it held into default. The store
@@ -197,7 +200,7 @@ func (s *QNTXServer) namespacesDelete(ctx context.Context, sent sigil.Sent) (any
 			Says: errors.Wrapf(err, "namespace %s ended, and its landing file was not removed", name).Error()}
 	}
 	s.logger.Infow("namespace deleted", "namespace", name, "by", askedBy(ctx))
-	return map[string]string{"name": name}, nil
+	return &protocol.NamespaceActedOn{Name: name}, nil
 }
 
 // namespacesNuke empties default without ending it. Everything a delete drains
@@ -225,7 +228,7 @@ func (s *QNTXServer) namespacesNuke(ctx context.Context, _ sigil.Sent) (any, *pr
 	// default again and finds it empty, which is what it now is.
 	s.held.Forget(auth.NamespaceDefault)
 	s.logger.Infow("default nuked", "by", askedBy(ctx))
-	return map[string]string{"name": auth.NamespaceDefault}, nil
+	return &protocol.NamespaceActedOn{Name: auth.NamespaceDefault}, nil
 }
 
 // notStandingIn refuses switching off or ending the namespace the caller

@@ -87,15 +87,20 @@ func runningNamespaceAgents(t *testing.T) (s *QNTXServer, ran string, in gardens
 // asking is a call on the agents signum by somebody admitted at level, acting
 // in the namespaces named.
 func asking(s *QNTXServer, who string, level auth.Level, acting []string, name string, sent sigil.Sent) (map[string]any, *protocol.Refusal) {
-	admitted := auth.Admitted(level, acting...)
-	admitted.Identity = who
-	asked := httptest.NewRequest(http.MethodPost, "/api/agents/"+sent["namespace"], nil)
-	asked = asked.WithContext(auth.WithAdmission(asked.Context(), admitted))
-	answer, refused := s.agentsSignum().Answers[name](sigil.WithCaller(asked.Context(), asked), sent)
+	answer, refused := answeredAs(s, who, level, acting, name, sent)
 	if refused != nil {
 		return nil, refused
 	}
 	return answer.(map[string]any), nil
+}
+
+// answeredAs is what the agents signum answered, as it answered it.
+func answeredAs(s *QNTXServer, who string, level auth.Level, acting []string, name string, sent sigil.Sent) (any, *protocol.Refusal) {
+	admitted := auth.Admitted(level, acting...)
+	admitted.Identity = who
+	asked := httptest.NewRequest(http.MethodPost, "/api/agents/"+sent["namespace"], nil)
+	asked = asked.WithContext(auth.WithAdmission(asked.Context(), admitted))
+	return s.agentsSignum().Answers[name](sigil.WithCaller(asked.Context(), asked), sent)
 }
 
 func rootAsks(s *QNTXServer, name string, sent sigil.Sent) (map[string]any, *protocol.Refusal) {
@@ -224,12 +229,13 @@ func TestWhatIsSaidToANamespaceAgentIsWrittenInTheNamespace(t *testing.T) {
 	assert.Empty(t, system.(*handed).rows)
 	assert.Empty(t, in.store["orchard"].rows)
 
-	read, refused := asking(s, visitor, auth.LevelUser, []string{"garden"}, "session", sigil.Sent{"namespace": "garden"})
+	read, refused := answeredAs(s, visitor, auth.LevelUser, []string{"garden"}, "session", sigil.Sent{"namespace": "garden"})
 	require.Nil(t, refused)
 	holds(t, s.agentsSignum(), "session", read)
-	transcript := read["transcript"].(transcript)
-	require.NotEmpty(t, transcript.Turns)
-	assert.Equal(t, "how long has the box been up?", transcript.Turns[0].Text)
+	whole, held := read.(*protocol.SessionTranscript)
+	require.True(t, held)
+	require.NotEmpty(t, whole.GetTranscript().GetTurns())
+	assert.Equal(t, "how long has the box been up?", whole.GetTranscript().GetTurns()[0].GetText())
 }
 
 // "shared amongst anyone who has REACH on it": who acts in the namespace

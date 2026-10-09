@@ -73,7 +73,9 @@ func TestStaandsFollowsUmami(t *testing.T) {
 	require.Len(t, follows, 1)
 	assert.Equal(t, "umami", follows[0].GetReference())
 
-	visits := sigilOf(t, (&QNTXServer{}).staandsSignum(), "visits").sigil
+	answered, err := answeredOf((&QNTXServer{}).staandsSignum())
+	require.NoError(t, err)
+	visits := sigilOf(t, answered, "visits").sigil
 	carried := map[string]string{}
 	for _, field := range visits.GetGives() {
 		carried[field.GetName()] = field.GetMessage()

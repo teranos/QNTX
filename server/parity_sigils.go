@@ -34,10 +34,11 @@ func everySignumFollows() []*protocol.Follows {
 			{Field: "protocol.Signum.name", Column: "Tool.title"},
 			{Field: "protocol.Sigil.name", Column: "Tool.title"},
 			{Field: "protocol.Sigil.does", Column: "Tool.description"},
-			// A property per param and per field, by its name (signa.go).
-			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema", KeyedBy: "name"},
-			{Field: "protocol.Sigil.gives", Column: "Tool.outputSchema", KeyedBy: "name"},
 			{Field: "protocol.Sigil.http", Column: "Tool.annotations"},
+		}, Folds: []*protocol.Fold{
+			// A property per param and per field, by its name (signa.go).
+			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema", Key: "name"},
+			{Field: "protocol.Sigil.gives", Column: "Tool.outputSchema", Key: "name"},
 		}},
 	}
 }
@@ -95,11 +96,18 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 func (s *QNTXServer) parityHold(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	var held *protocol.Signum
 	var names []string
-	for _, signum := range s.signa() {
-		names = append(names, signum.GetName())
-		if signum.GetName() == sent["signum"] {
-			held = signum.Signum
+	for _, declared := range s.signa() {
+		names = append(names, declared.GetName())
+		if declared.GetName() != sent["signum"] {
+			continue
 		}
+		// Held as it is served: what a sigil naming its answer gives is that
+		// message's fields, and the messages they carry are in scope.
+		signum, err := answeredOf(declared)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		}
+		held = signum.Signum
 	}
 	if held == nil {
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "signum",
@@ -150,6 +158,7 @@ func byReference(follows []*protocol.Follows) []*protocol.Follows {
 			merged = append(merged, held)
 		}
 		held.Columns = append(held.Columns, f.GetColumns()...)
+		held.Folds = append(held.Folds, f.GetFolds()...)
 	}
 	return merged
 }

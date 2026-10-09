@@ -123,27 +123,40 @@ message RichSearchResultsMessage {
 // itself: which store it keeps and which implementations are behind it.
 // Mirrors syscap.Message.
 message SystemCapabilitiesMessage {
-  string type = 1;                // "system_capabilities"
+  // system_capabilities.
+  string type = 1;
   // store is which store the node keeps (ADR-023) — sqlite or parquet.
   // Distinct from storage_backend, which is the implementation behind it.
   // Namespaces exist only under parquet, and sigma only under sqlite.
   string store = 2;
-  string storage_backend = 3;     // rust or go
-  bool storage_optimized = 4;     // Rust SQLite rather than the Go fallback
-  string storage_version = 5;     // ats-sqlite library version
-  string parser_backend = 6;      // wasm or go
-  bool parser_optimized = 7;      // ats via WASM rather than the Go parser
-  string parser_version = 8;      // ats version when using WASM
-  string parser_size = 9;         // WASM module size, e.g. "89KB"
+  // rust or go: which storage implementation is active.
+  string storage_backend = 3;
+  // Whether it is the Rust SQLite one.
+  bool storage_optimized = 4;
+  // The ats-sqlite library's version.
+  string storage_version = 5;
+  // wasm or go: which parser implementation is active.
+  string parser_backend = 6;
+  // Whether it is ats through WASM.
+  bool parser_optimized = 7;
+  // The ats version, through WASM.
+  string parser_version = 8;
+  // The WASM module's size.
+  string parser_size = 9;
 }
 
 // VersionInfo is which build is running, as am version answers it.
 // Mirrors version.Info.
 message VersionInfo {
+  // The whole commit.
   string commit_hash = 1;
+  // When it was built.
   string build_time = 2;
+  // The version tag.
   string version = 3;
+  // The Go it was built with.
   string go_version = 4;
+  // The OS and architecture.
   string platform = 5;
 }
 
@@ -315,4 +328,37 @@ message WatcherQueueStatusMessage {
   map<string, WatcherBroadcastStats> watcher_stats = 5;
   double oldest_age_seconds = 6;
   int64 timestamp = 7;
+}
+
+// ReachWritten is what reach grant and reach revoke answer.
+message ReachWritten {
+  // The attestation the line was written as.
+  string id = 1;
+}
+
+// NamespaceActedOn is what namespaces disable, enable, delete and nuke answer.
+message NamespaceActedOn {
+  // The namespace acted on.
+  string name = 1;
+}
+
+// VaultDirs is what vault dirs answers.
+message VaultDirs {
+  // Each folder's place in the vault, folders apart by /.
+  repeated string dirs = 1;
+}
+
+// VaultRepos is what vault repos answers.
+message VaultRepos {
+  // Each repository as owner/repo.
+  repeated string repos = 1;
+}
+
+// VaultSubdirs is what vault subdirs answers.
+message VaultSubdirs {
+  // Each folder's path from the repository's top.
+  repeated string dirs = 1;
+  // The repository's default branch, which the folders are read on and a
+  // folder is bound to.
+  string branch = 2;
 }

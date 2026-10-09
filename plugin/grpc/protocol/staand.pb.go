@@ -441,6 +441,854 @@ func (x *Visit) GetBounce() bool {
 	return false
 }
 
+// StaandCreated is what staands create answers.
+type StaandCreated struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The stand that was created.
+	Slug string `protobuf:"bytes,1,opt,name=slug,proto3" json:"slug,omitempty"`
+	// The path its pixel is fired at.
+	Url           string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandCreated) Reset() {
+	*x = StaandCreated{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandCreated) ProtoMessage() {}
+
+func (x *StaandCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandCreated.ProtoReflect.Descriptor instead.
+func (*StaandCreated) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *StaandCreated) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *StaandCreated) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+// StaandTakenDown is what staands take-down answers.
+type StaandTakenDown struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The stand that was taken down.
+	Slug string `protobuf:"bytes,1,opt,name=slug,proto3" json:"slug,omitempty"`
+	// removed.
+	Status        string `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandTakenDown) Reset() {
+	*x = StaandTakenDown{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandTakenDown) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandTakenDown) ProtoMessage() {}
+
+func (x *StaandTakenDown) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandTakenDown.ProtoReflect.Descriptor instead.
+func (*StaandTakenDown) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *StaandTakenDown) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *StaandTakenDown) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+// Staand is one stand as the stands element sees it. Beyond what it is (slug,
+// namespace, URL) it carries its defining system attestation — the ASID, when
+// it was created, and the DID that created it — the door it inherits from its
+// namespace, the sites reporting back, and its activity: arrivals recorded
+// against arrivals the rate limit refused, and when the last landed.
+//
+// defId and lastSeen are named as the view has always read them.
+type Staand struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Slug     string                 `protobuf:"bytes,1,opt,name=slug,proto3" json:"slug,omitempty"`
+	Market   string                 `protobuf:"bytes,2,opt,name=market,proto3" json:"market,omitempty"`
+	Url      string                 `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
+	Origin   string                 `protobuf:"bytes,4,opt,name=origin,proto3" json:"origin,omitempty"`
+	Creator  string                 `protobuf:"bytes,5,opt,name=creator,proto3" json:"creator,omitempty"`
+	DefId    string                 `protobuf:"bytes,6,opt,name=defId,proto3" json:"defId,omitempty"`
+	Created  string                 `protobuf:"bytes,7,opt,name=created,proto3" json:"created,omitempty"`
+	Sites    []string               `protobuf:"bytes,8,rep,name=sites,proto3" json:"sites,omitempty"`
+	Arrivals uint32                 `protobuf:"varint,9,opt,name=arrivals,proto3" json:"arrivals,omitempty"`
+	Visitors uint32                 `protobuf:"varint,10,opt,name=visitors,proto3" json:"visitors,omitempty"`
+	Dropped  uint32                 `protobuf:"varint,11,opt,name=dropped,proto3" json:"dropped,omitempty"`
+	LastSeen string                 `protobuf:"bytes,12,opt,name=lastSeen,proto3" json:"lastSeen,omitempty"`
+	Events   []*StaandSeen          `protobuf:"bytes,13,rep,name=events,proto3" json:"events,omitempty"`
+	Pages    []*StaandSeen          `protobuf:"bytes,14,rep,name=pages,proto3" json:"pages,omitempty"`
+	// How the people who arrived actually walked — what the counts above are a
+	// fold of.
+	Walks         []*StaandWalk `protobuf:"bytes,15,rep,name=walks,proto3" json:"walks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Staand) Reset() {
+	*x = Staand{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Staand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Staand) ProtoMessage() {}
+
+func (x *Staand) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Staand.ProtoReflect.Descriptor instead.
+func (*Staand) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Staand) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *Staand) GetMarket() string {
+	if x != nil {
+		return x.Market
+	}
+	return ""
+}
+
+func (x *Staand) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *Staand) GetOrigin() string {
+	if x != nil {
+		return x.Origin
+	}
+	return ""
+}
+
+func (x *Staand) GetCreator() string {
+	if x != nil {
+		return x.Creator
+	}
+	return ""
+}
+
+func (x *Staand) GetDefId() string {
+	if x != nil {
+		return x.DefId
+	}
+	return ""
+}
+
+func (x *Staand) GetCreated() string {
+	if x != nil {
+		return x.Created
+	}
+	return ""
+}
+
+func (x *Staand) GetSites() []string {
+	if x != nil {
+		return x.Sites
+	}
+	return nil
+}
+
+func (x *Staand) GetArrivals() uint32 {
+	if x != nil {
+		return x.Arrivals
+	}
+	return 0
+}
+
+func (x *Staand) GetVisitors() uint32 {
+	if x != nil {
+		return x.Visitors
+	}
+	return 0
+}
+
+func (x *Staand) GetDropped() uint32 {
+	if x != nil {
+		return x.Dropped
+	}
+	return 0
+}
+
+func (x *Staand) GetLastSeen() string {
+	if x != nil {
+		return x.LastSeen
+	}
+	return ""
+}
+
+func (x *Staand) GetEvents() []*StaandSeen {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
+func (x *Staand) GetPages() []*StaandSeen {
+	if x != nil {
+		return x.Pages
+	}
+	return nil
+}
+
+func (x *Staand) GetWalks() []*StaandWalk {
+	if x != nil {
+		return x.Walks
+	}
+	return nil
+}
+
+// StaandSeen is an event or a page and every moment it was attested, in unix
+// milliseconds. "The axis of time is more useful than a tally": the view draws
+// these as a line over time, and a count is not sent.
+type StaandSeen struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// A JSON number, as the view reads it: protojson writes a 64-bit integer as
+	// text, and a millisecond is exact in a double.
+	Seen          []float64 `protobuf:"fixed64,2,rep,packed,name=seen,proto3" json:"seen,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandSeen) Reset() {
+	*x = StaandSeen{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandSeen) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandSeen) ProtoMessage() {}
+
+func (x *StaandSeen) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandSeen.ProtoReflect.Descriptor instead.
+func (*StaandSeen) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *StaandSeen) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *StaandSeen) GetSeen() []float64 {
+	if x != nil {
+		return x.Seen
+	}
+	return nil
+}
+
+// StaandStep is one arrival read as a step rather than as a number: when it
+// landed, the page it was about, and the event the pixel named.
+type StaandStep struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	At            string                 `protobuf:"bytes,1,opt,name=at,proto3" json:"at,omitempty"`
+	Page          string                 `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	Event         string                 `protobuf:"bytes,3,opt,name=event,proto3" json:"event,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandStep) Reset() {
+	*x = StaandStep{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandStep) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandStep) ProtoMessage() {}
+
+func (x *StaandStep) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandStep.ProtoReflect.Descriptor instead.
+func (*StaandStep) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *StaandStep) GetAt() string {
+	if x != nil {
+		return x.At
+	}
+	return ""
+}
+
+func (x *StaandStep) GetPage() string {
+	if x != nil {
+		return x.Page
+	}
+	return ""
+}
+
+func (x *StaandStep) GetEvent() string {
+	if x != nil {
+		return x.Event
+	}
+	return ""
+}
+
+// StaandWalk is one person's steps past the stand, in the order they took
+// them. The visitor id is theirs and persists (the snippet keeps it in
+// localStorage), so this is a person's whole path across every visit, not one
+// sitting.
+type StaandWalk struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Who           string                 `protobuf:"bytes,1,opt,name=who,proto3" json:"who,omitempty"`
+	Steps         []*StaandStep          `protobuf:"bytes,2,rep,name=steps,proto3" json:"steps,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandWalk) Reset() {
+	*x = StaandWalk{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandWalk) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandWalk) ProtoMessage() {}
+
+func (x *StaandWalk) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandWalk.ProtoReflect.Descriptor instead.
+func (*StaandWalk) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *StaandWalk) GetWho() string {
+	if x != nil {
+		return x.Who
+	}
+	return ""
+}
+
+func (x *StaandWalk) GetSteps() []*StaandStep {
+	if x != nil {
+		return x.Steps
+	}
+	return nil
+}
+
+// StaandCount is one row the metrics sigil answers with: a value of the
+// dimension asked for and how many arrivals carried it, Umami's metrics shape.
+type StaandCount struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Count         uint32                 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandCount) Reset() {
+	*x = StaandCount{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandCount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandCount) ProtoMessage() {}
+
+func (x *StaandCount) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandCount.ProtoReflect.Descriptor instead.
+func (*StaandCount) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *StaandCount) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *StaandCount) GetCount() uint32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+// StaandActivityRow is one arrival read as a line rather than as a number.
+// The shape is Umami's session activity: one row per event, newest first, and
+// the reading of it is left to whoever asked (ADR-036).
+type StaandActivityRow struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	At             string                 `protobuf:"bytes,1,opt,name=at,proto3" json:"at,omitempty"`
+	Visit          string                 `protobuf:"bytes,2,opt,name=visit,proto3" json:"visit,omitempty"`
+	Visitor        string                 `protobuf:"bytes,3,opt,name=visitor,proto3" json:"visitor,omitempty"`
+	Path           string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	Query          string                 `protobuf:"bytes,5,opt,name=query,proto3" json:"query,omitempty"`
+	ReferrerDomain string                 `protobuf:"bytes,6,opt,name=referrer_domain,json=referrerDomain,proto3" json:"referrer_domain,omitempty"`
+	Event          string                 `protobuf:"bytes,7,opt,name=event,proto3" json:"event,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *StaandActivityRow) Reset() {
+	*x = StaandActivityRow{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandActivityRow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandActivityRow) ProtoMessage() {}
+
+func (x *StaandActivityRow) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandActivityRow.ProtoReflect.Descriptor instead.
+func (*StaandActivityRow) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *StaandActivityRow) GetAt() string {
+	if x != nil {
+		return x.At
+	}
+	return ""
+}
+
+func (x *StaandActivityRow) GetVisit() string {
+	if x != nil {
+		return x.Visit
+	}
+	return ""
+}
+
+func (x *StaandActivityRow) GetVisitor() string {
+	if x != nil {
+		return x.Visitor
+	}
+	return ""
+}
+
+func (x *StaandActivityRow) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *StaandActivityRow) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *StaandActivityRow) GetReferrerDomain() string {
+	if x != nil {
+		return x.ReferrerDomain
+	}
+	return ""
+}
+
+func (x *StaandActivityRow) GetEvent() string {
+	if x != nil {
+		return x.Event
+	}
+	return ""
+}
+
+// Staands is what staands list answers.
+type Staands struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One row per stand that has not been taken down.
+	Staands       []*Staand `protobuf:"bytes,1,rep,name=staands,proto3" json:"staands,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Staands) Reset() {
+	*x = Staands{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Staands) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Staands) ProtoMessage() {}
+
+func (x *Staands) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Staands.ProtoReflect.Descriptor instead.
+func (*Staands) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Staands) GetStaands() []*Staand {
+	if x != nil {
+		return x.Staands
+	}
+	return nil
+}
+
+// StaandMetrics is what staands metrics answers.
+type StaandMetrics struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// What the arrivals were grouped by.
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	// One row per value, most first: its name and its count.
+	Counts []*StaandCount `protobuf:"bytes,2,rep,name=counts,proto3" json:"counts,omitempty"`
+	// The market that was asked about.
+	Market string `protobuf:"bytes,3,opt,name=market,proto3" json:"market,omitempty"`
+	// The stand that was asked about.
+	Slug          string `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandMetrics) Reset() {
+	*x = StaandMetrics{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandMetrics) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandMetrics) ProtoMessage() {}
+
+func (x *StaandMetrics) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandMetrics.ProtoReflect.Descriptor instead.
+func (*StaandMetrics) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *StaandMetrics) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *StaandMetrics) GetCounts() []*StaandCount {
+	if x != nil {
+		return x.Counts
+	}
+	return nil
+}
+
+func (x *StaandMetrics) GetMarket() string {
+	if x != nil {
+		return x.Market
+	}
+	return ""
+}
+
+func (x *StaandMetrics) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+// StaandActivity is what staands activity answers.
+type StaandActivity struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One row per arrival, five hundred at most: when, the visit, the visitor,
+	// the page, where they came from, and the event.
+	Activity []*StaandActivityRow `protobuf:"bytes,1,rep,name=activity,proto3" json:"activity,omitempty"`
+	// The market that was asked about.
+	Market string `protobuf:"bytes,2,opt,name=market,proto3" json:"market,omitempty"`
+	// The stand that was asked about.
+	Slug          string `protobuf:"bytes,3,opt,name=slug,proto3" json:"slug,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandActivity) Reset() {
+	*x = StaandActivity{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandActivity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandActivity) ProtoMessage() {}
+
+func (x *StaandActivity) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandActivity.ProtoReflect.Descriptor instead.
+func (*StaandActivity) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *StaandActivity) GetActivity() []*StaandActivityRow {
+	if x != nil {
+		return x.Activity
+	}
+	return nil
+}
+
+func (x *StaandActivity) GetMarket() string {
+	if x != nil {
+		return x.Market
+	}
+	return ""
+}
+
+func (x *StaandActivity) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+// StaandVisits is what staands visits answers.
+type StaandVisits struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One row per sitting: who, when it started and ended, how long, the first
+	// and last page, how many views and events, and whether it was a bounce.
+	Visits []*Visit `protobuf:"bytes,1,rep,name=visits,proto3" json:"visits,omitempty"`
+	// The market that was asked about.
+	Market string `protobuf:"bytes,2,opt,name=market,proto3" json:"market,omitempty"`
+	// The stand that was asked about.
+	Slug          string `protobuf:"bytes,3,opt,name=slug,proto3" json:"slug,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandVisits) Reset() {
+	*x = StaandVisits{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandVisits) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandVisits) ProtoMessage() {}
+
+func (x *StaandVisits) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandVisits.ProtoReflect.Descriptor instead.
+func (*StaandVisits) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *StaandVisits) GetVisits() []*Visit {
+	if x != nil {
+		return x.Visits
+	}
+	return nil
+}
+
+func (x *StaandVisits) GetMarket() string {
+	if x != nil {
+		return x.Market
+	}
+	return ""
+}
+
+func (x *StaandVisits) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
 var File_plugin_grpc_protocol_staand_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_staand_proto_rawDesc = "" +
@@ -495,7 +1343,69 @@ const file_plugin_grpc_protocol_staand_proto_rawDesc = "" +
 	"\x05views\x18\n" +
 	" \x01(\rR\x05views\x12\x16\n" +
 	"\x06events\x18\v \x01(\rR\x06events\x12\x16\n" +
-	"\x06bounce\x18\f \x01(\bR\x06bounceB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\x06bounce\x18\f \x01(\bR\x06bounce\"5\n" +
+	"\rStaandCreated\x12\x12\n" +
+	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\"=\n" +
+	"\x0fStaandTakenDown\x12\x12\n" +
+	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\"\xb2\x03\n" +
+	"\x06Staand\x12\x12\n" +
+	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
+	"\x06market\x18\x02 \x01(\tR\x06market\x12\x10\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\x12\x16\n" +
+	"\x06origin\x18\x04 \x01(\tR\x06origin\x12\x18\n" +
+	"\acreator\x18\x05 \x01(\tR\acreator\x12\x14\n" +
+	"\x05defId\x18\x06 \x01(\tR\x05defId\x12\x18\n" +
+	"\acreated\x18\a \x01(\tR\acreated\x12\x14\n" +
+	"\x05sites\x18\b \x03(\tR\x05sites\x12\x1a\n" +
+	"\barrivals\x18\t \x01(\rR\barrivals\x12\x1a\n" +
+	"\bvisitors\x18\n" +
+	" \x01(\rR\bvisitors\x12\x18\n" +
+	"\adropped\x18\v \x01(\rR\adropped\x12\x1a\n" +
+	"\blastSeen\x18\f \x01(\tR\blastSeen\x12,\n" +
+	"\x06events\x18\r \x03(\v2\x14.protocol.StaandSeenR\x06events\x12*\n" +
+	"\x05pages\x18\x0e \x03(\v2\x14.protocol.StaandSeenR\x05pages\x12*\n" +
+	"\x05walks\x18\x0f \x03(\v2\x14.protocol.StaandWalkR\x05walks\"4\n" +
+	"\n" +
+	"StaandSeen\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04seen\x18\x02 \x03(\x01R\x04seen\"F\n" +
+	"\n" +
+	"StaandStep\x12\x0e\n" +
+	"\x02at\x18\x01 \x01(\tR\x02at\x12\x12\n" +
+	"\x04page\x18\x02 \x01(\tR\x04page\x12\x14\n" +
+	"\x05event\x18\x03 \x01(\tR\x05event\"J\n" +
+	"\n" +
+	"StaandWalk\x12\x10\n" +
+	"\x03who\x18\x01 \x01(\tR\x03who\x12*\n" +
+	"\x05steps\x18\x02 \x03(\v2\x14.protocol.StaandStepR\x05steps\"7\n" +
+	"\vStaandCount\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\rR\x05count\"\xbc\x01\n" +
+	"\x11StaandActivityRow\x12\x0e\n" +
+	"\x02at\x18\x01 \x01(\tR\x02at\x12\x14\n" +
+	"\x05visit\x18\x02 \x01(\tR\x05visit\x12\x18\n" +
+	"\avisitor\x18\x03 \x01(\tR\avisitor\x12\x12\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12\x14\n" +
+	"\x05query\x18\x05 \x01(\tR\x05query\x12'\n" +
+	"\x0freferrer_domain\x18\x06 \x01(\tR\x0ereferrerDomain\x12\x14\n" +
+	"\x05event\x18\a \x01(\tR\x05event\"5\n" +
+	"\aStaands\x12*\n" +
+	"\astaands\x18\x01 \x03(\v2\x10.protocol.StaandR\astaands\"~\n" +
+	"\rStaandMetrics\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12-\n" +
+	"\x06counts\x18\x02 \x03(\v2\x15.protocol.StaandCountR\x06counts\x12\x16\n" +
+	"\x06market\x18\x03 \x01(\tR\x06market\x12\x12\n" +
+	"\x04slug\x18\x04 \x01(\tR\x04slug\"u\n" +
+	"\x0eStaandActivity\x127\n" +
+	"\bactivity\x18\x01 \x03(\v2\x1b.protocol.StaandActivityRowR\bactivity\x12\x16\n" +
+	"\x06market\x18\x02 \x01(\tR\x06market\x12\x12\n" +
+	"\x04slug\x18\x03 \x01(\tR\x04slug\"c\n" +
+	"\fStaandVisits\x12'\n" +
+	"\x06visits\x18\x01 \x03(\v2\x0f.protocol.VisitR\x06visits\x12\x16\n" +
+	"\x06market\x18\x02 \x01(\tR\x06market\x12\x12\n" +
+	"\x04slug\x18\x03 \x01(\tR\x04slugB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_staand_proto_rawDescOnce sync.Once
@@ -509,19 +1419,39 @@ func file_plugin_grpc_protocol_staand_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_staand_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_staand_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_plugin_grpc_protocol_staand_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_plugin_grpc_protocol_staand_proto_goTypes = []any{
-	(*Arrival)(nil), // 0: protocol.Arrival
-	(*Visit)(nil),   // 1: protocol.Visit
-	nil,             // 2: protocol.Arrival.ParamsEntry
+	(*Arrival)(nil),           // 0: protocol.Arrival
+	(*Visit)(nil),             // 1: protocol.Visit
+	(*StaandCreated)(nil),     // 2: protocol.StaandCreated
+	(*StaandTakenDown)(nil),   // 3: protocol.StaandTakenDown
+	(*Staand)(nil),            // 4: protocol.Staand
+	(*StaandSeen)(nil),        // 5: protocol.StaandSeen
+	(*StaandStep)(nil),        // 6: protocol.StaandStep
+	(*StaandWalk)(nil),        // 7: protocol.StaandWalk
+	(*StaandCount)(nil),       // 8: protocol.StaandCount
+	(*StaandActivityRow)(nil), // 9: protocol.StaandActivityRow
+	(*Staands)(nil),           // 10: protocol.Staands
+	(*StaandMetrics)(nil),     // 11: protocol.StaandMetrics
+	(*StaandActivity)(nil),    // 12: protocol.StaandActivity
+	(*StaandVisits)(nil),      // 13: protocol.StaandVisits
+	nil,                       // 14: protocol.Arrival.ParamsEntry
 }
 var file_plugin_grpc_protocol_staand_proto_depIdxs = []int32{
-	2, // 0: protocol.Arrival.params:type_name -> protocol.Arrival.ParamsEntry
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	14, // 0: protocol.Arrival.params:type_name -> protocol.Arrival.ParamsEntry
+	5,  // 1: protocol.Staand.events:type_name -> protocol.StaandSeen
+	5,  // 2: protocol.Staand.pages:type_name -> protocol.StaandSeen
+	7,  // 3: protocol.Staand.walks:type_name -> protocol.StaandWalk
+	6,  // 4: protocol.StaandWalk.steps:type_name -> protocol.StaandStep
+	4,  // 5: protocol.Staands.staands:type_name -> protocol.Staand
+	8,  // 6: protocol.StaandMetrics.counts:type_name -> protocol.StaandCount
+	9,  // 7: protocol.StaandActivity.activity:type_name -> protocol.StaandActivityRow
+	1,  // 8: protocol.StaandVisits.visits:type_name -> protocol.Visit
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_staand_proto_init() }
@@ -535,7 +1465,7 @@ func file_plugin_grpc_protocol_staand_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_staand_proto_rawDesc), len(file_plugin_grpc_protocol_staand_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

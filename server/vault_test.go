@@ -183,13 +183,7 @@ func askVault(t *testing.T, s *QNTXServer, name string, sent sigil.Sent) (any, *
 	t.Helper()
 	got, refused := s.vaultSignum().Answers[name](asRoot(), sent)
 	if refused == nil {
-		for _, sg := range s.vaultSignum().GetSigils() {
-			if sg.GetName() == name {
-				raw, err := json.Marshal(got)
-				require.NoError(t, err)
-				require.NoError(t, sigil.Holds(sg, raw))
-			}
-		}
+		holds(t, s.vaultSignum(), name, got)
 	}
 	return got, refused
 }
@@ -201,7 +195,7 @@ func TestAVaultFolderIsBoundByClicking(t *testing.T) {
 
 	got, refused := askVault(t, s, "dirs", sigil.Sent{"name": "abcd"})
 	require.Nil(t, refused)
-	assert.Equal(t, []string{"ABCD", "ABCD/lttr", "Course Material"}, got.(map[string]any)["dirs"])
+	assert.Equal(t, []string{"ABCD", "ABCD/lttr", "Course Material"}, got.(*protocol.VaultDirs).GetDirs())
 
 	got, refused = askVault(t, s, "owners", sigil.Sent{})
 	require.Nil(t, refused, "%v", refused)
@@ -209,14 +203,14 @@ func TestAVaultFolderIsBoundByClicking(t *testing.T) {
 
 	got, refused = askVault(t, s, "repos", sigil.Sent{"installation": "7"})
 	require.Nil(t, refused, "%v", refused)
-	assert.Equal(t, []string{"abcd-nl/clean"}, got.(map[string]any)["repos"])
+	assert.Equal(t, []string{"abcd-nl/clean"}, got.(*protocol.VaultRepos).GetRepos())
 
 	got, refused = askVault(t, s, "subdirs", sigil.Sent{"repo": "abcd-nl/clean"})
 	require.Nil(t, refused, "%v", refused)
-	assert.Equal(t, []string{"cdr", "docs"}, got.(map[string]any)["dirs"])
+	assert.Equal(t, []string{"cdr", "docs"}, got.(*protocol.VaultSubdirs).GetDirs())
 	got, refused = askVault(t, s, "subdirs", sigil.Sent{"repo": "abcd-nl/clean", "path": "docs"})
 	require.Nil(t, refused, "%v", refused)
-	assert.Equal(t, []string{"docs/adr"}, got.(map[string]any)["dirs"])
+	assert.Equal(t, []string{"docs/adr"}, got.(*protocol.VaultSubdirs).GetDirs())
 
 	_, refused = askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)

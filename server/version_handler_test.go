@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
 // The full commit is the point. The WebSocket connect frame already sends
@@ -25,14 +26,14 @@ func TestAmVersionGivesTheFullCommit(t *testing.T) {
 		t.Fatalf("version refused: %s", refusal.GetSays())
 	}
 
-	got, ok := answer.(version.Info)
+	got, ok := answer.(*protocol.VersionInfo)
 	if !ok {
-		t.Fatalf("answer is %T, not version.Info", answer)
+		t.Fatalf("answer is %T, not protocol.VersionInfo", answer)
 	}
-	if got.CommitHash != version.CommitHash {
-		t.Errorf("commit_hash = %q, want the full %q", got.CommitHash, version.CommitHash)
+	if got.GetCommitHash() != version.CommitHash {
+		t.Errorf("commit_hash = %q, want the full %q", got.GetCommitHash(), version.CommitHash)
 	}
-	if got.Platform == "" || got.GoVersion == "" {
+	if got.GetPlatform() == "" || got.GetGoVersion() == "" {
 		t.Errorf("platform and go_version must be populated, got %+v", got)
 	}
 }

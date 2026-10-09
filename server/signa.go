@@ -14,9 +14,12 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
+	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
@@ -36,10 +39,14 @@ func (s *QNTXServer) signa() []sigil.Signum {
 // something to offer.
 func (s *QNTXServer) checkedSigna() []sigil.Signum {
 	var kept []sigil.Signum
-	for _, signum := range s.signa() {
-		if err := signum.Check(); err != nil {
+	for _, declared := range s.signa() {
+		signum, err := answeredOf(declared)
+		if err == nil {
+			err = signum.Check()
+		}
+		if err != nil {
 			if s.logger != nil {
-				s.logger.Errorw("a signum is not served", "signum", signum.GetName(), "error", err)
+				s.logger.Errorw("a signum is not served", "signum", declared.GetName(), "error", err)
 			}
 			continue
 		}
@@ -137,7 +144,14 @@ func overHTTP(path string, bound []heldBy, gate sigil.Gate, reaching func(string
 			case asked.Refusal != nil:
 				writeError(w, sigil.Status(asked.Refusal), asked.Refusal.GetSays())
 			default:
-				respond(w, logger, http.StatusOK, asked.Answer)
+				body, err := answerJSON(asked.Answer)
+				if err != nil {
+					writeError(w, http.StatusInternalServerError, "what "+held.sigil.GetName()+" answered does not marshal: "+err.Error())
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				deliver(w, logger, body, path)
 			}
 			return
 		}
@@ -218,35 +232,70 @@ func takenAsSchema(held *protocol.Sigil) map[string]any {
 	return map[string]any{"type": "object", "properties": properties, "required": required}
 }
 
-// promise is what a sigil says it gives, as MCP's outputSchema, and whether it
-// says anything: a sigil naming no Gives promises nothing, and an answer is
-// held to nothing.
+// answeredOf is signum with what each sigil naming its answer gives, from that
+// message: its fields, each in its .proto's words, and nothing listed by hand
+// beside them (TestNoSigilSaysWhatItGivesTwice). An answer this binary does not
+// know, or whose schema cannot be stated, is refused.
+func answeredOf(signum sigil.Signum) (sigil.Signum, error) {
+	held, cloned := proto.Clone(signum.Signum).(*protocol.Signum)
+	if !cloned {
+		return signum, errors.Newf("%s did not clone as a protocol.Signum", signum.GetName())
+	}
+	for _, s := range held.GetSigils() {
+		answer := s.GetAnswer()
+		if answer == "" {
+			continue
+		}
+		found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(answer))
+		if err != nil {
+			return signum, errors.Wrapf(err, "the sigil %s of %s answers %s, which is no message this binary knows", s.GetName(), held.GetName(), answer)
+		}
+		if err := protoJSONMessage(found.Descriptor(), map[string]any{}); err != nil {
+			return signum, errors.Wrapf(err, "the sigil %s of %s answers %s", s.GetName(), held.GetName(), answer)
+		}
+		s.Gives = nil
+		fields := found.Descriptor().Fields()
+		for i := 0; i < fields.Len(); i++ {
+			field := fields.Get(i)
+			says, err := parity.OursSay(string(field.FullName()))
+			if err != nil {
+				return signum, errors.Wrapf(err, "what %s says of itself did not read", field.FullName())
+			}
+			given := &protocol.Field{Name: string(field.Name()), Says: says}
+			if field.Kind() == protoreflect.MessageKind {
+				given.Message = string(field.Message().FullName())
+			}
+			s.Gives = append(s.Gives, given)
+		}
+	}
+	return sigil.Signum{Signum: held, Answers: signum.Answers, Declared: signum.Declared}, nil
+}
+
+// promise is what a tool says it gives, as MCP's outputSchema, when it says.
 type promise struct {
 	schema map[string]any
-	made   bool
+	says   bool
 }
 
-// holds is whether body is what the promise says, and nil for a promise not made.
-func (p promise) holds(body []byte) error {
-	if !p.made {
-		return nil
+// givenAsSchema is what a sigil gives, as MCP's outputSchema.
+//
+// A sigil naming its answer gives that message, every field of it there:
+// protojson writes zero as zero, so each is required.
+//
+// Otherwise it is one object, or a list of them a row at a time, with the
+// fields it names, and nothing when it names none. A Field says nothing of
+// whether it is always there, and an answer leaves some out (plugins list's
+// health_probed_at is "absent before the first probe") and one carries a field
+// it does not name, so no field is required and none is refused. A field that
+// names the message it carries is said in that message's shape, as
+// encoding/json writes it; any other field says only its words.
+func givenAsSchema(held *protocol.Sigil) (promise, error) {
+	if found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(held.GetAnswer())); err == nil {
+		schema, err := answerAsSchema(found.Descriptor())
+		return promise{schema: schema, says: true}, err
 	}
-	return heldTo(p.schema, body)
-}
-
-// givenAsSchema is what a sigil gives, as MCP's outputSchema: one object, or a
-// list of them a row at a time, with the fields it names.
-//
-// A Field says nothing of whether it is always there, and an answer leaves
-// some out (plugins list's health_probed_at is "absent before the first
-// probe") and one carries a field it does not name, so no field is required
-// and none is refused.
-//
-// A field that names the message it carries is said in that message's shape,
-// as the answer marshals it; any other field says only its words.
-func givenAsSchema(held *protocol.Sigil) promise {
 	if len(held.GetGives()) == 0 {
-		return promise{}
+		return promise{}, nil
 	}
 	defs := map[string]any{}
 	properties := map[string]any{}
@@ -260,11 +309,8 @@ func givenAsSchema(held *protocol.Sigil) promise {
 		properties[field.GetName()] = property
 	}
 	row := map[string]any{"type": "object", "properties": properties}
-	schema := map[string]any{"anyOf": []any{row, map[string]any{"type": "array", "items": row}, map[string]any{"type": "null"}}}
-	if len(defs) > 0 {
-		schema["$defs"] = defs
-	}
-	return promise{schema: schema, made: true}
+	return promise{schema: map[string]any{"$defs": defs,
+		"anyOf": []any{row, map[string]any{"type": "array", "items": row}, map[string]any{"type": "null"}}}, says: true}, nil
 }
 
 // messageAsSchema puts a message in defs as encoding/json writes the Go it is
@@ -316,6 +362,117 @@ func kindAsSchema(field protoreflect.FieldDescriptor, defs map[string]any) map[s
 		return map[string]any{"$ref": messageAsSchema(field.Message(), defs)}
 	}
 	return map[string]any{"type": "integer"}
+}
+
+// answerJSON is an answer as it goes out on every surface. A message is
+// written by protojson, every field there and zero as zero ("zero means
+// zero"), each by its .proto name; anything else as encoding/json writes it.
+func answerJSON(answer any) ([]byte, error) {
+	if message, ok := answer.(proto.Message); ok {
+		return protojson.MarshalOptions{UseProtoNames: true, EmitUnpopulated: true}.Marshal(message)
+	}
+	return json.Marshal(answer)
+}
+
+// answerAsSchema is a message as answerJSON writes it: the message itself at
+// the root, each field by its .proto name, every one required but a oneof's,
+// which protojson writes only when set. A message protojson writes in a form
+// of its own, google.protobuf's, is refused rather than guessed at.
+func answerAsSchema(message protoreflect.MessageDescriptor) (map[string]any, error) {
+	defs := map[string]any{}
+	if err := protoJSONMessage(message, defs); err != nil {
+		return nil, err
+	}
+	stated, held := defs[string(message.FullName())].(map[string]any)
+	if !held {
+		return nil, errors.Newf("%s is not stated among the schemas it holds", message.FullName())
+	}
+	root := map[string]any{"$defs": defs}
+	for key, value := range stated {
+		root[key] = value
+	}
+	return root, nil
+}
+
+// protoJSONMessage puts a message in defs as protojson writes it, under its
+// full name, which is how defsRef refers to it.
+func protoJSONMessage(message protoreflect.MessageDescriptor, defs map[string]any) error {
+	name := string(message.FullName())
+	if _, held := defs[name]; held {
+		return nil
+	}
+	if message.ParentFile().Package() == "google.protobuf" {
+		return errors.Newf("%s is written by protojson in a form of its own", name)
+	}
+	properties := map[string]any{}
+	required := []string{}
+	def := map[string]any{"type": "object", "properties": properties}
+	defs[name] = def
+	inOneof := map[string]bool{}
+	oneofs := message.Oneofs()
+	for i := 0; i < oneofs.Len(); i++ {
+		members := oneofs.Get(i).Fields()
+		for j := 0; j < members.Len(); j++ {
+			inOneof[string(members.Get(j).Name())] = true
+		}
+	}
+	fields := message.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		var property map[string]any
+		var err error
+		switch {
+		case field.IsMap():
+			var value map[string]any
+			value, err = protoJSONKind(field.MapValue(), defs)
+			property = map[string]any{"type": "object", "additionalProperties": value}
+		case field.IsList():
+			var item map[string]any
+			item, err = protoJSONKind(field, defs)
+			property = map[string]any{"type": "array", "items": item}
+		case field.Kind() == protoreflect.MessageKind:
+			// A message not set is written as null.
+			var set map[string]any
+			set, err = protoJSONKind(field, defs)
+			property = map[string]any{"anyOf": []any{set, map[string]any{"type": "null"}}}
+		case field.Kind() != protoreflect.MessageKind:
+			property, err = protoJSONKind(field, defs)
+		}
+		if err != nil {
+			return errors.Wrapf(err, "%s", field.FullName())
+		}
+		properties[string(field.Name())] = property
+		if !inOneof[string(field.Name())] {
+			required = append(required, string(field.Name()))
+		}
+	}
+	def["required"] = required
+	return nil
+}
+
+// defsRef is how a schema refers to a message it holds under $defs.
+func defsRef(message protoreflect.MessageDescriptor) string {
+	return "#/$defs/" + string(message.FullName())
+}
+
+// protoJSONKind is one value of a field as protojson writes it: a 64-bit
+// integer and an enum as text, every other integer as a number, bytes as base64
+// text.
+func protoJSONKind(field protoreflect.FieldDescriptor, defs map[string]any) (map[string]any, error) {
+	switch field.Kind() {
+	case protoreflect.BoolKind:
+		return map[string]any{"type": "boolean"}, nil
+	case protoreflect.StringKind, protoreflect.BytesKind, protoreflect.EnumKind,
+		protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind, protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return map[string]any{"type": "string"}, nil
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind, protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		return map[string]any{"type": "integer"}, nil
+	case protoreflect.FloatKind, protoreflect.DoubleKind:
+		return map[string]any{"type": "number"}, nil
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		return map[string]any{"$ref": defsRef(field.Message())}, protoJSONMessage(field.Message(), defs)
+	}
+	return nil, errors.Newf("%s is of a kind protojson is not known here to write: %s", field.FullName(), field.Kind())
 }
 
 // heldTo holds a JSON value to a schema a tool says: what it takes, or what it
@@ -382,12 +539,14 @@ func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy)
 	case asked.Refusal != nil:
 		return refused("%s", refusalSays(asked.Refusal))
 	}
-	body, err := json.Marshal(asked.Answer)
+	body, err := answerJSON(asked.Answer)
 	if err != nil {
 		return refused("what %s answered does not marshal: %v", held.sigil.GetName(), err)
 	}
-	if err := gives.holds(body); err != nil {
-		return refused("%s: what %s answered is not what it says it gives: %v", sigil.Failed, held.sigil.GetName(), err)
+	if gives.says {
+		if err := heldTo(gives.schema, body); err != nil {
+			return refused("%s: what %s answered is not what it says it gives: %v", sigil.Failed, held.sigil.GetName(), err)
+		}
 	}
 	return &mcp.CallToolResult{
 		Content:           []mcp.Content{&mcp.TextContent{Text: string(body)}},

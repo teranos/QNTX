@@ -185,11 +185,10 @@ func (s *QNTXServer) claudeHarness() *harness {
 	named := func() appcfg.RootAgentConfig { return s.deps.cfg.Agent.Root }
 	h := &harness{
 		name: "claude", called: "Claude Code", file: claudeSessionFile,
-		description:    "The ROOT agent: Claude Code, run by the node as itself.",
-		sayDoes:        "Says something to the ROOT agent and gives what it answered. It is one session that continues, written down by the agent as it goes and read with claude session.",
-		amDoes:         "Who the ROOT agent is and how the node runs it.",
-		sessionDoes:    "The ROOT agent's one session, whole: everything said to it by whoever said it, as a transcript.",
-		transcriptSays: "Its session as turns, each naming the attestation it was read from. Empty before anything was said to it.",
+		description: "The ROOT agent: Claude Code, run by the node as itself.",
+		sayDoes:     "Says something to the ROOT agent and gives what it answered. It is one session that continues, written down by the agent as it goes and read with claude session.",
+		amDoes:      "Who the ROOT agent is and how the node runs it.",
+		sessionDoes: "The ROOT agent's one session, whole: everything said to it by whoever said it, as a transcript.",
 		sayTakes: []*protocol.Param{
 			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "The permission mode Claude Code runs this in. Not sent, it is the one am.toml gives."},
 		},
@@ -356,7 +355,7 @@ func (s *QNTXServer) readAgentSession(agent *rootAgent, in *inHarness) (any, *pr
 func (s *QNTXServer) sessionTranscript(agent *rootAgent, session string, resumes bool) (any, *protocol.Refusal) {
 	none := transcript{Subjects: []string{}, Turns: []transcriptTurn{}}
 	if !resumes {
-		return map[string]any{"transcript": none}, nil
+		return &protocol.SessionTranscript{Transcript: none.message()}, nil
 	}
 	written, err := s.held.Read(agent.namespace)
 	if err != nil {
@@ -368,7 +367,7 @@ func (s *QNTXServer) sessionTranscript(agent *rootAgent, session string, resumes
 	}
 	if len(read) == 0 {
 		none.Session = session
-		return map[string]any{"transcript": none}, nil
+		return &protocol.SessionTranscript{Transcript: none.message()}, nil
 	}
-	return map[string]any{"transcript": read[0]}, nil
+	return &protocol.SessionTranscript{Transcript: read[0].message()}, nil
 }

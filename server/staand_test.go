@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/teranos/QNTX/server/namespaces"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // A stand's definition is a system attestation (ADR-035); arrivals land in the
@@ -296,20 +296,18 @@ func TestAStandSpendsOnlyItsOwnBudget(t *testing.T) {
 	}
 }
 
-func listStands(t *testing.T, s *QNTXServer) []staandInfo {
+func listStands(t *testing.T, s *QNTXServer) []*protocol.Staand {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodGet, "/api/staands", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list: %d %s", rec.Code, rec.Body.String())
 	}
-	var body struct {
-		Staands []staandInfo `json:"staands"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+	var body protocol.Staands
+	if err := protojson.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode list: %v", err)
 	}
-	return body.Staands
+	return body.GetStaands()
 }
 
 // Listing shows every stand across all markets, each naming its market, with
@@ -331,7 +329,7 @@ func TestListingAcrossMarkets(t *testing.T) {
 		t.Fatalf("listed %d stands, want 2 (gone is deleted): %+v", len(list), list)
 	}
 
-	byKey := map[string]staandInfo{}
+	byKey := map[string]*protocol.Staand{}
 	for _, st := range list {
 		byKey[st.Market+"/"+st.Slug] = st
 	}
@@ -339,10 +337,10 @@ func TestListingAcrossMarkets(t *testing.T) {
 	if !ok {
 		t.Fatalf("clean/boutique not listed: %+v", list)
 	}
-	if clean.Market != "clean" || clean.URL != "/s/clean/boutique" || clean.Origin != "example.com" {
+	if clean.Market != "clean" || clean.Url != "/s/clean/boutique" || clean.Origin != "example.com" {
 		t.Fatalf("clean stand listed wrong: %+v", clean)
 	}
-	if clean.DefID == "" || clean.Created == "" || clean.Creator == "" {
+	if clean.DefId == "" || clean.Created == "" || clean.Creator == "" {
 		t.Fatalf("the defining attestation is not surfaced: %+v", clean)
 	}
 	if clean.Arrivals != 1 || len(clean.Sites) != 1 || clean.Sites[0] != "example.com" {
@@ -364,7 +362,7 @@ func TestCreatingAndRemovingAStand(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
 	}
-	if got := listStands(t, s); len(got) != 1 || got[0].Slug != "home" || got[0].URL != "/s/clean/home" {
+	if got := listStands(t, s); len(got) != 1 || got[0].Slug != "home" || got[0].Url != "/s/clean/home" {
 		t.Fatalf("after create, listed %+v", got)
 	}
 
@@ -583,7 +581,7 @@ func TestABreakdownGroupsByOneDimension(t *testing.T) {
 }
 
 // breakdown asks one stand's metrics endpoint for one dimension.
-func breakdown(t *testing.T, s *QNTXServer, dim string) []staandCount {
+func breakdown(t *testing.T, s *QNTXServer, dim string) []*protocol.StaandCount {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	sigilHTTP(t, s, "/api/staands/metrics")(rec, httptest.NewRequest(http.MethodGet,
@@ -591,13 +589,11 @@ func breakdown(t *testing.T, s *QNTXServer, dim string) []staandCount {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("%s: %d %s", dim, rec.Code, rec.Body.String())
 	}
-	var got struct {
-		Counts []staandCount `json:"counts"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+	var got protocol.StaandMetrics
+	if err := protojson.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("%s: %v", dim, err)
 	}
-	return got.Counts
+	return got.GetCounts()
 }
 
 // The window a read covers is named in AX's own words, and a word that is not a
@@ -647,7 +643,7 @@ func TestSeenOfLeadsWithTheMostRecent(t *testing.T) {
 	if len(got) != 2 || got[0].Name != "lately" || got[1].Name != "often" {
 		t.Fatalf("seenOf is %+v, want lately then often, capped at two", got)
 	}
-	if len(got[1].Seen) != 3 || got[1].Seen[0] != base.UnixMilli() {
+	if len(got[1].Seen) != 3 || got[1].Seen[0] != float64(base.UnixMilli()) {
 		t.Fatalf("often was seen at %v", got[1].Seen)
 	}
 }

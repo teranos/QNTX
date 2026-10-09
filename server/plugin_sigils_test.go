@@ -303,7 +303,7 @@ func TestAPluginsSigilIsATool(t *testing.T) {
 	admits := func(_ string, _ auth.Reach, next http.HandlerFunc) http.HandlerFunc { return next }
 	everyone := func(string, heldBy) (auth.Reach, bool) { return auth.Reach{}, true }
 	answered := overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), read,
-		map[string]any{"kind": "competitor"}, givenAsSchema(read.sigil))
+		map[string]any{"kind": "competitor"}, promisedBy(t, read.sigil))
 	require.False(t, answered.IsError, textOf(t, answered))
 	assert.JSONEq(t, `{"observed":false}`, textOf(t, answered))
 }

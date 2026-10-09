@@ -20,7 +20,7 @@ type harness struct {
 	// file is where the agent's session in it is kept, under the agent's home.
 	file string
 
-	description, sayDoes, amDoes, sessionDoes, transcriptSays string
+	description, sayDoes, amDoes, sessionDoes string
 	// sayTakes is what say takes beyond says.
 	sayTakes          []*protocol.Param
 	sayGives, amGives []*protocol.Field
@@ -96,12 +96,10 @@ func (s *QNTXServer) harnessSignum(h *harness) sigil.Signum {
 					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: at},
 				},
 				{
-					Name: "session",
-					Does: h.sessionDoes,
-					Gives: []*protocol.Field{
-						{Name: "transcript", Says: h.transcriptSays, Message: "protocol.Transcript"},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: at + "/session"},
+					Name:   "session",
+					Does:   h.sessionDoes,
+					Answer: "protocol.SessionTranscript",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: at + "/session"},
 				},
 			}, also...),
 		},

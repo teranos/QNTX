@@ -153,3 +153,9 @@ export interface Binding {
    */
   signer_pubkey_hex: string;
 }
+
+/** Standing is what i standing and i step answer. */
+export interface Standing {
+  /** Where the person now stands. Never empty. */
+  namespace: string;
+}

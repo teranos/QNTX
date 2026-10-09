@@ -140,10 +140,9 @@ func piSessionSaid(t *testing.T, s *QNTXServer) [][2]string {
 	answer, refused := s.harnessSession(s.piHarness())
 	require.Nil(t, refused)
 	holds(t, s.harnessSignum(s.piHarness()), "session", answer)
-	read, _ := answer.(map[string]any)["transcript"].(transcript)
 	var said [][2]string
-	for _, turn := range read.Turns {
-		said = append(said, [2]string{turn.Speaker, turn.Text})
+	for _, turn := range answer.(*protocol.SessionTranscript).GetTranscript().GetTurns() {
+		said = append(said, [2]string{turn.GetSpeaker(), turn.GetText()})
 	}
 	return said
 }

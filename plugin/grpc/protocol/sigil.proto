@@ -36,15 +36,20 @@ message Node {
 }
 
 // Transcript is one agent session Ground recorded, derived from its hook
-// events: transcripts read answers these. Mirrors server.transcript.
+// events: transcripts read answers these.
 message Transcript {
+  // Its id.
   string session = 1;
+  // The subjects it was about.
   repeated string subjects = 2;
+  // When it started.
   string started = 3;
+  // When it ended.
   string ended = 4;
+  // Its turns, each naming the attestation it was read from.
   repeated Turn turns = 5;
   // Events the store folded into sigmas (ADR-020), counted and not read.
-  int64 folded = 6;
+  uint32 folded = 6;
   // The model the session started on, as its SessionStart says.
   string model = 7;
   // The effort its last Stop ran at, as that Stop's effort.level says.
@@ -52,12 +57,30 @@ message Transcript {
 }
 
 // Turn is one thing said or done in a session, naming the attestation it was
-// read from. Mirrors server.transcriptTurn.
+// read from.
 message Turn {
+  // When it was said or done.
   string at = 1;
+  // Who said or did it.
   string speaker = 2;
+  // What was said or done.
   string text = 3;
+  // The attestation it was read from.
   string of = 4;
+}
+
+// Transcripts is what transcripts read answers.
+message Transcripts {
+  // Each session: its id, the subjects it was about, when it started and
+  // ended, and its turns, each naming the attestation it was read from.
+  repeated Transcript transcripts = 1;
+}
+
+// SessionTranscript is what an agent harness's session sigil answers.
+message SessionTranscript {
+  // Its session as turns, each naming the attestation it was read from. Empty
+  // before anything was said to it.
+  Transcript transcript = 1;
 }
 
 // Follows says which column of a reference each of a signum's fields is. The
@@ -65,6 +88,7 @@ message Turn {
 message Follows {
   string reference = 1;
   repeated Corresponds columns = 2;
+  repeated Fold folds = 3;
 }
 
 // Corresponds is one field and the column it is in the reference. The field is
@@ -75,10 +99,20 @@ message Corresponds {
   string field = 1;
   // WebsiteEvent.urlPath
   string column = 2;
-  // A repeated field held as one object, a property per element, names here
-  // the element's field each property is named by: protocol.Sigil.takes is
-  // Tool.inputSchema, a property per Param, keyed by name.
-  string keyed_by = 3;
+  reserved 3;
+  reserved "keyed_by";
+}
+
+// Fold is a repeated field held as one object of a column, a property per
+// element: protocol.Sigil.takes is Tool.inputSchema, a property per Param,
+// keyed by name.
+message Fold {
+  // protocol.Sigil.takes
+  string field = 1;
+  // Tool.inputSchema
+  string column = 2;
+  // The element's field each property is named by: name.
+  string key = 3;
 }
 
 // A Sigil is one thing the node does. The function that does it is not here:
@@ -93,6 +127,10 @@ message Sigil {
   repeated Field gives = 4;
   // Where it answers on the HTTP API.
   Endpoint http = 5;
+  // The message its answer is, named in full: protocol.VersionInfo. What it
+  // gives is that message's fields, each in its .proto's words, and nothing
+  // is said of them a second time.
+  string answer = 6;
 }
 
 // A Param is one thing a sigil takes. It says nothing about how it travels:
