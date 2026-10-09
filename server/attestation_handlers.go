@@ -372,7 +372,7 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		Predicates []string       `json:"predicates"`
 		Contexts   []string       `json:"contexts"`
 		Actors     []string       `json:"actors"`
-		Timestamp  int64          `json:"timestamp"`
+		Timestamp  *int64         `json:"timestamp"` // Unix seconds; left out is now, and 0 is 1970
 		Source     string         `json:"source"`
 		Attributes map[string]any `json:"attributes"`
 	}
@@ -561,9 +561,11 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 	}
 	tookExists = time.Since(existsAt)
 
-	ts := time.Unix(req.Timestamp, 0)
-	if req.Timestamp == 0 {
-		ts = time.Now()
+	// A timestamp left out is the moment it arrived (omitting is how a caller
+	// asks for the default), and one said is the moment said, 0 included.
+	ts := time.Now()
+	if said := req.Timestamp; said != nil {
+		ts = time.Unix(*said, 0)
 	}
 
 	as := &types.As{

@@ -190,6 +190,15 @@ func (c *stepClock) step(t *testing.T, d time.Duration) {
 	c.waits = kept
 }
 
+// handled waits until the watch has handled a mail tick: it asks for the next
+// one only then. Releasing the store before that makes the answer and the
+// tick ready together, and select may take the answer and drop the mail.
+func (c *stepClock) handled(t *testing.T, mailEvery time.Duration) {
+	t.Helper()
+	require.Eventually(t, func() bool { return c.waitsOn(mailEvery) }, 10*time.Second, time.Millisecond,
+		"the watch did not handle its mail tick")
+}
+
 func (c *stepClock) waitsOn(d time.Duration) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -226,6 +235,7 @@ func TestASlowOperationalStoreIsWaitedOnAndROOTIsTold(t *testing.T) {
 	clock.step(t, shortPatience.every)
 	clock.step(t, shortPatience.mailEvery)
 	clock.step(t, shortPatience.mailEvery) // two mails, short of the minute
+	clock.handled(t, shortPatience.mailEvery)
 	require.NoError(t, held.Close())
 	clock.step(t, shortPatience.every)
 
@@ -344,6 +354,7 @@ func TestTheHeaviestTokenIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
 
 	// Past a mail about the wait, which is what a mail about its end answers.
 	clock.step(t, shortPatience.mailEvery-shortPatience.sentry)
+	clock.handled(t, shortPatience.mailEvery)
 	require.NoError(t, held.Close())
 	clock.step(t, shortPatience.every)
 	require.Eventually(t, func() bool {

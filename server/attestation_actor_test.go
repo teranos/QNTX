@@ -124,3 +124,19 @@ func TestTheNodeAuthorsWhatACallerNamedNobodyFor(t *testing.T) {
 		t.Fatalf("actors = %v, want the node's DID", actors)
 	}
 }
+
+// A timestamp of 0 is 1970, and only one left out is the moment of arrival.
+func TestATimestampOfZeroIsZero(t *testing.T) {
+	store, rec := writingAs(t, tokenAdmission(),
+		`{"subjects":["qntx"],"predicates":["noted"],"timestamp":0}`)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	found, err := store.GetAttestations(ats.AttestationFilter{Limit: 1})
+	if err != nil || len(found) != 1 {
+		t.Fatalf("read back %v, %v", found, err)
+	}
+	if found[0].Timestamp.Unix() != 0 {
+		t.Fatalf("a timestamp of 0 was written as %v", found[0].Timestamp)
+	}
+}
