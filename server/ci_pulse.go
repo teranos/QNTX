@@ -170,6 +170,22 @@ type ciWatchHandler struct {
 	// the person so it is found. Nil files it under the DID.
 	mintedBy func(did string) (string, bool)
 	logger   *zap.SugaredLogger
+	// booted is when this process began. A push re-armed at boot whose runs
+	// all concluded before it was answered by the process before this one.
+	booted time.Time
+}
+
+// rearmSource is the Source of a job setupCIWatch re-arms at boot.
+const rearmSource = "boot"
+
+// concludedBefore is whether every run concluded before at.
+func concludedBefore(runs []ciRun, at time.Time) bool {
+	for _, r := range runs {
+		if r.Status != "completed" || !r.UpdatedAt.Before(at) {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *ciWatchHandler) Name() string { return watcher.CIWatchHandlerName }
@@ -201,13 +217,14 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 	}
 	caller := as.Actors[0]
 	addressee := h.addressee(caller)
+	rearmed := job.Source == rearmSource
 
 	// A rite's dispatch names its run and nothing else: no branch, no sha.
 	if token := attrString(as.Attributes, "token"); token != "" {
 		if repo == "" {
 			return errors.Newf("ci.watch: attestation %s names a dispatched run and no repo", as.ID)
 		}
-		return h.watchDispatch(ctx, as, addressee, caller, repo, token)
+		return h.watchDispatch(ctx, as, addressee, caller, repo, token, rearmed)
 	}
 
 	branch := attrString(as.Attributes, "branch")
@@ -229,7 +246,9 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 	// On the row from the first moment, so a wait and a push nobody watched
 	// do not look the same from the laptop. Quiet: nothing is written down
 	// for it and no session is woken by it.
-	h.watching(watchingID, addressee, "watching "+branch+" "+shortSha)
+	if !rearmed {
+		h.watching(watchingID, addressee, "watching "+branch+" "+shortSha)
+	}
 	defer h.news.drop(watchingID)
 
 	token, err := h.token(ctx)
@@ -270,6 +289,14 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 			return err
 		}
 		if len(runs) > 0 && allConcluded(runs) {
+			// "too much green ci success that dont really give us signal"
+			// Every restart re-armed every push of the last hours and said
+			// each verdict again.
+			if rearmed && concludedBefore(runs, h.booted) {
+				h.logger.Infow("ci.watch: a re-armed push concluded before this process began; said once already",
+					"repo", repo, "branch", branch, "sha", shortSha, "for", addressee)
+				return nil
+			}
 			h.leave(as, addressee, caller, repo, branch, sha, runs, pushedAt)
 			return nil
 		}
@@ -386,13 +413,15 @@ const dispatchPoll = 5 * time.Second
 // dispatched by the name ground gave it. The walk on the laptop moved on the
 // instant the dispatch was accepted; the row is the only record an outcome is
 // owed, and this is where it is answered.
-func (h *ciWatchHandler) watchDispatch(ctx context.Context, as types.As, addressee, caller, repo, token string) error {
+func (h *ciWatchHandler) watchDispatch(ctx context.Context, as types.As, addressee, caller, repo, token string, rearmed bool) error {
 	sentAt := as.Timestamp
 	if sentAt.IsZero() {
 		sentAt = time.Now()
 	}
 	watchingID := as.ID + ":watching"
-	h.watching(watchingID, addressee, "watching "+token)
+	if !rearmed {
+		h.watching(watchingID, addressee, "watching "+token)
+	}
 	defer h.news.drop(watchingID)
 
 	ghToken, err := h.token(ctx)
@@ -430,8 +459,16 @@ func (h *ciWatchHandler) watchDispatch(ctx context.Context, as types.As, address
 			return nil
 		}
 		if allConcluded(runs) {
+			if rearmed && concludedBefore(runs, h.booted) {
+				h.logger.Infow("ci.watch: a re-armed dispatch concluded before this process began; said once already",
+					"repo", repo, "token", token, "for", addressee)
+				return nil
+			}
 			h.leaveDispatch(as, addressee, caller, repo, token, runs)
 			return nil
+		}
+		if rearmed {
+			h.watching(watchingID, addressee, "watching "+token)
 		}
 		if time.Now().After(deadline) {
 			return errors.Newf("ci.watch: %s still running after %s", token, ciWatchCeiling)
@@ -565,8 +602,21 @@ func verdict(runs []ciRun) (conclusion string, failed []ciRun) {
 	return conclusion, failed
 }
 
-// leave puts the conclusion on the row for the caller. There is no branch on
-// green versus red: the result is the event.
+// "im more intersted in fails"
+
+// successHold is how long a green push stays on the row: long enough for the
+// laptop's one-second poll to write it down, and no longer.
+const successHold = 5 * time.Second
+
+// holdFor is how long a push's conclusion stays on the row.
+func holdFor(conclusion string) time.Duration {
+	if conclusion == "success" {
+		return successHold
+	}
+	return newsHold
+}
+
+// leave puts the conclusion on the row for the caller.
 func (h *ciWatchHandler) leave(as types.As, addressee, caller, repo, branch, sha string, runs []ciRun, pushedAt time.Time) {
 	conclusion, failed := verdict(runs)
 	symbol := SymbolUnwell
@@ -615,7 +665,7 @@ func (h *ciWatchHandler) leave(as types.As, addressee, caller, repo, branch, sha
 			"took_s":     int64(now.Sub(pushedAt).Seconds()),
 			"session":    sessionOf(as.Contexts),
 		},
-		UntilMs: now.Add(newsHold).UnixMilli(),
+		UntilMs: now.Add(holdFor(conclusion)).UnixMilli(),
 	})
 	h.logger.Infow("ci.watch left news on the row",
 		"repo", repo, "branch", branch, "sha", shortSha, "conclusion", conclusion,
@@ -703,6 +753,7 @@ func (s *QNTXServer) setupCIWatch() {
 		news:     s.news,
 		mintedBy: s.authHandler.MintedBy,
 		logger:   s.logger.Named("ci.watch"),
+		booted:   time.Now(),
 	}
 	s.daemon.Registry().Register(h)
 	s.logger.Debugw("Registered ci.watch built-in")
@@ -750,7 +801,7 @@ func (s *QNTXServer) setupCIWatch() {
 			continue
 		}
 		sacred.Go("ci.watch rearm "+as.ID, func() {
-			job := &async.Job{ID: "rearm:" + as.ID, HandlerName: watcher.CIWatchHandlerName, Payload: payload, Source: "boot"}
+			job := &async.Job{ID: "rearm:" + as.ID, HandlerName: watcher.CIWatchHandlerName, Payload: payload, Source: rearmSource}
 			if err := h.Execute(s.ctx, job); err != nil {
 				s.noteHandlerFailure(HandlerFailure{Handler: watcher.CIWatchHandlerName, ExecutionID: job.ID,
 					Error: err.Error(), Details: errors.GetAllDetails(err)})
