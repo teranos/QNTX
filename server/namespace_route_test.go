@@ -36,11 +36,19 @@ func TestATokenOutsideAnyOpenNamespaceIsRefused(t *testing.T) {
 
 func TestTheDefaultNamespaceIsServed(t *testing.T) {
 	s := routeServer()
-	// Naming it, and naming none — a session names none.
-	for _, named := range [][]string{{auth.NamespaceDefault}, nil} {
-		if _, err := s.storeFor(requestAs(auth.Admission{Namespaces: named})); err != nil {
-			t.Fatalf("namespaces %v were refused: %v", named, err)
-		}
+	if _, err := s.storeFor(requestAs(auth.Admitted(auth.LevelAttestor, auth.NamespaceDefault))); err != nil {
+		t.Fatalf("an admission naming default was refused: %v", err)
+	}
+}
+
+// "nil is nil"
+
+// Naming no namespace reaches none, at any level below SUPER.
+func TestNamingNoNamespaceReachesNone(t *testing.T) {
+	s := routeServer()
+	_, err := s.storeFor(requestAs(auth.Admitted(auth.LevelAttestor)))
+	if err == nil {
+		t.Fatal("an admission naming no namespace got a store")
 	}
 }
 

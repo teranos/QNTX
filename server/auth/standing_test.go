@@ -144,22 +144,34 @@ func TestWhereAPersonIsStanding(t *testing.T) {
 			want:     "pond",
 		},
 		{
-			what:     "reaching every namespace, a person stands where they stepped",
-			admitted: Admission{},
+			what:     "ROOT reaches every namespace and stands where it stepped",
+			admitted: Admitted(LevelRoot),
 			stepped:  "playground",
 			want:     "playground",
 		},
 		{
 			what:     "having stepped nowhere, in the default project",
-			admitted: Admission{},
+			admitted: Admitted(LevelSuper),
 			stepped:  "",
 			want:     NamespaceDefault,
 		},
 		{
 			what:     "reaching several, a person stands where they stepped",
-			admitted: Admission{Namespaces: []string{"pond", "playground"}},
+			admitted: Admitted(LevelAttestor, "pond", "playground"),
 			stepped:  "playground",
 			want:     "playground",
+		},
+		{
+			what:     "reaching several, stepping outside them is standing nowhere",
+			admitted: Admitted(LevelAttestor, "pond", "playground"),
+			stepped:  "harbour",
+			want:     "",
+		},
+		{
+			what:     "naming no namespace is standing nowhere",
+			admitted: Admitted(LevelUser),
+			stepped:  "playground",
+			want:     "",
 		},
 	} {
 		if got := StandingIn(c.admitted, c.stepped); got != c.want {
@@ -171,7 +183,7 @@ func TestWhereAPersonIsStanding(t *testing.T) {
 // The rectangle is never on nothing, so the field it is drawn from is never
 // empty — a person who has never stepped anywhere included.
 func TestThePersonAlwaysStandsSomewhere(t *testing.T) {
-	p := personOf(User{ID: "u1"}, Admission{})
+	p := personOf(User{ID: "u1"}, Admitted(LevelRoot))
 	if p.Standing == "" {
 		t.Fatal("a person who has not stepped stands nowhere at all")
 	}
@@ -183,7 +195,7 @@ func TestThePersonAlwaysStandsSomewhere(t *testing.T) {
 // Door is where they came in and does not move; Standing is where they are.
 // Reading one for the other puts the rectangle on the door forever.
 func TestTheDoorIsNotWhereYouStand(t *testing.T) {
-	p := personOf(User{ID: "u1", Namespace: "pond", Standing: "playground"}, Admission{})
+	p := personOf(User{ID: "u1", Namespace: "pond", Standing: "playground"}, Admitted(LevelRoot))
 	if p.Door != "pond" {
 		t.Fatalf("the door moved to %q", p.Door)
 	}

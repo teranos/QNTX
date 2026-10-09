@@ -35,13 +35,12 @@ test('the person is drawn from what the node said', () => {
     expect(html).toContain('mastodon');
 });
 
-// ROOT walked up to no door, and no door is every namespace the node serves.
-// A blank there would read as a person acting nowhere.
+// ROOT walked up to no door and names no namespace. Naming none is none.
 test('a User that came in by no door says so rather than showing a blank', () => {
     const html = personSection(tim(), '');
 
     expect(html).toContain('no door');
-    expect(html).toContain('every namespace this node serves');
+    expect(html).not.toContain('every namespace');
 });
 
 // A registration belongs to the door it arrived at, and that door is where it

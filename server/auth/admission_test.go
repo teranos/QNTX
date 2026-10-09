@@ -37,7 +37,7 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 	// root_identities lists the ways one User is reached (ADR-030), and that
 	// User is ROOT (ADR-031). Being listed is what admits and what makes ROOT.
 	assert.Equal(t, string(LevelRoot), seen.LevelName())
-	// A session names none, which is every namespace the node serves.
+	// A session that came in by no door names none.
 	assert.Empty(t, seen.Namespaces)
 }
 

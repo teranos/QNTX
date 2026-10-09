@@ -263,8 +263,15 @@ func (h *Held) Write(admitted auth.Admission, namespace string) (ats.Attestation
 
 // Universe hands back the universe an admission acts in, whole. Same guard as
 // Write, and the door for everything a namespace holds beyond its attestations.
+// An admission reaches the namespaces it names, and naming none reaches none.
 func (h *Held) Universe(admitted auth.Admission, namespace string) (*Universe, error) {
-	if namespace == auth.NamespaceSystem && !admitted.MaySeeSystem() {
+	if namespace == auth.NamespaceSystem {
+		if !admitted.MaySeeSystem() {
+			return nil, NotServed{Asked: namespace}
+		}
+		return h.universeIn(namespace)
+	}
+	if !admitted.MayActIn(namespace) {
 		return nil, NotServed{Asked: namespace}
 	}
 	return h.universeIn(namespace)

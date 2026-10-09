@@ -373,8 +373,8 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	// where their requests act. Carried on the session the same way, and for the
 	// same reason: which door it was is settled at login and never re-asked.
 	//
-	// A User that walked up to no door names none, which is every namespace the
-	// node serves. That is ROOT, and everyone somebody else put here.
+	// A User that walked up to no door names none, and reaches none. ROOT reaches
+	// every namespace by its level (ADR-027).
 	if p.Namespace != "" {
 		admitted.Namespaces = []string{p.Namespace}
 	}
