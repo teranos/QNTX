@@ -72,6 +72,32 @@ func TestAVTagLandingOnQNTXIsKnown(t *testing.T) {
 	}
 }
 
+func TestAPushLandsOnTheFollowOfItsRepoAndBranch(t *testing.T) {
+	f := GitHubFollow{Repo: "teranos/QNTX", Branch: "main", Dispatches: "sbvh-nl/q.sbvh.nl", Workflow: "deploy.yml", Ref: "master"}
+	for name, c := range map[string]struct {
+		raw     string
+		enabled bool
+		follows bool
+	}{
+		"main of the repo":         {`{"ref":"refs/heads/main","repository":{"full_name":"teranos/QNTX"}}`, true, true},
+		"main, turned off":         {`{"ref":"refs/heads/main","repository":{"full_name":"teranos/QNTX"}}`, false, false},
+		"another branch":           {`{"ref":"refs/heads/wip","repository":{"full_name":"teranos/QNTX"}}`, true, false},
+		"a tag named main":         {`{"ref":"refs/tags/main","repository":{"full_name":"teranos/QNTX"}}`, true, false},
+		"main deleted":             {`{"ref":"refs/heads/main","deleted":true,"repository":{"full_name":"teranos/QNTX"}}`, true, false},
+		"main of another repo":     {`{"ref":"refs/heads/main","repository":{"full_name":"teranos/datapunt"}}`, true, false},
+		"the repo in another case": {`{"ref":"refs/heads/main","repository":{"full_name":"Teranos/qntx"}}`, true, true},
+	} {
+		var p gitHubPush
+		if err := json.Unmarshal([]byte(c.raw), &p); err != nil {
+			t.Fatal(err)
+		}
+		f.Enabled = c.enabled
+		if got := p.follows(f); got != c.follows {
+			t.Errorf("%s: follows=%v", name, got)
+		}
+	}
+}
+
 func TestAPushMovesTheBuildsItsRepoAndBranchFeed(t *testing.T) {
 	b := pluginBuild{
 		name:   "datapunt",

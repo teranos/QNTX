@@ -43,11 +43,17 @@ func (s *QNTXServer) repoDefaultBranch(ctx context.Context, owner, repo string) 
 
 // ownerRepo reads owner/repo.
 func ownerRepo(said string) (string, string, *protocol.Refusal) {
-	owner, repo, ok := strings.Cut(said, "/")
-	if !ok || owner == "" || repo == "" || strings.Contains(repo, "/") {
+	owner, repo, named := repoNamed(said)
+	if !named {
 		return "", "", &protocol.Refusal{Why: sigil.Invalid, Param: "repo", Says: said + " names no repository: owner/repo"}
 	}
 	return owner, repo, nil
+}
+
+// repoNamed is owner and repo of owner/repo, and whether said is one.
+func repoNamed(said string) (string, string, bool) {
+	owner, repo, ok := strings.Cut(said, "/")
+	return owner, repo, ok && owner != "" && repo != "" && !strings.Contains(repo, "/")
 }
 
 // githubPage is as many as GitHub gives on one page.
