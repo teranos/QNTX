@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/internal/agentenv"
 	"github.com/teranos/errors"
 )
 
@@ -139,7 +140,7 @@ func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
 			return Answer{}, errors.Wrapf(err, "could not create %s", dir)
 		}
 	}
-	env := append(os.Environ(), "PI_CODING_AGENT_DIR="+agentDir, "PI_SKIP_VERSION_CHECK=1", "PI_TELEMETRY=0")
+	env := append(agentenv.Carried(), "PI_CODING_AGENT_DIR="+agentDir, "PI_SKIP_VERSION_CHECK=1", "PI_TELEMETRY=0")
 	env = append(env, s.Env...)
 	bearers, err := s.writeMCP(agentDir)
 	if err != nil {
