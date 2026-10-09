@@ -171,7 +171,7 @@ func TestTheWordsARoleMaySayAreLinesToo(t *testing.T) {
 	assert.False(t, words.All, "no line said all, so the read is the worker's own")
 
 	// The test node serves default alone, so the worker acts there.
-	worker := auth.Holding(auth.Admitted(auth.LevelPublicRegistration), "WORKER")
+	worker := auth.Holding(auth.Admitted(auth.LevelPublicRegistration, auth.NamespaceDefault), "WORKER")
 	worker.Identity = gardenerRoute
 	worker = auth.Saying(worker, words)
 	rec = grants(t, s, worker, `{"subjects":["pond"],"predicates":["visit:done"],"contexts":["default"]}`)

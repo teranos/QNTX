@@ -44,8 +44,8 @@ export interface Person {
 /** A User that walked up to no door names none. */
 const NO_DOOR = 'no door';
 
-/** Naming no namespace is naming all of them, so the blank has to say which. */
-const EVERY_NAMESPACE = 'every namespace this node serves';
+/** Naming no namespace is naming none, and a blank would not say so. */
+const NO_NAMESPACE = 'none';
 
 /** Nobody has been joined to this User yet. */
 const NO_ACCOUNTS = 'none';
@@ -187,7 +187,7 @@ export function personSection(who: Person | null, refused: string): string {
                 ${row('Via:', who.via)}
                 ${row('Route:', who.identity)}
                 ${row('Door:', who.door || NO_DOOR)}
-                ${row('Namespace:', who.namespaces.join(', ') || EVERY_NAMESPACE)}
+                ${row('Namespace:', who.namespaces.join(', ') || NO_NAMESPACE)}
                 ${accounts}
             </div>
         `;

@@ -485,7 +485,7 @@ func (s *oauthStore) RotateRefreshToken(ctx context.Context, _ string, refreshSi
 }
 
 // namespaceOf is the one namespace a token acts in, or none when the record
-// named none, which is every namespace the person reaches.
+// named none.
 func namespaceOf(grant Grant) string {
 	if len(grant.Namespaces) > 0 {
 		return grant.Namespaces[0]
@@ -494,7 +494,7 @@ func namespaceOf(grant Grant) string {
 }
 
 // namespacesOf is where a token issued under this session acts: the client's
-// door, or none, which is every namespace the person reaches.
+// door, or none.
 func namespacesOf(session *TokenSession) []string {
 	if session.Namespace == "" {
 		return nil

@@ -14,9 +14,8 @@ import (
 // the person is and acts there.
 
 // StandingIn is the namespace an admission acts in, given where its person
-// stepped. An admission that reaches exactly one namespace is in that one and
-// stepping does not move it; anything else stands where the person stepped, and
-// a person who has not stepped is in the default project.
+// stepped. Reaching exactly one namespace is being in it; ROOT and SUPER
+// stand where they stepped; anyone else there only if they name it.
 //
 // The node resolves this once and everything reads the answer: the universe a
 // request acts in, and the rectangle the namespaces bar draws. Two readings of
@@ -26,11 +25,21 @@ func StandingIn(admitted Admission, standing string) string {
 	if len(admitted.Namespaces) == 1 {
 		return admitted.Namespaces[0]
 	}
-	if standing != "" {
+	if admitted.ReachesEveryNamespace() {
+		if standing != "" {
+			return standing
+		}
+		return NamespaceDefault
+	}
+	if admitted.MayActIn(standing) {
 		return standing
 	}
-	return NamespaceDefault
+	return Nowhere
 }
+
+// Nowhere is where an admission stands that names no namespace it stepped to.
+// It is no namespace, and no universe answers to it.
+const Nowhere = ""
 
 // Footing answers whether an admission may stand in a namespace. The stores
 // that know are outside this package, so the answer is handed in, the way

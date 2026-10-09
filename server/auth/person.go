@@ -34,7 +34,7 @@ type Person struct {
 	// wrote (ADR-034). Empty is a person holding none.
 	Roles []string `json:"roles"`
 	// Namespaces is where this admission acts: the door a session came in by,
-	// or what a token's record names. Empty is every namespace the node serves.
+	// or what a token's record names. Empty names none.
 	Namespaces []string `json:"namespaces"`
 	// Door is the namespace this User registered at (ADR-032). Empty is a User
 	// that walked up to no door — ROOT, and everyone somebody else put here.

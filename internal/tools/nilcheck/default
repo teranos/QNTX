@@ -1,0 +1,7 @@
+# config keys that turn into a value when left out, per file. Debt: each number may fall and may not rise.
+# Instead: a missing key is refused at load, or the field is omitted and nothing runs.
+# 69 in 3 files.
+
+1	cmd/qntx/commands/database_parquet.go
+67	internal/config/defaults.go
+1	server/namespaces/universe.go
