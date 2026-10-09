@@ -117,7 +117,9 @@ REACH is '/api/mail/report' '/api/mail/message'                           of ROO
 
 # What the node serves, as MCP tools (ADR-038). A connector's token is the
 # person who said yes, and every tool call is gated on its own path's line.
-REACH is '/mcp' '/mcp/'                                                   of ROOT SUPER
+# A namespace agent reaches the node's sigils through MCP with a token of its
+# own (ADR-048), which acts in its namespace and nowhere else.
+REACH is '/mcp' '/mcp/'                                                   of ROOT SUPER TOKEN
 
 # A line that names a signum is about its sigils, over every surface, whatever
 # path the plugin bound them to (ReachingSigil).
@@ -158,6 +160,12 @@ REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROO
 # of what guards it, and that is ROOT.
 REACH is '/api/claude' '/api/claude/say' '/api/claude/session' '/api/claude/login' of ROOT
 REACH is '/api/pi' '/api/pi/say' '/api/pi/session'                        of ROOT
+
+# The namespace agent (the agents signum, ADR-048): "shared amongst anyone who
+# has REACH on it". Who acts in the namespace reaches it, which the handler
+# asks of the admission; who may opt the namespace into one is its owner, ROOT
+# or SUPER, asked there too.
+REACH is '/api/agents/{namespace}' '/api/agents/{namespace}/say' '/api/agents/{namespace}/session' '/api/agents/{namespace}/login' of ROOT SUPER USER
 
 # A2A over HTTP+JSON, one line for every operation: a route like
 # /tasks/{id}:cancel is no pattern the mux reads. "A2A is ROOT's alone for the

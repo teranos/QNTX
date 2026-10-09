@@ -70,6 +70,11 @@ func (s *QNTXServer) claudeLogin(ctx context.Context, h *harness, sent sigil.Sen
 	if refused != nil {
 		return nil, refused
 	}
+	return s.loginAgent(ctx, h, agent, sent)
+}
+
+// loginAgent signs one agent in to Claude Code, or finishes the sign-in begun.
+func (s *QNTXServer) loginAgent(ctx context.Context, h *harness, agent *rootAgent, sent sigil.Sent) (any, *protocol.Refusal) {
 	binary, err := s.harnessHeldBy(h.name).Path(ctx)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no Claude Code to sign in to: " + err.Error()}

@@ -71,6 +71,34 @@
         "SUPER"
       ]
     },
+    "/api/agents/{namespace}": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "USER"
+      ]
+    },
+    "/api/agents/{namespace}/login": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "USER"
+      ]
+    },
+    "/api/agents/{namespace}/say": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "USER"
+      ]
+    },
+    "/api/agents/{namespace}/session": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "USER"
+      ]
+    },
     "/api/attestations": {
       "x-qntx-reach": [
         "ROOT",
@@ -822,13 +850,15 @@
     "/mcp": {
       "x-qntx-reach": [
         "ROOT",
-        "SUPER"
+        "SUPER",
+        "TOKEN"
       ]
     },
     "/mcp/": {
       "x-qntx-reach": [
         "ROOT",
-        "SUPER"
+        "SUPER",
+        "TOKEN"
       ],
       "x-qntx-prefix": true
     },
