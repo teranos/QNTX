@@ -151,6 +151,7 @@ type FetchServer struct {
 	protocol.UnimplementedFetchServiceServer
 	store           ats.AttestationStore
 	authToken       string
+	node            string // The node's DID: who wrote a fetch a plugin named no actor for.
 	client          *http.Client
 	logger          *zap.SugaredLogger
 	pathLimiter     *rateLimiter
@@ -190,8 +191,9 @@ func (s *FetchServer) storeFor(token string) (ats.AttestationStore, error) {
 }
 
 // NewFetchServer takes the fetch config as said: its defaults are am.toml's
-// (config.SetDefaults), and a 0 is 0 — no requests in a window, no pulse.
-func NewFetchServer(store ats.AttestationStore, authToken string, cfg appcfg.FetchConfig, logger *zap.SugaredLogger) *FetchServer {
+// (config.SetDefaults), and a 0 is 0 — no requests in a window, no pulse. node
+// is the node's DID.
+func NewFetchServer(store ats.AttestationStore, authToken, node string, cfg appcfg.FetchConfig, logger *zap.SugaredLogger) *FetchServer {
 	maxReqs := cfg.MaxRequestsPerWindow
 	windowSecs := cfg.WindowSeconds
 	pulseSecs := cfg.PulseIntervalSeconds
@@ -199,6 +201,7 @@ func NewFetchServer(store ats.AttestationStore, authToken string, cfg appcfg.Fet
 	s := &FetchServer{
 		store:     store,
 		authToken: authToken,
+		node:      node,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -438,9 +441,10 @@ func (s *FetchServer) attestFetchResult(ctx context.Context, store ats.Attestati
 		predicates = append(predicates, req.Predicate)
 	}
 
+	// The node authors a fetch its plugin named no actor for.
 	actor := req.Actor
 	if actor == "" {
-		actor = "fetch-service"
+		actor = s.node
 	}
 
 	source := req.Source

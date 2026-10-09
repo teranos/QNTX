@@ -22,7 +22,7 @@ import (
 func startATSStoreServer(t *testing.T, store ats.AttestationStore, authToken string) (string, func()) {
 	t.Helper()
 	logger := zaptest.NewLogger(t).Sugar()
-	server := services.NewATSStoreServer(store, authToken, logger)
+	server := services.NewATSStoreServer(store, authToken, "did:key:znode", logger)
 
 	listener, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)

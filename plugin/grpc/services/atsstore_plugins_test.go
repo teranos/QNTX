@@ -24,7 +24,7 @@ func standingIn(token string, store ats.AttestationStore) PluginStores {
 func TestAPluginsOwnTokenReachesTheNamespaceItStandsIn(t *testing.T) {
 	served := &namedStore{name: "default"}
 	clean := &namedStore{name: "clean"}
-	s := NewATSStoreServer(served, "shared", zap.NewNop().Sugar())
+	s := NewATSStoreServer(served, "shared", "did:key:znode", zap.NewNop().Sugar())
 	s.SetPluginStores(standingIn("cleanAPI", clean))
 
 	got, err := s.storeFor("cleanAPI")
@@ -45,7 +45,7 @@ func TestAPluginsOwnTokenReachesTheNamespaceItStandsIn(t *testing.T) {
 func TestAFetchIsAttestedWhereThePluginStands(t *testing.T) {
 	served := &namedStore{name: "default"}
 	clean := &namedStore{name: "clean"}
-	f := NewFetchServer(served, "shared", appcfg.FetchConfig{}, zap.NewNop().Sugar())
+	f := NewFetchServer(served, "shared", "did:key:znode", appcfg.FetchConfig{}, zap.NewNop().Sugar())
 	t.Cleanup(f.Stop)
 	f.SetPluginStores(standingIn("cleanAPI", clean))
 

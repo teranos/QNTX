@@ -69,7 +69,7 @@ Types themselves are attestations too - we attest that "restaurant" is a type wi
 
 ## Extensibility
 
-ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identification), `EntityResolver` (entity aliases), and `AttestationStore` and friends in [`store.go`](store.go) (any storage backend). Your domain logic plugs in without modifying core.
+ATS stays domain-agnostic through interfaces: `EntityResolver` (entity aliases), and `AttestationStore` and friends in [`store.go`](store.go) (any storage backend). Your domain logic plugs in without modifying core.
 
 ## Why ASIDs?
 
