@@ -44,7 +44,7 @@ func TestGRACEShutdownFlow(t *testing.T) {
 
 	// Create worker pool with parent context and fast polling for tests
 	pollInterval := 100 * time.Millisecond
-	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{
+	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff,
 		Workers:       1,
 		PauseOnBudget: false,
 		PollInterval:  &pollInterval, // Fast polling for tests
@@ -163,7 +163,7 @@ func TestGRACEOrphanRecovery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{Workers: 1}, zap.NewNop().Sugar())
+	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}, zap.NewNop().Sugar())
 	wp.Start()
 	defer wp.Stop()
 
@@ -197,7 +197,7 @@ func TestGRACECrashAndRestart(t *testing.T) {
 
 	// Phase 1: Start worker, enqueue job, simulate crash mid-execution
 	ctx1, cancel1 := context.WithCancel(context.Background())
-	wp1 := NewWorkerPoolWithContext(ctx1, db, cfg, WorkerPoolConfig{Workers: 1}, zap.NewNop().Sugar())
+	wp1 := NewWorkerPoolWithContext(ctx1, db, cfg, WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}, zap.NewNop().Sugar())
 	wp1.Start()
 
 	job, err := createTestJob("test.grace-handler", "crash test", 5, 0.01)
@@ -218,7 +218,7 @@ func TestGRACECrashAndRestart(t *testing.T) {
 	ctx2, cancel2 := context.WithCancel(context.Background())
 	defer cancel2()
 
-	wp2 := NewWorkerPoolWithContext(ctx2, db, cfg, WorkerPoolConfig{Workers: 1}, zap.NewNop().Sugar())
+	wp2 := NewWorkerPoolWithContext(ctx2, db, cfg, WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}, zap.NewNop().Sugar())
 	wp2.Start()
 	defer wp2.Stop()
 
@@ -291,7 +291,7 @@ func TestGRACEChildTasksPreserved(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{Workers: 1}, zap.NewNop().Sugar())
+	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}, zap.NewNop().Sugar())
 	wp.Start()
 	defer wp.Stop()
 

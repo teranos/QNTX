@@ -9,7 +9,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -92,7 +91,7 @@ func (s *QNTXServer) reachList(_ context.Context, _ sigil.Sent) (any, *protocol.
 		}
 		found, err := store.GetAttestations(ats.AttestationFilter{
 			Subjects: []string{reach.Subject},
-			Limit:    storage.MaxAttestationLimit,
+			Limit:    ats.EveryRow,
 		})
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}

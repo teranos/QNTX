@@ -241,9 +241,9 @@ func TestAWaitROOTWasNotMailedAboutMailsNothingWhenItEnds(t *testing.T) {
 // is let back in, and ROOT told so, once the store answers in time again.
 func TestTheHeaviestTokenIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
 	s, box, tokens := watchedNodeWithTokens(t)
-	heavy, _, err := tokens.Create(auth.NewToken{Label: "ground", MintedBy: rootAccount, Level: auth.LevelAttestor})
+	heavy, _, err := tokens.Create(auth.NewToken{Label: "ground", MintedBy: rootAccount, Level: auth.LevelAttestor, ExpiresAt: auth.NeverEnds()})
 	require.NoError(t, err)
-	light, _, err := tokens.Create(auth.NewToken{Label: "laptop-cron", MintedBy: rootAccount, Level: auth.LevelAttestor})
+	light, _, err := tokens.Create(auth.NewToken{Label: "laptop-cron", MintedBy: rootAccount, Level: auth.LevelAttestor, ExpiresAt: auth.NeverEnds()})
 	require.NoError(t, err)
 
 	gated := s.authHandler.Middleware("/api/attestations", auth.Also(auth.LevelAttestor), func(w http.ResponseWriter, r *http.Request) {

@@ -29,7 +29,9 @@ func (h *Handler) HoldNamespaceAgent(raw, did, label, mintedBy, namespace string
 	if mintedBy == "" {
 		return errors.Newf("nobody opted %s into its agent, so there is nobody for its token to speak for", namespace)
 	}
-	issued := IssuedToken{Hash: hash, DID: did, Label: label, MintedBy: mintedBy, Level: LevelToken, Namespaces: []string{namespace}}
+	// Derived from the node's key, so it is the same token for as long as the
+	// namespace keeps its agent: it does not end.
+	issued := IssuedToken{Hash: hash, DID: did, Label: label, MintedBy: mintedBy, Level: LevelToken, Namespaces: []string{namespace}, ExpiresAt: NeverEnds()}
 	if h.users != nil {
 		u, found, err := h.users.ByRoute(mintedBy)
 		if err != nil {
@@ -78,7 +80,7 @@ func (h *Handler) HoldRootAgent(raw, did string) error {
 	if len(roots) == 0 {
 		return errors.New("auth.root_identities names nobody, so there is no ROOT for the ROOT agent to speak for")
 	}
-	issued := IssuedToken{Hash: hash, DID: did, Label: RootAgentLabel, MintedBy: roots[0], Level: LevelRoot}
+	issued := IssuedToken{Hash: hash, DID: did, Label: RootAgentLabel, MintedBy: roots[0], Level: LevelRoot, ExpiresAt: NeverEnds()}
 	if h.users != nil {
 		u, found, err := h.users.ByRoute(roots[0])
 		if err != nil {

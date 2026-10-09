@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
@@ -58,7 +57,7 @@ func (r roleLines) WordLines() ([]auth.WordLine, error) {
 	for _, subject := range []string{auth.SubjectWrite, auth.SubjectRead} {
 		found, err := store.GetAttestations(ats.AttestationFilter{
 			Subjects: []string{subject},
-			Limit:    storage.MaxAttestationLimit,
+			Limit:    ats.EveryRow,
 		})
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read the %s lines", subject)
@@ -96,7 +95,7 @@ func (s *QNTXServer) runtime() reach.Runtime {
 	}
 	found, err := store.GetAttestations(ats.AttestationFilter{
 		Subjects: []string{reach.Subject},
-		Limit:    storage.MaxAttestationLimit,
+		Limit:    ats.EveryRow,
 	})
 	if err != nil {
 		s.logger.Errorw("the store's reach lines were not read; the const table serves alone",
@@ -144,7 +143,7 @@ func (r roleLines) RoleLines(namespace string) ([]auth.RoleLine, error) {
 			// The store's own ceiling, said out loud. Newest first, so a
 			// deployment past it loses the oldest lines rather than the ones
 			// that decide.
-			Limit: storage.MaxAttestationLimit,
+			Limit: ats.EveryRow,
 		})
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read the %s lines in %s", predicate, namespace)

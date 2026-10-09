@@ -196,9 +196,9 @@ func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 	}
 
 	req := &broadcastRequest{
-		reqType:  "message",
-		msg:      msg,
-		clientID: client.id,
+		reqType: "message",
+		msg:     msg,
+		to:      toClient(client.id),
 	}
 
 	select {
@@ -249,9 +249,9 @@ func (s *QNTXServer) sendErrorToClient(client *Client, surface string, err error
 	}{Type: "error", ErrorEnvelope: envelope}
 
 	req := &broadcastRequest{
-		reqType:  "message",
-		msg:      msg,
-		clientID: client.id,
+		reqType: "message",
+		msg:     msg,
+		to:      toClient(client.id),
 	}
 
 	select {
@@ -276,9 +276,9 @@ func (s *QNTXServer) sendJobToClient(client *Client, job *async.Job, isInitial b
 
 	// Send to broadcast worker (thread-safe)
 	req := &broadcastRequest{
-		reqType:  "message",
-		msg:      msg,
-		clientID: client.id, // Send to specific client only
+		reqType: "message",
+		msg:     msg,
+		to:      toClient(client.id),
 	}
 
 	select {

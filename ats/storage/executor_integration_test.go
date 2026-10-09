@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -283,9 +284,14 @@ func TestAxExecutorLimitHandling(t *testing.T) {
 			expectedCount: 5, // Only 5 test attestations
 		},
 		{
-			name:          "zero limit uses default",
+			name:          "zero limit is zero rows",
 			limit:         0,
-			expectedCount: 5, // Should return all (within default limit of 100)
+			expectedCount: 0,
+		},
+		{
+			name:          "every row, said",
+			limit:         ats.EveryRow,
+			expectedCount: 5,
 		},
 	}
 

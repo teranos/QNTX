@@ -47,7 +47,7 @@ func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
 	ticket, err := h.pendingLogins.open(mastodonAccount)
 	require.NoError(t, err)
 
-	req := mintRequest(`{"label":"ingest","level":"ATTESTOR"}`, "")
+	req := mintRequest(`{"expires_at":"never","label":"ingest","level":"ATTESTOR"}`, "")
 	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: ticket})
 	rec := httptest.NewRecorder()
 	mint(h, rec, req)
@@ -68,7 +68,7 @@ func TestALabelIsAllASuperMintAsksFor(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	mint(h, rec, mintRequest(`{"label":"mbp","level":"SUPER"}`, ""))
+	mint(h, rec, mintRequest(`{"expires_at":"never","label":"mbp","level":"SUPER"}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
@@ -82,7 +82,7 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"ingest","level":"ATTESTOR"}`, session))
+		`{"expires_at":"never","label":"ingest","level":"ATTESTOR"}`, session))
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var resp struct {
@@ -106,7 +106,7 @@ func TestANamespaceOtherThanDefaultIsMinted(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"other","level":"ATTESTOR","namespaces":["pond"]}`, session))
+		`{"expires_at":"never","label":"other","level":"ATTESTOR","namespaces":["pond"]}`, session))
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	listed, err := store.List()
@@ -151,7 +151,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	// A session that logged in as nobody — the ungoverned case.
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"sneak","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, ""))
+		`{"expires_at":"never","label":"sneak","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, ""))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 	// A refused caller gets the outcome. Who they are, whether that name is
 	// known, and what would have let them through are the node's to keep.
@@ -162,7 +162,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"fine","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, session))
+		`{"expires_at":"never","label":"fine","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, session))
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
@@ -178,7 +178,7 @@ func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"label":"late","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, session))
+		`{"expires_at":"never","label":"late","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, session))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
@@ -189,7 +189,7 @@ func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	mint(h, rec, mintRequest(
-		`{"label":"ordinary","level":"ATTESTOR"}`, ""))
+		`{"expires_at":"never","label":"ordinary","level":"ATTESTOR"}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
@@ -200,7 +200,7 @@ func TestMintingNamesTheKind(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
-	mint(h, rec, mintRequest(`{"label":"unsaid"}`, ""))
+	mint(h, rec, mintRequest(`{"expires_at":"never","label":"unsaid"}`, ""))
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.Contains(t, rec.Body.String(), string(LevelSuper))
@@ -212,8 +212,8 @@ func TestMintingNamesTheKind(t *testing.T) {
 func TestBothKindsAreMintedAsThemselves(t *testing.T) {
 	// An ATTESTOR names what it may attest, and a SUPER token is not narrowed.
 	for kind, body := range map[Level]string{
-		LevelSuper:    `{"label":"mine","level":"SUPER"}`,
-		LevelAttestor: `{"label":"theirs","level":"ATTESTOR"}`,
+		LevelSuper:    `{"expires_at":"never","label":"mine","level":"SUPER"}`,
+		LevelAttestor: `{"expires_at":"never","label":"theirs","level":"ATTESTOR"}`,
 	} {
 		h, store := grantHandler(t)
 		rec := httptest.NewRecorder()

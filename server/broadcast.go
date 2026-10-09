@@ -23,20 +23,51 @@ import (
 	"github.com/teranos/errors"
 )
 
+// audience is who a message reaches, named: every client, the clients in one
+// namespace, or one client. Its zero value names none and reaches nobody.
+type audience struct {
+	kind audienceKind
+	name string
+}
+
+type audienceKind int
+
+const (
+	// aboutTheNode is the node's daemon, plugins and spend: the same fact in
+	// every universe, so every client hears it.
+	aboutTheNode audienceKind = iota + 1
+	inNamespace
+	oneClient
+)
+
+func everyClient() audience            { return audience{kind: aboutTheNode} }
+func toNamespace(name string) audience { return audience{kind: inNamespace, name: name} }
+func toClient(id string) audience      { return audience{kind: oneClient, name: id} }
+
+// reaches reports whether a client is in this audience.
+func (a audience) reaches(c *Client) bool {
+	switch a.kind {
+	case aboutTheNode:
+		return true
+	case inNamespace:
+		return c.in == a.name
+	case oneClient:
+		return c.id == a.name
+	}
+	return false
+}
+
 // broadcastRequest represents a request to broadcast data to clients.
 // All broadcasts go through a dedicated worker goroutine to prevent race conditions.
 type broadcastRequest struct {
-	reqType  string // "message", "close", "watcher_match"
-	msg      any    // Generic message (for reqType="message")
-	payload  any    // Generic payload (for reqType="watcher_match")
-	clientID string // Target client ID. Empty string means "broadcast to all clients"
-	// (semantically: no specific target = all targets).
+	reqType string // "message", "close", "watcher_match"
+	msg     any    // Generic message (for reqType="message")
+	payload any    // Generic payload (for reqType="watcher_match")
 
-	// in is the namespace this is about, and empty is a message about the node
-	// rather than about a universe. Nothing crosses (ADR-026), so a message
-	// carrying what happened inside one namespace names it here or reaches
-	// people it is not about.
-	in string
+	// to is who this reaches, named. Nothing crosses (ADR-026), so a message
+	// carrying what happened inside one namespace names it, or reaches people
+	// it is not about.
+	to audience
 
 	// about is the attestation this message hands over, when it hands one over.
 	//
@@ -54,7 +85,7 @@ type broadcastRequest struct {
 // and is the same fact whichever universe the reader is in. Anything that came
 // out of one namespace goes through broadcastIn.
 func (s *QNTXServer) broadcastMessage(msg any) {
-	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg})
+	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg, to: everyClient()})
 }
 
 // broadcastIn sends a message to the clients in one namespace and to nobody
@@ -66,7 +97,7 @@ func (s *QNTXServer) broadcastIn(in string, msg any) {
 			"message", fmt.Sprintf("%T", msg))
 		return
 	}
-	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg, in: in})
+	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg, to: toNamespace(in)})
 }
 
 // queueBroadcast hands a request to the worker that owns the client channels.
@@ -792,21 +823,21 @@ func (s *QNTXServer) runBroadcastWorker() {
 func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 	switch req.reqType {
 	case "message":
-		s.sendMessageToClients(req.msg, req.clientID, req.in, req.about)
+		s.sendMessageToClients(req.msg, req.to, req.about)
 	case "close":
 		s.closeClientChannels(req.client)
 	case "watcher_match":
-		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
+		s.sendMessageToClients(req.payload, req.to, req.about)
 	case "watcher_error":
-		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
+		s.sendMessageToClients(req.payload, req.to, req.about)
 	case "element_fired":
-		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
+		s.sendMessageToClients(req.payload, req.to, req.about)
 	default:
 		s.logger.Warnw("Unknown broadcast request type", "type", req.reqType)
 	}
 }
 
-// sendMessageToClients sends a generic message to all clients (or specific client if clientID set).
+// sendMessageToClients sends a message to the clients its audience names.
 // Only called from broadcast worker - no concurrent access to client channels.
 //
 // When a client's message channel is full, the message is dropped rather than
@@ -817,22 +848,17 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 // that batches/summarizes updates for bandwidth-constrained clients. The goal is
 // for QNTX to remain functional even on extremely low-bandwidth links (GPRS-class).
 // See the degraded-mode branch for the broader connectivity resilience work.
-// in is the namespace the message is about, and empty is a message about the
-// node, which every client gets whichever universe they are in.
 // about is the attestation the message carries, or nil when it carries none.
 // A client who may not read it is not sent it, even inside its own namespace.
-func (s *QNTXServer) sendMessageToClients(msg any, targetClientID string, in string, about *types.As) {
+func (s *QNTXServer) sendMessageToClients(msg any, to audience, about *types.As) {
 	s.mu.RLock()
 	clients := make([]*Client, 0, len(s.clients))
 	withheld := 0
 	for client := range s.clients {
-		if targetClientID != "" && client.id != targetClientID {
-			continue
-		}
 		// A namespace is its own universe and nothing crosses (ADR-026). A
 		// client hearing that something happened somewhere else has learned
 		// something about a universe that is not theirs, whatever the payload.
-		if in != "" && client.in != in {
+		if !to.reaches(client) {
 			continue
 		}
 		// Being in the namespace says a socket may hear that something

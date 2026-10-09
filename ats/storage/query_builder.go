@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -104,15 +105,18 @@ func BuildFilterQuery(filter types.AxFilter) (string, []any) {
 	}
 	query += " ORDER BY timestamp DESC"
 
-	if filter.Limit > 0 {
-		limit := filter.Limit
-		if limit > MaxAttestationLimit {
-			limit = MaxAttestationLimit
-		}
-		query += fmt.Sprintf(" LIMIT %d", limit)
-	}
+	query += limitClause(filter.Limit)
 
 	return query, qb.args
+}
+
+// limitClause is a query's LIMIT: 0 is 0 rows, ats.EveryRow is every row, and
+// anything else is held to MaxAttestationLimit so a query cannot exhaust the node.
+func limitClause(limit int) string {
+	if limit == ats.EveryRow {
+		return ""
+	}
+	return fmt.Sprintf(" LIMIT %d", min(max(limit, 0), MaxAttestationLimit))
 }
 
 // buildTemporalFilters adds timestamp range filters

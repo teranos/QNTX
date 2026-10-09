@@ -26,7 +26,7 @@ func mintClient(t *testing.T, h *Handler, body string) *httptest.ResponseRecorde
 func TestAClientIsMintedWithAReturnAddress(t *testing.T) {
 	h, store := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","namespaces":["default"],"return_address":"https://app.example/callback"}`)
+	rec := mintClient(t, h, `{"expires_at":"never","label":"app","level":"OAUTH","namespaces":["default"],"return_address":"https://app.example/callback"}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	var resp struct {
@@ -51,7 +51,7 @@ func TestAClientActsInTheNamespacePickedAtMinting(t *testing.T) {
 	// Naming a namespace other than default is ROOT's (ADR-027).
 	h.SetIdentities([]string{mastodonAccount}, nil)
 
-	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","namespaces":["pond"],"return_address":"https://app.example/callback"}`)
+	rec := mintClient(t, h, `{"expires_at":"never","label":"app","level":"OAUTH","namespaces":["pond"],"return_address":"https://app.example/callback"}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	listed, err := store.List()
@@ -65,7 +65,7 @@ func TestAClientActsInTheNamespacePickedAtMinting(t *testing.T) {
 func TestAClientWithoutANamespaceIsRefused(t *testing.T) {
 	h, store := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","return_address":"https://app.example/callback"}`)
+	rec := mintClient(t, h, `{"expires_at":"never","label":"app","level":"OAUTH","return_address":"https://app.example/callback"}`)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 	listed, err := store.List()
@@ -77,7 +77,7 @@ func TestAClientWithoutANamespaceIsRefused(t *testing.T) {
 func TestAClientNamingTwoNamespacesIsRefused(t *testing.T) {
 	h, _ := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","namespaces":["pond","default"],"return_address":"https://app.example/callback"}`)
+	rec := mintClient(t, h, `{"expires_at":"never","label":"app","level":"OAUTH","namespaces":["pond","default"],"return_address":"https://app.example/callback"}`)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
@@ -85,7 +85,7 @@ func TestAClientNamingTwoNamespacesIsRefused(t *testing.T) {
 func TestAClientWithoutAReturnAddressIsRefused(t *testing.T) {
 	h, _ := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"app","level":"OAUTH","namespaces":["default"]}`)
+	rec := mintClient(t, h, `{"expires_at":"never","label":"app","level":"OAUTH","namespaces":["default"]}`)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
@@ -102,7 +102,7 @@ func TestAReturnAddressHasToBeReachable(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			h, _ := grantHandler(t)
-			rec := mintClient(t, h, `{"label":"app","level":"OAUTH","namespaces":["default"],"return_address":"`+address+`"}`)
+			rec := mintClient(t, h, `{"expires_at":"never","label":"app","level":"OAUTH","namespaces":["default"],"return_address":"`+address+`"}`)
 			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 		})
 	}
@@ -111,7 +111,7 @@ func TestAReturnAddressHasToBeReachable(t *testing.T) {
 func TestOnlyAClientHasAReturnAddress(t *testing.T) {
 	h, _ := grantHandler(t)
 
-	rec := mintClient(t, h, `{"label":"ingest","level":"ATTESTOR","return_address":"https://app.example/callback"}`)
+	rec := mintClient(t, h, `{"expires_at":"never","label":"ingest","level":"ATTESTOR","return_address":"https://app.example/callback"}`)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }

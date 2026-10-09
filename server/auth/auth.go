@@ -216,8 +216,8 @@ func (h *Handler) SetAppleClient(clientID, teamID, keyID, privateKey string) {
 }
 
 // SetPublicOrigin fixes the origin a provider redirects back to. Unset, it is
-// read off the request, which believes X-Forwarded-Host — and whoever sets that
-// header chooses where the authorization code is delivered.
+// this machine's loopback origin (publicOrigin): it is never read off a request,
+// so no header chooses where the authorization code is delivered.
 func (h *Handler) SetPublicOrigin(origin string) {
 	h.configuredOrigin = strings.TrimSuffix(strings.TrimSpace(origin), "/")
 }

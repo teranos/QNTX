@@ -120,7 +120,7 @@ type DistillConfig struct {
 type LLMConfig struct {
 	MaxConcurrent     int `mapstructure:"max_concurrent"`       // Max simultaneous provider calls (default: 1)
 	MaxCallsPerMinute int `mapstructure:"max_calls_per_minute"` // Rate limit across all callers (default: 60)
-	MaxQueueDepth     int `mapstructure:"max_queue_depth"`      // Max waiting requests before rejection (default: 25)
+	MaxQueueDepth     int `mapstructure:"max_queue_depth"`      // Max waiting requests before rejection; 0 queues nobody (default: 20)
 	CooldownSeconds   int `mapstructure:"cooldown_seconds"`     // Pause between inference runs (default: 3)
 }
 
@@ -163,7 +163,7 @@ type AuthConfig struct {
 	RPOrigins          []string              `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Omitted = ["https://" + rp_id]. Empty, or rp_id empty or "localhost" = loopback URLs derived from server.port / server.frontend_port. These are the door onto "default", so an app's scheme ("qntx://door") belongs here as well; it is a return address, and the relying party never sees it.
 	RootIdentities     []string              `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way. Required when server.bind_address is non-loopback and auth.enabled is true.
 	BindingSigners     []string              `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
-	PublicOrigin       string                `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Empty = read off the request, which trusts X-Forwarded-Host.
+	PublicOrigin       string                `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Left out, this machine's loopback origin; it is never read off a request.
 	Provider           ProviderConfig        `mapstructure:"provider"`             // Per-provider credentials the operator holds. A provider absent here is one that needs nothing: Mastodon registers its own app mid-ceremony, atproto spends a password the person types.
 	Door               map[string]DoorConfig `mapstructure:"door"`                 // Front doors, keyed by the slug of the namespace behind each — the name lowercased, because a TOML key arrives lowercase and a namespace keeps the name it was created with. A namespace absent here has no door, which is every namespace today. rp_id and rp_origins above are the door onto "default" and are not repeated here.
 }

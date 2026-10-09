@@ -92,6 +92,14 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		}, nil
 	}
 
+	// An interval of 0 is no ticking, and a schedule ticks: it names how often.
+	if req.IntervalSeconds <= 0 {
+		return &protocol.CreateScheduleResponse{
+			Success: false,
+			Error:   fmt.Sprintf("a schedule repeats every interval_seconds, and %d repeats never", req.IntervalSeconds),
+		}, nil
+	}
+
 	// Generate schedule ID
 	scheduleID, err := identity.GenerateASUID("AS", req.HandlerName, "schedule", "pulse")
 	if err != nil {

@@ -59,7 +59,7 @@ func TestAChildJobContinuesItsParentsTrace(t *testing.T) {
 	noPolling := time.Duration(0)
 	pool := NewWorkerPoolWithRegistry(
 		context.Background(), db, createTestConfig(),
-		WorkerPoolConfig{Workers: 1, PollInterval: &noPolling},
+		WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1, PollInterval: &noPolling},
 		createTestLogger(), registry, nil, nil,
 	)
 	registry.Register(&enqueueingHandler{name: "parent.work", queue: pool.queue, child: "child.work"})
