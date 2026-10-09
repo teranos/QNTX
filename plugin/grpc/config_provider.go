@@ -83,11 +83,13 @@ func (c *configWithEndpoints) failed(err error) {
 }
 
 // authToken is the token the plugin reaches the node's services with: its own,
-// for the namespace its record names, else the shared one (ADR-046).
+// for the namespace its record names (ADR-046). A record naming none stands
+// nowhere and is handed none, not the shared token on the served store.
 func (c *configWithEndpoints) authToken() string {
 	namespace := strings.TrimSpace(c.held()[PluginNamespaceKey])
 	if namespace == "" {
-		return c.endpoints.AuthToken
+		c.failed(errors.Newf("plugin %s names no namespace in its record, and a plugin stands where its record says (ADR-046)", c.domain))
+		return ""
 	}
 	if c.tokens == nil {
 		c.failed(errors.Newf("plugin %s stands in %s and this node mints no token for it", c.domain, namespace))
