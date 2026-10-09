@@ -8,12 +8,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/reach"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
-
-	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/server/reach"
 )
 
 // A reach line on a plugin the node does not run now: the node opens and serves
@@ -39,7 +39,7 @@ func TestANodeOpensPastALineOnAPluginItDoesNotRun(t *testing.T) {
 
 	listed, refused := s.reachList(context.Background(), nil)
 	require.Nil(t, refused)
-	lines := listed.(map[string]any)["lines"].([]reachLine)
+	lines := listed.(*protocol.ReachList).GetLines()
 	require.Len(t, lines, 1)
 	assert.Contains(t, lines[0].NotServed, "/api/cleanAPI/coverage")
 }

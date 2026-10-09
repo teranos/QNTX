@@ -69,13 +69,10 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/hold"},
 				},
 				{
-					Name: "storage",
-					Does: "For every thing QNTX persists, whether SQLite and DuckDB each hold it, as make parity read the source this build was made from. It says nothing of this node's own stores.",
-					Gives: []*protocol.Field{
-						{Name: "describes", Says: "What was read: source, the code this build was made from, and never this node."},
-						{Name: "things", Says: "One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go files that reach it with SQL written by hand."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/storage"},
+					Name:   "storage",
+					Does:   "For every thing QNTX persists, whether SQLite and DuckDB each hold it, as make parity read the source this build was made from. It says nothing of this node's own stores.",
+					Answer: "protocol.ParityStorage",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/storage"},
 				},
 				{
 					Name: "follows",
@@ -186,5 +183,9 @@ func (s *QNTXServer) parityStorage(context.Context, sigil.Sent) (any, *protocol.
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return map[string]any{"describes": "source", "things": things}, nil
+	answer := &protocol.ParityStorage{Describes: "source", Things: make([]*protocol.StoredThing, 0, len(things))}
+	for _, t := range things {
+		answer.Things = append(answer.Things, &protocol.StoredThing{Name: t.Name, Sqlite: t.SQLite, Duckdb: t.DuckDB, Rebuilt: t.Rebuilt, Sites: t.Sites})
+	}
+	return answer, nil
 }

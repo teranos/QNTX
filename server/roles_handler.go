@@ -16,27 +16,6 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// lineAnswer is one attestation the gate reads, as it was written: the five
-// slots, when, and who. It is read out loud as X is Y of Z by W.
-type lineAnswer struct {
-	ID         string   `json:"id"`
-	Subjects   []string `json:"subjects"`
-	Predicates []string `json:"predicates"`
-	Contexts   []string `json:"contexts"`
-	Actors     []string `json:"actors"`
-	// By is the writer, the actor the node put first: a token's name when
-	// that actor is a token's DID, otherwise the identity as written. ByToken
-	// is that token's id, the way to its element, and empty for a person.
-	By      string    `json:"by"`
-	ByToken string    `json:"by_token"`
-	At      time.Time `json:"at"`
-}
-
-type linesResponse struct {
-	Lines []lineAnswer `json:"lines"`
-	Count int          `json:"count"`
-}
-
 // Roles is the signum of the lines the gate reads about roles (ADR-039).
 func (s *QNTXServer) rolesSignum() sigil.Signum {
 	return sigil.Signum{
@@ -44,13 +23,10 @@ func (s *QNTXServer) rolesSignum() sigil.Signum {
 			Name: "roles",
 			Sigils: []*protocol.Sigil{
 				{
-					Name: "list",
-					Does: "Every line the gate reads about roles, as written, newest first: a REACH, WRITE or READ line, or a grant or a revoke. A superseded line is kept; what holds is the gate's to decide.",
-					Gives: []*protocol.Field{
-						{Name: "lines", Says: "One row per line: its slots, who wrote it, the token that did if one did, and when."},
-						{Name: "count", Says: "How many lines there are."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/roles"},
+					Name:   "list",
+					Does:   "Every line the gate reads about roles, as written, newest first: a REACH, WRITE or READ line, or a grant or a revoke. A superseded line is kept; what holds is the gate's to decide.",
+					Answer: "protocol.RolesList",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/roles"},
 				},
 			},
 		},
@@ -85,25 +61,33 @@ func (s *QNTXServer) rolesList(_ context.Context, _ sigil.Sent) (any, *protocol.
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 
-	lines := make([]lineAnswer, 0)
+	type line struct {
+		at  time.Time
+		row *protocol.RoleLine
+	}
+	var lines []line
 	for _, as := range found {
 		if !aboutRoles(as) {
 			continue
 		}
 		by, byToken := s.writerOf(as)
-		lines = append(lines, lineAnswer{
-			ID:         as.ID,
+		lines = append(lines, line{at: as.Timestamp, row: &protocol.RoleLine{
+			Id:         as.ID,
 			Subjects:   as.Subjects,
 			Predicates: as.Predicates,
 			Contexts:   as.Contexts,
 			Actors:     as.Actors,
 			By:         by,
 			ByToken:    byToken,
-			At:         as.Timestamp,
-		})
+			At:         as.Timestamp.Format(time.RFC3339Nano),
+		}})
 	}
-	slices.SortFunc(lines, func(a, b lineAnswer) int { return b.At.Compare(a.At) })
-	return linesResponse{Lines: lines, Count: len(lines)}, nil
+	slices.SortFunc(lines, func(a, b line) int { return b.at.Compare(a.at) })
+	answer := &protocol.RolesList{Lines: make([]*protocol.RoleLine, 0, len(lines)), Count: uint32(len(lines))}
+	for _, l := range lines {
+		answer.Lines = append(answer.Lines, l.row)
+	}
+	return answer, nil
 }
 
 // aboutRoles is whether the gate reads this attestation: a REACH, WRITE or

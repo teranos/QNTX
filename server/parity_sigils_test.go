@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/QNTX/server/sigil"
 )
@@ -95,15 +96,15 @@ func TestParityStorageIsWhatMakeParityWrote(t *testing.T) {
 	if refused != nil {
 		t.Fatalf("storage refused: %s", refused.GetSays())
 	}
-	given := answer.(map[string]any)
-	if given["describes"] != "source" {
-		t.Errorf("storage describes %v", given["describes"])
+	given := answer.(*protocol.ParityStorage)
+	if given.GetDescribes() != "source" {
+		t.Errorf("storage describes %v", given.GetDescribes())
 	}
 	written, err := parity.Storage()
 	if err != nil {
 		t.Fatal(err)
 	}
-	things := given["things"].([]parity.Stored)
+	things := given.GetThings()
 	if len(things) == 0 || len(things) != len(written) {
 		t.Errorf("storage gave %d things, and make parity wrote %d", len(things), len(written))
 	}

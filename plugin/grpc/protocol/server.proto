@@ -434,3 +434,127 @@ message VaultStates {
   repeated VaultFolderState folders = 1;
 }
 
+// ReachLine is one stored reach line, as it was written.
+message ReachLine {
+  string id = 1;
+  repeated string paths = 2;
+  repeated string to = 3;
+  bool revokes = 4;
+  string by = 5;
+  // RFC 3339, to the nanosecond.
+  string at = 6;
+  // Why the node does not serve this line now, when it does not.
+  string not_served = 7;
+}
+
+// ReachCompiled is one path the compiled-in table names, and the levels it
+// opens it to.
+message ReachCompiled {
+  string path = 1;
+  repeated string levels = 2;
+}
+
+// ReachList is what reach list answers.
+message ReachList {
+  // One row per stored line: its id, the paths, who they are opened to,
+  // whether it revokes, who wrote it and when. The latest line about a path
+  // and a role holds, ROOT's first.
+  repeated ReachLine lines = 1;
+  // Each path the compiled-in table names, and the levels it opens it to.
+  // Static: no line changes it.
+  repeated ReachCompiled compiled = 2;
+}
+
+// RoleLine is one attestation the gate reads, as it was written: the five
+// slots, when, and who. It is read out loud as X is Y of Z by W.
+message RoleLine {
+  string id = 1;
+  repeated string subjects = 2;
+  repeated string predicates = 3;
+  repeated string contexts = 4;
+  repeated string actors = 5;
+  // The writer, the actor the node put first: a token's name when that actor
+  // is a token's DID, otherwise the identity as written. by_token is that
+  // token's id, the way to its element, and empty for a person.
+  string by = 6;
+  string by_token = 7;
+  // RFC 3339, to the nanosecond.
+  string at = 8;
+}
+
+// RolesList is what roles list answers.
+message RolesList {
+  // One row per line: its slots, who wrote it, the token that did if one
+  // did, and when.
+  repeated RoleLine lines = 1;
+  // How many lines there are.
+  uint32 count = 2;
+}
+
+// NamespaceDefinition is what a namespace's ns.toml says (ADR-026). The owner
+// is an identity inside QNTX; the DID that proves you reach it is outside.
+// Mirrors storage.NamespaceDefinition.
+message NamespaceDefinition {
+  string owner = 1;
+  bool enabled = 2;
+  // RFC 3339.
+  string created_at = 3;
+}
+
+// Namespace is one namespace at a storage location, and what namespaces
+// create answers. Mirrors storage.Namespace.
+message Namespace {
+  // The namespace.
+  string name = 1;
+  // Its owner, that it is switched on, and when it was made. Null for one
+  // nobody wrote a ns.toml for: it is real, so it is listed.
+  NamespaceDefinition definition = 2;
+  // The kinds it holds: attestations, watchers, schedules, tokens.
+  repeated string kinds = 3;
+}
+
+// NamespacesList names the count, so an empty list and a backend that keeps
+// none are visibly different answers: what namespaces list answers.
+message NamespacesList {
+  // One row per namespace.
+  repeated Namespace namespaces = 1;
+  // How many there are, so none and a backend that keeps none are different
+  // answers.
+  uint32 count = 2;
+}
+
+// UsagePoint is one day of model use. Mirrors tracker.TimeSeriesPoint.
+message UsagePoint {
+  string date = 1;
+  uint32 requests = 2;
+  double cost = 3;
+}
+
+// TimeseriesUsage is what timeseries usage answers.
+message TimeseriesUsage {
+  // One per day: its date, how many requests, and what they cost.
+  repeated UsagePoint points = 1;
+}
+
+// StoredThing is one thing QNTX persists, as make parity read it. Mirrors
+// parity.Stored.
+message StoredThing {
+  string name = 1;
+  bool sqlite = 2;
+  bool duckdb = 3;
+  // Rebuilt rows cascade from attestations, so a take-in rebuilds them.
+  bool rebuilt = 4;
+  // The Go files that reach this thing with hand-written SQL.
+  repeated string sites = 5;
+}
+
+// ParityStorage is what parity storage answers.
+message ParityStorage {
+  // What was read: source, the code this build was made from, and never this
+  // node.
+  string describes = 1;
+  // One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go
+  // files that reach it with SQL written by hand.
+  repeated StoredThing things = 2;
+}
+

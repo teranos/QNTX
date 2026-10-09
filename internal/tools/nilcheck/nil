@@ -289,7 +289,7 @@
 26	server/lifecycle.go
 10	server/mail.go
 14	server/mcp.go
-12	server/namespace_handlers.go
+11	server/namespace_handlers.go
 2	server/namespace_run.go
 8	server/namespace_watchers.go
 19	server/namespaces/held.go

@@ -35,14 +35,17 @@ func TestAGrantIsALineAndTheListSaysIt(t *testing.T) {
 
 	listed, refusal := s.reachList(asked, sigil.Sent{})
 	require.Nil(t, refusal, refusal.GetSays())
-	lines := listed.(map[string]any)["lines"].([]reachLine)
+	lines := listed.(*protocol.ReachList).GetLines()
 	require.Len(t, lines, 2)
 	assert.True(t, lines[0].Revokes, "the newest line is the revoke")
 	assert.Equal(t, []string{"/api/hello-world/{path...}"}, lines[1].Paths)
 	assert.Equal(t, []string{"PUBLIC_REGISTRATION"}, lines[1].To)
 	assert.Equal(t, rootAccount, lines[1].By)
 
-	compiled := listed.(map[string]any)["compiled"].(map[string][]string)
+	compiled := map[string][]string{}
+	for _, row := range listed.(*protocol.ReachList).GetCompiled() {
+		compiled[row.GetPath()] = row.GetLevels()
+	}
 	assert.Equal(t, []string{"ROOT"}, compiled["/api/reach"])
 
 	assert.Len(t, systemHolds(t, s), 2, "a line was answered and not written")

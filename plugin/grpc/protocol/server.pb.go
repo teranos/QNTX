@@ -2910,6 +2910,806 @@ func (x *VaultStates) GetFolders() []*VaultFolderState {
 	return nil
 }
 
+// ReachLine is one stored reach line, as it was written.
+type ReachLine struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Paths   []string               `protobuf:"bytes,2,rep,name=paths,proto3" json:"paths,omitempty"`
+	To      []string               `protobuf:"bytes,3,rep,name=to,proto3" json:"to,omitempty"`
+	Revokes bool                   `protobuf:"varint,4,opt,name=revokes,proto3" json:"revokes,omitempty"`
+	By      string                 `protobuf:"bytes,5,opt,name=by,proto3" json:"by,omitempty"`
+	// RFC 3339, to the nanosecond.
+	At string `protobuf:"bytes,6,opt,name=at,proto3" json:"at,omitempty"`
+	// Why the node does not serve this line now, when it does not.
+	NotServed     string `protobuf:"bytes,7,opt,name=not_served,json=notServed,proto3" json:"not_served,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReachLine) Reset() {
+	*x = ReachLine{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReachLine) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReachLine) ProtoMessage() {}
+
+func (x *ReachLine) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReachLine.ProtoReflect.Descriptor instead.
+func (*ReachLine) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *ReachLine) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ReachLine) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+func (x *ReachLine) GetTo() []string {
+	if x != nil {
+		return x.To
+	}
+	return nil
+}
+
+func (x *ReachLine) GetRevokes() bool {
+	if x != nil {
+		return x.Revokes
+	}
+	return false
+}
+
+func (x *ReachLine) GetBy() string {
+	if x != nil {
+		return x.By
+	}
+	return ""
+}
+
+func (x *ReachLine) GetAt() string {
+	if x != nil {
+		return x.At
+	}
+	return ""
+}
+
+func (x *ReachLine) GetNotServed() string {
+	if x != nil {
+		return x.NotServed
+	}
+	return ""
+}
+
+// ReachCompiled is one path the compiled-in table names, and the levels it
+// opens it to.
+type ReachCompiled struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Levels        []string               `protobuf:"bytes,2,rep,name=levels,proto3" json:"levels,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReachCompiled) Reset() {
+	*x = ReachCompiled{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReachCompiled) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReachCompiled) ProtoMessage() {}
+
+func (x *ReachCompiled) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReachCompiled.ProtoReflect.Descriptor instead.
+func (*ReachCompiled) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ReachCompiled) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *ReachCompiled) GetLevels() []string {
+	if x != nil {
+		return x.Levels
+	}
+	return nil
+}
+
+// ReachList is what reach list answers.
+type ReachList struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One row per stored line: its id, the paths, who they are opened to,
+	// whether it revokes, who wrote it and when. The latest line about a path
+	// and a role holds, ROOT's first.
+	Lines []*ReachLine `protobuf:"bytes,1,rep,name=lines,proto3" json:"lines,omitempty"`
+	// Each path the compiled-in table names, and the levels it opens it to.
+	// Static: no line changes it.
+	Compiled      []*ReachCompiled `protobuf:"bytes,2,rep,name=compiled,proto3" json:"compiled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReachList) Reset() {
+	*x = ReachList{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReachList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReachList) ProtoMessage() {}
+
+func (x *ReachList) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReachList.ProtoReflect.Descriptor instead.
+func (*ReachList) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ReachList) GetLines() []*ReachLine {
+	if x != nil {
+		return x.Lines
+	}
+	return nil
+}
+
+func (x *ReachList) GetCompiled() []*ReachCompiled {
+	if x != nil {
+		return x.Compiled
+	}
+	return nil
+}
+
+// RoleLine is one attestation the gate reads, as it was written: the five
+// slots, when, and who. It is read out loud as X is Y of Z by W.
+type RoleLine struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Id         string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Subjects   []string               `protobuf:"bytes,2,rep,name=subjects,proto3" json:"subjects,omitempty"`
+	Predicates []string               `protobuf:"bytes,3,rep,name=predicates,proto3" json:"predicates,omitempty"`
+	Contexts   []string               `protobuf:"bytes,4,rep,name=contexts,proto3" json:"contexts,omitempty"`
+	Actors     []string               `protobuf:"bytes,5,rep,name=actors,proto3" json:"actors,omitempty"`
+	// The writer, the actor the node put first: a token's name when that actor
+	// is a token's DID, otherwise the identity as written. by_token is that
+	// token's id, the way to its element, and empty for a person.
+	By      string `protobuf:"bytes,6,opt,name=by,proto3" json:"by,omitempty"`
+	ByToken string `protobuf:"bytes,7,opt,name=by_token,json=byToken,proto3" json:"by_token,omitempty"`
+	// RFC 3339, to the nanosecond.
+	At            string `protobuf:"bytes,8,opt,name=at,proto3" json:"at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RoleLine) Reset() {
+	*x = RoleLine{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoleLine) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoleLine) ProtoMessage() {}
+
+func (x *RoleLine) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoleLine.ProtoReflect.Descriptor instead.
+func (*RoleLine) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *RoleLine) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RoleLine) GetSubjects() []string {
+	if x != nil {
+		return x.Subjects
+	}
+	return nil
+}
+
+func (x *RoleLine) GetPredicates() []string {
+	if x != nil {
+		return x.Predicates
+	}
+	return nil
+}
+
+func (x *RoleLine) GetContexts() []string {
+	if x != nil {
+		return x.Contexts
+	}
+	return nil
+}
+
+func (x *RoleLine) GetActors() []string {
+	if x != nil {
+		return x.Actors
+	}
+	return nil
+}
+
+func (x *RoleLine) GetBy() string {
+	if x != nil {
+		return x.By
+	}
+	return ""
+}
+
+func (x *RoleLine) GetByToken() string {
+	if x != nil {
+		return x.ByToken
+	}
+	return ""
+}
+
+func (x *RoleLine) GetAt() string {
+	if x != nil {
+		return x.At
+	}
+	return ""
+}
+
+// RolesList is what roles list answers.
+type RolesList struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One row per line: its slots, who wrote it, the token that did if one
+	// did, and when.
+	Lines []*RoleLine `protobuf:"bytes,1,rep,name=lines,proto3" json:"lines,omitempty"`
+	// How many lines there are.
+	Count         uint32 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RolesList) Reset() {
+	*x = RolesList{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RolesList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RolesList) ProtoMessage() {}
+
+func (x *RolesList) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RolesList.ProtoReflect.Descriptor instead.
+func (*RolesList) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *RolesList) GetLines() []*RoleLine {
+	if x != nil {
+		return x.Lines
+	}
+	return nil
+}
+
+func (x *RolesList) GetCount() uint32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+// NamespaceDefinition is what a namespace's ns.toml says (ADR-026). The owner
+// is an identity inside QNTX; the DID that proves you reach it is outside.
+// Mirrors storage.NamespaceDefinition.
+type NamespaceDefinition struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Owner   string                 `protobuf:"bytes,1,opt,name=owner,proto3" json:"owner,omitempty"`
+	Enabled bool                   `protobuf:"varint,2,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// RFC 3339.
+	CreatedAt     string `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NamespaceDefinition) Reset() {
+	*x = NamespaceDefinition{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NamespaceDefinition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NamespaceDefinition) ProtoMessage() {}
+
+func (x *NamespaceDefinition) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NamespaceDefinition.ProtoReflect.Descriptor instead.
+func (*NamespaceDefinition) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *NamespaceDefinition) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *NamespaceDefinition) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *NamespaceDefinition) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+// Namespace is one namespace at a storage location, and what namespaces
+// create answers. Mirrors storage.Namespace.
+type Namespace struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The namespace.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Its owner, that it is switched on, and when it was made. Null for one
+	// nobody wrote a ns.toml for: it is real, so it is listed.
+	Definition *NamespaceDefinition `protobuf:"bytes,2,opt,name=definition,proto3" json:"definition,omitempty"`
+	// The kinds it holds: attestations, watchers, schedules, tokens.
+	Kinds         []string `protobuf:"bytes,3,rep,name=kinds,proto3" json:"kinds,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Namespace) Reset() {
+	*x = Namespace{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Namespace) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Namespace) ProtoMessage() {}
+
+func (x *Namespace) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Namespace.ProtoReflect.Descriptor instead.
+func (*Namespace) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *Namespace) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Namespace) GetDefinition() *NamespaceDefinition {
+	if x != nil {
+		return x.Definition
+	}
+	return nil
+}
+
+func (x *Namespace) GetKinds() []string {
+	if x != nil {
+		return x.Kinds
+	}
+	return nil
+}
+
+// NamespacesList names the count, so an empty list and a backend that keeps
+// none are visibly different answers: what namespaces list answers.
+type NamespacesList struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One row per namespace.
+	Namespaces []*Namespace `protobuf:"bytes,1,rep,name=namespaces,proto3" json:"namespaces,omitempty"`
+	// How many there are, so none and a backend that keeps none are different
+	// answers.
+	Count         uint32 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NamespacesList) Reset() {
+	*x = NamespacesList{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NamespacesList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NamespacesList) ProtoMessage() {}
+
+func (x *NamespacesList) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NamespacesList.ProtoReflect.Descriptor instead.
+func (*NamespacesList) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *NamespacesList) GetNamespaces() []*Namespace {
+	if x != nil {
+		return x.Namespaces
+	}
+	return nil
+}
+
+func (x *NamespacesList) GetCount() uint32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+// UsagePoint is one day of model use. Mirrors tracker.TimeSeriesPoint.
+type UsagePoint struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Date          string                 `protobuf:"bytes,1,opt,name=date,proto3" json:"date,omitempty"`
+	Requests      uint32                 `protobuf:"varint,2,opt,name=requests,proto3" json:"requests,omitempty"`
+	Cost          float64                `protobuf:"fixed64,3,opt,name=cost,proto3" json:"cost,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UsagePoint) Reset() {
+	*x = UsagePoint{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UsagePoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UsagePoint) ProtoMessage() {}
+
+func (x *UsagePoint) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UsagePoint.ProtoReflect.Descriptor instead.
+func (*UsagePoint) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *UsagePoint) GetDate() string {
+	if x != nil {
+		return x.Date
+	}
+	return ""
+}
+
+func (x *UsagePoint) GetRequests() uint32 {
+	if x != nil {
+		return x.Requests
+	}
+	return 0
+}
+
+func (x *UsagePoint) GetCost() float64 {
+	if x != nil {
+		return x.Cost
+	}
+	return 0
+}
+
+// TimeseriesUsage is what timeseries usage answers.
+type TimeseriesUsage struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One per day: its date, how many requests, and what they cost.
+	Points        []*UsagePoint `protobuf:"bytes,1,rep,name=points,proto3" json:"points,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimeseriesUsage) Reset() {
+	*x = TimeseriesUsage{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimeseriesUsage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimeseriesUsage) ProtoMessage() {}
+
+func (x *TimeseriesUsage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimeseriesUsage.ProtoReflect.Descriptor instead.
+func (*TimeseriesUsage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *TimeseriesUsage) GetPoints() []*UsagePoint {
+	if x != nil {
+		return x.Points
+	}
+	return nil
+}
+
+// StoredThing is one thing QNTX persists, as make parity read it. Mirrors
+// parity.Stored.
+type StoredThing struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Name   string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Sqlite bool                   `protobuf:"varint,2,opt,name=sqlite,proto3" json:"sqlite,omitempty"`
+	Duckdb bool                   `protobuf:"varint,3,opt,name=duckdb,proto3" json:"duckdb,omitempty"`
+	// Rebuilt rows cascade from attestations, so a take-in rebuilds them.
+	Rebuilt bool `protobuf:"varint,4,opt,name=rebuilt,proto3" json:"rebuilt,omitempty"`
+	// The Go files that reach this thing with hand-written SQL.
+	Sites         []string `protobuf:"bytes,5,rep,name=sites,proto3" json:"sites,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StoredThing) Reset() {
+	*x = StoredThing{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StoredThing) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StoredThing) ProtoMessage() {}
+
+func (x *StoredThing) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StoredThing.ProtoReflect.Descriptor instead.
+func (*StoredThing) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *StoredThing) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *StoredThing) GetSqlite() bool {
+	if x != nil {
+		return x.Sqlite
+	}
+	return false
+}
+
+func (x *StoredThing) GetDuckdb() bool {
+	if x != nil {
+		return x.Duckdb
+	}
+	return false
+}
+
+func (x *StoredThing) GetRebuilt() bool {
+	if x != nil {
+		return x.Rebuilt
+	}
+	return false
+}
+
+func (x *StoredThing) GetSites() []string {
+	if x != nil {
+		return x.Sites
+	}
+	return nil
+}
+
+// ParityStorage is what parity storage answers.
+type ParityStorage struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// What was read: source, the code this build was made from, and never this
+	// node.
+	Describes string `protobuf:"bytes,1,opt,name=describes,proto3" json:"describes,omitempty"`
+	// One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go
+	// files that reach it with SQL written by hand.
+	Things        []*StoredThing `protobuf:"bytes,2,rep,name=things,proto3" json:"things,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ParityStorage) Reset() {
+	*x = ParityStorage{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ParityStorage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ParityStorage) ProtoMessage() {}
+
+func (x *ParityStorage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ParityStorage.ProtoReflect.Descriptor instead.
+func (*ParityStorage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ParityStorage) GetDescribes() string {
+	if x != nil {
+		return x.Describes
+	}
+	return ""
+}
+
+func (x *ParityStorage) GetThings() []*StoredThing {
+	if x != nil {
+		return x.Things
+	}
+	return nil
+}
+
 var File_plugin_grpc_protocol_server_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
@@ -3257,7 +4057,68 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x06branch\x18\x05 \x01(\tR\x06branch\x12\x12\n" +
 	"\x04pull\x18\x06 \x01(\tR\x04pull\"C\n" +
 	"\vVaultStates\x124\n" +
-	"\afolders\x18\x01 \x03(\v2\x1a.protocol.VaultFolderStateR\afoldersB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\afolders\x18\x01 \x03(\v2\x1a.protocol.VaultFolderStateR\afolders\"\x9a\x01\n" +
+	"\tReachLine\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05paths\x18\x02 \x03(\tR\x05paths\x12\x0e\n" +
+	"\x02to\x18\x03 \x03(\tR\x02to\x12\x18\n" +
+	"\arevokes\x18\x04 \x01(\bR\arevokes\x12\x0e\n" +
+	"\x02by\x18\x05 \x01(\tR\x02by\x12\x0e\n" +
+	"\x02at\x18\x06 \x01(\tR\x02at\x12\x1d\n" +
+	"\n" +
+	"not_served\x18\a \x01(\tR\tnotServed\";\n" +
+	"\rReachCompiled\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x16\n" +
+	"\x06levels\x18\x02 \x03(\tR\x06levels\"k\n" +
+	"\tReachList\x12)\n" +
+	"\x05lines\x18\x01 \x03(\v2\x13.protocol.ReachLineR\x05lines\x123\n" +
+	"\bcompiled\x18\x02 \x03(\v2\x17.protocol.ReachCompiledR\bcompiled\"\xc5\x01\n" +
+	"\bRoleLine\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
+	"\bsubjects\x18\x02 \x03(\tR\bsubjects\x12\x1e\n" +
+	"\n" +
+	"predicates\x18\x03 \x03(\tR\n" +
+	"predicates\x12\x1a\n" +
+	"\bcontexts\x18\x04 \x03(\tR\bcontexts\x12\x16\n" +
+	"\x06actors\x18\x05 \x03(\tR\x06actors\x12\x0e\n" +
+	"\x02by\x18\x06 \x01(\tR\x02by\x12\x19\n" +
+	"\bby_token\x18\a \x01(\tR\abyToken\x12\x0e\n" +
+	"\x02at\x18\b \x01(\tR\x02at\"K\n" +
+	"\tRolesList\x12(\n" +
+	"\x05lines\x18\x01 \x03(\v2\x12.protocol.RoleLineR\x05lines\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\rR\x05count\"d\n" +
+	"\x13NamespaceDefinition\x12\x14\n" +
+	"\x05owner\x18\x01 \x01(\tR\x05owner\x12\x18\n" +
+	"\aenabled\x18\x02 \x01(\bR\aenabled\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x03 \x01(\tR\tcreatedAt\"t\n" +
+	"\tNamespace\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12=\n" +
+	"\n" +
+	"definition\x18\x02 \x01(\v2\x1d.protocol.NamespaceDefinitionR\n" +
+	"definition\x12\x14\n" +
+	"\x05kinds\x18\x03 \x03(\tR\x05kinds\"[\n" +
+	"\x0eNamespacesList\x123\n" +
+	"\n" +
+	"namespaces\x18\x01 \x03(\v2\x13.protocol.NamespaceR\n" +
+	"namespaces\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\rR\x05count\"P\n" +
+	"\n" +
+	"UsagePoint\x12\x12\n" +
+	"\x04date\x18\x01 \x01(\tR\x04date\x12\x1a\n" +
+	"\brequests\x18\x02 \x01(\rR\brequests\x12\x12\n" +
+	"\x04cost\x18\x03 \x01(\x01R\x04cost\"?\n" +
+	"\x0fTimeseriesUsage\x12,\n" +
+	"\x06points\x18\x01 \x03(\v2\x14.protocol.UsagePointR\x06points\"\x81\x01\n" +
+	"\vStoredThing\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
+	"\x06sqlite\x18\x02 \x01(\bR\x06sqlite\x12\x16\n" +
+	"\x06duckdb\x18\x03 \x01(\bR\x06duckdb\x12\x18\n" +
+	"\arebuilt\x18\x04 \x01(\bR\arebuilt\x12\x14\n" +
+	"\x05sites\x18\x05 \x03(\tR\x05sites\"\\\n" +
+	"\rParityStorage\x12\x1c\n" +
+	"\tdescribes\x18\x01 \x01(\tR\tdescribes\x12-\n" +
+	"\x06things\x18\x02 \x03(\v2\x15.protocol.StoredThingR\x06thingsB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_server_proto_rawDescOnce sync.Once
@@ -3271,7 +4132,7 @@ func file_plugin_grpc_protocol_server_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_server_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
 var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*DaemonStatusMessage)(nil),            // 0: protocol.DaemonStatusMessage
 	(*AsyncJobProgress)(nil),               // 1: protocol.AsyncJobProgress
@@ -3306,40 +4167,59 @@ var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*VaultOwners)(nil),                    // 30: protocol.VaultOwners
 	(*VaultFolderState)(nil),               // 31: protocol.VaultFolderState
 	(*VaultStates)(nil),                    // 32: protocol.VaultStates
-	nil,                                    // 33: protocol.JobUpdateMessage.MetadataEntry
-	nil,                                    // 34: protocol.RichSearchMatch.AttributesEntry
-	nil,                                    // 35: protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	nil,                                    // 36: protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	nil,                                    // 37: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	nil,                                    // 38: protocol.Vault.SendsEntry
-	(*Attestation)(nil),                    // 39: protocol.Attestation
+	(*ReachLine)(nil),                      // 33: protocol.ReachLine
+	(*ReachCompiled)(nil),                  // 34: protocol.ReachCompiled
+	(*ReachList)(nil),                      // 35: protocol.ReachList
+	(*RoleLine)(nil),                       // 36: protocol.RoleLine
+	(*RolesList)(nil),                      // 37: protocol.RolesList
+	(*NamespaceDefinition)(nil),            // 38: protocol.NamespaceDefinition
+	(*Namespace)(nil),                      // 39: protocol.Namespace
+	(*NamespacesList)(nil),                 // 40: protocol.NamespacesList
+	(*UsagePoint)(nil),                     // 41: protocol.UsagePoint
+	(*TimeseriesUsage)(nil),                // 42: protocol.TimeseriesUsage
+	(*StoredThing)(nil),                    // 43: protocol.StoredThing
+	(*ParityStorage)(nil),                  // 44: protocol.ParityStorage
+	nil,                                    // 45: protocol.JobUpdateMessage.MetadataEntry
+	nil,                                    // 46: protocol.RichSearchMatch.AttributesEntry
+	nil,                                    // 47: protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	nil,                                    // 48: protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	nil,                                    // 49: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	nil,                                    // 50: protocol.Vault.SendsEntry
+	(*Attestation)(nil),                    // 51: protocol.Attestation
 }
 var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
 	1,  // 0: protocol.AsyncJob.progress:type_name -> protocol.AsyncJobProgress
 	2,  // 1: protocol.AsyncJob.pulse_state:type_name -> protocol.AsyncJobPulseState
 	3,  // 2: protocol.JobUpdateMessage.job:type_name -> protocol.AsyncJob
-	33, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
-	34, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
+	45, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
+	46, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
 	6,  // 5: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
 	13, // 6: protocol.LLMStreamMessage.signal:type_name -> protocol.LLMTokenSignal
 	11, // 7: protocol.SamplerStageSignal.top_k:type_name -> protocol.LLMTokenCandidate
 	11, // 8: protocol.LLMTokenSignal.top_k:type_name -> protocol.LLMTokenCandidate
 	12, // 9: protocol.LLMTokenSignal.sampler_stages:type_name -> protocol.SamplerStageSignal
-	39, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
+	51, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
 	14, // 11: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
-	35, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	36, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	37, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	38, // 15: protocol.Vault.sends:type_name -> protocol.Vault.SendsEntry
+	47, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	48, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	49, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	50, // 15: protocol.Vault.sends:type_name -> protocol.Vault.SendsEntry
 	27, // 16: protocol.Vaults.vaults:type_name -> protocol.Vault
 	29, // 17: protocol.VaultOwners.owners:type_name -> protocol.VaultOwner
 	31, // 18: protocol.VaultStates.folders:type_name -> protocol.VaultFolderState
-	20, // 19: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	33, // 19: protocol.ReachList.lines:type_name -> protocol.ReachLine
+	34, // 20: protocol.ReachList.compiled:type_name -> protocol.ReachCompiled
+	36, // 21: protocol.RolesList.lines:type_name -> protocol.RoleLine
+	38, // 22: protocol.Namespace.definition:type_name -> protocol.NamespaceDefinition
+	39, // 23: protocol.NamespacesList.namespaces:type_name -> protocol.Namespace
+	41, // 24: protocol.TimeseriesUsage.points:type_name -> protocol.UsagePoint
+	43, // 25: protocol.ParityStorage.things:type_name -> protocol.StoredThing
+	20, // 26: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
+	27, // [27:27] is the sub-list for method output_type
+	27, // [27:27] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_server_proto_init() }
@@ -3361,7 +4241,7 @@ func file_plugin_grpc_protocol_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_server_proto_rawDesc), len(file_plugin_grpc_protocol_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   39,
+			NumMessages:   51,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

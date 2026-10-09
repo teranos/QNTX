@@ -23,8 +23,8 @@ func (s *QNTXServer) timeseriesSignum() sigil.Signum {
 					Does: "Model requests and their cost, one point per day, for charting.",
 					Takes: []*protocol.Param{{Name: "days", Kind: sigil.Count,
 						Says: "How many days back: 7 when not sent, at least 1 and at most 365."}},
-					Gives: []*protocol.Field{{Name: "points", Says: "One per day: its date, how many requests, and what they cost."}},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: "/api/timeseries/usage"},
+					Answer: "protocol.TimeseriesUsage",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/timeseries/usage"},
 				},
 			},
 		},
@@ -46,7 +46,11 @@ func (s *QNTXServer) timeseriesUsage(_ context.Context, sent sigil.Sent) (any, *
 		s.logger.Errorw("failed to fetch time-series data", "days", days, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return map[string]any{"points": points}, nil
+	answer := &protocol.TimeseriesUsage{Points: make([]*protocol.UsagePoint, 0, len(points))}
+	for _, p := range points {
+		answer.Points = append(answer.Points, &protocol.UsagePoint{Date: p.Date, Requests: uint32(p.Requests), Cost: p.Cost})
+	}
+	return answer, nil
 }
 
 func (s *QNTXServer) openapiSignum() sigil.Signum {

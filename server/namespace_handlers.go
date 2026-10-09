@@ -17,13 +17,6 @@ import (
 // listing them, making one, switching one on or off, ending one, and emptying
 // default.
 
-// listNamespacesResponse names the count so an empty list and a backend that
-// keeps none are visibly different answers.
-type listNamespacesResponse struct {
-	Namespaces []storage.Namespace `json:"namespaces"`
-	Count      int                 `json:"count"`
-}
-
 func (s *QNTXServer) namespacesSignum() sigil.Signum {
 	name := &protocol.Param{Name: "name", Required: true, Says: "The namespace, by its name."}
 	return sigil.Signum{
@@ -33,24 +26,17 @@ func (s *QNTXServer) namespacesSignum() sigil.Signum {
 			Tags:        []string{"namespaces", "tenancy", "ownership"},
 			Sigils: []*protocol.Sigil{
 				{
-					Name: "list",
-					Does: "Every namespace the node keeps, with who owns it, whether it is switched on, and the kinds it holds.",
-					Gives: []*protocol.Field{
-						{Name: "namespaces", Says: "One row per namespace."},
-						{Name: "count", Says: "How many there are, so none and a backend that keeps none are different answers."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/namespaces"},
+					Name:   "list",
+					Does:   "Every namespace the node keeps, with who owns it, whether it is switched on, and the kinds it holds.",
+					Answer: "protocol.NamespacesList",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/namespaces"},
 				},
 				{
-					Name:  "create",
-					Does:  "Make a namespace, switched on, owned by whoever asked.",
-					Takes: []*protocol.Param{{Name: "name", Required: true, Says: "The new namespace's name: one path segment."}},
-					Gives: []*protocol.Field{
-						{Name: "name", Says: "The namespace made."},
-						{Name: "definition", Says: "Its owner, that it is switched on, and when it was made."},
-						{Name: "kinds", Says: "The kinds it holds: none yet."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces"},
+					Name:   "create",
+					Does:   "Make a namespace, switched on, owned by whoever asked.",
+					Takes:  []*protocol.Param{{Name: "name", Required: true, Says: "The new namespace's name: one path segment."}},
+					Answer: "protocol.Namespace",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces"},
 				},
 				{
 					Name:   "disable",
@@ -106,7 +92,21 @@ func (s *QNTXServer) namespacesList(ctx context.Context, _ sigil.Sent) (any, *pr
 		s.logger.Errorw("failed to list namespaces", "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrap(err, "failed to list namespaces").Error()}
 	}
-	return listNamespacesResponse{Namespaces: found, Count: len(found)}, nil
+	answer := &protocol.NamespacesList{Namespaces: make([]*protocol.Namespace, 0, len(found)), Count: uint32(len(found))}
+	for _, ns := range found {
+		answer.Namespaces = append(answer.Namespaces, namespaceMessage(ns))
+	}
+	return answer, nil
+}
+
+// namespaceMessage is a namespace as it is answered. One nobody wrote a
+// ns.toml for has no definition, and none is said.
+func namespaceMessage(ns storage.Namespace) *protocol.Namespace {
+	answered := &protocol.Namespace{Name: ns.Name, Kinds: ns.Kinds}
+	if definition := ns.Definition; definition != nil {
+		answered.Definition = &protocol.NamespaceDefinition{Owner: definition.Owner, Enabled: definition.Enabled, CreatedAt: definition.CreatedAt}
+	}
+	return answered
 }
 
 func (s *QNTXServer) namespacesCreate(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -114,10 +114,8 @@ func (s *QNTXServer) namespacesCreate(ctx context.Context, sent sigil.Sent) (any
 	if refusal != nil {
 		return nil, refusal
 	}
+	// Required, so refused before this is asked when it is not sent.
 	name := sent["name"]
-	if name == "" {
-		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: "name is required"}
-	}
 
 	// An identity owns a namespace, so a request nobody was admitted for has
 	// nobody to own what it would create.
@@ -138,7 +136,7 @@ func (s *QNTXServer) namespacesCreate(ctx context.Context, sent sigil.Sent) (any
 	}
 
 	s.logger.Infow("namespace created", "namespace", name, "by", definition.Owner)
-	return storage.Namespace{Name: name, Definition: &definition, Kinds: []string{}}, nil
+	return namespaceMessage(storage.Namespace{Name: name, Definition: &definition, Kinds: []string{}}), nil
 }
 
 // namespacesSwitch puts one in or out of service. The store refuses system and
@@ -168,10 +166,8 @@ func (s *QNTXServer) namespacesDelete(ctx context.Context, sent sigil.Sent) (any
 	if refusal != nil {
 		return nil, refusal
 	}
+	// Required, so refused before this is asked when it is not sent.
 	name := sent["name"]
-	if name == "" {
-		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: "no namespace named"}
-	}
 	if refusal := s.notStandingIn(ctx, name); refusal != nil {
 		return nil, refusal
 	}
