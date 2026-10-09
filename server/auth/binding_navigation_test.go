@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -124,6 +125,43 @@ func TestANavigatedCeremonyReturnsToItsDoor(t *testing.T) {
 	if recorded.Code == http.StatusFound {
 		assert.Equal(t, "https://garden.example", recorded.Header().Get("Location"))
 	}
+}
+
+// The ceremony comes back to the page it began on, where the invitation the
+// friend arrived with is held. A branch is served at /branch/<name> on the
+// door's own origin.
+func TestACeremonyReturnsToThePageItBeganOn(t *testing.T) {
+	h := twoDoors(t)
+	h.nodeKey = testNodeKey(t)
+
+	req := navigatedFrom(t, "https://garden.example")
+	req.URL.RawQuery += "&page=" + urlEncode("/branch/root-invites-a-user/")
+	recorded := httptest.NewRecorder()
+	h.handleBindingGo(recorded, req)
+	require.Equal(t, http.StatusFound, recorded.Code)
+
+	location := recorded.Header().Get("Location")
+	state := location[strings.Index(location, "&state=")+len("&state="):]
+	held, ok := h.bindingFlows.pending.Load(state)
+	require.True(t, ok)
+	assert.Equal(t, "https://garden.example/branch/root-invites-a-user/", held.(flow).returnTo)
+}
+
+// A page is a path on the door's own origin and nothing else: another host,
+// a scheme-relative path, or a query is the door's origin alone.
+func TestAPageIsAPathOnTheDoorsOrigin(t *testing.T) {
+	for page, want := range map[string]string{
+		"":                      "https://garden.example",
+		"/branch/x/":            "https://garden.example/branch/x/",
+		"//evil.example/":       "https://garden.example",
+		"https://evil.example/": "https://garden.example",
+		"/x?next=https://evil":  "https://garden.example",
+		"/x#y":                  "https://garden.example",
+		"/x\\evil":              "https://garden.example",
+	} {
+		assert.Equal(t, want, onPage("https://garden.example", page), page)
+	}
+	assert.Empty(t, onPage("", "/branch/x/"), "no door, nowhere to return")
 }
 
 // navigatedFrom is a top-level navigation: a Referer, and no Origin, which is

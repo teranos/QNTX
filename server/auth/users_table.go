@@ -139,12 +139,30 @@ func (t *UserTable) ByRoute(route string) (User, bool, error) {
 	if err != nil {
 		return User{}, false, err
 	}
-	for _, u := range held {
-		if u.Reaches(route) {
-			return u, true, nil
+	u, found := reachedBy(held, route)
+	return u, found, nil
+}
+
+// reachedBy is the User a route reaches. One account registered at several
+// public doors is a User at each; a User above that, ROOT or one ROOT made, is
+// the person, and is the answer when there is one.
+func reachedBy(held []User, route string) (User, bool) {
+	var public *User
+	for i := range held {
+		if !held[i].Reaches(route) {
+			continue
+		}
+		if held[i].Level != LevelPublicRegistration {
+			return held[i], true
+		}
+		if public == nil {
+			public = &held[i]
 		}
 	}
-	return User{}, false, nil
+	if public == nil {
+		return User{}, false
+	}
+	return *public, true
 }
 
 // Put writes the table first, then the record. A record that would not take

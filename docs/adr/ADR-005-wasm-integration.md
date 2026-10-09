@@ -5,14 +5,14 @@ Status: Accepted
 
 ## Context
 
-QNTX has multiple Rust components integrated into a Go server via CGO. The vision includes running entirely in the browser (offline-first), on mobile, and as a Tauri desktop app — all sharing the same core logic.
+QNTX has multiple Rust components integrated into a Go server via CGO. The vision includes running entirely in the browser (offline-first) and on mobile, sharing the same core logic.
 
 ## Decision
 
 All shared computation moves to Rust crates compiled to WebAssembly, running on:
 - **Go server**: wazero (pure Go, no CGO)
 - **Browser**: wasm-bindgen (native WebAssembly API)
-- **Tauri desktop**: embedded webview (same as browser) or native Rust (no WASM overhead)
+- **Tauri App**: Phone 
 
 ### Architecture
 
@@ -61,6 +61,6 @@ Any logic that both browser and server need: parsing, fuzzy search, classificati
 
 ## References
 
-- ADR-010: Identity system (ASUID generation via WASM)
+- [[ADR-010-identity-system]]: (ASUID generation via WASM)
 - wazero: https://wazero.io/
 - [Issue #387](https://github.com/teranos/QNTX/issues/387): Parser design flaws exposed during WASM integration

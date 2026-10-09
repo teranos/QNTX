@@ -106,6 +106,15 @@
     ]
   },
   {
+    "name": "auth_becomings",
+    "sqlite": true,
+    "duckdb": false,
+    "rebuilt": false,
+    "sites": [
+      "server/auth/becoming.go"
+    ]
+  },
+  {
     "name": "auth_sessions",
     "sqlite": true,
     "duckdb": false,

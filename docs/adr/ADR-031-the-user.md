@@ -64,6 +64,34 @@ cannot happen again, so it is attested as `node:claimed`. Recording never fails
 the thing it records (ADR-030), which makes this the one attestation whose loss
 cannot be made up later.
 
+## Becoming
+
+"i wish i was able to assume the identity of another user, one that isnt ROOT, but also be able to go back."
+
+"but its attested that they have been becoming and unbecoming"
+
+"and while ROOT is them, they cannot be themselves"
+
+"until ROOT unbecomes that user and is itself again."
+
+- ROOT becomes a User that is not ROOT, and unbecomes them. Both are attested.
+- Between the two, ROOT's session is that User: their level, their namespace,
+  their roles, and what it writes is theirs.
+
+"Not while ROOT is them."
+
+"So, yes, this can be destructive in the sense that a session may get revoked."
+
+"But for tokens its tmp access loss."
+
+- Becoming ends the User's own sessions. Their tokens are refused until ROOT
+  unbecomes them, and work again after.
+- A token minted while ROOT is them lives as long as the becoming.
+
+"and to become or unbecome, is actually in the specific User in the Users Element, the i element is to get back to ROOT"
+
+"And the Becoming and Unbecoming of another User, will be removed, the entire feature and capability will be removed before we can 1.0.0 this repo"
+
 ## What is recorded
 
 A User is one object per person under `<location>/system/users/` on the parquet
@@ -101,13 +129,6 @@ written down — `node:claimed` names it — but on the attestation rather than 
 the User, so the provenance is a record to go and find instead of a field to
 read.
 
-root Element for User management and overview
-
 GDPR delete, PR 911
-
-Creating Users manually as root
-
-ROOT switching a person off. The record and the gate are ready for it, and no
-route lets ROOT flip anyone but themselves yet.
 
 reassignment of e-mail address

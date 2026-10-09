@@ -84,5 +84,5 @@ the one place anything is typed. Admitting a second device from one already admi
 deferred.
 
 An entry that is not a Mastodon profile URL is a valid way in but not a one-press one: a
-credential provider needs an app password, which is typing (ADR-030).
+credential provider needs an app password, which is typing ([[ADR-030-identity-providers]]).
 

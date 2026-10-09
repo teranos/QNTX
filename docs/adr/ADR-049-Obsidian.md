@@ -117,3 +117,12 @@ folder itself carries nothing.
 "oh, require it to be a dir in the repo , not in its root"
 
 - A folder is bound to a folder inside the repository, never to its top.
+
+## Per namespace
+
+"and have the possibility to also set Obsidian per nanespace"
+
+- One vault today, synced by a systemd unit on the box as root. Every vault
+  sigil is `of ROOT` (server/reach/table.go), and a VAULT line is a node
+  record (server/vault.go). A vault per namespace is that line in the
+  namespace, its reach lines there, and one sync process per vault.

@@ -20,6 +20,7 @@ import { connectWebSocket, backendUrl } from './client';
 import { askHealth, isLive, statedPlainly } from './liveness';
 import { setupState, claimNode } from './setup.ts';
 import { signedIn, openDoor } from './signin.ts';
+import { heldInvitation } from './invitation.ts';
 import { relayed, doorStand, showDoor, stricken, say } from './door.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { wireLineTooltips } from '@teranos/elements';
@@ -138,19 +139,6 @@ function handleVersion(data: VersionMessage): void {
 }
 
 
-/**
- * Resting dot size for this device.
- *
- * Tablet dots are the largest: browsing the tray is a thumb slide, and the dot
- * must be hittable. Phones sit between tablet and desktop. Breakpoints match the
- * ones in web/css/element/states/dot.css.
- */
-function restingDotSize(): { minWidth: number; minHeight: number } {
-    if (window.matchMedia('(max-width: 768px)').matches) return { minWidth: 13, minHeight: 13 };
-    if (window.matchMedia('(max-width: 900px)').matches) return { minWidth: 15, minHeight: 15 };
-    return { minWidth: 10, minHeight: 10 };
-}
-
 // Initialize the application
 // WebSocket connects immediately — storage, WASM, and canvas sync run in parallel.
 async function init(): Promise<void> {
@@ -207,12 +195,16 @@ async function init(): Promise<void> {
     // this page cannot read, so the redirect marks itself: without this a
     // browser already signed in here draws no door and nothing finishes.
     const homeward = () => new URLSearchParams(location.search).has('homeward');
+    // Holding an invitation, from its link or back from the provider with it:
+    // the friend signs in as the account it names, whatever session this
+    // browser already holds.
+    const invited = () => heldInvitation() !== '';
 
     // A claimed node is the only one with a door to stand at, and it says
     // nothing about how it is configured — so being claimed is the question.
     if (owned.governed && !owned.claimed) {
         await claimNode(owned);
-    } else if (owned.claimed && (!holdsSession || relayed() || homeward())) {
+    } else if (owned.claimed && (!holdsSession || relayed() || homeward() || invited())) {
         // Relayed, the session is the dev server's rather than this browser's.
         // Walking straight in on someone else's credential without the door
         // ever standing is the one case where being let in says nothing.
@@ -297,6 +289,16 @@ async function init(): Promise<void> {
         }
         const cleaned = new URL(location.href);
         cleaned.searchParams.delete('canvas-invite');
+        history.replaceState(null, '', cleaned.toString());
+    }
+
+    // "the MAIL ROOT received has a button for cancelling the invitation"
+    const cancelling = new URLSearchParams(location.search).get('invitation-cancel');
+    if (cancelling && who) {
+        const { openInvitationCancel } = await import('./user-invite-element.ts');
+        openInvitationCancel(cancelling);
+        const cleaned = new URL(location.href);
+        cleaned.searchParams.delete('invitation-cancel');
         history.replaceState(null, '', cleaned.toString());
     }
 
@@ -440,10 +442,8 @@ async function init(): Promise<void> {
             findCompositionByElement: (elementId) => findCompositionByElement(elementId),
             flushSync: () => canvasSyncQueue.flush(),
         },
-        // Touch devices get a bigger resting dot so it stays findable with a thumb.
-        // This used to live in @media rules in web/css/element/states/dot.css, where it
-        // was overwritten by the inline size the proximity engine writes every frame.
-        dotGeometry: restingDotSize(),
+        // The resting dot's size is the package's own since 1.12.0: 13px on a
+        // phone, 15px up to 900px, 10px above, the sizes this passed.
     });
 
 
