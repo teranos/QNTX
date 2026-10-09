@@ -30,14 +30,6 @@ func staandUntilParam() *protocol.Param {
 	return &protocol.Param{Name: "until", Says: "Arrivals at or before this, said the way since is."}
 }
 
-// staandEchoed is what every read of one stand gives back with its answer.
-func staandEchoed(fields ...*protocol.Field) []*protocol.Field {
-	return append(fields,
-		&protocol.Field{Name: "market", Says: "The market that was asked about."},
-		&protocol.Field{Name: "slug", Says: "The stand that was asked about."},
-	)
-}
-
 func (s *QNTXServer) staandsSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
@@ -47,11 +39,11 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 			Follows:     []*protocol.Follows{staandsFollowUmami()},
 			Sigils: []*protocol.Sigil{
 				{
-					Name:  "list",
-					Does:  "List every stand across all markets, with what arrived at each.",
-					Takes: []*protocol.Param{staandSinceParam(), staandUntilParam()},
-					Gives: []*protocol.Field{{Name: "staands", Says: "One row per stand that has not been taken down."}},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands"},
+					Name:   "list",
+					Does:   "List every stand across all markets, with what arrived at each.",
+					Takes:  []*protocol.Param{staandSinceParam(), staandUntilParam()},
+					Answer: "protocol.Staands",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands"},
 				},
 				{
 					Name:   "create",
@@ -76,11 +68,8 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 						staandSinceParam(), staandUntilParam(),
 						{Name: "limit", Kind: sigil.Count, Says: "How many rows at most. Naming none is one hundred."},
 					},
-					Gives: staandEchoed(
-						&protocol.Field{Name: "type", Says: "What the arrivals were grouped by."},
-						&protocol.Field{Name: "counts", Says: "One row per value, most first: its name and its count."},
-					),
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/metrics"},
+					Answer: "protocol.StaandMetrics",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/metrics"},
 				},
 				{
 					Name: "activity",
@@ -90,19 +79,15 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 						{Name: "visitor", Says: "One person, by their id."},
 						staandSinceParam(), staandUntilParam(),
 					},
-					Gives: staandEchoed(
-						&protocol.Field{Name: "activity", Says: "One row per arrival, five hundred at most: when, the visit, the visitor, the page, where they came from, and the event."},
-					),
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/activity"},
+					Answer: "protocol.StaandActivity",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/activity"},
 				},
 				{
-					Name:  "visits",
-					Does:  "One stand's sittings, derived from its arrivals every time and stored nowhere.",
-					Takes: []*protocol.Param{staandMarketParam(), staandSlugParam(), staandSinceParam(), staandUntilParam()},
-					Gives: staandEchoed(
-						&protocol.Field{Name: "visits", Message: "protocol.Visit", Says: "One row per sitting: who, when it started and ended, how long, the first and last page, how many views and events, and whether it was a bounce."},
-					),
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/visits"},
+					Name:   "visits",
+					Does:   "One stand's sittings, derived from its arrivals every time and stored nowhere.",
+					Takes:  []*protocol.Param{staandMarketParam(), staandSlugParam(), staandSinceParam(), staandUntilParam()},
+					Answer: "protocol.StaandVisits",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/visits"},
 				},
 			},
 		},

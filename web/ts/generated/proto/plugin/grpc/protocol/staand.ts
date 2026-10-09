@@ -137,3 +137,137 @@ export interface StaandTakenDown {
   /** removed. */
   status: string;
 }
+
+/**
+ * Staand is one stand as the stands element sees it. Beyond what it is (slug,
+ * namespace, URL) it carries its defining system attestation — the ASID, when
+ * it was created, and the DID that created it — the door it inherits from its
+ * namespace, the sites reporting back, and its activity: arrivals recorded
+ * against arrivals the rate limit refused, and when the last landed.
+ *
+ * defId and lastSeen are named as the view has always read them.
+ */
+export interface Staand {
+  slug: string;
+  market: string;
+  url: string;
+  origin: string;
+  creator: string;
+  defId: string;
+  created: string;
+  sites: string[];
+  arrivals: number;
+  visitors: number;
+  dropped: number;
+  lastSeen: string;
+  events: StaandSeen[];
+  pages: StaandSeen[];
+  /**
+   * How the people who arrived actually walked — what the counts above are a
+   * fold of.
+   */
+  walks: StaandWalk[];
+}
+
+/**
+ * StaandSeen is an event or a page and every moment it was attested, in unix
+ * milliseconds. "The axis of time is more useful than a tally": the view draws
+ * these as a line over time, and a count is not sent.
+ */
+export interface StaandSeen {
+  name: string;
+  /**
+   * A JSON number, as the view reads it: protojson writes a 64-bit integer as
+   * text, and a millisecond is exact in a double.
+   */
+  seen: number[];
+}
+
+/**
+ * StaandStep is one arrival read as a step rather than as a number: when it
+ * landed, the page it was about, and the event the pixel named.
+ */
+export interface StaandStep {
+  at: string;
+  page: string;
+  event: string;
+}
+
+/**
+ * StaandWalk is one person's steps past the stand, in the order they took
+ * them. The visitor id is theirs and persists (the snippet keeps it in
+ * localStorage), so this is a person's whole path across every visit, not one
+ * sitting.
+ */
+export interface StaandWalk {
+  who: string;
+  steps: StaandStep[];
+}
+
+/**
+ * StaandCount is one row the metrics sigil answers with: a value of the
+ * dimension asked for and how many arrivals carried it, Umami's metrics shape.
+ */
+export interface StaandCount {
+  name: string;
+  count: number;
+}
+
+/**
+ * StaandActivityRow is one arrival read as a line rather than as a number.
+ * The shape is Umami's session activity: one row per event, newest first, and
+ * the reading of it is left to whoever asked (ADR-036).
+ */
+export interface StaandActivityRow {
+  at: string;
+  visit: string;
+  visitor: string;
+  path: string;
+  query: string;
+  referrer_domain: string;
+  event: string;
+}
+
+/** Staands is what staands list answers. */
+export interface Staands {
+  /** One row per stand that has not been taken down. */
+  staands: Staand[];
+}
+
+/** StaandMetrics is what staands metrics answers. */
+export interface StaandMetrics {
+  /** What the arrivals were grouped by. */
+  type: string;
+  /** One row per value, most first: its name and its count. */
+  counts: StaandCount[];
+  /** The market that was asked about. */
+  market: string;
+  /** The stand that was asked about. */
+  slug: string;
+}
+
+/** StaandActivity is what staands activity answers. */
+export interface StaandActivity {
+  /**
+   * One row per arrival, five hundred at most: when, the visit, the visitor,
+   * the page, where they came from, and the event.
+   */
+  activity: StaandActivityRow[];
+  /** The market that was asked about. */
+  market: string;
+  /** The stand that was asked about. */
+  slug: string;
+}
+
+/** StaandVisits is what staands visits answers. */
+export interface StaandVisits {
+  /**
+   * One row per sitting: who, when it started and ended, how long, the first
+   * and last page, how many views and events, and whether it was a bounce.
+   */
+  visits: Visit[];
+  /** The market that was asked about. */
+  market: string;
+  /** The stand that was asked about. */
+  slug: string;
+}

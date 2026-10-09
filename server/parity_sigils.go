@@ -96,11 +96,18 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 func (s *QNTXServer) parityHold(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	var held *protocol.Signum
 	var names []string
-	for _, signum := range s.signa() {
-		names = append(names, signum.GetName())
-		if signum.GetName() == sent["signum"] {
-			held = signum.Signum
+	for _, declared := range s.signa() {
+		names = append(names, declared.GetName())
+		if declared.GetName() != sent["signum"] {
+			continue
 		}
+		// Held as it is served: what a sigil naming its answer gives is that
+		// message's fields, and the messages they carry are in scope.
+		signum, err := answeredOf(declared)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		}
+		held = signum.Signum
 	}
 	if held == nil {
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "signum",
