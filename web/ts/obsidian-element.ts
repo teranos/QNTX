@@ -51,7 +51,8 @@ export function stateSays(state: FolderState): string {
 export interface Owner {
     login: string;
     type: string;
-    installation: number;
+    /** GitHub's id: 64 bits, so text in JSON. */
+    installation: string;
 }
 
 const ELEMENT_ID = 'obsidian-element';
