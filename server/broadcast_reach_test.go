@@ -109,7 +109,7 @@ func nodeWideBroadcastersIn(dir string) ([]string, error) {
 }
 
 // sendsToEveryone reports whether a body reaches every client: a call to
-// broadcastMessage, or a broadcastRequest naming neither in nor clientID.
+// broadcastMessage, or a broadcastRequest whose audience is every client.
 func sendsToEveryone(body *ast.BlockStmt) bool {
 	everyone := false
 	ast.Inspect(body, func(n ast.Node) bool {
@@ -134,8 +134,9 @@ func sendsToEveryone(body *ast.BlockStmt) bool {
 	return everyone
 }
 
-// addressed reports whether a request names who it is for: one namespace, one
-// client, or a close, which is about a connection the worker already holds.
+// addressed reports whether a request names who it is for short of everyone:
+// one namespace, one client, or a close, which is about a connection the
+// worker already holds.
 func addressed(lit *ast.CompositeLit) bool {
 	for _, field := range lit.Elts {
 		kv, ok := field.(*ast.KeyValueExpr)
@@ -147,8 +148,15 @@ func addressed(lit *ast.CompositeLit) bool {
 			continue
 		}
 		switch key.Name {
-		case "in", "clientID", "client":
+		case "client":
 			return true
+		case "to":
+			call, ok := kv.Value.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			fn, ok := call.Fun.(*ast.Ident)
+			return !ok || fn.Name != "everyClient"
 		}
 	}
 	return false

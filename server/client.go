@@ -898,9 +898,9 @@ func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 
 	// Send to broadcast worker (thread-safe)
 	req := &broadcastRequest{
-		reqType:  "message",
-		msg:      msg,
-		clientID: client.id, // Send to specific client only
+		reqType: "message",
+		msg:     msg,
+		to:      toClient(client.id),
 	}
 
 	select {

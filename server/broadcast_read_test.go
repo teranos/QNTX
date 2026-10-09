@@ -56,7 +56,7 @@ func TestAnAttestationReachesOnlyClientsThatMayReadIt(t *testing.T) {
 	all := connected(srv, "wide", wide)
 	srv.clients = map[*Client]bool{held: true, all: true}
 
-	srv.sendMessageToClients("a match", "", auth.NamespaceDefault, row("secret"))
+	srv.sendMessageToClients("a match", toNamespace(auth.NamespaceDefault), row("secret"))
 
 	if got := queued(held); len(got) != 0 {
 		t.Errorf("a client was handed an attestation its READ lines do not name: %v", got)
@@ -76,7 +76,7 @@ func TestAnAttestationReachesAClientWhosePredicateItIs(t *testing.T) {
 	held := connected(srv, "reader", reader)
 	srv.clients = map[*Client]bool{held: true}
 
-	srv.sendMessageToClients("a match", "", auth.NamespaceDefault, row("observed"))
+	srv.sendMessageToClients("a match", toNamespace(auth.NamespaceDefault), row("observed"))
 
 	if len(queued(held)) != 1 {
 		t.Error("a client was withheld an attestation its READ lines name")
@@ -98,7 +98,7 @@ func TestOnePredicateTheReaderMayNotHaveWithholdsTheRow(t *testing.T) {
 	both := row("observed")
 	both.Predicates = append(both.Predicates, "secret")
 
-	srv.sendMessageToClients("a match", "", auth.NamespaceDefault, both)
+	srv.sendMessageToClients("a match", toNamespace(auth.NamespaceDefault), both)
 
 	if got := queued(held); len(got) != 0 {
 		t.Errorf("a row carrying a word the reader may not have was handed over: %v", got)
@@ -120,12 +120,12 @@ func TestAnOwnOnlyReaderIsHandedOnlyItsOwnRows(t *testing.T) {
 	held := connected(srv, "own", own)
 	srv.clients = map[*Client]bool{held: true}
 
-	srv.sendMessageToClients("theirs", "", auth.NamespaceDefault, row("observed", "did:key:theirs"))
+	srv.sendMessageToClients("theirs", toNamespace(auth.NamespaceDefault), row("observed", "did:key:theirs"))
 	if got := queued(held); len(got) != 0 {
 		t.Errorf("an own-only reader was handed somebody else's row: %v", got)
 	}
 
-	srv.sendMessageToClients("mine", "", auth.NamespaceDefault, row("observed", "did:key:mine"))
+	srv.sendMessageToClients("mine", toNamespace(auth.NamespaceDefault), row("observed", "did:key:mine"))
 	if len(queued(held)) != 1 {
 		t.Error("an own-only reader was withheld its own row")
 	}
@@ -143,10 +143,25 @@ func TestAMessageCarryingNoAttestationIsNotGated(t *testing.T) {
 	held := connected(srv, "narrow", narrow)
 	srv.clients = map[*Client]bool{held: true}
 
-	srv.sendMessageToClients("the daemon stopped", "", auth.NamespaceDefault, nil)
+	srv.sendMessageToClients("the daemon stopped", toNamespace(auth.NamespaceDefault), nil)
 
 	if len(queued(held)) != 1 {
 		t.Error("a message about the node was withheld from a reader it is not about")
+	}
+}
+
+// "nil is nil"
+
+// An audience naming nobody reaches nobody: not every client.
+func TestAnAudienceNamingNobodyReachesNobody(t *testing.T) {
+	srv := broadcastServer()
+	held := connected(srv, "wide", auth.Admitted(auth.LevelSuper, auth.NamespaceDefault))
+	srv.clients = map[*Client]bool{held: true}
+
+	srv.sendMessageToClients("said to nobody", audience{}, nil)
+
+	if got := queued(held); len(got) != 0 {
+		t.Errorf("a message naming no audience reached a client: %v", got)
 	}
 }
 
@@ -158,7 +173,7 @@ func TestAnUngatedClientIsHandedNothing(t *testing.T) {
 	held := &Client{server: srv, sendMsg: make(chan any, 4), id: "ungated", in: auth.NamespaceDefault}
 	srv.clients = map[*Client]bool{held: true}
 
-	srv.sendMessageToClients("a match", "", auth.NamespaceDefault, row("anything"))
+	srv.sendMessageToClients("a match", toNamespace(auth.NamespaceDefault), row("anything"))
 
 	if got := queued(held); len(got) != 0 {
 		t.Errorf("a client nobody admitted was handed a row: %v", got)

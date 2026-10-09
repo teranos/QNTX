@@ -165,7 +165,7 @@ func (s *QNTXServer) broadcastWatcherMatch(in string, engine *watcher.Engine, wa
 	req := &broadcastRequest{
 		reqType: "watcher_match",
 		payload: msg,
-		in:      in,
+		to:      toNamespace(in),
 		about:   attestation,
 	}
 
@@ -200,7 +200,7 @@ func (s *QNTXServer) broadcastWatcherError(in string, watcherID string, errorMsg
 	req := &broadcastRequest{
 		reqType: "watcher_error",
 		payload: msg,
-		in:      in,
+		to:      toNamespace(in),
 	}
 
 	select {
@@ -238,7 +238,7 @@ func (s *QNTXServer) broadcastElementFired(in string, elementID string, attestat
 	req := &broadcastRequest{
 		reqType: "element_fired",
 		payload: msg,
-		in:      in,
+		to:      toNamespace(in),
 	}
 
 	select {

@@ -114,7 +114,7 @@ func TestAMessageAboutOneNamespaceReachesOnlyIt(t *testing.T) {
 	elsewhere := &Client{server: srv, sendMsg: make(chan any, 4), id: "elsewhere", in: "pond"}
 	srv.clients = map[*Client]bool{here: true, elsewhere: true}
 
-	srv.sendMessageToClients("what happened in default", "", "default", nil)
+	srv.sendMessageToClients("what happened in default", toNamespace("default"), nil)
 
 	if len(queued(here)) != 1 {
 		t.Error("the namespace the message is about did not get it")
@@ -133,7 +133,7 @@ func TestAMessageAboutTheNodeReachesEveryone(t *testing.T) {
 	elsewhere := &Client{server: srv, sendMsg: make(chan any, 4), id: "elsewhere", in: "pond"}
 	srv.clients = map[*Client]bool{here: true, elsewhere: true}
 
-	srv.sendMessageToClients("the daemon stopped", "", "", nil)
+	srv.sendMessageToClients("the daemon stopped", everyClient(), nil)
 
 	if len(queued(here)) != 1 || len(queued(elsewhere)) != 1 {
 		t.Error("a fact about the node did not reach every client")
