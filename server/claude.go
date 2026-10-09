@@ -44,6 +44,26 @@ type rootAgent struct {
 	sessionsMu sync.Mutex
 	// signingIn is its sign-in to Claude Code begun and not finished.
 	signingIn signingIn
+	// namespace is the namespace this agent stands in: system for ROOT's,
+	// whose sessions are the node's own record (ADR-048).
+	namespace string
+	// called is the agent as a sentence names it.
+	called string
+}
+
+// agentSpec is how an agent runs in Claude Code: am.toml's [agent.root] for
+// ROOT's, and the namespace's AGENT line for a namespace agent.
+type agentSpec struct {
+	Model, Effort, Mode string
+	Allow               []string
+	// TokenRef is a reference to a Claude plan token, or empty for an agent on
+	// its own sign-in (claude login).
+	TokenRef string
+}
+
+// specOf is how am.toml says the ROOT agent runs in Claude Code.
+func specOf(root appcfg.RootAgentConfig) agentSpec {
+	return agentSpec{Model: root.Model, Effort: root.Effort, Mode: root.Mode, Allow: root.Allow, TokenRef: root.TokenRef}
 }
 
 // in is the agent's session in h.
@@ -88,11 +108,23 @@ type turnInSession struct{ session string }
 
 // theRootAgent is the ROOT agent of the node holding this key, working in home.
 func theRootAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {
-	key, err := access.DeriveKey(node, rootAgentPurpose)
+	agent, err := theAgent(node, rootAgentPurpose, home)
 	if err != nil {
 		return nil, err
 	}
-	token, did, err := access.DeriveToken(node, rootAgentPurpose)
+	agent.namespace, agent.called = auth.NamespaceSystem, "the ROOT agent"
+	return agent, nil
+}
+
+// theAgent is an agent of the node holding this key: its own key and token
+// derived from the node's for purpose, so it is the same DID wherever the node
+// is rebuilt from its record, working in home.
+func theAgent(node ed25519.PrivateKey, purpose, home string) (*rootAgent, error) {
+	key, err := access.DeriveKey(node, purpose)
+	if err != nil {
+		return nil, err
+	}
+	token, did, err := access.DeriveToken(node, purpose)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +165,12 @@ func (a *rootAgent) keepIn(file, id string) error {
 // isSaidToBe is what the ROOT agent additionally is, said to Claude Code with
 // everything said to it.
 func (a *rootAgent) isSaidToBe() string {
+	if a.namespace != auth.NamespaceSystem {
+		return "You are the agent of the namespace " + a.namespace + " on a QNTX node, shared by everyone who has reach on that namespace. " +
+			"Your DID is " + a.did + ". " +
+			"The node's sigils are the tools of the MCP server named " + rootAgentMCP + ", which you reach with your own token; they act in " + a.namespace + " and nowhere else. " +
+			"You hold no git and no credential of the node's: never ask for, read, print or store one."
+	}
 	return "You are the ROOT agent of a QNTX node: the node itself, as ROOT speaks to it. " +
 		"You run on the machine the node runs on, as the user the node runs as. " +
 		"Your DID is " + a.did + ". " +
@@ -187,21 +225,21 @@ func (s *QNTXServer) claudeHarness() *harness {
 		absent:   s.thereIsNoRootAgent,
 		pathKey:  "claude_code",
 		fetching: "Claude Code is still being fetched",
-		part: func(ctx context.Context, sent sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal) {
-			return s.claudePart(named(), sent, agent)
+		spec:     func() agentSpec { return specOf(named()) },
+		part: func(ctx context.Context, sent sigil.Sent, agent *rootAgent, spec agentSpec) (aTurn, *protocol.Refusal) {
+			return s.claudePart(spec, sent, agent)
 		},
-		am: func(is map[string]any) {
-			root := named()
-			allow := root.Allow
+		am: func(is map[string]any, agent *rootAgent, spec agentSpec) {
+			allow := spec.Allow
 			if allow == nil {
 				allow = []string{}
 			}
-			is["model"], is["effort"], is["permission_mode"] = root.Model, root.Effort, root.Mode
+			is["model"], is["effort"], is["permission_mode"] = spec.Model, spec.Effort, spec.Mode
 			is["permission_modes"], is["allow"] = appcfg.PermissionModes, allow
 			// Asked of Claude Code itself, when the node holds one.
 			is["signed_in"], is["auth_method"] = false, ""
-			if binary, arrived, err := s.harnessHeldBy("claude").Now(); arrived && err == nil && s.rootAgent != nil {
-				if status, err := s.claudeStatus(s.ctx, binary, s.rootAgent.home); err == nil {
+			if binary, arrived, err := s.harnessHeldBy("claude").Now(); arrived && err == nil {
+				if status, err := s.claudeStatus(s.ctx, binary, agent.home); err == nil {
 					is["signed_in"], is["auth_method"] = status.SignedIn, status.AuthMethod
 				}
 			}
@@ -237,14 +275,14 @@ func (s *QNTXServer) thereIsNoRootAgent() *protocol.Refusal {
 
 // claudePart is Claude Code's part of one turn: run in the permission mode
 // whoever speaks names, or the one am.toml gives.
-func (s *QNTXServer) claudePart(named appcfg.RootAgentConfig, sent sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal) {
+func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal) {
 	mode := sent["permission_mode"]
 	if mode == "" {
 		mode = named.Mode
 	}
 	if mode == "" {
 		return aTurn{}, &protocol.Refusal{Why: sigil.Missing, Param: "permission_mode",
-			Says: "no permission mode was named, and am.toml gives none under [agent.root]"}
+			Says: "no permission mode was named, and none is set for " + agent.called + " (am.toml gives it under [agent.root])"}
 	}
 
 	var binary, plan string
@@ -267,7 +305,7 @@ func (s *QNTXServer) claudePart(named appcfg.RootAgentConfig, sent sigil.Sent, a
 				}
 				if !status.SignedIn {
 					return false, &protocol.Refusal{Why: sigil.Failed,
-						Says: "the agent has no Claude credential: am.toml names no plan token under [agent.root], and it is not signed in; sign it in with claude login"}
+						Says: agent.called + " has no Claude credential: no plan token is named for it, and it is not signed in; sign it in with claude login"}
 				}
 			}
 			// Pi may have started the session: Claude Code resumes only what it holds.
@@ -310,20 +348,21 @@ func (s *QNTXServer) readAgentSession(agent *rootAgent, in *inHarness) (any, *pr
 	if going := in.answering.Load(); going != nil {
 		session, kept = going.session, true
 	}
-	return s.sessionTranscript(session, kept)
+	return s.sessionTranscript(agent, session, kept)
 }
 
-// sessionTranscript is session read whole, or empty before it was kept.
-func (s *QNTXServer) sessionTranscript(session string, resumes bool) (any, *protocol.Refusal) {
+// sessionTranscript is session read whole from where the agent writes it
+// (sessionStoreOf), or empty before it was kept.
+func (s *QNTXServer) sessionTranscript(agent *rootAgent, session string, resumes bool) (any, *protocol.Refusal) {
 	none := transcript{Subjects: []string{}, Turns: []transcriptTurn{}}
 	if !resumes {
 		return map[string]any{"transcript": none}, nil
 	}
-	system, err := s.held.Read(auth.NamespaceSystem)
+	written, err := s.held.Read(agent.namespace)
 	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no system to read the ROOT agent's session from: " + err.Error()}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no " + agent.namespace + " to read the session of " + agent.called + " from: " + err.Error()}
 	}
-	read, refused := sessionsIn(system, []string{session}, 1)
+	read, refused := sessionsIn(written, []string{session}, 1)
 	if refused != nil {
 		return nil, refused
 	}
