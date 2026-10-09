@@ -192,11 +192,9 @@ func (h *Handler) GitHubKeeper() (GitHubKeeper, error) {
 var githubRefreshing sync.Mutex
 
 // GitHubToken is the GitHub token a namespace spends and the id of the record
-// it is kept in, which names the credential. No namespace is the node's own.
+// it is kept in, which names the credential. The node's own is system's,
+// reached by naming system; naming none reaches none.
 func (h *Handler) GitHubToken(ctx context.Context, namespace string) (string, string, error) {
-	if namespace == "" {
-		namespace = NamespaceSystem
-	}
 	keeper, err := h.GitHubKeeper()
 	if err != nil {
 		return "", "", err
@@ -209,7 +207,7 @@ func (h *Handler) GitHubToken(ctx context.Context, namespace string) (string, st
 		return "", "", err
 	}
 	if !found {
-		return "", "", errors.Newf("namespace %s has no GitHub: nobody set it up", namespace)
+		return "", "", errors.Newf("namespace %q has no GitHub: nobody set it up", namespace)
 	}
 	if held.RevokedAt != nil {
 		return "", "", errors.Newf("namespace %s's GitHub token %s is revoked", namespace, held.ID)
