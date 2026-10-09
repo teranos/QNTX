@@ -21,6 +21,7 @@ import (
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
+	"go.uber.org/zap/zaptest"
 )
 
 // gardens is the node's namespaces as a test keeps them: each with its own
@@ -28,6 +29,8 @@ import (
 type gardens struct {
 	store map[string]*handed
 	owner map[string]string
+	// tokens is what the gate holds, where a namespace agent's token lands.
+	tokens *auth.TokenTable
 }
 
 func (g gardens) List() ([]storage.Namespace, error) {
@@ -62,7 +65,16 @@ func runningNamespaceAgents(t *testing.T) (s *QNTXServer, ran string, in gardens
 	seed[0] = 9
 	s.nodeDID = &nodedid.Handler{PrivateKey: ed25519.NewKeyFromSeed(seed)}
 	s.agentsDir = t.TempDir()
-	in = gardens{store: map[string]*handed{}, owner: map[string]string{"garden": gardener}}
+	// The gate, holding tokens: a namespace agent's token is what keeps it in
+	// its namespace there.
+	_, db := createTestStore(t)
+	tokens, _, err := auth.OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	s.authHandler, err = auth.New(db, "localhost", nil, 8770, 8820, 24, zaptest.NewLogger(t).Sugar(),
+		func(next http.HandlerFunc) http.HandlerFunc { return next },
+		tokens, nil, false, []string{"https://example.org/root"}, nil)
+	require.NoError(t, err)
+	in = gardens{store: map[string]*handed{}, owner: map[string]string{"garden": gardener}, tokens: tokens}
 	for _, name := range []string{"garden", "orchard"} {
 		store, _ := createTestStore(t)
 		in.store[name] = &handed{AttestationStore: store}
@@ -122,6 +134,27 @@ func TestANamespaceOptsIntoAnAgentOfItsOwn(t *testing.T) {
 	require.Nil(t, refused)
 	assert.Equal(t, am["did"], again["did"], "one agent per namespace and model, wherever it is asked for")
 	holds(t, s.agentsSignum(), "am", again)
+
+	// Its token is held at the gate: a TOKEN in garden alone, speaking for
+	// whoever set it up, attesting as the agent.
+	held, err := in.tokens.List()
+	require.NoError(t, err)
+	require.Len(t, held, 1)
+	assert.Equal(t, "agent:garden:claude-sonnet-5-5", held[0].Label)
+	assert.Equal(t, auth.LevelToken, held[0].Level)
+	assert.Equal(t, []string{"garden"}, held[0].Namespaces)
+	assert.Equal(t, am["did"], held[0].DID)
+	assert.Equal(t, "https://example.org/root", held[0].MintedBy)
+}
+
+// A node without auth has no gate to hold the agent's token, and would admit
+// it everywhere as its one caller: it runs no namespace agent.
+func TestANodeWithoutAuthRunsNoNamespaceAgent(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	s.authHandler = nil
+	_, refused := rootAsks(s, "set", sonnetGarden)
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.Says, "without auth")
 }
 
 // Two namespaces are two agents, and so is one namespace naming a new model.

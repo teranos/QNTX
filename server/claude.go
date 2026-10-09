@@ -44,8 +44,8 @@ type rootAgent struct {
 	sessionsMu sync.Mutex
 	// signingIn is its sign-in to Claude Code begun and not finished.
 	signingIn signingIn
-	// namespace is the namespace this agent stands in, and empty is ROOT's,
-	// whose sessions are the node's own record in system (ADR-048).
+	// namespace is the namespace this agent stands in: system for ROOT's,
+	// whose sessions are the node's own record (ADR-048).
 	namespace string
 	// called is the agent as a sentence names it.
 	called string
@@ -112,7 +112,7 @@ func theRootAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {
 	if err != nil {
 		return nil, err
 	}
-	agent.called = "the ROOT agent"
+	agent.namespace, agent.called = auth.NamespaceSystem, "the ROOT agent"
 	return agent, nil
 }
 
@@ -165,7 +165,7 @@ func (a *rootAgent) keepIn(file, id string) error {
 // isSaidToBe is what the ROOT agent additionally is, said to Claude Code with
 // everything said to it.
 func (a *rootAgent) isSaidToBe() string {
-	if a.namespace != "" {
+	if a.namespace != auth.NamespaceSystem {
 		return "You are the agent of the namespace " + a.namespace + " on a QNTX node, shared by everyone who has reach on that namespace. " +
 			"Your DID is " + a.did + ". " +
 			"The node's sigils are the tools of the MCP server named " + rootAgentMCP + ", which you reach with your own token; they act in " + a.namespace + " and nowhere else. " +
@@ -358,13 +358,9 @@ func (s *QNTXServer) sessionTranscript(agent *rootAgent, session string, resumes
 	if !resumes {
 		return map[string]any{"transcript": none}, nil
 	}
-	in := auth.NamespaceSystem
-	if agent.namespace != "" {
-		in = agent.namespace
-	}
-	written, err := s.held.Read(in)
+	written, err := s.held.Read(agent.namespace)
 	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no " + in + " to read the session of " + agent.called + " from: " + err.Error()}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no " + agent.namespace + " to read the session of " + agent.called + " from: " + err.Error()}
 	}
 	read, refused := sessionsIn(written, []string{session}, 1)
 	if refused != nil {

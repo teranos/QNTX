@@ -102,7 +102,7 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	// The ROOT agent's git is its own (ADR-048, Its git). A namespace agent has
 	// none: nothing of it is written for one yet.
 	var itsGit []string
-	if agent.namespace == "" {
+	if agent.namespace == auth.NamespaceSystem {
 		if itsGit, err = s.gitEnvironment(agent); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent's git was not set up, so nothing was said to it: " + err.Error()}
 		}
@@ -128,7 +128,7 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 // agent, which stands there and nothing crosses (ADR-026). The namespace is
 // written as the caller is admitted to act there.
 func (s *QNTXServer) sessionStoreOf(caller *http.Request, agent *rootAgent) (ats.AttestationStore, error) {
-	if agent.namespace == "" {
+	if agent.namespace == auth.NamespaceSystem {
 		return s.held.WriteWhatTheNodeKnowsOfItself()
 	}
 	admitted, gated := auth.AdmissionFrom(caller.Context())
