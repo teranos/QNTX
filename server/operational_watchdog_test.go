@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -133,7 +134,7 @@ func watchedNodeWithTokens(t *testing.T) (*QNTXServer, *inbox, *auth.TokenTable)
 	return s, box, tokens
 }
 
-// The whole of a minute, shrunk so a test can wait it out.
+// The whole of a minute, shrunk.
 var shortPatience = operationalPatience{
 	every:     20 * time.Millisecond,
 	sentry:    30 * time.Millisecond,
@@ -142,40 +143,110 @@ var shortPatience = operationalPatience{
 	lastWords: time.Second,
 }
 
+// stepClock is time that moves only when the test moves it, so the watch acts
+// in the order the test says, however loaded the machine is.
+type stepClock struct {
+	mu    sync.Mutex
+	now   time.Time
+	waits []stepWait
+}
+
+type stepWait struct {
+	at time.Time
+	c  chan time.Time
+}
+
+func (c *stepClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *stepClock) After(d time.Duration) <-chan time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	w := stepWait{at: c.now.Add(d), c: make(chan time.Time, 1)}
+	c.waits = append(c.waits, w)
+	return w.c
+}
+
+// step waits until the watch waits on the moment d from now, then moves time
+// there and wakes everything due by then.
+func (c *stepClock) step(t *testing.T, d time.Duration) {
+	t.Helper()
+	require.Eventually(t, func() bool { return c.waitsOn(d) }, 10*time.Second, time.Millisecond,
+		"the watch does not wait on the moment %s from now", d)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+	kept := c.waits[:0]
+	for _, w := range c.waits {
+		if w.at.After(c.now) {
+			kept = append(kept, w)
+			continue
+		}
+		w.c <- c.now
+	}
+	c.waits = kept
+}
+
+func (c *stepClock) waitsOn(d time.Duration) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	at := c.now.Add(d)
+	for _, w := range c.waits {
+		if w.at.Equal(at) {
+			return true
+		}
+	}
+	return false
+}
+
+// watching starts the watch on a stepClock and waits until it has read ROOT,
+// which it does while the store still answers.
+func watching(t *testing.T, s *QNTXServer) (*stepClock, chan error) {
+	t.Helper()
+	clock := &stepClock{now: time.Date(2026, 10, 9, 18, 0, 0, 0, time.UTC)}
+	var root atomic.Pointer[services.MailRecipient]
+	stopped := make(chan error, 1)
+	go s.watchOperationalStore(func(reason error) { stopped <- reason }, shortPatience, clock, &root)
+	require.Eventually(t, func() bool { return root.Load() != nil }, 10*time.Second, time.Millisecond, "ROOT was not read")
+	return clock, stopped
+}
+
 // "make it so that we can take up to a minute before it decides to die ...
 // QNTX should send an email at 10 sec, 20 sec, 30 sec up to a minute. And also
 // an email if it recovered back to below 3 sec and how long it took."
 func TestASlowOperationalStoreIsWaitedOnAndROOTIsTold(t *testing.T) {
 	s, box := watchedNode(t)
-
-	stopped := make(chan error, 1)
-	go s.watchOperationalStore(func(reason error) { stopped <- reason }, shortPatience)
-	time.Sleep(3 * shortPatience.every) // ROOT is read while the store answers
+	clock, stopped := watching(t, s)
 
 	held, err := s.nodeDB.Conn(context.Background())
 	require.NoError(t, err)
-	time.Sleep(250 * time.Millisecond) // past two mails, short of the minute
+	clock.step(t, shortPatience.every)
+	clock.step(t, shortPatience.mailEvery)
+	clock.step(t, shortPatience.mailEvery) // two mails, short of the minute
 	require.NoError(t, held.Close())
+	clock.step(t, shortPatience.every)
 
 	require.Eventually(t, func() bool {
+		var waits int
+		var answered bool
 		for _, subject := range box.subjects() {
+			if strings.HasPrefix(subject, "The operational store has not answered for") {
+				waits++
+			}
 			if strings.HasPrefix(subject, "The operational store answers again, after") {
-				return true
+				answered = true
 			}
 		}
-		return false
-	}, time.Second, 10*time.Millisecond, "the store answered again and ROOT was not told: %v", box.subjects())
-
-	var waits int
-	for _, subject := range box.subjects() {
-		if strings.HasPrefix(subject, "The operational store has not answered for") {
-			waits++
-		}
-	}
-	assert.GreaterOrEqual(t, waits, 2, "ROOT was not mailed as the wait grew: %v", box.subjects())
+		return waits == 2 && answered
+	}, 10*time.Second, time.Millisecond, "ROOT was not mailed as the wait grew and when it ended: %v", box.subjects())
+	box.mu.Lock()
 	for _, m := range box.mails {
 		assert.Equal(t, "root@garden.test", m.To)
 	}
+	box.mu.Unlock()
 
 	select {
 	case reason := <-stopped:
@@ -188,19 +259,18 @@ func TestASlowOperationalStoreIsWaitedOnAndROOTIsTold(t *testing.T) {
 // before the process ends.
 func TestAStoreThatDoesNotAnswerInAMinuteStopsTheNodeAndROOTIsTold(t *testing.T) {
 	s, box := watchedNode(t)
-
-	stopped := make(chan error, 1)
-	go s.watchOperationalStore(func(reason error) { stopped <- reason }, shortPatience)
-	time.Sleep(3 * shortPatience.every)
+	clock, stopped := watching(t, s)
 
 	held, err := s.nodeDB.Conn(context.Background())
 	require.NoError(t, err)
 	defer held.Close()
+	clock.step(t, shortPatience.every)
+	clock.step(t, shortPatience.die)
 
 	select {
 	case reason := <-stopped:
 		require.ErrorIs(t, reason, context.DeadlineExceeded)
-	case <-time.After(5 * shortPatience.die):
+	case <-time.After(10 * time.Second):
 		t.Fatal("the store did not answer for the whole minute and the node did not stop")
 	}
 
@@ -214,17 +284,16 @@ func TestAStoreThatDoesNotAnswerInAMinuteStopsTheNodeAndROOTIsTold(t *testing.T)
 // ROOT was mailed about it mails nothing when it ends.
 func TestAWaitROOTWasNotMailedAboutMailsNothingWhenItEnds(t *testing.T) {
 	s, box := watchedNode(t)
-
-	stopped := make(chan error, 1)
-	go s.watchOperationalStore(func(reason error) { stopped <- reason }, shortPatience)
-	time.Sleep(3 * shortPatience.every)
+	clock, stopped := watching(t, s)
 
 	held, err := s.nodeDB.Conn(context.Background())
 	require.NoError(t, err)
-	time.Sleep(2 * shortPatience.sentry) // past Sentry, short of the first mail
+	clock.step(t, shortPatience.every)
+	clock.step(t, shortPatience.sentry) // past Sentry, short of the first mail
 	require.NoError(t, held.Close())
+	clock.step(t, shortPatience.every) // the store answers in time again
+	clock.step(t, shortPatience.every) // and the watch is past that answer
 
-	time.Sleep(10 * shortPatience.every) // the store answers in time again
 	assert.Empty(t, box.subjects())
 
 	select {
@@ -257,27 +326,26 @@ func TestTheHeaviestTokenIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
 		return rec.Code
 	}
 
-	stopped := make(chan error, 1)
-	go s.watchOperationalStore(func(reason error) { stopped <- reason }, shortPatience)
-	time.Sleep(3 * shortPatience.every)
+	clock, _ := watching(t, s)
+	for range 5 {
+		require.Equal(t, http.StatusOK, send(heavy))
+	}
+	require.Equal(t, http.StatusOK, send(light))
 
 	held, err := s.nodeDB.Conn(context.Background())
 	require.NoError(t, err)
-	// Sent while the store is still answering in time, so it is counted and
-	// not lifted before the stall begins.
-	for range 5 {
-		send(heavy)
-	}
-	send(light)
+	clock.step(t, shortPatience.every)
+	clock.step(t, shortPatience.sentry)
 
 	require.Eventually(t, func() bool {
 		return send(heavy) == http.StatusTooManyRequests
-	}, 2*shortPatience.mailEvery, 5*time.Millisecond, "the heaviest token was not turned away while the store was slow")
+	}, 10*time.Second, time.Millisecond, "the heaviest token was not turned away while the store was slow")
 	assert.Equal(t, http.StatusOK, send(light), "a token that was not the heaviest was turned away")
 
 	// Past a mail about the wait, which is what a mail about its end answers.
-	time.Sleep(2 * shortPatience.mailEvery)
+	clock.step(t, shortPatience.mailEvery-shortPatience.sentry)
 	require.NoError(t, held.Close())
+	clock.step(t, shortPatience.every)
 	require.Eventually(t, func() bool {
 		for _, text := range box.texts() {
 			if strings.Contains(text, "Let back in: ground") {
@@ -285,6 +353,6 @@ func TestTheHeaviestTokenIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
 			}
 		}
 		return false
-	}, time.Second, 10*time.Millisecond, "ROOT was not told the heaviest token was let back in: %v", box.subjects())
+	}, 10*time.Second, time.Millisecond, "ROOT was not told the heaviest token was let back in: %v", box.subjects())
 	assert.Equal(t, http.StatusOK, send(heavy), "the heaviest token was still turned away once the store answered in time")
 }
