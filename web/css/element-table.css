@@ -68,6 +68,13 @@
     border: 1px solid rgba(251, 191, 36, 0.4);
 }
 
+/* Invited, and not yet a User. */
+.element-pill-invited {
+    color: var(--color-info);
+    background: rgba(59, 131, 246, 0.16);
+    border: 1px solid rgba(59, 131, 246, 0.4);
+}
+
 /* When a status was reached, beside the pill. */
 .element-pill-when {
     margin-left: 6px;

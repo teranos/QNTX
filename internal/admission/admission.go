@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/teranos/QNTX/internal/access"
+	"github.com/teranos/QNTX/internal/slug"
 )
 
 type (
@@ -34,8 +35,7 @@ type Admission struct {
 	words Words
 	// Namespaces is where this admission may act. A session names the door the
 	// person registered at (ADR-032); a token names what its record does. None
-	// is every namespace the node serves, which is what a session that came in
-	// by no door names.
+	// is none: ROOT and SUPER reach every namespace by their level (ADR-027).
 	Namespaces []string
 	// Identity is the auth.root_identities entry that admitted this request —
 	// an account URL or a did:key. A token carries the identity that minted it.
@@ -96,7 +96,13 @@ func (a Admission) LevelName() string {
 // logging in and being attested. A role held where they act is what reaches
 // further, and it is a line ROOT wrote.
 func (a Admission) ReachesAStore() bool {
-	return a.level != access.LevelPublicRegistration || len(a.roles) > 0
+	return !reachesNothingAlone(a.level) || len(a.roles) > 0
+}
+
+// reachesNothingAlone is the rungs that reach no store without a line:
+// PUBLIC_REGISTRATION and USER.
+func reachesNothingAlone(level Level) bool {
+	return level == access.LevelPublicRegistration || level == access.LevelUser
 }
 
 // MaySeeSystem reports whether the system namespace is visible to this
@@ -111,6 +117,26 @@ func (a Admission) MaySeeSystem() bool {
 // by ROOT" and "by SUPER's in that namespace".
 func (a Admission) OwnsEveryCanvas() bool {
 	return a.level == access.LevelRoot || a.level == access.LevelSuper
+}
+
+// ReachesEveryNamespace reports whether this admission reaches every namespace
+// the node serves: ROOT and SUPER, by their level, and nobody by naming none.
+func (a Admission) ReachesEveryNamespace() bool {
+	return a.level == access.LevelRoot || a.level == access.LevelSuper
+}
+
+// MayActIn reports whether this admission may act in a namespace: one it
+// names, by slug, or any of them at ROOT and SUPER.
+func (a Admission) MayActIn(namespace string) bool {
+	if a.ReachesEveryNamespace() {
+		return true
+	}
+	for _, named := range a.Namespaces {
+		if slug.Of(named) == slug.Of(namespace) {
+			return true
+		}
+	}
+	return false
 }
 
 // MayEndNamespaces reports whether this admission may delete a namespace: ROOT
@@ -132,7 +158,7 @@ func (a Admission) belowTheLadder() bool {
 	if a.Grant != nil {
 		return a.Grant.Scoped()
 	}
-	return a.level == access.LevelPublicRegistration
+	return reachesNothingAlone(a.level)
 }
 
 // MayRead reports whether this admission may read attestations with a

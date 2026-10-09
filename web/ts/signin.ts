@@ -16,6 +16,7 @@ import { holdSession, dropSession } from './client/session';
 import { inApp, homeInSheet, APP_DOOR } from './app-door';
 import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
+import { heldInvitation, invited, letGoOfInvitation, onlyInvited, signsInWith } from './invitation';
 import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, tokenMark, relayed, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself, sentBy } from './door';
 import { log, SEG } from './logger';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
@@ -254,9 +255,14 @@ export function openDoor(): Promise<void> {
                 say('');
                 return;
             }
+            say('');
+            // "i think on this screen we dont need to actyually see the fingerprint, just the available provider for given user"
+            if (heldInvitation()) {
+                void offer();
+                return;
+            }
             const print = fingerprint(() => { print.disabled = true; void press(print); });
             stand.append(print);
-            say('');
             // Sent here by a client, the face names it: the app that sent the
             // person is not the origin they are looking at, and nothing else
             // in front of them says who will hold the token.
@@ -309,6 +315,18 @@ export function openDoor(): Promise<void> {
                 log.warn(SEG.UI, '[Door] could not list what this node accepts:', e);
                 return;
             }
+            // "so, if ROOT selected Mastodon, the invited user only sees the mastodon link"
+            const invitation = heldInvitation();
+            if (invitation) {
+                try {
+                    const inv = await invited(invitation);
+                    providers = onlyInvited(providers, inv);
+                    say(`you are invited: sign in with ${signsInWith(inv)}`);
+                } catch (e) {
+                    letGoOfInvitation();
+                    stumbled('reading your invitation', e);
+                }
+            }
             if (providers.length === 0) return;
 
             try {
@@ -316,7 +334,10 @@ export function openDoor(): Promise<void> {
                 host.replaceChildren();
                 say('signing in...');
                 nameYourself();
-                await standOnADevice(await layeLogin());
+                const half = await layeLogin(heldInvitation());
+                // The node made the User the invitation was for; the link is spent.
+                letGoOfInvitation();
+                await standOnADevice(half);
                 await through();
             } catch (e) {
                 stumbled('linking an account', e);

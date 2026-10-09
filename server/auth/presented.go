@@ -46,6 +46,12 @@ type Presented struct {
 	// requests act. Empty is a User that walked up to no door.
 	Namespace string
 
+	// BecomingBy is the ROOT User this session is, while it is being the User
+	// above (ADR-031). Empty for every other session.
+	BecomingBy string
+	// becameFrom is the route ROOT's session named before it became them.
+	becameFrom string
+
 	// The raw tokens, for the two acts that end what they name.
 	sessionToken string
 	pendingToken string
@@ -82,6 +88,7 @@ func (h *Handler) presented(r *http.Request) Presented {
 				p.UserID, p.DisplayName, p.Namespace = h.sessions.userOf(raw)
 			}
 		}
+		h.asBecome(&p)
 		if h.tokens != nil {
 			hash := sha256Hex(raw)
 			// A person is never turned away; a token may be, and is before
@@ -100,7 +107,9 @@ func (h *Handler) presented(r *http.Request) Presented {
 				h.touch(hash, grant.DID)
 			}
 		}
+		return p
 	}
+	h.asBecome(&p)
 	return p
 }
 

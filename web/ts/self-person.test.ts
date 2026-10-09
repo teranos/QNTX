@@ -4,7 +4,7 @@
  */
 
 import { test, expect } from 'bun:test';
-import { personSection, type Person } from './self-person';
+import { personSection, personUnbecome, type Person } from './self-person';
 
 function tim(over: Partial<Person> = {}): Person {
     return {
@@ -35,13 +35,12 @@ test('the person is drawn from what the node said', () => {
     expect(html).toContain('mastodon');
 });
 
-// ROOT walked up to no door, and no door is every namespace the node serves.
-// A blank there would read as a person acting nowhere.
+// ROOT walked up to no door and names no namespace. Naming none is none.
 test('a User that came in by no door says so rather than showing a blank', () => {
     const html = personSection(tim(), '');
 
     expect(html).toContain('no door');
-    expect(html).toContain('every namespace this node serves');
+    expect(html).not.toContain('every namespace');
 });
 
 // A registration belongs to the door it arrived at, and that door is where it
@@ -88,4 +87,12 @@ test('a name that is markup does not become markup', () => {
     const html = personSection(tim({ name: '<script>x</script>' }), '');
 
     expect(html).not.toContain('<script>');
+});
+
+// ROOT being somebody reads as such, and is offered the way back.
+test('ROOT being a User says so, and offers the way back', () => {
+    const being = tim({ level: 'PUBLIC_REGISTRATION', becoming_by: 'US-USER-ROOT0001' });
+    expect(personSection(being, '')).toContain('ROOT (US-USER-ROOT0001) is being this User');
+    expect(personUnbecome(being)?.textContent).toContain('Back to ROOT');
+    expect(personUnbecome(tim())).toBeNull();
 });

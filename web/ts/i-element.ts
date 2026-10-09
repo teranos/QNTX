@@ -15,7 +15,7 @@ import { I } from './sym';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import { createGhostButton } from './components/button.ts';
-import { person, personSection, personSwitch, type Person } from './self-person.ts';
+import { person, personSection, personSwitch, personUnbecome, type Person } from './self-person.ts';
 import { openTokensElement } from './tokens-element.ts';
 import { openRolesElement } from './roles-element.ts';
 import { openUsersElement } from './users-element.ts';
@@ -74,7 +74,9 @@ function renderI(): void {
     sections.push(personSection(iPerson, iPersonRefusal));
 
     // The person's own key, beside the person rather than beside the node's.
-    if (iOwnerDID !== null) {
+    // It is the passkey owner the node holds, which is ROOT's, so ROOT being
+    // somebody else is not shown it as theirs.
+    if (iOwnerDID !== null && !iPerson?.becoming_by) {
         const value = iOwnerDID
             ? `<span class="element-did">${escapeHtml(iOwnerDID)}</span>`
             : `<span class="status-unwell">${iRegistered ? '⚠ passkey registered, no identity established' : 'no passkey registered'}</span>`;
@@ -133,8 +135,13 @@ function renderI(): void {
         actions.appendChild(githubBtn.element);
     }
 
+    // ROOT being somebody gets back to itself here (ADR-031).
+    const back = personUnbecome(iPerson);
+    if (back) actions.appendChild(back);
+
     // The switch on the person (ADR-031), once the node has said who is looking.
-    if (iPersonAsked) {
+    // ROOT being somebody does not switch them off.
+    if (iPersonAsked && !iPerson?.becoming_by) {
         const flip = personSwitch(iPerson, iPersonRefusal, loadPerson);
         if (flip) actions.appendChild(flip);
     }

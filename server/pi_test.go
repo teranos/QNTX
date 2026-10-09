@@ -181,3 +181,16 @@ func TestOnlyRootTalksToItInPi(t *testing.T) {
 		assert.Equal(t, []string{"ROOT"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
 	}
 }
+
+// The same in Pi: the node's environment is the node's.
+func TestATurnInPiCarriesOnlyItsOwnCredential(t *testing.T) {
+	t.Setenv("QNTX_NODE_SECRET", "the node's")
+	s, _, ran := runningPiToo(t)
+	_, refused := sayingToPi(s, sigil.Sent{"says": "hello"})
+	require.Nil(t, refused)
+
+	env := ranWith(t, ran, "0", "env")
+	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.rootAgent.token)
+	assert.NotContains(t, env, "QNTX_TEST_PLAN_TOKEN=the-plan-token")
+	assert.NotContains(t, env, "QNTX_NODE_SECRET=the node's")
+}

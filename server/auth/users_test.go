@@ -19,12 +19,8 @@ type memUsers struct {
 }
 
 func (m *memUsers) ByRoute(route string) (User, bool, error) {
-	for _, u := range m.held {
-		if u.Reaches(route) {
-			return u, true, nil
-		}
-	}
-	return User{}, false, nil
+	u, found := reachedBy(m.held, route)
+	return u, found, nil
 }
 
 func (m *memUsers) List() ([]User, error) { return m.held, nil }

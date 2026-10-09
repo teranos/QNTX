@@ -12,7 +12,7 @@
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createPrimaryButton } from './components/button';
+import { Button, createDangerButton, createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
 import type { UserRecord } from './users-element';
@@ -91,11 +91,53 @@ function addForm(onAdded: () => void): HTMLDivElement {
     return form;
 }
 
+/** Flips the switch on one User. The node's refusal is the error. */
+async function flip(id: string, verb: 'disable' | 'enable'): Promise<void> {
+    await apiJson<{ status: string }>(`/auth/users/${encodeURIComponent(id)}/${verb}`, { method: 'POST' });
+}
+
+// "the infinite row of switch of is pissing me off as well, should be in the User themselves"
+
+/** The switch on this User: off carries the switcher's name, on undoes it. */
+function switchOn(u: UserRecord, onSwitched: () => void): HTMLElement {
+    const actions = document.createElement('div');
+    actions.className = 'element-actions';
+    if (u.disabled_by) {
+        const on = createPrimaryButton('Switch on', async () => {
+            await flip(u.id, 'enable');
+            onSwitched();
+        });
+        actions.appendChild(on.element);
+        return actions;
+    }
+    const off = createDangerButton('Switch off', 'Confirm switch off', async () => {
+        await flip(u.id, 'disable');
+        onSwitched();
+    });
+    actions.appendChild(off.element);
+    return actions;
+}
+
+// "and to become or unbecome, is actually in the specific User in the Users Element, the i element is to get back to ROOT"
+
+/** ROOT becomes this User (ADR-031), and the page is read again as them. */
+async function become(u: UserRecord): Promise<void> {
+    await apiJson(`/auth/users/${encodeURIComponent(u.id)}/become`, { method: 'POST' });
+    window.location.reload();
+}
+
+/** Exported for tests: whether ROOT is offered to become this User. */
+export function becomable(u: UserRecord, viewerIsRoot: boolean): boolean {
+    return viewerIsRoot && u.level !== 'ROOT' && !u.disabled_by;
+}
+
 /**
  * Exported for tests: one User's record. `own` is whether the viewer is this
- * User in a session, the one case the node takes an addition from.
+ * User in a session, the one case the node takes an addition from. `switches`
+ * is whether the viewer may switch a User: a session may, a token may not.
+ * `viewerIsRoot` is whether ROOT is looking, who may become this User.
  */
-export function renderUser(container: HTMLElement, u: UserRecord, own: boolean, onAdded: () => void = () => {}): void {
+export function renderUser(container: HTMLElement, u: UserRecord, own: boolean, onAdded: () => void = () => {}, switches = false, viewerIsRoot = false): void {
     container.innerHTML = '';
 
     const table = document.createElement('table');
@@ -115,6 +157,22 @@ export function renderUser(container: HTMLElement, u: UserRecord, own: boolean, 
     table.appendChild(row('Status', u.disabled_by ? `off, by ${u.disabled_by}` : 'on'));
     container.appendChild(table);
 
+    if (switches) {
+        container.appendChild(switchOn(u, onAdded));
+    }
+
+    if (becomable(u, viewerIsRoot)) {
+        const actions = document.createElement('div');
+        actions.className = 'element-actions';
+        actions.appendChild(new Button({
+            label: `Become ${nameOf(u)}`,
+            variant: 'danger',
+            confirmation: { label: `Their sessions end, and their tokens stop until you are ROOT again` },
+            onClick: () => become(u),
+        }).element);
+        container.appendChild(actions);
+    }
+
     if (own) {
         container.appendChild(addForm(onAdded));
         return;
@@ -133,7 +191,7 @@ async function redraw(container: HTMLElement, id: string): Promise<void> {
     }
     renderUser(container, u, who.user === id && who.via === 'session', () => {
         redraw(container, id).catch((err: unknown) => refused(container, err));
-    });
+    }, who.via !== 'token', who.level === 'ROOT');
 }
 
 function refused(container: HTMLElement, err: unknown): void {

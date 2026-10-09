@@ -37,13 +37,15 @@ export interface Person {
     via: string;
     accounts: PersonAccount[];
     keys: string[];
+    /** The ROOT User being this User, when this is ROOT's session being them (ADR-031). */
+    becoming_by?: string;
 }
 
 /** A User that walked up to no door names none. */
 const NO_DOOR = 'no door';
 
-/** Naming no namespace is naming all of them, so the blank has to say which. */
-const EVERY_NAMESPACE = 'every namespace this node serves';
+/** Naming no namespace is naming none, and a blank would not say so. */
+const NO_NAMESPACE = 'none';
 
 /** Nobody has been joined to this User yet. */
 const NO_ACCOUNTS = 'none';
@@ -107,6 +109,25 @@ export function personSwitch(who: Person | null, refused: string, reload: () => 
     return null;
 }
 
+/**
+ * The way back to ROOT, when this session is ROOT being somebody (ADR-031).
+ * The page is read again as ROOT once the node says it is.
+ */
+export function personUnbecome(who: Person | null): HTMLElement | null {
+    if (!who?.becoming_by) return null;
+    return new Button({
+        label: 'Back to ROOT',
+        variant: 'primary',
+        onClick: async () => {
+            const response = await apiFetch('/i/unbecome', { method: 'POST', headers: { Accept: 'application/json' } });
+            if (!response.ok) {
+                throw new Error(await refusal(response));
+            }
+            window.location.reload();
+        },
+    }).element;
+}
+
 /** What the node said when it would not answer. Its words, never softened. */
 export async function refusal(response: Response): Promise<string> {
     const body = await response.text().catch((err: unknown) => `(unreadable body: ${err})`);
@@ -160,12 +181,13 @@ export function personSection(who: Person | null, refused: string): string {
     return `
             <div class="element-section">
                 <h3 class="element-section-title">Who you are</h3>
+                ${who.becoming_by ? row('Being:', `ROOT (${who.becoming_by}) is being this User`) : ''}
                 ${row('Name:', who.name || who.user)}
                 ${row('Level:', who.level)}
                 ${row('Via:', who.via)}
                 ${row('Route:', who.identity)}
                 ${row('Door:', who.door || NO_DOOR)}
-                ${row('Namespace:', who.namespaces.join(', ') || EVERY_NAMESPACE)}
+                ${row('Namespace:', who.namespaces.join(', ') || NO_NAMESPACE)}
                 ${accounts}
             </div>
         `;

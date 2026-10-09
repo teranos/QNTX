@@ -5,17 +5,16 @@
 // "could you create a ts Users glyph to let us do the minimal management of users as ROOT ?"
 
 // Plain window, reached from the Self element. Lists every User as the record
-// holds them, and the switch on each: off carries ROOT's name so the person
-// cannot switch it back; on is on whoever switched it off. The minimal
-// management is seeing everyone and the one act on a person.
+// holds them; pressing a name opens that User, where the switch on them is.
 
 import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createDangerButton, createPrimaryButton } from './components/button';
+import { createGhostButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
 import { openUserElement } from './user-element';
+import { openInvitationCancel, openUserInviteElement, type InvitationRecord } from './user-invite-element';
 
 /** One User, as the record holds them. Nothing here is a secret: a key is a
  *  DID and an account is what a provider calls it. */
@@ -43,11 +42,6 @@ const UNNAMED = '—';
 
 async function fetchUsers(): Promise<UserRecord[]> {
     return await apiJson<UserRecord[]>('/auth/users');
-}
-
-/** Flips the switch on one User. The node's refusal is the error. */
-async function flip(id: string, verb: 'disable' | 'enable'): Promise<void> {
-    await apiJson<{ status: string }>(`/auth/users/${encodeURIComponent(id)}/${verb}`, { method: 'POST' });
 }
 
 /** What to call a User: their name, root for the ROOT User, and a dash for
@@ -111,10 +105,9 @@ export function reachedBy(u: UserRecord): { shown: string; whole: string } {
     return { shown: parts.join(', '), whole: routes.join('\n') };
 }
 
-/** Exported for tests: which control a row offers is the switch itself.
- *  `switches` is whether the viewer may switch anybody: a session may, a token
- *  may not, and a row does not offer a token what a token cannot do. */
-export function renderList(container: HTMLElement, users: UserRecord[], switches = true): void {
+/** Exported for tests: every User, a row each. A row is a way in to the
+ *  User and nothing else. */
+export function renderList(container: HTMLElement, users: UserRecord[], invitations: InvitationRecord[] = []): void {
     container.innerHTML = '';
 
     if (users.length === 0) {
@@ -138,11 +131,15 @@ export function renderList(container: HTMLElement, users: UserRecord[], switches
         <th>Phone</th>
         <th>Created</th>
         <th>Status</th>
-        ${switches ? '<th></th>' : ''}
     </tr>`;
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
+    // "but why dont i see my outgoing invitations in the same list, and a way for me to open the would-be-user"
+    for (const inv of invitations) {
+        if (inv.cancelled_at || inv.accepted_by) continue;
+        tbody.appendChild(invitationRow(inv));
+    }
     for (const u of users) {
         const tr = document.createElement('tr');
 
@@ -165,36 +162,80 @@ export function renderList(container: HTMLElement, users: UserRecord[], switches
         tr.appendChild(cell(fmt(u.created_at), 'element-time'));
         tr.appendChild(statusPill(u));
 
-        if (switches) {
-            const action = document.createElement('td');
-            action.className = 'element-actions';
-            if (u.disabled_by) {
-                const on = createPrimaryButton('Switch on', async () => {
-                    await flip(u.id, 'enable');
-                    await refreshList(container);
-                });
-                action.appendChild(on.element);
-            } else {
-                const off = createDangerButton('Switch off', 'Confirm switch off', async () => {
-                    await flip(u.id, 'disable');
-                    await refreshList(container);
-                });
-                action.appendChild(off.element);
-            }
-            tr.appendChild(action);
-        }
-
         tbody.appendChild(tr);
     }
     table.appendChild(tbody);
     container.appendChild(table);
 }
 
-// Who is looking decides what the rows offer: a session switches, a token
-// only reads.
+/** An open invitation, as the would-be User it is. Pressing the name opens
+ *  it, with its cancel. */
+function invitationRow(inv: InvitationRecord): HTMLTableRowElement {
+    const tr = document.createElement('tr');
+    const name = cell(inv.display_name || UNNAMED);
+    name.title = inv.id;
+    name.style.cursor = 'pointer';
+    name.addEventListener('click', () => { openInvitationCancel(inv.id); });
+    tr.appendChild(name);
+    tr.appendChild(cell('invited'));
+    tr.appendChild(cell('—'));
+    const routes = cell(inv.accounts.map(a => a.provider).join(', '), 'element-time');
+    routes.title = inv.accounts.map(a => `${a.provider}: ${a.account}`).join('\n');
+    tr.appendChild(routes);
+    tr.appendChild(cell(inv.email));
+    tr.appendChild(cell('—'));
+    tr.appendChild(cell(fmt(inv.created_at), 'element-time'));
+    const status = document.createElement('td');
+    const pill = document.createElement('span');
+    pill.className = 'element-pill element-pill-invited';
+    pill.textContent = 'invited';
+    status.appendChild(pill);
+    tr.appendChild(status);
+    return tr;
+}
+
+/** The invitations ROOT sent. A node that will not list them still lists its
+ *  Users. */
+async function fetchInvitations(): Promise<InvitationRecord[]> {
+    try {
+        return await apiJson<InvitationRecord[]>('/auth/invitations');
+    } catch (err: unknown) {
+        log.error(SEG.UI, '[UsersElement] the node did not list its invitations', err);
+        return [];
+    }
+}
+
 async function refreshList(container: HTMLElement): Promise<void> {
-    const [users, who] = await Promise.all([fetchUsers(), person()]);
-    renderList(container, users, who.via !== 'token');
+    const [users, invitations] = await Promise.all([fetchUsers(), fetchInvitations()]);
+    renderList(container, users, invitations);
+}
+
+// "as root, i press the + and i can create a new user, like how i would create a new oauth token"
+
+/** Exported for tests: the way to the invite element, the + Access Tokens has. */
+export function renderInviteLink(container: HTMLElement, invited?: () => void): void {
+    container.innerHTML = '';
+    container.style.padding = '8px 0';
+
+    const invite = createGhostButton('+', async () => {
+        openUserInviteElement(invited);
+    });
+    invite.element.title = 'invite a user';
+    invite.element.setAttribute('aria-label', 'Invite a user');
+    invite.element.style.fontSize = '16px';
+    invite.element.style.lineHeight = '1';
+    invite.element.style.padding = '4px 10px';
+    container.appendChild(invite.element);
+
+    // Inviting is a session's act, the way switching a person is.
+    person().then(who => {
+        if (who.via !== 'token') return;
+        const why = 'only a session invites a user, and this page reaches the node as a token';
+        invite.setDisabled(true, why);
+        container.title = why;
+    }).catch((err: unknown) => {
+        log.error(SEG.UI, '[UsersElement] the node did not say who is looking', err);
+    });
 }
 
 export function createUsersElement(): Element {
@@ -213,6 +254,12 @@ export function createUsersElement(): Element {
             const listContainer = document.createElement('div');
             listContainer.className = 'users-list';
             listContainer.innerHTML = '<div class="element-loading">Loading Users…</div>';
+
+            const inviteContainer = document.createElement('div');
+            inviteContainer.className = 'users-invite-link';
+            renderInviteLink(inviteContainer, () => { void refreshList(listContainer); });
+
+            content.appendChild(inviteContainer);
             content.appendChild(listContainer);
 
             refreshList(listContainer).catch((err: unknown) => {

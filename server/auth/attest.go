@@ -24,6 +24,10 @@ const (
 	// this carries the act: who flipped it, and when.
 	PredicateUserDisabled = "identity:disabled"
 	PredicateUserEnabled  = "identity:enabled"
+	// ROOT being a User, and ROOT being itself again (ADR-031). What ROOT
+	// writes in between is the User's, and these say when that was.
+	PredicateBecame   = "identity:became"
+	PredicateUnbecame = "identity:unbecame"
 )
 
 // Predicates for a role somebody holds. A role is an attestation and not a Go
