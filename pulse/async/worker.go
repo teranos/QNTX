@@ -10,7 +10,6 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/sacred"
-	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -32,12 +31,6 @@ const (
 	// when workers encounter consecutive errors
 	DefaultMaxBackoff = 30 * time.Second
 )
-
-// BudgetTracker interface defines budget tracking operations
-type BudgetTracker interface {
-	CheckBudget(estimatedCost float64) error
-	GetStatus() (*budget.Status, error)
-}
 
 // RateLimiter interface defines rate limiting operations
 type RateLimiter interface {
@@ -79,8 +72,7 @@ type JobExecutor interface {
 // WorkerPool manages a pool of workers that process async IX jobs
 type WorkerPool struct {
 	queue         *Queue
-	budgetTracker BudgetTracker // Budget tracking (optional - can be nil for tests)
-	rateLimiter   RateLimiter   // Rate limiting (optional - can be nil for tests)
+	rateLimiter   RateLimiter // Rate limiting (optional - can be nil for tests)
 	db            *sql.DB
 	cfg           *config.Config
 	poolConfig    WorkerPoolConfig // Store pool configuration for graceful start timing
@@ -101,7 +93,6 @@ type WorkerPool struct {
 type WorkerPoolConfig struct {
 	Workers              int            `json:"workers"`                // Number of concurrent workers
 	PollInterval         *time.Duration `json:"poll_interval"`          // Poll interval: nil = gradual ramp-up (default), 0 = no polling, positive = fixed interval
-	PauseOnBudget        bool           `json:"pause_on_budget"`        // Pause jobs when budget exceeded
 	GracefulStartPhase   time.Duration  `json:"graceful_start_phase"`   // Duration of each graceful start phase (default: 5min, test: 10s)
 	WorkerStopTimeout    time.Duration  `json:"worker_stop_timeout"`    // Max time to wait for workers to checkpoint and exit (default: 20s)
 	MaxConsecutiveErrors int            `json:"max_consecutive_errors"` // Threshold for applying exponential backoff (default: 5)
@@ -113,7 +104,6 @@ func DefaultWorkerPoolConfig() WorkerPoolConfig {
 	return WorkerPoolConfig{
 		Workers:              1,                           // Single worker to avoid race conditions initially
 		PollInterval:         nil,                         // nil = gradual ramp-up (production default)
-		PauseOnBudget:        true,                        // Pause when budget exceeded
 		GracefulStartPhase:   5 * time.Minute,             // 5min per phase = 15min total graceful start
 		WorkerStopTimeout:    DefaultWorkerStopTimeout,    // 20s for checkpoint completion
 		MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, // 5 errors before backoff
@@ -135,10 +125,10 @@ func NewWorkerPool(db *sql.DB, cfg *config.Config, poolCfg WorkerPoolConfig, log
 
 // NewWorkerPoolWithContext creates a worker pool with a custom context.
 // Useful for tests and situations where you need to control the lifecycle.
-// Uses nil budget/rate limiters - callers can use NewWorkerPoolWithRegistry for full control.
+// Uses no rate limiter - callers can use NewWorkerPoolWithRegistry for full control.
 func NewWorkerPoolWithContext(ctx context.Context, db *sql.DB, cfg *config.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger) *WorkerPool {
 	registry := NewHandlerRegistry()
-	return NewWorkerPoolWithRegistry(ctx, db, cfg, poolCfg, logger, registry, nil, nil)
+	return NewWorkerPoolWithRegistry(ctx, db, cfg, poolCfg, logger, registry, nil)
 }
 
 // NewWorkerPoolWithRegistry creates a worker pool with a custom handler registry.
@@ -147,8 +137,8 @@ func NewWorkerPoolWithContext(ctx context.Context, db *sql.DB, cfg *config.Confi
 // - Configure stream broadcasting for WebSocket LLM streaming
 // - Override default handler behavior
 //
-// Note: budgetTracker and rateLimiter can be nil for simple setups or tests.
-func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *config.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger, registry *HandlerRegistry, budgetTracker BudgetTracker, rateLimiter RateLimiter) *WorkerPool {
+// Note: rateLimiter can be nil for simple setups or tests.
+func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *config.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger, registry *HandlerRegistry, rateLimiter RateLimiter) *WorkerPool {
 	// Validate config: PollInterval (if set) must be >= 0 (nil = gradual ramp-up, 0 = no polling, positive = fixed interval)
 	if poolCfg.PollInterval != nil && *poolCfg.PollInterval < 0 {
 		panic("WorkerPoolConfig.PollInterval must be >= 0")
@@ -166,7 +156,6 @@ func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *config.Conf
 
 	return &WorkerPool{
 		queue:         NewQueue(db),
-		budgetTracker: budgetTracker,
 		rateLimiter:   rateLimiter,
 		db:            db,
 		cfg:           cfg,
@@ -439,8 +428,8 @@ func (wp *WorkerPool) processNextJob() error {
 	}
 
 	// TODO(QNTX #70): Add system load check as third gate before job execution
-	// Current gates: (1) Rate limiting, (2) Budget checking
-	// Needed gate: (3) System resource availability
+	// Current gate: (1) Rate limiting
+	// Needed gate: (2) System resource availability
 	//
 	// INTEGRATION POINT for cooperative multi-process resource management:
 	//
@@ -475,8 +464,7 @@ func (wp *WorkerPool) processNextJob() error {
 	//
 	// See QNTX #70 for full multi-process coordination design
 
-	// Check rate limit BEFORE budget check
-	// Rate limiting prevents API violations, budget prevents cost overruns
+	// Rate limiting prevents API violations
 	if paused, err := wp.checkRateLimit(job); paused || err != nil {
 		if err != nil {
 			err = errors.Wrapf(err, "rate limit check failed for job %s", job.ID)
@@ -488,19 +476,7 @@ func (wp *WorkerPool) processNextJob() error {
 		return nil // Job paused, no error
 	}
 
-	// Check budget before processing
-	if paused, err := wp.checkBudget(job); paused || err != nil {
-		if err != nil {
-			err = errors.Wrapf(err, "budget check failed for job %s", job.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
-			err = errors.WithDetail(err, fmt.Sprintf("Estimated cost: $%.4f", job.CostEstimate))
-			return err
-		}
-		return nil // Job paused, no error
-	}
-
-	// Update pulse state with current rate/budget stats
+	// Update pulse state with current rate stats
 	wp.updateJobPulseState(job)
 
 	// Track job for gradual startup
@@ -620,7 +596,6 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	span.SetData("job.source", job.Source)
 	span.SetData("job.retry_count", job.RetryCount)
 	span.SetData("job.progress_total", job.Progress.Total)
-	span.SetData("job.cost_estimate", job.CostEstimate)
 	if job.ParentJobID != "" {
 		// The causality Stage 2 will carry as a real parent span. Until then it
 		// is an attribute you can filter a flat list by.
@@ -647,10 +622,9 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 }
 
 // finishJobSpan closes the span, reading the fields the handler moved while it
-// ran. Cost and progress are written through the same *Job the executor was
-// given, so they are only true once it has returned.
+// ran. Progress is written through the same *Job the executor was given, so it
+// is only true once it has returned.
 func (wp *WorkerPool) finishJobSpan(span *sentry.Span, job *Job) {
-	span.SetData("job.cost_actual", job.CostActual)
 	span.SetData("job.progress_current", job.Progress.Current)
 	span.Finish()
 }
@@ -693,65 +667,10 @@ func (wp *WorkerPool) checkRateLimit(job *Job) (paused bool, err error) {
 	return false, nil
 }
 
-// checkBudget verifies budget availability and pauses/fails the job if exceeded.
-// Returns true if job was paused or failed (caller should return), false to continue.
-func (wp *WorkerPool) checkBudget(job *Job) (paused bool, err error) {
-	// If no budget tracker configured, skip budget checks (tests, simple setups)
-	if wp.budgetTracker == nil {
-		return false, nil
-	}
-
-	estimatedCost := job.CostEstimate
-	if err := wp.budgetTracker.CheckBudget(estimatedCost); err != nil {
-		// Get budget status for detailed logging
-		status, statusErr := wp.budgetTracker.GetStatus()
-		if statusErr == nil {
-			// Calculate total limits from spend + remaining
-			dailyLimit := status.DailySpend + status.DailyRemaining
-			monthlyLimit := status.MonthlySpend + status.MonthlyRemaining
-
-			action := "failed"
-			if wp.poolConfig.PauseOnBudget {
-				action = "paused"
-			}
-			wp.logger.SugaredLogger.Infow("Budget exceeded - job "+action,
-				"job_id", job.ID,
-				"estimated_cost", estimatedCost,
-				"daily_spend", status.DailySpend,
-				"daily_limit", dailyLimit,
-				"monthly_spend", status.MonthlySpend,
-				"monthly_limit", monthlyLimit,
-				"daily_remaining", status.DailyRemaining,
-				"monthly_remaining", status.MonthlyRemaining,
-				"reason", "budget_exceeded")
-		}
-
-		if wp.poolConfig.PauseOnBudget {
-			if pauseErr := wp.queue.PauseJob(job.ID, "budget_exceeded"); pauseErr != nil {
-				pauseErr = errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
-				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Job ID: %s", job.ID))
-				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Handler: %s", job.HandlerName))
-				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Estimated cost: $%.4f", estimatedCost))
-				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Pause reason: budget_exceeded"))
-				return false, pauseErr
-			}
-			return true, nil
-		}
-		return true, wp.queue.FailJob(job.ID, err)
-	}
-	return false, nil
-}
-
-// updateJobPulseState updates the job with current rate limiter and budget stats.
+// updateJobPulseState updates the job with current rate limiter stats.
 func (wp *WorkerPool) updateJobPulseState(job *Job) {
-	// If no budget/rate tracking configured, skip pulse state updates (tests, simple setups)
-	if wp.budgetTracker == nil || wp.rateLimiter == nil {
-		return
-	}
-
-	status, err := wp.budgetTracker.GetStatus()
-	if err != nil {
-		wp.logger.SugaredLogger.Warnw("Failed to get budget status", "error", err)
+	// If no rate limiter is configured, skip pulse state updates (tests, simple setups)
+	if wp.rateLimiter == nil {
 		return
 	}
 
@@ -759,14 +678,11 @@ func (wp *WorkerPool) updateJobPulseState(job *Job) {
 	job.UpdatePulseState(&PulseState{
 		CallsThisMinute: callsInWindow,
 		CallsRemaining:  callsRemaining,
-		SpendToday:      status.DailySpend,
-		SpendThisMonth:  status.MonthlySpend,
-		BudgetRemaining: status.DailyRemaining,
 		IsPaused:        false,
 		PauseReason:     "",
 	})
 	if err := wp.queue.UpdateJob(job); err != nil {
-		wp.logger.SugaredLogger.Errorw("Job pulse state is stale; budget and rate numbers will not move",
+		wp.logger.SugaredLogger.Errorw("Job pulse state is stale; rate numbers will not move",
 			"job_id", job.ID, "error", err)
 	}
 }

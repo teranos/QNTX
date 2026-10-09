@@ -65,51 +65,6 @@ describe('UIState', () => {
         });
     });
 
-    describe('Budget Warning Management', () => {
-        test('budget warnings start false', () => {
-            const warnings = uiState.getBudgetWarnings();
-            expect(warnings.daily).toBe(false);
-            expect(warnings.weekly).toBe(false);
-            expect(warnings.monthly).toBe(false);
-        });
-
-        test('setBudgetWarning sets individual warnings', () => {
-            uiState.setBudgetWarning('daily', true);
-            expect(uiState.getBudgetWarnings().daily).toBe(true);
-            expect(uiState.getBudgetWarnings().weekly).toBe(false);
-
-            uiState.setBudgetWarning('weekly', true);
-            expect(uiState.getBudgetWarnings().weekly).toBe(true);
-        });
-
-        test('resetBudgetWarnings clears all warnings', () => {
-            uiState.setBudgetWarning('daily', true);
-            uiState.setBudgetWarning('weekly', true);
-            uiState.setBudgetWarning('monthly', true);
-
-            uiState.resetBudgetWarnings();
-
-            const warnings = uiState.getBudgetWarnings();
-            expect(warnings.daily).toBe(false);
-            expect(warnings.weekly).toBe(false);
-            expect(warnings.monthly).toBe(false);
-        });
-    });
-
-    describe('Usage View Management', () => {
-        test('default usage view is week', () => {
-            expect(uiState.getUsageView()).toBe('week');
-        });
-
-        test('setUsageView changes view mode', () => {
-            uiState.setUsageView('month');
-            expect(uiState.getUsageView()).toBe('month');
-
-            uiState.setUsageView('week');
-            expect(uiState.getUsageView()).toBe('week');
-        });
-    });
-
     describe('Graph Session Management', () => {
         test('graph session starts empty', () => {
             const session = uiState.getGraphSession();
@@ -154,21 +109,21 @@ describe('UIState', () => {
         test('subscribe receives updates for specific key', () => {
             const callback = mock(() => {});
 
-            uiState.subscribe('usageView', callback);
-            uiState.setUsageView('month');
+            uiState.subscribe('graphSession', callback);
+            uiState.setGraphQuery('i:Function');
 
-            expect(callback).toHaveBeenCalledWith('month', 'usageView');
+            expect(callback).toHaveBeenCalledWith({ query: 'i:Function' }, 'graphSession');
         });
 
         test('unsubscribe stops receiving updates', () => {
             const callback = mock(() => {});
 
-            const unsubscribe = uiState.subscribe('usageView', callback);
-            uiState.setUsageView('month');
+            const unsubscribe = uiState.subscribe('graphSession', callback);
+            uiState.setGraphQuery('i:Function');
             expect(callback).toHaveBeenCalledTimes(1);
 
             unsubscribe();
-            uiState.setUsageView('week');
+            uiState.setGraphQuery('i:Type');
             expect(callback).toHaveBeenCalledTimes(1); // Still 1, not 2
         });
 
@@ -177,7 +132,7 @@ describe('UIState', () => {
 
             uiState.subscribeAll(callback);
             uiState.setPanelVisible('config', true);
-            uiState.setUsageView('month');
+            uiState.setGraphQuery('i:Function');
 
             expect(callback).toHaveBeenCalledTimes(2);
         });
@@ -185,17 +140,17 @@ describe('UIState', () => {
 
     describe('State Access', () => {
         test('getState returns readonly state snapshot', () => {
-            uiState.setUsageView('month');
+            uiState.setGraphQuery('i:Function');
             const state = uiState.getState();
 
-            expect(state.usageView).toBe('month');
+            expect(state.graphSession.query).toBe('i:Function');
             expect(state.panels).toBeDefined();
             expect(state.lastUpdated).toBeGreaterThan(0);
         });
 
         test('get returns specific state value', () => {
-            uiState.setUsageView('month');
-            expect(uiState.get('usageView')).toBe('month');
+            uiState.setGraphQuery('i:Function');
+            expect(uiState.get('graphSession').query).toBe('i:Function');
         });
     });
 
@@ -205,18 +160,18 @@ describe('UIState', () => {
 
     describe('Reset', () => {
         test('reset restores default state', () => {
-            uiState.setUsageView('month');
+            uiState.setGraphQuery('i:Function');
             uiState.setPanelVisible('config', true);
 
             uiState.reset();
 
-            expect(uiState.getUsageView()).toBe('week');
+            expect(uiState.getGraphSession().query).toBeUndefined();
             expect(uiState.isPanelVisible('config')).toBe(false);
         });
 
         test('reset notifies all subscribers', () => {
             const callback = mock(() => {});
-            uiState.subscribe('usageView', callback);
+            uiState.subscribe('graphSession', callback);
 
             uiState.reset();
 

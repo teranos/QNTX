@@ -27,8 +27,8 @@ message Job {
   string source = 4;            // For deduplication and logging
   string status = 5;            // queued, running, paused, completed, failed, cancelled
   Progress progress = 6;
-  double cost_estimate = 7;
-  double cost_actual = 8;
+  reserved 7, 8;
+  reserved "cost_estimate", "cost_actual";
   PulseState pulse_state = 9;
   string error = 10;
   string parent_job_id = 11;
@@ -46,9 +46,8 @@ message Progress {
 message PulseState {
   int32 calls_this_minute = 1;
   int32 calls_remaining = 2;
-  double spend_today = 3;
-  double spend_this_month = 4;
-  double budget_remaining = 5;
+  reserved 3, 4, 5;
+  reserved "spend_today", "spend_this_month", "budget_remaining";
   bool is_paused = 6;
   string pause_reason = 7;
 }

@@ -14,7 +14,7 @@ func TestMarkSettingsFromSource(t *testing.T) {
 	t.Run("Flat settings", func(t *testing.T) {
 		settings := map[string]any{
 			"workers":                 1,
-			"daily_budget_usd":        3.0,
+			"cooldown_seconds":        3,
 			"ticker_interval_seconds": 1,
 		}
 
@@ -30,8 +30,8 @@ func TestMarkSettingsFromSource(t *testing.T) {
 	t.Run("Nested settings", func(t *testing.T) {
 		settings := map[string]any{
 			"pulse": map[string]any{
-				"workers":          1,
-				"daily_budget_usd": 3.0,
+				"workers":                 1,
+				"ticker_interval_seconds": 3,
 			},
 			"storage": map[string]any{
 				"sqlite": map[string]any{
@@ -45,7 +45,7 @@ func TestMarkSettingsFromSource(t *testing.T) {
 
 		// Verify dotted keys are created correctly
 		assert.Equal(t, SourceUser, ConfigSources["pulse.workers"].Source)
-		assert.Equal(t, SourceUser, ConfigSources["pulse.daily_budget_usd"].Source)
+		assert.Equal(t, SourceUser, ConfigSources["pulse.ticker_interval_seconds"].Source)
 		assert.Equal(t, SourceUser, ConfigSources["storage.sqlite.path"].Source)
 
 		// Verify all have correct source path
@@ -78,8 +78,8 @@ func TestFlattenSettingsWithSources(t *testing.T) {
 	t.Run("Basic flattening with source assignment", func(t *testing.T) {
 		settings := map[string]any{
 			"pulse": map[string]any{
-				"workers":          1,
-				"daily_budget_usd": 3.0,
+				"workers":                 1,
+				"ticker_interval_seconds": 3,
 			},
 		}
 
@@ -88,7 +88,7 @@ func TestFlattenSettingsWithSources(t *testing.T) {
 				Source: SourceUser,
 				Path:   "/home/user/.qntx/am.toml",
 			},
-			"pulse.daily_budget_usd": {
+			"pulse.ticker_interval_seconds": {
 				Source: SourceProject,
 				Path:   "/home/user/project/am.toml",
 			},
@@ -100,24 +100,24 @@ func TestFlattenSettingsWithSources(t *testing.T) {
 		assert.Len(t, introspection.Settings, 2)
 
 		// Find specific settings
-		var workersSetting, budgetSetting *SettingInfo
+		var workersSetting, tickerSetting *SettingInfo
 		for i := range introspection.Settings {
 			if introspection.Settings[i].Key == "pulse.workers" {
 				workersSetting = &introspection.Settings[i]
 			}
-			if introspection.Settings[i].Key == "pulse.daily_budget_usd" {
-				budgetSetting = &introspection.Settings[i]
+			if introspection.Settings[i].Key == "pulse.ticker_interval_seconds" {
+				tickerSetting = &introspection.Settings[i]
 			}
 		}
 
 		require.NotNil(t, workersSetting)
-		require.NotNil(t, budgetSetting)
+		require.NotNil(t, tickerSetting)
 
 		assert.Equal(t, SourceUser, workersSetting.Source)
 		assert.Equal(t, 1, workersSetting.Value)
 
-		assert.Equal(t, SourceProject, budgetSetting.Source)
-		assert.Equal(t, 3.0, budgetSetting.Value)
+		assert.Equal(t, SourceProject, tickerSetting.Source)
+		assert.Equal(t, 3, tickerSetting.Value)
 	})
 
 	t.Run("Environment variable override", func(t *testing.T) {
@@ -179,22 +179,22 @@ func TestBuildSourceMap(t *testing.T) {
 		// Create config file
 		configContent := `
 [pulse]
-daily_budget_usd = 3.0
+ticker_interval_seconds = 3
 workers = 1
 `
 		err := os.WriteFile(configPath, []byte(configContent), 0644)
 		require.NoError(t, err)
 
 		// Set environment variable
-		oldEnv := os.Getenv("QNTX_PULSE_DAILY_BUDGET_USD")
-		defer os.Setenv("QNTX_PULSE_DAILY_BUDGET_USD", oldEnv)
-		os.Setenv("QNTX_PULSE_DAILY_BUDGET_USD", "7.0")
+		oldEnv := os.Getenv("QNTX_PULSE_TICKER_INTERVAL_SECONDS")
+		defer os.Setenv("QNTX_PULSE_TICKER_INTERVAL_SECONDS", oldEnv)
+		os.Setenv("QNTX_PULSE_TICKER_INTERVAL_SECONDS", "7")
 
 		// Test environment variable override
 		settings := map[string]any{
 			"pulse": map[string]any{
-				"daily_budget_usd": 3.0,
-				"workers":          1,
+				"ticker_interval_seconds": 3,
+				"workers":                 1,
 			},
 		}
 
@@ -213,8 +213,8 @@ workers = 1
 		}
 
 		// Verify environment variable overrode file
-		assert.Equal(t, SourceEnvironment, ConfigSources["pulse.daily_budget_usd"].Source)
-		assert.Equal(t, "QNTX_PULSE_DAILY_BUDGET_USD", ConfigSources["pulse.daily_budget_usd"].Path)
+		assert.Equal(t, SourceEnvironment, ConfigSources["pulse.ticker_interval_seconds"].Source)
+		assert.Equal(t, "QNTX_PULSE_TICKER_INTERVAL_SECONDS", ConfigSources["pulse.ticker_interval_seconds"].Path)
 
 		// Verify non-env setting still has file source
 		assert.Equal(t, SourceUser, ConfigSources["pulse.workers"].Source)

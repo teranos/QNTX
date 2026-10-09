@@ -40,23 +40,9 @@ const (
 
 // cachedDaemonStatus tracks the last broadcast status to detect changes
 type cachedDaemonStatus struct {
-	activeJobs             int
-	queuedJobs             int
-	loadPercent            float64
-	budgetDaily            float64
-	budgetWeekly           float64
-	budgetMonthly          float64
-	budgetDailyAggregate   float64
-	budgetWeeklyAggregate  float64
-	budgetMonthlyAggregate float64
-}
-
-type cachedUsageStats struct {
-	totalCost float64
-	requests  int
-	success   int
-	tokens    int
-	models    int
+	activeJobs  int
+	queuedJobs  int
+	loadPercent float64
 }
 
 // QueryMessage represents a client message
@@ -101,18 +87,6 @@ type CompleteMessage struct {
 	Message string `json:"message"` // Completion message
 }
 
-// UsageUpdateMessage represents AI usage statistics update
-type UsageUpdateMessage struct {
-	Type      string  `json:"type"`       // "usage_update"
-	TotalCost float64 `json:"total_cost"` // Total cost in last 24h
-	Requests  int     `json:"requests"`   // Total requests
-	Success   int     `json:"success"`    // Successful requests
-	Tokens    int     `json:"tokens"`     // Total tokens used
-	Models    int     `json:"models"`     // Unique models used
-	Since     string  `json:"since"`      // Time period (e.g., "24h")
-	Timestamp int64   `json:"timestamp"`  // Unix timestamp
-}
-
 // JobUpdateMessage represents async IX job update
 type JobUpdateMessage struct {
 	Type     string         `json:"type"`                    // "job_update"
@@ -122,29 +96,13 @@ type JobUpdateMessage struct {
 
 // DaemonStatusMessage represents daemon status update
 type DaemonStatusMessage struct {
-	Type               string  `json:"type"`                 // "daemon_status"
-	Running            bool    `json:"running"`              // Is daemon running
-	ActiveJobs         int     `json:"active_jobs"`          // Number of active jobs
-	QueuedJobs         int     `json:"queued_jobs"`          // Number of queued jobs
-	LoadPercent        float64 `json:"load_percent"`         // CPU/processing load (0-100)
-	BudgetDaily        float64 `json:"budget_daily"`         // Daily budget spent
-	BudgetWeekly       float64 `json:"budget_weekly"`        // Weekly budget spent
-	BudgetMonthly      float64 `json:"budget_monthly"`       // Monthly budget spent
-	BudgetDailyLimit   float64 `json:"budget_daily_limit"`   // Daily budget limit (config)
-	BudgetWeeklyLimit  float64 `json:"budget_weekly_limit"`  // Weekly budget limit (config)
-	BudgetMonthlyLimit float64 `json:"budget_monthly_limit"` // Monthly budget limit (config)
-	// Aggregate spend (local + non-stale peers). Matches what CheckBudget() enforces.
-	// Falls back to local spend when no peers are configured.
-	BudgetDailyAggregate   float64 `json:"budget_daily_aggregate"`
-	BudgetWeeklyAggregate  float64 `json:"budget_weekly_aggregate"`
-	BudgetMonthlyAggregate float64 `json:"budget_monthly_aggregate"`
-	PeerCount              int     `json:"peer_count"` // Number of non-stale peers included
-	// Cluster limits (averaged across all nodes). 0 = not configured.
-	ClusterDailyLimit   float64 `json:"cluster_daily_limit"`
-	ClusterWeeklyLimit  float64 `json:"cluster_weekly_limit"`
-	ClusterMonthlyLimit float64 `json:"cluster_monthly_limit"`
-	ServerState         string  `json:"server_state"` // Opening/Closing Phase 4: "running", "draining", "stopped"
-	Timestamp           int64   `json:"timestamp"`    // Unix timestamp
+	Type        string  `json:"type"`         // "daemon_status"
+	Running     bool    `json:"running"`      // Is daemon running
+	ActiveJobs  int     `json:"active_jobs"`  // Number of active jobs
+	QueuedJobs  int     `json:"queued_jobs"`  // Number of queued jobs
+	LoadPercent float64 `json:"load_percent"` // CPU/processing load (0-100)
+	ServerState string  `json:"server_state"` // Opening/Closing Phase 4: "running", "draining", "stopped"
+	Timestamp   int64   `json:"timestamp"`    // Unix timestamp
 }
 
 // LLMStreamMessage represents streaming LLM output

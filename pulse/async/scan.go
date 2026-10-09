@@ -35,8 +35,6 @@ func GetJobScanTargets(job *Job, args *JobScanArgs) []any {
 		&job.Status,
 		&job.Progress.Current,
 		&job.Progress.Total,
-		&job.CostEstimate,
-		&job.CostActual,
 		&args.PulseStateJSON,
 		&args.ErrorMsg,
 		&args.ErrorDetailsJSON,
@@ -129,7 +127,6 @@ func ScanJobFromRows(rows *sql.Rows, job *Job) error {
 func StandardJobSelectColumns() string {
 	return `id, handler_name, source, status,
 		progress_current, progress_total,
-		cost_estimate, cost_actual,
 		pulse_state, error, error_details, payload,
 		parent_job_id, retry_count, plugin_version,
 		trace_context, trace_baggage,

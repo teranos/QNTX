@@ -55,14 +55,12 @@ func (s *QNTXServer) handleGetJobChildren(w http.ResponseWriter, r *http.Request
 		}
 
 		child := ChildJobInfo{
-			ID:           job.ID,
-			HandlerName:  job.HandlerName,
-			Source:       job.Source,
-			Status:       string(job.Status),
-			ProgressPct:  progressPct,
-			CostEstimate: job.CostEstimate,
-			CostActual:   job.CostActual,
-			CreatedAt:    job.CreatedAt.Format(time.RFC3339),
+			ID:          job.ID,
+			HandlerName: job.HandlerName,
+			Source:      job.Source,
+			Status:      string(job.Status),
+			ProgressPct: progressPct,
+			CreatedAt:   job.CreatedAt.Format(time.RFC3339),
 		}
 
 		if job.Error != "" {

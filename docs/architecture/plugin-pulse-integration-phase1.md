@@ -48,7 +48,7 @@ Phase 1 adds the protocol foundation for plugins to register async handlers with
      bytes result = 3;
      int32 progress_current = 4;
      int32 progress_total = 5;
-     double cost_actual = 6;
+     reserved 6;
    }
    ```
 

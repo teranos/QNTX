@@ -20,31 +20,28 @@ import (
 
 func TestNewJobWithPayload(t *testing.T) {
 	tests := []struct {
-		name          string
-		handlerName   string
-		source        string
-		totalOps      int
-		estimatedCost float64
-		wantErr       bool
-		description   string
+		name        string
+		handlerName string
+		source      string
+		totalOps    int
+		wantErr     bool
+		description string
 	}{
 		{
-			name:          "video rendering speedrun",
-			handlerName:   "test.video-renderer",
-			source:        "speedrun-footage-2024.mp4",
-			totalOps:      240,
-			estimatedCost: 0.480,
-			wantErr:       false,
-			description:   "TAS Bot queues 240 frames for rendering",
+			name:        "video rendering speedrun",
+			handlerName: "test.video-renderer",
+			source:      "speedrun-footage-2024.mp4",
+			totalOps:    240,
+			wantErr:     false,
+			description: "TAS Bot queues 240 frames for rendering",
 		},
 		{
-			name:          "batch data sync mission",
-			handlerName:   "test.batch-sync",
-			source:        "database:users",
-			totalOps:      5000,
-			estimatedCost: 1.250,
-			wantErr:       false,
-			description:   "TAS Bot syncs 5000 user records",
+			name:        "batch data sync mission",
+			handlerName: "test.batch-sync",
+			source:      "database:users",
+			totalOps:    5000,
+			wantErr:     false,
+			description: "TAS Bot syncs 5000 user records",
 		},
 	}
 
@@ -62,7 +59,7 @@ func TestNewJobWithPayload(t *testing.T) {
 				t.Fatalf("Failed to marshal payload: %v", err)
 			}
 
-			job, err := NewJobWithPayload(tt.handlerName, tt.source, payloadJSON, tt.totalOps, tt.estimatedCost, "tas-bot")
+			job, err := NewJobWithPayload(tt.handlerName, tt.source, payloadJSON, tt.totalOps, "tas-bot")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewJobWithPayload() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -87,9 +84,6 @@ func TestNewJobWithPayload(t *testing.T) {
 				if job.Progress.Total != tt.totalOps {
 					t.Errorf("Job progress.total = %v, want %v", job.Progress.Total, tt.totalOps)
 				}
-				if job.CostEstimate != tt.estimatedCost {
-					t.Errorf("Job cost_estimate = %v, want %v", job.CostEstimate, tt.estimatedCost)
-				}
 
 				t.Logf("✓ TAS Bot created mission with ASID: %s", job.ID)
 			}
@@ -101,7 +95,7 @@ func TestJobStateTransitions(t *testing.T) {
 	t.Log("🎮 TAS Bot: Testing job state machine transitions")
 	t.Log("   Mission: 'Render speedrun compilation video'")
 
-	job, err := createTestJob("test.video-renderer", "speedrun-frames.mp4", 100, 0.200)
+	job, err := createTestJob("test.video-renderer", "speedrun-frames.mp4", 100)
 	if err != nil {
 		t.Fatalf("TAS Bot failed to create mission: %v", err)
 	}
@@ -150,7 +144,7 @@ func TestJobFailure(t *testing.T) {
 	t.Log("🎮 TAS Bot: Testing mission failure handling")
 	t.Log("   Sometimes even TAS runs fail...")
 
-	job, err := createTestJob("test.file-processor", "corrupted-file.dat", 50, 0.100)
+	job, err := createTestJob("test.file-processor", "corrupted-file.dat", 50)
 	if err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
@@ -177,7 +171,7 @@ func TestProgressTracking(t *testing.T) {
 	t.Log("🎮 TAS Bot: Tracking mission progress frame-by-frame")
 	t.Log("   Mission: 'Process image batch - 60 frames'")
 
-	job, err := createTestJob("test.image-processor", "image-batch.zip", 60, 0.120)
+	job, err := createTestJob("test.image-processor", "image-batch.zip", 60)
 	if err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
@@ -212,40 +206,11 @@ func TestProgressTracking(t *testing.T) {
 	t.Log("  ✓ Progress: 60/60 frames (100%) - mission complete!")
 }
 
-func TestCostTracking(t *testing.T) {
-	t.Log("🎮 TAS Bot: Tracking mission costs (API calls, compute, etc.)")
-	t.Log("   Mission: 'Sync 1000 database records'")
-
-	job, err := createTestJob("test.db-sync", "db:records", 1000, 0.500)
-	if err != nil {
-		t.Fatalf("Failed to create job: %v", err)
-	}
-
-	if job.CostActual != 0.0 {
-		t.Errorf("Initial cost_actual = %v, want 0.0", job.CostActual)
-	}
-	t.Log("  Initial cost: $0.000")
-
-	// Record batch 1 cost
-	job.RecordCost(0.125)
-	if job.CostActual != 0.125 {
-		t.Errorf("After recording $0.125, cost_actual = %v, want 0.125", job.CostActual)
-	}
-	t.Log("  Batch 1 processed: $0.125 spent")
-
-	// Record batch 2 cost
-	job.RecordCost(0.125)
-	if job.CostActual != 0.250 {
-		t.Errorf("After recording another $0.125, cost_actual = %v, want 0.250", job.CostActual)
-	}
-	t.Log("  ✓ Batch 2 processed: $0.250 total spent")
-}
-
 func TestPulseState(t *testing.T) {
-	t.Log("🎮 TAS Bot: Testing Pulse state tracking (rate limits & budgets)")
+	t.Log("🎮 TAS Bot: Testing Pulse state tracking (rate limits)")
 	t.Log("   Mission: 'API batch processing with rate limits'")
 
-	job, err := createTestJob("test.api-batch", "api-batch", 100, 0.200)
+	job, err := createTestJob("test.api-batch", "api-batch", 100)
 	if err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
@@ -258,9 +223,6 @@ func TestPulseState(t *testing.T) {
 	pulseState := &PulseState{
 		CallsThisMinute: 45,
 		CallsRemaining:  15,
-		SpendToday:      2.50,
-		SpendThisMonth:  15.75,
-		BudgetRemaining: 84.25,
 		IsPaused:        false,
 	}
 
@@ -268,11 +230,10 @@ func TestPulseState(t *testing.T) {
 	if job.PulseState == nil {
 		t.Fatal("Pulse state should be set")
 	}
-	if job.PulseState.SpendToday != 2.50 {
-		t.Errorf("Pulse state spend_today = %v, want 2.50", job.PulseState.SpendToday)
+	if job.PulseState.CallsRemaining != 15 {
+		t.Errorf("Pulse state calls_remaining = %v, want 15", job.PulseState.CallsRemaining)
 	}
-	t.Logf("  ✓ Pulse state: %d calls this minute, $%.2f spent today",
-		job.PulseState.CallsThisMinute, job.PulseState.SpendToday)
+	t.Logf("  ✓ Pulse state: %d calls this minute", job.PulseState.CallsThisMinute)
 }
 
 func TestJobPayload(t *testing.T) {
@@ -292,7 +253,7 @@ func TestJobPayload(t *testing.T) {
 		t.Fatalf("Failed to marshal payload: %v", err)
 	}
 
-	job, err := NewJobWithPayload("test.video-renderer", "video-render", payloadJSON, 720, 1.440, "tas-bot")
+	job, err := NewJobWithPayload("test.video-renderer", "video-render", payloadJSON, 720, "tas-bot")
 	if err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
@@ -322,11 +283,8 @@ func TestMarshalUnmarshalPulseState(t *testing.T) {
 	original := &PulseState{
 		CallsThisMinute: 50,
 		CallsRemaining:  10,
-		SpendToday:      5.25,
-		SpendThisMonth:  47.80,
-		BudgetRemaining: 52.20,
 		IsPaused:        true,
-		PauseReason:     "budget_exceeded",
+		PauseReason:     "rate_limited",
 	}
 
 	// Marshal to JSON
@@ -345,8 +303,8 @@ func TestMarshalUnmarshalPulseState(t *testing.T) {
 		t.Fatalf("UnmarshalPulseState() error = %v", err)
 	}
 
-	if restored.SpendToday != original.SpendToday {
-		t.Errorf("Restored SpendToday = %v, want %v", restored.SpendToday, original.SpendToday)
+	if restored.CallsRemaining != original.CallsRemaining {
+		t.Errorf("Restored CallsRemaining = %v, want %v", restored.CallsRemaining, original.CallsRemaining)
 	}
 	if restored.IsPaused != original.IsPaused {
 		t.Errorf("Restored IsPaused = %v, want %v", restored.IsPaused, original.IsPaused)
@@ -364,7 +322,7 @@ func TestParentJobHierarchy(t *testing.T) {
 	t.Log("   Children: Individual frame rendering tasks")
 
 	// Create parent mission
-	parent, err := createTestJob("test.video-compiler", "video-compilation", 0, 0.0)
+	parent, err := createTestJob("test.video-compiler", "video-compilation", 0)
 	if err != nil {
 		t.Fatalf("Failed to create parent job: %v", err)
 	}
@@ -378,7 +336,7 @@ func TestParentJobHierarchy(t *testing.T) {
 		"source":            "frame-001.png",
 	}
 	taskPayloadJSON, _ := json.Marshal(taskPayload)
-	task, err := NewJobWithPayload("test.frame-renderer", "frame-001.png", taskPayloadJSON, 1, 0.002, "render-worker")
+	task, err := NewJobWithPayload("test.frame-renderer", "frame-001.png", taskPayloadJSON, 1, "render-worker")
 	if err != nil {
 		t.Fatalf("Failed to create task: %v", err)
 	}
@@ -410,7 +368,7 @@ func TestRetryLogic(t *testing.T) {
 	t.Log("🎮 TAS Bot: Testing mission retry logic")
 	t.Log("   Mission: 'API call with transient failures'")
 
-	job, err := createTestJob("test.api-caller", "api-endpoint", 1, 0.002)
+	job, err := createTestJob("test.api-caller", "api-endpoint", 1)
 	if err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
@@ -498,7 +456,7 @@ func TestTaskPayloads(t *testing.T) {
 			t.Logf("  Testing: %s", tt.description)
 
 			payloadJSON, _ := json.Marshal(tt.payload)
-			job, err := NewJobWithPayload(tt.handlerName, "test-source", payloadJSON, 1, 0.002, "test-system")
+			job, err := NewJobWithPayload(tt.handlerName, "test-source", payloadJSON, 1, "test-system")
 			if err != nil {
 				t.Fatalf("Failed to create job: %v", err)
 			}
@@ -517,13 +475,13 @@ func TestTaskPayloads(t *testing.T) {
 	}
 }
 
-// TestTaskAggregation tests aggregating costs and progress from child tasks
+// TestTaskAggregation tests aggregating progress from child tasks
 func TestTaskAggregation(t *testing.T) {
 	t.Log("🎮 TAS Bot: Testing mission aggregation (parent collects child stats)")
 	t.Log("   Mission: 'Process image batch' with 5 parallel workers")
 
 	// Create parent coordinator
-	parent, err := createTestJob("test.batch-coordinator", "image-batch", 0, 0.0)
+	parent, err := createTestJob("test.batch-coordinator", "image-batch", 0)
 	if err != nil {
 		t.Fatalf("Failed to create parent: %v", err)
 	}
@@ -542,7 +500,6 @@ func TestTaskAggregation(t *testing.T) {
 			fmt.Sprintf("image-%d.png", i),
 			payloadJSON,
 			1,
-			0.002,
 			"image-worker",
 		)
 		if err != nil {
@@ -555,19 +512,16 @@ func TestTaskAggregation(t *testing.T) {
 
 	// Simulate task execution
 	tasks[0].Complete()
-	tasks[0].RecordCost(0.0021)
-	t.Log("  Worker 0: Completed ($0.0021)")
+	t.Log("  Worker 0: Completed")
 
 	tasks[1].Complete()
-	tasks[1].RecordCost(0.0019)
-	t.Log("  Worker 1: Completed ($0.0019)")
+	t.Log("  Worker 1: Completed")
 
 	tasks[2].Fail(fmt.Errorf("corrupted image data"))
 	t.Log("  Worker 2: Failed (corrupted data)")
 
 	tasks[3].Complete()
-	tasks[3].RecordCost(0.0020)
-	t.Log("  Worker 3: Completed ($0.0020)")
+	t.Log("  Worker 3: Completed")
 
 	tasks[4].Start()
 	t.Log("  Worker 4: Still running...")
@@ -576,7 +530,6 @@ func TestTaskAggregation(t *testing.T) {
 	completedCount := 0
 	failedCount := 0
 	runningCount := 0
-	totalCost := 0.0
 
 	for _, task := range tasks {
 		if task.Status == JobStatusCompleted {
@@ -586,7 +539,6 @@ func TestTaskAggregation(t *testing.T) {
 		} else if task.Status == JobStatusRunning {
 			runningCount++
 		}
-		totalCost += task.CostActual
 	}
 
 	// Verify aggregation
@@ -600,22 +552,13 @@ func TestTaskAggregation(t *testing.T) {
 		t.Errorf("Running count = %v, want 1", runningCount)
 	}
 
-	expectedCost := 0.0021 + 0.0019 + 0.0020
-	if totalCost != expectedCost {
-		t.Errorf("Total cost = %v, want %v", totalCost, expectedCost)
-	}
-
 	// Update parent with aggregated data
 	parent.Progress.Total = len(tasks)
 	parent.Progress.Current = completedCount
-	parent.CostActual = totalCost
 
 	if parent.Progress.Current != 3 {
 		t.Errorf("Parent progress = %v, want 3", parent.Progress.Current)
 	}
-	if parent.CostActual != expectedCost {
-		t.Errorf("Parent cost = %v, want %v", parent.CostActual, expectedCost)
-	}
 
-	t.Logf("  ✓ Aggregation complete: 3/5 workers done, 1 failed, $%.4f spent", totalCost)
+	t.Log("  ✓ Aggregation complete: 3/5 workers done, 1 failed")
 }
