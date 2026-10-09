@@ -244,9 +244,10 @@ log_theme = "everforest"
 # Auth (WebAuthn / Passkeys)
 # ════════════════════════════════════════════════════════════════
 
-# [auth]
-# Biometric passkey gate. Required when server.bind_address is non-loopback.
-# enabled = false
+[auth]
+# Biometric passkey gate. Said, true or false: a node whose am.toml leaves it
+# out does not start. Required true when server.bind_address is non-loopback.
+enabled = false
 # session_expiry_hours = 168
 #
 # WebAuthn Relying Party ID and Origins. MUST be set for any public
@@ -280,8 +281,7 @@ log_theme = "everforest"
 # from. Not rp_origins — that is where the page is, and a deployment can serve
 # the page and the API on different hosts.
 
-# Unset, it is read off the request, which believes X-Forwarded-Host: whoever
-# sets that header chooses where the authorization code is delivered.
+# Unset, it is this machine's loopback origin; it is never read off a request.
 # public_origin = "https://api.qntx.example.com"
 
 # ── Front doors (ADR-032) ───────────────────────────────────────
