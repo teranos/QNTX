@@ -243,23 +243,26 @@ func TestParityFollowsIsEverySignumAndItsReferences(t *testing.T) {
 	if refused != nil {
 		t.Fatalf("follows refused: %s", refused.GetSays())
 	}
-	rows := answer.([]map[string]any)
-	byName := map[string]map[string]any{}
-	for _, row := range rows {
-		byName[row["signum"].(string)] = row
+	followed, held := answer.(*protocol.ParityFollowed)
+	if !held {
+		t.Fatalf("follows answered %T", answer)
+	}
+	byName := map[string]*protocol.SignumFollowed{}
+	for _, row := range followed.GetSigna() {
+		byName[row.GetSignum()] = row
 	}
 	staands, ok := byName["staands"]
 	if !ok {
-		t.Fatalf("follows has no staands: %v", rows)
+		t.Fatalf("follows has no staands: %v", followed.GetSigna())
 	}
-	if strings.Join(staands["declares"].([]string), " ") != "umami" {
-		t.Errorf("staands declares %v", staands["declares"])
+	if strings.Join(staands.GetDeclares(), " ") != "umami" {
+		t.Errorf("staands declares %v", staands.GetDeclares())
 	}
-	if strings.Join(staands["by_shape"].([]string), " ") != "a2a mcp" {
-		t.Errorf("by its shape staands follows %v", staands["by_shape"])
+	if strings.Join(staands.GetByShape(), " ") != "a2a mcp" {
+		t.Errorf("by its shape staands follows %v", staands.GetByShape())
 	}
-	if len(byName["parity"]["declares"].([]string)) != 0 {
-		t.Errorf("parity declares %v", byName["parity"]["declares"])
+	if len(byName["parity"].GetDeclares()) != 0 {
+		t.Errorf("parity declares %v", byName["parity"].GetDeclares())
 	}
 	holds(t, signum, "follows", answer)
 }

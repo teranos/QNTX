@@ -548,6 +548,22 @@ message StoredThing {
   repeated string sites = 5;
 }
 
+// SignumFollowed is one signum, and the references it can be held to.
+message SignumFollowed {
+  // The signum, by name.
+  string signum = 1;
+  // The references it declares it follows.
+  repeated string declares = 2;
+  // The references every signum follows by its shape.
+  repeated string by_shape = 3;
+}
+
+// ParityFollowed is what parity follows answers.
+message ParityFollowed {
+  // Every signum the node serves.
+  repeated SignumFollowed signa = 1;
+}
+
 // ParityStorage is what parity storage answers.
 message ParityStorage {
   // What was read: source, the code this build was made from, and never this
