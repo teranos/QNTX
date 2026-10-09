@@ -75,11 +75,10 @@ func shipping(t *testing.T, rate float64) *heldTransport {
 	return held
 }
 
-// countingHandler is a handler that runs, spends, and reports progress — the
-// three things the span is supposed to carry out of it.
+// countingHandler is a handler that runs and reports progress — the two things
+// the span is supposed to carry out of it.
 type countingHandler struct {
 	name string
-	cost float64
 	done int
 	err  error
 }
@@ -87,7 +86,6 @@ type countingHandler struct {
 func (h *countingHandler) Name() string { return h.name }
 
 func (h *countingHandler) Execute(ctx context.Context, job *Job) error {
-	job.RecordCost(h.cost)
 	job.UpdateProgress(h.done)
 	return h.err
 }
@@ -109,8 +107,7 @@ func poolWith(t *testing.T, handler JobHandler) *WorkerPool {
 		WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1, PollInterval: &noPolling},
 		createTestLogger(),
 		registry,
-		nil, // no budget tracker: the budget gate is not what these tests are about
-		nil, // no rate limiter, same reason
+		nil, // no rate limiter: the rate gate is not what these tests are about
 	)
 	return pool
 }
@@ -119,7 +116,7 @@ func poolWith(t *testing.T, handler JobHandler) *WorkerPool {
 func enqueue(t *testing.T, pool *WorkerPool, handlerName string) *Job {
 	t.Helper()
 
-	job, err := createTestJob(handlerName, "span-test", 10, 0.25)
+	job, err := createTestJob(handlerName, "span-test", 10)
 	if err != nil {
 		t.Fatalf("could not build a job: %v", err)
 	}
@@ -201,12 +198,12 @@ func TestTheTransactionCarriesADuration(t *testing.T) {
 	}
 }
 
-// Cost and progress are written through the *Job the handler was given, so a
-// span that read them at the start would ship zeros.
-func TestCostAndProgressAreReadAfterTheHandlerRan(t *testing.T) {
+// Progress is written through the *Job the handler was given, so a span that
+// read it at the start would ship zeros.
+func TestProgressIsReadAfterTheHandlerRan(t *testing.T) {
 	held := shipping(t, 1.0)
-	pool := poolWith(t, &countingHandler{name: "spendy", cost: 1.50, done: 7})
-	job := enqueue(t, pool, "spendy")
+	pool := poolWith(t, &countingHandler{name: "progressing", done: 7})
+	job := enqueue(t, pool, "progressing")
 
 	if err := pool.processNextJob(); err != nil {
 		t.Fatalf("processNextJob: %v", err)
@@ -218,17 +215,11 @@ func TestCostAndProgressAreReadAfterTheHandlerRan(t *testing.T) {
 	}
 
 	data := traceData(t, shipped[0])
-	if data["job.cost_actual"] != 1.50 {
-		t.Errorf("cost_actual is %v, want 1.5 — read before the handler spent it", data["job.cost_actual"])
-	}
 	if data["job.progress_current"] != 7 {
-		t.Errorf("progress_current is %v, want 7", data["job.progress_current"])
+		t.Errorf("progress_current is %v, want 7 — read before the handler moved it", data["job.progress_current"])
 	}
 	if data["messaging.message.id"] != job.ID {
 		t.Errorf("the transaction names job %v, not %s", data["messaging.message.id"], job.ID)
-	}
-	if data["job.cost_estimate"] != 0.25 {
-		t.Errorf("cost_estimate is %v, want 0.25", data["job.cost_estimate"])
 	}
 }
 

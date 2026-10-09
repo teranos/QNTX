@@ -26,7 +26,6 @@ type JobHandler interface {
 	// The handler should:
 	// - Decode job.Payload into handler-specific struct
 	// - Update job.Progress as work proceeds
-	// - Set job.CostActual if tracking costs
 	// - Return nil on success, error on failure
 	//
 	// Context cancellation: Handlers MUST check ctx.Done() periodically

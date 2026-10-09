@@ -13,10 +13,7 @@
     "sqlite": true,
     "duckdb": false,
     "rebuilt": false,
-    "sites": [
-      "ai/tracker/usage_tracker.go",
-      "pulse/budget/store.go"
-    ]
+    "sites": []
   },
   {
     "name": "aliases",

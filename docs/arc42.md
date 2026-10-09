@@ -153,7 +153,6 @@ Architecture deep-dives:
 - [Two-Phase Jobs](architecture/two-phase-jobs.md)
 - [Resource Coordination](architecture/pulse-resource-coordination.md)
 - [Client State](architecture/client-state-storage.md)
-- [Budget System](architecture/budget-tracking.md)
 - [Plugin-Pulse Integration](architecture/plugin-pulse-integration.md)
 
 Type system: the [.proto files](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/), which every language generates from (ADR-006)
@@ -168,7 +167,7 @@ Key runtime flows:
 assert → store → index → notify watchers → trigger downstream elements
 
 **꩜ Pulse execution:**
-schedule tick → resource check → job dispatch → worker execution → result → budget tracking
+schedule tick → resource check → job dispatch → worker execution → result
 
 **Element meld DAG:**
 meld detection → edge creation → subscription activates → attestation arrives → downstream element fires

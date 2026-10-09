@@ -30,13 +30,7 @@ func TestGRACEShutdownFlow(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 
 	// Create test config
-	cfg := &config.Config{
-		Pulse: config.PulseConfig{
-			DailyBudgetUSD:   10.0,
-			MonthlyBudgetUSD: 100.0,
-			CostPerScoreUSD:  0.002,
-		},
-	}
+	cfg := &config.Config{}
 
 	// Create parent context that we'll cancel (simulates server shutdown)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -45,9 +39,8 @@ func TestGRACEShutdownFlow(t *testing.T) {
 	// Create worker pool with parent context and fast polling for tests
 	pollInterval := 100 * time.Millisecond
 	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff,
-		Workers:       1,
-		PauseOnBudget: false,
-		PollInterval:  &pollInterval, // Fast polling for tests
+		Workers:      1,
+		PollInterval: &pollInterval, // Fast polling for tests
 	}, zap.NewNop().Sugar())
 
 	// Register a mock handler for protein sequence analysis (generic bioinformatics job)
@@ -73,8 +66,7 @@ func TestGRACEShutdownFlow(t *testing.T) {
 		"test.grace-handler",
 		jobDesc,
 		payloadJSON,
-		10,  // total operations
-		0.1, // estimated cost
+		10, // total operations
 		"grace-test",
 	)
 	if err != nil {
@@ -141,7 +133,7 @@ func TestGRACEOrphanRecovery(t *testing.T) {
 	queue := NewQueue(db)
 
 	// Simulate crash: Create jobs in "running" state (orphaned)
-	job1, err := createTestJob("test.grace-handler", "orphaned job 1", 5, 0.01)
+	job1, err := createTestJob("test.grace-handler", "orphaned job 1", 5)
 	if err != nil {
 		t.Fatalf("Failed to create job1: %v", err)
 	}
@@ -150,7 +142,7 @@ func TestGRACEOrphanRecovery(t *testing.T) {
 		t.Fatalf("Failed to store job1: %v", err)
 	}
 
-	job2, err := createTestJob("test.grace-handler", "orphaned job 2", 5, 0.01)
+	job2, err := createTestJob("test.grace-handler", "orphaned job 2", 5)
 	if err != nil {
 		t.Fatalf("Failed to create job2: %v", err)
 	}
@@ -200,7 +192,7 @@ func TestGRACECrashAndRestart(t *testing.T) {
 	wp1 := NewWorkerPoolWithContext(ctx1, db, cfg, WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}, zap.NewNop().Sugar())
 	wp1.Start()
 
-	job, err := createTestJob("test.grace-handler", "crash test", 5, 0.01)
+	job, err := createTestJob("test.grace-handler", "crash test", 5)
 	if err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
@@ -251,7 +243,7 @@ func TestGRACEChildTasksPreserved(t *testing.T) {
 		"actor":  "test-actor",
 	}
 	payloadJSON, _ := json.Marshal(payload)
-	parentJob, err := NewJobWithPayload("test.grace-handler", "parent with children", payloadJSON, 5, 0.01, "test-actor")
+	parentJob, err := NewJobWithPayload("test.grace-handler", "parent with children", payloadJSON, 5, "test-actor")
 	if err != nil {
 		t.Fatalf("Failed to create parent job: %v", err)
 	}
@@ -267,7 +259,7 @@ func TestGRACEChildTasksPreserved(t *testing.T) {
 			"actor":  "test-actor",
 		}
 		childPayloadJSON, _ := json.Marshal(childPayload)
-		childTask, err := NewJobWithPayload("test.child-handler", fmt.Sprintf("scoring task %d", i), childPayloadJSON, 1, 0.001, "test-actor")
+		childTask, err := NewJobWithPayload("test.child-handler", fmt.Sprintf("scoring task %d", i), childPayloadJSON, 1, "test-actor")
 		if err != nil {
 			t.Fatalf("Failed to create child task %d: %v", i, err)
 		}

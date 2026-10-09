@@ -35,7 +35,6 @@ func TestTASBotCreatesJob(t *testing.T) {
 		Source:      "speedrun_checkpoint.html",
 		Status:      "queued",
 
-		CostEstimate: 0.15,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
@@ -65,7 +64,6 @@ func TestKirbyRetrievesJob(t *testing.T) {
 		Source:      "kirby_checkpoint.html",
 		Status:      "queued",
 
-		CostEstimate: 0.20,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
@@ -108,7 +106,6 @@ func TestTASBotUpdatesJob(t *testing.T) {
 		Source:      "update_test.html",
 		Status:      "queued",
 
-		CostEstimate: 0.10,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 		Progress:     Progress{Current: 0, Total: 100},
@@ -150,10 +147,10 @@ func TestKirbyListsJobs(t *testing.T) {
 
 	// TAS Bot creates multiple save states
 	jobs := []*Job{
-		{ID: "JOB_LIST_001", HandlerName: "test.weather-sensor", Source: "station-1.dat", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_LIST_002", HandlerName: "test.weather-sensor", Source: "station-2.dat", Status: "running", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_LIST_003", HandlerName: "test.weather-sensor", Source: "station-3.dat", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_LIST_004", HandlerName: "test.weather-sensor", Source: "station-4.dat", Status: "completed", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_LIST_001", HandlerName: "test.weather-sensor", Source: "station-1.dat", Status: "queued", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_LIST_002", HandlerName: "test.weather-sensor", Source: "station-2.dat", Status: "running", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_LIST_003", HandlerName: "test.weather-sensor", Source: "station-3.dat", Status: "queued", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_LIST_004", HandlerName: "test.weather-sensor", Source: "station-4.dat", Status: "completed", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 	}
 
 	for _, job := range jobs {
@@ -185,10 +182,10 @@ func TestTASBotListsActiveJobs(t *testing.T) {
 
 	// Create various save states
 	jobs := []*Job{
-		{ID: "JOB_ACTIVE_001", HandlerName: "test.weather-sensor", Source: "sensor-1.dat", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_ACTIVE_002", HandlerName: "test.weather-sensor", Source: "sensor-2.dat", Status: "running", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_ACTIVE_003", HandlerName: "test.weather-sensor", Source: "sensor-3.dat", Status: "completed", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_ACTIVE_004", HandlerName: "test.weather-sensor", Source: "sensor-4.dat", Status: "running", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_ACTIVE_001", HandlerName: "test.weather-sensor", Source: "sensor-1.dat", Status: "queued", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_ACTIVE_002", HandlerName: "test.weather-sensor", Source: "sensor-2.dat", Status: "running", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_ACTIVE_003", HandlerName: "test.weather-sensor", Source: "sensor-3.dat", Status: "completed", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_ACTIVE_004", HandlerName: "test.weather-sensor", Source: "sensor-4.dat", Status: "running", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 	}
 
 	for _, job := range jobs {
@@ -225,7 +222,6 @@ func TestKirbyDeletesJob(t *testing.T) {
 		Source:      "delete_me.html",
 		Status:      "failed",
 
-		CostEstimate: 0.10,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
@@ -262,7 +258,6 @@ func TestTASBotParentJobHierarchy(t *testing.T) {
 		Source:      "parent.html",
 		Status:      "running",
 
-		CostEstimate: 0.50,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
@@ -270,9 +265,9 @@ func TestTASBotParentJobHierarchy(t *testing.T) {
 
 	// Create child task save states
 	childJobs := []*Job{
-		{ID: "JOB_CHILD_001", ParentJobID: "JOB_PARENT_001", HandlerName: "test.task", Source: "task1", Status: "completed", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_CHILD_002", ParentJobID: "JOB_PARENT_001", HandlerName: "test.task", Source: "task2", Status: "running", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_CHILD_003", ParentJobID: "JOB_PARENT_001", HandlerName: "test.task", Source: "task3", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_CHILD_001", ParentJobID: "JOB_PARENT_001", HandlerName: "test.task", Source: "task1", Status: "completed", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_CHILD_002", ParentJobID: "JOB_PARENT_001", HandlerName: "test.task", Source: "task2", Status: "running", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_CHILD_003", ParentJobID: "JOB_PARENT_001", HandlerName: "test.task", Source: "task3", Status: "queued", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 	}
 
 	for _, child := range childJobs {
@@ -306,9 +301,9 @@ func TestCronosCleanupOldJobs(t *testing.T) {
 	recentTime := time.Now().Add(-1 * time.Hour)
 
 	oldJobs := []*Job{
-		{ID: "JOB_OLD_001", HandlerName: "test.weather-sensor", Source: "archive-1.dat", Status: "completed", CostEstimate: 0.10, CreatedAt: oldTime, UpdatedAt: oldTime},
-		{ID: "JOB_OLD_002", HandlerName: "test.weather-sensor", Source: "archive-2.dat", Status: "failed", CostEstimate: 0.10, CreatedAt: oldTime, UpdatedAt: oldTime},
-		{ID: "JOB_RECENT_001", HandlerName: "test.weather-sensor", Source: "recent.dat", Status: "completed", CostEstimate: 0.10, CreatedAt: recentTime, UpdatedAt: recentTime},
+		{ID: "JOB_OLD_001", HandlerName: "test.weather-sensor", Source: "archive-1.dat", Status: "completed", CreatedAt: oldTime, UpdatedAt: oldTime},
+		{ID: "JOB_OLD_002", HandlerName: "test.weather-sensor", Source: "archive-2.dat", Status: "failed", CreatedAt: oldTime, UpdatedAt: oldTime},
+		{ID: "JOB_RECENT_001", HandlerName: "test.weather-sensor", Source: "recent.dat", Status: "completed", CreatedAt: recentTime, UpdatedAt: recentTime},
 	}
 
 	for _, job := range oldJobs {
@@ -347,9 +342,6 @@ func TestKirbyPulseStateStorage(t *testing.T) {
 	pulseState := &PulseState{
 		CallsThisMinute: 10,
 		CallsRemaining:  50,
-		SpendToday:      0.75,
-		SpendThisMonth:  5.20,
-		BudgetRemaining: 4.25,
 		IsPaused:        false,
 		PauseReason:     "",
 	}
@@ -360,7 +352,6 @@ func TestKirbyPulseStateStorage(t *testing.T) {
 		Source:      "pulse_test.html",
 		Status:      "running",
 
-		CostEstimate: 0.10,
 		PulseState:   pulseState,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -385,8 +376,8 @@ func TestKirbyPulseStateStorage(t *testing.T) {
 		t.Errorf("Kirby expected 10 calls, got %d", retrieved.PulseState.CallsThisMinute)
 	}
 
-	if retrieved.PulseState.SpendToday != 0.75 {
-		t.Errorf("Kirby expected $0.75 spend, got $%.2f", retrieved.PulseState.SpendToday)
+	if retrieved.PulseState.CallsRemaining != 50 {
+		t.Errorf("Kirby expected 50 calls remaining, got %d", retrieved.PulseState.CallsRemaining)
 	}
 
 	t.Log("✓ Kirby successfully stored and retrieved Pulse state")
@@ -410,7 +401,6 @@ func TestTASBotAndKirbyStoreIntegration(t *testing.T) {
 		Source:      "integration_test.html",
 		Status:      "queued",
 
-		CostEstimate: 0.25,
 		Progress:     Progress{Current: 0, Total: 100},
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),

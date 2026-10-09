@@ -529,12 +529,6 @@
         "SUPER"
       ]
     },
-    "/api/timeseries/usage": {
-      "x-qntx-reach": [
-        "ROOT",
-        "SUPER"
-      ]
-    },
     "/api/transcripts": {
       "x-qntx-reach": [
         "ROOT",

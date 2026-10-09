@@ -2,9 +2,8 @@ package server
 
 // This file contains broadcasting and daemon management functionality for QNTXServer.
 // It handles real-time updates to WebSocket clients for:
-// - Usage statistics (AI model usage costs)
 // - Job updates (async IX job progress)
-// - Daemon status (worker pool activity, budget tracking)
+// - Daemon status (worker pool activity)
 //
 // Architecture: Dedicated broadcast worker goroutine
 // All client channel sends go through a single worker goroutine to eliminate
@@ -33,7 +32,7 @@ type audience struct {
 type audienceKind int
 
 const (
-	// aboutTheNode is the node's daemon, plugins and spend: the same fact in
+	// aboutTheNode is the node's daemon and plugins: the same fact in
 	// every universe, so every client hears it.
 	aboutTheNode audienceKind = iota + 1
 	inNamespace
@@ -81,7 +80,7 @@ type broadcastRequest struct {
 
 // broadcastMessage sends a message to all connected clients.
 //
-// What is said here is about the node — its daemon, its plugins, its spend —
+// What is said here is about the node — its daemon, its plugins —
 // and is the same fact whichever universe the reader is in. Anything that came
 // out of one namespace goes through broadcastIn.
 func (s *QNTXServer) broadcastMessage(msg any) {
@@ -108,71 +107,6 @@ func (s *QNTXServer) queueBroadcast(req *broadcastRequest) {
 	case <-s.ctx.Done():
 		// Server shutting down
 	}
-}
-
-func (s *QNTXServer) broadcastUsageUpdate() {
-	since := time.Now().Add(-24 * time.Hour)
-	stats, err := s.usageTracker.GetUsageStats(since)
-	if err != nil {
-		s.logger.Debugw("Failed to get usage stats",
-			"error", err.Error(),
-		)
-		return
-	}
-	// Check if usage has changed since last broadcast (with lock for lastUsage access)
-	s.mu.Lock()
-	if !s.usageHasChangedLocked(stats.TotalCost, stats.TotalRequests, stats.SuccessfulRequests, stats.TotalTokens, stats.UniqueModels) {
-		s.mu.Unlock()
-		return // Skip broadcast if nothing changed
-	}
-	// Update cached usage (still under lock)
-	s.lastUsage = &cachedUsageStats{
-		totalCost: stats.TotalCost,
-		requests:  stats.TotalRequests,
-		success:   stats.SuccessfulRequests,
-		tokens:    stats.TotalTokens,
-		models:    stats.UniqueModels,
-	}
-	s.mu.Unlock()
-	msg := UsageUpdateMessage{
-		Type:      "usage_update",
-		TotalCost: stats.TotalCost,
-		Requests:  stats.TotalRequests,
-		Success:   stats.SuccessfulRequests,
-		Tokens:    stats.TotalTokens,
-		Models:    stats.UniqueModels,
-		Since:     "24h",
-		Timestamp: time.Now().Unix(),
-	}
-	s.broadcastMessage(msg)
-}
-
-// startUsageUpdateTicker starts a periodic usage update broadcaster
-func (s *QNTXServer) startUsageUpdateTicker() {
-	ticker := time.NewTicker(500 * time.Millisecond) // Update every 0.5s for real-time UI
-	s.wg.Go("broadcast.usageUpdate", func() {
-		defer ticker.Stop()
-
-		// Send initial update
-		s.broadcastUsageUpdate()
-
-		for {
-			select {
-			case <-s.ctx.Done():
-				s.logger.Debugw("Usage update ticker stopping due to context cancellation")
-				return
-			case <-ticker.C:
-				// Only send updates if there are connected clients
-				s.mu.RLock()
-				hasClients := len(s.clients) > 0
-				s.mu.RUnlock()
-
-				if hasClients {
-					s.broadcastUsageUpdate()
-				}
-			}
-		}
-	})
 }
 
 // startJobUpdateBroadcaster subscribes to job queue updates and broadcasts them to WebSocket clients
@@ -435,71 +369,28 @@ func (s *QNTXServer) broadcastDaemonStatus() {
 		loadPercent = 100
 	}
 
-	// Get actual budget spend from ai_model_usage table
-	var budgetDaily, budgetWeekly, budgetMonthly float64
-	budgetStatus, err := s.budgetTracker.GetStatus()
-	if err != nil {
-		s.logger.Errorw("Budget status unavailable; the panel will show no spend rather than zero spend", "error", err)
-		// Continue with zeros on error
-		budgetDaily = 0.0
-		budgetWeekly = 0.0
-		budgetMonthly = 0.0
-	} else {
-		budgetDaily = budgetStatus.DailySpend
-		budgetWeekly = budgetStatus.WeeklySpend
-		budgetMonthly = budgetStatus.MonthlySpend
-	}
-
-	// Compute aggregate spend (local + non-stale peers) — matches CheckBudget() enforcement
-	aggDaily, aggWeekly, aggMonthly, peerCount := s.budgetTracker.AggregateSpend(budgetDaily, budgetWeekly, budgetMonthly)
-
 	// Check if status has changed meaningfully (with lock for lastStatus access)
 	s.mu.Lock()
-	if !s.statusHasChangedLocked(activeJobs, stats.Queued, loadPercent, budgetDaily, budgetWeekly, budgetMonthly, aggDaily, aggWeekly, aggMonthly) {
+	if !s.statusHasChangedLocked(activeJobs, stats.Queued, loadPercent) {
 		s.mu.Unlock()
 		return // Skip broadcast if nothing changed
 	}
 
 	// Update cached status (still under lock)
 	s.lastStatus = &cachedDaemonStatus{
-		activeJobs:             activeJobs,
-		queuedJobs:             stats.Queued,
-		loadPercent:            loadPercent,
-		budgetDaily:            budgetDaily,
-		budgetWeekly:           budgetWeekly,
-		budgetMonthly:          budgetMonthly,
-		budgetDailyAggregate:   aggDaily,
-		budgetWeeklyAggregate:  aggWeekly,
-		budgetMonthlyAggregate: aggMonthly,
+		activeJobs:  activeJobs,
+		queuedJobs:  stats.Queued,
+		loadPercent: loadPercent,
 	}
 	s.mu.Unlock()
 
-	// Get budget limits from tracker config
-	budgetLimits := s.budgetTracker.GetBudgetLimits()
-
-	// Get cluster limits (averaged across nodes)
-	clusterDaily, clusterWeekly, clusterMonthly, _ := s.budgetTracker.ClusterLimits()
-
 	msg := DaemonStatusMessage{
-		Type:                   "daemon_status",
-		Running:                true, // Daemon is running if this function is called
-		ActiveJobs:             activeJobs,
-		QueuedJobs:             stats.Queued,
-		LoadPercent:            loadPercent,
-		BudgetDaily:            budgetDaily,
-		BudgetWeekly:           budgetWeekly,
-		BudgetMonthly:          budgetMonthly,
-		BudgetDailyLimit:       budgetLimits.DailyBudgetUSD,
-		BudgetWeeklyLimit:      budgetLimits.WeeklyBudgetUSD,
-		BudgetMonthlyLimit:     budgetLimits.MonthlyBudgetUSD,
-		BudgetDailyAggregate:   aggDaily,
-		BudgetWeeklyAggregate:  aggWeekly,
-		BudgetMonthlyAggregate: aggMonthly,
-		PeerCount:              peerCount,
-		ClusterDailyLimit:      clusterDaily,
-		ClusterWeeklyLimit:     clusterWeekly,
-		ClusterMonthlyLimit:    clusterMonthly,
-		Timestamp:              time.Now().Unix(),
+		Type:        "daemon_status",
+		Running:     true, // Daemon is running if this function is called
+		ActiveJobs:  activeJobs,
+		QueuedJobs:  stats.Queued,
+		LoadPercent: loadPercent,
+		Timestamp:   time.Now().Unix(),
 	}
 
 	s.broadcastMessage(msg)
@@ -555,24 +446,9 @@ func (s *QNTXServer) getIntervalForActivityState(state DaemonState) time.Duratio
 	}
 }
 
-// usageHasChangedLocked checks if usage stats have meaningfully changed since last broadcast.
-// REQUIRES: s.mu must be held by caller.
-func (s *QNTXServer) usageHasChangedLocked(totalCost float64, requests, success int, tokens int, models int) bool {
-	if s.lastUsage == nil {
-		return true // First broadcast always sends
-	}
-
-	// Check for any changes (usage stats change infrequently, so broadcast any change)
-	return s.lastUsage.totalCost != totalCost ||
-		s.lastUsage.requests != requests ||
-		s.lastUsage.success != success ||
-		s.lastUsage.tokens != tokens ||
-		s.lastUsage.models != models
-}
-
 // statusHasChangedLocked checks if the daemon status has meaningfully changed since last broadcast.
 // REQUIRES: s.mu must be held by caller.
-func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPercent, budgetDaily, budgetWeekly, budgetMonthly, aggDaily, aggWeekly, aggMonthly float64) bool {
+func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPercent float64) bool {
 	if s.lastStatus == nil {
 		return true // First broadcast always sends
 	}
@@ -580,13 +456,7 @@ func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPerc
 	// Check for significant changes
 	return s.lastStatus.activeJobs != activeJobs ||
 		s.lastStatus.queuedJobs != queuedJobs ||
-		absDiff(s.lastStatus.loadPercent, loadPercent) > 1.0 || // 1% tolerance
-		absDiff(s.lastStatus.budgetDaily, budgetDaily) > 0.01 ||
-		absDiff(s.lastStatus.budgetWeekly, budgetWeekly) > 0.01 ||
-		absDiff(s.lastStatus.budgetMonthly, budgetMonthly) > 0.01 ||
-		absDiff(s.lastStatus.budgetDailyAggregate, aggDaily) > 0.01 ||
-		absDiff(s.lastStatus.budgetWeeklyAggregate, aggWeekly) > 0.01 ||
-		absDiff(s.lastStatus.budgetMonthlyAggregate, aggMonthly) > 0.01
+		absDiff(s.lastStatus.loadPercent, loadPercent) > 1.0 // 1% tolerance
 }
 
 // absDiff returns the absolute difference between two float64 values

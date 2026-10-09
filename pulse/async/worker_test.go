@@ -24,13 +24,7 @@ import (
 
 // createTestConfig creates a minimal config for testing
 func createTestConfig() *config.Config {
-	return &config.Config{
-		Pulse: config.PulseConfig{
-			DailyBudgetUSD:   10.0,
-			MonthlyBudgetUSD: 100.0,
-			CostPerScoreUSD:  0.01,
-		},
-	}
+	return &config.Config{}
 }
 
 // createTestLogger creates a no-op logger for testing
@@ -441,39 +435,4 @@ func TestCronosCheckRateLimitWithNilLimiter(t *testing.T) {
 
 	t.Log("✓ Cronos allows job through when no rate limit configured")
 	t.Log("  'Time flows unimpeded!'")
-}
-
-// TestCronosCheckBudgetWithNilTracker tests that checkBudget handles nil tracker gracefully
-func TestCronosCheckBudgetWithNilTracker(t *testing.T) {
-	t.Log("💰 Cronos tests budget enforcement with no tracker...")
-	t.Log("   'When there is no treasury, all spending is permitted!'")
-
-	db := qntxtest.CreateTestDB(t)
-	cfg := createTestConfig()
-
-	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}
-	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
-
-	// Create an expensive job
-	job := &Job{
-		ID:           "JOB_NO_BUDGET_TRACK",
-		HandlerName:  "test.expensive-handler",
-		Source:       "no_budget.html",
-		Status:       JobStatusQueued,
-		CostEstimate: 999.99, // Expensive
-		CreatedAt:    time.Now(),
-	}
-
-	// checkBudget should return false (not paused) when no tracker configured
-	paused, err := pool.checkBudget(job)
-	if err != nil {
-		t.Fatalf("checkBudget returned error: %v", err)
-	}
-
-	if paused {
-		t.Error("Expected job NOT to be paused when no budget tracker configured")
-	}
-
-	t.Log("✓ Cronos allows expensive job when no budget tracker configured")
-	t.Log("  'The treasury is infinite!'")
 }

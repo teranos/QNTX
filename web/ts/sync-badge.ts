@@ -43,13 +43,8 @@ export function initSyncBadge(): void {
 
     const drawerHeader = document.getElementById('system-drawer-header');
     if (drawerHeader) {
-        // Insert after usage badge (second position)
-        const usageBadge = document.getElementById('usage-badge');
-        if (usageBadge && usageBadge.nextSibling) {
-            drawerHeader.insertBefore(badge, usageBadge.nextSibling);
-        } else {
-            drawerHeader.appendChild(badge);
-        }
+        // Leftmost in the header
+        drawerHeader.insertBefore(badge, drawerHeader.firstChild);
 
         // Attach tooltip to the badge itself (event stops at badge, won't toggle drawer)
         tooltip.attach(drawerHeader, '#sync-badge');

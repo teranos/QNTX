@@ -42,4 +42,4 @@ These are currently implemented in Go. Moving them to Rust would let the browser
 | SO prompt execution (`ats/so/actions/prompt/`) | Holds a `database/sql` handle, calls `ai/provider`, submits through `pulse/async` |
 | Pulse scheduling | Job orchestration, goroutines, database-bound |
 | Embeddings | External model I/O, Rust FFI |
-| Sync protocol | WebSocket-bound, budget/quota coordination |
+| Sync protocol | WebSocket-bound, quota coordination |

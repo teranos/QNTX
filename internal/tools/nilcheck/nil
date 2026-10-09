@@ -1,11 +1,10 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3456 in 438 files.
+# 3428 in 435 files.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
 
 6	ai/provider/grpc_client.go
-3	ai/tracker/usage_tracker.go
 6	ats/attrs/attrs.go
 2	ats/ax/executor.go
 4	ats/ax/fixtures.go
@@ -179,7 +178,7 @@
 1	plugin/grpc/logbuffer.go
 1	plugin/grpc/pidfile.go
 2	plugin/grpc/protocol/convert.go
-9	plugin/grpc/pulse_handler.go
+8	plugin/grpc/pulse_handler.go
 1	plugin/grpc/records.go
 3	plugin/grpc/remote_atsstore.go
 3	plugin/grpc/remote_queue.go
@@ -223,8 +222,7 @@
 1	pulse/async/system_metrics_darwin.go
 1	pulse/async/system_metrics_linux.go
 1	pulse/async/system_metrics_windows.go
-13	pulse/async/worker.go
-12	pulse/budget/tracker.go
+11	pulse/async/worker.go
 14	pulse/schedule/execution_store.go
 8	pulse/schedule/store.go
 1	pulse/schedule/task_log_store.go
@@ -304,7 +302,7 @@
 13	server/auth/tokens_table.go
 6	server/auth/users.go
 9	server/auth/users_table.go
-22	server/broadcast.go
+20	server/broadcast.go
 4	server/builtin_executor.go
 2	server/checkpoint_pulse.go
 30	server/ci_pulse.go
@@ -341,10 +339,10 @@
 1	server/github_parity.go
 4	server/github_webhook.go
 2	server/ground_bridge.go
-15	server/handlers.go
+14	server/handlers.go
 4	server/host_gauges.go
 3	server/i_sigils.go
-15	server/init.go
+13	server/init.go
 5	server/invitations.go
 28	server/lifecycle.go
 10	server/mail.go
@@ -380,7 +378,7 @@
 25	server/plugin_sigils.go
 1	server/plugin_stores.go
 1	server/pprof.go
-33	server/prompt_handlers.go
+29	server/prompt_handlers.go
 2	server/prose_handlers.go
 7	server/pulse_async_jobs.go
 6	server/pulse_execution_handlers.go
@@ -431,7 +429,6 @@
 2	server/sub_store_proof.go
 2	server/sub_ticker.go
 1	server/syscap/parser_qntx.go
-1	server/timeseries_openapi_sigils.go
 12	server/transcripts.go
 10	server/type_handlers.go
 2	server/util.go

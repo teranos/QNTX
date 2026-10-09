@@ -30,8 +30,6 @@ type Job struct {
 	Source        string                 `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`                              // For deduplication and logging
 	Status        string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`                              // queued, running, paused, completed, failed, cancelled
 	Progress      *Progress              `protobuf:"bytes,6,opt,name=progress,proto3" json:"progress,omitempty"`
-	CostEstimate  float64                `protobuf:"fixed64,7,opt,name=cost_estimate,json=costEstimate,proto3" json:"cost_estimate,omitempty"`
-	CostActual    float64                `protobuf:"fixed64,8,opt,name=cost_actual,json=costActual,proto3" json:"cost_actual,omitempty"`
 	PulseState    *PulseState            `protobuf:"bytes,9,opt,name=pulse_state,json=pulseState,proto3" json:"pulse_state,omitempty"`
 	Error         string                 `protobuf:"bytes,10,opt,name=error,proto3" json:"error,omitempty"`
 	ParentJobId   string                 `protobuf:"bytes,11,opt,name=parent_job_id,json=parentJobId,proto3" json:"parent_job_id,omitempty"`
@@ -113,20 +111,6 @@ func (x *Job) GetProgress() *Progress {
 		return x.Progress
 	}
 	return nil
-}
-
-func (x *Job) GetCostEstimate() float64 {
-	if x != nil {
-		return x.CostEstimate
-	}
-	return 0
-}
-
-func (x *Job) GetCostActual() float64 {
-	if x != nil {
-		return x.CostActual
-	}
-	return 0
 }
 
 func (x *Job) GetPulseState() *PulseState {
@@ -234,9 +218,6 @@ type PulseState struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	CallsThisMinute int32                  `protobuf:"varint,1,opt,name=calls_this_minute,json=callsThisMinute,proto3" json:"calls_this_minute,omitempty"`
 	CallsRemaining  int32                  `protobuf:"varint,2,opt,name=calls_remaining,json=callsRemaining,proto3" json:"calls_remaining,omitempty"`
-	SpendToday      float64                `protobuf:"fixed64,3,opt,name=spend_today,json=spendToday,proto3" json:"spend_today,omitempty"`
-	SpendThisMonth  float64                `protobuf:"fixed64,4,opt,name=spend_this_month,json=spendThisMonth,proto3" json:"spend_this_month,omitempty"`
-	BudgetRemaining float64                `protobuf:"fixed64,5,opt,name=budget_remaining,json=budgetRemaining,proto3" json:"budget_remaining,omitempty"`
 	IsPaused        bool                   `protobuf:"varint,6,opt,name=is_paused,json=isPaused,proto3" json:"is_paused,omitempty"`
 	PauseReason     string                 `protobuf:"bytes,7,opt,name=pause_reason,json=pauseReason,proto3" json:"pause_reason,omitempty"`
 	unknownFields   protoimpl.UnknownFields
@@ -283,27 +264,6 @@ func (x *PulseState) GetCallsThisMinute() int32 {
 func (x *PulseState) GetCallsRemaining() int32 {
 	if x != nil {
 		return x.CallsRemaining
-	}
-	return 0
-}
-
-func (x *PulseState) GetSpendToday() float64 {
-	if x != nil {
-		return x.SpendToday
-	}
-	return 0
-}
-
-func (x *PulseState) GetSpendThisMonth() float64 {
-	if x != nil {
-		return x.SpendThisMonth
-	}
-	return 0
-}
-
-func (x *PulseState) GetBudgetRemaining() float64 {
-	if x != nil {
-		return x.BudgetRemaining
 	}
 	return 0
 }
@@ -774,17 +734,14 @@ var File_plugin_grpc_protocol_queue_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_queue_proto_rawDesc = "" +
 	"\n" +
-	" plugin/grpc/protocol/queue.proto\x12\bprotocol\"\xeb\x03\n" +
+	" plugin/grpc/protocol/queue.proto\x12\bprotocol\"\xcd\x03\n" +
 	"\x03Job\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x18\n" +
 	"\apayload\x18\x03 \x01(\fR\apayload\x12\x16\n" +
 	"\x06source\x18\x04 \x01(\tR\x06source\x12\x16\n" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12.\n" +
-	"\bprogress\x18\x06 \x01(\v2\x12.protocol.ProgressR\bprogress\x12#\n" +
-	"\rcost_estimate\x18\a \x01(\x01R\fcostEstimate\x12\x1f\n" +
-	"\vcost_actual\x18\b \x01(\x01R\n" +
-	"costActual\x125\n" +
+	"\bprogress\x18\x06 \x01(\v2\x12.protocol.ProgressR\bprogress\x125\n" +
 	"\vpulse_state\x18\t \x01(\v2\x14.protocol.PulseStateR\n" +
 	"pulseState\x12\x14\n" +
 	"\x05error\x18\n" +
@@ -796,20 +753,16 @@ const file_plugin_grpc_protocol_queue_proto_rawDesc = "" +
 	"created_at\x18\r \x01(\x03R\tcreatedAt\x12\x1d\n" +
 	"\n" +
 	"started_at\x18\x0e \x01(\x03R\tstartedAt\x12!\n" +
-	"\fcompleted_at\x18\x0f \x01(\x03R\vcompletedAt\":\n" +
+	"\fcompleted_at\x18\x0f \x01(\x03R\vcompletedAtJ\x04\b\a\x10\bJ\x04\b\b\x10\tR\rcost_estimateR\vcost_actual\":\n" +
 	"\bProgress\x12\x18\n" +
 	"\acurrent\x18\x01 \x01(\x05R\acurrent\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"\x97\x02\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\xe4\x01\n" +
 	"\n" +
 	"PulseState\x12*\n" +
 	"\x11calls_this_minute\x18\x01 \x01(\x05R\x0fcallsThisMinute\x12'\n" +
-	"\x0fcalls_remaining\x18\x02 \x01(\x05R\x0ecallsRemaining\x12\x1f\n" +
-	"\vspend_today\x18\x03 \x01(\x01R\n" +
-	"spendToday\x12(\n" +
-	"\x10spend_this_month\x18\x04 \x01(\x01R\x0espendThisMonth\x12)\n" +
-	"\x10budget_remaining\x18\x05 \x01(\x01R\x0fbudgetRemaining\x12\x1b\n" +
+	"\x0fcalls_remaining\x18\x02 \x01(\x05R\x0ecallsRemaining\x12\x1b\n" +
 	"\tis_paused\x18\x06 \x01(\bR\bisPaused\x12!\n" +
-	"\fpause_reason\x18\a \x01(\tR\vpauseReason\"P\n" +
+	"\fpause_reason\x18\a \x01(\tR\vpauseReasonJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\vspend_todayR\x10spend_this_monthR\x10budget_remaining\"P\n" +
 	"\x0eEnqueueRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x1f\n" +

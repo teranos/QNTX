@@ -85,10 +85,10 @@ path = "am.db"
 		require.NoError(t, err)
 
 		// Check a known default
-		assert.Equal(t, 0.002, cfg.Pulse.CostPerScoreUSD)
+		assert.Equal(t, 1, cfg.Pulse.TickerIntervalSeconds)
 
 		// Verify it's tracked as default
-		source, exists := ConfigSources["pulse.cost_per_score_usd"]
+		source, exists := ConfigSources["pulse.ticker_interval_seconds"]
 		assert.True(t, exists, "Default should be tracked")
 		assert.Equal(t, SourceDefault, source.Source)
 		assert.Equal(t, "", source.Path, "Defaults have no path")
