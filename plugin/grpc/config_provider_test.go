@@ -120,7 +120,8 @@ func TestAPluginStandingInANamespaceIsHandedItsOwnToken(t *testing.T) {
 // "nil is nil"
 
 // A record naming no namespace stands nowhere, and is handed no token: not the
-// shared one on the served store. The Initialize fails and says why.
+// shared one on the served store. It still starts, and acts only where a
+// caller acts, through the call's own token.
 func TestAPluginNamingNoNamespaceIsHandedNoToken(t *testing.T) {
 	SetPluginRecords(heldRecords{"datapunt": {Name: "datapunt", Config: map[string]string{}}})
 	t.Cleanup(func() { SetPluginRecords(nil) })
@@ -130,9 +131,7 @@ func TestAPluginNamingNoNamespaceIsHandedNoToken(t *testing.T) {
 
 	config := NewConfigProvider(&ServiceEndpoints{AuthToken: "shared"}, minted, zap.NewNop().Sugar()).GetPluginConfig("datapunt")
 	assert.Equal(t, "", config.GetString("_auth_token"), "a plugin naming no namespace was handed a token")
-	err := config.(interface{ Err() error }).Err()
-	require.Error(t, err, "a plugin naming no namespace was not told why")
-	assert.Contains(t, err.Error(), "datapunt")
+	assert.NoError(t, config.(interface{ Err() error }).Err(), "a plugin naming no namespace was refused its start")
 }
 
 // A namespace the node cannot mint a token for is a plugin not handed its
