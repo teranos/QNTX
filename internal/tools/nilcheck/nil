@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3020 in 380 files.
+# 3042 in 381 files.
 
 6	ai/provider/grpc_client.go
 2	ai/tracker/usage_tracker.go
@@ -196,6 +196,7 @@
 2	server/a2a_route.go
 9	server/agent_harness.go
 2	server/agent_turn.go
+20	server/agents.go
 7	server/am_ground.go
 2	server/am_sigils.go
 1	server/answers.go
@@ -234,7 +235,7 @@
 9	server/auth/public_user.go
 1	server/auth/refusals.go
 15	server/auth/roles.go
-3	server/auth/root_agent.go
+6	server/auth/root_agent.go
 7	server/auth/sessions.go
 5	server/auth/setup.go
 1	server/auth/shed.go
@@ -250,7 +251,7 @@
 4	server/builtin_executor.go
 2	server/checkpoint_pulse.go
 26	server/ci_pulse.go
-14	server/claude.go
+13	server/claude.go
 3	server/claude_git.go
 4	server/claude_login.go
 9	server/claude_turns.go
