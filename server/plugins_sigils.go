@@ -13,18 +13,13 @@ import (
 
 func (s *QNTXServer) pluginsSignum() sigil.Signum {
 	name := &protocol.Param{Name: "name", Required: true, Says: "The plugin, by the name it reports."}
-	acted := []*protocol.Field{
-		{Name: "name", Says: "The plugin acted on."},
-		{Name: "state", Says: "Its state after the action. A restart says restarting: the outcome is seen in its health."},
-		{Name: "action", Says: "The action taken."},
-	}
 	action := func(verb, does string) *protocol.Sigil {
 		return &protocol.Sigil{
-			Name:  verb,
-			Does:  does,
-			Takes: []*protocol.Param{name},
-			Gives: acted,
-			Http:  &protocol.Endpoint{Method: http.MethodPost, Path: "/api/plugins/{name}/" + verb},
+			Name:   verb,
+			Does:   does,
+			Takes:  []*protocol.Param{name},
+			Answer: "protocol.PluginAction",
+			Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/api/plugins/{name}/" + verb},
 		}
 	}
 	return sigil.Signum{

@@ -510,3 +510,38 @@ export interface WatcherQueueStatusMessage_WatcherStatsEntry {
   key: string;
   value: WatcherBroadcastStats | undefined;
 }
+
+/** ReachWritten is what reach grant and reach revoke answer. */
+export interface ReachWritten {
+  /** The attestation the line was written as. */
+  id: string;
+}
+
+/** NamespaceActedOn is what namespaces disable, enable, delete and nuke answer. */
+export interface NamespaceActedOn {
+  /** The namespace acted on. */
+  name: string;
+}
+
+/** VaultDirs is what vault dirs answers. */
+export interface VaultDirs {
+  /** Each folder's place in the vault, folders apart by /. */
+  dirs: string[];
+}
+
+/** VaultRepos is what vault repos answers. */
+export interface VaultRepos {
+  /** Each repository as owner/repo. */
+  repos: string[];
+}
+
+/** VaultSubdirs is what vault subdirs answers. */
+export interface VaultSubdirs {
+  /** Each folder's path from the repository's top. */
+  dirs: string[];
+  /**
+   * The repository's default branch, which the folders are read on and a
+   * folder is bound to.
+   */
+  branch: string;
+}

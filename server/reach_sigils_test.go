@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
@@ -27,7 +28,7 @@ func TestAGrantIsALineAndTheListSaysIt(t *testing.T) {
 
 	granted, refusal := s.reachGrant(asked, sigil.Sent{"path": "/api/hello-world/{path...}", "to": "public_registration"})
 	require.Nil(t, refusal, refusal.GetSays())
-	require.NotEmpty(t, granted.(map[string]string)["id"])
+	require.NotEmpty(t, granted.(*protocol.ReachWritten).GetId())
 
 	_, refusal = s.reachRevoke(asked, sigil.Sent{"path": "/api/hello-world/{path...}", "to": "PUBLIC_REGISTRATION"})
 	require.Nil(t, refusal, refusal.GetSays())

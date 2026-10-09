@@ -600,51 +600,10 @@ func originAllowed(origin, host string) bool {
 	return false
 }
 
-// staandInfo is one stand as the stands element sees it. Beyond what it is (slug,
-// namespace, URL) it carries its defining system attestation — the ASID, when
-// it was created, and the DID that created it — the door it inherits from its
-// namespace, the sites reporting back, and its activity: arrivals recorded
-// against arrivals the rate limit refused, and when the last landed.
-type staandInfo struct {
-	Slug     string       `json:"slug"`
-	Market   string       `json:"market"`
-	URL      string       `json:"url"`
-	Origin   string       `json:"origin"`
-	Creator  string       `json:"creator"`
-	DefID    string       `json:"defId"`
-	Created  string       `json:"created"`
-	Sites    []string     `json:"sites"`
-	Arrivals int          `json:"arrivals"`
-	Visitors int          `json:"visitors"`
-	Dropped  int          `json:"dropped"`
-	LastSeen string       `json:"lastSeen"`
-	Events   []staandSeen `json:"events"`
-	Pages    []staandSeen `json:"pages"`
-
-	// How the people who arrived actually walked — what the counts above are
-	// a fold of.
-	Walks []staandWalk `json:"walks"`
-}
-
-// staandCount is one row the metrics sigil answers with: a value of the
-// dimension asked for and how many arrivals carried it, Umami's metrics shape.
-type staandCount struct {
-	Name  string `json:"name"`
-	Count int    `json:"count"`
-}
-
-// staandSeen is an event or a page and every moment it was attested, in unix
-// milliseconds. "The axis of time is more useful than a tally": the view draws
-// these as a line over time, and a count is not sent.
-type staandSeen struct {
-	Name string  `json:"name"`
-	Seen []int64 `json:"seen"`
-}
-
 // seenOf is each name and when it was seen, the most recently seen first, the
 // first limit of them. Last seen and not most seen: a name that has not been
 // seen since last spring does not lead a list because it was seen often then.
-func seenOf(m map[string][]time.Time, limit int) []staandSeen {
+func seenOf(m map[string][]time.Time, limit int) []*protocol.StaandSeen {
 	type named struct {
 		name string
 		at   []time.Time
@@ -669,50 +628,46 @@ func seenOf(m map[string][]time.Time, limit int) []staandSeen {
 	if limit > 0 && len(all) > limit {
 		all = all[:limit]
 	}
-	out := make([]staandSeen, 0, len(all))
+	out := make([]*protocol.StaandSeen, 0, len(all))
 	for _, n := range all {
-		seen := make([]int64, 0, len(n.at))
+		seen := make([]float64, 0, len(n.at))
 		for _, t := range n.at {
-			seen = append(seen, t.UnixMilli())
+			seen = append(seen, float64(t.UnixMilli()))
 		}
-		out = append(out, staandSeen{Name: n.name, Seen: seen})
+		out = append(out, &protocol.StaandSeen{Name: n.name, Seen: seen})
 	}
 	return out
 }
 
-// staandStep is one arrival read as a step rather than as a number: when it
-// landed, the page it was about, and the event the pixel named.
+// staandStep is one arrival read as a step, as it is read: what is answered is
+// protocol.StaandStep.
 //
 // when is the time itself and never leaves; At is what the view reads. Sorting
 // the formatted string instead looks right and is not: Format writes whatever
 // offset the store's time carries, so a tree of Z and +02:00 stamps orders by
 // the digits of the hour and puts the walk in an order nobody walked.
 type staandStep struct {
-	At    string `json:"at"`
-	Page  string `json:"page"`
-	Event string `json:"event"`
+	At    string
+	Page  string
+	Event string
 
 	when time.Time
-}
-
-// staandWalk is one person's steps past the stand, in the order they took them.
-// The visitor id is theirs and persists (the snippet keeps it in localStorage),
-// so this is a person's whole path across every visit, not one sitting.
-type staandWalk struct {
-	Who   string       `json:"who"`
-	Steps []staandStep `json:"steps"`
 }
 
 // walksOf turns the per-visitor steps into walks, most recently seen first, so
 // whoever was here last is read first. Every walk, every step: what a stand
 // recorded is what the view is given.
-func walksOf(m map[string][]staandStep) []staandWalk {
-	out := make([]staandWalk, 0, len(m))
-	for who, steps := range m {
-		out = append(out, staandWalk{Who: who, Steps: steps})
+func walksOf(m map[string][]staandStep) []*protocol.StaandWalk {
+	type walk struct {
+		who   string
+		steps []staandStep
 	}
-	sort.Slice(out, func(i, j int) bool {
-		a, b := out[i].Steps, out[j].Steps
+	walks := make([]walk, 0, len(m))
+	for who, steps := range m {
+		walks = append(walks, walk{who: who, steps: steps})
+	}
+	sort.Slice(walks, func(i, j int) bool {
+		a, b := walks[i].steps, walks[j].steps
 		if len(a) == 0 || len(b) == 0 {
 			return len(a) > len(b)
 		}
@@ -720,22 +675,30 @@ func walksOf(m map[string][]staandStep) []staandWalk {
 		if !last.Equal(other) {
 			return last.After(other)
 		}
-		return out[i].Who < out[j].Who
+		return walks[i].who < walks[j].who
 	})
+	out := make([]*protocol.StaandWalk, 0, len(walks))
+	for _, w := range walks {
+		steps := make([]*protocol.StaandStep, 0, len(w.steps))
+		for _, step := range w.steps {
+			steps = append(steps, &protocol.StaandStep{At: step.At, Page: step.Page, Event: step.Event})
+		}
+		out = append(out, &protocol.StaandWalk{Who: w.who, Steps: steps})
+	}
 	return out
 }
 
 // topCounts turns a count map into a list, most first, ties by name, capped.
-func topCounts(m map[string]int, limit int) []staandCount {
-	out := make([]staandCount, 0, len(m))
+func topCounts(m map[string]int, limit int) []*protocol.StaandCount {
+	out := make([]*protocol.StaandCount, 0, len(m))
 	for name, c := range m {
-		out = append(out, staandCount{Name: name, Count: c})
+		out = append(out, &protocol.StaandCount{Name: name, Count: uint32(c)})
 	}
 	sort.Slice(out, func(i, j int) bool {
-		if out[i].Count != out[j].Count {
-			return out[i].Count > out[j].Count
+		if out[i].GetCount() != out[j].GetCount() {
+			return out[i].GetCount() > out[j].GetCount()
 		}
-		return out[i].Name < out[j].Name
+		return out[i].GetName() < out[j].GetName()
 	})
 	if limit > 0 && len(out) > limit {
 		out = out[:limit]
@@ -761,7 +724,7 @@ func (s *QNTXServer) staandsList(_ context.Context, sent sigil.Sent) (any, *prot
 		s.logger.Errorw("could not list the stands", "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "cannot list the stands"}
 	}
-	return map[string]any{"staands": live}, nil
+	return &protocol.Staands{Staands: live}, nil
 }
 
 // staandsCreate writes the defining attestation for a new stand into system.
@@ -781,7 +744,7 @@ func (s *QNTXServer) staandsCreate(ctx context.Context, sent sigil.Sent) (any, *
 		s.logger.Errorw("could not create a stand", "market", market, "slug", slug, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not create the stand in " + market}
 	}
-	return map[string]any{"slug": slug, "url": staandPathPrefix + market + "/" + slug}, nil
+	return &protocol.StaandCreated{Slug: slug, Url: staandPathPrefix + market + "/" + slug}, nil
 }
 
 // staandsTakeDown supersedes a stand with a deleted line, so its pixel stops
@@ -796,7 +759,7 @@ func (s *QNTXServer) staandsTakeDown(ctx context.Context, sent sigil.Sent) (any,
 		s.logger.Errorw("could not remove a stand", "market", market, "slug", slug, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not remove the stand in " + market}
 	}
-	return map[string]any{"slug": slug, "status": "removed"}, nil
+	return &protocol.StaandTakenDown{Slug: slug, Status: "removed"}, nil
 }
 
 // writeStaandDef writes a created or deleted line for a stand into system,
@@ -838,7 +801,7 @@ func (s *QNTXServer) writeStaandDef(ctx context.Context, market, slug, predicate
 // definitions are read from system, the latest line per stand decides, and a
 // stand whose latest is a delete is left out. Each live stand is then filled
 // with the activity read from the market it feeds.
-func (s *QNTXServer) liveStaands(since, until *time.Time) ([]staandInfo, error) {
+func (s *QNTXServer) liveStaands(since, until *time.Time) ([]*protocol.Staand, error) {
 	sys, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
 		return nil, err
@@ -875,7 +838,7 @@ func (s *QNTXServer) liveStaands(since, until *time.Time) ([]staandInfo, error) 
 	// Activity is read from each market once, not once per stand.
 	activity := map[string]map[string]*staandTally{}
 
-	var live []staandInfo
+	var live []*protocol.Staand
 	for key, as := range latest {
 		if !slices.Contains(as.Predicates, staandCreated) {
 			continue
@@ -888,26 +851,26 @@ func (s *QNTXServer) liveStaands(since, until *time.Time) ([]staandInfo, error) 
 		if len(as.Actors) > 0 {
 			creator = as.Actors[0]
 		}
-		info := staandInfo{
+		info := &protocol.Staand{
 			Slug:    slug,
 			Market:  market,
-			URL:     staandPathPrefix + market + "/" + slug,
+			Url:     staandPathPrefix + market + "/" + slug,
 			Origin:  s.namespaceDoorBinding(market),
 			Creator: creator,
-			DefID:   as.ID,
+			DefId:   as.ID,
 			Created: as.Timestamp.Format(time.RFC3339),
 			Sites:   []string{},
-			Dropped: s.staandDropCount(key),
-			Events:  []staandSeen{},
-			Pages:   []staandSeen{},
-			Walks:   []staandWalk{},
+			Dropped: uint32(s.staandDropCount(key)),
+			Events:  []*protocol.StaandSeen{},
+			Pages:   []*protocol.StaandSeen{},
+			Walks:   []*protocol.StaandWalk{},
 		}
 		if _, done := activity[market]; !done {
 			activity[market] = s.staandActivity(market, since, until)
 		}
 		if t, seen := activity[market][slug]; seen {
-			info.Arrivals = t.count
-			info.Visitors = len(t.visitors)
+			info.Arrivals = uint32(t.count)
+			info.Visitors = uint32(len(t.visitors))
 			info.Sites = t.sites()
 			info.Events = seenOf(t.events, 20)
 			info.Pages = seenOf(t.pages, 10)
@@ -919,10 +882,10 @@ func (s *QNTXServer) liveStaands(since, until *time.Time) ([]staandInfo, error) 
 		live = append(live, info)
 	}
 	sort.Slice(live, func(i, j int) bool {
-		if live[i].Market != live[j].Market {
-			return live[i].Market < live[j].Market
+		if live[i].GetMarket() != live[j].GetMarket() {
+			return live[i].GetMarket() < live[j].GetMarket()
 		}
-		return live[i].Slug < live[j].Slug
+		return live[i].GetSlug() < live[j].GetSlug()
 	})
 	return live, nil
 }
@@ -1051,12 +1014,7 @@ func (s *QNTXServer) staandsMetrics(_ context.Context, sent sigil.Sent) (any, *p
 			counts[v]++
 		}
 	}
-	return map[string]any{
-		"market": market,
-		"slug":   slug,
-		"type":   dim,
-		"counts": topCounts(counts, limit),
-	}, nil
+	return &protocol.StaandMetrics{Market: market, Slug: slug, Type: string(dim), Counts: topCounts(counts, limit)}, nil
 }
 
 // staandArrivals is what arrived in one market inside a window, read for the
@@ -1171,19 +1129,6 @@ func subjectOf(as *types.As) string {
 	return ""
 }
 
-// staandActivityRow is one arrival read as a line rather than as a number. The
-// shape is Umami's session activity: one row per event, newest first, and the
-// reading of it is left to whoever asked (ADR-036).
-type staandActivityRow struct {
-	At             string `json:"at"`
-	Visit          string `json:"visit,omitempty"`
-	Visitor        string `json:"visitor,omitempty"`
-	Path           string `json:"path"`
-	Query          string `json:"query,omitempty"`
-	ReferrerDomain string `json:"referrer_domain,omitempty"`
-	Event          string `json:"event"`
-}
-
 // staandActivityCap is how many rows one activity read answers with. Umami's
 // session activity stops at 500 and so does this.
 const staandActivityCap = 500
@@ -1223,13 +1168,13 @@ func (s *QNTXServer) staandsActivity(_ context.Context, sent sigil.Sent) (any, *
 		kept = kept[:staandActivityCap]
 	}
 
-	rows := make([]staandActivityRow, 0, len(kept))
+	rows := make([]*protocol.StaandActivityRow, 0, len(kept))
 	for _, as := range kept {
 		event := ""
 		if len(as.Predicates) > 0 {
 			event = as.Predicates[0]
 		}
-		rows = append(rows, staandActivityRow{
+		rows = append(rows, &protocol.StaandActivityRow{
 			At:             as.Timestamp.Format(time.RFC3339),
 			Visit:          attrString(as.Attributes, staandVisit),
 			Visitor:        attrString(as.Attributes, staandVisitor),
@@ -1238,11 +1183,7 @@ func (s *QNTXServer) staandsActivity(_ context.Context, sent sigil.Sent) (any, *
 			Event:          event,
 		})
 	}
-	return map[string]any{
-		"market":   market,
-		"slug":     slug,
-		"activity": rows,
-	}, nil
+	return &protocol.StaandActivity{Market: market, Slug: slug, Activity: rows}, nil
 }
 
 // staandsVisits is one stand's sittings, derived. Entry, exit, duration and
@@ -1258,11 +1199,7 @@ func (s *QNTXServer) staandsVisits(_ context.Context, sent sigil.Sent) (any, *pr
 	if refusal != nil {
 		return nil, refusal
 	}
-	return map[string]any{
-		"market": market,
-		"slug":   slug,
-		"visits": staandVisits(arrivals, market, slug),
-	}, nil
+	return &protocol.StaandVisits{Market: market, Slug: slug, Visits: staandVisits(arrivals, market, slug)}, nil
 }
 
 // staandTally is one stand's arrivals folded down: how many, when the last one

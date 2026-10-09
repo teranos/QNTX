@@ -2297,6 +2297,246 @@ func (x *WatcherQueueStatusMessage) GetTimestamp() int64 {
 	return 0
 }
 
+// ReachWritten is what reach grant and reach revoke answer.
+type ReachWritten struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The attestation the line was written as.
+	Id            string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReachWritten) Reset() {
+	*x = ReachWritten{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReachWritten) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReachWritten) ProtoMessage() {}
+
+func (x *ReachWritten) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReachWritten.ProtoReflect.Descriptor instead.
+func (*ReachWritten) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ReachWritten) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+// NamespaceActedOn is what namespaces disable, enable, delete and nuke answer.
+type NamespaceActedOn struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The namespace acted on.
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NamespaceActedOn) Reset() {
+	*x = NamespaceActedOn{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NamespaceActedOn) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NamespaceActedOn) ProtoMessage() {}
+
+func (x *NamespaceActedOn) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NamespaceActedOn.ProtoReflect.Descriptor instead.
+func (*NamespaceActedOn) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *NamespaceActedOn) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+// VaultDirs is what vault dirs answers.
+type VaultDirs struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Each folder's place in the vault, folders apart by /.
+	Dirs          []string `protobuf:"bytes,1,rep,name=dirs,proto3" json:"dirs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VaultDirs) Reset() {
+	*x = VaultDirs{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VaultDirs) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VaultDirs) ProtoMessage() {}
+
+func (x *VaultDirs) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VaultDirs.ProtoReflect.Descriptor instead.
+func (*VaultDirs) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *VaultDirs) GetDirs() []string {
+	if x != nil {
+		return x.Dirs
+	}
+	return nil
+}
+
+// VaultRepos is what vault repos answers.
+type VaultRepos struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Each repository as owner/repo.
+	Repos         []string `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VaultRepos) Reset() {
+	*x = VaultRepos{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VaultRepos) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VaultRepos) ProtoMessage() {}
+
+func (x *VaultRepos) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VaultRepos.ProtoReflect.Descriptor instead.
+func (*VaultRepos) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *VaultRepos) GetRepos() []string {
+	if x != nil {
+		return x.Repos
+	}
+	return nil
+}
+
+// VaultSubdirs is what vault subdirs answers.
+type VaultSubdirs struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Each folder's path from the repository's top.
+	Dirs []string `protobuf:"bytes,1,rep,name=dirs,proto3" json:"dirs,omitempty"`
+	// The repository's default branch, which the folders are read on and a
+	// folder is bound to.
+	Branch        string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VaultSubdirs) Reset() {
+	*x = VaultSubdirs{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VaultSubdirs) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VaultSubdirs) ProtoMessage() {}
+
+func (x *VaultSubdirs) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VaultSubdirs.ProtoReflect.Descriptor instead.
+func (*VaultSubdirs) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *VaultSubdirs) GetDirs() []string {
+	if x != nil {
+		return x.Dirs
+	}
+	return nil
+}
+
+func (x *VaultSubdirs) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
 var File_plugin_grpc_protocol_server_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
@@ -2604,7 +2844,19 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a`\n" +
 	"\x11WatcherStatsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x125\n" +
-	"\x05value\x18\x02 \x01(\v2\x1f.protocol.WatcherBroadcastStatsR\x05value:\x028\x01B.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\x05value\x18\x02 \x01(\v2\x1f.protocol.WatcherBroadcastStatsR\x05value:\x028\x01\"\x1e\n" +
+	"\fReachWritten\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"&\n" +
+	"\x10NamespaceActedOn\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x1f\n" +
+	"\tVaultDirs\x12\x12\n" +
+	"\x04dirs\x18\x01 \x03(\tR\x04dirs\"\"\n" +
+	"\n" +
+	"VaultRepos\x12\x14\n" +
+	"\x05repos\x18\x01 \x03(\tR\x05repos\":\n" +
+	"\fVaultSubdirs\x12\x12\n" +
+	"\x04dirs\x18\x01 \x03(\tR\x04dirs\x12\x16\n" +
+	"\x06branch\x18\x02 \x01(\tR\x06branchB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_server_proto_rawDescOnce sync.Once
@@ -2618,7 +2870,7 @@ func file_plugin_grpc_protocol_server_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_server_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*DaemonStatusMessage)(nil),            // 0: protocol.DaemonStatusMessage
 	(*AsyncJobProgress)(nil),               // 1: protocol.AsyncJobProgress
@@ -2642,29 +2894,34 @@ var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*PulseExecutionLogStreamMessage)(nil), // 19: protocol.PulseExecutionLogStreamMessage
 	(*WatcherBroadcastStats)(nil),          // 20: protocol.WatcherBroadcastStats
 	(*WatcherQueueStatusMessage)(nil),      // 21: protocol.WatcherQueueStatusMessage
-	nil,                                    // 22: protocol.JobUpdateMessage.MetadataEntry
-	nil,                                    // 23: protocol.RichSearchMatch.AttributesEntry
-	nil,                                    // 24: protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	nil,                                    // 25: protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	nil,                                    // 26: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	(*Attestation)(nil),                    // 27: protocol.Attestation
+	(*ReachWritten)(nil),                   // 22: protocol.ReachWritten
+	(*NamespaceActedOn)(nil),               // 23: protocol.NamespaceActedOn
+	(*VaultDirs)(nil),                      // 24: protocol.VaultDirs
+	(*VaultRepos)(nil),                     // 25: protocol.VaultRepos
+	(*VaultSubdirs)(nil),                   // 26: protocol.VaultSubdirs
+	nil,                                    // 27: protocol.JobUpdateMessage.MetadataEntry
+	nil,                                    // 28: protocol.RichSearchMatch.AttributesEntry
+	nil,                                    // 29: protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	nil,                                    // 30: protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	nil,                                    // 31: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	(*Attestation)(nil),                    // 32: protocol.Attestation
 }
 var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
 	1,  // 0: protocol.AsyncJob.progress:type_name -> protocol.AsyncJobProgress
 	2,  // 1: protocol.AsyncJob.pulse_state:type_name -> protocol.AsyncJobPulseState
 	3,  // 2: protocol.JobUpdateMessage.job:type_name -> protocol.AsyncJob
-	22, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
-	23, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
+	27, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
+	28, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
 	6,  // 5: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
 	13, // 6: protocol.LLMStreamMessage.signal:type_name -> protocol.LLMTokenSignal
 	11, // 7: protocol.SamplerStageSignal.top_k:type_name -> protocol.LLMTokenCandidate
 	11, // 8: protocol.LLMTokenSignal.top_k:type_name -> protocol.LLMTokenCandidate
 	12, // 9: protocol.LLMTokenSignal.sampler_stages:type_name -> protocol.SamplerStageSignal
-	27, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
+	32, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
 	14, // 11: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
-	24, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	25, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	26, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	29, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	30, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	31, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
 	20, // 15: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
 	16, // [16:16] is the sub-list for method output_type
 	16, // [16:16] is the sub-list for method input_type
@@ -2692,7 +2949,7 @@ func file_plugin_grpc_protocol_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_server_proto_rawDesc), len(file_plugin_grpc_protocol_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   27,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

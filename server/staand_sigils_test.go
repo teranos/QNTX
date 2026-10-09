@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -98,9 +97,7 @@ func TestAStaandAnswerIsWhatItsSigilGives(t *testing.T) {
 			found := sigilOf(t, staands, asked.sigil)
 			answer, refusal := found.answer(context.Background(), asked.sent)
 			require.Nil(t, refusal)
-			said, err := json.Marshal(answer)
-			require.NoError(t, err)
-			require.NoError(t, sigil.Holds(found.sigil, said), string(said))
+			holds(t, staands, asked.sigil, answer)
 		})
 	}
 }

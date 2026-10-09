@@ -146,3 +146,9 @@ enum AccessLevel {
   // ROOT goes beyond QNTX — wanted on dev, not on prod. There is one.
   ROOT = 2;
 }
+
+// Standing is what i standing and i step answer.
+message Standing {
+  // Where the person now stands. Never empty.
+  string namespace = 1;
+}
