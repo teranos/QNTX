@@ -110,11 +110,11 @@ func TestAToolIsAskedOnlyWhatItSaysItTakes(t *testing.T) {
 // A field that names the message it carries is said in that message's shape,
 // as the answer marshals it: one, a list, or none, each field of its kind.
 func TestAFieldNamingItsMessageIsSaidInItsShape(t *testing.T) {
-	gives := givenAsSchema(&protocol.Sigil{Gives: []*protocol.Field{
+	gives := promisedBy(t, &protocol.Sigil{Gives: []*protocol.Field{
 		{Name: "visits", Says: "The sittings.", Message: "protocol.Visit"},
 		{Name: "transcript", Says: "The session.", Message: "protocol.Transcript"},
 		{Name: "market", Says: "The market."},
-	}})
+	}}).schema
 	carried, err := json.Marshal(map[string]any{
 		"visits": []*protocol.Visit{{Visit: "v", Visitor: "p", DurationSeconds: 3, Views: 2, Bounce: true}},
 		"transcript": &protocol.Transcript{Session: "s", Subjects: []string{"a"}, Folded: 4,
@@ -126,6 +126,73 @@ func TestAFieldNamingItsMessageIsSaidInItsShape(t *testing.T) {
 	assert.NoError(t, heldTo(gives, []byte(`{"visits":null}`)), "none is what a field may carry")
 	assert.Error(t, heldTo(gives, []byte(`{"visits":[{"views":"2"}]}`)), "a count given as text")
 	assert.Error(t, heldTo(gives, []byte(`{"transcript":{"turns":[{"text":1}]}}`)), "a turn's text given as a number")
+}
+
+// promisedBy is what a sigil says it gives, as a tool says it.
+func promisedBy(t *testing.T, held *protocol.Sigil) promise {
+	t.Helper()
+	promised, err := givenAsSchema(held)
+	require.NoError(t, err)
+	return promised
+}
+
+// A sigil naming its answer gives that message, every field of it there and
+// zero as zero: what answerJSON writes is what the tool says it gives, and an
+// answer leaving a field out is not.
+func TestAnAnswerIsItsMessageWhole(t *testing.T) {
+	promised := promisedBy(t, &protocol.Sigil{Answer: "protocol.Transcripts"})
+	require.True(t, promised.says)
+
+	written, err := answerJSON(&protocol.Transcripts{Transcripts: []*protocol.Transcript{{Session: "s", Turns: []*protocol.Turn{{Text: "hey"}}}}})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"transcripts":[{"session":"s","subjects":[],"started":"","ended":"","turns":[{"at":"","speaker":"","text":"hey","of":""}],"folded":0,"model":"","effort":""}]}`, string(written))
+	assert.NoError(t, heldTo(promised.schema, written))
+
+	assert.Error(t, heldTo(promised.schema, []byte(`{"transcripts":[{"session":"s"}]}`)), "a session leaving out what it holds")
+	assert.Error(t, heldTo(promised.schema, []byte(`{"transcripts":[{"session":"s","subjects":[],"started":"","ended":"","turns":[],"folded":"0","model":"","effort":""}]}`)), "a count given as text")
+
+	written, err = answerJSON(&protocol.SessionTranscript{})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"transcript":null}`, string(written))
+	assert.NoError(t, heldTo(promisedBy(t, &protocol.Sigil{Answer: "protocol.SessionTranscript"}).schema, written), "a message not set is null")
+}
+
+// What a sigil naming its answer gives is that message's fields in its .proto's
+// words, said nowhere else. Naming the answer and listing the fields as well is
+// saying it twice, and a message this binary does not know is no answer.
+func TestWhatASigilGivesIsItsAnswer(t *testing.T) {
+	signum := func(held *protocol.Sigil) sigil.Signum {
+		held.Name, held.Does = "version", "Which build."
+		held.Http = &protocol.Endpoint{Method: http.MethodGet, Path: "/am/version"}
+		return sigil.Signum{Signum: &protocol.Signum{Name: "am", Sigils: []*protocol.Sigil{held}},
+			Answers: map[string]sigil.Answer{"version": func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return &protocol.VersionInfo{}, nil }}}
+	}
+	answered, err := answeredOf(signum(&protocol.Sigil{Answer: "protocol.VersionInfo"}))
+	require.NoError(t, err)
+	require.NoError(t, answered.Check())
+	var gives []string
+	for _, field := range answered.GetSigils()[0].GetGives() {
+		gives = append(gives, field.GetName()+": "+field.GetSays())
+	}
+	assert.Equal(t, []string{
+		"commit_hash: The whole commit.", "build_time: When it was built.", "version: The version tag.",
+		"go_version: The Go it was built with.", "platform: The OS and architecture.",
+	}, gives)
+
+	_, err = answeredOf(signum(&protocol.Sigil{Answer: "protocol.Nosuch"}))
+	assert.ErrorContains(t, err, "no message this binary knows")
+}
+
+// A sigil naming its answer says what it gives there and nowhere else: none of
+// the node's own lists the fields by hand as well.
+func TestNoSigilSaysWhatItGivesTwice(t *testing.T) {
+	for _, signum := range servedForTest(t).signa() {
+		for _, held := range signum.GetSigils() {
+			if held.GetAnswer() != "" {
+				assert.Empty(t, held.GetGives(), "%s %s names %s and lists what it gives as well", signum.GetName(), held.GetName(), held.GetAnswer())
+			}
+		}
+	}
 }
 
 // A tool a client cannot read the shape of is a tool it cannot call.
@@ -372,7 +439,7 @@ func TestAToolGivesWhatItSaysItGives(t *testing.T) {
 	admits := func(_ string, _ auth.Reach, next http.HandlerFunc) http.HandlerFunc { return next }
 	everyone := func(string, heldBy) (auth.Reach, bool) { return auth.Reach{}, true }
 	ask := func() *mcp.CallToolResult {
-		return overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), given, nil, givenAsSchema(given.sigil))
+		return overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), given, nil, promisedBy(t, given.sigil))
 	}
 
 	answer = map[string]any{"rows": []int{1}}

@@ -911,20 +911,28 @@ func (x *RichSearchResultsMessage) GetTotal() int32 {
 // Mirrors syscap.Message.
 type SystemCapabilitiesMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Type  string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "system_capabilities"
+	// system_capabilities.
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
 	// store is which store the node keeps (ADR-023) — sqlite or parquet.
 	// Distinct from storage_backend, which is the implementation behind it.
 	// Namespaces exist only under parquet, and sigma only under sqlite.
-	Store            string `protobuf:"bytes,2,opt,name=store,proto3" json:"store,omitempty"`
-	StorageBackend   string `protobuf:"bytes,3,opt,name=storage_backend,json=storageBackend,proto3" json:"storage_backend,omitempty"`        // rust or go
-	StorageOptimized bool   `protobuf:"varint,4,opt,name=storage_optimized,json=storageOptimized,proto3" json:"storage_optimized,omitempty"` // Rust SQLite rather than the Go fallback
-	StorageVersion   string `protobuf:"bytes,5,opt,name=storage_version,json=storageVersion,proto3" json:"storage_version,omitempty"`        // ats-sqlite library version
-	ParserBackend    string `protobuf:"bytes,6,opt,name=parser_backend,json=parserBackend,proto3" json:"parser_backend,omitempty"`           // wasm or go
-	ParserOptimized  bool   `protobuf:"varint,7,opt,name=parser_optimized,json=parserOptimized,proto3" json:"parser_optimized,omitempty"`    // ats via WASM rather than the Go parser
-	ParserVersion    string `protobuf:"bytes,8,opt,name=parser_version,json=parserVersion,proto3" json:"parser_version,omitempty"`           // ats version when using WASM
-	ParserSize       string `protobuf:"bytes,9,opt,name=parser_size,json=parserSize,proto3" json:"parser_size,omitempty"`                    // WASM module size, e.g. "89KB"
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	Store string `protobuf:"bytes,2,opt,name=store,proto3" json:"store,omitempty"`
+	// rust or go: which storage implementation is active.
+	StorageBackend string `protobuf:"bytes,3,opt,name=storage_backend,json=storageBackend,proto3" json:"storage_backend,omitempty"`
+	// Whether it is the Rust SQLite one.
+	StorageOptimized bool `protobuf:"varint,4,opt,name=storage_optimized,json=storageOptimized,proto3" json:"storage_optimized,omitempty"`
+	// The ats-sqlite library's version.
+	StorageVersion string `protobuf:"bytes,5,opt,name=storage_version,json=storageVersion,proto3" json:"storage_version,omitempty"`
+	// wasm or go: which parser implementation is active.
+	ParserBackend string `protobuf:"bytes,6,opt,name=parser_backend,json=parserBackend,proto3" json:"parser_backend,omitempty"`
+	// Whether it is ats through WASM.
+	ParserOptimized bool `protobuf:"varint,7,opt,name=parser_optimized,json=parserOptimized,proto3" json:"parser_optimized,omitempty"`
+	// The ats version, through WASM.
+	ParserVersion string `protobuf:"bytes,8,opt,name=parser_version,json=parserVersion,proto3" json:"parser_version,omitempty"`
+	// The WASM module's size.
+	ParserSize    string `protobuf:"bytes,9,opt,name=parser_size,json=parserSize,proto3" json:"parser_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SystemCapabilitiesMessage) Reset() {
@@ -1023,12 +1031,17 @@ func (x *SystemCapabilitiesMessage) GetParserSize() string {
 // VersionInfo is which build is running, as am version answers it.
 // Mirrors version.Info.
 type VersionInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CommitHash    string                 `protobuf:"bytes,1,opt,name=commit_hash,json=commitHash,proto3" json:"commit_hash,omitempty"`
-	BuildTime     string                 `protobuf:"bytes,2,opt,name=build_time,json=buildTime,proto3" json:"build_time,omitempty"`
-	Version       string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
-	GoVersion     string                 `protobuf:"bytes,4,opt,name=go_version,json=goVersion,proto3" json:"go_version,omitempty"`
-	Platform      string                 `protobuf:"bytes,5,opt,name=platform,proto3" json:"platform,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The whole commit.
+	CommitHash string `protobuf:"bytes,1,opt,name=commit_hash,json=commitHash,proto3" json:"commit_hash,omitempty"`
+	// When it was built.
+	BuildTime string `protobuf:"bytes,2,opt,name=build_time,json=buildTime,proto3" json:"build_time,omitempty"`
+	// The version tag.
+	Version string `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
+	// The Go it was built with.
+	GoVersion string `protobuf:"bytes,4,opt,name=go_version,json=goVersion,proto3" json:"go_version,omitempty"`
+	// The OS and architecture.
+	Platform      string `protobuf:"bytes,5,opt,name=platform,proto3" json:"platform,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

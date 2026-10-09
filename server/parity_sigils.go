@@ -34,10 +34,11 @@ func everySignumFollows() []*protocol.Follows {
 			{Field: "protocol.Signum.name", Column: "Tool.title"},
 			{Field: "protocol.Sigil.name", Column: "Tool.title"},
 			{Field: "protocol.Sigil.does", Column: "Tool.description"},
-			// A property per param and per field, by its name (signa.go).
-			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema", KeyedBy: "name"},
-			{Field: "protocol.Sigil.gives", Column: "Tool.outputSchema", KeyedBy: "name"},
 			{Field: "protocol.Sigil.http", Column: "Tool.annotations"},
+		}, Folds: []*protocol.Fold{
+			// A property per param and per field, by its name (signa.go).
+			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema", Key: "name"},
+			{Field: "protocol.Sigil.gives", Column: "Tool.outputSchema", Key: "name"},
 		}},
 	}
 }
@@ -150,6 +151,7 @@ func byReference(follows []*protocol.Follows) []*protocol.Follows {
 			merged = append(merged, held)
 		}
 		held.Columns = append(held.Columns, f.GetColumns()...)
+		held.Folds = append(held.Folds, f.GetFolds()...)
 	}
 	return merged
 }

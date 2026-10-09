@@ -288,7 +288,7 @@
 5	server/invitations.go
 26	server/lifecycle.go
 10	server/mail.go
-16	server/mcp.go
+14	server/mcp.go
 12	server/namespace_handlers.go
 2	server/namespace_run.go
 8	server/namespace_watchers.go
@@ -303,7 +303,7 @@
 15	server/parity/jsonschema.go
 20	server/parity/openapi.go
 3	server/parity/operations.go
-24	server/parity/prisma.go
+23	server/parity/prisma.go
 10	server/parity/references.go
 6	server/parity/says.go
 11	server/parity/tsdecl.go

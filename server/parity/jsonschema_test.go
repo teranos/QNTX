@@ -155,14 +155,15 @@ func TestReference_MCP(t *testing.T) {
 // A repeated field keyed by a field of its element is one object, a property
 // per element: it is followed into an object without departing, and what it is
 // keyed by is held to the element.
-func TestHold_KeyedBy(t *testing.T) {
-	signum := &protocol.Signum{Name: "s", Follows: []*protocol.Follows{{Reference: "ref", Columns: []*protocol.Corresponds{
-		{Field: "protocol.Sigil.takes", Column: "Seen.shape", KeyedBy: "name"},
-		{Field: "protocol.Sigil.gives", Column: "Seen._meta", KeyedBy: "nope"},
-		{Field: "protocol.Sigil.name", Column: "Seen.anything", KeyedBy: "name"},
-		{Field: "protocol.Sigil.takes", Column: "Seen.tags", KeyedBy: "name"},
-		{Field: "protocol.Sigil.does", Column: "Seen.visit"},
-	}}}}
+func TestHold_Folds(t *testing.T) {
+	signum := &protocol.Signum{Name: "s", Follows: []*protocol.Follows{{Reference: "ref",
+		Columns: []*protocol.Corresponds{{Field: "protocol.Sigil.does", Column: "Seen.visit"}},
+		Folds: []*protocol.Fold{
+			{Field: "protocol.Sigil.takes", Column: "Seen.shape", Key: "name"},
+			{Field: "protocol.Sigil.gives", Column: "Seen._meta", Key: "nope"},
+			{Field: "protocol.Sigil.name", Column: "Seen.anything", Key: "name"},
+			{Field: "protocol.Sigil.takes", Column: "Seen.tags", Key: "name"},
+		}}}}
 	p, refused := Hold(signum, "", "ref", readJSON(t, jsonShapes))
 	if refused != nil {
 		t.Fatal(refused)

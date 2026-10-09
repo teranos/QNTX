@@ -150,6 +150,12 @@ func protocolSaid() (map[string]string, error) {
 	return protocolSays, nil
 }
 
+// OursSay is what one of our messages or fields says of itself, by full name,
+// in its .proto's words.
+func OursSay(name string) (string, error) {
+	return oursSay(name)
+}
+
 // oursSay is what one of our messages or fields says of itself, by full name.
 func oursSay(name string) (string, error) {
 	says, err := protocolSaid()

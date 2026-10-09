@@ -213,7 +213,7 @@ export interface RichSearchResultsMessage {
  * Mirrors syscap.Message.
  */
 export interface SystemCapabilitiesMessage {
-  /** "system_capabilities" */
+  /** system_capabilities. */
   type: string;
   /**
    * store is which store the node keeps (ADR-023) — sqlite or parquet.
@@ -221,19 +221,19 @@ export interface SystemCapabilitiesMessage {
    * Namespaces exist only under parquet, and sigma only under sqlite.
    */
   store: string;
-  /** rust or go */
+  /** rust or go: which storage implementation is active. */
   storage_backend: string;
-  /** Rust SQLite rather than the Go fallback */
+  /** Whether it is the Rust SQLite one. */
   storage_optimized: boolean;
-  /** ats-sqlite library version */
+  /** The ats-sqlite library's version. */
   storage_version: string;
-  /** wasm or go */
+  /** wasm or go: which parser implementation is active. */
   parser_backend: string;
-  /** ats via WASM rather than the Go parser */
+  /** Whether it is ats through WASM. */
   parser_optimized: boolean;
-  /** ats version when using WASM */
+  /** The ats version, through WASM. */
   parser_version: string;
-  /** WASM module size, e.g. "89KB" */
+  /** The WASM module's size. */
   parser_size: string;
 }
 
@@ -242,10 +242,15 @@ export interface SystemCapabilitiesMessage {
  * Mirrors version.Info.
  */
 export interface VersionInfo {
+  /** The whole commit. */
   commit_hash: string;
+  /** When it was built. */
   build_time: string;
+  /** The version tag. */
   version: string;
+  /** The Go it was built with. */
   go_version: string;
+  /** The OS and architecture. */
   platform: string;
 }
 

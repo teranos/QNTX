@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 // "that is a ROOT question about governance and controls and monitoring that belongs in its own window element in the tray like others"
@@ -62,13 +62,23 @@ func asRoot() context.Context {
 // holds asks a sigil's real answer whether it carries what the sigil gives.
 func holds(t *testing.T, signum sigil.Signum, name string, answer any) {
 	t.Helper()
-	body, err := json.Marshal(answer)
+	answered, err := answeredOf(signum)
 	require.NoError(t, err)
-	for _, held := range signum.GetSigils() {
-		if held.GetName() == name {
-			require.NoError(t, sigil.Holds(held, body))
+	require.NoError(t, answered.Check())
+	body, err := answerJSON(answer)
+	require.NoError(t, err)
+	for _, held := range answered.GetSigils() {
+		if held.GetName() != name {
+			continue
+		}
+		// A message is held to the schema its sigil promises; anything else to
+		// the fields it lists.
+		if _, message := answer.(proto.Message); message {
+			require.NoError(t, heldTo(promisedBy(t, held).schema, body))
 			return
 		}
+		require.NoError(t, sigil.Holds(held, body))
+		return
 	}
 	t.Fatalf("the mail signum holds no sigil %s", name)
 }

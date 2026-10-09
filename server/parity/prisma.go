@@ -151,29 +151,9 @@ var kindFits = map[protoreflect.Kind][]string{
 
 // departs says how a field's kind and cardinality differ from the column it is
 // followed into. A map is held as one row per entry, so it may be followed into
-// a model's single-valued columns. A repeated field keyed by a field of its
-// element is held as one object, a property per element, so it is followed
-// into a single-valued column; what it is keyed by is held to the element.
-func departs(field protoreflect.FieldDescriptor, name, keyedBy string, column Column, fits func(protoreflect.Kind, Column) bool) []string {
+// a model's single-valued columns.
+func departs(field protoreflect.FieldDescriptor, name string, column Column, fits func(protoreflect.Kind, Column) bool) []string {
 	var reasons []string
-	if keyedBy != "" {
-		switch {
-		case field.IsMap() || !field.IsList() || field.Kind() != protoreflect.MessageKind:
-			reasons = append(reasons, fmt.Sprintf("keyed by %s, and %s is not a repeated message", keyedBy, name))
-		default:
-			key := field.Message().Fields().ByName(protoreflect.Name(keyedBy))
-			if key == nil || key.IsList() || key.Kind() != protoreflect.StringKind {
-				reasons = append(reasons, fmt.Sprintf("keyed by %s, and %s has no text field %s", keyedBy, field.Message().FullName(), keyedBy))
-			}
-		}
-		if column.List {
-			reasons = append(reasons, fmt.Sprintf("a list in the schema, and %s keyed by %s is one object", name, keyedBy))
-		}
-		if !fits(field.Kind(), column) {
-			reasons = append(reasons, fmt.Sprintf("%s in the schema, and %s is %s", column.Type, name, field.Kind()))
-		}
-		return reasons
-	}
 	if field.IsMap() {
 		if column.List {
 			reasons = append(reasons, fmt.Sprintf("a list in the schema, and %s is a map", name))
@@ -194,6 +174,36 @@ func departs(field protoreflect.FieldDescriptor, name, keyedBy string, column Co
 		reasons = append(reasons, fmt.Sprintf("%s in the schema, and %s is %s", column.Type, name, field.Kind()))
 	}
 	return reasons
+}
+
+// foldDeparts says how a fold departs from the column it is followed into: a
+// repeated message held as one object, a property per element, named by the
+// element's text field key.
+func foldDeparts(field protoreflect.FieldDescriptor, name, key string, column Column, fits func(protoreflect.Kind, Column) bool) []string {
+	var reasons []string
+	if field.IsMap() || !field.IsList() || field.Kind() != protoreflect.MessageKind {
+		reasons = append(reasons, fmt.Sprintf("keyed by %s, and %s is not a repeated message", key, name))
+	} else if !textField(field.Message(), key) {
+		reasons = append(reasons, fmt.Sprintf("keyed by %s, and %s has no text field %s", key, field.Message().FullName(), key))
+	}
+	if column.List {
+		reasons = append(reasons, fmt.Sprintf("a list in the schema, and %s keyed by %s is one object", name, key))
+	}
+	if !fits(field.Kind(), column) {
+		reasons = append(reasons, fmt.Sprintf("%s in the schema, and %s is %s", column.Type, name, field.Kind()))
+	}
+	return reasons
+}
+
+// textField is whether message has a field of that name holding one text.
+func textField(message protoreflect.MessageDescriptor, name string) bool {
+	fields := message.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		if field := fields.Get(i); string(field.Name()) == name {
+			return !field.IsList() && field.Kind() == protoreflect.StringKind
+		}
+	}
+	return false
 }
 
 // Item is one column of a model: whether it is followed, and how it departs,
@@ -302,10 +312,15 @@ func inScope(signum *protocol.Signum, named string) (messages map[string]bool, w
 		if s.GetName() != named {
 			continue
 		}
+		// Its answer and what its fields carry, each named in full when named.
 		messages = map[string]bool{}
+		carried := []string{s.GetAnswer()}
 		for _, f := range s.GetGives() {
-			if f.GetMessage() != "" {
-				messages[f.GetMessage()] = true
+			carried = append(carried, f.GetMessage())
+		}
+		for _, name := range carried {
+			if protoreflect.FullName(name).IsValid() {
+				messages[name] = true
 			}
 		}
 		if len(messages) == 0 {
@@ -329,12 +344,40 @@ func splitField(full string) (string, string) {
 // resolves is how many of a reference's columns name a column of the schema.
 func resolves(follows *protocol.Follows, columns map[string]Column) int {
 	n := 0
-	for _, c := range follows.GetColumns() {
-		if _, ok := columns[c.GetColumn()]; ok {
+	for _, c := range correspondences(follows) {
+		if _, ok := columns[c.column]; ok {
 			n++
 		}
 	}
 	return n
+}
+
+// correspondence is one field followed into one column, and how it departs
+// from it: as one value, or as a fold.
+type correspondence struct {
+	field, column string
+	departs       func(protoreflect.FieldDescriptor, Column, func(protoreflect.Kind, Column) bool) []string
+}
+
+// correspondences is every field a reference is followed by, its columns and
+// its folds alike.
+func correspondences(follows *protocol.Follows) []correspondence {
+	var all []correspondence
+	for _, c := range follows.GetColumns() {
+		name := c.GetField()
+		all = append(all, correspondence{field: name, column: c.GetColumn(),
+			departs: func(fd protoreflect.FieldDescriptor, column Column, fits func(protoreflect.Kind, Column) bool) []string {
+				return departs(fd, name, column, fits)
+			}})
+	}
+	for _, f := range follows.GetFolds() {
+		name, key := f.GetField(), f.GetKey()
+		all = append(all, correspondence{field: name, column: f.GetColumn(),
+			departs: func(fd protoreflect.FieldDescriptor, column Column, fits func(protoreflect.Kind, Column) bool) []string {
+				return foldDeparts(fd, name, key, column, fits)
+			}})
+	}
+	return all
 }
 
 // following is the reference by its name, as the signum declares it follows.
@@ -383,34 +426,34 @@ func Hold(signum *protocol.Signum, named, reference string, schema Schema) (Pari
 	followedFields := map[string]bool{}
 	messages := map[string]protoreflect.MessageDescriptor{}
 
-	for _, c := range follows.GetColumns() {
-		message, field := splitField(c.GetField())
+	for _, c := range correspondences(follows) {
+		message, field := splitField(c.field)
 		if !whole && !scope[message] {
 			continue
 		}
 		found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(message))
 		if err != nil {
-			return Parity{}, failed("%s follows %s, and %s is no message", signum.GetName(), c.GetField(), message)
+			return Parity{}, failed("%s follows %s, and %s is no message", signum.GetName(), c.field, message)
 		}
 		descriptor := found.Descriptor()
 		fd := descriptor.Fields().ByName(protoreflect.Name(field))
 		if fd == nil {
-			return Parity{}, failed("%s follows %s, and %s has no field %s", signum.GetName(), c.GetField(), message, field)
+			return Parity{}, failed("%s follows %s, and %s has no field %s", signum.GetName(), c.field, message, field)
 		}
 		messages[message] = descriptor
-		followedFields[c.GetField()] = true
+		followedFields[c.field] = true
 
-		column, ok := columns[c.GetColumn()]
+		column, ok := columns[c.column]
 		if !ok {
-			p.Missing = append(p.Missing, c.GetField()+" → "+c.GetColumn())
+			p.Missing = append(p.Missing, c.field+" → "+c.column)
 			continue
 		}
-		followedBy[c.GetColumn()] = append(followedBy[c.GetColumn()], c.GetField())
+		followedBy[c.column] = append(followedBy[c.column], c.field)
 		fits := schema.fits
 		if column.fits != nil {
 			fits = column.fits
 		}
-		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), c.GetKeyedBy(), column, fits)...)
+		departures[c.column] = append(departures[c.column], c.departs(fd, column, fits)...)
 	}
 	for message := range scope {
 		if _, ok := messages[message]; ok {

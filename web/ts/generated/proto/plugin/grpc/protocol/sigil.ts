@@ -42,13 +42,18 @@ export interface Node {
 
 /**
  * Transcript is one agent session Ground recorded, derived from its hook
- * events: transcripts read answers these. Mirrors server.transcript.
+ * events: transcripts read answers these.
  */
 export interface Transcript {
+  /** Its id. */
   session: string;
+  /** The subjects it was about. */
   subjects: string[];
+  /** When it started. */
   started: string;
+  /** When it ended. */
   ended: string;
+  /** Its turns, each naming the attestation it was read from. */
   turns: Turn[];
   /** Events the store folded into sigmas (ADR-020), counted and not read. */
   folded: number;
@@ -60,13 +65,35 @@ export interface Transcript {
 
 /**
  * Turn is one thing said or done in a session, naming the attestation it was
- * read from. Mirrors server.transcriptTurn.
+ * read from.
  */
 export interface Turn {
+  /** When it was said or done. */
   at: string;
+  /** Who said or did it. */
   speaker: string;
+  /** What was said or done. */
   text: string;
+  /** The attestation it was read from. */
   of: string;
+}
+
+/** Transcripts is what transcripts read answers. */
+export interface Transcripts {
+  /**
+   * Each session: its id, the subjects it was about, when it started and
+   * ended, and its turns, each naming the attestation it was read from.
+   */
+  transcripts: Transcript[];
+}
+
+/** SessionTranscript is what an agent harness's session sigil answers. */
+export interface SessionTranscript {
+  /**
+   * Its session as turns, each naming the attestation it was read from. Empty
+   * before anything was said to it.
+   */
+  transcript: Transcript | undefined;
 }
 
 /**
@@ -76,6 +103,7 @@ export interface Turn {
 export interface Follows {
   reference: string;
   columns: Corresponds[];
+  folds: Fold[];
 }
 
 /**
@@ -88,12 +116,20 @@ export interface Corresponds {
   field: string;
   /** WebsiteEvent.urlPath */
   column: string;
-  /**
-   * A repeated field held as one object, a property per element, names here
-   * the element's field each property is named by: protocol.Sigil.takes is
-   * Tool.inputSchema, a property per Param, keyed by name.
-   */
-  keyed_by: string;
+}
+
+/**
+ * Fold is a repeated field held as one object of a column, a property per
+ * element: protocol.Sigil.takes is Tool.inputSchema, a property per Param,
+ * keyed by name.
+ */
+export interface Fold {
+  /** protocol.Sigil.takes */
+  field: string;
+  /** Tool.inputSchema */
+  column: string;
+  /** The element's field each property is named by: name. */
+  key: string;
 }
 
 /**
@@ -109,7 +145,15 @@ export interface Sigil {
   /** What comes out, by field. */
   gives: Field[];
   /** Where it answers on the HTTP API. */
-  http: Endpoint | undefined;
+  http:
+    | Endpoint
+    | undefined;
+  /**
+   * The message its answer is, named in full: protocol.VersionInfo. What it
+   * gives is that message's fields, each in its .proto's words, and nothing
+   * is said of them a second time.
+   */
+  answer: string;
 }
 
 /**
