@@ -68,9 +68,8 @@ type openedCall struct {
 // openCall is a token for one call a plugin answers, reaching the store of the
 // namespace its caller acts in, and what closes it once the plugin has answered.
 // A caller who reaches no store is refused, and the refusal carries why.
-func (s *QNTXServer) openCall(ctx context.Context) (string, func(), *protocol.Refusal, error) {
-	admitted, gated := auth.AdmissionFrom(ctx)
-	universe, err := s.universeFor(admitted, gated)
+func (s *QNTXServer) openCall(admitted auth.Admission) (string, func(), *protocol.Refusal, error) {
+	universe, err := s.universeFor(admitted, true)
 	if err != nil {
 		return "", nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: err.Error()}, err
 	}
@@ -88,10 +87,11 @@ type callDoneKey struct{}
 // store, for a plugin answering over HTTP, and what closes it. A stranger, or
 // a User who reaches no store, is handed on with none.
 func (s *QNTXServer) callFor(ctx context.Context) context.Context {
-	if _, gated := auth.AdmissionFrom(ctx); !gated {
+	admitted, gated := auth.AdmissionFrom(ctx)
+	if !gated {
 		return ctx
 	}
-	token, done, refusal, err := s.openCall(ctx)
+	token, done, refusal, err := s.openCall(admitted)
 	if refusal != nil || err != nil {
 		return ctx
 	}
@@ -361,8 +361,8 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared 
 
 		// A stranger on an ANYONE sigil is asked through and handed no store:
 		// only an admitted caller has a namespace to act in.
-		if _, gated := auth.AdmissionFrom(ctx); gated {
-			token, done, notYours, err := s.openCall(ctx)
+		if admitted, gated := auth.AdmissionFrom(ctx); gated {
+			token, done, notYours, err := s.openCall(admitted)
 			if notYours != nil {
 				return nil, notYours
 			}

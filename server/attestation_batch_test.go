@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
 )
 
@@ -22,7 +23,7 @@ func TestABatchIsAnsweredOnePerAttestation(t *testing.T) {
 		`{"id":"ground:two","subjects":[],"predicates":["noted"]},` +
 		`{"id":"ground:three","subjects":["qntx"],"predicates":["noted"],"actors":["ground"]}` +
 		`]`
-	req := httptest.NewRequest(http.MethodPost, "/api/attestations", jsonBody(body))
+	req := rootRequest(httptest.NewRequest(http.MethodPost, "/api/attestations", jsonBody(body)))
 	rec := httptest.NewRecorder()
 	s.handleCreateAttestation(rec, req)
 
@@ -61,7 +62,7 @@ func TestABatchIsAnsweredOnePerAttestation(t *testing.T) {
 
 	// Sent again, each one that exists says so, as a single POST does.
 	again := httptest.NewRecorder()
-	s.handleCreateAttestation(again, httptest.NewRequest(http.MethodPost, "/api/attestations", jsonBody(body)))
+	s.handleCreateAttestation(again, rootRequest(httptest.NewRequest(http.MethodPost, "/api/attestations", jsonBody(body))))
 	if err := json.Unmarshal(again.Body.Bytes(), &said); err != nil {
 		t.Fatalf("the second answer did not parse: %v", err)
 	}
@@ -72,7 +73,8 @@ func TestABatchIsAnsweredOnePerAttestation(t *testing.T) {
 
 // A body that is not a list is the single POST it always was.
 func TestASingleAttestationIsUnchanged(t *testing.T) {
-	_, rec := writingAs(t, nil, `{"subjects":["qntx"],"predicates":["noted"]}`)
+	root := auth.Admitted(auth.LevelRoot)
+	_, rec := writingAs(t, &root, `{"subjects":["qntx"],"predicates":["noted"]}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201: %s", rec.Code, rec.Body.String())
 	}

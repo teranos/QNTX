@@ -1,6 +1,6 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 351 in 158 files.
+# 350 in 158 files.
 
 1	ai/tracker/usage_tracker.go
 1	ats/attrs/attrs.go
@@ -133,7 +133,7 @@
 3	server/plugin_build.go
 1	server/plugin_log_handlers.go
 3	server/plugin_roots.go
-3	server/plugin_sigils.go
+2	server/plugin_sigils.go
 1	server/plugin_stores.go
 1	server/pulse_schedules.go
 1	server/ratelimit.go

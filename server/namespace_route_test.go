@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +9,11 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
 )
+
+// rootRequest is a request as the gate of a node without auth hands it on.
+func rootRequest(r *http.Request) *http.Request {
+	return r.WithContext(auth.WithAdmission(r.Context(), auth.Admitted(auth.LevelRoot)))
+}
 
 func requestAs(caller auth.Admission) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
@@ -88,9 +92,6 @@ func TestNoCallerReachesNoStore(t *testing.T) {
 	s := routeServer()
 	if _, err := s.storeFor(httptest.NewRequest(http.MethodGet, "/api/attestations", nil)); err == nil {
 		t.Fatal("a request nobody admitted got the served store")
-	}
-	if _, _, refusal, _ := s.openCall(context.Background()); refusal == nil {
-		t.Fatal("a plugin call nobody admitted was handed a store token")
 	}
 }
 
