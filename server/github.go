@@ -90,6 +90,7 @@ type gitHubStatus struct {
 	Webhook     bool                        `json:"webhook"`
 	WebhookPath string                      `json:"webhook_path"`
 	WebhookURL  string                      `json:"webhook_url"`
+	Follows     []GitHubFollow              `json:"follows"`
 }
 
 // webhookURL is the URL to paste into the App's webhook settings.
@@ -126,6 +127,7 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 						{Name: "webhook", Says: "Whether ROOT generated the App's webhook secret, which is what opens the webhook's path."},
 						{Name: "webhook_path", Says: "Where the App's webhook URL points on this node."},
 						{Name: "webhook_url", Says: "The whole URL to paste into the App's webhook settings."},
+						{Name: "follows", Says: "What a push to a repo's branch dispatches, per follow ROOT set."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: githubPath},
 				},
@@ -162,6 +164,7 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 					Gives: []*protocol.Field{{Name: "runner", Says: "The runner as the Actions section shows it."}},
 					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/runner"},
 				},
+				githubFollowSigil(),
 				githubAskSigils()[0],
 				githubAskSigils()[1],
 			},
@@ -172,6 +175,7 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 			"runner":       s.githubRunner,
 			"webhook":      s.githubWebhook,
 			"webhook_path": s.githubWebhookPath,
+			"follow":       s.githubFollow,
 			"ask":          s.githubAsk,
 			"operations":   s.githubOperations,
 		},
@@ -191,6 +195,9 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 	}
 	_, status.Webhook = s.gitHubWebhook()
 	status.WebhookPath, status.WebhookURL = settings.WebhookPath, s.webhookURL(settings.WebhookPath)
+	if status.Follows, err = s.nodeRecords().Follows(); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
 	if s.authHandler == nil {
 		return status, nil
 	}

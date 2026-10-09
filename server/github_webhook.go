@@ -164,7 +164,8 @@ func (s *QNTXServer) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request)
 	}
 	names := s.buildsMovedBy(push)
 	filling := s.vaultsMovedBy(push)
-	respond(w, s.logger, http.StatusOK, map[string][]string{"building": names, "filling": filling})
+	dispatching := s.followsMovedBy(push)
+	respond(w, s.logger, http.StatusOK, map[string][]string{"building": names, "filling": filling, "dispatching": dispatching})
 }
 
 // buildsMovedBy starts the build of every enabled plugin push moves, and names them.
