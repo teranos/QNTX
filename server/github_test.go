@@ -82,20 +82,20 @@ func TestTheGitHubElementSeesEveryNamespacesGitHub(t *testing.T) {
 
 	said, refused := answer(t, s, "status", sigil.Sent{})
 	require.Nil(t, refused)
-	status := said.(gitHubStatus)
+	status := said.(*protocol.GitHubStatus)
 	require.Len(t, status.Namespaces, 2)
 
-	byName := map[string]gitHubNamespace{}
+	byName := map[string]*protocol.GitHubNamespace{}
 	for _, ns := range status.Namespaces {
 		byName[ns.Namespace] = ns
 	}
-	assert.True(t, byName["system"].AuthOK)
+	assert.True(t, byName["system"].AuthOk)
 	assert.Equal(t, auth.GitHubSourceOAuth, byName["system"].Source)
 	assert.Equal(t, "teranos", byName["system"].Login)
 	require.NotNil(t, byName["system"].Rate)
-	assert.Equal(t, int64(4999), byName["system"].Rate.Remaining)
+	assert.Equal(t, uint32(4999), byName["system"].Rate.Remaining)
 
-	assert.False(t, byName["garden"].AuthOK)
+	assert.False(t, byName["garden"].AuthOk)
 	assert.Contains(t, byName["garden"].AuthError, "Bad credentials")
 	assert.Equal(t, auth.GitHubSourceAccessToken, byName["garden"].Source)
 }
@@ -126,7 +126,7 @@ func TestAnEnabledRunnerShowsItsStats(t *testing.T) {
 
 	said, refused := answer(t, s, "status", sigil.Sent{})
 	require.Nil(t, refused)
-	status := said.(gitHubStatus)
+	status := said.(*protocol.GitHubStatus)
 	assert.True(t, status.Runner.Enabled)
 	assert.Equal(t, runner, status.Runner.Path)
 	require.NotNil(t, status.Runner.Stats)
@@ -138,5 +138,5 @@ func TestTheRunnerPathIsPrefilled(t *testing.T) {
 	s := githubKnowingServer(t)
 	said, refused := answer(t, s, "status", sigil.Sent{})
 	require.Nil(t, refused)
-	assert.Equal(t, "/opt/actions-runner", said.(gitHubStatus).Runner.Path)
+	assert.Equal(t, "/opt/actions-runner", said.(*protocol.GitHubStatus).Runner.Path)
 }
