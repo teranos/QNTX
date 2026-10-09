@@ -24,15 +24,13 @@ A sigil handles a server capability, the reach table governs it with attestation
 
 `make test` runs both backend (Go) and frontend (TypeScript) tests. See [web/TESTING.md](web/TESTING.md) for frontend testing patterns.
 
-**It is DISCOURAGED to craft custom test commands.**
-
 **Tests passing ≠ feature is correct.** Only manual verification by the developer confirms behavior matches intent.
 
 **Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, literally, don't describe implementation details, User Vision outlives derived code. Ask questions to preserve the user's mental model _verbatim_ rather than descriptive interpreted summaries. **Maximize signal-to-noise: essential context only, no filler.**
 
 ## Regex
 
-**FORBIDDEN.** Regex is banned. Use string methods (`split`, `indexOf`, `includes`, `startsWith`, `endsWith`, `slice`) instead.
+**FORBIDDEN.** Regex is banned in code. Use string methods (`split`, `indexOf`, `includes`, `startsWith`, `endsWith`, `slice`) instead.
 
 ## Identity
 
@@ -40,11 +38,10 @@ Who may log in, the provider ceremony, and what a passkey carries: [ADR-030](doc
 
 ## Plugins
 
-**ANY edit to a plugin MUST bump its version in `Metadata().Version`.** Plugins run as separate processes — the version in the UI or logs is the only way to confirm new code is running. No exceptions.
+**ANY edit to a plugin MUST bump its version in `Metadata().Version`.** Plugins run as separate processes.
 
 **Hot-swap:** Plugins are added, configured, enabled and disabled in the plugin element, at runtime. See [ADR-002](docs/adr/ADR-002-plugin-configuration.md).
 
-A plugin is its record on the node, written through sigils:
 
 1. `plugins_add` a repo or tree URL. Its last segment is the plugin's name, and equals `Metadata().Name`; the binary is `qntx-<name>-plugin`.
 2. `PUT /api/plugins/<name>/config` writes the record: the plugin's own keys, `namespace` (ADR-046), and `build.core`, `build.command`, `build.output`, `build.packages`, `build.inputs`, `build.inputs_env` ([server/plugin_build.go](server/plugin_build.go)).

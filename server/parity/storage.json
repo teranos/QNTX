@@ -13,10 +13,7 @@
     "sqlite": true,
     "duckdb": false,
     "rebuilt": false,
-    "sites": [
-      "ai/tracker/usage_tracker.go",
-      "pulse/budget/store.go"
-    ]
+    "sites": []
   },
   {
     "name": "aliases",
@@ -294,6 +291,24 @@
     "duckdb": false,
     "rebuilt": false,
     "sites": []
+  },
+  {
+    "name": "invitation_accounts",
+    "sqlite": true,
+    "duckdb": false,
+    "rebuilt": false,
+    "sites": [
+      "server/auth/invitation.go"
+    ]
+  },
+  {
+    "name": "invitations",
+    "sqlite": true,
+    "duckdb": false,
+    "rebuilt": false,
+    "sites": [
+      "server/auth/invitation.go"
+    ]
   },
   {
     "name": "job_checkpoints",

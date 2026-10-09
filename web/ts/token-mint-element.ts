@@ -35,8 +35,9 @@ async function createToken(
     namespaces: string[],
     returnAddress: string,
 ): Promise<CreateTokenResponse> {
+    // A token says when it ends, and one minted here does not: it says so.
     // A client's, and only a client's: the node refuses one on any other kind.
-    const body: Record<string, unknown> = { label, level, namespaces };
+    const body: Record<string, unknown> = { label, level, namespaces, expires_at: 'never' };
     if (returnAddress) body.return_address = returnAddress;
     return await apiJson<CreateTokenResponse>('/auth/tokens', {
         method: 'POST',

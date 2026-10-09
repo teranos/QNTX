@@ -5,6 +5,7 @@ package ats
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
@@ -75,8 +76,12 @@ type AttestationFilter struct {
 	Source     string     // Filter by source (exact match, e.g., "cli", "distill")
 	TimeStart  *time.Time // Temporal range start
 	TimeEnd    *time.Time // Temporal range end
-	Limit      int        // Maximum results
+	Limit      int        // How many rows: 0 is none, and every row is EveryRow
 }
+
+// EveryRow is the limit of a query that wants every matching row: a high value,
+// said, since a limit of 0 is 0 rows.
+const EveryRow = math.MaxInt32
 
 // PersistenceResult contains the results of a batch persistence operation
 type PersistenceResult struct {

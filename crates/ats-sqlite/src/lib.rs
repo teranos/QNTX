@@ -25,7 +25,7 @@
 //!
 //! ```rust,no_run
 //! use ats_sqlite::SqliteStore;
-//! use ats::{AttestationBuilder, storage::{AttestationStore, QueryStore}, AxFilter};
+//! use ats::{AttestationBuilder, storage::{AttestationStore, QueryStore}, AxFilter, EVERY_ROW};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create an in-memory store
@@ -49,6 +49,7 @@
 //! // Query with filters
 //! let filter = AxFilter {
 //!     subjects: vec!["ALICE".to_string()],
+//!     limit: EVERY_ROW,
 //!     ..Default::default()
 //! };
 //! let results = store.query(&filter)?;

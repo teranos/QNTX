@@ -143,6 +143,6 @@ Extended `domain.proto` ([Plugin gRPC API](https://github.com/teranos/QNTX/blob/
 
 ## Notes
 
-This decision removes the last barrier to a fully plugin-based async execution system. Domain logic (Python execution, git ingestion, etc.) now lives entirely in plugins, with core QNTX providing only generic infrastructure (routing, queuing, progress tracking, budget management).
+This decision removes the last barrier to a fully plugin-based async execution system. Domain logic (Python execution, git ingestion, etc.) now lives entirely in plugins, with core QNTX providing only generic infrastructure (routing, queuing, progress tracking).
 
 The self-certifying attestation pattern for handlers enables unlimited user-created handlers without hitting bounded storage limits, as each handler acts as its own actor.

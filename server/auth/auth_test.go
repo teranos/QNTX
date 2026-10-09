@@ -197,7 +197,7 @@ func TestMiddlewareRejectsAPIRequest(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/timeseries/usage", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/pulse/jobs", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -214,7 +214,7 @@ func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/timeseries/usage", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/pulse/jobs", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
 	rec := httptest.NewRecorder()
 
@@ -458,7 +458,7 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/timeseries/usage", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/pulse/jobs", nil)
 	req.Header.Set("Authorization", "Bearer "+rawToken)
 	rec := httptest.NewRecorder()
 
@@ -553,7 +553,7 @@ func TestSuperListsAndReadsTokensAndChangesNone(t *testing.T) {
 
 	// The route is answered on its table path; the request carries the whole.
 	asSuper := func(method, route, path string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(method, path, strings.NewReader(`{"label":"another","level":"ATTESTOR"}`))
+		req := httptest.NewRequest(method, path, strings.NewReader(`{"expires_at":"never","label":"another","level":"ATTESTOR"}`))
 		req.Header.Set("Authorization", "Bearer "+raw)
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
@@ -581,7 +581,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	h := &Handler{tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
-		strings.NewReader(`{"label":"laptop-cron","level":"ATTESTOR","scope":{"write":["ingested"]}}`))
+		strings.NewReader(`{"expires_at":"never","label":"laptop-cron","level":"ATTESTOR","scope":{"write":["ingested"]}}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -609,7 +609,7 @@ func TestANameIsHeldByOneToken(t *testing.T) {
 	h := &Handler{tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
-		strings.NewReader(`{"label":"pond-sensor","level":"ATTESTOR"}`))
+		strings.NewReader(`{"expires_at":"never","label":"pond-sensor","level":"ATTESTOR"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	mint(h, rec, req)

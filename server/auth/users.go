@@ -63,9 +63,12 @@ func (h *Handler) joinUser(route string, matched *SignedBinding, layeDID string)
 
 	// What the provider showed at this login, over whatever it showed last.
 	u, pictured := u.WithPicture(route, h.pictureFor(matched))
+	// The binding this sign-in proved, kept on its account, so the passkey after
+	// it asks about this proof, including on an account joined before bindings.
+	u, bound := withBindingKept(u, route, matched)
 
 	// The browser this login came from is one more place the User is reachable.
-	if u.HoldsKey(layeDID) && !pictured {
+	if u.HoldsKey(layeDID) && !pictured && !bound {
 		return u, nil
 	}
 	if !u.HoldsKey(layeDID) {
@@ -180,6 +183,19 @@ func (h *Handler) reachRoot(route string, matched *SignedBinding) (User, error) 
 	// the node has an owner.
 	h.attest(PredicateClaimed, u.ID, map[string]any{"route": route, "level": string(u.Level)})
 	return u, nil
+}
+
+// withBindingKept writes the binding a sign-in just proved onto the account it
+// is for, the newest proof over the last, and reports whether there was such
+// an account. A did:key route is a key and has no account to write one on.
+func withBindingKept(u User, route string, matched *SignedBinding) (User, bool) {
+	for i, a := range u.Accounts {
+		if a.CanonicalID == route {
+			u.Accounts[i].Binding = matched
+			return u, true
+		}
+	}
+	return u, false
 }
 
 // withRoute writes a route onto a User as the key or the account it is.

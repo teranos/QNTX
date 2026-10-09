@@ -166,6 +166,15 @@ func findProjectConfig() string {
 	return ""
 }
 
+// SourceOf is where a configuration key came from, and whether loading
+// recorded it at all.
+func SourceOf(key string) (ConfigSource, bool) {
+	configSourcesMu.RLock()
+	defer configSourcesMu.RUnlock()
+	info, recorded := ConfigSources[key]
+	return info.Source, recorded
+}
+
 // trackSource records where a configuration key came from
 func trackSource(key string, source ConfigSource, path string) {
 	configSourcesMu.Lock()

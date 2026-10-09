@@ -1,20 +1,18 @@
-# Pulse & Async IX: Budget-Controlled Asynchronous Job Processing
+# Pulse & Async IX: Asynchronous Job Processing
 
 ## Overview
 
-**Pulse** is QNTX's rate-limiting and budget control system for asynchronous operations. It enables long-running, cost-sensitive operations to run asynchronously while adhering to API rate limits and money budgets. For the HTTP API that controls Pulse, see the [Pulse API Documentation](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json).
+**Pulse** is QNTX's asynchronous job system. It enables long-running operations to run asynchronously while adhering to API rate limits. For the HTTP API that controls Pulse, see the [Pulse API Documentation](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json).
 
 ## Motivation
 
 Modern AI-powered applications often involve:
 - **Multiple API calls** per operation (batch processing)
-- **Real money costs** (~$0.002+ per API call)
 - **Time-intensive operations** (10-30+ seconds)
 - **Batch processing needs** (multiple items, re-processing)
 
 Without controls:
 - ❌ Blocking operations during processing (poor UX)
-- ❌ Uncontrolled API costs (budget overrun)
 - ❌ Rate limit violations (429 errors)
 - ❌ No visibility into running operations
 - ❌ Can't pause/stop expensive operations
@@ -23,17 +21,14 @@ Without controls:
 
 ### Pulse System
 
-Pulse acts as a **smart rate limiter and budget manager** for outgoing API calls.
+Pulse acts as a **rate limiter** for outgoing API calls.
 
 ```
 ┌─────────────────────────────────────────┐
 │          Pulse Controller               │
 ├─────────────────────────────────────────┤
 │  ├─ Rate Limiter (calls/minute)         │
-│  ├─ Budget Tracker (daily/monthly USD)  │
-│  ├─ Cost Estimator (per operation)      │
-│  ├─ Pause/Resume Control                │
-│  └─ Observability Integration           │
+│  └─ Pause/Resume Control                │
 └─────────────────────────────────────────┘
               ↓  ↑
        ┌──────────────┐
@@ -43,10 +38,7 @@ Pulse acts as a **smart rate limiter and budget manager** for outgoing API calls
 
 **Key Responsibilities:**
 - **Rate limiting**: Enforce max API calls per minute (sliding window algorithm)
-- **Budget tracking**: Monitor daily/monthly spend in USD
-- **Cost estimation**: Calculate projected costs before operations
-- **Pause control**: Stop operations when budget exceeded
-- **Observability**: Integrate with usage tracker
+- **Pause control**: Pause a job when the rate limit is reached
 
 ### Async Job System
 
@@ -61,9 +53,7 @@ type Job struct {
     Source       string          // Data source (for deduplication)
     Status       JobStatus       // "queued", "running", "paused", "completed", "failed"
     Progress     Progress        // Current/total operations
-    CostEstimate float64         // Estimated USD cost
-    CostActual   float64         // Actual USD cost so far
-    PulseState   *PulseState     // Rate limit, budget status
+    PulseState   *PulseState     // Rate limit status
     Error        string          // Error message if failed
     ParentJobID  string          // For task hierarchies
     RetryCount   int             // Retry attempts (max 2)
@@ -76,11 +66,8 @@ type Job struct {
 type PulseState struct {
     CallsThisMinute  int
     CallsRemaining   int
-    SpendToday       float64
-    SpendThisMonth   float64
-    BudgetRemaining  float64
     IsPaused         bool
-    PauseReason      string  // "budget_exceeded", "rate_limit", "user_requested"
+    PauseReason      string  // "rate_limited", "user_requested"
 }
 
 // Handler-based execution
@@ -104,30 +91,13 @@ Example Pulse configuration (see [config package](../../internal/config/README.m
 
 ```toml
 [pulse]
-max_calls_per_minute = 10
-daily_budget_usd = 5.0
-monthly_budget_usd = 100.0
-pause_on_budget_exceeded = true
+workers = 1
+ticker_interval_seconds = 1
 ```
 
 ## Implementation
 
 ### Database Schema
-
-#### Pulse Budget Tracking
-
-```sql
-CREATE TABLE pulse_budget (
-    date TEXT PRIMARY KEY,           -- "2025-11-23" for daily, "2025-11" for monthly
-    type TEXT NOT NULL,              -- "daily" or "monthly"
-    spend_usd REAL NOT NULL,         -- Current spend in USD
-    operations_count INTEGER NOT NULL,
-    created_at DATETIME,
-    updated_at DATETIME
-);
-
-CREATE INDEX idx_pulse_budget_type ON pulse_budget(type);
-```
 
 #### Async Job Queue
 
@@ -139,8 +109,8 @@ CREATE TABLE async_ix_jobs (
     status TEXT NOT NULL,            -- "queued", "running", "paused", "completed", "failed"
     progress_current INTEGER,        -- Current operations completed
     progress_total INTEGER,          -- Total operations
-    cost_estimate REAL,              -- Estimated USD cost
-    cost_actual REAL,                -- Actual USD cost
+    cost_estimate REAL,              -- No longer written
+    cost_actual REAL,                -- No longer written
     pulse_state TEXT,                -- JSON: PulseState
     error TEXT,                      -- Error message if failed
     payload TEXT,                    -- JSON: Handler-specific data
@@ -160,7 +130,7 @@ CREATE INDEX idx_async_ix_jobs_source_handler ON async_ix_jobs(source, handler_n
 
 ### Core Components
 
-#### Rate Limiter (`pulse/budget/limiter.go`)
+#### Rate Limiter (`pulse/ratelimit/limiter.go`)
 
 Sliding window rate limiter with configurable calls per minute:
 
@@ -188,34 +158,6 @@ func (r *Limiter) Wait(ctx context.Context) error {
 - Automatic expiration of old calls
 - Stats tracking (calls in window, remaining)
 - Context-aware blocking with Wait()
-
-#### Budget Tracker
-
-Tracks daily/monthly spend with persistence:
-
-```go
-type Tracker struct {
-    store  *Store
-    config BudgetConfig
-    mu     sync.RWMutex
-}
-
-func (b *Tracker) CheckBudget(estimatedCost float64) error {
-    // Check if operation would exceed budget
-}
-
-func (b *Tracker) RecordOperation(actualCost float64) error {
-    // Record actual cost in database
-}
-
-func (b *Tracker) GetStatus() (*Status, error) {
-    // Returns current budget status from ai_model_usage table
-}
-```
-
-> **Type Reference**: See [Limiter](../types/budget.md#limiter), [Tracker](../types/budget.md#tracker), [BudgetConfig](../types/budget.md#budgetconfig), and [Status](../types/budget.md#status) type definitions.
-
-**Package:** `pulse/budget` - Separated from async to eliminate import cycles
 
 #### Job Queue (`pulse/async/queue.go`)
 
@@ -252,8 +194,7 @@ Processes jobs with pulse integration:
 ```go
 type WorkerPool struct {
     queue         *Queue
-    budgetTracker *budget.Tracker  // Optional - can be nil for tests
-    rateLimiter   *budget.Limiter  // Optional - can be nil for tests
+    rateLimiter   RateLimiter      // Optional - can be nil for tests
     workers       int
     executor      JobExecutor
 }
@@ -264,13 +205,12 @@ func (wp *WorkerPool) Start()
 // Stop gracefully stops workers
 func (wp *WorkerPool) Stop()
 
-// processNextJob processes one job with rate limiting and budget checks
+// processNextJob processes one job with rate limiting
 func (wp *WorkerPool) processNextJob() error {
     // 1. Dequeue job
     // 2. Check rate limit (pause if exceeded)
-    // 3. Check budget (pause if exceeded)
-    // 4. Execute job via handler registry
-    // 5. Mark complete/failed
+    // 3. Execute job via handler registry
+    // 4. Mark complete/failed
 }
 ```
 
@@ -278,7 +218,6 @@ func (wp *WorkerPool) processNextJob() error {
 - Configurable worker count
 - Gradual startup (1s → 5s polling interval)
 - Graceful shutdown with 2s timeout
-- Rate limiting before budget checks
 - Job pause/resume on limit violations
 
 ### Handler Registration
@@ -332,22 +271,10 @@ func (wp *WorkerPool) processNextJob() error {
 ### Phase 1: Pulse Foundation ✅ COMPLETE
 
 - ✅ Configuration system
-- ✅ Budget tracking (pulse_budget table)
-- ✅ Budget checking before operations
-- ✅ Cost recording after operations
 - ✅ Database migrations
-- ✅ **Refactored (Dec 2025)**: Separated budget/rate limiting into `pulse/budget` package
 
 **Files:**
-- `pulse/budget/limiter.go` - Rate limiter
-- `pulse/budget/tracker.go` - Budget tracker
-- `pulse/budget/store.go` - Budget persistence
-
-**Architecture Benefits:**
-- Clean separation of concerns (budget tracking vs job execution)
-- Eliminates import cycles
-- Budget/rate limiting reusable across packages
-- Simpler testing (budget and async tested independently)
+- `pulse/ratelimit/limiter.go` - Rate limiter
 
 ### Phase 2: Async Job System ✅ COMPLETE
 
@@ -366,15 +293,14 @@ func (wp *WorkerPool) processNextJob() error {
 - `pulse/async/handler.go` - JobHandler interface and registry
 - `pulse/async/store.go` - Job persistence
 - `pulse/async/queue.go` - Queue operations
-- `pulse/async/worker.go` - Worker pool with budget integration
+- `pulse/async/worker.go` - Worker pool
 - `pulse/async/grace_test.go` - Opening/Closing tests
 
 ## Testing Strategy
 
 ### Unit Tests
 
-- `pulse/budget/limiter_test.go` - Rate limiting (9/9 tests)
-- `pulse/budget/tracker_test.go` - Budget calculations
+- `pulse/ratelimit/limiter_test.go` - Rate limiting
 - `pulse/async/job_test.go` - Job models and state
 - `pulse/async/queue_test.go` - Queue operations
 - `pulse/async/store_test.go` - Persistence
@@ -386,20 +312,12 @@ func (wp *WorkerPool) processNextJob() error {
 
 Full async workflow end-to-end:
 - Job enqueueing and dequeuing
-- Budget exceeded scenarios
 - Rate limiting enforcement
 - Pause/resume functionality
 - Worker pool lifecycle
 - Graceful shutdown ❀ and orphan recovery ✿
 
 ## Future Enhancements
-
-### Dynamic Cost Estimation
-
-Query pricing APIs for real-time cost updates:
-- Automatic pricing updates when providers change rates
-- Support for multiple models with different pricing
-- Config override vs API pricing
 
 ### Priority Queues
 
@@ -420,8 +338,6 @@ Schedule expensive operations for specific times:
 Configure different models for different operations:
 - Fast/cheap model for screening
 - Better model for detailed processing
-- Smart fallback when budget low
-- Budget-aware model selection
 
 ### Cost Optimization
 
@@ -460,7 +376,7 @@ func (h *BatchProcessHandler) Execute(ctx context.Context, job *async.Job) error
         return fmt.Errorf("invalid payload: %w", err)
     }
 
-    // Process with progress tracking and cost recording
+    // Process with progress tracking
     for i, recordID := range payload.RecordIDs {
         // Check for cancellation
         select {
@@ -469,14 +385,13 @@ func (h *BatchProcessHandler) Execute(ctx context.Context, job *async.Job) error
         default:
         }
 
-        // Process record (with API call cost)
+        // Process record
         if err := h.dataService.ProcessRecord(ctx, recordID); err != nil {
             return fmt.Errorf("failed to process record %s: %w", recordID, err)
         }
 
         // Update progress
         job.Progress.Current = i + 1
-        job.CostActual += 0.001 // $0.001 per API call
         if err := h.queue.UpdateJob(job); err != nil {
             h.logger.Warn("Failed to update job progress", zap.Error(err))
         }
@@ -518,50 +433,17 @@ func (h *InferenceHandler) Execute(ctx context.Context, job *async.Job) error {
         return fmt.Errorf("invalid payload: %w", err)
     }
 
-    // Run inference with cost tracking
-    results, cost, err := h.mlService.RunInference(ctx, payload.ModelName, payload.InputData)
+    results, err := h.mlService.RunInference(ctx, payload.ModelName, payload.InputData)
     if err != nil {
         return err
     }
 
-    job.CostActual += cost
     return h.queue.UpdateJob(job)
 }
 ```
 
-## Budget Exceeded Workflow
-
-When daily or monthly budget is exceeded, jobs are automatically paused:
-
-```
-User Operation:
-  → Pulse checks budget
-  → Daily budget exceeded: $5.02 / $5.00
-
-Response:
-  ✗ Daily budget exceeded: $5.02 / $5.00
-    Projected cost: $0.040 USD
-    Options:
-      1. Reduce batch size
-      2. Increase daily budget (config: pulse.daily_budget_usd)
-      3. Wait until tomorrow (budget resets at midnight UTC)
-```
-
-**Automatic Pause Behavior:**
-- Job transitions to `paused` status
-- `PulseState.IsPaused = true`
-- `PauseReason = "budget_exceeded"`
-- Workers skip paused jobs
-- User can manually resume after budget increase
-
-**Budget Reset:**
-- Daily budgets reset at midnight UTC
-- Monthly budgets reset on 1st of month
-- Paused jobs automatically resume on reset (if configured)
-
 ## Related Documentation
 
-- **Budget Tracking**: [budget-tracking.md](budget-tracking.md) - ai/tracker and pulse/budget cost management
 - **GRACE (❀)**: [ADR-036-GRACE.md](../adr/ADR-036-GRACE.md) - Graceful shutdown
 - **Handler Implementation**: Applications define domain-specific handlers implementing the JobHandler interface
 - **Configuration**: [config-system.md](config-system.md) - Configuration system including Pulse settings

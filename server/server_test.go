@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/watcher"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/server/auth"
 )
 
 // createTestDB is a local alias for qntxtest.CreateTestDB
@@ -217,7 +218,7 @@ func TestHandleWebSocket(t *testing.T) {
 	go srv.Run()
 
 	// Create test HTTP server
-	testServer := httptest.NewServer(http.HandlerFunc(srv.HandleWebSocket))
+	testServer := httptest.NewServer(srv.gate("/ws", auth.Reach{}, srv.HandleWebSocket))
 	defer testServer.Close()
 
 	// Convert http:// to ws://
@@ -361,7 +362,7 @@ func TestHandleQueryMessage(t *testing.T) {
 	go srv.Run()
 
 	// Create test HTTP server
-	testServer := httptest.NewServer(http.HandlerFunc(srv.HandleWebSocket))
+	testServer := httptest.NewServer(srv.gate("/ws", auth.Reach{}, srv.HandleWebSocket))
 	defer testServer.Close()
 
 	// Connect WebSocket client
@@ -415,7 +416,7 @@ func TestHandlePingMessage(t *testing.T) {
 	go srv.Run()
 
 	// Create test HTTP server
-	testServer := httptest.NewServer(http.HandlerFunc(srv.HandleWebSocket))
+	testServer := httptest.NewServer(srv.gate("/ws", auth.Reach{}, srv.HandleWebSocket))
 	defer testServer.Close()
 
 	// Connect WebSocket client
@@ -482,7 +483,7 @@ func TestMultipleWebSocketClients(t *testing.T) {
 	go srv.Run()
 
 	// Create test HTTP server
-	testServer := httptest.NewServer(http.HandlerFunc(srv.HandleWebSocket))
+	testServer := httptest.NewServer(srv.gate("/ws", auth.Reach{}, srv.HandleWebSocket))
 	defer testServer.Close()
 
 	// Connect multiple WebSocket clients

@@ -43,14 +43,13 @@ func (s *Store) CreateJob(job *Job) error {
 		INSERT INTO async_ix_jobs (
 			id, handler_name, source, status,
 			progress_current, progress_total,
-			cost_estimate, cost_actual,
 			pulse_state, error, error_details, payload,
 			parent_job_id, retry_count,
 			plugin_version,
 			trace_context, trace_baggage,
 			user_id, namespace,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	// exec_trace_* is absent on purpose: it is written when the job runs, by
 	// SetExecutionTrace, and a job being created has not run.
@@ -67,8 +66,6 @@ func (s *Store) CreateJob(job *Job) error {
 		job.Status,
 		job.Progress.Current,
 		job.Progress.Total,
-		job.CostEstimate,
-		job.CostActual,
 		pulseStateJSON,
 		errorMsg,
 		errorDetailsJSON,
@@ -166,7 +163,6 @@ func (s *Store) UpdateJob(job *Job) error {
 		    status = ?,
 		    progress_current = ?,
 		    progress_total = ?,
-		    cost_actual = ?,
 		    pulse_state = ?,
 		    error = ?,
 		    error_details = ?,
@@ -187,7 +183,6 @@ func (s *Store) UpdateJob(job *Job) error {
 		job.Status,
 		job.Progress.Current,
 		job.Progress.Total,
-		job.CostActual,
 		pulseStateJSON,
 		job.Error,
 		errorDetailsJSON,

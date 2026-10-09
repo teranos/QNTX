@@ -18,7 +18,7 @@ import { createAutoSave } from './element-autosave';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivity } from '../../client';
 import { createElementUI } from './element-ui';
-import { putAttestation, queryAttestations, parseQuery, generateASUID } from '../../ats-wasm';
+import { putAttestation, queryAttestations, parseQuery, generateASUID, EVERY_ROW } from '../../ats-wasm';
 import type { Attestation } from '../../ats-wasm';
 
 export const TS_DEFAULT_CODE = `// Generate a random attestation — each run creates a unique ASUID
@@ -103,7 +103,7 @@ function buildQntxApi(outputLines: string[]) {
             if (!result.ok) {
                 throw new Error(`Query parse error: ${result.error}`);
             }
-            return queryAttestations(result.query);
+            return queryAttestations(result.query, EVERY_ROW);
         },
 
         /** Append to script output */

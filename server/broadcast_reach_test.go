@@ -19,16 +19,14 @@ import (
 // something happened has learned it happened, whatever the payload says.
 //
 // So a broadcast either names the namespace it is about, or it is about the
-// node — its daemon, its plugins, its spend, its own liveness — and is the same
+// node — its daemon, its plugins, its own liveness — and is the same
 // fact for every reader. Which of the two is a claim somebody makes here.
 
 // nodeWideBroadcasts is every function that sends to every connected client,
 // and why what it sends is the node's rather than a namespace's.
 var nodeWideBroadcasts = map[string]string{
-	"broadcastUsageUpdate": "spend on AI models is the node's bill, metered per process " +
-		"and not per universe",
 	"broadcastDaemonStatus": "the async daemon is one pool of workers for the node, and " +
-		"its load and budget are what that pool is doing",
+		"its load is what that pool is doing",
 	"broadcastJobUpdate": "the async job queue is the node's, one queue however many " +
 		"namespaces it runs",
 	"broadcastLLMStream": "an LLM stream is addressed by job id, and the job it belongs " +
@@ -109,7 +107,7 @@ func nodeWideBroadcastersIn(dir string) ([]string, error) {
 }
 
 // sendsToEveryone reports whether a body reaches every client: a call to
-// broadcastMessage, or a broadcastRequest naming neither in nor clientID.
+// broadcastMessage, or a broadcastRequest whose audience is every client.
 func sendsToEveryone(body *ast.BlockStmt) bool {
 	everyone := false
 	ast.Inspect(body, func(n ast.Node) bool {
@@ -134,8 +132,9 @@ func sendsToEveryone(body *ast.BlockStmt) bool {
 	return everyone
 }
 
-// addressed reports whether a request names who it is for: one namespace, one
-// client, or a close, which is about a connection the worker already holds.
+// addressed reports whether a request names who it is for short of everyone:
+// one namespace, one client, or a close, which is about a connection the
+// worker already holds.
 func addressed(lit *ast.CompositeLit) bool {
 	for _, field := range lit.Elts {
 		kv, ok := field.(*ast.KeyValueExpr)
@@ -147,8 +146,15 @@ func addressed(lit *ast.CompositeLit) bool {
 			continue
 		}
 		switch key.Name {
-		case "in", "clientID", "client":
+		case "client":
 			return true
+		case "to":
+			call, ok := kv.Value.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			fn, ok := call.Fun.(*ast.Ident)
+			return !ok || fn.Name != "everyClient"
 		}
 	}
 	return false

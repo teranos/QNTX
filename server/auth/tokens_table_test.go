@@ -1,12 +1,14 @@
 package auth
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/errors"
 
+	"github.com/teranos/QNTX/internal/access"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
@@ -43,6 +45,7 @@ func aToken(hash, label string) IssuedToken {
 		MintedBy:   "https://mastodon.example/@tim",
 		Level:      LevelAttestor,
 		Namespaces: []string{"default"},
+		ExpiresAt:  NeverEnds(),
 	}
 }
 
@@ -125,9 +128,10 @@ func TestAMoveReachesTheTableAndTheRecord(t *testing.T) {
 // A token the record holds and the table lacks is what rebuilds the table
 // after host loss.
 func TestOpeningTakesInTheTokensTheRecordHoldsAndTheTableLacks(t *testing.T) {
+	never := access.NeverExpires
 	record := &countingTokens{held: []TokenRecord{{
 		ID: "T-1", Hash: "abc", Label: "one", DID: "did:key:zabc",
-		Level: string(LevelAttestor), Namespaces: []string{"default"}, CreatedAt: 1,
+		Level: string(LevelAttestor), Namespaces: []string{"default"}, CreatedAt: 1, ExpiresAt: &never,
 	}}}
 	table, done, err := OpenTokenTable(qntxtest.CreateTestDB(t), record)
 	require.NoError(t, err)
@@ -135,6 +139,24 @@ func TestOpeningTakesInTheTokensTheRecordHoldsAndTheTableLacks(t *testing.T) {
 
 	_, live := table.Lookup("abc")
 	assert.True(t, live, "a token taken in from the record does not authorize")
+}
+
+// A token minted before a token had to say when it ends meant never: migration
+// 076 writes that down, and the token keeps working.
+func TestATokenFromBeforeExpiriesWereSaidNeverEnds(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	_, err := db.Exec(`INSERT INTO access_tokens (hash, id, record) VALUES (?, ?, ?)`, "old",
+		"T-OLD", `{"id":"T-OLD","hash":"old","label":"old","level":"ATTESTOR","namespaces":["default"],"created_at":1}`)
+	require.NoError(t, err)
+	written, err := os.ReadFile("../../db/sqlite/migrations/076_a_token_says_when_it_ends.sql")
+	require.NoError(t, err)
+	_, err = db.Exec(string(written))
+	require.NoError(t, err)
+
+	table, _, err := OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	_, live := table.Lookup("old")
+	assert.True(t, live, "a token from before expiries were said stopped working")
 }
 
 // strictTokens is a record that takes a list only as a list, as the one behind

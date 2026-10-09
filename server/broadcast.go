@@ -2,9 +2,8 @@ package server
 
 // This file contains broadcasting and daemon management functionality for QNTXServer.
 // It handles real-time updates to WebSocket clients for:
-// - Usage statistics (AI model usage costs)
 // - Job updates (async IX job progress)
-// - Daemon status (worker pool activity, budget tracking)
+// - Daemon status (worker pool activity)
 //
 // Architecture: Dedicated broadcast worker goroutine
 // All client channel sends go through a single worker goroutine to eliminate
@@ -23,20 +22,51 @@ import (
 	"github.com/teranos/errors"
 )
 
+// audience is who a message reaches, named: every client, the clients in one
+// namespace, or one client. Its zero value names none and reaches nobody.
+type audience struct {
+	kind audienceKind
+	name string
+}
+
+type audienceKind int
+
+const (
+	// aboutTheNode is the node's daemon and plugins: the same fact in
+	// every universe, so every client hears it.
+	aboutTheNode audienceKind = iota + 1
+	inNamespace
+	oneClient
+)
+
+func everyClient() audience            { return audience{kind: aboutTheNode} }
+func toNamespace(name string) audience { return audience{kind: inNamespace, name: name} }
+func toClient(id string) audience      { return audience{kind: oneClient, name: id} }
+
+// reaches reports whether a client is in this audience.
+func (a audience) reaches(c *Client) bool {
+	switch a.kind {
+	case aboutTheNode:
+		return true
+	case inNamespace:
+		return c.in == a.name
+	case oneClient:
+		return c.id == a.name
+	}
+	return false
+}
+
 // broadcastRequest represents a request to broadcast data to clients.
 // All broadcasts go through a dedicated worker goroutine to prevent race conditions.
 type broadcastRequest struct {
-	reqType  string // "message", "close", "watcher_match"
-	msg      any    // Generic message (for reqType="message")
-	payload  any    // Generic payload (for reqType="watcher_match")
-	clientID string // Target client ID. Empty string means "broadcast to all clients"
-	// (semantically: no specific target = all targets).
+	reqType string // "message", "close", "watcher_match"
+	msg     any    // Generic message (for reqType="message")
+	payload any    // Generic payload (for reqType="watcher_match")
 
-	// in is the namespace this is about, and empty is a message about the node
-	// rather than about a universe. Nothing crosses (ADR-026), so a message
-	// carrying what happened inside one namespace names it here or reaches
-	// people it is not about.
-	in string
+	// to is who this reaches, named. Nothing crosses (ADR-026), so a message
+	// carrying what happened inside one namespace names it, or reaches people
+	// it is not about.
+	to audience
 
 	// about is the attestation this message hands over, when it hands one over.
 	//
@@ -50,11 +80,11 @@ type broadcastRequest struct {
 
 // broadcastMessage sends a message to all connected clients.
 //
-// What is said here is about the node — its daemon, its plugins, its spend —
+// What is said here is about the node — its daemon, its plugins —
 // and is the same fact whichever universe the reader is in. Anything that came
 // out of one namespace goes through broadcastIn.
 func (s *QNTXServer) broadcastMessage(msg any) {
-	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg})
+	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg, to: everyClient()})
 }
 
 // broadcastIn sends a message to the clients in one namespace and to nobody
@@ -66,7 +96,7 @@ func (s *QNTXServer) broadcastIn(in string, msg any) {
 			"message", fmt.Sprintf("%T", msg))
 		return
 	}
-	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg, in: in})
+	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg, to: toNamespace(in)})
 }
 
 // queueBroadcast hands a request to the worker that owns the client channels.
@@ -77,71 +107,6 @@ func (s *QNTXServer) queueBroadcast(req *broadcastRequest) {
 	case <-s.ctx.Done():
 		// Server shutting down
 	}
-}
-
-func (s *QNTXServer) broadcastUsageUpdate() {
-	since := time.Now().Add(-24 * time.Hour)
-	stats, err := s.usageTracker.GetUsageStats(since)
-	if err != nil {
-		s.logger.Debugw("Failed to get usage stats",
-			"error", err.Error(),
-		)
-		return
-	}
-	// Check if usage has changed since last broadcast (with lock for lastUsage access)
-	s.mu.Lock()
-	if !s.usageHasChangedLocked(stats.TotalCost, stats.TotalRequests, stats.SuccessfulRequests, stats.TotalTokens, stats.UniqueModels) {
-		s.mu.Unlock()
-		return // Skip broadcast if nothing changed
-	}
-	// Update cached usage (still under lock)
-	s.lastUsage = &cachedUsageStats{
-		totalCost: stats.TotalCost,
-		requests:  stats.TotalRequests,
-		success:   stats.SuccessfulRequests,
-		tokens:    stats.TotalTokens,
-		models:    stats.UniqueModels,
-	}
-	s.mu.Unlock()
-	msg := UsageUpdateMessage{
-		Type:      "usage_update",
-		TotalCost: stats.TotalCost,
-		Requests:  stats.TotalRequests,
-		Success:   stats.SuccessfulRequests,
-		Tokens:    stats.TotalTokens,
-		Models:    stats.UniqueModels,
-		Since:     "24h",
-		Timestamp: time.Now().Unix(),
-	}
-	s.broadcastMessage(msg)
-}
-
-// startUsageUpdateTicker starts a periodic usage update broadcaster
-func (s *QNTXServer) startUsageUpdateTicker() {
-	ticker := time.NewTicker(500 * time.Millisecond) // Update every 0.5s for real-time UI
-	s.wg.Go("broadcast.usageUpdate", func() {
-		defer ticker.Stop()
-
-		// Send initial update
-		s.broadcastUsageUpdate()
-
-		for {
-			select {
-			case <-s.ctx.Done():
-				s.logger.Debugw("Usage update ticker stopping due to context cancellation")
-				return
-			case <-ticker.C:
-				// Only send updates if there are connected clients
-				s.mu.RLock()
-				hasClients := len(s.clients) > 0
-				s.mu.RUnlock()
-
-				if hasClients {
-					s.broadcastUsageUpdate()
-				}
-			}
-		}
-	})
 }
 
 // startJobUpdateBroadcaster subscribes to job queue updates and broadcasts them to WebSocket clients
@@ -404,71 +369,28 @@ func (s *QNTXServer) broadcastDaemonStatus() {
 		loadPercent = 100
 	}
 
-	// Get actual budget spend from ai_model_usage table
-	var budgetDaily, budgetWeekly, budgetMonthly float64
-	budgetStatus, err := s.budgetTracker.GetStatus()
-	if err != nil {
-		s.logger.Errorw("Budget status unavailable; the panel will show no spend rather than zero spend", "error", err)
-		// Continue with zeros on error
-		budgetDaily = 0.0
-		budgetWeekly = 0.0
-		budgetMonthly = 0.0
-	} else {
-		budgetDaily = budgetStatus.DailySpend
-		budgetWeekly = budgetStatus.WeeklySpend
-		budgetMonthly = budgetStatus.MonthlySpend
-	}
-
-	// Compute aggregate spend (local + non-stale peers) — matches CheckBudget() enforcement
-	aggDaily, aggWeekly, aggMonthly, peerCount := s.budgetTracker.AggregateSpend(budgetDaily, budgetWeekly, budgetMonthly)
-
 	// Check if status has changed meaningfully (with lock for lastStatus access)
 	s.mu.Lock()
-	if !s.statusHasChangedLocked(activeJobs, stats.Queued, loadPercent, budgetDaily, budgetWeekly, budgetMonthly, aggDaily, aggWeekly, aggMonthly) {
+	if !s.statusHasChangedLocked(activeJobs, stats.Queued, loadPercent) {
 		s.mu.Unlock()
 		return // Skip broadcast if nothing changed
 	}
 
 	// Update cached status (still under lock)
 	s.lastStatus = &cachedDaemonStatus{
-		activeJobs:             activeJobs,
-		queuedJobs:             stats.Queued,
-		loadPercent:            loadPercent,
-		budgetDaily:            budgetDaily,
-		budgetWeekly:           budgetWeekly,
-		budgetMonthly:          budgetMonthly,
-		budgetDailyAggregate:   aggDaily,
-		budgetWeeklyAggregate:  aggWeekly,
-		budgetMonthlyAggregate: aggMonthly,
+		activeJobs:  activeJobs,
+		queuedJobs:  stats.Queued,
+		loadPercent: loadPercent,
 	}
 	s.mu.Unlock()
 
-	// Get budget limits from tracker config
-	budgetLimits := s.budgetTracker.GetBudgetLimits()
-
-	// Get cluster limits (averaged across nodes)
-	clusterDaily, clusterWeekly, clusterMonthly, _ := s.budgetTracker.ClusterLimits()
-
 	msg := DaemonStatusMessage{
-		Type:                   "daemon_status",
-		Running:                true, // Daemon is running if this function is called
-		ActiveJobs:             activeJobs,
-		QueuedJobs:             stats.Queued,
-		LoadPercent:            loadPercent,
-		BudgetDaily:            budgetDaily,
-		BudgetWeekly:           budgetWeekly,
-		BudgetMonthly:          budgetMonthly,
-		BudgetDailyLimit:       budgetLimits.DailyBudgetUSD,
-		BudgetWeeklyLimit:      budgetLimits.WeeklyBudgetUSD,
-		BudgetMonthlyLimit:     budgetLimits.MonthlyBudgetUSD,
-		BudgetDailyAggregate:   aggDaily,
-		BudgetWeeklyAggregate:  aggWeekly,
-		BudgetMonthlyAggregate: aggMonthly,
-		PeerCount:              peerCount,
-		ClusterDailyLimit:      clusterDaily,
-		ClusterWeeklyLimit:     clusterWeekly,
-		ClusterMonthlyLimit:    clusterMonthly,
-		Timestamp:              time.Now().Unix(),
+		Type:        "daemon_status",
+		Running:     true, // Daemon is running if this function is called
+		ActiveJobs:  activeJobs,
+		QueuedJobs:  stats.Queued,
+		LoadPercent: loadPercent,
+		Timestamp:   time.Now().Unix(),
 	}
 
 	s.broadcastMessage(msg)
@@ -524,24 +446,9 @@ func (s *QNTXServer) getIntervalForActivityState(state DaemonState) time.Duratio
 	}
 }
 
-// usageHasChangedLocked checks if usage stats have meaningfully changed since last broadcast.
-// REQUIRES: s.mu must be held by caller.
-func (s *QNTXServer) usageHasChangedLocked(totalCost float64, requests, success int, tokens int, models int) bool {
-	if s.lastUsage == nil {
-		return true // First broadcast always sends
-	}
-
-	// Check for any changes (usage stats change infrequently, so broadcast any change)
-	return s.lastUsage.totalCost != totalCost ||
-		s.lastUsage.requests != requests ||
-		s.lastUsage.success != success ||
-		s.lastUsage.tokens != tokens ||
-		s.lastUsage.models != models
-}
-
 // statusHasChangedLocked checks if the daemon status has meaningfully changed since last broadcast.
 // REQUIRES: s.mu must be held by caller.
-func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPercent, budgetDaily, budgetWeekly, budgetMonthly, aggDaily, aggWeekly, aggMonthly float64) bool {
+func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPercent float64) bool {
 	if s.lastStatus == nil {
 		return true // First broadcast always sends
 	}
@@ -549,13 +456,7 @@ func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPerc
 	// Check for significant changes
 	return s.lastStatus.activeJobs != activeJobs ||
 		s.lastStatus.queuedJobs != queuedJobs ||
-		absDiff(s.lastStatus.loadPercent, loadPercent) > 1.0 || // 1% tolerance
-		absDiff(s.lastStatus.budgetDaily, budgetDaily) > 0.01 ||
-		absDiff(s.lastStatus.budgetWeekly, budgetWeekly) > 0.01 ||
-		absDiff(s.lastStatus.budgetMonthly, budgetMonthly) > 0.01 ||
-		absDiff(s.lastStatus.budgetDailyAggregate, aggDaily) > 0.01 ||
-		absDiff(s.lastStatus.budgetWeeklyAggregate, aggWeekly) > 0.01 ||
-		absDiff(s.lastStatus.budgetMonthlyAggregate, aggMonthly) > 0.01
+		absDiff(s.lastStatus.loadPercent, loadPercent) > 1.0 // 1% tolerance
 }
 
 // absDiff returns the absolute difference between two float64 values
@@ -792,21 +693,21 @@ func (s *QNTXServer) runBroadcastWorker() {
 func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 	switch req.reqType {
 	case "message":
-		s.sendMessageToClients(req.msg, req.clientID, req.in, req.about)
+		s.sendMessageToClients(req.msg, req.to, req.about)
 	case "close":
 		s.closeClientChannels(req.client)
 	case "watcher_match":
-		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
+		s.sendMessageToClients(req.payload, req.to, req.about)
 	case "watcher_error":
-		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
+		s.sendMessageToClients(req.payload, req.to, req.about)
 	case "element_fired":
-		s.sendMessageToClients(req.payload, req.clientID, req.in, req.about)
+		s.sendMessageToClients(req.payload, req.to, req.about)
 	default:
 		s.logger.Warnw("Unknown broadcast request type", "type", req.reqType)
 	}
 }
 
-// sendMessageToClients sends a generic message to all clients (or specific client if clientID set).
+// sendMessageToClients sends a message to the clients its audience names.
 // Only called from broadcast worker - no concurrent access to client channels.
 //
 // When a client's message channel is full, the message is dropped rather than
@@ -817,22 +718,17 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 // that batches/summarizes updates for bandwidth-constrained clients. The goal is
 // for QNTX to remain functional even on extremely low-bandwidth links (GPRS-class).
 // See the degraded-mode branch for the broader connectivity resilience work.
-// in is the namespace the message is about, and empty is a message about the
-// node, which every client gets whichever universe they are in.
 // about is the attestation the message carries, or nil when it carries none.
 // A client who may not read it is not sent it, even inside its own namespace.
-func (s *QNTXServer) sendMessageToClients(msg any, targetClientID string, in string, about *types.As) {
+func (s *QNTXServer) sendMessageToClients(msg any, to audience, about *types.As) {
 	s.mu.RLock()
 	clients := make([]*Client, 0, len(s.clients))
 	withheld := 0
 	for client := range s.clients {
-		if targetClientID != "" && client.id != targetClientID {
-			continue
-		}
 		// A namespace is its own universe and nothing crosses (ADR-026). A
 		// client hearing that something happened somewhere else has learned
 		// something about a universe that is not theirs, whatever the payload.
-		if in != "" && client.in != in {
+		if !to.reaches(client) {
 			continue
 		}
 		// Being in the namespace says a socket may hear that something

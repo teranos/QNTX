@@ -31,7 +31,7 @@ Job with handler_name="python.script"
   → PluginProxyHandler.Execute()
   → gRPC call to Python plugin
   → Plugin executes code
-  → Returns result/progress/cost to Pulse
+  → Returns result/progress to Pulse
 ```
 
 ### ✅ Phase 3: Dynamic Handler Discovery (COMPLETE)
@@ -226,15 +226,14 @@ message ExecuteJobResponse {
   int32 progress_current = 4;
   int32 progress_total = 5;
 
-  // Cost tracking (optional)
-  double cost_actual = 6;
+  reserved 6;
 }
 ```
 
 **Design notes:**
 - `Initialize` now returns handler names instead of `Empty`
 - New `ExecuteJob` RPC allows Pulse to invoke plugin handlers
-- Response includes progress/cost for Pulse to update job state
+- Response includes progress for Pulse to update job state
 
 #### 2. Plugin Implementation Changes
 
@@ -328,16 +327,12 @@ func (h *PluginProxyHandler) Execute(ctx context.Context, job *Job) error {
         return errors.New(resp.Error)
     }
 
-    // Update job progress/cost from plugin response
+    // Update job progress from plugin response
     if resp.ProgressTotal > 0 {
         job.Progress = Progress{
             Current: int(resp.ProgressCurrent),
             Total:   int(resp.ProgressTotal),
         }
-    }
-
-    if resp.CostActual > 0 {
-        job.CostActual = resp.CostActual
     }
 
     return nil
@@ -518,7 +513,7 @@ func initializePlugins(ctx context.Context, db *sql.DB, logger *zap.SugaredLogge
 - [ ] Update `initialize()` to return `InitializeResponse`
 - [ ] Implement `execute_job()` RPC handler
 - [ ] Route to internal handlers based on `handler_name`
-- [ ] Return success/error/progress/cost in response
+- [ ] Return success/error/progress in response
 - [ ] Update tests
 
 ### Pulse Changes

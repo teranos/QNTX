@@ -38,7 +38,6 @@ func TestTASBotEnqueuesJob(t *testing.T) {
 		Source:      "speedrun_jd.html",
 		Status:      "queued",
 
-		CostEstimate: 0.10,
 		CreatedAt:    time.Now(),
 	}
 
@@ -67,7 +66,6 @@ func TestYugiDequeuesJob(t *testing.T) {
 		Source:      "card_ability.html",
 		Status:      "queued",
 
-		CostEstimate: 0.05,
 		CreatedAt:    time.Now(),
 	}
 	err := queue.Enqueue(job)
@@ -108,7 +106,6 @@ func TestTASBotJobPriority(t *testing.T) {
 		Source:      "slow_strat.html",
 		Status:      "queued",
 
-		CostEstimate: 0.10,
 		CreatedAt:    time.Now(),
 	}
 	queue.Enqueue(lowPriorityJob)
@@ -120,7 +117,6 @@ func TestTASBotJobPriority(t *testing.T) {
 		HandlerName:  "test.jd-extraction",
 		Source:       "fast_strat.html",
 		Status:       "queued",
-		CostEstimate: 0.10,
 		CreatedAt:    time.Now(),
 	}
 	queue.Enqueue(highPriorityJob)
@@ -176,7 +172,6 @@ func TestCronosPausedJob(t *testing.T) {
 		Source:      "paused.html",
 		Status:      "queued",
 
-		CostEstimate: 0.10,
 		CreatedAt:    time.Now(),
 	}
 	queue.Enqueue(job)
@@ -221,7 +216,6 @@ func TestTASBotResumeJob(t *testing.T) {
 		Source:      "resume.html",
 		Status:      "queued",
 
-		CostEstimate: 0.10,
 		CreatedAt:    time.Now(),
 	}
 	queue.Enqueue(job)
@@ -269,7 +263,6 @@ func TestYugiJobStateTransitions(t *testing.T) {
 		Source:      "transform.html",
 		Status:      "queued",
 
-		CostEstimate: 0.10,
 		CreatedAt:    time.Now(),
 	}
 	queue.Enqueue(job)
@@ -310,7 +303,6 @@ func TestTASBotFailJob(t *testing.T) {
 		Source:      "fail.html",
 		Status:      "queued",
 
-		CostEstimate: 0.10,
 		CreatedAt:    time.Now(),
 	}
 	queue.Enqueue(job)
@@ -339,7 +331,6 @@ func TestCronosScheduledJob(t *testing.T) {
 		HandlerName:  "test.jd-extraction",
 		Source:       "future.html",
 		Status:       "scheduled",
-		CostEstimate: 0.10,
 		CreatedAt:    time.Now(),
 	}
 	queue.Enqueue(job)
@@ -370,9 +361,9 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 	// TAS Bot enqueues multiple jobs in sequence
 	// NOTE: Currently the queue is LIFO (Last-In-First-Out) due to DESC ordering
 	jobs := []Job{
-		{ID: "JOB_INT_001", HandlerName: "test.jd-extraction", Source: "first.html", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now()},
-		{ID: "JOB_INT_002", HandlerName: "test.jd-extraction", Source: "second.html", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now().Add(time.Millisecond)},
-		{ID: "JOB_INT_003", HandlerName: "test.jd-extraction", Source: "third.html", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now().Add(2 * time.Millisecond)},
+		{ID: "JOB_INT_001", HandlerName: "test.jd-extraction", Source: "first.html", Status: "queued", CreatedAt: time.Now()},
+		{ID: "JOB_INT_002", HandlerName: "test.jd-extraction", Source: "second.html", Status: "queued", CreatedAt: time.Now().Add(time.Millisecond)},
+		{ID: "JOB_INT_003", HandlerName: "test.jd-extraction", Source: "third.html", Status: "queued", CreatedAt: time.Now().Add(2 * time.Millisecond)},
 	}
 
 	for _, job := range jobs {

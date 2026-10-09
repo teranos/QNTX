@@ -22,25 +22,11 @@ message DaemonStatusMessage {
   int32 queued_jobs = 4;
   double load_percent = 5;           // 0–100
 
-  // Spend on this node, and what it is allowed.
-  double budget_daily = 6;
-  double budget_weekly = 7;
-  double budget_monthly = 8;
-  double budget_daily_limit = 9;
-  double budget_weekly_limit = 10;
-  double budget_monthly_limit = 11;
-
-  // Aggregate spend: this node plus non-stale peers, which is what CheckBudget
-  // enforces. Falls back to local spend when no peers are configured.
-  double budget_daily_aggregate = 12;
-  double budget_weekly_aggregate = 13;
-  double budget_monthly_aggregate = 14;
-  int32 peer_count = 15;             // Non-stale peers counted in the aggregate
-
-  // Cluster limits, averaged across nodes. Zero means not configured.
-  double cluster_daily_limit = 16;
-  double cluster_weekly_limit = 17;
-  double cluster_monthly_limit = 18;
+  reserved 6 to 18;
+  reserved "budget_daily", "budget_weekly", "budget_monthly";
+  reserved "budget_daily_limit", "budget_weekly_limit", "budget_monthly_limit";
+  reserved "budget_daily_aggregate", "budget_weekly_aggregate", "budget_monthly_aggregate", "peer_count";
+  reserved "cluster_daily_limit", "cluster_weekly_limit", "cluster_monthly_limit";
 
   string server_state = 19;          // running, draining, stopped
   int64 timestamp = 20;              // Unix seconds
@@ -52,15 +38,14 @@ message AsyncJobProgress {
   optional int32 total = 2;           // Total operations
 }
 
-// AsyncJobPulseState is the rate limit and budget state carried with a job.
+// AsyncJobPulseState is the rate limit state carried with a job.
 message AsyncJobPulseState {
   optional int32 calls_this_minute = 1;
   optional int32 calls_remaining = 2;
-  optional double spend_today = 3;
-  optional double spend_this_month = 4;
-  optional double budget_remaining = 5;
+  reserved 3, 4, 5;
+  reserved "spend_today", "spend_this_month", "budget_remaining";
   optional bool is_paused = 6;
-  optional string pause_reason = 7;   // budget_exceeded, rate_limit, user_requested
+  optional string pause_reason = 7;   // rate_limited, user_requested
 }
 
 // AsyncJob is one job as the browser receives it, mirroring async.Job.
@@ -78,8 +63,8 @@ message AsyncJob {
   string source = 4;                  // For deduplication and logging
   string status = 5;                  // queued, running, paused, completed, failed, cancelled
   optional AsyncJobProgress progress = 6;
-  optional double cost_estimate = 7;
-  optional double cost_actual = 8;
+  reserved 7, 8;
+  reserved "cost_estimate", "cost_actual";
   optional AsyncJobPulseState pulse_state = 9;
   optional string error = 10;
   repeated string error_details = 11; // Structured context from the error chain
@@ -521,19 +506,6 @@ message NamespacesList {
   // How many there are, so none and a backend that keeps none are different
   // answers.
   uint32 count = 2;
-}
-
-// UsagePoint is one day of model use. Mirrors tracker.TimeSeriesPoint.
-message UsagePoint {
-  string date = 1;
-  uint32 requests = 2;
-  double cost = 3;
-}
-
-// TimeseriesUsage is what timeseries usage answers.
-message TimeseriesUsage {
-  // One per day: its date, how many requests, and what they cost.
-  repeated UsagePoint points = 1;
 }
 
 // StoredThing is one thing QNTX persists, as make parity read it. Mirrors

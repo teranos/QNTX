@@ -50,9 +50,9 @@ type Admission struct {
 	// DisplayName is what to call that person. The status line draws it, because
 	// a route is a door rather than a name.
 	DisplayName string
-	// Grant is present only when a token made the request. It names the token's
-	// own DID and the predicates it may touch, and nil means unrestricted —
-	// which is what a passkey session is.
+	// Grant is present only when a token made the request, and names the token's
+	// own DID and its level. A session and a connector carry none, and their
+	// level and roles decide what they may touch (belowTheLadder).
 	Grant *Grant
 	// ClientDID is the OAuth client a connector's token was issued through, and
 	// empty for every other caller. To a connector the namespace does not exist

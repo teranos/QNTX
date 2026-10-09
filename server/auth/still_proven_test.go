@@ -64,14 +64,29 @@ func TestABindingForAnotherAccountDoesNotProveThisOne(t *testing.T) {
 	require.Error(t, h.stillProven(half))
 }
 
-// A did:key route is its own proof: the signature was the whole of it, there
+// A did:key route is its own proof: the identity is the key that signed, there
 // is no binding behind it, and the list is all there is to ask.
 func TestAKeyRouteIsProvenByTheList(t *testing.T) {
-	h := handlerAdmitting(t, atprotoAccount)
+	pub, _, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	key := EncodeDIDKey(pub)
+	h := handlerAdmitting(t, key)
 
-	assert.NoError(t, h.stillProven(halfAdmission{identity: atprotoAccount}))
+	assert.NoError(t, h.stillProven(halfAdmission{identity: key, did: key}))
 	h.SetIdentities(nil, nil)
-	assert.Error(t, h.stillProven(halfAdmission{identity: atprotoAccount}))
+	assert.Error(t, h.stillProven(halfAdmission{identity: key, did: key}))
+}
+
+// "nil is nil"
+
+// An account is not its own proof. A half-admission for one that carries no
+// binding proves nothing.
+func TestAnAccountWithNoBindingIsNotProven(t *testing.T) {
+	h := handlerAdmitting(t, atprotoAccount)
+	pub, _, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+
+	require.Error(t, h.stillProven(halfAdmission{identity: atprotoAccount, did: EncodeDIDKey(pub)}))
 }
 
 // A User carries the signed binding for each account it holds (ADR-031), so
@@ -97,13 +112,40 @@ func TestAHeldBindingIsAskedAboutAgain(t *testing.T) {
 
 	assert.NoError(t, h.heldBindingStillCounts(u, mastodonAccount))
 
-	// A route with no binding kept, or not this User's, has nothing to ask.
-	assert.NoError(t, h.heldBindingStillCounts(u, atprotoAccount))
-	assert.NoError(t, h.heldBindingStillCounts(User{}, mastodonAccount))
+	// A key the User holds is its own route, and its signature was the proof.
+	assert.NoError(t, h.heldBindingStillCounts(u, half.did))
+
+	// A route that is not this User's account, an account with no binding
+	// kept, and no User at all: each is nothing proven.
+	require.Error(t, h.heldBindingStillCounts(u, atprotoAccount))
+	require.Error(t, h.heldBindingStillCounts(User{}, mastodonAccount))
+	unbound := User{ID: "US-TIM", Accounts: []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}}}
+	require.Error(t, h.heldBindingStillCounts(unbound, mastodonAccount))
 
 	// The signer is struck out: the binding written down no longer counts.
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	require.Error(t, h.heldBindingStillCounts(u, mastodonAccount))
+}
+
+// An account joined before bindings were kept gets the binding its provider
+// sign-in just proved, so the passkey after it has one to ask about.
+func TestASignInKeepsTheBindingAnAccountLacked(t *testing.T) {
+	h := handlerWithCreds(t)
+	half, _ := vouchedHalfAdmission(t, h)
+	store := &memUsers{}
+	h.users = store
+	require.NoError(t, store.Put(User{ID: "US-TIM", Level: LevelRoot,
+		Accounts: []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}}}))
+
+	u, err := h.joinUser(mastodonAccount, half.binding, half.did)
+	require.NoError(t, err)
+
+	require.Len(t, u.Accounts, 1)
+	assert.Equal(t, half.binding, u.Accounts[0].Binding)
+	kept, _, err := store.ByRoute(mastodonAccount)
+	require.NoError(t, err)
+	assert.Equal(t, half.binding, kept.Accounts[0].Binding, "the binding was not written down")
+	assert.NoError(t, h.heldBindingStillCounts(kept, mastodonAccount))
 }
 
 // A binding about a key the User does not hold reaches nobody, whoever
