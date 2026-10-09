@@ -118,3 +118,117 @@ message StaandTakenDown {
   // removed.
   string status = 2;
 }
+
+// Staand is one stand as the stands element sees it. Beyond what it is (slug,
+// namespace, URL) it carries its defining system attestation — the ASID, when
+// it was created, and the DID that created it — the door it inherits from its
+// namespace, the sites reporting back, and its activity: arrivals recorded
+// against arrivals the rate limit refused, and when the last landed.
+//
+// defId and lastSeen are named as the view has always read them.
+message Staand {
+  string slug = 1;
+  string market = 2;
+  string url = 3;
+  string origin = 4;
+  string creator = 5;
+  string defId = 6;
+  string created = 7;
+  repeated string sites = 8;
+  uint32 arrivals = 9;
+  uint32 visitors = 10;
+  uint32 dropped = 11;
+  string lastSeen = 12;
+  repeated StaandSeen events = 13;
+  repeated StaandSeen pages = 14;
+  // How the people who arrived actually walked — what the counts above are a
+  // fold of.
+  repeated StaandWalk walks = 15;
+}
+
+// StaandSeen is an event or a page and every moment it was attested, in unix
+// milliseconds. "The axis of time is more useful than a tally": the view draws
+// these as a line over time, and a count is not sent.
+message StaandSeen {
+  string name = 1;
+  // A JSON number, as the view reads it: protojson writes a 64-bit integer as
+  // text, and a millisecond is exact in a double.
+  repeated double seen = 2;
+}
+
+// StaandStep is one arrival read as a step rather than as a number: when it
+// landed, the page it was about, and the event the pixel named.
+message StaandStep {
+  string at = 1;
+  string page = 2;
+  string event = 3;
+}
+
+// StaandWalk is one person's steps past the stand, in the order they took
+// them. The visitor id is theirs and persists (the snippet keeps it in
+// localStorage), so this is a person's whole path across every visit, not one
+// sitting.
+message StaandWalk {
+  string who = 1;
+  repeated StaandStep steps = 2;
+}
+
+// StaandCount is one row the metrics sigil answers with: a value of the
+// dimension asked for and how many arrivals carried it, Umami's metrics shape.
+message StaandCount {
+  string name = 1;
+  uint32 count = 2;
+}
+
+// StaandActivityRow is one arrival read as a line rather than as a number.
+// The shape is Umami's session activity: one row per event, newest first, and
+// the reading of it is left to whoever asked (ADR-036).
+message StaandActivityRow {
+  string at = 1;
+  string visit = 2;
+  string visitor = 3;
+  string path = 4;
+  string query = 5;
+  string referrer_domain = 6;
+  string event = 7;
+}
+
+// Staands is what staands list answers.
+message Staands {
+  // One row per stand that has not been taken down.
+  repeated Staand staands = 1;
+}
+
+// StaandMetrics is what staands metrics answers.
+message StaandMetrics {
+  // What the arrivals were grouped by.
+  string type = 1;
+  // One row per value, most first: its name and its count.
+  repeated StaandCount counts = 2;
+  // The market that was asked about.
+  string market = 3;
+  // The stand that was asked about.
+  string slug = 4;
+}
+
+// StaandActivity is what staands activity answers.
+message StaandActivity {
+  // One row per arrival, five hundred at most: when, the visit, the visitor,
+  // the page, where they came from, and the event.
+  repeated StaandActivityRow activity = 1;
+  // The market that was asked about.
+  string market = 2;
+  // The stand that was asked about.
+  string slug = 3;
+}
+
+// StaandVisits is what staands visits answers.
+message StaandVisits {
+  // One row per sitting: who, when it started and ended, how long, the first
+  // and last page, how many views and events, and whether it was a bounce.
+  repeated Visit visits = 1;
+  // The market that was asked about.
+  string market = 2;
+  // The stand that was asked about.
+  string slug = 3;
+}
