@@ -1,6 +1,6 @@
 # errors and warnings logged and carried on from, per file. Debt: each number may fall and may not rise.
 # Instead: return the error, or say in a value why carrying on is the answer.
-# 445 in 125 files.
+# 444 in 124 files.
 
 6	ats/storage/embedding_store.go
 4	ats/storage/new_store_rust.go
@@ -30,7 +30,6 @@
 2	plugin/grpc/pulse_handler.go
 2	plugin/grpc/runner.go
 3	plugin/grpc/server.go
-1	plugin/grpc/services/atsstore_server.go
 2	plugin/grpc/services/fetch_server.go
 1	plugin/grpc/services/github_server.go
 1	plugin/grpc/services/llm_server.go
