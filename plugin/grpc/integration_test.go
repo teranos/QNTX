@@ -669,7 +669,7 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 	queue := async.NewQueue(db)
 
 	// 3. Start gRPC services for plugin callbacks
-	servicesManager := NewServicesManager(config.LLMConfig{MaxConcurrent: 1, MaxCallsPerMinute: 60}, config.FetchConfig{}, logger)
+	servicesManager := NewServicesManager(config.LLMConfig{MaxConcurrent: 1, MaxCallsPerMinute: 60}, config.FetchConfig{}, "did:key:znode", logger)
 	endpoints, err := servicesManager.Start(ctx, store, queue, nil, t.TempDir(), t.TempDir())
 	require.NoError(t, err)
 	defer servicesManager.Shutdown()

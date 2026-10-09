@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/errors"
 )
 
 // As represents an attestation - a verifiable claim about subjects,
@@ -35,11 +36,22 @@ type AsCommand struct {
 	Subjects      []string       `json:"subjects"`                 // Entities being attested about
 	Predicates    []string       `json:"predicates"`               // What is being claimed (optional, defaults to ["_"])
 	Contexts      []string       `json:"contexts"`                 // Optional "of" context (defaults to ["_"])
-	Actors        []string       `json:"actors"`                   // Who made the attestation (optional, uses default)
+	Actors        []string       `json:"actors"`                   // Who made the attestation; a store refuses a command naming none
 	Timestamp     time.Time      `json:"timestamp"`                // When attestation was made (optional, uses now)
 	Source        string         `json:"source,omitempty"`         // Source of attestation (e.g., "cli", "github", "atproto")
 	SourceVersion string         `json:"source_version,omitempty"` // Version of the source that created this attestation
 	Attributes    map[string]any `json:"attributes,omitempty"`     // Arbitrary JSON
+}
+
+// "the node"
+//
+// authors what its caller named nobody for, naming itself where it writes. A
+// store is not the node, so it refuses a command that names no actor.
+func (cmd *AsCommand) NamesItsActor() error {
+	if len(cmd.Actors) == 0 {
+		return errors.Newf("an attestation about %v names no actor, and a store does not invent one", cmd.Subjects)
+	}
+	return nil
 }
 
 // ToAs converts an AsCommand to an As struct with generated ASID and source

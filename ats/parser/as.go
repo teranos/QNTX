@@ -4,33 +4,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/errors"
 )
 
-// ParserOptions provides optional configuration for the AS command parser
-type ParserOptions struct {
-	// ActorDetector provides custom actor detection logic.
-	// If nil, uses DefaultActorDetector with system username.
-	ActorDetector ats.ActorDetector
-}
-
-// ParseAsCommand parses CLI arguments into an AsCommand using default options.
+// ParseAsCommand parses CLI arguments into an AsCommand. An attestation that
+// says no `by` names no actor here: whoever writes it names who wrote it.
 // Grammar: qntx as SUBJECTS [is PREDICATES] [of CONTEXTS] [by ACTOR] [on DATE]
 func ParseAsCommand(args []string) (*types.AsCommand, error) {
-	return ParseAsCommandWithOptions(args, ParserOptions{})
-}
-
-// ParseAsCommandWithOptions parses CLI arguments with custom options.
-// Grammar: qntx as SUBJECTS [is PREDICATES] [of CONTEXTS] [by ACTOR] [on DATE]
-func ParseAsCommandWithOptions(args []string, opts ParserOptions) (*types.AsCommand, error) {
-	// Use default detector if none provided
-	detector := opts.ActorDetector
-	if detector == nil {
-		detector = &ats.DefaultActorDetector{FallbackActor: "unknown"}
-	}
-
 	if len(args) == 0 {
 		return nil, errors.New("no arguments provided")
 	}
@@ -54,27 +35,6 @@ func ParseAsCommandWithOptions(args []string, opts ParserOptions) (*types.AsComm
 	err := parseAsTokens(tokens, cmd)
 	if err != nil {
 		return nil, err
-	}
-
-	// Always add LLM actor when in LLM environment (if detector provides one)
-	llmActor := detector.GetLLMActor()
-	if llmActor != "" {
-		// Add LLM actor if not already present
-		found := false
-		for _, actor := range cmd.Actors {
-			if actor == llmActor {
-				found = true
-				break
-			}
-		}
-		if !found {
-			cmd.Actors = append(cmd.Actors, llmActor)
-		}
-	}
-
-	// Set default actor if still no actors provided
-	if len(cmd.Actors) == 0 {
-		cmd.Actors = []string{detector.GetDefaultActor()}
 	}
 
 	// Validate that we have at least subjects

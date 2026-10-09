@@ -19,7 +19,7 @@ type namedStore struct {
 func TestAStoreIsTheOneItsTokenNames(t *testing.T) {
 	served := &namedStore{name: "default"}
 	caller := &namedStore{name: "vakconnectie"}
-	s := NewATSStoreServer(served, "shared", zap.NewNop().Sugar())
+	s := NewATSStoreServer(served, "shared", "did:key:znode", zap.NewNop().Sugar())
 	s.SetCallStores(func(token string) (ats.AttestationStore, bool) {
 		if token == "call" {
 			return caller, true
@@ -42,7 +42,7 @@ func TestAStoreIsTheOneItsTokenNames(t *testing.T) {
 
 // Before the node says which calls are open, no call token reaches anything.
 func TestNoCallTokenReachesAStoreBeforeCallsAreKnown(t *testing.T) {
-	s := NewATSStoreServer(&namedStore{name: "default"}, "shared", zap.NewNop().Sugar())
+	s := NewATSStoreServer(&namedStore{name: "default"}, "shared", "did:key:znode", zap.NewNop().Sugar())
 
 	if got, err := s.storeFor("call"); err == nil {
 		t.Fatalf("a call token reached %v with no calls known", got)

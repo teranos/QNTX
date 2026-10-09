@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -209,9 +208,9 @@ func TestParseAsCommand(t *testing.T) {
 				}
 			}
 
-			// Check that default actor is set when not specified
-			if len(tt.expected.Actors) == 0 && len(result.Actors) == 0 {
-				t.Errorf("ParseAsCommand() actors should have default value, got empty")
+			// No by names no actor: the parser invents none.
+			if len(tt.expected.Actors) == 0 && len(result.Actors) != 0 {
+				t.Errorf("ParseAsCommand() named no actor and got %v", result.Actors)
 			}
 
 			// Check timestamp for specific date tests
@@ -363,37 +362,15 @@ func TestParseTimeExpression(t *testing.T) {
 	}
 }
 
-func TestGetDefaultActor(t *testing.T) {
-	// Test the DefaultActorDetector
-	detector := &ats.DefaultActorDetector{FallbackActor: "unknown"}
-	actor := detector.GetDefaultActor()
-
-	// Should not be empty
-	if actor == "" {
-		t.Error("DefaultActorDetector.GetDefaultActor() returned empty string")
+// An attestation that says no `by` names no actor: the parser does not read one
+// off whoever runs the process.
+func TestAnAttestationSayingNoByNamesNoActor(t *testing.T) {
+	cmd, err := ParseAsCommand([]string{"ALICE", "is", "author"})
+	if err != nil {
+		t.Fatalf("ParseAsCommand: %v", err)
 	}
-
-	// Should contain @ symbol
-	if !strings.Contains(actor, "@") {
-		t.Errorf("DefaultActorDetector.GetDefaultActor() = %s, should contain '@'", actor)
-	}
-
-	// Should be in format ats+user@host
-	parts := strings.Split(actor, "@")
-	if len(parts) != 2 {
-		t.Errorf("DefaultActorDetector.GetDefaultActor() = %s, should be in format 'ats+user@host'", actor)
-	}
-
-	userPart := parts[0]
-	// Should start with ats+
-	if !strings.HasPrefix(userPart, "ats+") {
-		t.Errorf("DefaultActorDetector.GetDefaultActor() user part = %s, should start with 'ats+'", userPart)
-	}
-
-	// GetLLMActor should return empty string for default detector
-	llmActor := detector.GetLLMActor()
-	if llmActor != "" {
-		t.Errorf("DefaultActorDetector.GetLLMActor() = %s, should return empty string", llmActor)
+	if len(cmd.Actors) != 0 {
+		t.Errorf("an attestation saying no by names %v", cmd.Actors)
 	}
 }
 

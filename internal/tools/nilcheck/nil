@@ -1,15 +1,15 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3428 in 435 files.
+# 3420 in 434 files.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
+# ats/types/attestation.go: +1, NamesItsActor refuses a command naming no actor: one check every store's generate path calls, where four filled one in.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
 2	ats/ax/executor.go
 4	ats/ax/fixtures.go
-2	ats/interfaces.go
-10	ats/parser/as.go
+7	ats/parser/as.go
 2	ats/parser/ax.go
 6	ats/parser/dispatch_qntxwasm.go
 5	ats/parser/error.go
@@ -24,7 +24,7 @@
 7	ats/so/actions/prompt/template.go
 1	ats/so/util.go
 4	ats/storage/alias_store.go
-4	ats/storage/ats_store.go
+3	ats/storage/ats_store.go
 4	ats/storage/batch.go
 2	ats/storage/bounded_store.go
 1	ats/storage/duckdbcgo/adapter.go
@@ -50,15 +50,15 @@
 7	ats/storage/retrieval.go
 2	ats/storage/rfc3339.go
 19	ats/storage/rich_search.go
-12	ats/storage/rust_backed_store.go
+10	ats/storage/rust_backed_store.go
 6	ats/storage/sql_raw_store.go
 1	ats/storage/sqlitecgo/adapter.go
 11	ats/storage/sqlitecgo/slowlog.go
-51	ats/storage/sqlitecgo/storage_cgo.go
+50	ats/storage/sqlitecgo/storage_cgo.go
 1	ats/storage/sqlitecgo/writequeue_cgo.go
 4	ats/storage/subject_warn.go
 21	ats/storage/watcher_store.go
-7	ats/types/attestation.go
+8	ats/types/attestation.go
 6	ats/types/type_definitions.go
 3	ats/types_said.go
 16	ats/wasm/engine.go
