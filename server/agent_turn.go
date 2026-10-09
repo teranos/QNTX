@@ -57,7 +57,13 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "nowhere to write the session of " + agent.called + ": " + err.Error()}
 	}
+	return s.turnIn(ctx, spokenBy(caller), store, agent, says, t, "")
+}
 
+// turnIn is one turn of agent in the harness t is the part of, said by by and
+// written down in store. picksUp is the turn it picks up, by the id of what was
+// said in it, and empty for a turn said afresh.
+func (s *QNTXServer) turnIn(ctx context.Context, by string, store ats.AttestationStore, agent *rootAgent, says string, t aTurn, picksUp string) (any, *protocol.Refusal) {
 	select {
 	case t.in.turn <- struct{}{}:
 		defer func() { <-t.in.turn }()
@@ -107,10 +113,19 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent's git was not set up, so nothing was said to it: " + err.Error()}
 		}
 	}
-	told, err := writes.told(says, spokenBy(caller), time.Now())
+	told, err := writes.told(says, by, time.Now())
+	if err == nil && picksUp != "" {
+		told.Attributes[picksUpKey] = picksUp
+	}
 	write([]*types.As{told}, err)
 
 	answer, err := t.run(turnRun{says: says, session: session, resumes: resumes, env: itsGit, writes: writes, write: write})
+	// The node stopping is what ended it, whatever the harness said on its way
+	// out: written down, it is a turn the node picks up once it is up again.
+	if s.ctx.Err() != nil {
+		stopped, err := writes.row("StopFailure", time.Now(), map[string]any{"error": nodeStopped, "last_assistant_message": "the node stopped while this turn was going"})
+		write([]*types.As{stopped}, err)
+	}
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: t.called + " did not answer: " + err.Error()}
 	}
