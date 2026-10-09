@@ -167,6 +167,113 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 	}
 }
 
+func aRunAt(name, status, conclusion string, updated time.Time) string {
+	return `{"name":"` + name + `","status":"` + status + `","conclusion":"` + conclusion + `","updated_at":"` + updated.UTC().Format(time.RFC3339) + `"}`
+}
+
+func rearmJobFor(t *testing.T, as *types.As) *async.Job {
+	t.Helper()
+	job := jobFor(t, as)
+	job.Source = rearmSource
+	return job
+}
+
+// "too much green ci success that dont really give us sifnal, it lingers too long"
+// A push re-armed at boot whose runs concluded before the process began was
+// said by the process before; saying it again on every restart was the green.
+func TestCIWatchARearmedPushThatConcludedBeforeBootSaysNothing(t *testing.T) {
+	booted := time.Now()
+	gh := &scriptedGitHub{
+		history: noHistory(),
+		commits: []string{runsJSON(aRunAt("Go", "completed", "success", booted.Add(-time.Hour)),
+			aRunAt("Nix", "completed", "failure", booted.Add(-time.Hour)))},
+	}
+	news := newNewsLog()
+	h := handlerOver(gh, news)
+	h.booted = booted
+	if err := h.Execute(context.Background(), rearmJobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if got, _ := news.leftFor("https://mastodon.example/@alice"); len(got) != 0 {
+		t.Fatalf("a push concluded before boot was put on the row again: %+v", got)
+	}
+}
+
+// A re-armed push that concludes after boot is what the restart re-armed for.
+func TestCIWatchARearmedPushThatConcludesAfterBootIsSaid(t *testing.T) {
+	booted := time.Now().Add(-time.Minute)
+	gh := &scriptedGitHub{
+		history: noHistory(),
+		commits: []string{
+			runsJSON(aRunAt("Go", "in_progress", "", booted.Add(time.Second))),
+			runsJSON(aRunAt("Go", "completed", "failure", booted.Add(30*time.Second))),
+		},
+	}
+	news := newNewsLog()
+	h := handlerOver(gh, news)
+	h.booted = booted
+	var seen []News
+	h.sleep = func(context.Context, time.Duration) error {
+		seen, _ = news.leftFor("https://mastodon.example/@alice")
+		return nil
+	}
+	if err := h.Execute(context.Background(), rearmJobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if len(seen) != 1 || !seen[0].Quiet || !strings.Contains(seen[0].Item.Note, "watching sky-whisper abc123 1 runs") {
+		t.Fatalf("while the re-armed run went on the row showed %+v", seen)
+	}
+	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
+	if len(got) != 1 || got[0].Item.Symbol != SymbolUnwell {
+		t.Fatalf("a re-armed push that failed after boot drew %+v", got)
+	}
+}
+
+// A re-armed push is not on the row before its runs are read: fifteen of
+// them at once said "watching" for pushes long concluded.
+func TestCIWatchARearmedPushIsNotWatchedBeforeItsRunsAreRead(t *testing.T) {
+	booted := time.Now()
+	gh := &scriptedGitHub{history: noHistory(), commits: []string{runsJSON(aRunAt("Go", "completed", "success", booted.Add(-time.Hour)))}}
+	news := newNewsLog()
+	h := handlerOver(gh, news)
+	h.booted = booted
+	h.get = func(ctx context.Context, token, url string) ([]byte, error) {
+		if held, _ := news.leftFor("https://mastodon.example/@alice"); len(held) != 0 {
+			t.Fatalf("on the row before its runs were read: %+v", held)
+		}
+		return gh.get(ctx, token, url)
+	}
+	if err := h.Execute(context.Background(), rearmJobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+}
+
+// "im more intersted in fails"
+// Green leaves the row once the laptop has seen it; anything else stays the whole hold.
+func TestCIWatchHoldsAFailureLongerThanASuccess(t *testing.T) {
+	if holdFor("success") >= holdFor("failure") || holdFor("cancelled") != newsHold || holdFor("failure") != newsHold {
+		t.Fatalf("success %s, failure %s, cancelled %s", holdFor("success"), holdFor("failure"), holdFor("cancelled"))
+	}
+	if successHold < 2*time.Second {
+		t.Fatalf("a success held %s is gone before the laptop's one-second poll has looked twice", successHold)
+	}
+}
+
+// A dispatch re-armed at boot that concluded before it was said before.
+func TestCIWatchARearmedDispatchThatConcludedBeforeBootSaysNothing(t *testing.T) {
+	booted := time.Now()
+	gh := &scriptedGitHub{dispatched: []string{runsJSON(aRunAt("deploy q-deploy-1790:TARGET", "completed", "success", booted.Add(-time.Hour)))}}
+	news := newNewsLog()
+	h := handlerOver(gh, news)
+	h.booted = booted
+	if err := h.Execute(context.Background(), rearmJobFor(t, dispatchAs("did:key:alice"))); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if got, _ := news.leftFor("https://mastodon.example/@alice"); len(got) != 0 {
+		t.Fatalf("a dispatch concluded before boot was put on the row again: %+v", got)
+	}
+}
+
 // A red beside a green is red. Reading one run read whichever finished first,
 // and the row said green four times over a failing lint.
 func TestCIWatchARedBesideAGreenIsRed(t *testing.T) {
