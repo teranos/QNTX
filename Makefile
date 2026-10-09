@@ -61,6 +61,8 @@ says: ## Write what the specs and our protocol say of themselves for the parity 
 # still going red about it. Both halves, one gate.
 sacred-error: ## Fail on any dropped failure this branch adds (.golangci.yml, clippy)
 	@command -v nix >/dev/null 2>&1 || { echo "sacred-error needs nix: the linters are pinned in flake.nix" >&2; exit 1; }
+	@# The web bans, the TypeScript half of nilcheck among them.
+	@$(MAKE) --no-print-directory lint
 	@# One shell for all three: entering it costs ~55s and the linting itself
 	@# costs five, so three entries would be two minutes of flake evaluation.
 	@# The clippy exclusions are the ones .github/workflows/rs.yml names —
@@ -85,8 +87,9 @@ sacred-spawn-write: ## Bring the goroutine baseline to what the tree holds
 	@go run ./internal/tools/spawncheck -write
 
 # "nil is nil"
-nil-write: ## Bring the nil, zero and empty baseline to what the tree holds
+nil-write: ## Bring every absence baseline, Go, Rust and TypeScript, to what the tree holds
 	@go run ./internal/tools/nilcheck -write
+	@cd web && bun x eslint ts --prune-suppressions
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."

@@ -1,0 +1,972 @@
+{
+  "ts/a2a-card-element.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/a2a-card-element.ts": {
+    "no-restricted-syntax": {
+      "count": 13
+    }
+  },
+  "ts/accessibility.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/address.ts": {
+    "no-restricted-syntax": {
+      "count": 14
+    }
+  },
+  "ts/am-element.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "ts/api/attestation-sync.test.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/api/attestation-sync.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/api/canvas-export.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/api/canvas-sync-backoff.test.ts": {
+    "no-restricted-syntax": {
+      "count": 11
+    }
+  },
+  "ts/api/canvas-sync.test.ts": {
+    "no-restricted-syntax": {
+      "count": 17
+    }
+  },
+  "ts/api/canvas-sync.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "ts/api/canvas.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "ts/app-door.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/arrival.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/ats-wasm.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/base-panel-error.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/brow.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "ts/ceremony.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "ts/claude-element.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/claude-element.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "ts/client/connectivity.ts": {
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
+  "ts/client/session.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/client/ws.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "ts/components/button.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/components/doughnut.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/element/absent-element.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "ts/components/element/attestation-attrs.ts": {
+    "no-restricted-syntax": {
+      "count": 24
+    }
+  },
+  "ts/components/element/attestation-element.ts": {
+    "no-restricted-syntax": {
+      "count": 16
+    }
+  },
+  "ts/components/element/attestation-result-row.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/components/element/attestation-triple.ts": {
+    "no-restricted-syntax": {
+      "count": 16
+    }
+  },
+  "ts/components/element/ax-element.ts": {
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
+  "ts/components/element/bioviz/fasta-renderer.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/components/element/bioviz/genbank-renderer.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "ts/components/element/bioviz/structure-renderer.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/element/canvas/action-bar.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "ts/components/element/canvas/action-bar.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/components/element/canvas/breadcrumb.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/components/element/canvas/canvas-element.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/element/canvas/canvas-pan.ts": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "ts/components/element/canvas/canvas-workspace-builder.ts": {
+    "no-restricted-syntax": {
+      "count": 39
+    }
+  },
+  "ts/components/element/canvas/keyboard-shortcuts.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/components/element/canvas/placement-mode.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/components/element/canvas/rectangle-selection.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/element/canvas/selection.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/element/canvas/spawn-menu.ts": {
+    "no-restricted-syntax": {
+      "count": 11
+    }
+  },
+  "ts/components/element/canvas/spine-renderer.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/components/element/canvas/thread-extend.test.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/components/element/canvas/thread-line.test.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/components/element/canvas/thread-line.ts": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "ts/components/element/canvas/thread-navigation.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "ts/components/element/chart-element.ts": {
+    "no-restricted-syntax": {
+      "count": 13
+    }
+  },
+  "ts/components/element/connectivity-element.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/components/element/conversions.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/components/element/element-autosave.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/element/element-followup.ts": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "ts/components/element/element-lift.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/components/element/element-module-loader.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "ts/components/element/element-registry.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/components/element/element-registry.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "ts/components/element/element-ui.ts": {
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
+  "ts/components/element/error-element.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/element/error-recovery-workflow.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/components/element/manifestations/canvas-expanded.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/components/element/meld/auto-meld-result.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/components/element/nebula-nav.ts": {
+    "no-restricted-syntax": {
+      "count": 21
+    }
+  },
+  "ts/components/element/note-element.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "ts/components/element/plugin-element.ts": {
+    "no-restricted-syntax": {
+      "count": 15
+    }
+  },
+  "ts/components/element/plugin-provided-elements.ts": {
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
+  "ts/components/element/predicate-element.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/element/prompt-element.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "ts/components/element/py-element.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/element/py-element.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/components/element/query-element-states.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/components/element/response-state.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/components/element/result-element.ts": {
+    "no-restricted-syntax": {
+      "count": 36
+    }
+  },
+  "ts/components/element/segment-element.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/components/element/semantic-element.ts": {
+    "no-restricted-syntax": {
+      "count": 33
+    }
+  },
+  "ts/components/element/sigma-element.ts": {
+    "no-restricted-syntax": {
+      "count": 23
+    }
+  },
+  "ts/components/element/spawn-on-canvas.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/components/element/subcanvas-element.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/components/element/thread-element.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "ts/components/element/token-popup.ts": {
+    "no-restricted-syntax": {
+      "count": 15
+    }
+  },
+  "ts/components/element/transcript-element.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/components/element/transcript-element.ts": {
+    "no-restricted-syntax": {
+      "count": 11
+    }
+  },
+  "ts/components/element/triplet-element.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/components/element/triplet-element.ts": {
+    "no-restricted-syntax": {
+      "count": 28
+    }
+  },
+  "ts/components/element/ts-element.ts": {
+    "no-restricted-syntax": {
+      "count": 11
+    }
+  },
+  "ts/components/element/type-element.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "ts/components/element/type-result-line.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/pager.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/components/sacred.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/sparkline.ts": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "ts/components/tooltip.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/components/tooltip.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/db-element.ts": {
+    "no-restricted-syntax": {
+      "count": 46
+    }
+  },
+  "ts/dev-debug-interceptor.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/dev-mode.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/door-dev.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/door-field.ts": {
+    "no-restricted-syntax": {
+      "count": 21
+    }
+  },
+  "ts/door.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/embedding-store.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/embeddings-element.ts": {
+    "no-restricted-syntax": {
+      "count": 83
+    }
+  },
+  "ts/error-handler.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/eviction-chart.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "ts/file-upload.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/filetree/navigator.ts": {
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
+  "ts/github-element.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/github-element.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/ground-element.test.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/ground-element.ts": {
+    "no-restricted-syntax": {
+      "count": 47
+    }
+  },
+  "ts/ground-scene.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/handlers-doc.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/handlers-panel.ts": {
+    "no-restricted-syntax": {
+      "count": 50
+    }
+  },
+  "ts/html-utils.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "ts/http-utils.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/i-element.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/indexeddb-storage.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/invitation.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/keyboard.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/laye.ts": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "ts/leave.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/liveness.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/llm-provider-element.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/local-semantic-search.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/logger.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/mail-element.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/main.ts": {
+    "no-restricted-syntax": {
+      "count": 31
+    }
+  },
+  "ts/market-element.ts": {
+    "no-restricted-syntax": {
+      "count": 25
+    }
+  },
+  "ts/namespace-page.ts": {
+    "no-restricted-syntax": {
+      "count": 19
+    }
+  },
+  "ts/namespaces-bar.ts": {
+    "no-restricted-syntax": {
+      "count": 22
+    }
+  },
+  "ts/namespaces-view.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/obsidian-element.ts": {
+    "no-restricted-syntax": {
+      "count": 11
+    }
+  },
+  "ts/page-element.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "ts/parity-element.ts": {
+    "no-restricted-syntax": {
+      "count": 15
+    }
+  },
+  "ts/passkey.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/pi-element.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/plugin-panel-add.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/plugin-panel.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/plugin-panel.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/plugin-panel.ts": {
+    "no-restricted-syntax": {
+      "count": 56
+    }
+  },
+  "ts/prose/note-markdown.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "ts/pulse-panel.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/pulse/active-queue.ts": {
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
+  "ts/pulse/api.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/pulse/execution-api.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/pulse/job-actions.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/pulse/panel-events.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/pulse/panel-state.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/pulse/panel-subscriptions.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/pulse/realtime-handlers.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/pulse/schedules.ts": {
+    "no-restricted-syntax": {
+      "count": 14
+    }
+  },
+  "ts/pulse/system-status.ts": {
+    "no-restricted-syntax": {
+      "count": 24
+    }
+  },
+  "ts/pulse/types.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/pulse/validation.test.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/reconnect.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/roles-compose.ts": {
+    "no-restricted-syntax": {
+      "count": 20
+    }
+  },
+  "ts/roles-element.ts": {
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
+  "ts/search-view.ts": {
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
+  "ts/self-person.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/setup.ts": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "ts/sigma-panel.ts": {
+    "no-restricted-syntax": {
+      "count": 13
+    }
+  },
+  "ts/signin.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/signin.ts": {
+    "no-restricted-syntax": {
+      "count": 24
+    }
+  },
+  "ts/stand-activity-element.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/stand-activity-element.ts": {
+    "no-restricted-syntax": {
+      "count": 17
+    }
+  },
+  "ts/standing.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/state/compositions.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/state/storage.dom.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/state/storage.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "ts/state/sync-state.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "ts/state/tube-journey.test.ts": {
+    "no-restricted-syntax": {
+      "count": 11
+    }
+  },
+  "ts/state/ui-impl.ts": {
+    "no-restricted-syntax": {
+      "count": 13
+    }
+  },
+  "ts/status-indicators.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "ts/sync-badge.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/system-drawer.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/tauri-notifications.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "ts/test/mock-ui-state.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "ts/ticket.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/toast.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/token-element.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/token-element.ts": {
+    "no-restricted-syntax": {
+      "count": 34
+    }
+  },
+  "ts/token-mint-element.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "ts/tokens-element.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/tokens-element.ts": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "ts/type-definition-window.ts": {
+    "no-restricted-syntax": {
+      "count": 21
+    }
+  },
+  "ts/user-element.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "ts/user-invite-element.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/users-element.test.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "ts/users-element.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "ts/watcher-predicates.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "ts/websocket-handlers/daemon-status.ts": {
+    "no-restricted-syntax": {
+      "count": 17
+    }
+  },
+  "ts/websocket-handlers/plugin-health.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "ts/websocket-handlers/watcher-queue-status.ts": {
+    "no-restricted-syntax": {
+      "count": 11
+    }
+  },
+  "ts/who.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  }
+}

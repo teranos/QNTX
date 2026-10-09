@@ -8,7 +8,7 @@
 
 **Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` ticker interval = no ticking. For "unlimited", use a high value. For "use default", omit the field.
 
-**Nil is nil:** nil, empty and zero mean nothing. Meaning given to nothing is banned outright: no granting all namespaces, no unrestricted, no every. `internal/tools/nilcheck` stops the build on a new test against nothing.
+**Nil is nil:** nil, empty and zero mean nothing. Meaning given to nothing is banned outright: no granting all namespaces, no unrestricted, no every. Banned the same way: a discarded result, a catch-all branch, a fallback value, an error logged and carried on from, a config default. `internal/tools/nilcheck` (Go, Rust) and `web/eslint.config.js` (TypeScript) stop the build on a new one; what already stands is debt that only falls.
 
 "it needs to be abolutely clear you cant attribute meaning to nil like granting all namepsaces"
 

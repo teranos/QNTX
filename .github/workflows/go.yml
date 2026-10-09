@@ -198,7 +198,8 @@
         "**/*.go",
         "go.mod",
         "go.sum",
-        "internal/tools/nilcheck/baseline",
+        "internal/tools/nilcheck/**",
+        "**/*.rs",
         ".github/workflows/go.yml"
       ]
     },

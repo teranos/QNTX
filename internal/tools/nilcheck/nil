@@ -1,6 +1,6 @@
-# Tests against nil, zero and empty, per file. nilcheck holds each number;
-# `make nil-write` is how a change to one lands, as a diff that is read.
-# 3005 tests in 378 files.
+# tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
+# Instead: name the meaning in a type or a value, or refuse on nothing.
+# 3005 in 378 files.
 
 6	ai/provider/grpc_client.go
 2	ai/tracker/usage_tracker.go

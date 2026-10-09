@@ -77,6 +77,25 @@ const NO_RAW_FETCH = [
     },
 ];
 
+// "ban 1, 2, 3, 4, 5"
+
+// An absence becoming behaviour, the same kinds nilcheck holds in Go and Rust.
+// What already stands is in eslint-suppressions.json, and only falls.
+const ABSENCE = [
+    { selector: "BinaryExpression[right.type='Literal'][right.value='']", message: 'nil is nil: a test against the empty string gives nothing a meaning, or refuses on it. Name the meaning.' },
+    { selector: "BinaryExpression[right.type='Literal'][right.value=0]", message: 'zero means zero: a test against 0 gives nothing a meaning, or refuses on it. Name the meaning.' },
+    { selector: "BinaryExpression[right.type='Literal'][right.raw='null']", message: 'nil is nil: a test against null gives nothing a meaning, or refuses on it. Name the meaning.' },
+    { selector: "BinaryExpression[right.type='Identifier'][right.name='undefined']", message: 'nil is nil: a test against undefined gives nothing a meaning, or refuses on it. Name the meaning.' },
+    { selector: "UnaryExpression[operator='void']", message: 'a discarded value is BANNED: read what came back.' },
+    { selector: 'SwitchCase[test=null]', message: 'a catch-all default: is BANNED: name every case, and refuse an unknown one.' },
+    { selector: "LogicalExpression[operator='??']", message: 'a fallback is BANNED: a missing value is refused, not replaced with an invented one.' },
+    { selector: "LogicalExpression[operator='||'][right.type='Literal']", message: 'a fallback is BANNED: a missing value is refused, not replaced with an invented one.' },
+    { selector: "LogicalExpression[operator='||'][right.type='TemplateLiteral']", message: 'a fallback is BANNED: a missing value is refused, not replaced with an invented one.' },
+    { selector: "LogicalExpression[operator='||'][right.type='ArrayExpression']", message: 'a fallback is BANNED: a missing value is refused, not replaced with an invented one.' },
+    { selector: "LogicalExpression[operator='||'][right.type='ObjectExpression']", message: 'a fallback is BANNED: a missing value is refused, not replaced with an invented one.' },
+    { selector: 'CatchClause:not(:has(ThrowStatement)):not(:has(ReturnStatement))', message: 'catching and carrying on is BANNED: throw it on, or return what the failure means.' },
+];
+
 export default [
     {
         // Generated from proto; change the generator.
@@ -89,7 +108,7 @@ export default [
             'no-alert': 'error',
             'no-empty': 'error',
             'no-restricted-globals': ['error', ...BANNED_GLOBALS],
-            'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH],
+            'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE],
         },
     },
     {
@@ -110,14 +129,14 @@ export default [
         // client/ is where apiFetch lives.
         files: ['ts/client/**/*.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH],
+            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
         },
     },
     {
         // These load a .wasm binary by URL.
         files: ['ts/laye.ts', 'ts/ats-wasm.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH],
+            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
         },
     },
     {
@@ -125,7 +144,7 @@ export default [
         // reports every answer to the connectivity manager.
         files: ['ts/liveness.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH],
+            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
         },
     },
     {
@@ -136,7 +155,7 @@ export default [
         // "i want tooltip to be propagated more"
         files: ['ts/market-element.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE],
+            'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE],
         },
     },
 ];
