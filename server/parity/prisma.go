@@ -482,7 +482,7 @@ func (p Parity) Render(all bool) string {
 			fmt.Fprintf(&b, "  %-*s  %3d\n", width, c.Model, 0)
 		case c.Score() == 100 && !all:
 			hidden++
-		default:
+		case c.followed():
 			fmt.Fprintf(&b, "  %-*s  %3d\n", width, c.Model, c.Score())
 			for _, i := range c.Items {
 				mark := 0

@@ -114,7 +114,7 @@ func TestAFieldNamingItsMessageIsSaidInItsShape(t *testing.T) {
 		{Name: "visits", Says: "The sittings.", Message: "protocol.Visit"},
 		{Name: "transcript", Says: "The session.", Message: "protocol.Transcript"},
 		{Name: "market", Says: "The market."},
-	}})
+	}}).schema
 	carried, err := json.Marshal(map[string]any{
 		"visits": []*protocol.Visit{{Visit: "v", Visitor: "p", DurationSeconds: 3, Views: 2, Bounce: true}},
 		"transcript": &protocol.Transcript{Session: "s", Subjects: []string{"a"}, Folded: 4,

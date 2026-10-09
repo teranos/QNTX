@@ -218,9 +218,24 @@ func takenAsSchema(held *protocol.Sigil) map[string]any {
 	return map[string]any{"type": "object", "properties": properties, "required": required}
 }
 
+// promise is what a sigil says it gives, as MCP's outputSchema, and whether it
+// says anything: a sigil naming no Gives promises nothing, and an answer is
+// held to nothing.
+type promise struct {
+	schema map[string]any
+	made   bool
+}
+
+// holds is whether body is what the promise says, and nil for a promise not made.
+func (p promise) holds(body []byte) error {
+	if !p.made {
+		return nil
+	}
+	return heldTo(p.schema, body)
+}
+
 // givenAsSchema is what a sigil gives, as MCP's outputSchema: one object, or a
-// list of them a row at a time, with the fields it names. Nil when it names
-// none.
+// list of them a row at a time, with the fields it names.
 //
 // A Field says nothing of whether it is always there, and an answer leaves
 // some out (plugins list's health_probed_at is "absent before the first
@@ -229,9 +244,9 @@ func takenAsSchema(held *protocol.Sigil) map[string]any {
 //
 // A field that names the message it carries is said in that message's shape,
 // as the answer marshals it; any other field says only its words.
-func givenAsSchema(held *protocol.Sigil) map[string]any {
+func givenAsSchema(held *protocol.Sigil) promise {
 	if len(held.GetGives()) == 0 {
-		return nil
+		return promise{}
 	}
 	defs := map[string]any{}
 	properties := map[string]any{}
@@ -249,7 +264,7 @@ func givenAsSchema(held *protocol.Sigil) map[string]any {
 	if len(defs) > 0 {
 		schema["$defs"] = defs
 	}
-	return schema
+	return promise{schema: schema, made: true}
 }
 
 // messageAsSchema puts a message in defs as encoding/json writes the Go it is
@@ -357,8 +372,8 @@ func offeredTo(admitted auth.Admission, known bool, reaching auth.Reach, anyone 
 //
 // The answer is the result's structured content, and its text too. A tool that
 // says what it gives must give that (outputSchema), so its answer is held to
-// the schema it promised first. gives is nil for a tool that promises none.
-func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy) (auth.Reach, bool), caller *http.Request, held heldBy, args map[string]any, gives map[string]any) *mcp.CallToolResult {
+// the schema it promised first.
+func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy) (auth.Reach, bool), caller *http.Request, held heldBy, args map[string]any, gives promise) *mcp.CallToolResult {
 	asked := held.asking(reach.OverMCP, gate, reaching, caller).Ask(ctx, args)
 	switch {
 	case asked.Rejected != nil:
@@ -371,10 +386,8 @@ func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy)
 	if err != nil {
 		return refused("what %s answered does not marshal: %v", held.sigil.GetName(), err)
 	}
-	if gives != nil {
-		if err := heldTo(gives, body); err != nil {
-			return refused("%s: what %s answered is not what it says it gives: %v", sigil.Failed, held.sigil.GetName(), err)
-		}
+	if err := gives.holds(body); err != nil {
+		return refused("%s: what %s answered is not what it says it gives: %v", sigil.Failed, held.sigil.GetName(), err)
 	}
 	return &mcp.CallToolResult{
 		Content:           []mcp.Content{&mcp.TextContent{Text: string(body)}},
