@@ -169,6 +169,10 @@
           "run": "make rust-sqlite"
         },
         {
+          "name": "nil is nil",
+          "run": "go run ./internal/tools/nilcheck"
+        },
+        {
           "name": "Run tests",
           "run": "export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH\ngo test -tags \"rustsqlite,qntxwasm\" ./...\n"
         },
@@ -194,6 +198,7 @@
         "**/*.go",
         "go.mod",
         "go.sum",
+        "internal/tools/nilcheck/baseline",
         ".github/workflows/go.yml"
       ]
     },

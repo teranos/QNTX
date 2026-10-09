@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-spawn-write test-web test-jsdom test test-suite test-parquet test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-spawn-write nil-writetest-web test-jsdom test test-suite test-parquet test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -82,6 +82,10 @@ sacred-error: ## Fail on any dropped failure this branch adds (.golangci.yml, cl
 # is how that lands as a diff somebody can read, which is the whole mechanism.
 sacred-spawn-write: ## Bring the goroutine baseline to what the tree holds
 	@go run ./internal/tools/spawncheck -write
+
+# "nil is nil"
+nil-write: ## Bring the nil, zero and empty baseline to what the tree holds
+	@go run ./internal/tools/nilcheck -write
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
@@ -179,6 +183,7 @@ test: lint ## Run all tests (Go + TypeScript + parquet backend)
 	@echo "✓ All tests complete"
 
 test-suite: ## The suite itself. Run `make test`, which reports a verdict.
+	@go run ./internal/tools/nilcheck
 	@go test -tags "rustsqlite,qntxwasm" -short ./...
 	@$(MAKE) --no-print-directory test-parquet
 	@if [ ! -d "web/node_modules" ]; then \
