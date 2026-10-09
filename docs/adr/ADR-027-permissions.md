@@ -17,6 +17,10 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - Visibility is per-namespace.
 - Which levels reach which route is one table: `server/reach`. 
 - A role is lines (attestations) in system, not a level compiled into the binary (ADR-034).
+- An admission naming no namespace reaches none. ROOT and SUPER reach every
+  namespace by their level, not by naming none.
+
+"nil is nil"
 
 ## The credential does not carry the permission
 
