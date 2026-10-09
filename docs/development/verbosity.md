@@ -55,7 +55,7 @@ Zero and default values add noise at lower verbosity levels. They're only shown 
 
 **Filtered at levels 0-3:**
 - Integer zeros: `count=0`, `total=0`, `group=0`
-- Float zeros: `cost_estimate=0.0`, `cost_actual=0.0`
+- Float zeros: `load_percent=0.0`
 - Empty strings: `type=""`, `name=""`
 - Default values: `type="untyped"`, `status="unknown"`
 

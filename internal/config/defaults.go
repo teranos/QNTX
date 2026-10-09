@@ -25,10 +25,6 @@ func SetDefaults(v *viper.Viper) {
 	// Pulse (async job infrastructure) defaults
 	v.SetDefault("pulse.workers", 1)
 	v.SetDefault("pulse.ticker_interval_seconds", 1)
-	v.SetDefault("pulse.daily_budget_usd", 3.0)     // Default $3/day limit
-	v.SetDefault("pulse.weekly_budget_usd", 7.0)    // Default $7/week limit
-	v.SetDefault("pulse.monthly_budget_usd", 15.0)  // Default $15/month limit
-	v.SetDefault("pulse.cost_per_score_usd", 0.002) // Default $0.002 per operation
 
 	// LLM routing defaults (queuing at core, not provider)
 	v.SetDefault("llm.max_concurrent", 1)        // scry is single-threaded
@@ -272,11 +268,6 @@ func (c *Config) GetServerAllowedOrigins() []string {
 		"tauri://localhost",
 		"http://tauri.localhost",
 		"https://tauri.localhost",
-	}
-
-	// If no custom origins configured, return defaults
-	if len(c.Server.AllowedOrigins) == 0 {
-		return defaults
 	}
 
 	// Merge: Start with defaults, add custom origins (deduplicated via map)

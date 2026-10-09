@@ -175,8 +175,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			handlerName,
 			sourceURL,
 			payload,
-			0,   // Total unknown
-			0.0, // Cost calculated during execution
+			0, // Total unknown
 			fmt.Sprintf("user:force-trigger:%s", jobID),
 		)
 		if err != nil {

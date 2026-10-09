@@ -259,7 +259,7 @@ func (s *DuckdbStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As
 		Source     string   `json:"source,omitempty"`
 		TimeStart  *int64   `json:"time_start,omitempty"`
 		TimeEnd    *int64   `json:"time_end,omitempty"`
-		Limit      int      `json:"limit,omitempty"`
+		Limit      int      `json:"limit"`
 	}{
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,

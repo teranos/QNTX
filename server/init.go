@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/errors"
@@ -22,8 +20,6 @@ import (
 // serverDependencies holds dependencies created for QNTXServer.
 // Available to subsystems via s.deps during Init.
 type serverDependencies struct {
-	usageTracker  *tracker.UsageTracker
-	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
 	pluginManager *grpcplugin.PluginManager
 	cfg           *appcfg.Config
@@ -57,12 +53,6 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create server dependencies")
 	}
-	if deps.usageTracker == nil {
-		return nil, errors.New("usage tracker creation failed")
-	}
-	if deps.budgetTracker == nil {
-		return nil, errors.New("budget tracker creation failed")
-	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -74,7 +64,7 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		poolConfig.Workers = deps.cfg.Pulse.Workers
 	}
 	registry := async.NewHandlerRegistry()
-	daemon := async.NewWorkerPoolWithRegistry(ctx, db, deps.cfg, poolConfig, serverLogger, registry, nil, nil)
+	daemon := async.NewWorkerPoolWithRegistry(ctx, db, deps.cfg, poolConfig, serverLogger, registry, nil)
 
 	// The schedules of the namespace this node serves, which is what the ticker
 	// ticks. A namespace has its schedules the way it has its attestations.
@@ -129,8 +119,6 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		deps:          deps,
 		store:         deps.cfg.Storage.Backend,
 		bindAddress:   bindAddr,
-		usageTracker:  deps.usageTracker,
-		budgetTracker: deps.budgetTracker,
 		daemon:        daemon,
 		pluginManager: deps.pluginManager,
 		scheduleStore: scheduleStore,
@@ -209,18 +197,6 @@ func createServerLogger(_ int) *zap.SugaredLogger {
 func createServerDependencies(db *sql.DB, cfg *appcfg.Config, serverLogger *zap.SugaredLogger) (*serverDependencies, error) {
 	start := time.Now()
 
-	usageTracker := tracker.NewUsageTracker(db, 0)
-
-	budgetTracker := budget.NewTracker(db, budget.BudgetConfig{
-		DailyBudgetUSD:          cfg.Pulse.DailyBudgetUSD,
-		WeeklyBudgetUSD:         cfg.Pulse.WeeklyBudgetUSD,
-		MonthlyBudgetUSD:        cfg.Pulse.MonthlyBudgetUSD,
-		CostPerScoreUSD:         cfg.Pulse.CostPerScoreUSD,
-		ClusterDailyBudgetUSD:   cfg.Pulse.ClusterDailyBudgetUSD,
-		ClusterWeeklyBudgetUSD:  cfg.Pulse.ClusterWeeklyBudgetUSD,
-		ClusterMonthlyBudgetUSD: cfg.Pulse.ClusterMonthlyBudgetUSD,
-	})
-
 	daemonStart := time.Now()
 	daemon := async.NewWorkerPool(db, cfg, async.DefaultWorkerPoolConfig(), serverLogger)
 	serverLogger.Debugw("Daemon created", "duration_ms", time.Since(daemonStart).Milliseconds())
@@ -230,8 +206,6 @@ func createServerDependencies(db *sql.DB, cfg *appcfg.Config, serverLogger *zap.
 	serverLogger.Debugw("All dependencies created", "total_duration_ms", time.Since(start).Milliseconds())
 
 	return &serverDependencies{
-		usageTracker:  usageTracker,
-		budgetTracker: budgetTracker,
 		daemon:        daemon,
 		pluginManager: pluginManager,
 		cfg:           cfg,
@@ -256,25 +230,6 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 
 	server.configWatcher = configWatcher
 	appcfg.SetGlobalWatcher(configWatcher)
-
-	configWatcher.OnReload(func(newCfg *appcfg.Config) error {
-		serverLogger.Infow("Config reloaded, updating budget tracker",
-			"daily_budget", newCfg.Pulse.DailyBudgetUSD,
-			"weekly_budget", newCfg.Pulse.WeeklyBudgetUSD,
-			"monthly_budget", newCfg.Pulse.MonthlyBudgetUSD,
-		)
-		server.budgetTracker = budget.NewTracker(db, budget.BudgetConfig{
-			DailyBudgetUSD:          newCfg.Pulse.DailyBudgetUSD,
-			WeeklyBudgetUSD:         newCfg.Pulse.WeeklyBudgetUSD,
-			MonthlyBudgetUSD:        newCfg.Pulse.MonthlyBudgetUSD,
-			CostPerScoreUSD:         newCfg.Pulse.CostPerScoreUSD,
-			ClusterDailyBudgetUSD:   newCfg.Pulse.ClusterDailyBudgetUSD,
-			ClusterWeeklyBudgetUSD:  newCfg.Pulse.ClusterWeeklyBudgetUSD,
-			ClusterMonthlyBudgetUSD: newCfg.Pulse.ClusterMonthlyBudgetUSD,
-		})
-		server.broadcastDaemonStatus()
-		return nil
-	})
 
 	// Who may log in is read from am.toml on every login rather than captured
 	// at boot, so striking an account out revokes it and its passkeys now.

@@ -1,6 +1,6 @@
 # errors and warnings logged and carried on from, per file. Debt: each number may fall and may not rise.
 # Instead: return the error, or say in a value why carrying on is the answer.
-# 448 in 125 files.
+# 445 in 125 files.
 
 6	ats/storage/embedding_store.go
 4	ats/storage/new_store_rust.go
@@ -75,7 +75,7 @@
 4	server/auth/sign_binding.go
 1	server/auth/switch.go
 2	server/auth/users.go
-4	server/broadcast.go
+3	server/broadcast.go
 2	server/ci_pulse.go
 9	server/client.go
 4	server/db_stats_cache.go
@@ -103,7 +103,7 @@
 4	server/plugin_config_handlers.go
 3	server/plugin_sigils.go
 1	server/pprof.go
-4	server/prompt_handlers.go
+2	server/prompt_handlers.go
 2	server/pulse_job_children.go
 5	server/pulse_schedules.go
 1	server/python_handlers.go

@@ -33,15 +33,12 @@ func IsValidStatus(s string) bool {
 	}
 }
 
-// PulseState represents the pulse rate limiting and budget state for a job
+// PulseState represents the pulse rate limiting state for a job
 type PulseState struct {
-	CallsThisMinute int     `json:"calls_this_minute,omitempty"`
-	CallsRemaining  int     `json:"calls_remaining,omitempty"`
-	SpendToday      float64 `json:"spend_today,omitempty"`
-	SpendThisMonth  float64 `json:"spend_this_month,omitempty"`
-	BudgetRemaining float64 `json:"budget_remaining,omitempty"`
-	IsPaused        bool    `json:"is_paused,omitempty"`
-	PauseReason     string  `json:"pause_reason,omitempty"` // "budget_exceeded", "rate_limit", "user_requested"
+	CallsThisMinute int    `json:"calls_this_minute,omitempty"`
+	CallsRemaining  int    `json:"calls_remaining,omitempty"`
+	IsPaused        bool   `json:"is_paused,omitempty"`
+	PauseReason     string `json:"pause_reason,omitempty"` // "rate_limited", "user_requested"
 }
 
 // Progress represents job progress information
@@ -73,8 +70,6 @@ type Job struct {
 	Source        string          `json:"source"`            // For deduplication and logging
 	Status        JobStatus       `json:"status"`
 	Progress      Progress        `json:"progress,omitempty"`
-	CostEstimate  float64         `json:"cost_estimate,omitempty"`
-	CostActual    float64         `json:"cost_actual,omitempty"`
 	PulseState    *PulseState     `json:"pulse_state,omitempty"`
 	Error         string          `json:"error,omitempty"`
 	ErrorDetails  []string        `json:"error_details,omitempty"`  // Structured error context from errors.GetAllDetails()
@@ -114,14 +109,14 @@ type Job struct {
 //
 //	payload := BatchImportPayload{SourceURL: "https://...", RecordIDs: []string{"1", "2"}}
 //	payloadJSON, _ := json.Marshal(payload)
-//	job, _ := async.NewJobWithPayload("data.batch-import", "https://...", payloadJSON, 100, 0.50, "user@example.com")
-func NewJobWithPayload(handlerName string, source string, payload json.RawMessage, totalOps int, estimatedCost float64, actor string) (*Job, error) {
-	return NewChildJobWithPayload(handlerName, source, payload, totalOps, estimatedCost, actor, "")
+//	job, _ := async.NewJobWithPayload("data.batch-import", "https://...", payloadJSON, 100, "user@example.com")
+func NewJobWithPayload(handlerName string, source string, payload json.RawMessage, totalOps int, actor string) (*Job, error) {
+	return NewChildJobWithPayload(handlerName, source, payload, totalOps, actor, "")
 }
 
 // NewChildJobWithPayload creates a new job with an optional parent job ID.
 // Use this when creating child jobs that should be grouped under a parent orchestrator job.
-func NewChildJobWithPayload(handlerName string, source string, payload json.RawMessage, totalOps int, estimatedCost float64, actor string, parentJobID string) (*Job, error) {
+func NewChildJobWithPayload(handlerName string, source string, payload json.RawMessage, totalOps int, actor string, parentJobID string) (*Job, error) {
 	if handlerName == "" {
 		err := errors.New("handlerName cannot be empty")
 		err = errors.WithDetail(err, "Handler name is required to create a job")
@@ -144,17 +139,15 @@ func NewChildJobWithPayload(handlerName string, source string, payload json.RawM
 
 	now := time.Now()
 	return &Job{
-		ID:           jobID,
-		HandlerName:  handlerName,
-		Payload:      payload,
-		Source:       source,
-		Status:       JobStatusQueued,
-		Progress:     Progress{Current: 0, Total: totalOps},
-		CostEstimate: estimatedCost,
-		CostActual:   0.0,
-		ParentJobID:  parentJobID,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:          jobID,
+		HandlerName: handlerName,
+		Payload:     payload,
+		Source:      source,
+		Status:      JobStatusQueued,
+		Progress:    Progress{Current: 0, Total: totalOps},
+		ParentJobID: parentJobID,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}, nil
 }
 
@@ -216,12 +209,6 @@ func (j *Job) Cancel(reason string) {
 // UpdateProgress updates the job's progress
 func (j *Job) UpdateProgress(current int) {
 	j.Progress.Current = current
-	j.UpdatedAt = time.Now()
-}
-
-// RecordCost adds to the actual cost incurred
-func (j *Job) RecordCost(cost float64) {
-	j.CostActual += cost
 	j.UpdatedAt = time.Now()
 }
 

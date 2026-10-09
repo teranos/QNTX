@@ -2049,8 +2049,6 @@ type ChildJobInfo struct {
 	Source        string                 `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
 	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
 	ProgressPct   *float64               `protobuf:"fixed64,5,opt,name=progress_pct,json=progressPct,proto3,oneof" json:"progress_pct,omitempty"`
-	CostEstimate  *float64               `protobuf:"fixed64,6,opt,name=cost_estimate,json=costEstimate,proto3,oneof" json:"cost_estimate,omitempty"`
-	CostActual    *float64               `protobuf:"fixed64,7,opt,name=cost_actual,json=costActual,proto3,oneof" json:"cost_actual,omitempty"`
 	Error         *string                `protobuf:"bytes,8,opt,name=error,proto3,oneof" json:"error,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`              // RFC3339
 	StartedAt     *string                `protobuf:"bytes,10,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`       // RFC3339
@@ -2120,20 +2118,6 @@ func (x *ChildJobInfo) GetStatus() string {
 func (x *ChildJobInfo) GetProgressPct() float64 {
 	if x != nil && x.ProgressPct != nil {
 		return *x.ProgressPct
-	}
-	return 0
-}
-
-func (x *ChildJobInfo) GetCostEstimate() float64 {
-	if x != nil && x.CostEstimate != nil {
-		return *x.CostEstimate
-	}
-	return 0
-}
-
-func (x *ChildJobInfo) GetCostActual() float64 {
-	if x != nil && x.CostActual != nil {
-		return *x.CostActual
 	}
 	return 0
 }
@@ -2471,29 +2455,24 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\x19ListScheduledJobsResponse\x122\n" +
 	"\x04jobs\x18\x01 \x03(\v2\x1e.protocol.ScheduledJobResponseR\x04jobs\x12\x19\n" +
 	"\x05count\x18\x02 \x01(\x05H\x00R\x05count\x88\x01\x01B\b\n" +
-	"\x06_count\"\xcc\x03\n" +
+	"\x06_count\"\x82\x03\n" +
 	"\fChildJobInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x16\n" +
 	"\x06source\x18\x03 \x01(\tR\x06source\x12\x16\n" +
 	"\x06status\x18\x04 \x01(\tR\x06status\x12&\n" +
-	"\fprogress_pct\x18\x05 \x01(\x01H\x00R\vprogressPct\x88\x01\x01\x12(\n" +
-	"\rcost_estimate\x18\x06 \x01(\x01H\x01R\fcostEstimate\x88\x01\x01\x12$\n" +
-	"\vcost_actual\x18\a \x01(\x01H\x02R\n" +
-	"costActual\x88\x01\x01\x12\x19\n" +
-	"\x05error\x18\b \x01(\tH\x03R\x05error\x88\x01\x01\x12\x1d\n" +
+	"\fprogress_pct\x18\x05 \x01(\x01H\x00R\vprogressPct\x88\x01\x01\x12\x19\n" +
+	"\x05error\x18\b \x01(\tH\x01R\x05error\x88\x01\x01\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\t \x01(\tR\tcreatedAt\x12\"\n" +
 	"\n" +
 	"started_at\x18\n" +
-	" \x01(\tH\x04R\tstartedAt\x88\x01\x01\x12&\n" +
-	"\fcompleted_at\x18\v \x01(\tH\x05R\vcompletedAt\x88\x01\x01B\x0f\n" +
-	"\r_progress_pctB\x10\n" +
-	"\x0e_cost_estimateB\x0e\n" +
-	"\f_cost_actualB\b\n" +
+	" \x01(\tH\x02R\tstartedAt\x88\x01\x01\x12&\n" +
+	"\fcompleted_at\x18\v \x01(\tH\x03R\vcompletedAt\x88\x01\x01B\x0f\n" +
+	"\r_progress_pctB\b\n" +
 	"\x06_errorB\r\n" +
 	"\v_started_atB\x0f\n" +
-	"\r_completed_at\"m\n" +
+	"\r_completed_atJ\x04\b\x06\x10\aJ\x04\b\a\x10\bR\rcost_estimateR\vcost_actual\"m\n" +
 	"\x13JobChildrenResponse\x12\"\n" +
 	"\rparent_job_id\x18\x01 \x01(\tR\vparentJobId\x122\n" +
 	"\bchildren\x18\x02 \x03(\v2\x16.protocol.ChildJobInfoR\bchildren\"?\n" +

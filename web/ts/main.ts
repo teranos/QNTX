@@ -36,7 +36,6 @@ import { formatDateTime } from './html-utils.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
 import { uiState } from './state/ui.ts';
 import { appState } from './state/app.ts';
-import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { initSyncBadge } from './sync-badge.ts';
 import { handleDaemonStatus } from './websocket-handlers/daemon-status.ts';
 import { statusIndicators } from './status-indicators.ts';
@@ -222,7 +221,6 @@ async function init(): Promise<void> {
         'import_progress': handleImportProgress,
         'import_stats': handleImportStats,
         'import_complete': handleImportComplete,
-        'usage_update': handleUsageUpdate,
         'daemon_status': handleDaemonStatus,
         'pulse_execution_started': handlePulseExecutionStarted,
         'pulse_execution_failed': handlePulseExecutionFailed,
@@ -513,7 +511,6 @@ async function init(): Promise<void> {
     initQueryFileDrop();
 
     if (window.logLoaderStep) window.logLoaderStep('Initializing UI controls...');
-    initUsageBadge();
     initSyncBadge();
 
     // The brow — the node's status line around the Dynamic Island. Mounts

@@ -53,7 +53,6 @@ func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 		{"_ground_endpoint", "localhost:9008"},
 		{"_search_endpoint", "localhost:9009"},
 		{"_mail_endpoint", "localhost:9010"},
-		{"_auth_token", "test-token-123"},
 	}
 
 	for _, tc := range cases {
@@ -104,12 +103,10 @@ func TestAPluginsConfigIsItsRecord(t *testing.T) {
 }
 
 // A plugin whose record names a namespace is handed a token of its own for it,
-// minted by the node; one whose record names none is handed the shared token
-// (ADR-046).
+// minted by the node (ADR-046).
 func TestAPluginStandingInANamespaceIsHandedItsOwnToken(t *testing.T) {
 	SetPluginRecords(heldRecords{
 		"cleanAPI": {Name: "cleanAPI", Config: map[string]string{PluginNamespaceKey: "Clean"}},
-		"datapunt": {Name: "datapunt", Config: map[string]string{}},
 	})
 	t.Cleanup(func() { SetPluginRecords(nil) })
 	minted := func(plugin, namespace string) (string, error) {
@@ -118,7 +115,23 @@ func TestAPluginStandingInANamespaceIsHandedItsOwnToken(t *testing.T) {
 
 	provider := NewConfigProvider(&ServiceEndpoints{AuthToken: "shared"}, minted, zap.NewNop().Sugar())
 	assert.Equal(t, "cleanAPI@Clean", provider.GetPluginConfig("cleanAPI").GetString("_auth_token"))
-	assert.Equal(t, "shared", provider.GetPluginConfig("datapunt").GetString("_auth_token"))
+}
+
+// "nil is nil"
+
+// A record naming no namespace stands nowhere, and is handed no token: not the
+// shared one on the served store. It still starts, and acts only where a
+// caller acts, through the call's own token.
+func TestAPluginNamingNoNamespaceIsHandedNoToken(t *testing.T) {
+	SetPluginRecords(heldRecords{"datapunt": {Name: "datapunt", Config: map[string]string{}}})
+	t.Cleanup(func() { SetPluginRecords(nil) })
+	minted := func(plugin, namespace string) (string, error) {
+		return plugin + "@" + namespace, nil
+	}
+
+	config := NewConfigProvider(&ServiceEndpoints{AuthToken: "shared"}, minted, zap.NewNop().Sugar()).GetPluginConfig("datapunt")
+	assert.Equal(t, "", config.GetString("_auth_token"), "a plugin naming no namespace was handed a token")
+	assert.NoError(t, config.(interface{ Err() error }).Err(), "a plugin naming no namespace was refused its start")
 }
 
 // A namespace the node cannot mint a token for is a plugin not handed its

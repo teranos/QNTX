@@ -1288,8 +1288,6 @@ type ExecuteJobResponse struct {
 	// Progress tracking (optional) - Pulse updates job.Progress
 	ProgressCurrent int32 `protobuf:"varint,4,opt,name=progress_current,json=progressCurrent,proto3" json:"progress_current,omitempty"`
 	ProgressTotal   int32 `protobuf:"varint,5,opt,name=progress_total,json=progressTotal,proto3" json:"progress_total,omitempty"`
-	// Cost tracking (optional) - Pulse updates job.CostActual
-	CostActual float64 `protobuf:"fixed64,6,opt,name=cost_actual,json=costActual,proto3" json:"cost_actual,omitempty"`
 	// Execution logs — written to task_logs table by PluginProxyHandler
 	LogEntries []*JobLogEntry `protobuf:"bytes,7,rep,name=log_entries,json=logEntries,proto3" json:"log_entries,omitempty"`
 	// Plugin version that produced this result (e.g., "0.2.14")
@@ -1359,13 +1357,6 @@ func (x *ExecuteJobResponse) GetProgressCurrent() int32 {
 func (x *ExecuteJobResponse) GetProgressTotal() int32 {
 	if x != nil {
 		return x.ProgressTotal
-	}
-	return 0
-}
-
-func (x *ExecuteJobResponse) GetCostActual() float64 {
-	if x != nil {
-		return x.CostActual
 	}
 	return 0
 }
@@ -1805,18 +1796,16 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\vstore_token\x18\x05 \x01(\tR\n" +
 	"storeToken\x12\x17\n" +
 	"\auser_id\x18\x06 \x01(\tR\x06userIdB\x0f\n" +
-	"\r_timeout_secs\"\xae\x02\n" +
+	"\r_timeout_secs\"\xa0\x02\n" +
 	"\x12ExecuteJobResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x16\n" +
 	"\x06result\x18\x03 \x01(\fR\x06result\x12)\n" +
 	"\x10progress_current\x18\x04 \x01(\x05R\x0fprogressCurrent\x12%\n" +
-	"\x0eprogress_total\x18\x05 \x01(\x05R\rprogressTotal\x12\x1f\n" +
-	"\vcost_actual\x18\x06 \x01(\x01R\n" +
-	"costActual\x126\n" +
+	"\x0eprogress_total\x18\x05 \x01(\x05R\rprogressTotal\x126\n" +
 	"\vlog_entries\x18\a \x03(\v2\x15.protocol.JobLogEntryR\n" +
 	"logEntries\x12%\n" +
-	"\x0eplugin_version\x18\b \x01(\tR\rpluginVersion\"\x8d\x01\n" +
+	"\x0eplugin_version\x18\b \x01(\tR\rpluginVersionJ\x04\b\x06\x10\aR\vcost_actual\"\x8d\x01\n" +
 	"\vJobLogEntry\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\tR\ttimestamp\x12\x14\n" +
 	"\x05level\x18\x02 \x01(\tR\x05level\x12\x18\n" +

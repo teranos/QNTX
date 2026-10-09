@@ -23,6 +23,7 @@ import (
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -361,11 +362,12 @@ func stoppedWithTheNode(ctx context.Context) bool {
 // that touched its file.
 func (s *QNTXServer) buildRev(ctx context.Context, source buildSource) (string, error) {
 	said, err := s.gitHubService().ListCommits(ctx, &protocol.GitHubListCommitsRequest{
-		Owner:   source.Owner,
-		Repo:    source.Repo,
-		Sha:     source.Branch,
-		Path:    source.Path,
-		PerPage: 1,
+		Namespace: auth.NamespaceSystem,
+		Owner:     source.Owner,
+		Repo:      source.Repo,
+		Sha:       source.Branch,
+		Path:      source.Path,
+		PerPage:   1,
 	})
 	if err != nil {
 		return "", err
@@ -473,7 +475,7 @@ func (s *QNTXServer) buildPlugin(ctx context.Context, b pluginBuild, revs []stri
 
 // fetchCore writes the core's archive at rev to path.
 func (s *QNTXServer) fetchCore(ctx context.Context, core buildSource, rev, path string) error {
-	body, err := s.gitHubService().Tarball(ctx, "", core.Owner, core.Repo, rev)
+	body, err := s.gitHubService().Tarball(ctx, auth.NamespaceSystem, core.Owner, core.Repo, rev)
 	if err != nil {
 		return errors.Wrapf(err, "failed to fetch %s at %s", core.String(), rev)
 	}
@@ -495,10 +497,11 @@ func (s *QNTXServer) fetchCore(ctx context.Context, core buildSource, rev, path 
 // fetchInput writes one input file at rev into work, and says where.
 func (s *QNTXServer) fetchInput(ctx context.Context, in buildSource, rev, work string) (string, error) {
 	said, err := s.gitHubService().GetRepositoryContent(ctx, &protocol.GitHubGetRepositoryContentRequest{
-		Owner: in.Owner,
-		Repo:  in.Repo,
-		Path:  in.Path,
-		Ref:   rev,
+		Namespace: auth.NamespaceSystem,
+		Owner:     in.Owner,
+		Repo:      in.Repo,
+		Path:      in.Path,
+		Ref:       rev,
 	})
 	if err != nil {
 		return "", err

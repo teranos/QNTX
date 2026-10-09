@@ -135,6 +135,26 @@ func TestUnparseableOriginRefuses(t *testing.T) {
 	}
 }
 
+// "nil is nil"
+
+// Whether a gate stands is said: a config that left auth.enabled out does not
+// start a node, and one that said false does.
+func TestAGateLeftOutIsRefused(t *testing.T) {
+	appcfg.Reset()
+	t.Cleanup(appcfg.Reset)
+	t.Cleanup(func() { delete(appcfg.ConfigSources, "auth.enabled") })
+
+	appcfg.ConfigSources["auth.enabled"] = appcfg.SourceInfo{Source: appcfg.SourceDefault}
+	if err := RefuseUnsaidGate(); err == nil {
+		t.Fatal("a config that left auth.enabled out started a node")
+	}
+
+	appcfg.ConfigSources["auth.enabled"] = appcfg.SourceInfo{Source: appcfg.SourceProject, Path: "am.toml"}
+	if err := RefuseUnsaidGate(); err != nil {
+		t.Fatalf("a config that said auth.enabled was refused: %v", err)
+	}
+}
+
 // The refusal names the address it read, so a deployment that is public by
 // accident can see which address made it so.
 func TestRefusalNamesTheBindAddress(t *testing.T) {

@@ -182,7 +182,7 @@ workers = 3`),
 		assert.Equal(t, int64(3), settingsMap["pulse.workers"])
 
 		// Default settings should also be there (not just our overrides)
-		assert.NotNil(t, settingsMap["pulse.cost_per_score_usd"], "Defaults should appear in introspection")
+		assert.NotNil(t, settingsMap["pulse.ticker_interval_seconds"], "Defaults should appear in introspection")
 
 		// What we loaded should match what introspection reports
 		assert.Equal(t, cfg.Storage.Sqlite.Path, settingsMap["storage.sqlite.path"])

@@ -13,7 +13,7 @@ import (
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/pulse/budget"
+	"github.com/teranos/QNTX/pulse/ratelimit"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -27,7 +27,7 @@ import (
 // Queuing: a priority-aware concurrency semaphore limits how many calls reach
 // the provider simultaneously. Callers that don't get a slot block until one
 // opens, served in priority order (lower value = higher priority).
-// Rate limiting reuses Pulse's budget.Limiter (sliding window, calls/minute).
+// Rate limiting is ratelimit.Limiter (sliding window, calls/minute).
 type LLMServer struct {
 	protocol.UnimplementedLLMServiceServer
 
@@ -35,7 +35,7 @@ type LLMServer struct {
 	providers       map[string]protocol.LLMServiceClient // provider name → client
 	defaultProvider string
 	queue           *llmQueue
-	limiter         *budget.Limiter
+	limiter         *ratelimit.Limiter
 	store           ats.AttestationStore // nil = weave creation disabled
 	logger          *zap.SugaredLogger
 }
@@ -47,7 +47,7 @@ func NewLLMServer(cfg config.LLMConfig, store ats.AttestationStore, logger *zap.
 		providers: make(map[string]protocol.LLMServiceClient),
 		queue:     newLLMQueue(cfg.MaxConcurrent, cfg.MaxQueueDepth, time.Duration(cfg.CooldownSeconds)*time.Second),
 		store:     store,
-		limiter:   budget.NewLimiter(cfg.MaxCallsPerMinute),
+		limiter:   ratelimit.NewLimiter(cfg.MaxCallsPerMinute),
 		logger:    logger,
 	}
 }

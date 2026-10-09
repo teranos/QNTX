@@ -259,7 +259,8 @@ pub struct QueryFilter {
     pub time_start: Option<i64>,
     #[serde(default)]
     pub time_end: Option<i64>,
-    #[serde(default)]
+    /// How many rows. Required: 0 is 0 rows, and a filter that names none is
+    /// refused rather than read as some number.
     pub limit: i64,
 }
 
@@ -756,10 +757,10 @@ impl DuckdbStore {
             sql.push_str(&conds.join(" AND "));
         }
         sql.push_str(" ORDER BY timestamp DESC");
-        if filter.limit > 0 {
-            // limit is a validated integer — inline safely.
-            sql.push_str(&format!(" LIMIT {}", filter.limit));
-        }
+        // A limit of 0 is 0 rows: a query names how many rows it wants, and
+        // every row is a high value said (Go's ats.EveryRow). An integer,
+        // inlined safely.
+        sql.push_str(&format!(" LIMIT {}", filter.limit.max(0)));
 
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt.query_map(duckdb::params_from_iter(binds.iter()), |row| {

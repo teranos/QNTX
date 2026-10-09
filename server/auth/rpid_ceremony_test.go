@@ -153,8 +153,11 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Enrolment records the identity whose session authorized it, so the
-	// ceremony needs one to speak for.
-	sessionToken, err := h.sessions.create("https://mastodon.example/@tim", User{})
+	// ceremony needs one to speak for: a key route, held by its User.
+	route := EncodeDIDKey(ownerPub)
+	h.SetIdentities([]string{route}, nil)
+	h.users = &memUsers{held: []User{{ID: "US-TIM", Level: LevelRoot, Keys: []UserKey{{DID: route, Origin: OriginBrowser}}}}}
+	sessionToken, err := h.sessions.create(route, User{ID: "US-TIM"})
 	require.NoError(t, err)
 
 	// --- POST /auth/register/finish ---

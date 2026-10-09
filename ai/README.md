@@ -10,11 +10,6 @@ QNTX needs to call LLMs for various operations (code analysis, data extraction, 
 
 ## Packages
 
-### tracker
-**Why**: Track API usage and costs across all LLM calls.
-
-Budget control requires knowing what you've spent. The tracker records every API call (tokens, cost, model, timestamp) for budget enforcement and analytics.
-
 ### openrouter
 **Why**: Multi-model LLM access through a single API.
 
@@ -31,20 +26,13 @@ Users want to run models locally (llama.cpp) for privacy/cost, or use cloud APIs
 - **Not a model abstraction layer** - We don't hide model-specific features
 - **Not a RAG framework** - Retrieval/context is domain-specific
 
-## Related Packages
-
-- **[pulse/budget](../pulse/budget/)** - Budget enforcement (uses tracker data)
-
 ## Usage Pattern
 
 ```go
 // Get appropriate LLM client (local or cloud)
 client, err := provider.GetClient(config)
 
-// Make call (tracker records usage automatically)
 resp, err := client.ChatCompletion(ctx, messages, model)
-
-// Budget system checks spend, pauses jobs if needed
 ```
 
 ## Philosophy

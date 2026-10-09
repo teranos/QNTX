@@ -220,9 +220,13 @@ pub struct AxFilter {
     /// Filter by source (exact match, e.g., "cli", "distill")
     pub source: Option<String>,
 
-    /// Maximum results
-    pub limit: Option<usize>,
+    /// Maximum results. A filter that leaves it out is refused, 0 is 0 rows,
+    /// and every row is [`EVERY_ROW`].
+    pub limit: usize,
 }
+
+/// The limit that reads every row, said; Go's `ats.EveryRow`.
+pub const EVERY_ROW: usize = i32::MAX as usize;
 
 /// Result of an ax query
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

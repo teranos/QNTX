@@ -51,7 +51,6 @@ export type MessageType =
   | 'ix_progress'
   | 'ix_error'
   | 'ix_complete'
-  | 'usage_update'
   | 'parse_response'
   | 'parse_request'
   | 'job_details'
@@ -285,18 +284,6 @@ export interface IXCompleteMessage extends BaseMessage {
   };
 }
 
-/**
- * Usage update (matches server format from server/types.go:UsageUpdateMessage)
- */
-export interface UsageUpdateMessage extends BaseMessage {
-  type: 'usage_update';
-  total_cost: number;    // Total cost in last 24h
-  requests: number;      // Total requests
-  success: number;       // Successful requests
-  tokens: number;        // Total tokens used
-  models: number;        // Unique models used
-  since: string;         // Time period (e.g., "24h")
-}
 
 /**
  * Parse request (sent from frontend)
@@ -527,7 +514,6 @@ export type WebSocketMessage =
   | IXProgressMessage
   | IXErrorMessage
   | IXCompleteMessage
-  | UsageUpdateMessage
   | ParseRequestMessage
   | ParseResponseMessage
   | QueryMessage
@@ -574,7 +560,6 @@ export interface MessageHandlers {
   ix_progress?: MessageHandler<IXProgressMessage>;
   ix_error?: MessageHandler<IXErrorMessage>;
   ix_complete?: MessageHandler<IXCompleteMessage>;
-  usage_update?: MessageHandler<UsageUpdateMessage>;
   parse_response?: MessageHandler<ParseResponseMessage>;
   query?: MessageHandler<QueryMessage>;
   pulse_execution_started?: MessageHandler<PulseExecutionStartedMessage>;

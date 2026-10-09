@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
@@ -22,7 +21,6 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
@@ -53,9 +51,9 @@ type QNTXServer struct {
 	harnessBinaries     harnessesHeld         // Each harness the ROOT agent runs in, as this node holds its binary, by the harness's name (ADR-048)
 	rootAgent           *rootAgent            // The ROOT agent this node runs; nil when am.toml names none (ADR-048)
 	noRootAgent         error                 // Why the ROOT agent am.toml names did not start, for whoever speaks to it
+	namespaceAgents     agentsHeld            // Each namespace agent this node has held, by its purpose (ADR-048)
+	agentsDir           string                // Where agents are kept; empty is ~/.qntx/agents
 	ownURL              string                // Where this node answers on its own machine; empty until it listens
-	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
-	budgetTracker       *budget.Tracker       // Budget tracking for Pulse daemon
 	daemon              *async.WorkerPool     // Background job processor (daemon)
 	scheduleStore       *schedule.Store       // Schedule persistence (shared with ticker)
 	tickerCfg           schedule.TickerConfig // Ticker configuration (resolved at init)
@@ -72,7 +70,6 @@ type QNTXServer struct {
 	unregister          chan *Client
 	mu                  sync.RWMutex
 	lastStatus          *cachedDaemonStatus // Cache last daemon status for change detection
-	lastUsage           *cachedUsageStats   // Cache last usage stats for change detection
 	verbosity           atomic.Int32        // Thread-safe verbosity level (fixes Issue #64)
 	logger              *zap.SugaredLogger
 	consoleBuffer       *ConsoleBuffer              // Browser console log buffer for debugging (dev mode only)

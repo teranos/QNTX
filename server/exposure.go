@@ -36,6 +36,16 @@ func offLoopback(bindAddr string) bool {
 	return !appcfg.IsLoopbackAddress(bindAddr)
 }
 
+// RefuseUnsaidGate refuses a node whose am.toml left auth.enabled out. Whether a
+// gate stands in front of the node is said, true or false, and leaving it out
+// does not open one. Asked by `qntx server` before it serves.
+func RefuseUnsaidGate() error {
+	if source, recorded := appcfg.SourceOf("auth.enabled"); recorded && source == appcfg.SourceDefault {
+		return errors.New("auth.enabled says whether a gate stands in front of this node, and am.toml left it out: say true, or false for a node only this machine reaches")
+	}
+	return nil
+}
+
 // refusePublicDeploy names what a deployment on this bind address has not said
 // yet. A non-nil return stops startup. Loopback answers nil to all of it.
 func refusePublicDeploy(bindAddr string, auth appcfg.AuthConfig) error {

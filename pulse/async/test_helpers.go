@@ -3,7 +3,7 @@ package async
 import "encoding/json"
 
 // createTestJob is a shared helper for all tests to create jobs with generic payloads
-func createTestJob(handlerName, source string, totalOps int, estimatedCost float64) (*Job, error) {
+func createTestJob(handlerName, source string, totalOps int) (*Job, error) {
 	payload := map[string]any{
 		"source": source,
 		"actor":  "test-system",
@@ -12,5 +12,5 @@ func createTestJob(handlerName, source string, totalOps int, estimatedCost float
 	if err != nil {
 		return nil, err
 	}
-	return NewJobWithPayload(handlerName, source, payloadJSON, totalOps, estimatedCost, "test-system")
+	return NewJobWithPayload(handlerName, source, payloadJSON, totalOps, "test-system")
 }

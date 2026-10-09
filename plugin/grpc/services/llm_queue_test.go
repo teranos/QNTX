@@ -11,7 +11,7 @@ import (
 )
 
 func TestLLMQueue_ImmediateAcquire(t *testing.T) {
-	q := newLLMQueue(2, 0, 0)
+	q := newLLMQueue(2, 8, 0)
 
 	require.NoError(t, q.Acquire(context.Background(), 0))
 	require.NoError(t, q.Acquire(context.Background(), 0))
@@ -29,7 +29,7 @@ func TestLLMQueue_ImmediateAcquire(t *testing.T) {
 }
 
 func TestLLMQueue_BlocksWhenFull(t *testing.T) {
-	q := newLLMQueue(1, 0, 0)
+	q := newLLMQueue(1, 8, 0)
 
 	require.NoError(t, q.Acquire(context.Background(), 0))
 
@@ -42,7 +42,7 @@ func TestLLMQueue_BlocksWhenFull(t *testing.T) {
 }
 
 func TestLLMQueue_PriorityOrdering(t *testing.T) {
-	q := newLLMQueue(1, 0, 0)
+	q := newLLMQueue(1, 8, 0)
 
 	// Fill the single slot
 	require.NoError(t, q.Acquire(context.Background(), 0))
@@ -92,7 +92,7 @@ func TestLLMQueue_PriorityOrdering(t *testing.T) {
 }
 
 func TestLLMQueue_ContextCancelWhileWaiting(t *testing.T) {
-	q := newLLMQueue(1, 0, 0)
+	q := newLLMQueue(1, 8, 0)
 	require.NoError(t, q.Acquire(context.Background(), 0))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -119,6 +119,19 @@ func TestLLMQueue_ContextCancelWhileWaiting(t *testing.T) {
 	q.Release()
 	active, _ := q.Stats()
 	assert.Equal(t, 0, active)
+}
+
+// "zero means zero"
+
+// A queue depth of 0 queues nobody: with every slot taken, the next is refused.
+func TestLLMQueue_ADepthOfZeroQueuesNobody(t *testing.T) {
+	q := newLLMQueue(1, 0, 0)
+	require.NoError(t, q.Acquire(context.Background(), 0))
+
+	err := q.Acquire(context.Background(), 0)
+	require.Error(t, err, "a queue of depth 0 queued a request")
+	assert.Contains(t, err.Error(), "queue full")
+	q.Release()
 }
 
 func TestLLMQueue_RejectsWhenQueueFull(t *testing.T) {

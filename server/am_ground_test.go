@@ -144,7 +144,7 @@ func TestAmGroundSaysWhatUgPosted(t *testing.T) {
 		require.NoError(t, store.CreateAttestation(as))
 	}
 	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
-	asked := httptest.NewRequest(http.MethodGet, "/am/ground", nil)
+	asked := rootRequest(httptest.NewRequest(http.MethodGet, "/am/ground", nil))
 
 	answer, refused := s.amGround(sigil.WithCaller(context.Background(), asked), sigil.Sent{})
 	require.Nil(t, refused)

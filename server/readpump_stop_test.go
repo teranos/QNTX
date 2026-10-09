@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/teranos/QNTX/server/auth"
 )
 
 // Stop closes every socket and cancels the context, which ends the hub. A read
@@ -11,7 +13,9 @@ import (
 // and waiting for one held every stop of the node to ShutdownTimeout.
 func TestAReadPumpEndsOnceTheHubHasStopped(t *testing.T) {
 	srv := nodeUnderTest(t)
-	held := socketAs(t, srv, func(r *http.Request) *http.Request { return r })
+	held := socketAs(t, srv, func(r *http.Request) *http.Request {
+		return r.WithContext(auth.WithAdmission(r.Context(), auth.Admitted(auth.LevelRoot)))
+	})
 	if len(held) != 1 {
 		t.Fatalf("%d clients registered, want 1", len(held))
 	}

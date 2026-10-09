@@ -20,8 +20,6 @@ export interface Job {
   /** queued, running, paused, completed, failed, cancelled */
   status: string;
   progress: Progress | undefined;
-  cost_estimate: number;
-  cost_actual: number;
   pulse_state: PulseState | undefined;
   error: string;
   parent_job_id: string;
@@ -42,9 +40,6 @@ export interface Progress {
 export interface PulseState {
   calls_this_minute: number;
   calls_remaining: number;
-  spend_today: number;
-  spend_this_month: number;
-  budget_remaining: number;
   is_paused: boolean;
   pause_reason: string;
 }
