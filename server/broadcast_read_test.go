@@ -150,8 +150,9 @@ func TestAMessageCarryingNoAttestationIsNotGated(t *testing.T) {
 	}
 }
 
-// A node running without auth has one caller, and nobody to keep anything from.
-func TestAnUngatedClientIsHandedEverything(t *testing.T) {
+// A client nobody admitted is handed no row. A node without auth admits its
+// one caller at the gate, as ROOT.
+func TestAnUngatedClientIsHandedNothing(t *testing.T) {
 	srv := broadcastServer()
 
 	held := &Client{server: srv, sendMsg: make(chan any, 4), id: "ungated", in: auth.NamespaceDefault}
@@ -159,7 +160,7 @@ func TestAnUngatedClientIsHandedEverything(t *testing.T) {
 
 	srv.sendMessageToClients("a match", "", auth.NamespaceDefault, row("anything"))
 
-	if len(queued(held)) != 1 {
-		t.Error("a node without auth withheld a row from its one caller")
+	if got := queued(held); len(got) != 0 {
+		t.Errorf("a client nobody admitted was handed a row: %v", got)
 	}
 }

@@ -85,10 +85,10 @@ func (c *Client) mayRead(as *types.As) bool {
 	if as == nil {
 		return true
 	}
-	// Not gated is a node running without auth, where every caller is the one
-	// caller, and there is nobody to keep anything from.
+	// Not gated is a socket nobody admitted, and it is handed nothing. A node
+	// without auth admits its one caller at the gate.
 	if !c.gated {
-		return true
+		return false
 	}
 
 	// "DEFAULT DENY": every predicate on the row, not one of them.

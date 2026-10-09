@@ -181,7 +181,7 @@ func TestAPluginIsToldWhichTokenAsked(t *testing.T) {
 	held := stubSignum("stub").GetSigils()[0]
 	headers := func(admitted auth.Admission) map[string][]string {
 		ctx := auth.WithAdmission(context.Background(), admitted)
-		req, err := forwarded("stub", held, map[string]any{"kind": "competitor"}, ctx, "call")
+		req, err := forwarded("stub", held, map[string]any{"kind": "competitor"}, ctx)
 		require.NoError(t, err)
 		out := map[string][]string{}
 		for _, h := range req.GetHeaders() {
@@ -355,6 +355,8 @@ func TestAPluginsDeclaredRoutesAreItsSigils(t *testing.T) {
 	require.Len(t, p.handed, 1)
 	assert.Equal(t, "/kvk/zoek/naam", p.handed[0].GetPath())
 	assert.JSONEq(t, `{"naam":"acme","filter":{"plaats":"Amsterdam"}}`, string(p.handed[0].GetBody()))
+	assert.Empty(t, headerOf(p.handed[0], HeaderStoreToken), "a stranger's call was handed a store")
+	assert.Empty(t, headerOf(p.handed[0], HeaderNamespace), "a stranger's call was handed a namespace")
 
 	p.answer = &protocol.HTTPResponse{StatusCode: http.StatusNotFound, Body: []byte(`{"error":"niet in het handelsregister"}`)}
 	answered = ask(map[string]any{"naam": "acme"})

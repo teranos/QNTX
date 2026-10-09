@@ -79,21 +79,15 @@ func TestASocketCarriesWhatItsUpgradeWasAdmittedAs(t *testing.T) {
 	}
 }
 
-// A node running without auth has one caller, and the served universe is what
-// it has to give. The socket says so rather than claiming an admission.
+// A socket nobody admitted reaches no universe, and the node does not keep it.
+// A node without auth admits its one caller at the gate.
 func TestAnUngatedSocketIsNotAdmittedToAnything(t *testing.T) {
 	srv := nodeUnderTest(t)
 
 	held := socketAs(t, srv, func(r *http.Request) *http.Request { return r })
 
-	if len(held) != 1 {
-		t.Fatalf("the node registered %d clients, want 1", len(held))
-	}
-	if held[0].gated {
-		t.Error("a socket that passed no gate claims it did")
-	}
-	if _, err := held[0].universe(); err != nil {
-		t.Errorf("an ungated socket reaches no universe: %v", err)
+	if len(held) != 0 {
+		t.Fatalf("the node registered %d clients nobody admitted", len(held))
 	}
 }
 
