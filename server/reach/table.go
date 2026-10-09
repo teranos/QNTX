@@ -156,7 +156,7 @@ REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROO
 
 # The ROOT agent (the claude signum, ADR-048). Who may talk to it is the whole
 # of what guards it, and that is ROOT.
-REACH is '/api/claude' '/api/claude/say' '/api/claude/session'            of ROOT
+REACH is '/api/claude' '/api/claude/say' '/api/claude/session' '/api/claude/login' of ROOT
 REACH is '/api/pi' '/api/pi/say' '/api/pi/session'                        of ROOT
 
 # A2A over HTTP+JSON, one line for every operation: a route like

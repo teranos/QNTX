@@ -49,6 +49,25 @@ func claudeStandIn(t *testing.T, stream string) (binary, ran string) {
 		"mkdir '" + ran + "'/$n\n" +
 		"for arg in \"$@\"; do printf '%s\\n' \"$arg\"; done > '" + ran + "'/$n/args\n" +
 		"env > '" + ran + "'/$n/env\n" +
+		// Signing in, as Claude Code does it headless: the URL, then the code
+		// read on stdin and kept in the config dir. Status reads what is kept.
+		"if [ \"$1\" = auth ]; then\n" +
+		"  if [ \"$2\" = login ]; then\n" +
+		"    echo 'Opening browser to sign in…'\n" +
+		"    echo 'If the browser didn'\"'\"'t open, visit: " + standInSignInURL + "'\n" +
+		"    printf 'Paste code here if prompted > '\n" +
+		"    read code\n" +
+		"    if [ \"$code\" = bad-code ]; then echo 'Invalid code' >&2; exit 1; fi\n" +
+		"    printf '%s\\n' \"$code\" > \"$CLAUDE_CONFIG_DIR/.credentials.json\"\n" +
+		"    exit 0\n" +
+		"  fi\n" +
+		"  if [ -f \"$CLAUDE_CONFIG_DIR/.credentials.json\" ]; then\n" +
+		"    echo '{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"apiProvider\":\"firstParty\"}'\n" +
+		"  else\n" +
+		"    echo '{\"loggedIn\":false,\"authMethod\":\"none\",\"apiProvider\":\"firstParty\"}'\n" +
+		"  fi\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"prev=''\n" +
 		"for arg in \"$@\"; do\n" +
 		"  if [ \"$prev\" = '--session-id' ] && [ -n \"$CLAUDE_CONFIG_DIR\" ]; then\n" +
