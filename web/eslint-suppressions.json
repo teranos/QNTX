@@ -249,11 +249,6 @@
       "count": 5
     }
   },
-  "ts/components/element/chart-element.ts": {
-    "no-restricted-syntax": {
-      "count": 13
-    }
-  },
   "ts/components/element/connectivity-element.ts": {
     "no-restricted-syntax": {
       "count": 1
@@ -756,7 +751,7 @@
   },
   "ts/pulse/system-status.ts": {
     "no-restricted-syntax": {
-      "count": 24
+      "count": 1
     }
   },
   "ts/pulse/types.ts": {
@@ -856,7 +851,7 @@
   },
   "ts/state/ui-impl.ts": {
     "no-restricted-syntax": {
-      "count": 13
+      "count": 12
     }
   },
   "ts/status-indicators.ts": {
@@ -947,11 +942,6 @@
   "ts/watcher-predicates.ts": {
     "no-restricted-syntax": {
       "count": 2
-    }
-  },
-  "ts/websocket-handlers/daemon-status.ts": {
-    "no-restricted-syntax": {
-      "count": 17
     }
   },
   "ts/websocket-handlers/plugin-health.ts": {

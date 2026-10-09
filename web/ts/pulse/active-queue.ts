@@ -70,9 +70,6 @@ function renderActiveJob(job: any): string {
                     ${completed} / ${total} operations
                 </div>
             ` : ''}
-            ${job.cost_usd ? `
-                <div class="pulse-job-cost">Cost: $${job.cost_usd.toFixed(3)}</div>
-            ` : ''}
         </div>
     `;
 }

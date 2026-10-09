@@ -182,6 +182,17 @@ message PiAm {
   string not_ready = 9;
 }
 
+// NamespaceAgentAm is what agents am and agents set answer: the namespace's
+// agent, who opted the namespace into it, and who it is in Claude Code.
+message NamespaceAgentAm {
+  // The namespace it stands in.
+  string namespace = 1;
+  // Who opted the namespace into it.
+  string set_by = 2;
+  // Who the agent is and how it runs.
+  ClaudeAm agent = 3;
+}
+
 // Follows says which column of a reference each of a signum's fields is. The
 // reference is named, not described: its own schema says what its columns are.
 message Follows {

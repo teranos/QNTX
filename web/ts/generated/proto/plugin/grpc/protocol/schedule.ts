@@ -313,8 +313,6 @@ export interface ChildJobInfo {
   source: string;
   status: string;
   progress_pct?: number | undefined;
-  cost_estimate?: number | undefined;
-  cost_actual?: number | undefined;
   error?:
     | string
     | undefined;

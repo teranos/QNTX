@@ -48,14 +48,27 @@ var operationalPatienceDefault = operationalPatience{
 // serves nothing while it boots, so a slow store is waited on for up to a
 // minute before it is given up on.
 func (s *QNTXServer) WatchOperationalStore(stop func(reason error)) {
-	s.watchOperationalStore(stop, operationalPatienceDefault)
+	var root atomic.Pointer[services.MailRecipient]
+	s.watchOperationalStore(stop, operationalPatienceDefault, wallClock{}, &root)
 }
 
-func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationalPatience) {
+// watchClock is the time the watch reads and waits on.
+type watchClock interface {
+	Now() time.Time
+	After(d time.Duration) <-chan time.Time
+}
+
+// wallClock is the time the node runs on.
+type wallClock struct{}
+
+func (wallClock) Now() time.Time                         { return time.Now() }
+func (wallClock) After(d time.Duration) <-chan time.Time { return time.After(d) }
+
+// watchOperationalStore keeps the ROOT User it mails in root, once read.
+func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationalPatience, clock watchClock, root *atomic.Pointer[services.MailRecipient]) {
 	// ROOT is read while the store answers: the Users are in the store that is
 	// being waited on, so reading them when it does not answer waits too.
-	var root atomic.Pointer[services.MailRecipient]
-	sacred.Go("operational.root", func() { s.rememberRoot(&root, p.every) })
+	sacred.Go("operational.root", func() { s.rememberRoot(root, p.every, clock) })
 
 	var stalled time.Time // When the store stopped answering within p.sentry; zero while it does.
 	var longest time.Duration
@@ -64,11 +77,11 @@ func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationa
 		select {
 		case <-s.ctx.Done():
 			return
-		case <-time.After(p.every):
+		case <-clock.After(p.every):
 		}
 
-		asked := time.Now()
-		took, mailed, err := s.askOperationalStore(p, asked, root.Load)
+		asked := clock.Now()
+		took, mailed, err := s.askOperationalStore(p, clock, asked, root.Load)
 		told = told || mailed
 		if s.ctx.Err() != nil {
 			return
@@ -114,8 +127,8 @@ func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationa
 // askOperationalStore pings the operational store and waits up to p.die for
 // the answer, saying so at p.sentry and mailing ROOT every p.mailEvery. It says
 // whether ROOT was mailed.
-func (s *QNTXServer) askOperationalStore(p operationalPatience, asked time.Time, root func() *services.MailRecipient) (time.Duration, bool, error) {
-	ctx, cancel := context.WithTimeout(s.ctx, p.die)
+func (s *QNTXServer) askOperationalStore(p operationalPatience, clock watchClock, asked time.Time, root func() *services.MailRecipient) (time.Duration, bool, error) {
+	ctx, cancel := context.WithCancel(s.ctx)
 	defer cancel()
 
 	answered := make(chan error, 1)
@@ -126,22 +139,24 @@ func (s *QNTXServer) askOperationalStore(p operationalPatience, asked time.Time,
 		err = s.nodeDB.PingContext(ctx)
 	})
 
-	sentry := time.NewTimer(p.sentry)
-	defer sentry.Stop()
-	mail := time.NewTicker(p.mailEvery)
-	defer mail.Stop()
+	die := clock.After(p.die)
+	sentry := clock.After(p.sentry)
+	mail := clock.After(p.mailEvery)
 	mailed := false
 	for {
 		select {
 		case err := <-answered:
-			return time.Since(asked), mailed, err
-		case <-sentry.C:
+			return clock.Now().Sub(asked), mailed, err
+		case <-die:
+			return clock.Now().Sub(asked), mailed, errors.Wrapf(context.DeadlineExceeded, "the operational store did not answer in %s", p.die)
+		case <-sentry:
 			s.turnAwayHeaviest()
 			s.logger.Errorw("The operational store has not answered for "+p.sentry.String(),
 				"asked_at", asked, "pool", s.operationalPool().String(), "dies_at", p.die,
 				"turned_away", s.turnedAway())
-		case <-mail.C:
-			waited := time.Since(asked)
+		case <-mail:
+			mail = clock.After(p.mailEvery)
+			waited := clock.Now().Sub(asked)
 			if waited >= p.die {
 				continue
 			}
@@ -200,7 +215,7 @@ func (p operationalPool) String() string {
 }
 
 // rememberRoot reads the ROOT User every tick until there is one to mail.
-func (s *QNTXServer) rememberRoot(root *atomic.Pointer[services.MailRecipient], every time.Duration) {
+func (s *QNTXServer) rememberRoot(root *atomic.Pointer[services.MailRecipient], every time.Duration, clock watchClock) {
 	for {
 		if s.authHandler != nil {
 			u, found, err := s.authHandler.RootUser()
@@ -212,7 +227,7 @@ func (s *QNTXServer) rememberRoot(root *atomic.Pointer[services.MailRecipient], 
 		select {
 		case <-s.ctx.Done():
 			return
-		case <-time.After(every):
+		case <-clock.After(every):
 		}
 	}
 }

@@ -92,21 +92,11 @@ entity_actors_limit = 64
 # description = "What this node is for."
 
 [agent.root]
-# The ROOT agent (ADR-048): QNTX itself as ROOT talks to it, run as Claude Code.
+# The ROOT agent (ADR-048): QNTX itself as ROOT talks to it.
 # Named whole or not at all. Default: none, and the node has no ROOT agent.
 # model = 'claude-opus-5-5'
 
 # effort = 'low'
-
-# The Claude plan token `claude setup-token` prints, by reference.
-# token = 'ssm:///q/box/claude/oauth-token'
-
-# The permission mode it runs in when whoever speaks to it names none: one of
-# acceptEdits, auto, bypassPermissions, manual, dontAsk, plan.
-# permission_mode = 'dontAsk'
-
-# The tools it may use without being asked, by Claude Code's names for them.
-# allow = ['mcp__qntx', 'Read']
 
 [sentry]
 # The project logs and metrics are shipped to. Empty is off, and
@@ -254,9 +244,10 @@ log_theme = "everforest"
 # Auth (WebAuthn / Passkeys)
 # ════════════════════════════════════════════════════════════════
 
-# [auth]
-# Biometric passkey gate. Required when server.bind_address is non-loopback.
-# enabled = false
+[auth]
+# Biometric passkey gate. Said, true or false: a node whose am.toml leaves it
+# out does not start. Required true when server.bind_address is non-loopback.
+enabled = false
 # session_expiry_hours = 168
 #
 # WebAuthn Relying Party ID and Origins. MUST be set for any public
@@ -290,8 +281,7 @@ log_theme = "everforest"
 # from. Not rp_origins — that is where the page is, and a deployment can serve
 # the page and the API on different hosts.
 
-# Unset, it is read off the request, which believes X-Forwarded-Host: whoever
-# sets that header chooses where the authorization code is delivered.
+# Unset, it is this machine's loopback origin; it is never read off a request.
 # public_origin = "https://api.qntx.example.com"
 
 # ── Front doors (ADR-032) ───────────────────────────────────────
@@ -335,21 +325,6 @@ workers = 1
 # How often to check for scheduled jobs (seconds)
 # Default: 1
 ticker_interval_seconds = 1
-
-# Node-level budget limits (enforced per-node against aggregate spend)
-# Uses sliding windows (24h/7d/30d) on ai_model_usage table
-# Default: $3/day, $7/week, $15/month
-# daily_budget_usd = 3.0
-# weekly_budget_usd = 7.0
-# monthly_budget_usd = 15.0
-# cost_per_score_usd = 0.002
-
-# Cluster-level budget (enforced against aggregate spend across all synced nodes)
-# Effective limit = average of all nodes' configured cluster limits
-# 0 = no cluster enforcement (default)
-# cluster_daily_budget_usd = 0
-# cluster_weekly_budget_usd = 0
-# cluster_monthly_budget_usd = 0
 
 # ════════════════════════════════════════════════════════════════
 # Plugin Configuration

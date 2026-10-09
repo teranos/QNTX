@@ -17,7 +17,6 @@
  * - Panel visibility (transient, not persisted)
  * - User preferences (persisted)
  * - Session (query, verbosity — persisted with expiry)
- * - Budget warnings (transient)
  */
 
 import type { PanelState } from '../../types/core';
@@ -44,15 +43,6 @@ export type PanelId =
     | 'hixtory'     // ⨳ ix - Job history panel
     | 'commandExplorer' // Command explorer overlay
     | 'log';        // Log panel
-
-/**
- * Budget warning thresholds that have been crossed
- */
-export interface BudgetWarningState {
-    daily: boolean;
-    weekly: boolean;
-    monthly: boolean;
-}
 
 /**
  * Graph session state (persisted with 7-day expiry)
@@ -120,12 +110,6 @@ export interface UIStateData {
     // Panel visibility
     panels: Record<PanelId, PanelState>;
 
-    // Budget warning tracking (prevents duplicate toasts)
-    budgetWarnings: BudgetWarningState;
-
-    // Usage badge view mode
-    usageView: 'week' | 'month';
-
     // Graph session (query, verbosity, transform)
     graphSession: GraphSessionState;
 
@@ -168,7 +152,6 @@ export type GlobalSubscriber = (state: UIStateData, changedKey: keyof UIStateDat
  * Subset of UIStateData that gets persisted to localStorage
  */
 interface PersistedUIState {
-    usageView: 'week' | 'month';
     graphSession: GraphSessionState;
     minimizedWindows: string[];
     canvasElements: CanvasElementState[];
@@ -198,12 +181,6 @@ function createDefaultState(): UIStateData {
             commandExplorer: { ...DEFAULT_PANEL_STATE },
             log: { ...DEFAULT_PANEL_STATE },
         },
-        budgetWarnings: {
-            daily: false,
-            weekly: false,
-            monthly: false,
-        },
-        usageView: 'week',
         graphSession: {},
         minimizedWindows: [],
         canvasElements: [],
@@ -326,50 +303,6 @@ export class UIState {
     // ========================================================================
     // Modality Management
     // ========================================================================
-
-    // ========================================================================
-    // Budget Warning Management
-    // ========================================================================
-
-    /**
-     * Get budget warning state
-     */
-    getBudgetWarnings(): BudgetWarningState {
-        return this.state.budgetWarnings;
-    }
-
-    /**
-     * Set a budget warning flag
-     */
-    setBudgetWarning(period: keyof BudgetWarningState, warned: boolean): void {
-        const warnings = { ...this.state.budgetWarnings, [period]: warned };
-        this.update('budgetWarnings', warnings);
-    }
-
-    /**
-     * Reset all budget warnings (e.g., on new day/week/month)
-     */
-    resetBudgetWarnings(): void {
-        this.update('budgetWarnings', { daily: false, weekly: false, monthly: false });
-    }
-
-    // ========================================================================
-    // Usage View Management
-    // ========================================================================
-
-    /**
-     * Get usage view mode
-     */
-    getUsageView(): 'week' | 'month' {
-        return this.state.usageView;
-    }
-
-    /**
-     * Set usage view mode
-     */
-    setUsageView(view: 'week' | 'month'): void {
-        this.update('usageView', view);
-    }
 
     // ========================================================================
     // Graph Session Management
@@ -725,14 +658,13 @@ export class UIState {
      */
     private getPersistedState(): PersistedUIState {
         return {
-            usageView: this.state.usageView,
             graphSession: this.state.graphSession,
             minimizedWindows: this.state.minimizedWindows,
             canvasElements: this.state.canvasElements,
             canvasCompositions: this.state.canvasCompositions,
             canvasSpines: this.state.canvasSpines,
             canvasPan: this.state.canvasPan,
-            // Don't persist: panels (should start closed), budgetWarnings (session-only)
+            // Don't persist: panels (should start closed)
         };
     }
 
@@ -758,7 +690,6 @@ export class UIState {
         const defaultState = createDefaultState();
         return {
             ...defaultState,
-            usageView: persisted.usageView ?? defaultState.usageView,
             graphSession: persisted.graphSession ?? defaultState.graphSession,
             minimizedWindows: persisted.minimizedWindows ?? defaultState.minimizedWindows,
             canvasElements: persisted.canvasElements ?? defaultState.canvasElements,

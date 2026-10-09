@@ -5,9 +5,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/errors"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -52,18 +55,18 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	// Its token is ROOT's kind, and it would be asking from inside the turn
 	// it then waits on.
 	if spokenBy(caller) == agent.did {
-		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: "the ROOT agent does not speak to itself: it is in the turn that asked"}
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: agent.called + " does not speak to itself: it is in the turn that asked"}
 	}
-	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	store, err := s.sessionStoreOf(caller, agent)
 	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no system to write the ROOT agent's session in: " + err.Error()}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "nowhere to write the session of " + agent.called + ": " + err.Error()}
 	}
 
 	select {
 	case t.in.turn <- struct{}{}:
 		defer func() { <-t.in.turn }()
 	case <-ctx.Done():
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent was still answering somebody else when this caller left"}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " was still answering somebody else when this caller left"}
 	}
 
 	session, kept, err := agent.sessionIn(t.in.file)
@@ -94,15 +97,19 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 			}
 		}
 		if err != nil {
-			s.logger.Errorw("a row of the ROOT agent's session was not written", "session", session, "harness", t.called, "error", err)
+			s.logger.Errorw("a row of the agent's session was not written", "agent", agent.did, "session", session, "harness", t.called, "error", err)
 			if unwritten == "" {
 				unwritten = err.Error()
 			}
 		}
 	}
-	itsGit, err := s.gitEnvironment(agent)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent's git was not set up, so nothing was said to it: " + err.Error()}
+	// The ROOT agent's git is its own (ADR-048, Its git). A namespace agent has
+	// none: nothing of it is written for one yet.
+	var itsGit []string
+	if agent.namespace == auth.NamespaceSystem {
+		if itsGit, err = s.gitEnvironment(agent); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent's git was not set up, so nothing was said to it: " + err.Error()}
+		}
 	}
 	told, err := writes.told(says, spokenBy(caller), time.Now())
 	write([]*types.As{told}, err)
@@ -118,4 +125,19 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 		}
 	}
 	return answer, nil
+}
+
+// sessionStoreOf is where an agent's session is written: system for ROOT's,
+// whose sessions are the node's own record, and its namespace for a namespace
+// agent, which stands there and nothing crosses (ADR-026). The namespace is
+// written as the caller is admitted to act there.
+func (s *QNTXServer) sessionStoreOf(caller *http.Request, agent *rootAgent) (ats.AttestationStore, error) {
+	if agent.namespace == auth.NamespaceSystem {
+		return s.held.WriteWhatTheNodeKnowsOfItself()
+	}
+	admitted, gated := auth.AdmissionFrom(caller.Context())
+	if !gated {
+		return nil, errors.Newf("the session of %s is written in %s as its caller acts there, and this caller was admitted nowhere", agent.called, agent.namespace)
+	}
+	return s.held.Write(admitted, agent.namespace)
 }

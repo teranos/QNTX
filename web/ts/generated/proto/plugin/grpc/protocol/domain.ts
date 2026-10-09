@@ -317,8 +317,6 @@ export interface ExecuteJobResponse {
   /** Progress tracking (optional) - Pulse updates job.Progress */
   progress_current: number;
   progress_total: number;
-  /** Cost tracking (optional) - Pulse updates job.CostActual */
-  cost_actual: number;
   /** Execution logs — written to task_logs table by PluginProxyHandler */
   log_entries: JobLogEntry[];
   /** Plugin version that produced this result (e.g., "0.2.14") */

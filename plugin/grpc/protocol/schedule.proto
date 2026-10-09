@@ -279,8 +279,8 @@ message ChildJobInfo {
   string source = 3;
   string status = 4;
   optional double progress_pct = 5;
-  optional double cost_estimate = 6;
-  optional double cost_actual = 7;
+  reserved 6, 7;
+  reserved "cost_estimate", "cost_actual";
   optional string error = 8;
   string created_at = 9;                   // RFC3339
   optional string started_at = 10;         // RFC3339

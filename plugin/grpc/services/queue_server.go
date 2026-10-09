@@ -143,12 +143,10 @@ func (s *QueueServer) ListJobs(ctx context.Context, req *protocol.ListJobsReques
 		}, nil
 	}
 
-	limit := 0
+	// Left out is the default page of 100; a limit said is that limit, 0 included.
+	limit := 100
 	if req.Limit != nil {
 		limit = int(*req.Limit)
-	}
-	if limit == 0 {
-		limit = 100 // Default limit
 	}
 
 	// List jobs
@@ -196,9 +194,6 @@ func ProtoToJob(proto *protocol.Job) (*async.Job, error) {
 		pulseState = &async.PulseState{
 			CallsThisMinute: int(proto.PulseState.CallsThisMinute),
 			CallsRemaining:  int(proto.PulseState.CallsRemaining),
-			SpendToday:      proto.PulseState.SpendToday,
-			SpendThisMonth:  proto.PulseState.SpendThisMonth,
-			BudgetRemaining: proto.PulseState.BudgetRemaining,
 			IsPaused:        proto.PulseState.IsPaused,
 			PauseReason:     proto.PulseState.PauseReason,
 		}
@@ -214,13 +209,11 @@ func ProtoToJob(proto *protocol.Job) (*async.Job, error) {
 			Current: int(proto.Progress.Current),
 			Total:   int(proto.Progress.Total),
 		},
-		CostEstimate: proto.CostEstimate,
-		CostActual:   proto.CostActual,
-		PulseState:   pulseState,
-		Error:        proto.Error,
-		ParentJobID:  proto.ParentJobId,
-		RetryCount:   int(proto.RetryCount),
-		CreatedAt:    time.Unix(proto.CreatedAt, 0),
+		PulseState:  pulseState,
+		Error:       proto.Error,
+		ParentJobID: proto.ParentJobId,
+		RetryCount:  int(proto.RetryCount),
+		CreatedAt:   time.Unix(proto.CreatedAt, 0),
 	}
 
 	if proto.StartedAt != 0 {
@@ -242,9 +235,6 @@ func JobToProto(job *async.Job) (*protocol.Job, error) {
 		pulseState = &protocol.PulseState{
 			CallsThisMinute: int32(job.PulseState.CallsThisMinute),
 			CallsRemaining:  int32(job.PulseState.CallsRemaining),
-			SpendToday:      job.PulseState.SpendToday,
-			SpendThisMonth:  job.PulseState.SpendThisMonth,
-			BudgetRemaining: job.PulseState.BudgetRemaining,
 			IsPaused:        job.PulseState.IsPaused,
 			PauseReason:     job.PulseState.PauseReason,
 		}
@@ -260,13 +250,11 @@ func JobToProto(job *async.Job) (*protocol.Job, error) {
 			Current: int32(job.Progress.Current),
 			Total:   int32(job.Progress.Total),
 		},
-		CostEstimate: job.CostEstimate,
-		CostActual:   job.CostActual,
-		PulseState:   pulseState,
-		Error:        job.Error,
-		ParentJobId:  job.ParentJobID,
-		RetryCount:   int32(job.RetryCount),
-		CreatedAt:    job.CreatedAt.Unix(),
+		PulseState:  pulseState,
+		Error:       job.Error,
+		ParentJobId: job.ParentJobID,
+		RetryCount:  int32(job.RetryCount),
+		CreatedAt:   job.CreatedAt.Unix(),
 	}
 
 	if job.StartedAt != nil {

@@ -32,7 +32,7 @@ The frontend must `await canvasSyncQueue.flush()` before firing the API call —
 
 Direct gRPC has no queuing. Providers like scry are single-threaded — when multiple plugins fire LLM calls concurrently, requests queue inside the provider and later ones exceed their gRPC deadline.
 
-`LLMServer` becomes the queuing point. A concurrency semaphore limits how many calls reach the provider simultaneously. Callers that don't get a slot block until one opens, ordered by priority — interactive prompts (user-initiated) before background work (generators, batch matching). A priority field on `LLMChatRequest` lets the caller declare intent. Rate limiting and budget tracking reuse Pulse's existing `budget.Limiter` and `budget.Tracker`.
+`LLMServer` becomes the queuing point. A concurrency semaphore limits how many calls reach the provider simultaneously. Callers that don't get a slot block until one opens, ordered by priority — interactive prompts (user-initiated) before background work (generators, batch matching). A priority field on `LLMChatRequest` lets the caller declare intent. Rate limiting is `ratelimit.Limiter` (`pulse/ratelimit`).
 
 This keeps the streaming gRPC path intact — no async/sync bridge needed. The caller still holds the `StreamChat` connection; it just waits longer when the provider is busy instead of deadlining.
 

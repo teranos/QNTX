@@ -18,7 +18,7 @@ import (
 // - Pulse worker picks up job with handler_name "python.script"
 // - PluginProxyHandler routes job to Python plugin via ExecuteJob RPC
 // - Plugin executes script and returns result
-// - Handler updates job state (progress, cost, error) and writes logs to task_logs
+// - Handler updates job state (progress, error) and writes logs to task_logs
 // PluginHandlerName returns the namespaced registry key for a plugin handler.
 // This is the single source of truth for the naming convention.
 func PluginHandlerName(pluginName, handlerName string) string {
@@ -108,10 +108,6 @@ func (h *PluginProxyHandler) Execute(ctx context.Context, job *async.Job) error 
 			Current: int(resp.ProgressCurrent),
 			Total:   int(resp.ProgressTotal),
 		}
-	}
-
-	if resp.CostActual > 0 {
-		job.CostActual = resp.CostActual
 	}
 
 	return nil

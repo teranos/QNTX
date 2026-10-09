@@ -5,7 +5,6 @@ package server
 // - WebSocket connections (HandleWebSocket)
 // - Static file serving (HandleStatic)
 // - Health checks (HandleHealth)
-// - Usage time series data (HandleUsageTimeSeries)
 
 import (
 	"context"
@@ -91,7 +90,7 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Send active jobs on connection (so hard refresh shows current jobs)
 	s.wg.Go("ws.sendInitialJobs", func() { s.sendInitialJobsToClient(client) })
 
-	// Send daemon status on connection (so budget bars + daemon badge render immediately)
+	// Send daemon status on connection (so the daemon badge renders immediately)
 	s.wg.Go("ws.sendInitialDaemonStatus", func() { s.sendInitialDaemonStatusToClient(client) })
 
 	// Reading and writing the socket. Through sacred so a panic in either is a
@@ -136,7 +135,7 @@ func (s *QNTXServer) sendInitialJobsToClient(client *Client) {
 }
 
 // sendInitialDaemonStatusToClient sends current daemon status to a newly connected client.
-// Without this, clients wait up to 30s (idle broadcaster tick) before seeing budget bars.
+// Without this, clients wait up to 30s (idle broadcaster tick) before seeing the daemon badge.
 func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 	// Small delay to ensure client is fully registered
 	select {
@@ -145,7 +144,7 @@ func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 		return
 	}
 
-	if s.daemon == nil || s.budgetTracker == nil {
+	if s.daemon == nil {
 		return
 	}
 
@@ -161,44 +160,19 @@ func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 		loadPercent = 100
 	}
 
-	var budgetDaily, budgetWeekly, budgetMonthly float64
-	budgetStatus, err := s.budgetTracker.GetStatus()
-	if err == nil {
-		budgetDaily = budgetStatus.DailySpend
-		budgetWeekly = budgetStatus.WeeklySpend
-		budgetMonthly = budgetStatus.MonthlySpend
-	}
-
-	aggDaily, aggWeekly, aggMonthly, peerCount := s.budgetTracker.AggregateSpend(budgetDaily, budgetWeekly, budgetMonthly)
-	budgetLimits := s.budgetTracker.GetBudgetLimits()
-	clusterDaily, clusterWeekly, clusterMonthly, _ := s.budgetTracker.ClusterLimits()
-
 	msg := DaemonStatusMessage{
-		Type:                   "daemon_status",
-		Running:                true, // Pulse starts because the node starts
-		ActiveJobs:             activeJobs,
-		QueuedJobs:             stats.Queued,
-		LoadPercent:            loadPercent,
-		BudgetDaily:            budgetDaily,
-		BudgetWeekly:           budgetWeekly,
-		BudgetMonthly:          budgetMonthly,
-		BudgetDailyLimit:       budgetLimits.DailyBudgetUSD,
-		BudgetWeeklyLimit:      budgetLimits.WeeklyBudgetUSD,
-		BudgetMonthlyLimit:     budgetLimits.MonthlyBudgetUSD,
-		BudgetDailyAggregate:   aggDaily,
-		BudgetWeeklyAggregate:  aggWeekly,
-		BudgetMonthlyAggregate: aggMonthly,
-		PeerCount:              peerCount,
-		ClusterDailyLimit:      clusterDaily,
-		ClusterWeeklyLimit:     clusterWeekly,
-		ClusterMonthlyLimit:    clusterMonthly,
-		Timestamp:              time.Now().Unix(),
+		Type:        "daemon_status",
+		Running:     true, // Pulse starts because the node starts
+		ActiveJobs:  activeJobs,
+		QueuedJobs:  stats.Queued,
+		LoadPercent: loadPercent,
+		Timestamp:   time.Now().Unix(),
 	}
 
 	req := &broadcastRequest{
-		reqType:  "message",
-		msg:      msg,
-		clientID: client.id,
+		reqType: "message",
+		msg:     msg,
+		to:      toClient(client.id),
 	}
 
 	select {
@@ -249,9 +223,9 @@ func (s *QNTXServer) sendErrorToClient(client *Client, surface string, err error
 	}{Type: "error", ErrorEnvelope: envelope}
 
 	req := &broadcastRequest{
-		reqType:  "message",
-		msg:      msg,
-		clientID: client.id,
+		reqType: "message",
+		msg:     msg,
+		to:      toClient(client.id),
 	}
 
 	select {
@@ -276,9 +250,9 @@ func (s *QNTXServer) sendJobToClient(client *Client, job *async.Job, isInitial b
 
 	// Send to broadcast worker (thread-safe)
 	req := &broadcastRequest{
-		reqType:  "message",
-		msg:      msg,
-		clientID: client.id, // Send to specific client only
+		reqType: "message",
+		msg:     msg,
+		to:      toClient(client.id),
 	}
 
 	select {

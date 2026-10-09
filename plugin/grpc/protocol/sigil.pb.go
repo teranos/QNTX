@@ -963,6 +963,71 @@ func (x *PiAm) GetNotReady() string {
 	return ""
 }
 
+// NamespaceAgentAm is what agents am and agents set answer: the namespace's
+// agent, who opted the namespace into it, and who it is in Claude Code.
+type NamespaceAgentAm struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The namespace it stands in.
+	Namespace string `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	// Who opted the namespace into it.
+	SetBy string `protobuf:"bytes,2,opt,name=set_by,json=setBy,proto3" json:"set_by,omitempty"`
+	// Who the agent is and how it runs.
+	Agent         *ClaudeAm `protobuf:"bytes,3,opt,name=agent,proto3" json:"agent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NamespaceAgentAm) Reset() {
+	*x = NamespaceAgentAm{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NamespaceAgentAm) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NamespaceAgentAm) ProtoMessage() {}
+
+func (x *NamespaceAgentAm) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NamespaceAgentAm.ProtoReflect.Descriptor instead.
+func (*NamespaceAgentAm) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *NamespaceAgentAm) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *NamespaceAgentAm) GetSetBy() string {
+	if x != nil {
+		return x.SetBy
+	}
+	return ""
+}
+
+func (x *NamespaceAgentAm) GetAgent() *ClaudeAm {
+	if x != nil {
+		return x.Agent
+	}
+	return nil
+}
+
 // Follows says which column of a reference each of a signum's fields is. The
 // reference is named, not described: its own schema says what its columns are.
 type Follows struct {
@@ -976,7 +1041,7 @@ type Follows struct {
 
 func (x *Follows) Reset() {
 	*x = Follows{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -988,7 +1053,7 @@ func (x *Follows) String() string {
 func (*Follows) ProtoMessage() {}
 
 func (x *Follows) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1001,7 +1066,7 @@ func (x *Follows) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Follows.ProtoReflect.Descriptor instead.
 func (*Follows) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{10}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Follows) GetReference() string {
@@ -1040,7 +1105,7 @@ type Corresponds struct {
 
 func (x *Corresponds) Reset() {
 	*x = Corresponds{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1052,7 +1117,7 @@ func (x *Corresponds) String() string {
 func (*Corresponds) ProtoMessage() {}
 
 func (x *Corresponds) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1065,7 +1130,7 @@ func (x *Corresponds) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Corresponds.ProtoReflect.Descriptor instead.
 func (*Corresponds) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{11}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Corresponds) GetField() string {
@@ -1099,7 +1164,7 @@ type Fold struct {
 
 func (x *Fold) Reset() {
 	*x = Fold{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1111,7 +1176,7 @@ func (x *Fold) String() string {
 func (*Fold) ProtoMessage() {}
 
 func (x *Fold) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1124,7 +1189,7 @@ func (x *Fold) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Fold.ProtoReflect.Descriptor instead.
 func (*Fold) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{12}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Fold) GetField() string {
@@ -1171,7 +1236,7 @@ type Sigil struct {
 
 func (x *Sigil) Reset() {
 	*x = Sigil{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[13]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1183,7 +1248,7 @@ func (x *Sigil) String() string {
 func (*Sigil) ProtoMessage() {}
 
 func (x *Sigil) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[13]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1196,7 +1261,7 @@ func (x *Sigil) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sigil.ProtoReflect.Descriptor instead.
 func (*Sigil) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{13}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Sigil) GetName() string {
@@ -1258,7 +1323,7 @@ type Param struct {
 
 func (x *Param) Reset() {
 	*x = Param{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[14]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1270,7 +1335,7 @@ func (x *Param) String() string {
 func (*Param) ProtoMessage() {}
 
 func (x *Param) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[14]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1283,7 +1348,7 @@ func (x *Param) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Param.ProtoReflect.Descriptor instead.
 func (*Param) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{14}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Param) GetName() string {
@@ -1334,7 +1399,7 @@ type Field struct {
 
 func (x *Field) Reset() {
 	*x = Field{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[15]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1346,7 +1411,7 @@ func (x *Field) String() string {
 func (*Field) ProtoMessage() {}
 
 func (x *Field) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[15]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1359,7 +1424,7 @@ func (x *Field) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Field.ProtoReflect.Descriptor instead.
 func (*Field) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{15}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Field) GetName() string {
@@ -1394,7 +1459,7 @@ type Endpoint struct {
 
 func (x *Endpoint) Reset() {
 	*x = Endpoint{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[16]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1406,7 +1471,7 @@ func (x *Endpoint) String() string {
 func (*Endpoint) ProtoMessage() {}
 
 func (x *Endpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[16]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1419,7 +1484,7 @@ func (x *Endpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Endpoint.ProtoReflect.Descriptor instead.
 func (*Endpoint) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{16}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *Endpoint) GetMethod() string {
@@ -1452,7 +1517,7 @@ type Refusal struct {
 
 func (x *Refusal) Reset() {
 	*x = Refusal{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[17]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1464,7 +1529,7 @@ func (x *Refusal) String() string {
 func (*Refusal) ProtoMessage() {}
 
 func (x *Refusal) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[17]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1477,7 +1542,7 @@ func (x *Refusal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Refusal.ProtoReflect.Descriptor instead.
 func (*Refusal) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{17}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Refusal) GetWhy() string {
@@ -1589,7 +1654,11 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x02pi\x18\a \x01(\tR\x02pi\x12\x1d\n" +
 	"\n" +
 	"pi_version\x18\b \x01(\tR\tpiVersion\x12\x1b\n" +
-	"\tnot_ready\x18\t \x01(\tR\bnotReady\"~\n" +
+	"\tnot_ready\x18\t \x01(\tR\bnotReady\"q\n" +
+	"\x10NamespaceAgentAm\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x15\n" +
+	"\x06set_by\x18\x02 \x01(\tR\x05setBy\x12(\n" +
+	"\x05agent\x18\x03 \x01(\v2\x12.protocol.ClaudeAmR\x05agent\"~\n" +
 	"\aFollows\x12\x1c\n" +
 	"\treference\x18\x01 \x01(\tR\treference\x12/\n" +
 	"\acolumns\x18\x02 \x03(\v2\x15.protocol.CorrespondsR\acolumns\x12$\n" +
@@ -1638,7 +1707,7 @@ func file_plugin_grpc_protocol_sigil_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*Signum)(nil),            // 0: protocol.Signum
 	(*Node)(nil),              // 1: protocol.Node
@@ -1650,32 +1719,34 @@ var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*PiSaid)(nil),            // 7: protocol.PiSaid
 	(*ClaudeAm)(nil),          // 8: protocol.ClaudeAm
 	(*PiAm)(nil),              // 9: protocol.PiAm
-	(*Follows)(nil),           // 10: protocol.Follows
-	(*Corresponds)(nil),       // 11: protocol.Corresponds
-	(*Fold)(nil),              // 12: protocol.Fold
-	(*Sigil)(nil),             // 13: protocol.Sigil
-	(*Param)(nil),             // 14: protocol.Param
-	(*Field)(nil),             // 15: protocol.Field
-	(*Endpoint)(nil),          // 16: protocol.Endpoint
-	(*Refusal)(nil),           // 17: protocol.Refusal
+	(*NamespaceAgentAm)(nil),  // 10: protocol.NamespaceAgentAm
+	(*Follows)(nil),           // 11: protocol.Follows
+	(*Corresponds)(nil),       // 12: protocol.Corresponds
+	(*Fold)(nil),              // 13: protocol.Fold
+	(*Sigil)(nil),             // 14: protocol.Sigil
+	(*Param)(nil),             // 15: protocol.Param
+	(*Field)(nil),             // 16: protocol.Field
+	(*Endpoint)(nil),          // 17: protocol.Endpoint
+	(*Refusal)(nil),           // 18: protocol.Refusal
 }
 var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
-	13, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
-	10, // 1: protocol.Signum.follows:type_name -> protocol.Follows
+	14, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
+	11, // 1: protocol.Signum.follows:type_name -> protocol.Follows
 	0,  // 2: protocol.Node.signa:type_name -> protocol.Signum
 	3,  // 3: protocol.Transcript.turns:type_name -> protocol.Turn
 	2,  // 4: protocol.Transcripts.transcripts:type_name -> protocol.Transcript
 	2,  // 5: protocol.SessionTranscript.transcript:type_name -> protocol.Transcript
-	11, // 6: protocol.Follows.columns:type_name -> protocol.Corresponds
-	12, // 7: protocol.Follows.folds:type_name -> protocol.Fold
-	14, // 8: protocol.Sigil.takes:type_name -> protocol.Param
-	15, // 9: protocol.Sigil.gives:type_name -> protocol.Field
-	16, // 10: protocol.Sigil.http:type_name -> protocol.Endpoint
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	8,  // 6: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
+	12, // 7: protocol.Follows.columns:type_name -> protocol.Corresponds
+	13, // 8: protocol.Follows.folds:type_name -> protocol.Fold
+	15, // 9: protocol.Sigil.takes:type_name -> protocol.Param
+	16, // 10: protocol.Sigil.gives:type_name -> protocol.Field
+	17, // 11: protocol.Sigil.http:type_name -> protocol.Endpoint
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }
@@ -1689,7 +1760,7 @@ func file_plugin_grpc_protocol_sigil_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_sigil_proto_rawDesc), len(file_plugin_grpc_protocol_sigil_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

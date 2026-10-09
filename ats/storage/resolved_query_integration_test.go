@@ -68,13 +68,13 @@ func TestResolvedQuery_RoutingIsWhatItClaims(t *testing.T) {
 	store, _ := resolvedStore(t, nil, nil)
 
 	_, supported, err := store.ExecuteAxQueryResolved(context.Background(),
-		types.AxFilter{Subjects: []string{"ALICE"}})
+		types.AxFilter{Limit: ats.EveryRow, Subjects: []string{"ALICE"}})
 	require.NoError(t, err)
 	require.True(t, supported, "the FFI-backed store must take the Rust path")
 
 	// A store with no raw querier cannot reach it, and says so.
 	bare := NewSQLQueryStore(nil)
-	_, supported, err = bare.ExecuteAxQueryResolved(context.Background(), types.AxFilter{})
+	_, supported, err = bare.ExecuteAxQueryResolved(context.Background(), types.AxFilter{Limit: ats.EveryRow})
 	require.NoError(t, err)
 	require.False(t, supported)
 }
@@ -108,7 +108,7 @@ func TestResolvedQuery_SupersededClaimIsDropped(t *testing.T) {
 	}
 
 	store, resolver := resolvedStore(t, attestations, nil)
-	result := ask(t, store, resolver, types.AxFilter{Subjects: []string{"ALICE"}})
+	result := ask(t, store, resolver, types.AxFilter{Limit: ats.EveryRow, Subjects: []string{"ALICE"}})
 
 	require.Equal(t, []string{"AS-new"}, ids(result.Attestations),
 		"the superseded claim does not survive resolution")
@@ -134,7 +134,7 @@ func TestResolvedQuery_AliasExpansionFindsTheOtherName(t *testing.T) {
 	store, resolver := resolvedStore(t, attestations,
 		[][2]string{{"ALICE", "alice@example.com"}})
 
-	result := ask(t, store, resolver, types.AxFilter{Subjects: []string{"ALICE"}})
+	result := ask(t, store, resolver, types.AxFilter{Limit: ats.EveryRow, Subjects: []string{"ALICE"}})
 
 	require.Equal(t, []string{"AS-aliased"}, ids(result.Attestations),
 		"expansion in Rust finds what was written under the other name")
@@ -168,7 +168,7 @@ func TestResolvedQuery_CoexistingClaimsAllSurvive(t *testing.T) {
 	}
 
 	store, resolver := resolvedStore(t, attestations, nil)
-	result := ask(t, store, resolver, types.AxFilter{Subjects: []string{"ALICE"}})
+	result := ask(t, store, resolver, types.AxFilter{Limit: ats.EveryRow, Subjects: []string{"ALICE"}})
 
 	require.Len(t, result.Attestations, 2)
 	require.ElementsMatch(t, []string{"AS-gh", "AS-gl"}, ids(result.Attestations))
@@ -176,7 +176,7 @@ func TestResolvedQuery_CoexistingClaimsAllSurvive(t *testing.T) {
 
 func TestResolvedQuery_EmptyResult(t *testing.T) {
 	store, resolver := resolvedStore(t, nil, nil)
-	result := ask(t, store, resolver, types.AxFilter{Subjects: []string{"NOBODY"}})
+	result := ask(t, store, resolver, types.AxFilter{Limit: ats.EveryRow, Subjects: []string{"NOBODY"}})
 
 	require.Empty(t, result.Attestations)
 	require.Equal(t, 0, result.Summary.TotalAttestations)
@@ -216,7 +216,7 @@ func TestRawQueryPathStaysUnresolved(t *testing.T) {
 		require.NoError(t, store.CreateAttestation(as))
 	}
 
-	raw, err := store.GetAttestations(ats.AttestationFilter{Subjects: []string{"ALICE"}})
+	raw, err := store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, Subjects: []string{"ALICE"}})
 	require.NoError(t, err)
 	require.Len(t, raw, 2,
 		"GetAttestations returns both claims; resolution belongs to the ax path alone")

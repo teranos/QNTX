@@ -198,6 +198,19 @@ export interface PiAm {
 }
 
 /**
+ * NamespaceAgentAm is what agents am and agents set answer: the namespace's
+ * agent, who opted the namespace into it, and who it is in Claude Code.
+ */
+export interface NamespaceAgentAm {
+  /** The namespace it stands in. */
+  namespace: string;
+  /** Who opted the namespace into it. */
+  set_by: string;
+  /** Who the agent is and how it runs. */
+  agent: ClaudeAm | undefined;
+}
+
+/**
  * Follows says which column of a reference each of a signum's fields is. The
  * reference is named, not described: its own schema says what its columns are.
  */

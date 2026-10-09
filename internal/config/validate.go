@@ -62,20 +62,6 @@ func (c *Config) Validate() error {
 		return errors.Newf("pulse.ticker_interval_seconds must be >= 0, got %d", c.Pulse.TickerIntervalSeconds)
 	}
 
-	// Budget values: 0 = no budget (valid per "zero means zero"), negative = invalid
-	if c.Pulse.DailyBudgetUSD < 0 {
-		return errors.Newf("pulse.daily_budget_usd must be >= 0, got %f", c.Pulse.DailyBudgetUSD)
-	}
-	if c.Pulse.WeeklyBudgetUSD < 0 {
-		return errors.Newf("pulse.weekly_budget_usd must be >= 0, got %f", c.Pulse.WeeklyBudgetUSD)
-	}
-	if c.Pulse.MonthlyBudgetUSD < 0 {
-		return errors.Newf("pulse.monthly_budget_usd must be >= 0, got %f", c.Pulse.MonthlyBudgetUSD)
-	}
-	if c.Pulse.CostPerScoreUSD < 0 {
-		return errors.Newf("pulse.cost_per_score_usd must be >= 0, got %f", c.Pulse.CostPerScoreUSD)
-	}
-
 	// The ROOT agent is named whole or not at all (ADR-048): a model nothing
 	// named would be a model something chose for it.
 	if root := c.Agent.Root; root.Named() {

@@ -40,8 +40,8 @@ func (q *llmQueue) Acquire(ctx context.Context, priority int32) error {
 		return nil
 	}
 
-	// Reject if queue is full.
-	if q.maxWaiters > 0 && q.waiters.Len() >= q.maxWaiters {
+	// Reject if queue is full. A depth of 0 queues nobody.
+	if q.waiters.Len() >= q.maxWaiters {
 		q.mu.Unlock()
 		return errors.Newf("LLM queue full (%d waiting, %d active)", q.waiters.Len(), q.active)
 	}

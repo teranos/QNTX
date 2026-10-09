@@ -184,11 +184,14 @@ func (s *QNTXServer) Unspoken() []string {
 	return append([]string(nil), s.unnamed...)
 }
 
-// gate is the auth middleware, or nothing when the deployment runs without
-// auth. am.toml requires auth whenever bind_address is not loopback.
+// gate is the auth middleware. A node running without auth has one caller,
+// and the gate says that caller is ROOT rather than saying nothing. am.toml
+// requires auth whenever bind_address is not loopback.
 func (s *QNTXServer) gate(path string, reaching auth.Reach, handler http.HandlerFunc) http.HandlerFunc {
 	if !s.authEnabled || s.authHandler == nil {
-		return handler
+		return func(w http.ResponseWriter, r *http.Request) {
+			handler(w, r.WithContext(auth.WithAdmission(r.Context(), auth.Admitted(auth.LevelRoot))))
+		}
 	}
 	return s.authHandler.Middleware(path, reaching, handler)
 }

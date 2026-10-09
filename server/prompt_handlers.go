@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ai/provider"
-	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
@@ -100,8 +98,7 @@ func resolveProvider(explicit string) string {
 }
 
 // forwardToProviderPlugin re-encodes the request and forwards it to the named plugin's
-// prompt handler. Buffers the response to extract token usage for core-side tracking.
-// Returns true if forwarded, false if the provider is local or unknown.
+// prompt handler. Returns true if forwarded, false if the provider is local or unknown.
 func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Request, providerName string, body any, endpoint string) bool {
 	if router := s.servicesManager.GetLLMRouter(); router != nil && router.HasProvider(providerName) {
 		return false
@@ -118,112 +115,8 @@ func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Requ
 	r.ContentLength = int64(len(encoded))
 	r.URL.Path = "/api/" + providerName + endpoint
 
-	requestTime := time.Now()
-
-	// Buffer the plugin response so we can extract token usage for tracking
-	rec := httptest.NewRecorder()
-	s.handlePluginRequest(rec, r)
-
-	// Copy buffered response to the real ResponseWriter
-	result := rec.Result()
-	for k, vals := range result.Header {
-		for _, v := range vals {
-			w.Header().Add(k, v)
-		}
-	}
-	w.WriteHeader(result.StatusCode)
-	respBody := rec.Body.Bytes()
-	deliver(w, s.logger, respBody, "proxied "+providerName+" "+endpoint)
-
-	// Track usage asynchronously from the buffered response
-	if result.StatusCode == http.StatusOK && s.usageTracker != nil {
-		go s.trackPluginUsage(respBody, providerName, endpoint, requestTime)
-	}
-
+	s.handlePluginRequest(w, r)
 	return true
-}
-
-// pluginResponseTokens is a generic shape to extract token counts from any plugin response.
-// Works for /prompt/direct (top-level fields) and /prompt/execute (results array).
-type pluginResponseTokens struct {
-	// Top-level fields (/prompt/direct)
-	Model            string `json:"model"`
-	PromptTokens     int    `json:"prompt_tokens"`
-	CompletionTokens int    `json:"completion_tokens"`
-	TotalTokens      int    `json:"total_tokens"`
-
-	// Nested array (/prompt/execute)
-	Results []struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-		TotalTokens      int `json:"total_tokens"`
-	} `json:"results"`
-}
-
-// trackPluginUsage parses token counts from a buffered plugin response and records usage.
-func (s *QNTXServer) trackPluginUsage(body []byte, providerName, endpoint string, requestTime time.Time) {
-	// This runs in a goroutine: a swallowed failure here silently stops all
-	// spend recording for the provider. Debug is not the level for that.
-	var parsed pluginResponseTokens
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		s.logger.Errorw("Could not parse plugin response for usage tracking; this call's spend is unrecorded",
-			"provider", providerName, "endpoint", endpoint, "body_bytes", len(body), "error", err)
-		return
-	}
-
-	promptTokens := parsed.PromptTokens
-	completionTokens := parsed.CompletionTokens
-	totalTokens := parsed.TotalTokens
-	model := parsed.Model
-
-	// Aggregate from results (execute) if top-level is zero
-	if totalTokens == 0 {
-		for _, r := range parsed.Results {
-			promptTokens += r.PromptTokens
-			completionTokens += r.CompletionTokens
-			totalTokens += r.TotalTokens
-		}
-	}
-
-	// A provider renaming its token fields parses cleanly into zeros — the
-	// shape change that silently ends spend recording. Say so instead.
-	if totalTokens == 0 {
-		s.logger.Warnw("Plugin response carried no token counts; nothing recorded for this call",
-			"provider", providerName, "endpoint", endpoint, "model", model, "body_bytes", len(body))
-		return
-	}
-
-	responseTime := time.Now()
-	cost, priced := tracker.CalculateCost(model, promptTokens, completionTokens)
-	if !priced {
-		s.logger.Errorw("No pricing for model; recording flat placeholder cost, so budget totals are wrong until the pricing table knows this model (#636)",
-			"model", model, "provider", providerName, "placeholder_cost", cost,
-			"prompt_tokens", promptTokens, "completion_tokens", completionTokens)
-	}
-
-	// Determine operation type from endpoint (endpoint is e.g. "/prompt/direct")
-	opType := "prompt"
-	if len(endpoint) > 1 {
-		opType = endpoint[1:] // strip leading slash: "prompt/direct", "prompt/preview"
-	}
-
-	usage := &tracker.ModelUsage{
-		OperationType:     opType,
-		EntityType:        "plugin",
-		EntityID:          providerName,
-		ModelName:         model,
-		ModelProvider:     providerName,
-		RequestTimestamp:  requestTime,
-		ResponseTimestamp: &responseTime,
-		TokensUsed:        &totalTokens,
-		Cost:              &cost,
-		Success:           true,
-	}
-
-	if err := s.usageTracker.TrackUsage(usage); err != nil {
-		s.logger.Warnw("Failed to track plugin usage",
-			"provider", providerName, "endpoint", endpoint, "error", err)
-	}
 }
 
 // HandlePromptExecute handles POST /api/prompt/execute

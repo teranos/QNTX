@@ -197,7 +197,7 @@ func TestGetAttestationsFilter(t *testing.T) {
 		}
 	}
 
-	got, err := store.GetAttestations(ats.AttestationFilter{
+	got, err := store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, 
 		Subjects: []string{"ALICE"},
 	})
 	if err != nil {
@@ -205,7 +205,7 @@ func TestGetAttestationsFilter(t *testing.T) {
 	}
 	assertIDSet(t, "subject=ALICE", got, "AS-q-1", "AS-q-3")
 
-	got, err = store.GetAttestations(ats.AttestationFilter{
+	got, err = store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, 
 		Predicates: []string{"trusts"},
 	})
 	if err != nil {
@@ -213,7 +213,7 @@ func TestGetAttestationsFilter(t *testing.T) {
 	}
 	assertIDSet(t, "predicate=trusts", got, "AS-q-3")
 
-	got, err = store.GetAttestations(ats.AttestationFilter{
+	got, err = store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, 
 		Subjects:   []string{"ALICE"},
 		Predicates: []string{"knows"},
 	})
@@ -222,7 +222,7 @@ func TestGetAttestationsFilter(t *testing.T) {
 	}
 	assertIDSet(t, "subject=ALICE AND predicate=knows", got, "AS-q-1")
 
-	got, err = store.GetAttestations(ats.AttestationFilter{
+	got, err = store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, 
 		Contexts: []string{"personal"},
 	})
 	if err != nil {
@@ -230,7 +230,7 @@ func TestGetAttestationsFilter(t *testing.T) {
 	}
 	assertIDSet(t, "context=personal", got, "AS-q-3")
 
-	got, err = store.GetAttestations(ats.AttestationFilter{
+	got, err = store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, 
 		Actors: []string{"human:b"},
 	})
 	if err != nil {
@@ -238,7 +238,7 @@ func TestGetAttestationsFilter(t *testing.T) {
 	}
 	assertIDSet(t, "actor=human:b", got, "AS-q-2")
 
-	got, err = store.GetAttestations(ats.AttestationFilter{
+	got, err = store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, 
 		Source: "test-source-y",
 	})
 	if err != nil {
@@ -247,7 +247,7 @@ func TestGetAttestationsFilter(t *testing.T) {
 	assertIDSet(t, "source=test-source-y", got, "AS-q-2")
 
 	tStart := time.UnixMilli(1_700_000_150_000)
-	got, err = store.GetAttestations(ats.AttestationFilter{
+	got, err = store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, 
 		TimeStart: &tStart,
 	})
 	if err != nil {
@@ -256,7 +256,7 @@ func TestGetAttestationsFilter(t *testing.T) {
 	assertIDSet(t, "time_start>=1_700_000_150_000", got, "AS-q-3")
 
 	tEnd := time.UnixMilli(1_700_000_100_000)
-	got, err = store.GetAttestations(ats.AttestationFilter{
+	got, err = store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, 
 		TimeEnd: &tEnd,
 	})
 	if err != nil {
@@ -272,7 +272,7 @@ func TestGetAttestationsFilter(t *testing.T) {
 		t.Errorf("limit=1: len(got)=%d, want 1", len(got))
 	}
 
-	got, err = store.GetAttestations(ats.AttestationFilter{})
+	got, err = store.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow, })
 	if err != nil {
 		t.Fatalf("empty filter failed: %v", err)
 	}

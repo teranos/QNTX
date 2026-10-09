@@ -8,7 +8,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/server/auth"
@@ -61,7 +60,7 @@ func newestLines(s *QNTXServer, subject, kept string) (map[string]*types.As, err
 	}
 	found, err := reading.GetAttestations(ats.AttestationFilter{
 		Subjects: []string{subject},
-		Limit:    storage.MaxAttestationLimit,
+		Limit:    ats.EveryRow,
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read the %s lines in %s", subject, where)

@@ -31,7 +31,7 @@ type enqueueingHandler struct {
 func (h *enqueueingHandler) Name() string { return h.name }
 
 func (h *enqueueingHandler) Execute(ctx context.Context, job *Job) error {
-	child, err := createTestJob(h.child, "child-of-"+job.ID, 1, 0)
+	child, err := createTestJob(h.child, "child-of-"+job.ID, 1)
 	if err != nil {
 		return err
 	}
@@ -59,13 +59,13 @@ func TestAChildJobContinuesItsParentsTrace(t *testing.T) {
 	noPolling := time.Duration(0)
 	pool := NewWorkerPoolWithRegistry(
 		context.Background(), db, createTestConfig(),
-		WorkerPoolConfig{Workers: 1, PollInterval: &noPolling},
-		createTestLogger(), registry, nil, nil,
+		WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1, PollInterval: &noPolling},
+		createTestLogger(), registry, nil,
 	)
 	registry.Register(&enqueueingHandler{name: "parent.work", queue: pool.queue, child: "child.work"})
 	registry.Register(&countingHandler{name: "child.work"})
 
-	parent, err := createTestJob("parent.work", "span-test", 1, 0)
+	parent, err := createTestJob("parent.work", "span-test", 1)
 	if err != nil {
 		t.Fatalf("could not build the parent job: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestTheCauseSurvivesTheQueue(t *testing.T) {
 		sentry.SetHubOnContext(context.Background(), sentry.CurrentHub().Clone()),
 		"the.cause",
 	)
-	job, err := createTestJob("caused.work", "span-test", 1, 0)
+	job, err := createTestJob("caused.work", "span-test", 1)
 	if err != nil {
 		t.Fatalf("could not build a job: %v", err)
 	}
@@ -201,7 +201,7 @@ func TestAChildWithOnlyAParentIDStillJoinsTheTrace(t *testing.T) {
 
 	// Everything the child gets is the parent's id. No context, no span —
 	// exactly what arrives over gRPC.
-	child, err := createTestJob("child.work", "over-grpc", 1, 0)
+	child, err := createTestJob("child.work", "over-grpc", 1)
 	if err != nil {
 		t.Fatalf("could not build the child: %v", err)
 	}

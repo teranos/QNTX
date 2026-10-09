@@ -137,6 +137,8 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	if err != nil {
 		return err
 	}
+	// Every agent the node runs is kept beside ROOT's (ADR-048).
+	s.agentsDir = filepath.Dir(home)
 	return s.nameRootAgent(home)
 }
 

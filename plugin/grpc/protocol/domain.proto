@@ -283,8 +283,8 @@ message ExecuteJobResponse {
   int32 progress_current = 4;
   int32 progress_total = 5;
 
-  // Cost tracking (optional) - Pulse updates job.CostActual
-  double cost_actual = 6;
+  reserved 6;
+  reserved "cost_actual";
 
   // Execution logs — written to task_logs table by PluginProxyHandler
   repeated JobLogEntry log_entries = 7;

@@ -33,11 +33,14 @@ type harness struct {
 	absent func() *protocol.Refusal
 	// fetching is what am says while the binary has not arrived.
 	fetching string
-	// part is its part of one turn, or why nothing is said to it.
-	part func(ctx context.Context, sent sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal)
-	// am is what am answers: what every harness says of the agent in it, and
-	// what is the harness's own.
-	am func(is agentIn) proto.Message
+	// spec is how the ROOT agent runs in it, as am.toml names it.
+	spec func() agentSpec
+	// part is its part of one turn for an agent running as spec says, or why
+	// nothing is said to it.
+	part func(ctx context.Context, sent sigil.Sent, agent *rootAgent, spec agentSpec) (aTurn, *protocol.Refusal)
+	// am is what am answers of an agent in it, running as spec says: what
+	// every harness says of the agent in it, and what is the harness's own.
+	am func(is agentIn, agent *rootAgent, spec agentSpec) proto.Message
 	// also is what this harness has beyond say, am and session.
 	also []harnessSigil
 }
@@ -118,15 +121,20 @@ func (s *QNTXServer) harnessAgent(h *harness) (*rootAgent, *protocol.Refusal) {
 }
 
 func (s *QNTXServer) harnessSay(ctx context.Context, h *harness, sent sigil.Sent) (any, *protocol.Refusal) {
-	caller := sigil.Caller(ctx)
-	if caller == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to the ROOT agent is written down with who said it, and this asking carried no request"}
-	}
 	agent, refused := s.harnessAgent(h)
 	if refused != nil {
 		return nil, refused
 	}
-	t, refused := h.part(ctx, sent, agent)
+	return s.sayTo(ctx, h, agent, h.spec(), sent)
+}
+
+// sayTo says something to one agent in h, running as spec says.
+func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, spec agentSpec, sent sigil.Sent) (any, *protocol.Refusal) {
+	caller := sigil.Caller(ctx)
+	if caller == nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to " + agent.called + " is written down with who said it, and this asking carried no request"}
+	}
+	t, refused := h.part(ctx, sent, agent, spec)
 	if refused != nil {
 		return nil, refused
 	}
@@ -139,6 +147,11 @@ func (s *QNTXServer) harnessAm(h *harness) (any, *protocol.Refusal) {
 	if refused != nil {
 		return nil, refused
 	}
+	return s.amOf(h, agent, h.spec()), nil
+}
+
+// amOf is who one agent in h is and how the node runs it.
+func (s *QNTXServer) amOf(h *harness, agent *rootAgent, spec agentSpec) proto.Message {
 	in := agent.in(h)
 	is := agentIn{did: agent.did}
 	session, kept, err := agent.sessionIn(in.file)
@@ -160,7 +173,7 @@ func (s *QNTXServer) harnessAm(h *harness) (any, *protocol.Refusal) {
 	default:
 		is.path = path
 	}
-	return h.am(is), nil
+	return h.am(is, agent, spec)
 }
 
 // agentIn is what am says of the agent in every harness: its DID, the session

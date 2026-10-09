@@ -98,9 +98,9 @@ func (s *Served) Reaching(path string) (reaching auth.Reach, anyone bool) {
 	return row.reach, row.anyone
 }
 
-// The surfaces a line can be about (ADR-039). A line that names none is about
-// every surface. "A2A will be one", and "The boundary to other systems is
-// deferred, and it will be runtime lines in the attestation DSL": a2a:staands.
+// The surfaces a line can be about (ADR-039). A line naming a sigil is about
+// the sigil, the same thing over every surface; one naming a surface is about
+// that surface alone, a2a:staands among them.
 const (
 	OverHTTP = "http"
 	OverMCP  = "mcp"

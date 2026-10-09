@@ -240,9 +240,7 @@ impl IndexedDbStore {
             .filter(|a| matches_filter(a, filter))
             .collect();
 
-        if let Some(limit) = filter.limit {
-            matching.truncate(limit);
-        }
+        matching.truncate(filter.limit);
 
         let summary = build_summary(&matching);
 

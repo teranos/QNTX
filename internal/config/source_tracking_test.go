@@ -260,7 +260,7 @@ port = 9090
 		userConfig := `
 [pulse]
 workers = 2
-daily_budget_usd = 5.0
+ticker_interval_seconds = 5
 `
 		require.NoError(t, os.WriteFile(
 			filepath.Join(qntxDir, "am.toml"),
@@ -272,8 +272,10 @@ daily_budget_usd = 5.0
 		// disk. It is not a source, so what it says changes nothing.
 		leftover := `
 [pulse]
-daily_budget_usd = 10.0
-monthly_budget_usd = 300.0
+ticker_interval_seconds = 10
+
+[llm]
+cooldown_seconds = 300
 `
 		require.NoError(t, os.WriteFile(
 			filepath.Join(qntxDir, "am_from_ui.toml"),
@@ -308,17 +310,17 @@ monthly_budget_usd = 300.0
 		assert.Equal(t, int64(2), workers.Value)
 
 		// The leftover does not override it.
-		dailyBudget := settings["pulse.daily_budget_usd"]
-		require.NotNil(t, dailyBudget)
-		assert.Equal(t, SourceUser, dailyBudget.Source)
-		assert.NotContains(t, dailyBudget.SourcePath, "am_from_ui.toml")
-		assert.Equal(t, float64(5), dailyBudget.Value)
+		ticker := settings["pulse.ticker_interval_seconds"]
+		require.NotNil(t, ticker)
+		assert.Equal(t, SourceUser, ticker.Source)
+		assert.NotContains(t, ticker.SourcePath, "am_from_ui.toml")
+		assert.Equal(t, int64(5), ticker.Value)
 
 		// And a key only the leftover names does not come from it.
-		if monthlyBudget := settings["pulse.monthly_budget_usd"]; monthlyBudget != nil {
-			assert.NotEqual(t, float64(300), monthlyBudget.Value,
+		if cooldown := settings["llm.cooldown_seconds"]; cooldown != nil {
+			assert.NotEqual(t, int64(300), cooldown.Value,
 				"am_from_ui.toml was read; it is not a source")
-			assert.NotContains(t, monthlyBudget.SourcePath, "am_from_ui.toml")
+			assert.NotContains(t, cooldown.SourcePath, "am_from_ui.toml")
 		}
 	})
 
@@ -354,17 +356,17 @@ func TestSourceTrackingDefaults(t *testing.T) {
 	require.NoError(t, err)
 
 	// Find a known default setting
-	var pulseCost *SettingInfo
+	var ticker *SettingInfo
 	for i := range intro.Settings {
-		if intro.Settings[i].Key == "pulse.cost_per_score_usd" {
-			pulseCost = &intro.Settings[i]
+		if intro.Settings[i].Key == "pulse.ticker_interval_seconds" {
+			ticker = &intro.Settings[i]
 			break
 		}
 	}
 
 	// Verify it's marked as default with no path
-	require.NotNil(t, pulseCost, "Default pulse.cost_per_score_usd should be present")
-	assert.Equal(t, SourceDefault, pulseCost.Source)
-	assert.Equal(t, "", pulseCost.SourcePath, "Default values should have empty source path")
-	assert.Equal(t, 0.002, pulseCost.Value, "Should have the default value")
+	require.NotNil(t, ticker, "Default pulse.ticker_interval_seconds should be present")
+	assert.Equal(t, SourceDefault, ticker.Source)
+	assert.Equal(t, "", ticker.SourcePath, "Default values should have empty source path")
+	assert.Equal(t, 1, ticker.Value, "Should have the default value")
 }

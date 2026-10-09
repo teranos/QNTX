@@ -28,7 +28,7 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 	// Build set of namespaced handler names this plugin currently declares
 	declaredHandlers := make(map[string]bool, len(schedules))
 	for _, s := range schedules {
-		if s.IntervalSeconds > 0 || s.EnabledByDefault {
+		if s.IntervalSeconds > 0 {
 			declaredHandlers[PluginHandlerName(pluginName, s.HandlerName)] = true
 		}
 	}
@@ -77,11 +77,14 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 	}
 
 	for _, s := range schedules {
-		// Skip disabled schedules (interval <= 0 and not enabled by default)
-		if s.IntervalSeconds <= 0 && !s.EnabledByDefault {
-			logger.Debugw("Skipping disabled schedule",
+		// An interval of 0 is no ticking, whatever enabled_by_default says: a
+		// schedule that runs names how often.
+		if s.IntervalSeconds <= 0 {
+			logger.Infow("A plugin schedule with no interval does not tick",
 				"plugin", pluginName,
 				"handler", s.HandlerName,
+				"interval_seconds", s.IntervalSeconds,
+				"enabled_by_default", s.EnabledByDefault,
 			)
 			continue
 		}

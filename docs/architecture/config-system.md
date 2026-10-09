@@ -19,10 +19,10 @@ Configuration is loaded from multiple sources in this order (lowest to highest p
 ### Source Precedence
 
 Each layer overrides values from lower layers. For example:
-- System sets `daily_budget_usd = 5.0`
-- User manually sets `daily_budget_usd = 10.0` in `~/.qntx/config.toml`
-- Project sets `daily_budget_usd = 20.0` in project `config.toml`
-- **Result**: `20.0` (project wins)
+- System sets `workers = 1`
+- User manually sets `workers = 2` in `~/.qntx/config.toml`
+- Project sets `workers = 4` in project `config.toml`
+- **Result**: `4` (project wins)
 
 ### Storage Backend Selection
 
@@ -64,7 +64,7 @@ Accepted values live in `KnownStorageBackends` (`internal/config/validate.go`); 
 ### Environment Variables
 - Highest precedence - overrides all files
 - Format: `QNTX_SECTION_KEY=value`
-- Example: `QNTX_PULSE_DAILY_BUDGET_USD=50.0`
+- Example: `QNTX_PULSE_WORKERS=4`
 
 ## Config Update Strategy
 
@@ -241,7 +241,6 @@ toml.Marshal(config)
 
 ## Related Documentation
 
-- **Budget Tracking**: [budget-tracking.md](budget-tracking.md) - Budget configuration and enforcement
 - **Glossary**: [Configuration Terms](../GLOSSARY.md#configuration) - Symbol and command reference
 - **User Guide**: How to configure QNTX (TBD)
 

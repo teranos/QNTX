@@ -11,6 +11,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
 )
 
@@ -60,8 +61,9 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 	if err != nil {
 		return nil, err
 	}
-	// The empty namespace is the node's own GitHub.
-	found, err := s.gitHubService().GetARepository(ctx, &protocol.GitHubGetARepositoryRequest{Owner: source.Owner, Repo: source.Repo})
+	// The node's own GitHub is system's, named.
+	found, err := s.gitHubService().GetARepository(ctx, &protocol.GitHubGetARepositoryRequest{
+		Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo})
 	if err != nil {
 		return nil, errors.Wrapf(err, "GitHubService did not answer for %s/%s", source.Owner, source.Repo)
 	}
@@ -79,7 +81,7 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 
 	if source.Path != "" {
 		held, err := s.gitHubService().GetRepositoryContent(ctx, &protocol.GitHubGetRepositoryContentRequest{
-			Owner: source.Owner, Repo: source.Repo, Path: source.Path, Ref: ref})
+			Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo, Path: source.Path, Ref: ref})
 		if err != nil {
 			return nil, errors.Wrapf(err, "GitHubService did not answer for %s in %s at %s", source.Path, found.FullName, ref)
 		}
@@ -113,11 +115,11 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 func (s *QNTXServer) pluginReadme(ctx context.Context, source gitHubSource, ref string) (*protocol.GitHubGetARepositoryREADMEResponse, error) {
 	if source.Path == "" {
 		readme, err := s.gitHubService().GetARepositoryREADME(ctx, &protocol.GitHubGetARepositoryREADMERequest{
-			Owner: source.Owner, Repo: source.Repo, Ref: ref})
+			Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo, Ref: ref})
 		return readme, errors.Wrapf(err, "GitHubService did not answer for the README of %s/%s at %s", source.Owner, source.Repo, ref)
 	}
 	readme, err := s.gitHubService().GetARepositoryREADMEForADirectory(ctx, &protocol.GitHubGetARepositoryREADMEForADirectoryRequest{
-		Owner: source.Owner, Repo: source.Repo, Dir: source.Path, Ref: ref})
+		Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo, Dir: source.Path, Ref: ref})
 	return readme, errors.Wrapf(err, "GitHubService did not answer for the README of %s in %s/%s at %s", source.Path, source.Owner, source.Repo, ref)
 }
 

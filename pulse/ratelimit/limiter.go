@@ -1,4 +1,5 @@
-package budget
+// Package ratelimit holds calls to a number per minute.
+package ratelimit
 
 import (
 	"context"

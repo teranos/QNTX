@@ -1,8 +1,7 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 351 in 158 files.
+# 346 in 155 files.
 
-1	ai/tracker/usage_tracker.go
 1	ats/attrs/attrs.go
 1	ats/identity/quickdev.go
 1	ats/parser/temporal.go
@@ -70,7 +69,6 @@
 1	plugin/grpc/websocket_security.go
 3	pulse/async/store.go
 1	pulse/async/worker.go
-1	pulse/budget/tracker.go
 1	pulse/schedule/execution_store.go
 3	pulse/schedule/store.go
 6	qntx-plugins/qntx-atproto/attestations.go
@@ -106,7 +104,6 @@
 1	server/auth/token_strategy.go
 1	server/auth/tokens_table.go
 1	server/auth/users_table.go
-1	server/broadcast.go
 1	server/checkpoint_pulse.go
 1	server/ci_pulse.go
 2	server/client.go
@@ -120,7 +117,7 @@
 2	server/github_deliveries.go
 1	server/github_tag.go
 1	server/ground_bridge.go
-4	server/handlers.go
+3	server/handlers.go
 1	server/host_gauges.go
 2	server/mcp.go
 1	server/namespace_handlers.go
@@ -133,7 +130,7 @@
 3	server/plugin_build.go
 1	server/plugin_log_handlers.go
 3	server/plugin_roots.go
-3	server/plugin_sigils.go
+2	server/plugin_sigils.go
 1	server/plugin_stores.go
 1	server/pulse_schedules.go
 1	server/ratelimit.go

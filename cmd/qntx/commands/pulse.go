@@ -24,7 +24,6 @@ var PulseCmd = &cobra.Command{
 
 The Pulse daemon provides:
 - Async job queue processing with worker pool
-- Budget tracking and enforcement (daily/monthly limits)
 - Scheduled job execution (recurring operations)
 - GRACE shutdown (completes current jobs before exit)
 
@@ -32,7 +31,6 @@ Pulse is the foundation for:
 - Background processing of long-running tasks
 - Rate-limited operations (API calls, external requests)
 - Recurring workflows (scheduled ingestion, cleanup)
-- Resource-constrained compute (budget limits, quotas)
 
 Example:
   qntx pulse start              # Start daemon in foreground
@@ -51,7 +49,6 @@ var PulseStartCmd = &cobra.Command{
 The daemon will:
 - Start worker pool for async job processing
 - Start scheduler ticker for recurring jobs
-- Enforce budget limits on operations
 - Run until interrupted (Ctrl+C) with GRACE shutdown`,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		// GetInt fails only for a flag that does not exist — a broken registration.
@@ -87,7 +84,7 @@ The daemon will:
 		registry := async.NewHandlerRegistry()
 
 		// Create worker pool with registered handlers
-		pool := async.NewWorkerPoolWithRegistry(ctx, database, cfg, poolCfg, logger.Logger, registry, nil, nil)
+		pool := async.NewWorkerPoolWithRegistry(ctx, database, cfg, poolCfg, logger.Logger, registry, nil)
 
 		pool.Start()
 
@@ -100,8 +97,6 @@ The daemon will:
 		fmt.Printf("Pulse daemon started\n")
 		fmt.Printf("  Workers: %d\n", workers)
 		fmt.Printf("  Poll interval: %v\n", poolCfg.PollInterval)
-		fmt.Printf("  Daily budget: $%.2f\n", cfg.Pulse.DailyBudgetUSD)
-		fmt.Printf("  Monthly budget: $%.2f\n", cfg.Pulse.MonthlyBudgetUSD)
 		fmt.Printf("  Scheduler interval: %v\n", tickerCfg.Interval)
 		fmt.Printf("\nPress Ctrl+C for graceful shutdown\n\n")
 

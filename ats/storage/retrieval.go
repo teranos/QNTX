@@ -53,14 +53,7 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) (_ []*types.As, 
 
 	// Add ORDER BY and LIMIT
 	query += " ORDER BY timestamp DESC"
-	if filters.Limit > 0 {
-		// Validate limit is within reasonable bounds to prevent resource exhaustion
-		limit := filters.Limit
-		if limit > MaxAttestationLimit {
-			limit = MaxAttestationLimit
-		}
-		query += fmt.Sprintf(" LIMIT %d", limit)
-	}
+	query += limitClause(filters.Limit)
 
 	rows, err := db.Query(query, qb.args...)
 	if err != nil {

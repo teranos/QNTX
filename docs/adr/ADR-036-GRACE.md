@@ -91,7 +91,6 @@ func (h *MyHandler) Execute(ctx context.Context, job *async.Job) error {
 type WorkerPoolConfig struct {
     Workers              int           // Number of concurrent workers
     PollInterval         *time.Duration // Poll interval: nil = gradual ramp-up (default), 0 = no polling, positive = fixed interval
-    PauseOnBudget        bool          // Pause jobs when budget exceeded
     GracefulStartPhase   time.Duration // Duration of each graceful start phase (default: 5min, test: 10s)
     WorkerStopTimeout    time.Duration // Max time to wait for workers to checkpoint and exit (default: 20s)
     MaxConsecutiveErrors int           // Threshold for applying exponential backoff (default: 5)

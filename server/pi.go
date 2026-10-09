@@ -30,10 +30,11 @@ func (s *QNTXServer) piHarness() *harness {
 		named:       func() bool { return named().Named() },
 		absent:      s.thereIsNoPi,
 		fetching:    "Pi is still being built",
-		part: func(_ context.Context, _ sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal) {
+		spec:        func() agentSpec { return agentSpec{} },
+		part: func(_ context.Context, _ sigil.Sent, agent *rootAgent, _ agentSpec) (aTurn, *protocol.Refusal) {
 			return s.piPart(named(), agent), nil
 		},
-		am: func(is agentIn) proto.Message {
+		am: func(is agentIn, _ *rootAgent, _ agentSpec) proto.Message {
 			pin := named()
 			return &protocol.PiAm{
 				Did: is.did, Model: pin.Model, Thinking: pin.Thinking, Gateway: pin.Gateway,
