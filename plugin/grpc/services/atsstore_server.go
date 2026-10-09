@@ -35,6 +35,7 @@ type ATSStoreServer struct {
 	protocol.UnimplementedATSStoreServiceServer
 	store           ats.AttestationStore
 	authToken       string
+	node            string // The node's DID: who wrote an attestation a plugin named no actor for.
 	logger          *zap.SugaredLogger
 	versionResolver VersionResolver
 	// Set after the service is serving, while plugins may already be calling.
@@ -47,12 +48,13 @@ type ATSStoreServer struct {
 	streamCancel context.CancelFunc
 }
 
-// NewATSStoreServer creates a new ATS store gRPC server
-func NewATSStoreServer(store ats.AttestationStore, authToken string, logger *zap.SugaredLogger) *ATSStoreServer {
+// NewATSStoreServer creates a new ATS store gRPC server. node is the node's DID.
+func NewATSStoreServer(store ats.AttestationStore, authToken, node string, logger *zap.SugaredLogger) *ATSStoreServer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &ATSStoreServer{
 		store:        store,
 		authToken:    authToken,
+		node:         node,
 		logger:       logger,
 		streamCtx:    ctx,
 		streamCancel: cancel,
@@ -402,14 +404,12 @@ func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*ty
 		}
 	}
 
-	// A plugin's actor is its name. Source already holds it, and a plugin that
-	// names no actor is not an attestation nobody wrote — it is one the plugin
-	// wrote and did not say so. What a plugin does name stands, because two
-	// actors can make contradictory claims and both are valid
-	// (docs/attestation.md); this only fills the silence.
+	// "the node"
+	//
+	// authors what a plugin named no actor for: the plugin wrote through it.
 	actors := proto.Actors
 	if len(actors) == 0 {
-		actors = []string{source}
+		actors = []string{s.node}
 	}
 
 	return &types.AsCommand{

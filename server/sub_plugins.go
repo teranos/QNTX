@@ -40,7 +40,8 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 
 	// Start gRPC services for plugins (Issue #138)
 	// These services allow plugins to call back to QNTX core
-	servicesManager := grpcplugin.NewServicesManager(s.deps.cfg.LLM, s.deps.cfg.Fetch, s.logger)
+	// The node DID subsystem runs first and is fatal, so the node has its DID here.
+	servicesManager := grpcplugin.NewServicesManager(s.deps.cfg.LLM, s.deps.cfg.Fetch, s.nodeDID.DID, s.logger)
 	filesDir := filepath.Join(filepath.Dir(s.dbPath), "files")
 
 	endpoints, err := servicesManager.Start(s.ctx, s.held.Served(), queue, s.scheduleStore, filesDir, s.deps.cfg.GroundDBPath)

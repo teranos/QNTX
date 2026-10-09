@@ -264,6 +264,7 @@ func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
 			Subjects:   []string{collectorID},
 			Predicates: []string{"wants"},
 			Contexts:   []string{bookID},
+			Actors:     []string{collectorID},
 		}
 		if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			return err
@@ -285,6 +286,7 @@ func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
 			Subjects:   []string{seller},
 			Predicates: []string{"offers"},
 			Contexts:   []string{bookID},
+			Actors:     []string{seller},
 		}
 		if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			return err

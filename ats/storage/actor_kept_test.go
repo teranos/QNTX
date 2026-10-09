@@ -34,24 +34,22 @@ func TestGenerateKeepsTheActorItWasGiven(t *testing.T) {
 	}
 }
 
-// Nothing named, so the id stands as the actor — the self-certifying default the
-// store has always had, now only where there is silence to fill.
-func TestGenerateFallsBackToTheIDWhenNoActorIsNamed(t *testing.T) {
+// "the node"
+//
+// authors what its caller named nobody for, naming itself where it writes. A
+// store is not the node, so an attestation reaching it with no actor is refused.
+func TestGenerateRefusesAnAttestationNamingNoActor(t *testing.T) {
 	store, _ := createTestStore(t)
 
-	as, err := store.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
+	_, err := store.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
 		Subjects:   []string{"batch"},
 		Predicates: []string{"crawl-timeout"},
 		Contexts:   []string{"levi:batch"},
 		Timestamp:  time.Now(),
 		Source:     "collector",
 	})
-	if err != nil {
-		t.Fatalf("GenerateAndCreateAttestation: %v", err)
-	}
-
-	if len(as.Actors) != 1 || as.Actors[0] != as.ID {
-		t.Errorf("an unclaimed attestation should stand on its own id, got %v for %s", as.Actors, as.ID)
+	if err == nil {
+		t.Fatal("a store wrote an attestation that names no actor")
 	}
 }
 

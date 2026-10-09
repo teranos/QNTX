@@ -116,6 +116,9 @@ func (s *RustBackedStore) QueryFilterResolved(filter types.AxFilter) ([]*types.A
 // Reimplemented here (rather than delegating to RustStore) so that CreateAttestation
 // goes through this wrapper's signing/observers/bounded enforcement path.
 func (s *RustBackedStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
+	if err := cmd.NamesItsActor(); err != nil {
+		return nil, err
+	}
 	checkExists := func(asid string) bool {
 		return s.rust.AttestationExists(asid)
 	}
@@ -139,10 +142,6 @@ func (s *RustBackedStore) GenerateAndCreateAttestation(ctx context.Context, cmd 
 	}
 
 	as := cmd.ToAs(asid, "")
-	if len(as.Actors) == 0 {
-		as.Actors = []string{asid}
-	}
-
 	if err := s.CreateAttestation(as); err != nil {
 		return nil, errors.Wrap(err, "failed to create attestation")
 	}
@@ -165,6 +164,9 @@ func (s *RustBackedStore) BatchGenerateAndCreateAttestations(ctx context.Context
 	attestations := make([]*types.As, 0, len(cmds))
 
 	for _, cmd := range cmds {
+		if err := cmd.NamesItsActor(); err != nil {
+			return 0, errors.Wrapf(err, "batch item %d", len(attestations))
+		}
 		subject := "_"
 		if len(cmd.Subjects) > 0 {
 			subject = cmd.Subjects[0]
@@ -184,9 +186,6 @@ func (s *RustBackedStore) BatchGenerateAndCreateAttestations(ctx context.Context
 		}
 
 		as := cmd.ToAs(asid, "")
-		if len(as.Actors) == 0 {
-			as.Actors = []string{asid}
-		}
 
 		warnIDLikeSubjects(s.log, as.ID, as.Subjects)
 

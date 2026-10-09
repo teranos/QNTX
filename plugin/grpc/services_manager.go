@@ -59,6 +59,7 @@ type ServicesManager struct {
 	fetchServer        *grpc.Server
 	fetchSrv           *services.FetchServer // for version resolver injection
 	fetchCfg           config.FetchConfig
+	node               string // The node's DID, who writes what a plugin named no actor for
 	mailServer         *grpc.Server
 	mailSrv            *services.MailServer // wired once the node has Users and its DID
 	endpoints          ServiceEndpoints
@@ -94,11 +95,12 @@ func (m *ServicesManager) noteDegraded(service string, err error) {
 	m.degraded[service] = err.Error()
 }
 
-// NewServicesManager creates a new services manager
-func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, logger *zap.SugaredLogger) *ServicesManager {
+// NewServicesManager creates a new services manager. node is the node's DID.
+func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, node string, logger *zap.SugaredLogger) *ServicesManager {
 	return &ServicesManager{
 		llmConfig: llmCfg,
 		fetchCfg:  fetchCfg,
+		node:      node,
 		logger:    logger,
 	}
 }
@@ -261,7 +263,7 @@ func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.At
 
 	// Create gRPC server
 	m.atsStoreServer = grpc.NewServer()
-	m.atsStore = services.NewATSStoreServer(store, authToken, m.logger)
+	m.atsStore = services.NewATSStoreServer(store, authToken, m.node, m.logger)
 	protocol.RegisterATSStoreServiceServer(m.atsStoreServer, m.atsStore)
 
 	m.serve(ctx, "ATSStore", m.atsStoreServer, listener)
@@ -440,7 +442,7 @@ func (m *ServicesManager) startFetchService(ctx context.Context, store ats.Attes
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.fetchSrv = services.NewFetchServer(store, authToken, m.fetchCfg, m.logger)
+	m.fetchSrv = services.NewFetchServer(store, authToken, m.node, m.fetchCfg, m.logger)
 	m.fetchServer = grpc.NewServer()
 	protocol.RegisterFetchServiceServer(m.fetchServer, m.fetchSrv)
 
