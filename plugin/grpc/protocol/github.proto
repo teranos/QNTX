@@ -458,3 +458,23 @@ message GitHubRateLimitResponse {
   string error = 2;
   map<string, GitHubRate> resources = 3;
 }
+
+// GitHubNode is what github node answers.
+message GitHubNode {
+  // Whether GitHub is on for the node now.
+  bool enabled = 1;
+}
+
+// GitHubWebhook is what github webhook answers.
+message GitHubWebhook {
+  // The secret, for the App's webhook settings.
+  string secret = 1;
+  // The whole URL to paste into the App's webhook settings.
+  string url = 2;
+}
+
+// GitHubWebhookPath is what github webhook_path answers.
+message GitHubWebhookPath {
+  // The whole URL to paste into the App's webhook settings now.
+  string url = 1;
+}

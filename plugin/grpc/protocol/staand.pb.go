@@ -441,6 +441,116 @@ func (x *Visit) GetBounce() bool {
 	return false
 }
 
+// StaandCreated is what staands create answers.
+type StaandCreated struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The stand that was created.
+	Slug string `protobuf:"bytes,1,opt,name=slug,proto3" json:"slug,omitempty"`
+	// The path its pixel is fired at.
+	Url           string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandCreated) Reset() {
+	*x = StaandCreated{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandCreated) ProtoMessage() {}
+
+func (x *StaandCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandCreated.ProtoReflect.Descriptor instead.
+func (*StaandCreated) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *StaandCreated) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *StaandCreated) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+// StaandTakenDown is what staands take-down answers.
+type StaandTakenDown struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The stand that was taken down.
+	Slug string `protobuf:"bytes,1,opt,name=slug,proto3" json:"slug,omitempty"`
+	// removed.
+	Status        string `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StaandTakenDown) Reset() {
+	*x = StaandTakenDown{}
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StaandTakenDown) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StaandTakenDown) ProtoMessage() {}
+
+func (x *StaandTakenDown) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_staand_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StaandTakenDown.ProtoReflect.Descriptor instead.
+func (*StaandTakenDown) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_staand_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *StaandTakenDown) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *StaandTakenDown) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
 var File_plugin_grpc_protocol_staand_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_staand_proto_rawDesc = "" +
@@ -495,7 +605,13 @@ const file_plugin_grpc_protocol_staand_proto_rawDesc = "" +
 	"\x05views\x18\n" +
 	" \x01(\rR\x05views\x12\x16\n" +
 	"\x06events\x18\v \x01(\rR\x06events\x12\x16\n" +
-	"\x06bounce\x18\f \x01(\bR\x06bounceB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\x06bounce\x18\f \x01(\bR\x06bounce\"5\n" +
+	"\rStaandCreated\x12\x12\n" +
+	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\"=\n" +
+	"\x0fStaandTakenDown\x12\x12\n" +
+	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06statusB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_staand_proto_rawDescOnce sync.Once
@@ -509,14 +625,16 @@ func file_plugin_grpc_protocol_staand_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_staand_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_staand_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_plugin_grpc_protocol_staand_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_plugin_grpc_protocol_staand_proto_goTypes = []any{
-	(*Arrival)(nil), // 0: protocol.Arrival
-	(*Visit)(nil),   // 1: protocol.Visit
-	nil,             // 2: protocol.Arrival.ParamsEntry
+	(*Arrival)(nil),         // 0: protocol.Arrival
+	(*Visit)(nil),           // 1: protocol.Visit
+	(*StaandCreated)(nil),   // 2: protocol.StaandCreated
+	(*StaandTakenDown)(nil), // 3: protocol.StaandTakenDown
+	nil,                     // 4: protocol.Arrival.ParamsEntry
 }
 var file_plugin_grpc_protocol_staand_proto_depIdxs = []int32{
-	2, // 0: protocol.Arrival.params:type_name -> protocol.Arrival.ParamsEntry
+	4, // 0: protocol.Arrival.params:type_name -> protocol.Arrival.ParamsEntry
 	1, // [1:1] is the sub-list for method output_type
 	1, // [1:1] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
@@ -535,7 +653,7 @@ func file_plugin_grpc_protocol_staand_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_staand_proto_rawDesc), len(file_plugin_grpc_protocol_staand_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

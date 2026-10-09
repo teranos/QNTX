@@ -1617,6 +1617,72 @@ func (x *ElementDef) GetModulePath() string {
 	return ""
 }
 
+// PluginAction is what plugins pause, resume, restart, enable and disable
+// answer.
+type PluginAction struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The plugin acted on.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Its state after the action. A restart says restarting: the outcome is seen
+	// in its health.
+	State string `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
+	// The action taken.
+	Action        string `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginAction) Reset() {
+	*x = PluginAction{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginAction) ProtoMessage() {}
+
+func (x *PluginAction) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginAction.ProtoReflect.Descriptor instead.
+func (*PluginAction) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *PluginAction) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PluginAction) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *PluginAction) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
 var File_plugin_grpc_protocol_domain_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
@@ -1769,7 +1835,11 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\rdefault_width\x18\x06 \x01(\x05R\fdefaultWidth\x12%\n" +
 	"\x0edefault_height\x18\a \x01(\x05R\rdefaultHeight\x12\x1f\n" +
 	"\vmodule_path\x18\b \x01(\tR\n" +
-	"modulePath2\xd3\x04\n" +
+	"modulePath\"P\n" +
+	"\fPluginAction\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05state\x18\x02 \x01(\tR\x05state\x12\x16\n" +
+	"\x06action\x18\x03 \x01(\tR\x06action2\xd3\x04\n" +
 	"\x13DomainPluginService\x127\n" +
 	"\bMetadata\x12\x0f.protocol.Empty\x1a\x1a.protocol.MetadataResponse\x12G\n" +
 	"\n" +
@@ -1797,7 +1867,7 @@ func file_plugin_grpc_protocol_domain_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_domain_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(WebSocketMessage_Type)(0),   // 0: protocol.WebSocketMessage.Type
 	(*Empty)(nil),                // 1: protocol.Empty
@@ -1819,24 +1889,25 @@ var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(*JobLogEntry)(nil),          // 17: protocol.JobLogEntry
 	(*ElementDefResponse)(nil),   // 18: protocol.ElementDefResponse
 	(*ElementDef)(nil),           // 19: protocol.ElementDef
-	nil,                          // 20: protocol.InitializeRequest.ConfigEntry
-	nil,                          // 21: protocol.WebSocketMessage.HeadersEntry
-	nil,                          // 22: protocol.HealthResponse.DetailsEntry
-	nil,                          // 23: protocol.ConfigSchemaResponse.FieldsEntry
-	(*Signum)(nil),               // 24: protocol.Signum
+	(*PluginAction)(nil),         // 20: protocol.PluginAction
+	nil,                          // 21: protocol.InitializeRequest.ConfigEntry
+	nil,                          // 22: protocol.WebSocketMessage.HeadersEntry
+	nil,                          // 23: protocol.HealthResponse.DetailsEntry
+	nil,                          // 24: protocol.ConfigSchemaResponse.FieldsEntry
+	(*Signum)(nil),               // 25: protocol.Signum
 }
 var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
-	20, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
+	21, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
 	6,  // 1: protocol.HTTPRequest.headers:type_name -> protocol.HTTPHeader
 	6,  // 2: protocol.HTTPResponse.headers:type_name -> protocol.HTTPHeader
 	0,  // 3: protocol.WebSocketMessage.type:type_name -> protocol.WebSocketMessage.Type
-	21, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
-	22, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
-	23, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
+	22, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
+	23, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
+	24, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
 	11, // 7: protocol.InitializeResponse.schedules:type_name -> protocol.ScheduleInfo
 	14, // 8: protocol.InitializeResponse.watchers:type_name -> protocol.WatcherRegistration
 	13, // 9: protocol.InitializeResponse.http_routes:type_name -> protocol.RouteInfo
-	24, // 10: protocol.InitializeResponse.signa:type_name -> protocol.Signum
+	25, // 10: protocol.InitializeResponse.signa:type_name -> protocol.Signum
 	17, // 11: protocol.ExecuteJobResponse.log_entries:type_name -> protocol.JobLogEntry
 	19, // 12: protocol.ElementDefResponse.elements:type_name -> protocol.ElementDef
 	10, // 13: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
@@ -1878,7 +1949,7 @@ func file_plugin_grpc_protocol_domain_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_domain_proto_rawDesc), len(file_plugin_grpc_protocol_domain_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   23,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

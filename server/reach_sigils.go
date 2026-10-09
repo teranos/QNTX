@@ -29,7 +29,6 @@ func (s *QNTXServer) reachSignum() sigil.Signum {
 		Says: "What the line is about: a path, a signum, or signum:sigil, optionally after http:, mcp: or a2a:."}
 	toParam := &protocol.Param{Name: "to", Required: true,
 		Says: "A role, or a level (SUPER, TOKEN, ATTESTOR, PUBLIC_REGISTRATION, ANYONE), which opens only a plugin's route or sigil the compiled table does not name."}
-	written := []*protocol.Field{{Name: "id", Says: "The attestation the line was written as."}}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name: "reach",
@@ -44,18 +43,18 @@ func (s *QNTXServer) reachSignum() sigil.Signum {
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: reachPath},
 				},
 				{
-					Name:  "grant",
-					Does:  "Open something to a role, or a plugin's route or sigil to a level, by writing a reach line. Served from the next request on.",
-					Takes: []*protocol.Param{pathParam, toParam},
-					Gives: written,
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: reachPath},
+					Name:   "grant",
+					Does:   "Open something to a role, or a plugin's route or sigil to a level, by writing a reach line. Served from the next request on.",
+					Takes:  []*protocol.Param{pathParam, toParam},
+					Answer: "protocol.ReachWritten",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: reachPath},
 				},
 				{
-					Name:  "revoke",
-					Does:  "Take back what a line opened, by writing the line that revokes it. What the compiled-in table opens stays.",
-					Takes: []*protocol.Param{pathParam, toParam},
-					Gives: written,
-					Http:  &protocol.Endpoint{Method: http.MethodDelete, Path: reachPath},
+					Name:   "revoke",
+					Does:   "Take back what a line opened, by writing the line that revokes it. What the compiled-in table opens stays.",
+					Takes:  []*protocol.Param{pathParam, toParam},
+					Answer: "protocol.ReachWritten",
+					Http:   &protocol.Endpoint{Method: http.MethodDelete, Path: reachPath},
 				},
 			},
 		},
@@ -200,5 +199,5 @@ func (s *QNTXServer) writeReachLine(ctx context.Context, path, to string, revoke
 				Says: "the line " + id + " is stored and not served; what the node serves is unchanged: " + err.Error()}
 		}
 	}
-	return map[string]string{"id": id}, nil
+	return &protocol.ReachWritten{Id: id}, nil
 }

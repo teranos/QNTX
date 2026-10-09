@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 )
 
@@ -129,7 +130,7 @@ func TestAFolderIsBoundToItsRepositorysDefaultBranch(t *testing.T) {
 
 	got, refused := askVault(t, s, "subdirs", sigil.Sent{"repo": "abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
-	assert.Equal(t, "trunk", got.(map[string]any)["branch"])
+	assert.Equal(t, "trunk", got.(*protocol.VaultSubdirs).GetBranch())
 
 	_, refused = askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)

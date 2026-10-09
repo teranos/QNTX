@@ -344,3 +344,36 @@ message WatcherQueueStatusMessage {
   double oldest_age_seconds = 6;
   int64 timestamp = 7;
 }
+
+// ReachWritten is what reach grant and reach revoke answer.
+message ReachWritten {
+  // The attestation the line was written as.
+  string id = 1;
+}
+
+// NamespaceActedOn is what namespaces disable, enable, delete and nuke answer.
+message NamespaceActedOn {
+  // The namespace acted on.
+  string name = 1;
+}
+
+// VaultDirs is what vault dirs answers.
+message VaultDirs {
+  // Each folder's place in the vault, folders apart by /.
+  repeated string dirs = 1;
+}
+
+// VaultRepos is what vault repos answers.
+message VaultRepos {
+  // Each repository as owner/repo.
+  repeated string repos = 1;
+}
+
+// VaultSubdirs is what vault subdirs answers.
+message VaultSubdirs {
+  // Each folder's path from the repository's top.
+  repeated string dirs = 1;
+  // The repository's default branch, which the folders are read on and a
+  // folder is bound to.
+  string branch = 2;
+}

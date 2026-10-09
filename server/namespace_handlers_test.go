@@ -144,7 +144,7 @@ func TestTheSwitchSaysWhichWayItWent(t *testing.T) {
 		if refusal != nil {
 			t.Fatalf("%s: refused: %s", verb.sigil, refusal.GetSays())
 		}
-		if got := answer.(map[string]string)["name"]; got != "pond" {
+		if got := answer.(*protocol.NamespaceActedOn).GetName(); got != "pond" {
 			t.Errorf("%s: gave back %q, want pond", verb.sigil, got)
 		}
 		if fake.switched != "pond" {
@@ -169,7 +169,7 @@ func TestDeleteEndsTheNamespaceItNames(t *testing.T) {
 	if fake.deleted != "pond" {
 		t.Errorf("deleted %q, want pond", fake.deleted)
 	}
-	if got := answer.(map[string]string)["name"]; got != "pond" {
+	if got := answer.(*protocol.NamespaceActedOn).GetName(); got != "pond" {
 		t.Errorf("gave back %q, want pond", got)
 	}
 }
@@ -223,7 +223,7 @@ func TestNukingIsReachedFromSystem(t *testing.T) {
 	if !fake.nuked {
 		t.Error("standing in system did not reach the store")
 	}
-	if got := answer.(map[string]string)["name"]; got != auth.NamespaceDefault {
+	if got := answer.(*protocol.NamespaceActedOn).GetName(); got != auth.NamespaceDefault {
 		t.Errorf("gave back %q, want %s", got, auth.NamespaceDefault)
 	}
 }

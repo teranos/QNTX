@@ -497,6 +497,52 @@ func (x *Binding) GetSignerPubkeyHex() string {
 	return ""
 }
 
+// Standing is what i standing and i step answer.
+type Standing struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Where the person now stands. Never empty.
+	Namespace     string `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Standing) Reset() {
+	*x = Standing{}
+	mi := &file_plugin_grpc_protocol_user_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Standing) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Standing) ProtoMessage() {}
+
+func (x *Standing) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_user_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Standing.ProtoReflect.Descriptor instead.
+func (*Standing) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_user_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Standing) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
 var File_plugin_grpc_protocol_user_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_user_proto_rawDesc = "" +
@@ -531,7 +577,9 @@ const file_plugin_grpc_protocol_user_proto_rawDesc = "" +
 	"\x0fpeer_pubkey_hex\x18\x01 \x01(\tR\rpeerPubkeyHex\x12\x1b\n" +
 	"\tissued_at\x18\x02 \x01(\x04R\bissuedAt\x12#\n" +
 	"\rsignature_hex\x18\x03 \x01(\tR\fsignatureHex\x12*\n" +
-	"\x11signer_pubkey_hex\x18\x04 \x01(\tR\x0fsignerPubkeyHex*V\n" +
+	"\x11signer_pubkey_hex\x18\x04 \x01(\tR\x0fsignerPubkeyHex\"(\n" +
+	"\bStanding\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace*V\n" +
 	"\tKeyOrigin\x12\x1a\n" +
 	"\x16KEY_ORIGIN_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12KEY_ORIGIN_BROWSER\x10\x01\x12\x15\n" +
@@ -554,7 +602,7 @@ func file_plugin_grpc_protocol_user_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_user_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_plugin_grpc_protocol_user_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_plugin_grpc_protocol_user_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_plugin_grpc_protocol_user_proto_goTypes = []any{
 	(KeyOrigin)(0),   // 0: protocol.KeyOrigin
 	(AccessLevel)(0), // 1: protocol.AccessLevel
@@ -562,6 +610,7 @@ var file_plugin_grpc_protocol_user_proto_goTypes = []any{
 	(*Key)(nil),      // 3: protocol.Key
 	(*Account)(nil),  // 4: protocol.Account
 	(*Binding)(nil),  // 5: protocol.Binding
+	(*Standing)(nil), // 6: protocol.Standing
 }
 var file_plugin_grpc_protocol_user_proto_depIdxs = []int32{
 	3, // 0: protocol.User.keys:type_name -> protocol.Key
@@ -587,7 +636,7 @@ func file_plugin_grpc_protocol_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_user_proto_rawDesc), len(file_plugin_grpc_protocol_user_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -121,3 +121,19 @@ export interface Visit {
    */
   bounce: boolean;
 }
+
+/** StaandCreated is what staands create answers. */
+export interface StaandCreated {
+  /** The stand that was created. */
+  slug: string;
+  /** The path its pixel is fired at. */
+  url: string;
+}
+
+/** StaandTakenDown is what staands take-down answers. */
+export interface StaandTakenDown {
+  /** The stand that was taken down. */
+  slug: string;
+  /** removed. */
+  status: string;
+}

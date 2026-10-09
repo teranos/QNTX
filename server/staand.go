@@ -781,7 +781,7 @@ func (s *QNTXServer) staandsCreate(ctx context.Context, sent sigil.Sent) (any, *
 		s.logger.Errorw("could not create a stand", "market", market, "slug", slug, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not create the stand in " + market}
 	}
-	return map[string]any{"slug": slug, "url": staandPathPrefix + market + "/" + slug}, nil
+	return &protocol.StaandCreated{Slug: slug, Url: staandPathPrefix + market + "/" + slug}, nil
 }
 
 // staandsTakeDown supersedes a stand with a deleted line, so its pixel stops
@@ -796,7 +796,7 @@ func (s *QNTXServer) staandsTakeDown(ctx context.Context, sent sigil.Sent) (any,
 		s.logger.Errorw("could not remove a stand", "market", market, "slug", slug, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not remove the stand in " + market}
 	}
-	return map[string]any{"slug": slug, "status": "removed"}, nil
+	return &protocol.StaandTakenDown{Slug: slug, Status: "removed"}, nil
 }
 
 // writeStaandDef writes a created or deleted line for a stand into system,

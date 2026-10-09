@@ -79,7 +79,7 @@ func TestParityHoldRefuses(t *testing.T) {
 		"follows nothing":     {sigil.Sent{"signum": "parity"}, "signum", sigil.NotFound},
 		"not a reference":     {sigil.Sent{"signum": "staands", "reference": "matomo"}, "reference", sigil.NotFound},
 		"no such sigil":       {sigil.Sent{"signum": "staands", "sigil": "nosuch"}, "sigil", sigil.NotFound},
-		"a sigil of no shape": {sigil.Sent{"signum": "staands", "sigil": "create"}, "sigil", sigil.Invalid},
+		"a sigil of no shape": {sigil.Sent{"signum": "staands", "sigil": "list"}, "sigil", sigil.Invalid},
 	} {
 		_, refused := hold(context.Background(), c.sent)
 		if refused == nil || refused.GetParam() != c.param || refused.GetWhy() != c.why {

@@ -102,3 +102,19 @@ message Visit {
   // differently makes the number incomparable to everyone else's.
   bool bounce = 12;
 }
+
+// StaandCreated is what staands create answers.
+message StaandCreated {
+  // The stand that was created.
+  string slug = 1;
+  // The path its pixel is fired at.
+  string url = 2;
+}
+
+// StaandTakenDown is what staands take-down answers.
+message StaandTakenDown {
+  // The stand that was taken down.
+  string slug = 1;
+  // removed.
+  string status = 2;
+}

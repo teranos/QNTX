@@ -181,11 +181,11 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath},
 				},
 				{
-					Name:  "dirs",
-					Does:  "Every folder of a vault's copy on the box, by its place in the vault. Obsidian's own folders, the ones starting with a dot, are left out.",
-					Takes: []*protocol.Param{{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."}},
-					Gives: []*protocol.Field{{Name: "dirs", Says: "Each folder's place in the vault, folders apart by /."}},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/dirs"},
+					Name:   "dirs",
+					Does:   "Every folder of a vault's copy on the box, by its place in the vault. Obsidian's own folders, the ones starting with a dot, are left out.",
+					Takes:  []*protocol.Param{{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."}},
+					Answer: "protocol.VaultDirs",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/dirs"},
 				},
 				{
 					Name:  "owners",
@@ -194,11 +194,11 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/owners"},
 				},
 				{
-					Name:  "repos",
-					Does:  "Each repository one installation of the GitHub App reaches, as the installation itself is answered.",
-					Takes: []*protocol.Param{{Name: "installation", Required: true, Kind: sigil.Count, Says: "The installation's id, as owners gives it."}},
-					Gives: []*protocol.Field{{Name: "repos", Says: "Each repository as owner/repo."}},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/repos"},
+					Name:   "repos",
+					Does:   "Each repository one installation of the GitHub App reaches, as the installation itself is answered.",
+					Takes:  []*protocol.Param{{Name: "installation", Required: true, Kind: sigil.Count, Says: "The installation's id, as owners gives it."}},
+					Answer: "protocol.VaultRepos",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/repos"},
 				},
 				{
 					Name: "subdirs",
@@ -207,11 +207,8 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 						{Name: "repo", Required: true, Says: "The repository, as owner/repo."},
 						{Name: "path", Says: "The folder, from the repository's top. Its top when not sent."},
 					},
-					Gives: []*protocol.Field{
-						{Name: "dirs", Says: "Each folder's path from the repository's top."},
-						{Name: "branch", Says: "The repository's default branch, which the folders are read on and a folder is bound to."},
-					},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/subdirs"},
+					Answer: "protocol.VaultSubdirs",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/subdirs"},
 				},
 				{
 					Name: "bind",

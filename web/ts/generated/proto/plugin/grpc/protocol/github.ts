@@ -31,3 +31,23 @@ export interface GitHubRateLimitResponse_ResourcesEntry {
   key: string;
   value: GitHubRate | undefined;
 }
+
+/** GitHubNode is what github node answers. */
+export interface GitHubNode {
+  /** Whether GitHub is on for the node now. */
+  enabled: boolean;
+}
+
+/** GitHubWebhook is what github webhook answers. */
+export interface GitHubWebhook {
+  /** The secret, for the App's webhook settings. */
+  secret: string;
+  /** The whole URL to paste into the App's webhook settings. */
+  url: string;
+}
+
+/** GitHubWebhookPath is what github webhook_path answers. */
+export interface GitHubWebhookPath {
+  /** The whole URL to paste into the App's webhook settings now. */
+  url: string;
+}

@@ -425,7 +425,7 @@ func asyncJobStatusPtr(status async.JobStatus) *async.JobStatus {
 
 // pluginAction is the answer of the plugins signum's pause, resume, restart,
 // enable and disable sigils.
-func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map[string]interface{}, *protocol.Refusal) {
+func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*protocol.PluginAction, *protocol.Refusal) {
 	if s.pluginRegistry == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin registry not available"}
 	}
@@ -527,7 +527,7 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 		}
 		if _, loaded := pm.GetPlugin(name); !loaded {
-			return map[string]interface{}{"name": name, "state": string(plugin.StateStopped), "action": action}, nil
+			return &protocol.PluginAction{Name: name, State: string(plugin.StateStopped), Action: action}, nil
 		}
 		// Capture metadata before disabling (plugin will be gone after)
 		var disabledVersion string
@@ -569,9 +569,5 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (map
 	if action == "restart" {
 		state = plugin.StateRestarting
 	}
-	return map[string]interface{}{
-		"name":   name,
-		"state":  string(state),
-		"action": action,
-	}, nil
+	return &protocol.PluginAction{Name: name, State: string(state), Action: action}, nil
 }
