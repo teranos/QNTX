@@ -63,3 +63,142 @@ message SendMailResponse {
   string message_id = 3;       // The id the transport gave the mail.
   string attestation_id = 4;   // The attestation of the mail.
 }
+
+// MailRow is one mail the node sent or tried to, as the sent list names it.
+message MailRow {
+  string id = 1;
+  // RFC 3339, to the nanosecond.
+  string at = 2;
+  string user = 3;
+  string to = 4;
+  string plugin = 5;
+  string template = 6;
+  string subject = 7;
+  bool sent = 8;
+  string message_id = 9;
+  string error = 10;
+}
+
+// MailSent is what mail sent answers.
+message MailSent {
+  // One row per mail: its attestation, when, the User, the address it went
+  // to, the plugin, the template, the subject, whether it was sent, and the
+  // transport's message id or its refusal.
+  repeated MailRow mails = 1;
+}
+
+// MailKeptImage is one image a mail's html shows by cid, whole, as the mail's
+// attestation keeps it: its data base64.
+message MailKeptImage {
+  string content_id = 1;
+  string content_type = 2;
+  string data = 3;
+}
+
+// MailWhole is one mail whole, as it was sent: a MailRow's fields, then what
+// the mail itself held. Its row is not nested, as the view reads it.
+message MailWhole {
+  string id = 1;
+  string at = 2;
+  string user = 3;
+  string to = 4;
+  string plugin = 5;
+  string template = 6;
+  string subject = 7;
+  bool sent = 8;
+  string message_id = 9;
+  string error = 10;
+  string from = 11;
+  string html = 12;
+  string text = 13;
+  repeated MailKeptImage images = 14;
+}
+
+// MailMessage is what mail message answers.
+message MailMessage {
+  // The mail: its row in the sent list, the address it was sent from, its
+  // html and text, and each image the html shows by cid, whole, as base64. A
+  // mail attested before its images were kept names none.
+  MailWhole mail = 1;
+}
+
+// MailTemplateRow is one template mail is filled from.
+message MailTemplateRow {
+  string id = 1;
+  // RFC 3339, to the nanosecond.
+  string at = 2;
+  string plugin = 3;
+  string version = 4;
+  string name = 5;
+  string subject = 6;
+  string html = 7;
+  string text = 8;
+  repeated string values = 9;
+}
+
+// NodeMail is one mail the node writes itself, whole.
+message NodeMail {
+  string name = 1;
+  string says = 2;
+}
+
+// MailTemplates is what mail templates answers.
+message MailTemplates {
+  // QNTX's own template, filled when a plugin names none: its subject, html
+  // and text, and the values it takes.
+  MailTemplateRow neutral = 1;
+  // QNTX's own template drawn as a QNTX window, filled when a plugin names
+  // dark: its subject, html and text, and the values it takes.
+  MailTemplateRow dark = 2;
+  // One row per plugin and name: its attestation, when it was set, the
+  // plugin, its version, the name, and the subject, html and text.
+  repeated MailTemplateRow templates = 3;
+  // The mail the node writes itself, whole: not filled from any template, and
+  // named here so it is not missing.
+  repeated NodeMail node = 4;
+}
+
+// MailSES is mail.ses as the node was wired with it.
+message MailSES {
+  bool enabled = 1;
+  string region = 2;
+}
+
+// SESAccount is what SES says of the account, as it is now.
+message SESAccount {
+  string region = 1;
+  bool production_access = 2;
+  bool sending_enabled = 3;
+  string enforcement_status = 4;
+  double max_24_hour_send = 5;
+  double max_send_rate = 6;
+  double sent_last_24_hours = 7;
+}
+
+// MailAccount is what mail account answers.
+message MailAccount {
+  // mail.from: the address every mail is sent from. Empty sends nothing.
+  string from = 1;
+  // mail.ses: whether SES is enabled, and the region am.toml names.
+  MailSES ses = 2;
+  // What SES says of the account now: its region, production access, whether
+  // sending is enabled, its enforcement status, the 24-hour quota, how much of
+  // it is spent, and the send rate. Null when SES was not asked or did not
+  // say.
+  SESAccount account = 3;
+  // Why there is no account: SES is not enabled, or what SES said instead.
+  // Empty when it answered.
+  string unanswered = 4;
+}
+
+// MailReport is where the report went and what records it: what mail report
+// answers.
+message MailReport {
+  // The address it went to: the ROOT User's primary one.
+  string to = 1;
+  // The id the transport gave the mail.
+  string message_id = 2;
+  // The attestation of the mail.
+  string attestation_id = 3;
+}
+

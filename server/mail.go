@@ -93,40 +93,26 @@ func (s *QNTXServer) mailSignum() sigil.Signum {
 					Does: "Every mail the node sent on a plugin's behalf, and every one the transport refused, newest first.",
 					Takes: []*protocol.Param{{Name: "limit", Kind: sigil.Count,
 						Says: "How many mails at most. Naming none is one hundred."}},
-					Gives: []*protocol.Field{{Name: "mails", Says: "One row per mail: its attestation, when, the User, the address it went to, the plugin, the template, the subject, whether it was sent, and the transport's message id or its refusal."}},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: mailPath},
+					Answer: "protocol.MailSent",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: mailPath},
 				},
 				{
-					Name: "templates",
-					Does: "The templates mail is filled from: QNTX's neutral and dark ones, and the newest each plugin set under each name.",
-					Gives: []*protocol.Field{
-						{Name: "neutral", Says: "QNTX's own template, filled when a plugin names none: its subject, html and text, and the values it takes."},
-						{Name: "dark", Says: "QNTX's own template drawn as a QNTX window, filled when a plugin names dark: its subject, html and text, and the values it takes."},
-						{Name: "templates", Says: "One row per plugin and name: its attestation, when it was set, the plugin, its version, the name, and the subject, html and text."},
-						{Name: "node", Says: "The mail the node writes itself, whole: not filled from any template, and named here so it is not missing."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: mailTemplatesPath},
+					Name:   "templates",
+					Does:   "The templates mail is filled from: QNTX's neutral and dark ones, and the newest each plugin set under each name.",
+					Answer: "protocol.MailTemplates",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: mailTemplatesPath},
 				},
 				{
-					Name: "account",
-					Does: "What the node sends mail through: the address it sends from, whether SES is enabled in am.toml, and what SES says of the account now.",
-					Gives: []*protocol.Field{
-						{Name: "from", Says: "mail.from: the address every mail is sent from. Empty sends nothing."},
-						{Name: "ses", Says: "mail.ses: whether SES is enabled, and the region am.toml names."},
-						{Name: "account", Says: "What SES says of the account now: its region, production access, whether sending is enabled, its enforcement status, the 24-hour quota, how much of it is spent, and the send rate. Null when SES was not asked or did not say."},
-						{Name: "unanswered", Says: "Why there is no account: SES is not enabled, or what SES said instead. Empty when it answered."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: mailAccountPath},
+					Name:   "account",
+					Does:   "What the node sends mail through: the address it sends from, whether SES is enabled in am.toml, and what SES says of the account now.",
+					Answer: "protocol.MailAccount",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: mailAccountPath},
 				},
 				{
-					Name: "report",
-					Does: "Send the weekly report to the ROOT User now: the one the node sends on its own schedule (ADR-042).",
-					Gives: []*protocol.Field{
-						{Name: "to", Says: "The address it went to: the ROOT User's primary one."},
-						{Name: "message_id", Says: "The id the transport gave the mail."},
-						{Name: "attestation_id", Says: "The attestation of the mail."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodPost, Path: mailReportPath},
+					Name:   "report",
+					Does:   "Send the weekly report to the ROOT User now: the one the node sends on its own schedule (ADR-042).",
+					Answer: "protocol.MailReport",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: mailReportPath},
 				},
 				{
 					Name: "message",
@@ -135,8 +121,8 @@ func (s *QNTXServer) mailSignum() sigil.Signum {
 						{Name: "id", Required: true, Says: "The mail's attestation, as the sent list names it."},
 						{Name: "user", Required: true, Says: "The User it went to, as the sent list names it."},
 					},
-					Gives: []*protocol.Field{{Name: "mail", Says: "The mail: its row in the sent list, the address it was sent from, its html and text, and each image the html shows by cid, whole, as base64. A mail attested before its images were kept names none."}},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: mailMessagePath},
+					Answer: "protocol.MailMessage",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: mailMessagePath},
 				},
 			},
 		},
@@ -148,20 +134,6 @@ func (s *QNTXServer) mailSignum() sigil.Signum {
 			"message":   s.mailMessage,
 		},
 	}
-}
-
-// mailRow is one mail the node sent or tried to.
-type mailRow struct {
-	ID        string    `json:"id"`
-	At        time.Time `json:"at"`
-	User      string    `json:"user"`
-	To        string    `json:"to"`
-	Plugin    string    `json:"plugin"`
-	Template  string    `json:"template"`
-	Subject   string    `json:"subject"`
-	Sent      bool      `json:"sent"`
-	MessageID string    `json:"message_id"`
-	Error     string    `json:"error"`
 }
 
 func (s *QNTXServer) mailSent(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -181,7 +153,13 @@ func (s *QNTXServer) mailSent(_ context.Context, sent sigil.Sent) (any, *protoco
 
 	// One query per predicate: a store may read several in one filter as all
 	// of them rather than any (staand.go).
-	mails := []mailRow{}
+	// Ordered by the time itself: the written time orders by whatever offset
+	// it carries.
+	type mail struct {
+		at  time.Time
+		row *protocol.MailRow
+	}
+	var mails []mail
 	for _, predicate := range []string{services.PredicateMailSent, services.PredicateMailFailed} {
 		found, err := store.GetAttestations(ats.AttestationFilter{Predicates: []string{predicate}, Limit: limit})
 		if err != nil {
@@ -191,45 +169,36 @@ func (s *QNTXServer) mailSent(_ context.Context, sent sigil.Sent) (any, *protoco
 			if !slices.Contains(as.Predicates, predicate) {
 				continue
 			}
-			mails = append(mails, mailRowOf(as, predicate == services.PredicateMailSent))
+			mails = append(mails, mail{at: as.Timestamp, row: mailRowOf(as, predicate == services.PredicateMailSent)})
 		}
 	}
-	slices.SortFunc(mails, func(a, b mailRow) int { return b.At.Compare(a.At) })
+	slices.SortFunc(mails, func(a, b mail) int { return b.at.Compare(a.at) })
 	if len(mails) > limit {
 		mails = mails[:limit]
 	}
-	return map[string]any{"mails": mails}, nil
+	answer := &protocol.MailSent{Mails: make([]*protocol.MailRow, 0, len(mails))}
+	for _, m := range mails {
+		answer.Mails = append(answer.Mails, m.row)
+	}
+	return answer, nil
 }
 
-func mailRowOf(as *types.As, sent bool) mailRow {
-	row := mailRow{
-		ID:        as.ID,
-		At:        as.Timestamp,
+func mailRowOf(as *types.As, sent bool) *protocol.MailRow {
+	row := &protocol.MailRow{
+		Id:        as.ID,
+		At:        as.Timestamp.Format(time.RFC3339Nano),
 		To:        attr(as, "to"),
 		Plugin:    attr(as, "plugin"),
 		Template:  attr(as, "template"),
 		Subject:   attr(as, "subject"),
 		Sent:      sent,
-		MessageID: attr(as, "message_id"),
+		MessageId: attr(as, "message_id"),
 		Error:     attr(as, "error"),
 	}
 	if len(as.Subjects) > 0 {
 		row.User = as.Subjects[0]
 	}
 	return row
-}
-
-// mailTemplateRow is one template mail is filled from.
-type mailTemplateRow struct {
-	ID      string    `json:"id"`
-	At      time.Time `json:"at"`
-	Plugin  string    `json:"plugin"`
-	Version string    `json:"version"`
-	Name    string    `json:"name"`
-	Subject string    `json:"subject"`
-	HTML    string    `json:"html"`
-	Text    string    `json:"text"`
-	Values  []string  `json:"values"`
 }
 
 func (s *QNTXServer) mailTemplates(_ context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
@@ -240,19 +209,21 @@ func (s *QNTXServer) mailTemplates(_ context.Context, _ sigil.Sent) (any, *proto
 	}
 	// Both take what the neutral template takes: the dark one is it, drawn as a window.
 	values := []string{"subject", "body", "link (not required)", "link_label (not required)"}
-	answer := map[string]any{
-		"neutral": mailTemplateRow{
-			Plugin: "qntx", Name: services.NeutralTemplateName,
-			Subject: neutral.Subject, HTML: neutral.Html, Text: neutral.Text,
+	// QNTX's own were never set, so their time is none: Go's zero time, as
+	// the view has always been given it.
+	var never time.Time
+	answer := &protocol.MailTemplates{
+		Neutral: &protocol.MailTemplateRow{
+			At: never.Format(time.RFC3339Nano), Plugin: "qntx", Name: services.NeutralTemplateName,
+			Subject: neutral.Subject, Html: neutral.Html, Text: neutral.Text,
 			Values: values,
 		},
-		"dark": mailTemplateRow{
-			Plugin: "qntx", Name: services.DarkTemplateName,
-			Subject: dark.Subject, HTML: dark.Html, Text: dark.Text,
+		Dark: &protocol.MailTemplateRow{
+			At: never.Format(time.RFC3339Nano), Plugin: "qntx", Name: services.DarkTemplateName,
+			Subject: dark.Subject, Html: dark.Html, Text: dark.Text,
 			Values: values,
 		},
-		"templates": []mailTemplateRow{},
-		"node": []nodeMailRow{{
+		Node: []*protocol.NodeMail{{
 			Name: reportHandlerName,
 			Says: "The weekly report to the ROOT User (ADR-042), written whole by the node. What it looked like is the mail itself, under Sent.",
 		}},
@@ -281,84 +252,55 @@ func (s *QNTXServer) mailTemplates(_ context.Context, _ sigil.Sent) (any, *proto
 			newest[ref] = as
 		}
 	}
-	templates := []mailTemplateRow{}
+	templates := []*protocol.MailTemplateRow{}
 	for _, as := range newest {
 		kept := services.TemplateOf(as)
-		templates = append(templates, mailTemplateRow{
-			ID: as.ID, At: as.Timestamp,
+		templates = append(templates, &protocol.MailTemplateRow{
+			Id: as.ID, At: as.Timestamp.Format(time.RFC3339Nano),
 			Plugin: attr(as, "plugin"), Version: attr(as, "source_version"), Name: attr(as, "name"),
-			Subject: kept.Subject, HTML: kept.Html, Text: kept.Text,
+			Subject: kept.Subject, Html: kept.Html, Text: kept.Text,
 			Values: []string{},
 		})
 	}
-	slices.SortFunc(templates, func(a, b mailTemplateRow) int {
-		if a.Plugin != b.Plugin {
-			if a.Plugin < b.Plugin {
+	slices.SortFunc(templates, func(a, b *protocol.MailTemplateRow) int {
+		if a.GetPlugin() != b.GetPlugin() {
+			if a.GetPlugin() < b.GetPlugin() {
 				return -1
 			}
 			return 1
 		}
-		if a.Name < b.Name {
+		if a.GetName() < b.GetName() {
 			return -1
 		}
-		if a.Name > b.Name {
+		if a.GetName() > b.GetName() {
 			return 1
 		}
 		return 0
 	})
-	answer["templates"] = templates
+	answer.Templates = templates
 	return answer, nil
-}
-
-// mailSES is mail.ses as the node was wired with it.
-type mailSES struct {
-	Enabled bool   `json:"enabled"`
-	Region  string `json:"region"`
 }
 
 func (s *QNTXServer) mailAccount(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
-	ses := mailSES{Enabled: s.mailConfig.SES.Enabled, Region: s.mailConfig.SES.Region}
-	answer := map[string]any{
-		"from":       s.mailConfig.From,
-		"ses":        ses,
-		"account":    nil,
-		"unanswered": "",
-	}
-	if !ses.Enabled {
-		answer["unanswered"] = "SES is not enabled: mail.ses.enabled is false in am.toml, so no mail is sent"
+	ses := &protocol.MailSES{Enabled: s.mailConfig.SES.Enabled, Region: s.mailConfig.SES.Region}
+	answer := &protocol.MailAccount{From: s.mailConfig.From, Ses: ses}
+	if !ses.GetEnabled() {
+		answer.Unanswered = "SES is not enabled: mail.ses.enabled is false in am.toml, so no mail is sent"
 		return answer, nil
 	}
-	account, err := services.SESTransport{Region: ses.Region}.Account(ctx)
+	account, err := services.SESTransport{Region: ses.GetRegion()}.Account(ctx)
 	if err != nil {
 		// SES not answering is what this window is for; it is said, not refused.
-		s.logger.Warnw("SES did not say what the account is", "region", ses.Region, "error", err)
-		answer["unanswered"] = err.Error()
+		s.logger.Warnw("SES did not say what the account is", "region", ses.GetRegion(), "error", err)
+		answer.Unanswered = err.Error()
 		return answer, nil
 	}
-	answer["account"] = account
+	answer.Account = &protocol.SESAccount{
+		Region: account.Region, ProductionAccess: account.ProductionAccess, SendingEnabled: account.SendingEnabled,
+		EnforcementStatus: account.EnforcementStatus, Max_24HourSend: account.Max24HourSend,
+		MaxSendRate: account.MaxSendRate, SentLast_24Hours: account.SentLast24Hours,
+	}
 	return answer, nil
-}
-
-// nodeMailRow is one mail the node writes itself, whole.
-type nodeMailRow struct {
-	Name string `json:"name"`
-	Says string `json:"says"`
-}
-
-// mailImage is one image a mail's html shows by cid, whole.
-type mailImage struct {
-	ContentID   string `json:"content_id"`
-	ContentType string `json:"content_type"`
-	Data        string `json:"data"`
-}
-
-// mailMessage is one mail whole, as it was sent.
-type mailMessage struct {
-	mailRow
-	From   string      `json:"from"`
-	HTML   string      `json:"html"`
-	Text   string      `json:"text"`
-	Images []mailImage `json:"images"`
 }
 
 // "i would have expected to be able to click the main and see exactly what was sent."
@@ -381,14 +323,13 @@ func (s *QNTXServer) mailMessage(_ context.Context, sent sigil.Sent) (any, *prot
 			if as.ID != id || !slices.Contains(as.Predicates, predicate) {
 				continue
 			}
-			m := mailMessage{
-				mailRow: mailRowOf(as, predicate == services.PredicateMailSent),
-				From:    attr(as, "from"),
-				HTML:    attr(as, "html"),
-				Text:    attr(as, "text"),
-				Images:  imagesOf(as),
-			}
-			return map[string]any{"mail": m}, nil
+			row := mailRowOf(as, predicate == services.PredicateMailSent)
+			return &protocol.MailMessage{Mail: &protocol.MailWhole{
+				Id: row.GetId(), At: row.GetAt(), User: row.GetUser(), To: row.GetTo(), Plugin: row.GetPlugin(),
+				Template: row.GetTemplate(), Subject: row.GetSubject(), Sent: row.GetSent(),
+				MessageId: row.GetMessageId(), Error: row.GetError(),
+				From: attr(as, "from"), Html: attr(as, "html"), Text: attr(as, "text"), Images: imagesOf(as),
+			}}, nil
 		}
 	}
 	return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "id", Says: "no mail " + id + " to " + user}
@@ -396,8 +337,8 @@ func (s *QNTXServer) mailMessage(_ context.Context, sent sigil.Sent) (any, *prot
 
 // imagesOf reads back the images a mail was sent with. None is a mail that had
 // none, or one attested before they were kept.
-func imagesOf(as *types.As) []mailImage {
-	images := []mailImage{}
+func imagesOf(as *types.As) []*protocol.MailKeptImage {
+	images := []*protocol.MailKeptImage{}
 	kept, ok := as.Attributes["images"].([]any)
 	if !ok {
 		return images
@@ -407,8 +348,8 @@ func imagesOf(as *types.As) []mailImage {
 		if !ok {
 			continue
 		}
-		images = append(images, mailImage{
-			ContentID:   attrOf(img, "content_id"),
+		images = append(images, &protocol.MailKeptImage{
+			ContentId:   attrOf(img, "content_id"),
 			ContentType: attrOf(img, "content_type"),
 			Data:        attrOf(img, "data"),
 		})

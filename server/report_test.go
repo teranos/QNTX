@@ -279,10 +279,10 @@ func TestTheReportIsMailedToTheRootUser(t *testing.T) {
 	s.sentryConfig = appcfg.SentryConfig{}
 	sent, err := s.sendReport(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, "root@garden.test", sent.To)
+	assert.Equal(t, "root@garden.test", sent.GetTo())
 	require.Len(t, box.mails, 1)
 	assert.Equal(t, "root@garden.test", box.mails[0].To)
-	assert.NotEmpty(t, sent.AttestationID)
+	assert.NotEmpty(t, sent.GetAttestationId())
 }
 
 // A ROOT User without an address gets no report, and the refusal says so.
