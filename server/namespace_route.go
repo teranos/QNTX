@@ -46,10 +46,10 @@ func (s *QNTXServer) storeFor(r *http.Request) (ats.AttestationStore, error) {
 // A socket outlives the request that opened it, so a connection holds what it
 // was admitted as and asks here. storeFor is this and then its attestations.
 func (s *QNTXServer) universeFor(admitted auth.Admission, gated bool) (*namespaces.Universe, error) {
-	// Not gated is a node running without auth, where every caller is the one
-	// caller. The served universe is what such a node has to give.
+	// Not gated is a stranger on an ANYONE route, or a handler wired past the
+	// gate. A node without auth admits its one caller at the gate (gate).
 	if !gated {
-		return s.held.ServedUniverse(), nil
+		return nil, namespaces.ReachesNothing{}
 	}
 	if !admitted.ReachesAStore() {
 		return nil, namespaces.ReachesNothing{}

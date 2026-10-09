@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -81,10 +82,32 @@ func TestATokenCannotReachSystem(t *testing.T) {
 	}
 }
 
-// A request that never reached auth has no caller and no namespace to check.
-func TestNoCallerFallsToTheServedStore(t *testing.T) {
+// A request no gate admitted is a stranger on an ANYONE route, or a handler
+// wired past the gate. Neither reaches a store.
+func TestNoCallerReachesNoStore(t *testing.T) {
 	s := routeServer()
-	if _, err := s.storeFor(httptest.NewRequest(http.MethodGet, "/api/attestations", nil)); err != nil {
-		t.Fatalf("a request with no caller was refused: %v", err)
+	if _, err := s.storeFor(httptest.NewRequest(http.MethodGet, "/api/attestations", nil)); err == nil {
+		t.Fatal("a request nobody admitted got the served store")
+	}
+	if _, _, refusal, _ := s.openCall(context.Background()); refusal == nil {
+		t.Fatal("a plugin call nobody admitted was handed a store token")
+	}
+}
+
+// A node without auth says who its one caller is, rather than saying nothing
+// and having nothing read as everything.
+func TestANodeWithoutAuthAdmitsItsOneCallerAsRoot(t *testing.T) {
+	s := routeServer()
+	var seen auth.Admission
+	var admitted bool
+	s.gate("/api/attestations", auth.Reach{}, func(_ http.ResponseWriter, r *http.Request) {
+		seen, admitted = auth.AdmissionFrom(r.Context())
+	})(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/attestations", nil))
+
+	if !admitted {
+		t.Fatal("the gate of a node without auth admitted nobody")
+	}
+	if !seen.ReachesEveryNamespace() || !seen.IsRoot() {
+		t.Fatalf("the one caller of a node without auth is %s", seen.LevelName())
 	}
 }

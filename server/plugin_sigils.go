@@ -347,15 +347,6 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared 
 			return failed(errors.Newf("%s cannot be asked a sigil", plugin))
 		}
 
-		token, done, notYours, err := s.openCall(ctx)
-		if notYours != nil {
-			return nil, notYours
-		}
-		if err != nil {
-			return failed(err)
-		}
-		defer done()
-
 		carried := map[string]any{}
 		for name, value := range sent {
 			carried[name] = value
@@ -363,15 +354,30 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared 
 		if declared {
 			carried = sigil.Arrived(ctx)
 		}
-		req, err := forwarded(plugin, held, carried, ctx, token)
+		req, err := forwarded(plugin, held, carried, ctx)
 		if err != nil {
 			return failed(err)
 		}
-		caller, open := s.callerOf(token)
-		if !open {
-			return failed(errors.Newf("the call to %s closed before it was handed", plugin))
+
+		// A stranger on an ANYONE sigil is asked through and handed no store:
+		// only an admitted caller has a namespace to act in.
+		if _, gated := auth.AdmissionFrom(ctx); gated {
+			token, done, notYours, err := s.openCall(ctx)
+			if notYours != nil {
+				return nil, notYours
+			}
+			if err != nil {
+				return failed(err)
+			}
+			defer done()
+			caller, open := s.callerOf(token)
+			if !open {
+				return failed(errors.Newf("the call to %s closed before it was handed", plugin))
+			}
+			req.Headers = append(req.Headers,
+				&protocol.HTTPHeader{Name: HeaderStoreToken, Values: []string{token}},
+				&protocol.HTTPHeader{Name: HeaderNamespace, Values: []string{caller.Namespace}})
 		}
-		req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderNamespace, Values: []string{caller.Namespace}})
 		resp, err := holder.AnswerHTTP(ctx, req)
 		if err != nil {
 			return failed(errors.Wrapf(err, "%s %s did not answer", req.GetMethod(), req.GetPath()))
@@ -397,7 +403,7 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared 
 }
 
 // forwarded is the request a plugin is handed for one asking.
-func forwarded(plugin string, held *protocol.Sigil, carried map[string]any, ctx context.Context, storeToken string) (*protocol.HTTPRequest, error) {
+func forwarded(plugin string, held *protocol.Sigil, carried map[string]any, ctx context.Context) (*protocol.HTTPRequest, error) {
 	method := held.GetHttp().GetMethod()
 	req := &protocol.HTTPRequest{
 		Method: method,
@@ -449,7 +455,6 @@ func forwarded(plugin string, held *protocol.Sigil, carried map[string]any, ctx 
 			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerClient, Values: []string{admitted.ClientDID}})
 		}
 	}
-	req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderStoreToken, Values: []string{storeToken}})
 	return req, nil
 }
 
