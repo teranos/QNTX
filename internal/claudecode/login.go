@@ -118,18 +118,25 @@ func (in *SigningIn) Finish(code string) error {
 	if code == "" {
 		return errors.New("no code was handed over")
 	}
-	if _, err := io.WriteString(in.stdin, code+"\n"); err != nil {
+	handed := code + "\n"
+	written, err := io.WriteString(in.stdin, handed)
+	if err != nil {
 		return errors.Wrap(err, "the code was not handed to Claude Code")
+	}
+	if written != len(handed) {
+		return errors.Newf("the code was handed to Claude Code in part: %d of %d bytes", written, len(handed))
 	}
 	if err := in.stdin.Close(); err != nil {
 		return errors.Wrap(err, "the code was handed to Claude Code and its stdin did not close")
 	}
-	// What it prints after the code is read to the end so it can end.
-	if _, err := io.Copy(io.Discard, in.stdout); err != nil {
+	// What it prints after the code is read to the end so it can end, and
+	// said with its refusal when it refuses.
+	printed, err := io.ReadAll(in.stdout)
+	if err != nil {
 		return errors.Wrap(err, "what Claude Code printed after the code was cut short")
 	}
 	if err := in.cmd.Wait(); err != nil {
-		return errors.Wrapf(err, "Claude Code refused the code, saying: %s", in.said())
+		return errors.Wrapf(err, "Claude Code refused the code, saying: %s", strings.TrimSpace(string(printed)+"\n"+in.said()))
 	}
 	return nil
 }

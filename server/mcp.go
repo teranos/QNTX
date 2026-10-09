@@ -182,12 +182,12 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			}
 			// A declared route's answer is the plugin's own and is not held to
 			// what it gives on the plugin path, so it is not promised here.
-			var given map[string]any
+			given := promise{}
 			if !signum.Declared {
 				given = givenAsSchema(held.sigil)
 			}
-			if given != nil {
-				tool.OutputSchema = given
+			if given.made {
+				tool.OutputSchema = given.schema
 			}
 			server.AddTool(tool, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				if result := takenAsSaid(schema, toolNameOf(held.signum, held.sigil), req.Params.Arguments); result != nil {

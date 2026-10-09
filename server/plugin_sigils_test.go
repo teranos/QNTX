@@ -346,7 +346,7 @@ func TestAPluginsDeclaredRoutesAreItsSigils(t *testing.T) {
 	admits := func(_ string, _ auth.Reach, next http.HandlerFunc) http.HandlerFunc { return next }
 	everyone := func(string, heldBy) (auth.Reach, bool) { return auth.Reach{}, true }
 	ask := func(args map[string]any) *mcp.CallToolResult {
-		return overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), zoek, args, nil)
+		return overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), zoek, args, promise{})
 	}
 
 	answered := ask(map[string]any{"naam": "acme", "filter": map[string]any{"plaats": "Amsterdam"}})

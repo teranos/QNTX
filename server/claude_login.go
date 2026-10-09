@@ -29,6 +29,10 @@ type signingIn struct {
 	mu      sync.Mutex
 	pending *claudecode.SigningIn
 	cancel  context.CancelFunc
+	// unended is why the sign-in whose window closed was not ended cleanly,
+	// kept for the next sign-in to say, since the window's closing has nobody
+	// to tell.
+	unended error
 }
 
 // take hands over the pending sign-in, leaving none.
@@ -38,6 +42,16 @@ func (s *signingIn) take() (*claudecode.SigningIn, context.CancelFunc) {
 	pending, cancel := s.pending, s.cancel
 	s.pending, s.cancel = nil, nil
 	return pending, cancel
+}
+
+// takeUnended hands over why the last sign-in whose window closed was not
+// ended, leaving none.
+func (s *signingIn) takeUnended() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	unended := s.unended
+	s.unended = nil
+	return unended
 }
 
 // loginSigil is the Claude harness's own sigil: sign the agent in.
@@ -95,11 +109,16 @@ func (s *QNTXServer) loginAgent(ctx context.Context, h *harness, agent *rootAgen
 	}
 
 	// A sign-in begun over one not finished ends the first: one URL is live.
+	// One that does not end is said, and nothing new begins over it.
 	if pending, cancel := agent.signingIn.take(); pending != nil {
-		if err := pending.Abandon(); err != nil {
-			s.logger.Warnw("the sign-in begun before was not ended cleanly", "agent", agent.did, "error", err)
-		}
+		err := pending.Abandon()
 		cancel()
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the sign-in begun before was not ended, so none begins over it: " + err.Error()}
+		}
+	}
+	if err := agent.signingIn.takeUnended(); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the sign-in whose window closed was not ended, so none begins over it: " + err.Error()}
 	}
 	// Under the node's own context, not the caller's: the caller leaves, and
 	// the process waits for the code until the window ends.
@@ -118,9 +137,7 @@ func (s *QNTXServer) loginAgent(ctx context.Context, h *harness, agent *rootAgen
 		agent.signingIn.mu.Lock()
 		defer agent.signingIn.mu.Unlock()
 		if agent.signingIn.pending == in {
-			if err := in.Abandon(); err != nil {
-				s.logger.Warnw("a sign-in nobody finished was not ended cleanly", "agent", agent.did, "error", err)
-			}
+			agent.signingIn.unended = in.Abandon()
 			agent.signingIn.pending, agent.signingIn.cancel = nil, nil
 		}
 	}()
