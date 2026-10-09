@@ -30,7 +30,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/slug"
@@ -79,7 +78,7 @@ func (s *QNTXServer) agentLineOf(namespace string) (agentLine, bool, error) {
 	if err != nil {
 		return agentLine{}, false, errors.Wrapf(err, "failed to read the %s line of %s", agentLineSubject, namespace)
 	}
-	found, err := reading.GetAttestations(ats.AttestationFilter{Subjects: []string{agentLineSubject}, Limit: storage.MaxAttestationLimit})
+	found, err := reading.GetAttestations(ats.AttestationFilter{Subjects: []string{agentLineSubject}, Limit: ats.EveryRow})
 	if err != nil {
 		return agentLine{}, false, errors.Wrapf(err, "failed to read the %s line of %s", agentLineSubject, namespace)
 	}

@@ -264,7 +264,7 @@ func (s *QNTXServer) mailTemplates(_ context.Context, _ sigil.Sent) (any, *proto
 	}
 	found, err := store.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{services.PredicateMailTemplate},
-		Limit:      storage.MaxAttestationLimit,
+		Limit:      ats.EveryRow,
 	})
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the mail templates could not be read: " + err.Error()}
@@ -372,7 +372,7 @@ func (s *QNTXServer) mailMessage(_ context.Context, sent sigil.Sent) (any, *prot
 		found, err := store.GetAttestations(ats.AttestationFilter{
 			Predicates: []string{predicate},
 			Subjects:   []string{user},
-			Limit:      storage.MaxAttestationLimit,
+			Limit:      ats.EveryRow,
 		})
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the mail to " + user + " could not be read: " + err.Error()}
