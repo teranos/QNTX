@@ -312,10 +312,8 @@ func (wp *WorkerPool) Stop() {
 		close(done)
 	})
 
+	// As configured: DefaultWorkerPoolConfig says 20s, and 0 waits for nobody.
 	timeout := wp.poolConfig.WorkerStopTimeout
-	if timeout == 0 {
-		timeout = DefaultWorkerStopTimeout
-	}
 	select {
 	case <-done:
 		wp.logger.Pulse("WorkerPool.Stop() complete - all workers exited cleanly")
@@ -335,14 +333,8 @@ func (wp *WorkerPool) worker(id int) {
 	// Error backoff state
 	errorCount := 0
 	maxConsecutiveErrors := wp.poolConfig.MaxConsecutiveErrors
-	if maxConsecutiveErrors == 0 {
-		maxConsecutiveErrors = DefaultMaxConsecutiveErrors
-	}
 	backoffDuration := time.Second
 	maxBackoff := wp.poolConfig.MaxBackoff
-	if maxBackoff == 0 {
-		maxBackoff = DefaultMaxBackoff
-	}
 
 	for {
 		select {

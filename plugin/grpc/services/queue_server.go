@@ -143,12 +143,10 @@ func (s *QueueServer) ListJobs(ctx context.Context, req *protocol.ListJobsReques
 		}, nil
 	}
 
-	limit := 0
+	// Left out is the default page of 100; a limit said is that limit, 0 included.
+	limit := 100
 	if req.Limit != nil {
 		limit = int(*req.Limit)
-	}
-	if limit == 0 {
-		limit = 100 // Default limit
 	}
 
 	// List jobs

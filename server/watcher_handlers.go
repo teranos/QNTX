@@ -22,18 +22,19 @@ import (
 
 // WatcherCreateRequest represents a request to create a new watcher
 type WatcherCreateRequest struct {
-	ID                string   `json:"id"`
-	Name              string   `json:"name"`
-	Subjects          []string `json:"subjects,omitempty"`
-	Predicates        []string `json:"predicates,omitempty"`
-	Contexts          []string `json:"contexts,omitempty"`
-	Actors            []string `json:"actors,omitempty"`
-	TimeStart         string   `json:"time_start,omitempty"` // RFC3339
-	TimeEnd           string   `json:"time_end,omitempty"`   // RFC3339
-	ActionType        string   `json:"action_type"`          // "python", "webhook", or "semantic_match"
-	ActionData        string   `json:"action_data"`          // Python code or webhook URL (not required for semantic_match)
-	MaxFiresPerSecond int      `json:"max_fires_per_second,omitempty"`
-	Enabled           *bool    `json:"enabled,omitempty"`
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Subjects   []string `json:"subjects,omitempty"`
+	Predicates []string `json:"predicates,omitempty"`
+	Contexts   []string `json:"contexts,omitempty"`
+	Actors     []string `json:"actors,omitempty"`
+	TimeStart  string   `json:"time_start,omitempty"` // RFC3339
+	TimeEnd    string   `json:"time_end,omitempty"`   // RFC3339
+	ActionType string   `json:"action_type"`          // "python", "webhook", or "semantic_match"
+	ActionData string   `json:"action_data"`          // Python code or webhook URL (not required for semantic_match)
+	// Left out is watcher.max_fires_per_second; said, it is that, 0 included.
+	MaxFiresPerSecond *int  `json:"max_fires_per_second,omitempty"`
+	Enabled           *bool `json:"enabled,omitempty"`
 	// Semantic matching fields (for se elements)
 	SemanticQuery     string  `json:"semantic_query,omitempty"`
 	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`

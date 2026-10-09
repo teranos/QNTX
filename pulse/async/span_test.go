@@ -106,7 +106,7 @@ func poolWith(t *testing.T, handler JobHandler) *WorkerPool {
 		context.Background(),
 		db,
 		createTestConfig(),
-		WorkerPoolConfig{Workers: 1, PollInterval: &noPolling},
+		WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1, PollInterval: &noPolling},
 		createTestLogger(),
 		registry,
 		nil, // no budget tracker: the budget gate is not what these tests are about

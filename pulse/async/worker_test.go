@@ -49,7 +49,7 @@ func TestTASBotInitializesWorkerPool(t *testing.T) {
 
 	// TAS Bot creates worker pool with specific worker count
 	workerCount := 3
-	poolCfg := WorkerPoolConfig{Workers: workerCount}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: workerCount}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 
 	if pool == nil {
@@ -74,7 +74,7 @@ func TestKirbyExecutesJobs(t *testing.T) {
 	cfg := createTestConfig()
 
 	// Kirby creates a small worker pool
-	poolCfg := WorkerPoolConfig{Workers: 2}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 2}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 
 	// Kirby starts the worker pool
@@ -99,7 +99,7 @@ func TestTASBotGracefulShutdown(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	poolCfg := WorkerPoolConfig{Workers: 3}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 3}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 	pool.Start()
 
@@ -128,7 +128,7 @@ func TestCronosWorkerIntervals(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	poolCfg := WorkerPoolConfig{Workers: 1}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 
 	// Cronos checks initial interval (warmup: 1 second)
@@ -162,7 +162,7 @@ func TestKirbyContextCancellation(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	poolCfg := WorkerPoolConfig{Workers: 2}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 2}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 
 	// Kirby starts workers using the pool's Start() method
@@ -199,7 +199,7 @@ func TestTASBotWorkerPoolStop(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	poolCfg := WorkerPoolConfig{Workers: 3}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 3}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 	pool.Start()
 
@@ -238,7 +238,7 @@ func TestCronosShutdownTimeout(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	poolCfg := WorkerPoolConfig{Workers: 2}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 2}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 	pool.Start()
 
@@ -274,7 +274,7 @@ func TestKirbyProcessNextJobContextCheck(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	poolCfg := WorkerPoolConfig{Workers: 1}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 
 	// Cancel context before processing
@@ -302,7 +302,7 @@ func TestTASBotMultipleWorkers(t *testing.T) {
 	cfg := createTestConfig()
 
 	workerCount := 5
-	poolCfg := WorkerPoolConfig{Workers: workerCount}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: workerCount}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 
 	// TAS Bot starts all workers using pool.Start()
@@ -330,7 +330,7 @@ func TestKirbyAndTASBotIntegration(t *testing.T) {
 	cfg := createTestConfig()
 
 	// TAS Bot sets up the worker pool
-	poolCfg := WorkerPoolConfig{Workers: 3}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 3}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 
 	t.Log("  TAS Bot: 'Starting worker pool...'")
@@ -360,7 +360,7 @@ func TestCronosRateLimitingEnforcement(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	poolCfg := WorkerPoolConfig{Workers: 1}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 
 	// Skip if rate limiter not configured (requires pulse package, would create import cycle)
@@ -417,7 +417,7 @@ func TestCronosCheckRateLimitWithNilLimiter(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	poolCfg := WorkerPoolConfig{Workers: 1}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 
 	// Create a test job
@@ -451,7 +451,7 @@ func TestCronosCheckBudgetWithNilTracker(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	poolCfg := WorkerPoolConfig{Workers: 1}
+	poolCfg := WorkerPoolConfig{WorkerStopTimeout: DefaultWorkerStopTimeout, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, MaxBackoff: DefaultMaxBackoff, Workers: 1}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 
 	// Create an expensive job
