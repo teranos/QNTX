@@ -274,11 +274,6 @@ func (c *Config) GetServerAllowedOrigins() []string {
 		"https://tauri.localhost",
 	}
 
-	// If no custom origins configured, return defaults
-	if len(c.Server.AllowedOrigins) == 0 {
-		return defaults
-	}
-
 	// Merge: Start with defaults, add custom origins (deduplicated via map)
 	originSet := make(map[string]bool)
 	for _, origin := range defaults {
