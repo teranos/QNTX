@@ -58,9 +58,9 @@ func TestSigningInIsClaudeCodesOwnFlow(t *testing.T) {
 
 	is, refused := s.harnessAm(s.claudeHarness())
 	require.Nil(t, refused)
-	am := is.(map[string]any)
-	assert.Equal(t, true, am["signed_in"])
-	assert.Equal(t, "claude.ai", am["auth_method"])
+	am := is.(*protocol.ClaudeAm)
+	assert.True(t, am.GetSignedIn())
+	assert.Equal(t, "claude.ai", am.GetAuthMethod())
 	holds(t, s.harnessSignum(s.claudeHarness()), "am", am)
 }
 
@@ -123,7 +123,7 @@ func TestATurnWithNoCredentialIsToldToSignIn(t *testing.T) {
 
 	answer, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
-	assert.Equal(t, "Up 3 days.", answer["answer"])
+	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
 	// The turn carries no plan token: Claude Code runs on what the sign-in left.
 	for _, run := range []string{"0", "1", "2", "3", "4"} {
 		if env, err := os.ReadFile(filepath.Join(ran, run, "env")); err == nil {

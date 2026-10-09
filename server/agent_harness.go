@@ -7,6 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
+	"google.golang.org/protobuf/proto"
 )
 
 // A harness the ROOT agent runs in (ADR-048). Its sigils, its session and its
@@ -22,20 +23,21 @@ type harness struct {
 
 	description, sayDoes, amDoes, sessionDoes string
 	// sayTakes is what say takes beyond says.
-	sayTakes          []*protocol.Param
-	sayGives, amGives []*protocol.Field
+	sayTakes []*protocol.Param
+	// sayAnswer and amAnswer are the messages say and am answer.
+	sayAnswer, amAnswer string
 
 	// named reports whether am.toml names the agent in it, and absent says why
 	// it cannot be spoken to there when it does not.
 	named  func() bool
 	absent func() *protocol.Refusal
-	// pathKey is what am calls where its binary is, and fetching what am says
-	// while the binary has not arrived.
-	pathKey, fetching string
+	// fetching is what am says while the binary has not arrived.
+	fetching string
 	// part is its part of one turn, or why nothing is said to it.
 	part func(ctx context.Context, sent sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal)
-	// am says what is the harness's own of the agent in it.
-	am func(is map[string]any)
+	// am is what am answers: what every harness says of the agent in it, and
+	// what is the harness's own.
+	am func(is agentIn) proto.Message
 	// also is what this harness has beyond say, am and session.
 	also []harnessSigil
 }
@@ -80,17 +82,17 @@ func (s *QNTXServer) harnessSignum(h *harness) sigil.Signum {
 			Tags:        []string{"agent", h.name, "root"},
 			Sigils: append([]*protocol.Sigil{
 				{
-					Name:  "say",
-					Does:  h.sayDoes,
-					Takes: append([]*protocol.Param{{Name: "says", Required: true, Says: "What is said to it."}}, h.sayTakes...),
-					Gives: h.sayGives,
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: at + "/say"},
+					Name:   "say",
+					Does:   h.sayDoes,
+					Takes:  append([]*protocol.Param{{Name: "says", Required: true, Says: "What is said to it."}}, h.sayTakes...),
+					Answer: h.sayAnswer,
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/say"},
 				},
 				{
-					Name:  "am",
-					Does:  h.amDoes,
-					Gives: h.amGives,
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: at},
+					Name:   "am",
+					Does:   h.amDoes,
+					Answer: h.amAnswer,
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: at},
 				},
 				{
 					Name:   "session",
@@ -138,28 +140,35 @@ func (s *QNTXServer) harnessAm(h *harness) (any, *protocol.Refusal) {
 		return nil, refused
 	}
 	in := agent.in(h)
-	is := map[string]any{"did": agent.did, "session": "", "answering": false, h.pathKey: "", "not_ready": ""}
-	h.am(is)
+	is := agentIn{did: agent.did}
 	session, kept, err := agent.sessionIn(in.file)
 	if err != nil {
-		is["not_ready"] = err.Error()
+		is.notReady = err.Error()
 	} else if kept {
-		is["session"] = session
+		is.session = session
 	}
 	// A first turn is in a session not kept yet, and is read all the same.
 	if going := in.answering.Load(); going != nil {
-		is["answering"], is["session"] = true, going.session
+		is.answering, is.session = true, going.session
 	}
 	// Asked without waiting: a fetch still going is said, not sat through.
 	switch path, arrived, err := s.harnessHeldBy(h.name).Now(); {
 	case !arrived:
-		is["not_ready"] = h.fetching
+		is.notReady = h.fetching
 	case err != nil:
-		is["not_ready"] = err.Error()
+		is.notReady = err.Error()
 	default:
-		is[h.pathKey] = path
+		is.path = path
 	}
-	return is, nil
+	return h.am(is), nil
+}
+
+// agentIn is what am says of the agent in every harness: its DID, the session
+// it continues, whether it is in a turn, where the harness's binary is, and
+// why it cannot be spoken to when it cannot.
+type agentIn struct {
+	did, session, path, notReady string
+	answering                    bool
 }
 
 // harnessSession reads the agent's session in h from where it is written, so
