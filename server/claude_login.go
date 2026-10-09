@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/claudecode"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 )
@@ -132,7 +133,7 @@ func (s *QNTXServer) loginAgent(ctx context.Context, h *harness, agent *rootAgen
 	agent.signingIn.pending, agent.signingIn.cancel = in, cancel
 	agent.signingIn.mu.Unlock()
 	// A window that closes with no code leaves nothing pending.
-	go func() {
+	sacred.Go("claude.login.window", func() {
 		<-window.Done()
 		agent.signingIn.mu.Lock()
 		defer agent.signingIn.mu.Unlock()
@@ -140,7 +141,7 @@ func (s *QNTXServer) loginAgent(ctx context.Context, h *harness, agent *rootAgen
 			agent.signingIn.unended = in.Abandon()
 			agent.signingIn.pending, agent.signingIn.cancel = nil, nil
 		}
-	}()
+	})
 	return s.signedIn(ctx, binary, agent.home, in.URL)
 }
 
