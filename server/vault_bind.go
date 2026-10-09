@@ -121,15 +121,8 @@ func (s *QNTXServer) vaultDirs(_ context.Context, sent sigil.Sent) (any, *protoc
 	return &protocol.VaultDirs{Dirs: dirs}, nil
 }
 
-// vaultOwner is one user or organization the App is installed on.
-type vaultOwner struct {
-	Login        string `json:"login"`
-	Type         string `json:"type"`
-	Installation int64  `json:"installation"`
-}
-
 func (s *QNTXServer) vaultOwners(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
-	owners := []vaultOwner{}
+	owners := []*protocol.VaultOwner{}
 	for page := int64(1); ; page++ {
 		answered, err := s.gitHubService().ListInstallationsForTheAuthenticatedApp(ctx,
 			&protocol.GitHubListInstallationsForTheAuthenticatedAppRequest{PerPage: githubPage, Page: page})
@@ -141,7 +134,7 @@ func (s *QNTXServer) vaultOwners(ctx context.Context, _ sigil.Sent) (any, *proto
 		}
 		for _, installation := range answered.GetItems() {
 			account := installation.GetAccount().GetFields()
-			owners = append(owners, vaultOwner{
+			owners = append(owners, &protocol.VaultOwner{
 				Login:        account["login"].GetStringValue(),
 				Type:         account["type"].GetStringValue(),
 				Installation: installation.GetId(),
@@ -151,8 +144,8 @@ func (s *QNTXServer) vaultOwners(ctx context.Context, _ sigil.Sent) (any, *proto
 			break
 		}
 	}
-	slices.SortFunc(owners, func(a, b vaultOwner) int { return strings.Compare(a.Login, b.Login) })
-	return map[string]any{"owners": owners}, nil
+	slices.SortFunc(owners, func(a, b *protocol.VaultOwner) int { return strings.Compare(a.GetLogin(), b.GetLogin()) })
+	return &protocol.VaultOwners{Owners: owners}, nil
 }
 
 func (s *QNTXServer) vaultRepos(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -320,17 +313,6 @@ func (s *QNTXServer) vaultSwitch(ctx context.Context, sent sigil.Sent, disable b
 	return s.vaultList(ctx, sent)
 }
 
-// vaultFolderState is what one folder a vault holds is now.
-type vaultFolderState struct {
-	Folder string `json:"folder"`
-	Place  string `json:"place"`
-	State  string `json:"state"`
-	Why    string `json:"why"`
-	// Branch is the branch the folder sends to, and Pull its open pull request.
-	Branch string `json:"branch"`
-	Pull   string `json:"pull"`
-}
-
 // "what should a valid binding show? that its active, green dot,"
 const (
 	vaultActive   = "active"
@@ -344,7 +326,7 @@ const (
 // "it should show red, and have you redo the binding"
 
 // foldersState is what an enabled folder whose place is on the box is now.
-func (s *QNTXServer) foldersState(ctx context.Context, vault Vault, source buildSource, place string, state *vaultFolderState) {
+func (s *QNTXServer) foldersState(ctx context.Context, vault Vault, source buildSource, place string, state *protocol.VaultFolderState) {
 	defaultBranch, err := s.repoDefaultBranch(ctx, source.Owner, source.Repo)
 	if err != nil {
 		state.State, state.Why = vaultInvalid, err.Error()
@@ -381,10 +363,10 @@ func (s *QNTXServer) vaultStates(ctx context.Context, sent sigil.Sent) (any, *pr
 	if refused != nil {
 		return nil, refused
 	}
-	states := []vaultFolderState{}
+	states := []*protocol.VaultFolderState{}
 	for _, folder := range vault.Folders {
 		repo, place, named := strings.Cut(folder, "=")
-		state := vaultFolderState{Folder: folder, Place: place, State: vaultActive}
+		state := &protocol.VaultFolderState{Folder: folder, Place: place, State: vaultActive}
 		if !named {
 			state.State, state.Why = vaultInvalid, folder+" names no place in the vault: owner/repo@branch:path=place"
 			states = append(states, state)
@@ -406,9 +388,9 @@ func (s *QNTXServer) vaultStates(ctx context.Context, sent sigil.Sent) (any, *pr
 			// Disabled does nothing, so nothing is asked of GitHub for it.
 			state.State = vaultDisabled
 		default:
-			s.foldersState(ctx, vault, source, place, &state)
+			s.foldersState(ctx, vault, source, place, state)
 		}
 		states = append(states, state)
 	}
-	return map[string]any{"folders": states}, nil
+	return &protocol.VaultStates{Folders: states}, nil
 }

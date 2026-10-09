@@ -377,3 +377,60 @@ message VaultSubdirs {
   // folder is bound to.
   string branch = 2;
 }
+
+// Vault is one vault as the node keeps it: where its copy is on the box, and
+// each folder it holds as owner/repo@branch:path=place, place being in the
+// vault. Mirrors server.Vault, the record the node keeps.
+message Vault {
+  string name = 1;
+  string path = 2;
+  repeated string folders = 3;
+  // Each place whose folder is still bound and does nothing.
+  repeated string disabled = 4;
+  // By place, the branch the vault's changes there are committed to. A place
+  // not in it sends nothing: it is opted into, never assumed.
+  map<string, string> sends = 5;
+}
+
+// Vaults is what vault list answers, and what every vault sigil that changes
+// one answers after it.
+message Vaults {
+  // Every vault the node keeps now, one per vault: its name, its path on the
+  // box, and its folders as owner/repo@branch:path=place.
+  repeated Vault vaults = 1;
+}
+
+// VaultOwner is one user or organization the App is installed on.
+message VaultOwner {
+  string login = 1;
+  string type = 2;
+  // GitHub's id, 64 bits, so text in JSON.
+  int64 installation = 3;
+}
+
+// VaultOwners is what vault owners answers.
+message VaultOwners {
+  // One per installation: its login, whether it is a User or an Organization,
+  // and the installation's id.
+  repeated VaultOwner owners = 1;
+}
+
+// VaultFolderState is what one folder a vault holds is now.
+message VaultFolderState {
+  string folder = 1;
+  string place = 2;
+  string state = 3;
+  string why = 4;
+  // The branch the folder sends to, and pull its open pull request.
+  string branch = 5;
+  string pull = 6;
+}
+
+// VaultStates is what vault states answers.
+message VaultStates {
+  // One per folder: the folder as owner/repo@branch:path=place, its place,
+  // its state (active, disabled, invalid, changes or unchanged), why when
+  // invalid, the branch it sends to, and its open pull request.
+  repeated VaultFolderState folders = 1;
+}
+

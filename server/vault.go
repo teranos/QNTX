@@ -164,10 +164,10 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 			Name: "vault",
 			Sigils: []*protocol.Sigil{
 				{
-					Name:  "list",
-					Does:  "Every Obsidian vault the node keeps a copy of: where the copy is on the box, and the folders of repositories it holds.",
-					Gives: []*protocol.Field{{Name: "vaults", Says: "One per vault: its name, its path on the box, and its folders as owner/repo@branch:path=place."}},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath},
+					Name:   "list",
+					Does:   "Every Obsidian vault the node keeps a copy of: where the copy is on the box, and the folders of repositories it holds.",
+					Answer: "protocol.Vaults",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath},
 				},
 				{
 					Name: "set",
@@ -177,8 +177,8 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 						{Name: "path", Required: true, Says: "Where the vault's copy is on the box: an absolute path."},
 						{Name: "folders", Says: "Each folder the vault holds as owner/repo@branch:path=place, the place being where in the vault it is, separated by spaces. None when not sent."},
 					},
-					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath},
+					Answer: "protocol.Vaults",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath},
 				},
 				{
 					Name:   "dirs",
@@ -188,10 +188,10 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/dirs"},
 				},
 				{
-					Name:  "owners",
-					Does:  "Each GitHub user and organization the node's GitHub App is installed on: where a vault's folder can be bound.",
-					Gives: []*protocol.Field{{Name: "owners", Says: "One per installation: its login, whether it is a User or an Organization, and the installation's id."}},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/owners"},
+					Name:   "owners",
+					Does:   "Each GitHub user and organization the node's GitHub App is installed on: where a vault's folder can be bound.",
+					Answer: "protocol.VaultOwners",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/owners"},
 				},
 				{
 					Name:   "repos",
@@ -219,8 +219,8 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 						{Name: "repo", Required: true, Says: "The repository, as owner/repo."},
 						{Name: "path", Required: true, Says: "The repository's folder, from its top, as subdirs gives it."},
 					},
-					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/bind"},
+					Answer: "protocol.Vaults",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/bind"},
 				},
 				{
 					Name: "unbind",
@@ -229,8 +229,8 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
 						{Name: "place", Required: true, Says: "The vault's folder, by its place in the vault."},
 					},
-					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/unbind"},
+					Answer: "protocol.Vaults",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/unbind"},
 				},
 				{
 					Name: "disable",
@@ -239,8 +239,8 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
 						{Name: "place", Required: true, Says: "The vault's folder, by its place in the vault."},
 					},
-					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/disable"},
+					Answer: "protocol.Vaults",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/disable"},
 				},
 				{
 					Name: "enable",
@@ -249,8 +249,8 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
 						{Name: "place", Required: true, Says: "The vault's folder, by its place in the vault."},
 					},
-					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/enable"},
+					Answer: "protocol.Vaults",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/enable"},
 				},
 				{
 					Name: "send",
@@ -260,15 +260,15 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 						{Name: "place", Required: true, Says: "The vault's folder, by its place in the vault."},
 						{Name: "branch", Says: "The branch to send to; not the default branch. None stops sending."},
 					},
-					Gives: []*protocol.Field{{Name: "vaults", Says: "Every vault the node keeps now."}},
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/send"},
+					Answer: "protocol.Vaults",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/send"},
 				},
 				{
-					Name:  "states",
-					Does:  "What each folder a vault holds is now: active, disabled, or invalid and why; one that sends is changes or unchanged. A folder is invalid when its folder in the vault is not on the box, its repository's default branch is no longer the one it was bound to, its repository's folder is not on that branch, or the App cannot reach the repository.",
-					Takes: []*protocol.Param{{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."}},
-					Gives: []*protocol.Field{{Name: "folders", Says: "One per folder: the folder as owner/repo@branch:path=place, its place, its state (active, disabled, invalid, changes or unchanged), why when invalid, the branch it sends to, and its open pull request."}},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/states"},
+					Name:   "states",
+					Does:   "What each folder a vault holds is now: active, disabled, or invalid and why; one that sends is changes or unchanged. A folder is invalid when its folder in the vault is not on the box, its repository's default branch is no longer the one it was bound to, its repository's folder is not on that branch, or the App cannot reach the repository.",
+					Takes:  []*protocol.Param{{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."}},
+					Answer: "protocol.VaultStates",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: vaultPath + "/states"},
 				},
 			},
 		},
@@ -286,7 +286,11 @@ func (s *QNTXServer) vaultList(context.Context, sigil.Sent) (any, *protocol.Refu
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return map[string]any{"vaults": vaults}, nil
+	answer := &protocol.Vaults{Vaults: make([]*protocol.Vault, 0, len(vaults))}
+	for _, v := range vaults {
+		answer.Vaults = append(answer.Vaults, &protocol.Vault{Name: v.Name, Path: v.Path, Folders: v.Folders, Disabled: v.Disabled, Sends: v.Sends})
+	}
+	return answer, nil
 }
 
 func (s *QNTXServer) vaultSet(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {

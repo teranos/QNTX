@@ -108,7 +108,7 @@ describe('the vault is its folders', () => {
 describe('a folder is bound by clicking', () => {
     test('owner, repository, folder, and two presses of Confirm', async () => {
         answers = {
-            '/api/vault/owners': { owners: [{ login: 'abcd-nl', type: 'Organization', installation: 7 }, { login: 'abcd', type: 'User', installation: 8 }] },
+            '/api/vault/owners': { owners: [{ login: 'abcd-nl', type: 'Organization', installation: '7' }, { login: 'abcd', type: 'User', installation: '8' }] },
             '/api/vault/repos?installation=7': { repos: ['abcd-nl/clean'] },
             '/api/vault/subdirs?repo=abcd-nl%2Fclean&path=': { dirs: ['cdr', 'docs'], branch: 'trunk' },
             '/api/vault/subdirs?repo=abcd-nl%2Fclean&path=docs': { dirs: ['docs/adr'], branch: 'trunk' },
