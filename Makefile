@@ -67,13 +67,14 @@ sacred-error: ## Fail on any dropped failure this branch adds (.golangci.yml, cl
 	@# ats-duckdb needs libduckdb, qntx-reduce-plugin builds only through Nix.
 	@# tagcheck first: golangci reads only what its build-tags list lets it, so a
 	@# wrong list makes everything after it a pass over less code than ships.
-	@# spawncheck last, and over the whole tree rather than the branch — the
-	@# count it holds is a debt, and merge-base cannot see a debt.
+	@# spawncheck and nilcheck last, and over the whole tree rather than the
+	@# branch — the count each holds is a debt, and merge-base cannot see a debt.
 	@nix develop .#default --command bash -c '\
 		set -e; \
 		go run ./internal/tools/tagcheck; \
 		golangci-lint run --issues-exit-code 2 --new-from-merge-base origin/main ./...; \
 		go run ./internal/tools/spawncheck; \
+		go run ./internal/tools/nilcheck; \
 		export RUSTFLAGS=-Dwarnings; \
 		cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets || exit 2; \
 		cargo clippy --package ats-duckdb --all-targets || exit 2'
