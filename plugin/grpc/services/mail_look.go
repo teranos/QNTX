@@ -31,9 +31,9 @@ type look struct {
 	barHeight, barPadding, barBorder, barGap string // .title-bar
 	titleColor, titleSize, titleWeight       string // .title-bar > .symbol + span
 
-	windowPadding                     string // .element-window-content
+	windowPadding                    string // .element-window-content
 	contentPadding, size, lineHeight string // .element-content
-	sectionGap                        string // .element-section
+	sectionGap                       string // .element-section
 
 	headingMargin, headingPadding, headingSize, headingWeight, headingColor string // .element-section-title
 

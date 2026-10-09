@@ -1,6 +1,6 @@
 # default: branches and _ => arms, per file. Debt: each number may fall and may not rise.
 # Instead: name every case; an unknown value is refused, not let through.
-# 164 in 113 files.
+# 163 in 113 files.
 
 1	ats/parser/error.go
 1	ats/parser/temporal.go

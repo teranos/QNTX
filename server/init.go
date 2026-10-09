@@ -129,15 +129,19 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		unregister:    make(chan *Client),
 		logger:        serverLogger,
 		consoleBuffer: consoleBuffer,
-		rlAuth:        newRateLimitGroup(rl.AuthRate, rl.AuthBurst),
-		rlWS:          newRateLimitGroup(rl.WSRate, rl.WSBurst),
-		rlWrite:       newRateLimitGroup(rl.WriteRate, rl.WriteBurst),
-		rlRead:        newRateLimitGroup(rl.ReadRate, rl.ReadBurst),
-		rlPublic:      newRateLimitGroup(rl.PublicRate, rl.PublicBurst),
-		rlStaand:      newRateLimitGroup(rl.StaandRate, rl.StaandBurst),
-		rlOpened:      newRateLimitGroup(rl.OpenedRate, rl.OpenedBurst),
-		ctx:           ctx,
-		cancel:        cancel,
+		// What built-ins leave on the status row, and the handlers that failed:
+		// the node has both from its start, so nothing makes one when it is late.
+		news:            newNewsLog(),
+		handlerFailures: newHandlerFailureLog(),
+		rlAuth:          newRateLimitGroup(rl.AuthRate, rl.AuthBurst),
+		rlWS:            newRateLimitGroup(rl.WSRate, rl.WSBurst),
+		rlWrite:         newRateLimitGroup(rl.WriteRate, rl.WriteBurst),
+		rlRead:          newRateLimitGroup(rl.ReadRate, rl.ReadBurst),
+		rlPublic:        newRateLimitGroup(rl.PublicRate, rl.PublicBurst),
+		rlStaand:        newRateLimitGroup(rl.StaandRate, rl.StaandBurst),
+		rlOpened:        newRateLimitGroup(rl.OpenedRate, rl.OpenedBurst),
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 	server.verbosity.Store(int32(verbosity))
 	server.state.Store(int32(ServerStateRunning))

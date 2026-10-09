@@ -7,17 +7,22 @@ import (
 	"testing"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
 )
 
-const tokenDID = "did:key:ztoken"
+const (
+	tokenDID = "did:key:ztoken"
+	nodeDID  = "did:key:znode"
+)
 
 // writingAs posts one attestation through the real handler as the given caller.
 func writingAs(t *testing.T, caller *auth.Admission, body string) (ats.AttestationStore, *httptest.ResponseRecorder) {
 	t.Helper()
 	store, db := createTestStore(t)
-	s := &QNTXServer{nodeDB: db, logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{nodeDB: db, logger: zap.NewNop().Sugar(),
+		nodeDID: &nodedid.Handler{DID: nodeDID}}
 	s.held = servingOne(db, store)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/attestations", jsonBody(body))
@@ -103,5 +108,19 @@ func TestASessionAddsNoActor(t *testing.T) {
 	actors := actorsOf(t, store, rec)
 	if len(actors) != 1 || actors[0] != "tim" {
 		t.Fatalf("actors = %v, want only what the caller named", actors)
+	}
+}
+
+// "the node"
+//
+// authors what its caller named nobody for: a person naming no actor.
+func TestTheNodeAuthorsWhatACallerNamedNobodyFor(t *testing.T) {
+	session := auth.Admitted(auth.LevelSuper)
+	session.Identity = "https://mastodon.example/@tim"
+	store, rec := writingAs(t, &session, `{"subjects":["qntx"],"predicates":["noted"],"actors":[]}`)
+
+	actors := actorsOf(t, store, rec)
+	if len(actors) != 1 || actors[0] != nodeDID {
+		t.Fatalf("actors = %v, want the node's DID", actors)
 	}
 }

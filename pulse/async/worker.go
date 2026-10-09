@@ -155,17 +155,17 @@ func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *config.Conf
 	executor := NewRegistryExecutor(registry, nil) // No fallback - all job types should be registered
 
 	return &WorkerPool{
-		queue:         NewQueue(db),
-		rateLimiter:   rateLimiter,
-		db:            db,
-		cfg:           cfg,
-		poolConfig:    poolCfg, // Store for graceful start timing
-		workers:       poolCfg.Workers,
-		parentCtx:     ctx, // Store parent context for context recreation
-		ctx:           workerCtx,
-		cancel:        cancel,
-		executor:      executor,
-		logger:        pLogger,
+		queue:       NewQueue(db),
+		rateLimiter: rateLimiter,
+		db:          db,
+		cfg:         cfg,
+		poolConfig:  poolCfg, // Store for graceful start timing
+		workers:     poolCfg.Workers,
+		parentCtx:   ctx, // Store parent context for context recreation
+		ctx:         workerCtx,
+		cancel:      cancel,
+		executor:    executor,
+		logger:      pLogger,
 	}
 }
 

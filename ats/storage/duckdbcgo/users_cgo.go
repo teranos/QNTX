@@ -141,7 +141,7 @@ func (s *UserStore) Put(u access.User) error {
 	defer C.duckdb_storage_result_free(result)
 
 	if !bool(result.success) {
-		return failed(result.error_msg, "failed to write User %s",u.ID)
+		return failed(result.error_msg, "failed to write User %s", u.ID)
 	}
 	return nil
 }

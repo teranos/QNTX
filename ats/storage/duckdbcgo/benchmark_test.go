@@ -13,9 +13,10 @@ import (
 )
 
 // The ADR-024 minimum performance floor:
-//   30 attestations/s written, sustained for at least 10 seconds
-//   300 attestations/s read, sustained for at least 10 seconds
-//   attestation size: ~1 KB
+//
+//	30 attestations/s written, sustained for at least 10 seconds
+//	300 attestations/s read, sustained for at least 10 seconds
+//	attestation size: ~1 KB
 //
 // This test enforces the floor in CI against a file:// location. The Lightsail
 // benchmark against a real S3 bucket is a separate release-gate step (see ADR).

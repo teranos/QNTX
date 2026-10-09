@@ -38,7 +38,7 @@ func TestTASBotEnqueuesJob(t *testing.T) {
 		Source:      "speedrun_jd.html",
 		Status:      "queued",
 
-		CreatedAt:    time.Now(),
+		CreatedAt: time.Now(),
 	}
 
 	// TAS Bot enqueues the job
@@ -66,7 +66,7 @@ func TestYugiDequeuesJob(t *testing.T) {
 		Source:      "card_ability.html",
 		Status:      "queued",
 
-		CreatedAt:    time.Now(),
+		CreatedAt: time.Now(),
 	}
 	err := queue.Enqueue(job)
 	if err != nil {
@@ -106,18 +106,18 @@ func TestTASBotJobPriority(t *testing.T) {
 		Source:      "slow_strat.html",
 		Status:      "queued",
 
-		CreatedAt:    time.Now(),
+		CreatedAt: time.Now(),
 	}
 	queue.Enqueue(lowPriorityJob)
 
 	// TAS Bot enqueues high-priority job (after low-priority)
 	time.Sleep(10 * time.Millisecond) // Ensure different timestamps
 	highPriorityJob := &Job{
-		ID:           "JOB_HIGH_PRIORITY",
-		HandlerName:  "test.jd-extraction",
-		Source:       "fast_strat.html",
-		Status:       "queued",
-		CreatedAt:    time.Now(),
+		ID:          "JOB_HIGH_PRIORITY",
+		HandlerName: "test.jd-extraction",
+		Source:      "fast_strat.html",
+		Status:      "queued",
+		CreatedAt:   time.Now(),
 	}
 	queue.Enqueue(highPriorityJob)
 
@@ -172,7 +172,7 @@ func TestCronosPausedJob(t *testing.T) {
 		Source:      "paused.html",
 		Status:      "queued",
 
-		CreatedAt:    time.Now(),
+		CreatedAt: time.Now(),
 	}
 	queue.Enqueue(job)
 
@@ -216,7 +216,7 @@ func TestTASBotResumeJob(t *testing.T) {
 		Source:      "resume.html",
 		Status:      "queued",
 
-		CreatedAt:    time.Now(),
+		CreatedAt: time.Now(),
 	}
 	queue.Enqueue(job)
 
@@ -263,7 +263,7 @@ func TestYugiJobStateTransitions(t *testing.T) {
 		Source:      "transform.html",
 		Status:      "queued",
 
-		CreatedAt:    time.Now(),
+		CreatedAt: time.Now(),
 	}
 	queue.Enqueue(job)
 
@@ -303,7 +303,7 @@ func TestTASBotFailJob(t *testing.T) {
 		Source:      "fail.html",
 		Status:      "queued",
 
-		CreatedAt:    time.Now(),
+		CreatedAt: time.Now(),
 	}
 	queue.Enqueue(job)
 
@@ -327,11 +327,11 @@ func TestCronosScheduledJob(t *testing.T) {
 
 	// Cronos creates a job with scheduled status
 	job := &Job{
-		ID:           "JOB_SCHEDULED_001",
-		HandlerName:  "test.jd-extraction",
-		Source:       "future.html",
-		Status:       "scheduled",
-		CreatedAt:    time.Now(),
+		ID:          "JOB_SCHEDULED_001",
+		HandlerName: "test.jd-extraction",
+		Source:      "future.html",
+		Status:      "scheduled",
+		CreatedAt:   time.Now(),
 	}
 	queue.Enqueue(job)
 

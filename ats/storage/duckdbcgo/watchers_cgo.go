@@ -42,13 +42,13 @@ type WatcherRecord struct {
 
 	// The AX filter and the attribute filters travel as the JSON Go already
 	// speaks — nested shapes the crate has no reason to know the inside of.
-	FilterJSON              string  `json:"filter_json"`
-	AttributeFiltersJSON    string  `json:"attribute_filters_json"`
-	SemanticQuery           string  `json:"semantic_query"`
-	SemanticThreshold       float64 `json:"semantic_threshold"`
-	SemanticClusterID       *int64  `json:"semantic_cluster_id"`
-	UpstreamSemanticQuery   string  `json:"upstream_semantic_query"`
-	UpstreamSemanticThresh  float64 `json:"upstream_semantic_threshold"`
+	FilterJSON             string  `json:"filter_json"`
+	AttributeFiltersJSON   string  `json:"attribute_filters_json"`
+	SemanticQuery          string  `json:"semantic_query"`
+	SemanticThreshold      float64 `json:"semantic_threshold"`
+	SemanticClusterID      *int64  `json:"semantic_cluster_id"`
+	UpstreamSemanticQuery  string  `json:"upstream_semantic_query"`
+	UpstreamSemanticThresh float64 `json:"upstream_semantic_threshold"`
 }
 
 // Tally is what the counters used to hold, derived from the fire stream.

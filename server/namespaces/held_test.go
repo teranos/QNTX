@@ -200,7 +200,7 @@ func TestAUniverseHoldsItsOwnWatchers(t *testing.T) {
 	held.SetDefault(mustMake("default", nothing{}, watchersOf{namespace: "default"}))
 
 	for _, name := range []string{"clean", "harbour"} {
-		universe, err := held.Universe(auth.Admitted(auth.LevelRoot),name)
+		universe, err := held.Universe(auth.Admitted(auth.LevelRoot), name)
 		if err != nil {
 			t.Fatalf("%s was not served: %v", name, err)
 		}
@@ -243,17 +243,17 @@ func TestANamespaceStartsWhenItIsOpened(t *testing.T) {
 		started = append(started, u.Name())
 		// What a namespace starts may reach back for the namespace starting it,
 		// which deadlocks if the lock is still held.
-		if _, err := held.Universe(auth.Admitted(auth.LevelRoot),u.Name()); err != nil {
+		if _, err := held.Universe(auth.Admitted(auth.LevelRoot), u.Name()); err != nil {
 			t.Errorf("a starting namespace could not reach itself: %v", err)
 		}
 	})
 
 	for range 3 {
-		if _, err := held.Universe(auth.Admitted(auth.LevelRoot),"clean"); err != nil {
+		if _, err := held.Universe(auth.Admitted(auth.LevelRoot), "clean"); err != nil {
 			t.Fatalf("clean was not served: %v", err)
 		}
 	}
-	if _, err := held.Universe(auth.Admitted(auth.LevelRoot),"harbour"); err != nil {
+	if _, err := held.Universe(auth.Admitted(auth.LevelRoot), "harbour"); err != nil {
 		t.Fatalf("harbour was not served: %v", err)
 	}
 
@@ -405,7 +405,7 @@ func TestTwoCallersOfOneOpeningNamespaceShareOneOpen(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			u, err := held.Universe(auth.Admitted(auth.LevelRoot),"pond")
+			u, err := held.Universe(auth.Admitted(auth.LevelRoot), "pond")
 			assert.NoError(t, err)
 			got[i] = u
 		}()

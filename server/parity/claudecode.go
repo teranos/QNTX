@@ -11,6 +11,7 @@ import (
 
 // manifest.json is Anthropic's own for the pinned version: the one place the
 // sha256 of its binaries is written.
+//
 //go:embed claudecode_*/manifest.json
 var claudeCodePin embed.FS
 

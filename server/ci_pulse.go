@@ -743,9 +743,6 @@ func (s *QNTXServer) setupCIWatch() {
 	if s.daemon == nil {
 		return
 	}
-	if s.news == nil {
-		s.news = newNewsLog()
-	}
 	h := &ciWatchHandler{
 		get:      githubGet,
 		token:    githubToken,

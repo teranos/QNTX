@@ -35,8 +35,8 @@ func TestTASBotCreatesJob(t *testing.T) {
 		Source:      "speedrun_checkpoint.html",
 		Status:      "queued",
 
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	// TAS Bot saves the game state
@@ -64,8 +64,8 @@ func TestKirbyRetrievesJob(t *testing.T) {
 		Source:      "kirby_checkpoint.html",
 		Status:      "queued",
 
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	store.CreateJob(originalJob)
 
@@ -106,9 +106,9 @@ func TestTASBotUpdatesJob(t *testing.T) {
 		Source:      "update_test.html",
 		Status:      "queued",
 
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
-		Progress:     Progress{Current: 0, Total: 100},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Progress:  Progress{Current: 0, Total: 100},
 	}
 	store.CreateJob(job)
 
@@ -222,8 +222,8 @@ func TestKirbyDeletesJob(t *testing.T) {
 		Source:      "delete_me.html",
 		Status:      "failed",
 
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	store.CreateJob(job)
 
@@ -258,8 +258,8 @@ func TestTASBotParentJobHierarchy(t *testing.T) {
 		Source:      "parent.html",
 		Status:      "running",
 
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	store.CreateJob(parentJob)
 
@@ -352,9 +352,9 @@ func TestKirbyPulseStateStorage(t *testing.T) {
 		Source:      "pulse_test.html",
 		Status:      "running",
 
-		PulseState:   pulseState,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		PulseState: pulseState,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
 	}
 
 	err := store.CreateJob(job)
@@ -401,9 +401,9 @@ func TestTASBotAndKirbyStoreIntegration(t *testing.T) {
 		Source:      "integration_test.html",
 		Status:      "queued",
 
-		Progress:     Progress{Current: 0, Total: 100},
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		Progress:  Progress{Current: 0, Total: 100},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	store.CreateJob(job)
 

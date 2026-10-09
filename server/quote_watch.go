@@ -195,9 +195,6 @@ func (s *QNTXServer) setupQuoteProvenance() {
 	if s.daemon == nil {
 		return
 	}
-	if s.news == nil {
-		s.news = newNewsLog()
-	}
 	s.daemon.Registry().Register(&quoteHandler{
 		prompts:  s.namespacePrompts,
 		news:     s.news,
