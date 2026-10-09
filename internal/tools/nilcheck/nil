@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3041 in 381 files.
+# 3038 in 381 files.
 
 6	ai/provider/grpc_client.go
 2	ai/tracker/usage_tracker.go
@@ -219,7 +219,7 @@
 12	server/auth/github_token.go
 2	server/auth/google.go
 9	server/auth/handlers.go
-31	server/auth/handlers_tokens.go
+28	server/auth/handlers_tokens.go
 5	server/auth/handlers_users.go
 3	server/auth/homeward.go
 25	server/auth/invitation.go
