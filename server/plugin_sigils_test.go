@@ -447,9 +447,14 @@ func TestThePanelIsToldEachSigilAndWhoReachesIt(t *testing.T) {
 	assert.Equal(t, "/api/stub/read", read.Path)
 	assert.Equal(t, []string{"competitor"}, read.Takes[0].GetOneOf())
 	for _, surface := range []string{"http", "mcp", "a2a"} {
-		assert.Equal(t, reached{Levels: []string{}, Roles: []string{}}, read.Reach[surface],
-			"a plugin sigil no line opens is ROOT's only, over "+surface)
+		who := read.Reach[surface]
+		assert.False(t, who.GetAnyone(), "a plugin sigil no line opens is ROOT's only, over "+surface)
+		assert.Empty(t, who.GetLevels(), "a plugin sigil no line opens is ROOT's only, over "+surface)
+		assert.Empty(t, who.GetRoles(), "a plugin sigil no line opens is ROOT's only, over "+surface)
 	}
+
+	holds(t, srv.pluginsSignum(), "list", &protocol.PluginsList{
+		Plugins: []*protocol.PluginInfo{{Name: "stub", Sigils: rows}}})
 
 	p.signa = []*protocol.Signum{stubSignum("staands")}
 	rows, refused = srv.pluginSigilRows("stub")

@@ -22,7 +22,7 @@ type PluginHandler struct {
 	health func() (map[string]plugin.HealthStatus, time.Time, string)
 	// sigils is one plugin's sigils, with who reaches each, and why any signum
 	// it handed is not served. Nil on a node that serves no plugin sigils.
-	sigils func(name string) ([]sigilRow, []string)
+	sigils func(name string) ([]*protocol.SigilRow, []string)
 	// records is every plugin the node knows, running or not. Nil lists only
 	// what the registry holds.
 	records func() ([]plugingrpc.PluginRecord, error)
@@ -35,9 +35,10 @@ func NewPluginHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 }
 
 // list is every installed plugin and its status: plugins_list's answer.
-func (h *PluginHandler) list() map[string]any {
+func (h *PluginHandler) list() *protocol.PluginsList {
+	answer := &protocol.PluginsList{Plugins: []*protocol.PluginInfo{}}
 	if h.registry == nil {
-		return map[string]any{"plugins": []any{}}
+		return answer
 	}
 
 	// Read the last probe rather than making one. Probing here cost gRPC calls
@@ -45,41 +46,11 @@ func (h *PluginHandler) list() map[string]any {
 	healthResults, probedAt, probeFailure := h.health()
 	stateResults := h.registry.GetAllStates()
 
-	type PluginInfo struct {
-		Name        string `json:"name"`
-		Version     string `json:"version"`
-		QNTXVersion string `json:"qntx_version,omitempty"`
-		Description string `json:"description"`
-		Author      string `json:"author,omitempty"`
-		License     string `json:"license,omitempty"`
-		Healthy     bool   `json:"healthy"`
-		// Probed is whether the last probe saw this plugin. Unprobed is not
-		// unhealthy: it started after the probe was taken.
-		Probed   bool           `json:"probed"`
-		Message  string         `json:"message,omitempty"`
-		Details  map[string]any `json:"details,omitempty"`
-		State    string         `json:"state"`
-		Pausable bool           `json:"pausable"`
-		// ModuleDigest identifies the element module this plugin serves, so the
-		// browser can import a replaced one instead of the module record it
-		// already holds for that URL. Empty for anything not serving a module.
-		ModuleDigest string `json:"module_digest,omitempty"`
-		// Sigils is what the plugin does, as the node serves it (ADR-039), and
-		// SignaRefused is why a signum it handed is served nowhere.
-		Sigils       []sigilRow `json:"sigils,omitempty"`
-		SignaRefused []string   `json:"signa_refused,omitempty"`
-		// Repo and Enabled are the plugin's record: where it was added from,
-		// and whether it is switched on.
-		Repo    string `json:"repo,omitempty"`
-		Enabled bool   `json:"enabled"`
-	}
-
 	known := map[string]plugingrpc.PluginRecord{}
-	var recordsFailure string
 	if h.records != nil {
 		held, err := h.records()
 		if err != nil {
-			recordsFailure = err.Error()
+			answer.RecordsFailure = err.Error()
 		}
 		for _, record := range held {
 			known[record.Name] = record
@@ -89,8 +60,6 @@ func (h *PluginHandler) list() map[string]any {
 	// A plugin that serves a canvas module can say which one. Asked of the
 	// interface, so the answer does not depend on how the plugin is run.
 	type moduleDigester interface{ ModuleDigest() string }
-
-	plugins := make([]PluginInfo, 0)
 
 	// Include all known plugins — both fully registered and failed/loading
 	seen := make(map[string]bool)
@@ -105,17 +74,17 @@ func (h *PluginHandler) list() map[string]any {
 		health, probed := healthResults[name]
 		state := stateResults[name]
 
-		info := PluginInfo{
+		info := &protocol.PluginInfo{
 			Name:        meta.Name,
 			Version:     meta.Version,
-			QNTXVersion: meta.QNTXVersion,
+			QntxVersion: meta.QNTXVersion,
 			Description: meta.Description,
 			Author:      meta.Author,
 			License:     meta.License,
 			Healthy:     health.Healthy,
 			Probed:      probed,
 			Message:     health.Message,
-			Details:     health.Details,
+			Details:     healthDetails(health.Details),
 			State:       string(state),
 			Pausable:    h.registry.IsPausable(name),
 		}
@@ -126,7 +95,7 @@ func (h *PluginHandler) list() map[string]any {
 			info.Sigils, info.SignaRefused = h.sigils(name)
 		}
 		info.Repo, info.Enabled = known[name].Repo, known[name].Enabled
-		plugins = append(plugins, info)
+		answer.Plugins = append(answer.Plugins, info)
 	}
 
 	// Add pre-registered plugins that failed to load (not in plugins map)
@@ -135,7 +104,7 @@ func (h *PluginHandler) list() map[string]any {
 			continue
 		}
 		state := stateResults[name]
-		info := PluginInfo{
+		info := &protocol.PluginInfo{
 			Name:  name,
 			State: string(state),
 		}
@@ -144,7 +113,7 @@ func (h *PluginHandler) list() map[string]any {
 		}
 		seen[name] = true
 		info.Repo, info.Enabled = known[name].Repo, known[name].Enabled
-		plugins = append(plugins, info)
+		answer.Plugins = append(answer.Plugins, info)
 	}
 
 	// Every added plugin the registry does not hold: disabled, or enabled and
@@ -154,80 +123,67 @@ func (h *PluginHandler) list() map[string]any {
 			continue
 		}
 		record := known[name]
-		info := PluginInfo{Name: name, State: "disabled", Repo: record.Repo, Enabled: record.Enabled}
+		info := &protocol.PluginInfo{Name: name, State: "disabled", Repo: record.Repo, Enabled: record.Enabled}
 		if record.Enabled {
 			info.State = string(plugin.StateFailed)
 			if errMsg, ok := h.registry.GetError(name); ok {
 				info.Message = errMsg
 			}
 		}
-		plugins = append(plugins, info)
+		answer.Plugins = append(answer.Plugins, info)
 	}
 
 	// Health here is a probe with an age. Saying when it was taken is what keeps
 	// a stale answer from reading as a current one.
-	response := map[string]any{
-		"plugins": plugins,
-	}
 	if !probedAt.IsZero() {
-		response["health_probed_at"] = probedAt.UTC().Format(time.RFC3339)
-		response["health_age_ms"] = time.Since(probedAt).Milliseconds()
+		answer.Health = &protocol.PluginHealthProbe{
+			ProbedAt: probedAt.UTC().Format(time.RFC3339),
+			AgeMs:    float64(time.Since(probedAt).Milliseconds()),
+		}
 	}
-	if probeFailure != "" {
-		response["health_probe_failure"] = probeFailure
+	answer.HealthProbeFailure = probeFailure
+	return answer
+}
+
+// healthDetails is what a plugin's health said besides, as gRPC carries it:
+// each value formatted the way the plugin's side formats it (grpc/server.go).
+func healthDetails(details map[string]any) map[string]string {
+	said := make(map[string]string, len(details))
+	for key, value := range details {
+		said[key] = fmt.Sprintf("%v", value)
 	}
-	if recordsFailure != "" {
-		response["records_failure"] = recordsFailure
-	}
-	return response
+	return said
 }
 
 // routes is what each running plugin serves: plugins_routes's answer.
-func (h *PluginHandler) routes() map[string]any {
+func (h *PluginHandler) routes() *protocol.PluginRoutes {
+	answer := &protocol.PluginRoutes{Routes: []*protocol.PluginRoute{}}
 	if h.registry == nil {
-		return map[string]any{"routes": []any{}}
+		return answer
 	}
 
-	type RouteEndpoint struct {
-		Method      string `json:"method"`
-		Path        string `json:"path"`
-		Description string `json:"description,omitempty"`
-	}
-
-	type PluginRoute struct {
-		Name      string          `json:"name"`
-		HTTP      string          `json:"http"`
-		WebSocket string          `json:"ws,omitempty"`
-		Roles     []string        `json:"roles,omitempty"`
-		Handlers  []string        `json:"handlers,omitempty"`
-		Schedules int             `json:"schedules,omitempty"`
-		Watchers  int             `json:"watchers,omitempty"`
-		Endpoints []RouteEndpoint `json:"endpoints,omitempty"`
-	}
-
-	routes := make([]PluginRoute, 0)
 	for _, name := range h.registry.List() {
 		p, ok := h.registry.Get(name)
 		if !ok {
 			continue
 		}
 
-		route := PluginRoute{
+		route := &protocol.PluginRoute{
 			Name: name,
-			HTTP: "/api/" + name + "/",
+			Http: "/api/" + name + "/",
 		}
 
 		// Check WebSocket registration
 		wsHandlers, err := p.RegisterWebSocket()
 		if err == nil && len(wsHandlers) > 0 {
-			route.WebSocket = "/ws/" + name
+			route.Ws = "/ws/" + name
 		}
 
 		// Check capabilities via type assertion to ExternalDomainProxy
 		if proxy, ok := p.(*plugingrpc.ExternalDomainProxy); ok {
 			if proxy.IsLLMProvider() {
 				route.Roles = append(route.Roles, "llm-provider")
-				route.Endpoints = append(route.Endpoints, RouteEndpoint{
+				route.Endpoints = append(route.Endpoints, &protocol.RouteEndpoint{
 					Method:      "POST",
 					Path:        "/api/prompt/direct",
 					Description: "LLM inference via " + name + " (set \"provider\": \"" + name + "\" in request body)",
@@ -240,14 +196,14 @@ func (h *PluginHandler) routes() map[string]any {
 				route.Roles = append(route.Roles, "embedding-provider")
 			}
 			route.Handlers = proxy.GetHandlerNames()
-			route.Schedules = len(proxy.GetSchedules())
-			route.Watchers = len(proxy.GetWatchers())
+			route.Schedules = uint32(len(proxy.GetSchedules()))
+			route.Watchers = uint32(len(proxy.GetWatchers()))
 		}
 
-		routes = append(routes, route)
+		answer.Routes = append(answer.Routes, route)
 	}
 
-	return map[string]any{"routes": routes}
+	return answer
 }
 
 // elements is the element definitions running plugins make: plugins_elements's

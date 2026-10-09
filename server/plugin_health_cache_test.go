@@ -42,16 +42,22 @@ func TestTheAnswerSaysWhenItWasProbed(t *testing.T) {
 		})
 
 	said := answeredAsJSON(t, h.list())
-	if said["health_probed_at"] == nil {
+	health, ok := said["health"].(map[string]any)
+	if !ok {
+		t.Fatalf("the answer does not say when it was probed: %v", said["health"])
+	}
+	if health["probed_at"] == "" {
 		t.Error("the answer does not say when it was probed")
 	}
-	age, ok := said["health_age_ms"].(float64)
+	age, ok := health["age_ms"].(float64)
 	if !ok {
-		t.Fatalf("health_age_ms missing or not a number: %v", said["health_age_ms"])
+		t.Fatalf("age_ms missing or not a number: %v", health["age_ms"])
 	}
 	if age < 89_000 {
-		t.Errorf("health_age_ms = %v, want at least 89000", age)
+		t.Errorf("age_ms = %v, want at least 89000", age)
 	}
+	holds(t, (&QNTXServer{}).pluginsSignum(), "list", h.list())
+	holds(t, (&QNTXServer{}).pluginsSignum(), "routes", h.routes())
 }
 
 // An empty result set with nothing said reads as "no plugins". The handler
@@ -71,7 +77,7 @@ func TestAnUnansweredProbeIsSaidRatherThanHidden(t *testing.T) {
 // answeredAsJSON is an answer as the surfaces carry it: marshalled.
 func answeredAsJSON(t *testing.T, answer any) map[string]any {
 	t.Helper()
-	body, err := json.Marshal(answer)
+	body, err := answerJSON(answer)
 	if err != nil {
 		t.Fatalf("answer does not marshal: %v", err)
 	}

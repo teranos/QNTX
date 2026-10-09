@@ -312,12 +312,12 @@
 21	server/plugin_build.go
 8	server/plugin_check.go
 12	server/plugin_config_handlers.go
-10	server/plugin_handlers.go
+8	server/plugin_handlers.go
 2	server/plugin_health_cache.go
 3	server/plugin_log_handlers.go
 4	server/plugin_records.go
 2	server/plugin_roots.go
-25	server/plugin_sigils.go
+24	server/plugin_sigils.go
 1	server/plugin_stores.go
 33	server/prompt_handlers.go
 2	server/prose_handlers.go
