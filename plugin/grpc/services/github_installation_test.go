@@ -190,16 +190,16 @@ func TestWhatAnswersWithACredentialIsNotAskedByName(t *testing.T) {
 	assert.Empty(t, *seen)
 
 	for _, op := range GitHubOperations() {
-		assert.NotEqual(t, "CreateAnInstallationAccessTokenForAnApp", op.Name)
+		assert.NotEqual(t, "CreateAnInstallationAccessTokenForAnApp", op.GetOperation())
 	}
 }
 
 // What can be asked is listed, each with where it goes on GitHub and what it takes.
 func TestGitHubServiceListsWhatCanBeAsked(t *testing.T) {
-	var pulls *GitHubOperation
+	var pulls *protocol.GitHubOperation
 	for _, op := range GitHubOperations() {
-		if op.Name == "CreateAPullRequest" {
-			pulls = &op
+		if op.GetOperation() == "CreateAPullRequest" {
+			pulls = op
 			break
 		}
 	}

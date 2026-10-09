@@ -478,3 +478,117 @@ message GitHubWebhookPath {
   // The whole URL to paste into the App's webhook settings now.
   string url = 1;
 }
+
+// GitHubCoreRate is GitHub's core rate limit for a namespace's token.
+message GitHubCoreRate {
+  uint32 limit = 1;
+  uint32 remaining = 2;
+  // RFC 3339, to the nanosecond.
+  string reset = 3;
+}
+
+// GitHubNamespace is one namespace's GitHub as the element shows it.
+message GitHubNamespace {
+  string namespace = 1;
+  string source = 2;
+  string login = 3;
+  string minted_by = 4;
+  bool revoked = 5;
+  bool auth_ok = 6;
+  string auth_error = 7;
+  // Null when GitHub did not say.
+  GitHubCoreRate rate = 8;
+}
+
+// TakenBuild is one plugin build the runner made and the node took. Mirrors
+// grpc.TakenBuild.
+message TakenBuild {
+  string plugin = 1;
+  string archive = 2;
+  string digest = 3;
+  // RFC 3339, to the nanosecond.
+  string at = 4;
+  bool changed = 5;
+  // A build that landed before the installed one was installed, and so is not
+  // installed over it.
+  bool older = 6;
+}
+
+// RunnerStats is the runner as its directory says it is now. Mirrors
+// grpc.RunnerStats.
+message RunnerStats {
+  string path = 1;
+  string name = 2;
+  string github_url = 3;
+  repeated string workspaces = 4;
+  // When each job the runner ran was last written, oldest first, each RFC
+  // 3339 to the nanosecond.
+  repeated string jobs = 5;
+  repeated TakenBuild taken = 6;
+}
+
+// GitHubRunner is the runner as the Actions section shows it.
+message GitHubRunner {
+  string path = 1;
+  bool enabled = 2;
+  string error = 3;
+  // Null when the runner is off or not watched yet.
+  RunnerStats stats = 4;
+}
+
+// PluginBuild is what QNTX knows of a plugin it builds itself. Mirrors
+// server.PluginBuildState.
+message PluginBuild {
+  repeated string revs = 1;
+  string digest = 2;
+  // RFC 3339, to the nanosecond.
+  string at = 3;
+  bool changed = 4;
+  string error = 5;
+}
+
+// GitHubStatus is the whole of what the GitHub element shows: what github
+// status answers.
+message GitHubStatus {
+  // Whether GitHub is on for the node.
+  bool enabled = 1;
+  // One row per namespace with a GitHub token: its source, whether GitHub
+  // accepts it, and its rate limit.
+  repeated GitHubNamespace namespaces = 2;
+  // The runner's path, whether it is on, why it is not running when it is
+  // not, and its stats.
+  GitHubRunner runner = 3;
+  // Per plugin QNTX builds itself: the revs it was last built from, when,
+  // whether that changed the plugin, and what failed.
+  map<string, PluginBuild> builds = 4;
+  // Whether ROOT generated the App's webhook secret, which is what opens the
+  // webhook's path.
+  bool webhook = 5;
+  // Where the App's webhook URL points on this node.
+  string webhook_path = 6;
+  // The whole URL to paste into the App's webhook settings.
+  string webhook_url = 7;
+}
+
+// GitHubRunnerSet is what github runner answers.
+message GitHubRunnerSet {
+  // The runner as the Actions section shows it.
+  GitHubRunner runner = 1;
+}
+
+// GitHubOperation is one thing GitHubService can be asked: where it goes on
+// GitHub and the fields it takes, by GitHub's own names for them.
+message GitHubOperation {
+  string operation = 1;
+  string method = 2;
+  string path = 3;
+  repeated string takes = 4;
+}
+
+// GitHubOperations is what github operations answers.
+message GitHubOperations {
+  // One row per operation: its name, its method and path on GitHub, and what
+  // it takes.
+  repeated GitHubOperation operations = 1;
+}
+

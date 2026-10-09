@@ -30,12 +30,10 @@ func githubAskSigils() []*protocol.Sigil {
 			Http: &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/ask"},
 		},
 		{
-			Name: "operations",
-			Does: "Everything github ask can be asked: each operation's name, where it goes on GitHub and the fields it takes.",
-			Gives: []*protocol.Field{
-				{Name: "operations", Says: "One row per operation: its name, its method and path on GitHub, and what it takes."},
-			},
-			Http: &protocol.Endpoint{Method: http.MethodGet, Path: githubPath + "/operations"},
+			Name:   "operations",
+			Does:   "Everything github ask can be asked: each operation's name, where it goes on GitHub and the fields it takes.",
+			Answer: "protocol.GitHubOperations",
+			Http:   &protocol.Endpoint{Method: http.MethodGet, Path: githubPath + "/operations"},
 		},
 	}
 }
@@ -76,5 +74,5 @@ func (s *QNTXServer) githubAsk(ctx context.Context, sent sigil.Sent) (any, *prot
 }
 
 func (s *QNTXServer) githubOperations(context.Context, sigil.Sent) (any, *protocol.Refusal) {
-	return map[string]any{"operations": services.GitHubOperations()}, nil
+	return &protocol.GitHubOperations{Operations: services.GitHubOperations()}, nil
 }
