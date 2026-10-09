@@ -8,6 +8,7 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/internal/sentryread"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -38,34 +39,27 @@ func (h *reportHandler) Execute(ctx context.Context, _ *async.Job) error {
 	return err
 }
 
-// reportSent is where the report went and what records it.
-type reportSent struct {
-	To            string `json:"to"`
-	MessageID     string `json:"message_id"`
-	AttestationID string `json:"attestation_id"`
-}
-
 // sendReport gathers the week ending now and mails it to the ROOT User.
-func (s *QNTXServer) sendReport(ctx context.Context) (reportSent, error) {
+func (s *QNTXServer) sendReport(ctx context.Context) (*protocol.MailReport, error) {
 	if s.nodeMailer == nil {
-		return reportSent{}, errors.New("the mail service did not start, so the report is not sent")
+		return nil, errors.New("the mail service did not start, so the report is not sent")
 	}
 	root, found, err := s.authHandler.RootUser()
 	if err != nil {
-		return reportSent{}, errors.Wrap(err, "the report has nobody to go to")
+		return nil, errors.Wrap(err, "the report has nobody to go to")
 	}
 	if !found {
-		return reportSent{}, errors.New("nobody has claimed this node, so there is no ROOT User to report to")
+		return nil, errors.New("nobody has claimed this node, so there is no ROOT User to report to")
 	}
 
 	reader, why := s.sentryReader(ctx)
 	r := s.gatherReport(ctx, time.Now().UTC(), reader, why)
 	mail, err := renderReport(r)
 	if err != nil {
-		return reportSent{}, errors.Wrap(err, "the report could not be rendered")
+		return nil, errors.Wrap(err, "the report could not be rendered")
 	}
 	messageID, attestationID, err := s.nodeMailer.SendAsNode(ctx, root.ID, mail)
-	sent := reportSent{To: root.PrimaryEmail(), MessageID: messageID, AttestationID: attestationID}
+	sent := &protocol.MailReport{To: root.PrimaryEmail(), MessageId: messageID, AttestationId: attestationID}
 	if err != nil {
 		return sent, errors.Wrapf(err, "the report to the ROOT User %s was not sent", root.ID)
 	}

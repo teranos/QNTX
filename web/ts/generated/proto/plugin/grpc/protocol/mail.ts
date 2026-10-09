@@ -77,3 +77,171 @@ export interface SendMailResponse {
   /** The attestation of the mail. */
   attestation_id: string;
 }
+
+/** MailRow is one mail the node sent or tried to, as the sent list names it. */
+export interface MailRow {
+  id: string;
+  /** RFC 3339, to the nanosecond. */
+  at: string;
+  user: string;
+  to: string;
+  plugin: string;
+  template: string;
+  subject: string;
+  sent: boolean;
+  message_id: string;
+  error: string;
+}
+
+/** MailSent is what mail sent answers. */
+export interface MailSent {
+  /**
+   * One row per mail: its attestation, when, the User, the address it went
+   * to, the plugin, the template, the subject, whether it was sent, and the
+   * transport's message id or its refusal.
+   */
+  mails: MailRow[];
+}
+
+/**
+ * MailKeptImage is one image a mail's html shows by cid, whole, as the mail's
+ * attestation keeps it: its data base64.
+ */
+export interface MailKeptImage {
+  content_id: string;
+  content_type: string;
+  data: string;
+}
+
+/**
+ * MailWhole is one mail whole, as it was sent: a MailRow's fields, then what
+ * the mail itself held. Its row is not nested, as the view reads it.
+ */
+export interface MailWhole {
+  id: string;
+  at: string;
+  user: string;
+  to: string;
+  plugin: string;
+  template: string;
+  subject: string;
+  sent: boolean;
+  message_id: string;
+  error: string;
+  from: string;
+  html: string;
+  text: string;
+  images: MailKeptImage[];
+}
+
+/** MailMessage is what mail message answers. */
+export interface MailMessage {
+  /**
+   * The mail: its row in the sent list, the address it was sent from, its
+   * html and text, and each image the html shows by cid, whole, as base64. A
+   * mail attested before its images were kept names none.
+   */
+  mail: MailWhole | undefined;
+}
+
+/** MailTemplateRow is one template mail is filled from. */
+export interface MailTemplateRow {
+  id: string;
+  /** RFC 3339, to the nanosecond. */
+  at: string;
+  plugin: string;
+  version: string;
+  name: string;
+  subject: string;
+  html: string;
+  text: string;
+  values: string[];
+}
+
+/** NodeMail is one mail the node writes itself, whole. */
+export interface NodeMail {
+  name: string;
+  says: string;
+}
+
+/** MailTemplates is what mail templates answers. */
+export interface MailTemplates {
+  /**
+   * QNTX's own template, filled when a plugin names none: its subject, html
+   * and text, and the values it takes.
+   */
+  neutral:
+    | MailTemplateRow
+    | undefined;
+  /**
+   * QNTX's own template drawn as a QNTX window, filled when a plugin names
+   * dark: its subject, html and text, and the values it takes.
+   */
+  dark:
+    | MailTemplateRow
+    | undefined;
+  /**
+   * One row per plugin and name: its attestation, when it was set, the
+   * plugin, its version, the name, and the subject, html and text.
+   */
+  templates: MailTemplateRow[];
+  /**
+   * The mail the node writes itself, whole: not filled from any template, and
+   * named here so it is not missing.
+   */
+  node: NodeMail[];
+}
+
+/** MailSES is mail.ses as the node was wired with it. */
+export interface MailSES {
+  enabled: boolean;
+  region: string;
+}
+
+/** SESAccount is what SES says of the account, as it is now. */
+export interface SESAccount {
+  region: string;
+  production_access: boolean;
+  sending_enabled: boolean;
+  enforcement_status: string;
+  max_24_hour_send: number;
+  max_send_rate: number;
+  sent_last_24_hours: number;
+}
+
+/** MailAccount is what mail account answers. */
+export interface MailAccount {
+  /** mail.from: the address every mail is sent from. Empty sends nothing. */
+  from: string;
+  /** mail.ses: whether SES is enabled, and the region am.toml names. */
+  ses:
+    | MailSES
+    | undefined;
+  /**
+   * What SES says of the account now: its region, production access, whether
+   * sending is enabled, its enforcement status, the 24-hour quota, how much of
+   * it is spent, and the send rate. Null when SES was not asked or did not
+   * say.
+   */
+  account:
+    | SESAccount
+    | undefined;
+  /**
+   * Why there is no account: SES is not enabled, or what SES said instead.
+   * Empty when it answered.
+   */
+  unanswered: string;
+}
+
+/**
+ * MailReport is where the report went and what records it: what mail report
+ * answers.
+ */
+export interface MailReport {
+  /** The address it went to: the ROOT User's primary one. */
+  to: string;
+  /** The id the transport gave the mail. */
+  message_id: string;
+  /** The attestation of the mail. */
+  attestation_id: string;
+}

@@ -26,7 +26,7 @@ func TestTheVaultReachesTheBranchItIsToldTo(t *testing.T) {
 	assert.Empty(t, stand.commits)
 	assert.Empty(t, stand.pulls)
 	got, _ := askVault(t, s, "states", sigil.Sent{"name": "abcd"})
-	state := got.(map[string]any)["folders"].([]vaultFolderState)[0]
+	state := got.(*protocol.VaultStates).GetFolders()[0]
 	assert.Equal(t, vaultUnchanged, state.State)
 	assert.Equal(t, "obsidian-abcd", state.Branch)
 
@@ -50,7 +50,7 @@ func TestTheVaultReachesTheBranchItIsToldTo(t *testing.T) {
 	assert.Equal(t, "# ADR-001\n\nAs main has it.\n", mainNotes["docs/adr/ADR-001.md"], "main is changed by merging, never by the vault")
 
 	got, _ = askVault(t, s, "states", sigil.Sent{"name": "abcd"})
-	state = got.(map[string]any)["folders"].([]vaultFolderState)[0]
+	state = got.(*protocol.VaultStates).GetFolders()[0]
 	assert.Equal(t, vaultChanges, state.State)
 	assert.Equal(t, "https://github.com/abcd-nl/clean/pull/1", state.Pull)
 
@@ -74,7 +74,7 @@ func TestAFolderStopsSending(t *testing.T) {
 	assert.Empty(t, s.sendVault(t.Context(), "abcd", everyPlace))
 	assert.Empty(t, stand.commits)
 	got, _ := askVault(t, s, "states", sigil.Sent{"name": "abcd"})
-	assert.Equal(t, vaultActive, got.(map[string]any)["folders"].([]vaultFolderState)[0].State)
+	assert.Equal(t, vaultActive, got.(*protocol.VaultStates).GetFolders()[0].State)
 }
 
 // "i dont want that to be automatically opted in,"
@@ -116,7 +116,7 @@ func TestASendThatFailedIsWhatTheFolderIs(t *testing.T) {
 	_, refused = askVault(t, s, "send", sigil.Sent{"name": "abcd", "place": "Course Material", "branch": "docs"})
 	require.Nil(t, refused, "%v", refused)
 	got, _ := askVault(t, s, "states", sigil.Sent{"name": "abcd"})
-	state := got.(map[string]any)["folders"].([]vaultFolderState)[0]
+	state := got.(*protocol.VaultStates).GetFolders()[0]
 	assert.Equal(t, vaultInvalid, state.State)
 	assert.Contains(t, state.Why, "Reference update failed")
 	assert.Equal(t, "docs", state.Branch)
@@ -148,7 +148,7 @@ func TestABindingWhoseDefaultBranchMovedIsInvalid(t *testing.T) {
 
 	got, refused := askVault(t, s, "states", sigil.Sent{"name": "abcd"})
 	require.Nil(t, refused, "%v", refused)
-	state := got.(map[string]any)["folders"].([]vaultFolderState)[0]
+	state := got.(*protocol.VaultStates).GetFolders()[0]
 	assert.Equal(t, vaultInvalid, state.State)
 	assert.Equal(t, "the default branch of abcd-nl/clean is now trunk, not main: bind Course Material again", state.Why)
 }

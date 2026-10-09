@@ -2389,6 +2389,379 @@ func (x *VaultSubdirs) GetBranch() string {
 	return ""
 }
 
+// Vault is one vault as the node keeps it: where its copy is on the box, and
+// each folder it holds as owner/repo@branch:path=place, place being in the
+// vault. Mirrors server.Vault, the record the node keeps.
+type Vault struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Name    string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Path    string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Folders []string               `protobuf:"bytes,3,rep,name=folders,proto3" json:"folders,omitempty"`
+	// Each place whose folder is still bound and does nothing.
+	Disabled []string `protobuf:"bytes,4,rep,name=disabled,proto3" json:"disabled,omitempty"`
+	// By place, the branch the vault's changes there are committed to. A place
+	// not in it sends nothing: it is opted into, never assumed.
+	Sends         map[string]string `protobuf:"bytes,5,rep,name=sends,proto3" json:"sends,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Vault) Reset() {
+	*x = Vault{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Vault) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Vault) ProtoMessage() {}
+
+func (x *Vault) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Vault.ProtoReflect.Descriptor instead.
+func (*Vault) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *Vault) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Vault) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *Vault) GetFolders() []string {
+	if x != nil {
+		return x.Folders
+	}
+	return nil
+}
+
+func (x *Vault) GetDisabled() []string {
+	if x != nil {
+		return x.Disabled
+	}
+	return nil
+}
+
+func (x *Vault) GetSends() map[string]string {
+	if x != nil {
+		return x.Sends
+	}
+	return nil
+}
+
+// Vaults is what vault list answers, and what every vault sigil that changes
+// one answers after it.
+type Vaults struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Every vault the node keeps now, one per vault: its name, its path on the
+	// box, and its folders as owner/repo@branch:path=place.
+	Vaults        []*Vault `protobuf:"bytes,1,rep,name=vaults,proto3" json:"vaults,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Vaults) Reset() {
+	*x = Vaults{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Vaults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Vaults) ProtoMessage() {}
+
+func (x *Vaults) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Vaults.ProtoReflect.Descriptor instead.
+func (*Vaults) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *Vaults) GetVaults() []*Vault {
+	if x != nil {
+		return x.Vaults
+	}
+	return nil
+}
+
+// VaultOwner is one user or organization the App is installed on.
+type VaultOwner struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Login string                 `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
+	Type  string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	// GitHub's id, 64 bits, so text in JSON.
+	Installation  int64 `protobuf:"varint,3,opt,name=installation,proto3" json:"installation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VaultOwner) Reset() {
+	*x = VaultOwner{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VaultOwner) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VaultOwner) ProtoMessage() {}
+
+func (x *VaultOwner) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VaultOwner.ProtoReflect.Descriptor instead.
+func (*VaultOwner) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *VaultOwner) GetLogin() string {
+	if x != nil {
+		return x.Login
+	}
+	return ""
+}
+
+func (x *VaultOwner) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *VaultOwner) GetInstallation() int64 {
+	if x != nil {
+		return x.Installation
+	}
+	return 0
+}
+
+// VaultOwners is what vault owners answers.
+type VaultOwners struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One per installation: its login, whether it is a User or an Organization,
+	// and the installation's id.
+	Owners        []*VaultOwner `protobuf:"bytes,1,rep,name=owners,proto3" json:"owners,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VaultOwners) Reset() {
+	*x = VaultOwners{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VaultOwners) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VaultOwners) ProtoMessage() {}
+
+func (x *VaultOwners) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VaultOwners.ProtoReflect.Descriptor instead.
+func (*VaultOwners) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *VaultOwners) GetOwners() []*VaultOwner {
+	if x != nil {
+		return x.Owners
+	}
+	return nil
+}
+
+// VaultFolderState is what one folder a vault holds is now.
+type VaultFolderState struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Folder string                 `protobuf:"bytes,1,opt,name=folder,proto3" json:"folder,omitempty"`
+	Place  string                 `protobuf:"bytes,2,opt,name=place,proto3" json:"place,omitempty"`
+	State  string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	Why    string                 `protobuf:"bytes,4,opt,name=why,proto3" json:"why,omitempty"`
+	// The branch the folder sends to, and pull its open pull request.
+	Branch        string `protobuf:"bytes,5,opt,name=branch,proto3" json:"branch,omitempty"`
+	Pull          string `protobuf:"bytes,6,opt,name=pull,proto3" json:"pull,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VaultFolderState) Reset() {
+	*x = VaultFolderState{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VaultFolderState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VaultFolderState) ProtoMessage() {}
+
+func (x *VaultFolderState) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VaultFolderState.ProtoReflect.Descriptor instead.
+func (*VaultFolderState) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *VaultFolderState) GetFolder() string {
+	if x != nil {
+		return x.Folder
+	}
+	return ""
+}
+
+func (x *VaultFolderState) GetPlace() string {
+	if x != nil {
+		return x.Place
+	}
+	return ""
+}
+
+func (x *VaultFolderState) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *VaultFolderState) GetWhy() string {
+	if x != nil {
+		return x.Why
+	}
+	return ""
+}
+
+func (x *VaultFolderState) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
+func (x *VaultFolderState) GetPull() string {
+	if x != nil {
+		return x.Pull
+	}
+	return ""
+}
+
+// VaultStates is what vault states answers.
+type VaultStates struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One per folder: the folder as owner/repo@branch:path=place, its place,
+	// its state (active, disabled, invalid, changes or unchanged), why when
+	// invalid, the branch it sends to, and its open pull request.
+	Folders       []*VaultFolderState `protobuf:"bytes,1,rep,name=folders,proto3" json:"folders,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VaultStates) Reset() {
+	*x = VaultStates{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VaultStates) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VaultStates) ProtoMessage() {}
+
+func (x *VaultStates) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VaultStates.ProtoReflect.Descriptor instead.
+func (*VaultStates) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *VaultStates) GetFolders() []*VaultFolderState {
+	if x != nil {
+		return x.Folders
+	}
+	return nil
+}
+
 var File_plugin_grpc_protocol_server_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
@@ -2681,7 +3054,35 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x05repos\x18\x01 \x03(\tR\x05repos\":\n" +
 	"\fVaultSubdirs\x12\x12\n" +
 	"\x04dirs\x18\x01 \x03(\tR\x04dirs\x12\x16\n" +
-	"\x06branch\x18\x02 \x01(\tR\x06branchB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\x06branch\x18\x02 \x01(\tR\x06branch\"\xd1\x01\n" +
+	"\x05Vault\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x18\n" +
+	"\afolders\x18\x03 \x03(\tR\afolders\x12\x1a\n" +
+	"\bdisabled\x18\x04 \x03(\tR\bdisabled\x120\n" +
+	"\x05sends\x18\x05 \x03(\v2\x1a.protocol.Vault.SendsEntryR\x05sends\x1a8\n" +
+	"\n" +
+	"SendsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"1\n" +
+	"\x06Vaults\x12'\n" +
+	"\x06vaults\x18\x01 \x03(\v2\x0f.protocol.VaultR\x06vaults\"Z\n" +
+	"\n" +
+	"VaultOwner\x12\x14\n" +
+	"\x05login\x18\x01 \x01(\tR\x05login\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12\"\n" +
+	"\finstallation\x18\x03 \x01(\x03R\finstallation\";\n" +
+	"\vVaultOwners\x12,\n" +
+	"\x06owners\x18\x01 \x03(\v2\x14.protocol.VaultOwnerR\x06owners\"\x94\x01\n" +
+	"\x10VaultFolderState\x12\x16\n" +
+	"\x06folder\x18\x01 \x01(\tR\x06folder\x12\x14\n" +
+	"\x05place\x18\x02 \x01(\tR\x05place\x12\x14\n" +
+	"\x05state\x18\x03 \x01(\tR\x05state\x12\x10\n" +
+	"\x03why\x18\x04 \x01(\tR\x03why\x12\x16\n" +
+	"\x06branch\x18\x05 \x01(\tR\x06branch\x12\x12\n" +
+	"\x04pull\x18\x06 \x01(\tR\x04pull\"C\n" +
+	"\vVaultStates\x124\n" +
+	"\afolders\x18\x01 \x03(\v2\x1a.protocol.VaultFolderStateR\afoldersB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_server_proto_rawDescOnce sync.Once
@@ -2695,7 +3096,7 @@ func file_plugin_grpc_protocol_server_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_server_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
 var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*DaemonStatusMessage)(nil),            // 0: protocol.DaemonStatusMessage
 	(*AsyncJobProgress)(nil),               // 1: protocol.AsyncJobProgress
@@ -2724,35 +3125,46 @@ var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*VaultDirs)(nil),                      // 24: protocol.VaultDirs
 	(*VaultRepos)(nil),                     // 25: protocol.VaultRepos
 	(*VaultSubdirs)(nil),                   // 26: protocol.VaultSubdirs
-	nil,                                    // 27: protocol.JobUpdateMessage.MetadataEntry
-	nil,                                    // 28: protocol.RichSearchMatch.AttributesEntry
-	nil,                                    // 29: protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	nil,                                    // 30: protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	nil,                                    // 31: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	(*Attestation)(nil),                    // 32: protocol.Attestation
+	(*Vault)(nil),                          // 27: protocol.Vault
+	(*Vaults)(nil),                         // 28: protocol.Vaults
+	(*VaultOwner)(nil),                     // 29: protocol.VaultOwner
+	(*VaultOwners)(nil),                    // 30: protocol.VaultOwners
+	(*VaultFolderState)(nil),               // 31: protocol.VaultFolderState
+	(*VaultStates)(nil),                    // 32: protocol.VaultStates
+	nil,                                    // 33: protocol.JobUpdateMessage.MetadataEntry
+	nil,                                    // 34: protocol.RichSearchMatch.AttributesEntry
+	nil,                                    // 35: protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	nil,                                    // 36: protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	nil,                                    // 37: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	nil,                                    // 38: protocol.Vault.SendsEntry
+	(*Attestation)(nil),                    // 39: protocol.Attestation
 }
 var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
 	1,  // 0: protocol.AsyncJob.progress:type_name -> protocol.AsyncJobProgress
 	2,  // 1: protocol.AsyncJob.pulse_state:type_name -> protocol.AsyncJobPulseState
 	3,  // 2: protocol.JobUpdateMessage.job:type_name -> protocol.AsyncJob
-	27, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
-	28, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
+	33, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
+	34, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
 	6,  // 5: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
 	13, // 6: protocol.LLMStreamMessage.signal:type_name -> protocol.LLMTokenSignal
 	11, // 7: protocol.SamplerStageSignal.top_k:type_name -> protocol.LLMTokenCandidate
 	11, // 8: protocol.LLMTokenSignal.top_k:type_name -> protocol.LLMTokenCandidate
 	12, // 9: protocol.LLMTokenSignal.sampler_stages:type_name -> protocol.SamplerStageSignal
-	32, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
+	39, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
 	14, // 11: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
-	29, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	30, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	31, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	20, // 15: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
-	16, // [16:16] is the sub-list for method output_type
-	16, // [16:16] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	35, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	36, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	37, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	38, // 15: protocol.Vault.sends:type_name -> protocol.Vault.SendsEntry
+	27, // 16: protocol.Vaults.vaults:type_name -> protocol.Vault
+	29, // 17: protocol.VaultOwners.owners:type_name -> protocol.VaultOwner
+	31, // 18: protocol.VaultStates.folders:type_name -> protocol.VaultFolderState
+	20, // 19: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_server_proto_init() }
@@ -2774,7 +3186,7 @@ func file_plugin_grpc_protocol_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_server_proto_rawDesc), len(file_plugin_grpc_protocol_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   32,
+			NumMessages:   39,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

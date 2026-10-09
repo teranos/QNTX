@@ -520,3 +520,76 @@ export interface VaultSubdirs {
    */
   branch: string;
 }
+
+/**
+ * Vault is one vault as the node keeps it: where its copy is on the box, and
+ * each folder it holds as owner/repo@branch:path=place, place being in the
+ * vault. Mirrors server.Vault, the record the node keeps.
+ */
+export interface Vault {
+  name: string;
+  path: string;
+  folders: string[];
+  /** Each place whose folder is still bound and does nothing. */
+  disabled: string[];
+  /**
+   * By place, the branch the vault's changes there are committed to. A place
+   * not in it sends nothing: it is opted into, never assumed.
+   */
+  sends: { [key: string]: string };
+}
+
+export interface Vault_SendsEntry {
+  key: string;
+  value: string;
+}
+
+/**
+ * Vaults is what vault list answers, and what every vault sigil that changes
+ * one answers after it.
+ */
+export interface Vaults {
+  /**
+   * Every vault the node keeps now, one per vault: its name, its path on the
+   * box, and its folders as owner/repo@branch:path=place.
+   */
+  vaults: Vault[];
+}
+
+/** VaultOwner is one user or organization the App is installed on. */
+export interface VaultOwner {
+  login: string;
+  type: string;
+  /** GitHub's id, 64 bits, so text in JSON. */
+  installation: number;
+}
+
+/** VaultOwners is what vault owners answers. */
+export interface VaultOwners {
+  /**
+   * One per installation: its login, whether it is a User or an Organization,
+   * and the installation's id.
+   */
+  owners: VaultOwner[];
+}
+
+/** VaultFolderState is what one folder a vault holds is now. */
+export interface VaultFolderState {
+  folder: string;
+  place: string;
+  state: string;
+  why: string;
+  /** The branch the folder sends to, and pull its open pull request. */
+  branch: string;
+  pull: string;
+}
+
+/** VaultStates is what vault states answers. */
+export interface VaultStates {
+  /**
+   * One per folder: the folder as owner/repo@branch:path=place, its place,
+   * its state (active, disabled, invalid, changes or unchanged), why when
+   * invalid, the branch it sends to, and its open pull request.
+   */
+  folders: VaultFolderState[];
+}

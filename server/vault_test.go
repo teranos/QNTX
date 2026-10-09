@@ -199,7 +199,9 @@ func TestAVaultFolderIsBoundByClicking(t *testing.T) {
 
 	got, refused = askVault(t, s, "owners", sigil.Sent{})
 	require.Nil(t, refused, "%v", refused)
-	assert.Equal(t, []vaultOwner{{Login: "abcd-nl", Type: "Organization", Installation: 7}}, got.(map[string]any)["owners"])
+	owners := got.(*protocol.VaultOwners).GetOwners()
+	require.Len(t, owners, 1)
+	assert.Equal(t, []any{"abcd-nl", "Organization", int64(7)}, []any{owners[0].GetLogin(), owners[0].GetType(), owners[0].GetInstallation()})
 
 	got, refused = askVault(t, s, "repos", sigil.Sent{"installation": "7"})
 	require.Nil(t, refused, "%v", refused)
@@ -272,12 +274,12 @@ func TestADisabledFolderStaysBound(t *testing.T) {
 	assert.Equal(t, []string{"Course Material"}, vaults[0].Disabled)
 	got, refused := askVault(t, s, "states", sigil.Sent{"name": "abcd"})
 	require.Nil(t, refused, "%v", refused)
-	assert.Equal(t, vaultDisabled, got.(map[string]any)["folders"].([]vaultFolderState)[0].State)
+	assert.Equal(t, vaultDisabled, got.(*protocol.VaultStates).GetFolders()[0].State)
 
 	_, refused = askVault(t, s, "enable", sigil.Sent{"name": "abcd", "place": "Course Material"})
 	require.Nil(t, refused, "%v", refused)
 	got, _ = askVault(t, s, "states", sigil.Sent{"name": "abcd"})
-	assert.Equal(t, vaultActive, got.(map[string]any)["folders"].([]vaultFolderState)[0].State)
+	assert.Equal(t, vaultActive, got.(*protocol.VaultStates).GetFolders()[0].State)
 
 	_, refused = askVault(t, s, "disable", sigil.Sent{"name": "abcd", "place": "ABCD"})
 	require.NotNil(t, refused)
@@ -299,7 +301,7 @@ func TestEachBoundFolderSaysWhetherItIsActive(t *testing.T) {
 
 	got, refused := askVault(t, s, "states", sigil.Sent{"name": "abcd"})
 	require.Nil(t, refused, "%v", refused)
-	states := got.(map[string]any)["folders"].([]vaultFolderState)
+	states := got.(*protocol.VaultStates).GetFolders()
 	require.Len(t, states, 4)
 	assert.Equal(t, vaultActive, states[0].State)
 	assert.Empty(t, states[0].Why)
