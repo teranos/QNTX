@@ -404,7 +404,11 @@ type Corresponds struct {
 	// protocol.Arrival.path
 	Field string `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
 	// WebsiteEvent.urlPath
-	Column        string `protobuf:"bytes,2,opt,name=column,proto3" json:"column,omitempty"`
+	Column string `protobuf:"bytes,2,opt,name=column,proto3" json:"column,omitempty"`
+	// A repeated field held as one object, a property per element, names here
+	// the element's field each property is named by: protocol.Sigil.takes is
+	// Tool.inputSchema, a property per Param, keyed by name.
+	KeyedBy       string `protobuf:"bytes,3,opt,name=keyed_by,json=keyedBy,proto3" json:"keyed_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -449,6 +453,13 @@ func (x *Corresponds) GetField() string {
 func (x *Corresponds) GetColumn() string {
 	if x != nil {
 		return x.Column
+	}
+	return ""
+}
+
+func (x *Corresponds) GetKeyedBy() string {
+	if x != nil {
+		return x.KeyedBy
 	}
 	return ""
 }
@@ -827,10 +838,11 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x02of\x18\x04 \x01(\tR\x02of\"X\n" +
 	"\aFollows\x12\x1c\n" +
 	"\treference\x18\x01 \x01(\tR\treference\x12/\n" +
-	"\acolumns\x18\x02 \x03(\v2\x15.protocol.CorrespondsR\acolumns\";\n" +
+	"\acolumns\x18\x02 \x03(\v2\x15.protocol.CorrespondsR\acolumns\"V\n" +
 	"\vCorresponds\x12\x14\n" +
 	"\x05field\x18\x01 \x01(\tR\x05field\x12\x16\n" +
-	"\x06column\x18\x02 \x01(\tR\x06column\"\xa5\x01\n" +
+	"\x06column\x18\x02 \x01(\tR\x06column\x12\x19\n" +
+	"\bkeyed_by\x18\x03 \x01(\tR\akeyedBy\"\xa5\x01\n" +
 	"\x05Sigil\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04does\x18\x02 \x01(\tR\x04does\x12%\n" +

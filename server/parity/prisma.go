@@ -151,9 +151,29 @@ var kindFits = map[protoreflect.Kind][]string{
 
 // departs says how a field's kind and cardinality differ from the column it is
 // followed into. A map is held as one row per entry, so it may be followed into
-// a model's single-valued columns.
-func departs(field protoreflect.FieldDescriptor, name string, column Column, fits func(protoreflect.Kind, Column) bool) []string {
+// a model's single-valued columns. A repeated field keyed by a field of its
+// element is held as one object, a property per element, so it is followed
+// into a single-valued column; what it is keyed by is held to the element.
+func departs(field protoreflect.FieldDescriptor, name, keyedBy string, column Column, fits func(protoreflect.Kind, Column) bool) []string {
 	var reasons []string
+	if keyedBy != "" {
+		switch {
+		case field.IsMap() || !field.IsList() || field.Kind() != protoreflect.MessageKind:
+			reasons = append(reasons, fmt.Sprintf("keyed by %s, and %s is not a repeated message", keyedBy, name))
+		default:
+			key := field.Message().Fields().ByName(protoreflect.Name(keyedBy))
+			if key == nil || key.IsList() || key.Kind() != protoreflect.StringKind {
+				reasons = append(reasons, fmt.Sprintf("keyed by %s, and %s has no text field %s", keyedBy, field.Message().FullName(), keyedBy))
+			}
+		}
+		if column.List {
+			reasons = append(reasons, fmt.Sprintf("a list in the schema, and %s keyed by %s is one object", name, keyedBy))
+		}
+		if !fits(field.Kind(), column) {
+			reasons = append(reasons, fmt.Sprintf("%s in the schema, and %s is %s", column.Type, name, field.Kind()))
+		}
+		return reasons
+	}
 	if field.IsMap() {
 		if column.List {
 			reasons = append(reasons, fmt.Sprintf("a list in the schema, and %s is a map", name))
@@ -390,7 +410,7 @@ func Hold(signum *protocol.Signum, named, reference string, schema Schema) (Pari
 		if column.fits != nil {
 			fits = column.fits
 		}
-		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), column, fits)...)
+		departures[c.GetColumn()] = append(departures[c.GetColumn()], departs(fd, c.GetField(), c.GetKeyedBy(), column, fits)...)
 	}
 	for message := range scope {
 		if _, ok := messages[message]; ok {

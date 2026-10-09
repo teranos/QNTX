@@ -303,7 +303,7 @@ func TestAPluginsSigilIsATool(t *testing.T) {
 	admits := func(_ string, _ auth.Reach, next http.HandlerFunc) http.HandlerFunc { return next }
 	everyone := func(string, heldBy) (auth.Reach, bool) { return auth.Reach{}, true }
 	answered := overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), read,
-		map[string]any{"kind": "competitor"}, true)
+		map[string]any{"kind": "competitor"}, givenAsSchema(read.sigil))
 	require.False(t, answered.IsError, textOf(t, answered))
 	assert.JSONEq(t, `{"observed":false}`, textOf(t, answered))
 }
@@ -346,7 +346,7 @@ func TestAPluginsDeclaredRoutesAreItsSigils(t *testing.T) {
 	admits := func(_ string, _ auth.Reach, next http.HandlerFunc) http.HandlerFunc { return next }
 	everyone := func(string, heldBy) (auth.Reach, bool) { return auth.Reach{}, true }
 	ask := func(args map[string]any) *mcp.CallToolResult {
-		return overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), zoek, args, false)
+		return overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), zoek, args, nil)
 	}
 
 	answered := ask(map[string]any{"naam": "acme", "filter": map[string]any{"plaats": "Amsterdam"}})

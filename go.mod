@@ -15,6 +15,7 @@ require (
 	// still reads. Anything from v0.46.0 up stops this module compiling.
 	github.com/getsentry/sentry-go v0.45.1
 	github.com/go-webauthn/webauthn v0.15.0
+	github.com/google/jsonschema-go v0.4.3
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/go-getter v1.8.4
@@ -50,7 +51,6 @@ require (
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/gobuffalo/pop/v6 v6.1.1 // indirect
 	github.com/golang/mock v1.6.0 // indirect
-	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
 	github.com/mattn/goveralls v0.0.12 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect

@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
 // A JSON Schema's shape: a property of each form the pinned MCP schema writes.
@@ -147,5 +149,34 @@ func TestReference_MCP(t *testing.T) {
 	}
 	if icons := tool.Columns[3]; !icons.List || icons.Type != "Icon" {
 		t.Errorf("icons is %+v", icons)
+	}
+}
+
+// A repeated field keyed by a field of its element is one object, a property
+// per element: it is followed into an object without departing, and what it is
+// keyed by is held to the element.
+func TestHold_KeyedBy(t *testing.T) {
+	signum := &protocol.Signum{Name: "s", Follows: []*protocol.Follows{{Reference: "ref", Columns: []*protocol.Corresponds{
+		{Field: "protocol.Sigil.takes", Column: "Seen.shape", KeyedBy: "name"},
+		{Field: "protocol.Sigil.gives", Column: "Seen._meta", KeyedBy: "nope"},
+		{Field: "protocol.Sigil.name", Column: "Seen.anything", KeyedBy: "name"},
+		{Field: "protocol.Sigil.takes", Column: "Seen.tags", KeyedBy: "name"},
+		{Field: "protocol.Sigil.does", Column: "Seen.visit"},
+	}}}}
+	p, refused := Hold(signum, "", "ref", readJSON(t, jsonShapes))
+	if refused != nil {
+		t.Fatal(refused)
+	}
+	if i := itemOf(t, p, "Seen", "shape"); !i.Conforms() {
+		t.Errorf("a list keyed by name in an object departs: %v", i.Departs)
+	}
+	for column, want := range map[string]string{
+		"_meta":    "keyed by nope, and protocol.Field has no text field nope",
+		"anything": "keyed by name, and protocol.Sigil.name is not a repeated message",
+		"tags":     "a list in the schema, and protocol.Sigil.takes keyed by name is one object",
+	} {
+		if i := itemOf(t, p, "Seen", column); i.Conforms() || !strings.Contains(strings.Join(i.Departs, ";"), want) {
+			t.Errorf("%s departs by %v, not %q", column, i.Departs, want)
+		}
 	}
 }

@@ -63,11 +63,11 @@ func TestTheToolsAreTheSigilsAndTheRoutesServed(t *testing.T) {
 	assert.True(t, named["http_auth_tokens"], "the tokens ROOT and SUPER reach are not a tool")
 }
 
-// Nothing says which methods a route no sigil answers takes, so a call that
-// names none is refused before anything is asked.
-func TestARouteToolAskedWithoutAMethodIsRefused(t *testing.T) {
+// askingFor is an MCP client of the tools srv offers.
+func askingFor(t *testing.T, srv *QNTXServer) *mcp.ClientSession {
+	t.Helper()
 	ctx := context.Background()
-	server := servedForTest(t).mcpServerFor(httptest.NewRequest(http.MethodPost, "/mcp/", nil))
+	server := srv.mcpServerFor(httptest.NewRequest(http.MethodPost, "/mcp/", nil))
 	clientSide, serverSide := mcp.NewInMemoryTransports()
 	serving, err := server.Connect(ctx, serverSide, nil)
 	require.NoError(t, err)
@@ -75,11 +75,57 @@ func TestARouteToolAskedWithoutAMethodIsRefused(t *testing.T) {
 	asking, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "0"}, nil).Connect(ctx, clientSide, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = asking.Close() })
+	return asking
+}
 
-	result, err := asking.CallTool(ctx, &mcp.CallToolParams{Name: "http_api_types", Arguments: map[string]any{}})
+// Nothing says which methods a route no sigil answers takes, so a call that
+// names none is refused before anything is asked.
+func TestARouteToolAskedWithoutAMethodIsRefused(t *testing.T) {
+	result, err := askingFor(t, servedForTest(t)).CallTool(context.Background(), &mcp.CallToolParams{Name: "http_api_types", Arguments: map[string]any{}})
 	require.NoError(t, err)
 	assert.True(t, result.IsError)
-	assert.Contains(t, textOf(t, result), "needs a method")
+	assert.Contains(t, textOf(t, result), "does not take what was sent")
+	assert.Contains(t, textOf(t, result), "method")
+}
+
+// What a tool says it takes is what it takes: a call is held to its
+// inputSchema before anything is asked, so a number is not text and a method
+// is one of those it names.
+func TestAToolIsAskedOnlyWhatItSaysItTakes(t *testing.T) {
+	asking := askingFor(t, servedForTest(t))
+	for name, args := range map[string]map[string]any{
+		"parity_hold":    {"signum": 5},
+		"http_api_types": {"method": "FETCH"},
+	} {
+		result, err := asking.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
+		require.NoError(t, err)
+		assert.True(t, result.IsError, name+" was asked what it does not take")
+		assert.Contains(t, textOf(t, result), "invalid (arguments): "+name+" does not take what was sent")
+	}
+	held, err := asking.CallTool(context.Background(), &mcp.CallToolParams{Name: "parity_hold", Arguments: map[string]any{"signum": "parity", "reference": "mcp"}})
+	require.NoError(t, err)
+	assert.False(t, held.IsError, textOf(t, held))
+}
+
+// A field that names the message it carries is said in that message's shape,
+// as the answer marshals it: one, a list, or none, each field of its kind.
+func TestAFieldNamingItsMessageIsSaidInItsShape(t *testing.T) {
+	gives := givenAsSchema(&protocol.Sigil{Gives: []*protocol.Field{
+		{Name: "visits", Says: "The sittings.", Message: "protocol.Visit"},
+		{Name: "transcript", Says: "The session.", Message: "protocol.Transcript"},
+		{Name: "market", Says: "The market."},
+	}})
+	carried, err := json.Marshal(map[string]any{
+		"visits": []*protocol.Visit{{Visit: "v", Visitor: "p", DurationSeconds: 3, Views: 2, Bounce: true}},
+		"transcript": &protocol.Transcript{Session: "s", Subjects: []string{"a"}, Folded: 4,
+			Turns: []*protocol.Turn{{At: "t", Speaker: "person", Text: "hey"}}},
+		"market": 7,
+	})
+	require.NoError(t, err)
+	assert.NoError(t, heldTo(gives, carried), "what the answer marshals is not what the tool says it gives")
+	assert.NoError(t, heldTo(gives, []byte(`{"visits":null}`)), "none is what a field may carry")
+	assert.Error(t, heldTo(gives, []byte(`{"visits":[{"views":"2"}]}`)), "a count given as text")
+	assert.Error(t, heldTo(gives, []byte(`{"transcript":{"turns":[{"text":1}]}}`)), "a turn's text given as a number")
 }
 
 // A tool a client cannot read the shape of is a tool it cannot call.
@@ -326,7 +372,7 @@ func TestAToolGivesWhatItSaysItGives(t *testing.T) {
 	admits := func(_ string, _ auth.Reach, next http.HandlerFunc) http.HandlerFunc { return next }
 	everyone := func(string, heldBy) (auth.Reach, bool) { return auth.Reach{}, true }
 	ask := func() *mcp.CallToolResult {
-		return overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), given, nil, true)
+		return overMCP(context.Background(), admits, everyone, httptest.NewRequest(http.MethodPost, "/mcp", nil), given, nil, givenAsSchema(given.sigil))
 	}
 
 	answer = map[string]any{"rows": []int{1}}

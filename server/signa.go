@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
@@ -16,6 +17,8 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 // What the node serves from sigils (ADR-039). A signum that is filled in gives
@@ -223,38 +226,103 @@ func takenAsSchema(held *protocol.Sigil) map[string]any {
 // some out (plugins list's health_probed_at is "absent before the first
 // probe") and one carries a field it does not name, so no field is required
 // and none is refused.
+//
+// A field that names the message it carries is said in that message's shape,
+// as the answer marshals it; any other field says only its words.
 func givenAsSchema(held *protocol.Sigil) map[string]any {
 	if len(held.GetGives()) == 0 {
 		return nil
 	}
+	defs := map[string]any{}
 	properties := map[string]any{}
 	for _, field := range held.GetGives() {
-		properties[field.GetName()] = map[string]any{"description": field.GetSays()}
+		property := map[string]any{"description": field.GetSays()}
+		if found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(field.GetMessage())); err == nil {
+			// One, a list of them, or none: the field does not say which.
+			carried := map[string]any{"$ref": messageAsSchema(found.Descriptor(), defs)}
+			property["anyOf"] = []any{carried, map[string]any{"type": "array", "items": carried}, map[string]any{"type": "null"}}
+		}
+		properties[field.GetName()] = property
 	}
 	row := map[string]any{"type": "object", "properties": properties}
-	return map[string]any{"anyOf": []any{row, map[string]any{"type": "array", "items": row}, map[string]any{"type": "null"}}}
+	schema := map[string]any{"anyOf": []any{row, map[string]any{"type": "array", "items": row}, map[string]any{"type": "null"}}}
+	if len(defs) > 0 {
+		schema["$defs"] = defs
+	}
+	return schema
 }
 
-// shapedAsGiven is whether an answer is what givenAsSchema promises: one
-// object, a list of objects, or nothing.
-func shapedAsGiven(body []byte) error {
-	var answer any
-	if err := json.Unmarshal(body, &answer); err != nil {
-		return err
+// messageAsSchema puts a message in defs as encoding/json writes the Go it is
+// generated as, and is how to refer to it there: each field by its .proto name
+// and none required, since a zero value is left out. A oneof is written as Go
+// wraps it, so a message holding one says only that it is an object.
+func messageAsSchema(message protoreflect.MessageDescriptor, defs map[string]any) string {
+	name := string(message.FullName())
+	ref := "#/$defs/" + name
+	if _, held := defs[name]; held {
+		return ref
 	}
-	switch answer := answer.(type) {
-	case nil, map[string]any:
-		return nil
-	case []any:
-		for i, row := range answer {
-			if _, ok := row.(map[string]any); !ok {
-				return errors.Newf("row %d of the answer is %T, not an object", i, row)
-			}
+	def := map[string]any{"type": "object"}
+	defs[name] = def
+	oneofs := message.Oneofs()
+	for i := 0; i < oneofs.Len(); i++ {
+		if !oneofs.Get(i).IsSynthetic() {
+			return ref
 		}
-		return nil
-	default:
-		return errors.Newf("the answer is %T, neither an object nor a list of them", answer)
 	}
+	properties := map[string]any{}
+	fields := message.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		switch {
+		case field.IsMap():
+			properties[string(field.Name())] = map[string]any{"type": "object", "additionalProperties": kindAsSchema(field.MapValue(), defs)}
+		case field.IsList():
+			properties[string(field.Name())] = map[string]any{"type": "array", "items": kindAsSchema(field, defs)}
+		default:
+			properties[string(field.Name())] = kindAsSchema(field, defs)
+		}
+	}
+	def["properties"] = properties
+	return ref
+}
+
+// kindAsSchema is one value of a field as encoding/json writes it: an enum and
+// every integer as a number, bytes as base64 text.
+func kindAsSchema(field protoreflect.FieldDescriptor, defs map[string]any) map[string]any {
+	switch field.Kind() {
+	case protoreflect.BoolKind:
+		return map[string]any{"type": "boolean"}
+	case protoreflect.StringKind, protoreflect.BytesKind:
+		return map[string]any{"type": "string"}
+	case protoreflect.FloatKind, protoreflect.DoubleKind:
+		return map[string]any{"type": "number"}
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		return map[string]any{"$ref": messageAsSchema(field.Message(), defs)}
+	}
+	return map[string]any{"type": "integer"}
+}
+
+// heldTo holds a JSON value to a schema a tool says: what it takes, or what it
+// gives (MCP 2026-07-28, Tool.inputSchema and Tool.outputSchema).
+func heldTo(schema map[string]any, value []byte) error {
+	said, err := json.Marshal(schema)
+	if err != nil {
+		return errors.Wrap(err, "the schema does not marshal")
+	}
+	var read jsonschema.Schema
+	if err := json.Unmarshal(said, &read); err != nil {
+		return errors.Wrap(err, "the schema does not read as JSON Schema")
+	}
+	resolved, err := read.Resolve(nil)
+	if err != nil {
+		return errors.Wrap(err, "the schema does not resolve")
+	}
+	var held any
+	if err := json.Unmarshal(value, &held); err != nil {
+		return errors.Wrap(err, "the value is not JSON")
+	}
+	return resolved.Validate(held)
 }
 
 // annotationsOf is what a sigil's method promises, as MCP's hints: a GET is
@@ -289,8 +357,8 @@ func offeredTo(admitted auth.Admission, known bool, reaching auth.Reach, anyone 
 //
 // The answer is the result's structured content, and its text too. A tool that
 // says what it gives must give that (outputSchema), so its answer is held to
-// the shape it promised first.
-func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy) (auth.Reach, bool), caller *http.Request, held heldBy, args map[string]any, saysWhatItGives bool) *mcp.CallToolResult {
+// the schema it promised first. gives is nil for a tool that promises none.
+func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy) (auth.Reach, bool), caller *http.Request, held heldBy, args map[string]any, gives map[string]any) *mcp.CallToolResult {
 	asked := held.asking(reach.OverMCP, gate, reaching, caller).Ask(ctx, args)
 	switch {
 	case asked.Rejected != nil:
@@ -303,8 +371,8 @@ func overMCP(ctx context.Context, gate sigil.Gate, reaching func(string, heldBy)
 	if err != nil {
 		return refused("what %s answered does not marshal: %v", held.sigil.GetName(), err)
 	}
-	if saysWhatItGives {
-		if err := shapedAsGiven(body); err != nil {
+	if gives != nil {
+		if err := heldTo(gives, body); err != nil {
 			return refused("%s: what %s answered is not what it says it gives: %v", sigil.Failed, held.sigil.GetName(), err)
 		}
 	}
