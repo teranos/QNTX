@@ -12,7 +12,7 @@ import (
 func TestBindingAnAccountIsAttested(t *testing.T) {
 	h := &Handler{logger: testLogger()}
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	h.attestRegistration("google", account{
 		CanonicalID: "google:110000000000000000000",
@@ -31,7 +31,7 @@ func TestBindingAnAccountIsAttested(t *testing.T) {
 func TestAHandleIsCarriedWhenThereIsOne(t *testing.T) {
 	h := &Handler{logger: testLogger()}
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	h.attestRegistration("google", account{
 		CanonicalID: "google:110000000000000000000",
@@ -48,7 +48,7 @@ func TestAHandleIsCarriedWhenThereIsOne(t *testing.T) {
 func TestTheDoorIsCarriedIntoTheRecord(t *testing.T) {
 	h := &Handler{logger: testLogger()}
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	h.attestRegistration("google", account{CanonicalID: "google:110"}, "garden")
 
@@ -62,7 +62,7 @@ func TestTheDoorIsCarriedIntoTheRecord(t *testing.T) {
 func TestNoDoorIsNoRecord(t *testing.T) {
 	h := &Handler{logger: testLogger()}
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	h.attestRegistration("atproto", account{CanonicalID: "did:plc:something"}, "")
 
@@ -75,7 +75,7 @@ func TestNoDoorIsNoRecord(t *testing.T) {
 func TestNoHandleIsNoField(t *testing.T) {
 	h := &Handler{logger: testLogger()}
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	h.attestRegistration("atproto", account{CanonicalID: "did:plc:something"}, "garden")
 
@@ -88,7 +88,7 @@ func TestNoHandleIsNoField(t *testing.T) {
 func TestAnAccountWithNoIdentifierIsNotAttested(t *testing.T) {
 	h := &Handler{logger: testLogger()}
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	h.attestRegistration("google", account{Handle: "someone@example.com"}, "garden")
 

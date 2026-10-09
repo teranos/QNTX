@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/ed25519"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,16 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"go.uber.org/zap"
 )
+
+// attestingNode hands h an attestor and the node key it writes as: a handler
+// with no node key has nobody to write as, and writes nothing.
+func attestingNode(t *testing.T, h *Handler, a Attestor) {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	h.SetNodeKey(priv)
+	h.SetAttestor(a)
+}
 
 // An attestor that keeps what it was handed, so a test can ask what the door
 // wrote down rather than what it logged.
@@ -34,7 +45,7 @@ func (m *memAttestor) predicates() []string {
 func TestSettlingANameIsAttested(t *testing.T) {
 	h, _, session := arrivingHandler(t)
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	require.Equal(t, http.StatusOK, arrive(h, session, `{"display_name":"tim"}`).Code)
 
@@ -45,7 +56,7 @@ func TestSettlingANameIsAttested(t *testing.T) {
 func TestArrivingWithNoNameIsNotAttested(t *testing.T) {
 	h, _, session := arrivingHandler(t)
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	require.Equal(t, http.StatusOK, arrive(h, session, `{}`).Code)
 
@@ -58,7 +69,7 @@ func TestATokensLifeIsAttested(t *testing.T) {
 	h, store := grantHandler(t)
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
@@ -88,7 +99,7 @@ func TestAStoreThatDidNotAnswerIsAttested(t *testing.T) {
 		sessions: newSessionStore(24),
 		logger:   zap.NewNop().Sugar(),
 	}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 	h.SetIdentities([]string{mastodonAccount}, nil)
 
 	session, err := h.sessions.create(mastodonAccount, User{})
@@ -109,7 +120,7 @@ func TestAStoreThatDidNotAnswerIsAttested(t *testing.T) {
 func TestClaimingTheNodeIsAttested(t *testing.T) {
 	h, _ := handlerWithUsers(t)
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	u, err := h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowser")
 	require.NoError(t, err)
@@ -134,7 +145,7 @@ func TestASecondRouteDoesNotClaimTheNodeAgain(t *testing.T) {
 	require.NoError(t, err)
 
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 
 	_, err = h.joinUser(atprotoAccount,
 		accountBinding("atproto", atprotoAccount, "@tim.bsky.social"), "did:key:zBrowser")

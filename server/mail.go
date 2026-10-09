@@ -40,7 +40,7 @@ func (s *QNTXServer) mailWiring() services.MailWiring {
 	w := services.MailWiring{
 		From:    s.mailConfig.From,
 		Records: s.mailRecords,
-		Actor:   s.nodeDIDOrUnknown(),
+		Actor:   s.nodeActor(),
 	}
 	if s.mailConfig.SES.Enabled {
 		w.Transport = services.SESTransport{Region: s.mailConfig.SES.Region}
@@ -73,11 +73,9 @@ func (s *QNTXServer) mailRecipient(id string) (services.MailRecipient, bool, err
 	return services.MailRecipient{ID: u.ID, Email: u.PrimaryEmail(), DisabledBy: u.DisabledBy}, true, nil
 }
 
-// nodeDIDOrUnknown is who the node is when it writes as itself.
-func (s *QNTXServer) nodeDIDOrUnknown() string {
-	if s.nodeDID == nil || s.nodeDID.DID == "" {
-		return "did:key:unknown"
-	}
+// nodeActor is who the node is when it writes as itself: its DID, which the
+// node DID subsystem sets first and fatally, so a running node has one.
+func (s *QNTXServer) nodeActor() string {
 	return s.nodeDID.DID
 }
 

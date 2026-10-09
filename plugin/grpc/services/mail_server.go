@@ -177,7 +177,7 @@ func (s *MailServer) attest(store ats.AttestationStore, actor, subject, predicat
 		return "", errors.Wrapf(err, "no id could be minted for %s of %s", predicate, subject)
 	}
 	if actor == "" {
-		actor = "did:key:unknown"
+		return "", errors.Newf("the mail service was wired without the node, so nobody writes %s of %s", predicate, subject)
 	}
 	now := time.Now()
 	if err := store.CreateAttestation(&types.As{
