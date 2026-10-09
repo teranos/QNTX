@@ -121,7 +121,7 @@ type downtime struct {
 // gatherReport asks every source for the week ending at end.
 func (s *QNTXServer) gatherReport(ctx context.Context, end time.Time, sentry sentryAsker, sentryErr error) Report {
 	r := Report{
-		Node:   s.nodeDIDOrUnknown(),
+		Node:   s.nodeActor(),
 		Window: sentryread.Window{Start: end.Add(-reportWeek), End: end},
 	}
 
@@ -285,7 +285,7 @@ func (s *QNTXServer) restartsIn(w sentryread.Window) (int, string) {
 		}
 		store = system
 	}
-	return startsOf(store, s.nodeDIDOrUnknown(), w)
+	return startsOf(store, s.nodeActor(), w)
 }
 
 func startsOf(store namespaces.Reading, node string, w sentryread.Window) (int, string) {

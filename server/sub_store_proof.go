@@ -31,10 +31,7 @@ func (storeProofSubsystem) Init(s *QNTXServer) error {
 	}
 
 	// The node talking about itself, in the namespace that is nobody's.
-	subject := "did:key:unknown"
-	if s.nodeDID != nil {
-		subject = s.nodeDID.DID
-	}
+	subject := s.nodeActor()
 
 	id, err := identity.GenerateASUID("AS", subject, PredicateStarted, auth.NamespaceSystem)
 	if err != nil {

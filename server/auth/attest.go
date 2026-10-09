@@ -100,7 +100,14 @@ func (h *Handler) attest(predicate, subject string, attrs map[string]any) {
 		return
 	}
 
-	actor := h.nodeDIDOrUnknown()
+	actor, known := h.nodeDID()
+	if !known {
+		// Error rather than Warn, as below: an admission nobody can say who wrote
+		// is not written, and the node has stopped accounting for itself.
+		h.logger.Errorw("admission not attested: the handler holds no node key, so there is nobody to write it",
+			"predicate", predicate, "subject", subject)
+		return
+	}
 	now := time.Now()
 	as := &types.As{
 		ID:         id,
@@ -152,15 +159,16 @@ func (h *Handler) attestRegistration(providerID string, acct account, door strin
 	h.attest(PredicateRegistered, acct.CanonicalID, attrs)
 }
 
-// nodeDIDOrUnknown names who is doing the attesting. The node signs bindings
-// with this key, so it is the identity the deployment answers as.
-func (h *Handler) nodeDIDOrUnknown() string {
+// nodeDID names who is doing the attesting. The node signs bindings with this
+// key, so it is the identity the deployment answers as. False is a handler
+// given no node key, which has nobody to write as.
+func (h *Handler) nodeDID() (string, bool) {
 	if h.nodeKey == nil {
-		return "did:key:unknown"
+		return "", false
 	}
 	pub, ok := h.nodeKey.Public().(ed25519.PublicKey)
 	if !ok {
-		return "did:key:unknown"
+		return "", false
 	}
-	return EncodeDIDKey(pub)
+	return EncodeDIDKey(pub), true
 }

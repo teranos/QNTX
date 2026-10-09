@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
 )
@@ -29,7 +30,8 @@ func rootKnowingServer(t *testing.T) *QNTXServer {
 		nil, nil, false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 
-	s := &QNTXServer{nodeDB: db, authHandler: h, logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{nodeDB: db, authHandler: h, logger: zap.NewNop().Sugar(),
+		nodeDID: &nodedid.Handler{DID: "did:key:z6Mkgardennode"}}
 	s.held = servingOne(db, store)
 	s.held.SetSystem(oneNamespace("system", system))
 	return s

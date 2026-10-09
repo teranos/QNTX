@@ -180,7 +180,7 @@ func TestArrivingWhereNoDoorAnswersRegistersNobody(t *testing.T) {
 func TestRegisteringIsAttestedOnceAndAdmissionEveryTime(t *testing.T) {
 	h, signer, _ := publicDoor(t)
 	wrote := &memAttestor{}
-	h.SetAttestor(wrote)
+	attestingNode(t, h, wrote)
 	_, browser, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 

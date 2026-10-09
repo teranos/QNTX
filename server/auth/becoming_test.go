@@ -37,7 +37,7 @@ func aNodeToBecomeOn(t *testing.T) becomingNode {
 	otherSession, err := h.sessions.create("did:key:zOther", other)
 	require.NoError(t, err)
 	kept := &memAttestor{}
-	h.SetAttestor(kept)
+	attestingNode(t, h, kept)
 	tokens, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), &countingTokens{})
 	require.NoError(t, err)
 	h.tokens = tokens

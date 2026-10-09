@@ -9,7 +9,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -389,10 +388,11 @@ func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*ty
 		timestamp = time.UnixMilli(*proto.Timestamp)
 	}
 
+	// Source is how an attestation was made: a plugin that does not say is
+	// refused rather than written as some plugin.
 	source := proto.Source
 	if source == "" {
-		logger.Logger.Warnw("AttestationCommand.source not set by plugin, falling back to 'plugin'", "hint", "set source to your plugin name")
-		source = "plugin"
+		return nil, errors.Newf("the command about %v names no source; set source to the plugin's name", proto.Subjects)
 	}
 
 	// Stamp source_version: prefer explicit value from proto, fall back to registry lookup
