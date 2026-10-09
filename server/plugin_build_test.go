@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"go.uber.org/zap"
 )
 
 func TestBuildOfReadsWhatDatapuntIsBuiltFrom(t *testing.T) {
@@ -212,12 +213,23 @@ func TestBuildOfRefusesAnIncompleteBuild(t *testing.T) {
 // A deploy stops the node, and a build it cut off is not a build that failed:
 // it is not kept as one, so the next start builds it.
 func TestABuildStoppedWithTheNodeIsNotAFailure(t *testing.T) {
+	s := &QNTXServer{logger: zap.NewNop().Sugar()}
 	running, stop := context.WithCancel(context.Background())
-	if stoppedWithTheNode(running) {
+	if s.stoppedWithTheNode(running) {
 		t.Fatal("a build in a running node reads as stopped with it")
 	}
 	stop()
-	if !stoppedWithTheNode(running) {
+	if !s.stoppedWithTheNode(running) {
 		t.Fatal("a build in a node that stopped does not read as stopped with it")
+	}
+}
+
+// openrouter-qntx's build was terminated by a deploy's stop while its node
+// drained with its context not yet ended, and was kept as failed.
+func TestABuildCutOffWhileTheNodeDrainsIsNotAFailure(t *testing.T) {
+	s := &QNTXServer{logger: zap.NewNop().Sugar()}
+	s.setState(ServerStateDraining)
+	if !s.stoppedWithTheNode(context.Background()) {
+		t.Fatal("a build in a draining node does not read as stopped with it")
 	}
 }
