@@ -250,7 +250,7 @@
 4	server/builtin_executor.go
 2	server/checkpoint_pulse.go
 26	server/ci_pulse.go
-14	server/claude.go
+12	server/claude.go
 3	server/claude_git.go
 4	server/claude_login.go
 9	server/claude_turns.go
