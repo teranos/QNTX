@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/internal/admission"
@@ -121,3 +122,10 @@ type (
 	TokenRecord = access.TokenRecord
 	TokenInfo   = access.TokenInfo
 )
+
+// NeverEnds is the expiry of a token that is not to end (access.NeverExpires),
+// as the time a token is issued with.
+func NeverEnds() *time.Time {
+	never := time.UnixMilli(access.NeverExpires).UTC()
+	return &never
+}

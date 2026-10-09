@@ -31,7 +31,8 @@ pub struct Namespaces(pub Vec<String>);
 /// plus the hash, which never leaves this crate.
 ///
 /// Timestamps are milliseconds since the Unix epoch, matching `Attestation`.
-/// `expires_at` is optional because a token may simply live until revoked.
+/// `expires_at` is optional only so a record written before a token had to say
+/// when it ends still reads; such a token is not usable.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TokenRecord {
@@ -113,15 +114,16 @@ pub struct GitHubSecret {
 impl TokenRecord {
     /// Whether this token authorizes a request made at `now_ms`.
     ///
-    /// Revoked beats everything, then expiry. A token with no `expires_at`
-    /// stays usable until someone revokes it.
+    /// Revoked beats everything, then expiry. A token says when it ends, and
+    /// one saying nothing is not usable: one that does not end says the
+    /// node's NeverExpires (internal/access).
     pub fn is_usable(&self, now_ms: i64) -> bool {
         if self.revoked_at.is_some() {
             return false;
         }
         match self.expires_at {
             Some(expiry) => expiry > now_ms,
-            None => true,
+            None => false,
         }
     }
 }
@@ -566,7 +568,7 @@ mod tests {
             scope_read: vec!["reads".to_string()],
             scope_write: vec!["writes".to_string()],
             created_at: 1_700_000_000_000,
-            expires_at: None,
+            expires_at: Some(NEVER_EXPIRES),
             last_used_at: None,
             revoked_at: None,
             github: None,
@@ -574,6 +576,19 @@ mod tests {
     }
 
     const NS: &str = "did:key:ztestnamespace";
+
+    /// internal/access NeverExpires: 9999-12-31T23:59:59Z.
+    const NEVER_EXPIRES: i64 = 253_402_300_799_000;
+
+    // "nil is nil"
+
+    /// A token saying nothing of when it ends is not usable.
+    #[test]
+    fn a_token_saying_no_expiry_is_not_usable() {
+        let mut r = record("n1", "hash-n1");
+        r.expires_at = None;
+        assert!(!r.is_usable(1_800_000_000_000));
+    }
 
     /// A client's return address is where its codes go. One that only lived
     /// in memory is a client whose codes go nowhere after a restart.
@@ -1053,14 +1068,18 @@ mod tests {
         assert_eq!(store(&dir).list()[0].revoked_at, None);
     }
 
-    /// A token with no expiry lives until revoked — that is what a nil
-    /// `expiresAt` means at `server/auth/tokens.go:17`.
+    /// A token that does not end says NeverExpires, and one saying nothing is
+    /// not looked up as live.
     #[test]
-    fn token_without_expiry_never_expires() {
+    fn a_token_that_never_ends_says_so() {
         let dir = tempfile::tempdir().unwrap();
         let mut s = store(&dir);
         s.put(record("t1", "hash-1")).unwrap();
-        assert!(s.lookup("hash-1", i64::MAX));
+        assert!(s.lookup("hash-1", NEVER_EXPIRES - 1));
+        let mut silent = record("t2", "hash-2");
+        silent.expires_at = None;
+        s.put(silent).unwrap();
+        assert!(!s.lookup("hash-2", 1_700_000_000_000));
     }
 
     #[test]

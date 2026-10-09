@@ -132,14 +132,16 @@ type TokenRecord struct {
 	GitHub *GitHubSecret `json:"github,omitempty"`
 }
 
+// NeverExpires is the expiry of a token that is not to end: a moment past any
+// that matters, 9999-12-31T23:59:59Z, written down rather than left out.
+const NeverExpires int64 = 253402300799000
+
 // Usable reports whether this token authorizes a request at nowMS. Revoked is
-// never usable; an expiry in the past is not either. No expiry does not expire.
+// never usable, and neither is an expiry in the past nor a token saying no
+// expiry at all: one that does not end says NeverExpires.
 func (t TokenRecord) Usable(nowMS int64) bool {
-	if t.RevokedAt != nil {
+	if t.RevokedAt != nil || t.ExpiresAt == nil {
 		return false
-	}
-	if t.ExpiresAt == nil {
-		return true
 	}
 	return *t.ExpiresAt > nowMS
 }
