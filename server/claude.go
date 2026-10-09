@@ -20,6 +20,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/errors"
+	"google.golang.org/protobuf/proto"
 )
 
 // The ROOT agent, as the node runs it. What it is and why is ADR-048's.
@@ -154,56 +155,29 @@ func (s *QNTXServer) claudeHarness() *harness {
 		sayTakes: []*protocol.Param{
 			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "The permission mode Claude Code runs this in. Not sent, it is the one am.toml gives."},
 		},
-		sayGives: []*protocol.Field{
-			{Name: "answer", Says: "What it answered."},
-			{Name: "is_error", Says: "Whether Claude Code reports the turn as failed, in the answer's words."},
-			{Name: "subtype", Says: "How Claude Code says the turn ended."},
-			{Name: "session", Says: "The session it was said in."},
-			{Name: "model", Says: "The model that answered."},
-			{Name: "claude_code", Says: "The Claude Code that ran."},
-			{Name: "permission_mode", Says: "The permission mode it ran in."},
-			{Name: "denied", Says: "Each tool it reached for and was not allowed."},
-			{Name: "cost_usd", Says: "What Claude Code says the turn cost."},
-			{Name: "took_ms", Says: "How long the turn took."},
-			{Name: "unwritten", Says: "Why a row of the session was not written down, when one was not."},
-		},
-		amGives: []*protocol.Field{
-			{Name: "did", Says: "Its own DID, which signs what it writes down."},
-			{Name: "model", Says: "The model am.toml names."},
-			{Name: "effort", Says: "The effort am.toml names."},
-			{Name: "permission_mode", Says: "The permission mode it runs in when whoever speaks names none."},
-			{Name: "permission_modes", Says: "Every permission mode Claude Code has."},
-			{Name: "allow", Says: "The tools it may use without being asked."},
-			{Name: "session", Says: "The session it continues, or empty before anything was said to it."},
-			{Name: "answering", Says: "Whether it is in a turn now."},
-			{Name: "claude_code", Says: "Where the Claude Code it runs on is, or empty when the node has none."},
-			{Name: "not_ready", Says: "Why it cannot be spoken to, when it cannot."},
-			{Name: "signed_in", Says: "Whether Claude Code says it is signed in, by claude login."},
-			{Name: "auth_method", Says: "How it is signed in, as Claude Code names it, or empty when it is not."},
-		},
+		sayAnswer: "protocol.ClaudeSaid",
+		amAnswer:  "protocol.ClaudeAm",
 		// am.toml naming the ROOT agent names it in Claude Code.
 		named:    func() bool { return true },
 		absent:   s.thereIsNoRootAgent,
-		pathKey:  "claude_code",
 		fetching: "Claude Code is still being fetched",
 		part: func(ctx context.Context, sent sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal) {
 			return s.claudePart(named(), sent, agent)
 		},
-		am: func(is map[string]any) {
+		am: func(is agentIn) proto.Message {
 			root := named()
-			allow := root.Allow
-			if allow == nil {
-				allow = []string{}
+			am := &protocol.ClaudeAm{
+				Did: is.did, Model: root.Model, Effort: root.Effort, PermissionMode: root.Mode,
+				PermissionModes: appcfg.PermissionModes, Allow: root.Allow,
+				Session: is.session, Answering: is.answering, ClaudeCode: is.path, NotReady: is.notReady,
 			}
-			is["model"], is["effort"], is["permission_mode"] = root.Model, root.Effort, root.Mode
-			is["permission_modes"], is["allow"] = appcfg.PermissionModes, allow
 			// Asked of Claude Code itself, when the node holds one.
-			is["signed_in"], is["auth_method"] = false, ""
 			if binary, arrived, err := s.harnessHeldBy("claude").Now(); arrived && err == nil && s.rootAgent != nil {
 				if status, err := s.claudeStatus(s.ctx, binary, s.rootAgent.home); err == nil {
-					is["signed_in"], is["auth_method"] = status.SignedIn, status.AuthMethod
+					am.SignedIn, am.AuthMethod = status.SignedIn, status.AuthMethod
 				}
 			}
+			return am
 		},
 	}
 	h.also = []harnessSigil{s.loginSigil(h)}
@@ -272,7 +246,7 @@ func (s *QNTXServer) claudePart(named appcfg.RootAgentConfig, sent sigil.Sent, a
 			// Pi may have started the session: Claude Code resumes only what it holds.
 			return kept && claudecode.Holds(agent.home, session), nil
 		},
-		run: func(t turnRun) (map[string]any, error) {
+		run: func(t turnRun) (proto.Message, error) {
 			said := claudecode.Said{
 				Binary: binary, Home: agent.home, Session: t.session, Resumes: t.resumes,
 				Says: t.says, Model: named.Model, Effort: named.Effort, Token: plan,
@@ -286,15 +260,11 @@ func (s *QNTXServer) claudePart(named appcfg.RootAgentConfig, sent sigil.Sent, a
 				t.write(t.writes.rowsOf(claudecode.Message{Type: "result", Subtype: "no_result", IsError: true, Result: err.Error()}, t.now()))
 				return nil, err
 			}
-			denied := answer.Denied
-			if denied == nil {
-				denied = []string{}
-			}
-			return map[string]any{
-				"answer": answer.Text, "is_error": answer.IsError, "subtype": answer.Subtype,
-				"session": t.session, "model": answer.Model, "claude_code": answer.Version,
-				"permission_mode": mode, "denied": denied,
-				"cost_usd": answer.CostUSD, "took_ms": answer.Took.Milliseconds(),
+			return &protocol.ClaudeSaid{
+				Answer: answer.Text, IsError: answer.IsError, Subtype: answer.Subtype,
+				Session: t.session, Model: answer.Model, ClaudeCode: answer.Version,
+				PermissionMode: mode, Denied: answer.Denied,
+				CostUsd: answer.CostUSD, TookMs: float64(answer.Took.Milliseconds()), Unwritten: t.unwritten(),
 			}, nil
 		},
 	}, nil
