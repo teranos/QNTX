@@ -34,8 +34,9 @@ func everySignumFollows() []*protocol.Follows {
 			{Field: "protocol.Signum.name", Column: "Tool.title"},
 			{Field: "protocol.Sigil.name", Column: "Tool.title"},
 			{Field: "protocol.Sigil.does", Column: "Tool.description"},
-			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema"},
-			{Field: "protocol.Sigil.gives", Column: "Tool.outputSchema"},
+			// A property per param and per field, by its name (signa.go).
+			{Field: "protocol.Sigil.takes", Column: "Tool.inputSchema", KeyedBy: "name"},
+			{Field: "protocol.Sigil.gives", Column: "Tool.outputSchema", KeyedBy: "name"},
 			{Field: "protocol.Sigil.http", Column: "Tool.annotations"},
 		}},
 	}

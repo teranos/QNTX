@@ -207,7 +207,7 @@ func TestASigilIsAskedOverMCP(t *testing.T) {
 	}
 
 	answered := overMCP(context.Background(), admits, forSupers, caller, counts,
-		map[string]any{"market": "clean", "type": "page", "limit": 5}, false)
+		map[string]any{"market": "clean", "type": "page", "limit": 5}, nil)
 	require.False(t, answered.IsError, textOf(t, answered))
 	assert.JSONEq(t, `{"type":"page","counts":[2,1]}`, textOf(t, answered))
 	assert.Equal(t, sigil.Sent{"market": "clean", "type": "page", "limit": "5"}, sentToIt)
@@ -215,14 +215,14 @@ func TestASigilIsAskedOverMCP(t *testing.T) {
 
 	// The refusal the connector never got.
 	sentToIt = nil
-	refusedByIt := overMCP(context.Background(), admits, forSupers, caller, counts, map[string]any{"market": "clean"}, false)
+	refusedByIt := overMCP(context.Background(), admits, forSupers, caller, counts, map[string]any{"market": "clean"}, nil)
 	assert.True(t, refusedByIt.IsError)
 	assert.Contains(t, textOf(t, refusedByIt), "metrics needs type")
 	assert.Nil(t, sentToIt, "the sigil answered something it refuses")
 
 	// Somebody the lines do not reach never reaches the sigil.
 	refusedAtTheGate := overMCP(context.Background(), turnsAway, forSupers, caller, counts,
-		map[string]any{"market": "clean", "type": "page"}, false)
+		map[string]any{"market": "clean", "type": "page"}, nil)
 	assert.True(t, refusedAtTheGate.IsError)
 	assert.Contains(t, textOf(t, refusedAtTheGate), "this route is not yours")
 	assert.Nil(t, sentToIt, "the sigil answered somebody the gate turned away")

@@ -75,6 +75,10 @@ message Corresponds {
   string field = 1;
   // WebsiteEvent.urlPath
   string column = 2;
+  // A repeated field held as one object, a property per element, names here
+  // the element's field each property is named by: protocol.Sigil.takes is
+  // Tool.inputSchema, a property per Param, keyed by name.
+  string keyed_by = 3;
 }
 
 // A Sigil is one thing the node does. The function that does it is not here:

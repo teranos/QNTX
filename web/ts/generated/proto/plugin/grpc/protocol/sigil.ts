@@ -88,6 +88,12 @@ export interface Corresponds {
   field: string;
   /** WebsiteEvent.urlPath */
   column: string;
+  /**
+   * A repeated field held as one object, a property per element, names here
+   * the element's field each property is named by: protocol.Sigil.takes is
+   * Tool.inputSchema, a property per Param, keyed by name.
+   */
+  keyed_by: string;
 }
 
 /**

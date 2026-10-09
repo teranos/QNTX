@@ -182,12 +182,17 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			}
 			// A declared route's answer is the plugin's own and is not held to
 			// what it gives on the plugin path, so it is not promised here.
-			given := givenAsSchema(held.sigil)
-			saysWhatItGives := given != nil && !signum.Declared
-			if saysWhatItGives {
+			var given map[string]any
+			if !signum.Declared {
+				given = givenAsSchema(held.sigil)
+			}
+			if given != nil {
 				tool.OutputSchema = given
 			}
 			server.AddTool(tool, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				if result := takenAsSaid(schema, toolNameOf(held.signum, held.sigil), req.Params.Arguments); result != nil {
+					return result, nil
+				}
 				args := map[string]any{}
 				if len(req.Params.Arguments) > 0 {
 					if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
@@ -199,7 +204,7 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				}
 				// Who reaches it is asked again on the call, so a line written
 				// since the list was drawn holds, and a listed tool is still gated.
-				return overMCP(ctx, s.gate, s.reachingOver, r, held, args, saysWhatItGives), nil
+				return overMCP(ctx, s.gate, s.reachingOver, r, held, args, given), nil
 			})
 		}
 	}
@@ -231,6 +236,9 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			Description: describe(path, prefix),
 			InputSchema: calledThroughSchema,
 		}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if result := takenAsSaid(calledThroughSchema, toolName(path), req.Params.Arguments); result != nil {
+				return result, nil
+			}
 			var in calledThrough
 			if len(req.Params.Arguments) > 0 {
 				if err := json.Unmarshal(req.Params.Arguments, &in); err != nil {
@@ -245,6 +253,19 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 		})
 	}
 	return server
+}
+
+// takenAsSaid holds a call's arguments to the inputSchema its tool says, before
+// anything is asked: what a tool says it takes is what it takes over MCP. Nil
+// is held; a tool error says what is not. No arguments are an empty object.
+func takenAsSaid(schema map[string]any, tool string, arguments json.RawMessage) *mcp.CallToolResult {
+	if len(arguments) == 0 || string(arguments) == "null" {
+		arguments = json.RawMessage("{}")
+	}
+	if err := heldTo(schema, arguments); err != nil {
+		return refused("%s (arguments): %s does not take what was sent: %v", sigil.Invalid, tool, err)
+	}
+	return nil
 }
 
 // describe is the route a tool calls. Nothing else is known of it until a

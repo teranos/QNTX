@@ -43,6 +43,7 @@
   "protocol.Corresponds": "Corresponds is one field and the column it is in the reference. The field is named in full, message and field, so a field no sigil answers with — what a signum keeps rather than what it gives — is named the same way.",
   "protocol.Corresponds.column": "WebsiteEvent.urlPath",
   "protocol.Corresponds.field": "protocol.Arrival.path",
+  "protocol.Corresponds.keyed_by": "A repeated field held as one object, a property per element, names here the element's field each property is named by: protocol.Sigil.takes is Tool.inputSchema, a property per Param, keyed by name.",
   "protocol.CreateMailIdentityRequest": "as \u003cemail\u003e is mail:address of \u003cuser_id\u003e",
   "protocol.DaemonStatusMessage": "DaemonStatusMessage represents daemon status update sent to clients. Mirrors server.DaemonStatusMessage.",
   "protocol.DaemonStatusMessage.budget_daily": "Spend on this node, and what it is allowed.",
