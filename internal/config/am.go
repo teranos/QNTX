@@ -120,7 +120,7 @@ type DistillConfig struct {
 type LLMConfig struct {
 	MaxConcurrent     int `mapstructure:"max_concurrent"`       // Max simultaneous provider calls (default: 1)
 	MaxCallsPerMinute int `mapstructure:"max_calls_per_minute"` // Rate limit across all callers (default: 60)
-	MaxQueueDepth     int `mapstructure:"max_queue_depth"`      // Max waiting requests before rejection (default: 25)
+	MaxQueueDepth     int `mapstructure:"max_queue_depth"`      // Max waiting requests before rejection; 0 queues nobody (default: 20)
 	CooldownSeconds   int `mapstructure:"cooldown_seconds"`     // Pause between inference runs (default: 3)
 }
 
