@@ -8,6 +8,10 @@
 
 **Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` ticker interval = no ticking. For "unlimited", use a high value. For "use default", omit the field.
 
+**Nil is nil:** nil, empty and zero mean nothing. Meaning given to nothing is banned outright: no granting all namespaces, no unrestricted, no every. `internal/tools/nilcheck` stops the build on a new test against nothing.
+
+"it needs to be abolutely clear you cant attribute meaning to nil like granting all namepsaces"
+
 A sigil handles a server capability, the reach table governs it with attestation DSL policy lines like this:
 `REACH is '/i/standing' of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION`
 `REACH is '/am/syscap' of ROOT`
