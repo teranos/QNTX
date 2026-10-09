@@ -883,9 +883,7 @@ pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
         sql.push_str(&conditions.join(" AND "));
     }
     sql.push_str(" ORDER BY att.created_at DESC, att.rowid DESC");
-    if let Some(limit) = filter.limit {
-        sql.push_str(&format!(" LIMIT {}", limit));
-    }
+    sql.push_str(&format!(" LIMIT {}", filter.limit));
 
     (sql, params)
 }
