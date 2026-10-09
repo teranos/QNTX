@@ -296,6 +296,24 @@
     "sites": []
   },
   {
+    "name": "invitation_accounts",
+    "sqlite": true,
+    "duckdb": false,
+    "rebuilt": false,
+    "sites": [
+      "server/auth/invitation.go"
+    ]
+  },
+  {
+    "name": "invitations",
+    "sqlite": true,
+    "duckdb": false,
+    "rebuilt": false,
+    "sites": [
+      "server/auth/invitation.go"
+    ]
+  },
+  {
     "name": "job_checkpoints",
     "sqlite": true,
     "duckdb": false,

@@ -27,6 +27,9 @@ func newStore(t *testing.T) *TokenStore {
 	return store
 }
 
+// neverEnds is the expiry of a token that does not end, said.
+var neverEnds = time.UnixMilli(access.NeverExpires).UTC()
+
 func hashOf(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
@@ -43,6 +46,7 @@ func TestAClientKeepsItsReturnAddress(t *testing.T) {
 	raw, _, err := first.Create(access.NewToken{
 		Label: "app", MintedBy: "https://mastodon.example/@tim", Level: access.LevelOAuth,
 		Namespaces: []string{NamespaceDefault}, ReturnAddress: "https://app.example/callback",
+		ExpiresAt: &neverEnds,
 	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -112,9 +116,9 @@ func TestAnIssuedTokenIsFoundByItsHash(t *testing.T) {
 	}
 }
 
-// A token that names no namespace acts in every namespace its person reaches,
-// which is what a connector's token is. It is written down all the same: a nil
-// list marshals as null, and the store reads a list.
+// A token that names no namespace reaches none on its own (ADR-027). It is
+// written down all the same: a nil list marshals as null, and the store reads
+// a list.
 func TestATokenNamingNoNamespaceIsWritten(t *testing.T) {
 	store := newStore(t)
 	raw, did, err := access.MintToken()
@@ -123,7 +127,7 @@ func TestATokenNamingNoNamespaceIsWritten(t *testing.T) {
 	}
 	if _, err := store.Issue(access.IssuedToken{
 		Hash: hashOf(raw), DID: did, Label: "connector", MintedBy: "https://mastodon.example/@tim",
-		Level: access.LevelRoot,
+		Level: access.LevelRoot, ExpiresAt: &neverEnds,
 	}); err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
@@ -140,7 +144,7 @@ func TestATokenNamingNoNamespaceIsWritten(t *testing.T) {
 func TestCreateReturnsAUsableToken(t *testing.T) {
 	store := newStore(t)
 
-	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
+	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -159,7 +163,7 @@ func TestCreateReturnsAUsableToken(t *testing.T) {
 // FFI: last used is what a revocation is watched by (ADR-025).
 func TestTouchIsReadBackAsLastUsed(t *testing.T) {
 	store := newStore(t)
-	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
+	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -188,7 +192,7 @@ func TestTouchIsReadBackAsLastUsed(t *testing.T) {
 // The requirement, through the whole stack: revoke it and it is dead.
 func TestRevokeKillsTheToken(t *testing.T) {
 	store := newStore(t)
-	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
+	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -204,7 +208,7 @@ func TestRevokeKillsTheToken(t *testing.T) {
 // Revocation is a switch (ADR-025).
 func TestEnableBringsItBack(t *testing.T) {
 	store := newStore(t)
-	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
+	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -237,7 +241,7 @@ func TestTokensSurviveReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTokenStore: %v", err)
 	}
-	raw, _, err := first.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
+	raw, _, err := first.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -257,7 +261,7 @@ func TestTokensSurviveReopen(t *testing.T) {
 // Neither the raw token nor its hash may reach a list response.
 func TestListLeaksNeitherRawNorHash(t *testing.T) {
 	store := newStore(t)
-	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
+	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -288,7 +292,7 @@ func TestListLeaksNeitherRawNorHash(t *testing.T) {
 // that is what the UI draws next to the red X.
 func TestListKeepsRevokedTokens(t *testing.T) {
 	store := newStore(t)
-	_, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
+	_, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -326,11 +330,11 @@ func TestExpiredTokenDoesNotAuthenticate(t *testing.T) {
 // Two tokens must not collide, and revoking one must not touch the other.
 func TestRevokeHitsOnlyItsOwnToken(t *testing.T) {
 	store := newStore(t)
-	rawA, idA, err := store.Create(access.NewToken{Label: "a", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
+	rawA, idA, err := store.Create(access.NewToken{Label: "a", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
 	if err != nil {
 		t.Fatalf("Create a: %v", err)
 	}
-	rawB, _, err := store.Create(access.NewToken{Label: "b", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
+	rawB, _, err := store.Create(access.NewToken{Label: "b", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
 	if err != nil {
 		t.Fatalf("Create b: %v", err)
 	}
@@ -354,7 +358,7 @@ func TestRevokeHitsOnlyItsOwnToken(t *testing.T) {
 // the seam, not a number.
 func TestTheTokenStoreSaysWhatItAskedFor(t *testing.T) {
 	store := newStore(t)
-	if _, _, err := store.Create(access.NewToken{Label: "counted", ExpiresAt: nil, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}}); err != nil {
+	if _, _, err := store.Create(access.NewToken{Label: "counted", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}}); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 
