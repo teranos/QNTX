@@ -759,6 +759,22 @@ export interface StoredThing {
   sites: string[];
 }
 
+/** SignumFollowed is one signum, and the references it can be held to. */
+export interface SignumFollowed {
+  /** The signum, by name. */
+  signum: string;
+  /** The references it declares it follows. */
+  declares: string[];
+  /** The references every signum follows by its shape. */
+  by_shape: string[];
+}
+
+/** ParityFollowed is what parity follows answers. */
+export interface ParityFollowed {
+  /** Every signum the node serves. */
+  signa: SignumFollowed[];
+}
+
 /** ParityStorage is what parity storage answers. */
 export interface ParityStorage {
   /**

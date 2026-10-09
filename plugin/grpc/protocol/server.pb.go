@@ -3653,6 +3653,116 @@ func (x *StoredThing) GetSites() []string {
 	return nil
 }
 
+// SignumFollowed is one signum, and the references it can be held to.
+type SignumFollowed struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The signum, by name.
+	Signum string `protobuf:"bytes,1,opt,name=signum,proto3" json:"signum,omitempty"`
+	// The references it declares it follows.
+	Declares []string `protobuf:"bytes,2,rep,name=declares,proto3" json:"declares,omitempty"`
+	// The references every signum follows by its shape.
+	ByShape       []string `protobuf:"bytes,3,rep,name=by_shape,json=byShape,proto3" json:"by_shape,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignumFollowed) Reset() {
+	*x = SignumFollowed{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignumFollowed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignumFollowed) ProtoMessage() {}
+
+func (x *SignumFollowed) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignumFollowed.ProtoReflect.Descriptor instead.
+func (*SignumFollowed) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *SignumFollowed) GetSignum() string {
+	if x != nil {
+		return x.Signum
+	}
+	return ""
+}
+
+func (x *SignumFollowed) GetDeclares() []string {
+	if x != nil {
+		return x.Declares
+	}
+	return nil
+}
+
+func (x *SignumFollowed) GetByShape() []string {
+	if x != nil {
+		return x.ByShape
+	}
+	return nil
+}
+
+// ParityFollowed is what parity follows answers.
+type ParityFollowed struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Every signum the node serves.
+	Signa         []*SignumFollowed `protobuf:"bytes,1,rep,name=signa,proto3" json:"signa,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ParityFollowed) Reset() {
+	*x = ParityFollowed{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ParityFollowed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ParityFollowed) ProtoMessage() {}
+
+func (x *ParityFollowed) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ParityFollowed.ProtoReflect.Descriptor instead.
+func (*ParityFollowed) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *ParityFollowed) GetSigna() []*SignumFollowed {
+	if x != nil {
+		return x.Signa
+	}
+	return nil
+}
+
 // ParityStorage is what parity storage answers.
 type ParityStorage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -3668,7 +3778,7 @@ type ParityStorage struct {
 
 func (x *ParityStorage) Reset() {
 	*x = ParityStorage{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[44]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3680,7 +3790,7 @@ func (x *ParityStorage) String() string {
 func (*ParityStorage) ProtoMessage() {}
 
 func (x *ParityStorage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[44]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3693,7 +3803,7 @@ func (x *ParityStorage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParityStorage.ProtoReflect.Descriptor instead.
 func (*ParityStorage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{44}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ParityStorage) GetDescribes() string {
@@ -4115,7 +4225,13 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x06sqlite\x18\x02 \x01(\bR\x06sqlite\x12\x16\n" +
 	"\x06duckdb\x18\x03 \x01(\bR\x06duckdb\x12\x18\n" +
 	"\arebuilt\x18\x04 \x01(\bR\arebuilt\x12\x14\n" +
-	"\x05sites\x18\x05 \x03(\tR\x05sites\"\\\n" +
+	"\x05sites\x18\x05 \x03(\tR\x05sites\"_\n" +
+	"\x0eSignumFollowed\x12\x16\n" +
+	"\x06signum\x18\x01 \x01(\tR\x06signum\x12\x1a\n" +
+	"\bdeclares\x18\x02 \x03(\tR\bdeclares\x12\x19\n" +
+	"\bby_shape\x18\x03 \x03(\tR\abyShape\"@\n" +
+	"\x0eParityFollowed\x12.\n" +
+	"\x05signa\x18\x01 \x03(\v2\x18.protocol.SignumFollowedR\x05signa\"\\\n" +
 	"\rParityStorage\x12\x1c\n" +
 	"\tdescribes\x18\x01 \x01(\tR\tdescribes\x12-\n" +
 	"\x06things\x18\x02 \x03(\v2\x15.protocol.StoredThingR\x06thingsB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
@@ -4132,7 +4248,7 @@ func file_plugin_grpc_protocol_server_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_server_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
+var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
 var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*DaemonStatusMessage)(nil),            // 0: protocol.DaemonStatusMessage
 	(*AsyncJobProgress)(nil),               // 1: protocol.AsyncJobProgress
@@ -4178,32 +4294,34 @@ var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*UsagePoint)(nil),                     // 41: protocol.UsagePoint
 	(*TimeseriesUsage)(nil),                // 42: protocol.TimeseriesUsage
 	(*StoredThing)(nil),                    // 43: protocol.StoredThing
-	(*ParityStorage)(nil),                  // 44: protocol.ParityStorage
-	nil,                                    // 45: protocol.JobUpdateMessage.MetadataEntry
-	nil,                                    // 46: protocol.RichSearchMatch.AttributesEntry
-	nil,                                    // 47: protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	nil,                                    // 48: protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	nil,                                    // 49: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	nil,                                    // 50: protocol.Vault.SendsEntry
-	(*Attestation)(nil),                    // 51: protocol.Attestation
+	(*SignumFollowed)(nil),                 // 44: protocol.SignumFollowed
+	(*ParityFollowed)(nil),                 // 45: protocol.ParityFollowed
+	(*ParityStorage)(nil),                  // 46: protocol.ParityStorage
+	nil,                                    // 47: protocol.JobUpdateMessage.MetadataEntry
+	nil,                                    // 48: protocol.RichSearchMatch.AttributesEntry
+	nil,                                    // 49: protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	nil,                                    // 50: protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	nil,                                    // 51: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	nil,                                    // 52: protocol.Vault.SendsEntry
+	(*Attestation)(nil),                    // 53: protocol.Attestation
 }
 var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
 	1,  // 0: protocol.AsyncJob.progress:type_name -> protocol.AsyncJobProgress
 	2,  // 1: protocol.AsyncJob.pulse_state:type_name -> protocol.AsyncJobPulseState
 	3,  // 2: protocol.JobUpdateMessage.job:type_name -> protocol.AsyncJob
-	45, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
-	46, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
+	47, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
+	48, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
 	6,  // 5: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
 	13, // 6: protocol.LLMStreamMessage.signal:type_name -> protocol.LLMTokenSignal
 	11, // 7: protocol.SamplerStageSignal.top_k:type_name -> protocol.LLMTokenCandidate
 	11, // 8: protocol.LLMTokenSignal.top_k:type_name -> protocol.LLMTokenCandidate
 	12, // 9: protocol.LLMTokenSignal.sampler_stages:type_name -> protocol.SamplerStageSignal
-	51, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
+	53, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
 	14, // 11: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
-	47, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	48, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	49, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	50, // 15: protocol.Vault.sends:type_name -> protocol.Vault.SendsEntry
+	49, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	50, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	51, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	52, // 15: protocol.Vault.sends:type_name -> protocol.Vault.SendsEntry
 	27, // 16: protocol.Vaults.vaults:type_name -> protocol.Vault
 	29, // 17: protocol.VaultOwners.owners:type_name -> protocol.VaultOwner
 	31, // 18: protocol.VaultStates.folders:type_name -> protocol.VaultFolderState
@@ -4213,13 +4331,14 @@ var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
 	38, // 22: protocol.Namespace.definition:type_name -> protocol.NamespaceDefinition
 	39, // 23: protocol.NamespacesList.namespaces:type_name -> protocol.Namespace
 	41, // 24: protocol.TimeseriesUsage.points:type_name -> protocol.UsagePoint
-	43, // 25: protocol.ParityStorage.things:type_name -> protocol.StoredThing
-	20, // 26: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	44, // 25: protocol.ParityFollowed.signa:type_name -> protocol.SignumFollowed
+	43, // 26: protocol.ParityStorage.things:type_name -> protocol.StoredThing
+	20, // 27: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
+	28, // [28:28] is the sub-list for method output_type
+	28, // [28:28] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_server_proto_init() }
@@ -4241,7 +4360,7 @@ func file_plugin_grpc_protocol_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_server_proto_rawDesc), len(file_plugin_grpc_protocol_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   51,
+			NumMessages:   53,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
