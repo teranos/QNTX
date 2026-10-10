@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # The app as the phone runs it — QNTX-App's shell, Apple's web view, not Safari —
 # booted in the iPhone Simulator. A 12px box is tapped with a real finger (idb),
-# and a square on the screen says whether the page zoomed: green it did not,
-# anything else it did.
+# and two squares on the screen say what happened: whether the box took the
+# keyboard, and whether the page zoomed.
 #
 #   "you tap a box to type, and the only thing that happens is the keyboard coming up."
 #
@@ -16,7 +16,7 @@ OUT="${OUT:-keyboard-shots}"
 DIST=qntx/internal/server/dist
 mkdir -p "$OUT"
 
-# The box and the square go into whatever page the app carries.
+# The box and the squares go into whatever page the app carries.
 python3 - "$DIST/index.html" <<'EOF'
 import sys
 path = sys.argv[1]
@@ -28,7 +28,9 @@ s = page.index('name="viewport"')
 print('viewport:', page[page.rindex('<', 0, s):page.index('>', s) + 1])
 EOF
 
-# The page is compiled into the app, so each page under test is its own build.
+# The page is compiled into the app, so each page under test is its own build,
+# from a clean output: the last build's app is in the way of the next.
+rm -rf gen/apple/build
 cargo tauri ios build --target aarch64-sim --no-sign --debug
 APP=$(find gen/apple/build -maxdepth 4 -name '*.app' -path '*arm64-sim*' | head -1)
 test -n "$APP"
@@ -38,31 +40,59 @@ xcrun simctl terminate "$UDID" nl.sbvh.qntx || true
 xcrun simctl uninstall "$UDID" nl.sbvh.qntx || true
 xcrun simctl install "$UDID" "$APP"
 xcrun simctl launch "$UDID" nl.sbvh.qntx
-sleep 10
-xcrun simctl io "$UDID" screenshot "$OUT/$NAME-0-before.png"
 
-# The box sits at 30% of the screen, centred, 44pt tall: tap its middle, in points.
-read -r W H < <(idb describe --udid "$UDID" --json | python3 -c 'import json,sys; d=json.load(sys.stdin)["screen_dimensions"]; print(d["width_points"], d["height_points"])')
-idb ui tap --udid "$UDID" $((W / 2)) $((H * 30 / 100 + 22))
-sleep 4
-xcrun simctl io "$UDID" screenshot "$OUT/$NAME-1-tapped.png"
-
-# The square, read off the screen, before and after the tap.
-python3 - "$OUT/$NAME-0-before.png" "$OUT/$NAME-1-tapped.png" "$NAME" <<'EOF'
+# What the squares say, read off a screenshot.
+squares() {
+    xcrun simctl io "$UDID" screenshot "$1" > /dev/null
+    python3 - "$1" <<'EOF'
 import sys
 from PIL import Image
-def at(path):
-    img = Image.open(path).convert('RGB')
-    return img.getpixel((img.width // 2, img.height * 12 // 100))
-def green(p):
-    return p[1] > 150 and p[0] < 100
-before, after, name = at(sys.argv[1]), at(sys.argv[2]), sys.argv[3]
-if not green(before):
-    verdict = 'unreadable'
-elif green(after):
-    verdict = 'stayed'
-else:
-    verdict = 'zoomed'
-print('%s: before %s, after %s -> %s' % (name, before, after, verdict))
-open('verdicts.txt', 'a').write('%s: %s\n' % (name, verdict))
+img = Image.open(sys.argv[1]).convert('RGB')
+y = img.height * 15 // 100
+def name(p):
+    r, g, b = p
+    if b > 200 and r < 100: return 'blue'
+    if g > 150 and r < 100 and b < 150: return 'green'
+    if r > 150 and g < 100 and b < 100: return 'red'
+    if abs(r - g) < 20 and abs(g - b) < 20 and 100 < r < 160: return 'grey'
+    return 'other%s' % (p,)
+print(name(img.getpixel((img.width * 30 // 100, y))), name(img.getpixel((img.width * 70 // 100, y))))
 EOF
+}
+
+# The page is loaded once the squares stand: grey (no keyboard yet), green (its own scale).
+for i in $(seq 1 60); do
+    seen=$(squares "$OUT/$NAME-0-before.png")
+    [ "$seen" = "grey green" ] && break
+    sleep 1
+done
+echo "before: $seen"
+if [ "$seen" != "grey green" ]; then
+    echo "$NAME: page never showed" >> verdicts.txt
+    exit 1
+fi
+
+# The box, where the Simulator says it is.
+read -r X Y < <(idb ui describe-all --udid "$UDID" --json | python3 -c '
+import json, sys
+for e in json.load(sys.stdin):
+    if e.get("AXLabel") == "probe box" or "ROOT agent" in (e.get("AXValue") or "") + (e.get("AXLabel") or ""):
+        f = e["frame"]
+        print(int(f["x"] + f["width"] / 2), int(f["y"] + f["height"] / 2))
+        break
+')
+echo "the box is at $X,$Y"
+idb ui tap --udid "$UDID" "$X" "$Y"
+sleep 4
+seen=$(squares "$OUT/$NAME-1-tapped.png")
+echo "after: $seen"
+
+# Red is a zoom whatever the other square says: a zoom can carry it off screen.
+case "$seen" in
+    *" red") verdict="zoomed" ;;
+    "blue green") verdict="stayed" ;;
+    blue*) verdict="moved" ;;
+    *) verdict="box not taken" ;;
+esac
+echo "$NAME: $verdict"
+echo "$NAME: $verdict" >> verdicts.txt

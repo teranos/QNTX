@@ -1,17 +1,25 @@
 <!-- What the run taps and reads. The box sits high, where no keyboard covers it,
-     so the page has no reason to move; the square says whether it did: green
-     while the page is at its own scale, red from the moment it is not. -->
+     so the page has no reason to move. Two squares say what happened: the left
+     turns blue once the box has the keyboard, so a missed tap is never read as
+     a pass; the right is green while the page is at its own scale and red from
+     the moment it is not. -->
 <style>
     #probe-says { position: fixed; left: 10%; width: 80%; top: 30%; height: 44px; font: 12px monospace; box-sizing: border-box; z-index: 2147483647; }
-    #probe-light { position: fixed; left: calc(50% - 40px); top: calc(12% - 40px); width: 80px; height: 80px; background: #00c853; z-index: 2147483647; }
-    #probe-light.zoomed { background: #d50000; }
+    .probe-light { position: fixed; top: calc(15% - 40px); width: 80px; height: 80px; z-index: 2147483647; }
+    #probe-focus { left: calc(30% - 40px); background: #808080; }
+    #probe-focus.focused { background: #2962ff; }
+    #probe-scale { left: calc(70% - 40px); background: #00c853; }
+    #probe-scale.zoomed { background: #d50000; }
 </style>
-<div id="probe-light"></div>
-<textarea id="probe-says" placeholder="Say something to the ROOT agent"></textarea>
+<div id="probe-focus" class="probe-light"></div>
+<div id="probe-scale" class="probe-light"></div>
+<textarea id="probe-says" aria-label="probe box" placeholder="Say something to the ROOT agent"></textarea>
 <script>
     (function () {
+        var box = document.getElementById('probe-says');
+        box.addEventListener('focus', function () { document.getElementById('probe-focus').classList.add('focused'); });
         function look() {
-            if (window.visualViewport && window.visualViewport.scale > 1.01) document.getElementById('probe-light').classList.add('zoomed');
+            if (window.visualViewport && window.visualViewport.scale > 1.01) document.getElementById('probe-scale').classList.add('zoomed');
         }
         window.visualViewport.addEventListener('resize', look);
         window.visualViewport.addEventListener('scroll', look);
