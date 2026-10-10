@@ -8,6 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -35,11 +36,17 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 	}
 
 	// Refused before anything is pruned or written
+	termsOf := make(map[string]named.Count, len(registrations))
 	for _, reg := range registrations {
 		if !declaredHandlers[reg.HandlerName] {
 			return errors.Newf("watcher %s of plugin %s names handler %q, which the plugin does not declare (it declares %v), so ExecuteJob would never be called",
 				reg.Id, pluginName, reg.HandlerName, handlerNames)
 		}
+		terms, err := filterTerms(reg)
+		if err != nil {
+			return errors.Wrapf(err, "watcher %s of plugin %s is refused", reg.Id, pluginName)
+		}
+		termsOf[reg.Id] = terms
 	}
 
 	ws := storage.NewWatcherStore(db)
@@ -110,6 +117,7 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 			"plugin", pluginName,
 			"watcher_id", watcherID,
 			"handler", reg.HandlerName,
+			"filter_terms", termsOf[reg.Id].Int(),
 			"predicates", reg.Predicates,
 			"contexts", reg.Contexts,
 			"max_fires_per_second", reg.MaxFiresPerSecond,
@@ -128,11 +136,32 @@ func WatcherNames(watchers []*protocol.WatcherRegistration) []string {
 	return names
 }
 
-// UnfilteredWatcherNames returns IDs of watchers with no filter fields set.
+// filterTerms is how many subjects, predicates, contexts and actors a watcher
+// filters on. A filter naming none is refused: it is not every attestation.
+func filterTerms(reg *protocol.WatcherRegistration) (named.Count, error) {
+	return named.CountOf("the filter of watcher "+reg.GetId(),
+		len(reg.GetSubjects())+len(reg.GetPredicates())+len(reg.GetContexts())+len(reg.GetActors()))
+}
+
+// filteredWatchers is how many terms each watcher's filter names, for the
+// watchers whose filter names any.
+func filteredWatchers(watchers []*protocol.WatcherRegistration) map[string]named.Count {
+	counted := make(map[string]named.Count, len(watchers))
+	for _, w := range watchers {
+		if terms, err := filterTerms(w); err == nil {
+			counted[w.GetId()] = terms
+		}
+	}
+	return counted
+}
+
+// UnfilteredWatcherNames returns IDs of watchers whose filter names nothing,
+// which SetupPluginWatchers refuses.
 func UnfilteredWatcherNames(watchers []*protocol.WatcherRegistration) []string {
+	filtered := filteredWatchers(watchers)
 	var names []string
 	for _, w := range watchers {
-		if len(w.Subjects) == 0 && len(w.Predicates) == 0 && len(w.Contexts) == 0 && len(w.Actors) == 0 {
+		if _, counted := filtered[w.GetId()]; !counted {
 			names = append(names, w.GetId())
 		}
 	}
