@@ -30,6 +30,34 @@ if (USE_JSDOM) {
     };
 }
 
+// mock.module is process-global and the last one wins: another file's client
+// mock without failures would reach the window's content, so this one is whole.
+mock.module('../../client', () => ({
+    connectivity: {
+        get state() { return 'online' as const; },
+        get authenticated() { return true; },
+        subscribe: () => () => {},
+        subscribeAuth: () => () => {},
+        subscribeFailures: () => () => {},
+        failures: [],
+        reportReachable: () => {},
+        reportHttpFailure: () => {},
+        reportWsFailure: () => {},
+        reportUnauthenticated: () => {},
+        reportAuthenticated: () => {},
+        setWebSocketConnected: () => {},
+    },
+    apiFetch: () => Promise.resolve(new Response()),
+    apiJson: () => Promise.resolve({}),
+    backendUrl: () => 'http://localhost',
+    backendWsUrl: () => 'ws://localhost',
+    backendPath: (path: string) => 'http://localhost' + path,
+    sendMessage: () => false,
+    connectWebSocket: () => {},
+    registerHandler: () => {},
+    unregisterHandler: () => {},
+}));
+
 import { createMockUiState } from '../../test/mock-ui-state';
 const { uiState } = createMockUiState();
 mock.module('../../state/ui', () => ({ uiState }));
