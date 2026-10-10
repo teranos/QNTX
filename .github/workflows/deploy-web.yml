@@ -103,7 +103,7 @@
           "run": "{\n  echo \"## Deploy complete\"\n  echo \"\"\n  echo \"- QNTX branch: ${{ inputs.branch }}\"\n  echo \"- QNTX rev:    $(git rev-parse HEAD)\"\n  echo \"- Bucket:      ${{ inputs.static_bucket }}\"\n  echo \"- Live at:     ${{ steps.target.outputs.url }}\"\n} >> \"$GITHUB_STEP_SUMMARY\"\n"
         }
       ],
-      "timeout-minutes": 20
+      "timeout-minutes": 30
     }
   },
   "name": "deploy-web",
