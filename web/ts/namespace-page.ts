@@ -197,7 +197,7 @@ function render(): void {
         ? '<div class="canvas-none">no canvas here yet</div>'
         : canvases.map(c => cardHtml(c, buttons)).join('');
     body.innerHTML = `
-        <h2 class="namespace-page-name">${escapeHtml(who?.standing || 'default')}</h2>
+        <h2 class="namespace-page-name">${escapeHtml(who && who.standing !== '' ? who.standing : 'you stand in no namespace')}</h2>
         <div class="canvas-list">${rows}</div>
         <input class="canvas-ask" type="text" placeholder="an e-mail, for invite…" autocomplete="off" spellcheck="false">
         <div class="canvas-birth">${birthHtml(buttons)}</div>

@@ -153,12 +153,10 @@ function labelField(): HTMLInputElement {
 }
 
 /** Every namespace the node lists, in the bar's order, set to where you stand.
- *  Standing nowhere is default; a standing the list lacks starts on nothing,
- *  rather than on a namespace you are not in. */
+ *  Standing nowhere, or where the list lacks, starts on nothing. */
 export function namespacePick(namespaces: Namespace[], standing: string): { names: string[]; chosen: string } {
     const names = ordered(namespaces).map(ns => ns.name);
-    const here = standing === '' ? 'default' : standing;
-    return { names, chosen: names.includes(here) ? here : '' };
+    return { names, chosen: names.includes(standing) ? standing : '' };
 }
 
 // "I SHOULD NOT HAVE TO TYPE THE NAMESPACE NAME"
