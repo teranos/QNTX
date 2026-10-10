@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 // BookPlugin is a test plugin featuring classic computer science books.
@@ -554,8 +555,8 @@ func (p *BookPlugin) RegisterElements() []plugin.ElementDef {
 			Label:         "book-auction",
 			ContentPath:   "/auction",
 			CSSPath:       "/auction.css",
-			DefaultWidth:  600,
-			DefaultHeight: 400,
+			DefaultWidth:  proto.Int32(600),
+			DefaultHeight: proto.Int32(400),
 		},
 	}
 }

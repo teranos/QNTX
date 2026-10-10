@@ -219,7 +219,8 @@ type ElementDef struct {
 	// The module must export: render(element, ui) => HTMLElement
 	ModulePath string
 
-	// DefaultWidth and DefaultHeight in pixels. 0 = use system default.
-	DefaultWidth  int
-	DefaultHeight int
+	// DefaultWidth and DefaultHeight in pixels. "For 'use default', omit the
+	// field": nil is omitted.
+	DefaultWidth  *int32
+	DefaultHeight *int32
 }

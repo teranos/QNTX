@@ -1002,8 +1002,8 @@ func TestUIPlugin_RegisterElements(t *testing.T) {
 	assert.Equal(t, "book-auction", item.Label)
 	assert.Equal(t, "/auction", item.ContentPath)
 	assert.Equal(t, "/auction.css", item.CssPath)
-	assert.Equal(t, int32(600), item.DefaultWidth)
-	assert.Equal(t, int32(400), item.DefaultHeight)
+	assert.Equal(t, int32(600), item.GetDefaultWidth())
+	assert.Equal(t, int32(400), item.GetDefaultHeight())
 
 	t.Log("✓ RegisterElements RPC returned correct element definition")
 }

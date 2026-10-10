@@ -487,8 +487,8 @@ func (s *PluginServer) RegisterElements(ctx context.Context, _ *protocol.Empty) 
 			Label:         def.Label,
 			ContentPath:   def.ContentPath,
 			CssPath:       def.CSSPath,
-			DefaultWidth:  int32(def.DefaultWidth),
-			DefaultHeight: int32(def.DefaultHeight),
+			DefaultWidth:  def.DefaultWidth,
+			DefaultHeight: def.DefaultHeight,
 			ModulePath:    def.ModulePath,
 		}
 	}
