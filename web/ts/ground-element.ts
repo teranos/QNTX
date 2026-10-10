@@ -30,7 +30,8 @@ import { apiJson } from './client/http';
 import { log, SEG } from './logger';
 import { Ground } from './sym';
 import { openTranscriptElement, when, type TranscriptRead, type Turn } from './components/element/transcript-element';
-import { cloud, cloudBank, comet, core, horizon, nebula, seam, starburst, starField } from './ground-scene';
+import { cloud, cloudBank, comets, core, horizon, nebula, seam, starburst, starField, type Comet, type Head } from './ground-scene';
+import { openCometElement } from './comet-element';
 import { labelsOf, seenOver, seriesOf, type Window as Span } from './components/sparkline';
 import { apiError, sacredEntry, type SacredError } from './components/sacred';
 
@@ -57,6 +58,8 @@ export interface Does {
     failed: Array<{ at: string; error: string; execution_id: string }>;
     // What the node sees of ug. A node from before it saw any answers without it.
     ug?: Ug;
+    // Each repository as a comet, the heaviest first. A node from before comets answers without the key at all.
+    comets?: Comet[];
 }
 
 // The tmux bar's asks by the minute, each session's readings by the hour, and
@@ -248,6 +251,12 @@ const UG_SEEN = 'A status-line ug posts its session\'s first reading of a window
 
 // What Scry is, in its own README's words (qntx-plugins/scry/README.md).
 const SCRY_IS = 'Scry is local inference through llama.cpp with Metal, a plugin of a node.';
+
+// What the picture says of comets where the node names none.
+const COMET_UNSEEN = 'The comet does not exist yet. Ground is built where it runs, by make install, or fetched from GitHub Releases. This node names no comets.';
+
+// What stays unknown once the node names them.
+const COMET_SEEN = 'Observing a comet, and the build it starts, are not in the node yet: a head pressed here opens the comet and nothing more.';
 
 // How far down its thread each star hangs: neighbours hang far apart, so what
 // is written under one never reaches the next.
@@ -631,8 +640,27 @@ export interface GroundScene {
     unread(why: string): void;
 }
 
+// Whether the node's answer names comets at all: a node from before comets answers without the key.
+function namesComets(answer: Does): answer is Does & { comets: Comet[] } {
+    return 'comets' in answer;
+}
+
+// "i can click on a comet"
+
+// A head on the band, pressed to open its comet; its name is shown over it and nowhere else at rest.
+function cometHit(c: Comet, head: Head, onChoose: (c: Comet) => void): HTMLElement {
+    const hit = make('button', 'gr-comet-hit');
+    hit.type = 'button';
+    hit.style.left = `${head.x}px`;
+    hit.style.top = `${head.y}px`;
+    hit.setAttribute('aria-label', c.repo);
+    hit.appendChild(make('span', 'gr-comet-name', c.built ? `${c.repo} · ${c.size.toFixed(1)} MB` : c.repo));
+    hit.addEventListener('click', () => onChoose(c));
+    return hit;
+}
+
 /** Exported for tests: the whole picture drawn into body, every stratum in order. */
-export function drawGround(body: HTMLElement): GroundScene {
+export function drawGround(body: HTMLElement, onComet: (c: Comet) => void = openCometElement): GroundScene {
     // Real once the node's own row names a scry among its plugins.
     const scry = stratum('scry gr-unreal', 'Scry', 'the nebula', nebula());
     const inferring = make('div', 'gr-told');
@@ -647,9 +675,12 @@ export function drawGround(body: HTMLElement): GroundScene {
     stars.body.prepend(hung);
     stars.body.append(written, unhung, limit('What QNTX left is kept in memory, the newest 256 of it for everybody: a restart empties it, and the count begins again.'));
 
-    const fall = stratum('comet gr-unreal', 'Comet', 'the ground binary, built by QNTX, landing on earth', comet());
-    fall.section.prepend(starField(150, 30, 11));
-    fall.body.appendChild(limit('The comet does not exist yet. Ground is built where it runs, by make install, or fetched from GitHub Releases.'));
+    // Real once the node names the comets: each repository, the heaviest first.
+    const fall = stratum('comet gr-unreal', 'Comet', 'the ground binary, built by QNTX, landing on earth', comets([]).svg);
+    const fallLimit = limit(COMET_UNSEEN);
+    fall.body.appendChild(fallLimit);
+    const hits = make('div', 'gr-comet-hits');
+    fall.section.appendChild(hits);
 
     const sky = stratum('sky', 'Sky', 'how we talk to QNTX and receive from it', cloudBank());
     const carried = make('div', 'gr-says');
@@ -714,9 +745,13 @@ export function drawGround(body: HTMLElement): GroundScene {
         const unsaid: string[] = [];
         if (done === null) {
             unsaid.push('Asking QNTX what it does for Ground…');
+            shower([], false);
         } else if (typeof done === 'string') {
             unsaid.push(`QNTX did not say what it does for Ground: ${done}`);
+            shower([], false);
         } else {
+            if (namesComets(done)) shower(done.comets, true);
+            else shower([], false);
             if (done.started) hanging.push({ key: 'up', name: 'up', note: upFor(done.started, Date.now()), well: true });
             for (const watch of done.watches) {
                 hanging.push({ key: `watch:${watch.id}`, name: watch.name, note: (watch.predicates ?? []).map(p => `on ${p}`).join(', '), well: true });
@@ -735,6 +770,22 @@ export function drawGround(body: HTMLElement): GroundScene {
         unhung.textContent = unsaid.join('\n');
         burrow(done !== null && typeof done !== 'string' ? done.ug : undefined);
         burn();
+    };
+
+    // The comets: drawn again only when the node names them differently, so a
+    // head stays where it is, and its name over it, between two answers.
+    let showered = '';
+    const shower = (list: Comet[], named: boolean) => {
+        const now = named ? JSON.stringify(list) : '';
+        if (now === showered) return;
+        showered = now;
+        fall.section.classList.toggle('gr-unreal', !named);
+        fall.section.classList.toggle('gr-shower', named);
+        relimit(fallLimit, named ? COMET_SEEN : COMET_UNSEEN);
+        const drew = comets(list);
+        const plate = fall.section.querySelector('svg.gr-plate');
+        if (plate) fall.section.replaceChild(drew.svg, plate);
+        hits.replaceChildren(...drew.heads.map((head, i) => cometHit(list[i], head, onComet)));
     };
 
     // What failed, in the sessions read and on the node's own side, newest

@@ -114,21 +114,125 @@ export function starburst(size: number): SVGSVGElement {
     return svg;
 }
 
-/** The comet: a head falling toward the earth, its tail fanning back up to the stars it left. */
-export function comet(): SVGSVGElement {
-    const svg = plate(150, 'comet');
-    const hx = 372;
-    const hy = 108;
-    for (let k = -4; k <= 4; k++) {
-        const turn = -0.95 + k * 0.035;
-        const long = 240 - Math.abs(k) * 30;
-        draw(svg, 'line', {
-            class: 'gr-comet-tail',
-            x1: hx, y1: hy,
-            x2: (hx + Math.cos(turn) * long).toFixed(1), y2: (hy + Math.sin(turn) * long).toFixed(1),
-        });
+// "each repository is a comet"
+// "more active comets have longer trail"
+// "importance is more based on importance in terms of load, like heaviest at top"
+
+/** One repository as a comet: what it is built into, and how main moved. */
+export interface Comet {
+    repo: string;
+    /** Whether a ground has been built from it. */
+    built: boolean;
+    /** The size of the ground built from it, in MB: how big a head it falls with. */
+    size: number;
+    /** How often main moved in the last week. */
+    moved: number;
+    state: 'observed' | 'observing' | 'unobserved';
+}
+
+/** The height the comet band is drawn at, and the most comets drawn in it. */
+export const COMET_BAND = 300;
+export const COMETS_AT_MOST = 10;
+
+// Where each comet falls, the heaviest first and highest: no two on a line,
+// and each heading a little off the others, as a shower does.
+const COMET_SLOTS = [
+    { x: 462, y: 78, turn: 0.02 }, { x: 258, y: 112, turn: -0.03 }, { x: 392, y: 136, turn: 0.04 },
+    { x: 118, y: 150, turn: -0.05 }, { x: 322, y: 176, turn: 0.01 }, { x: 470, y: 206, turn: -0.02 },
+    { x: 204, y: 212, turn: 0.03 }, { x: 374, y: 240, turn: -0.04 }, { x: 84, y: 244, turn: 0 },
+    { x: 276, y: 266, turn: 0.02 },
+];
+
+// The tail points up and left, back to the stars the comet left.
+const COMET_UP = Math.PI * 1.1;
+
+/** Where a comet's head is on the band, for what is laid over it. */
+export interface Head {
+    x: number;
+    y: number;
+    r: number;
+}
+
+function dotPath(points: Array<[number, number]>): string {
+    return points.map(([x, y]) => `M ${x.toFixed(1)} ${y.toFixed(1)} l 0.01 0`).join(' ');
+}
+
+// One comet, engraved: a burst of rays for the head, sized by what it is built
+// into, and a tail of stipple dense at the head and thinning to single dots,
+// as long as main moved, with a faint fan of hairlines under a heavy one.
+function engrave(into: SVGElement, c: Comet, x: number, y: number, turn: number, seed: number, scale: number): Head {
+    const next = seeded(seed);
+    const tone = `gr-comet-${c.state}`;
+    const r = (3 + c.size * 2.6) * scale;
+    const long = (26 + c.moved * 2.4) * scale;
+    // A light one has no hairlines: its path is drawn with nothing on it.
+    const hairs = scale > 1 ? 18 : c.moved >= 40 ? 7 : 0;
+    let hair = '';
+    for (let k = 0; k < hairs; k++) {
+        const t = k / (hairs - 1) - 0.5;
+        const a = turn + t * 0.11;
+        const reach = long * (1 - Math.abs(t) * 0.8) * (0.7 + next() * 0.3);
+        hair += `M ${x} ${y} L ${(x + Math.cos(a) * reach).toFixed(1)} ${(y + Math.sin(a) * reach).toFixed(1)} `;
     }
-    draw(svg, 'path', { class: 'gr-comet-head', d: burstPath(hx, hy, 16, 9.5, 3.4, 12) });
+    draw(into, 'path', { class: `gr-comet-hair ${tone}`, d: hair });
+    const grains: Array<Array<[number, number]>> = [[], [], []];
+    const motes = Math.round(c.moved * 9 * scale * scale);
+    for (let i = 0; i < motes; i++) {
+        const far = Math.pow(next(), 1.6);
+        const along = r * 0.6 + far * long;
+        const spread = (0.7 + along * 0.07) * (0.5 + next() * 0.5);
+        const across = (next() - 0.5) * 2 * spread;
+        const weight = (1 - far) * next();
+        grains[weight < 0.3 ? 0 : weight < 0.65 ? 1 : 2].push([
+            x + Math.cos(turn) * along - Math.sin(turn) * across,
+            y + Math.sin(turn) * along + Math.cos(turn) * across,
+        ]);
+    }
+    grains.forEach((grain, i) => {
+        draw(into, 'path', { class: `gr-comet-grain gr-comet-grain-${i + 1} ${tone}`, d: dotPath(grain) });
+    });
+    draw(into, 'path', { class: `gr-comet-burst ${tone}`, d: burstPath(x, y, r, r * 0.62, r * 0.26, 16) });
+    if (c.size >= 1.5 || scale > 1) {
+        let d = '';
+        for (let k = 0; k < 4; k++) {
+            const a = -Math.PI / 2 + k * Math.PI / 2;
+            d += `M ${(x + Math.cos(a) * r).toFixed(1)} ${(y + Math.sin(a) * r).toFixed(1)} L ${(x + Math.cos(a) * r * 1.9).toFixed(1)} ${(y + Math.sin(a) * r * 1.9).toFixed(1)} `;
+        }
+        draw(into, 'path', { class: `gr-comet-rays ${tone}`, d });
+    }
+    draw(into, 'path', { class: `gr-comet-core ${tone}`, d: burstPath(x, y, r * 0.3, r * 0.3, r * 0.1, 8) });
+    return { x, y, r };
+}
+
+/**
+ * The comets: one per repository, the heaviest first and highest, each a
+ * head falling toward the earth and a tail back up to the stars it left.
+ * Returns the band and where each head is, in the order given.
+ */
+export function comets(list: Comet[]): { svg: SVGSVGElement; heads: Head[] } {
+    const svg = plate(COMET_BAND, 'comet');
+    const next = seeded(5);
+    for (let i = 0; i < 150; i++) {
+        const light = next() < 0.85 ? 'gr-star gr-star-1' : 'gr-star gr-star-3';
+        draw(svg, 'circle', { class: light, cx: (next() * WIDE).toFixed(1), cy: (next() * COMET_BAND).toFixed(1), r: light.endsWith('1') ? 0.4 : 0.65 });
+    }
+    const heads: Head[] = [];
+    list.slice(0, COMETS_AT_MOST).forEach((c, i) => {
+        const slot = COMET_SLOTS[i];
+        heads.push(engrave(svg, c, slot.x, slot.y, COMET_UP + slot.turn, 7 + i * 13, 1));
+    });
+    return { svg, heads };
+}
+
+/** One comet alone, large: the Comet element's own picture of a repository. */
+export function cometAlone(c: Comet): SVGSVGElement {
+    const svg = plate(230, 'comet');
+    const next = seeded(9);
+    for (let i = 0; i < 90; i++) {
+        const light = next() < 0.85 ? 'gr-star gr-star-1' : 'gr-star gr-star-3';
+        draw(svg, 'circle', { class: light, cx: (next() * WIDE).toFixed(1), cy: (next() * 230).toFixed(1), r: light.endsWith('1') ? 0.4 : 0.65 });
+    }
+    engrave(svg, c, 430, 150, Math.PI * 1.13, 21, 2.6);
     return svg;
 }
 
