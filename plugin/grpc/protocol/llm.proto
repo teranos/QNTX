@@ -53,11 +53,16 @@ message LLMChatResponse {
 message LLMChatChunk {
   string token = 1;                        // The generated token text
   bool done = 2;                           // True on final chunk
-  string model = 3;                        // Model name (sent on first or last chunk)
+  string model = 3;                        // Model name: the final chunk names it, others may
   int32 prompt_tokens = 4;                 // Sent on final chunk
   int32 completion_tokens = 5;             // Sent on final chunk
   int32 total_tokens = 6;                  // Sent on final chunk
-  TokenSignalProto signal = 7;             // Per-token signal data (if available)
+  // Per-token signal data, or that this chunk carries none. A chunk naming
+  // neither is refused.
+  oneof signal_of {
+    TokenSignalProto signal = 7;
+    bool no_signal = 8;                    // False is refused.
+  }
 }
 
 message TokenSignalProto {

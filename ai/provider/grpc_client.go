@@ -137,21 +137,25 @@ func (c *GRPCLLMClient) ChatStreaming(ctx context.Context, req ChatRequest, stre
 			sc.TotalTokens = int(chunk.TotalTokens)
 		}
 
-		if chunk.Signal != nil {
+		signal, carried, err := chunk.SignalCarried()
+		if err != nil {
+			return errors.Wrapf(err, "provider %s", c.provider)
+		}
+		if carried {
 			sig := &TokenSignal{
-				Confidence:       chunk.Signal.Confidence,
-				Entropy:          chunk.Signal.Entropy,
-				TopGap:           chunk.Signal.TopGap,
-				FullDistribution: chunk.Signal.FullDistribution,
+				Confidence:       signal.Confidence,
+				Entropy:          signal.Entropy,
+				TopGap:           signal.TopGap,
+				FullDistribution: signal.FullDistribution,
 			}
-			for _, tc := range chunk.Signal.TopK {
+			for _, tc := range signal.TopK {
 				sig.TopK = append(sig.TopK, TokenCandidate{
 					ID:   tc.Id,
 					Text: tc.Text,
 					Prob: tc.Prob,
 				})
 			}
-			for _, stage := range chunk.Signal.SamplerStages {
+			for _, stage := range signal.SamplerStages {
 				ss := SamplerStageSignal{
 					Name:        stage.Name,
 					ActiveCount: stage.ActiveCount,
