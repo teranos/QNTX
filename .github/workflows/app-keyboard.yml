@@ -1,0 +1,106 @@
+{
+  "jobs": {
+    "ios": {
+      "name": "QNTX-App in the iPhone Simulator",
+      "runs-on": "macos-15",
+      "steps": [
+        {
+          "uses": "actions/checkout@v5",
+          "with": {
+            "repository": "teranos/QNTX-App"
+          }
+        },
+        {
+          "uses": "actions/checkout@v5",
+          "with": {
+            "path": "qntx"
+          }
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "targets": "aarch64-apple-ios-sim, wasm32-unknown-unknown"
+          }
+        },
+        {
+          "uses": "jetli/wasm-pack-action@v0.4.0",
+          "with": {
+            "version": "v0.13.1"
+          }
+        },
+        {
+          "uses": "oven-sh/setup-bun@v2",
+          "with": {
+            "bun-version": "1.3.3"
+          }
+        },
+        {
+          "name": "Fetch tauri-cli 2.11.4",
+          "run": "curl -sSL -o cargo-tauri.zip https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v2.11.4/cargo-tauri-aarch64-apple-darwin.zip\nunzip -o -q cargo-tauri.zip -d \"$HOME/.cargo/bin\"\nrm cargo-tauri.zip\ncargo tauri --version\n"
+        },
+        {
+          "uses": "actions/setup-python@v5",
+          "with": {
+            "python-version": "3.11"
+          }
+        },
+        {
+          "name": "A finger, and eyes",
+          "run": "curl -sSL https://github.com/facebook/idb/releases/download/v1.1.8/idb-companion.universal.tar.gz | tar -xz\nCOMPANION=$(dirname \"$(find \"$PWD\" -name idb_companion -type f -perm -u+x | head -1)\")\necho \"$COMPANION\" >> \"$GITHUB_PATH\"\npython -m pip install --quiet fb-idb pillow\n"
+        },
+        {
+          "run": "cargo tauri ios init"
+        },
+        {
+          "name": "Boot an iPhone, with its own keyboard",
+          "run": "defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false\nRUNTIME=$(xcrun simctl list runtimes available -j | jq -r '[.runtimes[] | select(.platform == \"iOS\")] | sort_by(.version) | last | .identifier')\nUDID=$(xcrun simctl list devices available -j | jq -r --arg rt \"$RUNTIME\" '[.devices[$rt][] | select(.name | startswith(\"iPhone\"))] | first | .udid')\necho \"UDID=$UDID\" >> \"$GITHUB_ENV\"\nxcrun simctl boot \"$UDID\"\nxcrun simctl bootstatus \"$UDID\" -b\nopen -a Simulator --args -CurrentDeviceUDID \"$UDID\"\n"
+        },
+        {
+          "name": "A bare page without the viewport line: the web view zooms, and this run sees it",
+          "run": "mkdir -p qntx/internal/server/dist\nsed 's|<!-- VIEWPORT -->|<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">|' qntx/ci/app-keyboard/page.html > qntx/internal/server/dist/index.html\nbash qntx/ci/app-keyboard/run.sh without\n",
+          "timeout-minutes": 20
+        },
+        {
+          "if": "always()",
+          "name": "The same page, with html and body pinned to the window and not scrolling",
+          "run": "(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index(\"<meta name=\\\"viewport\\\"\"); b=s.index(\">\", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index(\"</head>\"); open(p,\"w\").write(s[:c]+\"<style>html, body { height: 100%; overflow: hidden; }</style>\"+s[c:])' qntx/internal/server/dist/index.html '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">'\nbash qntx/ci/app-keyboard/run.sh pinned\n",
+          "timeout-minutes": 20
+        },
+        {
+          "if": "always()",
+          "name": "QNTX's page as main builds it, holding where its window stood while a field has the keyboard",
+          "run": "(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); c=s.index(\"</head>\"); open(p,\"w\").write(s[:c]+open(sys.argv[2]).read()+s[c:])' qntx/internal/server/dist/index.html qntx/ci/app-keyboard/hold-page.html\nbash qntx/ci/app-keyboard/run.sh page\n",
+          "timeout-minutes": 20
+        },
+        {
+          "if": "always()",
+          "name": "What the screen said",
+          "run": "cat verdicts.txt\ngrep -q '^without: zoomed$' verdicts.txt || echo \"without the line the page did not zoom\"\ngrep -q '^pinned: stayed$' verdicts.txt || echo \"pinned, QNTX's page did more than bring the keyboard\"\ngrep -q '^page: stayed$' verdicts.txt\n"
+        },
+        {
+          "if": "always()",
+          "name": "The screens",
+          "uses": "actions/upload-artifact@v4",
+          "with": {
+            "name": "app-keyboard",
+            "path": "keyboard-shots",
+            "retention-days": 14
+          }
+        }
+      ],
+      "timeout-minutes": 110
+    }
+  },
+  "name": "App keyboard",
+  "on": {
+    "pull_request": {
+      "paths": [
+        "ci/app-keyboard/**",
+        "ci/app-keyboard.nix",
+        ".github/workflows/app-keyboard.yml",
+        "web/index.html"
+      ]
+    },
+    "workflow_dispatch": null
+  }
+}
