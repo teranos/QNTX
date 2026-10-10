@@ -9,13 +9,16 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/teranos/QNTX/ats/signing"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/internal/claudecode"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/secretref"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
@@ -293,9 +296,14 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			if s.ownURL != "" {
 				said.MCP = []claudecode.MCPServer{{Name: rootAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
 			}
-			answer, err := said.Run(s.ctx, func(m claudecode.Message) { t.write(t.writes.rowsOf(m, t.now())) })
+			// Apart from the node, so the turn outlives a node that stops
+			// before it answers; the next node takes it up (takeUpTurnLeft).
+			turn, err := said.Start(s.turnsApart)
 			if err != nil {
-				t.write(t.writes.rowsOf(claudecode.Message{Type: "result", Subtype: "no_result", IsError: true, Result: err.Error()}, t.now()))
+				return nil, err
+			}
+			answer, err := s.followTurn(agent, turn, t.write, t.writes)
+			if err != nil {
 				return nil, err
 			}
 			return &protocol.ClaudeSaid{
@@ -306,6 +314,58 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			}, nil
 		},
 	}, nil
+}
+
+// followTurn follows a turn in Claude Code to its answer, writing each row its
+// stream says happened. A node stopping leaves the turn running and kept; a
+// turn that ended keeps its session before it is let go of.
+func (s *QNTXServer) followTurn(agent *rootAgent, turn *claudecode.Turn, write func([]*types.As, error), writes sessionWriter) (claudecode.Answer, error) {
+	answer, err := turn.Follow(s.ctx, func(m claudecode.Message) { write(writes.rowsOf(m, time.Now())) })
+	if stoppingErr := s.ctx.Err(); stoppingErr != nil {
+		return claudecode.Answer{}, err
+	}
+	if err != nil {
+		write(writes.rowsOf(claudecode.Message{Type: "result", Subtype: "no_result", IsError: true, Result: err.Error()}, time.Now()))
+		return claudecode.Answer{}, sqlclose.With(err, turn.End(), "the turn that did not answer")
+	}
+	if err := agent.keepIn(claudeSessionFile, turn.Session); err != nil {
+		return claudecode.Answer{}, errors.Wrap(err, "it answered, and the session it answered in was not kept")
+	}
+	return answer, turn.End()
+}
+
+// takeUpTurnLeft follows the turn a node before this one left running in the
+// agent's home, as that turn: nobody waits on its answer, and its session is
+// written down and kept as if they did.
+func (s *QNTXServer) takeUpTurnLeft(agent *rootAgent) {
+	turn, left, err := claudecode.TurnLeftIn(agent.home)
+	if err != nil {
+		s.logger.Errorw("The turn the node before left was not taken up", "agent", agent.did, "error", err)
+		return
+	}
+	if !left {
+		return
+	}
+	in := agent.in(s.claudeHarness())
+	in.turn <- struct{}{}
+	defer func() { <-in.turn }()
+	in.answering.Store(&turnInSession{session: turn.Session})
+	defer in.answering.Store(nil)
+
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	if err != nil {
+		s.logger.Errorw("The turn the node before left was not taken up: nowhere to write its session", "agent", agent.did, "session", turn.Session, "error", err)
+		return
+	}
+	writes := sessionWriter{did: agent.did, session: turn.Session, resumed: turn.Resumes, effort: turn.Effort}
+	write, unwritten := s.sessionWrites(agent, store, turn.Session, "Claude Code")
+	s.logger.Infow("Taking up the turn the node before left", "agent", agent.did, "session", turn.Session, "pid", turn.PID, "handed_on", turn.HandedOn)
+	answer, err := s.followTurn(agent, turn, write, writes)
+	if err != nil {
+		s.logger.Errorw("The turn the node before left did not answer", "agent", agent.did, "session", turn.Session, "error", err)
+		return
+	}
+	s.logger.Infow("The turn the node before left answered", "agent", agent.did, "session", turn.Session, "is_error", answer.IsError, "unwritten", unwritten())
 }
 
 // readAgentSession reads the session in keeps, or the one a turn going is in.

@@ -133,13 +133,22 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 		s.holdHarness("pi", holdPi(s.ctx, pi.PinnedFlake, s.wg.Go, s.logger))
 	}
 
+	if s.turnsApart, err = claudecode.ApartHere(); err != nil {
+		return err
+	}
+
 	home, err := rootAgentHome()
 	if err != nil {
 		return err
 	}
 	// Every agent the node runs is kept beside ROOT's (ADR-048).
 	s.agentsDir = filepath.Dir(home)
-	return s.nameRootAgent(home)
+	if err := s.nameRootAgent(home); err != nil {
+		return err
+	}
+	agent := s.rootAgent
+	s.wg.Go("agent.turnLeft", func() { s.takeUpTurnLeft(agent) })
+	return nil
 }
 
 // nameRootAgent makes the ROOT agent this node's: a key of its own from the

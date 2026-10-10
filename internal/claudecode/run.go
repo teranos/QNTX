@@ -1,13 +1,9 @@
 package claudecode
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -121,21 +117,38 @@ type Answer struct {
 // stderrKept is how much of what Claude Code wrote to stderr an error carries.
 const stderrKept = 4096
 
-// Run says it and reads the stream to its result, handing each message to
-// each as it arrives. A run that prints no result is an error carrying what
-// Claude Code wrote to stderr.
+// Run says it, apart from the caller as a process of its own, and reads the
+// stream to its result, handing each message to each as it arrives. A run
+// that prints no result is an error carrying what Claude Code wrote to stderr.
 func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
+	if each == nil {
+		each = func(Message) {}
+	}
+	turn, err := s.Start(Apart{})
+	if err != nil {
+		return Answer{}, err
+	}
+	answer, err := turn.Follow(ctx, each)
+	if err != nil {
+		return Answer{}, err
+	}
+	return answer, turn.End()
+}
+
+// prepare is what Claude Code is run with for it: its arguments, and its
+// environment, which carries nothing of the node's beyond agentenv's.
+func (s Said) prepare() (args, env []string, err error) {
 	if s.Mode == "" {
-		return Answer{}, errors.New("no permission mode was named for the session, and none is assumed")
+		return nil, nil, errors.New("no permission mode was named for the session, and none is assumed")
 	}
 	config, work := filepath.Join(s.Home, "claude"), filepath.Join(s.Home, "work")
 	for _, dir := range []string{config, work} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return Answer{}, errors.Wrapf(err, "could not create %s", dir)
+			return nil, nil, errors.Wrapf(err, "could not create %s", dir)
 		}
 	}
 
-	args := []string{"-p", s.Says, "--output-format", "stream-json", "--verbose",
+	args = []string{"-p", s.Says, "--output-format", "stream-json", "--verbose",
 		"--model", s.Model, "--effort", s.Effort, "--permission-mode", s.Mode}
 	if len(s.Allow) > 0 {
 		args = append(args, "--allowedTools", strings.Join(s.Allow, ","))
@@ -148,7 +161,7 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	if s.System != "" {
 		args = append(args, "--append-system-prompt", s.System)
 	}
-	env := append(agentenv.Carried(), "CLAUDE_CONFIG_DIR="+config, "DISABLE_AUTOUPDATER=1")
+	env = append(agentenv.Carried(), "CLAUDE_CONFIG_DIR="+config, "DISABLE_AUTOUPDATER=1")
 	env = append(env, s.Env...)
 	if s.Token != "" {
 		env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+s.Token)
@@ -156,74 +169,32 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	if len(s.MCP) > 0 {
 		path, bearers, err := s.writeMCP()
 		if err != nil {
-			return Answer{}, err
+			return nil, nil, err
 		}
 		args = append(args, "--mcp-config", path, "--strict-mcp-config")
 		env = append(env, bearers...)
 	}
+	return args, env, nil
+}
 
-	cmd := exec.CommandContext(ctx, s.Binary, args...)
-	cmd.Dir, cmd.Env = work, env
-	// Stopped the way a person stops it, so the session is left as written.
-	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
-	cmd.WaitDelay = 10 * time.Second
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return Answer{}, errors.Wrap(err, "could not read what Claude Code prints")
+// take is what m says of how the run went: the model and version it started
+// on, and the result it ended with. It reports whether m is that result.
+func (a *Answer) take(m Message) bool {
+	if m.Type == "system" && m.Subtype == "init" {
+		a.Model, a.Version = m.Model, m.Version
 	}
-	if err := cmd.Start(); err != nil {
-		return Answer{}, errors.Wrapf(err, "could not start %s", s.Binary)
+	if m.Type != "result" {
+		return false
 	}
-
-	var answer Answer
-	answered := false
-	lines := bufio.NewReader(stdout)
-	for {
-		line, readErr := lines.ReadBytes('\n')
-		if len(bytes.TrimSpace(line)) > 0 {
-			var m Message
-			// A line that is not a message is nothing the stream promised.
-			if json.Unmarshal(line, &m) == nil && m.Type != "" {
-				if m.Type == "system" && m.Subtype == "init" {
-					answer.Model, answer.Version = m.Model, m.Version
-				}
-				if m.Type == "result" {
-					answered = true
-					answer.Text, answer.IsError, answer.Subtype = m.Result, m.IsError, m.Subtype
-					answer.Session, answer.CostUSD = m.SessionID, m.CostUSD
-					answer.Took = time.Duration(m.TookMS) * time.Millisecond
-					for _, denial := range m.Denials {
-						if !slices.Contains(answer.Denied, denial.Tool) {
-							answer.Denied = append(answer.Denied, denial.Tool)
-						}
-					}
-				}
-				if each != nil {
-					each(m)
-				}
-			}
-		}
-		if readErr != nil {
-			if !errors.Is(readErr, io.EOF) {
-				return Answer{}, errors.Wrap(readErr, "the stream Claude Code prints was cut short")
-			}
-			break
+	a.Text, a.IsError, a.Subtype = m.Result, m.IsError, m.Subtype
+	a.Session, a.CostUSD = m.SessionID, m.CostUSD
+	a.Took = time.Duration(m.TookMS) * time.Millisecond
+	for _, denial := range m.Denials {
+		if !slices.Contains(a.Denied, denial.Tool) {
+			a.Denied = append(a.Denied, denial.Tool)
 		}
 	}
-	waitErr := cmd.Wait()
-	if answered {
-		return answer, nil
-	}
-	said := strings.TrimSpace(stderr.String())
-	if len(said) > stderrKept {
-		said = said[len(said)-stderrKept:]
-	}
-	if waitErr != nil {
-		return Answer{}, errors.Wrapf(waitErr, "Claude Code ended with no result, saying: %s", said)
-	}
-	return Answer{}, errors.Newf("Claude Code ended with no result, saying: %s", said)
+	return true
 }
 
 // Holds reports whether Claude Code under home keeps the session: it writes

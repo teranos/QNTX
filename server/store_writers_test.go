@@ -69,6 +69,9 @@ var storeWriters = map[string]string{
 		"reach table gives to ROOT; a namespace agent's in its namespace, through Write as the caller " +
 		"is admitted to act there, reached from the agents sigils, which the table gives to whoever acts " +
 		"in a namespace and the handler narrows to the namespace named",
+	"takeUpTurnLeft": "the rest of the ROOT agent's session, from a turn a node before this one left " +
+		"running (ADR-048), in system as sessionStoreOf writes it. Nobody asks: the node does at start, " +
+		"for the turn a caller the claude sigil admitted as ROOT began",
 	"setAgentLine": "the AGENT line a namespace opts into its agent by (ADR-048), in the namespace's own " +
 		"store through Write as the setter is admitted, after maySetAgent says they own the namespace, " +
 		"or are ROOT or SUPER",
