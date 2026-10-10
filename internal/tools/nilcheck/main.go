@@ -327,6 +327,24 @@ func discards(a *ast.AssignStmt) bool {
 	return false
 }
 
+// answers is a statement that answers the caller with http.Error.
+func answers(stmt ast.Stmt) bool {
+	expr, ok := stmt.(*ast.ExprStmt)
+	if !ok {
+		return false
+	}
+	call, ok := expr.X.(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	return ok && pkg.Name == "http" && sel.Sel.Name == "Error"
+}
+
 // logs is a statement that is an error or warning call.
 func logs(stmt ast.Stmt) bool {
 	expr, ok := stmt.(*ast.ExprStmt)
@@ -339,6 +357,10 @@ func logs(stmt ast.Stmt) bool {
 	}
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
+		return false
+	}
+	// http.Error answers the caller; it says nothing on the node.
+	if answers(stmt) {
 		return false
 	}
 	for _, name := range logNames {
@@ -354,6 +376,10 @@ func logs(stmt ast.Stmt) bool {
 func leaves(list []ast.Stmt, i int) bool {
 	if i >= len(list) {
 		return false
+	}
+	// Answering the caller on the way out is still on the way out.
+	if answers(list[i]) {
+		return leaves(list, i+1)
 	}
 	switch stmt := list[i].(type) {
 	case *ast.ReturnStmt, *ast.BranchStmt:

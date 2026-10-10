@@ -1,6 +1,6 @@
 # errors and warnings logged and carried on from, per file. Debt: each number may fall and may not rise.
 # Instead: return the error, or say in a value why carrying on is the answer.
-# 356 in 107 files.
+# 320 in 104 files.
 
 6	ats/storage/embedding_store.go
 4	ats/storage/new_store_rust.go
@@ -15,13 +15,12 @@
 4	cmd/qntx/commands/database_sqlite.go
 12	cmd/qntx/main.go
 1	db/migrate.go
-4	element/handlers/canvas.go
+3	element/handlers/canvas.go
 2	internal/config/watcher.go
 6	internal/logger/logger.go
 1	internal/nodedid/handlers.go
 2	internal/sacred/spawn.go
 1	internal/sqlclose/sqlclose.go
-1	plugin/grpc/client.go
 2	plugin/grpc/services/fetch_server.go
 1	plugin/grpc/services/github_server.go
 1	plugin/grpc/services/mail_server.go
@@ -31,9 +30,8 @@
 10	pulse/async/worker.go
 7	pulse/schedule/ticker.go
 5	qntx-plugins/qntx-atproto/attestations.go
-13	qntx-plugins/qntx-atproto/handlers.go
+12	qntx-plugins/qntx-atproto/handlers.go
 4	qntx-plugins/qntx-atproto/plugin.go
-2	qntx-plugins/qntx-atproto/response.go
 2	qntx-plugins/qntx-atproto/timeline_sync.go
 2	qntx-plugins/qntx-github/events.go
 2	qntx-plugins/qntx-github/plugin.go
@@ -42,7 +40,7 @@
 1	server/agent_turn.go
 1	server/attestation_handlers.go
 1	server/auth/attest.go
-2	server/auth/auth.go
+1	server/auth/auth.go
 10	server/auth/forget.go
 25	server/auth/handlers.go
 2	server/auth/handlers_tokens.go
@@ -65,16 +63,16 @@
 9	server/client.go
 4	server/db_stats_cache.go
 1	server/element_module_handlers.go
-2	server/embeddings/cluster_handler.go
-2	server/embeddings/cluster_memberships.go
+1	server/embeddings/cluster_handler.go
+1	server/embeddings/cluster_memberships.go
 9	server/embeddings/clustering.go
-8	server/embeddings/clusters.go
-21	server/embeddings/handlers.go
-2	server/embeddings/project_handler.go
+4	server/embeddings/clusters.go
+10	server/embeddings/handlers.go
+1	server/embeddings/project_handler.go
 1	server/embeddings/projection.go
 5	server/embeddings/pulse.go
 3	server/embeddings_pulse.go
-12	server/files.go
+4	server/files.go
 2	server/github.go
 3	server/github_deliveries.go
 6	server/handlers.go
@@ -89,10 +87,9 @@
 2	server/pulse_job_children.go
 5	server/pulse_schedules.go
 1	server/python_handlers.go
-1	server/ratelimit.go
 1	server/report_pulse.go
 4	server/response.go
-7	server/routing.go
+4	server/routing.go
 2	server/server.go
 1	server/signa.go
 1	server/staand.go
