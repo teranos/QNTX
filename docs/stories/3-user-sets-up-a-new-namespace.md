@@ -6,4 +6,6 @@ the wizard is similar to the first-time node setup,
 
 but its for a namespace
 
+a namespace will start without a backend, user can choose local sqlite/supabase parquet optionally
+
 at some point the namespace part is done
