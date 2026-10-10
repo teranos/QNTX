@@ -99,6 +99,16 @@
         "USER"
       ]
     },
+    "/api/approvals": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/approvals/answer": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/attestations": {
       "x-qntx-reach": [
         "ROOT",

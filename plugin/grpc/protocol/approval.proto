@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// Approvals (ADR-052): what waits on the human. These are the shapes the
+// approvals element reads; the record itself is attestations
+// (server/approvals.go). "approvals are attestations obviously"
+
+// Approvals is what approvals list answers: every pull request against its
+// repository's default branch that waits on ROOT, or whose answer still waits
+// on main's CI.
+message Approvals {
+  // Each pull request that waits, newest first.
+  repeated Approval approvals = 1;
+}
+
+// Approval is one pull request that waits on the human, as its lines read.
+message Approval {
+  // The pull request by a name a reader knows: teranos/elements#29.
+  string subject = 1;
+  // The pull request's title.
+  string title = 2;
+  // Where it lives, opened from the title row.
+  string link = 3;
+  // owner/repo, as GitHub takes it.
+  string repo = 4;
+  // The pull request's number, as GitHub takes it.
+  int64 pull = 5;
+  // The head it waits at. A push moves it to a new one, and what was answered
+  // about the old one is history.
+  string sha = 6;
+  // The branch it targets: "these are always targeting main".
+  string base = 7;
+  // When it came in, RFC3339.
+  string asked_at = 8;
+  // "The checks are what occur on the PR itself, before we even want to
+  // present it as something to approve or not."
+  repeated ApprovalCheck checks = 9;
+  // The option pressed last: Merge or Don’t merge. Empty is undecided.
+  string option = 10;
+  // What that press said: merge when main CI passes, force merge, cancel the
+  // merge, or definitely no. Empty is undecided.
+  string said = 11;
+  // What stands waits on main's CI: "merge after CI passes".
+  bool waits = 12;
+}
+
+// ApprovalCheck is one check on the head, as GitHub last said of it.
+message ApprovalCheck {
+  // The check's name, as GitHub shows it.
+  string name = 1;
+  // waiting, running, done or failed: the segment it is drawn as.
+  string state = 2;
+  // The check on GitHub.
+  string link = 3;
+}
+
+// ApprovalAnswered is what the answer route answers: what the press did.
+message ApprovalAnswered {
+  // The pull request the press was about.
+  string subject = 1;
+  // The head the press was about.
+  string sha = 2;
+  // The option pressed.
+  string option = 3;
+  // What the press said.
+  string said = 4;
+  // merged: the node merged it. waiting: it merges when main's CI passes.
+  // nothing: the press stands and nothing is done for it.
+  string did = 5;
+  // The merge commit, when did is merged.
+  string merge_sha = 6;
+}

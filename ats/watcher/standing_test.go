@@ -24,6 +24,10 @@ var whyStanding = map[string]string{
 		"sha to find it by, so it is found by the name ground gave it, here, where the socket " +
 		"is, and the verdict goes back the way a push's does. Sky asked github for this from the " +
 		"laptop every five seconds",
+	StandingApproval: "an approval is lines about a pull request, and the page holds the roll it " +
+		"drew of them. Told that one moved, it reads the lines again and moves what moved; " +
+		"without this it shows the approvals of when it opened until somebody reloads by hand, " +
+		"and a merge the human waited on goes unseen",
 	StandingQuoteClaimed: "a quoted span claims the user said it. ground checked the claim in a " +
 		"hook that held the write for up to twelve seconds, against every prompt on the laptop; " +
 		"the write now passes, and the claim is asked of the prompts this namespace holds, here, " +

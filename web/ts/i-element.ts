@@ -22,6 +22,7 @@ import { openUsersElement } from './users-element.ts';
 import { openMarketElement } from './market-element.ts';
 import { openMailElement } from './mail-element.ts';
 import { openGitHubElement } from './github-element.ts';
+import { openApprovalsElement } from './approvals-element.ts';
 
 // Who the node thinks is looking, and what it said instead when it would not
 // say. Both empty is nothing asked yet, which draws no section at all.
@@ -133,6 +134,11 @@ function renderI(): void {
             openGitHubElement();
         });
         actions.appendChild(githubBtn.element);
+        // What waits on the human is ROOT's to answer (ADR-052).
+        const approvalsBtn = createGhostButton('✓ Approvals', async () => {
+            openApprovalsElement();
+        });
+        actions.appendChild(approvalsBtn.element);
     }
 
     // ROOT being somebody gets back to itself here (ADR-031).
