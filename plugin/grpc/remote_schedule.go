@@ -147,9 +147,5 @@ func (r *RemoteSchedule) Get(scheduleID string) (*schedule.Job, error) {
 		return nil, errors.Newf("get schedule failed: %s", resp.Error)
 	}
 
-	if resp.Job == nil {
-		return nil, errors.Newf("schedule not found: %s", scheduleID)
-	}
-
 	return resp.Job, nil
 }

@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // RemoteATSStore is a gRPC client wrapper for the attestation store.
@@ -60,13 +59,11 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *
 		SourceVersion: cmd.SourceVersion,
 	}
 
-	if len(cmd.Attributes) > 0 {
-		attrs, err := structpb.NewStruct(cmd.Attributes)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to convert attributes to Struct")
-		}
-		protoCmd.Attributes = attrs
+	attrs, err := protocol.AttributesStruct(cmd.Attributes)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the attestation of %v is not sent", cmd.Subjects)
 	}
+	protoCmd.Attributes = attrs
 
 	if !cmd.Timestamp.IsZero() {
 		ts := cmd.Timestamp.UnixMilli()

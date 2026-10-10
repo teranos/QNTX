@@ -149,3 +149,20 @@ func TestATokenTheNodeCannotMintFailsTheInitialize(t *testing.T) {
 	require.Error(t, err, "a token the node could not mint was not said")
 	assert.Contains(t, err.Error(), "pond")
 }
+
+// A record whose namespace key is there but names nothing is the node's to
+// refuse, as any namespace it does not serve, not a plugin standing nowhere.
+func TestAnEmptyNamespaceIsTheNodesToRefuse(t *testing.T) {
+	SetPluginRecords(heldRecords{"cleanAPI": {Name: "cleanAPI", Config: map[string]string{PluginNamespaceKey: ""}}})
+	t.Cleanup(func() { SetPluginRecords(nil) })
+	var asked []string
+	refused := func(plugin, namespace string) (string, error) {
+		asked = append(asked, namespace)
+		return "", errors.Newf("namespace %q is not served", namespace)
+	}
+
+	config := NewConfigProvider(&ServiceEndpoints{AuthToken: "shared"}, refused, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
+	assert.Equal(t, "", config.GetString("_auth_token"))
+	assert.Equal(t, []string{""}, asked, "an empty namespace was not handed to the node")
+	require.Error(t, config.(interface{ Err() error }).Err(), "an empty namespace started the plugin standing nowhere")
+}

@@ -8,6 +8,8 @@ import (
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,12 +73,14 @@ type ExternalDomainProxy struct {
 	// traffic is what the proxy carried to this plugin, per declared route.
 	traffic *Traffic
 
-	// WebSocket configuration (set via SetWebSocketConfig)
-	keepaliveConfig *KeepaliveConfig
-	wsConfig        *WebSocketConfig
+	// WebSocket configuration: the defaults a proxy is made with, until
+	// SetWebSocketConfig hands it the node's.
+	keepaliveConfig KeepaliveConfig
+	wsConfig        WebSocketConfig
 
 	// Callback invoked after plugin watchers are written to DB.
 	// Allows the server to reload the watcher engine's in-memory map.
+	// A proxy is made with one that has nothing to reload.
 	OnWatchersSetup func()
 
 	// Initialize idempotency — multiple code paths may call Initialize
@@ -114,11 +118,14 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 	client := protocol.NewDomainPluginServiceClient(conn)
 
 	proxy := &ExternalDomainProxy{
-		conn:    conn,
-		client:  client,
-		logger:  logger,
-		addr:    addr,
-		traffic: newTraffic(),
+		conn:            conn,
+		client:          client,
+		logger:          logger,
+		addr:            addr,
+		traffic:         newTraffic(),
+		keepaliveConfig: DefaultKeepaliveConfig(),
+		wsConfig:        DefaultWebSocketConfig(),
+		OnWatchersSetup: func() {},
 	}
 
 	// Fetch and cache metadata
@@ -155,10 +162,10 @@ func (c *ExternalDomainProxy) Close() error {
 }
 
 // SetWebSocketConfig configures WebSocket settings for keepalive and origin validation.
-// If not called, defaults will be used.
+// If not called, the defaults the proxy was made with are used.
 func (c *ExternalDomainProxy) SetWebSocketConfig(keepalive KeepaliveConfig, ws WebSocketConfig) {
-	c.keepaliveConfig = &keepalive
-	c.wsConfig = &ws
+	c.keepaliveConfig = keepalive
+	c.wsConfig = ws
 }
 
 // Metadata returns the plugin's metadata (cached from connection).
@@ -314,11 +321,10 @@ func askerFrom(ctx context.Context) []*protocol.HTTPHeader {
 	if !gated {
 		return nil
 	}
+	// Each header says what the admission holds, as it holds it.
 	var headers []*protocol.HTTPHeader
 	add := func(name, value string) {
-		if value != "" {
-			headers = append(headers, &protocol.HTTPHeader{Name: name, Values: []string{value}})
-		}
+		headers = append(headers, &protocol.HTTPHeader{Name: name, Values: []string{value}})
 	}
 	if call, opened := ctx.Value(openedCallKey{}).(openedCall); opened {
 		add("X-Qntx-Store-Token", call.token)
@@ -361,115 +367,38 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	pluginConfig := services.Config(c.metadata.Name)
 
 	// Pass all configuration keys from the plugin's namespace
-	// This includes both built-in keys and the keys the plugin's record holds
+	// This includes both built-in keys and the keys the plugin's record holds,
+	// each as the string it reads as.
 	keys := pluginConfig.GetKeys()
-	if unread, says := pluginConfig.(interface{ Err() error }); says && unread.Err() != nil {
-		return errors.Wrapf(unread.Err(), "plugin %s was not handed its config", c.metadata.Name)
+	if err := configErr(pluginConfig); err != nil {
+		return errors.Wrapf(err, "plugin %s was not handed its config", c.metadata.Name)
 	}
 	for _, key := range keys {
 		// Skip internal keys (prefixed with _)
-		if len(key) > 0 && key[0] == '_' {
+		if strings.HasPrefix(key, "_") {
 			continue
 		}
-
-		// Get raw value and convert to string for protobuf
-		val := pluginConfig.Get(key)
-		if val == nil {
-			continue
-		}
-
-		// Type-based conversion to string
-		switch v := val.(type) {
-		case string:
-			if v != "" {
-				config[key] = v
-			}
-		case int, int8, int16, int32, int64:
-			config[key] = fmt.Sprintf("%d", v)
-		case float32, float64:
-			config[key] = fmt.Sprintf("%f", v)
-		case bool:
-			config[key] = fmt.Sprintf("%v", v)
-		case []any:
-			// Array types - serialize as JSON
-			if jsonBytes, err := json.Marshal(v); err == nil {
-				config[key] = string(jsonBytes)
-			}
-		default:
-			// Try JSON marshaling for complex types
-			if jsonBytes, err := json.Marshal(v); err == nil {
-				config[key] = string(jsonBytes)
-			}
-		}
+		config[key] = pluginConfig.GetString(key)
 	}
 
-	// Get service endpoints from the service registry if available
-	// These will be empty strings if services aren't running
-	atsStoreEndpoint := ""
-	queueEndpoint := ""
-	scheduleEndpoint := ""
-	fileServiceEndpoint := ""
-	authToken := ""
-
-	// Try to extract endpoints from config (passed by PluginManager)
-	if ep := pluginConfig.GetString("_ats_store_endpoint"); ep != "" {
-		atsStoreEndpoint = ep
-		c.logger.Debugw("Extracted ATSStore endpoint from config", "endpoint", ep)
-	}
-	if ep := pluginConfig.GetString("_queue_endpoint"); ep != "" {
-		queueEndpoint = ep
-		c.logger.Debugw("Extracted Queue endpoint from config", "endpoint", ep)
-	}
-	if ep := pluginConfig.GetString("_schedule_endpoint"); ep != "" {
-		scheduleEndpoint = ep
-		c.logger.Debugw("Extracted Schedule endpoint from config", "endpoint", ep)
-	}
-	if ep := pluginConfig.GetString("_file_service_endpoint"); ep != "" {
-		fileServiceEndpoint = ep
-		c.logger.Debugw("Extracted FileService endpoint from config", "endpoint", ep)
-	}
-	llmEndpoint := ""
-	if ep := pluginConfig.GetString("_llm_endpoint"); ep != "" {
-		llmEndpoint = ep
-		c.logger.Debugw("Extracted LLM endpoint from config", "endpoint", ep)
-	}
-	embeddingEndpoint := ""
-	if ep := pluginConfig.GetString("_embedding_endpoint"); ep != "" {
-		embeddingEndpoint = ep
-		c.logger.Debugw("Extracted Embedding endpoint from config", "endpoint", ep)
-	}
-	vectorSearchEndpoint := ""
-	if ep := pluginConfig.GetString("_vector_search_endpoint"); ep != "" {
-		vectorSearchEndpoint = ep
-		c.logger.Debugw("Extracted VectorSearch endpoint from config", "endpoint", ep)
-	}
-	groundEndpoint := ""
-	if ep := pluginConfig.GetString("_ground_endpoint"); ep != "" {
-		groundEndpoint = ep
-		c.logger.Debugw("Extracted Ground endpoint from config", "endpoint", ep)
-	}
-	searchEndpoint := ""
-	if ep := pluginConfig.GetString("_search_endpoint"); ep != "" {
-		searchEndpoint = ep
-		c.logger.Debugw("Extracted Search endpoint from config", "endpoint", ep)
-	}
-	fetchEndpoint := ""
-	if ep := pluginConfig.GetString("_fetch_endpoint"); ep != "" {
-		fetchEndpoint = ep
-		c.logger.Debugw("Extracted Fetch endpoint from config", "endpoint", ep)
-	}
-	mailEndpoint := ""
-	if ep := pluginConfig.GetString("_mail_endpoint"); ep != "" {
-		mailEndpoint = ep
-		c.logger.Debugw("Extracted Mail endpoint from config", "endpoint", ep)
-	}
-	if token := pluginConfig.GetString("_auth_token"); token != "" {
-		authToken = token
-	}
+	// The service endpoints and token, as the node's config hands them: a
+	// service the node is not running is handed as it is.
+	atsStoreEndpoint := pluginConfig.GetString("_ats_store_endpoint")
+	queueEndpoint := pluginConfig.GetString("_queue_endpoint")
+	scheduleEndpoint := pluginConfig.GetString("_schedule_endpoint")
+	fileServiceEndpoint := pluginConfig.GetString("_file_service_endpoint")
+	llmEndpoint := pluginConfig.GetString("_llm_endpoint")
+	embeddingEndpoint := pluginConfig.GetString("_embedding_endpoint")
+	vectorSearchEndpoint := pluginConfig.GetString("_vector_search_endpoint")
+	groundEndpoint := pluginConfig.GetString("_ground_endpoint")
+	searchEndpoint := pluginConfig.GetString("_search_endpoint")
+	fetchEndpoint := pluginConfig.GetString("_fetch_endpoint")
+	mailEndpoint := pluginConfig.GetString("_mail_endpoint")
+	authToken := pluginConfig.GetString("_auth_token")
 	// A token the node could not mint for the namespace the plugin stands in
 	// fails the Initialize here, rather than starting the plugin on no token.
-	if unread, says := pluginConfig.(interface{ Err() error }); says && unread.Err() != nil {
-		return errors.Wrapf(unread.Err(), "plugin %s was not handed its config", c.metadata.Name)
+	if err := configErr(pluginConfig); err != nil {
+		return errors.Wrapf(err, "plugin %s was not handed its config", c.metadata.Name)
 	}
 
 	// A plugin needing a credential would otherwise need it written literally
@@ -552,18 +481,13 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store Python provider capability
 	c.pythonProvider = resp.GetPythonProvider()
 
-	// Store and create watcher registrations
+	// Store and create watcher registrations. Declaring none withdraws
+	// every watcher the plugin declared before.
 	c.watchers = resp.GetWatchers()
-	if len(c.watchers) > 0 {
-		if err := SetupPluginWatchers(services.Database(), c.metadata.Name, c.watchers, c.handlerNames, c.logger); err != nil {
-			c.logger.Warnw("Failed to setup plugin watchers",
-				"plugin", c.metadata.Name,
-				"error", err,
-			)
-		} else if c.OnWatchersSetup != nil {
-			c.OnWatchersSetup()
-		}
+	if err := SetupPluginWatchers(services.Database(), c.metadata.Name, c.watchers, c.handlerNames, c.logger); err != nil {
+		return errors.Wrapf(err, "plugin %s at %s: its watchers were not set up", c.metadata.Name, c.addr)
 	}
+	c.OnWatchersSetup()
 
 	c.logger.Debugw("Plugin initialized",
 		"name", c.metadata.Name,
@@ -636,8 +560,7 @@ func (c *ExternalDomainProxy) RegisterHTTP(mux *http.ServeMux) error {
 	return nil
 }
 
-// Traffic is what the proxy carried to this plugin. Nil is a proxy built
-// without the constructor, which carried nothing.
+// Traffic is what the proxy carried to this plugin.
 func (c *ExternalDomainProxy) Traffic() *Traffic {
 	return c.traffic
 }
@@ -646,36 +569,16 @@ func (c *ExternalDomainProxy) Traffic() *Traffic {
 // Tries stripped path first (without /api/{plugin}), then full path if 404 (Issue #277).
 // This allows plugins to register routes either way without friction.
 func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Request) {
-	// Counted once per request, whatever it came to. A request the browser
+	// Counted once per request, as it was answered. A request the browser
 	// abandoned was answered by nobody, and is not counted.
 	started := time.Now()
-	answered := 0
-	defer func() {
-		if c.traffic == nil || answered == 0 {
-			return
-		}
-		route := routeOf(r.Method, c.strippedPath(r.URL.Path), c.httpRoutes)
-		took := time.Since(started)
-		c.traffic.record(route, answered, took, started)
-		attrs := []measure.Attr{
-			measure.String(measure.AttrPlugin, c.metadata.Name),
-			measure.String(measure.AttrPluginRoute, route),
-			measure.String(measure.AttrOutcome, outcomeOf(answered)),
-		}
-		measure.Count(measure.PluginCalled, 1, attrs...)
-		measure.Took(measure.PluginTook, took, attrs...)
-	}()
 
-	// Read request body
-	var body []byte
-	if r.Body != nil {
-		var err error
-		body, err = io.ReadAll(r.Body)
-		if err != nil {
-			answered = http.StatusInternalServerError
-			http.Error(w, "Failed to read request body", http.StatusInternalServerError)
-			return
-		}
+	// Read request body. A server's request always has one.
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		c.count(r, http.StatusInternalServerError, started)
+		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		return
 	}
 
 	// Convert HTTP headers to protocol format
@@ -695,16 +598,10 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 	originalPath := r.URL.Path
 	strippedPath := c.strippedPath(originalPath)
 
-	// Add query string
-	queryString := ""
-	if r.URL.RawQuery != "" {
-		queryString = "?" + r.URL.RawQuery
-	}
-
 	// Try stripped path first (modern approach: plugins don't need to know mount point)
 	req := &protocol.HTTPRequest{
 		Method:  r.Method,
-		Path:    strippedPath + queryString,
+		Path:    withQuery(strippedPath, r.URL.RawQuery),
 		Headers: headers,
 		Body:    body,
 	}
@@ -715,14 +612,14 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 	// If stripped path returns 404, try full path (for LLMs that naturally include prefix)
 	if err == nil && resp.StatusCode == 404 && strippedPath != originalPath {
 		c.logger.Debugw("Stripped path 404, retrying with full path", "plugin", c.metadata.Name, "full_path", originalPath)
-		req.Path = originalPath + queryString
+		req.Path = withQuery(originalPath, r.URL.RawQuery)
 		resp, err = c.client.HandleHTTP(r.Context(), req)
 	}
 
 	// Handle errors — context canceled means the browser navigated away or refreshed.
 	// The request is abandoned; no response needed, no error to log.
 	if err != nil {
-		if r.Context().Err() != nil {
+		if ctxErr := r.Context().Err(); ctxErr != nil {
 			return
 		}
 		// Unimplemented/NotFound = plugin doesn't serve this path; debug, not error
@@ -731,21 +628,20 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 				"plugin", c.metadata.Name,
 				"method", r.Method,
 				"path", req.Path)
-			answered = http.StatusNotFound
+			c.count(r, http.StatusNotFound, started)
 			http.Error(w, fmt.Sprintf("Plugin '%s': %s not found", c.metadata.Name, req.Path), http.StatusNotFound)
 			return
 		}
+		c.count(r, http.StatusBadGateway, started)
 		c.logger.Errorw("Remote HTTP request failed",
 			"plugin", c.metadata.Name,
 			"method", r.Method,
 			"path", req.Path,
 			"addr", c.addr,
 			"error", err)
-		answered = http.StatusBadGateway
 		http.Error(w, fmt.Sprintf("Plugin '%s' error: %v (%s %s)", c.metadata.Name, err, r.Method, req.Path), http.StatusBadGateway)
 		return
 	}
-	answered = int(resp.StatusCode)
 
 	// Write response headers
 	// Support multi-value headers (e.g., Set-Cookie)
@@ -755,31 +651,56 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// Write status and body
+	// Write status and body. A body the client did not take was answered to
+	// nobody, and is not counted.
 	w.WriteHeader(int(resp.StatusCode))
-	if len(resp.Body) > 0 {
-		if _, err := w.Write(resp.Body); err != nil {
-			c.logger.Warnw("Plugin response body not delivered",
-				"plugin", c.metadata.Name, "status", resp.StatusCode, "bytes", len(resp.Body), "error", err)
-		}
+	if n, err := w.Write(resp.Body); err != nil {
+		c.logger.Warnw("Plugin response body not delivered",
+			"plugin", c.metadata.Name, "status", resp.StatusCode, "bytes", len(resp.Body), "written", n, "error", err)
+		return
 	}
+	c.count(r, int(resp.StatusCode), started)
+}
+
+// count records one request the plugin was asked and how it was answered.
+func (c *ExternalDomainProxy) count(r *http.Request, status int, started time.Time) {
+	route := routeOf(r.Method, c.strippedPath(r.URL.Path), c.httpRoutes)
+	took := time.Since(started)
+	c.traffic.record(route, status, took, started)
+	attrs := []measure.Attr{
+		measure.String(measure.AttrPlugin, c.metadata.Name),
+		measure.String(measure.AttrPluginRoute, route),
+		measure.String(measure.AttrOutcome, outcomeOf(status)),
+	}
+	measure.Count(measure.PluginCalled, 1, attrs...)
+	measure.Took(measure.PluginTook, took, attrs...)
+}
+
+// withQuery is path with the raw query the request carried, as a request URI.
+func withQuery(path, rawQuery string) string {
+	return (&url.URL{Path: path, RawQuery: rawQuery}).RequestURI()
+}
+
+// configErr is why a plugin config could not be handed, for a config that
+// keeps one.
+func configErr(config plugin.Config) error {
+	if keeps, says := config.(interface{ Err() error }); says {
+		return keeps.Err()
+	}
+	return nil
 }
 
 // strippedPath is a path under /api/{plugin} with that prefix taken off:
 // /api/code -> /, /api/code/x -> /x. Anything else comes back as it was.
 func (c *ExternalDomainProxy) strippedPath(originalPath string) string {
-	prefix := "/api/" + c.metadata.Name
-	if originalPath == prefix {
-		return "/"
+	stripped, under := strings.CutPrefix(originalPath, "/api/"+c.metadata.Name)
+	if !under {
+		return originalPath
 	}
-	if len(originalPath) > len(prefix) && originalPath[:len(prefix)] == prefix {
-		stripped := originalPath[len(prefix):]
-		if stripped == "" || stripped[0] != '/' {
-			stripped = "/" + stripped
-		}
-		return stripped
+	if !strings.HasPrefix(stripped, "/") {
+		stripped = "/" + stripped
 	}
-	return originalPath
+	return stripped
 }
 
 // RegisterWebSocket returns WebSocket handlers that proxy to the remote plugin.
@@ -787,27 +708,16 @@ func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]plugin.WebSocketHa
 	// Return a proxy WebSocket handler
 	handlers := make(map[string]plugin.WebSocketHandler)
 
-	// Use configured keepalive or default
-	keepaliveCfg := DefaultKeepaliveConfig()
-	if c.keepaliveConfig != nil {
-		keepaliveCfg = *c.keepaliveConfig
-	}
 	pluginLogger := c.logger.With("plugin", c.metadata.Name)
 	pluginLabel := fmt.Sprintf("%s v%s", c.metadata.Name, c.metadata.Version)
-	keepaliveHandler := NewKeepaliveHandler(keepaliveCfg, pluginLogger, pluginLabel)
-
-	// Use configured WebSocket security or default
-	wsCfg := DefaultWebSocketConfig()
-	if c.wsConfig != nil {
-		wsCfg = *c.wsConfig
-	}
+	keepaliveHandler := NewKeepaliveHandler(c.keepaliveConfig, pluginLogger, pluginLabel)
 
 	// Create a proxy handler for the plugin's WebSocket endpoints
 	handlers[fmt.Sprintf("/ws/%s", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
 		logger:    pluginLogger,
 		keepalive: keepaliveHandler,
-		wsConfig:  wsCfg,
+		wsConfig:  c.wsConfig,
 	}
 
 	return handlers, nil
@@ -875,21 +785,18 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	// detects disconnection and sends CLOSE, so we don't need r.Context().
 	ctx, streamCancel := context.WithCancel(context.Background())
 	defer streamCancel()
+	// Each query parameter, with every value it was given.
 	md := metadata.New(nil)
 	for key, values := range r.URL.Query() {
-		if len(values) > 0 {
-			md.Set(key, values[0])
-		}
+		md.Set(key, values...)
 	}
 	ctx = metadata.NewOutgoingContext(ctx, md)
 	stream, err := h.client.client.HandleWebSocket(ctx)
 	if err != nil {
-		h.logger.Errorw("Failed to establish gRPC stream", "error", err)
 		// Without this the client sees the socket drop with no reason given.
-		if closeErr := wsConn.WriteMessage(websocket.CloseMessage,
-			websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "Failed to connect to plugin")); closeErr != nil {
-			h.logger.Warnw("Close reason not delivered to WebSocket client", "error", closeErr)
-		}
+		closeErr := wsConn.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "Failed to connect to plugin"))
+		h.logger.Errorw("Failed to establish gRPC stream", "error", err, "close_reason_not_delivered", closeErr)
 		return
 	}
 
@@ -917,26 +824,21 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	// Bridge WebSocket and gRPC stream bidirectionally
 	errChan := make(chan error, 2)
 
+	// Each direction ends by handing why on errChan, and that is said once,
+	// below, where the connection ends.
+
 	// WebSocket -> gRPC stream
 	go func() {
-		defer func() {
-			// A CLOSE the plugin never receives leaves it holding a session for
-			// a client that is gone.
-			if err := stream.Send(&protocol.WebSocketMessage{
-				Type:      protocol.WebSocketMessage_CLOSE,
-				Timestamp: time.Now().UnixNano(),
-			}); err != nil {
-				h.logger.Warnw("CLOSE not delivered to plugin", "error", err)
-			}
-		}()
-
 		for {
 			messageType, data, err := wsConn.ReadMessage()
 			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
-					h.logger.Errorw("WebSocket read error", "error", err)
-				}
-				errChan <- err
+				// A CLOSE the plugin never receives leaves it holding a session
+				// for a client that is gone, so its failure travels with err.
+				closeErr := stream.Send(&protocol.WebSocketMessage{
+					Type:      protocol.WebSocketMessage_CLOSE,
+					Timestamp: time.Now().UnixNano(),
+				})
+				errChan <- errors.WithSecondaryError(err, closeErr)
 				return
 			}
 
@@ -950,14 +852,10 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Decode base64 data field
-			var rawData []byte
-			if browserMsg.Data != "" {
-				var decErr error
-				rawData, decErr = base64.StdEncoding.DecodeString(browserMsg.Data)
-				if decErr != nil {
-					h.logger.Errorw("Failed to decode base64 data", "error", decErr)
-					continue
-				}
+			rawData, decErr := base64.StdEncoding.DecodeString(browserMsg.Data)
+			if decErr != nil {
+				h.logger.Errorw("Failed to decode base64 data", "error", decErr)
+				continue
 			}
 
 			protoMsg := &protocol.WebSocketMessage{
@@ -969,8 +867,7 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 			// Send to gRPC stream
 			if err := stream.Send(protoMsg); err != nil {
-				h.logger.Errorw("Failed to send to gRPC stream", "error", err)
-				errChan <- err
+				errChan <- errors.Wrap(err, "failed to send to gRPC stream")
 				return
 			}
 		}
@@ -981,12 +878,6 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 		for {
 			msg, err := stream.Recv()
 			if err != nil {
-				// Unavailable = plugin process was killed (restart/shutdown) — expected.
-				// EOF / Canceled / ctx done = normal teardown.
-				if !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) && ctx.Err() == nil &&
-					status.Code(err) != codes.Unavailable {
-					h.logger.Errorw("gRPC stream read error", "error", err)
-				}
 				errChan <- err
 				return
 			}
@@ -997,27 +888,28 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 			// no reply, and that is the type saying so, not a nil to decode.
 			switch msg.Type {
 			case protocol.WebSocketMessage_PING:
+				// A PONG that cannot be sent is a stream that is gone.
 				if err := stream.Send(h.keepalive.HandlePing(msg)); err != nil {
-					h.logger.Errorw("Failed to send PONG", "error", err)
+					errChan <- errors.Wrap(err, "failed to send PONG")
+					return
 				}
 				continue
 			case protocol.WebSocketMessage_PONG:
 				h.keepalive.HandlePong(msg)
 				continue
 			case protocol.WebSocketMessage_ERROR:
-				err := errors.Newf("websocket error: %s", string(msg.Data))
-				h.logger.Errorw("Keepalive error", "error", err)
-				errChan <- err
+				errChan <- errors.Newf("websocket error: %s", string(msg.Data))
 				return
 			}
 
 			// Handle CLOSE message from plugin
 			if msg.Type == protocol.WebSocketMessage_CLOSE {
+				ended := io.EOF
 				if closeErr := wsConn.WriteMessage(websocket.CloseMessage,
 					websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); closeErr != nil {
-					h.logger.Warnw("Normal close not delivered to WebSocket client", "error", closeErr)
+					ended = errors.Wrap(closeErr, "normal close not delivered to WebSocket client")
 				}
-				errChan <- io.EOF
+				errChan <- ended
 				return
 			}
 
@@ -1031,47 +923,45 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 				}
 				jsonBytes, err := json.Marshal(outMsg)
 				if err != nil {
-					h.logger.Errorw("Failed to marshal outbound message", "error", err)
-					errChan <- err
+					errChan <- errors.Wrap(err, "failed to marshal outbound message")
 					return
 				}
 				if err := wsConn.WriteMessage(websocket.TextMessage, jsonBytes); err != nil {
-					h.logger.Errorw("WebSocket write error", "error", err)
-					errChan <- err
+					errChan <- errors.Wrap(err, "WebSocket write error")
 					return
 				}
 			}
 		}
 	}()
 
-	// Wait for error from either direction
+	// Wait for why either direction ended. EOF and the normal closes are a
+	// connection ending; Unavailable is the plugin process killed (restart or
+	// shutdown), expected.
+	// The connection's end is said once, with how it went: as an error when
+	// it ended any other way.
 	err = <-errChan
-	if err != nil && !errors.Is(err, io.EOF) &&
-		!websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) &&
-		status.Code(err) != codes.Unavailable {
-		h.logger.Errorw("WebSocket proxy error", "error", err)
-	}
-
-	// Log connection metrics
 	metrics := h.keepalive.Metrics()
-	h.logger.Debugw("WebSocket connection closed",
+	ended := []any{
 		"uptime", metrics.GetConnectionUptime(),
 		"pings_sent", metrics.GetTotalPings(),
 		"pongs_received", metrics.GetTotalPongs(),
 		"avg_latency", metrics.GetAverageLatency(),
-	)
+		"ended_by", err,
+	}
+	if !errors.Is(err, io.EOF) &&
+		!websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) &&
+		status.Code(err) != codes.Unavailable {
+		h.logger.Errorw("WebSocket proxy error", ended...)
+		return
+	}
+	h.logger.Debugw("WebSocket connection closed", ended...)
 }
 
 // Health returns the remote plugin's health status.
 func (c *ExternalDomainProxy) Health(ctx context.Context) plugin.HealthStatus {
-	// Add explicit timeout for health checks to prevent hanging
-	// Use provided context's deadline if set, otherwise default to 5 seconds
-	healthCtx := ctx
-	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		var cancel context.CancelFunc
-		healthCtx, cancel = context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-	}
+	// A health check takes at most 5 seconds, or less when ctx ends sooner.
+	healthCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
 	resp, err := c.client.Health(healthCtx, &protocol.Empty{})
 	if err != nil {

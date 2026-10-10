@@ -3,7 +3,12 @@ package grpc
 import (
 	"net"
 	"net/http"
+	"net/netip"
 	"path/filepath"
+	"slices"
+	"strings"
+
+	"go.uber.org/zap"
 )
 
 // WebSocketConfig defines security policy for WebSocket connections
@@ -32,61 +37,53 @@ func DefaultWebSocketConfig() WebSocketConfig {
 }
 
 // CreateOriginChecker creates a CheckOrigin function for websocket.Upgrader
-func CreateOriginChecker(config WebSocketConfig, logger any) func(*http.Request) bool {
-	// Logger interface for optional logging
-	type sugaredLogger interface {
-		Warnw(msg string, keysAndValues ...any)
-		Debugw(msg string, keysAndValues ...any)
-	}
-
-	var log sugaredLogger
-	if l, ok := logger.(sugaredLogger); ok {
-		log = l
-	}
-
+func CreateOriginChecker(config WebSocketConfig, log *zap.SugaredLogger) func(*http.Request) bool {
 	return func(r *http.Request) bool {
 		// Allow all origins if configured (dev mode)
 		if config.AllowAllOrigins {
 			return true
 		}
 
-		origin := r.Header.Get("Origin")
-
-		// SECURITY: Empty origin headers are only allowed from localhost
+		// SECURITY: a request sending no Origin is only allowed from localhost.
 		// Some WebSocket clients (like wscat, websocat) don't send Origin header
 		// But we should only trust this from local connections
-		if origin == "" {
+		if _, sent := r.Header["Origin"]; !sent {
 			// Extract host from RemoteAddr (format: "IP:port" or "[IPv6]:port")
-			host, _, err := net.SplitHostPort(r.RemoteAddr)
+			host, port, err := net.SplitHostPort(r.RemoteAddr)
 			if err != nil {
 				// If we can't parse RemoteAddr, reject for safety
-				if log != nil {
-					log.Warnw("WebSocket rejected - invalid RemoteAddr format",
-						"remote_addr", r.RemoteAddr,
-						"error", err,
-					)
-				}
+				log.Warnw("WebSocket rejected - invalid RemoteAddr format",
+					"remote_addr", r.RemoteAddr,
+					"error", err,
+				)
 				return false
 			}
 
 			// Check if connection is from localhost
 			if isLocalhost(host) {
-				if log != nil {
-					log.Debugw("WebSocket accepted - empty origin from localhost",
-						"remote_addr", r.RemoteAddr,
-						"host", host,
-					)
-				}
+				log.Debugw("WebSocket accepted - no origin from localhost",
+					"host", host,
+					"port", port,
+				)
 				return true
 			}
 
-			// Reject empty origin from remote hosts
-			if log != nil {
-				log.Warnw("WebSocket rejected - empty origin from remote host",
-					"remote_addr", r.RemoteAddr,
-					"host", host,
-				)
-			}
+			// Reject a request sending no origin from remote hosts
+			log.Warnw("WebSocket rejected - no origin from remote host",
+				"host", host,
+				"port", port,
+			)
+			return false
+		}
+
+		// An Origin is a scheme and a host. One that names neither is refused,
+		// whatever the allowed patterns would match.
+		origin := r.Header.Get("Origin")
+		if !strings.Contains(origin, "://") {
+			log.Warnw("WebSocket rejected - origin names no scheme and host",
+				"origin", origin,
+				"remote_addr", r.RemoteAddr,
+			)
 			return false
 		}
 
@@ -94,50 +91,41 @@ func CreateOriginChecker(config WebSocketConfig, logger any) func(*http.Request)
 		for _, allowed := range config.AllowedOrigins {
 			// Exact match
 			if origin == allowed {
-				if log != nil {
-					log.Debugw("WebSocket accepted - exact origin match",
-						"origin", origin,
-						"pattern", allowed,
-						"remote_addr", r.RemoteAddr,
-					)
-				}
+				log.Debugw("WebSocket accepted - exact origin match",
+					"origin", origin,
+					"pattern", allowed,
+					"remote_addr", r.RemoteAddr,
+				)
 				return true
 			}
 
 			// Wildcard match using filepath.Match (supports * and ?)
 			if matched, err := filepath.Match(allowed, origin); err == nil && matched {
-				if log != nil {
-					log.Debugw("WebSocket accepted - wildcard origin match",
-						"origin", origin,
-						"pattern", allowed,
-						"remote_addr", r.RemoteAddr,
-					)
-				}
+				log.Debugw("WebSocket accepted - wildcard origin match",
+					"origin", origin,
+					"pattern", allowed,
+					"remote_addr", r.RemoteAddr,
+				)
 				return true
 			}
 
 			// Special case: allow "*" to match anything
 			if allowed == "*" {
-				if log != nil {
-					log.Debugw("WebSocket accepted - wildcard match",
-						"origin", origin,
-						"remote_addr", r.RemoteAddr,
-					)
-				}
+				log.Debugw("WebSocket accepted - wildcard match",
+					"origin", origin,
+					"remote_addr", r.RemoteAddr,
+				)
 				return true
 			}
 		}
 
 		// Origin not allowed
-		if log != nil {
-			log.Warnw("WebSocket origin rejected",
-				"origin", origin,
-				"remote_addr", r.RemoteAddr,
-				"path", r.URL.Path,
-				"allowed_origins", config.AllowedOrigins,
-			)
-		}
-
+		log.Warnw("WebSocket origin rejected",
+			"origin", origin,
+			"remote_addr", r.RemoteAddr,
+			"path", r.URL.Path,
+			"allowed_origins", config.AllowedOrigins,
+		)
 		return false
 	}
 }
@@ -157,31 +145,14 @@ func AddSecurityHeaders(w http.ResponseWriter) {
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
 }
 
-// isLocalhost checks if the given host is a localhost address
-func isLocalhost(host string) bool {
-	// Parse as IP first
-	ip := net.ParseIP(host)
-	if ip != nil {
-		// Check IPv4 localhost (127.0.0.0/8)
-		if ip.IsLoopback() {
-			return true
-		}
-		// Explicitly check 127.0.0.1
-		if ip.Equal(net.IPv4(127, 0, 0, 1)) {
-			return true
-		}
-		// Explicitly check ::1 (IPv6 localhost)
-		if ip.Equal(net.IPv6loopback) {
-			return true
-		}
-		return false
-	}
+// localhostNames are the names a host is localhost by.
+var localhostNames = []string{"localhost", "ip6-localhost", "ip6-loopback"}
 
-	// String comparison for hostname
-	switch host {
-	case "localhost", "ip6-localhost", "ip6-loopback":
-		return true
-	default:
-		return false
+// isLocalhost checks if the given host is a localhost address: an IP in the
+// loopback range, or one of localhostNames.
+func isLocalhost(host string) bool {
+	if ip, err := netip.ParseAddr(host); err == nil {
+		return ip.IsLoopback()
 	}
+	return slices.Contains(localhostNames, host)
 }

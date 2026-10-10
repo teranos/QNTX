@@ -16,8 +16,8 @@ import (
 const PluginNamespaceKey = "namespace"
 
 // PluginTokens is how the node mints a plugin its own store token for the
-// namespace its record names. Nil is a node that hands every plugin the shared
-// token, whatever its record names.
+// namespace its record names. A node that mints none for a namespace says so
+// in the error it returns.
 type PluginTokens func(plugin, namespace string) (string, error)
 
 // NewConfigProvider creates a ConfigProvider that hands each plugin the config
@@ -55,58 +55,60 @@ type configWithEndpoints struct {
 	endpoints *ServiceEndpoints
 	tokens    PluginTokens
 	logger    *zap.SugaredLogger
-	// readErr is the first failure to read the plugin's record, kept for Err.
+	// readErr is every failure to hand the plugin its config, kept for Err.
 	readErr error
 }
 
 // held is the plugin's config as its record holds it. The interface has no
-// error to return, so a record that could not be read is said once and kept.
+// error to return, so a record that could not be read, or a plugin with no
+// record, is kept once for Err.
 func (c *configWithEndpoints) held() map[string]string {
-	record, _, err := pluginRecord(c.domain)
+	record, found, err := pluginRecord(c.domain)
 	if err != nil && c.readErr == nil {
-		c.readErr = err
-		c.logger.Errorw("Plugin handed no config: its record was not read", "plugin", c.domain, "error", err)
+		c.readErr = errors.Wrapf(err, "plugin %s handed no config: its record was not read", c.domain)
+	}
+	if !found && c.readErr == nil {
+		c.readErr = errors.Newf("plugin %s handed no config: it has no record, so nothing says its config", c.domain)
 	}
 	return record.Config
 }
 
-// Err is why the plugin's record could not be read, so Initialize fails with
-// it rather than starting the plugin with no config.
+// Err is every reason the plugin was not handed its config, so Initialize
+// fails with it rather than starting the plugin with no config.
 func (c *configWithEndpoints) Err() error { return c.readErr }
 
-// failed keeps the first failure for Err, and says it.
+// failed keeps a failure for Err, the first as the error and each after it
+// beside the first.
 func (c *configWithEndpoints) failed(err error) {
 	if c.readErr == nil {
 		c.readErr = err
+		return
 	}
-	c.logger.Errorw("Plugin handed no config", "plugin", c.domain, "error", err)
+	c.readErr = errors.WithSecondaryError(c.readErr, err)
 }
 
 // authToken is the token the plugin reaches the node's services with: its own,
-// for the namespace its record names (ADR-046). A record naming none stands
-// nowhere and is handed none, not the shared token on the served store: it
-// acts only where a caller acts, through the call's own token.
+// for the namespace its record names (ADR-046). A record without the key
+// stands nowhere and is handed none, not the shared token on the served store:
+// it acts only where a caller acts, through the call's own token. A namespace
+// the key names is the node's to mint for or refuse, an empty one included.
 func (c *configWithEndpoints) authToken() string {
-	namespace := strings.TrimSpace(c.held()[PluginNamespaceKey])
-	if namespace == "" {
+	raw, named := c.held()[PluginNamespaceKey]
+	if !named {
 		return ""
 	}
-	if c.tokens == nil {
-		c.failed(errors.Newf("plugin %s stands in %s and this node mints no token for it", c.domain, namespace))
-		return ""
-	}
+	namespace := strings.TrimSpace(raw)
 	token, err := c.tokens(c.domain, namespace)
 	if err != nil {
-		c.failed(errors.Wrapf(err, "plugin %s stands in %s", c.domain, namespace))
+		c.failed(errors.Wrapf(err, "plugin %s stands in %q", c.domain, namespace))
 		return ""
 	}
 	return token
 }
 
-// unread says a value that does not read as the type asked for.
+// unread keeps a value that does not read as the type asked for, for Err.
 func (c *configWithEndpoints) unread(key, raw, as string, err error) {
-	c.logger.Errorw("Plugin config value does not read as "+as,
-		"plugin", c.domain, "key", key, "value", raw, "error", err)
+	c.failed(errors.Wrapf(err, "plugin %s config %s value %q does not read as %s", c.domain, key, raw, as))
 }
 
 func (c *configWithEndpoints) GetString(key string) string {
@@ -166,11 +168,10 @@ func (c *configWithEndpoints) Get(key string) any {
 	return nil
 }
 
-// Set leaves the record as it is, and says so: the plugin element is what
-// writes a record.
+// Set leaves the record as it is, and keeps that for Err: the plugin element
+// is what writes a record.
 func (c *configWithEndpoints) Set(key string, value any) {
-	c.logger.Errorw("Plugin config not set: a plugin's config is written in the plugin element",
-		"plugin", c.domain, "key", key, "value", value)
+	c.failed(errors.Newf("plugin %s config %s not set to %v: a plugin's config is written in the plugin element", c.domain, key, value))
 }
 
 func (c *configWithEndpoints) GetKeys() []string {

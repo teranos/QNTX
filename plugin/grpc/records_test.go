@@ -10,9 +10,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
-	"go.uber.org/zap/zaptest/observer"
 )
 
 // unreadableRecords is a store that does not answer.
@@ -50,16 +48,17 @@ func TestMalformedArgsAreAnError(t *testing.T) {
 	assert.Contains(t, failed["pyre"], "args")
 }
 
-// A config value that does not read as the type asked for is said, not turned into zero silently.
+// A config value that does not read as the type asked for is said, not turned
+// into zero silently: it is the config's error, which fails the Initialize.
 func TestAConfigValueOfTheWrongTypeIsSaid(t *testing.T) {
-	core, logs := observer.New(zapcore.ErrorLevel)
 	SetPluginRecords(heldRecords{"pyre": {Name: "pyre", Config: map[string]string{"poll_interval": "often"}}})
 	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
-	config := NewConfigProvider(nil, nil, zap.New(core).Sugar()).GetPluginConfig("pyre")
+	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
 	assert.Equal(t, 0, config.GetInt("poll_interval"))
-	require.Equal(t, 1, logs.Len())
-	assert.Equal(t, "poll_interval", logs.All()[0].ContextMap()["key"])
+	err := config.(interface{ Err() error }).Err()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "poll_interval")
 }
 
 // A plugin whose record could not be read is not started with no config: its
@@ -76,14 +75,27 @@ func TestAPluginWhoseRecordIsUnreadableDoesNotInitialize(t *testing.T) {
 	assert.Contains(t, err.Error(), "pyre")
 }
 
-// A record that could not be read while handing a plugin its config is said.
+// A record that could not be read while handing a plugin its config is said,
+// as the config's error.
 func TestAnUnreadableRecordIsSaidWhenConfigIsAsked(t *testing.T) {
-	core, logs := observer.New(zapcore.ErrorLevel)
 	SetPluginRecords(unreadableRecords{})
 	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
-	config := NewConfigProvider(nil, nil, zap.New(core).Sugar()).GetPluginConfig("pyre")
+	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
 	assert.Empty(t, config.GetKeys())
-	require.Equal(t, 1, logs.Len())
-	assert.Equal(t, "pyre", logs.All()[0].ContextMap()["plugin"])
+	err := config.(interface{ Err() error }).Err()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "pyre")
+}
+
+// A plugin with no record has nothing that says its config, and is not handed one.
+func TestAPluginWithNoRecordIsNotHandedAConfig(t *testing.T) {
+	SetPluginRecords(heldRecords{})
+	t.Cleanup(func() { SetPluginRecords(nil) })
+
+	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
+	assert.Empty(t, config.GetKeys())
+	err := config.(interface{ Err() error }).Err()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no record")
 }

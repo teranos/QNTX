@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -91,35 +90,46 @@ func (m *ServicesManager) noteDegraded(service string, err error) {
 		"service", service, "error", err)
 	m.degradedMu.Lock()
 	defer m.degradedMu.Unlock()
-	if m.degraded == nil {
-		m.degraded = make(map[string]string)
-	}
 	m.degraded[service] = err.Error()
 }
 
 // NewServicesManager creates a new services manager. node is the node's DID.
+// Until the node hands over how to mint a run's store token, minting one is
+// refused.
 func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, node string, logger *zap.SugaredLogger) *ServicesManager {
-	return &ServicesManager{
+	m := &ServicesManager{
 		llmConfig: llmCfg,
 		fetchCfg:  fetchCfg,
 		node:      node,
 		logger:    logger,
+		degraded:  map[string]string{},
 	}
+	notYet := OpenRun(func(_, namespace string) (string, func(), error) {
+		return "", nil, errors.Newf("the node has not handed over how to mint a store token for namespace %s yet", namespace)
+	})
+	m.openRun.Store(&notYet)
+	return m
 }
 
 // Start starts the gRPC service servers with dynamic port allocation.
 // filesDir is the path to stored files (for the FileService).
-// groundDBPath is the path to Ground's SQLite database (empty = Ground service disabled).
+// groundDBPath is the path to Ground's SQLite database; with none, the Ground
+// service refuses each write, saying ground_db_path is not configured.
+//
+// The services the node hands things to after Start (the ATS store, schedule,
+// fetch and mail services) are made before any listens, so each is there
+// whether or not its server came to serve.
 func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore, queue *async.Queue, scheduleStore *schedule.Store, filesDir string, groundDBPath string) (*ServiceEndpoints, error) {
 	m.groundDBPath = groundDBPath
-	// Generate authentication token
-	authToken, err := generateAuthToken()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate auth token for plugin services")
-	}
+	// The token plugins reach every service with
+	authToken := rand.Text()
+	m.atsStore = services.NewATSStoreServer(store, authToken, m.node, m.logger)
+	m.scheduleSrv = services.NewScheduleServer(scheduleStore, authToken, m.logger)
+	m.fetchSrv = services.NewFetchServer(store, authToken, m.node, m.fetchCfg, m.logger)
+	m.mailSrv = services.NewMailServer(authToken, m.logger)
 
 	// Start ATSStore service
-	atsStoreAddr, err := m.startATSStoreService(ctx, store, authToken)
+	atsStoreAddr, err := m.startATSStoreService(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to start ATS store service")
 	}
@@ -132,7 +142,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	}
 
 	// Start Schedule service
-	scheduleAddr, err := m.startScheduleService(ctx, scheduleStore, authToken)
+	scheduleAddr, err := m.startScheduleService(ctx)
 	if err != nil {
 		m.stopRunning()
 		return nil, errors.Wrap(err, "failed to start schedule service")
@@ -166,15 +176,11 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		vectorSearchAddr = ""
 	}
 
-	// Start Ground service (only if ground_db_path is configured)
-	groundAddr := ""
-	if groundDBPath != "" {
-		var groundErr error
-		groundAddr, groundErr = m.startGroundService(ctx, groundDBPath, authToken)
-		if groundErr != nil {
-			m.noteDegraded("ground", groundErr)
-			groundAddr = ""
-		}
+	// Start Ground service
+	groundAddr, err := m.startGroundService(ctx, groundDBPath, authToken)
+	if err != nil {
+		m.noteDegraded("ground", err)
+		groundAddr = ""
 	}
 
 	// Start Search service (starts empty, provider registers after plugin init)
@@ -185,14 +191,14 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	}
 
 	// Start Fetch service
-	fetchAddr, err := m.startFetchService(ctx, store, authToken)
+	fetchAddr, err := m.startFetchService(ctx)
 	if err != nil {
 		m.noteDegraded("fetch", err)
 		fetchAddr = ""
 	}
 
 	// Start Mail service (sends nothing until the node wires it: ADR-041)
-	mailAddr, err := m.startMailService(ctx, authToken)
+	mailAddr, err := m.startMailService(ctx)
 	if err != nil {
 		m.noteDegraded("mail", err)
 		mailAddr = ""
@@ -234,14 +240,15 @@ func (m *ServicesManager) serve(
 		server.GracefulStop()
 	})
 	sacred.Go("grpc."+name+".serve", func() {
+		// A service that stops serving is one plugins run without from then on.
 		if err := server.Serve(listener); err != nil {
-			m.logger.Errorw("gRPC service stopped serving", "service", name, "error", err)
+			m.noteDegraded(name, errors.Wrapf(err, "gRPC service %s stopped serving at %s", name, listener.Addr()))
 		}
 	})
 }
 
 // startATSStoreService starts the ATSStore gRPC service
-func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.AttestationStore, authToken string) (string, error) {
+func (m *ServicesManager) startATSStoreService(ctx context.Context) (string, error) {
 	// Listen on dynamic port
 	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -251,7 +258,6 @@ func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.At
 
 	// Create gRPC server
 	m.atsStoreServer = grpc.NewServer()
-	m.atsStore = services.NewATSStoreServer(store, authToken, m.node, m.logger)
 	protocol.RegisterATSStoreServiceServer(m.atsStoreServer, m.atsStore)
 
 	m.serve(ctx, "ATSStore", m.atsStoreServer, listener)
@@ -285,7 +291,7 @@ func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Qu
 }
 
 // startScheduleService starts the Schedule gRPC service
-func (m *ServicesManager) startScheduleService(ctx context.Context, store *schedule.Store, authToken string) (string, error) {
+func (m *ServicesManager) startScheduleService(ctx context.Context) (string, error) {
 	// Listen on dynamic port
 	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -295,7 +301,6 @@ func (m *ServicesManager) startScheduleService(ctx context.Context, store *sched
 
 	// Create gRPC server
 	m.scheduleServer = grpc.NewServer()
-	m.scheduleSrv = services.NewScheduleServer(store, authToken, m.logger)
 	protocol.RegisterScheduleServiceServer(m.scheduleServer, m.scheduleSrv)
 
 	m.serve(ctx, "Schedule", m.scheduleServer, listener)
@@ -424,13 +429,12 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 	return addr, nil
 }
 
-func (m *ServicesManager) startFetchService(ctx context.Context, store ats.AttestationStore, authToken string) (string, error) {
+func (m *ServicesManager) startFetchService(ctx context.Context) (string, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.fetchSrv = services.NewFetchServer(store, authToken, m.node, m.fetchCfg, m.logger)
 	m.fetchServer = grpc.NewServer()
 	protocol.RegisterFetchServiceServer(m.fetchServer, m.fetchSrv)
 
@@ -442,13 +446,12 @@ func (m *ServicesManager) startFetchService(ctx context.Context, store ats.Attes
 	return addr, nil
 }
 
-func (m *ServicesManager) startMailService(ctx context.Context, authToken string) (string, error) {
+func (m *ServicesManager) startMailService(ctx context.Context) (string, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.mailSrv = services.NewMailServer(authToken, m.logger)
 	m.mailServer = grpc.NewServer()
 	protocol.RegisterMailServiceServer(m.mailServer, m.mailSrv)
 
@@ -461,7 +464,7 @@ func (m *ServicesManager) startMailService(ctx context.Context, authToken string
 }
 
 // MailServer is the mail service, for what the node mails in its own name
-// (ADR-042). Nil when it did not start.
+// (ADR-042). Made by Start whether or not its server came to serve plugins.
 func (m *ServicesManager) MailServer() *services.MailServer {
 	return m.mailSrv
 }
@@ -469,51 +472,35 @@ func (m *ServicesManager) MailServer() *services.MailServer {
 // SetMail hands the mail service what it sends with. Until then a plugin
 // asking to send is told the node has not finished starting.
 func (m *ServicesManager) SetMail(w services.MailWiring) {
-	if m.mailSrv != nil {
-		m.mailSrv.Wire(w)
-	}
+	m.mailSrv.Wire(w)
 }
 
 // SetVersionResolver installs a source→version resolver on ATSStore and Fetch services.
 // Call after plugin registry is populated so attestations carry source_version automatically.
 func (m *ServicesManager) SetVersionResolver(resolver services.VersionResolver) {
-	if m.atsStore != nil {
-		m.atsStore.SetVersionResolver(resolver)
-	}
-	if m.fetchSrv != nil {
-		m.fetchSrv.SetVersionResolver(resolver)
-	}
-	if m.mailSrv != nil {
-		m.mailSrv.SetVersionResolver(resolver)
-	}
+	m.atsStore.SetVersionResolver(resolver)
+	m.fetchSrv.SetVersionResolver(resolver)
+	m.mailSrv.SetVersionResolver(resolver)
 }
 
 // SetCallStores hands the ATS store service the stores of the calls plugins are
 // answering, so a plugin reads and writes where its caller acts.
 func (m *ServicesManager) SetCallStores(calls services.CallStores) {
-	if m.atsStore != nil {
-		m.atsStore.SetCallStores(calls)
-	}
+	m.atsStore.SetCallStores(calls)
 }
 
 // SetPluginStores hands the ATS store and fetch services the stores of the
 // namespaces plugins stand in, by the tokens the node handed them (ADR-046).
 func (m *ServicesManager) SetPluginStores(plugins services.PluginStores) {
-	if m.atsStore != nil {
-		m.atsStore.SetPluginStores(plugins)
-	}
-	if m.fetchSrv != nil {
-		m.fetchSrv.SetPluginStores(plugins)
-	}
+	m.atsStore.SetPluginStores(plugins)
+	m.fetchSrv.SetPluginStores(plugins)
 }
 
 // SetCallers hands the schedule service the callers of the calls plugins are
 // answering, so a schedule created during one remembers who created it and
 // where.
 func (m *ServicesManager) SetCallers(callers services.Callers) {
-	if m.scheduleSrv != nil {
-		m.scheduleSrv.SetCallers(callers)
-	}
+	m.scheduleSrv.SetCallers(callers)
 }
 
 // OpenRun mints a store token for one run of a job, reaching the store of the
@@ -531,11 +518,7 @@ func (m *ServicesManager) OpenRunFor(userID, namespace string) (string, func(), 
 	if m == nil {
 		return "", nil, errors.Newf("no services manager to mint a store token for namespace %s", namespace)
 	}
-	open := m.openRun.Load()
-	if open == nil {
-		return "", nil, errors.Newf("the node has not handed over how to mint a store token for namespace %s yet", namespace)
-	}
-	return (*open)(userID, namespace)
+	return (*m.openRun.Load())(userID, namespace)
 }
 
 // GetSearchRouter returns the search router for provider registration.
@@ -547,9 +530,7 @@ func (m *ServicesManager) GetSearchRouter() *services.SearchServer {
 // CancelATSStreams cancels all active ATSStore streams.
 // Called during plugin restart to free the database mutex before launching the new process.
 func (m *ServicesManager) CancelATSStreams() {
-	if m.atsStore != nil {
-		m.atsStore.CancelStreams()
-	}
+	m.atsStore.CancelStreams()
 }
 
 // GetLLMRouter returns the LLM router for provider registration.
@@ -589,13 +570,4 @@ func (m *ServicesManager) stopRunning() {
 // GetEndpoints returns the service endpoints
 func (m *ServicesManager) GetEndpoints() *ServiceEndpoints {
 	return &m.endpoints
-}
-
-// generateAuthToken generates a random authentication token
-func generateAuthToken() (string, error) {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(bytes), nil
 }
