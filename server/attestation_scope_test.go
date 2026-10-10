@@ -99,3 +99,26 @@ func TestNarrowingAfterTheStoreDropsWhatIsOutOfScope(t *testing.T) {
 	assert.Equal(t, "AS-1", kept[0].ID)
 	assert.Equal(t, "AS-3", kept[1].ID)
 }
+
+// A word ending in the namespace marker is every predicate under it. That is a
+// word a WRITE line says; an attestation carries the one it means.
+func TestAPredicateNamesOneThingAndNotANamespace(t *testing.T) {
+	refused := validateNamed([]string{"tag:"})
+	assert.NotEmpty(t, refused, "tag: names every tag, and was taken as a claim about one")
+	assert.Contains(t, refused, "tag:", "the refusal does not name what was asked for")
+
+	// A tag named by a space is a tag nobody named.
+	assert.NotEmpty(t, validateNamed([]string{"tag: "}))
+	assert.NotEmpty(t, validateNamed([]string{"noted", "distill:"}))
+}
+
+// The tag it means, and every predicate that carries no marker at all.
+func TestAPredicateThatNamesOneThingIsTaken(t *testing.T) {
+	assert.Empty(t, validateNamed([]string{"tag:ci-runner"}))
+	assert.Empty(t, validateNamed([]string{"type"}))
+	assert.Empty(t, validateNamed([]string{"tag:ci-runner", "noted", "distill:noted"}))
+	assert.Empty(t, validateNamed(nil))
+
+	// A tag under a tag is still one tag: the marker is not the last character.
+	assert.Empty(t, validateNamed([]string{"tag:incident:sev1"}))
+}
