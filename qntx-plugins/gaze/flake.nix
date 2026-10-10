@@ -11,8 +11,14 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
-        # Proto files live outside the plugin directory
-        protoSrc = ../../plugin/grpc/protocol;
+        # Proto files live outside the plugin directory. They are laid out under
+        # plugin/grpc/protocol as in the repo: proto.cmake resolves a qualified
+        # import ("plugin/grpc/protocol/sigil.proto") three levels above them.
+        protoRoot = pkgs.runCommand "qntx-protocol" { } ''
+          mkdir -p $out/plugin/grpc
+          cp -r ${../../plugin/grpc/protocol} $out/plugin/grpc/protocol
+        '';
+        protoSrc = "${protoRoot}/plugin/grpc/protocol";
 
         # llama.cpp pinned to the same commit as the git submodule
         llama-cpp-src = pkgs.fetchFromGitHub {
