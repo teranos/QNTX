@@ -184,21 +184,22 @@ type Status struct {
 func StatusOf(ctx context.Context, binary, home string) (Status, error) {
 	cmd := exec.CommandContext(ctx, binary, "auth", "status", "--json")
 	cmd.Dir, cmd.Env = home, environment(home)
-	out, err := cmd.Output()
-	if err != nil {
+	out, exitErr := cmd.Output()
+	if exitErr != nil {
 		var exit *exec.ExitError
-		if !errors.As(err, &exit) {
-			return Status{}, errors.Wrap(err, "claude auth status did not run")
+		if !errors.As(exitErr, &exit) {
+			return Status{}, errors.Wrap(exitErr, "claude auth status did not run")
 		}
-		var status Status
-		if exit.ExitCode() == 1 && json.Unmarshal(out, &status) == nil && !status.SignedIn {
-			return status, nil
+		if exit.ExitCode() != 1 {
+			return Status{}, errors.Wrapf(exitErr, "claude auth status failed, saying: %s", strings.TrimSpace(string(out)+"\n"+string(exit.Stderr)))
 		}
-		return Status{}, errors.Wrapf(err, "claude auth status failed, saying: %s", strings.TrimSpace(string(out)+"\n"+string(exit.Stderr)))
 	}
 	var status Status
 	if err := json.Unmarshal(out, &status); err != nil {
 		return Status{}, errors.Wrapf(err, "claude auth status did not answer JSON: %s", strings.TrimSpace(string(out)))
+	}
+	if exitErr != nil && status.SignedIn {
+		return Status{}, errors.Wrapf(exitErr,"claude auth status exited 1 and said it is signed in: %s", strings.TrimSpace(string(out)))
 	}
 	return status, nil
 }
