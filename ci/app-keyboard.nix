@@ -21,7 +21,7 @@
   jobs.ios = {
     name = "QNTX-App in the iPhone Simulator";
     runs-on = "macos-15";
-    timeout-minutes = 60;
+    timeout-minutes = 90;
     steps = [
       {
         uses = "actions/checkout@v5";
@@ -80,6 +80,8 @@
       }
       {
         name = "A bare page without the viewport line: the web view zooms, and this run sees it";
+        # A case that hangs ends here, its log kept, and the next case still runs.
+        timeout-minutes = 20;
         run = ''
           mkdir -p qntx/internal/server/dist
           sed 's|<!-- VIEWPORT -->|<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">|' qntx/ci/app-keyboard/page.html > qntx/internal/server/dist/index.html
@@ -89,6 +91,8 @@
       {
         "if" = "always()";
         name = "QNTX's own page, never zooming, in the shell on QNTX-App main, which zooms nothing";
+        # A case that hangs ends here, its log kept, and the next case still runs.
+        timeout-minutes = 20;
         run = ''
           (cd qntx && make web)
           python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index("<meta name=\"viewport\""); b=s.index(">", a)+1; open(p,"w").write(s[:a]+sys.argv[2]+s[b:])' qntx/internal/server/dist/index.html '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'
@@ -98,6 +102,8 @@
       {
         "if" = "always()";
         name = "The same page, with html and body pinned to the window and not scrolling";
+        # A case that hangs ends here, its log kept, and the next case still runs.
+        timeout-minutes = 20;
         run = ''
           (cd qntx && make web)
           python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index("<meta name=\"viewport\""); b=s.index(">", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index("</head>"); open(p,"w").write(s[:c]+"<style>html, body { height: 100%; overflow: hidden; }</style>"+s[c:])' qntx/internal/server/dist/index.html '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'

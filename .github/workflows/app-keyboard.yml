@@ -57,17 +57,20 @@
         },
         {
           "name": "A bare page without the viewport line: the web view zooms, and this run sees it",
-          "run": "mkdir -p qntx/internal/server/dist\nsed 's|<!-- VIEWPORT -->|<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">|' qntx/ci/app-keyboard/page.html > qntx/internal/server/dist/index.html\nbash qntx/ci/app-keyboard/run.sh without\n"
+          "run": "mkdir -p qntx/internal/server/dist\nsed 's|<!-- VIEWPORT -->|<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">|' qntx/ci/app-keyboard/page.html > qntx/internal/server/dist/index.html\nbash qntx/ci/app-keyboard/run.sh without\n",
+          "timeout-minutes": 20
         },
         {
           "if": "always()",
           "name": "QNTX's own page, never zooming, in the shell on QNTX-App main, which zooms nothing",
-          "run": "(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index(\"<meta name=\\\"viewport\\\"\"); b=s.index(\">\", a)+1; open(p,\"w\").write(s[:a]+sys.argv[2]+s[b:])' qntx/internal/server/dist/index.html '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">'\nbash qntx/ci/app-keyboard/run.sh whole\n"
+          "run": "(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index(\"<meta name=\\\"viewport\\\"\"); b=s.index(\">\", a)+1; open(p,\"w\").write(s[:a]+sys.argv[2]+s[b:])' qntx/internal/server/dist/index.html '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">'\nbash qntx/ci/app-keyboard/run.sh whole\n",
+          "timeout-minutes": 20
         },
         {
           "if": "always()",
           "name": "The same page, with html and body pinned to the window and not scrolling",
-          "run": "(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index(\"<meta name=\\\"viewport\\\"\"); b=s.index(\">\", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index(\"</head>\"); open(p,\"w\").write(s[:c]+\"<style>html, body { height: 100%; overflow: hidden; }</style>\"+s[c:])' qntx/internal/server/dist/index.html '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">'\nbash qntx/ci/app-keyboard/run.sh pinned\n"
+          "run": "(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index(\"<meta name=\\\"viewport\\\"\"); b=s.index(\">\", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index(\"</head>\"); open(p,\"w\").write(s[:c]+\"<style>html, body { height: 100%; overflow: hidden; }</style>\"+s[c:])' qntx/internal/server/dist/index.html '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">'\nbash qntx/ci/app-keyboard/run.sh pinned\n",
+          "timeout-minutes": 20
         },
         {
           "if": "always()",
@@ -85,7 +88,7 @@
           }
         }
       ],
-      "timeout-minutes": 60
+      "timeout-minutes": 90
     }
   },
   "name": "App keyboard",

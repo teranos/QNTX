@@ -9,7 +9,7 @@
 # Run from the QNTX-App checkout, with QNTX beside it at qntx/ and the page the
 # app is to carry already in qntx/internal/server/dist.
 #   bash qntx/ci/app-keyboard/run.sh <name>
-set -euo pipefail
+set -euxo pipefail
 
 NAME="$1"
 OUT="${OUT:-keyboard-shots}"
