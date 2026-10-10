@@ -347,6 +347,11 @@ private template getProtoNum(T, size_t i) {
 
 struct Empty {}
 
+/// A plugin saying it stopped: the answer to Shutdown.
+struct ShutdownResponse {
+    @Proto(1) bool stopped;
+}
+
 struct MetadataResponse {
     @Proto(1) string name;
     @Proto(2) string version_;

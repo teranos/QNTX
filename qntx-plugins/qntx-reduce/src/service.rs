@@ -2,7 +2,7 @@ use crate::handlers::{HandlerContext, ReduceState};
 use crate::proto::{
     domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, ElementDefResponse,
     Empty, ExecuteJobRequest, ExecuteJobResponse, HealthResponse, HttpRequest, HttpResponse,
-    InitializeRequest, InitializeResponse, MetadataResponse, WebSocketMessage,
+    InitializeRequest, InitializeResponse, MetadataResponse, ShutdownResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -86,10 +86,13 @@ impl DomainPluginService for ReducePluginService {
         Ok(Response::new(ElementDefResponse { elements: vec![] }))
     }
 
-    async fn shutdown(&self, _request: Request<Empty>) -> Result<Response<Empty>, Status> {
+    async fn shutdown(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<ShutdownResponse>, Status> {
         info!("Shutting down Reduce plugin");
         self.handlers.clear_models();
-        Ok(Response::new(Empty {}))
+        Ok(Response::new(ShutdownResponse { stopped: true }))
     }
 
     async fn handle_http(

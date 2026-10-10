@@ -409,7 +409,7 @@ void registerHandlers(ref GrpcServer server) {
 
     server.registerHandler("/protocol.DomainPluginService/Shutdown", (const ubyte[] _) {
         shutdown();
-        return encode(Empty());
+        return encode(ShutdownResponse(true));
     });
 
     server.registerHandler("/protocol.DomainPluginService/HandleHTTP", (const ubyte[] data) {

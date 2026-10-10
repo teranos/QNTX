@@ -522,9 +522,12 @@ func (c *ExternalDomainProxy) RegisterElements(ctx context.Context) (*protocol.E
 
 // Shutdown shuts down the remote plugin.
 func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
-	_, err := c.client.Shutdown(ctx, &protocol.Empty{})
+	answered, err := c.client.Shutdown(ctx, &protocol.Empty{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to shutdown remote plugin %s at %s", c.metadata.Name, c.addr)
+	}
+	if !answered.GetStopped() {
+		return errors.Newf("remote plugin %s at %s answered Shutdown without saying it stopped", c.metadata.Name, c.addr)
 	}
 	return c.conn.Close()
 }
