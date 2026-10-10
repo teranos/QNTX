@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/access"
+	"github.com/teranos/QNTX/internal/named"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
@@ -34,11 +36,18 @@ func (b *sentBox) Send(_ context.Context, m OutgoingMail) (string, error) {
 	return "ses-0001", nil
 }
 
-var tim = MailRecipient{ID: "UStim", Email: "tim@defacile.nl"}
+var tim = UserRecipient(access.User{ID: "UStim", EmailAddresses: []string{"tim@defacile.nl", "tim@elders.nl"}})
 
 // A mail service wired the way the node wires it: a transport, the Users, and
 // the store it attests into.
 func wiredMail(t *testing.T, transport MailTransport, users ...MailRecipient) (*MailServer, ats.AttestationStore) {
+	t.Helper()
+	return wiredMailBy(t, Having(transport), users...)
+}
+
+// wiredMailBy is wiredMail with the transport had, or the node running without
+// one.
+func wiredMailBy(t *testing.T, transport Had[MailTransport], users ...MailRecipient) (*MailServer, ats.AttestationStore) {
 	t.Helper()
 	store, _ := qntxtest.CreateTestStore(t)
 	held := map[string]MailRecipient{}
@@ -47,14 +56,14 @@ func wiredMail(t *testing.T, transport MailTransport, users ...MailRecipient) (*
 	}
 	s := NewMailServer(mailToken, zap.NewNop().Sugar())
 	s.Wire(MailWiring{
-		From:      mailFrom,
+		From:      MailFrom(mailFrom),
 		Transport: transport,
-		Recipients: func(id string) (MailRecipient, bool, error) {
+		Recipients: Having[MailRecipients](func(id string) (MailRecipient, bool, error) {
 			u, found := held[id]
 			return u, found, nil
-		},
-		Records: func() ats.AttestationStore { return store },
-		Actor:   mailActor,
+		}),
+		Records: func() (ats.AttestationStore, error) { return store, nil },
+		Actor:   MailActor(mailActor),
 	})
 	return s, store
 }
@@ -67,7 +76,7 @@ func attested(t *testing.T, store ats.AttestationStore, predicate string) []*typ
 }
 
 func neutralSend(user string, values map[string]string) *protocol.SendMailRequest {
-	return &protocol.SendMailRequest{AuthToken: mailToken, Source: "garden", UserId: user, Values: values}
+	return &protocol.SendMailRequest{AuthToken: mailToken, Source: "garden", UserId: user, Template: NeutralTemplateName, Values: values}
 }
 
 // "goes to their primary email address if there are multiple."
@@ -232,7 +241,7 @@ func TestATemplateThatDoesNotParseIsNotKept(t *testing.T) {
 
 // "ses being enabled for use with email service can be enabled in the am.toml"
 func TestNoTransportEnabledNamesTheKeyThatEnablesOne(t *testing.T) {
-	s, _ := wiredMail(t, nil, tim)
+	s, _ := wiredMailBy(t, HavingNot[MailTransport](errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml")), tim)
 
 	resp, err := s.Send(context.Background(), neutralSend("UStim", map[string]string{"subject": "Welkom", "body": "Hallo."}))
 	require.NoError(t, err)
@@ -241,8 +250,8 @@ func TestNoTransportEnabledNamesTheKeyThatEnablesOne(t *testing.T) {
 }
 
 func TestAMailIsRefusedForAUserItCannotReach(t *testing.T) {
-	switchedOff := MailRecipient{ID: "USjenny", Email: "jenny@defacile.nl", DisabledBy: "USjenny"}
-	addressless := MailRecipient{ID: "USspike"}
+	switchedOff := UserRecipient(access.User{ID: "USjenny", EmailAddresses: []string{"jenny@defacile.nl"}, DisabledBy: "USjenny"})
+	addressless := UserRecipient(access.User{ID: "USspike"})
 	box := &sentBox{}
 	s, store := wiredMail(t, box, switchedOff, addressless)
 
@@ -332,7 +341,7 @@ func TestTheNodeMailsAUserInItsOwnName(t *testing.T) {
 // The node is held to what a plugin is held to: no address, no mail.
 func TestTheNodeDoesNotMailAUserWithoutAnAddress(t *testing.T) {
 	box := &sentBox{}
-	s, store := wiredMail(t, box, MailRecipient{ID: "USroot"})
+	s, store := wiredMail(t, box, UserRecipient(access.User{ID: "USroot"}))
 
 	_, _, err := s.SendAsNode(context.Background(), "USroot", NodeMail{Name: "report.weekly", Subject: "Week 39", Text: "The week."})
 	require.Error(t, err)
@@ -399,7 +408,7 @@ func TestAPluginMailsAnImageItsHTMLShows(t *testing.T) {
 
 	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
 		AuthToken: mailToken, Source: "garden", UserId: "UStim", Template: "bed",
-		Inline: []*protocol.MailImage{{ContentId: "bed", ContentType: "image/png", Data: tinyPNG}},
+		Inline: []*protocol.MailImage{{ContentId: "bed", ContentType: "image/png", FileName: "bed.png", Data: tinyPNG}},
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Success, resp.Error)
@@ -438,19 +447,23 @@ func TestAPluginMailWithAnImageItMayNotSendIsNotSent(t *testing.T) {
 		},
 		"over the cap together": {
 			[]*protocol.MailImage{
-				{ContentId: "a", ContentType: "image/png", Data: over[:MaxMailImageBytes/2+1]},
-				{ContentId: "b", ContentType: "image/png", Data: over[:MaxMailImageBytes/2+1]},
+				{ContentId: "a", ContentType: "image/png", FileName: "x.png", Data: over[:MaxMailImageBytes/2+1]},
+				{ContentId: "b", ContentType: "image/png", FileName: "x.png", Data: over[:MaxMailImageBytes/2+1]},
 			},
 			"more than",
 		},
 		"no content_id": {
 			[]*protocol.MailImage{{ContentType: "image/png", Data: tinyPNG}},
-			"no content_id",
+			"content_id of inline image 0",
+		},
+		"no file_name": {
+			[]*protocol.MailImage{{ContentId: "bed", ContentType: "image/png", Data: tinyPNG}},
+			"file_name of inline image bed",
 		},
 		"one content_id twice": {
 			[]*protocol.MailImage{
-				{ContentId: "bed", ContentType: "image/png", Data: tinyPNG},
-				{ContentId: "bed", ContentType: "image/png", Data: tinyPNG},
+				{ContentId: "bed", ContentType: "image/png", FileName: "bed.png", Data: tinyPNG},
+				{ContentId: "bed", ContentType: "image/png", FileName: "bed.png", Data: tinyPNG},
 			},
 			"repeats content_id bed",
 		},
@@ -469,4 +482,39 @@ func TestAPluginMailWithAnImageItMayNotSendIsNotSent(t *testing.T) {
 			assert.Empty(t, attested(t, store, PredicateMailSent))
 		})
 	}
+}
+
+// QNTX's neutral template is named like any other: a Send naming none is
+// refused, not filled from it.
+func TestASendNamingNoTemplateIsRefused(t *testing.T) {
+	box := &sentBox{}
+	s, store := wiredMail(t, box, tim)
+
+	req := neutralSend("UStim", map[string]string{"subject": "Welkom", "body": "Hallo."})
+	req.Template = ""
+	resp, err := s.Send(context.Background(), req)
+	require.NoError(t, err)
+	assert.False(t, resp.Success)
+	assert.Contains(t, resp.Error, NeutralTemplateName)
+	assert.Empty(t, box.sent)
+	assert.Empty(t, attested(t, store, PredicateMailSent))
+}
+
+// "no mail is sent that cannot be attested": a mail that went out and was not
+// recorded is answered as a failure, naming the id the transport gave it.
+func TestAMailTheStoreRefusesToRecordIsAnsweredAsAFailure(t *testing.T) {
+	box := &sentBox{}
+	s, _ := wiredMail(t, box, tim)
+	w, err := s.wiredWith()
+	require.NoError(t, err)
+	unwritten := *w
+	unwritten.Actor = HavingNot[named.Text](errors.New("the node has no DID"))
+	s.Wire(unwritten)
+
+	resp, err := s.Send(context.Background(), neutralSend("UStim", map[string]string{"subject": "Welkom", "body": "Hallo."}))
+	require.NoError(t, err)
+	assert.False(t, resp.Success)
+	assert.Contains(t, resp.Error, "not attested")
+	assert.Equal(t, "ses-0001", resp.MessageId)
+	assert.Len(t, box.sent, 1)
 }

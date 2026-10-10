@@ -7,6 +7,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/errors"
 )
 
@@ -19,23 +20,21 @@ import (
 // credentials it first read, and a host whose credentials rotate would go on
 // presenting expired ones.
 type SESTransport struct {
-	Region string // Empty = the AWS default chain's region.
+	// mail.ses.region. Left out of am.toml, the AWS chain names the region:
+	// its own loader reads an empty region as none given.
+	Region string
 }
 
 func (t SESTransport) client(ctx context.Context) (*sesv2.Client, string, error) {
-	var opts []func(*awsconfig.LoadOptions) error
-	if t.Region != "" {
-		opts = append(opts, awsconfig.WithRegion(t.Region))
-	}
-	cfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(t.Region))
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to load AWS credentials to reach SES")
 	}
-	if cfg.Region == "" {
-		err := errors.New("no AWS region to reach SES in")
+	region, err := named.TextOf("the AWS region to reach SES in", cfg.Region)
+	if err != nil {
 		return nil, "", errors.WithHint(err, "set mail.ses.region in am.toml, or AWS_REGION for the node")
 	}
-	return sesv2.NewFromConfig(cfg), cfg.Region, nil
+	return sesv2.NewFromConfig(cfg), region.String(), nil
 }
 
 // Send hands one mail to SES and names the id SES gave it.
@@ -45,12 +44,13 @@ func (t SESTransport) Send(ctx context.Context, m OutgoingMail) (string, error) 
 		return "", err
 	}
 
+	// A part the mail holds nothing in is a part it is not sent in.
 	body := &sestypes.Body{}
-	if m.HTML != "" {
-		body.Html = &sestypes.Content{Data: aws.String(m.HTML), Charset: aws.String("UTF-8")}
+	if html, htmlErr := named.TextOf("html", m.HTML); htmlErr == nil {
+		body.Html = &sestypes.Content{Data: aws.String(html.String()), Charset: aws.String("UTF-8")}
 	}
-	if m.Text != "" {
-		body.Text = &sestypes.Content{Data: aws.String(m.Text), Charset: aws.String("UTF-8")}
+	if text, textErr := named.TextOf("text", m.Text); textErr == nil {
+		body.Text = &sestypes.Content{Data: aws.String(text.String()), Charset: aws.String("UTF-8")}
 	}
 
 	// An inline image is referenced from the html by cid:<ContentID>.

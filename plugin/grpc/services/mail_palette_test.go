@@ -64,7 +64,7 @@ func TestTheWindowIsOneColourOnTheCanvas(t *testing.T) {
 
 func TestAMailIsTablesAndInlineStyles(t *testing.T) {
 	html, err := DrawMail(MailWindow{Symbol: "≡", Title: "week", Sections: []MailSection{
-		{Title: "Node", Rows: []MailRow{{Label: "Restarts:", Value: "3"}, {Value: "None.", State: RowNote}}},
+		{Title: "Node", Rows: []MailRow{{Label: "Restarts:", Value: "3"}, {Value: "None.", Unlabelled: true, State: RowNote}}},
 	}})
 	require.NoError(t, err)
 	assert.NotContains(t, html, "display:flex", "a mail client lays flex out its own way")

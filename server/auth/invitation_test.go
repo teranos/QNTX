@@ -42,7 +42,11 @@ func (m *mailbox) SendAsNode(_ context.Context, userID string, mail services.Nod
 }
 
 func (m *mailbox) SendAsNodeTo(_ context.Context, u services.MailRecipient, mail services.NodeMail) (string, string, error) {
-	m.sent = append(m.sent, sentMail{userID: u.ID, to: u.Email, mail: mail})
+	to, err := u.Address()
+	if err != nil {
+		return "", "", err
+	}
+	m.sent = append(m.sent, sentMail{userID: u.ID, to: to.String(), mail: mail})
 	return "msg", "AS", nil
 }
 

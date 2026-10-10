@@ -271,8 +271,8 @@ func TestTheReportIsMailedToTheRootUser(t *testing.T) {
 
 	box := &kept{}
 	mail := services.NewMailServer("token", zap.NewNop().Sugar())
-	mail.Wire(services.MailWiring{From: "Garden <mail@garden.test>", Transport: box,
-		Recipients: s.mailRecipient, Records: s.mailRecords, Actor: "did:key:z6Mkgardennode"})
+	mail.Wire(services.MailWiring{From: services.MailFrom("Garden <mail@garden.test>"), Transport: services.Having[services.MailTransport](box),
+		Recipients: services.Having[services.MailRecipients](s.mailRecipient), Records: s.mailRecords, Actor: services.MailActor("did:key:z6Mkgardennode")})
 	s.nodeMailer = mail
 
 	// Sentry is not set up here; the report says so and goes.
@@ -298,8 +298,8 @@ func TestNoReportGoesToARootUserWithoutAnAddress(t *testing.T) {
 
 	box := &kept{}
 	mail := services.NewMailServer("token", zap.NewNop().Sugar())
-	mail.Wire(services.MailWiring{From: "Garden <mail@garden.test>", Transport: box,
-		Recipients: s.mailRecipient, Records: s.mailRecords, Actor: "did:key:z6Mkgardennode"})
+	mail.Wire(services.MailWiring{From: services.MailFrom("Garden <mail@garden.test>"), Transport: services.Having[services.MailTransport](box),
+		Recipients: services.Having[services.MailRecipients](s.mailRecipient), Records: s.mailRecords, Actor: services.MailActor("did:key:z6Mkgardennode")})
 	s.nodeMailer = mail
 	s.sentryConfig = appcfg.SentryConfig{}
 

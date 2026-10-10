@@ -404,7 +404,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 
 	// The invitee holds no User yet: the mail goes to the address, recorded
 	// under the invitation.
-	if _, _, err := h.inviteMailer.SendAsNodeTo(r.Context(), services.MailRecipient{ID: "invitation:" + id, Email: email}, services.NodeMail{
+	if _, _, err := h.inviteMailer.SendAsNodeTo(r.Context(), services.AddressRecipient("invitation:"+id, email), services.NodeMail{
 		Name:    "invitation",
 		Subject: inviter + " invites you to QNTX",
 		Text: inviter + " invites you to QNTX.\n\nSign in with " + signsIn + ":\n" + link + "\n\n" +
