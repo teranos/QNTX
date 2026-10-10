@@ -92,9 +92,8 @@ func (q *llmQueue) Acquire(ctx context.Context, priority int32) error {
 // cooldown duration before waking the next one — gives the system breathing room
 // between back-to-back inference runs.
 func (q *llmQueue) Release() {
-	if q.cooldown > 0 {
-		time.Sleep(q.cooldown)
-	}
+	// A cooldown of 0 sleeps for 0.
+	time.Sleep(q.cooldown)
 
 	q.mu.Lock()
 	defer q.mu.Unlock()
