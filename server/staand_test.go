@@ -37,9 +37,10 @@ func (m markets) List() ([]storage.Namespace, error) {
 }
 func (markets) Create(string, storage.NamespaceDefinition) error { return nil }
 func (markets) SetEnabled(string, bool) error                    { return nil }
+func (markets) SetRecord(string, storage.NamespaceRecord) error  { return nil }
 func (markets) Delete(string) error                              { return nil }
 func (markets) Nuke() error                                      { return nil }
-func (m markets) OpenNamespace(name string) (*namespaces.Universe, error) {
+func (m markets) OpenNamespace(name string, _ storage.NamespaceRecord) (*namespaces.Universe, error) {
 	if s, ok := m.store[name]; ok {
 		return oneNamespace(name, s), nil
 	}

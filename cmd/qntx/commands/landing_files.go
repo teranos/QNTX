@@ -3,10 +3,18 @@ package commands
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/errors"
 )
+
+// sendInterval is how often a landing file sends what it holds to the record,
+// and so the most a lost host loses. A crashed process loses nothing: the
+// rows wait in the landing file for the next send.
+//
+// "let's go for 6h"
+const sendInterval = 6 * time.Hour
 
 // landingPath is where a namespace's landing file is: beside the operational
 // db, under namespaces/, named by the slug (ADR-037).

@@ -336,7 +336,7 @@ message ReachWritten {
   string id = 1;
 }
 
-// NamespaceActedOn is what namespaces disable, enable, delete and nuke answer.
+// NamespaceActedOn is what namespaces disable, enable, store, delete and nuke answer.
 message NamespaceActedOn {
   // The namespace acted on.
   string name = 1;
@@ -484,6 +484,18 @@ message NamespaceDefinition {
   bool enabled = 2;
   // RFC 3339.
   string created_at = 3;
+  // Where its attestations are kept.
+  NamespaceRecord record = 4;
+}
+
+// NamespaceRecord is a namespace's storage, as its ns.toml's [record] says.
+// Mirrors storage.NamespaceRecord.
+message NamespaceRecord {
+  // none, sqlite, parquet or postgres. A namespace begins with none.
+  string kind = 1;
+  // Postgres's connection string as an ssm:// or env: reference, never the
+  // password itself. Only a postgres record carries one.
+  string url = 2;
 }
 
 // Namespace is one namespace at a storage location, and what namespaces
@@ -518,6 +530,7 @@ message StoredThing {
   bool rebuilt = 4;
   // The Go files that reach this thing with hand-written SQL.
   repeated string sites = 5;
+  bool postgres = 6;
 }
 
 // SignumFollowed is one signum, and the references it can be held to.
@@ -541,8 +554,8 @@ message ParityStorage {
   // What was read: source, the code this build was made from, and never this
   // node.
   string describes = 1;
-  // One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go
-  // files that reach it with SQL written by hand.
+  // One per thing, by name: sqlite, duckdb, postgres, rebuilt by a take-in,
+  // and the Go files that reach it with SQL written by hand.
   repeated StoredThing things = 2;
 }
 

@@ -52,6 +52,15 @@ entity_actors_limit = 64
 # [storage.parquet]
 # location = "s3://bucket/prefix"
 
+# ── Postgres records ────────────────────────────────────────────
+# A namespace given Postgres names its connection string in its own
+# ns.toml, by reference. The string says whether it is TLS:
+# sslmode=disable is in the clear, and anything else verifies the
+# server against this node's ca.
+#
+# [storage.postgres]
+# ca = "supabase-ca.crt"
+
 # ════════════════════════════════════════════════════════════════
 # Attestation Distillation (ADR-020)
 # Folds old attestations into compressed summaries before deletion.

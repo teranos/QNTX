@@ -38,16 +38,22 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # The Postgres the Supabase free tier runs, server/parity/postgres_<version>_<rev>.
+    # Nothing follows ours: it is their build, so their cache serves it.
+    supabase-postgres.url = "github:supabase/postgres/e60902168c6f9b4030151d61d0fd741b52eaafd3";
   };
 
   # Binary cache configuration
   nixConfig = {
-    extra-substituters = [ "https://qntx.cachix.org" ];
-    extra-trusted-public-keys = [ "qntx.cachix.org-1:sL1EkSS5871D3ycLjHzuD+/zNddU9G38HGt3qQotAtg=" ];
+    extra-substituters = [ "https://qntx.cachix.org" "https://nix-postgres-artifacts.s3.amazonaws.com" ];
+    extra-trusted-public-keys = [
+      "qntx.cachix.org-1:sL1EkSS5871D3ycLjHzuD+/zNddU9G38HGt3qQotAtg="
+      "nix-postgres-artifacts:dGZlQOvKcNEjvT7QEAJbcV6b6uk7VF/hWMjhYleiaLI="
+    ];
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix, supabase-postgres }:
     {
       # Shared vendorHash imported from single source of truth
       rootVendorHash = import ./nix/vendor-hash.nix;
@@ -162,6 +168,32 @@
           installPhase = "true";
         };
 
+        # Build ats-postgres as static library for CGO linking. Peer of
+        # ats-duckdb-ffi; the client speaks the wire protocol itself, so there
+        # is no libpq to link.
+        ats-postgres-ffi = (pkgs.makeRustPlatform {
+          cargo = fenix.packages.${system}.stable.cargo;
+          rustc = fenix.packages.${system}.stable.rustc;
+        }).buildRustPackage {
+          pname = "ats-postgres-ffi";
+          version = self.rev or "dev";
+          src = ./.;
+
+          cargoDeps = crateSources;
+
+          cargoBuildFlags = [ "-p" "ats-postgres" "--features" "ffi" "--lib" ];
+          doCheck = false;
+
+          postBuild = ''
+            mkdir -p $out/lib $out/include
+            find target -name 'libats_postgres.a' -exec cp {} $out/lib/ \;
+            find target -name 'libats_postgres.so' -exec cp {} $out/lib/ \;
+            cp crates/ats-postgres/include/postgres_ffi.h $out/include/
+          '';
+
+          installPhase = "true";
+        };
+
         # Common preBuild hook for Go derivations: copy WASM module and Rust FFI libs
         goWasmPreBuild = ''
           export GOWORK=off  # Build without workspace (use go.mod only)
@@ -169,6 +201,7 @@
           mkdir -p target/release
           cp ${ats-sqlite-ffi}/lib/libats_sqlite.a target/release/
           cp ${ats-duckdb-ffi}/lib/libats_duckdb.a target/release/
+          cp ${ats-postgres-ffi}/lib/libats_postgres.a target/release/
         '';
 
         # Pre-commit hooks configuration
@@ -262,9 +295,10 @@
 
           # Build tags: rustsqlite (ADR-013), qntxwasm (wazero WASM module),
           # rustduckdb (ADR-024 parquet backend via ats-duckdb + duckdbcgo).
+          # rustpostgres (the postgres backend via ats-postgres + postgrescgo).
           # Without rustduckdb, backend = "parquet" in am.toml would validate
           # but the duckdbcgo wrapper wouldn't be compiled in.
-          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" ];
+          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" ];
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -360,6 +394,7 @@
           # without going through the full qntx binary build.
           ats-sqlite-ffi = ats-sqlite-ffi;
           ats-duckdb-ffi = ats-duckdb-ffi;
+          ats-postgres-ffi = ats-postgres-ffi;
 
           # Static documentation site with provenance and infrastructure docs
           # For CI builds with full provenance, pass additional args
@@ -406,6 +441,14 @@
           qntx-image = QNTXImage;
           qntx-image-amd64 = mkQNTXImage "amd64";
           qntx-image-arm64 = mkQNTXImage "arm64";
+        } // pkgs.lib.optionalAttrs (builtins.elem system [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ]) {
+          # The pinned Supabase Postgres server, which make parity runs
+          # ats-postgres's migrations in: postgresql_17, the server psql_17 is
+          # built on, without its extensions. ats-postgres uses none, and the
+          # extensions are what does not fit on a runner's disk when built
+          # from source. The systems are the ones its flake.nix builds for,
+          # named here so that listing ours does not evaluate theirs.
+          postgres = supabase-postgres.packages.${system}.postgresql_17;
         };
 
         # Development shell with same tools

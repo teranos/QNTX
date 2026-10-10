@@ -8,10 +8,11 @@ import (
 // TestClaudeCodeIsPinned: the pin's directory and Anthropic's manifest inside
 // it name the same version, and the manifest gives a sha256 per platform.
 func TestClaudeCodeIsPinned(t *testing.T) {
-	named, err := Pinned(".", "claudecode")
+	pin, err := PinOf(".", "claudecode")
 	if err != nil {
-		t.Fatalf("Pinned: %v", err)
+		t.Fatalf("PinOf: %v", err)
 	}
+	named := pin.Version
 	version, checksums, err := ClaudeCode()
 	if err != nil {
 		t.Fatalf("ClaudeCode: %v", err)

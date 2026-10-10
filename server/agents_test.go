@@ -42,9 +42,10 @@ func (g gardens) List() ([]storage.Namespace, error) {
 }
 func (gardens) Create(string, storage.NamespaceDefinition) error { return nil }
 func (gardens) SetEnabled(string, bool) error                    { return nil }
+func (gardens) SetRecord(string, storage.NamespaceRecord) error  { return nil }
 func (gardens) Delete(string) error                              { return nil }
 func (gardens) Nuke() error                                      { return nil }
-func (g gardens) OpenNamespace(name string) (*namespaces.Universe, error) {
+func (g gardens) OpenNamespace(name string, _ storage.NamespaceRecord) (*namespaces.Universe, error) {
 	if s, ok := g.store[name]; ok {
 		return oneNamespace(name, s), nil
 	}

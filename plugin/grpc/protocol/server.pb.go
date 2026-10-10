@@ -2195,7 +2195,7 @@ func (x *ReachWritten) GetId() string {
 	return ""
 }
 
-// NamespaceActedOn is what namespaces disable, enable, delete and nuke answer.
+// NamespaceActedOn is what namespaces disable, enable, store, delete and nuke answer.
 type NamespaceActedOn struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The namespace acted on.
@@ -3139,7 +3139,9 @@ type NamespaceDefinition struct {
 	Owner   string                 `protobuf:"bytes,1,opt,name=owner,proto3" json:"owner,omitempty"`
 	Enabled bool                   `protobuf:"varint,2,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	// RFC 3339.
-	CreatedAt     string `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	CreatedAt string `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// Where its attestations are kept.
+	Record        *NamespaceRecord `protobuf:"bytes,4,opt,name=record,proto3" json:"record,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3195,6 +3197,70 @@ func (x *NamespaceDefinition) GetCreatedAt() string {
 	return ""
 }
 
+func (x *NamespaceDefinition) GetRecord() *NamespaceRecord {
+	if x != nil {
+		return x.Record
+	}
+	return nil
+}
+
+// NamespaceRecord is a namespace's storage, as its ns.toml's [record] says.
+// Mirrors storage.NamespaceRecord.
+type NamespaceRecord struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// none, sqlite, parquet or postgres. A namespace begins with none.
+	Kind string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	// Postgres's connection string as an ssm:// or env: reference, never the
+	// password itself. Only a postgres record carries one.
+	Url           string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NamespaceRecord) Reset() {
+	*x = NamespaceRecord{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NamespaceRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NamespaceRecord) ProtoMessage() {}
+
+func (x *NamespaceRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NamespaceRecord.ProtoReflect.Descriptor instead.
+func (*NamespaceRecord) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *NamespaceRecord) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *NamespaceRecord) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
 // Namespace is one namespace at a storage location, and what namespaces
 // create answers. Mirrors storage.Namespace.
 type Namespace struct {
@@ -3212,7 +3278,7 @@ type Namespace struct {
 
 func (x *Namespace) Reset() {
 	*x = Namespace{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[39]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3224,7 +3290,7 @@ func (x *Namespace) String() string {
 func (*Namespace) ProtoMessage() {}
 
 func (x *Namespace) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[39]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3237,7 +3303,7 @@ func (x *Namespace) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Namespace.ProtoReflect.Descriptor instead.
 func (*Namespace) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{39}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *Namespace) GetName() string {
@@ -3276,7 +3342,7 @@ type NamespacesList struct {
 
 func (x *NamespacesList) Reset() {
 	*x = NamespacesList{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[40]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3288,7 +3354,7 @@ func (x *NamespacesList) String() string {
 func (*NamespacesList) ProtoMessage() {}
 
 func (x *NamespacesList) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[40]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3301,7 +3367,7 @@ func (x *NamespacesList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NamespacesList.ProtoReflect.Descriptor instead.
 func (*NamespacesList) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{40}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *NamespacesList) GetNamespaces() []*Namespace {
@@ -3329,13 +3395,14 @@ type StoredThing struct {
 	Rebuilt bool `protobuf:"varint,4,opt,name=rebuilt,proto3" json:"rebuilt,omitempty"`
 	// The Go files that reach this thing with hand-written SQL.
 	Sites         []string `protobuf:"bytes,5,rep,name=sites,proto3" json:"sites,omitempty"`
+	Postgres      bool     `protobuf:"varint,6,opt,name=postgres,proto3" json:"postgres,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StoredThing) Reset() {
 	*x = StoredThing{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[41]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3347,7 +3414,7 @@ func (x *StoredThing) String() string {
 func (*StoredThing) ProtoMessage() {}
 
 func (x *StoredThing) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[41]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3360,7 +3427,7 @@ func (x *StoredThing) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StoredThing.ProtoReflect.Descriptor instead.
 func (*StoredThing) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{41}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *StoredThing) GetName() string {
@@ -3398,6 +3465,13 @@ func (x *StoredThing) GetSites() []string {
 	return nil
 }
 
+func (x *StoredThing) GetPostgres() bool {
+	if x != nil {
+		return x.Postgres
+	}
+	return false
+}
+
 // SignumFollowed is one signum, and the references it can be held to.
 type SignumFollowed struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -3413,7 +3487,7 @@ type SignumFollowed struct {
 
 func (x *SignumFollowed) Reset() {
 	*x = SignumFollowed{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[42]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3425,7 +3499,7 @@ func (x *SignumFollowed) String() string {
 func (*SignumFollowed) ProtoMessage() {}
 
 func (x *SignumFollowed) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[42]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3438,7 +3512,7 @@ func (x *SignumFollowed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignumFollowed.ProtoReflect.Descriptor instead.
 func (*SignumFollowed) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{42}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *SignumFollowed) GetSignum() string {
@@ -3473,7 +3547,7 @@ type ParityFollowed struct {
 
 func (x *ParityFollowed) Reset() {
 	*x = ParityFollowed{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[43]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3485,7 +3559,7 @@ func (x *ParityFollowed) String() string {
 func (*ParityFollowed) ProtoMessage() {}
 
 func (x *ParityFollowed) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[43]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3498,7 +3572,7 @@ func (x *ParityFollowed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParityFollowed.ProtoReflect.Descriptor instead.
 func (*ParityFollowed) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{43}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ParityFollowed) GetSigna() []*SignumFollowed {
@@ -3514,8 +3588,8 @@ type ParityStorage struct {
 	// What was read: source, the code this build was made from, and never this
 	// node.
 	Describes string `protobuf:"bytes,1,opt,name=describes,proto3" json:"describes,omitempty"`
-	// One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go
-	// files that reach it with SQL written by hand.
+	// One per thing, by name: sqlite, duckdb, postgres, rebuilt by a take-in,
+	// and the Go files that reach it with SQL written by hand.
 	Things        []*StoredThing `protobuf:"bytes,2,rep,name=things,proto3" json:"things,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3523,7 +3597,7 @@ type ParityStorage struct {
 
 func (x *ParityStorage) Reset() {
 	*x = ParityStorage{}
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[44]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3535,7 +3609,7 @@ func (x *ParityStorage) String() string {
 func (*ParityStorage) ProtoMessage() {}
 
 func (x *ParityStorage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[44]
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3548,7 +3622,7 @@ func (x *ParityStorage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParityStorage.ProtoReflect.Descriptor instead.
 func (*ParityStorage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{44}
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ParityStorage) GetDescribes() string {
@@ -3914,12 +3988,16 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x02at\x18\b \x01(\tR\x02at\"K\n" +
 	"\tRolesList\x12(\n" +
 	"\x05lines\x18\x01 \x03(\v2\x12.protocol.RoleLineR\x05lines\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\rR\x05count\"d\n" +
+	"\x05count\x18\x02 \x01(\rR\x05count\"\x97\x01\n" +
 	"\x13NamespaceDefinition\x12\x14\n" +
 	"\x05owner\x18\x01 \x01(\tR\x05owner\x12\x18\n" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x03 \x01(\tR\tcreatedAt\"t\n" +
+	"created_at\x18\x03 \x01(\tR\tcreatedAt\x121\n" +
+	"\x06record\x18\x04 \x01(\v2\x19.protocol.NamespaceRecordR\x06record\"7\n" +
+	"\x0fNamespaceRecord\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\"t\n" +
 	"\tNamespace\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12=\n" +
 	"\n" +
@@ -3930,13 +4008,14 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\n" +
 	"namespaces\x18\x01 \x03(\v2\x13.protocol.NamespaceR\n" +
 	"namespaces\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\rR\x05count\"\x81\x01\n" +
+	"\x05count\x18\x02 \x01(\rR\x05count\"\x9d\x01\n" +
 	"\vStoredThing\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06sqlite\x18\x02 \x01(\bR\x06sqlite\x12\x16\n" +
 	"\x06duckdb\x18\x03 \x01(\bR\x06duckdb\x12\x18\n" +
 	"\arebuilt\x18\x04 \x01(\bR\arebuilt\x12\x14\n" +
-	"\x05sites\x18\x05 \x03(\tR\x05sites\"_\n" +
+	"\x05sites\x18\x05 \x03(\tR\x05sites\x12\x1a\n" +
+	"\bpostgres\x18\x06 \x01(\bR\bpostgres\"_\n" +
 	"\x0eSignumFollowed\x12\x16\n" +
 	"\x06signum\x18\x01 \x01(\tR\x06signum\x12\x1a\n" +
 	"\bdeclares\x18\x02 \x03(\tR\bdeclares\x12\x19\n" +
@@ -3959,7 +4038,7 @@ func file_plugin_grpc_protocol_server_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_server_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
+var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
 var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*DaemonStatusMessage)(nil),            // 0: protocol.DaemonStatusMessage
 	(*AsyncJobProgress)(nil),               // 1: protocol.AsyncJobProgress
@@ -4000,53 +4079,55 @@ var file_plugin_grpc_protocol_server_proto_goTypes = []any{
 	(*RoleLine)(nil),                       // 36: protocol.RoleLine
 	(*RolesList)(nil),                      // 37: protocol.RolesList
 	(*NamespaceDefinition)(nil),            // 38: protocol.NamespaceDefinition
-	(*Namespace)(nil),                      // 39: protocol.Namespace
-	(*NamespacesList)(nil),                 // 40: protocol.NamespacesList
-	(*StoredThing)(nil),                    // 41: protocol.StoredThing
-	(*SignumFollowed)(nil),                 // 42: protocol.SignumFollowed
-	(*ParityFollowed)(nil),                 // 43: protocol.ParityFollowed
-	(*ParityStorage)(nil),                  // 44: protocol.ParityStorage
-	nil,                                    // 45: protocol.JobUpdateMessage.MetadataEntry
-	nil,                                    // 46: protocol.RichSearchMatch.AttributesEntry
-	nil,                                    // 47: protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	nil,                                    // 48: protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	nil,                                    // 49: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	nil,                                    // 50: protocol.Vault.SendsEntry
-	(*Attestation)(nil),                    // 51: protocol.Attestation
+	(*NamespaceRecord)(nil),                // 39: protocol.NamespaceRecord
+	(*Namespace)(nil),                      // 40: protocol.Namespace
+	(*NamespacesList)(nil),                 // 41: protocol.NamespacesList
+	(*StoredThing)(nil),                    // 42: protocol.StoredThing
+	(*SignumFollowed)(nil),                 // 43: protocol.SignumFollowed
+	(*ParityFollowed)(nil),                 // 44: protocol.ParityFollowed
+	(*ParityStorage)(nil),                  // 45: protocol.ParityStorage
+	nil,                                    // 46: protocol.JobUpdateMessage.MetadataEntry
+	nil,                                    // 47: protocol.RichSearchMatch.AttributesEntry
+	nil,                                    // 48: protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	nil,                                    // 49: protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	nil,                                    // 50: protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	nil,                                    // 51: protocol.Vault.SendsEntry
+	(*Attestation)(nil),                    // 52: protocol.Attestation
 }
 var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
 	1,  // 0: protocol.AsyncJob.progress:type_name -> protocol.AsyncJobProgress
 	2,  // 1: protocol.AsyncJob.pulse_state:type_name -> protocol.AsyncJobPulseState
 	3,  // 2: protocol.JobUpdateMessage.job:type_name -> protocol.AsyncJob
-	45, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
-	46, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
+	46, // 3: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
+	47, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
 	6,  // 5: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
 	13, // 6: protocol.LLMStreamMessage.signal:type_name -> protocol.LLMTokenSignal
 	11, // 7: protocol.SamplerStageSignal.top_k:type_name -> protocol.LLMTokenCandidate
 	11, // 8: protocol.LLMTokenSignal.top_k:type_name -> protocol.LLMTokenCandidate
 	12, // 9: protocol.LLMTokenSignal.sampler_stages:type_name -> protocol.SamplerStageSignal
-	51, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
+	52, // 10: protocol.WatcherFire.attestation:type_name -> protocol.Attestation
 	14, // 11: protocol.WatcherResponse.recent_fires:type_name -> protocol.WatcherFire
-	47, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
-	48, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
-	49, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
-	50, // 15: protocol.Vault.sends:type_name -> protocol.Vault.SendsEntry
+	48, // 12: protocol.WatcherQueueStatusMessage.per_watcher:type_name -> protocol.WatcherQueueStatusMessage.PerWatcherEntry
+	49, // 13: protocol.WatcherQueueStatusMessage.target_elements:type_name -> protocol.WatcherQueueStatusMessage.TargetElementsEntry
+	50, // 14: protocol.WatcherQueueStatusMessage.watcher_stats:type_name -> protocol.WatcherQueueStatusMessage.WatcherStatsEntry
+	51, // 15: protocol.Vault.sends:type_name -> protocol.Vault.SendsEntry
 	27, // 16: protocol.Vaults.vaults:type_name -> protocol.Vault
 	29, // 17: protocol.VaultOwners.owners:type_name -> protocol.VaultOwner
 	31, // 18: protocol.VaultStates.folders:type_name -> protocol.VaultFolderState
 	33, // 19: protocol.ReachList.lines:type_name -> protocol.ReachLine
 	34, // 20: protocol.ReachList.compiled:type_name -> protocol.ReachCompiled
 	36, // 21: protocol.RolesList.lines:type_name -> protocol.RoleLine
-	38, // 22: protocol.Namespace.definition:type_name -> protocol.NamespaceDefinition
-	39, // 23: protocol.NamespacesList.namespaces:type_name -> protocol.Namespace
-	42, // 24: protocol.ParityFollowed.signa:type_name -> protocol.SignumFollowed
-	41, // 25: protocol.ParityStorage.things:type_name -> protocol.StoredThing
-	20, // 26: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	39, // 22: protocol.NamespaceDefinition.record:type_name -> protocol.NamespaceRecord
+	38, // 23: protocol.Namespace.definition:type_name -> protocol.NamespaceDefinition
+	40, // 24: protocol.NamespacesList.namespaces:type_name -> protocol.Namespace
+	43, // 25: protocol.ParityFollowed.signa:type_name -> protocol.SignumFollowed
+	42, // 26: protocol.ParityStorage.things:type_name -> protocol.StoredThing
+	20, // 27: protocol.WatcherQueueStatusMessage.WatcherStatsEntry.value:type_name -> protocol.WatcherBroadcastStats
+	28, // [28:28] is the sub-list for method output_type
+	28, // [28:28] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_server_proto_init() }
@@ -4068,7 +4149,7 @@ func file_plugin_grpc_protocol_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_server_proto_rawDesc), len(file_plugin_grpc_protocol_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   51,
+			NumMessages:   52,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

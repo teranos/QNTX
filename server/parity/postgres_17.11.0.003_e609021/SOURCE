@@ -1,0 +1,10 @@
+Supabase Postgres
+
+https://github.com/supabase/postgres/tree/e60902168c6f9b4030151d61d0fd741b52eaafd3 (the commit the tag of this version points to)
+
+sha256-TLEy0bAjTvfla6LiuqoqVGvcPyQMMXtFFwFChgeakGo=  supabase/postgres
+
+That hash is the source's as Nix fetches it, the narHash flake.lock records.
+flake.nix takes the flake at that commit as an input and builds its
+postgresql_17: the server the free tier runs, the one psql_17 is built on,
+without psql_17's extensions.

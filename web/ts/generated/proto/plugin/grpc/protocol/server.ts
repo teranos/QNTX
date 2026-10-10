@@ -492,7 +492,7 @@ export interface ReachWritten {
   id: string;
 }
 
-/** NamespaceActedOn is what namespaces disable, enable, delete and nuke answer. */
+/** NamespaceActedOn is what namespaces disable, enable, store, delete and nuke answer. */
 export interface NamespaceActedOn {
   /** The namespace acted on. */
   name: string;
@@ -673,6 +673,22 @@ export interface NamespaceDefinition {
   enabled: boolean;
   /** RFC 3339. */
   created_at: string;
+  /** Where its attestations are kept. */
+  record: NamespaceRecord | undefined;
+}
+
+/**
+ * NamespaceRecord is a namespace's storage, as its ns.toml's [record] says.
+ * Mirrors storage.NamespaceRecord.
+ */
+export interface NamespaceRecord {
+  /** none, sqlite, parquet or postgres. A namespace begins with none. */
+  kind: string;
+  /**
+   * Postgres's connection string as an ssm:// or env: reference, never the
+   * password itself. Only a postgres record carries one.
+   */
+  url: string;
 }
 
 /**
@@ -719,6 +735,7 @@ export interface StoredThing {
   rebuilt: boolean;
   /** The Go files that reach this thing with hand-written SQL. */
   sites: string[];
+  postgres: boolean;
 }
 
 /** SignumFollowed is one signum, and the references it can be held to. */
@@ -745,8 +762,8 @@ export interface ParityStorage {
    */
   describes: string;
   /**
-   * One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go
-   * files that reach it with SQL written by hand.
+   * One per thing, by name: sqlite, duckdb, postgres, rebuilt by a take-in,
+   * and the Go files that reach it with SQL written by hand.
    */
   things: StoredThing[];
 }

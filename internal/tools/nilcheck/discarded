@@ -1,6 +1,6 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 346 in 155 files.
+# 344 in 154 files.
 
 1	ats/attrs/attrs.go
 1	ats/identity/quickdev.go
@@ -123,7 +123,6 @@
 1	server/namespace_handlers.go
 1	server/namespace_route.go
 2	server/operational_watchdog.go
-2	server/parity/engines.go
 1	server/parity/prisma.go
 1	server/parity/references.go
 3	server/parity/tsdecl.go

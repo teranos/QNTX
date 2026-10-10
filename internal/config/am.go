@@ -235,9 +235,10 @@ type OAuthClientConfig struct {
 // StorageConfig selects the storage backend and holds backend-specific config.
 // See ADR-023 for the selection model.
 type StorageConfig struct {
-	Backend string        `mapstructure:"backend"` // "sqlite" (default) or "parquet". Additional backends in subsequent ADRs.
-	Sqlite  SqliteConfig  `mapstructure:"sqlite"`
-	Parquet ParquetConfig `mapstructure:"parquet"`
+	Backend  string         `mapstructure:"backend"` // "sqlite" (default) or "parquet". Additional backends in subsequent ADRs.
+	Sqlite   SqliteConfig   `mapstructure:"sqlite"`
+	Parquet  ParquetConfig  `mapstructure:"parquet"`
+	Postgres PostgresConfig `mapstructure:"postgres"`
 }
 
 // SqliteConfig configures the SQLite backend.
@@ -253,6 +254,13 @@ type SqliteConfig struct {
 // default chain resolves them.
 type ParquetConfig struct {
 	Location string `mapstructure:"location"`
+}
+
+// PostgresConfig is this node's side of a namespace whose record is Postgres:
+// the certificate the server is verified against. Which Postgres a namespace
+// sends to is its own, in its ns.toml; a path on one machine is not.
+type PostgresConfig struct {
+	CA string `mapstructure:"ca"`
 }
 
 // BoundedStorageConfig configures storage limits for attestations.

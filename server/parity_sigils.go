@@ -70,7 +70,7 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 				},
 				{
 					Name:   "storage",
-					Does:   "For every thing QNTX persists, whether SQLite and DuckDB each hold it, as make parity read the source this build was made from. It says nothing of this node's own stores.",
+					Does:   "For every thing QNTX persists, whether SQLite, DuckDB and Postgres each hold it, as make parity read the source this build was made from. It says nothing of this node's own stores.",
 					Answer: "protocol.ParityStorage",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/storage"},
 				},
@@ -181,7 +181,7 @@ func (s *QNTXServer) parityStorage(context.Context, sigil.Sent) (any, *protocol.
 	}
 	answer := &protocol.ParityStorage{Describes: "source", Things: make([]*protocol.StoredThing, 0, len(things))}
 	for _, t := range things {
-		answer.Things = append(answer.Things, &protocol.StoredThing{Name: t.Name, Sqlite: t.SQLite, Duckdb: t.DuckDB, Rebuilt: t.Rebuilt, Sites: t.Sites})
+		answer.Things = append(answer.Things, &protocol.StoredThing{Name: t.Name, Sqlite: t.SQLite, Duckdb: t.DuckDB, Postgres: t.Postgres, Rebuilt: t.Rebuilt, Sites: t.Sites})
 	}
 	return answer, nil
 }

@@ -10,14 +10,15 @@ import (
 )
 
 // footing is whether an admission may stand in a namespace, asked at the same
-// door a write goes through. Not served is 404, switched off is 409.
+// door a write goes through. Not served is 404, switched off or given no storage is 409.
 func (s *QNTXServer) footing(admitted auth.Admission, namespace string) (int, string) {
 	_, err := s.held.Universe(admitted, namespace)
 	if err == nil {
 		return 0, ""
 	}
 	var off namespaces.Disabled
-	if errors.As(err, &off) {
+	var storeless namespaces.NoStorage
+	if errors.As(err, &off) || errors.As(err, &storeless) {
 		return http.StatusConflict, err.Error()
 	}
 	var notServed namespaces.NotServed
