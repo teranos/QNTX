@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -150,7 +151,7 @@ func healthDetails(details map[string]any) map[string]string {
 }
 
 // routes is what each running plugin serves: plugins_routes's answer.
-func (h *PluginHandler) routes() *protocol.PluginRoutes {
+func (h *PluginHandler) routes() (*protocol.PluginRoutes, error) {
 	answer := &protocol.PluginRoutes{Routes: []*protocol.PluginRoute{}}
 
 	for _, name := range h.registry.List() {
@@ -164,9 +165,13 @@ func (h *PluginHandler) routes() *protocol.PluginRoutes {
 			Http: "/api/" + name + "/",
 		}
 
-		// Check WebSocket registration
+		// A plugin's socket is the handler it serves at /ws/{name}, where the
+		// node looks for it.
 		wsHandlers, err := p.RegisterWebSocket()
-		if err == nil && len(wsHandlers) > 0 {
+		if err != nil {
+			return nil, errors.Wrapf(err, "plugin %s did not say what it serves over WebSocket", name)
+		}
+		if _, serves := wsHandlers["/ws/"+name]; serves {
 			route.Ws = "/ws/" + name
 		}
 
@@ -194,7 +199,7 @@ func (h *PluginHandler) routes() *protocol.PluginRoutes {
 		answer.Routes = append(answer.Routes, route)
 	}
 
-	return answer
+	return answer, nil
 }
 
 // elements is the element definitions running plugins make: plugins_elements's

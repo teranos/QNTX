@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/teranos/QNTX/ats"
@@ -181,45 +183,39 @@ type handedSigna struct {
 
 // pluginSignaOf is what one ready plugin handed the node.
 func (s *QNTXServer) pluginSignaOf(name string) handedSigna {
-	served, refused := s.signaHandedBy(name)
-	return handedSigna{served: served, refused: refused}
-}
-
-// signaHandedBy is the signa one ready plugin serves, and why it serves none
-// of the rest.
-func (s *QNTXServer) signaHandedBy(name string) (served []sigil.Signum, refused []string) {
+	var handed handedSigna
 	if !s.pluginRegistry.IsReady(name) {
-		return nil, nil
+		return handed
 	}
 	p, ok := s.pluginRegistry.Get(name)
 	if !ok {
-		return nil, nil
+		return handed
 	}
 	holder, holds := p.(signaHolder)
 	if !holds {
-		return nil, nil
+		return handed
 	}
 	signa, declared := holder.GetSigna(), false
 	if len(signa) == 0 && len(holder.GetHTTPRoutes()) > 0 {
 		signa, declared = []*protocol.Signum{declaredSignum(name, holder.GetHTTPRoutes())}, true
 	}
-	for _, handed := range signa {
-		if err := boundUnder(name, handed); err != nil {
-			refused = append(refused, err.Error())
+	for _, signum := range signa {
+		if err := boundUnder(name, signum); err != nil {
+			handed.refused = append(handed.refused, err.Error())
 			continue
 		}
 		answers := map[string]sigil.Answer{}
-		for _, held := range handed.GetSigils() {
+		for _, held := range signum.GetSigils() {
 			answers[held.GetName()] = s.pluginAnswer(name, held, declared)
 		}
-		signum := sigil.Signum{Signum: handed, Answers: answers, Declared: declared}
-		if err := signum.Check(); err != nil {
-			refused = append(refused, err.Error())
+		served := sigil.Signum{Signum: signum, Answers: answers, Declared: declared}
+		if err := served.Check(); err != nil {
+			handed.refused = append(handed.refused, err.Error())
 			continue
 		}
-		served = append(served, signum)
+		handed.served = append(handed.served, served)
 	}
-	return served, refused
+	return handed
 }
 
 // declaredSignum is a plugin that declares routes as its own signum (ADR-001):
@@ -334,12 +330,14 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared 
 			return failed(errors.Newf("%s cannot be asked a sigil", plugin))
 		}
 
+		// A declared route is handed what arrived whole; a sigil, what was sent.
 		carried := map[string]any{}
-		for name, value := range sent {
-			carried[name] = value
-		}
 		if declared {
-			carried = sigil.Arrived(ctx)
+			maps.Copy(carried, sigil.Arrived(ctx))
+		} else {
+			for name, value := range sent {
+				carried[name] = value
+			}
 		}
 		req, err := forwarded(plugin, held, carried, ctx)
 		if err != nil {
@@ -398,21 +396,20 @@ func forwarded(plugin string, held *protocol.Sigil, carried map[string]any, ctx 
 		Path:   strings.TrimPrefix(held.GetHttp().GetPath(), "/api/"+plugin),
 	}
 	if carriesBody(method) {
-		if carried == nil {
-			carried = map[string]any{}
-		}
 		body, err := json.Marshal(carried)
 		if err != nil {
 			return nil, errors.Wrapf(err, "what was sent to %s did not marshal", held.GetName())
 		}
 		req.Body = body
 		req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: "Content-Type", Values: []string{"application/json"}})
-	} else if len(carried) > 0 {
+	} else {
+		// The path with what was carried as its query, which a URL leaves off
+		// when nothing was.
 		query := url.Values{}
 		for name, value := range carried {
 			query.Set(name, fmt.Sprint(value))
 		}
-		req.Path += "?" + query.Encode()
+		req.Path = (&url.URL{Path: req.Path, RawQuery: query.Encode()}).String()
 	}
 
 	// A node with no login admits nobody by name, and says nobody.
@@ -462,16 +459,17 @@ func refusedBy(resp *protocol.HTTPResponse) (*protocol.Refusal, error) {
 		return nil, errors.Newf("the refusal says nothing: %s", resp.GetBody())
 	}
 	why := said.Why
-	switch why {
-	case "", sigil.Missing, sigil.NotOneOf, sigil.Invalid, sigil.NotFound, sigil.NotAllowed, sigil.Failed:
-	default:
-		return nil, errors.Newf("%q is not a kind of no", why)
-	}
 	if why == "" {
 		why = whyOf(resp.GetStatusCode())
 	}
+	if !slices.Contains(kindsOfNo, why) {
+		return nil, errors.Newf("%q is not a kind of no", why)
+	}
 	return &protocol.Refusal{Why: why, Param: said.Param, Says: said.Says}, nil
 }
+
+// kindsOfNo is every kind of no a plugin's refusal may say.
+var kindsOfNo = []string{sigil.Missing, sigil.NotOneOf, sigil.Invalid, sigil.NotFound, sigil.NotAllowed, sigil.Failed}
 
 // whyOf is the kind of no a plugin's status says, when it says no other.
 func whyOf(status int32) string {

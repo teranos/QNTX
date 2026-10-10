@@ -61,7 +61,11 @@ func TestTheAnswerSaysWhenItWasProbed(t *testing.T) {
 		t.Errorf("age_ms = %v, want at least 89000", age)
 	}
 	holds(t, bareNode().pluginsSignum(), "list", h.list())
-	holds(t, bareNode().pluginsSignum(), "routes", h.routes())
+	routes, err := h.routes()
+	if err != nil {
+		t.Fatalf("routes: %v", err)
+	}
+	holds(t, bareNode().pluginsSignum(), "routes", routes)
 	holds(t, bareNode().pluginsSignum(), "elements", h.elements(context.Background()))
 	// A width a plugin names is said; one it omits is left out.
 	holds(t, bareNode().pluginsSignum(), "elements", &protocol.PluginElements{Elements: []*protocol.PluginElement{
