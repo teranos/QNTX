@@ -3,6 +3,7 @@ package main
 import (
 	"go/ast"
 	"go/parser"
+	"go/token"
 	"testing"
 )
 
@@ -42,6 +43,38 @@ func TestRustTestsAgainstNothingAreCounted(t *testing.T) {
 	} {
 		if got := testsAgainstNothingRust(line); got != counted {
 			t.Errorf("%q counted %v, want %v", line, got, counted)
+		}
+	}
+}
+
+// "nil is nil"
+func TestANameHoldingNothingCountsLikeWhatItHolds(t *testing.T) {
+	files := []goFile{}
+	for dir, source := range map[string]string{
+		"logger": "package logger\nconst Quiet = 0\nconst Loud = 4\nvar None = \"\"",
+		"server": "package server\nconst nobody = \"\"",
+	} {
+		file, err := parser.ParseFile(token.NewFileSet(), dir+".go", source, 0)
+		if err != nil {
+			t.Fatalf("%s does not parse: %v", dir, err)
+		}
+		files = append(files, goFile{rel: dir + "/" + dir + ".go", dir: dir, file: file})
+	}
+	named := emptyNames(files).in("server")
+	empty := func(x ast.Expr) bool { return nothing(x) || named(x) }
+	for source, counted := range map[string]bool{
+		"level == logger.Quiet": true,
+		"name != logger.None":   true,
+		"actor == nobody":       true,
+		"level == logger.Loud":  false,
+		"level == Quiet":        false,
+	} {
+		expr, err := parser.ParseExpr(source)
+		if err != nil {
+			t.Fatalf("%s does not parse: %v", source, err)
+		}
+		if got := testsAgainst(expr.(*ast.BinaryExpr), empty); got != counted {
+			t.Errorf("%s counted %v, want %v", source, got, counted)
 		}
 	}
 }
