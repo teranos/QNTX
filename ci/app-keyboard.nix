@@ -116,11 +116,21 @@
       }
       {
         "if" = "always()";
+        name = "QNTX's own page, never zooming, in a shell that zooms nothing";
+        run = ''
+          git apply qntx/ci/app-keyboard/native.patch
+          (cd qntx && make web)
+          python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index("<meta name=\"viewport\""); b=s.index(">", a)+1; open(p,"w").write(s[:a]+sys.argv[2]+s[b:])' qntx/internal/server/dist/index.html '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'
+          bash qntx/ci/app-keyboard/run.sh whole
+        '';
+      }
+      {
+        "if" = "always()";
         name = "What the screen said";
         run = ''
           cat verdicts.txt
           grep -q '^without: zoomed$' verdicts.txt || { echo "without the line the page did not zoom: this run cannot see a zoom"; exit 1; }
-          grep -q '^qntx: stayed$' verdicts.txt || { echo "on QNTX's own page the box did not just bring the keyboard"; exit 1; }
+          grep -q '^whole: stayed$' verdicts.txt || { echo "with the page never zooming and the shell zooming nothing, the box still did more than bring the keyboard"; exit 1; }
         '';
       }
       {
