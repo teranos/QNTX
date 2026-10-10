@@ -167,6 +167,11 @@ REACH is '/api/pi' '/api/pi/say' '/api/pi/session'                        of ROO
 # or SUPER, asked there too.
 REACH is '/api/agents/{namespace}' '/api/agents/{namespace}/say' '/api/agents/{namespace}/session' '/api/agents/{namespace}/login' of ROOT SUPER USER
 
+# Approvals (ADR-052): "approvals is ROOT only for now". The list is a sigil;
+# the answer is a route and no sigil, "human only" and "only through it's
+# element", which the handler asks of the admission: a token is refused.
+REACH is '/api/approvals' '/api/approvals/answer'                         of ROOT
+
 # A2A over HTTP+JSON, one line for every operation: a route like
 # /tasks/{id}:cancel is no pattern the mux reads. "A2A is ROOT's alone for the
 # foreseeable future" (ADR-039); a2a:<signum> lines say who reaches a skill.
