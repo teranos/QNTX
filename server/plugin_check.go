@@ -16,25 +16,30 @@ import (
 )
 
 // gitHubSource is a plugin's repository URL, read into the parts GitHub names.
-// Ref and Path are empty for a plugin that is the whole repository.
+// A tree URL names a Ref, and a Path when the plugin is a directory of it; a
+// plugin that is the whole repository names neither.
 type gitHubSource struct {
-	Owner string
-	Repo  string
-	Ref   string
-	Path  string
+	Owner     string
+	Repo      string
+	Ref       string
+	RefNamed  bool
+	Path      string
+	PathNamed bool
 }
 
 // readGitHubSource reads github.com/owner/repo, or .../tree/<ref>/<path>.
 func readGitHubSource(repo string) (gitHubSource, error) {
 	u, err := url.Parse(strings.TrimSpace(repo))
-	if err != nil || u.Host == "" {
-		return gitHubSource{}, errors.Newf("%q is not a repository URL", repo)
+	if err != nil {
+		return gitHubSource{}, errors.Wrapf(err, "%q is not a repository URL", repo)
 	}
 	if u.Host != "github.com" {
-		return gitHubSource{}, errors.Newf("%q is on %s, and a plugin's repository is on github.com", repo, u.Host)
+		return gitHubSource{}, errors.Newf("%q is not on github.com, and a plugin's repository is", repo)
 	}
+	// An owner or repository named empty is one GitHub does not have, and it
+	// says so when asked.
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+	if len(parts) < 2 {
 		return gitHubSource{}, errors.Newf("%q names no owner/repo", repo)
 	}
 	source := gitHubSource{Owner: parts[0], Repo: strings.TrimSuffix(parts[1], ".git")}
@@ -44,8 +49,8 @@ func readGitHubSource(repo string) (gitHubSource, error) {
 	if parts[2] != "tree" || len(parts) < 4 {
 		return gitHubSource{}, errors.Newf("%q continues past owner/repo with %q, and only a tree URL does", repo, parts[2])
 	}
-	source.Ref = parts[3]
-	source.Path = strings.Join(parts[4:], "/")
+	source.Ref, source.RefNamed = parts[3], true
+	source.Path, source.PathNamed = strings.Join(parts[4:], "/"), len(parts) > 4
 	return source, nil
 }
 
@@ -53,13 +58,15 @@ func readGitHubSource(repo string) (gitHubSource, error) {
 // written, installed or downloaded.
 func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.PluginChecked, error) {
 	repo = strings.TrimSpace(repo)
-	name := config.PluginNameFromRepo(repo)
-	if name == "" || name == "." || name == "/" {
-		return nil, errors.Newf("%q names no plugin", repo)
-	}
 	source, err := readGitHubSource(repo)
 	if err != nil {
 		return nil, err
+	}
+	// A repository on GitHub names its owner and itself, so a plugin read from
+	// one is named; "." is a directory naming no plugin.
+	name := config.PluginNameFromRepo(repo)
+	if name == "." {
+		return nil, errors.Newf("%q names no plugin", repo)
 	}
 	// The node's own GitHub is system's, named.
 	found, err := s.gitHubService().GetARepository(ctx, &protocol.GitHubGetARepositoryRequest{
@@ -70,16 +77,17 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 	if !found.Success {
 		return nil, errors.Newf("%s/%s: %s", source.Owner, source.Repo, found.Error)
 	}
-	ref := source.Ref
-	if ref == "" {
-		ref = found.DefaultBranch
+	// A URL naming no ref is the repository as its default branch is.
+	ref := found.DefaultBranch
+	if source.RefNamed {
+		ref = source.Ref
 	}
 	checked := &protocol.PluginChecked{
 		Name: name, Repo: repo, Repository: found.FullName, Private: found.Private,
 		Ref: ref, Path: source.Path,
 	}
 
-	if source.Path != "" {
+	if source.PathNamed {
 		held, err := s.gitHubService().GetRepositoryContent(ctx, &protocol.GitHubGetRepositoryContentRequest{
 			Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo, Path: source.Path, Ref: ref})
 		if err != nil {
@@ -113,7 +121,7 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 // pluginReadme is the README of the plugin's directory, or of the repository
 // when the plugin is the whole of it.
 func (s *QNTXServer) pluginReadme(ctx context.Context, source gitHubSource, ref string) (*protocol.GitHubGetARepositoryREADMEResponse, error) {
-	if source.Path == "" {
+	if !source.PathNamed {
 		readme, err := s.gitHubService().GetARepositoryREADME(ctx, &protocol.GitHubGetARepositoryREADMERequest{
 			Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo, Ref: ref})
 		return readme, errors.Wrapf(err, "GitHubService did not answer for the README of %s/%s at %s", source.Owner, source.Repo, ref)

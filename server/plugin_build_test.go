@@ -112,7 +112,7 @@ func TestAFailedBuildIsTriedOncePerRevsAndRecipe(t *testing.T) {
 	if failedBefore("cleanAPI", fixed.failedKey([]string{"c0ffee"})) {
 		t.Fatal("a record changed at the same revs is taken as already failed")
 	}
-	if err := keepFailed("cleanAPI", ""); err != nil {
+	if err := clearFailed("cleanAPI"); err != nil {
 		t.Fatalf("clear: %v", err)
 	}
 	if failedBefore("cleanAPI", key) {
@@ -133,19 +133,19 @@ func TestABuildKeepsWhatItWasBuiltFrom(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if revs := installedRevs("inbox"); revs != nil {
+	if revs, built := installedRevs("inbox"); built {
 		t.Fatalf("no binary, and revs %v", revs)
 	}
 	if err := os.WriteFile(filepath.Join(dir, grpcplugin.PluginBinaryName("inbox")), []byte("bin"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if revs := installedRevs("inbox"); revs != nil {
+	if revs, built := installedRevs("inbox"); built {
 		t.Fatalf("a binary QNTX did not build, and revs %v", revs)
 	}
 	if err := keepBuiltRevs("inbox", []string{"c0ffee", "beef"}); err != nil {
 		t.Fatalf("keep: %v", err)
 	}
-	if revs := installedRevs("inbox"); strings.Join(revs, " ") != "c0ffee beef" {
+	if revs, built := installedRevs("inbox"); !built || strings.Join(revs, " ") != "c0ffee beef" {
 		t.Fatalf("revs %v", revs)
 	}
 }
@@ -166,7 +166,7 @@ func TestABuildWorksOnDiskUnderTheNodesHome(t *testing.T) {
 		t.Fatalf("%s is not a directory: %v", dir, err)
 	}
 
-	env := buildEnv("/w", "", nil)
+	env := buildEnv("/w", pluginBuild{}, nil)
 	if !slices.Contains(env, "TMPDIR=/w/tmp") {
 		t.Fatalf("the build's temp files go elsewhere: %v", env)
 	}
@@ -176,7 +176,7 @@ func TestABuildWorksOnDiskUnderTheNodesHome(t *testing.T) {
 //
 // "18 minutes is also too slow"
 func TestABuildRunsAtTheLowestPriority(t *testing.T) {
-	env := buildEnv("/w", "", nil)
+	env := buildEnv("/w", pluginBuild{}, nil)
 	for _, held := range []string{"CARGO_BUILD_JOBS=1", "GOFLAGS=-p=1", "MAKEFLAGS=-j1"} {
 		if slices.Contains(env, held) {
 			t.Fatalf("%s holds the build to one job: %v", held, env)
@@ -198,6 +198,7 @@ func TestBuildOfLeavesAPluginWithoutABuildAlone(t *testing.T) {
 func TestBuildOfRefusesAnIncompleteBuild(t *testing.T) {
 	for name, config := range map[string]map[string]string{
 		"no branch":  {buildCore: "teranos/datapunt", buildCommand: "x", buildOutput: "y"},
+		"empty core": {buildCore: "", buildCommand: "x", buildOutput: "y"},
 		"no command": {buildCore: "teranos/datapunt@main", buildOutput: "y"},
 		"no output":  {buildCore: "teranos/datapunt@main", buildCommand: "x"},
 		"input without env": {buildCore: "teranos/datapunt@main", buildCommand: "x", buildOutput: "y",

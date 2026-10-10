@@ -80,27 +80,34 @@ func parseBuildSource(s string, withPath bool) (buildSource, error) {
 
 // pluginBuild is how one plugin is built, as its record says.
 type pluginBuild struct {
-	name      string
-	core      buildSource
-	inputs    []buildSource
-	inputsEnv string
-	packages  []string
-	command   string
-	output    string
+	name   string
+	core   buildSource
+	inputs []buildSource
+	// inputsEnv is the variable the build reads its inputs' files from, and
+	// inputsEnvNamed whether the record names one.
+	inputsEnv      string
+	inputsEnvNamed bool
+	packages       []string
+	command        string
+	output         string
 }
 
 // buildOf is the build a record names. False is a plugin QNTX does not build.
 func buildOf(record grpcplugin.PluginRecord) (pluginBuild, bool, error) {
+	// A record naming no build.core is a plugin QNTX does not build; one naming
+	// an empty one names no source, and parseBuildSource refuses it.
 	core, ok := record.Config[buildCore]
-	if !ok || strings.TrimSpace(core) == "" {
+	if !ok {
 		return pluginBuild{}, false, nil
 	}
+	inputsEnv, inputsEnvNamed := record.Config[buildInputsEnv]
 	b := pluginBuild{
-		name:      record.Name,
-		inputsEnv: record.Config[buildInputsEnv],
-		packages:  strings.Fields(record.Config[buildPackages]),
-		command:   strings.TrimSpace(record.Config[buildCommand]),
-		output:    strings.TrimSpace(record.Config[buildOutput]),
+		name:           record.Name,
+		inputsEnv:      inputsEnv,
+		inputsEnvNamed: inputsEnvNamed,
+		packages:       strings.Fields(record.Config[buildPackages]),
+		command:        strings.TrimSpace(record.Config[buildCommand]),
+		output:         strings.TrimSpace(record.Config[buildOutput]),
 	}
 	var err error
 	if b.core, err = parseBuildSource(core, false); err != nil {
@@ -111,6 +118,10 @@ func buildOf(record grpcplugin.PluginRecord) (pluginBuild, bool, error) {
 		if err != nil {
 			return pluginBuild{}, false, errors.Wrapf(err, "plugin %s: %s", record.Name, buildInputs)
 		}
+		// An input is handed to the build in the variable the record names.
+		if !inputsEnvNamed {
+			return pluginBuild{}, false, errors.Newf("plugin %s takes %s and names no %s", record.Name, buildInputs, buildInputsEnv)
+		}
 		b.inputs = append(b.inputs, source)
 	}
 	switch {
@@ -118,24 +129,22 @@ func buildOf(record grpcplugin.PluginRecord) (pluginBuild, bool, error) {
 		return pluginBuild{}, false, errors.Newf("plugin %s names no %s", record.Name, buildCommand)
 	case b.output == "":
 		return pluginBuild{}, false, errors.Newf("plugin %s names no %s", record.Name, buildOutput)
-	case len(b.inputs) > 0 && b.inputsEnv == "":
-		return pluginBuild{}, false, errors.Newf("plugin %s takes %s and names no %s", record.Name, buildInputs, buildInputsEnv)
 	}
 	return b, true, nil
 }
 
-// enabledBuilds is each enabled plugin QNTX builds, and why any record's build
-// is not one QNTX can run.
-func enabledBuilds(records []grpcplugin.PluginRecord) ([]pluginBuild, []error) {
+// enabledBuilds is each enabled plugin QNTX builds, and why any record's build,
+// by plugin, is not one QNTX can run.
+func enabledBuilds(records []grpcplugin.PluginRecord) ([]pluginBuild, map[string]error) {
 	var builds []pluginBuild
-	var refused []error
+	refused := map[string]error{}
 	for _, record := range records {
 		if !record.Enabled {
 			continue
 		}
 		b, built, err := buildOf(record)
 		if err != nil {
-			refused = append(refused, err)
+			refused[record.Name] = err
 			continue
 		}
 		if built {
@@ -149,20 +158,21 @@ func enabledBuilds(records []grpcplugin.PluginRecord) ([]pluginBuild, []error) {
 const builtRevsFile = "built-revs"
 
 // installedRevs is what name's installed build was built from. None is a
-// plugin with no binary, or one whose binary QNTX did not build.
-func installedRevs(name string) []string {
+// plugin with no binary, or one whose binary QNTX did not build: false, for
+// whatever reason, is a plugin built when its sources are next read.
+func installedRevs(name string) ([]string, bool) {
 	dir, err := grpcplugin.PluginInstallPath(name)
 	if err != nil {
-		return nil
+		return nil, false
 	}
 	if info, err := os.Stat(filepath.Join(dir, grpcplugin.PluginBinaryName(name))); err != nil || info.IsDir() {
-		return nil
+		return nil, false
 	}
 	held, err := os.ReadFile(filepath.Join(dir, builtRevsFile))
 	if err != nil {
-		return nil
+		return nil, false
 	}
-	return strings.Fields(string(held))
+	return strings.Fields(string(held)), true
 }
 
 // keepBuiltRevs writes what name's installed build was built from beside it.
@@ -197,17 +207,24 @@ func failedBefore(name, key string) bool {
 	return err == nil && string(held) == key
 }
 
-// keepFailed writes which build failed beside the install; a built one clears it.
-func keepFailed(name, key string) error {
+// clearFailed removes which build failed from beside the install: a built one
+// clears it.
+func clearFailed(name string) error {
 	dir, err := grpcplugin.PluginInstallPath(name)
 	if err != nil {
 		return err
 	}
-	if key == "" {
-		if err := os.Remove(filepath.Join(dir, failedBuildFile)); err != nil && !os.IsNotExist(err) {
-			return errors.Wrapf(err, "the failed build of %s was not cleared", name)
-		}
-		return nil
+	if err := os.Remove(filepath.Join(dir, failedBuildFile)); err != nil && !os.IsNotExist(err) {
+		return errors.Wrapf(err, "the failed build of %s was not cleared", name)
+	}
+	return nil
+}
+
+// keepFailed writes which build failed beside the install.
+func keepFailed(name, key string) error {
+	dir, err := grpcplugin.PluginInstallPath(name)
+	if err != nil {
+		return err
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make %s to keep %s's failed build in", dir, name)
@@ -229,12 +246,15 @@ func (s *QNTXServer) BuildMoved() {
 		return
 	}
 	builds, refused := enabledBuilds(records)
-	for _, err := range refused {
-		logger.Errorw("A plugin's build is not one QNTX can run", "error", err)
+	// A build QNTX cannot run is said where the builds are shown, and the
+	// others are built all the same.
+	for name, err := range refused {
+		s.builds.set(name, PluginBuildState{At: time.Now(), Error: "this build is not one QNTX can run: " + err.Error()})
 	}
 	for _, b := range builds {
-		if revs := installedRevs(b.name); revs != nil {
+		if revs, built := installedRevs(b.name); built {
 			s.builds.set(b.name, PluginBuildState{Revs: revs, At: time.Now()})
+			s.builds.built(b.name, revs)
 		}
 		sacred.Go("plugin.build."+b.name, func() {
 			s.building.Lock()
@@ -260,35 +280,35 @@ type PluginBuildState struct {
 	Error   string    `json:"error,omitempty"`
 }
 
-// pluginBuilds is what the builds know between rounds.
+// pluginBuilds is what the builds know between rounds: each plugin's last
+// round as the GitHub element shows it, and the revs its installed build was
+// built from.
 type pluginBuilds struct {
-	mu    sync.Mutex
-	state map[string]PluginBuildState
+	state     sync.Map // plugin name → PluginBuildState
+	installed sync.Map // plugin name → its revs, space separated
 }
 
 func (p *pluginBuilds) set(name string, state PluginBuildState) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.state == nil {
-		p.state = map[string]PluginBuildState{}
-	}
-	p.state[name] = state
+	p.state.Store(name, state)
 }
 
-func (p *pluginBuilds) get(name string) (PluginBuildState, bool) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	state, ok := p.state[name]
-	return state, ok
+// built is that name's installed build was built from revs.
+func (p *pluginBuilds) built(name string, revs []string) {
+	p.installed.Store(name, strings.Join(revs, " "))
+}
+
+// builtFrom is whether name's installed build was built from revs.
+func (p *pluginBuilds) builtFrom(name string, revs []string) bool {
+	held, ok := p.installed.Load(name)
+	return ok && held.(string) == strings.Join(revs, " ")
 }
 
 func (p *pluginBuilds) all() map[string]PluginBuildState {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	out := map[string]PluginBuildState{}
-	for name, state := range p.state {
-		out[name] = state
-	}
+	p.state.Range(func(name, state any) bool {
+		out[name.(string)] = state.(PluginBuildState)
+		return true
+	})
 	return out
 }
 
@@ -299,14 +319,15 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 	for _, source := range b.sources() {
 		rev, err := s.buildRev(ctx, source)
 		if err != nil {
-			logger.Warnw("A source's rev was not read, so the plugin is not built", "plugin", b.name, "source", source.String(), "error", err)
-			s.builds.set(b.name, PluginBuildState{At: time.Now(), Error: err.Error()})
+			// Said where the builds are shown, and mailed to ROOT.
+			s.builds.set(b.name, PluginBuildState{At: time.Now(),
+				Error: "the rev of " + source.String() + " was not read, so the plugin is not built: " + err.Error()})
 			s.mailBuildFailure(ctx, b, nil, err, logger)
 			return
 		}
 		revs = append(revs, rev)
 	}
-	if held, ok := s.builds.get(b.name); ok && held.Error == "" && strings.Join(held.Revs, " ") == strings.Join(revs, " ") {
+	if s.builds.builtFrom(b.name, revs) {
 		return
 	}
 	// A build that failed fails again at the same revs with the same recipe,
@@ -329,23 +350,27 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 		s.builds.set(b.name, state)
 		return
 	}
+	// A failed build is said where the builds are shown, and mailed to ROOT.
 	if err != nil {
 		state.Error = err.Error()
-		logger.Warnw("A plugin was not built", "plugin", b.name, "revs", revs, "error", err)
+		if keptErr := keepFailed(b.name, key); keptErr != nil {
+			state.Error += "; and it was not kept as failed, so the next start builds and mails it again: " + keptErr.Error()
+		}
 		s.builds.set(b.name, state)
 		s.mailBuildFailure(ctx, b, revs, err, logger)
-		if err := keepFailed(b.name, key); err != nil {
-			logger.Errorw("A failed build was not kept, so the next start builds and mails it again", "plugin", b.name, "error", err)
-		}
 		return
 	}
-	s.builds.set(b.name, state)
+	s.builds.built(b.name, revs)
+	// What did not follow a build that landed is said where the builds are shown.
+	var unkept []string
 	if err := keepBuiltRevs(b.name, revs); err != nil {
-		logger.Errorw("A plugin built and what it was built from was not kept, so the next start builds it again", "plugin", b.name, "error", err)
+		unkept = append(unkept, "what it was built from was not kept, so the next start builds it again: "+err.Error())
 	}
-	if err := keepFailed(b.name, ""); err != nil {
-		logger.Errorw("A plugin built and its earlier failure was not cleared", "plugin", b.name, "error", err)
+	if err := clearFailed(b.name); err != nil {
+		unkept = append(unkept, "its earlier failure was not cleared: "+err.Error())
 	}
+	state.Error = strings.Join(unkept, "; ")
+	s.builds.set(b.name, state)
 	if changed {
 		s.buildLanded(b.name)
 	}
@@ -355,7 +380,10 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 // stopping: systemd signals the build with the node, before its context ends.
 // A deploy stops the node, and a build cut off by it says nothing of the plugin.
 func (s *QNTXServer) stoppedWithTheNode(ctx context.Context) bool {
-	return ctx.Err() != nil || s.getState() != ServerStateRunning
+	if err := ctx.Err(); err != nil {
+		return true
+	}
+	return s.getState() != ServerStateRunning
 }
 
 // buildRev is the commit source's branch points at now, or the last commit
@@ -396,13 +424,13 @@ func buildsDir() (string, error) {
 
 // buildEnv is what a build runs with: the node's nix, its inputs, and its
 // temp files inside its own work directory.
-func buildEnv(work, inputsEnv string, files []string) []string {
+func buildEnv(work string, b pluginBuild, files []string) []string {
 	env := []string{
 		"PATH=" + nixBin + ":" + os.Getenv("PATH"),
 		"TMPDIR=" + filepath.Join(work, "tmp"),
 	}
-	if inputsEnv != "" {
-		env = append(env, inputsEnv+"="+strings.Join(files, " "))
+	if b.inputsEnvNamed {
+		env = append(env, b.inputsEnv+"="+strings.Join(files, " "))
 	}
 	return env
 }
@@ -443,7 +471,7 @@ func (s *QNTXServer) buildPlugin(ctx context.Context, b pluginBuild, revs []stri
 		return false, "", errors.Wrapf(err, "failed to make %s", src)
 	}
 	// GitHub's archive holds one directory named for the repository and rev.
-	if _, err := runBuild(ctx, work, nil, "tar", "-xzf", tarball, "--strip-components=1", "-C", src); err != nil {
+	if err := runBuild(ctx, work, nil, "tar", "-xzf", tarball, "--strip-components=1", "-C", src); err != nil {
 		return false, "", errors.Wrapf(err, "failed to unpack %s at %s", b.core.String(), revs[0])
 	}
 
@@ -462,7 +490,7 @@ func (s *QNTXServer) buildPlugin(ctx context.Context, b pluginBuild, revs []stri
 	}
 	args = append(args, "-c", "sh", "-c", b.command)
 	nice, niceArgs := gentle(filepath.Join(nixBin, "nix"), args)
-	if _, err := runBuild(ctx, src, buildEnv(work, b.inputsEnv, files), nice, niceArgs...); err != nil {
+	if err := runBuild(ctx, src, buildEnv(work, b, files), nice, niceArgs...); err != nil {
 		return false, "", errors.Wrapf(err, "the build of %s at %s failed", b.name, revs[0])
 	}
 
@@ -527,22 +555,22 @@ func (s *QNTXServer) fetchInput(ctx context.Context, in buildSource, rev, work s
 	return file, nil
 }
 
-// runBuild runs one step of a build in dir and hands back what it printed. A
-// step that fails says what it printed last.
-func runBuild(ctx context.Context, dir string, env []string, name string, args ...string) (string, error) {
+// runBuild runs one step of a build in dir. A step that fails says what it
+// printed last.
+func runBuild(ctx context.Context, dir string, env []string, name string, args ...string) error {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), env...)
-	var out, errOut bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errOut
+	var errOut bytes.Buffer
+	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		said := errOut.String()
 		if len(said) > 2000 {
 			said = said[len(said)-2000:]
 		}
-		return "", errors.Wrapf(err, "%s %s: %s", name, strings.Join(args, " "), said)
+		return errors.Wrapf(err, "%s %s: %s", name, strings.Join(args, " "), said)
 	}
-	return out.String(), nil
+	return nil
 }
 
 // buildFailureMail is the mail a failed build is, to the ROOT User.

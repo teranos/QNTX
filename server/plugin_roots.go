@@ -85,7 +85,7 @@ func rootStorePaths(ctx context.Context, nixStore, binary, roots string) ([]stri
 	var fetched []string
 	for _, path := range storePathsIn(data) {
 		_, missing := os.Stat(path)
-		if _, err := runBuild(ctx, roots, nil, nixStore, "--realise", path, "--add-root", filepath.Join(roots, filepath.Base(path))); err != nil {
+		if err := runBuild(ctx, roots, nil, nixStore, "--realise", path, "--add-root", filepath.Join(roots, filepath.Base(path))); err != nil {
 			return fetched, errors.Wrapf(err, "%s names %s, and it was not kept", binary, path)
 		}
 		if missing != nil {
