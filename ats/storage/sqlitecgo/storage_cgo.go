@@ -67,6 +67,7 @@ type RustStore struct {
 	muWrite  sync.Mutex
 	muRead   sync.Mutex // kept for backward compat (driver registration)
 	store    *C.SqliteStore
+	closed   bool             // set by Close under muWrite, when store is freed
 	dbPath   string           // filesystem path (empty for in-memory)
 	readConn *C.ReadConn      // primary read conn (kept for driver/backward compat)
 	readPool []*readConnEntry // pooled read connections for concurrent reads
@@ -261,7 +262,7 @@ func (rs *RustStore) SetEnforcementConfig(config *EnforcementConfig) error {
 	rs.muWrite.Lock()
 	rs.SetWriteHolder("set-enforcement-config")
 	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
-	if rs.store == nil {
+	if rs.closed {
 		return errors.New("store is closed")
 	}
 
@@ -286,6 +287,9 @@ func (rs *RustStore) Close() error {
 	rs.muRead.Lock()
 	defer rs.muRead.Unlock()
 	defer rs.muWrite.Unlock()
+	if rs.closed {
+		return nil
+	}
 	// Free pooled read connections
 	for i, entry := range rs.readPool {
 		C.read_conn_free(entry.conn)
@@ -299,10 +303,8 @@ func (rs *RustStore) Close() error {
 		C.read_conn_free(rs.readConn)
 		rs.readConn = nil
 	}
-	if rs.store != nil {
-		C.storage_free(rs.store)
-		rs.store = nil
-	}
+	C.storage_free(rs.store)
+	rs.closed = true
 	return nil
 }
 
@@ -332,7 +334,7 @@ func (rs *RustStore) createAttestationWithPriority(as *types.As, high bool) erro
 		caller = "put:high"
 	}
 	return rs.SubmitWrite(high, caller, func() error {
-		if rs.store == nil {
+		if rs.closed {
 			return errors.New("store is closed")
 		}
 		result := C.storage_put(rs.store, cJSON)
@@ -377,7 +379,7 @@ func (rs *RustStore) BatchCreateAttestations(attestations []*types.As) (int, err
 		}
 		chunk := items[i:end]
 		err := rs.SubmitWrite(false, "batch-put", func() error {
-			if rs.store == nil {
+			if rs.closed {
 				return errors.New("store is closed")
 			}
 			for _, item := range chunk {
@@ -413,6 +415,10 @@ func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
+		if rs.closed {
+			rs.muWrite.Unlock()
+			return nil, errors.New("store is closed")
+		}
 		result = C.storage_get(rs.store, cID)
 		rs.muWrite.Unlock()
 	}
@@ -448,7 +454,7 @@ func (rs *RustStore) AttestationExists(id string) bool {
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
-		if rs.store == nil {
+		if rs.closed {
 			rs.muWrite.Unlock()
 			return false
 		}
@@ -473,7 +479,7 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 	rs.muWrite.Lock()
 	rs.SetWriteHolder("update")
 	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
-	if rs.store == nil {
+	if rs.closed {
 		return errors.New("store is closed")
 	}
 
@@ -497,7 +503,7 @@ func (rs *RustStore) ListAttestationIDs() ([]string, error) {
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
-		if rs.store == nil {
+		if rs.closed {
 			rs.muWrite.Unlock()
 			return nil, errors.New("store is closed")
 		}
@@ -534,7 +540,7 @@ func (rs *RustStore) CountAttestations() (int, error) {
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
-		if rs.store == nil {
+		if rs.closed {
 			rs.muWrite.Unlock()
 			return 0, errors.New("store is closed")
 		}
@@ -603,7 +609,7 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 
 	// Low priority — GenerateAndCreate is used by plugins
 	err = rs.SubmitWrite(false, "generate-and-create", func() error {
-		if rs.store == nil {
+		if rs.closed {
 			return errors.New("store is closed")
 		}
 		return rs.putLocked(jsonBytes)
@@ -709,7 +715,7 @@ func (rs *RustStore) query(rustFilter rustQueryFilter, slowKey string, resolved 
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
-		if rs.store == nil {
+		if rs.closed {
 			rs.muWrite.Unlock()
 			return nil, errors.New("store is closed")
 		}
@@ -775,7 +781,7 @@ func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *
 
 	rs.muWrite.Lock()
 	rs.SetWriteHolder("enforce-limits")
-	if rs.store == nil {
+	if rs.closed {
 		rs.ClearWriteHolder()
 		rs.muWrite.Unlock()
 		return nil, errors.New("store is closed")
@@ -821,7 +827,7 @@ func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
-		if rs.store == nil {
+		if rs.closed {
 			rs.muWrite.Unlock()
 			return nil, errors.New("store is closed")
 		}
@@ -900,7 +906,7 @@ func (rs *RustStore) readStrings(
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
-		if rs.store == nil {
+		if rs.closed {
 			rs.muWrite.Unlock()
 			return nil, errors.New("store is closed")
 		}
@@ -981,7 +987,7 @@ func (rs *RustStore) QueryAttestationsRaw(sql string, params []any) ([]*types.As
 		rs.releaseReadConn(entry)
 	} else {
 		rs.muWrite.Lock()
-		if rs.store == nil {
+		if rs.closed {
 			rs.muWrite.Unlock()
 			return nil, errors.New("store is closed")
 		}
@@ -1038,7 +1044,7 @@ func (rs *RustStore) ageDistillFFI(cCutoff *C.char, batchSize int) (int, int, in
 	rs.muWrite.Lock()
 	rs.SetWriteHolder("age-distill")
 	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
-	if rs.store == nil {
+	if rs.closed {
 		return 0, 0, 0, errors.New("store is closed")
 	}
 
@@ -1060,7 +1066,7 @@ func (rs *RustStore) WALCheckpointTruncate() (busy, walPages, checkpointedPages 
 	rs.SetWriteHolder("wal-checkpoint")
 	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
 
-	if rs.store == nil {
+	if rs.closed {
 		return 0, 0, 0, errors.New("store is closed")
 	}
 
