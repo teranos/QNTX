@@ -239,7 +239,9 @@ func TestASlowOperationalStoreIsWaitedOnAndROOTIsTold(t *testing.T) {
 	require.NoError(t, held.Close())
 	clock.step(t, shortPatience.every)
 
-	require.Eventually(t, func() bool {
+	// The inbox is read when the wait gives up: an argument here is read once,
+	// before the first poll, while the mails are still on their way.
+	if !assert.Eventually(t, func() bool {
 		var waits int
 		var answered bool
 		for _, subject := range box.subjects() {
@@ -251,7 +253,9 @@ func TestASlowOperationalStoreIsWaitedOnAndROOTIsTold(t *testing.T) {
 			}
 		}
 		return waits == 2 && answered
-	}, 10*time.Second, time.Millisecond, "ROOT was not mailed as the wait grew and when it ended: %v", box.subjects())
+	}, 10*time.Second, time.Millisecond) {
+		t.Fatalf("ROOT was not mailed as the wait grew and when it ended: %v", box.subjects())
+	}
 	box.mu.Lock()
 	for _, m := range box.mails {
 		assert.Equal(t, "root@garden.test", m.To)
@@ -357,13 +361,15 @@ func TestTheHeaviestTokenIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
 	clock.handled(t, shortPatience.mailEvery)
 	require.NoError(t, held.Close())
 	clock.step(t, shortPatience.every)
-	require.Eventually(t, func() bool {
+	if !assert.Eventually(t, func() bool {
 		for _, text := range box.texts() {
 			if strings.Contains(text, "Let back in: ground") {
 				return true
 			}
 		}
 		return false
-	}, 10*time.Second, time.Millisecond, "ROOT was not told the heaviest token was let back in: %v", box.subjects())
+	}, 10*time.Second, time.Millisecond) {
+		t.Fatalf("ROOT was not told the heaviest token was let back in: %v", box.subjects())
+	}
 	assert.Equal(t, http.StatusOK, send(heavy), "the heaviest token was still turned away once the store answered in time")
 }
