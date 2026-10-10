@@ -9,7 +9,7 @@
 import { connectivity, type Failure } from '../../client';
 import { copyable } from '../../copyable';
 import { log, SEG } from '../../logger';
-import { tray } from '@teranos/elements';
+import { DEFAULT_COLOR, getForm, tray } from '@teranos/elements';
 import type { Element } from '@teranos/elements';
 
 const CONNECTIVITY_ELEMENT_ID = 'connectivity';
@@ -82,25 +82,71 @@ function renderConnectivityContent(): HTMLElement {
     return container;
 }
 
+// The dot's color while a failure has arrived that nobody has opened it to see.
+const UNSEEN_FAILURE_COLOR = '#e06060';
+
+// One item for the element's whole life, so a color set on it is the one every
+// form reads back.
+const item: Element = {
+    id: CONNECTIVITY_ELEMENT_ID,
+    title: 'Connectivity',
+    renderContent: renderConnectivityContent,
+    onClose: () => {
+        log.debug(SEG.ELEMENT, '[ConnectivityElement] Closed');
+    },
+};
+
+function isOpen(el: HTMLElement): boolean {
+    const form = getForm(el);
+    return form === 'window' || form === 'panel';
+}
+
+// The DOM element the observer below is on. A close removes it and the next
+// add makes another, which is watched in turn.
+let watched: HTMLElement | null = null;
+
+/**
+ * Opened is seen: the color comes off. Content renders once and is restored
+ * from a stash after, so the form changing is the one sign of every opening.
+ */
+function clearColorWhenOpened(el: HTMLElement): void {
+    if (watched === el) return;
+    watched = el;
+    new MutationObserver(() => {
+        if (!isOpen(el) || item.color !== UNSEEN_FAILURE_COLOR) return;
+        delete item.color;
+        el.style.backgroundColor = DEFAULT_COLOR;
+    }).observe(el, { attributes: true, attributeFilter: ['data-form'] });
+}
+
 /**
  * Add the connectivity element to the tray and open it. No-op if already present.
  * Called on the first failure event via subscribeFailures.
  */
 export function spawnConnectivityElement(): void {
-    if (tray.has(CONNECTIVITY_ELEMENT_ID)) {
-        tray.open(CONNECTIVITY_ELEMENT_ID);
+    if (!tray.has(CONNECTIVITY_ELEMENT_ID)) tray.add(item);
+    tray.open(CONNECTIVITY_ELEMENT_ID);
+}
+
+/**
+ * Put the connectivity element in the tray without opening it, and change its
+ * dot's color. Nothing is opened over what is being done.
+ *
+ * "While it's in the tray, it may change dot color on activity"
+ */
+export function signalConnectivityInTray(): void {
+    if (!tray.has(CONNECTIVITY_ELEMENT_ID)) tray.add(item);
+    item.color = UNSEEN_FAILURE_COLOR;
+    const el = document.querySelector<HTMLElement>(`[data-element-id="${CONNECTIVITY_ELEMENT_ID}"]`);
+    if (!el) {
+        log.warn(SEG.ELEMENT, `[ConnectivityElement] Added to the tray, but no element with data-element-id="${CONNECTIVITY_ELEMENT_ID}" is in the DOM`);
         return;
     }
-
-    const item: Element = {
-        id: CONNECTIVITY_ELEMENT_ID,
-        title: 'Connectivity',
-        renderContent: renderConnectivityContent,
-        onClose: () => {
-            log.debug(SEG.ELEMENT, '[ConnectivityElement] Closed');
-        },
-    };
-
-    tray.add(item);
-    tray.open(CONNECTIVITY_ELEMENT_ID);
+    clearColorWhenOpened(el);
+    // Open, it is being looked at: nothing to signal.
+    if (isOpen(el)) {
+        delete item.color;
+        return;
+    }
+    el.style.backgroundColor = UNSEEN_FAILURE_COLOR;
 }

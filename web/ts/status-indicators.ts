@@ -11,7 +11,7 @@ import type { DaemonStatusMessage } from '../types/websocket';
 import { DB, Sigma } from './sym';
 import { openDoor, signedIn, standAtTheDoor } from './signin';
 import { log, SEG } from './logger';
-import { spawnConnectivityElement } from './components/element/connectivity-element';
+import { signalConnectivityInTray, spawnConnectivityElement } from './components/element/connectivity-element';
 import { tray } from '@teranos/elements';
 import { connectingLabel } from './reconnect';
 
@@ -238,17 +238,20 @@ class StatusIndicatorManager {
     }
 
     /**
-     * Open the connectivity element on a failure, except on a phone. Every
-     * failure reopened it, and a node down for minutes fails once a second, so
-     * no dismissal held. The failures still reach Sentry through the logger.
+     * Open the connectivity element on a failure, except on a phone: there it
+     * rests in the tray and its dot changes color. Every failure reopened it,
+     * and a node down for minutes fails once a second, so no dismissal held.
      *
      * "On mobile it's actively harming user experience in any circumstance it pops up"
-     * "Sentry should have this observability already"
+     * "While it's in the tray, it may change dot color on activity"
      */
     private setupConnectivityDiagnostic(): void {
         const phone = window.matchMedia('(max-width: 768px)');
         connectivity.subscribeFailures(() => {
-            if (phone.matches) return;
+            if (phone.matches) {
+                signalConnectivityInTray();
+                return;
+            }
             spawnConnectivityElement();
         });
     }
