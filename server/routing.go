@@ -48,7 +48,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer(githubCredentialPath, s.HandleGitHubCredential)
 
 	// The human's answer to an approval (ADR-052): a route, no sigil and no
-	// tool, and no line, which is ROOT's alone.
+	// tool; the reach table names it of ROOT.
 	s.answer(approvalsAnswerPath, s.HandleApprovalAnswer)
 
 	// A staand answers the public pixel on /s/{namespace}/{slug} (ADR-035). The
