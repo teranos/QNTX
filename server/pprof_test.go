@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,7 +36,7 @@ func TestTheServedHandlerRefusesProfiling(t *testing.T) {
 // profiling would have got it on an address nobody named. servePprof blocks
 // serving a listener it opens, so returning is the observable difference.
 func TestPprofPortZeroListensNowhere(t *testing.T) {
-	s := &QNTXServer{logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar()}
 
 	returned := make(chan struct{})
 	go func() {

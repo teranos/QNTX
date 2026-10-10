@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -32,7 +33,7 @@ func TestRateLimitGroup_AllowAndDeny(t *testing.T) {
 // origins, so a 429 with no Access-Control-Allow-Origin is blocked before any
 // script can read it, and reaches the person as a network failure instead.
 func TestARefusedAuthRequestStillCarriesCORS(t *testing.T) {
-	s := &QNTXServer{rlAuth: newRateLimitGroup(0, 0)}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), rlAuth: newRateLimitGroup(0, 0)}
 	reached := false
 	// The production wrapper itself, not a copy of its order.
 	wrapped := s.authGate(func(http.ResponseWriter, *http.Request) {
@@ -139,8 +140,9 @@ func TestClientIP_XForwardedForChain(t *testing.T) {
 
 func TestRateLimitMiddleware_Returns429(t *testing.T) {
 	s := &QNTXServer{
-		rlRead:  newRateLimitGroup(1, 1), // 1/sec, burst 1
-		rlWrite: newRateLimitGroup(1, 1),
+		pluginRegistry: plugin.GetDefaultRegistry(),
+		rlRead:         newRateLimitGroup(1, 1), // 1/sec, burst 1
+		rlWrite:        newRateLimitGroup(1, 1),
 	}
 
 	handler := s.rateLimitMiddleware(func(w http.ResponseWriter, r *http.Request) {
@@ -172,8 +174,9 @@ func TestRateLimitMiddleware_Returns429(t *testing.T) {
 
 func TestRateLimitMiddleware_WriteMethod(t *testing.T) {
 	s := &QNTXServer{
-		rlRead:  newRateLimitGroup(100, 200), // generous read limit
-		rlWrite: newRateLimitGroup(1, 1),     // tight write limit
+		pluginRegistry: plugin.GetDefaultRegistry(),
+		rlRead:         newRateLimitGroup(100, 200), // generous read limit
+		rlWrite:        newRateLimitGroup(1, 1),     // tight write limit
 	}
 
 	handler := s.rateLimitMiddleware(func(w http.ResponseWriter, r *http.Request) {

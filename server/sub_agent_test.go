@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -95,7 +96,7 @@ func TestTheNodeNamesItsRootAgentAndTheGateKnowsIt(t *testing.T) {
 		tokens, testUsers(t), false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 	node := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
-	s := &QNTXServer{authHandler: h, nodeDID: &nodedid.Handler{PrivateKey: node}, logger: zaptest.NewLogger(t).Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), authHandler: h, nodeDID: &nodedid.Handler{PrivateKey: node}, logger: zaptest.NewLogger(t).Sugar()}
 
 	require.NoError(t, s.nameRootAgent(t.TempDir()))
 	require.NotNil(t, s.rootAgent)
@@ -121,7 +122,7 @@ func TestTheNodeNamesItsRootAgentAndTheGateKnowsIt(t *testing.T) {
 // A node with no login has no gate to know the agent, and names it all the same.
 func TestANodeWithNoLoginStillNamesItsRootAgent(t *testing.T) {
 	node := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
-	s := &QNTXServer{nodeDID: &nodedid.Handler{PrivateKey: node}, logger: zaptest.NewLogger(t).Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), nodeDID: &nodedid.Handler{PrivateKey: node}, logger: zaptest.NewLogger(t).Sugar()}
 	require.NoError(t, s.nameRootAgent(t.TempDir()))
 	require.NotNil(t, s.rootAgent)
 	assert.NotEmpty(t, s.rootAgent.did)
@@ -162,7 +163,7 @@ func TestAClaudeCodeAlreadyFetchedIsNeverSaidToBeArriving(t *testing.T) {
 
 // A node whose am.toml names no agent fetches nothing.
 func TestANodeThatNamesNoAgentFetchesNoClaudeCode(t *testing.T) {
-	s := &QNTXServer{deps: &serverDependencies{cfg: &appcfg.Config{}}, logger: zaptest.NewLogger(t).Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), deps: &serverDependencies{cfg: &appcfg.Config{}}, logger: zaptest.NewLogger(t).Sugar()}
 	require.NoError(t, agentSubsystem{}.Init(s))
 	assert.Nil(t, s.harnessHeldBy("claude"))
 }

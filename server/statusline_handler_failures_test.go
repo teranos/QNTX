@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -166,7 +167,7 @@ func TestNoHandlerFailureLogDrawsNoFailures(t *testing.T) {
 // A job with no handler name must still name something the row can draw and a
 // click can find, rather than drawing an empty span.
 func TestUnnamedHandlerFallsBackToTheJobID(t *testing.T) {
-	s := &QNTXServer{handlerFailures: newHandlerFailureLog()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), handlerFailures: newHandlerFailureLog()}
 	s.noteHandlerFailure(HandlerFailure{
 		ScheduledJobID: "AS-CAPYCAPY-SCHEDULE-PULSE-FZ36C6PW",
 		Error:          "no name on the job",

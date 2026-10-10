@@ -13,11 +13,7 @@ type pluginServicesSubsystem struct{}
 func (pluginServicesSubsystem) Name() string { return "plugin-services" }
 
 func (pluginServicesSubsystem) Init(s *QNTXServer) error {
-	pluginRegistry := plugin.GetDefaultRegistry()
-	if pluginRegistry == nil {
-		return nil
-	}
-	s.pluginRegistry = pluginRegistry
+	pluginRegistry := s.pluginRegistry
 	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth)
 	s.pluginHandler.sigils = s.pluginSigilRows
 	s.pluginHandler.records = s.pluginRecords().Plugins

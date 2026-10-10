@@ -136,7 +136,7 @@ func TestASigilIsGatedOverHTTPByTheLinesAboutIt(t *testing.T) {
 // does, and takes what the sigil takes.
 func TestASigilIsATool(t *testing.T) {
 	named := map[string]*mcp.Tool{}
-	for _, tool := range toolsOffered(t, &QNTXServer{}) {
+	for _, tool := range toolsOffered(t, bareNode()) {
 		named[tool.Name] = tool
 	}
 	for _, name := range []string{"staands_list", "staands_create", "staands_take-down", "staands_metrics", "staands_activity", "staands_visits"} {
@@ -249,7 +249,7 @@ func TestACallerIsShownTheToolsTheyReach(t *testing.T) {
 // The document the node serves says a sigil's operations as the sigil says
 // them. The written file says no operation: it is the reach table's paths.
 func TestTheServedDocumentSaysWhatTheSigilsSay(t *testing.T) {
-	s := &QNTXServer{}
+	s := bareNode()
 	raw, err := s.openapiServed()
 	require.NoError(t, err)
 

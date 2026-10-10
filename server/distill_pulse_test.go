@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/teranos/QNTX/plugin"
 	"testing"
 	"time"
 
@@ -35,7 +36,7 @@ func TestDistillHandler_CallsDistiller(t *testing.T) {
 		skipped:       2,
 	}
 
-	srv := &QNTXServer{ageDistiller: mock}
+	srv := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), ageDistiller: mock}
 	h := &distillHandler{
 		server:    srv,
 		maxAge:    1 * time.Hour,
@@ -55,7 +56,7 @@ func TestDistillHandler_CallsDistiller(t *testing.T) {
 }
 
 func TestDistillHandler_NilDistiller(t *testing.T) {
-	srv := &QNTXServer{} // ageDistiller is nil
+	srv := bareNode() // ageDistiller is nil
 	h := &distillHandler{
 		server:    srv,
 		maxAge:    1 * time.Hour,
@@ -72,7 +73,7 @@ func TestDistillHandler_PropagatesError(t *testing.T) {
 		err: assert.AnError,
 	}
 
-	srv := &QNTXServer{ageDistiller: mock}
+	srv := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), ageDistiller: mock}
 	h := &distillHandler{
 		server:    srv,
 		maxAge:    2 * time.Hour,

@@ -18,7 +18,7 @@ func admittedAs(level auth.Level, namespaces ...string) *http.Request {
 // Somebody who walked up to a door reaches no store. Logging in is the whole
 // of what the rung buys.
 func TestAPublicRegistrationReachesNoStore(t *testing.T) {
-	s := &QNTXServer{}
+	s := bareNode()
 
 	_, err := s.storeFor(admittedAs(auth.LevelPublicRegistration, "garden"))
 
@@ -30,7 +30,7 @@ func TestAPublicRegistrationReachesNoStore(t *testing.T) {
 // The rung sits under all of them, so it is not one of the levels that reach
 // the system namespace.
 func TestAPublicRegistrationIsNotAboveAnything(t *testing.T) {
-	s := &QNTXServer{}
+	s := bareNode()
 
 	_, err := s.storeFor(admittedAs(auth.LevelPublicRegistration, auth.NamespaceSystem))
 

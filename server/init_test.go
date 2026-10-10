@@ -28,11 +28,6 @@ func TestServerInitialization(t *testing.T) {
 	if server.logger == nil {
 		t.Error("Logger not initialized")
 	}
-
-	// pluginManager and pluginRegistry may be nil if no plugins configured - that's OK
-	// Just verify they're accessible fields
-	_ = server.pluginManager
-	_ = server.pluginRegistry
 }
 
 // TestServerWithPluginManager verifies plugin manager is correctly wired up when set globally
@@ -61,7 +56,7 @@ func TestServerWithPluginManager(t *testing.T) {
 	}
 }
 
-// TestServerWithPluginRegistry verifies plugin registry field exists
+// The node runs with the registry cmd/qntx set, the one TestMain sets here.
 func TestServerWithPluginRegistry(t *testing.T) {
 	store, db := qntxtest.CreateTestStore(t)
 
@@ -70,10 +65,9 @@ func TestServerWithPluginRegistry(t *testing.T) {
 		t.Fatalf("Failed to create server: %v", err)
 	}
 
-	// Note: pluginRegistry gets set later in initialization via plugin.GetDefaultRegistry()
-	// This test just verifies the field exists and is accessible
-	// The registry may or may not be set depending on test execution order
-	_ = server.pluginRegistry
+	if server.pluginRegistry != plugin.GetDefaultRegistry() {
+		t.Error("the node runs with a registry other than the one it was given")
+	}
 }
 
 // TestServerServicesRegistry verifies services registry is properly initialized
@@ -90,19 +84,13 @@ func TestServerServicesRegistry(t *testing.T) {
 		grpcplugin.SetDefaultPluginManager(nil)
 	})
 
-	// Get default registry if it exists (may be set from other tests)
-	// If not set, services will be nil which is expected
-	existingRegistry := plugin.GetDefaultRegistry()
-
 	server, err := NewQNTXServer(db, servingOne(db, store), "test.db", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
 
-	// If plugin registry exists, services should be initialized
-	// This prevents nil pointer panics during plugin reinitialization
-	if existingRegistry != nil && server.services == nil {
-		t.Error("Services registry should be set when plugin registry exists (prevents nil pointer in ReinitializePlugin)")
+	if server.services == nil {
+		t.Error("Services registry should be set (prevents nil pointer in ReinitializePlugin)")
 	}
 }
 

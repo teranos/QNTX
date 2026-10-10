@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3323 in 435 files.
+# 3309 in 435 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -13,6 +13,7 @@
 # From 3368: the server logs, rather than asking first whether it has a logger.
 # From 3355: Pulse runs because the node runs, and nothing asks whether the daemon is there.
 # From 3339: a closed store says it is closed, rather than its pointer being nil.
+# From 3323: the node runs with its plugin registry, and nothing asks whether it has one.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -338,22 +339,22 @@
 7	server/embeddings/project_handler.go
 5	server/embeddings/projection.go
 12	server/embeddings/pulse.go
-6	server/embeddings_handlers.go
+4	server/embeddings_handlers.go
 8	server/embeddings_pulse.go
 4	server/exposure.go
 1	server/files.go
-13	server/github.go
+12	server/github.go
 2	server/github_credential.go
 2	server/github_deliveries.go
 1	server/github_parity.go
 4	server/github_webhook.go
 2	server/ground_bridge.go
-12	server/handlers.go
+11	server/handlers.go
 4	server/host_gauges.go
 3	server/i_sigils.go
-13	server/init.go
+14	server/init.go
 5	server/invitations.go
-24	server/lifecycle.go
+22	server/lifecycle.go
 8	server/mail.go
 14	server/mcp.go
 11	server/namespace_handlers.go
@@ -380,14 +381,14 @@
 8	server/plugin_check.go
 12	server/plugin_config_handlers.go
 8	server/plugin_handlers.go
-2	server/plugin_health_cache.go
+1	server/plugin_health_cache.go
 3	server/plugin_log_handlers.go
 4	server/plugin_records.go
 2	server/plugin_roots.go
-21	server/plugin_sigils.go
+19	server/plugin_sigils.go
 1	server/plugin_stores.go
 1	server/pprof.go
-27	server/prompt_handlers.go
+26	server/prompt_handlers.go
 2	server/prose_handlers.go
 5	server/pulse_async_jobs.go
 6	server/pulse_execution_handlers.go
@@ -412,7 +413,7 @@
 2	server/roles.go
 2	server/roles_handler.go
 4	server/routes.go
-9	server/routing.go
+5	server/routing.go
 11	server/search_observer.go
 5	server/server.go
 5	server/sigil/ask.go
@@ -435,7 +436,7 @@
 8	server/sub_auth.go
 6	server/sub_canvas.go
 9	server/sub_embedding.go
-2	server/sub_plugins.go
+1	server/sub_plugins.go
 1	server/sub_store_proof.go
 2	server/sub_ticker.go
 1	server/syscap/parser_qntx.go
