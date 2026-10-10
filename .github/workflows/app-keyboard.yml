@@ -19,7 +19,19 @@
         {
           "uses": "dtolnay/rust-toolchain@stable",
           "with": {
-            "targets": "aarch64-apple-ios-sim"
+            "targets": "aarch64-apple-ios-sim, wasm32-unknown-unknown"
+          }
+        },
+        {
+          "uses": "jetli/wasm-pack-action@v0.4.0",
+          "with": {
+            "version": "v0.13.1"
+          }
+        },
+        {
+          "uses": "oven-sh/setup-bun@v2",
+          "with": {
+            "bun-version": "1.3.3"
           }
         },
         {
@@ -44,18 +56,29 @@
           "run": "defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false\nRUNTIME=$(xcrun simctl list runtimes available -j | jq -r '[.runtimes[] | select(.platform == \"iOS\")] | sort_by(.version) | last | .identifier')\nUDID=$(xcrun simctl list devices available -j | jq -r --arg rt \"$RUNTIME\" '[.devices[$rt][] | select(.name | startswith(\"iPhone\"))] | first | .udid')\necho \"UDID=$UDID\" >> \"$GITHUB_ENV\"\nxcrun simctl boot \"$UDID\"\nxcrun simctl bootstatus \"$UDID\" -b\nopen -a Simulator --args -CurrentDeviceUDID \"$UDID\"\n"
         },
         {
-          "name": "Without the line: the app's web view zooms on a 12px box, and this sees it",
-          "run": "bash qntx/ci/app-keyboard/run.sh without \"width=device-width, initial-scale=1, viewport-fit=cover\""
+          "name": "A bare page without the viewport line: the web view zooms, and this run sees it",
+          "run": "mkdir -p qntx/internal/server/dist\nsed 's|<!-- VIEWPORT -->|<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">|' qntx/ci/app-keyboard/page.html > qntx/internal/server/dist/index.html\nbash qntx/ci/app-keyboard/run.sh without\n"
         },
         {
           "if": "always()",
-          "name": "With QNTX's own line",
-          "run": "LINE=$(python3 -c 'import sys; s=open(\"qntx/web/index.html\").read(); i=s.index(\"name=\\\"viewport\\\" content=\\\"\")+len(\"name=\\\"viewport\\\" content=\\\"\"); print(s[i:s.index(\"\\\"\", i)])')\nbash qntx/ci/app-keyboard/run.sh qntx \"$LINE\"\n"
+          "name": "A bare page with QNTX's viewport line",
+          "run": "LINE=$(grep -o '<meta name=\"viewport\"[^>]*>' qntx/web/index.html)\npython3 -c 'import sys; open(sys.argv[2],\"w\").write(open(sys.argv[1]).read().replace(\"<!-- VIEWPORT -->\", sys.argv[3]))' qntx/ci/app-keyboard/page.html qntx/internal/server/dist/index.html \"$LINE\"\nbash qntx/ci/app-keyboard/run.sh line\n"
+        },
+        {
+          "if": "always()",
+          "name": "QNTX's own page, as the app carries it",
+          "run": "make web",
+          "working-directory": "qntx"
+        },
+        {
+          "if": "always()",
+          "name": "The box on QNTX's own page",
+          "run": "bash qntx/ci/app-keyboard/run.sh qntx"
         },
         {
           "if": "always()",
           "name": "What the screen said",
-          "run": "cat verdicts.txt\ngrep -q '^without: zoomed$' verdicts.txt || { echo \"without the line it did not zoom: this run cannot see a zoom\"; exit 1; }\ngrep -q '^qntx: not zoomed$' verdicts.txt || { echo \"with QNTX's line the box still zoomed\"; exit 1; }\n"
+          "run": "cat verdicts.txt\ngrep -q '^without: zoomed$' verdicts.txt || { echo \"without the line the page did not zoom: this run cannot see a zoom\"; exit 1; }\ngrep -q '^qntx: stayed$' verdicts.txt || { echo \"on QNTX's own page the box did not just bring the keyboard\"; exit 1; }\n"
         },
         {
           "if": "always()",

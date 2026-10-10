@@ -33,7 +33,15 @@
       }
       {
         uses = "dtolnay/rust-toolchain@stable";
-        "with".targets = "aarch64-apple-ios-sim";
+        "with".targets = "aarch64-apple-ios-sim, wasm32-unknown-unknown";
+      }
+      {
+        uses = "jetli/wasm-pack-action@v0.4.0";
+        "with".version = "v0.13.1";
+      }
+      {
+        uses = "oven-sh/setup-bun@v2";
+        "with".bun-version = "1.3.3";
       }
       {
         name = "Fetch tauri-cli 2.11.4";
@@ -71,24 +79,40 @@
         '';
       }
       {
-        name = "Without the line: the app's web view zooms on a 12px box, and this sees it";
-        run = ''bash qntx/ci/app-keyboard/run.sh without "width=device-width, initial-scale=1, viewport-fit=cover"'';
+        name = "A bare page without the viewport line: the web view zooms, and this run sees it";
+        run = ''
+          mkdir -p qntx/internal/server/dist
+          sed 's|<!-- VIEWPORT -->|<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">|' qntx/ci/app-keyboard/page.html > qntx/internal/server/dist/index.html
+          bash qntx/ci/app-keyboard/run.sh without
+        '';
       }
       {
         "if" = "always()";
-        name = "With QNTX's own line";
+        name = "A bare page with QNTX's viewport line";
         run = ''
-          LINE=$(python3 -c 'import sys; s=open("qntx/web/index.html").read(); i=s.index("name=\"viewport\" content=\"")+len("name=\"viewport\" content=\""); print(s[i:s.index("\"", i)])')
-          bash qntx/ci/app-keyboard/run.sh qntx "$LINE"
+          LINE=$(grep -o '<meta name="viewport"[^>]*>' qntx/web/index.html)
+          python3 -c 'import sys; open(sys.argv[2],"w").write(open(sys.argv[1]).read().replace("<!-- VIEWPORT -->", sys.argv[3]))' qntx/ci/app-keyboard/page.html qntx/internal/server/dist/index.html "$LINE"
+          bash qntx/ci/app-keyboard/run.sh line
         '';
+      }
+      {
+        "if" = "always()";
+        name = "QNTX's own page, as the app carries it";
+        working-directory = "qntx";
+        run = "make web";
+      }
+      {
+        "if" = "always()";
+        name = "The box on QNTX's own page";
+        run = "bash qntx/ci/app-keyboard/run.sh qntx";
       }
       {
         "if" = "always()";
         name = "What the screen said";
         run = ''
           cat verdicts.txt
-          grep -q '^without: zoomed$' verdicts.txt || { echo "without the line it did not zoom: this run cannot see a zoom"; exit 1; }
-          grep -q '^qntx: not zoomed$' verdicts.txt || { echo "with QNTX's line the box still zoomed"; exit 1; }
+          grep -q '^without: zoomed$' verdicts.txt || { echo "without the line the page did not zoom: this run cannot see a zoom"; exit 1; }
+          grep -q '^qntx: stayed$' verdicts.txt || { echo "on QNTX's own page the box did not just bring the keyboard"; exit 1; }
         '';
       }
       {

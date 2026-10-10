@@ -4,24 +4,8 @@
     <meta charset="utf-8">
     <!-- VIEWPORT -->
     <title>QNTX keyboard</title>
-    <style>
-        html, body { margin: 0; height: 100%; background: #00c853; }
-        body.zoomed { background: #d50000; }
-        /* As the ROOT agent's box is drawn: 12px, under what iOS zooms for. */
-        #says { position: fixed; left: 10%; width: 80%; top: 55%; height: 44px; font: 12px monospace; box-sizing: border-box; }
-    </style>
+    <style>html, body { margin: 0; height: 100%; background: #202020; }</style>
 </head>
 <body>
-    <textarea id="says" placeholder="Say something to the ROOT agent"></textarea>
-    <script>
-        // Green while the page is at its own scale, red from the moment it is not,
-        // and red stays: a screenshot after the keyboard settles says whether it ever zoomed.
-        function look() {
-            if (window.visualViewport && window.visualViewport.scale > 1.01) document.body.classList.add('zoomed');
-        }
-        window.visualViewport.addEventListener('resize', look);
-        window.visualViewport.addEventListener('scroll', look);
-        setInterval(look, 100);
-    </script>
 </body>
 </html>
