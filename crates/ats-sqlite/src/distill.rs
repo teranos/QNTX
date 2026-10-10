@@ -307,11 +307,16 @@ fn merge_numbers(
 
     for v in present {
         if has_aggregated && is_numeric_aggregate(v) {
-            // Merge with prior aggregate
-            let a_min = v.get("min").and_then(|n| n.as_f64()).unwrap_or(0.0);
-            let a_max = v.get("max").and_then(|n| n.as_f64()).unwrap_or(0.0);
-            let a_sum = v.get("sum").and_then(|n| n.as_f64()).unwrap_or(0.0);
-            let a_count = v.get("count").and_then(|n| n.as_u64()).unwrap_or(0);
+            // Merge with prior aggregate. One whose numbers do not all read adds
+            // nothing: a zero in its place is a min or max nobody observed.
+            let (Some(a_min), Some(a_max), Some(a_sum), Some(a_count)) = (
+                v.get("min").and_then(|n| n.as_f64()),
+                v.get("max").and_then(|n| n.as_f64()),
+                v.get("sum").and_then(|n| n.as_f64()),
+                v.get("count").and_then(|n| n.as_u64()),
+            ) else {
+                continue;
+            };
             if a_min < min {
                 min = a_min;
             }
@@ -601,6 +606,36 @@ mod tests {
         assert_eq!(elapsed.get("count").unwrap(), &Value::Number(3.into()));
         // All present, so no "present" field
         assert!(elapsed.get("present").is_none());
+    }
+
+    // "zero means zero"
+    #[test]
+    fn an_aggregate_whose_numbers_do_not_read_adds_no_zeros() {
+        let unreadable: Value =
+            serde_json::json!({"min": null, "max": null, "sum": 30, "count": 2});
+        let readable: Value = serde_json::json!({"min": 10, "max": 20, "sum": 30, "count": 2});
+        let atts = vec![
+            AttestationBuilder::new()
+                .id("AS-1")
+                .subject("X")
+                .attribute("elapsed_ms".to_string(), readable)
+                .build(),
+            AttestationBuilder::new()
+                .id("AS-2")
+                .subject("X")
+                .attribute("elapsed_ms".to_string(), unreadable)
+                .build(),
+        ];
+
+        let merged = merge_attributes(&atts);
+        let elapsed = merged.get("elapsed_ms").unwrap();
+        assert_eq!(
+            elapsed.get("min").unwrap(),
+            &Value::Number(10.into()),
+            "a min nobody observed"
+        );
+        assert_eq!(elapsed.get("max").unwrap(), &Value::Number(20.into()));
+        assert_eq!(elapsed.get("count").unwrap(), &Value::Number(2.into()));
     }
 
     #[test]
