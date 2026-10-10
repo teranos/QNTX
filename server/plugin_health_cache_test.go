@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/plugin"
+	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -21,7 +22,7 @@ func TestTheHandlerReadsTheProbeRatherThanMakingOne(t *testing.T) {
 		func() (map[string]plugin.HealthStatus, time.Time, string) {
 			probes++
 			return map[string]plugin.HealthStatus{}, time.Now(), ""
-		})
+		}, noSigils, noRecords)
 	_ = s
 
 	for i := 0; i < 5; i++ {
@@ -42,7 +43,7 @@ func TestTheAnswerSaysWhenItWasProbed(t *testing.T) {
 	h := NewPluginHandler(plugin.NewRegistry("test", zap.NewNop().Sugar()), zap.NewNop().Sugar(),
 		func() (map[string]plugin.HealthStatus, time.Time, string) {
 			return map[string]plugin.HealthStatus{}, probedAt, ""
-		})
+		}, noSigils, noRecords)
 
 	said := answeredAsJSON(t, h.list())
 	health, ok := said["health"].(map[string]any)
@@ -60,7 +61,11 @@ func TestTheAnswerSaysWhenItWasProbed(t *testing.T) {
 		t.Errorf("age_ms = %v, want at least 89000", age)
 	}
 	holds(t, bareNode().pluginsSignum(), "list", h.list())
-	holds(t, bareNode().pluginsSignum(), "routes", h.routes())
+	routes, err := h.routes()
+	if err != nil {
+		t.Fatalf("routes: %v", err)
+	}
+	holds(t, bareNode().pluginsSignum(), "routes", routes)
 	holds(t, bareNode().pluginsSignum(), "elements", h.elements(context.Background()))
 	// A width a plugin names is said; one it omits is left out.
 	holds(t, bareNode().pluginsSignum(), "elements", &protocol.PluginElements{Elements: []*protocol.PluginElement{
@@ -75,13 +80,19 @@ func TestAnUnansweredProbeIsSaidRatherThanHidden(t *testing.T) {
 	h := NewPluginHandler(plugin.NewRegistry("test", zap.NewNop().Sugar()), zap.NewNop().Sugar(),
 		func() (map[string]plugin.HealthStatus, time.Time, string) {
 			return nil, time.Time{}, "no probe has completed yet"
-		})
+		}, noSigils, noRecords)
 
 	said := answeredAsJSON(t, h.list())
 	if said["health_probe_failure"] != "no probe has completed yet" {
 		t.Errorf("health_probe_failure = %v, want the reason stated", said["health_probe_failure"])
 	}
 }
+
+// noSigils is a handler's node serving no plugin's sigils.
+func noSigils(string) ([]*protocol.SigilRow, []string) { return nil, nil }
+
+// noRecords is a handler's node that knows no plugin.
+func noRecords() ([]grpcplugin.PluginRecord, error) { return nil, nil }
 
 // answeredAsJSON is an answer as the surfaces carry it: marshalled.
 func answeredAsJSON(t *testing.T, answer any) map[string]any {

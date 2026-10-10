@@ -23,7 +23,7 @@ func TestNewServiceRegistry(t *testing.T) {
 	config := &mockConfigProvider{}
 	queue := &async.Queue{}
 
-	registry := NewServiceRegistry(db, logger, store, config, queue)
+	registry := NewServiceRegistry(NewRegistry("1.0.0", logger), db, logger, store, config, queue)
 	assert.NotNil(t, registry)
 
 	// Verify it implements ServiceRegistry interface
@@ -37,7 +37,7 @@ func TestDefaultServiceRegistry_Database(t *testing.T) {
 	config := &mockConfigProvider{}
 	queue := &async.Queue{}
 
-	registry := NewServiceRegistry(db, logger, store, config, queue)
+	registry := NewServiceRegistry(NewRegistry("1.0.0", logger), db, logger, store, config, queue)
 	assert.Equal(t, db, registry.Database())
 }
 
@@ -48,7 +48,7 @@ func TestDefaultServiceRegistry_Logger(t *testing.T) {
 	config := &mockConfigProvider{}
 	queue := &async.Queue{}
 
-	registry := NewServiceRegistry(db, logger, store, config, queue)
+	registry := NewServiceRegistry(NewRegistry("1.0.0", logger), db, logger, store, config, queue)
 
 	t.Run("logger with domain name", func(t *testing.T) {
 		domainLogger := registry.Logger("test-domain")
@@ -78,7 +78,7 @@ func TestDefaultServiceRegistry_Config(t *testing.T) {
 	}
 	queue := &async.Queue{}
 
-	registry := NewServiceRegistry(db, logger, store, mockProvider, queue)
+	registry := NewServiceRegistry(NewRegistry("1.0.0", logger), db, logger, store, mockProvider, queue)
 
 	t.Run("get plugin config", func(t *testing.T) {
 		testConfig := &mockConfig{}
@@ -116,7 +116,7 @@ func TestDefaultServiceRegistry_ATSStore(t *testing.T) {
 	config := &mockConfigProvider{}
 	queue := &async.Queue{}
 
-	registry := NewServiceRegistry(db, logger, store, config, queue)
+	registry := NewServiceRegistry(NewRegistry("1.0.0", logger), db, logger, store, config, queue)
 	assert.Equal(t, store, registry.ATSStore())
 }
 
@@ -127,7 +127,7 @@ func TestDefaultServiceRegistry_Queue(t *testing.T) {
 	config := &mockConfigProvider{}
 	queue := &async.Queue{}
 
-	registry := NewServiceRegistry(db, logger, store, config, queue)
+	registry := NewServiceRegistry(NewRegistry("1.0.0", logger), db, logger, store, config, queue)
 	assert.Equal(t, queue, registry.Queue())
 }
 
@@ -232,7 +232,7 @@ func TestServiceRegistry_Integration(t *testing.T) {
 	}
 	queue := &async.Queue{}
 
-	registry := NewServiceRegistry(db, logger, store, configProvider, queue)
+	registry := NewServiceRegistry(NewRegistry("1.0.0", logger), db, logger, store, configProvider, queue)
 
 	// Create a mock plugin and initialize it with the service registry
 	plugin := newMockPlugin("integration-test")

@@ -260,7 +260,8 @@ func TestRegistry_InitializeAll(t *testing.T) {
 		err := registry.InitializeAll(context.Background(), mockServices)
 		// Should return error indicating failure, but continue with other plugins
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to initialize 1 plugin(s)")
+		assert.Contains(t, err.Error(), "failed to initialize plugin test1")
+		assert.Contains(t, err.Error(), "init failed")
 
 		// test1 should be marked as failed
 		state1, ok := registry.GetState("test1")
@@ -326,8 +327,11 @@ func TestRegistry_ShutdownAll(t *testing.T) {
 		registry.Register(plugin2)
 
 		err := registry.ShutdownAll(context.Background())
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "shutdown errors")
+		require.Error(t, err)
+		// Every failure is held: the last as the error, the ones before it with it.
+		said := fmt.Sprintf("%+v", err)
+		assert.Contains(t, said, "plugin test1 did not shut down: shutdown failed 1")
+		assert.Contains(t, said, "plugin test2 did not shut down: shutdown failed 2")
 	})
 
 	t.Run("reverse order shutdown", func(t *testing.T) {
@@ -482,12 +486,14 @@ func TestRegistry_validateVersion(t *testing.T) {
 func TestGlobalRegistry(t *testing.T) {
 	// Note: Global registry tests need to run in isolation
 	// because they modify global state
+	reset := func() {
+		registryMu.Lock()
+		defaultRegistry, registrySet = nil, false
+		registryMu.Unlock()
+	}
 
 	t.Run("set and get default registry", func(t *testing.T) {
-		// Reset global state
-		registryMu.Lock()
-		defaultRegistry = nil
-		registryMu.Unlock()
+		reset()
 
 		registry := NewRegistry("1.0.0", testLogger(t))
 		SetDefaultRegistry(registry)
@@ -497,10 +503,7 @@ func TestGlobalRegistry(t *testing.T) {
 	})
 
 	t.Run("panic on double initialization", func(t *testing.T) {
-		// Reset global state
-		registryMu.Lock()
-		defaultRegistry = nil
-		registryMu.Unlock()
+		reset()
 
 		registry1 := NewRegistry("1.0.0", testLogger(t))
 		registry2 := NewRegistry("2.0.0", testLogger(t))
@@ -509,59 +512,6 @@ func TestGlobalRegistry(t *testing.T) {
 		assert.Panics(t, func() {
 			SetDefaultRegistry(registry2)
 		})
-	})
-
-	t.Run("global Register function", func(t *testing.T) {
-		// Reset global state
-		registryMu.Lock()
-		defaultRegistry = nil
-		registryMu.Unlock()
-
-		registry := NewRegistry("1.0.0", testLogger(t))
-		SetDefaultRegistry(registry)
-
-		plugin := newMockPlugin("test")
-		err := Register(plugin)
-		assert.NoError(t, err)
-
-		retrieved, ok := Get("test")
-		assert.True(t, ok)
-		assert.Equal(t, plugin, retrieved)
-	})
-
-	t.Run("global functions without registry", func(t *testing.T) {
-		// Reset global state
-		registryMu.Lock()
-		defaultRegistry = nil
-		registryMu.Unlock()
-
-		plugin := newMockPlugin("test")
-		err := Register(plugin)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not initialized")
-
-		retrieved, ok := Get("test")
-		assert.False(t, ok)
-		assert.Nil(t, retrieved)
-
-		list := List()
-		assert.Nil(t, list)
-	})
-
-	t.Run("global List function", func(t *testing.T) {
-		// Reset global state
-		registryMu.Lock()
-		defaultRegistry = nil
-		registryMu.Unlock()
-
-		registry := NewRegistry("1.0.0", testLogger(t))
-		SetDefaultRegistry(registry)
-
-		Register(newMockPlugin("alpha"))
-		Register(newMockPlugin("beta"))
-
-		list := List()
-		assert.Equal(t, []string{"alpha", "beta"}, list)
 	})
 }
 

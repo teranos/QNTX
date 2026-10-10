@@ -67,7 +67,7 @@ func TestAPluginWhoseRecordIsUnreadableDoesNotInitialize(t *testing.T) {
 	SetPluginRecords(unreadableRecords{})
 	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 	logger := zaptest.NewLogger(t).Sugar()
-	services := plugin.NewServiceRegistry(nil, logger, nil, NewConfigProvider(nil, nil, logger), nil)
+	services := plugin.NewServiceRegistry(plugin.NewRegistry("test", logger), nil, logger, nil, NewConfigProvider(nil, nil, logger), nil)
 
 	proxy := &ExternalDomainProxy{metadata: plugin.Metadata{Name: "pyre"}, logger: logger}
 	err := proxy.doInitialize(context.Background(), services)

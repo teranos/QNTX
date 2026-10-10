@@ -34,10 +34,13 @@ import (
 //	    // plugin-specific initialization
 //	}
 type Base struct {
-	meta     Metadata
-	mu       sync.RWMutex
-	paused   bool
-	services ServiceRegistry
+	meta   Metadata
+	mu     sync.RWMutex
+	paused bool
+	// initialized is whether Init has handed Base its services: before it, the
+	// plugin has no logger to say anything with and nothing running to pause.
+	initialized bool
+	services    ServiceRegistry
 }
 
 // NewBase creates a Base with the given metadata.
@@ -47,7 +50,10 @@ func NewBase(meta Metadata) Base {
 
 // Init stores the ServiceRegistry. Call this from your plugin's Initialize().
 func (b *Base) Init(services ServiceRegistry) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.services = services
+	b.initialized = true
 }
 
 // Metadata returns the plugin metadata.
@@ -65,13 +71,14 @@ func (b *Base) Pause(ctx context.Context) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	if !b.initialized {
+		return errors.Newf("%s plugin is not initialized, so there is nothing running to pause", b.meta.Name)
+	}
 	if b.paused {
 		return errors.Newf("%s plugin is already paused", b.meta.Name)
 	}
 	b.paused = true
-	if b.services != nil {
-		b.services.Logger(b.meta.Name).Infof("%s plugin paused", b.meta.Name)
-	}
+	b.services.Logger(b.meta.Name).Infof("%s plugin paused", b.meta.Name)
 	return nil
 }
 
@@ -80,13 +87,14 @@ func (b *Base) Resume(ctx context.Context) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	if !b.initialized {
+		return errors.Newf("%s plugin is not initialized, so there is nothing paused to resume", b.meta.Name)
+	}
 	if !b.paused {
 		return errors.Newf("%s plugin is not paused", b.meta.Name)
 	}
 	b.paused = false
-	if b.services != nil {
-		b.services.Logger(b.meta.Name).Infof("%s plugin resumed", b.meta.Name)
-	}
+	b.services.Logger(b.meta.Name).Infof("%s plugin resumed", b.meta.Name)
 	return nil
 }
 
@@ -116,11 +124,16 @@ func (b *Base) Health(ctx context.Context) HealthStatus {
 	}
 }
 
-// Shutdown is a no-op default. Override if your plugin needs cleanup.
+// Shutdown is a no-op default. Override if your plugin needs cleanup. A plugin
+// never initialized started nothing, so it has nothing to shut down and no
+// logger to say so with.
 func (b *Base) Shutdown(ctx context.Context) error {
-	if b.services != nil {
-		b.services.Logger(b.meta.Name).Infof("%s plugin shutting down", b.meta.Name)
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if !b.initialized {
+		return nil
 	}
+	b.services.Logger(b.meta.Name).Infof("%s plugin shutting down", b.meta.Name)
 	return nil
 }
 

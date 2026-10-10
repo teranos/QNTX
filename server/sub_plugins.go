@@ -14,9 +14,8 @@ func (pluginServicesSubsystem) Name() string { return "plugin-services" }
 
 func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	pluginRegistry := s.pluginRegistry
-	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth)
-	s.pluginHandler.sigils = s.pluginSigilRows
-	s.pluginHandler.records = s.pluginRecords().Plugins
+	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth,
+		s.pluginSigilRows, s.pluginRecords().Plugins)
 	grpcplugin.SetPluginRecords(s.pluginRecords())
 	s.statusLineHandler = NewStatusLineHandler(pluginRegistry, s.logger, s.pluginHealth,
 		// Fetched per request: the backend supplies the watcher store after
@@ -54,7 +53,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	// Wrap config provider to inject service endpoints for plugins. A plugin
 	// whose record names a namespace is handed a token of its own for it.
 	configProvider := grpcplugin.NewConfigProvider(endpoints, s.pluginToken, s.logger)
-	services := plugin.NewServiceRegistry(s.nodeDB, s.logger, s.held.Served(), configProvider, queue)
+	services := plugin.NewServiceRegistry(pluginRegistry, s.nodeDB, s.logger, s.held.Served(), configProvider, queue)
 
 	// Wire version resolver: ATSStore and FetchService auto-stamp source_version
 	// from the plugin registry, so individual plugins don't need to set it.
@@ -91,9 +90,12 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	// is typically nil here. This captures the registry state in the structured log.
 	states := pluginRegistry.GetAllStates()
 	for name, state := range states {
-		errMsg, _ := pluginRegistry.GetError(name)
-		s.logger.Debugw("Plugin state at server startup",
-			"plugin", name, "state", state, "error", errMsg)
+		if errMsg, failed := pluginRegistry.GetError(name); failed {
+			s.logger.Debugw("Plugin state at server startup",
+				"plugin", name, "state", state, "error", errMsg)
+			continue
+		}
+		s.logger.Debugw("Plugin state at server startup", "plugin", name, "state", state)
 	}
 
 	return nil

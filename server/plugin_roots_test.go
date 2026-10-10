@@ -45,9 +45,12 @@ func TestWhatAPluginLoadsFromIsRootedAndFetchedAgain(t *testing.T) {
 	require.NoError(t, os.WriteFile(binary, []byte("\x7fELF"+glibcPath+"/lib/ld-linux-x86-64.so.2\x00"), 0o755))
 	roots := filepath.Join(t.TempDir(), storeRootsDir)
 
-	fetched, err := rootStorePaths(context.Background(), nixStore, binary, roots)
+	data, err := os.ReadFile(binary)
+	require.NoError(t, err)
+	fetched, collected, err := rootStorePaths(context.Background(), nixStore, binary, data, roots)
 	require.NoError(t, err)
 	assert.Equal(t, []string{glibcPath}, fetched, "the collected glibc is not said to be fetched")
+	assert.True(t, collected, "the collected glibc is not said to have been collected")
 
 	raw, err := os.ReadFile(ran)
 	require.NoError(t, err)

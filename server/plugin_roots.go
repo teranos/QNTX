@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,27 +73,32 @@ func storePathsIn(data []byte) []string {
 	}
 }
 
-// rootStorePaths keeps every store path binary names alive with a root under
-// roots, and fetches any a collection already took. It says which it fetched.
-func rootStorePaths(ctx context.Context, nixStore, binary, roots string) ([]string, error) {
-	data, err := os.ReadFile(binary)
-	if err != nil {
-		return nil, errors.Wrapf(err, "%s did not read", binary)
-	}
+// rootStorePaths keeps every store path binary (read as data) names alive with
+// a root under roots, and fetches any a collection already took. It says which
+// it fetched, and whether a collection had taken any.
+func rootStorePaths(ctx context.Context, nixStore, binary string, data []byte, roots string) ([]string, bool, error) {
 	if err := os.MkdirAll(roots, 0o755); err != nil {
-		return nil, errors.Wrapf(err, "could not create %s", roots)
+		return nil, false, errors.Wrapf(err, "could not create %s", roots)
 	}
 	var fetched []string
+	collected := false
 	for _, path := range storePathsIn(data) {
-		_, missing := os.Stat(path)
-		if _, err := runBuild(ctx, roots, nil, nixStore, "--realise", path, "--add-root", filepath.Join(roots, filepath.Base(path))); err != nil {
-			return fetched, errors.Wrapf(err, "%s names %s, and it was not kept", binary, path)
+		// A path a collection took is not there; one that does not stat for
+		// another reason is not known to be either.
+		_, statErr := os.Stat(path)
+		taken := errors.Is(statErr, fs.ErrNotExist)
+		if statErr != nil && !taken {
+			return fetched, collected, errors.Wrapf(statErr, "%s names %s, and whether it is there did not read", binary, path)
 		}
-		if missing != nil {
+		if err := runBuild(ctx, roots, nil, nixStore, "--realise", path, "--add-root", filepath.Join(roots, filepath.Base(path))); err != nil {
+			return fetched, collected, errors.Wrapf(err, "%s names %s, and it was not kept", binary, path)
+		}
+		if taken {
 			fetched = append(fetched, path)
+			collected = true
 		}
 	}
-	return fetched, nil
+	return fetched, collected, nil
 }
 
 // storeRootsDir is beside a plugin's binary: the roots of what it loads from.
@@ -107,15 +113,21 @@ func (s *QNTXServer) keepStoreAlive(ctx context.Context, name string, logger *za
 		return
 	}
 	binary := filepath.Join(dir, grpcplugin.PluginBinaryName(name))
-	if _, err := os.Stat(binary); err != nil {
+	data, err := os.ReadFile(binary)
+	if errors.Is(err, fs.ErrNotExist) {
+		// No build is installed, so nothing it loads from is there to root.
 		return
 	}
-	fetched, err := rootStorePaths(ctx, filepath.Join(nixBin, "nix-store"), binary, filepath.Join(dir, storeRootsDir))
+	if err != nil {
+		logger.Errorw("A plugin's binary did not read, so what it loads from is not rooted", "plugin", name, "binary", binary, "error", err)
+		return
+	}
+	fetched, collected, err := rootStorePaths(ctx, filepath.Join(nixBin, "nix-store"), binary, data, filepath.Join(dir, storeRootsDir))
 	if err != nil {
 		logger.Errorw("What a plugin loads from was not kept, so a collection of the store can stop it", "plugin", name, "error", err)
 		return
 	}
-	if len(fetched) > 0 {
+	if collected {
 		logger.Infow("What a plugin loads from had been collected, and is fetched and kept again", "plugin", name, "fetched", fetched)
 		s.buildLanded(name)
 	}
