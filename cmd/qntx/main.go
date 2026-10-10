@@ -33,19 +33,12 @@ var rootCmd = &cobra.Command{
 	Long: `QNTX - Attestation-based knowledge management and infrastructure.
 
 QNTX provides core attestation system functionality, configuration management,
-and infrastructure tools for building knowledge-based applications.
-
-Available commands:
-  am     - Manage QNTX core configuration ("I am")
-  db     - Manage QNTX database operations
-  pulse  - Manage Pulse daemon (async job processor + scheduler)
-  server - Start WebSocket graph visualization server
+and infrastructure tools for building knowledge-backed applications.
 
 Examples:
+  qntx server              # Run the node
   qntx am show             # Show current configuration
-  qntx pulse start         # Start Pulse daemon
-  qntx db stats            # Show database statistics
-  qntx server              # Start graph visualization server`,
+  qntx db stats            # Show database statistics`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// No subcommand: try Tauri desktop app first, fall back to server
 		if tauriPath := findTauriBinary(); tauriPath != "" {

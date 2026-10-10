@@ -30,8 +30,8 @@ import (
 var ServerCmd = &cobra.Command{
 	Use:     "server",
 	Aliases: []string{"serve"},
-	Short:   "Start the QNTX server for graph visualization and attestation exploration",
-	Long:    `Launch the QNTX server with graph visualization interface. Type Ax queries to visualize relationships, explore attestations, and navigate the continuous intelligence substrate.`,
+	Short:   "Run the QNTX node",
+	Long:    `Run the QNTX node: its HTTP and WebSocket API, its plugins, and Pulse, its job queue and scheduler, all in this one process.`,
 	RunE:    runServer,
 }
 
