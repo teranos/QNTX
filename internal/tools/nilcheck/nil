@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3406 in 437 files.
+# 3399 in 436 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -363,7 +363,6 @@
 15	server/operational_watchdog.go
 5	server/parity/apiwords.go
 1	server/parity/claudecode.go
-1	server/parity/engines.go
 15	server/parity/jsonschema.go
 20	server/parity/openapi.go
 3	server/parity/operations.go

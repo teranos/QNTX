@@ -258,9 +258,10 @@ type ParquetConfig struct {
 
 // PostgresConfig configures the Postgres backend: the record a node's
 // attestations are sent to, on Supabase's free tier. URL is the connection
-// string as an ssm:// or env: reference, since it carries the password; CA is
-// the path of the certificate to verify the server against, and the
-// connection is in the clear when it is omitted.
+// string as an ssm:// or env: reference, since it carries the password. The
+// connection string says whether it is TLS, as libpq's does: sslmode=disable
+// is in the clear, and anything else is verified against the certificate at
+// CA.
 type PostgresConfig struct {
 	URL string `mapstructure:"url"`
 	CA  string `mapstructure:"ca"`

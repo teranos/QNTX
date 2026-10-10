@@ -27,6 +27,7 @@ import "C"
 import (
 	"encoding/json"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/teranos/QNTX/ats"
@@ -41,18 +42,18 @@ type PostgresStore struct {
 	ptr       unsafe.Pointer // *C.PostgresStore
 	namespace string
 	mu        sync.Mutex
+	closed    bool
 }
 
-// failed reads a result's error slot; the caller still frees the struct.
+// failed reads the error slot of a result that said success=false, which the
+// crate always writes; the caller still frees the struct.
 func failed(said *C.char, format string, args ...any) error {
-	if said == nil {
-		return errors.Newf(format+", and the reason was not recorded", args...)
-	}
 	return errors.Wrapf(sacred.Decode(C.GoString(said)), format, args...)
 }
 
-// NewPostgresStore connects to url, over TLS against the CA file ca when it is
-// not empty, makes the namespace's schema and applies its migrations.
+// NewPostgresStore connects to url, over TLS against the CA file ca unless the
+// url says sslmode=disable, makes the namespace's schema and applies its
+// migrations.
 func NewPostgresStore(url, ca, namespace string) (*PostgresStore, error) {
 	cURL := C.CString(url)
 	defer C.free(unsafe.Pointer(cURL))
@@ -61,28 +62,24 @@ func NewPostgresStore(url, ca, namespace string) (*PostgresStore, error) {
 	cNamespace := C.CString(namespace)
 	defer C.free(unsafe.Pointer(cNamespace))
 
-	var said *C.char
-	ptr := C.postgres_storage_new(cURL, cCA, cNamespace, &said)
-	if ptr == nil {
+	result := C.postgres_storage_new(cURL, cCA, cNamespace)
+	defer C.postgres_open_result_free(result)
+	if !result.success {
 		// The url is not repeated: it carries the password.
-		if said == nil {
-			return nil, errors.Newf("failed to open the postgres store for %s, and the reason was not recorded", namespace)
-		}
-		defer C.postgres_string_free(said)
-		return nil, errors.Wrapf(sacred.Decode(C.GoString(said)), "failed to open the postgres store for %s", namespace)
+		return nil, failed(result.error_msg, "failed to open the postgres store for %s", namespace)
 	}
-	return &PostgresStore{ptr: unsafe.Pointer(ptr), namespace: namespace}, nil
+	return &PostgresStore{ptr: unsafe.Pointer(result.store), namespace: namespace}, nil
 }
 
 // Close frees the Rust store and its connection. Safe to call more than once.
 func (s *PostgresStore) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.ptr == nil {
+	if s.closed {
 		return nil
 	}
 	C.postgres_storage_free((*C.PostgresStore)(s.ptr))
-	s.ptr = nil
+	s.closed = true
 	return nil
 }
 
@@ -114,11 +111,11 @@ func (s *PostgresStore) GetAttestation(id string) (*types.As, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	result := C.postgres_storage_get((*C.PostgresStore)(s.ptr), cID)
-	defer C.postgres_attestation_result_free(result)
+	defer C.postgres_found_result_free(result)
 	if !result.success {
 		return nil, failed(result.error_msg, "postgres get failed for %s in %s", id, s.namespace)
 	}
-	if result.attestation_json == nil {
+	if !result.found {
 		return nil, errors.Newf("attestation %s is not held in %s", id, s.namespace)
 	}
 	as, err := fromRustJSON([]byte(C.GoString(result.attestation_json)))
@@ -137,8 +134,8 @@ func (s *PostgresStore) AttestationExists(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	result := C.postgres_storage_exists((*C.PostgresStore)(s.ptr), cID)
-	defer C.postgres_storage_result_free(result)
-	return bool(result.success)
+	defer C.postgres_found_result_free(result)
+	return bool(result.success) && bool(result.found)
 }
 
 // CountAttestations returns how many attestations the namespace holds.
@@ -153,8 +150,20 @@ func (s *PostgresStore) CountAttestations() (int, error) {
 	return int(result.count), nil
 }
 
+// millis is an instant as it crosses: milliseconds since 1970.
+type millis time.Time
+
+func (m millis) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Time(m).UnixMilli())
+}
+
 // GetAttestations retrieves attestations matching the filter, newest first.
-// The filter crosses as the JSON duckdbcgo and sqlitecgo send.
+//
+// The crate reads a field it is given as a constraint, an empty list matching
+// nothing, and a field left out as none. An empty list in an AttestationFilter
+// is how every backend is asked for no constraint on that field, so it is left
+// out here: that meaning is AttestationFilter's, and it stays in these tags.
+// The limit always crosses, and 0 is no rows.
 func (s *PostgresStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
 	rustFilter := struct {
 		Subjects   []string `json:"subjects,omitempty"`
@@ -162,24 +171,18 @@ func (s *PostgresStore) GetAttestations(filter ats.AttestationFilter) ([]*types.
 		Contexts   []string `json:"contexts,omitempty"`
 		Actors     []string `json:"actors,omitempty"`
 		Source     string   `json:"source,omitempty"`
-		TimeStart  *int64   `json:"time_start,omitempty"`
-		TimeEnd    *int64   `json:"time_end,omitempty"`
-		Limit      int      `json:"limit,omitempty"`
+		TimeStart  *millis  `json:"time_start,omitempty"`
+		TimeEnd    *millis  `json:"time_end,omitempty"`
+		Limit      int      `json:"limit"`
 	}{
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
 		Actors:     filter.Actors,
 		Source:     filter.Source,
+		TimeStart:  (*millis)(filter.TimeStart),
+		TimeEnd:    (*millis)(filter.TimeEnd),
 		Limit:      filter.Limit,
-	}
-	if filter.TimeStart != nil {
-		ms := filter.TimeStart.UnixMilli()
-		rustFilter.TimeStart = &ms
-	}
-	if filter.TimeEnd != nil {
-		ms := filter.TimeEnd.UnixMilli()
-		rustFilter.TimeEnd = &ms
 	}
 	body, err := json.Marshal(rustFilter)
 	if err != nil {
@@ -195,9 +198,6 @@ func (s *PostgresStore) GetAttestations(filter ats.AttestationFilter) ([]*types.
 	if !result.success {
 		return nil, failed(result.error_msg, "postgres query failed in %s", s.namespace)
 	}
-	if result.attestation_json == nil {
-		return []*types.As{}, nil
-	}
 	return fromRustArray(C.GoString(result.attestation_json))
 }
 
@@ -205,9 +205,6 @@ func (s *PostgresStore) GetAttestations(filter ats.AttestationFilter) ([]*types.
 // answers the rows of the batch the record now holds. storage.SendOut names
 // the method for the parquet record, whose batch is a file.
 func (s *PostgresStore) WriteFile(attestations []*types.As) (int, error) {
-	if len(attestations) == 0 {
-		return 0, nil
-	}
 	raws := make([]json.RawMessage, 0, len(attestations))
 	for _, as := range attestations {
 		raw, err := toRustJSON(as)

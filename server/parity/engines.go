@@ -16,25 +16,21 @@ import (
 // No schema sits beside SOURCE, so the embed above never carries these and the
 // parity sigil holds no signum to them.
 
-// Pinned is the version of the engine named, from the one directory under dir
-// pinned for it.
-func Pinned(dir, engine string) (string, error) {
-	version, _, err := pin(dir, engine)
-	return version, err
+// Pin is what an engine's pin names: its version, and the commit it was taken
+// at, by the 7 characters git abbreviates a commit to.
+type Pin struct {
+	Version string
+	Rev     string
 }
 
-// PinnedAt is the commit the engine named was taken at, as its pin names it.
-func PinnedAt(dir, engine string) (string, error) {
-	_, rev, err := pin(dir, engine)
-	return rev, err
-}
-
-func pin(dir, engine string) (version, rev string, err error) {
+// PinOf is the one pin under dir for the engine named.
+func PinOf(dir, engine string) (Pin, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "failed to read the pins under %s", dir)
+		return Pin{}, errors.Wrapf(err, "failed to read the pins under %s", dir)
 	}
-	var found []string
+	var found []Pin
+	var names []string
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -43,22 +39,27 @@ func pin(dir, engine string) (version, rev string, err error) {
 		if !ok || name != engine {
 			continue
 		}
-		v, r, ok := strings.Cut(rest, "_")
-		if !ok || r == "" {
-			return "", "", errors.Newf("%s names no commit: a pin is %s_<version>_<rev>", entry.Name(), engine)
+		version, rev, ok := strings.Cut(rest, "_")
+		if !ok || len(rev) != 7 || strings.ContainsFunc(rev, notHex) {
+			return Pin{}, errors.Newf("%s names no commit: a pin is %s_<version>_<7 hex of the commit>", entry.Name(), engine)
 		}
-		if _, err := os.Stat(dir + "/" + entry.Name() + "/SOURCE"); err != nil {
-			return "", "", errors.Wrapf(err, "%s under %s has no SOURCE", entry.Name(), dir)
+		source := dir + "/" + entry.Name() + "/SOURCE"
+		info, err := os.Stat(source)
+		if err != nil {
+			return Pin{}, errors.Wrapf(err, "%s under %s has no SOURCE", entry.Name(), dir)
 		}
-		version, rev = v, r
-		found = append(found, entry.Name())
+		if !info.Mode().IsRegular() {
+			return Pin{}, errors.Newf("%s is not a file", source)
+		}
+		found = append(found, Pin{Version: version, Rev: rev})
+		names = append(names, entry.Name())
 	}
-	switch len(found) {
-	case 0:
-		return "", "", errors.Newf("%s is not pinned under %s", engine, dir)
-	case 1:
-		return version, rev, nil
-	default:
-		return "", "", errors.Newf("%s is pinned more than once under %s: %s", engine, dir, strings.Join(found, ", "))
+	if len(found) != 1 {
+		return Pin{}, errors.Newf("%s is pinned %d times under %s, and is pinned once: [%s]", engine, len(found), dir, strings.Join(names, ", "))
 	}
+	return found[0], nil
+}
+
+func notHex(r rune) bool {
+	return !strings.ContainsRune("0123456789abcdef", r)
 }

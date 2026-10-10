@@ -7,7 +7,7 @@
  * Memory Management:
  * - Store pointers are freed with postgres_storage_free()
  * - Every result struct is freed with its *_result_free()
- * - A reason written into an error_out slot is freed with postgres_string_free()
+ * - A result that says success=false carries its reason in error_msg
  */
 
 #ifndef QNTX_POSTGRES_FFI_H
@@ -35,6 +35,21 @@ typedef struct {
     char *attestation_json;
 } AttestationResultC;
 
+/* An opened store, or why it did not open. */
+typedef struct {
+    bool success;
+    char *error_msg;
+    PostgresStore *store;
+} OpenResultC;
+
+/* Whether an attestation is held, and for a get, the attestation. */
+typedef struct {
+    bool success;
+    char *error_msg;
+    bool found;
+    char *attestation_json;
+} FoundResultC;
+
 typedef struct {
     bool success;
     char *error_msg;
@@ -50,24 +65,23 @@ typedef struct {
     char *server_version;
 } SchemaResultC;
 
-/* Connect to url (over TLS against the CA file ca when it is not empty), make
- * the namespace's schema and apply its migrations. NULL on failure, with the
- * reason in *error_out. */
-PostgresStore *postgres_storage_new(const char *url, const char *ca, const char *namespace, char **error_out);
+/* Connect to url (over TLS against the CA file ca unless the url says
+ * sslmode=disable), make the namespace's schema and apply its migrations.
+ * postgres_open_result_free frees the result and leaves the store. */
+OpenResultC postgres_storage_new(const char *url, const char *ca, const char *namespace);
 void postgres_storage_free(PostgresStore *store);
 
 StorageResultC postgres_storage_put(PostgresStore *store, const char *attestation_json);
-/* attestation_json is NULL when nothing is held under id. */
-AttestationResultC postgres_storage_get(const PostgresStore *store, const char *id);
-/* success is whether the attestation is held; error_msg says why asking failed. */
-StorageResultC postgres_storage_exists(const PostgresStore *store, const char *id);
+FoundResultC postgres_storage_get(const PostgresStore *store, const char *id);
+FoundResultC postgres_storage_exists(const PostgresStore *store, const char *id);
 CountResultC postgres_storage_count(const PostgresStore *store);
 AttestationResultC postgres_storage_query(const PostgresStore *store, const char *filter_json);
 CountResultC postgres_storage_write_batch(const PostgresStore *store, const char *attestations_json);
 
 SchemaResultC postgres_schema(const char *url, const char *ca, const char *namespace);
 
-void postgres_string_free(char *s);
+void postgres_open_result_free(OpenResultC result);
+void postgres_found_result_free(FoundResultC result);
 void postgres_storage_result_free(StorageResultC result);
 void postgres_attestation_result_free(AttestationResultC result);
 void postgres_count_result_free(CountResultC result);

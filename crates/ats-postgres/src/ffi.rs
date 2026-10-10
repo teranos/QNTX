@@ -9,9 +9,7 @@ use std::os::raw::c_char;
 use std::ptr;
 
 use ats::storage::{AttestationStore, StoreError};
-use qntx_ffi_common::{
-    cstr_to_str, cstring_new_or_empty, cstring_new_or_fallback, free_boxed, free_cstring, FfiResult,
-};
+use qntx_ffi_common::{cstr_to_str, cstring_new_or_empty, free_boxed, free_cstring, FfiResult};
 use qntx_proto::proto_convert;
 
 use crate::error::PostgresError;
@@ -32,6 +30,23 @@ pub struct StorageResultC {
 pub struct AttestationResultC {
     pub success: bool,
     pub error_msg: *mut c_char,
+    pub attestation_json: *mut c_char,
+}
+
+/// An opened store, or why it did not open.
+#[repr(C)]
+pub struct OpenResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub store: *mut PostgresStore,
+}
+
+/// Whether an attestation is held, and for a get, the attestation.
+#[repr(C)]
+pub struct FoundResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub found: bool,
     pub attestation_json: *mut c_char,
 }
 
@@ -68,6 +83,29 @@ impl FfiResult for AttestationResultC {
         Self {
             success: false,
             error_msg,
+            attestation_json: ptr::null_mut(),
+        }
+    }
+}
+
+impl FfiResult for OpenResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            store: ptr::null_mut(),
+        }
+    }
+}
+
+impl FfiResult for FoundResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            found: false,
             attestation_json: ptr::null_mut(),
         }
     }
@@ -127,70 +165,26 @@ trait Crosses {
 
 impl Crosses for PostgresError {
     fn crosses(self, call: &str) -> String {
-        self.sacred_json(call)
+        self.sacred_json(Some(call))
     }
 }
 
 impl Crosses for serde_json::Error {
     fn crosses(self, call: &str) -> String {
-        PostgresError::Serde(self).sacred_json(call)
+        PostgresError::Serde(self).sacred_json(Some(call))
     }
 }
 
-impl Crosses for qntx_ffi_common::CStrError {
-    fn crosses(self, call: &str) -> String {
-        PostgresError::BadArgument {
-            call: "",
-            argument: "",
-            source: self,
-        }
-        .sacred_json(call)
-    }
-}
-
-/// The trait's error as the sacred shape. A `Backend` already carries the
-/// shape as its string; the trait's own variants are built into one here.
+/// A `Backend` already carries the sacred shape as its string; the trait's
+/// own variants are built into one.
 impl Crosses for StoreError {
     fn crosses(self, call: &str) -> String {
-        let region = match &self {
-            StoreError::AlreadyExists(_) => "already-exists",
-            StoreError::NotFound(_) => "not-found",
-            StoreError::InvalidData(_) => "invalid-data",
-            StoreError::Backend(_) => "backend",
-            StoreError::Query(_) => "query",
-            StoreError::Serialization(_) => "serialization",
-            StoreError::QuotaExceeded { .. } => "quota-exceeded",
-        };
         if let StoreError::Backend(json) = &self {
             if serde_json::from_str::<laye_error::Error>(json).is_ok() {
                 return json.clone();
             }
         }
-        let at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis().to_string())
-            .unwrap_or_default();
-        let sacred = laye_error::Error {
-            id: format!("err-{}-{at}", crate::error::SURFACE),
-            severity: laye_error::Severity::Error,
-            context: laye_error::Context {
-                surface: crate::error::SURFACE.to_string(),
-                region: Some(region.to_string()),
-                anchor: None,
-            },
-            title: self.to_string(),
-            why: String::new(),
-            trace: Vec::new(),
-            raw: Some(format!("{self:?}")),
-            at,
-            source: None,
-            ffi_call: (!call.is_empty()).then(|| call.to_string()),
-            location: None,
-            js_stack: None,
-            raw_stderr: None,
-            requires_reload: false,
-        };
-        serde_json::to_string(&sacred).unwrap_or_default()
+        PostgresError::Store(self).sacred_json(Some(call))
     }
 }
 
@@ -208,51 +202,39 @@ unsafe fn argument<'a>(
     })
 }
 
-/// Connect to `url` (over TLS against the CA at `ca` when it is not empty),
-/// make the namespace's schema and apply its migrations. Returns NULL on
-/// failure, writing the reason into `error_out`, which the caller frees with
-/// `postgres_string_free`.
+/// Connect to `url` (over TLS against the CA at `ca` unless the url says
+/// `sslmode=disable`), make the namespace's schema and apply its migrations.
+/// The store, or why it did not open; the result is freed with
+/// `postgres_open_result_free`, which leaves the store.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn postgres_storage_new(
     url: *const c_char,
     ca: *const c_char,
     namespace: *const c_char,
-    error_out: *mut *mut c_char,
-) -> *mut PostgresStore {
-    qntx_ffi_common::guarded(
-        "postgres_storage_new",
-        || {
-            const CALL: &str = "postgres_storage_new";
-            let fail = |e: PostgresError| -> *mut PostgresStore {
-                if !error_out.is_null() {
-                    let json = e.sacred_json(CALL);
-                    unsafe {
-                        *error_out =
-                            cstring_new_or_fallback(&json, "the reason could not be encoded")
-                    };
-                }
-                ptr::null_mut()
-            };
-            let url = match unsafe { argument(CALL, "url", url) } {
-                Ok(s) => s,
-                Err(e) => return fail(e),
-            };
-            let ca = match unsafe { argument(CALL, "ca", ca) } {
-                Ok(s) => s,
-                Err(e) => return fail(e),
-            };
-            let ns = match unsafe { argument(CALL, "namespace", namespace) } {
-                Ok(s) => s,
-                Err(e) => return fail(e),
-            };
-            match PostgresStore::open(url, ca, ns) {
-                Ok(store) => Box::into_raw(Box::new(store)),
-                Err(e) => fail(e),
-            }
-        },
-        |_| ptr::null_mut(),
-    )
+) -> OpenResultC {
+    qntx_ffi_common::guarded_result("postgres_storage_new", || {
+        const CALL: &str = "postgres_storage_new";
+        let args = || -> Result<(&str, &str, &str), PostgresError> {
+            Ok((
+                unsafe { argument(CALL, "url", url) }?,
+                unsafe { argument(CALL, "ca", ca) }?,
+                unsafe { argument(CALL, "namespace", namespace) }?,
+            ))
+        };
+        let (url, ca, ns) = match args() {
+            Ok(a) => a,
+            Err(e) => return OpenResultC::error(e.crosses(CALL)),
+        };
+        match PostgresStore::open(url, ca, ns) {
+            Ok(store) => OpenResultC {
+                success: true,
+                error_msg: ptr::null_mut(),
+                store: Box::into_raw(Box::new(store)),
+            },
+            Err(e) => OpenResultC::error(e.crosses(CALL)),
+        }
+    })
 }
 
 #[no_mangle]
@@ -276,7 +258,7 @@ pub extern "C" fn postgres_storage_put(
         if store.is_null() {
             return StorageResultC::error("null store pointer");
         }
-        let json = match unsafe { cstr_to_str(attestation_json) } {
+        let json = match unsafe { argument(CALL, "attestation_json", attestation_json) } {
             Ok(s) => s,
             Err(e) => return StorageResultC::error(e.crosses(CALL)),
         };
@@ -295,66 +277,72 @@ pub extern "C" fn postgres_storage_put(
     })
 }
 
-/// The attestation under `id`, or a NULL `attestation_json` when none is.
+/// Whether an attestation is held under `id`, and when it is, the attestation.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn postgres_storage_get(
     store: *const PostgresStore,
     id: *const c_char,
-) -> AttestationResultC {
+) -> FoundResultC {
     qntx_ffi_common::guarded_result("postgres_storage_get", || {
         const CALL: &str = "postgres_storage_get";
         if store.is_null() {
-            return AttestationResultC::error("null store pointer");
+            return FoundResultC::error("null store pointer");
         }
-        let id = match unsafe { cstr_to_str(id) } {
+        let id = match unsafe { argument(CALL, "id", id) } {
             Ok(s) => s,
-            Err(e) => return AttestationResultC::error(e.crosses(CALL)),
+            Err(e) => return FoundResultC::error(e.crosses(CALL)),
         };
         if id.len() > MAX_ID_LENGTH {
-            return AttestationResultC::error("ID exceeds maximum length");
+            return FoundResultC::error("ID exceeds maximum length");
         }
         match unsafe { &*store }.get(id) {
             Ok(Some(attestation)) => {
                 match serde_json::to_string(&proto_convert::to_proto(attestation)) {
-                    Ok(json) => attestation_json(json),
-                    Err(e) => AttestationResultC::error(e.crosses(CALL)),
+                    Ok(json) => FoundResultC {
+                        success: true,
+                        error_msg: ptr::null_mut(),
+                        found: true,
+                        attestation_json: cstring_new_or_empty(&json),
+                    },
+                    Err(e) => FoundResultC::error(e.crosses(CALL)),
                 }
             }
-            Ok(None) => AttestationResultC {
+            Ok(None) => FoundResultC {
                 success: true,
                 error_msg: ptr::null_mut(),
+                found: false,
                 attestation_json: ptr::null_mut(),
             },
-            Err(e) => AttestationResultC::error(e.crosses(CALL)),
+            Err(e) => FoundResultC::error(e.crosses(CALL)),
         }
     })
 }
 
-/// `success` is whether the attestation is held. A failure to ask carries its
-/// reason in `error_msg`.
+/// Whether an attestation is held under `id`.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn postgres_storage_exists(
     store: *const PostgresStore,
     id: *const c_char,
-) -> StorageResultC {
+) -> FoundResultC {
     qntx_ffi_common::guarded_result("postgres_storage_exists", || {
         const CALL: &str = "postgres_storage_exists";
         if store.is_null() {
-            return StorageResultC::error("null store pointer");
+            return FoundResultC::error("null store pointer");
         }
-        let id = match unsafe { cstr_to_str(id) } {
+        let id = match unsafe { argument(CALL, "id", id) } {
             Ok(s) => s,
-            Err(e) => return StorageResultC::error(e.crosses(CALL)),
+            Err(e) => return FoundResultC::error(e.crosses(CALL)),
         };
         match unsafe { &*store }.exists(id) {
-            Ok(true) => ok(),
-            Ok(false) => StorageResultC {
-                success: false,
+            Ok(found) => FoundResultC {
+                success: true,
                 error_msg: ptr::null_mut(),
+                found,
+                attestation_json: ptr::null_mut(),
             },
-            Err(e) => StorageResultC::error(e.crosses(CALL)),
+            Err(e) => FoundResultC::error(e.crosses(CALL)),
         }
     })
 }
@@ -386,7 +374,7 @@ pub extern "C" fn postgres_storage_query(
         if store.is_null() {
             return AttestationResultC::error("null store pointer");
         }
-        let json = match unsafe { cstr_to_str(filter_json) } {
+        let json = match unsafe { argument(CALL, "filter_json", filter_json) } {
             Ok(s) => s,
             Err(e) => return AttestationResultC::error(e.crosses(CALL)),
         };
@@ -425,7 +413,7 @@ pub extern "C" fn postgres_storage_write_batch(
         if store.is_null() {
             return CountResultC::error("null store pointer");
         }
-        let json = match unsafe { cstr_to_str(attestations_json) } {
+        let json = match unsafe { argument(CALL, "attestations_json", attestations_json) } {
             Ok(s) => s,
             Err(e) => return CountResultC::error(e.crosses(CALL)),
         };
@@ -504,6 +492,27 @@ pub extern "C" fn postgres_attestation_result_free(result: AttestationResultC) {
 }
 
 #[no_mangle]
+pub extern "C" fn postgres_open_result_free(result: OpenResultC) {
+    qntx_ffi_common::guarded(
+        "postgres_open_result_free",
+        || unsafe { free_cstring(result.error_msg) },
+        |_| (),
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn postgres_found_result_free(result: FoundResultC) {
+    qntx_ffi_common::guarded(
+        "postgres_found_result_free",
+        || unsafe {
+            free_cstring(result.error_msg);
+            free_cstring(result.attestation_json);
+        },
+        |_| (),
+    )
+}
+
+#[no_mangle]
 pub extern "C" fn postgres_count_result_free(result: CountResultC) {
     qntx_ffi_common::guarded(
         "postgres_count_result_free",
@@ -525,5 +534,4 @@ pub extern "C" fn postgres_schema_result_free(result: SchemaResultC) {
     )
 }
 
-qntx_ffi_common::define_string_free!(postgres_string_free);
 qntx_ffi_common::define_version_fn!(postgres_storage_version);

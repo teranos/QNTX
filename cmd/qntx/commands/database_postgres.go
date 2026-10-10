@@ -65,16 +65,16 @@ func openPostgresDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attes
 // what the record holds from the take-in mark on. A record that does not
 // answer is a node that does not open: a file behind its record would answer
 // reads with a hole in them.
+//
+// A file that never sent sends everything it holds. Postgres keeps the first
+// of a row it is given twice, so a row the record already has costs nothing,
+// and a row written before the file first opened is not left behind.
 func landOnPostgres(landing *sqlitecgo.RustStore, record *postgrescgo.PostgresStore, path string, sent storage.FileSentMark) error {
-	_, hasSent, err := sent.Read()
+	rows, err := storage.SendOut(landing, record, sent)
 	if err != nil {
-		return errors.Wrapf(err, "%s could not read its send mark", path)
+		return errors.Wrapf(err, "%s could not send to postgres what it held before it closed, %d rows sent", path, rows)
 	}
-	if hasSent {
-		if _, err := storage.SendOut(landing, record, sent); err != nil {
-			return errors.Wrapf(err, "%s could not send to postgres what it held before it closed", path)
-		}
-	}
+	logger.Logger.Infow("Sent to postgres on open", "file", path, "rows", rows)
 
 	started := time.Now()
 	took, err := storage.TakeIn(landing, record, storage.FileMark{Path: path + ".taken-in"})
@@ -90,12 +90,10 @@ func landOnPostgres(landing *sqlitecgo.RustStore, record *postgrescgo.PostgresSt
 		"took", time.Since(started),
 	)
 
-	// What was taken in is already in the record; a file that never sent
-	// counts everything it holds as sent.
-	if !hasSent || took.TakenIn > 0 {
-		if err := storage.MarkAllSent(landing, sent); err != nil {
-			return errors.Wrapf(err, "%s could not mark what postgres holds as sent", path)
-		}
+	// Everything the file held was sent above, and what was taken in came
+	// from the record, so the record has every row the file holds.
+	if err := storage.MarkAllSent(landing, sent); err != nil {
+		return errors.Wrapf(err, "%s could not mark what postgres holds as sent", path)
 	}
 	return nil
 }
@@ -117,9 +115,7 @@ func sendToPostgres(landing *sqlitecgo.RustStore, record *postgrescgo.PostgresSt
 					"sent", rows, "error", err)
 				return
 			}
-			if rows > 0 {
-				logger.Logger.Infow("Sent to postgres", "rows", rows, "took", time.Since(started))
-			}
+			logger.Logger.Infow("Sent to postgres", "rows", rows, "took", time.Since(started))
 		}()
 	}
 }

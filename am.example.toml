@@ -56,11 +56,11 @@ entity_actors_limit = 64
 # Uncomment when backend = "postgres": the record attestations are
 # sent to, Supabase Postgres on its free tier. url names the
 # connection string (ssm:// or env:), since it carries the password.
-# ca is the certificate the server is verified against; omitted,
-# the connection is in the clear.
+# The connection string says whether it is TLS: sslmode=disable is
+# in the clear, and anything else verifies the server against ca.
 #
 # [storage.postgres]
-# url = "env:QNTX_POSTGRES_URL"
+# url = "env:QNTX_POSTGRES_URL"   # ...?sslmode=require
 # ca = "supabase-ca.crt"
 
 # ════════════════════════════════════════════════════════════════

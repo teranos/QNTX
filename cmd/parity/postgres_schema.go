@@ -15,8 +15,8 @@ import (
 // pinned Supabase Postgres (scripts/with-postgres.sh). schema_migrations, the
 // runner's own bookkeeping, is left out.
 func PostgresSchema() (map[string]bool, string, error) {
-	url := os.Getenv("QNTX_POSTGRES_URL")
-	if url == "" {
+	url, named := os.LookupEnv("QNTX_POSTGRES_URL")
+	if !named {
 		return nil, "", errors.New("QNTX_POSTGRES_URL names no Postgres: make parity starts the pinned one with scripts/with-postgres.sh")
 	}
 	tables, version, err := postgrescgo.Schema(url, "", "default")

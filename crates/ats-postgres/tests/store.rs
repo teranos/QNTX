@@ -55,6 +55,20 @@ fn an_attestation_round_trips() {
     assert_eq!(store.get("AS-2").unwrap(), None);
 }
 
+/// A filter that constrains nothing, asking for every row.
+fn every_row() -> QueryFilter {
+    QueryFilter {
+        subjects: None,
+        predicates: None,
+        contexts: None,
+        actors: None,
+        source: None,
+        time_start: None,
+        time_end: None,
+        limit: i32::MAX as u32,
+    }
+}
+
 #[test]
 fn a_query_filters_and_answers_newest_first() {
     let mut store = PostgresStore::open(&url(), "", &namespace()).unwrap();
@@ -64,8 +78,8 @@ fn a_query_filters_and_answers_newest_first() {
 
     let alice = store
         .query(&QueryFilter {
-            subjects: vec!["ALICE".to_string()],
-            ..Default::default()
+            subjects: Some(vec!["ALICE".to_string()]),
+            ..every_row()
         })
         .unwrap();
     let ids: Vec<_> = alice.iter().map(|a| a.id.as_str()).collect();
@@ -74,10 +88,32 @@ fn a_query_filters_and_answers_newest_first() {
     let since = store
         .query(&QueryFilter {
             time_start: Some(2000),
-            ..Default::default()
+            ..every_row()
         })
         .unwrap();
     assert_eq!(since.len(), 2);
+}
+
+#[test]
+fn zero_means_zero_and_none_means_none() {
+    let mut store = PostgresStore::open(&url(), "", &namespace()).unwrap();
+    store.put(attestation("AS-1", "ALICE", 1000)).unwrap();
+
+    let limited = store
+        .query(&QueryFilter {
+            limit: 0,
+            ..every_row()
+        })
+        .unwrap();
+    assert_eq!(limited.len(), 0);
+
+    let nobody = store
+        .query(&QueryFilter {
+            subjects: Some(Vec::new()),
+            ..every_row()
+        })
+        .unwrap();
+    assert_eq!(nobody.len(), 0);
 }
 
 #[test]
@@ -109,5 +145,5 @@ fn a_namespace_that_cannot_name_a_schema_is_refused() {
 fn the_schema_is_what_the_migrations_leave() {
     let (tables, version) = schema_tables(&url(), "", &namespace()).unwrap();
     assert_eq!(tables, ["attestations", "schema_migrations"]);
-    assert!(!version.is_empty());
+    assert!(version.starts_with(|c: char| c.is_ascii_digit()));
 }
