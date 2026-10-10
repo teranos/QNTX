@@ -11,6 +11,7 @@ import (
 	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -35,27 +36,32 @@ func NewGroundServer(dbPath string, authToken string, logger *zap.SugaredLogger)
 
 // WriteToGround inserts an attestation into Ground's SQLite database
 func (s *GroundServer) WriteToGround(ctx context.Context, req *protocol.WriteToGroundRequest) (*protocol.WriteToGroundResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	refused := func(err error) (*protocol.WriteToGroundResponse, error) {
 		return &protocol.WriteToGroundResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
 	}
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+		return refused(err)
+	}
 
-	// Generate ASID from request fields
-	subject := "_"
-	if len(req.Subjects) > 0 {
-		subject = req.Subjects[0]
+	// What Ground is told is about something, says something of it, in some
+	// context; a write naming none of one is refused, not written about "_".
+	subjects, err := named.ItemsOf("subjects", req.Subjects)
+	if err != nil {
+		return refused(err)
 	}
-	predicate := "_"
-	if len(req.Predicates) > 0 {
-		predicate = req.Predicates[0]
+	predicates, err := named.ItemsOf("predicates", req.Predicates)
+	if err != nil {
+		return refused(err)
 	}
-	ctxStr := "_"
-	if len(req.Contexts) > 0 {
-		ctxStr = req.Contexts[0]
+	contexts, err := named.ItemsOf("contexts", req.Contexts)
+	if err != nil {
+		return refused(err)
 	}
-	asid, err := identity.GenerateASUID("AS", subject, predicate, ctxStr)
+
+	asid, err := identity.GenerateASUID("AS", subjects.First(), predicates.First(), contexts.First())
 	if err != nil {
 		return &protocol.WriteToGroundResponse{
 			Success: false,
@@ -69,9 +75,9 @@ func (s *GroundServer) WriteToGround(ctx context.Context, req *protocol.WriteToG
 	now := time.Now()
 	as := &types.As{
 		ID:         asid,
-		Subjects:   req.Subjects,
-		Predicates: req.Predicates,
-		Contexts:   req.Contexts,
+		Subjects:   subjects.All(),
+		Predicates: predicates.All(),
+		Contexts:   contexts.All(),
 		Actors:     req.Actors,
 		Timestamp:  now,
 		Source:     req.Source,

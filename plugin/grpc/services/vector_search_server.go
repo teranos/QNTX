@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -63,14 +64,21 @@ func (s *VectorSearchServer) Search(ctx context.Context, req *protocol.VectorSea
 		return nil, err
 	}
 
-	if req.Index == "" {
-		return nil, errors.New("index name cannot be empty")
+	index, err := named.TextOf("index", req.Index)
+	if err != nil {
+		return nil, err
 	}
-	if len(req.QueryVector) == 0 {
-		return nil, errors.New("query vector cannot be empty")
+	query, err := named.ItemsOf("query vector", req.QueryVector)
+	if err != nil {
+		return nil, err
 	}
 
-	return svc.Search(ctx, req)
+	return svc.Search(ctx, &protocol.VectorSearchRequest{
+		AuthToken:   req.AuthToken,
+		Index:       index.String(),
+		QueryVector: query.All(),
+		TopK:        req.TopK,
+	})
 }
 
 // AddVectors inserts vectors into a named index.
@@ -84,14 +92,20 @@ func (s *VectorSearchServer) AddVectors(ctx context.Context, req *protocol.AddVe
 		return nil, err
 	}
 
-	if req.Index == "" {
-		return nil, errors.New("index name cannot be empty")
+	index, err := named.TextOf("index", req.Index)
+	if err != nil {
+		return nil, err
 	}
-	if len(req.Vectors) == 0 {
-		return nil, errors.New("no vectors provided")
+	vectors, err := named.ItemsOf("vectors", req.Vectors)
+	if err != nil {
+		return nil, err
 	}
 
-	return svc.AddVectors(ctx, req)
+	return svc.AddVectors(ctx, &protocol.AddVectorsRequest{
+		AuthToken: req.AuthToken,
+		Index:     index.String(),
+		Vectors:   vectors.All(),
+	})
 }
 
 // CreateIndex creates a new named vector index.
@@ -105,12 +119,18 @@ func (s *VectorSearchServer) CreateIndex(ctx context.Context, req *protocol.Crea
 		return nil, err
 	}
 
-	if req.Name == "" {
-		return nil, errors.New("index name cannot be empty")
+	name, err := named.TextOf("index name", req.Name)
+	if err != nil {
+		return nil, err
 	}
-	if req.Dimensions <= 0 {
-		return nil, errors.Newf("dimensions must be positive, got %d", req.Dimensions)
+	dimensions, err := named.CountOf("dimensions", int(req.Dimensions))
+	if err != nil {
+		return nil, err
 	}
 
-	return svc.CreateIndex(ctx, req)
+	return svc.CreateIndex(ctx, &protocol.CreateIndexRequest{
+		AuthToken:  req.AuthToken,
+		Name:       name.String(),
+		Dimensions: int32(dimensions.Int()),
+	})
 }
