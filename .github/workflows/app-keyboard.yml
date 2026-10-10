@@ -62,26 +62,26 @@
         },
         {
           "if": "always()",
-          "name": "QNTX's own page, never zooming, in the shell on QNTX-App main, which zooms nothing",
-          "run": "(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index(\"<meta name=\\\"viewport\\\"\"); b=s.index(\">\", a)+1; open(p,\"w\").write(s[:a]+sys.argv[2]+s[b:])' qntx/internal/server/dist/index.html '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">'\nbash qntx/ci/app-keyboard/run.sh whole\n",
-          "timeout-minutes": 20
-        },
-        {
-          "if": "always()",
           "name": "The same page, with html and body pinned to the window and not scrolling",
           "run": "(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index(\"<meta name=\\\"viewport\\\"\"); b=s.index(\">\", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index(\"</head>\"); open(p,\"w\").write(s[:c]+\"<style>html, body { height: 100%; overflow: hidden; }</style>\"+s[c:])' qntx/internal/server/dist/index.html '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">'\nbash qntx/ci/app-keyboard/run.sh pinned\n",
           "timeout-minutes": 20
         },
         {
           "if": "always()",
-          "name": "The same pinned page, in a shell whose web view does not shift its content for the keyboard",
-          "run": "python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=\"scroll.bouncesZoom = false\\n\"; assert a in s; open(p,\"w\").write(s.replace(a, a+\"    scroll.contentInsetAdjustmentBehavior = .never\\n\"))' sheet/ios/Sources/Sheet.swift\n(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index(\"<meta name=\\\"viewport\\\"\"); b=s.index(\">\", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index(\"</head>\"); open(p,\"w\").write(s[:c]+\"<style>html, body { height: 100%; overflow: hidden; }</style>\"+s[c:])' qntx/internal/server/dist/index.html '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">'\nbash qntx/ci/app-keyboard/run.sh inset\n",
+          "name": "The pinned page, its window held at the top by the page",
+          "run": "(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index(\"<meta name=\\\"viewport\\\"\"); b=s.index(\">\", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index(\"</head>\"); open(p,\"w\").write(s[:c]+\"<style>html, body { height: 100%; overflow: hidden; }</style>\"+s[c:])' qntx/internal/server/dist/index.html '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">'\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); c=s.index(\"</head>\"); open(p,\"w\").write(s[:c]+open(sys.argv[2]).read()+s[c:])' qntx/internal/server/dist/index.html qntx/ci/app-keyboard/hold-page.html\nbash qntx/ci/app-keyboard/run.sh page\n",
+          "timeout-minutes": 20
+        },
+        {
+          "if": "always()",
+          "name": "The pinned page, in a shell that holds its web view at the top",
+          "run": "python3 qntx/ci/app-keyboard/hold-native.py sheet/ios/Sources/Sheet.swift\n(cd qntx && make web)\npython3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index(\"<meta name=\\\"viewport\\\"\"); b=s.index(\">\", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index(\"</head>\"); open(p,\"w\").write(s[:c]+\"<style>html, body { height: 100%; overflow: hidden; }</style>\"+s[c:])' qntx/internal/server/dist/index.html '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">'\nbash qntx/ci/app-keyboard/run.sh native\n",
           "timeout-minutes": 20
         },
         {
           "if": "always()",
           "name": "What the screen said",
-          "run": "cat verdicts.txt\ngrep -q '^without: zoomed$' verdicts.txt || echo \"without the line the page did not zoom\"\ngrep -q '^whole: stayed$' verdicts.txt || echo \"QNTX's page did more than bring the keyboard\"\ngrep -q '^pinned: stayed$' verdicts.txt || echo \"pinned, QNTX's page still did more than bring the keyboard\"\ngrep -q '^inset: stayed$' verdicts.txt || { echo \"with the web view's insets fixed, QNTX's page still did more than bring the keyboard\"; exit 1; }\n"
+          "run": "cat verdicts.txt\ngrep -q '^without: zoomed$' verdicts.txt || echo \"without the line the page did not zoom\"\ngrep -q '^pinned: stayed$' verdicts.txt || echo \"pinned, QNTX's page did more than bring the keyboard\"\ngrep -q '^page: stayed$' verdicts.txt || echo \"held by the page, QNTX's page did more than bring the keyboard\"\ngrep -q '^native: stayed$' verdicts.txt || echo \"held by the shell, QNTX's page did more than bring the keyboard\"\ngrep -qE '^(page|native): stayed$' verdicts.txt\n"
         },
         {
           "if": "always()",

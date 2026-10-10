@@ -90,17 +90,6 @@
       }
       {
         "if" = "always()";
-        name = "QNTX's own page, never zooming, in the shell on QNTX-App main, which zooms nothing";
-        # A case that hangs ends here, its log kept, and the next case still runs.
-        timeout-minutes = 20;
-        run = ''
-          (cd qntx && make web)
-          python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index("<meta name=\"viewport\""); b=s.index(">", a)+1; open(p,"w").write(s[:a]+sys.argv[2]+s[b:])' qntx/internal/server/dist/index.html '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'
-          bash qntx/ci/app-keyboard/run.sh whole
-        '';
-      }
-      {
-        "if" = "always()";
         name = "The same page, with html and body pinned to the window and not scrolling";
         # A case that hangs ends here, its log kept, and the next case still runs.
         timeout-minutes = 20;
@@ -112,15 +101,26 @@
       }
       {
         "if" = "always()";
-        name = "The same pinned page, in a shell whose web view does not shift its content for the keyboard";
-        # The pinned page slid 35 points as the window shrank from 778 to 743
-        # with the box well above the keyboard: the web view moved its insets.
+        name = "The pinned page, its window held at the top by the page";
+        # Pinned, the window still went from 778 to 743 tall and the page scrolled
+        # 35 to match, in a shell with or without the web view's inset adjustment.
         timeout-minutes = 20;
         run = ''
-          python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a="scroll.bouncesZoom = false\n"; assert a in s; open(p,"w").write(s.replace(a, a+"    scroll.contentInsetAdjustmentBehavior = .never\n"))' sheet/ios/Sources/Sheet.swift
           (cd qntx && make web)
           python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index("<meta name=\"viewport\""); b=s.index(">", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index("</head>"); open(p,"w").write(s[:c]+"<style>html, body { height: 100%; overflow: hidden; }</style>"+s[c:])' qntx/internal/server/dist/index.html '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'
-          bash qntx/ci/app-keyboard/run.sh inset
+          python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); c=s.index("</head>"); open(p,"w").write(s[:c]+open(sys.argv[2]).read()+s[c:])' qntx/internal/server/dist/index.html qntx/ci/app-keyboard/hold-page.html
+          bash qntx/ci/app-keyboard/run.sh page
+        '';
+      }
+      {
+        "if" = "always()";
+        name = "The pinned page, in a shell that holds its web view at the top";
+        timeout-minutes = 20;
+        run = ''
+          python3 qntx/ci/app-keyboard/hold-native.py sheet/ios/Sources/Sheet.swift
+          (cd qntx && make web)
+          python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index("<meta name=\"viewport\""); b=s.index(">", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index("</head>"); open(p,"w").write(s[:c]+"<style>html, body { height: 100%; overflow: hidden; }</style>"+s[c:])' qntx/internal/server/dist/index.html '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'
+          bash qntx/ci/app-keyboard/run.sh native
         '';
       }
       {
@@ -129,9 +129,10 @@
         run = ''
           cat verdicts.txt
           grep -q '^without: zoomed$' verdicts.txt || echo "without the line the page did not zoom"
-          grep -q '^whole: stayed$' verdicts.txt || echo "QNTX's page did more than bring the keyboard"
-          grep -q '^pinned: stayed$' verdicts.txt || echo "pinned, QNTX's page still did more than bring the keyboard"
-          grep -q '^inset: stayed$' verdicts.txt || { echo "with the web view's insets fixed, QNTX's page still did more than bring the keyboard"; exit 1; }
+          grep -q '^pinned: stayed$' verdicts.txt || echo "pinned, QNTX's page did more than bring the keyboard"
+          grep -q '^page: stayed$' verdicts.txt || echo "held by the page, QNTX's page did more than bring the keyboard"
+          grep -q '^native: stayed$' verdicts.txt || echo "held by the shell, QNTX's page did more than bring the keyboard"
+          grep -qE '^(page|native): stayed$' verdicts.txt
         '';
       }
       {
