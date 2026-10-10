@@ -14,9 +14,8 @@ func (pluginServicesSubsystem) Name() string { return "plugin-services" }
 
 func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	pluginRegistry := s.pluginRegistry
-	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth)
-	s.pluginHandler.sigils = s.pluginSigilRows
-	s.pluginHandler.records = s.pluginRecords().Plugins
+	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth,
+		s.pluginSigilRows, s.pluginRecords().Plugins)
 	grpcplugin.SetPluginRecords(s.pluginRecords())
 	s.statusLineHandler = NewStatusLineHandler(pluginRegistry, s.logger, s.pluginHealth,
 		// Fetched per request: the backend supplies the watcher store after

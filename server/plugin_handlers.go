@@ -21,25 +21,23 @@ type PluginHandler struct {
 	// most recent attempt failed if it did. It reaches no plugin.
 	health func() (map[string]plugin.HealthStatus, time.Time, string)
 	// sigils is one plugin's sigils, with who reaches each, and why any signum
-	// it handed is not served. Nil on a node that serves no plugin sigils.
+	// it handed is not served.
 	sigils func(name string) ([]*protocol.SigilRow, []string)
-	// records is every plugin the node knows, running or not. Nil lists only
-	// what the registry holds.
+	// records is every plugin the node knows, running or not.
 	records func() ([]plugingrpc.PluginRecord, error)
 }
 
 // NewPluginHandler creates a handler for plugin info endpoints.
 func NewPluginHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
-	health func() (map[string]plugin.HealthStatus, time.Time, string)) *PluginHandler {
-	return &PluginHandler{registry: registry, logger: logger, health: health}
+	health func() (map[string]plugin.HealthStatus, time.Time, string),
+	sigils func(name string) ([]*protocol.SigilRow, []string),
+	records func() ([]plugingrpc.PluginRecord, error)) *PluginHandler {
+	return &PluginHandler{registry: registry, logger: logger, health: health, sigils: sigils, records: records}
 }
 
 // list is every installed plugin and its status: plugins_list's answer.
 func (h *PluginHandler) list() *protocol.PluginsList {
 	answer := &protocol.PluginsList{Plugins: []*protocol.PluginInfo{}}
-	if h.registry == nil {
-		return answer
-	}
 
 	// Read the last probe rather than making one. Probing here cost gRPC calls
 	// per request and held the registry's read lock across them.
@@ -47,14 +45,12 @@ func (h *PluginHandler) list() *protocol.PluginsList {
 	stateResults := h.registry.GetAllStates()
 
 	known := map[string]plugingrpc.PluginRecord{}
-	if h.records != nil {
-		held, err := h.records()
-		if err != nil {
-			answer.RecordsFailure = err.Error()
-		}
-		for _, record := range held {
-			known[record.Name] = record
-		}
+	held, err := h.records()
+	if err != nil {
+		answer.RecordsFailure = err.Error()
+	}
+	for _, record := range held {
+		known[record.Name] = record
 	}
 
 	// A plugin that serves a canvas module can say which one. Asked of the
@@ -91,9 +87,7 @@ func (h *PluginHandler) list() *protocol.PluginsList {
 		if digester, serves := p.(moduleDigester); serves {
 			info.ModuleDigest = digester.ModuleDigest()
 		}
-		if h.sigils != nil {
-			info.Sigils, info.SignaRefused = h.sigils(name)
-		}
+		info.Sigils, info.SignaRefused = h.sigils(name)
 		info.Repo, info.Enabled = known[name].Repo, known[name].Enabled
 		answer.Plugins = append(answer.Plugins, info)
 	}
@@ -158,9 +152,6 @@ func healthDetails(details map[string]any) map[string]string {
 // routes is what each running plugin serves: plugins_routes's answer.
 func (h *PluginHandler) routes() *protocol.PluginRoutes {
 	answer := &protocol.PluginRoutes{Routes: []*protocol.PluginRoute{}}
-	if h.registry == nil {
-		return answer
-	}
 
 	for _, name := range h.registry.List() {
 		p, ok := h.registry.Get(name)
@@ -210,9 +201,6 @@ func (h *PluginHandler) routes() *protocol.PluginRoutes {
 // answer. A sigil gives an object, so the rows are under elements.
 func (h *PluginHandler) elements(ctx context.Context) *protocol.PluginElements {
 	answer := &protocol.PluginElements{Elements: []*protocol.PluginElement{}}
-	if h.registry == nil {
-		return answer
-	}
 
 	// Iterate through all plugins and get their element definitions
 	for _, name := range h.registry.List() {

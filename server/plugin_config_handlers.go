@@ -15,7 +15,7 @@ import (
 
 const (
 	// internalKeyPrefix marks internal config keys that should not be exposed via API
-	internalKeyPrefix = '_'
+	internalKeyPrefix = "_"
 )
 
 // writeRichErrorMethod is a method wrapper for writeRichError that uses the server's logger.
@@ -28,19 +28,9 @@ func (s *QNTXServer) writeRichError(w http.ResponseWriter, err error, statusCode
 // GET /api/plugins/{name}/config - Get plugin configuration
 // PUT /api/plugins/{name}/config - Update plugin configuration
 func (s *QNTXServer) HandlePluginConfig(w http.ResponseWriter, r *http.Request) {
-	// Parse plugin name from path: /api/plugins/{name}/config
-	path := strings.TrimPrefix(r.URL.Path, "/api/plugins/")
-	path = strings.TrimSuffix(path, "/config")
-	pluginName := path
-
-	if pluginName == "" {
-		err := errors.WithDetail(
-			errors.New("plugin name required in URL path"),
-			"The URL path must include the plugin name: /api/plugins/{name}/config",
-		)
-		s.writeRichError(w, err, http.StatusBadRequest)
-		return
-	}
+	// The mux's {name} is a whole path segment, so it names a plugin; one
+	// nobody added is refused by its record.
+	pluginName := r.PathValue("name")
 
 	switch r.Method {
 	case http.MethodGet:
@@ -66,7 +56,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 	}
 	settings := make(map[string]string, len(record.Config))
 	for key, value := range record.Config {
-		if len(key) > 0 && key[0] != internalKeyPrefix {
+		if !strings.HasPrefix(key, internalKeyPrefix) {
 			settings[key] = value
 		}
 	}
@@ -81,26 +71,24 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 
 			// Type assert to ExternalDomainProxy to access ConfigSchema
 			if proxy, ok := pluginClient.(*grpcplugin.ExternalDomainProxy); ok {
-				if schemaResp, err := proxy.ConfigSchema(ctx); err == nil && schemaResp != nil {
-					// Convert protobuf schema to JSON-friendly map
-					schema = make(map[string]any)
-					for fieldName, fieldSchema := range schemaResp.Fields {
-						schema[fieldName] = map[string]any{
-							"type":          fieldSchema.Type,
-							"description":   fieldSchema.Description,
-							"default_value": fieldSchema.DefaultValue,
-							"required":      fieldSchema.Required,
-							"min_value":     fieldSchema.MinValue,
-							"max_value":     fieldSchema.MaxValue,
-							"pattern":       fieldSchema.Pattern,
-							"element_type":  fieldSchema.ElementType,
-						}
-					}
-				} else if err != nil {
-					wrappedErr := errors.Wrap(err, "ConfigSchema RPC failed")
-					s.logger.Warnw("Failed to get config schema from plugin", "plugin", pluginName, "error", err)
-					s.writeRichError(w, wrappedErr, http.StatusServiceUnavailable)
+				schemaResp, err := proxy.ConfigSchema(ctx)
+				if err != nil {
+					s.writeRichError(w, errors.Wrapf(err, "ConfigSchema RPC of plugin %s failed", pluginName), http.StatusServiceUnavailable)
 					return
+				}
+				// Convert protobuf schema to JSON-friendly map
+				schema = make(map[string]any)
+				for fieldName, fieldSchema := range schemaResp.GetFields() {
+					schema[fieldName] = map[string]any{
+						"type":          fieldSchema.Type,
+						"description":   fieldSchema.Description,
+						"default_value": fieldSchema.DefaultValue,
+						"required":      fieldSchema.Required,
+						"min_value":     fieldSchema.MinValue,
+						"max_value":     fieldSchema.MaxValue,
+						"pattern":       fieldSchema.Pattern,
+						"element_type":  fieldSchema.ElementType,
+					}
 				}
 			} else {
 				// Not an external gRPC plugin
@@ -138,6 +126,17 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// A plugin nobody added has no record to configure, or to validate for.
+	_, found, err := s.pluginRecords().Plugin(pluginName)
+	if err != nil {
+		s.writeRichError(w, errors.Wrapf(err, "failed to read the record of plugin %s", pluginName), http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		s.writeRichError(w, errors.Newf("plugin %q was never added: press + in the plugin element", pluginName), http.StatusNotFound)
+		return
+	}
+
 	if req.Config == nil {
 		s.writeRichError(w, errors.New("config field required"), http.StatusBadRequest)
 		return
@@ -155,7 +154,6 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 				schema, err := extProxy.ConfigSchema(ctx)
 				cancel()
 				if err != nil {
-					s.logger.Errorw("Failed to get config schema", "error", err, "plugin", pluginName)
 					s.writeRichError(w, errors.Wrapf(err, "failed to validate the config of plugin %s", pluginName), http.StatusInternalServerError)
 					return
 				}
@@ -181,7 +179,6 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := s.pluginRecords().ConfigurePlugin(actorOf(r.Context()), pluginName, req.Config); err != nil {
-		s.logger.Errorw("Failed to update plugin config", "error", err, "plugin", pluginName)
 		s.writeRichError(w, errors.Wrapf(err, "failed to write the config of plugin %s", pluginName), http.StatusBadRequest)
 		return
 	}
@@ -191,12 +188,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		defer cancel()
 
 		if err := pm.ReinitializePlugin(ctx, pluginName, s.services); err != nil {
-			s.logger.Errorw("Failed to reinitialize plugin", "error", err, "plugin", pluginName)
-			respond(w, s.logger, http.StatusInternalServerError, map[string]any{
-				"success": false,
-				"message": "Configuration saved but plugin reinitialization failed: " + err.Error(),
-				"plugin":  pluginName,
-			})
+			s.writeRichError(w, errors.Wrapf(err, "the config of plugin %s was saved, and the plugin was not reinitialized with it", pluginName), http.StatusInternalServerError)
 			return
 		}
 	}

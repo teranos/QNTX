@@ -32,8 +32,8 @@ func (s *QNTXServer) pluginToken(plugin, namespace string) (string, error) {
 		return "", errors.Newf("namespace %s holds no store", namespace)
 	}
 	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", errors.Wrapf(err, "no token could be drawn for plugin %s", plugin)
+	if drawn, err := rand.Read(raw); err != nil {
+		return "", errors.Wrapf(err, "no token could be drawn for plugin %s: %d of %d bytes drawn", plugin, drawn, len(raw))
 	}
 	token := hex.EncodeToString(raw)
 	if before, held := s.pluginTokens.Load(plugin); held {

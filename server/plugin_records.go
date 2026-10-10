@@ -84,9 +84,12 @@ func (r PluginRecords) pluginLine(actor string, record grpcplugin.PluginRecord) 
 // error naming the line, never a plugin missing part of what was written.
 func asPluginRecord(as *types.As) (grpcplugin.PluginRecord, error) {
 	record := grpcplugin.PluginRecord{Name: as.Predicates[0], Config: map[string]string{}}
-	if len(as.Contexts) > 0 {
-		record.Repo = as.Contexts[0]
+	// pluginLine writes the repository a plugin was added from as the one context.
+	if len(as.Contexts) != 1 {
+		return grpcplugin.PluginRecord{}, errors.Newf("%s line %s about %s: contexts are %v, not the one repository it was added from",
+			pluginSubject, as.ID, record.Name, as.Contexts)
 	}
+	record.Repo = as.Contexts[0]
 	enabled, ok := as.Attributes["enabled"].(bool)
 	if !ok {
 		return grpcplugin.PluginRecord{}, errors.Newf("%s line %s about %s: enabled is %v, not true or false",

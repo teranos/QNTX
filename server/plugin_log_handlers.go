@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/errors"
@@ -18,14 +17,9 @@ func (s *QNTXServer) HandlePluginLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse plugin name from path: /api/plugins/{name}/logs
-	path := strings.TrimPrefix(r.URL.Path, "/api/plugins/")
-	pluginName := strings.TrimSuffix(path, "/logs")
-
-	if pluginName == "" {
-		writeError(w, http.StatusBadRequest, "plugin name required in URL path")
-		return
-	}
+	// The mux's {name} is a whole path segment, so it names a plugin; one with
+	// no log buffer is refused below.
+	pluginName := r.PathValue("name")
 
 	pm := s.getPluginManager()
 	if pm == nil {
@@ -91,8 +85,8 @@ func writeSSEEntry(w http.ResponseWriter, entry grpcplugin.LogEntry) error {
 	if err != nil {
 		return errors.Wrapf(err, "log entry from %s could not be encoded", entry.Source)
 	}
-	if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
-		return errors.Wrap(err, "the log stream could not be written to")
+	if written, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+		return errors.Wrapf(err, "the log stream could not be written to: %d of %d bytes of an entry from %s went out", written, len(data)+len("data: \n\n"), entry.Source)
 	}
 	return nil
 }
