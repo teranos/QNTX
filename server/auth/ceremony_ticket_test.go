@@ -12,7 +12,7 @@ import (
 )
 
 func ticketHandler() *Handler {
-	return &Handler{logger: zap.NewNop().Sugar()}
+	return &Handler{users: &memUsers{}, logger: zap.NewNop().Sugar()}
 }
 
 // Linking happens before anyone can log in, so the ceremony cannot be gated on

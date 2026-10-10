@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3399 in 436 files.
+# 3266 in 433 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -8,6 +8,16 @@
 # server/attestation_handlers.go: +1, the node authors what its caller named nobody for.
 # server/quote_removal.go: 7, from 82e8e8cf unbaselined: refusals of no actor, namespace or span, nothing removed ends the run, a count for the note, the daemon check its siblings hold.
 # From 3414: a test against a package-level const or var holding nil, zero or empty counts like one against what it holds; each was there before it was counted.
+# From 3400: auth.New refuses a handler with no User store, and the 23 tests for one that keeps no Users are gone; the header had drifted to 3406 by hand.
+# From 3378: rich search logs, rather than asking first whether it has a logger.
+# From 3368: the server logs, rather than asking first whether it has a logger.
+# From 3355: Pulse runs because the node runs, and nothing asks whether the daemon is there.
+# From 3339: a closed store says it is closed, rather than its pointer being nil.
+# From 3323: the node runs with its plugin registry, and nothing asks whether it has one.
+# From 3309: the vectors are the namespace's from boot, and only making them waits for a plugin.
+# From 3290: the canvas is handed its logger, whatever else it is handed.
+# From 3285: a refusal the caller is told is answered without a nil logger standing for not logging it.
+# From 3283: the services that started are a list, and stopping them is stopping that list.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -52,12 +62,12 @@
 8	ats/storage/query_store.go
 7	ats/storage/retrieval.go
 2	ats/storage/rfc3339.go
-19	ats/storage/rich_search.go
+9	ats/storage/rich_search.go
 10	ats/storage/rust_backed_store.go
 6	ats/storage/sql_raw_store.go
 1	ats/storage/sqlitecgo/adapter.go
 11	ats/storage/sqlitecgo/slowlog.go
-50	ats/storage/sqlitecgo/storage_cgo.go
+34	ats/storage/sqlitecgo/storage_cgo.go
 1	ats/storage/sqlitecgo/writequeue_cgo.go
 4	ats/storage/subject_warn.go
 21	ats/storage/watcher_store.go
@@ -134,7 +144,7 @@
 4	db/migrate.go
 10	db/rustdriver/driver.go
 1	db/rustdriver/slow.go
-34	element/handlers/canvas.go
+29	element/handlers/canvas.go
 15	element/handlers/canvases.go
 4	element/storage/canvas_store.go
 8	element/storage/canvases.go
@@ -211,7 +221,7 @@
 5	plugin/grpc/services/schedule_server.go
 2	plugin/grpc/services/search_server.go
 10	plugin/grpc/services/vector_search_server.go
-29	plugin/grpc/services_manager.go
+13	plugin/grpc/services_manager.go
 1	plugin/grpc/traffic.go
 11	plugin/grpc/watchers.go
 6	plugin/grpc/websocket_keepalive.go
@@ -254,69 +264,67 @@
 14	server/a2a/http.go
 4	server/a2a/operations.go
 5	server/a2a_card.go
-2	server/a2a_route.go
 9	server/agent_harness.go
 2	server/agent_turn.go
 20	server/agents.go
-7	server/am_ground.go
+5	server/am_ground.go
 2	server/am_sigils.go
 1	server/answers.go
 31	server/attestation_handlers.go
 5	server/auth/apple.go
-11	server/auth/arrive.go
+10	server/auth/arrive.go
 3	server/auth/atproto.go
 7	server/auth/attest.go
 23	server/auth/auth.go
-17	server/auth/becoming.go
+16	server/auth/becoming.go
 4	server/auth/binding.go
 1	server/auth/ceremony_owner.go
 9	server/auth/client_doors.go
 6	server/auth/credentials.go
-1	server/auth/devices.go
 17	server/auth/doors.go
-4	server/auth/forget.go
+3	server/auth/forget.go
 3	server/auth/github.go
 3	server/auth/github_app.go
 14	server/auth/github_token.go
 2	server/auth/google.go
 9	server/auth/handlers.go
 28	server/auth/handlers_tokens.go
-5	server/auth/handlers_users.go
+3	server/auth/handlers_users.go
 3	server/auth/homeward.go
-25	server/auth/invitation.go
+23	server/auth/invitation.go
 4	server/auth/laye.go
 4	server/auth/mastodon.go
 1	server/auth/may_register.go
 20	server/auth/oauth.go
 2	server/auth/owner_match.go
-8	server/auth/person.go
+6	server/auth/person.go
 3	server/auth/picture.go
 4	server/auth/presented.go
 9	server/auth/providers.go
-9	server/auth/public_user.go
+7	server/auth/public_user.go
 1	server/auth/refusals.go
 15	server/auth/roles.go
-6	server/auth/root_agent.go
+4	server/auth/root_agent.go
 7	server/auth/sessions.go
-6	server/auth/setup.go
+5	server/auth/setup.go
 1	server/auth/shed.go
 17	server/auth/sign_binding.go
 4	server/auth/standing.go
-9	server/auth/switch.go
+5	server/auth/switch.go
 3	server/auth/token_strategy.go
 1	server/auth/tokens.go
 13	server/auth/tokens_table.go
-6	server/auth/users.go
+3	server/auth/users.go
 9	server/auth/users_table.go
 20	server/broadcast.go
 4	server/builtin_executor.go
 2	server/checkpoint_pulse.go
-29	server/ci_pulse.go
+28	server/ci_pulse.go
 11	server/claude.go
 3	server/claude_git.go
 4	server/claude_login.go
 9	server/claude_turns.go
-22	server/client.go
+21	server/client.go
 6	server/conversation.go
 1	server/db_performance.go
 17	server/db_stats_cache.go
@@ -324,33 +332,33 @@
 14	server/distill_pulse.go
 8	server/element_config_handlers.go
 10	server/element_module_handlers.go
-8	server/embeddings/cluster_handler.go
-2	server/embeddings/cluster_memberships.go
+7	server/embeddings/cluster_handler.go
+1	server/embeddings/cluster_memberships.go
 23	server/embeddings/clustering.go
-9	server/embeddings/clusters.go
+5	server/embeddings/clusters.go
 2	server/embeddings/handler.go
-38	server/embeddings/handlers.go
+32	server/embeddings/handlers.go
 12	server/embeddings/observer.go
 6	server/embeddings/plugin_service.go
-7	server/embeddings/project_handler.go
+6	server/embeddings/project_handler.go
 5	server/embeddings/projection.go
 12	server/embeddings/pulse.go
-6	server/embeddings_handlers.go
-8	server/embeddings_pulse.go
+4	server/embeddings_handlers.go
+6	server/embeddings_pulse.go
 4	server/exposure.go
 1	server/files.go
-14	server/github.go
+12	server/github.go
 2	server/github_credential.go
 2	server/github_deliveries.go
 1	server/github_parity.go
 4	server/github_webhook.go
 2	server/ground_bridge.go
-14	server/handlers.go
+11	server/handlers.go
 4	server/host_gauges.go
 3	server/i_sigils.go
-13	server/init.go
+14	server/init.go
 5	server/invitations.go
-28	server/lifecycle.go
+22	server/lifecycle.go
 8	server/mail.go
 14	server/mcp.go
 11	server/namespace_handlers.go
@@ -376,16 +384,16 @@
 8	server/plugin_check.go
 12	server/plugin_config_handlers.go
 8	server/plugin_handlers.go
-2	server/plugin_health_cache.go
+1	server/plugin_health_cache.go
 3	server/plugin_log_handlers.go
 4	server/plugin_records.go
 2	server/plugin_roots.go
-24	server/plugin_sigils.go
+19	server/plugin_sigils.go
 1	server/plugin_stores.go
 1	server/pprof.go
-27	server/prompt_handlers.go
+26	server/prompt_handlers.go
 2	server/prose_handlers.go
-7	server/pulse_async_jobs.go
+5	server/pulse_async_jobs.go
 6	server/pulse_execution_handlers.go
 5	server/pulse_execution_poller.go
 5	server/pulse_job_children.go
@@ -395,25 +403,24 @@
 1	server/pulse_types.go
 2	server/python_handlers.go
 4	server/quote_provenance.go
-7	server/quote_removal.go
-12	server/quote_watch.go
+6	server/quote_removal.go
+11	server/quote_watch.go
 2	server/ratelimit.go
 6	server/reach/open.go
 9	server/reach/table.go
 8	server/reach_sigils.go
-11	server/report.go
-9	server/report_pulse.go
+10	server/report.go
+8	server/report_pulse.go
 16	server/report_render.go
-4	server/response.go
 2	server/roles.go
 2	server/roles_handler.go
 4	server/routes.go
-10	server/routing.go
+5	server/routing.go
 11	server/search_observer.go
 5	server/server.go
 5	server/sigil/ask.go
 15	server/sigil/sigil.go
-15	server/signa.go
+13	server/signa.go
 56	server/staand.go
 9	server/standing_observer.go
 4	server/statusline_asks.go
@@ -421,7 +428,7 @@
 16	server/statusline_handler_failures.go
 30	server/statusline_handlers.go
 12	server/statusline_news.go
-16	server/statusline_node.go
+14	server/statusline_node.go
 1	server/statusline_plugin_frames.go
 7	server/statusline_plugin_row.go
 5	server/statusline_watchers.go
@@ -430,8 +437,8 @@
 3	server/sub_agent.go
 8	server/sub_auth.go
 6	server/sub_canvas.go
-9	server/sub_embedding.go
-2	server/sub_plugins.go
+7	server/sub_embedding.go
+1	server/sub_plugins.go
 1	server/sub_store_proof.go
 2	server/sub_ticker.go
 1	server/syscap/parser_qntx.go
@@ -443,5 +450,5 @@
 2	server/vault_fill.go
 10	server/vault_send.go
 35	server/watcher_handler.go
-15	server/watcher_handlers.go
+13	server/watcher_handlers.go
 5	server/watcher_reload.go

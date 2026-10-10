@@ -299,7 +299,7 @@ export async function handleDaemonStatusNotification(status: {
  * - none: Clear progress indicator
  * - normal: Show progress bar with percentage
  * - indeterminate: Show spinning/pulsing indicator (jobs queued but no progress info)
- * - paused: Show yellow/warning progress bar (Pulse daemon paused)
+ * - paused: Show yellow/warning progress bar (Pulse has no pause; nothing sets this)
  * - error: Show red progress bar (job failed)
  */
 export type TaskbarProgressState = 'none' | 'normal' | 'indeterminate' | 'paused' | 'error';
@@ -346,7 +346,7 @@ export async function showTaskbarProgress(percent: number): Promise<void> {
 
 /**
  * Show paused state (yellow/warning indicator)
- * Use when Pulse daemon is paused
+ * Nothing calls this: Pulse runs inside the node and has no pause
  */
 export async function showTaskbarPaused(progress?: number): Promise<void> {
     await setTaskbarProgress('paused', progress);
@@ -366,7 +366,7 @@ export async function showTaskbarError(progress?: number): Promise<void> {
  *
  * @param activeJobs - Number of currently running jobs
  * @param queuedJobs - Number of queued jobs
- * @param isPaused - Whether Pulse daemon is paused
+ * @param isPaused - Whether jobs are paused; Pulse has no pause, so nothing passes true
  * @param hasError - Whether any job recently failed
  */
 export async function updateTaskbarFromJobState(

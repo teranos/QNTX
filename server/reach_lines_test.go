@@ -97,7 +97,7 @@ func TestPublicRegistrationIsOpenedOnAPluginRouteAndNowhereElse(t *testing.T) {
 // A plugin's paths are the routes the node offers it and any literal path
 // under /api/{name}/, of a plugin that is loaded, and nothing else.
 func TestAPluginRouteIsOneTheNodeOffersAPlugin(t *testing.T) {
-	s := &QNTXServer{}
+	s := bareNode()
 	s.pluginRoutes.Store("hello-world", true)
 
 	for _, path := range []string{"/api/hello-world", "/api/hello-world/{path...}", "/ws/hello-world", "/api/hello-world/book/new",

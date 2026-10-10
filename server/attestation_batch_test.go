@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,7 +16,7 @@ import (
 // "but batch them"
 func TestABatchIsAnsweredOnePerAttestation(t *testing.T) {
 	store, db := createTestStore(t)
-	s := &QNTXServer{nodeDB: db, logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), nodeDB: db, logger: zap.NewNop().Sugar()}
 	s.held = servingOne(db, store)
 
 	body := `[` +

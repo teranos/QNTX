@@ -11,7 +11,7 @@ import (
 )
 
 func testHandler() *Handler {
-	h := &Handler{sessions: newSessionStore(24), logger: zap.NewNop().Sugar()}
+	h := &Handler{users: &memUsers{}, sessions: newSessionStore(24), logger: zap.NewNop().Sugar()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	return h
 }
@@ -45,7 +45,9 @@ func TestMiddlewarePutsTheCallerInContext(t *testing.T) {
 // acting where a session has always acted.
 func TestARootSessionNamesNoNamespace(t *testing.T) {
 	h := testHandler()
-	session, err := h.sessions.create(mastodonAccount, User{ID: "US-USER-ROOT", Level: LevelRoot})
+	root := User{ID: "US-USER-ROOT", Level: LevelRoot}
+	require.NoError(t, h.users.Put(root))
+	session, err := h.sessions.create(mastodonAccount, root)
 	require.NoError(t, err)
 
 	var seen Admission

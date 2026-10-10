@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/teranos/QNTX/plugin"
 	"io"
 	"strings"
 	"testing"
@@ -73,7 +74,7 @@ func jsonBody(body string) io.Reader {
 
 func namespaceServer(t *testing.T, known storage.Namespaces) *QNTXServer {
 	t.Helper()
-	s := &QNTXServer{logger: zap.NewNop().Sugar(), held: &namespaces.Held{}}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar(), held: &namespaces.Held{}}
 	s.held.SetKnown(known)
 	return s
 }

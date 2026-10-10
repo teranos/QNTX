@@ -64,34 +64,30 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously
-	if s.pluginRegistry != nil {
-		// A plugin registers its own routes over gRPC and the host never sees
-		// them, so no row here can describe one. Every plugin route is ROOT's.
-		for _, name := range s.pluginRegistry.ListEnabled() {
-			// Register exact match for /api/{plugin} (e.g., /api/code)
-			exactPattern := "/api/" + name
-			s.answer(exactPattern, s.handlePluginRequest)
+	// A plugin registers its own routes over gRPC and the host never sees
+	// them, so no row here can describe one. Every plugin route is ROOT's.
+	for _, name := range s.pluginRegistry.ListEnabled() {
+		// Register exact match for /api/{plugin} (e.g., /api/code)
+		exactPattern := "/api/" + name
+		s.answer(exactPattern, s.handlePluginRequest)
 
-			// Register wildcard for /api/{plugin}/* (e.g., /api/code/file.go)
-			wildcardPattern := "/api/" + name + "/{path...}"
-			s.answer(wildcardPattern, s.handlePluginRequest)
+		// Register wildcard for /api/{plugin}/* (e.g., /api/code/file.go)
+		wildcardPattern := "/api/" + name + "/{path...}"
+		s.answer(wildcardPattern, s.handlePluginRequest)
 
-			s.pluginRoutes.Store(name, true)
-			s.logger.Debugw("Registered HTTP routes", "plugin", name,
-				"exact", exactPattern,
-				"wildcard", wildcardPattern)
-		}
+		s.pluginRoutes.Store(name, true)
+		s.logger.Debugw("Registered HTTP routes", "plugin", name,
+			"exact", exactPattern,
+			"wildcard", wildcardPattern)
 	}
 
 	// Register WebSocket routes for plugins (same lazy pattern as HTTP routes above).
 	// Plugins load asynchronously, so we register /ws/<name> from pre-registered names
 	// and resolve the actual handler when the connection arrives.
-	if s.pluginRegistry != nil {
-		for _, name := range s.pluginRegistry.ListEnabled() {
-			pattern := "/ws/" + name
-			s.answerSocket(pattern, s.handlePluginWebSocket)
-			s.logger.Debugw("Registered WebSocket route", "plugin", name, "path", pattern)
-		}
+	for _, name := range s.pluginRegistry.ListEnabled() {
+		pattern := "/ws/" + name
+		s.answerSocket(pattern, s.handlePluginWebSocket)
+		s.logger.Debugw("Registered WebSocket route", "plugin", name, "path", pattern)
 	}
 
 	// Generic /ws/llm resolves the configured LLM provider and proxies to it.
@@ -240,7 +236,7 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check if plugin is ready
-	if s.pluginRegistry == nil || !s.pluginRegistry.IsReady(pluginName) {
+	if !s.pluginRegistry.IsReady(pluginName) {
 		w.Header().Set("Retry-After", "5")
 		http.Error(w, fmt.Sprintf("Plugin '%s' is still loading, please retry", pluginName), http.StatusServiceUnavailable)
 		return
@@ -388,10 +384,6 @@ func (s *QNTXServer) handlePluginWebSocket(w http.ResponseWriter, r *http.Reques
 	pluginName := strings.TrimPrefix(r.URL.Path, "/ws/")
 
 	// Wait for plugin to be ready (polls briefly since plugins load async)
-	if s.pluginRegistry == nil {
-		http.Error(w, "Plugin registry not available", http.StatusServiceUnavailable)
-		return
-	}
 	if !s.pluginRegistry.IsReady(pluginName) {
 		// Give async loading a moment to finish
 		deadline := time.Now().Add(5 * time.Second)
@@ -458,7 +450,7 @@ func (rr *responseRecorder) flush(logger *zap.SugaredLogger) {
 		rr.ResponseWriter.WriteHeader(rr.statusCode)
 	}
 	if len(rr.body) > 0 {
-		if _, err := rr.ResponseWriter.Write(rr.body); err != nil && logger != nil {
+		if _, err := rr.ResponseWriter.Write(rr.body); err != nil {
 			logger.Warnw("Buffered plugin response not delivered",
 				"status", rr.statusCode, "bytes", len(rr.body), "error", err)
 		}

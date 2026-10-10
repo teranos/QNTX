@@ -24,6 +24,15 @@ const NO_TOAST = {
     message: 'toast() is BANNED. Use contextualized error display in component context',
 };
 
+// toast() was banned by name, and showToast() walked past it.
+const NO_SHOW_TOAST = {
+    patterns: [{
+        group: ['**/toast', '**/toast.ts'],
+        importNames: ['showToast'],
+        message: 'showToast() is toast() under another name, and BANNED. Use contextualized error display in component context',
+    }],
+};
+
 // The error axiom, as far as ESLint can carry it: a catch that does not bind
 // what it caught can only swallow it.
 const SACRED_CATCH = [
@@ -108,6 +117,7 @@ export default [
             'no-alert': 'error',
             'no-empty': 'error',
             'no-restricted-globals': ['error', ...BANNED_GLOBALS],
+            'no-restricted-imports': ['error', NO_SHOW_TOAST],
             'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE],
         },
     },

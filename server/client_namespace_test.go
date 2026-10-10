@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -108,7 +109,7 @@ func queued(client *Client) []any {
 // surely as a query does: a page told that something happened has learned it
 // happened, whatever the payload says.
 func TestAMessageAboutOneNamespaceReachesOnlyIt(t *testing.T) {
-	srv := &QNTXServer{logger: zap.NewNop().Sugar(), held: servingStub(stubStore{})}
+	srv := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar(), held: servingStub(stubStore{})}
 
 	here := &Client{server: srv, sendMsg: make(chan any, 4), id: "here", in: "default"}
 	elsewhere := &Client{server: srv, sendMsg: make(chan any, 4), id: "elsewhere", in: "pond"}
@@ -127,7 +128,7 @@ func TestAMessageAboutOneNamespaceReachesOnlyIt(t *testing.T) {
 // A message about the node — its daemon, its plugins, its spend — is the same
 // fact whichever universe the reader is in.
 func TestAMessageAboutTheNodeReachesEveryone(t *testing.T) {
-	srv := &QNTXServer{logger: zap.NewNop().Sugar(), held: servingStub(stubStore{})}
+	srv := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar(), held: servingStub(stubStore{})}
 
 	here := &Client{server: srv, sendMsg: make(chan any, 4), id: "here", in: "default"}
 	elsewhere := &Client{server: srv, sendMsg: make(chan any, 4), id: "elsewhere", in: "pond"}
@@ -143,7 +144,7 @@ func TestAMessageAboutTheNodeReachesEveryone(t *testing.T) {
 // A message that cannot say where it came from is not sent to everybody as a
 // consolation: broadcastIn refuses it and says so.
 func TestANamespaceMessageWithNoNamespaceIsNotSent(t *testing.T) {
-	srv := &QNTXServer{logger: zap.NewNop().Sugar(), held: servingStub(stubStore{})}
+	srv := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar(), held: servingStub(stubStore{})}
 	srv.broadcastReq = make(chan *broadcastRequest, 4)
 
 	srv.broadcastIn("", "who is this for")

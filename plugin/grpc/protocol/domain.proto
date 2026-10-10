@@ -325,14 +325,37 @@ message ElementDef {
   // CSSPath is an optional HTTP path to a stylesheet for this element type
   string css_path = 5;
 
-  // DefaultWidth and DefaultHeight in pixels (0 = use system default)
-  int32 default_width = 6;
-  int32 default_height = 7;
+  // DefaultWidth and DefaultHeight in pixels. "For 'use default', omit the
+  // field."
+  optional int32 default_width = 6;
+  optional int32 default_height = 7;
 
   // ModulePath is the HTTP path to a JS/TS module exporting a render function.
   // When set, the frontend dynamically imports it with SDK injection,
   // bypassing the server-rendered HTML pipeline.
   string module_path = 8;
+}
+
+// PluginElement is one element definition a running plugin makes, with where
+// its content, style and module are served.
+message PluginElement {
+  string plugin = 1;
+  string symbol = 2;
+  string title = 3;
+  string label = 4;
+  string content_url = 5;
+  string css_url = 6;
+  string module_url = 7;
+  // In pixels, when the plugin names one: "For 'use default', omit the
+  // field."
+  optional int32 default_width = 8;
+  optional int32 default_height = 9;
+}
+
+// PluginElements is what plugins elements answers.
+message PluginElements {
+  // One row per element definition.
+  repeated PluginElement elements = 1;
 }
 
 // PluginAction is what plugins pause, resume, restart, enable and disable

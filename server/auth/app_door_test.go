@@ -57,7 +57,7 @@ func TestAnAppOntoDefaultStandsInRPOrigins(t *testing.T) {
 		nil, "q.sbvh.nl", []string{"https://q.sbvh.nl", "qntx://door"},
 		8770, 8820, 24, testLogger(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		nil, nil, false, []string{mastodonAccount}, nil,
+		nil, &memUsers{}, false, []string{mastodonAccount}, nil,
 	)
 	require.NoError(t, err)
 

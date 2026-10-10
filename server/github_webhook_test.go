@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,7 +34,7 @@ func TestSignedIsTheDeliverysHMAC(t *testing.T) {
 }
 
 func TestTheWebhookIsNoneUntilROOTGeneratesItsSecret(t *testing.T) {
-	s := &QNTXServer{logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar()}
 	w := httptest.NewRecorder()
 	s.HandleGitHubWebhook(w, httptest.NewRequest(http.MethodPost, githubWebhookPath, strings.NewReader(`{}`)))
 	if w.Code != http.StatusNotFound {

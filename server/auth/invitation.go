@@ -286,8 +286,8 @@ func randomHex(n int) (string, error) {
 // invitationsCollection answers GET /auth/invitations, every invitation, and
 // POST, ROOT inviting someone.
 func (h *Handler) invitationsCollection(w http.ResponseWriter, r *http.Request, p Presented) {
-	if h.invitations == nil || h.users == nil {
-		h.writeError(w, http.StatusServiceUnavailable, "this node keeps no Users, so it invites nobody")
+	if h.invitations == nil {
+		h.writeError(w, http.StatusServiceUnavailable, "this node keeps no invitations")
 		return
 	}
 	switch r.Method {
@@ -529,7 +529,7 @@ func (h *Handler) cancelInvitation(w http.ResponseWriter, p Presented, id string
 // that provider: the User is made, USER and made by ROOT, and the invitation
 // is spent. False with no error admits nobody.
 func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (string, *SignedBinding, bool, error) {
-	if h.invitations == nil || h.users == nil || token == "" {
+	if h.invitations == nil || token == "" {
 		return "", nil, false, nil
 	}
 	inv, found, err := h.invitations.byToken(token)

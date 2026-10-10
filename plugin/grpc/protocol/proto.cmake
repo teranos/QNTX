@@ -40,3 +40,25 @@ function(generate_proto PROTO_FILE)
 
     set(GENERATED_SRCS ${GENERATED_SRCS} ${PROTO_SRC} ${GRPC_SRC} PARENT_SCOPE)
 endfunction()
+
+# A proto imported by its qualified name (domain.proto imports
+# "plugin/grpc/protocol/sigil.proto") is generated under that path, which is
+# where the importer's header includes it from. Messages only, no service.
+function(generate_qualified_proto PROTO_FILE)
+    get_filename_component(PROTO_NAME ${PROTO_FILE} NAME_WE)
+    get_filename_component(PROTO_ROOT "${PROTO_DIR}/../../.." ABSOLUTE)
+    set(QUALIFIED "plugin/grpc/protocol")
+    set(PROTO_SRC "${PROTO_GEN_DIR}/${QUALIFIED}/${PROTO_NAME}.pb.cc")
+    set(PROTO_HDR "${PROTO_GEN_DIR}/${QUALIFIED}/${PROTO_NAME}.pb.h")
+    add_custom_command(
+        OUTPUT ${PROTO_SRC} ${PROTO_HDR}
+        COMMAND protobuf::protoc
+            --proto_path=${PROTO_ROOT}
+            --cpp_out=${PROTO_GEN_DIR}
+            ${PROTO_ROOT}/${QUALIFIED}/${PROTO_FILE}
+        DEPENDS ${PROTO_DIR}/${PROTO_FILE}
+        COMMENT "Generating C++ protos for ${QUALIFIED}/${PROTO_FILE}"
+    )
+
+    set(GENERATED_SRCS ${GENERATED_SRCS} ${PROTO_SRC} PARENT_SCOPE)
+endfunction()

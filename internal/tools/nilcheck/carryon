@@ -1,11 +1,11 @@
 # errors and warnings logged and carried on from, per file. Debt: each number may fall and may not rise.
 # Instead: return the error, or say in a value why carrying on is the answer.
-# 445 in 124 files.
+# 437 in 123 files.
 # cmd/qntx/commands/database_sqlite.go: +1, a call into the store that held it past a second is said with its statement; nothing failed to carry on from.
 
 6	ats/storage/embedding_store.go
 4	ats/storage/new_store_rust.go
-4	ats/storage/rich_search.go
+2	ats/storage/rich_search.go
 1	ats/storage/sqlitecgo/writequeue_cgo.go
 1	ats/storage/subject_warn.go
 1	ats/storage/testutil/ax_helpers.go
@@ -16,7 +16,7 @@
 4	cmd/qntx/commands/database_sqlite.go
 12	cmd/qntx/main.go
 1	db/migrate.go
-5	element/handlers/canvas.go
+4	element/handlers/canvas.go
 2	internal/config/watcher.go
 6	internal/logger/logger.go
 1	internal/nodedid/handlers.go
@@ -52,9 +52,8 @@
 2	qntx-plugins/qntx-github/events.go
 2	qntx-plugins/qntx-github/plugin.go
 3	server/a2a_card.go
-2	server/a2a_route.go
+1	server/a2a_route.go
 1	server/agent_turn.go
-2	server/am_ground.go
 1	server/attestation_handlers.go
 1	server/auth/attest.go
 2	server/auth/auth.go
@@ -101,7 +100,7 @@
 4	server/operational_watchdog.go
 7	server/plugin_build.go
 4	server/plugin_config_handlers.go
-3	server/plugin_sigils.go
+2	server/plugin_sigils.go
 1	server/pprof.go
 2	server/prompt_handlers.go
 2	server/pulse_job_children.go
@@ -112,7 +111,7 @@
 4	server/response.go
 7	server/routing.go
 2	server/server.go
-2	server/signa.go
+1	server/signa.go
 1	server/staand.go
 2	server/standing_observer.go
 1	server/statusline_handlers.go

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/ed25519"
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -130,12 +131,13 @@ func runningTheRootAgent(t *testing.T, named appcfg.RootAgentConfig) (s *QNTXSer
 	system, _ := createTestStore(t)
 	held.SetSystem(oneNamespace("system", &handed{AttestationStore: system}))
 	s = &QNTXServer{
-		held:      held,
-		logger:    zaptest.NewLogger(t).Sugar(),
-		deps:      &serverDependencies{cfg: &appcfg.Config{Agent: appcfg.AgentConfig{Root: named}}},
-		rootAgent: agent,
-		ctx:       context.Background(),
-		ownURL:    "http://127.0.0.1:8770",
+		pluginRegistry: plugin.GetDefaultRegistry(),
+		held:           held,
+		logger:         zaptest.NewLogger(t).Sugar(),
+		deps:           &serverDependencies{cfg: &appcfg.Config{Agent: appcfg.AgentConfig{Root: named}}},
+		rootAgent:      agent,
+		ctx:            context.Background(),
+		ownURL:         "http://127.0.0.1:8770",
 	}
 	s.holdHarness("claude", &harnessHeld{fetched: fetched, path: binary})
 	return s, ran

@@ -192,8 +192,8 @@ impl DomainPluginService for PTYElementService {
             label: "pty".to_string(),
             content_path: String::new(),
             css_path: "/xterm.css".to_string(),
-            default_width: 800,
-            default_height: 600,
+            default_width: Some(800),
+            default_height: Some(600),
             module_path: "/pty-element-module.js".to_string(),
         }];
 

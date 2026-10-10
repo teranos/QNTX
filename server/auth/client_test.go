@@ -120,7 +120,7 @@ func TestOnlyAClientHasAReturnAddress(t *testing.T) {
 // an app holds must not be a bearer that reaches a route, whoever minted it.
 func TestAClientIsNotABearer(t *testing.T) {
 	store := newMemTokenStore()
-	h := &Handler{
+	h := &Handler{users: &memUsers{},
 		sessions: newSessionStore(1),
 		tokens:   store,
 		logger:   testLogger(),

@@ -356,7 +356,7 @@ func TestASessionCarriesTheUser(t *testing.T) {
 // A deployment that keeps no Users still issues sessions. They name a route and
 // nobody, which is what the row falls back to drawing.
 func TestASessionWithoutAUserStoreNamesNobody(t *testing.T) {
-	h := &Handler{sessions: newSessionStore(24), logger: zap.NewNop().Sugar()}
+	h := &Handler{users: &memUsers{}, sessions: newSessionStore(24), logger: zap.NewNop().Sugar()}
 
 	token, err := h.sessions.create(mastodonAccount, h.userFor(mastodonAccount))
 	require.NoError(t, err)
@@ -383,7 +383,7 @@ func TestRootIsCalledRootUntilItSaysOtherwise(t *testing.T) {
 // A backend with no User store records nothing. An admission that worked is not
 // undone by there being nowhere to write it down.
 func TestAdmissionSurvivesHavingNoUserStore(t *testing.T) {
-	h := &Handler{logger: zap.NewNop().Sugar()}
+	h := &Handler{users: &memUsers{}, logger: zap.NewNop().Sugar()}
 
 	assert.NotPanics(t, func() {
 		h.joinUser(mastodonAccount, mastodonBinding("@tim@mastodon.example"), "did:key:zBrowserOne")

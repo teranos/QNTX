@@ -119,9 +119,6 @@ func (h *Handler) HandleTheUser(w http.ResponseWriter, r *http.Request) {
 // registrations (ADR-032), so a route can reach more than one User and only the
 // id says which of them is asking.
 func (h *Handler) theUser(admitted Admission) (User, int, error) {
-	if h.users == nil {
-		return User{}, http.StatusServiceUnavailable, errors.New("this node keeps no Users, so there is nobody to answer with")
-	}
 	if admitted.UserID == "" {
 		return User{}, http.StatusNotFound, errors.Newf("the admission that let %q in names no User", admitted.Identity)
 	}
@@ -145,7 +142,7 @@ func (h *Handler) theUser(admitted Admission) (User, int, error) {
 // pictureOf is the picture of the User a session names. A lookup that fails is
 // a person drawn without one, never a status that does not answer.
 func (h *Handler) pictureOf(p Presented) string {
-	if h.users == nil || !p.SessionLive || p.UserID == "" {
+	if !p.SessionLive || p.UserID == "" {
 		return ""
 	}
 	u, _, err := h.theUser(Admission{Identity: p.Session, UserID: p.UserID})

@@ -45,9 +45,7 @@ func (s *QNTXServer) checkedSigna() []sigil.Signum {
 			err = signum.Check()
 		}
 		if err != nil {
-			if s.logger != nil {
-				s.logger.Errorw("a signum is not served", "signum", declared.GetName(), "error", err)
-			}
+			s.logger.Errorw("a signum is not served", "signum", declared.GetName(), "error", err)
 			continue
 		}
 		kept = append(kept, signum)
@@ -138,7 +136,7 @@ func overHTTP(path string, bound []heldBy, gate sigil.Gate, reaching func(string
 					w.Header()[name] = values
 				}
 				w.WriteHeader(asked.Rejected.Status)
-				if _, err := w.Write([]byte(asked.Rejected.Body)); err != nil && logger != nil {
+				if _, err := w.Write([]byte(asked.Rejected.Body)); err != nil {
 					logger.Errorw("could not write what the gate said", "route", path, "error", err)
 				}
 			case asked.Refusal != nil:

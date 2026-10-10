@@ -311,7 +311,7 @@ func startsOf(store namespaces.Reading, node string, w sentryread.Window) (int, 
 
 // "top 3 handler failures"
 func (s *QNTXServer) failedHandlers(w sentryread.Window) ([]async.HandlerFailures, string) {
-	if s.daemon == nil || s.daemon.GetQueue() == nil {
+	if s.daemon.GetQueue() == nil {
 		return nil, "this node runs no Pulse queue"
 	}
 	failed, err := s.daemon.GetQueue().FailedHandlersSince(w.Start, reportTop)

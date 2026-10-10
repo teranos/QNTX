@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"github.com/teranos/QNTX/plugin"
 	"os"
 	"path/filepath"
 	"slices"
@@ -213,7 +214,7 @@ func TestBuildOfRefusesAnIncompleteBuild(t *testing.T) {
 // A deploy stops the node, and a build it cut off is not a build that failed:
 // it is not kept as one, so the next start builds it.
 func TestABuildStoppedWithTheNodeIsNotAFailure(t *testing.T) {
-	s := &QNTXServer{logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar()}
 	running, stop := context.WithCancel(context.Background())
 	if s.stoppedWithTheNode(running) {
 		t.Fatal("a build in a running node reads as stopped with it")
@@ -227,7 +228,7 @@ func TestABuildStoppedWithTheNodeIsNotAFailure(t *testing.T) {
 // openrouter-qntx's build was terminated by a deploy's stop while its node
 // drained with its context not yet ended, and was kept as failed.
 func TestABuildCutOffWhileTheNodeDrainsIsNotAFailure(t *testing.T) {
-	s := &QNTXServer{logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar()}
 	s.setState(ServerStateDraining)
 	if !s.stoppedWithTheNode(context.Background()) {
 		t.Fatal("a build in a draining node does not read as stopped with it")

@@ -27,7 +27,7 @@ func setupHandlerWithWatcher(t *testing.T) (*CanvasHandler, *watcher.Engine, *st
 	}
 	t.Cleanup(engine.Stop)
 
-	handler := NewCanvasHandler(canvasStore, WithWatcherEngine(engine, logger))
+	handler := NewCanvasHandler(canvasStore, logger, WithWatcherEngine(engine))
 	watcherStore := storage.NewWatcherStore(db)
 	return handler, engine, watcherStore
 }

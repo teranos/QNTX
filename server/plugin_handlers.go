@@ -208,24 +208,11 @@ func (h *PluginHandler) routes() *protocol.PluginRoutes {
 
 // elements is the element definitions running plugins make: plugins_elements's
 // answer. A sigil gives an object, so the rows are under elements.
-func (h *PluginHandler) elements(ctx context.Context) map[string]any {
+func (h *PluginHandler) elements(ctx context.Context) *protocol.PluginElements {
+	answer := &protocol.PluginElements{Elements: []*protocol.PluginElement{}}
 	if h.registry == nil {
-		return map[string]any{"elements": []any{}}
+		return answer
 	}
-
-	type PluginElementDef struct {
-		Plugin        string `json:"plugin"`
-		Symbol        string `json:"symbol"`
-		Title         string `json:"title"`
-		Label         string `json:"label"`
-		ContentURL    string `json:"content_url"`
-		CSSURL        string `json:"css_url,omitempty"`
-		ModuleURL     string `json:"module_url,omitempty"`
-		DefaultWidth  int    `json:"default_width,omitempty"`
-		DefaultHeight int    `json:"default_height,omitempty"`
-	}
-
-	items := make([]PluginElementDef, 0)
 
 	// Iterate through all plugins and get their element definitions
 	for _, name := range h.registry.List() {
@@ -267,19 +254,19 @@ func (h *PluginHandler) elements(ctx context.Context) map[string]any {
 				moduleURL = fmt.Sprintf("/api/%s%s", name, def.ModulePath)
 			}
 
-			items = append(items, PluginElementDef{
+			answer.Elements = append(answer.Elements, &protocol.PluginElement{
 				Plugin:        name,
 				Symbol:        def.Symbol,
 				Title:         def.Title,
 				Label:         def.Label,
-				ContentURL:    contentURL,
-				CSSURL:        cssURL,
-				ModuleURL:     moduleURL,
-				DefaultWidth:  int(def.DefaultWidth),
-				DefaultHeight: int(def.DefaultHeight),
+				ContentUrl:    contentURL,
+				CssUrl:        cssURL,
+				ModuleUrl:     moduleURL,
+				DefaultWidth:  def.DefaultWidth,
+				DefaultHeight: def.DefaultHeight,
 			})
 		}
 	}
 
-	return map[string]any{"elements": items}
+	return answer
 }

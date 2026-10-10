@@ -53,6 +53,7 @@ if(NOT DEFINED PROTO_DIR)
 endif()
 set(GENERATED_SRCS "")
 include(${PROTO_DIR}/proto.cmake)
+generate_qualified_proto(sigil.proto)
 generate_proto(domain.proto)
 generate_proto(llm.proto)
 

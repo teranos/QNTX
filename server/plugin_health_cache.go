@@ -20,10 +20,6 @@ type cachedPluginHealth struct {
 // per request. /api/plugins used to fan out gRPC calls on every render, so the
 // cost was plugins × requests and a status line could starve a plugin restart.
 func (s *QNTXServer) startPluginHealthRefresher() {
-	if s.pluginRegistry == nil {
-		return
-	}
-
 	s.wg.Go("plugins.healthRefresher", func() {
 		s.refreshPluginHealth()
 

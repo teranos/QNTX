@@ -81,7 +81,7 @@ func (s *QNTXServer) setupWeeklyReport(cfg *appcfg.Config) {
 			s.nodeMailer = mail
 		}
 	}
-	if s.daemon == nil || s.held == nil {
+	if s.held == nil {
 		return
 	}
 	s.daemon.Registry().Register(&reportHandler{server: s})

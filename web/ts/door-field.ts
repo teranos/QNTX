@@ -176,8 +176,12 @@ export function startField(canvas: HTMLCanvasElement): Field {
 
     const halfFloat = regl.hasExtension('oes_texture_half_float')
         && regl.hasExtension('ext_color_buffer_half_float');
+    // The field is gathered by blending, so a target it cannot blend into is
+    // no target. An iPhone renders to 32-bit float and cannot blend into it:
+    // without this the gather draws nothing and the door is black.
     const fullFloat = regl.hasExtension('oes_texture_float')
-        && regl.hasExtension('webgl_color_buffer_float');
+        && regl.hasExtension('webgl_color_buffer_float')
+        && regl.hasExtension('ext_float_blend');
 
     log.info(SEG.UI, '[Door] field', {
         css: `${canvas.clientWidth}x${canvas.clientHeight}`,

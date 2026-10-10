@@ -26,7 +26,7 @@ func appKey(t *testing.T) (*rsa.PrivateKey, string) {
 // backdated a minute for clock drift and expiring within GitHub's ten.
 func TestGitHubAppTokenIsTheAppsJWT(t *testing.T) {
 	key, pemmed := appKey(t)
-	h := &Handler{}
+	h := &Handler{users: &memUsers{}}
 	h.SetGitHubApp("Iv23li-the-app", pemmed)
 
 	signed, err := h.GitHubAppToken()
@@ -48,7 +48,7 @@ func TestGitHubAppTokenIsTheAppsJWT(t *testing.T) {
 }
 
 func TestGitHubAppTokenWithoutTheKeyIsRefused(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{users: &memUsers{}}
 	h.SetGitHubApp("Iv23li-the-app", "")
 	if _, err := h.GitHubAppToken(); err == nil || !strings.Contains(err.Error(), "private_key") {
 		t.Fatalf("GitHubAppToken = %v, want a refusal naming private_key", err)
@@ -56,7 +56,7 @@ func TestGitHubAppTokenWithoutTheKeyIsRefused(t *testing.T) {
 }
 
 func TestGitHubAppTokenOfAKeyThatIsNotRSAIsRefused(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{users: &memUsers{}}
 	h.SetGitHubApp("Iv23li-the-app", "not a key")
 	if _, err := h.GitHubAppToken(); err == nil || !strings.Contains(err.Error(), "Iv23li-the-app") {
 		t.Fatalf("GitHubAppToken = %v, want a refusal naming the App", err)

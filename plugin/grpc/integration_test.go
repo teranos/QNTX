@@ -790,21 +790,9 @@ func TestPortAutoIncrement_FullIntegration(t *testing.T) {
 
 	logger := zaptest.NewLogger(t).Sugar()
 
-	// Find a free port
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	occupiedAddr := listener.Addr().String()
-	host, portStr, err := net.SplitHostPort(occupiedAddr)
-	require.NoError(t, err)
-
-	// Close listener but immediately reopen to occupy the port
-	// (small race condition window, but acceptable for testing)
-	listener.Close()
-	listener, err = net.Listen("tcp", occupiedAddr)
-	require.NoError(t, err)
-	defer listener.Close()
-
-	basePort := mustParsePort(t, portStr)
+	host := "127.0.0.1"
+	basePort := heldRun(t, 1)
+	occupiedAddr := net.JoinHostPort(host, fmt.Sprintf("%d", basePort))
 	expectedPort := basePort + 1
 
 	t.Logf("Occupying port %d, plugin should auto-increment to %d", basePort, expectedPort)
@@ -876,24 +864,9 @@ func TestPortAutoIncrement_MultipleConflicts(t *testing.T) {
 
 	logger := zaptest.NewLogger(t).Sugar()
 
-	// Find a free port
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	baseAddr := listener.Addr().String()
-	host, portStr, err := net.SplitHostPort(baseAddr)
-	require.NoError(t, err)
-	basePort := mustParsePort(t, portStr)
-	listener.Close()
-
-	// Occupy the next 3 ports
-	var occupiedListeners []net.Listener
-	for i := 0; i < 3; i++ {
-		addr := net.JoinHostPort(host, fmt.Sprintf("%d", basePort+i))
-		l, err := net.Listen("tcp", addr)
-		require.NoError(t, err, "Failed to occupy port %d", basePort+i)
-		occupiedListeners = append(occupiedListeners, l)
-		defer l.Close()
-	}
+	host := "127.0.0.1"
+	basePort := heldRun(t, 3)
+	baseAddr := net.JoinHostPort(host, fmt.Sprintf("%d", basePort))
 
 	t.Logf("Occupied ports %d-%d, plugin should bind to %d", basePort, basePort+2, basePort+3)
 
@@ -946,29 +919,12 @@ func TestPortAutoIncrement_MaxAttempts(t *testing.T) {
 	// This test is expensive (64 port allocations), so we only verify the limit exists
 	// by checking that the server eventually gives up
 
-	// Find a free port
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	baseAddr := listener.Addr().String()
-	host, portStr, err := net.SplitHostPort(baseAddr)
-	require.NoError(t, err)
-	basePort := mustParsePort(t, portStr)
-	listener.Close()
-
-	// Occupy a large range (let's do 10 to keep test fast, full test would be 64)
-	var occupiedListeners []net.Listener
-	for i := 0; i < 10; i++ {
-		addr := net.JoinHostPort(host, fmt.Sprintf("%d", basePort+i))
-		l, err := net.Listen("tcp", addr)
-		if err != nil {
-			// Some ports might fail due to OS restrictions, skip them
-			continue
-		}
-		occupiedListeners = append(occupiedListeners, l)
-		defer l.Close()
-	}
-
-	t.Logf("Occupied %d ports starting from %d", len(occupiedListeners), basePort)
+	// 10 keeps the test fast; the limit is 64.
+	const occupied = 10
+	host := "127.0.0.1"
+	basePort := heldRun(t, occupied)
+	baseAddr := net.JoinHostPort(host, fmt.Sprintf("%d", basePort))
+	t.Logf("Occupied %d ports starting from %d", occupied, basePort)
 
 	// Plugin should find the first available port after our occupied range
 	plugin := newMockPluginWithName("max-attempts-test")
@@ -986,7 +942,7 @@ func TestPortAutoIncrement_MaxAttempts(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Server should have found a port after our occupied range
-	expectedPort := basePort + len(occupiedListeners)
+	expectedPort := basePort + occupied
 	expectedAddr := net.JoinHostPort(host, fmt.Sprintf("%d", expectedPort))
 
 	connCtx, connCancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -998,7 +954,7 @@ func TestPortAutoIncrement_MaxAttempts(t *testing.T) {
 	require.NoError(t, err, "Server should have found port %d", expectedPort)
 	defer conn.Close()
 
-	t.Logf("✓ Server successfully navigated %d occupied ports and bound to %d", len(occupiedListeners), expectedPort)
+	t.Logf("✓ Server successfully navigated %d occupied ports and bound to %d", occupied, expectedPort)
 
 	cancel()
 }
@@ -1046,8 +1002,8 @@ func TestUIPlugin_RegisterElements(t *testing.T) {
 	assert.Equal(t, "book-auction", item.Label)
 	assert.Equal(t, "/auction", item.ContentPath)
 	assert.Equal(t, "/auction.css", item.CssPath)
-	assert.Equal(t, int32(600), item.DefaultWidth)
-	assert.Equal(t, int32(400), item.DefaultHeight)
+	assert.Equal(t, int32(600), item.GetDefaultWidth())
+	assert.Equal(t, int32(400), item.GetDefaultHeight())
 
 	t.Log("✓ RegisterElements RPC returned correct element definition")
 }
@@ -1093,4 +1049,40 @@ func TestUIPlugin_AuctionElementContent(t *testing.T) {
 	assert.Contains(t, css, ".auction-actions")
 
 	t.Log("✓ Auction element CSS renders correctly")
+}
+
+// heldRun holds n consecutive ports on 127.0.0.1 until the test ends, with the
+// port after them free, and returns the first. A run another process sits in
+// is tried again from a new base, never counted as if the test held it.
+func heldRun(t *testing.T, n int) int {
+	t.Helper()
+	for range 50 {
+		probe, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		base := probe.Addr().(*net.TCPAddr).Port
+		require.NoError(t, probe.Close())
+
+		var held []net.Listener
+		for i := range n + 1 {
+			l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", base+i))
+			if err != nil {
+				break
+			}
+			held = append(held, l)
+		}
+		if len(held) == n+1 {
+			require.NoError(t, held[n].Close())
+			t.Cleanup(func() {
+				for _, l := range held[:n] {
+					require.NoError(t, l.Close())
+				}
+			})
+			return base
+		}
+		for _, l := range held {
+			require.NoError(t, l.Close())
+		}
+	}
+	t.Fatalf("no run of %d free ports in 50 tries", n+1)
+	return 0
 }

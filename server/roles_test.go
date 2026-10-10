@@ -9,7 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/nodedid"
+	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
 )
@@ -19,6 +22,16 @@ const (
 	gardenerRoute = "google:110169484474386276334"
 )
 
+// testUsers is the users table of a migrated test db, holding nobody yet: the
+// User store every node with login keeps (ADR-037).
+func testUsers(t *testing.T) auth.UserStore {
+	t.Helper()
+	_, db := createTestStore(t)
+	users, _, err := auth.OpenUserTable(db, nil)
+	require.NoError(t, err)
+	return users
+}
+
 // A node that knows one ROOT account, so a grant has somebody who may write it.
 func rootKnowingServer(t *testing.T) *QNTXServer {
 	t.Helper()
@@ -27,11 +40,14 @@ func rootKnowingServer(t *testing.T) *QNTXServer {
 
 	h, err := auth.New(nil, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		nil, nil, false, []string{rootAccount}, nil)
+		nil, testUsers(t), false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 
-	s := &QNTXServer{nodeDB: db, authHandler: h, logger: zap.NewNop().Sugar(),
-		nodeDID: &nodedid.Handler{DID: "did:key:z6Mkgardennode"}}
+	// Pulse runs because the node runs: the daemon is there, never started.
+	daemon := async.NewWorkerPool(db, &appcfg.Config{}, async.DefaultWorkerPoolConfig(), zap.NewNop().Sugar())
+	s := &QNTXServer{nodeDB: db, authHandler: h, logger: zap.NewNop().Sugar(), daemon: daemon,
+		pluginRegistry: plugin.GetDefaultRegistry(),
+		nodeDID:        &nodedid.Handler{DID: "did:key:z6Mkgardennode"}}
 	s.held = servingOne(db, store)
 	s.held.SetSystem(oneNamespace("system", system))
 	return s

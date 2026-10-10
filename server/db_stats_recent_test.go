@@ -84,13 +84,13 @@ func TestDimensionsOf_ReadsTheNamespacesOwnFile(t *testing.T) {
 	}))
 
 	landing := Landing{Namespace: "Clean", Path: "namespaces/clean.db", DB: db}
-	require.NoError(t, (&QNTXServer{}).dimensionsOf(&landing))
+	require.NoError(t, bareNode().dimensionsOf(&landing))
 	assert.Equal(t, 1, landing.Subjects)
 	assert.Equal(t, map[string]int64{"2026-09-20T08": 1}, landing.Over)
 	require.Len(t, landing.TopPredicates, 1)
 	assert.Equal(t, "page_view", landing.TopPredicates[0].Name)
 
-	err := (&QNTXServer{}).dimensionsOf(&Landing{Namespace: "Clean", Path: "namespaces/clean.db"})
+	err := bareNode().dimensionsOf(&Landing{Namespace: "Clean", Path: "namespaces/clean.db"})
 	assert.ErrorContains(t, err, "namespaces/clean.db")
 }
 

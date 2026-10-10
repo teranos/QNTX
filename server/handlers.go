@@ -110,10 +110,6 @@ func (s *QNTXServer) sendInitialJobsToClient(client *Client) {
 		return
 	}
 
-	if s.daemon == nil {
-		return
-	}
-
 	jobs, err := s.loadJobHistoryForClient(client)
 	if err != nil {
 		s.logger.Errorw("Failed to load job history", "client_id", client.id, "error", err)
@@ -141,10 +137,6 @@ func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 	select {
 	case <-time.After(50 * time.Millisecond):
 	case <-s.ctx.Done():
-		return
-	}
-
-	if s.daemon == nil {
 		return
 	}
 
@@ -400,10 +392,6 @@ func asyncJobStatusPtr(status async.JobStatus) *async.JobStatus {
 // pluginAction is the answer of the plugins signum's pause, resume, restart,
 // enable and disable sigils.
 func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*protocol.PluginAction, *protocol.Refusal) {
-	if s.pluginRegistry == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin registry not available"}
-	}
-
 	var err error
 
 	switch action {

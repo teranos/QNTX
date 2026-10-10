@@ -66,9 +66,7 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 	enabled := &protocol.Param{Name: "enabled", Required: true, Says: "true or false."}
 	var follows []*protocol.Follows
 	if f, err := githubFollowGitHub(); err != nil {
-		if s.logger != nil {
-			s.logger.Errorw("GitHubService's messages were not read against GitHub's description, so parity cannot hold github", "error", err)
-		}
+		s.logger.Errorw("GitHubService's messages were not read against GitHub's description, so parity cannot hold github", "error", err)
 	} else {
 		follows = append(follows, f)
 	}
@@ -372,7 +370,7 @@ func (s *QNTXServer) buildLanded(name string) {
 		return
 	}
 	pm := s.getPluginManager()
-	if pm == nil || s.pluginRegistry == nil {
+	if pm == nil {
 		s.logger.Errorw("A build landed and there is no plugin manager to run it", "plugin", name)
 		return
 	}

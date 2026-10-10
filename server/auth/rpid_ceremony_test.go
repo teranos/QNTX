@@ -53,7 +53,7 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 		testLogger(),
 		passthroughCors,
 		nil,                       // token store not exercised by RPID ceremony tests
-		nil,                       // User store - admission is not reached by these tests
+		&memUsers{},               // User store - admission is not reached by these tests
 		false,                     // secureCookies — cookie flag not exercised here
 		[]string{mastodonAccount}, // rootIdentities — enrolment is admitted or it does not happen
 		nil,                       // bindingSigners

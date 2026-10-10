@@ -73,7 +73,7 @@ func runningNamespaceAgents(t *testing.T) (s *QNTXServer, ran string, in gardens
 	require.NoError(t, err)
 	s.authHandler, err = auth.New(db, "localhost", nil, 8770, 8820, 24, zaptest.NewLogger(t).Sugar(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		tokens, nil, false, []string{"https://example.org/root"}, nil)
+		tokens, testUsers(t), false, []string{"https://example.org/root"}, nil)
 	require.NoError(t, err)
 	in = gardens{store: map[string]*handed{}, owner: map[string]string{"garden": gardener}, tokens: tokens}
 	for _, name := range []string{"garden", "orchard"} {

@@ -16,7 +16,7 @@ import (
 // The gate of the parity sigil: it gives of staands what make parity prisma
 // gave, as recorded beside the pinned Umami schema before the command went.
 func TestParityHoldsStaandsAsRecorded(t *testing.T) {
-	s := &QNTXServer{}
+	s := bareNode()
 	signum := s.paritySignum()
 	answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": "staands"})
 	if refused != nil {
@@ -40,7 +40,7 @@ func TestParityHoldsStaandsAsRecorded(t *testing.T) {
 // follows is read from its messages, and gives what is recorded beside the
 // pinned description. A model at 100 is not recorded.
 func TestParityHoldsGitHubAsRecorded(t *testing.T) {
-	s := &QNTXServer{}
+	s := bareNode()
 	signum := s.paritySignum()
 	answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": "github"})
 	if refused != nil {
@@ -70,7 +70,7 @@ func TestParityHoldsGitHubAsRecorded(t *testing.T) {
 
 // What hold is asked that the node cannot answer is refused by the param.
 func TestParityHoldRefuses(t *testing.T) {
-	hold := (&QNTXServer{}).paritySignum().Answers["hold"]
+	hold := bareNode().paritySignum().Answers["hold"]
 	for name, c := range map[string]struct {
 		sent  sigil.Sent
 		param string
@@ -91,7 +91,7 @@ func TestParityHoldRefuses(t *testing.T) {
 
 // storage gives what make parity wrote, and says it is of the source.
 func TestParityStorageIsWhatMakeParityWrote(t *testing.T) {
-	signum := (&QNTXServer{}).paritySignum()
+	signum := bareNode().paritySignum()
 	answer, refused := signum.Answers["storage"](context.Background(), nil)
 	if refused != nil {
 		t.Fatalf("storage refused: %s", refused.GetSays())
@@ -114,7 +114,7 @@ func TestParityStorageIsWhatMakeParityWrote(t *testing.T) {
 // The gate of a2a: any signum held to AgentSkill by its shape. id, name,
 // description and tags follow, and nothing the spec requires is left.
 func TestParityHoldsEverySignumToA2A(t *testing.T) {
-	signum := (&QNTXServer{}).paritySignum()
+	signum := bareNode().paritySignum()
 	for _, name := range []string{"staands", "parity"} {
 		answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": name, "reference": "a2a"})
 		if refused != nil {
@@ -153,7 +153,7 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 // takes and outputSchema gives, each one object with a property per element by
 // its name, and both conform.
 func TestParityHoldsEverySigilToMCP(t *testing.T) {
-	signum := (&QNTXServer{}).paritySignum()
+	signum := bareNode().paritySignum()
 	for _, name := range []string{"staands", "parity"} {
 		answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": name, "reference": "mcp"})
 		if refused != nil {
@@ -209,7 +209,7 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 // name, description, version and skills follow; what an A2A binding would
 // fill does not, and is said to be required.
 func TestParityHoldsTheNodeToAgentCard(t *testing.T) {
-	signum := (&QNTXServer{}).paritySignum()
+	signum := bareNode().paritySignum()
 	answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": "am"})
 	if refused != nil {
 		t.Fatalf("hold refused am: %s", refused.GetSays())
@@ -238,7 +238,7 @@ func TestParityHoldsTheNodeToAgentCard(t *testing.T) {
 // follows is what the parity window offers to hold: every signum, what it
 // declares it follows, and what every signum follows by its shape.
 func TestParityFollowsIsEverySignumAndItsReferences(t *testing.T) {
-	signum := (&QNTXServer{}).paritySignum()
+	signum := bareNode().paritySignum()
 	answer, refused := signum.Answers["follows"](context.Background(), nil)
 	if refused != nil {
 		t.Fatalf("follows refused: %s", refused.GetSays())

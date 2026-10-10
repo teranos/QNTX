@@ -55,14 +55,12 @@ func (s *QNTXServer) startBackgroundServices() {
 	// Pulse runs because the node runs. It is not separate enough from the node
 	// to be worth turning on and off, so there is no state to consult here and
 	// nothing that can leave a node up with its scheduled work silently dead.
-	if s.daemon != nil {
-		s.daemon.Start()
-		if s.ticker != nil {
-			s.ticker.Start()
-			s.logger.Debugw("Pulse ticker started")
-		}
-		s.logger.Debugw("Daemon started", "workers", s.daemon.Workers())
+	s.daemon.Start()
+	if s.ticker != nil {
+		s.ticker.Start()
+		s.logger.Debugw("Pulse ticker started")
 	}
+	s.logger.Debugw("Daemon started", "workers", s.daemon.Workers())
 
 	// Start auth session sweep (if auth is enabled)
 	if s.authHandler != nil {
@@ -75,15 +73,8 @@ func (s *QNTXServer) startBackgroundServices() {
 	})
 
 	// Broadcast worker is started in Run() method
-	// Start job update broadcaster (if daemon is available)
-	if s.daemon != nil {
-		s.startJobUpdateBroadcaster()
-	}
-
-	// Start daemon status broadcaster (if daemon is available)
-	if s.daemon != nil {
-		s.startDaemonStatusBroadcaster()
-	}
+	s.startJobUpdateBroadcaster()
+	s.startDaemonStatusBroadcaster()
 
 	// Start Pulse execution completion poller (if ticker is available)
 	if s.ticker != nil {
@@ -223,9 +214,7 @@ func (s *QNTXServer) Stop() error {
 	}
 
 	// Stop daemon FIRST before stopping server goroutines
-	if s.daemon != nil {
-		s.daemon.Stop()
-	}
+	s.daemon.Stop()
 
 	// Stop every namespace's watcher engine — drain loops stop, in-flight entries re-queued for next startup
 	for _, engine := range s.allEngines() {
@@ -252,10 +241,8 @@ func (s *QNTXServer) Stop() error {
 	}
 
 	// Shutdown plugins and gRPC services
-	if s.pluginRegistry != nil {
-		if err := s.pluginRegistry.ShutdownAll(s.ctx); err != nil {
-			s.logger.Errorw("Plugins did not all shut down cleanly; processes or locks may survive", "error", err)
-		}
+	if err := s.pluginRegistry.ShutdownAll(s.ctx); err != nil {
+		s.logger.Errorw("Plugins did not all shut down cleanly; processes or locks may survive", "error", err)
 	}
 	if s.servicesManager != nil {
 		s.servicesManager.Shutdown()
@@ -357,10 +344,7 @@ func (s *QNTXServer) emitLifecycleNews(event string, port int) {
 
 	// Collect plugin names — at startup these are enabled (not yet initialized),
 	// at shutdown these are the plugins that were registered during the session.
-	var plugins []string
-	if s.pluginRegistry != nil {
-		plugins = s.pluginRegistry.List()
-	}
+	plugins := s.pluginRegistry.List()
 
 	ts := time.Now().Format("15:04:05")
 	detail := fmt.Sprintf("QNTX %s (%s) %s at %s", v.Version, v.Short(), event, ts)

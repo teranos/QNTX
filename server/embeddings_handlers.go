@@ -25,16 +25,12 @@ func (s *QNTXServer) SetupEmbeddingService() {
 func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServiceClient) {
 	svc := serverembeddings.NewPluginEmbeddingServiceFromClient(client, s.logger.Named("plugin-embeddings"))
 
-	// The vectors of the namespace this serves.
-	embStore := s.held.ServedUniverse().Embeddings()
-
+	embStore := s.embeddingStore
 	s.embeddingService = svc
-	s.embeddingStore = embStore
 
 	// Update the handler to use the plugin backend
 	if s.embeddingsHandler != nil {
 		s.embeddingsHandler.Service = svc
-		s.embeddingsHandler.Store = embStore
 		s.embeddingsHandler.ClusterFunc = svc.ClusterHDBSCAN
 	}
 
@@ -66,9 +62,6 @@ func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServic
 // callReducePlugin sends an HTTP request to the reduce plugin via gRPC.
 // Returns the response body or an error.
 func (s *QNTXServer) callReducePlugin(ctx context.Context, method, path string, body []byte) ([]byte, error) {
-	if s.pluginRegistry == nil {
-		return nil, errors.New("plugin registry not available")
-	}
 	p, ok := s.pluginRegistry.Get("reduce")
 	if !ok {
 		return nil, errors.New("reduce plugin not registered")
@@ -97,9 +90,6 @@ func (s *QNTXServer) callReducePlugin(ctx context.Context, method, path string, 
 // for each configured method that supports transform (skips t-SNE).
 // Silently returns if the plugin is not available or not fitted.
 func (s *QNTXServer) projectToCanvas(embeddingID string, embedding []float32) {
-	if s.pluginRegistry == nil {
-		return
-	}
 	if _, ok := s.pluginRegistry.Get("reduce"); !ok {
 		return
 	}

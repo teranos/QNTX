@@ -16,40 +16,30 @@ import (
 	"github.com/teranos/errors"
 )
 
-// PulseCmd represents the pulse command - Pulse daemon for async job processing
+// PulseCmd is Pulse, the job queue and scheduler, run outside a node
 var PulseCmd = &cobra.Command{
 	Use:   "pulse",
-	Short: "Manage Pulse daemon (async job processor + scheduler)",
-	Long: `Pulse daemon - continuous compute infrastructure.
+	Short: "Run Pulse, the job queue and scheduler, outside a node",
+	Long: `Pulse is QNTX's job queue and scheduler. A node runs it inside qntx server,
+where plugins register the handlers its jobs run on.
 
-The Pulse daemon provides:
-- Async job queue processing with worker pool
-- Scheduled job execution (recurring operations)
-- GRACE shutdown (completes current jobs before exit)
-
-Pulse is the foundation for:
-- Background processing of long-running tasks
-- Rate-limited operations (API calls, external requests)
-- Recurring workflows (scheduled ingestion, cleanup)
+qntx pulse start runs a queue and scheduler on the database by themselves, with
+no handlers registered.
 
 Example:
-  qntx pulse start              # Start daemon in foreground
-  qntx pulse start --workers 3  # Start with 3 concurrent workers`,
+  qntx pulse start              # Run in the foreground
+  qntx pulse start --workers 3  # With 3 concurrent workers`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	},
 }
 
-// PulseStartCmd starts the Pulse daemon
+// PulseStartCmd runs a Pulse queue and scheduler alone, with no handlers
 var PulseStartCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start the Pulse daemon",
-	Long: `Start the Pulse daemon in foreground mode.
-
-The daemon will:
-- Start worker pool for async job processing
-- Start scheduler ticker for recurring jobs
-- Run until interrupted (Ctrl+C) with GRACE shutdown`,
+	Short: "Run Pulse's queue and scheduler in the foreground",
+	Long: `Run Pulse's worker pool and scheduler ticker in the foreground, with no
+handlers registered, until interrupted (Ctrl+C) with GRACE shutdown.`,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		// GetInt fails only for a flag that does not exist — a broken registration.
 		workers, err := cmd.Flags().GetInt("workers")
@@ -57,7 +47,7 @@ The daemon will:
 			return errors.Wrap(err, "the workers flag is not registered as an int")
 		}
 
-		fmt.Printf("Starting Pulse daemon with %d worker(s)...\n", workers)
+		fmt.Printf("Starting Pulse outside a node, with %d worker(s) and no handlers...\n", workers)
 
 		// Load configuration
 		cfg, err := config.Load()
@@ -94,7 +84,7 @@ The daemon will:
 		ticker := schedule.NewTickerWithContext(ctx, scheduleStore, pool.GetQueue(), pool, nil, tickerCfg, logger.Logger)
 		ticker.Start()
 
-		fmt.Printf("Pulse daemon started\n")
+		fmt.Printf("Pulse started\n")
 		fmt.Printf("  Workers: %d\n", workers)
 		fmt.Printf("  Poll interval: %v\n", poolCfg.PollInterval)
 		fmt.Printf("  Scheduler interval: %v\n", tickerCfg.Interval)
@@ -113,7 +103,7 @@ The daemon will:
 
 		cancel() // Clean up parent context
 
-		fmt.Printf("Pulse daemon stopped\n")
+		fmt.Printf("Pulse stopped\n")
 		return nil
 	},
 }

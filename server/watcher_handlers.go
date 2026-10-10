@@ -302,22 +302,18 @@ func (s *QNTXServer) initWatcherEngine() error {
 	// What a builtin_execute action reaches: the daemon's registry, and the
 	// same failure log a scheduled handler reports to. Held on the server as
 	// well, because the standing observer of every namespace reaches it too.
-	if s.daemon != nil {
-		s.builtin = &builtinExecutor{
-			registry:    s.daemon.Registry(),
-			noteFailure: s.noteHandlerFailure,
-		}
-		s.watcherEngine.SetBuiltinExecutor(s.builtin)
+	s.builtin = &builtinExecutor{
+		registry:    s.daemon.Registry(),
+		noteFailure: s.noteHandlerFailure,
 	}
+	s.watcherEngine.SetBuiltinExecutor(s.builtin)
 
 	// Wire embedding service for semantic matching (optional — nil when embeddings unavailable)
 	// Note: embeddingService may be nil here if SetupEmbeddingService() hasn't run yet.
 	// In that case, init.go reconnects after embedding init.
 	if s.embeddingService != nil {
 		s.watcherEngine.SetEmbeddingService(&watcherEmbeddingAdapter{svc: s.embeddingService})
-		if s.embeddingStore != nil {
-			s.watcherEngine.SetEmbeddingSearcher(&watcherSearchAdapter{store: s.embeddingStore})
-		}
+		s.watcherEngine.SetEmbeddingSearcher(&watcherSearchAdapter{store: s.embeddingStore})
 	}
 
 	// The engine holds the watchers of one universe — Held.Served(), the

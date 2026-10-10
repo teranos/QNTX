@@ -47,7 +47,7 @@ func pluginServingServer(t *testing.T, name string) (*QNTXServer, map[auth.Level
 	tokens := &heldTokens{grants: map[string]auth.Grant{}}
 	h, err := auth.New(nil, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		tokens, nil, false, []string{rootAccount}, nil)
+		tokens, testUsers(t), false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 
 	registry := plugin.NewRegistry("test-version", logger)
