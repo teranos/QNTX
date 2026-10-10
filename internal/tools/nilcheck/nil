@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3355 in 435 files.
+# 3339 in 435 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -11,6 +11,7 @@
 # From 3400: auth.New refuses a handler with no User store, and the 23 tests for one that keeps no Users are gone; the header had drifted to 3406 by hand.
 # From 3378: rich search logs, rather than asking first whether it has a logger.
 # From 3368: the server logs, rather than asking first whether it has a logger.
+# From 3355: Pulse runs because the node runs, and nothing asks whether the daemon is there.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -312,7 +313,7 @@
 20	server/broadcast.go
 4	server/builtin_executor.go
 2	server/checkpoint_pulse.go
-29	server/ci_pulse.go
+28	server/ci_pulse.go
 11	server/claude.go
 3	server/claude_git.go
 4	server/claude_login.go
@@ -346,12 +347,12 @@
 1	server/github_parity.go
 4	server/github_webhook.go
 2	server/ground_bridge.go
-14	server/handlers.go
+12	server/handlers.go
 4	server/host_gauges.go
 3	server/i_sigils.go
 13	server/init.go
 5	server/invitations.go
-28	server/lifecycle.go
+24	server/lifecycle.go
 8	server/mail.go
 14	server/mcp.go
 11	server/namespace_handlers.go
@@ -387,7 +388,7 @@
 1	server/pprof.go
 27	server/prompt_handlers.go
 2	server/prose_handlers.go
-7	server/pulse_async_jobs.go
+5	server/pulse_async_jobs.go
 6	server/pulse_execution_handlers.go
 5	server/pulse_execution_poller.go
 5	server/pulse_job_children.go
@@ -397,14 +398,14 @@
 1	server/pulse_types.go
 2	server/python_handlers.go
 4	server/quote_provenance.go
-7	server/quote_removal.go
-12	server/quote_watch.go
+6	server/quote_removal.go
+11	server/quote_watch.go
 2	server/ratelimit.go
 6	server/reach/open.go
 9	server/reach/table.go
 8	server/reach_sigils.go
-11	server/report.go
-9	server/report_pulse.go
+10	server/report.go
+8	server/report_pulse.go
 16	server/report_render.go
 2	server/response.go
 2	server/roles.go
@@ -423,7 +424,7 @@
 16	server/statusline_handler_failures.go
 30	server/statusline_handlers.go
 12	server/statusline_news.go
-16	server/statusline_node.go
+14	server/statusline_node.go
 1	server/statusline_plugin_frames.go
 7	server/statusline_plugin_row.go
 5	server/statusline_watchers.go
@@ -445,5 +446,5 @@
 2	server/vault_fill.go
 10	server/vault_send.go
 35	server/watcher_handler.go
-15	server/watcher_handlers.go
+14	server/watcher_handlers.go
 5	server/watcher_reload.go

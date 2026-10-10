@@ -99,7 +99,7 @@ func (s *QNTXServer) Schedules() int {
 // Handlers is what the pulse registry holds: the built-in job handlers plus one
 // proxy per handler a plugin declared.
 func (s *QNTXServer) Handlers() int {
-	if s == nil || s.daemon == nil {
+	if s == nil {
 		return 0
 	}
 
@@ -113,7 +113,7 @@ func (s *QNTXServer) Handlers() int {
 // HandlerNames is the same registry by name. A plugin's handlers carry its name
 // as their namespace, which is what lets a slot pick out its own.
 func (s *QNTXServer) HandlerNames() []string {
-	if s == nil || s.daemon == nil {
+	if s == nil {
 		return nil
 	}
 

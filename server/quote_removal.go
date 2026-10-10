@@ -112,9 +112,6 @@ func (h *quoteRemovalHandler) leave(as types.As, namespace, commit string, remov
 // setupQuoteRemoval registers the built-in. No schedule: the standing row
 // reaches it when a commit's removals arrive.
 func (s *QNTXServer) setupQuoteRemoval() {
-	if s.daemon == nil {
-		return
-	}
 	s.daemon.Registry().Register(&quoteRemovalHandler{
 		prompts:  s.namespacePrompts,
 		news:     s.news,

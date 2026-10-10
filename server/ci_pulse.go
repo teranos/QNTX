@@ -740,9 +740,6 @@ func (s *QNTXServer) rearmFailed(namespace string, err error) {
 // reaches it on arrival. The pushes of the last hours are waited on again,
 // because whatever was waiting on them before this process is gone.
 func (s *QNTXServer) setupCIWatch() {
-	if s.daemon == nil {
-		return
-	}
 	h := &ciWatchHandler{
 		get:      githubGet,
 		token:    githubToken,

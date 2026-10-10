@@ -110,10 +110,6 @@ func (s *QNTXServer) sendInitialJobsToClient(client *Client) {
 		return
 	}
 
-	if s.daemon == nil {
-		return
-	}
-
 	jobs, err := s.loadJobHistoryForClient(client)
 	if err != nil {
 		s.logger.Errorw("Failed to load job history", "client_id", client.id, "error", err)
@@ -141,10 +137,6 @@ func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
 	select {
 	case <-time.After(50 * time.Millisecond):
 	case <-s.ctx.Done():
-		return
-	}
-
-	if s.daemon == nil {
 		return
 	}
 
