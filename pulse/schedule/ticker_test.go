@@ -302,3 +302,31 @@ func TestEnqueueAsyncJob_CarriesTheSchedulesCaller(t *testing.T) {
 	assert.Equal(t, "UStim", run.UserID)
 	assert.Equal(t, "defacile", run.Namespace)
 }
+
+// "0 ticker interval = no ticking"
+func TestCheckJobs_ZeroIntervalNeverRuns(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewStore(db)
+	queue := async.NewQueue(db)
+
+	now := time.Now()
+	require.NoError(t, store.CreateJob(&Job{
+		Id:              "SPJ_zero_interval",
+		HandlerName:     "role.jd-ingestion",
+		IntervalSeconds: 0,
+		NextRunAt:       now.Add(-1 * time.Minute).Format(time.RFC3339),
+		State:           StateActive,
+		CreatedAt:       now.Format(time.RFC3339),
+		UpdatedAt:       now.Format(time.RFC3339),
+	}))
+
+	ticker := NewTicker(store, queue, nil, &mockBroadcaster{}, DefaultTickerConfig(), logger.Logger)
+	require.NoError(t, ticker.checkScheduledJobs(now))
+
+	jobs, err := queue.ListJobs(nil, 100)
+	require.NoError(t, err)
+	assert.Empty(t, jobs, "a schedule with interval 0 ran")
+	held, err := store.GetJob("SPJ_zero_interval")
+	require.NoError(t, err)
+	assert.Empty(t, held.LastExecutionId, "a schedule with interval 0 was executed")
+}

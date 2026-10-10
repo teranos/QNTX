@@ -307,6 +307,12 @@ func (t *Ticker) checkScheduledJobs(now time.Time) error {
 		default:
 		}
 
+		// "0 ticker interval = no ticking": a schedule with no interval is
+		// held, and never run.
+		if job.IntervalSeconds == 0 {
+			continue
+		}
+
 		if err := t.executeScheduledJob(job, now); err != nil {
 			t.pulseLog.Errorw("Failed to execute scheduled job",
 				"job_id", job.Id,
@@ -440,10 +446,6 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 // replaces it with the actual last_run_at timestamp from the scheduled job.
 // This enables incremental processing for scheduled jobs.
 func (t *Ticker) resolvePayloadLastRun(scheduled *Job) []byte {
-	if scheduled.Payload == nil || len(scheduled.Payload) == 0 {
-		return scheduled.Payload
-	}
-
 	// Check if payload contains "last_run" (quick check before parsing)
 	if !strings.Contains(string(scheduled.Payload), `"last_run"`) {
 		return scheduled.Payload

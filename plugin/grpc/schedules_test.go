@@ -56,17 +56,18 @@ func TestSetupPluginSchedules_DisabledByDefault(t *testing.T) {
 	err := SetupPluginSchedules(db, "testplugin", schedules, logger)
 	require.NoError(t, err)
 
-	// Verify schedule was NOT created (disabled)
+	// Made, and held paused: it is not enabled by default
 	store := schedule.NewStore(db)
 	jobs, err := store.ListAllScheduledJobs()
 	require.NoError(t, err)
-	assert.Len(t, jobs, 0)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, schedule.StatePaused, jobs[0].State)
 }
 
 // "zero means zero"
 
-// An interval of 0 is no ticking, enabled by default or not: no schedule is
-// made that would fire on every tick.
+// An interval of 0 is no ticking: the schedule is made as declared, with no
+// interval, and the ticker never runs it.
 func TestSetupPluginSchedules_ZeroIntervalNeverTicks(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zaptest.NewLogger(t).Sugar()
@@ -80,7 +81,25 @@ func TestSetupPluginSchedules_ZeroIntervalNeverTicks(t *testing.T) {
 
 	jobs, err := schedule.NewStore(db).ListAllScheduledJobs()
 	require.NoError(t, err)
-	assert.Empty(t, jobs, "a schedule with interval 0 was made to tick")
+	require.Len(t, jobs, 1)
+	assert.Equal(t, int32(0), jobs[0].IntervalSeconds, "a schedule with interval 0 was given one")
+}
+
+// An interval of fewer than no seconds is refused.
+func TestSetupPluginSchedules_NegativeIntervalIsRefused(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zaptest.NewLogger(t).Sugar()
+
+	err := SetupPluginSchedules(db, "testplugin", []*protocol.ScheduleInfo{{
+		HandlerName:      "test.handler",
+		IntervalSeconds:  -60,
+		EnabledByDefault: true,
+	}}, logger)
+	require.Error(t, err)
+
+	jobs, err := schedule.NewStore(db).ListAllScheduledJobs()
+	require.NoError(t, err)
+	assert.Empty(t, jobs)
 }
 
 func TestSetupPluginSchedules_Idempotent(t *testing.T) {

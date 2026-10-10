@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2914 in 414 files.
+# 2911 in 413 files.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -171,7 +171,6 @@
 1	plugin/grpc/pulse_handler.go
 2	plugin/grpc/remote_atsstore.go
 1	plugin/grpc/remote_queue.go
-2	plugin/grpc/schedules.go
 7	plugin/grpc/services/atsstore_server.go
 3	plugin/grpc/services/embedding_server.go
 11	plugin/grpc/services/fetch_server.go
@@ -206,7 +205,7 @@
 14	pulse/schedule/execution_store.go
 8	pulse/schedule/store.go
 1	pulse/schedule/task_log_store.go
-14	pulse/schedule/ticker.go
+13	pulse/schedule/ticker.go
 1	qntx-plugins/pty-element/src/main.rs
 2	qntx-plugins/pty-element/src/websocket.rs
 8	qntx-plugins/qntx-atproto/attestations.go
