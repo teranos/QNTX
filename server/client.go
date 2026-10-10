@@ -448,10 +448,10 @@ func (c *Client) handleRichSearch(query string) {
 
 	// Text search: MeiliSearch if available, SQL substring fallback
 	var matches []storage.RichSearchMatch
-	var searchStrategy string
+	searchStrategy := "substring"
+	meiliAnswered := false
 
 	if router := c.server.servicesManager.GetSearchRouter(); router != nil && router.HasProvider() {
-		searchStrategy = "meilisearch"
 		meiliMatches, err := c.searchMeili(ctx, query, 50)
 		if err != nil {
 			c.server.logger.Warnw("MeiliSearch failed, falling back to substring",
@@ -459,16 +459,13 @@ func (c *Client) handleRichSearch(query string) {
 				"error", err,
 			)
 			searchStrategy = "substring (meili fallback)"
-			meiliMatches = nil
+		} else {
+			searchStrategy, matches, meiliAnswered = "meilisearch", meiliMatches, true
 		}
-		matches = meiliMatches
 	}
 
 	// SQL substring fallback (no MeiliSearch provider, or MeiliSearch failed)
-	if matches == nil {
-		if searchStrategy == "" {
-			searchStrategy = "substring"
-		}
+	if !meiliAnswered {
 		// The rich fields of the namespace this connection is in — the one it
 		// was admitted to, not the one the node happens to serve.
 		u, err := c.universe()
