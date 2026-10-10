@@ -178,17 +178,23 @@ type Status struct {
 	APIProvider string `json:"apiProvider"`
 }
 
-// StatusOf asks Claude Code whether the agent under home is signed in.
+// StatusOf asks Claude Code whether the agent under home is signed in. Signed
+// out, Claude Code says so and exits 1: that exit with its answer is the
+// answer, and an exit 1 with no answer is still a failure.
 func StatusOf(ctx context.Context, binary, home string) (Status, error) {
 	cmd := exec.CommandContext(ctx, binary, "auth", "status", "--json")
 	cmd.Dir, cmd.Env = home, environment(home)
 	out, err := cmd.Output()
 	if err != nil {
 		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			return Status{}, errors.Wrapf(err, "claude auth status failed, saying: %s", strings.TrimSpace(string(exit.Stderr)))
+		if !errors.As(err, &exit) {
+			return Status{}, errors.Wrap(err, "claude auth status did not run")
 		}
-		return Status{}, errors.Wrap(err, "claude auth status did not run")
+		var status Status
+		if exit.ExitCode() == 1 && json.Unmarshal(out, &status) == nil && !status.SignedIn {
+			return status, nil
+		}
+		return Status{}, errors.Wrapf(err, "claude auth status failed, saying: %s", strings.TrimSpace(string(out)+"\n"+string(exit.Stderr)))
 	}
 	var status Status
 	if err := json.Unmarshal(out, &status); err != nil {

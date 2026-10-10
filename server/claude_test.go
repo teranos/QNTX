@@ -62,12 +62,13 @@ func claudeStandIn(t *testing.T, stream string) (binary, ran string) {
 		"    printf '%s\\n' \"$code\" > \"$CLAUDE_CONFIG_DIR/.credentials.json\"\n" +
 		"    exit 0\n" +
 		"  fi\n" +
+		// Signed out, Claude Code 2.1.289 says so and exits 1.
 		"  if [ -f \"$CLAUDE_CONFIG_DIR/.credentials.json\" ]; then\n" +
 		"    echo '{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"apiProvider\":\"firstParty\"}'\n" +
-		"  else\n" +
-		"    echo '{\"loggedIn\":false,\"authMethod\":\"none\",\"apiProvider\":\"firstParty\"}'\n" +
+		"    exit 0\n" +
 		"  fi\n" +
-		"  exit 0\n" +
+		"  echo '{\"loggedIn\":false,\"authMethod\":\"none\",\"apiProvider\":\"firstParty\"}'\n" +
+		"  exit 1\n" +
 		"fi\n" +
 		"prev=''\n" +
 		"for arg in \"$@\"; do\n" +
