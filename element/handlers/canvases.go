@@ -135,9 +135,6 @@ func (h *CanvasHandler) createCanvas(w http.ResponseWriter, r *http.Request, sto
 		h.writeError(w, errors.Wrap(err, "invalid request body"), http.StatusBadRequest)
 		return
 	}
-	if body.Kind == "" {
-		body.Kind = elementstorage.CanvasOfAUser
-	}
 	if body.Kind == elementstorage.CanvasOfTheNamespace && !admitted.OwnsEveryCanvas() {
 		h.writeError(w, errors.New("only ROOT, or SUPER here, creates the namespace's canvas"), http.StatusForbidden)
 		return
