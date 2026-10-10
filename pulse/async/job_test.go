@@ -59,7 +59,7 @@ func TestNewJobWithPayload(t *testing.T) {
 				t.Fatalf("Failed to marshal payload: %v", err)
 			}
 
-			job, err := NewJobWithPayload(tt.handlerName, tt.source, payloadJSON, tt.totalOps, "tas-bot")
+			job, err := NewJobWithPayload(tt.handlerName, tt.source, payloadJSON, tt.totalOps)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewJobWithPayload() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -253,7 +253,7 @@ func TestJobPayload(t *testing.T) {
 		t.Fatalf("Failed to marshal payload: %v", err)
 	}
 
-	job, err := NewJobWithPayload("test.video-renderer", "video-render", payloadJSON, 720, "tas-bot")
+	job, err := NewJobWithPayload("test.video-renderer", "video-render", payloadJSON, 720)
 	if err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestParentJobHierarchy(t *testing.T) {
 		"source":            "frame-001.png",
 	}
 	taskPayloadJSON, _ := json.Marshal(taskPayload)
-	task, err := NewJobWithPayload("test.frame-renderer", "frame-001.png", taskPayloadJSON, 1, "render-worker")
+	task, err := NewJobWithPayload("test.frame-renderer", "frame-001.png", taskPayloadJSON, 1)
 	if err != nil {
 		t.Fatalf("Failed to create task: %v", err)
 	}
@@ -456,7 +456,7 @@ func TestTaskPayloads(t *testing.T) {
 			t.Logf("  Testing: %s", tt.description)
 
 			payloadJSON, _ := json.Marshal(tt.payload)
-			job, err := NewJobWithPayload(tt.handlerName, "test-source", payloadJSON, 1, "test-system")
+			job, err := NewJobWithPayload(tt.handlerName, "test-source", payloadJSON, 1)
 			if err != nil {
 				t.Fatalf("Failed to create job: %v", err)
 			}
@@ -500,7 +500,6 @@ func TestTaskAggregation(t *testing.T) {
 			fmt.Sprintf("image-%d.png", i),
 			payloadJSON,
 			1,
-			"image-worker",
 		)
 		if err != nil {
 			t.Fatalf("Failed to create task %d: %v", i, err)
