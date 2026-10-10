@@ -38,6 +38,7 @@ func (h *heldNamespaces) List() ([]storage.Namespace, error) {
 
 func (*heldNamespaces) Create(string, storage.NamespaceDefinition) error { return nil }
 func (*heldNamespaces) SetEnabled(string, bool) error                    { return nil }
+func (*heldNamespaces) SetRecord(string, storage.NamespaceRecord) error  { return nil }
 func (*heldNamespaces) Delete(string) error                              { return nil }
 func (*heldNamespaces) Nuke() error                                      { return nil }
 
@@ -45,7 +46,7 @@ func (*heldNamespaces) Nuke() error                                      { retur
 // back is not what these tests are about; the name it is opened under is.
 type openedNamespaces struct{ asked []string }
 
-func (o *openedNamespaces) OpenNamespace(name string) (*Universe, error) {
+func (o *openedNamespaces) OpenNamespace(name string, _ storage.NamespaceRecord) (*Universe, error) {
 	o.asked = append(o.asked, name)
 	return nil, nil
 }
@@ -189,7 +190,7 @@ type watchersOf struct {
 // eachHoldsItsOwn is an opener that gives every namespace its own watchers.
 type eachHoldsItsOwn struct{}
 
-func (eachHoldsItsOwn) OpenNamespace(name string) (*Universe, error) {
+func (eachHoldsItsOwn) OpenNamespace(name string, _ storage.NamespaceRecord) (*Universe, error) {
 	return mustMake(name, nothing{}, watchersOf{namespace: name}), nil
 }
 
@@ -336,7 +337,7 @@ func newSlowOpener() *slowOpener {
 	return &slowOpener{started: make(chan string, 8), release: make(chan struct{})}
 }
 
-func (o *slowOpener) OpenNamespace(name string) (*Universe, error) {
+func (o *slowOpener) OpenNamespace(name string, _ storage.NamespaceRecord) (*Universe, error) {
 	o.mu.Lock()
 	o.asked = append(o.asked, name)
 	o.mu.Unlock()

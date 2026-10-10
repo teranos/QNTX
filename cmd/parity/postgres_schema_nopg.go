@@ -2,7 +2,7 @@
 
 package main
 
-import "github.com/teranos/errors"
+import errors "github.com/teranos/sacred-error"
 
 // PostgresSchema needs ats-postgres, which this build does not link without
 // the rustpostgres tag.

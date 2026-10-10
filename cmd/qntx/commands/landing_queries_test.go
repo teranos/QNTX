@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/storage/duckdbcgo"
 	"github.com/teranos/QNTX/ats/types"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
@@ -23,7 +24,7 @@ import (
 func TestANamespaceAnswersAxFromItsOwnFile(t *testing.T) {
 	h := openedParquetNode(t)
 
-	u, err := h.OpenNamespace("Pond")
+	u, err := h.OpenNamespace("Pond", storage.NamespaceRecord{Kind: storage.RecordParquet})
 	require.NoError(t, err)
 	t.Cleanup(func() { h.CloseNamespace("Pond") })
 
@@ -54,7 +55,7 @@ func openedParquetNode(t *testing.T) *parquetHandles {
 	for _, name := range []string{duckdbcgo.NamespaceDefault, duckdbcgo.NamespaceSystem} {
 		record, err := duckdbcgo.NewDuckdbStore(h.location, name)
 		require.NoError(t, err)
-		landing, err := openLanding(h.dbPath, name, record)
+		landing, err := openLanding(h.dbPath, name, parquetRecord{record})
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			require.NoError(t, landing.db.Close())

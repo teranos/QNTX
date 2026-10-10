@@ -252,8 +252,8 @@ func TestValidate_ParquetLocation(t *testing.T) {
 	}
 }
 
-// TestValidate_StorageBackend verifies ADR-023: only "sqlite", "parquet" and
-// "postgres" are accepted backend values; unknown values are rejected at load time.
+// TestValidate_StorageBackend verifies ADR-023/ADR-024: only "sqlite" and "parquet"
+// are accepted backend values; unknown values are rejected at load time.
 func TestValidate_StorageBackend(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -262,8 +262,7 @@ func TestValidate_StorageBackend(t *testing.T) {
 	}{
 		{"sqlite is valid", "sqlite", false},
 		{"parquet is valid", "parquet", false},
-		{"postgres is valid", "postgres", false},
-		{"unknown backend rejected", "mysql", true},
+		{"unknown backend rejected", "postgres", true},
 		{"typo rejected", "sqlight", true},
 		{"empty backend rejected", "", true},
 	}
@@ -283,40 +282,11 @@ func TestValidate_StorageBackend(t *testing.T) {
 					// Provide a valid Parquet location so parquet-backend cases
 					// don't fail on the location requirement — this test focuses
 					// on backend-value validation only.
-					Parquet:  ParquetConfig{Location: "s3://bucket/prefix"},
-					Postgres: PostgresConfig{URL: "env:QNTX_POSTGRES_URL"},
+					Parquet: ParquetConfig{Location: "s3://bucket/prefix"},
 				},
 				// Each case says its backend; one left out is RefuseUnsaid's.
 				said: map[string]bool{"storage.backend": true},
 			}
-			err := cfg.Validate()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-// TestValidate_PostgresURL: the connection string carries the password, so it
-// is named by reference and a literal is refused.
-func TestValidate_PostgresURL(t *testing.T) {
-	tests := []struct {
-		name    string
-		url     string
-		wantErr bool
-	}{
-		{"env reference", "env:QNTX_POSTGRES_URL", false},
-		{"ssm reference", "ssm:///qntx/postgres-url", false},
-		{"literal refused", "postgresql://postgres:secret@db.example.supabase.co:5432/postgres", true},
-		{"missing refused", "", true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := Config{Storage: StorageConfig{
-				Backend:  "postgres",
-				Sqlite:   SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
-				Postgres: PostgresConfig{URL: tt.url},
-			}, said: map[string]bool{"storage.backend": true}}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)

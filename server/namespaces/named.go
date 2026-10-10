@@ -47,6 +47,12 @@ type Disabled struct{ Asked string }
 
 func (e Disabled) Error() string { return e.Asked + " is disabled" }
 
+// NoStorage is a namespace that has not been given storage. It exists, owned
+// and listed, and holds nothing until it is given SQLite, Parquet or Postgres.
+type NoStorage struct{ Asked string }
+
+func (e NoStorage) Error() string { return e.Asked + " has no storage yet" }
+
 // Ambiguous is two namespaces this node holds under one slug. Both names are
 // said, and what was asked for: which one was meant is the operator's to
 // settle, and a node that picked would pick a universe.

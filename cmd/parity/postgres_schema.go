@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/teranos/QNTX/ats/storage/postgrescgo"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // PostgresSchema returns the tables Postgres ends up with, applied by
