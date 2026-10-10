@@ -15,15 +15,17 @@ describe('which namespace a token is minted into', () => {
             expect(pick.chosen).toBe('POND');
         });
 
-        test('standing nowhere is standing in default', () => {
-            expect(namespacePick([ns('system'), ns('default')], '').chosen).toBe('default');
-        });
     });
 
     describe('spike', () => {
         // Starting on the first namespace would mint into one you are not in.
         test('a standing the list lacks starts on nothing', () => {
             expect(namespacePick([ns('default'), ns('POND')], 'MARSH').chosen).toBe('');
+        });
+
+        // "nil is nil"
+        test('standing nowhere starts on nothing', () => {
+            expect(namespacePick([ns('system'), ns('default')], '').chosen).toBe('');
         });
 
         test('a node listing no namespaces offers nothing and starts on nothing', () => {

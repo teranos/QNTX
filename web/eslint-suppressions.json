@@ -901,7 +901,7 @@
   },
   "ts/token-mint-element.ts": {
     "no-restricted-syntax": {
-      "count": 4
+      "count": 3
     }
   },
   "ts/tokens-element.test.ts": {
