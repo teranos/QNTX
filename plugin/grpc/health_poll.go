@@ -103,7 +103,7 @@ func (h *healthPollState) inCooldown(name string) bool {
 // StartHealthPolling begins periodic health checks on all running plugins.
 // When a plugin fails consecutiveFailuresBeforeRestart health checks in a row,
 // it is automatically restarted with exponential backoff (disable + enable).
-// The onEvent callback (if non-nil) is called on health state changes for UI broadcast.
+// onEvent is called on health state changes for UI broadcast.
 // Stops when shutdownCtx is cancelled. See ADR-018 for health polling behavior.
 func (m *PluginManager) StartHealthPolling(registry *plugin.Registry, services plugin.ServiceRegistry, onEvent func(HealthEvent)) {
 	state := newHealthPollState()
@@ -175,54 +175,52 @@ func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugi
 			"message", health.Message,
 			"consecutive_failures", count,
 		}
-		m.logger.Warnw("Plugin health check failed",
-			append(base, "threshold", consecutiveFailuresBeforeRestart)...)
-
-		if count >= consecutiveFailuresBeforeRestart {
-			state.resetFailures(name)
-
-			// Check cooldown — don't restart too aggressively
-			if state.inCooldown(name) {
-				m.logger.Infow("Plugin restart skipped (cooldown active)",
-					"plugin", name,
-				)
-				continue
-			}
-
-			backoff := state.recordRestart(name)
-			// Structured, not interpolated: the "plugin" field is what lets
-			// Sentry raise one issue per plugin instead of one per statement.
-			m.logger.Errorw("Plugin failed consecutive health checks, restarting",
-				append(base, "next_backoff", backoff)...)
-			registry.MarkFailed(name, health.Message)
-
-			// Notify UI that plugin crashed
-			if onEvent != nil {
-				onEvent(HealthEvent{
-					Name:    name,
-					Healthy: false,
-					State:   string(plugin.StateFailed),
-					Message: health.Message,
-				})
-			}
-
-			// Restart in a goroutine so we don't block the polling loop
-			go func(pluginName string) {
-				if err := m.RestartPlugin(m.shutdownCtx, pluginName, nil, registry, services); err != nil {
-					m.logger.Errorf("Failed to restart plugin '%s': %v", pluginName, err)
-					return
-				}
-				// Banner is emitted by registerRestarted's health goroutine
-				// Notify UI that plugin recovered
-				if onEvent != nil {
-					onEvent(HealthEvent{
-						Name:    pluginName,
-						Healthy: true,
-						State:   string(plugin.StateRunning),
-						Message: "Plugin restarted after health check failure",
-					})
-				}
-			}(name)
+		if count < consecutiveFailuresBeforeRestart {
+			m.logger.Warnw("Plugin health check failed",
+				append(base, "threshold", consecutiveFailuresBeforeRestart)...)
+			continue
 		}
+		state.resetFailures(name)
+
+		// Check cooldown — don't restart too aggressively
+		if state.inCooldown(name) {
+			m.logger.Infow("Plugin restart skipped (cooldown active)",
+				"plugin", name,
+			)
+			continue
+		}
+
+		backoff := state.recordRestart(name)
+		// The failure is said where the plugin is shown: the registry holds it
+		// and the UI is told the plugin failed. A restart that does not take
+		// is the error.
+		m.logger.Infow("Plugin failed consecutive health checks, restarting",
+			append(base, "next_backoff", backoff)...)
+		registry.MarkFailed(name, health.Message)
+		onEvent(HealthEvent{
+			Name:    name,
+			Healthy: false,
+			State:   string(plugin.StateFailed),
+			Message: health.Message,
+		})
+
+		// Restart in a goroutine so we don't block the polling loop
+		go func(pluginName, why string, failures int) {
+			if err := m.restartLoaded(m.shutdownCtx, pluginName, registry, services); err != nil {
+				// Structured, not interpolated: the "plugin" field is what lets
+				// Sentry raise one issue per plugin instead of one per statement.
+				m.logger.Errorw("Plugin failed consecutive health checks and did not restart",
+					"plugin", pluginName, "message", why, "consecutive_failures", failures, "error", err)
+				return
+			}
+			// Banner is emitted by registerRestarted's health goroutine
+			// Notify UI that plugin recovered
+			onEvent(HealthEvent{
+				Name:    pluginName,
+				Healthy: true,
+				State:   string(plugin.StateRunning),
+				Message: "Plugin restarted after health check failure",
+			})
+		}(name, health.Message, count)
 	}
 }

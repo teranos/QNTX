@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -33,19 +34,15 @@ func LoadPluginsFromRecords(ctx context.Context, manager *PluginManager, records
 		}
 		launch, err := recordArgs(record)
 		if err != nil {
-			logger.Errorw("Plugin not loaded: its args do not read", "plugin", record.Name, "error", err)
 			failedPlugins = append(failedPlugins, record.Name)
 			manager.mu.Lock()
 			manager.failedPlugins[record.Name] = err.Error()
 			manager.mu.Unlock()
+			logger.Errorw("Plugin not loaded: its args do not read", "plugin", record.Name, "error", err)
 			continue
 		}
 		pluginNames = append(pluginNames, record.Name)
 		args[record.Name] = launch
-	}
-	if len(pluginNames) == 0 && len(failedPlugins) == 0 {
-		logger.Infow("No plugin is enabled", "known", len(known))
-		return nil
 	}
 
 	// Sort plugin names for deterministic iteration
@@ -57,40 +54,31 @@ func LoadPluginsFromRecords(ctx context.Context, manager *PluginManager, records
 	for _, pluginName := range pluginNames {
 		pluginConfig, err := discoverPlugin(pluginName, searchPaths, logger)
 		if err != nil {
-			logger.Warnf("Plugin '%s' unavailable: %v - searched paths: %v, tried names: [qntx-%s-plugin, qntx-%s, %s]%s",
-				pluginName, err, searchPaths, pluginName, pluginName, pluginName,
-				formatHints(err))
 			failedPlugins = append(failedPlugins, pluginName)
 			manager.mu.Lock()
 			manager.failedPlugins[pluginName] = err.Error()
 			manager.mu.Unlock()
+			logger.Warnw("Plugin unavailable", "plugin", pluginName, "error", err,
+				"searched", searchPaths, "tried", pluginBinaryNames(pluginName),
+				"hints", errors.GetAllHints(err))
 			continue
 		}
-		if len(args[pluginName]) > 0 {
-			pluginConfig.Args = args[pluginName]
-		}
-		logger.Debugf("Will load '%s' plugin from binary: %s", pluginName, pluginConfig.Binary)
+		pluginConfig.Args = args[pluginName]
+		logger.Debugf("Will load '%s' plugin from %s", pluginName, pluginConfig.Source)
 		pluginConfigs = append(pluginConfigs, pluginConfig)
 	}
 
-	if len(pluginConfigs) > 0 {
-		if err := manager.LoadPlugins(ctx, pluginConfigs); err != nil {
-			return errors.Wrapf(err, "failed to load %d plugins", len(pluginConfigs))
-		}
+	if err := manager.LoadPlugins(ctx, pluginConfigs); err != nil {
+		return errors.Wrapf(err, "failed to load %d plugins", len(pluginConfigs))
 	}
 
-	if len(failedPlugins) > 0 {
-		logger.Warnw("Some enabled plugins failed to load",
-			"enabled", enabled,
-			"loaded", len(pluginConfigs),
-			"failed", failedPlugins,
-		)
-	} else if len(pluginConfigs) > 0 {
-		logger.Debugw("Plugin discovery complete",
-			"enabled", enabled,
-			"loaded", len(pluginConfigs),
-		)
-	}
+	// Each failure was said as it happened and is held in the manager's failed plugins.
+	logger.Infow("Plugin discovery complete",
+		"known", len(known),
+		"enabled", enabled,
+		"launching", len(pluginConfigs),
+		"failed", failedPlugins,
+	)
 	return nil
 }
 
@@ -115,10 +103,11 @@ func ConfigureWebSocketFromConfig(manager *PluginManager, cfg *config.Config) {
 }
 
 // recordArgs is the launch args a plugin's config holds under args, written
-// as a JSON list. A plugin with no args key has none.
+// as a JSON list. A plugin with no args key has none; an args key that holds
+// no JSON list is refused.
 func recordArgs(record PluginRecord) ([]string, error) {
 	raw, set := record.Config["args"]
-	if !set || strings.TrimSpace(raw) == "" {
+	if !set {
 		return nil, nil
 	}
 	var args []string
@@ -126,16 +115,6 @@ func recordArgs(record PluginRecord) ([]string, error) {
 		return nil, errors.Wrapf(err, "plugin %s: args is %q, and args is a JSON list of strings", record.Name, raw)
 	}
 	return args, nil
-}
-
-// formatHints renders an error's hints for a log line, or "" when it has none.
-// Hints hold the fix; %v alone shows only the failure.
-func formatHints(err error) string {
-	hints := errors.GetAllHints(err)
-	if len(hints) == 0 {
-		return ""
-	}
-	return " - " + strings.Join(hints, "; ")
 }
 
 // discoverPlugin finds a plugin binary in the configured search paths.
@@ -156,88 +135,52 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 
 	// Search for plugin binary
 	for _, searchPath := range expandedPaths {
-		// Try common plugin binary names
-		candidates := make([]string, 0, 3)
 		for _, binaryName := range pluginBinaryNames(name) {
-			candidates = append(candidates, filepath.Join(searchPath, binaryName))
-		}
-
-		for _, candidate := range candidates {
-			if fileInfo, err := os.Stat(candidate); err == nil {
-				// Special handling for TypeScript plugins
-				if fileInfo.IsDir() {
-					// Check if this is a TypeScript plugin directory (has package.json with qntx-plugin marker)
-					pkgPath := filepath.Join(candidate, "package.json")
-					if _, err := os.Stat(pkgPath); err == nil {
-						// Has package.json, check if it's a QNTX plugin
-						var pkg struct {
-							QNTXPlugin bool `json:"qntx-plugin"`
-						}
-						if data, err := os.ReadFile(pkgPath); err == nil {
-							if err := json.Unmarshal(data, &pkg); err == nil && pkg.QNTXPlugin {
-								// TypeScript plugin directory - look for plugin.ts
-								pluginTsPath := filepath.Join(candidate, "plugin.ts")
-								if _, err := os.Stat(pluginTsPath); err == nil {
-									logger.Debugf("Found '%s' TypeScript plugin: %s", name, pluginTsPath)
-									return PluginConfig{
-										Name:      name,
-										Enabled:   true,
-										Binary:    pluginTsPath,
-										AutoStart: true,
-									}, nil
-								}
-							}
-						}
-					}
-
-					// Native plugin shipped as a tree: the binary sits inside
-					// the directory with its private libraries beside it, found
-					// via an $ORIGIN-relative RPATH. QNTX's own release is
-					// packaged this way; plugins may be too.
-					if binary, ok := nativePluginInDir(candidate, name); ok {
-						logger.Debugf("Found '%s' plugin tree: %s", name, binary)
-						return PluginConfig{
-							Name:      name,
-							Enabled:   true,
-							Binary:    binary,
-							AutoStart: true,
-						}, nil
-					}
-
-					// Not a valid plugin directory, continue searching
-					continue
-				}
-
-				// Regular file - check if executable
-				// Issue #137: This doesn't work on Windows where executability is by extension
-				if fileInfo.Mode()&0111 == 0 {
-					// Not executable - check if it's a .ts file (TypeScript plugin)
-					if strings.HasSuffix(candidate, ".ts") {
-						logger.Debugf("Found '%s' TypeScript plugin: %s", name, candidate)
-						return PluginConfig{
-							Name:      name,
-							Enabled:   true,
-							Binary:    candidate,
-							AutoStart: true,
-						}, nil
-					}
-
-					logger.Debugw("Found plugin binary but not executable",
-						"plugin", name,
-						"path", candidate,
-					)
-					continue
-				}
-
-				logger.Debugf("Found '%s' plugin binary: %s", name, candidate)
-
-				return PluginConfig{
-					Name:      name,
-					Enabled:   true,
-					Binary:    candidate,
-					AutoStart: true,
-				}, nil
+			candidate := filepath.Join(searchPath, binaryName)
+			fileInfo, err := os.Stat(candidate)
+			if err != nil {
+				continue
 			}
+
+			if fileInfo.IsDir() {
+				// A TypeScript plugin directory: package.json marks it, plugin.ts runs it.
+				if pluginTs, ok := typeScriptPluginInDir(candidate); ok {
+					logger.Debugf("Found '%s' TypeScript plugin: %s", name, pluginTs)
+					return PluginConfig{Name: name, Enabled: true, Source: LaunchBinary(pluginTs)}, nil
+				}
+
+				// Native plugin shipped as a tree: the binary sits inside
+				// the directory with its private libraries beside it, found
+				// via an $ORIGIN-relative RPATH. QNTX's own release is
+				// packaged this way; plugins may be too.
+				if binary, ok := nativePluginInDir(candidate, name); ok {
+					logger.Debugf("Found '%s' plugin tree: %s", name, binary)
+					return PluginConfig{Name: name, Enabled: true, Source: LaunchBinary(binary)}, nil
+				}
+
+				// Not a valid plugin directory, continue searching
+				continue
+			}
+
+			// A TypeScript plugin file runs under bun, executable or not.
+			if strings.HasSuffix(candidate, ".ts") {
+				logger.Debugf("Found '%s' TypeScript plugin: %s", name, candidate)
+				return PluginConfig{Name: name, Enabled: true, Source: LaunchBinary(candidate)}, nil
+			}
+
+			// Issue #137: This doesn't work on Windows where executability is by extension
+			binary, err := exec.LookPath(candidate)
+			if err != nil {
+				logger.Debugw("Found plugin binary but it does not run",
+					"plugin", name,
+					"path", candidate,
+					"error", err,
+				)
+				continue
+			}
+
+			logger.Debugf("Found '%s' plugin binary: %s", name, binary)
+			return PluginConfig{Name: name, Enabled: true, Source: LaunchBinary(binary)}, nil
 		}
 	}
 
@@ -255,20 +198,35 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 // makes a binary built on one distro fail to exec on another.
 func nativePluginInDir(dir, name string) (string, bool) {
 	for _, candidate := range pluginBinaryNames(name) {
-		path := filepath.Join(dir, candidate)
-
-		info, err := os.Stat(path)
-		if err != nil || info.IsDir() {
+		path, err := exec.LookPath(filepath.Join(dir, candidate))
+		if err != nil {
 			continue
 		}
-		if info.Mode()&0111 == 0 {
-			continue
-		}
-
 		return path, true
 	}
 
 	return "", false
+}
+
+// typeScriptPluginInDir is the plugin.ts of a directory whose package.json
+// says "qntx-plugin": true.
+func typeScriptPluginInDir(dir string) (string, bool) {
+	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
+	if err != nil {
+		return "", false
+	}
+	var pkg struct {
+		QNTXPlugin bool `json:"qntx-plugin"`
+	}
+	if err := json.Unmarshal(data, &pkg); err != nil || !pkg.QNTXPlugin {
+		return "", false
+	}
+	pluginTs := filepath.Join(dir, "plugin.ts")
+	info, err := os.Stat(pluginTs)
+	if err != nil || info.IsDir() {
+		return "", false
+	}
+	return pluginTs, true
 }
 
 // pluginBinaryNames lists the file names a plugin binary may have, most
@@ -303,7 +261,7 @@ func expandAndValidatePath(path string) (string, error) {
 	// Get current working directory for resolving relative paths
 	pwd, err := os.Getwd()
 	if err != nil {
-		pwd = "."
+		return "", errors.Wrapf(err, "no working directory to resolve %s against", path)
 	}
 
 	// Use go-getter's detection to safely handle paths
@@ -318,18 +276,9 @@ func expandAndValidatePath(path string) (string, error) {
 		return "", errors.Wrap(err, "failed to parse path")
 	}
 
-	// For file:// URLs, extract the path
+	// go-getter detects a local path, relative or absolute, as a file:// URL.
 	if u.Scheme == "file" {
 		return u.Path, nil
-	}
-
-	// For local paths (no scheme or empty scheme), make absolute
-	if u.Scheme == "" {
-		abs, err := filepath.Abs(path)
-		if err != nil {
-			return "", errors.Wrap(err, "failed to make absolute path")
-		}
-		return abs, nil
 	}
 
 	err = errors.Newf("unsupported path scheme: %s (expected file:// or local path)", u.Scheme)

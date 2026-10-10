@@ -51,7 +51,7 @@ func TestCriticalPath_PluginLifecycle(t *testing.T) {
 
 	// 3. Load plugin from address
 	configs := []PluginConfig{
-		{Name: "critical-test", Enabled: true, Address: addr},
+		{Name: "critical-test", Enabled: true, Source: RunningAt(addr)},
 	}
 	err := manager.LoadPlugins(context.Background(), configs)
 	require.NoError(t, err)
@@ -104,9 +104,9 @@ func TestCriticalPath_MultiPluginCoordination(t *testing.T) {
 	// Load all plugins
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "plugin1", Enabled: true, Address: addr1},
-		{Name: "plugin2", Enabled: true, Address: addr2},
-		{Name: "plugin3", Enabled: true, Address: addr3},
+		{Name: "plugin1", Enabled: true, Source: RunningAt(addr1)},
+		{Name: "plugin2", Enabled: true, Source: RunningAt(addr2)},
+		{Name: "plugin3", Enabled: true, Source: RunningAt(addr3)},
 	}
 	err := manager.LoadPlugins(context.Background(), configs)
 	require.NoError(t, err)
@@ -421,8 +421,8 @@ func TestCrash_PartialFailure(t *testing.T) {
 
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "plugin1", Enabled: true, Address: addr1},
-		{Name: "plugin2", Enabled: true, Address: addr2},
+		{Name: "plugin1", Enabled: true, Source: RunningAt(addr1)},
+		{Name: "plugin2", Enabled: true, Source: RunningAt(addr2)},
 	}
 	err := manager.LoadPlugins(context.Background(), configs)
 	require.NoError(t, err)
@@ -460,7 +460,7 @@ func TestCrash_GracefulDegradation(t *testing.T) {
 
 	// Try to load plugin that doesn't exist
 	configs := []PluginConfig{
-		{Name: "nonexistent", Enabled: true, Address: "localhost:59999"},
+		{Name: "nonexistent", Enabled: true, Source: RunningAt("localhost:59999")},
 	}
 
 	// Should not return error (resilient loading) but log and continue

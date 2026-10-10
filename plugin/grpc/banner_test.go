@@ -4,6 +4,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/teranos/errors"
 )
 
 func TestFormatBanner_Boot(t *testing.T) {
@@ -27,9 +31,9 @@ func TestFormatBanner_Boot(t *testing.T) {
 	if !strings.Contains(plain, "indexes: 3") {
 		t.Errorf("banner should contain index count detail, got:\n%s", plain)
 	}
-	// Boot reason should not add parenthetical
-	if strings.Contains(plain, "(boot)") || strings.Contains(plain, "(restart)") {
-		t.Errorf("boot banner should not have reason parenthetical, got:\n%s", plain)
+	// Boot is a reason like any other, and is said
+	if !strings.Contains(plain, "(boot)") || strings.Contains(plain, "(restart)") {
+		t.Errorf("boot banner should say (boot), got:\n%s", plain)
 	}
 }
 
@@ -89,7 +93,7 @@ func TestFormatBanner_Failed(t *testing.T) {
 		Name:    "meili",
 		Version: "0.4.0",
 		Reason:  BannerBoot,
-		Error:   "MeiliSearch at 10.195.67.11:7700 not accessible",
+		Err:     errors.New("MeiliSearch at 10.195.67.11:7700 not accessible"),
 	}
 	banner := FormatBanner(info)
 
@@ -116,13 +120,13 @@ func TestFormatBanner_HandlersSchedulesWatchers(t *testing.T) {
 	banner := FormatBanner(info)
 	plain := stripANSI(banner)
 
-	if !strings.Contains(plain, "2 handlers: ingest, process") {
+	if !strings.Contains(plain, "2 handlers [ingest, process]") {
 		t.Errorf("banner should show handler names, got:\n%s", plain)
 	}
-	if !strings.Contains(plain, "3 schedules: cleanup, sync, backup") {
+	if !strings.Contains(plain, "3 schedules [cleanup, sync, backup]") {
 		t.Errorf("banner should show schedule names, got:\n%s", plain)
 	}
-	if !strings.Contains(plain, "1 watchers: new-attestation") {
+	if !strings.Contains(plain, "1 watchers [new-attestation]") {
 		t.Errorf("banner should show watcher names, got:\n%s", plain)
 	}
 }
@@ -232,20 +236,20 @@ func TestFormatBanner_NoRoutesAdvertised(t *testing.T) {
 		Version: "1.0",
 	}
 	plain := stripANSI(FormatBanner(info))
-	if !strings.Contains(plain, "no sigils handed") {
-		t.Errorf("no sigils with no error and non-disabled reason should emit fallback, got:\n%s", plain)
+	if !strings.Contains(plain, "0 sigils []") {
+		t.Errorf("a plugin binding no sigils should say it binds none, got:\n%s", plain)
 	}
 }
 
-func TestFormatBanner_NoRoutesAdvertised_SkipOnDisabled(t *testing.T) {
+func TestFormatBanner_NoRoutesAdvertised_Disabled(t *testing.T) {
 	info := BannerInfo{
 		Name:    "x",
 		Version: "1.0",
 		Reason:  BannerDisabled,
 	}
 	plain := stripANSI(FormatBanner(info))
-	if strings.Contains(plain, "no sigils handed") {
-		t.Errorf("disabled reason must suppress no-sigils fallback, got:\n%s", plain)
+	if !strings.Contains(plain, "(disabled)") || !strings.Contains(plain, "0 sigils []") {
+		t.Errorf("a disabled plugin says it is disabled and binds no sigils, got:\n%s", plain)
 	}
 }
 
@@ -253,10 +257,10 @@ func TestFormatBanner_NoRoutesAdvertised_SkipOnError(t *testing.T) {
 	info := BannerInfo{
 		Name:    "x",
 		Version: "1.0",
-		Error:   "broken",
+		Err:     errors.New("broken"),
 	}
 	plain := stripANSI(FormatBanner(info))
-	if strings.Contains(plain, "no sigils handed") {
+	if strings.Contains(plain, "sigils") {
 		t.Errorf("error path must not reach no-sigils fallback, got:\n%s", plain)
 	}
 }
@@ -269,8 +273,8 @@ func TestFormatBanner_CountsTruncated(t *testing.T) {
 		Handlers: handlers,
 	}
 	plain := stripANSI(FormatBanner(info))
-	if !strings.Contains(plain, "11 handlers:") {
-		t.Errorf("expected '11 handlers:' prefix, got:\n%s", plain)
+	if !strings.Contains(plain, "11 handlers [") {
+		t.Errorf("expected '11 handlers [' prefix, got:\n%s", plain)
 	}
 	if !strings.Contains(plain, "…") {
 		t.Errorf("expected ellipsis truncation marker, got:\n%s", plain)
@@ -343,15 +347,10 @@ func TestDiffConfig_Removed(t *testing.T) {
 	}
 }
 
-func TestDiffConfig_NilMaps(t *testing.T) {
-	diffs := DiffConfig(nil, map[string]string{"a": "b"})
-	if diffs != nil {
-		t.Errorf("expected nil for nil before, got %v", diffs)
-	}
-	diffs = DiffConfig(map[string]string{"a": "b"}, nil)
-	if diffs != nil {
-		t.Errorf("expected nil for nil after, got %v", diffs)
-	}
+// A config with no keys is compared like any other: every key is added, or removed.
+func TestDiffConfig_NoKeys(t *testing.T) {
+	assert.Equal(t, []string{"a added: b"}, DiffConfig(nil, map[string]string{"a": "b"}))
+	assert.Equal(t, []string{"a removed"}, DiffConfig(map[string]string{"a": "b"}, nil))
 }
 
 func TestColorForPlugin_Deterministic(t *testing.T) {
@@ -394,9 +393,8 @@ func TestAccumulator_SetFailed(t *testing.T) {
 	info := acc.plugins["meili"]
 	acc.mu.Unlock()
 
-	if info.Error != "connection refused" {
-		t.Errorf("expected error 'connection refused', got %q", info.Error)
-	}
+	require.Error(t, info.Err)
+	assert.Equal(t, "connection refused", info.Err.Error())
 }
 
 func TestAccumulator_SnapshotAndDiff(t *testing.T) {
@@ -420,8 +418,10 @@ func TestPluginLogger_WritesToFile(t *testing.T) {
 	defer tmpFile.Close()
 
 	pl := &pluginLogger{
-		file:  tmpFile,
-		level: "info",
+		file:      tmpFile,
+		stream:    stdoutStream,
+		level:     "info",
+		logBuffer: NewLogBuffer(10),
 	}
 
 	pl.Write([]byte("[spindle] ATSClient connected to 127.0.0.1:50648\n"))

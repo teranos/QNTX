@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -15,7 +16,7 @@ import (
 type BannerReason string
 
 const (
-	BannerBoot         BannerReason = ""
+	BannerBoot         BannerReason = "boot"
 	BannerRestart      BannerReason = "restart"
 	BannerRecovered    BannerReason = "recovered"
 	BannerReconfigured BannerReason = "reconfigured"
@@ -35,7 +36,7 @@ type BannerInfo struct {
 	UnfilteredWatchers []string          // watcher IDs with empty filters (receive all attestations)
 	Status             string            // from Health().Message
 	Details            map[string]string // from Health().Details
-	Error              string            // non-empty = failed
+	Err                error             // why the plugin failed; a failed banner says only this
 	ConfigDiff         []string          // "url changed: old → new"
 	HTTPRoutes         []string          // what its signa bind: "GET /api/datapunt/read", etc.
 
@@ -80,10 +81,7 @@ func FormatBanner(info BannerInfo) string {
 
 	// Header line: HH:MM:SS ── name version (reason) ───────────
 	ts := time.Now().Format("15:04:05")
-	reason := ""
-	if info.Reason != "" {
-		reason = " (" + string(info.Reason) + ")"
-	}
+	reason := " (" + string(info.Reason) + ")"
 	// Plain length for padding calculation (no ANSI)
 	plainPrefix := ts + " ── " + info.Name + " " + info.Version + reason + " "
 	padLen := bannerWidth - len(plainPrefix)
@@ -105,9 +103,7 @@ func FormatBanner(info BannerInfo) string {
 	b.WriteString(" ")
 	b.WriteString(ansiDim)
 	b.WriteString(info.Version)
-	if reason != "" {
-		b.WriteString(reason)
-	}
+	b.WriteString(reason)
 	b.WriteString(ansiReset)
 	b.WriteString(" ")
 	b.WriteString(color)
@@ -115,119 +111,66 @@ func FormatBanner(info BannerInfo) string {
 	b.WriteString(ansiReset)
 	b.WriteByte('\n')
 
-	if info.Error != "" {
+	if info.Err != nil {
 		// Error banner
 		b.WriteString("   ")
 		b.WriteString(ansiRed)
 		b.WriteString("✗ ")
-		b.WriteString(info.Error)
+		b.WriteString(info.Err.Error())
 		b.WriteString(ansiReset)
 		b.WriteByte('\n')
 		return b.String()
 	}
 
-	// Role + status lines
-	for _, role := range info.Roles {
-		b.WriteString("   ")
-		b.WriteString(color)
-		b.WriteString(role)
-		b.WriteString(ansiReset)
-		if info.Status != "" {
-			b.WriteString("  ")
-			b.WriteString(info.Status)
-		}
-		b.WriteByte('\n')
-	}
-
-	// If no roles but there's a status, show it standalone
-	if len(info.Roles) == 0 && info.Status != "" {
-		b.WriteString("   ")
-		b.WriteString(info.Status)
-		b.WriteByte('\n')
-	}
+	// Roles, then what its health says
+	b.WriteString("   ")
+	b.WriteString(color)
+	b.WriteString(strings.Join(info.Roles, ", "))
+	b.WriteString(ansiReset)
+	b.WriteString("  ")
+	b.WriteString(info.Status)
+	b.WriteByte('\n')
 
 	// Detail lines from Health().Details
-	if len(info.Details) > 0 {
-		keys := make([]string, 0, len(info.Details))
-		for k := range info.Details {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			// Skip details already represented in status
-			if k == "backend" {
-				continue
-			}
-			if info.Status != "" && strings.Contains(info.Status, info.Details[k]) {
-				continue
-			}
-			v := info.Details[k]
-			if v == "false" {
-				continue
-			}
-			b.WriteString("   ")
-			b.WriteString(ansiDim)
-			if v == "true" {
-				b.WriteString(k)
-			} else {
-				b.WriteString(k)
-				b.WriteString(": ")
-				b.WriteString(v)
-			}
-			b.WriteString(ansiReset)
-			b.WriteByte('\n')
-		}
+	keys := make([]string, 0, len(info.Details))
+	for k := range info.Details {
+		keys = append(keys, k)
 	}
-
-	// Summary of handlers/schedules/watchers
-	var counts []string
-	if n := len(info.Handlers); n > 0 {
-		if n <= 10 {
-			counts = append(counts, fmt.Sprintf("%d handlers: %s", n, strings.Join(info.Handlers, ", ")))
-		} else {
-			counts = append(counts, fmt.Sprintf("%d handlers: %s, …", n, strings.Join(info.Handlers[:10], ", ")))
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := info.Details[k]
+		// Skip details already represented in status
+		if k == "backend" || strings.Contains(info.Status, v) || v == "false" {
+			continue
 		}
-	}
-	if n := len(info.ScheduleNames); n > 0 {
-		if n <= 10 {
-			counts = append(counts, fmt.Sprintf("%d schedules: %s", n, strings.Join(info.ScheduleNames, ", ")))
-		} else {
-			counts = append(counts, fmt.Sprintf("%d schedules: %s, …", n, strings.Join(info.ScheduleNames[:10], ", ")))
-		}
-	}
-	if n := len(info.WatcherNames); n > 0 {
-		suffix := ""
-		if u := len(info.UnfilteredWatchers); u > 0 {
-			suffix = fmt.Sprintf(" (%d unfiltered)", u)
-		}
-		if n <= 10 {
-			counts = append(counts, fmt.Sprintf("%d watchers: %s%s", n, strings.Join(info.WatcherNames, ", "), suffix))
-		} else {
-			counts = append(counts, fmt.Sprintf("%d watchers: %s, …%s", n, strings.Join(info.WatcherNames[:10], ", "), suffix))
-		}
-	}
-	if len(counts) > 0 {
 		b.WriteString("   ")
 		b.WriteString(ansiDim)
-		b.WriteString(strings.Join(counts, ", "))
+		b.WriteString(k)
+		if v != "true" {
+			b.WriteString(": ")
+			b.WriteString(v)
+		}
 		b.WriteString(ansiReset)
 		b.WriteByte('\n')
 	}
 
-	// HTTP routes
-	if len(info.HTTPRoutes) > 0 {
-		b.WriteString("   ")
-		b.WriteString(ansiDim)
-		b.WriteString(strings.Join(info.HTTPRoutes, ", "))
-		b.WriteString(ansiReset)
-		b.WriteByte('\n')
-	} else if info.Error == "" && info.Reason != BannerDisabled {
-		b.WriteString("   ")
-		b.WriteString(ansiDim)
-		b.WriteString("no sigils handed (set signa in InitializeResponse)")
-		b.WriteString(ansiReset)
-		b.WriteByte('\n')
-	}
+	// Handlers, schedules and watchers, each counted, zero included
+	b.WriteString("   ")
+	b.WriteString(ansiDim)
+	b.WriteString(strings.Join([]string{
+		listed("handlers", info.Handlers),
+		listed("schedules", info.ScheduleNames),
+		listed("watchers", info.WatcherNames) + fmt.Sprintf(" (%d unfiltered)", len(info.UnfilteredWatchers)),
+	}, " · "))
+	b.WriteString(ansiReset)
+	b.WriteByte('\n')
+
+	// What its signa bind; a plugin that sets no signa in InitializeResponse binds none
+	b.WriteString("   ")
+	b.WriteString(ansiDim)
+	b.WriteString(listed("sigils", info.HTTPRoutes))
+	b.WriteString(ansiReset)
+	b.WriteByte('\n')
 
 	// Config diff lines
 	for _, diff := range info.ConfigDiff {
@@ -241,12 +184,21 @@ func FormatBanner(info BannerInfo) string {
 	return b.String()
 }
 
+// bannerListMax is how many names a banner line shows before it says there are more.
+const bannerListMax = 10
+
+// listed is names counted under noun, the first bannerListMax of them shown:
+// "2 handlers [ingest, process]", "0 schedules []".
+func listed(noun string, names []string) string {
+	shown, more := names, ""
+	if len(names) > bannerListMax {
+		shown, more = names[:bannerListMax], ", …"
+	}
+	return fmt.Sprintf("%d %s [%s%s]", len(names), noun, strings.Join(shown, ", "), more)
+}
+
 // DiffConfig compares two config maps and returns human-readable diff lines.
 func DiffConfig(before, after map[string]string) []string {
-	if before == nil || after == nil {
-		return nil
-	}
-
 	allKeys := make(map[string]bool)
 	for k := range before {
 		allKeys[k] = true
@@ -368,8 +320,8 @@ func (a *PluginAccumulator) SetHealth(name string, healthy bool, message string,
 	info := a.getOrCreate(name)
 	info.Status = message
 	info.Details = details
-	if !healthy && message != "" {
-		info.Error = message
+	if !healthy {
+		info.Err = errors.Newf("unhealthy: %s", message)
 	}
 }
 
@@ -378,7 +330,7 @@ func (a *PluginAccumulator) SetFailed(name string, err string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	info := a.getOrCreate(name)
-	info.Error = err
+	info.Err = errors.New(err)
 }
 
 // SnapshotConfig saves the current config for later diffing.

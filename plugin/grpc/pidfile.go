@@ -6,8 +6,28 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
+
+// pids is where a manager records the processes it launches, so the next run
+// can kill what this one left behind.
+type pids interface {
+	// CleanStale kills what a previous run left and forgets it.
+	CleanStale() error
+	// Add records a launched process.
+	Add(pid int) error
+	// Remove forgets every process, on a clean shutdown.
+	Remove() error
+}
+
+// unrecordedPids is a manager not handed a PID file: what it launches is not
+// recorded, so a run that ends uncleanly leaves its plugins for nothing to kill.
+type unrecordedPids struct{}
+
+func (unrecordedPids) CleanStale() error { return nil }
+func (unrecordedPids) Add(int) error     { return nil }
+func (unrecordedPids) Remove() error     { return nil }
 
 // pidFile tracks plugin process IDs for cleanup across restarts.
 // Each QNTX instance writes its plugin PIDs to a file keyed by server port,
@@ -24,21 +44,21 @@ func newPidFile(path string, logger *zap.SugaredLogger) *pidFile {
 	}
 }
 
-// CleanStale reads the PID file from a previous run and kills any surviving processes.
-// Removes the file afterward regardless of outcome.
-func (p *pidFile) CleanStale() {
+// CleanStale reads the PID file from a previous run, kills any surviving
+// processes, and removes the file. No file is a previous run that left nothing.
+// A file that stays is refused: the next run would kill the PIDs it lists,
+// which by then may be anyone's.
+func (p *pidFile) CleanStale() error {
 	data, err := os.ReadFile(p.path)
+	if os.IsNotExist(err) {
+		return nil
+	}
 	if err != nil {
-		return // no file = nothing to clean
+		return errors.Wrapf(err, "failed to read the plugin PID file %s", p.path)
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		pid, err := strconv.Atoi(line)
+	for _, line := range strings.Split(string(data), "\n") {
+		pid, err := strconv.Atoi(strings.TrimSpace(line))
 		if err != nil {
 			continue
 		}
@@ -67,35 +87,36 @@ func (p *pidFile) CleanStale() {
 	}
 
 	if err := os.Remove(p.path); err != nil {
-		p.logger.Warnw("Failed to remove stale PID file; next startup will re-clean it",
-			"path", p.path, "error", err)
+		return errors.Wrapf(err, "failed to remove the stale plugin PID file %s", p.path)
 	}
+	return nil
 }
 
 // Add appends a PID to the file. An unrecorded PID is an orphan on the next
 // restart — CleanStale finds nothing to kill and the old plugin keeps its
-// ports and DB locks — so every failure here is said, not swallowed.
-func (p *pidFile) Add(pid int) {
+// ports and DB locks — so every failure here is returned, not swallowed.
+func (p *pidFile) Add(pid int) (err error) {
 	f, err := os.OpenFile(p.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		p.logger.Warnw("Failed to open plugin PID file; this plugin will be orphaned if QNTX restarts uncleanly",
-			"path", p.path, "pid", pid, "error", err)
-		return
+		return errors.Wrapf(err, "failed to open the plugin PID file %s to record pid %d", p.path, pid)
 	}
-	if _, err := f.WriteString(strconv.Itoa(pid) + "\n"); err != nil {
-		p.logger.Warnw("Failed to record plugin PID; this plugin will be orphaned if QNTX restarts uncleanly",
-			"path", p.path, "pid", pid, "error", err)
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			err = alongside(err, errors.Wrapf(closeErr, "failed to close the plugin PID file %s after recording pid %d", p.path, pid))
+		}
+	}()
+	line := strconv.Itoa(pid) + "\n"
+	if written, err := f.WriteString(line); err != nil {
+		return errors.Wrapf(err, "failed to record pid %d in %s: %d of %d bytes written", pid, p.path, written, len(line))
 	}
-	if err := f.Close(); err != nil {
-		p.logger.Warnw("Failed to close plugin PID file; the PID may not have reached disk",
-			"path", p.path, "pid", pid, "error", err)
-	}
+	return nil
 }
 
-// Remove deletes the PID file (called on clean shutdown).
-func (p *pidFile) Remove() {
+// Remove deletes the PID file (called on clean shutdown). A file that stays
+// has the next startup kill the PIDs it lists.
+func (p *pidFile) Remove() error {
 	if err := os.Remove(p.path); err != nil && !os.IsNotExist(err) {
-		p.logger.Warnw("Failed to remove plugin PID file on shutdown; next startup will kill PIDs it lists",
-			"path", p.path, "error", err)
+		return errors.Wrapf(err, "failed to remove the plugin PID file %s; the next startup kills the PIDs it lists", p.path)
 	}
+	return nil
 }

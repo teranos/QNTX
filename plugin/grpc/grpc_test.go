@@ -714,7 +714,7 @@ func TestPluginManager_LoadPlugins_WithAddress(t *testing.T) {
 
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "mock", Enabled: true, Address: addr}, // Use "mock" to match the plugin metadata
+		{Name: "mock", Enabled: true, Source: RunningAt(addr)}, // Use "mock" to match the plugin metadata
 	}
 
 	err := manager.LoadPlugins(context.Background(), configs)
@@ -741,7 +741,7 @@ func TestPluginManager_GetPlugin(t *testing.T) {
 
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "test", Enabled: true, Address: addr},
+		{Name: "test", Enabled: true, Source: RunningAt(addr)},
 	}
 	manager.LoadPlugins(context.Background(), configs)
 
@@ -768,7 +768,7 @@ func TestPluginManager_Shutdown(t *testing.T) {
 
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "test", Enabled: true, Address: addr},
+		{Name: "test", Enabled: true, Source: RunningAt(addr)},
 	}
 	manager.LoadPlugins(context.Background(), configs)
 
@@ -796,7 +796,7 @@ func TestPluginManager_LoadedPluginNames(t *testing.T) {
 
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "mock", Enabled: true, Address: addr},
+		{Name: "mock", Enabled: true, Source: RunningAt(addr)},
 	}
 	manager.LoadPlugins(context.Background(), configs)
 
@@ -818,7 +818,7 @@ func TestPluginManager_DisablePlugin(t *testing.T) {
 
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "mock", Enabled: true, Address: addr},
+		{Name: "mock", Enabled: true, Source: RunningAt(addr)},
 	}
 	manager.LoadPlugins(context.Background(), configs)
 
@@ -907,24 +907,14 @@ func TestPluginServer_ConcurrentRequests(t *testing.T) {
 	}
 }
 
-func TestPluginConfig_Defaults(t *testing.T) {
-	cfg := PluginConfig{
-		Name:    "test",
-		Enabled: true,
-	}
+// A plugin config made naming no source names nothing to run, and loading it is refused.
+func TestPluginConfig_NoSourceIsRefused(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	manager := NewPluginManager(logger, logger, "")
 
-	assert.Equal(t, "test", cfg.Name)
-	assert.True(t, cfg.Enabled)
-	assert.Empty(t, cfg.Address)
-	assert.Empty(t, cfg.Binary)
-	assert.False(t, cfg.AutoStart)
-}
-
-func TestDiscoverPlugins_EmptyDir(t *testing.T) {
-	// Test with non-existent directory
-	configs, err := DiscoverPlugins("/nonexistent/path")
-	require.NoError(t, err)
-	assert.Empty(t, configs)
+	err := manager.loadPlugin(context.Background(), PluginConfig{Name: "test", Enabled: true})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "neither a binary to launch nor an address")
 }
 
 // TestPluginServer_WebSocketStreaming tests WebSocket bidirectional streaming
