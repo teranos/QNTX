@@ -151,6 +151,7 @@ func extractArchive(archive []byte, dir, binaryName string) (_ string, _ int, er
 	tr := tar.NewReader(gz)
 	var seen []string
 	var binary string
+	found := false
 	files := 0
 
 	for {
@@ -168,11 +169,11 @@ func extractArchive(archive []byte, dir, binaryName string) (_ string, _ int, er
 			continue
 		}
 
-		rel, err := safeArchivePath(header.Name)
+		rel, inside, err := safeArchivePath(header.Name)
 		if err != nil {
 			return "", 0, err
 		}
-		if rel == "" {
+		if !inside {
 			continue
 		}
 
@@ -191,19 +192,16 @@ func extractArchive(archive []byte, dir, binaryName string) (_ string, _ int, er
 			return "", 0, errors.Wrapf(err, "failed to create directory for %s", target)
 		}
 
-		// The archive's mode decides only whether a file is executable. A
-		// release cannot make anything group- or world-writable here.
-		mode := os.FileMode(0o644)
-		if header.Mode&0o111 != 0 {
-			mode = 0o755
-		}
+		// The archive's mode decides only who may execute a file. A release
+		// cannot make anything group- or world-writable here.
+		mode := os.FileMode(0o644 | header.Mode&0o111)
 
 		out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
 		if err != nil {
 			return "", 0, errors.Wrapf(err, "failed to create %s", target)
 		}
-		if _, err := io.Copy(out, tr); err != nil {
-			err = errors.Wrapf(err, "failed to write %s", target)
+		if written, err := io.Copy(out, tr); err != nil {
+			err = errors.Wrapf(err, "failed to write %s after %d of its %d bytes", target, written, header.Size)
 			err = sqlclose.With(err, out.Close(), target)
 			return "", 0, err
 		}
@@ -214,7 +212,7 @@ func extractArchive(archive []byte, dir, binaryName string) (_ string, _ int, er
 		files++
 
 		if filepath.Base(rel) == binaryName {
-			binary = target
+			binary, found = target, true
 			// The binary must be executable whatever the archive claimed —
 			// tar modes survive some packaging pipelines and not others.
 			if err := os.Chmod(target, 0o755); err != nil {
@@ -223,7 +221,7 @@ func extractArchive(archive []byte, dir, binaryName string) (_ string, _ int, er
 		}
 	}
 
-	if binary == "" {
+	if !found {
 		err := errors.Newf("archive contains no file named %s (has: %s)", binaryName, strings.Join(seen, ", "))
 		return "", 0, errors.WithHintf(err, "the release asset must contain the plugin binary named %s", binaryName)
 	}
@@ -232,23 +230,23 @@ func extractArchive(archive []byte, dir, binaryName string) (_ string, _ int, er
 }
 
 // safeArchivePath rejects an archive entry that would write outside the
-// directory it is being unpacked into. Returns the cleaned relative path, or
-// empty for an entry that names the directory itself.
-func safeArchivePath(name string) (string, error) {
+// directory it is being unpacked into. Returns the cleaned relative path, and
+// whether it is inside the directory rather than the directory itself.
+func safeArchivePath(name string) (string, bool, error) {
 	if filepath.IsAbs(name) || strings.HasPrefix(name, "/") {
-		return "", errors.Newf("archive entry %q is an absolute path", name)
+		return "", false, errors.Newf("archive entry %q is an absolute path", name)
 	}
 
 	clean := filepath.Clean(filepath.FromSlash(name))
 	if clean == "." || clean == string(filepath.Separator) {
-		return "", nil
+		return clean, false, nil
 	}
 
 	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
-		return "", errors.Newf("archive entry %q escapes the plugin directory", name)
+		return "", false, errors.Newf("archive entry %q escapes the plugin directory", name)
 	}
 
-	return clean, nil
+	return clean, true, nil
 }
 
 // install unpacks archive into dir, replacing whatever was there, and returns

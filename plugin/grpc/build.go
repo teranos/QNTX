@@ -36,8 +36,8 @@ func PackageBuild(name, binary string) ([]byte, error) {
 	if err := tw.WriteHeader(header); err != nil {
 		return nil, errors.Wrapf(err, "failed to package %s", binary)
 	}
-	if _, err := tw.Write(data); err != nil {
-		return nil, errors.Wrapf(err, "failed to package %s", binary)
+	if written, err := tw.Write(data); err != nil {
+		return nil, errors.Wrapf(err, "failed to package %s: %d of its %d bytes went in", binary, written, len(data))
 	}
 	if err := tw.Close(); err != nil {
 		return nil, errors.Wrapf(err, "failed to package %s", binary)
