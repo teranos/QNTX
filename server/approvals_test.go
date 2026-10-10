@@ -54,13 +54,14 @@ func approvingServer(t *testing.T) (*QNTXServer, *fakeGitHub) {
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]any{"token": "ghs_minted", "expires_at": "2099-01-01T00:00:00Z",
 				"permissions": map[string]string{"contents": "write", "pull_requests": "write"}})
-		case route == "GET /repos/teranos/elements/commits/main/check-suites":
+		case route == "GET /repos/teranos/elements/commits/main/check-runs":
 			status, conclusion := "in_progress", ""
 			if fake.mainGreen {
 				status, conclusion = "completed", "success"
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"total_count": 1, "check_suites": []map[string]any{
-				{"id": 1, "head_branch": "main", "status": status, "conclusion": conclusion, "latest_check_runs_count": 3},
+			_ = json.NewEncoder(w).Encode(map[string]any{"total_count": 2, "check_runs": []map[string]any{
+				{"id": 1, "name": "TypeScript", "head_sha": "35174ca", "status": "completed", "conclusion": "success"},
+				{"id": 2, "name": "Browser", "head_sha": "35174ca", "status": status, "conclusion": conclusion},
 			}})
 		case strings.HasPrefix(route, "PUT /repos/teranos/elements/pulls/") && strings.HasSuffix(route, "/merge"):
 			fake.merges = append(fake.merges, string(body))
