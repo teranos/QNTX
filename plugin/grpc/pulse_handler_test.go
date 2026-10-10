@@ -42,11 +42,16 @@ func TestWriteLogs(t *testing.T) {
 			Message:   "Starting timeline sync",
 		},
 		{
-			Stage:    "timeline-sync",
-			Level:    "info",
-			Message:  "Timeline sync completed",
-			Metadata: `{"items_synced": 42}`,
-			// No timestamp — handler should fill in current time
+			Stage:   "timeline-sync",
+			Level:   "info",
+			Message: "a line that says no time",
+		},
+		{
+			Stage:     "timeline-sync",
+			Timestamp: "2026-02-24T15:15:16+01:00",
+			Level:     "info",
+			Message:   "Timeline sync completed",
+			Metadata:  `{"items_synced": 42}`,
 		},
 	}
 
@@ -69,6 +74,8 @@ func TestWriteLogs(t *testing.T) {
 	}
 	require.NoError(t, rows.Err())
 
+	// "zero means zero"
+	// A line that says no time is not written at a time it never said.
 	require.Len(t, logs, 2)
 
 	assert.Equal(t, "timeline-sync", logs[0].stage)
