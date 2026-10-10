@@ -101,7 +101,7 @@ func TestATSStoreServer_GenerateAndCreate_NilCommand(t *testing.T) {
 	})
 	require.NoError(t, err, "RPC should not return transport error")
 	assert.False(t, resp.Success)
-	assert.Contains(t, resp.Error, "names no source")
+	assert.Contains(t, resp.Error, "source of the command")
 }
 
 func TestATSStoreServer_GenerateAndCreate_ValidCommand(t *testing.T) {
@@ -126,8 +126,10 @@ func TestATSStoreServer_GenerateAndCreate_ValidCommand(t *testing.T) {
 			Subjects:   []string{"test-subject"},
 			Predicates: []string{"test-predicate"},
 			Contexts:   []string{"test-context"},
-			Actors:     []string{"test-actor"},
+			By:         &protocol.AttestationCommand_ActorsNamed{ActorsNamed: &protocol.ActorNames{Names: []string{"test-actor"}}},
+			When:       &protocol.AttestationCommand_Now{Now: true},
 			Source:     "test",
+			Version:    &protocol.AttestationCommand_SourceVersion{SourceVersion: "1.0.0"},
 		},
 	})
 	require.NoError(t, err, "RPC should not return transport error")

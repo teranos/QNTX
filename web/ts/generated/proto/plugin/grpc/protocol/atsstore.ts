@@ -29,21 +29,44 @@ export interface Attestation {
   signer_did: string;
 }
 
-/** AttestationCommand is used for creating attestations */
+/**
+ * AttestationCommand is used for creating attestations. Each oneof names one
+ * of its sides; a command naming neither is refused, and so is a bool side
+ * sent false.
+ */
 export interface AttestationCommand {
   subjects: string[];
   predicates: string[];
   contexts: string[];
-  actors: string[];
-  /** Unix timestamp in milliseconds. If not set, server uses current time. */
-  timestamp?: number | undefined;
+  actors_named?:
+    | ActorNames
+    | undefined;
+  /** "the node" authors it. */
+  by_node?:
+    | boolean
+    | undefined;
+  /** Unix timestamp in milliseconds. */
+  timestamp?:
+    | number
+    | undefined;
+  /** When the node writes it. */
+  now?: boolean | undefined;
   attributes:
     | { [key: string]: any }
     | undefined;
   /** Plugin name that created this attestation (e.g. "python", "atproto") */
   source: string;
-  /** Plugin version that created this attestation (e.g. "0.5.3") */
-  source_version: string;
+  /** As the plugin says it (e.g. "0.5.3"). */
+  source_version?:
+    | string
+    | undefined;
+  /** As the node's plugin registry has it for source. */
+  version_from_registry?: boolean | undefined;
+}
+
+/** ActorNames are the actors a command names. */
+export interface ActorNames {
+  names: string[];
 }
 
 /** AttestationFilter for querying attestations */
@@ -52,16 +75,18 @@ export interface AttestationFilter {
   predicates: string[];
   contexts: string[];
   actors: string[];
-  /** Unix timestamp in milliseconds. If not set, no lower bound. */
-  time_start?:
-    | number
+  /** Unix timestamp in milliseconds. */
+  time_start?: number | undefined;
+  unbounded_start?:
+    | boolean
     | undefined;
-  /** Unix timestamp in milliseconds. If not set, no upper bound. */
-  time_end?:
-    | number
+  /** Unix timestamp in milliseconds. */
+  time_end?: number | undefined;
+  unbounded_end?:
+    | boolean
     | undefined;
-  /** Maximum results. If not set, no limit applied. */
-  limit?: number | undefined;
+  /** How many rows at most: 0 is none, every row is 2147483647. */
+  limit: number;
 }
 
 export interface CreateAttestationRequest {

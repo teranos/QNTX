@@ -43,16 +43,37 @@ message Attestation {
   string signer_did = 11;     // did:key of the signing node (optional)
 }
 
-// AttestationCommand is used for creating attestations
+// AttestationCommand is used for creating attestations. Each oneof names one
+// of its sides; a command naming neither is refused, and so is a bool side
+// sent false.
 message AttestationCommand {
   repeated string subjects = 1;
   repeated string predicates = 2;
   repeated string contexts = 3;
-  repeated string actors = 4;
-  optional int64 timestamp = 5;  // Unix timestamp in milliseconds. If not set, server uses current time.
+  reserved 4;
+  reserved "actors";
+  // Who made it: the actors it names, at least one, or the node.
+  oneof by {
+    ActorNames actors_named = 12;
+    bool by_node = 10;           // "the node" authors it.
+  }
+  // When it was made.
+  oneof when {
+    int64 timestamp = 5;         // Unix timestamp in milliseconds.
+    bool now = 9;                // When the node writes it.
+  }
   google.protobuf.Struct attributes = 6;
   string source = 7;             // Plugin name that created this attestation (e.g. "python", "atproto")
-  string source_version = 8;     // Plugin version that created this attestation (e.g. "0.5.3")
+  // The version of the plugin that created it.
+  oneof version {
+    string source_version = 8;   // As the plugin says it (e.g. "0.5.3").
+    bool version_from_registry = 11; // As the node's plugin registry has it for source.
+  }
+}
+
+// ActorNames are the actors a command names.
+message ActorNames {
+  repeated string names = 1;
 }
 
 // AttestationFilter for querying attestations
@@ -61,9 +82,16 @@ message AttestationFilter {
   repeated string predicates = 2;
   repeated string contexts = 3;
   repeated string actors = 4;
-  optional int64 time_start = 5;  // Unix timestamp in milliseconds. If not set, no lower bound.
-  optional int64 time_end = 6;    // Unix timestamp in milliseconds. If not set, no upper bound.
-  optional int32 limit = 7;      // Maximum results. If not set, no limit applied.
+  // Where the time range starts, and where it ends: a bound, or none.
+  oneof from {
+    int64 time_start = 5;        // Unix timestamp in milliseconds.
+    bool unbounded_start = 8;
+  }
+  oneof to {
+    int64 time_end = 6;          // Unix timestamp in milliseconds.
+    bool unbounded_end = 9;
+  }
+  int32 limit = 7;               // How many rows at most: 0 is none, every row is 2147483647.
 }
 
 message CreateAttestationRequest {

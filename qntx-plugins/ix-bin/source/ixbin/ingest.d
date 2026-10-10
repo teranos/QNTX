@@ -139,6 +139,8 @@ private AttestationCommand makeAttestation(string source, string context, string
     cmd.subjects = [source];
     cmd.predicates = ["ingested"];
     cmd.contexts = [context];
+    cmd.now = true;
+    cmd.byNode = true;
     cmd.source = "ix-bin";
     cmd.sourceVersion = PLUGIN_VERSION;
     cmd.attributes = encodeStructFromStringMap(summary);

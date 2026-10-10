@@ -451,13 +451,19 @@ struct ExecuteJobResponse {
 // ATS Store protocol messages (mirrors atsstore.proto)
 // ---------------------------------------------------------------------------
 
+// Each oneof of the command names one side: its actors, and now.
 struct AttestationCommand {
     @Proto(1) string[] subjects;
     @Proto(2) string[] predicates;
     @Proto(3) string[] contexts;
-    @Proto(4) string[] actors;
+    @Proto(12) ActorNames actorsNamed; // oneof by
+    @Proto(9) bool now;                // oneof when: when the node writes it
     @Proto(7) string source;
     @Proto(8) string sourceVersion;
+}
+
+struct ActorNames {
+    @Proto(1) string[] names;
 }
 
 struct GenerateAttestationRequest {
@@ -475,6 +481,9 @@ struct AttestationFilter {
     @Proto(2) @Repeated string[] predicates;
     @Proto(3) @Repeated string[] contexts;
     @Proto(4) @Repeated string[] actors;
+    @Proto(7) int limit;          // 0 is none; every row is int.max
+    @Proto(8) bool unboundedStart; // oneof from
+    @Proto(9) bool unboundedEnd;   // oneof to
 }
 
 struct GetAttestationsRequest {

@@ -147,17 +147,37 @@ func (x *Attestation) GetSignerDid() string {
 	return ""
 }
 
-// AttestationCommand is used for creating attestations
+// AttestationCommand is used for creating attestations. Each oneof names one
+// of its sides; a command naming neither is refused, and so is a bool side
+// sent false.
 type AttestationCommand struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Subjects      []string               `protobuf:"bytes,1,rep,name=subjects,proto3" json:"subjects,omitempty"`
-	Predicates    []string               `protobuf:"bytes,2,rep,name=predicates,proto3" json:"predicates,omitempty"`
-	Contexts      []string               `protobuf:"bytes,3,rep,name=contexts,proto3" json:"contexts,omitempty"`
-	Actors        []string               `protobuf:"bytes,4,rep,name=actors,proto3" json:"actors,omitempty"`
-	Timestamp     *int64                 `protobuf:"varint,5,opt,name=timestamp,proto3,oneof" json:"timestamp,omitempty"` // Unix timestamp in milliseconds. If not set, server uses current time.
-	Attributes    *structpb.Struct       `protobuf:"bytes,6,opt,name=attributes,proto3" json:"attributes,omitempty"`
-	Source        string                 `protobuf:"bytes,7,opt,name=source,proto3" json:"source,omitempty"`                                    // Plugin name that created this attestation (e.g. "python", "atproto")
-	SourceVersion string                 `protobuf:"bytes,8,opt,name=source_version,json=sourceVersion,proto3" json:"source_version,omitempty"` // Plugin version that created this attestation (e.g. "0.5.3")
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Subjects   []string               `protobuf:"bytes,1,rep,name=subjects,proto3" json:"subjects,omitempty"`
+	Predicates []string               `protobuf:"bytes,2,rep,name=predicates,proto3" json:"predicates,omitempty"`
+	Contexts   []string               `protobuf:"bytes,3,rep,name=contexts,proto3" json:"contexts,omitempty"`
+	// Who made it: the actors it names, at least one, or the node.
+	//
+	// Types that are valid to be assigned to By:
+	//
+	//	*AttestationCommand_ActorsNamed
+	//	*AttestationCommand_ByNode
+	By isAttestationCommand_By `protobuf_oneof:"by"`
+	// When it was made.
+	//
+	// Types that are valid to be assigned to When:
+	//
+	//	*AttestationCommand_Timestamp
+	//	*AttestationCommand_Now
+	When       isAttestationCommand_When `protobuf_oneof:"when"`
+	Attributes *structpb.Struct          `protobuf:"bytes,6,opt,name=attributes,proto3" json:"attributes,omitempty"`
+	Source     string                    `protobuf:"bytes,7,opt,name=source,proto3" json:"source,omitempty"` // Plugin name that created this attestation (e.g. "python", "atproto")
+	// The version of the plugin that created it.
+	//
+	// Types that are valid to be assigned to Version:
+	//
+	//	*AttestationCommand_SourceVersion
+	//	*AttestationCommand_VersionFromRegistry
+	Version       isAttestationCommand_Version `protobuf_oneof:"version"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -213,18 +233,54 @@ func (x *AttestationCommand) GetContexts() []string {
 	return nil
 }
 
-func (x *AttestationCommand) GetActors() []string {
+func (x *AttestationCommand) GetBy() isAttestationCommand_By {
 	if x != nil {
-		return x.Actors
+		return x.By
+	}
+	return nil
+}
+
+func (x *AttestationCommand) GetActorsNamed() *ActorNames {
+	if x != nil {
+		if x, ok := x.By.(*AttestationCommand_ActorsNamed); ok {
+			return x.ActorsNamed
+		}
+	}
+	return nil
+}
+
+func (x *AttestationCommand) GetByNode() bool {
+	if x != nil {
+		if x, ok := x.By.(*AttestationCommand_ByNode); ok {
+			return x.ByNode
+		}
+	}
+	return false
+}
+
+func (x *AttestationCommand) GetWhen() isAttestationCommand_When {
+	if x != nil {
+		return x.When
 	}
 	return nil
 }
 
 func (x *AttestationCommand) GetTimestamp() int64 {
-	if x != nil && x.Timestamp != nil {
-		return *x.Timestamp
+	if x != nil {
+		if x, ok := x.When.(*AttestationCommand_Timestamp); ok {
+			return x.Timestamp
+		}
 	}
 	return 0
+}
+
+func (x *AttestationCommand) GetNow() bool {
+	if x != nil {
+		if x, ok := x.When.(*AttestationCommand_Now); ok {
+			return x.Now
+		}
+	}
+	return false
 }
 
 func (x *AttestationCommand) GetAttributes() *structpb.Struct {
@@ -241,30 +297,151 @@ func (x *AttestationCommand) GetSource() string {
 	return ""
 }
 
+func (x *AttestationCommand) GetVersion() isAttestationCommand_Version {
+	if x != nil {
+		return x.Version
+	}
+	return nil
+}
+
 func (x *AttestationCommand) GetSourceVersion() string {
 	if x != nil {
-		return x.SourceVersion
+		if x, ok := x.Version.(*AttestationCommand_SourceVersion); ok {
+			return x.SourceVersion
+		}
 	}
 	return ""
 }
 
+func (x *AttestationCommand) GetVersionFromRegistry() bool {
+	if x != nil {
+		if x, ok := x.Version.(*AttestationCommand_VersionFromRegistry); ok {
+			return x.VersionFromRegistry
+		}
+	}
+	return false
+}
+
+type isAttestationCommand_By interface {
+	isAttestationCommand_By()
+}
+
+type AttestationCommand_ActorsNamed struct {
+	ActorsNamed *ActorNames `protobuf:"bytes,12,opt,name=actors_named,json=actorsNamed,proto3,oneof"`
+}
+
+type AttestationCommand_ByNode struct {
+	ByNode bool `protobuf:"varint,10,opt,name=by_node,json=byNode,proto3,oneof"` // "the node" authors it.
+}
+
+func (*AttestationCommand_ActorsNamed) isAttestationCommand_By() {}
+
+func (*AttestationCommand_ByNode) isAttestationCommand_By() {}
+
+type isAttestationCommand_When interface {
+	isAttestationCommand_When()
+}
+
+type AttestationCommand_Timestamp struct {
+	Timestamp int64 `protobuf:"varint,5,opt,name=timestamp,proto3,oneof"` // Unix timestamp in milliseconds.
+}
+
+type AttestationCommand_Now struct {
+	Now bool `protobuf:"varint,9,opt,name=now,proto3,oneof"` // When the node writes it.
+}
+
+func (*AttestationCommand_Timestamp) isAttestationCommand_When() {}
+
+func (*AttestationCommand_Now) isAttestationCommand_When() {}
+
+type isAttestationCommand_Version interface {
+	isAttestationCommand_Version()
+}
+
+type AttestationCommand_SourceVersion struct {
+	SourceVersion string `protobuf:"bytes,8,opt,name=source_version,json=sourceVersion,proto3,oneof"` // As the plugin says it (e.g. "0.5.3").
+}
+
+type AttestationCommand_VersionFromRegistry struct {
+	VersionFromRegistry bool `protobuf:"varint,11,opt,name=version_from_registry,json=versionFromRegistry,proto3,oneof"` // As the node's plugin registry has it for source.
+}
+
+func (*AttestationCommand_SourceVersion) isAttestationCommand_Version() {}
+
+func (*AttestationCommand_VersionFromRegistry) isAttestationCommand_Version() {}
+
+// ActorNames are the actors a command names.
+type ActorNames struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Names         []string               `protobuf:"bytes,1,rep,name=names,proto3" json:"names,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActorNames) Reset() {
+	*x = ActorNames{}
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActorNames) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActorNames) ProtoMessage() {}
+
+func (x *ActorNames) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActorNames.ProtoReflect.Descriptor instead.
+func (*ActorNames) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ActorNames) GetNames() []string {
+	if x != nil {
+		return x.Names
+	}
+	return nil
+}
+
 // AttestationFilter for querying attestations
 type AttestationFilter struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Subjects      []string               `protobuf:"bytes,1,rep,name=subjects,proto3" json:"subjects,omitempty"`
-	Predicates    []string               `protobuf:"bytes,2,rep,name=predicates,proto3" json:"predicates,omitempty"`
-	Contexts      []string               `protobuf:"bytes,3,rep,name=contexts,proto3" json:"contexts,omitempty"`
-	Actors        []string               `protobuf:"bytes,4,rep,name=actors,proto3" json:"actors,omitempty"`
-	TimeStart     *int64                 `protobuf:"varint,5,opt,name=time_start,json=timeStart,proto3,oneof" json:"time_start,omitempty"` // Unix timestamp in milliseconds. If not set, no lower bound.
-	TimeEnd       *int64                 `protobuf:"varint,6,opt,name=time_end,json=timeEnd,proto3,oneof" json:"time_end,omitempty"`       // Unix timestamp in milliseconds. If not set, no upper bound.
-	Limit         *int32                 `protobuf:"varint,7,opt,name=limit,proto3,oneof" json:"limit,omitempty"`                          // Maximum results. If not set, no limit applied.
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Subjects   []string               `protobuf:"bytes,1,rep,name=subjects,proto3" json:"subjects,omitempty"`
+	Predicates []string               `protobuf:"bytes,2,rep,name=predicates,proto3" json:"predicates,omitempty"`
+	Contexts   []string               `protobuf:"bytes,3,rep,name=contexts,proto3" json:"contexts,omitempty"`
+	Actors     []string               `protobuf:"bytes,4,rep,name=actors,proto3" json:"actors,omitempty"`
+	// Where the time range starts, and where it ends: a bound, or none.
+	//
+	// Types that are valid to be assigned to From:
+	//
+	//	*AttestationFilter_TimeStart
+	//	*AttestationFilter_UnboundedStart
+	From isAttestationFilter_From `protobuf_oneof:"from"`
+	// Types that are valid to be assigned to To:
+	//
+	//	*AttestationFilter_TimeEnd
+	//	*AttestationFilter_UnboundedEnd
+	To            isAttestationFilter_To `protobuf_oneof:"to"`
+	Limit         int32                  `protobuf:"varint,7,opt,name=limit,proto3" json:"limit,omitempty"` // How many rows at most: 0 is none, every row is 2147483647.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AttestationFilter) Reset() {
 	*x = AttestationFilter{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -276,7 +453,7 @@ func (x *AttestationFilter) String() string {
 func (*AttestationFilter) ProtoMessage() {}
 
 func (x *AttestationFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -289,7 +466,7 @@ func (x *AttestationFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttestationFilter.ProtoReflect.Descriptor instead.
 func (*AttestationFilter) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{2}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AttestationFilter) GetSubjects() []string {
@@ -320,26 +497,94 @@ func (x *AttestationFilter) GetActors() []string {
 	return nil
 }
 
+func (x *AttestationFilter) GetFrom() isAttestationFilter_From {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
 func (x *AttestationFilter) GetTimeStart() int64 {
-	if x != nil && x.TimeStart != nil {
-		return *x.TimeStart
+	if x != nil {
+		if x, ok := x.From.(*AttestationFilter_TimeStart); ok {
+			return x.TimeStart
+		}
 	}
 	return 0
+}
+
+func (x *AttestationFilter) GetUnboundedStart() bool {
+	if x != nil {
+		if x, ok := x.From.(*AttestationFilter_UnboundedStart); ok {
+			return x.UnboundedStart
+		}
+	}
+	return false
+}
+
+func (x *AttestationFilter) GetTo() isAttestationFilter_To {
+	if x != nil {
+		return x.To
+	}
+	return nil
 }
 
 func (x *AttestationFilter) GetTimeEnd() int64 {
-	if x != nil && x.TimeEnd != nil {
-		return *x.TimeEnd
+	if x != nil {
+		if x, ok := x.To.(*AttestationFilter_TimeEnd); ok {
+			return x.TimeEnd
+		}
 	}
 	return 0
 }
 
+func (x *AttestationFilter) GetUnboundedEnd() bool {
+	if x != nil {
+		if x, ok := x.To.(*AttestationFilter_UnboundedEnd); ok {
+			return x.UnboundedEnd
+		}
+	}
+	return false
+}
+
 func (x *AttestationFilter) GetLimit() int32 {
-	if x != nil && x.Limit != nil {
-		return *x.Limit
+	if x != nil {
+		return x.Limit
 	}
 	return 0
 }
+
+type isAttestationFilter_From interface {
+	isAttestationFilter_From()
+}
+
+type AttestationFilter_TimeStart struct {
+	TimeStart int64 `protobuf:"varint,5,opt,name=time_start,json=timeStart,proto3,oneof"` // Unix timestamp in milliseconds.
+}
+
+type AttestationFilter_UnboundedStart struct {
+	UnboundedStart bool `protobuf:"varint,8,opt,name=unbounded_start,json=unboundedStart,proto3,oneof"`
+}
+
+func (*AttestationFilter_TimeStart) isAttestationFilter_From() {}
+
+func (*AttestationFilter_UnboundedStart) isAttestationFilter_From() {}
+
+type isAttestationFilter_To interface {
+	isAttestationFilter_To()
+}
+
+type AttestationFilter_TimeEnd struct {
+	TimeEnd int64 `protobuf:"varint,6,opt,name=time_end,json=timeEnd,proto3,oneof"` // Unix timestamp in milliseconds.
+}
+
+type AttestationFilter_UnboundedEnd struct {
+	UnboundedEnd bool `protobuf:"varint,9,opt,name=unbounded_end,json=unboundedEnd,proto3,oneof"`
+}
+
+func (*AttestationFilter_TimeEnd) isAttestationFilter_To() {}
+
+func (*AttestationFilter_UnboundedEnd) isAttestationFilter_To() {}
 
 type CreateAttestationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -351,7 +596,7 @@ type CreateAttestationRequest struct {
 
 func (x *CreateAttestationRequest) Reset() {
 	*x = CreateAttestationRequest{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -363,7 +608,7 @@ func (x *CreateAttestationRequest) String() string {
 func (*CreateAttestationRequest) ProtoMessage() {}
 
 func (x *CreateAttestationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -376,7 +621,7 @@ func (x *CreateAttestationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAttestationRequest.ProtoReflect.Descriptor instead.
 func (*CreateAttestationRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{3}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateAttestationRequest) GetAuthToken() string {
@@ -403,7 +648,7 @@ type CreateAttestationResponse struct {
 
 func (x *CreateAttestationResponse) Reset() {
 	*x = CreateAttestationResponse{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -415,7 +660,7 @@ func (x *CreateAttestationResponse) String() string {
 func (*CreateAttestationResponse) ProtoMessage() {}
 
 func (x *CreateAttestationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -428,7 +673,7 @@ func (x *CreateAttestationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAttestationResponse.ProtoReflect.Descriptor instead.
 func (*CreateAttestationResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreateAttestationResponse) GetSuccess() bool {
@@ -455,7 +700,7 @@ type AttestationExistsRequest struct {
 
 func (x *AttestationExistsRequest) Reset() {
 	*x = AttestationExistsRequest{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +712,7 @@ func (x *AttestationExistsRequest) String() string {
 func (*AttestationExistsRequest) ProtoMessage() {}
 
 func (x *AttestationExistsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +725,7 @@ func (x *AttestationExistsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttestationExistsRequest.ProtoReflect.Descriptor instead.
 func (*AttestationExistsRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *AttestationExistsRequest) GetAuthToken() string {
@@ -506,7 +751,7 @@ type AttestationExistsResponse struct {
 
 func (x *AttestationExistsResponse) Reset() {
 	*x = AttestationExistsResponse{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -518,7 +763,7 @@ func (x *AttestationExistsResponse) String() string {
 func (*AttestationExistsResponse) ProtoMessage() {}
 
 func (x *AttestationExistsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -531,7 +776,7 @@ func (x *AttestationExistsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttestationExistsResponse.ProtoReflect.Descriptor instead.
 func (*AttestationExistsResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{6}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AttestationExistsResponse) GetExists() bool {
@@ -551,7 +796,7 @@ type GenerateAttestationRequest struct {
 
 func (x *GenerateAttestationRequest) Reset() {
 	*x = GenerateAttestationRequest{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -563,7 +808,7 @@ func (x *GenerateAttestationRequest) String() string {
 func (*GenerateAttestationRequest) ProtoMessage() {}
 
 func (x *GenerateAttestationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -576,7 +821,7 @@ func (x *GenerateAttestationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateAttestationRequest.ProtoReflect.Descriptor instead.
 func (*GenerateAttestationRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{7}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GenerateAttestationRequest) GetAuthToken() string {
@@ -604,7 +849,7 @@ type GenerateAttestationResponse struct {
 
 func (x *GenerateAttestationResponse) Reset() {
 	*x = GenerateAttestationResponse{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[8]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -616,7 +861,7 @@ func (x *GenerateAttestationResponse) String() string {
 func (*GenerateAttestationResponse) ProtoMessage() {}
 
 func (x *GenerateAttestationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[8]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -629,7 +874,7 @@ func (x *GenerateAttestationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateAttestationResponse.ProtoReflect.Descriptor instead.
 func (*GenerateAttestationResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{8}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GenerateAttestationResponse) GetSuccess() bool {
@@ -663,7 +908,7 @@ type BatchGenerateAttestationRequest struct {
 
 func (x *BatchGenerateAttestationRequest) Reset() {
 	*x = BatchGenerateAttestationRequest{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -675,7 +920,7 @@ func (x *BatchGenerateAttestationRequest) String() string {
 func (*BatchGenerateAttestationRequest) ProtoMessage() {}
 
 func (x *BatchGenerateAttestationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -688,7 +933,7 @@ func (x *BatchGenerateAttestationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchGenerateAttestationRequest.ProtoReflect.Descriptor instead.
 func (*BatchGenerateAttestationRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{9}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BatchGenerateAttestationRequest) GetAuthToken() string {
@@ -716,7 +961,7 @@ type BatchGenerateAttestationResponse struct {
 
 func (x *BatchGenerateAttestationResponse) Reset() {
 	*x = BatchGenerateAttestationResponse{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +973,7 @@ func (x *BatchGenerateAttestationResponse) String() string {
 func (*BatchGenerateAttestationResponse) ProtoMessage() {}
 
 func (x *BatchGenerateAttestationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -741,7 +986,7 @@ func (x *BatchGenerateAttestationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchGenerateAttestationResponse.ProtoReflect.Descriptor instead.
 func (*BatchGenerateAttestationResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{10}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *BatchGenerateAttestationResponse) GetSuccess() bool {
@@ -775,7 +1020,7 @@ type GetAttestationsRequest struct {
 
 func (x *GetAttestationsRequest) Reset() {
 	*x = GetAttestationsRequest{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -787,7 +1032,7 @@ func (x *GetAttestationsRequest) String() string {
 func (*GetAttestationsRequest) ProtoMessage() {}
 
 func (x *GetAttestationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -800,7 +1045,7 @@ func (x *GetAttestationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAttestationsRequest.ProtoReflect.Descriptor instead.
 func (*GetAttestationsRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{11}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetAttestationsRequest) GetAuthToken() string {
@@ -828,7 +1073,7 @@ type GetAttestationsResponse struct {
 
 func (x *GetAttestationsResponse) Reset() {
 	*x = GetAttestationsResponse{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -840,7 +1085,7 @@ func (x *GetAttestationsResponse) String() string {
 func (*GetAttestationsResponse) ProtoMessage() {}
 
 func (x *GetAttestationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -853,7 +1098,7 @@ func (x *GetAttestationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAttestationsResponse.ProtoReflect.Descriptor instead.
 func (*GetAttestationsResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{12}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetAttestationsResponse) GetSuccess() bool {
@@ -900,36 +1145,45 @@ const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"\tsignature\x18\n" +
 	" \x01(\fR\tsignature\x12\x1d\n" +
 	"\n" +
-	"signer_did\x18\v \x01(\tR\tsignerDid\"\xad\x02\n" +
+	"signer_did\x18\v \x01(\tR\tsignerDid\"\xcd\x03\n" +
 	"\x12AttestationCommand\x12\x1a\n" +
 	"\bsubjects\x18\x01 \x03(\tR\bsubjects\x12\x1e\n" +
 	"\n" +
 	"predicates\x18\x02 \x03(\tR\n" +
 	"predicates\x12\x1a\n" +
-	"\bcontexts\x18\x03 \x03(\tR\bcontexts\x12\x16\n" +
-	"\x06actors\x18\x04 \x03(\tR\x06actors\x12!\n" +
-	"\ttimestamp\x18\x05 \x01(\x03H\x00R\ttimestamp\x88\x01\x01\x127\n" +
+	"\bcontexts\x18\x03 \x03(\tR\bcontexts\x129\n" +
+	"\factors_named\x18\f \x01(\v2\x14.protocol.ActorNamesH\x00R\vactorsNamed\x12\x19\n" +
+	"\aby_node\x18\n" +
+	" \x01(\bH\x00R\x06byNode\x12\x1e\n" +
+	"\ttimestamp\x18\x05 \x01(\x03H\x01R\ttimestamp\x12\x12\n" +
+	"\x03now\x18\t \x01(\bH\x01R\x03now\x127\n" +
 	"\n" +
 	"attributes\x18\x06 \x01(\v2\x17.google.protobuf.StructR\n" +
 	"attributes\x12\x16\n" +
-	"\x06source\x18\a \x01(\tR\x06source\x12%\n" +
-	"\x0esource_version\x18\b \x01(\tR\rsourceVersionB\f\n" +
+	"\x06source\x18\a \x01(\tR\x06source\x12'\n" +
+	"\x0esource_version\x18\b \x01(\tH\x02R\rsourceVersion\x124\n" +
+	"\x15version_from_registry\x18\v \x01(\bH\x02R\x13versionFromRegistryB\x04\n" +
+	"\x02byB\x06\n" +
+	"\x04whenB\t\n" +
+	"\aversionJ\x04\b\x04\x10\x05R\x06actors\"\"\n" +
 	"\n" +
-	"_timestamp\"\x88\x02\n" +
+	"ActorNames\x12\x14\n" +
+	"\x05names\x18\x01 \x03(\tR\x05names\"\xb7\x02\n" +
 	"\x11AttestationFilter\x12\x1a\n" +
 	"\bsubjects\x18\x01 \x03(\tR\bsubjects\x12\x1e\n" +
 	"\n" +
 	"predicates\x18\x02 \x03(\tR\n" +
 	"predicates\x12\x1a\n" +
 	"\bcontexts\x18\x03 \x03(\tR\bcontexts\x12\x16\n" +
-	"\x06actors\x18\x04 \x03(\tR\x06actors\x12\"\n" +
+	"\x06actors\x18\x04 \x03(\tR\x06actors\x12\x1f\n" +
 	"\n" +
-	"time_start\x18\x05 \x01(\x03H\x00R\ttimeStart\x88\x01\x01\x12\x1e\n" +
-	"\btime_end\x18\x06 \x01(\x03H\x01R\atimeEnd\x88\x01\x01\x12\x19\n" +
-	"\x05limit\x18\a \x01(\x05H\x02R\x05limit\x88\x01\x01B\r\n" +
-	"\v_time_startB\v\n" +
-	"\t_time_endB\b\n" +
-	"\x06_limit\"r\n" +
+	"time_start\x18\x05 \x01(\x03H\x00R\ttimeStart\x12)\n" +
+	"\x0funbounded_start\x18\b \x01(\bH\x00R\x0eunboundedStart\x12\x1b\n" +
+	"\btime_end\x18\x06 \x01(\x03H\x01R\atimeEnd\x12%\n" +
+	"\runbounded_end\x18\t \x01(\bH\x01R\funboundedEnd\x12\x14\n" +
+	"\x05limit\x18\a \x01(\x05R\x05limitB\x06\n" +
+	"\x04fromB\x04\n" +
+	"\x02to\"r\n" +
 	"\x18CreateAttestationRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x127\n" +
@@ -987,49 +1241,51 @@ func file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_atsstore_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_atsstore_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_plugin_grpc_protocol_atsstore_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_plugin_grpc_protocol_atsstore_proto_goTypes = []any{
 	(*Attestation)(nil),                      // 0: protocol.Attestation
 	(*AttestationCommand)(nil),               // 1: protocol.AttestationCommand
-	(*AttestationFilter)(nil),                // 2: protocol.AttestationFilter
-	(*CreateAttestationRequest)(nil),         // 3: protocol.CreateAttestationRequest
-	(*CreateAttestationResponse)(nil),        // 4: protocol.CreateAttestationResponse
-	(*AttestationExistsRequest)(nil),         // 5: protocol.AttestationExistsRequest
-	(*AttestationExistsResponse)(nil),        // 6: protocol.AttestationExistsResponse
-	(*GenerateAttestationRequest)(nil),       // 7: protocol.GenerateAttestationRequest
-	(*GenerateAttestationResponse)(nil),      // 8: protocol.GenerateAttestationResponse
-	(*BatchGenerateAttestationRequest)(nil),  // 9: protocol.BatchGenerateAttestationRequest
-	(*BatchGenerateAttestationResponse)(nil), // 10: protocol.BatchGenerateAttestationResponse
-	(*GetAttestationsRequest)(nil),           // 11: protocol.GetAttestationsRequest
-	(*GetAttestationsResponse)(nil),          // 12: protocol.GetAttestationsResponse
-	(*structpb.Struct)(nil),                  // 13: google.protobuf.Struct
+	(*ActorNames)(nil),                       // 2: protocol.ActorNames
+	(*AttestationFilter)(nil),                // 3: protocol.AttestationFilter
+	(*CreateAttestationRequest)(nil),         // 4: protocol.CreateAttestationRequest
+	(*CreateAttestationResponse)(nil),        // 5: protocol.CreateAttestationResponse
+	(*AttestationExistsRequest)(nil),         // 6: protocol.AttestationExistsRequest
+	(*AttestationExistsResponse)(nil),        // 7: protocol.AttestationExistsResponse
+	(*GenerateAttestationRequest)(nil),       // 8: protocol.GenerateAttestationRequest
+	(*GenerateAttestationResponse)(nil),      // 9: protocol.GenerateAttestationResponse
+	(*BatchGenerateAttestationRequest)(nil),  // 10: protocol.BatchGenerateAttestationRequest
+	(*BatchGenerateAttestationResponse)(nil), // 11: protocol.BatchGenerateAttestationResponse
+	(*GetAttestationsRequest)(nil),           // 12: protocol.GetAttestationsRequest
+	(*GetAttestationsResponse)(nil),          // 13: protocol.GetAttestationsResponse
+	(*structpb.Struct)(nil),                  // 14: google.protobuf.Struct
 }
 var file_plugin_grpc_protocol_atsstore_proto_depIdxs = []int32{
-	13, // 0: protocol.Attestation.attributes:type_name -> google.protobuf.Struct
-	13, // 1: protocol.AttestationCommand.attributes:type_name -> google.protobuf.Struct
-	0,  // 2: protocol.CreateAttestationRequest.attestation:type_name -> protocol.Attestation
-	1,  // 3: protocol.GenerateAttestationRequest.command:type_name -> protocol.AttestationCommand
-	0,  // 4: protocol.GenerateAttestationResponse.attestation:type_name -> protocol.Attestation
-	1,  // 5: protocol.BatchGenerateAttestationRequest.commands:type_name -> protocol.AttestationCommand
-	2,  // 6: protocol.GetAttestationsRequest.filter:type_name -> protocol.AttestationFilter
-	0,  // 7: protocol.GetAttestationsResponse.attestations:type_name -> protocol.Attestation
-	3,  // 8: protocol.ATSStoreService.CreateAttestation:input_type -> protocol.CreateAttestationRequest
-	5,  // 9: protocol.ATSStoreService.AttestationExists:input_type -> protocol.AttestationExistsRequest
-	7,  // 10: protocol.ATSStoreService.GenerateAndCreateAttestation:input_type -> protocol.GenerateAttestationRequest
-	9,  // 11: protocol.ATSStoreService.BatchGenerateAndCreateAttestations:input_type -> protocol.BatchGenerateAttestationRequest
-	11, // 12: protocol.ATSStoreService.GetAttestations:input_type -> protocol.GetAttestationsRequest
-	11, // 13: protocol.ATSStoreService.GetAttestationsStream:input_type -> protocol.GetAttestationsRequest
-	4,  // 14: protocol.ATSStoreService.CreateAttestation:output_type -> protocol.CreateAttestationResponse
-	6,  // 15: protocol.ATSStoreService.AttestationExists:output_type -> protocol.AttestationExistsResponse
-	8,  // 16: protocol.ATSStoreService.GenerateAndCreateAttestation:output_type -> protocol.GenerateAttestationResponse
-	10, // 17: protocol.ATSStoreService.BatchGenerateAndCreateAttestations:output_type -> protocol.BatchGenerateAttestationResponse
-	12, // 18: protocol.ATSStoreService.GetAttestations:output_type -> protocol.GetAttestationsResponse
-	0,  // 19: protocol.ATSStoreService.GetAttestationsStream:output_type -> protocol.Attestation
-	14, // [14:20] is the sub-list for method output_type
-	8,  // [8:14] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	14, // 0: protocol.Attestation.attributes:type_name -> google.protobuf.Struct
+	2,  // 1: protocol.AttestationCommand.actors_named:type_name -> protocol.ActorNames
+	14, // 2: protocol.AttestationCommand.attributes:type_name -> google.protobuf.Struct
+	0,  // 3: protocol.CreateAttestationRequest.attestation:type_name -> protocol.Attestation
+	1,  // 4: protocol.GenerateAttestationRequest.command:type_name -> protocol.AttestationCommand
+	0,  // 5: protocol.GenerateAttestationResponse.attestation:type_name -> protocol.Attestation
+	1,  // 6: protocol.BatchGenerateAttestationRequest.commands:type_name -> protocol.AttestationCommand
+	3,  // 7: protocol.GetAttestationsRequest.filter:type_name -> protocol.AttestationFilter
+	0,  // 8: protocol.GetAttestationsResponse.attestations:type_name -> protocol.Attestation
+	4,  // 9: protocol.ATSStoreService.CreateAttestation:input_type -> protocol.CreateAttestationRequest
+	6,  // 10: protocol.ATSStoreService.AttestationExists:input_type -> protocol.AttestationExistsRequest
+	8,  // 11: protocol.ATSStoreService.GenerateAndCreateAttestation:input_type -> protocol.GenerateAttestationRequest
+	10, // 12: protocol.ATSStoreService.BatchGenerateAndCreateAttestations:input_type -> protocol.BatchGenerateAttestationRequest
+	12, // 13: protocol.ATSStoreService.GetAttestations:input_type -> protocol.GetAttestationsRequest
+	12, // 14: protocol.ATSStoreService.GetAttestationsStream:input_type -> protocol.GetAttestationsRequest
+	5,  // 15: protocol.ATSStoreService.CreateAttestation:output_type -> protocol.CreateAttestationResponse
+	7,  // 16: protocol.ATSStoreService.AttestationExists:output_type -> protocol.AttestationExistsResponse
+	9,  // 17: protocol.ATSStoreService.GenerateAndCreateAttestation:output_type -> protocol.GenerateAttestationResponse
+	11, // 18: protocol.ATSStoreService.BatchGenerateAndCreateAttestations:output_type -> protocol.BatchGenerateAttestationResponse
+	13, // 19: protocol.ATSStoreService.GetAttestations:output_type -> protocol.GetAttestationsResponse
+	0,  // 20: protocol.ATSStoreService.GetAttestationsStream:output_type -> protocol.Attestation
+	15, // [15:21] is the sub-list for method output_type
+	9,  // [9:15] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_atsstore_proto_init() }
@@ -1037,15 +1293,27 @@ func file_plugin_grpc_protocol_atsstore_proto_init() {
 	if File_plugin_grpc_protocol_atsstore_proto != nil {
 		return
 	}
-	file_plugin_grpc_protocol_atsstore_proto_msgTypes[1].OneofWrappers = []any{}
-	file_plugin_grpc_protocol_atsstore_proto_msgTypes[2].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_atsstore_proto_msgTypes[1].OneofWrappers = []any{
+		(*AttestationCommand_ActorsNamed)(nil),
+		(*AttestationCommand_ByNode)(nil),
+		(*AttestationCommand_Timestamp)(nil),
+		(*AttestationCommand_Now)(nil),
+		(*AttestationCommand_SourceVersion)(nil),
+		(*AttestationCommand_VersionFromRegistry)(nil),
+	}
+	file_plugin_grpc_protocol_atsstore_proto_msgTypes[3].OneofWrappers = []any{
+		(*AttestationFilter_TimeStart)(nil),
+		(*AttestationFilter_UnboundedStart)(nil),
+		(*AttestationFilter_TimeEnd)(nil),
+		(*AttestationFilter_UnboundedEnd)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_atsstore_proto_rawDesc), len(file_plugin_grpc_protocol_atsstore_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

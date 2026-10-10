@@ -450,12 +450,15 @@ struct Attestation {
     @Proto(11) string signerDid;
 }
 
+// Each oneof of the command names one side: a timestamp or now, and the node
+// as its author (actors_named, field 12, is not sent from here).
 struct AttestationCommand {
     @Proto(1) string[] subjects;
     @Proto(2) string[] predicates;
     @Proto(3) string[] contexts;
-    @Proto(4) string[] actors;
-    @Proto(5) long timestamp;
+    @Proto(5) long timestamp;     // oneof when: Unix milliseconds
+    @Proto(9) bool now;           // oneof when: when the node writes it
+    @Proto(10) bool byNode;       // oneof by: the node authors it
     @Proto(6) ubyte[] attributes; // google.protobuf.Struct as raw bytes
     @Proto(7) string source;
     @Proto(8) string sourceVersion;

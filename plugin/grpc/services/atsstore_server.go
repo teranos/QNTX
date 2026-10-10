@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -249,19 +250,22 @@ func (s *ATSStoreServer) BatchGenerateAndCreateAttestations(ctx context.Context,
 		}, nil
 	}
 
-	// Fallback: individual writes
-	var created int32
+	// Fallback: individual writes, each attestation named as it is made
+	made := make([]string, 0, len(cmds))
 	for _, cmd := range cmds {
-		if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
-			s.logger.Errorw("BatchGenerateAndCreateAttestations fallback failed", "created", created, "total", len(cmds), "error", err)
+		as, err := store.GenerateAndCreateAttestation(ctx, cmd)
+		if err != nil {
+			s.logger.Errorw("BatchGenerateAndCreateAttestations fallback failed", "created", made, "total", len(cmds), "error", err)
 			return &protocol.BatchGenerateAttestationResponse{
 				Success: false,
-				Error:   fmt.Sprintf("individual write failed at %d/%d: %v", created, len(cmds), err),
-				Created: created,
+				Error:   fmt.Sprintf("individual write failed at %d/%d, after %v: %v", len(made), len(cmds), made, err),
+				Created: int32(len(made)),
 			}, nil
 		}
-		created++
+		made = append(made, as.ID)
 	}
+	s.logger.Debugw("Batch written one attestation at a time", "attestations", made)
+	created := int32(len(made))
 	return &protocol.BatchGenerateAttestationResponse{
 		Success: true,
 		Created: created,
@@ -379,34 +383,25 @@ func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*ty
 	// Source is how an attestation was made: a plugin that does not say is
 	// refused rather than written as some plugin. A request that carries no
 	// command says no source either.
-	source := proto.GetSource()
-	if source == "" {
-		return nil, errors.Newf("the command about %v names no source; set source to the plugin's name", proto.GetSubjects())
+	source, err := named.TextOf(fmt.Sprintf("the source of the command about %v (the plugin's name)", proto.GetSubjects()), proto.GetSource())
+	if err != nil {
+		return nil, err
 	}
 
 	// No attributes sent is a command with none: AsMap reads an absent Struct
 	// as no fields.
 	attributes := proto.GetAttributes().AsMap()
 
-	// A timestamp of 0 is the epoch, as said.
-	timestamp := time.Now()
-	if proto.Timestamp != nil {
-		timestamp = time.UnixMilli(*proto.Timestamp)
+	timestamp, err := commandTime(proto)
+	if err != nil {
+		return nil, err
 	}
-
-	// Stamp source_version: prefer explicit value from proto, fall back to registry lookup
-	if proto.SourceVersion != "" {
-		attributes["source_version"] = proto.SourceVersion
-	} else if version, known := s.versionResolver(source); known {
-		attributes["source_version"] = version
+	if err := s.stampVersion(proto, source.String(), attributes); err != nil {
+		return nil, err
 	}
-
-	// "the node"
-	//
-	// authors what a plugin named no actor for: the plugin wrote through it.
-	actors := proto.Actors
-	if len(actors) == 0 {
-		actors = []string{s.node}
+	actors, err := s.commandActors(proto)
+	if err != nil {
+		return nil, err
 	}
 
 	return &types.AsCommand{
@@ -416,34 +411,124 @@ func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*ty
 		Actors:     actors,
 		Timestamp:  timestamp,
 		Attributes: attributes,
-		Source:     source,
+		Source:     source.String(),
 	}, nil
 }
 
+// commandTime is when a command says it was made: the time it names, or now.
+// A timestamp of 0 is the epoch, as said.
+func commandTime(proto *protocol.AttestationCommand) (time.Time, error) {
+	switch when := proto.GetWhen().(type) {
+	case *protocol.AttestationCommand_Timestamp:
+		return time.UnixMilli(when.Timestamp), nil
+	case *protocol.AttestationCommand_Now:
+		if !when.Now {
+			return time.Time{}, errors.Newf("the command about %v says now is false: it names a timestamp, or now", proto.GetSubjects())
+		}
+		return time.Now(), nil
+	}
+	return time.Time{}, errors.Newf("the command about %v names no time: a timestamp, or now", proto.GetSubjects())
+}
+
+// stampVersion stamps source_version: as the plugin says it, or as the
+// registry has it for the source.
+func (s *ATSStoreServer) stampVersion(proto *protocol.AttestationCommand, source string, attributes map[string]any) error {
+	switch version := proto.GetVersion().(type) {
+	case *protocol.AttestationCommand_SourceVersion:
+		said, err := named.TextOf("source_version", version.SourceVersion)
+		if err != nil {
+			return err
+		}
+		attributes["source_version"] = said.String()
+		return nil
+	case *protocol.AttestationCommand_VersionFromRegistry:
+		if !version.VersionFromRegistry {
+			return errors.Newf("the command from %s says version_from_registry is false: it names its source_version, or the registry's", source)
+		}
+		registered, known := s.versionResolver(source)
+		if !known {
+			return errors.Newf("the node runs no plugin %s, so the registry has no version of it", source)
+		}
+		attributes["source_version"] = registered
+		return nil
+	}
+	return errors.Newf("the command from %s names no version: its source_version, or version_from_registry", source)
+}
+
+// commandActors are who a command says made it: the actors it names, or the
+// node.
+func (s *ATSStoreServer) commandActors(proto *protocol.AttestationCommand) ([]string, error) {
+	switch by := proto.GetBy().(type) {
+	case *protocol.AttestationCommand_ActorsNamed:
+		actors, err := named.ItemsOf(fmt.Sprintf("the actors of the command about %v", proto.GetSubjects()), by.ActorsNamed.GetNames())
+		if err != nil {
+			return nil, err
+		}
+		return actors.All(), nil
+	case *protocol.AttestationCommand_ByNode:
+		// "the node"
+		//
+		// authors what a plugin asks it to: the plugin wrote through it.
+		if !by.ByNode {
+			return nil, errors.Newf("the command about %v says by_node is false: it names its actors, or the node", proto.GetSubjects())
+		}
+		return []string{s.node}, nil
+	}
+	return nil, errors.Newf("the command about %v names who made it: its actors, or by_node", proto.GetSubjects())
+}
+
 // protoToFilter is a plugin's filter as the store reads it. A query names how
-// many rows it wants, every row being ats.EveryRow; one naming no limit is
-// refused rather than handed every row or none.
+// many rows it wants, 0 being none and every row ats.EveryRow, and where its
+// time range starts and ends, or that it is unbounded there.
 func protoToFilter(proto *protocol.AttestationFilter) (ats.AttestationFilter, error) {
-	if proto.Limit == nil {
-		return ats.AttestationFilter{}, errors.New("a query names how many rows it wants, and this one named no limit; every row is ats.EveryRow")
-	}
 	filter := ats.AttestationFilter{
-		Limit:      int(*proto.Limit),
-		Actors:     proto.Actors,
-		Subjects:   proto.Subjects,
-		Predicates: proto.Predicates,
-		Contexts:   proto.Contexts,
+		Limit:      int(proto.GetLimit()),
+		Actors:     proto.GetActors(),
+		Subjects:   proto.GetSubjects(),
+		Predicates: proto.GetPredicates(),
+		Contexts:   proto.GetContexts(),
 	}
 
-	if proto.TimeStart != nil {
-		t := time.UnixMilli(*proto.TimeStart)
-		filter.TimeStart = &t
+	start, err := filterStart(proto)
+	if err != nil {
+		return ats.AttestationFilter{}, err
 	}
-
-	if proto.TimeEnd != nil {
-		t := time.UnixMilli(*proto.TimeEnd)
-		filter.TimeEnd = &t
+	end, err := filterEnd(proto)
+	if err != nil {
+		return ats.AttestationFilter{}, err
 	}
-
+	// ats.AttestationFilter holds an unbounded side by a nil.
+	filter.TimeStart, filter.TimeEnd = start, end
 	return filter, nil
+}
+
+// filterStart is where a query's time range starts, or nil for unbounded,
+// which is how ats.AttestationFilter holds it.
+func filterStart(proto *protocol.AttestationFilter) (*time.Time, error) {
+	switch from := proto.GetFrom().(type) {
+	case *protocol.AttestationFilter_TimeStart:
+		t := time.UnixMilli(from.TimeStart)
+		return &t, nil
+	case *protocol.AttestationFilter_UnboundedStart:
+		if !from.UnboundedStart {
+			return nil, errors.New("unbounded_start is false: a query names where its time range starts, or that it is unbounded")
+		}
+		return nil, nil
+	}
+	return nil, errors.New("a query names where its time range starts: time_start, or unbounded_start")
+}
+
+// filterEnd is where a query's time range ends, or nil for unbounded.
+func filterEnd(proto *protocol.AttestationFilter) (*time.Time, error) {
+	switch to := proto.GetTo().(type) {
+	case *protocol.AttestationFilter_TimeEnd:
+		t := time.UnixMilli(to.TimeEnd)
+		return &t, nil
+	case *protocol.AttestationFilter_UnboundedEnd:
+		if !to.UnboundedEnd {
+			return nil, errors.New("unbounded_end is false: a query names where its time range ends, or that it is unbounded")
+		}
+		return nil, nil
+	}
+	return nil, errors.New("a query names where its time range ends: time_end, or unbounded_end")
 }
