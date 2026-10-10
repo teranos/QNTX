@@ -147,9 +147,7 @@ func ugReadings(store ats.AttestationStore, since time.Time) (sessions, windows 
 func (s *QNTXServer) amGround(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
 	watches, err := groundWatches()
 	if err != nil {
-		if s.logger != nil {
-			s.logger.Errorw("am ground could not read what the node watches for Ground", "error", err)
-		}
+		s.logger.Errorw("am ground could not read what the node watches for Ground", "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what the node watches for Ground did not read: " + err.Error()}
 	}
 
@@ -176,9 +174,7 @@ func (s *QNTXServer) amGround(ctx context.Context, _ sigil.Sent) (any, *protocol
 		}
 		sessions, windows, err = ugReadings(store, since)
 		if err != nil {
-			if s.logger != nil {
-				s.logger.Errorw("am ground could not read what ug posted", "error", err)
-			}
+			s.logger.Errorw("am ground could not read what ug posted", "error", err)
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what ug posted did not read: " + err.Error()}
 		}
 	}

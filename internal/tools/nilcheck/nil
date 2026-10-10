@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3368 in 436 files.
+# 3355 in 435 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -10,6 +10,7 @@
 # From 3414: a test against a package-level const or var holding nil, zero or empty counts like one against what it holds; each was there before it was counted.
 # From 3400: auth.New refuses a handler with no User store, and the 23 tests for one that keeps no Users are gone; the header had drifted to 3406 by hand.
 # From 3378: rich search logs, rather than asking first whether it has a logger.
+# From 3368: the server logs, rather than asking first whether it has a logger.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -256,11 +257,10 @@
 14	server/a2a/http.go
 4	server/a2a/operations.go
 5	server/a2a_card.go
-2	server/a2a_route.go
 9	server/agent_harness.go
 2	server/agent_turn.go
 20	server/agents.go
-7	server/am_ground.go
+5	server/am_ground.go
 2	server/am_sigils.go
 1	server/answers.go
 31	server/attestation_handlers.go
@@ -340,7 +340,7 @@
 8	server/embeddings_pulse.go
 4	server/exposure.go
 1	server/files.go
-14	server/github.go
+13	server/github.go
 2	server/github_credential.go
 2	server/github_deliveries.go
 1	server/github_parity.go
@@ -382,7 +382,7 @@
 3	server/plugin_log_handlers.go
 4	server/plugin_records.go
 2	server/plugin_roots.go
-24	server/plugin_sigils.go
+21	server/plugin_sigils.go
 1	server/plugin_stores.go
 1	server/pprof.go
 27	server/prompt_handlers.go
@@ -406,16 +406,16 @@
 11	server/report.go
 9	server/report_pulse.go
 16	server/report_render.go
-4	server/response.go
+2	server/response.go
 2	server/roles.go
 2	server/roles_handler.go
 4	server/routes.go
-10	server/routing.go
+9	server/routing.go
 11	server/search_observer.go
 5	server/server.go
 5	server/sigil/ask.go
 15	server/sigil/sigil.go
-15	server/signa.go
+13	server/signa.go
 56	server/staand.go
 9	server/standing_observer.go
 4	server/statusline_asks.go
