@@ -10,6 +10,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -154,10 +155,19 @@ func compare(drift *strings.Builder, k kind, baseline map[string]int, hits map[s
 	}
 }
 
-// walk reads every Go and Rust file under root.
+// goFile is one parsed Go file and the directory its package is in.
+type goFile struct {
+	rel, dir string
+	file     *ast.File
+}
+
+// walk reads every Go and Rust file under root. Go is read twice: once for the
+// package-level names that hold nothing, and once to count, so a test against
+// such a name counts like a test against the literal it holds.
 func walk(root string) (found, error) {
 	fset := token.NewFileSet()
 	hits := found{}
+	var files []goFile
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -189,19 +199,85 @@ func walk(root string) (found, error) {
 		if err != nil {
 			return errors.Wrapf(err, "%s could not be parsed, so what it does with nothing went uncounted", rel)
 		}
-		readGo(fset, file, rel, hits)
+		files = append(files, goFile{rel: rel, dir: filepath.ToSlash(filepath.Dir(rel)), file: file})
 		return nil
 	})
-	return hits, err
+	if err != nil {
+		return hits, err
+	}
+	empty := emptyNames(files)
+	for _, f := range files {
+		readGo(fset, f.file, f.rel, hits, empty.in(f.dir))
+	}
+	return hits, nil
 }
 
-func readGo(fset *token.FileSet, file *ast.File, rel string, hits found) {
+// emptiness is every package-level const and var whose value is nil, the
+// empty string or zero, by the directory its package is in.
+type emptiness map[string]map[string]bool
+
+func emptyNames(files []goFile) emptiness {
+	e := emptiness{}
+	for _, f := range files {
+		for _, decl := range f.file.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || (gen.Tok != token.CONST && gen.Tok != token.VAR) {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				value, ok := spec.(*ast.ValueSpec)
+				if !ok {
+					continue
+				}
+				for i, name := range value.Names {
+					if i < len(value.Values) && nothing(value.Values[i]) {
+						names, held := e[f.dir]
+						if !held {
+							names = map[string]bool{}
+							e[f.dir] = names
+						}
+						names[name.Name] = true
+					}
+				}
+			}
+		}
+	}
+	return e
+}
+
+// in is what a file in dir can name that holds nothing: its own package's
+// names bare, and another package's through that package's name.
+func (e emptiness) in(dir string) nothingNamed {
+	return func(x ast.Expr) bool {
+		switch v := x.(type) {
+		case *ast.Ident:
+			return e[dir][v.Name]
+		case *ast.SelectorExpr:
+			pkg, ok := v.X.(*ast.Ident)
+			if !ok {
+				return false
+			}
+			for d, names := range e {
+				if path.Base(d) == pkg.Name && names[v.Sel.Name] {
+					return true
+				}
+			}
+		}
+		return false
+	}
+}
+
+// nothingNamed is whether an expression names a value that holds nothing.
+type nothingNamed func(ast.Expr) bool
+
+func readGo(fset *token.FileSet, file *ast.File, rel string, hits found, named nothingNamed) {
 	line := func(n ast.Node) int { return fset.Position(n.Pos()).Line }
+	empty := func(x ast.Expr) bool { return nothing(x) || named(x) }
 
 	ast.Inspect(file, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.BinaryExpr:
-			if testsAgainstNothing(node) {
+			if testsAgainst(node, empty) {
 				hits.add("nil", rel, line(node))
 			}
 		case *ast.CaseClause:
@@ -209,7 +285,7 @@ func readGo(fset *token.FileSet, file *ast.File, rel string, hits found) {
 				hits.add("catchall", rel, line(node))
 			}
 			for _, item := range node.List {
-				if nothing(item) {
+				if empty(item) {
 					hits.add("nil", rel, line(item))
 				}
 			}
@@ -359,16 +435,22 @@ func testsAgainstNothingRust(text string) bool {
 // length against 0 or 1, or zero set apart from what is above it. An error
 // being there is not a value being empty.
 func testsAgainstNothing(b *ast.BinaryExpr) bool {
+	return testsAgainst(b, nothing)
+}
+
+// testsAgainst is testsAgainstNothing with empty saying what holds nothing:
+// the literals, and the names that hold one.
+func testsAgainst(b *ast.BinaryExpr, empty func(ast.Expr) bool) bool {
 	switch b.Op {
 	case token.EQL, token.NEQ:
 		if anError(b.X) || anError(b.Y) {
 			return false
 		}
-		return nothing(b.X) || nothing(b.Y) || lengthAgainst(b, "0")
+		return empty(b.X) || empty(b.Y) || lengthAgainst(b, "0")
 	case token.GTR, token.LEQ:
-		return lengthAgainst(b, "0") || lengthAgainst(b, "1") || nothing(b.Y)
+		return lengthAgainst(b, "0") || lengthAgainst(b, "1") || empty(b.Y)
 	case token.LSS, token.GEQ:
-		return lengthAgainst(b, "0") || lengthAgainst(b, "1") || nothing(b.X)
+		return lengthAgainst(b, "0") || lengthAgainst(b, "1") || empty(b.X)
 	}
 	return false
 }

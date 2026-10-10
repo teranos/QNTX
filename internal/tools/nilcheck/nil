@@ -1,11 +1,12 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3414 in 435 files.
+# 3418 in 438 files.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
 # ats/types/attestation.go: +1, NamesItsActor refuses a command naming no actor: one check every store's generate path calls, where four filled one in.
 # server/attestation_handlers.go: +1, the node authors what its caller named nobody for.
 # server/quote_removal.go: 7, from 82e8e8cf unbaselined: refusals of no actor, namespace or span, nothing removed ends the run, a count for the note, the daemon check its siblings hold.
+# From 3414: a test against a package-level const or var holding nil, zero or empty counts like one against what it holds; each was there before it was counted.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -154,7 +155,9 @@
 5	internal/logger/fields.go
 16	internal/logger/logger.go
 17	internal/logger/minimal_encoder.go
+1	internal/logger/output.go
 4	internal/logger/sentry.go
+2	internal/logger/verbosity.go
 5	internal/measure/measure.go
 1	internal/nodedid/handlers.go
 13	internal/pi/run.go
@@ -350,6 +353,7 @@
 8	server/mail.go
 14	server/mcp.go
 12	server/namespace_handlers.go
+1	server/namespace_route.go
 2	server/namespace_run.go
 8	server/namespace_watchers.go
 19	server/namespaces/held.go
