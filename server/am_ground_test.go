@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -35,7 +36,7 @@ func TestAmGroundSaysWhatTheNodeDoesForGround(t *testing.T) {
 	failures := newHandlerFailureLog()
 	failures.record(HandlerFailure{Handler: watcher.CIWatchHandlerName, ExecutionID: "rearm:p-0", Error: "ci.watch: stopped waiting on main@162d82f: context canceled", AtMs: time.Now().UnixMilli()})
 	failures.record(HandlerFailure{Handler: "garden/harvest", Error: "no water", AtMs: time.Now().UnixMilli()})
-	s := &QNTXServer{news: l, handlerFailures: failures, startedAt: time.Date(2026, 10, 3, 21, 58, 0, 0, time.UTC)}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: l, handlerFailures: failures, startedAt: time.Date(2026, 10, 3, 21, 58, 0, 0, time.UTC)}
 	signum := s.amSignum()
 	require.NoError(t, signum.Check())
 
@@ -89,7 +90,7 @@ func TestAWaitIsNeverCountedAsLeft(t *testing.T) {
 func TestWhatLeftTheRowIsStillSaid(t *testing.T) {
 	l := newNewsLog()
 	l.leave(News{ID: "p-0:old", For: alice, Item: StatusItem{Name: "ci", Note: "success main", Symbol: SymbolWell}, UntilMs: time.Now().Add(-time.Hour).UnixMilli()})
-	s := &QNTXServer{news: l}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: l}
 
 	answer, refused := s.amGround(auth.WithAdmission(context.Background(), tokenCaller("did:key:alice")), sigil.Sent{})
 	require.Nil(t, refused)
@@ -102,7 +103,7 @@ func TestWhatLeftTheRowIsStillSaid(t *testing.T) {
 func TestAmGroundForNobody(t *testing.T) {
 	l := newNewsLog()
 	left(l, News{ID: "p-1", For: alice, Item: StatusItem{Name: "ci", Symbol: SymbolWell}})
-	s := &QNTXServer{news: l}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: l}
 
 	answer, refused := s.amGround(context.Background(), sigil.Sent{})
 	require.Nil(t, refused)
@@ -143,7 +144,7 @@ func TestAmGroundSaysWhatUgPosted(t *testing.T) {
 	for _, as := range rows {
 		require.NoError(t, store.CreateAttestation(as))
 	}
-	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
 	asked := rootRequest(httptest.NewRequest(http.MethodGet, "/am/ground", nil))
 
 	answer, refused := s.amGround(sigil.WithCaller(context.Background(), asked), sigil.Sent{})

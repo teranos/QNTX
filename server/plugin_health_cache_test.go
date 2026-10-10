@@ -13,7 +13,7 @@ import (
 // and holds the registry's read lock across them. It reads a snapshot now.
 func TestTheHandlerReadsTheProbeRatherThanMakingOne(t *testing.T) {
 	probes := 0
-	s := &QNTXServer{logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar()}
 	h := NewPluginHandler(plugin.NewRegistry("test", zap.NewNop().Sugar()), zap.NewNop().Sugar(),
 		func() (map[string]plugin.HealthStatus, time.Time, string) {
 			probes++
@@ -56,8 +56,8 @@ func TestTheAnswerSaysWhenItWasProbed(t *testing.T) {
 	if age < 89_000 {
 		t.Errorf("age_ms = %v, want at least 89000", age)
 	}
-	holds(t, (&QNTXServer{}).pluginsSignum(), "list", h.list())
-	holds(t, (&QNTXServer{}).pluginsSignum(), "routes", h.routes())
+	holds(t, bareNode().pluginsSignum(), "list", h.list())
+	holds(t, bareNode().pluginsSignum(), "routes", h.routes())
 }
 
 // An empty result set with nothing said reads as "no plugins". The handler
@@ -91,7 +91,7 @@ func answeredAsJSON(t *testing.T, answer any) map[string]any {
 // Before the first probe completes there is no answer, and saying so beats
 // publishing an empty one that reads as "no plugins".
 func TestNoProbeYetIsNotAnEmptyAnswer(t *testing.T) {
-	s := &QNTXServer{logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar()}
 
 	results, at, failure := s.pluginHealth()
 	if results != nil {

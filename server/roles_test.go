@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/nodedid"
+	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
@@ -45,7 +46,8 @@ func rootKnowingServer(t *testing.T) *QNTXServer {
 	// Pulse runs because the node runs: the daemon is there, never started.
 	daemon := async.NewWorkerPool(db, &appcfg.Config{}, async.DefaultWorkerPoolConfig(), zap.NewNop().Sugar())
 	s := &QNTXServer{nodeDB: db, authHandler: h, logger: zap.NewNop().Sugar(), daemon: daemon,
-		nodeDID: &nodedid.Handler{DID: "did:key:z6Mkgardennode"}}
+		pluginRegistry: plugin.GetDefaultRegistry(),
+		nodeDID:        &nodedid.Handler{DID: "did:key:z6Mkgardennode"}}
 	s.held = servingOne(db, store)
 	s.held.SetSystem(oneNamespace("system", system))
 	return s

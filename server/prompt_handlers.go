@@ -90,7 +90,7 @@ func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Requ
 	if router := s.servicesManager.GetLLMRouter(); router != nil && router.HasProvider(providerName) {
 		return false
 	}
-	if s.pluginRegistry == nil || !s.pluginRegistry.IsReady(providerName) {
+	if !s.pluginRegistry.IsReady(providerName) {
 		return false
 	}
 	encoded, err := json.Marshal(body)

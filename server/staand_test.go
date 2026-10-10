@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/server/namespaces"
 	"net/http"
 	"net/http/httptest"
@@ -56,7 +57,7 @@ func standServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.Attestat
 		stores[n] = st
 	}
 	m := markets{store: stores}
-	s := &QNTXServer{nodeDB: db, logger: zap.NewNop().Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), nodeDB: db, logger: zap.NewNop().Sugar()}
 	s.held = servingOne(db, sys)
 	s.held.SetSystem(oneNamespace("system", sys))
 	// A stand's market is never default, so the default store standing in for
@@ -380,7 +381,7 @@ func TestCreatingAndRemovingAStand(t *testing.T) {
 // events keep their name, and the rest fold to "other" so a caller cannot explode
 // the metric's cardinality (ADR-035).
 func TestStaandEventDimCapsCardinality(t *testing.T) {
-	s := &QNTXServer{}
+	s := bareNode()
 	key := "clean/boutique"
 	for i := 0; i < staandEventCap; i++ {
 		e := fmt.Sprintf("staand:e%d", i)

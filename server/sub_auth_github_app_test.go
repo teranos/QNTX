@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"github.com/teranos/QNTX/plugin"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,7 +30,7 @@ func TestTheNodeSignsAsTheAppOnceItsKeyReads(t *testing.T) {
 
 	h := bareAuthHandler(t)
 	setOperatorClients(h, cfg, zap.NewNop().Sugar())
-	var app services.GitHubApp = gitHubCredentials{s: &QNTXServer{authHandler: h}}
+	var app services.GitHubApp = gitHubCredentials{s: &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), authHandler: h}}
 	signed, err := app.AppToken()
 	require.NoError(t, err)
 	assert.NotEmpty(t, signed)

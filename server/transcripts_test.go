@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -166,7 +167,7 @@ func TestTheTranscriptsSigilReadsWhereTheCallerStands(t *testing.T) {
 	for _, as := range append(aSession(at), streamed("x", "UserPromptSubmit", "s-2", at.Add(time.Hour), map[string]any{"prompt": "another"})) {
 		require.NoError(t, store.CreateAttestation(as))
 	}
-	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
 	signum := s.transcriptsSignum()
 	require.NoError(t, signum.Check())
 	asked := rootRequest(httptest.NewRequest(http.MethodGet, "/api/transcripts", nil))
@@ -197,7 +198,7 @@ func TestAGroundedRowNoPredicateNamesIsATurn(t *testing.T) {
 	for _, as := range rows {
 		require.NoError(t, store.CreateAttestation(as))
 	}
-	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
 	asked := rootRequest(httptest.NewRequest(http.MethodGet, "/api/transcripts", nil))
 
 	for _, sent := range []sigil.Sent{{}, {"session": "s-1"}} {

@@ -9,6 +9,7 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -40,6 +41,12 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 	}
 	if verbosity < 0 || verbosity > 4 {
 		return nil, errors.Newf("verbosity must be 0-4, got %d", verbosity)
+	}
+	// Plugins are added and enabled at runtime, so a node runs with its
+	// registry even when nothing is in it yet.
+	pluginRegistry := plugin.GetDefaultRegistry()
+	if pluginRegistry == nil {
+		return nil, errors.New("the node was given no plugin registry")
 	}
 
 	cfg, err := appcfg.Load()
@@ -113,22 +120,23 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		held:   held,
 		// Uptime counts from here rather than from Start, so opening the store
 		// is part of it.
-		startedAt:     time.Now(),
-		dbPath:        dbPath,
-		logPath:       logPath,
-		deps:          deps,
-		store:         deps.cfg.Storage.Backend,
-		bindAddress:   bindAddr,
-		daemon:        daemon,
-		pluginManager: deps.pluginManager,
-		scheduleStore: scheduleStore,
-		tickerCfg:     tickerCfg,
-		clients:       make(map[*Client]bool),
-		broadcastReq:  make(chan *broadcastRequest, MaxClientMessageQueueSize*2),
-		register:      make(chan *Client),
-		unregister:    make(chan *Client),
-		logger:        serverLogger,
-		consoleBuffer: consoleBuffer,
+		startedAt:      time.Now(),
+		dbPath:         dbPath,
+		logPath:        logPath,
+		deps:           deps,
+		store:          deps.cfg.Storage.Backend,
+		bindAddress:    bindAddr,
+		daemon:         daemon,
+		pluginRegistry: pluginRegistry,
+		pluginManager:  deps.pluginManager,
+		scheduleStore:  scheduleStore,
+		tickerCfg:      tickerCfg,
+		clients:        make(map[*Client]bool),
+		broadcastReq:   make(chan *broadcastRequest, MaxClientMessageQueueSize*2),
+		register:       make(chan *Client),
+		unregister:     make(chan *Client),
+		logger:         serverLogger,
+		consoleBuffer:  consoleBuffer,
 		// What built-ins leave on the status row, and the handlers that failed:
 		// the node has both from its start, so nothing makes one when it is late.
 		news:            newNewsLog(),

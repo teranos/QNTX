@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/plugin"
 	"testing"
 
 	"github.com/teranos/QNTX/ats/types"
@@ -17,7 +18,7 @@ import (
 // Whether it may be handed the thing is the read gate's, and it is asked here.
 
 func broadcastServer() *QNTXServer {
-	return &QNTXServer{logger: zap.NewNop().Sugar(), held: servingStub(stubStore{})}
+	return &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar(), held: servingStub(stubStore{})}
 }
 
 // connected is a client admitted as `as`, in the served namespace.

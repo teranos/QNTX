@@ -14,7 +14,7 @@ import (
 // Reading where you stand and stepping are two sigils on one path. Before,
 // GET answered 405, and where you stood was only learned by stepping.
 func TestStandingIsReadAndSteppedOnOnePath(t *testing.T) {
-	signum := (&QNTXServer{}).iSignum()
+	signum := bareNode().iSignum()
 	require.NoError(t, signum.Check())
 
 	methods := map[string]string{}

@@ -33,7 +33,7 @@ func resolvesTo(name string) protoreflect.MessageDescriptor {
 // A field that says which message it carries names one that exists, on every
 // signum the node holds.
 func TestAFieldsMessageExists(t *testing.T) {
-	for _, signum := range (&QNTXServer{}).signa() {
+	for _, signum := range bareNode().signa() {
 		for _, s := range signum.GetSigils() {
 			for _, field := range s.GetGives() {
 				if field.GetMessage() == "" {
@@ -49,7 +49,7 @@ func TestAFieldsMessageExists(t *testing.T) {
 // A signum that follows a reference names, for every column, a field of a
 // message that exists, and names no column without one.
 func TestWhatASignumFollowsIsItsOwnFields(t *testing.T) {
-	for _, signum := range (&QNTXServer{}).signa() {
+	for _, signum := range bareNode().signa() {
 		for _, follows := range signum.GetFollows() {
 			require.NotEmpty(t, follows.GetReference(), "%s follows something it does not name", signum.GetName())
 			for _, c := range follows.GetColumns() {
@@ -69,11 +69,11 @@ func TestWhatASignumFollowsIsItsOwnFields(t *testing.T) {
 
 // Staands follows Umami and nothing else.
 func TestStaandsFollowsUmami(t *testing.T) {
-	follows := (&QNTXServer{}).staandsSignum().GetFollows()
+	follows := bareNode().staandsSignum().GetFollows()
 	require.Len(t, follows, 1)
 	assert.Equal(t, "umami", follows[0].GetReference())
 
-	answered, err := answeredOf((&QNTXServer{}).staandsSignum())
+	answered, err := answeredOf(bareNode().staandsSignum())
 	require.NoError(t, err)
 	visits := sigilOf(t, answered, "visits").sigil
 	carried := map[string]string{}

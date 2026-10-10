@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/plugin"
 	"testing"
 	"time"
 
@@ -87,8 +88,9 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 	var capturedErrorDetails []string
 
 	mockServer := &QNTXServer{
-		nodeDB: db,
-		logger: zap.NewNop().Sugar(),
+		pluginRegistry: plugin.GetDefaultRegistry(),
+		nodeDB:         db,
+		logger:         zap.NewNop().Sugar(),
 		// Override broadcast method (would need to modify QNTXServer to support this)
 		// For now, we'll verify by checking the job's error details are populated
 	}

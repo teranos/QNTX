@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -40,7 +41,7 @@ func TestAccessLogSeesTheAdmission(t *testing.T) {
 // id on every request reaches every sink the logger has, forever, for nothing.
 func TestTheAccessLogNeverCarriesTheIdentity(t *testing.T) {
 	core, written := observer.New(zapcore.InfoLevel)
-	s := &QNTXServer{logger: zap.New(core).Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.New(core).Sugar()}
 
 	admitted := auth.Admitted(auth.LevelSuper)
 	admitted.Identity = "google:110106507016968762213"

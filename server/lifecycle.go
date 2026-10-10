@@ -241,10 +241,8 @@ func (s *QNTXServer) Stop() error {
 	}
 
 	// Shutdown plugins and gRPC services
-	if s.pluginRegistry != nil {
-		if err := s.pluginRegistry.ShutdownAll(s.ctx); err != nil {
-			s.logger.Errorw("Plugins did not all shut down cleanly; processes or locks may survive", "error", err)
-		}
+	if err := s.pluginRegistry.ShutdownAll(s.ctx); err != nil {
+		s.logger.Errorw("Plugins did not all shut down cleanly; processes or locks may survive", "error", err)
 	}
 	if s.servicesManager != nil {
 		s.servicesManager.Shutdown()
@@ -346,10 +344,7 @@ func (s *QNTXServer) emitLifecycleNews(event string, port int) {
 
 	// Collect plugin names — at startup these are enabled (not yet initialized),
 	// at shutdown these are the plugins that were registered during the session.
-	var plugins []string
-	if s.pluginRegistry != nil {
-		plugins = s.pluginRegistry.List()
-	}
+	plugins := s.pluginRegistry.List()
 
 	ts := time.Now().Format("15:04:05")
 	detail := fmt.Sprintf("QNTX %s (%s) %s at %s", v.Version, v.Short(), event, ts)

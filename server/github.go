@@ -370,7 +370,7 @@ func (s *QNTXServer) buildLanded(name string) {
 		return
 	}
 	pm := s.getPluginManager()
-	if pm == nil || s.pluginRegistry == nil {
+	if pm == nil {
 		s.logger.Errorw("A build landed and there is no plugin manager to run it", "plugin", name)
 		return
 	}

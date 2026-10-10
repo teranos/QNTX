@@ -273,7 +273,7 @@ func TestAProxiedMCPRequestIsNotRefusedAsRebinding(t *testing.T) {
 		&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8770}))
 
 	w := httptest.NewRecorder()
-	(&QNTXServer{}).HandleMCP(w, req)
+	bareNode().HandleMCP(w, req)
 
 	assert.NotEqual(t, http.StatusForbidden, w.Code, w.Body.String())
 }

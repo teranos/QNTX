@@ -81,7 +81,7 @@ func TestAVaultRefusesTwoFoldersAtOnePlace(t *testing.T) {
 }
 
 func TestTheVaultSignumSaysWhatItHolds(t *testing.T) {
-	s := &QNTXServer{}
+	s := bareNode()
 	require.NoError(t, s.vaultSignum().Check())
 }
 

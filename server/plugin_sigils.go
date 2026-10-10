@@ -156,9 +156,6 @@ func (s *QNTXServer) callerOf(token string) (services.Caller, bool) {
 // plugin naming another's would be reached by whoever reaches that one. A
 // signum that does not is said in the log and served nowhere.
 func (s *QNTXServer) pluginSigna() []sigil.Signum {
-	if s.pluginRegistry == nil {
-		return nil
-	}
 	var signa []sigil.Signum
 	for _, name := range s.pluginRegistry.ListEnabled() {
 		served, refused := s.pluginSignaOf(name)
@@ -173,7 +170,7 @@ func (s *QNTXServer) pluginSigna() []sigil.Signum {
 // pluginSignaOf is what one ready plugin handed the node: the signa it serves,
 // and why it serves none of the rest.
 func (s *QNTXServer) pluginSignaOf(name string) (served []sigil.Signum, refused []string) {
-	if s.pluginRegistry == nil || !s.pluginRegistry.IsReady(name) {
+	if !s.pluginRegistry.IsReady(name) {
 		return nil, nil
 	}
 	p, ok := s.pluginRegistry.Get(name)

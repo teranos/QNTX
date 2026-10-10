@@ -392,10 +392,6 @@ func asyncJobStatusPtr(status async.JobStatus) *async.JobStatus {
 // pluginAction is the answer of the plugins signum's pause, resume, restart,
 // enable and disable sigils.
 func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*protocol.PluginAction, *protocol.Refusal) {
-	if s.pluginRegistry == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin registry not available"}
-	}
-
 	var err error
 
 	switch action {

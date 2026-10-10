@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,7 +22,7 @@ const (
 func writingAs(t *testing.T, caller *auth.Admission, body string) (ats.AttestationStore, *httptest.ResponseRecorder) {
 	t.Helper()
 	store, db := createTestStore(t)
-	s := &QNTXServer{nodeDB: db, logger: zap.NewNop().Sugar(),
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), nodeDB: db, logger: zap.NewNop().Sugar(),
 		nodeDID: &nodedid.Handler{DID: nodeDID}}
 	s.held = servingOne(db, store)
 
