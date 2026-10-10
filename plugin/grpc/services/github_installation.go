@@ -185,11 +185,13 @@ func githubService() protoreflect.ServiceDescriptor {
 // and what it answered as JSON, success and error among it. An operation it
 // does not have, and a field the operation does not take, are an error.
 func (s *GitHubServer) Ask(ctx context.Context, operation string, request []byte) ([]byte, error) {
-	method := githubService().Methods().ByName(protoreflect.Name(operation))
 	route, routed := githubRoutes[operation]
-	if method == nil || !routed {
+	if !routed {
 		return nil, NoSuchOperation{Operation: operation}
 	}
+	// One route per RPC and one RPC per route (TestGitHubEveryRPCRouted), so a
+	// routed operation is one the service declares.
+	method := githubService().Methods().ByName(protoreflect.Name(operation))
 	if route.mints {
 		return nil, NotWhatItTakes{Operation: operation, Why: "what it answers is a credential, which is the node's own to ask for and is handed to nobody by name"}
 	}

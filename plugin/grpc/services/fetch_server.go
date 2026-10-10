@@ -88,28 +88,35 @@ type fetchStats struct {
 	bytes    atomic.Int64
 	errors   atomic.Int64
 	deduped  atomic.Int64
+	// active is a fetch asked for since the last flush, whatever became of it.
+	active atomic.Bool
 }
 
 func (s *fetchStats) recordRequest(bytes int) {
 	s.requests.Add(1)
 	s.bytes.Add(int64(bytes))
+	s.active.Store(true)
 }
 
 func (s *fetchStats) recordError() {
 	s.errors.Add(1)
+	s.active.Store(true)
 }
 
 func (s *fetchStats) recordDedup() {
 	s.deduped.Add(1)
+	s.active.Store(true)
 }
 
-// flush returns accumulated stats and resets counters. Returns false if no activity.
-func (s *fetchStats) flush() (requests, bytes, errors, deduped int64, ok bool) {
+// flush returns accumulated stats and resets counters, and whether any fetch
+// was asked for since the last flush.
+func (s *fetchStats) flush() (requests, bytes, errors, deduped int64, active bool) {
+	active = s.active.Swap(false)
 	requests = s.requests.Swap(0)
 	bytes = s.bytes.Swap(0)
 	errors = s.errors.Swap(0)
 	deduped = s.deduped.Swap(0)
-	return requests, bytes, errors, deduped, requests > 0 || deduped > 0
+	return requests, bytes, errors, deduped, active
 }
 
 // rateLimiter tracks last-request times per key and enforces minimum intervals.
@@ -226,8 +233,8 @@ func (s *FetchServer) pulseLoop(interval time.Duration) {
 	for {
 		select {
 		case <-ticker.C:
-			requests, bytes, errors, deduped, ok := s.stats.flush()
-			if !ok {
+			requests, bytes, errors, deduped, active := s.stats.flush()
+			if !active {
 				continue
 			}
 			s.logger.Infow("Fetch pulse",

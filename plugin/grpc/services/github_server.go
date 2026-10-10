@@ -32,7 +32,8 @@ const githubDisabled = "GitHub is disabled on this node"
 // GitHubCredentials answers which GitHub token a namespace spends.
 type GitHubCredentials interface {
 	// Token is the token namespace spends, and key names that credential so
-	// rate-limit state is kept per credential. An error refuses the call.
+	// rate-limit state is kept per credential. An error refuses the call; a
+	// token handed is spent as handed, and GitHub refuses one that is empty.
 	Token(ctx context.Context, namespace string) (token, key string, err error)
 }
 
@@ -146,9 +147,6 @@ func (s *GitHubServer) Tarball(ctx context.Context, namespace, owner, repo, ref 
 	token, key, err := s.creds.Token(ctx, namespace)
 	if err != nil {
 		return nil, errors.Wrapf(err, "no GitHub credential for namespace %q", namespace)
-	}
-	if token == "" {
-		return nil, errors.Newf("namespace %q has an empty GitHub token", namespace)
 	}
 	path := "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo) + "/tarball/" + url.PathEscape(ref)
 	s.mu.Lock()
@@ -362,9 +360,6 @@ func (s *GitHubServer) credential(ctx context.Context, route githubRoute, msg pr
 	token, key, err = s.creds.Token(ctx, namespace)
 	if err != nil {
 		return "", key, namespace, errors.Newf("no GitHub credential for namespace %q: %v", namespace, err)
-	}
-	if token == "" {
-		return "", key, namespace, errors.Newf("namespace %q has an empty GitHub token", namespace)
 	}
 	return token, key, namespace, nil
 }

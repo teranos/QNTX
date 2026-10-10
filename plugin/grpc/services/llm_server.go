@@ -44,7 +44,7 @@ type LLMServer struct {
 func NewLLMServer(cfg config.LLMConfig, store ats.AttestationStore, logger *zap.SugaredLogger) *LLMServer {
 	return &LLMServer{
 		providers: make(map[string]protocol.LLMServiceClient),
-		queue:     newLLMQueue(cfg.MaxConcurrent, cfg.MaxQueueDepth, time.Duration(cfg.CooldownSeconds)*time.Second),
+		queue:     newLLMQueue(cfg.MaxConcurrent, cfg.MaxQueueDepth, time.Duration(cfg.CooldownSeconds)*time.Second, logger),
 		store:     store,
 		limiter:   ratelimit.NewLimiter(cfg.MaxCallsPerMinute),
 		logger:    logger,
@@ -214,10 +214,6 @@ func (s *LLMServer) resolveProvider(name string) (protocol.LLMServiceClient, str
 func (s *LLMServer) gate(ctx context.Context, priority int32) error {
 	if err := s.limiter.Wait(ctx); err != nil {
 		return status.Errorf(codes.ResourceExhausted, "LLM rate limit: %v", err)
-	}
-	active, queued := s.queue.Stats()
-	if queued > 0 {
-		s.logger.Infow("LLM request queued", "priority", priority, "active", active, "queued", queued)
 	}
 	if err := s.queue.Acquire(ctx, priority); err != nil {
 		return status.Errorf(codes.ResourceExhausted, "LLM queue: %v", err)

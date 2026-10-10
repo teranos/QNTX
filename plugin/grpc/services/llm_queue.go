@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/errors"
+	"go.uber.org/zap"
 )
 
 // llmQueue is a priority-aware concurrency limiter.
@@ -19,13 +20,15 @@ type llmQueue struct {
 	maxWaiters int
 	cooldown   time.Duration // pause after each request before waking next waiter
 	waiters    waiterHeap
+	logger     *zap.SugaredLogger // says a request waits, when one does
 }
 
-func newLLMQueue(maxSlots int, maxWaiters int, cooldown time.Duration) *llmQueue {
+func newLLMQueue(maxSlots int, maxWaiters int, cooldown time.Duration, logger *zap.SugaredLogger) *llmQueue {
 	return &llmQueue{
 		maxSlots:   maxSlots,
 		maxWaiters: maxWaiters,
 		cooldown:   cooldown,
+		logger:     logger,
 	}
 }
 
@@ -63,7 +66,9 @@ func (q *llmQueue) Acquire(ctx context.Context, priority int32) error {
 		ready:    make(chan struct{}),
 	}
 	heap.Push(&q.waiters, w)
+	active, queued := q.active, q.waiters.Len()
 	q.mu.Unlock()
+	q.logger.Infow("LLM request queued", "priority", priority, "active", active, "queued", queued)
 
 	select {
 	case <-w.ready:
