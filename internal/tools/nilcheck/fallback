@@ -1,6 +1,6 @@
 # unwrap_or fallbacks, per file. Debt: each number may fall and may not rise.
 # Instead: a missing value is refused, not replaced with an invented one.
-# 140 in 44 files.
+# 136 in 44 files.
 
 3	crates/ats-duckdb/src/error.rs
 2	crates/ats-duckdb/src/ffi.rs
@@ -16,7 +16,7 @@
 4	crates/ats-indexeddb/src/idb.rs
 2	crates/ats-indexeddb/src/store.rs
 2	crates/ats-sqlite/src/bounded.rs
-17	crates/ats-sqlite/src/distill.rs
+13	crates/ats-sqlite/src/distill.rs
 8	crates/ats-sqlite/src/enforcement.rs
 1	crates/ats-sqlite/src/flight_recorder.rs
 2	crates/ats-sqlite/src/sql_ffi.rs
