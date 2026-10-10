@@ -23,20 +23,34 @@ const (
 
 // Job represents an async operation
 type Job struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	HandlerName   string                 `protobuf:"bytes,2,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"` // "data.batch-import", "bio.sequence-align"
-	Payload       []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`                            // Handler-specific data (JSON)
-	Source        string                 `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`                              // For deduplication and logging
-	Status        string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`                              // queued, running, paused, completed, failed, cancelled
-	Progress      *Progress              `protobuf:"bytes,6,opt,name=progress,proto3" json:"progress,omitempty"`
-	PulseState    *PulseState            `protobuf:"bytes,9,opt,name=pulse_state,json=pulseState,proto3" json:"pulse_state,omitempty"`
-	Error         string                 `protobuf:"bytes,10,opt,name=error,proto3" json:"error,omitempty"`
-	ParentJobId   string                 `protobuf:"bytes,11,opt,name=parent_job_id,json=parentJobId,proto3" json:"parent_job_id,omitempty"`
-	RetryCount    int32                  `protobuf:"varint,12,opt,name=retry_count,json=retryCount,proto3" json:"retry_count,omitempty"`
-	CreatedAt     int64                  `protobuf:"varint,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`       // Unix timestamp in seconds
-	StartedAt     int64                  `protobuf:"varint,14,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`       // Unix timestamp in seconds (0 if not started)
-	CompletedAt   int64                  `protobuf:"varint,15,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"` // Unix timestamp in seconds (0 if not completed)
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	HandlerName string                 `protobuf:"bytes,2,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"` // "data.batch-import", "bio.sequence-align"
+	Payload     []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`                            // Handler-specific data (JSON)
+	Source      string                 `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`                              // For deduplication and logging
+	Status      string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`                              // queued, running, paused, completed, failed, cancelled
+	Progress    *Progress              `protobuf:"bytes,6,opt,name=progress,proto3" json:"progress,omitempty"`
+	// The job's pacing, or that it carries none.
+	//
+	// Types that are valid to be assigned to Pulse:
+	//
+	//	*Job_PulseState
+	//	*Job_NoPulseState
+	Pulse       isJob_Pulse `protobuf_oneof:"pulse"`
+	Error       string      `protobuf:"bytes,10,opt,name=error,proto3" json:"error,omitempty"`
+	ParentJobId string      `protobuf:"bytes,11,opt,name=parent_job_id,json=parentJobId,proto3" json:"parent_job_id,omitempty"`
+	RetryCount  int32       `protobuf:"varint,12,opt,name=retry_count,json=retryCount,proto3" json:"retry_count,omitempty"`
+	CreatedAt   int64       `protobuf:"varint,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // Unix timestamp in seconds
+	// Types that are valid to be assigned to Started:
+	//
+	//	*Job_StartedAt
+	//	*Job_NotStarted
+	Started isJob_Started `protobuf_oneof:"started"`
+	// Types that are valid to be assigned to Completed:
+	//
+	//	*Job_CompletedAt
+	//	*Job_NotCompleted
+	Completed     isJob_Completed `protobuf_oneof:"completed"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -113,11 +127,29 @@ func (x *Job) GetProgress() *Progress {
 	return nil
 }
 
-func (x *Job) GetPulseState() *PulseState {
+func (x *Job) GetPulse() isJob_Pulse {
 	if x != nil {
-		return x.PulseState
+		return x.Pulse
 	}
 	return nil
+}
+
+func (x *Job) GetPulseState() *PulseState {
+	if x != nil {
+		if x, ok := x.Pulse.(*Job_PulseState); ok {
+			return x.PulseState
+		}
+	}
+	return nil
+}
+
+func (x *Job) GetNoPulseState() bool {
+	if x != nil {
+		if x, ok := x.Pulse.(*Job_NoPulseState); ok {
+			return x.NoPulseState
+		}
+	}
+	return false
 }
 
 func (x *Job) GetError() string {
@@ -148,19 +180,103 @@ func (x *Job) GetCreatedAt() int64 {
 	return 0
 }
 
+func (x *Job) GetStarted() isJob_Started {
+	if x != nil {
+		return x.Started
+	}
+	return nil
+}
+
 func (x *Job) GetStartedAt() int64 {
 	if x != nil {
-		return x.StartedAt
+		if x, ok := x.Started.(*Job_StartedAt); ok {
+			return x.StartedAt
+		}
 	}
 	return 0
 }
 
+func (x *Job) GetNotStarted() bool {
+	if x != nil {
+		if x, ok := x.Started.(*Job_NotStarted); ok {
+			return x.NotStarted
+		}
+	}
+	return false
+}
+
+func (x *Job) GetCompleted() isJob_Completed {
+	if x != nil {
+		return x.Completed
+	}
+	return nil
+}
+
 func (x *Job) GetCompletedAt() int64 {
 	if x != nil {
-		return x.CompletedAt
+		if x, ok := x.Completed.(*Job_CompletedAt); ok {
+			return x.CompletedAt
+		}
 	}
 	return 0
 }
+
+func (x *Job) GetNotCompleted() bool {
+	if x != nil {
+		if x, ok := x.Completed.(*Job_NotCompleted); ok {
+			return x.NotCompleted
+		}
+	}
+	return false
+}
+
+type isJob_Pulse interface {
+	isJob_Pulse()
+}
+
+type Job_PulseState struct {
+	PulseState *PulseState `protobuf:"bytes,9,opt,name=pulse_state,json=pulseState,proto3,oneof"`
+}
+
+type Job_NoPulseState struct {
+	NoPulseState bool `protobuf:"varint,16,opt,name=no_pulse_state,json=noPulseState,proto3,oneof"` // False is refused.
+}
+
+func (*Job_PulseState) isJob_Pulse() {}
+
+func (*Job_NoPulseState) isJob_Pulse() {}
+
+type isJob_Started interface {
+	isJob_Started()
+}
+
+type Job_StartedAt struct {
+	StartedAt int64 `protobuf:"varint,14,opt,name=started_at,json=startedAt,proto3,oneof"` // Unix timestamp in seconds
+}
+
+type Job_NotStarted struct {
+	NotStarted bool `protobuf:"varint,17,opt,name=not_started,json=notStarted,proto3,oneof"` // False is refused.
+}
+
+func (*Job_StartedAt) isJob_Started() {}
+
+func (*Job_NotStarted) isJob_Started() {}
+
+type isJob_Completed interface {
+	isJob_Completed()
+}
+
+type Job_CompletedAt struct {
+	CompletedAt int64 `protobuf:"varint,15,opt,name=completed_at,json=completedAt,proto3,oneof"` // Unix timestamp in seconds
+}
+
+type Job_NotCompleted struct {
+	NotCompleted bool `protobuf:"varint,18,opt,name=not_completed,json=notCompleted,proto3,oneof"` // False is refused.
+}
+
+func (*Job_CompletedAt) isJob_Completed() {}
+
+func (*Job_NotCompleted) isJob_Completed() {}
 
 type Progress struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -611,10 +727,16 @@ func (x *UpdateJobResponse) GetError() string {
 }
 
 type ListJobsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`      // Optional status filter (empty = all)
-	Limit         *int32                 `protobuf:"varint,3,opt,name=limit,proto3,oneof" json:"limit,omitempty"` // Maximum results. If not set, returns all matching jobs.
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AuthToken string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
+	// Which jobs: those in one status, or in every status. Naming neither is refused.
+	//
+	// Types that are valid to be assigned to Which:
+	//
+	//	*ListJobsRequest_Status
+	//	*ListJobsRequest_EveryStatus
+	Which         isListJobsRequest_Which `protobuf_oneof:"which"`
+	Limit         int32                   `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"` // How many jobs at most: 0 is none.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -656,19 +778,53 @@ func (x *ListJobsRequest) GetAuthToken() string {
 	return ""
 }
 
+func (x *ListJobsRequest) GetWhich() isListJobsRequest_Which {
+	if x != nil {
+		return x.Which
+	}
+	return nil
+}
+
 func (x *ListJobsRequest) GetStatus() string {
 	if x != nil {
-		return x.Status
+		if x, ok := x.Which.(*ListJobsRequest_Status); ok {
+			return x.Status
+		}
 	}
 	return ""
 }
 
+func (x *ListJobsRequest) GetEveryStatus() bool {
+	if x != nil {
+		if x, ok := x.Which.(*ListJobsRequest_EveryStatus); ok {
+			return x.EveryStatus
+		}
+	}
+	return false
+}
+
 func (x *ListJobsRequest) GetLimit() int32 {
-	if x != nil && x.Limit != nil {
-		return *x.Limit
+	if x != nil {
+		return x.Limit
 	}
 	return 0
 }
+
+type isListJobsRequest_Which interface {
+	isListJobsRequest_Which()
+}
+
+type ListJobsRequest_Status struct {
+	Status string `protobuf:"bytes,2,opt,name=status,proto3,oneof"` // queued, running, paused, completed, failed, cancelled
+}
+
+type ListJobsRequest_EveryStatus struct {
+	EveryStatus bool `protobuf:"varint,4,opt,name=every_status,json=everyStatus,proto3,oneof"` // False is refused.
+}
+
+func (*ListJobsRequest_Status) isListJobsRequest_Which() {}
+
+func (*ListJobsRequest_EveryStatus) isListJobsRequest_Which() {}
 
 type ListJobsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -734,26 +890,33 @@ var File_plugin_grpc_protocol_queue_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_queue_proto_rawDesc = "" +
 	"\n" +
-	" plugin/grpc/protocol/queue.proto\x12\bprotocol\"\xcd\x03\n" +
+	" plugin/grpc/protocol/queue.proto\x12\bprotocol\"\xe6\x04\n" +
 	"\x03Job\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x18\n" +
 	"\apayload\x18\x03 \x01(\fR\apayload\x12\x16\n" +
 	"\x06source\x18\x04 \x01(\tR\x06source\x12\x16\n" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12.\n" +
-	"\bprogress\x18\x06 \x01(\v2\x12.protocol.ProgressR\bprogress\x125\n" +
-	"\vpulse_state\x18\t \x01(\v2\x14.protocol.PulseStateR\n" +
-	"pulseState\x12\x14\n" +
+	"\bprogress\x18\x06 \x01(\v2\x12.protocol.ProgressR\bprogress\x127\n" +
+	"\vpulse_state\x18\t \x01(\v2\x14.protocol.PulseStateH\x00R\n" +
+	"pulseState\x12&\n" +
+	"\x0eno_pulse_state\x18\x10 \x01(\bH\x00R\fnoPulseState\x12\x14\n" +
 	"\x05error\x18\n" +
 	" \x01(\tR\x05error\x12\"\n" +
 	"\rparent_job_id\x18\v \x01(\tR\vparentJobId\x12\x1f\n" +
 	"\vretry_count\x18\f \x01(\x05R\n" +
 	"retryCount\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\r \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"created_at\x18\r \x01(\x03R\tcreatedAt\x12\x1f\n" +
 	"\n" +
-	"started_at\x18\x0e \x01(\x03R\tstartedAt\x12!\n" +
-	"\fcompleted_at\x18\x0f \x01(\x03R\vcompletedAtJ\x04\b\a\x10\bJ\x04\b\b\x10\tR\rcost_estimateR\vcost_actual\":\n" +
+	"started_at\x18\x0e \x01(\x03H\x01R\tstartedAt\x12!\n" +
+	"\vnot_started\x18\x11 \x01(\bH\x01R\n" +
+	"notStarted\x12#\n" +
+	"\fcompleted_at\x18\x0f \x01(\x03H\x02R\vcompletedAt\x12%\n" +
+	"\rnot_completed\x18\x12 \x01(\bH\x02R\fnotCompletedB\a\n" +
+	"\x05pulseB\t\n" +
+	"\astartedB\v\n" +
+	"\tcompletedJ\x04\b\a\x10\bJ\x04\b\b\x10\tR\rcost_estimateR\vcost_actual\":\n" +
 	"\bProgress\x12\x18\n" +
 	"\acurrent\x18\x01 \x01(\x05R\acurrent\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\"\xe4\x01\n" +
@@ -785,13 +948,14 @@ const file_plugin_grpc_protocol_queue_proto_rawDesc = "" +
 	"\x03job\x18\x02 \x01(\v2\r.protocol.JobR\x03job\"C\n" +
 	"\x11UpdateJobResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"m\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\x8e\x01\n" +
 	"\x0fListJobsRequest\x12\x1d\n" +
 	"\n" +
-	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\x12\x19\n" +
-	"\x05limit\x18\x03 \x01(\x05H\x00R\x05limit\x88\x01\x01B\b\n" +
-	"\x06_limit\"e\n" +
+	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x18\n" +
+	"\x06status\x18\x02 \x01(\tH\x00R\x06status\x12#\n" +
+	"\fevery_status\x18\x04 \x01(\bH\x00R\veveryStatus\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limitB\a\n" +
+	"\x05which\"e\n" +
 	"\x10ListJobsResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12!\n" +
@@ -855,7 +1019,18 @@ func file_plugin_grpc_protocol_queue_proto_init() {
 	if File_plugin_grpc_protocol_queue_proto != nil {
 		return
 	}
-	file_plugin_grpc_protocol_queue_proto_msgTypes[9].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_queue_proto_msgTypes[0].OneofWrappers = []any{
+		(*Job_PulseState)(nil),
+		(*Job_NoPulseState)(nil),
+		(*Job_StartedAt)(nil),
+		(*Job_NotStarted)(nil),
+		(*Job_CompletedAt)(nil),
+		(*Job_NotCompleted)(nil),
+	}
+	file_plugin_grpc_protocol_queue_proto_msgTypes[9].OneofWrappers = []any{
+		(*ListJobsRequest_Status)(nil),
+		(*ListJobsRequest_EveryStatus)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
