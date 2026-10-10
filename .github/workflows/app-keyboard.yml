@@ -1,0 +1,86 @@
+{
+  "jobs": {
+    "ios": {
+      "name": "QNTX-App in the iPhone Simulator",
+      "runs-on": "macos-15",
+      "steps": [
+        {
+          "uses": "actions/checkout@v5",
+          "with": {
+            "repository": "teranos/QNTX-App"
+          }
+        },
+        {
+          "uses": "actions/checkout@v5",
+          "with": {
+            "path": "qntx"
+          }
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "targets": "aarch64-apple-ios-sim"
+          }
+        },
+        {
+          "name": "Fetch tauri-cli 2.11.4",
+          "run": "curl -sSL -o cargo-tauri.zip https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v2.11.4/cargo-tauri-aarch64-apple-darwin.zip\nunzip -o -q cargo-tauri.zip -d \"$HOME/.cargo/bin\"\nrm cargo-tauri.zip\ncargo tauri --version\n"
+        },
+        {
+          "uses": "actions/setup-python@v5",
+          "with": {
+            "python-version": "3.11"
+          }
+        },
+        {
+          "name": "A finger, and eyes",
+          "run": "curl -sSL https://github.com/facebook/idb/releases/download/v1.1.8/idb-companion.universal.tar.gz | tar -xz\nCOMPANION=$(dirname \"$(find \"$PWD\" -name idb_companion -type f -perm -u+x | head -1)\")\necho \"$COMPANION\" >> \"$GITHUB_PATH\"\npython -m pip install --quiet fb-idb pillow\n"
+        },
+        {
+          "run": "cargo tauri ios init"
+        },
+        {
+          "name": "Boot an iPhone, with its own keyboard",
+          "run": "defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false\nRUNTIME=$(xcrun simctl list runtimes available -j | jq -r '[.runtimes[] | select(.platform == \"iOS\")] | sort_by(.version) | last | .identifier')\nUDID=$(xcrun simctl list devices available -j | jq -r --arg rt \"$RUNTIME\" '[.devices[$rt][] | select(.name | startswith(\"iPhone\"))] | first | .udid')\necho \"UDID=$UDID\" >> \"$GITHUB_ENV\"\nxcrun simctl boot \"$UDID\"\nxcrun simctl bootstatus \"$UDID\" -b\nopen -a Simulator --args -CurrentDeviceUDID \"$UDID\"\n"
+        },
+        {
+          "name": "Without the line: the app's web view zooms on a 12px box, and this sees it",
+          "run": "bash qntx/ci/app-keyboard/run.sh without \"width=device-width, initial-scale=1, viewport-fit=cover\""
+        },
+        {
+          "if": "always()",
+          "name": "With QNTX's own line",
+          "run": "LINE=$(python3 -c 'import sys; s=open(\"qntx/web/index.html\").read(); i=s.index(\"name=\\\"viewport\\\" content=\\\"\")+len(\"name=\\\"viewport\\\" content=\\\"\"); print(s[i:s.index(\"\\\"\", i)])')\nbash qntx/ci/app-keyboard/run.sh qntx \"$LINE\"\n"
+        },
+        {
+          "if": "always()",
+          "name": "What the screen said",
+          "run": "cat verdicts.txt\ngrep -q '^without: zoomed$' verdicts.txt || { echo \"without the line it did not zoom: this run cannot see a zoom\"; exit 1; }\ngrep -q '^qntx: not zoomed$' verdicts.txt || { echo \"with QNTX's line the box still zoomed\"; exit 1; }\n"
+        },
+        {
+          "if": "always()",
+          "name": "The screens",
+          "uses": "actions/upload-artifact@v4",
+          "with": {
+            "name": "app-keyboard",
+            "path": "keyboard-shots",
+            "retention-days": 14
+          }
+        }
+      ],
+      "timeout-minutes": 60
+    }
+  },
+  "name": "App keyboard",
+  "on": {
+    "pull_request": {
+      "paths": [
+        "ci/app-keyboard/**",
+        "ci/app-keyboard.nix",
+        ".github/workflows/app-keyboard.yml",
+        "web/index.html"
+      ]
+    },
+    "workflow_dispatch": null
+  }
+}
