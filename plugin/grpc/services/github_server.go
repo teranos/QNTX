@@ -32,7 +32,8 @@ const githubDisabled = "GitHub is disabled on this node"
 // GitHubCredentials answers which GitHub token a namespace spends.
 type GitHubCredentials interface {
 	// Token is the token namespace spends, and key names that credential so
-	// rate-limit state is kept per credential. An error refuses the call.
+	// rate-limit state is kept per credential. An error refuses the call; a
+	// token handed is spent as handed, and GitHub refuses one that is empty.
 	Token(ctx context.Context, namespace string) (token, key string, err error)
 }
 
@@ -84,7 +85,7 @@ func NewGitHubServer(creds GitHubCredentials, enabled func() bool, logger *zap.S
 			// A route whose answer carries a location asks where GitHub points:
 			// that redirect is the answer. Any other (a renamed repository) is followed.
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				if req.Context().Value(githubNoFollow{}) != nil {
+				if noFollow, marked := req.Context().Value(githubNoFollow{}).(bool); marked && noFollow {
 					return http.ErrUseLastResponse
 				}
 				if len(via) >= 10 {
@@ -147,9 +148,6 @@ func (s *GitHubServer) Tarball(ctx context.Context, namespace, owner, repo, ref 
 	if err != nil {
 		return nil, errors.Wrapf(err, "no GitHub credential for namespace %q", namespace)
 	}
-	if token == "" {
-		return nil, errors.Newf("namespace %q has an empty GitHub token", namespace)
-	}
 	path := "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo) + "/tarball/" + url.PathEscape(ref)
 	s.mu.Lock()
 	target := s.baseURL + path
@@ -167,8 +165,11 @@ func (s *GitHubServer) Tarball(ctx context.Context, namespace, owner, repo, ref 
 	}
 	s.recordHeaders(key, httpResp.Header)
 	if httpResp.StatusCode < 200 || httpResp.StatusCode > 299 {
-		raw, _ := io.ReadAll(io.LimitReader(httpResp.Body, 4096))
+		raw, readErr := io.ReadAll(io.LimitReader(httpResp.Body, 4096))
 		sqlclose.Log(httpResp.Body.Close(), s.logger, "the GitHub response body")
+		if readErr != nil {
+			return nil, errors.Wrapf(readErr, "GitHub GET %s answered %d, and what it said did not read", path, httpResp.StatusCode)
+		}
 		return nil, errors.Newf("GitHub GET %s answered %d: %s", path, httpResp.StatusCode, githubMessage(raw))
 	}
 	// The archive is the caller's to read and close.
@@ -249,14 +250,18 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 		return key, false
 	}
 
+	query, err := githubQuery(route, msg)
+	if err != nil {
+		githubFail(resp, fmt.Sprintf("GitHubService %s: %v", rpc, err))
+		return key, false
+	}
+
 	s.mu.Lock()
 	target := s.baseURL + path
 	s.mu.Unlock()
-	if query := githubQuery(route, msg); query != "" {
-		target += "?" + query
-	}
 
-	wantsLocation := resp.ProtoReflect().Descriptor().Fields().ByName("location") != nil
+	// A response that carries a location is answered by where GitHub points.
+	_, wantsLocation := resp.(interface{ GetLocation() string })
 	if wantsLocation {
 		ctx = context.WithValue(ctx, githubNoFollow{}, true)
 	}
@@ -270,6 +275,8 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 		githubFail(resp, fmt.Sprintf("failed to build GitHub request %s %s: %v", route.method, path, err))
 		return key, false
 	}
+	// The query is what the route's set fields say; none set is none sent.
+	httpReq.URL.RawQuery = query
 	httpReq.Header.Set("Authorization", "Bearer "+token)
 	httpReq.Header.Set("Accept", "application/vnd.github+json")
 	httpReq.Header.Set("X-GitHub-Api-Version", githubAPIVersion)
@@ -318,8 +325,9 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 		return key, false
 	}
 	// A list GitHub pages by cursor says where the next page is in this header.
-	if fd := resp.ProtoReflect().Descriptor().Fields().ByName("link"); fd != nil {
-		resp.ProtoReflect().Set(fd, protoreflect.ValueOfString(httpResp.Header.Get("Link")))
+	if _, paged := resp.(interface{ GetLink() string }); paged {
+		answered := resp.ProtoReflect()
+		answered.Set(answered.Descriptor().Fields().ByName("link"), protoreflect.ValueOfString(httpResp.Header.Get("Link")))
 	}
 	githubSucceed(resp)
 	return key, true
@@ -344,7 +352,7 @@ func (s *GitHubServer) credential(ctx context.Context, route githubRoute, msg pr
 		token, key, err = s.installationTokenOf(ctx, id)
 		return token, key, "", err
 	}
-	if ctx.Value(githubAsInstallation{}) != nil {
+	if asInstallation, marked := ctx.Value(githubAsInstallation{}).(bool); marked && asInstallation {
 		token, key, err = s.asInstallation(ctx, msg)
 		return token, key, "", err
 	}
@@ -352,9 +360,6 @@ func (s *GitHubServer) credential(ctx context.Context, route githubRoute, msg pr
 	token, key, err = s.creds.Token(ctx, namespace)
 	if err != nil {
 		return "", key, namespace, errors.Newf("no GitHub credential for namespace %q: %v", namespace, err)
-	}
-	if token == "" {
-		return "", key, namespace, errors.Newf("namespace %q has an empty GitHub token", namespace)
 	}
 	return token, key, namespace, nil
 }
@@ -375,7 +380,10 @@ func githubPath(route githubRoute, msg protoreflect.Message) (string, error) {
 		if !msg.Has(fd) {
 			return "", errors.Newf("%s is required for %s %s", name, route.method, route.path)
 		}
-		value := githubScalar(msg.Get(fd), fd)
+		value, err := githubScalar(msg.Get(fd), fd)
+		if err != nil {
+			return "", err
+		}
 		if slices.Contains(route.slashed, name) {
 			segments := strings.Split(value, "/")
 			for i, segment := range segments {
@@ -392,31 +400,37 @@ func githubPath(route githubRoute, msg protoreflect.Message) (string, error) {
 }
 
 // githubQuery encodes the route's query fields that are set.
-func githubQuery(route githubRoute, msg protoreflect.Message) string {
+func githubQuery(route githubRoute, msg protoreflect.Message) (string, error) {
 	values := url.Values{}
 	for _, name := range route.query {
 		fd := msg.Descriptor().Fields().ByName(protoreflect.Name(name))
 		if fd == nil || !msg.Has(fd) {
 			continue
 		}
-		values.Set(name, githubScalar(msg.Get(fd), fd))
+		value, err := githubScalar(msg.Get(fd), fd)
+		if err != nil {
+			return "", err
+		}
+		values.Set(name, value)
 	}
-	return values.Encode()
+	return values.Encode(), nil
 }
 
-// githubScalar is a path or query value as GitHub reads it.
-func githubScalar(v protoreflect.Value, fd protoreflect.FieldDescriptor) string {
+// githubScalar is a path or query value as GitHub reads it. A field of a kind
+// GitHub takes no path or query value as is refused, not written as Go prints it.
+func githubScalar(v protoreflect.Value, fd protoreflect.FieldDescriptor) (string, error) {
 	switch fd.Kind() {
+	case protoreflect.StringKind:
+		return v.String(), nil
 	case protoreflect.BoolKind:
-		return strconv.FormatBool(v.Bool())
+		return strconv.FormatBool(v.Bool()), nil
 	case protoreflect.Int32Kind, protoreflect.Int64Kind, protoreflect.Sint32Kind, protoreflect.Sint64Kind,
 		protoreflect.Sfixed32Kind, protoreflect.Sfixed64Kind:
-		return strconv.FormatInt(v.Int(), 10)
+		return strconv.FormatInt(v.Int(), 10), nil
 	case protoreflect.Uint32Kind, protoreflect.Uint64Kind, protoreflect.Fixed32Kind, protoreflect.Fixed64Kind:
-		return strconv.FormatUint(v.Uint(), 10)
-	default:
-		return v.String()
+		return strconv.FormatUint(v.Uint(), 10), nil
 	}
+	return "", errors.Newf("%s is a %s, which is no path or query value", fd.FullName(), fd.Kind())
 }
 
 // githubBody is the JSON body of the route's body fields that are set; nil
@@ -451,8 +465,19 @@ func githubBody(route githubRoute, msg protoreflect.Message) ([]byte, error) {
 // string where GitHub wants a number, so it is used only for google.protobuf
 // Struct/Value/ListValue, which are JSON already.
 func githubJSON(v protoreflect.Value, fd protoreflect.FieldDescriptor) (any, error) {
-	switch {
-	case fd.IsList():
+	switch fd.Cardinality() {
+	case protoreflect.Repeated:
+		return githubJSONRepeated(v, fd)
+	case protoreflect.Optional, protoreflect.Required:
+		return githubJSONOne(v, fd)
+	}
+	return nil, errors.Newf("%s has cardinality %s, which is not one GitHub's JSON is written from", fd.FullName(), fd.Cardinality())
+}
+
+// githubJSONRepeated is a repeated field as GitHub's JSON: a map is an object,
+// and a list an array.
+func githubJSONRepeated(v protoreflect.Value, fd protoreflect.FieldDescriptor) (any, error) {
+	if fd.IsList() {
 		list := v.List()
 		out := make([]any, 0, list.Len())
 		for i := 0; i < list.Len(); i++ {
@@ -463,22 +488,20 @@ func githubJSON(v protoreflect.Value, fd protoreflect.FieldDescriptor) (any, err
 			out = append(out, item)
 		}
 		return out, nil
-	case fd.IsMap():
-		out := map[string]any{}
-		var failed error
-		v.Map().Range(func(k protoreflect.MapKey, mv protoreflect.Value) bool {
-			item, err := githubJSONOne(mv, fd.MapValue())
-			if err != nil {
-				failed = err
-				return false
-			}
-			out[k.String()] = item
-			return true
-		})
-		return out, failed
-	default:
-		return githubJSONOne(v, fd)
 	}
+	// A repeated field that is no list is a map.
+	out := map[string]any{}
+	var rangeErr error
+	v.Map().Range(func(k protoreflect.MapKey, mv protoreflect.Value) bool {
+		item, err := githubJSONOne(mv, fd.MapValue())
+		if err != nil {
+			rangeErr = err
+			return false
+		}
+		out[k.String()] = item
+		return true
+	})
+	return out, rangeErr
 }
 
 func githubJSONOne(v protoreflect.Value, fd protoreflect.FieldDescriptor) (any, error) {
@@ -509,9 +532,14 @@ func githubJSONOne(v protoreflect.Value, fd protoreflect.FieldDescriptor) (any, 
 			return string(ev.Name()), nil
 		}
 		return int32(v.Enum()), nil
-	default:
+	case protoreflect.BoolKind, protoreflect.StringKind, protoreflect.BytesKind,
+		protoreflect.FloatKind, protoreflect.DoubleKind,
+		protoreflect.Int32Kind, protoreflect.Int64Kind, protoreflect.Sint32Kind, protoreflect.Sint64Kind,
+		protoreflect.Sfixed32Kind, protoreflect.Sfixed64Kind,
+		protoreflect.Uint32Kind, protoreflect.Uint64Kind, protoreflect.Fixed32Kind, protoreflect.Fixed64Kind:
 		return v.Interface(), nil
 	}
+	return nil, errors.Newf("%s is a %s, which GitHub's JSON is not written from", fd.FullName(), fd.Kind())
 }
 
 // githubJSONName is the key GitHub knows a field by: its json_name where the
@@ -564,22 +592,20 @@ func githubDecode(raw []byte, resp proto.Message) error {
 	return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(trimmed, resp)
 }
 
-// githubMessage is what GitHub said in a refusal: its message, or the body.
+// githubMessage is what GitHub said in a refusal: its message, or the body as
+// it came, quoted, so a body that said nothing reads as "".
 func githubMessage(raw []byte) string {
-	var said struct {
-		Message string `json:"message"`
-	}
-	if err := json.Unmarshal(raw, &said); err == nil && said.Message != "" {
-		return said.Message
+	var said map[string]any
+	if err := json.Unmarshal(raw, &said); err == nil {
+		if message, given := said["message"].(string); given {
+			return message
+		}
 	}
 	text := strings.TrimSpace(string(raw))
-	if text == "" {
-		return "no message"
-	}
 	if len(text) > 500 {
 		text = text[:500]
 	}
-	return text
+	return strconv.Quote(text)
 }
 
 func githubFail(resp proto.Message, reason string) {

@@ -144,18 +144,17 @@ func (s *GitHubServer) installationTokenOf(ctx context.Context, installationID i
 // asInstallation is what a call marked AsInstallation spends: the token of the
 // installation where the repository it names is.
 func (s *GitHubServer) asInstallation(ctx context.Context, msg protoreflect.Message) (token, key string, err error) {
-	named := func(field string) string {
-		fd := msg.Descriptor().Fields().ByName(protoreflect.Name(field))
-		if fd == nil || fd.Kind() != protoreflect.StringKind {
-			return ""
-		}
-		return msg.Get(fd).String()
-	}
-	owner, repo := named("owner"), named("repo")
-	if owner == "" || repo == "" {
+	// An owner or repo left unset is refused where the installation is asked
+	// for, as every path parameter is.
+	named, ofARepository := msg.Interface().(interface {
+		GetOwner() string
+		GetRepo() string
+	})
+	if !ofARepository {
 		return "", "", errors.Newf("%s is asked as the App's installation, which is found by a repository, and it names no repository",
 			msg.Descriptor().Name())
 	}
+	owner, repo := named.GetOwner(), named.GetRepo()
 	minted, err := s.InstallationToken(ctx, owner, repo)
 	if err != nil {
 		return "", "installation:" + owner, err
@@ -186,11 +185,13 @@ func githubService() protoreflect.ServiceDescriptor {
 // and what it answered as JSON, success and error among it. An operation it
 // does not have, and a field the operation does not take, are an error.
 func (s *GitHubServer) Ask(ctx context.Context, operation string, request []byte) ([]byte, error) {
-	method := githubService().Methods().ByName(protoreflect.Name(operation))
 	route, routed := githubRoutes[operation]
-	if method == nil || !routed {
+	if !routed {
 		return nil, NoSuchOperation{Operation: operation}
 	}
+	// One route per RPC and one RPC per route (TestGitHubEveryRPCRouted), so a
+	// routed operation is one the service declares.
+	method := githubService().Methods().ByName(protoreflect.Name(operation))
 	if route.mints {
 		return nil, NotWhatItTakes{Operation: operation, Why: "what it answers is a credential, which is the node's own to ask for and is handed to nobody by name"}
 	}

@@ -101,7 +101,7 @@ func TestATSStoreServer_GenerateAndCreate_NilCommand(t *testing.T) {
 	})
 	require.NoError(t, err, "RPC should not return transport error")
 	assert.False(t, resp.Success)
-	assert.Contains(t, resp.Error, "nil")
+	assert.Contains(t, resp.Error, "names no source")
 }
 
 func TestATSStoreServer_GenerateAndCreate_ValidCommand(t *testing.T) {

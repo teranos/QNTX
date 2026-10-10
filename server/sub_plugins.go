@@ -58,11 +58,11 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 
 	// Wire version resolver: ATSStore and FetchService auto-stamp source_version
 	// from the plugin registry, so individual plugins don't need to set it.
-	servicesManager.SetVersionResolver(func(source string) string {
+	servicesManager.SetVersionResolver(func(source string) (string, bool) {
 		if p, ok := pluginRegistry.Get(source); ok {
-			return p.Metadata().Version
+			return p.Metadata().Version, true
 		}
-		return ""
+		return "", false
 	})
 
 	// A plugin answering a sigil reads and writes where its caller acts.

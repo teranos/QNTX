@@ -92,7 +92,7 @@ type MailWiring struct {
 	From       string                      // mail.from. Empty sends nothing.
 	Transport  MailTransport               // Nil is no transport enabled in am.toml.
 	Recipients MailRecipients              // Nil is a node that keeps no Users.
-	Records    func() ats.AttestationStore // Where templates and mail are attested.
+	Records    func() ats.AttestationStore // Where templates and mail are attested. Always handed.
 	Actor      string                      // The node's DID: who sent the mail.
 }
 
@@ -101,18 +101,36 @@ type MailServer struct {
 	protocol.UnimplementedMailServiceServer
 	authToken       string
 	logger          *zap.SugaredLogger
-	wired           atomic.Pointer[MailWiring]
+	wired           atomic.Pointer[mailWired]
 	versionResolver atomic.Pointer[VersionResolver]
+}
+
+// mailWired is what the service sends with, or why it has nothing yet.
+type mailWired struct {
+	wiring MailWiring
+	err    error // the service not wired yet
 }
 
 // NewMailServer creates the mail service. It sends nothing until Wire.
 func NewMailServer(authToken string, logger *zap.SugaredLogger) *MailServer {
-	return &MailServer{authToken: authToken, logger: logger}
+	s := &MailServer{authToken: authToken, logger: logger}
+	s.wired.Store(&mailWired{err: errors.New("the mail service is not wired yet: the node has not finished starting")})
+	s.SetVersionResolver(noVersions)
+	return s
 }
 
 // Wire hands the service what it sends with.
 func (s *MailServer) Wire(w MailWiring) {
-	s.wired.Store(&w)
+	s.wired.Store(&mailWired{wiring: w})
+}
+
+// wiredWith is what Wire handed the service, or that it has not been yet.
+func (s *MailServer) wiredWith() (*MailWiring, error) {
+	wired := s.wired.Load()
+	if err := wired.err; err != nil {
+		return nil, err
+	}
+	return &wired.wiring, nil
 }
 
 // SetVersionResolver stamps source_version on what the service attests.
@@ -143,13 +161,13 @@ func (s *MailServer) SetTemplate(_ context.Context, req *protocol.SetMailTemplat
 		return refuse(errors.Wrapf(err, "template %s of %s", req.Name, req.Source))
 	}
 
-	w := s.wired.Load()
-	if w == nil || w.Records == nil {
-		return refuse(errors.New("the mail service has nowhere to keep a template yet"))
+	w, err := s.wiredWith()
+	if err != nil {
+		return refuse(errors.Wrap(err, "the mail service has nowhere to keep a template yet"))
 	}
-	store := w.Records()
-	if store == nil {
-		return refuse(errors.New("the node holds no store to keep the template in"))
+	store, err := w.records()
+	if err != nil {
+		return refuse(errors.Wrapf(err, "template %s of %s was not kept", req.Name, req.Source))
 	}
 
 	ref := templateRef(req.Source, req.Name)
@@ -311,7 +329,7 @@ func (s *MailServer) SendAsNodeTo(ctx context.Context, u MailRecipient, m NodeMa
 
 // ready is the wiring a send needs and the address it goes to, or why there is
 // none.
-func (s *MailServer) ready(userID string) (*MailWiring, string, error) {
+func (s *MailServer) ready(userID string) (*mailSending, string, error) {
 	w, err := s.wiring()
 	if err != nil {
 		return nil, "", err
@@ -323,11 +341,18 @@ func (s *MailServer) ready(userID string) (*MailWiring, string, error) {
 	return w, to, nil
 }
 
+// mailSending is the wiring a send goes out by, with the store its record is
+// kept in, read once when the send begins.
+type mailSending struct {
+	*MailWiring
+	store ats.AttestationStore
+}
+
 // wiring is what a send needs besides the User, or why there is none.
-func (s *MailServer) wiring() (*MailWiring, error) {
-	w := s.wired.Load()
-	if w == nil {
-		return nil, errors.New("the mail service is not wired yet: the node has not finished starting")
+func (s *MailServer) wiring() (*mailSending, error) {
+	w, err := s.wiredWith()
+	if err != nil {
+		return nil, err
 	}
 	if w.Transport == nil {
 		return nil, errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml")
@@ -338,15 +363,26 @@ func (s *MailServer) wiring() (*MailWiring, error) {
 	if w.Recipients == nil {
 		return nil, errors.New("this node keeps no Users, so there is nobody to mail")
 	}
-	if w.Records == nil || w.Records() == nil {
-		return nil, errors.New("the node holds no store to attest the mail in, so none is sent")
+	store, err := w.records()
+	if err != nil {
+		return nil, errors.Wrap(err, "no mail is sent that cannot be attested")
 	}
-	return w, nil
+	return &mailSending{MailWiring: w, store: store}, nil
+}
+
+// records is the store the node keeps mail's records in, or that it holds
+// none: the node's own records are not there before the node has them.
+func (w *MailWiring) records() (ats.AttestationStore, error) {
+	store := w.Records()
+	if store == nil {
+		return nil, errors.New("the node holds no store to keep mail's records in")
+	}
+	return store, nil
 }
 
 // deliver hands a filled mail to the transport and attests what became of it:
 // mail:sent with the transport's id, or mail:failed with its refusal.
-func (s *MailServer) deliver(ctx context.Context, w *MailWiring, userID, source, ref string, mail OutgoingMail) (string, string, error) {
+func (s *MailServer) deliver(ctx context.Context, w *mailSending, userID, source, ref string, mail OutgoingMail) (string, string, error) {
 	messageID, sendErr := w.Transport.Send(ctx, mail)
 
 	attrs := map[string]any{
@@ -362,20 +398,19 @@ func (s *MailServer) deliver(ctx context.Context, w *MailWiring, userID, source,
 	//
 	// The images are kept whole beside the html that shows them, so the mail
 	// can be shown again as it went out, graphs and all.
-	if len(mail.Inline) > 0 {
-		images := make([]any, 0, len(mail.Inline))
-		for _, img := range mail.Inline {
-			sum := sha256.Sum256(img.Data)
-			images = append(images, map[string]any{
-				"content_id":   img.ContentID,
-				"content_type": img.ContentType,
-				"file_name":    img.FileName,
-				"sha256":       hex.EncodeToString(sum[:]),
-				"data":         base64.StdEncoding.EncodeToString(img.Data),
-			})
-		}
-		attrs["images"] = images
+	// A mail that carried none keeps none.
+	images := make([]any, 0, len(mail.Inline))
+	for _, img := range mail.Inline {
+		sum := sha256.Sum256(img.Data)
+		images = append(images, map[string]any{
+			"content_id":   img.ContentID,
+			"content_type": img.ContentType,
+			"file_name":    img.FileName,
+			"sha256":       hex.EncodeToString(sum[:]),
+			"data":         base64.StdEncoding.EncodeToString(img.Data),
+		})
 	}
+	attrs["images"] = images
 	predicate := PredicateMailSent
 	if sendErr != nil {
 		predicate = PredicateMailFailed
@@ -384,7 +419,7 @@ func (s *MailServer) deliver(ctx context.Context, w *MailWiring, userID, source,
 		attrs["message_id"] = messageID
 	}
 
-	attestationID, attestErr := s.attest(w.Records(), w.Actor, userID, predicate, ref, source, attrs)
+	attestationID, attestErr := s.attest(w.store, w.Actor, userID, predicate, ref, source, attrs)
 	if attestErr != nil {
 		// The mail left or failed either way; what is lost is the record of it,
 		// and that is said with everything the record would have held.
@@ -406,7 +441,7 @@ func (s *MailServer) deliver(ctx context.Context, w *MailWiring, userID, source,
 }
 
 // recipient is the address a User's mail goes to, or why there is none.
-func (s *MailServer) recipient(w *MailWiring, userID string) (string, error) {
+func (s *MailServer) recipient(w *mailSending, userID string) (string, error) {
 	u, found, err := w.Recipients(userID)
 	if err != nil {
 		return "", errors.Wrapf(err, "User %s could not be read", userID)
@@ -434,7 +469,7 @@ func sendable(u MailRecipient) error {
 
 // template is what a Send is filled from: QNTX's neutral template when it names
 // none, else the newest the plugin set under that name.
-func (s *MailServer) template(w *MailWiring, plugin, name string) (*protocol.MailTemplate, string, error) {
+func (s *MailServer) template(w *mailSending, plugin, name string) (*protocol.MailTemplate, string, error) {
 	if name == "" {
 		return NeutralTemplate(), NeutralTemplateName, nil
 	}
@@ -443,7 +478,7 @@ func (s *MailServer) template(w *MailWiring, plugin, name string) (*protocol.Mai
 		return own, name, err
 	}
 	ref := templateRef(plugin, name)
-	kept, found, err := NewestMailTemplate(w.Records(), plugin, name)
+	kept, found, err := NewestMailTemplate(w.store, plugin, name)
 	if err != nil {
 		return nil, ref, err
 	}
@@ -465,16 +500,17 @@ func NewestMailTemplate(store ats.AttestationStore, plugin, name string) (*proto
 		return nil, false, errors.Wrapf(err, "template %s could not be read", ref)
 	}
 	var newest *types.As
+	found := false
 	for _, as := range kept {
 		// A store may match a subject loosely; a template is its exact name.
 		if !slices.Contains(as.Subjects, ref) {
 			continue
 		}
-		if newest == nil || as.Timestamp.After(newest.Timestamp) {
-			newest = as
+		if !found || as.Timestamp.After(newest.Timestamp) {
+			newest, found = as, true
 		}
 	}
-	if newest == nil {
+	if !found {
 		return nil, false, nil
 	}
 	return TemplateOf(newest), true, nil
@@ -498,10 +534,8 @@ func templateRef(plugin, name string) string {
 
 // stamped adds the version of the plugin a record came from.
 func (s *MailServer) stamped(source string, attrs map[string]any) map[string]any {
-	if resolver := s.versionResolver.Load(); resolver != nil && *resolver != nil {
-		if v := (*resolver)(source); v != "" {
-			attrs["source_version"] = v
-		}
+	if version, known := (*s.versionResolver.Load())(source); known {
+		attrs["source_version"] = version
 	}
 	return attrs
 }

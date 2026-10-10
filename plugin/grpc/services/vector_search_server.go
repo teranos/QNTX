@@ -14,17 +14,19 @@ import (
 // plugin initializes (same lazy pattern as EmbeddingServer).
 type VectorSearchServer struct {
 	protocol.UnimplementedVectorSearchServiceServer
-	mu        sync.RWMutex
-	service   protocol.VectorSearchServiceClient
-	authToken string
-	logger    *zap.SugaredLogger
+	mu         sync.RWMutex
+	service    protocol.VectorSearchServiceClient
+	serviceErr error // the backend not registered yet
+	authToken  string
+	logger     *zap.SugaredLogger
 }
 
 // NewVectorSearchServer creates a new vector search gRPC server.
 func NewVectorSearchServer(authToken string, logger *zap.SugaredLogger) *VectorSearchServer {
 	return &VectorSearchServer{
-		authToken: authToken,
-		logger:    logger,
+		serviceErr: errors.New("vector search service not initialized"),
+		authToken:  authToken,
+		logger:     logger,
 	}
 }
 
@@ -32,7 +34,7 @@ func NewVectorSearchServer(authToken string, logger *zap.SugaredLogger) *VectorS
 func (s *VectorSearchServer) SetService(client protocol.VectorSearchServiceClient) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.service = client
+	s.service, s.serviceErr = client, nil
 	s.logger.Infow("VectorSearch gRPC service backend registered")
 }
 
@@ -40,7 +42,14 @@ func (s *VectorSearchServer) SetService(client protocol.VectorSearchServiceClien
 func (s *VectorSearchServer) HasProvider() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.service != nil
+	return s.serviceErr == nil
+}
+
+// backend is the registered vector search backend, or why there is none yet.
+func (s *VectorSearchServer) backend() (protocol.VectorSearchServiceClient, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.service, s.serviceErr
 }
 
 // Search finds the nearest neighbors to a query vector in a named index.
@@ -49,12 +58,9 @@ func (s *VectorSearchServer) Search(ctx context.Context, req *protocol.VectorSea
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, errors.New("vector search service not initialized")
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Index == "" {
@@ -73,12 +79,9 @@ func (s *VectorSearchServer) AddVectors(ctx context.Context, req *protocol.AddVe
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, errors.New("vector search service not initialized")
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Index == "" {
@@ -97,12 +100,9 @@ func (s *VectorSearchServer) CreateIndex(ctx context.Context, req *protocol.Crea
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, errors.New("vector search service not initialized")
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Name == "" {

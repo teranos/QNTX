@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
@@ -14,8 +16,20 @@ import (
 	"google.golang.org/grpc"
 )
 
-func newTestLLMServer(logger *zap.SugaredLogger) *LLMServer {
-	return NewLLMServer(config.LLMConfig{MaxConcurrent: 2, MaxCallsPerMinute: 1000}, nil, logger)
+// weaveStore keeps what the LLM server weaves; nothing else is asked of it.
+type weaveStore struct {
+	ats.AttestationStore
+	woven chan *types.AsCommand
+}
+
+func (w *weaveStore) GenerateAndCreateAttestation(_ context.Context, cmd *types.AsCommand) (*types.As, error) {
+	w.woven <- cmd
+	return &types.As{ID: "AS-woven"}, nil
+}
+
+func newTestLLMServer(logger *zap.SugaredLogger) (*LLMServer, *weaveStore) {
+	store := &weaveStore{woven: make(chan *types.AsCommand, 8)}
+	return NewLLMServer(config.LLMConfig{MaxConcurrent: 2, MaxCallsPerMinute: 1000}, store, logger), store
 }
 
 // stubLLMClient implements protocol.LLMServiceClient for testing.
@@ -34,101 +48,59 @@ func (s *stubLLMClient) StreamChat(ctx context.Context, in *protocol.LLMChatRequ
 }
 
 func TestLLMServer_NoProviders(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-	srv := newTestLLMServer(logger)
+	srv, _ := newTestLLMServer(zaptest.NewLogger(t).Sugar())
 
 	_, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
 		UserPrompt: "hello",
+		Provider:   "openrouter",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no LLM providers registered")
-}
-
-func TestLLMServer_DefaultProvider(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-	srv := newTestLLMServer(logger)
-
-	stub := &stubLLMClient{
-		chatResp: &protocol.LLMChatResponse{
-			Content:     "world",
-			Model:       "test-model",
-			TotalTokens: 42,
-		},
-	}
-	srv.RegisterProvider("openrouter", stub)
-
-	resp, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
-		UserPrompt: "hello",
-		// provider empty → uses default
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "world", resp.Content)
-	assert.Equal(t, "test-model", resp.Model)
-	assert.Equal(t, int32(42), resp.TotalTokens)
+	assert.Contains(t, err.Error(), `LLM provider "openrouter" is not registered`)
 }
 
 func TestLLMServer_ExplicitProvider(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-	srv := newTestLLMServer(logger)
+	// The weave is written after the call returns, so what it logs may come
+	// after the test has ended.
+	srv, store := newTestLLMServer(zap.NewNop().Sugar())
 
-	stubA := &stubLLMClient{
-		chatResp: &protocol.LLMChatResponse{Content: "from-a"},
-	}
-	stubB := &stubLLMClient{
-		chatResp: &protocol.LLMChatResponse{Content: "from-b"},
-	}
+	srv.RegisterProvider("a", &stubLLMClient{chatResp: &protocol.LLMChatResponse{Content: "from-a"}})
+	srv.RegisterProvider("b", &stubLLMClient{chatResp: &protocol.LLMChatResponse{
+		Content: "from-b", Model: "test-model", TotalTokens: 42,
+	}})
 
-	srv.RegisterProvider("a", stubA)
-	srv.RegisterProvider("b", stubB)
-
-	// Explicit provider=b
 	resp, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
 		UserPrompt: "test",
 		Provider:   "b",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "from-b", resp.Content)
+	assert.Equal(t, "test-model", resp.Model)
+	assert.Equal(t, int32(42), resp.TotalTokens)
 
-	// Default should be "a" (first registered)
-	resp, err = srv.Chat(context.Background(), &protocol.LLMChatRequest{
-		UserPrompt: "test",
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "from-a", resp.Content)
+	woven := <-store.woven
+	assert.Equal(t, []string{"b"}, woven.Actors)
+	assert.Equal(t, "from-b", woven.Attributes["text"])
 }
 
-func TestLLMServer_UnknownProviderFallsBackToDefault(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-	srv := newTestLLMServer(logger)
+// "nil is nil"
+func TestLLMServer_ACallNamingNoProviderIsRefused(t *testing.T) {
+	srv, _ := newTestLLMServer(zaptest.NewLogger(t).Sugar())
+	srv.RegisterProvider("first", &stubLLMClient{chatResp: &protocol.LLMChatResponse{Content: "first"}})
 
-	stub := &stubLLMClient{
-		chatResp: &protocol.LLMChatResponse{Content: "from default"},
-	}
-	srv.RegisterProvider("openrouter", stub)
+	_, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{UserPrompt: "test"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `LLM provider "" is not registered`)
+}
 
-	resp, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
+// "nil is nil"
+func TestLLMServer_AnUnknownProviderIsRefused(t *testing.T) {
+	srv, _ := newTestLLMServer(zaptest.NewLogger(t).Sugar())
+	srv.RegisterProvider("openrouter", &stubLLMClient{chatResp: &protocol.LLMChatResponse{Content: "from openrouter"}})
+
+	_, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
 		UserPrompt: "test",
 		Provider:   "nonexistent",
 	})
-	require.NoError(t, err)
-	assert.Equal(t, "from default", resp.Content)
-}
-
-func TestLLMServer_FirstRegisteredIsDefault(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-	srv := newTestLLMServer(logger)
-
-	srv.RegisterProvider("first", &stubLLMClient{
-		chatResp: &protocol.LLMChatResponse{Content: "first"},
-	})
-	srv.RegisterProvider("second", &stubLLMClient{
-		chatResp: &protocol.LLMChatResponse{Content: "second"},
-	})
-
-	// Empty provider → default → "first"
-	resp, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
-		UserPrompt: "test",
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "first", resp.Content)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `LLM provider "nonexistent" is not registered`)
 }

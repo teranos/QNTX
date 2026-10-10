@@ -16,11 +16,13 @@ import (
 // engine is initialized (same lazy pattern as LLMServer).
 type EmbeddingServer struct {
 	protocol.UnimplementedEmbeddingServiceServer
-	mu        sync.RWMutex
-	service   embeddingBackend
-	store     *storage.EmbeddingStore
-	authToken string
-	logger    *zap.SugaredLogger
+	mu         sync.RWMutex
+	service    embeddingBackend
+	serviceErr error // the backend not registered yet
+	store      *storage.EmbeddingStore
+	storeErr   error // the store not registered yet
+	authToken  string
+	logger     *zap.SugaredLogger
 }
 
 // embeddingBackend is the subset of ManagedEmbeddingService needed by the gRPC server.
@@ -33,8 +35,10 @@ type embeddingBackend interface {
 // NewEmbeddingServer creates a new embedding gRPC server.
 func NewEmbeddingServer(authToken string, logger *zap.SugaredLogger) *EmbeddingServer {
 	return &EmbeddingServer{
-		authToken: authToken,
-		logger:    logger,
+		serviceErr: errors.New("embedding service not initialized"),
+		storeErr:   errors.New("embedding store not initialized"),
+		authToken:  authToken,
+		logger:     logger,
 	}
 }
 
@@ -42,7 +46,7 @@ func NewEmbeddingServer(authToken string, logger *zap.SugaredLogger) *EmbeddingS
 func (s *EmbeddingServer) SetService(svc embeddingBackend) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.service = svc
+	s.service, s.serviceErr = svc, nil
 	s.logger.Infow("Embedding gRPC service backend registered")
 }
 
@@ -50,8 +54,22 @@ func (s *EmbeddingServer) SetService(svc embeddingBackend) {
 func (s *EmbeddingServer) SetStore(store *storage.EmbeddingStore) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.store = store
+	s.store, s.storeErr = store, nil
 	s.logger.Infow("Embedding gRPC store registered")
+}
+
+// backend is the registered embedding backend, or why there is none yet.
+func (s *EmbeddingServer) backend() (embeddingBackend, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.service, s.serviceErr
+}
+
+// clusters is the registered embedding store, or why there is none yet.
+func (s *EmbeddingServer) clusters() (*storage.EmbeddingStore, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.store, s.storeErr
 }
 
 // Embed generates a vector embedding for a single text.
@@ -60,12 +78,9 @@ func (s *EmbeddingServer) Embed(ctx context.Context, req *protocol.EmbedRequest)
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, errors.New("embedding service not initialized")
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Text == "" {
@@ -96,12 +111,9 @@ func (s *EmbeddingServer) BatchEmbed(ctx context.Context, req *protocol.BatchEmb
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, errors.New("embedding service not initialized")
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
 	}
 
 	if len(req.Texts) == 0 {
@@ -140,12 +152,9 @@ func (s *EmbeddingServer) GetLabelEligibleClusters(ctx context.Context, req *pro
 		return nil, err
 	}
 
-	s.mu.RLock()
-	store := s.store
-	s.mu.RUnlock()
-
-	if store == nil {
-		return nil, errors.New("embedding store not initialized")
+	store, err := s.clusters()
+	if err != nil {
+		return nil, err
 	}
 
 	eligible, err := store.GetLabelEligibleClusters(int(req.MinSize), int(req.CooldownDays), int(req.Limit))
@@ -170,12 +179,9 @@ func (s *EmbeddingServer) SampleClusterTexts(ctx context.Context, req *protocol.
 		return nil, err
 	}
 
-	s.mu.RLock()
-	store := s.store
-	s.mu.RUnlock()
-
-	if store == nil {
-		return nil, errors.New("embedding store not initialized")
+	store, err := s.clusters()
+	if err != nil {
+		return nil, err
 	}
 
 	texts, err := store.SampleClusterTexts(int(req.ClusterId), int(req.SampleSize))
@@ -192,12 +198,9 @@ func (s *EmbeddingServer) SetClusterLabel(ctx context.Context, req *protocol.Set
 		return nil, err
 	}
 
-	s.mu.RLock()
-	store := s.store
-	s.mu.RUnlock()
-
-	if store == nil {
-		return nil, errors.New("embedding store not initialized")
+	store, err := s.clusters()
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Label == "" {
