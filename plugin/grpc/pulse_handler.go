@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
@@ -120,9 +119,14 @@ func (h *PluginProxyHandler) writeLogs(jobID string, entries []*protocol.JobLogE
 	}
 
 	for _, entry := range entries {
+		// The time a line was said is the plugin's to say. Stamping it with when it
+		// arrived would put it after the job that said it.
 		ts := entry.Timestamp
 		if ts == "" {
-			ts = time.Now().Format(time.RFC3339)
+			h.logger.Errorw("A plugin's job log line says no time, so it is not written to task_logs",
+				"job_id", jobID, "plugin", h.pluginName, "handler", h.handlerName,
+				"stage", entry.Stage, "level", entry.Level, "message", entry.Message)
+			continue
 		}
 
 		var metaPtr *string
