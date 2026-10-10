@@ -46,12 +46,12 @@ test('an open invitation is a row of its own, invited, among the Users', () => {
     const open = {
         id: 'inv1', email: 'ada@gmail.com', display_name: 'Ada',
         accounts: [{ provider: 'google', account: 'ada@gmail.com' }],
-        invited_by: 'US-USER-Y3BNGXYR', created_at: 1789342756348,
+        invited_by: 'US-USER-Y3BNGXYR', created_at: 1789342756348, state: 'open' as const,
     };
     renderList(container, [root()], [
         open,
-        { ...open, id: 'inv2', display_name: 'Bob', cancelled_at: 2 },
-        { ...open, id: 'inv3', display_name: 'Cy', accepted_by: 'US-CY' },
+        { ...open, id: 'inv2', display_name: 'Bob', cancelled_at: 0, state: 'cancelled' as const },
+        { ...open, id: 'inv3', display_name: 'Cy', accepted_by: 'US-CY', state: 'accepted' as const },
     ]);
     const rows = Array.from(container.querySelectorAll('tbody tr')).map(r => r.textContent ?? '');
     expect(rows).toHaveLength(2);

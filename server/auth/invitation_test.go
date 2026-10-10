@@ -334,6 +334,26 @@ func TestAnotherAccountIsNotApplicable(t *testing.T) {
 	assert.Len(t, store.held, 1)
 }
 
+// "zero means zero"
+func TestAnInvitationCancelledAtZeroIsCancelled(t *testing.T) {
+	table := newInvitationTable(qntxtest.CreateTestDB(t))
+	require.NoError(t, table.put(Invitation{ID: "inv-0", Email: "ada@gmail.com", InvitedBy: "US-ROOT", CreatedAt: 1,
+		Accounts: []InvitationAccount{{Provider: "google", Account: "ada@gmail.com"}}}, "token-0"))
+
+	held, found, err := table.byID("inv-0")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.True(t, held.open(), "an invitation nobody cancelled or used is not open")
+
+	closed, err := table.cancel("inv-0", 0)
+	require.NoError(t, err)
+	require.True(t, closed)
+
+	held, _, err = table.byID("inv-0")
+	require.NoError(t, err)
+	assert.False(t, held.open(), "an invitation cancelled at the second 0 still admits")
+}
+
 // ROOT cancels, and the link admits nobody.
 func TestRootCancelsTheInvitation(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)

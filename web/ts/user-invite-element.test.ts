@@ -123,7 +123,7 @@ describe('Tim, as ROOT, opens the cancel in his copy of the mail', () => {
     const ada = {
         id: 'inv1', email: 'ada@gmail.com', display_name: 'Ada',
         accounts: [{ provider: 'google', account: 'ada@gmail.com' }, { provider: 'github', account: 'adalovelace' }],
-        invited_by: 'US-TIM', created_at: 1,
+        invited_by: 'US-TIM', created_at: 1, state: 'open' as const,
     };
 
     beforeEach(() => {
@@ -141,13 +141,20 @@ describe('Tim, as ROOT, opens the cancel in his copy of the mail', () => {
     });
 
     test('a used invitation offers nothing to cancel', () => {
-        renderCancel(container, { ...ada, accepted_by: 'US-ADA' });
+        renderCancel(container, { ...ada, accepted_by: 'US-ADA', state: 'accepted' });
         expect(container.textContent).toContain('already accepted');
         expect(container.textContent).not.toContain('Cancel the invitation');
     });
 
     test('a cancelled one says so', () => {
-        renderCancel(container, { ...ada, cancelled_at: 2 });
+        renderCancel(container, { ...ada, cancelled_at: 2, state: 'cancelled' });
+        expect(container.textContent).toContain('already cancelled');
+        expect(container.textContent).not.toContain('Cancel the invitation');
+    });
+
+    // "zero means zero"
+    test('one cancelled at 0 is cancelled', () => {
+        renderCancel(container, { ...ada, cancelled_at: 0, state: 'cancelled' });
         expect(container.textContent).toContain('already cancelled');
         expect(container.textContent).not.toContain('Cancel the invitation');
     });

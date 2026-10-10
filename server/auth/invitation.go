@@ -53,14 +53,35 @@ type Invitation struct {
 	Accounts    []InvitationAccount `json:"accounts"`
 	InvitedBy   string              `json:"invited_by"`
 	CreatedAt   int64               `json:"created_at"`
-	CancelledAt int64               `json:"cancelled_at,omitempty"`
-	AcceptedBy  string              `json:"accepted_by,omitempty"`
-	AcceptedAt  int64               `json:"accepted_at,omitempty"`
+	CancelledAt *int64              `json:"cancelled_at,omitempty"`
+	AcceptedBy  *string             `json:"accepted_by,omitempty"`
+	AcceptedAt  *int64              `json:"accepted_at,omitempty"`
+	// State is which of the three the invitation is, said rather than left to
+	// be read off which fields are missing.
+	State string `json:"state"`
+}
+
+// What an invitation's State says.
+const (
+	invitationOpen      = "open"
+	invitationCancelled = "cancelled"
+	invitationAccepted  = "accepted"
+)
+
+// stateOf is which of the three an invitation is: used, cancelled, or neither.
+func stateOf(inv Invitation) string {
+	if inv.AcceptedBy != nil {
+		return invitationAccepted
+	}
+	if inv.CancelledAt != nil {
+		return invitationCancelled
+	}
+	return invitationOpen
 }
 
 // open is whether the link still admits anybody.
 func (inv Invitation) open() bool {
-	return inv.CancelledAt == 0 && inv.AcceptedBy == ""
+	return inv.State == invitationOpen
 }
 
 // names is whether a binding is one of the accounts ROOT entered: the same
@@ -116,12 +137,13 @@ func newInvitationTable(db *sql.DB) *invitationTable {
 }
 
 const invitationColumns = `id, email, display_name, invited_by, created_at,
-	COALESCE(cancelled_at, 0), COALESCE(accepted_by, ''), COALESCE(accepted_at, 0)`
+	cancelled_at, accepted_by, accepted_at`
 
 func scanInvitation(row interface{ Scan(...any) error }) (Invitation, error) {
 	var inv Invitation
 	err := row.Scan(&inv.ID, &inv.Email, &inv.DisplayName, &inv.InvitedBy, &inv.CreatedAt,
 		&inv.CancelledAt, &inv.AcceptedBy, &inv.AcceptedAt)
+	inv.State = stateOf(inv)
 	return inv, err
 }
 
@@ -358,7 +380,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 	}
 	inv := Invitation{
 		ID: id, Email: email, DisplayName: name, Accounts: accounts,
-		InvitedBy: p.UserID, CreatedAt: time.Now().UTC().UnixMilli(),
+		InvitedBy: p.UserID, CreatedAt: time.Now().UTC().UnixMilli(), State: invitationOpen,
 	}
 	if err := h.invitations.put(inv, token); err != nil {
 		h.writeError(w, http.StatusInternalServerError, err.Error())
