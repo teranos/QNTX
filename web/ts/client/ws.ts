@@ -27,6 +27,7 @@ import { handlePluginHealth } from '../websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from '../websocket-handlers/system-capabilities';
 import { handleWatcherQueueStatus } from '../websocket-handlers/watcher-queue-status';
 import { STANDING_ELEMENT_PUBLISHED } from '../components/element/plugin-provided-elements';
+import { STANDING_APPROVAL } from '../approvals-standing';
 import { log, SEG } from '../logger';
 import { heldSession } from './session';
 import { stripProtocol } from '../http-utils';
@@ -212,6 +213,10 @@ const MESSAGE_HANDLERS = {
             dispatch('watcher_match', () => import('../components/element/semantic-element.js').then(({ updateSemanticElementResults }) => {
                 updateSemanticElementResults(data.target_element_id!, data.attestation, data.score);
             }));
+        } else if (data.watcher_id === STANDING_APPROVAL) {
+            // An approval moved. The open element reads the lines again; the
+            // row announcing one is not what it draws.
+            dispatch('watcher_match', () => import('../approvals-element.js').then(({ reloadApprovals }) => reloadApprovals()));
         } else if (data.watcher_id === STANDING_ELEMENT_PUBLISHED) {
             // An element module was published. The page holds the module it
             // imported, so it asks /g/ what is standing now and swaps what

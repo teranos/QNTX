@@ -30,7 +30,7 @@ import (
 
 // signa is every signum the node holds: its own, and every ready plugin's.
 func (s *QNTXServer) signa() []sigil.Signum {
-	own := append([]sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum(), s.githubSignum(), s.namespacesSignum(), s.rolesSignum(), s.amSignum(), s.openapiSignum(), s.paritySignum(), s.transcriptsSignum(), s.vaultSignum(), s.agentsSignum()}, s.harnessSigna()...)
+	own := append([]sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum(), s.githubSignum(), s.namespacesSignum(), s.rolesSignum(), s.amSignum(), s.openapiSignum(), s.paritySignum(), s.transcriptsSignum(), s.vaultSignum(), s.agentsSignum(), s.approvalsSignum()}, s.harnessSigna()...)
 	return append(own, s.pluginSigna()...)
 }
 

@@ -20,6 +20,7 @@ import { createUsersElement } from './users-element.ts';
 import { createMarketElement } from './market-element.ts';
 import { createMailElement } from './mail-element.ts';
 import { createGitHubElement } from './github-element.ts';
+import { createApprovalsElement } from './approvals-element.ts';
 import { createObsidianElement } from './obsidian-element.ts';
 import { createGroundElement } from './ground-element.ts';
 import { createClaudeElement } from './claude-element.ts';
@@ -72,6 +73,9 @@ export function registerDefaultElements(hasCanvas: boolean = true): void {
 
     // GitHub Element — the node's GitHub and its Actions runner, opened from ⍟ (ADR-043)
     tray.add(createGitHubElement());
+
+    // Approvals Element — what waits on the human, opened from ⍟ (ADR-052)
+    tray.add(createApprovalsElement());
 
     // Obsidian Element — the vaults the node keeps, and the folders each holds (ADR-049)
     tray.add(createObsidianElement());
