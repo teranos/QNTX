@@ -7,6 +7,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strconv"
 
 	"github.com/teranos/QNTX/ats/watcher"
@@ -76,13 +77,13 @@ func checkState(status, conclusion string) string {
 	switch status {
 	case "completed":
 		if concludedWell(conclusion) {
-			return "done"
+			return checkDone
 		}
-		return "failed"
+		return checkFailed
 	case "in_progress":
-		return "running"
+		return checkRunning
 	}
-	return "waiting"
+	return checkWaiting
 }
 
 // approvalSubject is the pull request's name: owner/repo#n.
@@ -138,11 +139,22 @@ func (s *QNTXServer) pullRequestEvent(e gitHubPullRequestEvent) ([]string, error
 		if err := s.approvalLine(s.nodeActor(), subject, watcher.ApprovalClosed, e.Repository.FullName, attrs); err != nil {
 			return nil, err
 		}
-	default:
+	case "assigned", "unassigned", "labeled", "unlabeled", "edited", "locked", "unlocked",
+		"review_requested", "review_request_removed", "milestoned", "demilestoned",
+		"auto_merge_enabled", "auto_merge_disabled", "enqueued", "dequeued", "typed", "untyped":
+		// What GitHub says of a pull request that is not about whether it
+		// waits, or at which head.
 		return []string{}, nil
+	}
+	if !slices.Contains(pullRequestActionsRead, e.Action) {
+		return nil, errors.Newf("the pull_request action %q on %s is one this node does not read", e.Action, subject)
 	}
 	return []string{subject}, nil
 }
+
+// pullRequestActionsRead is every action the switch above answers with the
+// pull request: the ones that make it wait, and the ones that end it.
+var pullRequestActionsRead = []string{"opened", "reopened", "ready_for_review", "synchronize", "closed", "converted_to_draft"}
 
 // checkRunEvent writes a check run down on every open approval waiting at its head.
 func (s *QNTXServer) checkRunEvent(e gitHubCheckRunEvent) ([]string, error) {
@@ -171,5 +183,5 @@ func (s *QNTXServer) checkSuiteEvent(ctx context.Context, e gitHubCheckSuiteEven
 	if e.Action != "completed" || e.CheckSuite.HeadBranch != e.Repository.DefaultBranch {
 		return []string{}, nil
 	}
-	return s.mergeWhatWaits(ctx, e.Repository.FullName), nil
+	return s.mergeWhatWaits(ctx, e.Repository.FullName)
 }

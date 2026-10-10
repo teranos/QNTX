@@ -15,6 +15,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"net/http"
 	"slices"
 	"sort"
@@ -62,6 +63,14 @@ const (
 	didNothing = "nothing"
 )
 
+// The segment a check is drawn as (protocol.ApprovalCheck.state).
+const (
+	checkWaiting = "waiting"
+	checkRunning = "running"
+	checkDone    = "done"
+	checkFailed  = "failed"
+)
+
 // approvalCheck is one check on the head, as the newest line about it says.
 type approvalCheck struct {
 	name, state, link string
@@ -74,8 +83,8 @@ type approvalState struct {
 	pull                                  int64
 	askedAt                               time.Time
 	checks                                []approvalCheck
-	option, said                          string
-	answeredAt                            time.Time
+	// What stands, and who said it: the newest press about the head.
+	option, said, answeredBy string
 	// over is merged or closed: nothing more is asked of anybody.
 	over bool
 }
@@ -84,7 +93,7 @@ type approvalState struct {
 // be decided, and one failed it is not ready for approval at all.
 func (a *approvalState) presented() bool {
 	for _, c := range a.checks {
-		if c.state != "done" {
+		if c.state != checkDone {
 			return false
 		}
 	}
@@ -96,21 +105,28 @@ func (a *approvalState) waits() bool {
 	return a.said == saysMergeWhenReady
 }
 
-func (a *approvalState) owner() string {
-	owner, _, _ := strings.Cut(a.repo, "/")
-	return owner
+// ownerAndName is the repository as GitHub takes it in a path, in two.
+func (a *approvalState) ownerAndName() (string, string, error) {
+	owner, name, slashed := strings.Cut(a.repo, "/")
+	if !slashed {
+		return "", "", errors.Newf("%s names its repository %q, which is not owner/repo", a.subject, a.repo)
+	}
+	return owner, name, nil
 }
 
-func (a *approvalState) name() string {
-	_, name, _ := strings.Cut(a.repo, "/")
-	return name
+// headOf is the first of a line's words. A line with none names nothing, and
+// says so.
+func headOf(words []string) (string, bool) {
+	for _, word := range words {
+		return word, true
+	}
+	return "", false
 }
 
 // approvalLines is every approval line the node holds, oldest first.
 func (s *QNTXServer) approvalLines() ([]*types.As, error) {
-	if s.held == nil {
-		return nil, errors.New("this node holds no store to keep its approvals in")
-	}
+	// Read where the node's own records are written: system, or default on a
+	// backend with none.
 	where := auth.NamespaceDefault
 	if s.held.KeepsSystem() {
 		where = auth.NamespaceSystem
@@ -138,13 +154,13 @@ func (s *QNTXServer) approvalLines() ([]*types.As, error) {
 func foldApprovals(lines []*types.As) map[string]*approvalState {
 	states := map[string]*approvalState{}
 	for _, as := range lines {
-		if len(as.Subjects) == 0 || len(as.Predicates) == 0 {
+		subject, named := headOf(as.Subjects)
+		predicate, said := headOf(as.Predicates)
+		if !named || !said {
 			continue
 		}
-		subject := as.Subjects[0]
 		sha := attrString(as.Attributes, "sha")
-		switch as.Predicates[0] {
-		case watcher.ApprovalAsked:
+		if predicate == watcher.ApprovalAsked {
 			states[subject] = &approvalState{
 				subject: subject, repo: attrString(as.Attributes, "repo"), pull: attrInt(as.Attributes, "pull"),
 				sha: sha, base: attrString(as.Attributes, "base"), title: attrString(as.Attributes, "title"),
@@ -156,7 +172,7 @@ func foldApprovals(lines []*types.As) map[string]*approvalState {
 		if !asked || st.sha != sha {
 			continue
 		}
-		switch as.Predicates[0] {
+		switch predicate {
 		case watcher.ApprovalChecked:
 			check := approvalCheck{name: attrString(as.Attributes, "name"), state: attrString(as.Attributes, "state"), link: attrString(as.Attributes, "link")}
 			if i := slices.IndexFunc(st.checks, func(c approvalCheck) bool { return c.name == check.name }); i >= 0 {
@@ -165,9 +181,16 @@ func foldApprovals(lines []*types.As) map[string]*approvalState {
 				st.checks = append(st.checks, check)
 			}
 		case watcher.ApprovalAnswered:
-			st.option, st.said, st.answeredAt = attrString(as.Attributes, "option"), attrString(as.Attributes, "said"), as.Timestamp
+			by, somebody := headOf(as.Actors)
+			if !somebody {
+				continue
+			}
+			st.option, st.said, st.answeredBy = attrString(as.Attributes, "option"), attrString(as.Attributes, "said"), by
 		case watcher.ApprovalMerged, watcher.ApprovalClosed:
 			st.over = true
+		case watcher.ApprovalFailed:
+			// A refused merge changes nothing: what stands still stands, and
+			// the human presses again or not.
 		}
 	}
 	return states
@@ -238,6 +261,14 @@ func (s *QNTXServer) approvalsList(context.Context, sigil.Sent) (any, *protocol.
 	return answer, nil
 }
 
+// aToken is whether the admission is a bearer token's: it acts as its own
+// did:key, which is not the route a person came in by. A person acts as that
+// route, or as nobody in particular.
+func aToken(admitted auth.Admission) bool {
+	acts := admitted.ActsAs()
+	return acts != admitted.Identity && strings.HasPrefix(acts, "did:key:")
+}
+
 // HandleApprovalAnswer takes one press: the human's, at ROOT, in a session.
 // "Me, the human the logged in user". A token is refused whatever it holds,
 // because a tool reaches it and the agent reaches every tool.
@@ -251,14 +282,11 @@ func (s *QNTXServer) HandleApprovalAnswer(w http.ResponseWriter, r *http.Request
 	case !ok:
 		writeError(w, http.StatusUnauthorized, "an approval is answered by the logged-in human, and nobody is logged in")
 		return
-	case admitted.Grant != nil:
-		writeError(w, http.StatusForbidden, "an approval is answered by the logged-in human, not by a token ("+admitted.Grant.Label+")")
+	case aToken(admitted):
+		writeError(w, http.StatusForbidden, "an approval is answered by the logged-in human, not by a token ("+admitted.ActsAs()+")")
 		return
 	case !admitted.IsRoot():
 		writeError(w, http.StatusForbidden, "approvals are ROOT's, and this session is "+admitted.LevelName())
-		return
-	case admitted.Identity == "":
-		writeError(w, http.StatusForbidden, "an approval is answered by somebody, and this session names nobody")
 		return
 	}
 	var sent struct {
@@ -295,82 +323,85 @@ func (s *QNTXServer) HandleApprovalAnswer(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusConflict, sent.Subject+" cannot be decided until every check on "+st.sha+" has passed")
 		return
 	}
+	// A merge that waits on main's CI asks GitHub how main is before the press
+	// is written down: a press the node cannot act on is refused, not kept.
+	mergeNow := sent.Said == saysForceMerge
+	if sent.Said == saysMergeWhenReady {
+		green, err := s.mainGreen(r.Context(), st)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		mergeNow = green
+	}
 	if err := s.approvalLine(admitted.Identity, st.subject, watcher.ApprovalAnswered, st.repo,
 		map[string]any{"sha": st.sha, "option": sent.Option, "said": sent.Said}); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	st.option, st.said = sent.Option, sent.Said
+	st.option, st.said, st.answeredBy = sent.Option, sent.Said, admitted.Identity
 
 	answered := &protocol.ApprovalAnswered{Subject: st.subject, Sha: st.sha, Option: st.option, Said: st.said, Did: didNothing}
-	switch st.said {
-	case saysForceMerge:
-		mergeSha, err := s.mergeApproval(r.Context(), st, admitted.Identity)
+	if st.waits() {
+		answered.Did = didWaiting
+	}
+	if mergeNow {
+		mergeSha, err := s.mergeApproval(r.Context(), st)
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}
 		answered.Did, answered.MergeSha = didMerged, mergeSha
-	case saysMergeWhenReady:
-		answered.Did = didWaiting
-		green, err := s.mainGreen(r.Context(), st)
-		if err != nil {
-			s.logger.Warnw("main's CI was not asked; the merge waits for its next suite", "subject", st.subject, "error", err)
-			break
-		}
-		if green {
-			mergeSha, err := s.mergeApproval(r.Context(), st, admitted.Identity)
-			if err != nil {
-				writeError(w, http.StatusBadGateway, err.Error())
-				return
-			}
-			answered.Did, answered.MergeSha = didMerged, mergeSha
-		}
 	}
 	respond(w, s.logger, http.StatusOK, answered)
 }
 
 // mergeApproval merges the pull request at the head the human saw, as the
 // App's installation where the repository is, and writes the merge down by
-// the human: the node did it, and the human decided it.
-func (s *QNTXServer) mergeApproval(ctx context.Context, st *approvalState, by string) (string, error) {
+// the human who answered: the node did it, and the human decided it.
+func (s *QNTXServer) mergeApproval(ctx context.Context, st *approvalState) (string, error) {
+	owner, name, err := st.ownerAndName()
+	if err != nil {
+		return "", err
+	}
 	said, err := s.gitHubService().MergeAPullRequest(services.AsInstallation(ctx), &protocol.GitHubMergeAPullRequestRequest{
-		Owner: st.owner(), Repo: st.name(), PullNumber: st.pull, Sha: st.sha, MergeMethod: "merge",
+		Owner: owner, Repo: name, PullNumber: st.pull, Sha: st.sha, MergeMethod: "merge",
 	})
 	if err != nil {
 		return "", errors.Wrapf(err, "GitHub was not asked to merge %s", st.subject)
 	}
 	if !said.GetSuccess() {
 		if err := s.approvalLine(s.nodeActor(), st.subject, watcher.ApprovalFailed, st.repo, map[string]any{"sha": st.sha, "error": said.GetError()}); err != nil {
-			s.logger.Errorw("GitHub refused a merge and the refusal was not written down", "subject", st.subject, "error", err)
+			return "", errors.Wrapf(err, "GitHub refused to merge %s at %s (%s), and the refusal was not written down", st.subject, st.sha, said.GetError())
 		}
 		return "", errors.Newf("GitHub refused to merge %s at %s: %s", st.subject, st.sha, said.GetError())
 	}
-	if err := s.approvalLine(by, st.subject, watcher.ApprovalMerged, st.repo, map[string]any{"sha": st.sha, "merge_sha": said.GetSha()}); err != nil {
+	if err := s.approvalLine(st.answeredBy, st.subject, watcher.ApprovalMerged, st.repo, map[string]any{"sha": st.sha, "merge_sha": said.GetSha()}); err != nil {
 		return "", errors.Wrapf(err, "%s was merged and the merge was not written down", st.subject)
 	}
 	st.over = true
 	return said.GetSha(), nil
 }
 
-// mainGreen is whether every check suite at the head of the branch the pull
-// request targets has concluded well. A branch no suite runs on waits on
+// mainGreen is whether every check run at the head of the branch the pull
+// request targets has concluded well. A branch nothing runs on waits on
 // nothing.
 func (s *QNTXServer) mainGreen(ctx context.Context, st *approvalState) (bool, error) {
-	said, err := s.gitHubService().ListCheckSuitesForAGitReference(services.AsInstallation(ctx), &protocol.GitHubListCheckSuitesForAGitReferenceRequest{
-		Owner: st.owner(), Repo: st.name(), Ref: st.base, PerPage: 100,
+	owner, name, err := st.ownerAndName()
+	if err != nil {
+		return false, err
+	}
+	said, err := s.gitHubService().ListCheckRunsForAGitReference(services.AsInstallation(ctx), &protocol.GitHubListCheckRunsForAGitReferenceRequest{
+		Owner: owner, Repo: name, Ref: st.base, PerPage: 100,
 	})
 	if err != nil {
-		return false, errors.Wrapf(err, "GitHub was not asked about %s's check suites", st.base)
+		return false, errors.Wrapf(err, "GitHub was not asked about the check runs on %s", st.base)
 	}
 	if !said.GetSuccess() {
-		return false, errors.Newf("%s's check suites were not listed: %s", st.base, said.GetError())
+		return false, errors.Newf("the check runs on %s were not listed: %s", st.base, said.GetError())
 	}
-	for _, suite := range said.GetCheckSuites() {
-		if suite.GetLatestCheckRunsCount() == 0 {
-			continue
-		}
-		if suite.GetStatus() != "completed" || !concludedWell(suite.GetConclusion()) {
+	for _, run := range said.GetCheckRuns() {
+		if checkState(run.GetStatus(), run.GetConclusion()) != checkDone {
 			return false, nil
 		}
 	}
@@ -383,61 +414,41 @@ func concludedWell(conclusion string) bool {
 }
 
 // mergeWhatWaits merges every pull request of repo whose standing answer waits
-// on main's CI, now that main's CI concluded. Each is asked of GitHub again:
-// the suite that concluded may not have been the last.
-func (s *QNTXServer) mergeWhatWaits(ctx context.Context, repo string) []string {
+// on main's CI, now that main's CI concluded, and names the ones it merged.
+// Each is asked of GitHub again: the run that concluded may not have been the
+// last. One that cannot be merged is said, and the others are still tried.
+func (s *QNTXServer) mergeWhatWaits(ctx context.Context, repo string) ([]string, error) {
 	open, err := s.openApprovals()
 	if err != nil {
-		s.logger.Errorw("main's CI concluded and the approvals were not read", "repo", repo, "error", err)
-		return []string{}
+		return nil, err
 	}
 	merged := []string{}
+	var failed error
 	for _, st := range open {
 		if st.repo != repo || !st.waits() {
 			continue
 		}
 		green, err := s.mainGreen(ctx, st)
 		if err != nil {
-			s.logger.Warnw("main's CI was not asked", "subject", st.subject, "error", err)
+			failed = stderrors.Join(failed, err)
 			continue
 		}
 		if !green {
 			continue
 		}
-		by, err := s.approvalAnsweredBy(st)
+		mergeSha, err := s.mergeApproval(ctx, st)
 		if err != nil {
-			s.logger.Errorw("who answered was not read, so nothing was merged for them", "subject", st.subject, "error", err)
+			failed = stderrors.Join(failed, err)
 			continue
 		}
-		if _, err := s.mergeApproval(ctx, st, by); err != nil {
-			s.logger.Errorw("the merge the human waited for did not happen", "subject", st.subject, "error", err)
-			continue
-		}
+		s.logger.Infow("main's CI passed and the merge the human waited for happened", "subject", st.subject, "sha", st.sha, "merge_sha", mergeSha, "by", st.answeredBy)
 		merged = append(merged, st.subject)
 	}
-	return merged
-}
-
-// approvalAnsweredBy is who wrote the standing answer: the human the merge is by.
-func (s *QNTXServer) approvalAnsweredBy(st *approvalState) (string, error) {
-	lines, err := s.approvalLines()
-	if err != nil {
-		return "", err
-	}
-	by := ""
-	for _, as := range lines {
-		if len(as.Subjects) > 0 && as.Subjects[0] == st.subject && len(as.Predicates) > 0 && as.Predicates[0] == watcher.ApprovalAnswered &&
-			attrString(as.Attributes, "sha") == st.sha && len(as.Actors) > 0 {
-			by = as.Actors[0]
-		}
-	}
-	if by == "" {
-		return "", errors.Newf("no line says who answered %s at %s", st.subject, st.sha)
-	}
-	return by, nil
+	return merged, failed
 }
 
 // attrInt reads a number an attribute holds, however the store gave it back.
+// What does not read as one reads as nothing.
 func attrInt(attrs map[string]any, key string) int64 {
 	switch v := attrs[key].(type) {
 	case int64:
@@ -447,10 +458,16 @@ func attrInt(attrs map[string]any, key string) int64 {
 	case float64:
 		return int64(v)
 	case json.Number:
-		n, _ := v.Int64()
+		n, err := v.Int64()
+		if err != nil {
+			return 0
+		}
 		return n
 	case string:
-		n, _ := strconv.ParseInt(v, 10, 64)
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return 0
+		}
 		return n
 	}
 	return 0
