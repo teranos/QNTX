@@ -29,7 +29,7 @@ func (unreadableRecords) Plugin(name string) (PluginRecord, bool, error) {
 // A record that could not be read is an error, never a plugin with no record.
 func TestAnUnreadableRecordIsAnError(t *testing.T) {
 	SetPluginRecords(unreadableRecords{})
-	t.Cleanup(func() { SetPluginRecords(nil) })
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
 	_, _, err := pluginRecord("pyre")
 	require.Error(t, err)
@@ -54,7 +54,7 @@ func TestMalformedArgsAreAnError(t *testing.T) {
 func TestAConfigValueOfTheWrongTypeIsSaid(t *testing.T) {
 	core, logs := observer.New(zapcore.ErrorLevel)
 	SetPluginRecords(heldRecords{"pyre": {Name: "pyre", Config: map[string]string{"poll_interval": "often"}}})
-	t.Cleanup(func() { SetPluginRecords(nil) })
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
 	config := NewConfigProvider(nil, nil, zap.New(core).Sugar()).GetPluginConfig("pyre")
 	assert.Equal(t, 0, config.GetInt("poll_interval"))
@@ -66,7 +66,7 @@ func TestAConfigValueOfTheWrongTypeIsSaid(t *testing.T) {
 // Initialize fails, and that failure is what Enable answers with.
 func TestAPluginWhoseRecordIsUnreadableDoesNotInitialize(t *testing.T) {
 	SetPluginRecords(unreadableRecords{})
-	t.Cleanup(func() { SetPluginRecords(nil) })
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 	logger := zaptest.NewLogger(t).Sugar()
 	services := plugin.NewServiceRegistry(nil, logger, nil, NewConfigProvider(nil, nil, logger), nil)
 
@@ -80,7 +80,7 @@ func TestAPluginWhoseRecordIsUnreadableDoesNotInitialize(t *testing.T) {
 func TestAnUnreadableRecordIsSaidWhenConfigIsAsked(t *testing.T) {
 	core, logs := observer.New(zapcore.ErrorLevel)
 	SetPluginRecords(unreadableRecords{})
-	t.Cleanup(func() { SetPluginRecords(nil) })
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
 	config := NewConfigProvider(nil, nil, zap.New(core).Sugar()).GetPluginConfig("pyre")
 	assert.Empty(t, config.GetKeys())

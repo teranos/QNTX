@@ -81,7 +81,7 @@ func TestAPluginIsHandedTheConfigItsRecordHolds(t *testing.T) {
 		"poll_interval": "300",
 		"verbose":       "true",
 	}}})
-	t.Cleanup(func() { SetPluginRecords(nil) })
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
 	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
 	assert.ElementsMatch(t, []string{"token", "poll_interval", "verbose"}, config.GetKeys())
@@ -95,7 +95,7 @@ func TestAPluginsConfigIsItsRecord(t *testing.T) {
 	appcfg.Set("pyre.poll_interval", "300")
 	t.Cleanup(appcfg.Reset)
 	SetPluginRecords(heldRecords{"pyre": {Name: "pyre", Config: map[string]string{}}})
-	t.Cleanup(func() { SetPluginRecords(nil) })
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
 	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
 	assert.Empty(t, config.GetKeys())
@@ -108,7 +108,7 @@ func TestAPluginStandingInANamespaceIsHandedItsOwnToken(t *testing.T) {
 	SetPluginRecords(heldRecords{
 		"cleanAPI": {Name: "cleanAPI", Config: map[string]string{PluginNamespaceKey: "Clean"}},
 	})
-	t.Cleanup(func() { SetPluginRecords(nil) })
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 	minted := func(plugin, namespace string) (string, error) {
 		return plugin + "@" + namespace, nil
 	}
@@ -124,7 +124,7 @@ func TestAPluginStandingInANamespaceIsHandedItsOwnToken(t *testing.T) {
 // caller acts, through the call's own token.
 func TestAPluginNamingNoNamespaceIsHandedNoToken(t *testing.T) {
 	SetPluginRecords(heldRecords{"datapunt": {Name: "datapunt", Config: map[string]string{}}})
-	t.Cleanup(func() { SetPluginRecords(nil) })
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 	minted := func(plugin, namespace string) (string, error) {
 		return plugin + "@" + namespace, nil
 	}
@@ -138,7 +138,7 @@ func TestAPluginNamingNoNamespaceIsHandedNoToken(t *testing.T) {
 // config, said with the reason, never a plugin started on an empty token.
 func TestATokenTheNodeCannotMintFailsTheInitialize(t *testing.T) {
 	SetPluginRecords(heldRecords{"cleanAPI": {Name: "cleanAPI", Config: map[string]string{PluginNamespaceKey: "pond"}}})
-	t.Cleanup(func() { SetPluginRecords(nil) })
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 	refused := func(plugin, namespace string) (string, error) {
 		return "", errors.Newf("namespace %s is not served", namespace)
 	}
