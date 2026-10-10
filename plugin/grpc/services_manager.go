@@ -64,6 +64,8 @@ type ServicesManager struct {
 	mailSrv            *services.MailServer // wired once the node has Users and its DID
 	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
+	// running is every service server that started, in the order it did.
+	running []*grpc.Server
 
 	// Services that failed to start, by name. QNTX boots without them, so the
 	// reason has to outlive the boot — a plugin failing to reach one later is
@@ -125,36 +127,21 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	// Start Queue service
 	queueAddr, err := m.startQueueService(ctx, queue, authToken)
 	if err != nil {
-		if m.atsStoreServer != nil {
-			m.atsStoreServer.Stop()
-		}
+		m.stopRunning()
 		return nil, errors.Wrap(err, "failed to start queue service")
 	}
 
 	// Start Schedule service
 	scheduleAddr, err := m.startScheduleService(ctx, scheduleStore, authToken)
 	if err != nil {
-		if m.atsStoreServer != nil {
-			m.atsStoreServer.Stop()
-		}
-		if m.queueServer != nil {
-			m.queueServer.Stop()
-		}
+		m.stopRunning()
 		return nil, errors.Wrap(err, "failed to start schedule service")
 	}
 
 	// Start File service
 	fileServiceAddr, err := m.startFileService(ctx, filesDir, authToken)
 	if err != nil {
-		if m.atsStoreServer != nil {
-			m.atsStoreServer.Stop()
-		}
-		if m.queueServer != nil {
-			m.queueServer.Stop()
-		}
-		if m.scheduleServer != nil {
-			m.scheduleServer.Stop()
-		}
+		m.stopRunning()
 		return nil, errors.Wrap(err, "failed to start file service")
 	}
 
@@ -240,6 +227,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 func (m *ServicesManager) serve(
 	ctx context.Context, name string, server *grpc.Server, listener net.Listener,
 ) {
+	m.running = append(m.running, server)
 	sacred.Go("grpc."+name+".shutdown", func() {
 		<-ctx.Done()
 		m.logger.Debugw("Context cancelled, stopping service", "service", name)
@@ -585,48 +573,17 @@ func (m *ServicesManager) GetVectorSearchRouter() *services.VectorSearchServer {
 // Shutdown gracefully stops all service servers
 func (m *ServicesManager) Shutdown() {
 	m.logger.Debug("Shutting down plugin services")
-
-	if m.atsStoreServer != nil {
-		m.atsStoreServer.GracefulStop()
+	for _, server := range m.running {
+		server.GracefulStop()
 	}
-
-	if m.queueServer != nil {
-		m.queueServer.GracefulStop()
-	}
-
-	if m.scheduleServer != nil {
-		m.scheduleServer.GracefulStop()
-	}
-
-	if m.fileServiceServer != nil {
-		m.fileServiceServer.GracefulStop()
-	}
-
-	if m.llmServer != nil {
-		m.llmServer.GracefulStop()
-	}
-
-	if m.embeddingServer != nil {
-		m.embeddingServer.GracefulStop()
-	}
-
-	if m.vectorSearchServer != nil {
-		m.vectorSearchServer.GracefulStop()
-	}
-
-	if m.groundServer != nil {
-		m.groundServer.GracefulStop()
-	}
-
-	if m.searchServer != nil {
-		m.searchServer.GracefulStop()
-	}
-
-	if m.mailServer != nil {
-		m.mailServer.GracefulStop()
-	}
-
 	m.logger.Debug("Plugin services stopped")
+}
+
+// stopRunning stops every service that started, for a Start that cannot finish.
+func (m *ServicesManager) stopRunning() {
+	for _, server := range m.running {
+		server.Stop()
+	}
 }
 
 // GetEndpoints returns the service endpoints
