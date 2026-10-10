@@ -357,7 +357,7 @@ func (s *Store) UpdateJobInterval(jobID string, newInterval int) error {
 // UpdateJobNextRun sets when a job runs next, without claiming it has run.
 // UpdateJobAfterExecution writes last_run_at along with the next run, so a job
 // that has never run could otherwise only rejoin the schedule by lying.
-func (s *Store) UpdateJobNextRun(jobID string, nextRun time.Time) error {
+func (s *Store) UpdateJobNextRun(jobID string, nextRun time.Time) (err error) {
 	query := `
 		UPDATE scheduled_pulse_jobs
 		SET next_run_at = ?,
@@ -365,8 +365,14 @@ func (s *Store) UpdateJobNextRun(jobID string, nextRun time.Time) error {
 		WHERE id = ?
 	`
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return errors.Wrapf(err, "failed to begin schedule tick transaction for %s", jobID)
+	}
+	defer func() { err = db.Undone(err, tx) }()
+
 	now := time.Now().UTC().Format(time.RFC3339)
-	result, err := s.db.Exec(query, nextRun.Format(time.RFC3339), now, jobID)
+	result, err := tx.Exec(query, nextRun.Format(time.RFC3339), now, jobID)
 	if err != nil {
 		err = errors.Wrap(err, "failed to update scheduled job next run")
 		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
@@ -386,11 +392,23 @@ func (s *Store) UpdateJobNextRun(jobID string, nextRun time.Time) error {
 		return err
 	}
 
+	_, err = tx.Exec(`
+		INSERT INTO schedule_ticks (schedule_id, at_ms, execution_id, next_run_at_ms)
+		VALUES (?, ?, NULL, ?)`,
+		jobID, time.Now().UnixMilli(), nextRun.UnixMilli())
+	if err != nil {
+		return errors.Wrapf(err, "failed to record schedule tick for %s", jobID)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return errors.Wrapf(err, "failed to commit schedule tick for %s", jobID)
+	}
+
 	return nil
 }
 
 // UpdateJobAfterExecution updates a scheduled job after creating an async job
-func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executionID string, nextRun time.Time) error {
+func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executionID string, nextRun time.Time) (err error) {
 	query := `
 		UPDATE scheduled_pulse_jobs
 		SET last_run_at = ?,
@@ -400,7 +418,13 @@ func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executi
 		WHERE id = ?
 	`
 
-	result, err := s.db.Exec(query,
+	tx, err := s.db.Begin()
+	if err != nil {
+		return errors.Wrapf(err, "failed to begin schedule tick transaction for %s", jobID)
+	}
+	defer func() { err = db.Undone(err, tx) }()
+
+	result, err := tx.Exec(query,
 		lastRun.Format(time.RFC3339),
 		executionID,
 		nextRun.Format(time.RFC3339),
@@ -426,6 +450,18 @@ func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executi
 		err := errors.Newf("scheduled job not found: %s", jobID)
 		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
 		return err
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO schedule_ticks (schedule_id, at_ms, execution_id, next_run_at_ms)
+		VALUES (?, ?, ?, ?)`,
+		jobID, lastRun.UnixMilli(), executionID, nextRun.UnixMilli())
+	if err != nil {
+		return errors.Wrapf(err, "failed to record schedule tick for %s", jobID)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return errors.Wrapf(err, "failed to commit schedule tick for %s", jobID)
 	}
 
 	return nil
