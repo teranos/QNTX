@@ -589,7 +589,7 @@
   "protocol.ParityFollowed.signa": "Every signum the node serves.",
   "protocol.ParityStorage": "ParityStorage is what parity storage answers.",
   "protocol.ParityStorage.describes": "What was read: source, the code this build was made from, and never this node.",
-  "protocol.ParityStorage.things": "One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go files that reach it with SQL written by hand.",
+  "protocol.ParityStorage.things": "One per thing, by name: sqlite, duckdb, postgres, rebuilt by a take-in, and the Go files that reach it with SQL written by hand.",
   "protocol.PiAm": "PiAm is what pi am answers.",
   "protocol.PiAm.answering": "Whether it is in a turn in Pi now.",
   "protocol.PiAm.did": "Its own DID, which signs what it writes down.",
