@@ -23,8 +23,7 @@ import (
 
 // "the ROOT agent should live separately in a sense"
 //
-// "when QNTX has restarted, it should just know somehow that the ROOT agent
-// session is already there"
+// "when QNTX has restarted, it should just know somehow that the ROOT agent session is already there"
 
 // The files a turn is kept in, under the agent's home. Claude Code prints the
 // turn to the stream, and whichever node runs follows it from there.

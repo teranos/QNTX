@@ -30,8 +30,7 @@ func halting(t *testing.T, first, rest string) (binary, goAhead string) {
 	return binary, goAhead
 }
 
-// "when QNTX has restarted, it should just know somehow that the ROOT agent
-// session is already there"
+// "when QNTX has restarted, it should just know somehow that the ROOT agent session is already there"
 func TestATurnOutlivesTheNodeFollowingItAndIsTakenUp(t *testing.T) {
 	first := `{"type":"system","subtype":"init","session_id":"s-1","model":"claude-opus-5-5","claude_code_version":"2.1.289"}
 `
