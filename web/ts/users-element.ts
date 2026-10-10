@@ -137,7 +137,7 @@ export function renderList(container: HTMLElement, users: UserRecord[], invitati
     const tbody = document.createElement('tbody');
     // "but why dont i see my outgoing invitations in the same list, and a way for me to open the would-be-user"
     for (const inv of invitations) {
-        if (inv.cancelled_at || inv.accepted_by) continue;
+        if (inv.state !== 'open') continue;
         tbody.appendChild(invitationRow(inv));
     }
     for (const u of users) {

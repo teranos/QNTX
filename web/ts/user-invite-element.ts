@@ -260,6 +260,8 @@ export interface InvitationRecord {
     cancelled_at?: number;
     accepted_by?: string;
     accepted_at?: number;
+    /** Which of the three it is, as the node says. */
+    state: 'open' | 'cancelled' | 'accepted';
 }
 
 const CANCEL_ID = 'invitation-cancel-element';
@@ -282,19 +284,19 @@ export function renderCancel(content: HTMLElement, inv: InvitationRecord): void 
     content.appendChild(what);
 
     const state = document.createElement('div');
-    if (inv.accepted_by) {
+    if (inv.state === 'accepted') {
         state.textContent = `already accepted by ${inv.accepted_by}`;
         content.appendChild(state);
         return;
     }
-    if (inv.cancelled_at) {
+    if (inv.state === 'cancelled') {
         state.textContent = 'already cancelled';
         content.appendChild(state);
         return;
     }
     const cancel = createDangerButton('Cancel the invitation', 'Confirm cancel', async () => {
         await apiJson<unknown>(`/auth/invitations/${encodeURIComponent(inv.id)}/cancel`, { method: 'POST' });
-        renderCancel(content, { ...inv, cancelled_at: Date.now() });
+        renderCancel(content, { ...inv, cancelled_at: Date.now(), state: 'cancelled' });
     });
     content.appendChild(cancel.element);
 }
