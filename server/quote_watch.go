@@ -192,9 +192,6 @@ func (s *QNTXServer) namespacePrompts(namespace string) ([]string, error) {
 // setupQuoteProvenance registers the built-in. No schedule: the standing row
 // reaches it when a claim arrives.
 func (s *QNTXServer) setupQuoteProvenance() {
-	if s.daemon == nil {
-		return
-	}
 	s.daemon.Registry().Register(&quoteHandler{
 		prompts:  s.namespacePrompts,
 		news:     s.news,

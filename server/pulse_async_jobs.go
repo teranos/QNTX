@@ -91,10 +91,6 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 // handleListAsyncJobs lists all async jobs (active + completed + failed)
 func (s *QNTXServer) handleListAsyncJobs(w http.ResponseWriter, r *http.Request) {
 	// Check if daemon is available
-	if s.daemon == nil {
-		writeError(w, http.StatusServiceUnavailable, "Daemon not available")
-		return
-	}
 
 	queue := s.daemon.GetQueue()
 
@@ -139,11 +135,6 @@ func (s *QNTXServer) handleListAsyncJobs(w http.ResponseWriter, r *http.Request)
 
 // handleGetAsyncJob retrieves a specific async job by ID
 func (s *QNTXServer) handleGetAsyncJob(w http.ResponseWriter, r *http.Request, jobID string) {
-	if s.daemon == nil {
-		writeError(w, http.StatusServiceUnavailable, "Daemon not available")
-		return
-	}
-
 	queue := s.daemon.GetQueue()
 	job, err := queue.GetJob(jobID)
 	if err != nil {

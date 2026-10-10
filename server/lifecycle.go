@@ -55,14 +55,12 @@ func (s *QNTXServer) startBackgroundServices() {
 	// Pulse runs because the node runs. It is not separate enough from the node
 	// to be worth turning on and off, so there is no state to consult here and
 	// nothing that can leave a node up with its scheduled work silently dead.
-	if s.daemon != nil {
-		s.daemon.Start()
-		if s.ticker != nil {
-			s.ticker.Start()
-			s.logger.Debugw("Pulse ticker started")
-		}
-		s.logger.Debugw("Daemon started", "workers", s.daemon.Workers())
+	s.daemon.Start()
+	if s.ticker != nil {
+		s.ticker.Start()
+		s.logger.Debugw("Pulse ticker started")
 	}
+	s.logger.Debugw("Daemon started", "workers", s.daemon.Workers())
 
 	// Start auth session sweep (if auth is enabled)
 	if s.authHandler != nil {
@@ -75,15 +73,8 @@ func (s *QNTXServer) startBackgroundServices() {
 	})
 
 	// Broadcast worker is started in Run() method
-	// Start job update broadcaster (if daemon is available)
-	if s.daemon != nil {
-		s.startJobUpdateBroadcaster()
-	}
-
-	// Start daemon status broadcaster (if daemon is available)
-	if s.daemon != nil {
-		s.startDaemonStatusBroadcaster()
-	}
+	s.startJobUpdateBroadcaster()
+	s.startDaemonStatusBroadcaster()
 
 	// Start Pulse execution completion poller (if ticker is available)
 	if s.ticker != nil {
@@ -223,9 +214,7 @@ func (s *QNTXServer) Stop() error {
 	}
 
 	// Stop daemon FIRST before stopping server goroutines
-	if s.daemon != nil {
-		s.daemon.Stop()
-	}
+	s.daemon.Stop()
 
 	// Stop every namespace's watcher engine — drain loops stop, in-flight entries re-queued for next startup
 	for _, engine := range s.allEngines() {
