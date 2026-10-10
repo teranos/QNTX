@@ -395,13 +395,6 @@
 .claude-brand .claude-send { background: var(--claude-clay); border-color: var(--claude-clay); color: var(--claude-slate); }
 .claude-brand .claude-send:disabled { opacity: 0.5; }
 .claude-says { flex: 1; min-width: 0; resize: none; background: var(--bg-almost-black); color: var(--text-on-dark); border: 1px solid var(--border-on-dark); font: inherit; padding: 2px 4px; }
-/* "It needs to not zoom in when I want to type". A field is the host's to dress
- * (teranos/elements README), at 16px: iOS Safari zooms the page on focus for
- * anything smaller. 44 is the touch target Apple's HIG asks for. */
-@media (pointer: coarse) {
-    .claude-says,
-    .claude-mode { font-size: 16px; min-height: 44px; }
-}
 
 /* Ground's own faces, the ones its book is typeset in (teranos/ground doc/fonts), worn by the Ground element alone */
 @font-face { font-family: "TeX Gyre Schola"; src: url("../fonts/ground/texgyreschola-regular.otf") format("opentype"); font-weight: normal; font-style: normal; font-display: block; }
