@@ -55,15 +55,15 @@ func readLook() (look, error) {
 		return look{}, err
 	}
 	var l look
-	var failed error
+	var readErr error
 	prop := func(into *string, selector, property string) {
-		if failed == nil {
-			*into, failed = s.prop(selector, property)
+		if readErr == nil {
+			*into, readErr = s.prop(selector, property)
 		}
 	}
 	token := func(into *string, name string) {
-		if failed == nil {
-			*into, failed = s.token(name)
+		if readErr == nil {
+			*into, readErr = s.token(name)
 		}
 	}
 
@@ -105,8 +105,8 @@ func readLook() (look, error) {
 	token(&l.graphRule, "--border-on-dark")
 	token(&l.graphFill, "--element-status-success-bg")
 	token(&l.graphLine, "--accent-on-dark")
-	if failed != nil {
-		return look{}, errors.Wrap(failed, "a mail cannot be drawn from web/css")
+	if readErr != nil {
+		return look{}, errors.Wrap(readErr, "a mail cannot be drawn from web/css")
 	}
 
 	// A mail client that reads no rgba would drop the window; the colour the

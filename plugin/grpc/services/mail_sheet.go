@@ -75,8 +75,8 @@ func (s sheet) add(css string) error {
 		}
 		for _, selector := range strings.Split(prelude, ",") {
 			selector = strings.Join(strings.Fields(selector), " ")
-			props := s.rules[selector]
-			if props == nil {
+			props, seen := s.rules[selector]
+			if !seen {
 				props = map[string]string{}
 				s.rules[selector] = props
 			}
@@ -139,13 +139,12 @@ func (s sheet) resolve(value string) (string, error) {
 		}
 		name, fallback, hasFallback := strings.Cut(value[at+len("var("):end-1], ",")
 		name = strings.TrimSpace(name)
-		replacement, ok := s.tokens[name]
-		switch {
-		case ok:
-		case hasFallback:
-			replacement = strings.TrimSpace(fallback)
-		default:
+		replacement, set := s.tokens[name]
+		if !set && !hasFallback {
 			return "", errors.Newf(":root sets no %s, and %q names no fallback", name, value)
+		}
+		if !set {
+			replacement = strings.TrimSpace(fallback)
 		}
 		value = value[:at] + replacement + value[end:]
 	}

@@ -79,13 +79,6 @@ func (s *QueueServer) GetJob(ctx context.Context, req *protocol.GetJobRequest) (
 		}, nil
 	}
 
-	if job == nil {
-		return &protocol.GetJobResponse{
-			Success: false,
-			Error:   "job not found",
-		}, nil
-	}
-
 	// Convert to protobuf
 	protoJob, err := JobToProto(job)
 	if err != nil {
@@ -143,11 +136,15 @@ func (s *QueueServer) ListJobs(ctx context.Context, req *protocol.ListJobsReques
 		}, nil
 	}
 
-	// Left out is the default page of 100; a limit said is that limit, 0 included.
-	limit := 100
-	if req.Limit != nil {
-		limit = int(*req.Limit)
+	// A listing names how many jobs it wants, 0 included; one naming no limit
+	// is refused rather than handed a page size nobody said.
+	if req.Limit == nil {
+		return &protocol.ListJobsResponse{
+			Success: false,
+			Error:   "a listing names how many jobs it wants, and this one named no limit",
+		}, nil
 	}
+	limit := int(*req.Limit)
 
 	// List jobs
 	var jobs []*async.Job

@@ -81,7 +81,14 @@ func (s *FileServiceServer) ReadFileBase64(ctx context.Context, req *protocol.Re
 			Error:   fmt.Sprintf("invalid file ID %q", req.FileId),
 		}, nil
 	}
-	if _, statErr := os.Stat(path); statErr != nil {
+	info, statErr := os.Stat(path)
+	if statErr == nil && info.IsDir() {
+		return &protocol.ReadFileResponse{
+			Success: false,
+			Error:   fmt.Sprintf("file ID %q names a directory, not a stored file", req.FileId),
+		}, nil
+	}
+	if statErr != nil {
 		// Try globbing for id.* (bare UUID without extension)
 		// Glob only fails on a malformed pattern, so the ID is malformed —
 		// which is not the same answer as the file being absent.

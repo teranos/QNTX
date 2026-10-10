@@ -82,12 +82,10 @@ type FilledMail struct {
 }
 
 // checkMailTemplate refuses a template that cannot be kept: no subject, no
-// body, or a part that does not parse.
+// body, or a part that does not parse. A request that sent no template sent
+// no subject either.
 func checkMailTemplate(t *protocol.MailTemplate) error {
-	if t == nil {
-		return errors.New("no template was sent")
-	}
-	if strings.TrimSpace(t.Subject) == "" {
+	if strings.TrimSpace(t.GetSubject()) == "" {
 		return errors.New("a template needs a subject")
 	}
 	if strings.TrimSpace(t.Html) == "" && strings.TrimSpace(t.Text) == "" {
@@ -111,10 +109,6 @@ func fillMail(t *protocol.MailTemplate, values map[string]string) (FilledMail, e
 	if err := checkMailTemplate(t); err != nil {
 		return FilledMail{}, err
 	}
-	if values == nil {
-		values = map[string]string{}
-	}
-
 	subject, err := fillText("subject", t.Subject, values)
 	if err != nil {
 		return FilledMail{}, err
@@ -132,24 +126,20 @@ func fillMail(t *protocol.MailTemplate, values map[string]string) (FilledMail, e
 		return FilledMail{}, err
 	}
 
+	// A part the template leaves empty fills empty.
 	var html bytes.Buffer
-	if strings.TrimSpace(t.Html) != "" {
-		parsed, err := htmltemplate.New("html").Option("missingkey=error").Parse(t.Html)
-		if err != nil {
-			return FilledMail{}, errors.Wrap(err, "the html does not parse")
-		}
-		if err := parsed.Execute(&html, values); err != nil {
-			return FilledMail{}, errors.Wrap(err, "the html could not be filled")
-		}
+	parsed, err := htmltemplate.New("html").Option("missingkey=error").Parse(t.Html)
+	if err != nil {
+		return FilledMail{}, errors.Wrap(err, "the html does not parse")
+	}
+	if err := parsed.Execute(&html, values); err != nil {
+		return FilledMail{}, errors.Wrap(err, "the html could not be filled")
 	}
 
 	return FilledMail{Subject: subject, HTML: html.String(), Text: text}, nil
 }
 
 func fillText(part, body string, values map[string]string) (string, error) {
-	if strings.TrimSpace(body) == "" {
-		return "", nil
-	}
 	parsed, err := texttemplate.New(part).Option("missingkey=error").Parse(body)
 	if err != nil {
 		return "", errors.Wrapf(err, "the %s does not parse", part)

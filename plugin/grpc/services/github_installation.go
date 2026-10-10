@@ -144,18 +144,17 @@ func (s *GitHubServer) installationTokenOf(ctx context.Context, installationID i
 // asInstallation is what a call marked AsInstallation spends: the token of the
 // installation where the repository it names is.
 func (s *GitHubServer) asInstallation(ctx context.Context, msg protoreflect.Message) (token, key string, err error) {
-	named := func(field string) string {
-		fd := msg.Descriptor().Fields().ByName(protoreflect.Name(field))
-		if fd == nil || fd.Kind() != protoreflect.StringKind {
-			return ""
-		}
-		return msg.Get(fd).String()
-	}
-	owner, repo := named("owner"), named("repo")
-	if owner == "" || repo == "" {
+	// An owner or repo left unset is refused where the installation is asked
+	// for, as every path parameter is.
+	named, ofARepository := msg.Interface().(interface {
+		GetOwner() string
+		GetRepo() string
+	})
+	if !ofARepository {
 		return "", "", errors.Newf("%s is asked as the App's installation, which is found by a repository, and it names no repository",
 			msg.Descriptor().Name())
 	}
+	owner, repo := named.GetOwner(), named.GetRepo()
 	minted, err := s.InstallationToken(ctx, owner, repo)
 	if err != nil {
 		return "", "installation:" + owner, err
