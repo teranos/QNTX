@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3412 in 436 files.
+# 3408 in 436 files.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
 # ats/types/attestation.go: +1, NamesItsActor refuses a command naming no actor: one check every store's generate path calls, where four filled one in.
@@ -22,7 +22,7 @@
 2	ats/so/action.go
 13	ats/so/actions/prompt/action.go
 6	ats/so/actions/prompt/frontmatter.go
-19	ats/so/actions/prompt/handler.go
+17	ats/so/actions/prompt/handler.go
 8	ats/so/actions/prompt/store.go
 7	ats/so/actions/prompt/template.go
 1	ats/so/util.go
@@ -382,7 +382,7 @@
 25	server/plugin_sigils.go
 1	server/plugin_stores.go
 1	server/pprof.go
-29	server/prompt_handlers.go
+27	server/prompt_handlers.go
 2	server/prose_handlers.go
 7	server/pulse_async_jobs.go
 6	server/pulse_execution_handlers.go
