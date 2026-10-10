@@ -64,14 +64,16 @@ func (h *PluginProxyHandler) Execute(ctx context.Context, job *async.Job) error 
 	}
 
 	// A job a caller's schedule started runs where that caller acted, as them.
-	if job.Namespace != "" {
-		token, done, err := h.openRun(job.UserID, job.Namespace)
-		if err != nil {
-			return errors.Wrapf(err, "no store token for job %s in namespace %s", job.ID, job.Namespace)
+	// One no caller made is sent without a store token, which the protocol
+	// reads as a job no caller made: the plugin runs it as itself.
+	if caller, err := job.Caller(); err == nil {
+		token, done, openErr := h.openRun(caller.UserID, caller.Namespace.String())
+		if openErr != nil {
+			return errors.Wrapf(openErr, "no store token for job %s in namespace %s", job.ID, caller.Namespace)
 		}
 		defer done()
 		req.StoreToken = token
-		req.UserId = job.UserID
+		req.UserId = caller.UserID
 	}
 
 	client := h.plugin.Client()

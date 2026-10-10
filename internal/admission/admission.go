@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/internal/slug"
+	"github.com/teranos/errors"
 )
 
 type (
@@ -155,10 +156,19 @@ func (a Admission) Roles() []string {
 // ATTESTOR token, or somebody who walked up to a door. ROOT, SUPER and a
 // SUPER token stand above the lines and are narrowed by nothing.
 func (a Admission) belowTheLadder() bool {
-	if a.Grant != nil {
-		return a.Grant.Scoped()
+	if token, err := a.Token(); err == nil {
+		return token.Scoped()
 	}
 	return reachesNothingAlone(a.level)
+}
+
+// Token is the token that made the request, or why none did: a session and a
+// connector admitted as the person carry none.
+func (a Admission) Token() (Grant, error) {
+	if a.Grant == nil {
+		return Grant{}, errors.Newf("no token made this request: %s was admitted by a session or as the person a connector speaks for", a.Identity)
+	}
+	return *a.Grant, nil
 }
 
 // MayRead reports whether this admission may read attestations with a
@@ -205,8 +215,8 @@ func (a Admission) OwnOnly() bool {
 // admission that signs nothing, which is ROOT and everyone above the ladder
 // writing without a role.
 func (a Admission) ActsAs() string {
-	if a.Grant != nil {
-		return a.Grant.DID
+	if token, err := a.Token(); err == nil {
+		return token.DID
 	}
 	if len(a.roles) > 0 {
 		return a.Identity

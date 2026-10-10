@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
@@ -84,11 +85,9 @@ func (s *QNTXServer) openCall(admitted auth.Admission) (string, func(), error) {
 	if err != nil {
 		return "", nil, callRefused{refusal: &protocol.Refusal{Why: sigil.NotAllowed, Says: err.Error()}, cause: err}
 	}
-	store := universe.Store()
-	if store == nil {
-		return "", nil, errors.New("the caller's namespace holds no store")
-	}
-	return s.mintCall(openedCall{store: store, userID: admitted.UserID, namespace: universe.Name()})
+	// A universe is made with its store (namespaces.NewUniverse refuses one
+	// without), so the caller's namespace has one.
+	return s.mintCall(openedCall{store: universe.Store(), userID: admitted.UserID, namespace: universe.Name()})
 }
 
 type callDoneKey struct{}
@@ -122,11 +121,7 @@ func (s *QNTXServer) openRun(userID, namespace string) (string, func(), error) {
 	if err != nil {
 		return "", nil, errors.Wrapf(err, "namespace %s of User %s is not served", namespace, userID)
 	}
-	store := universe.Store()
-	if store == nil {
-		return "", nil, errors.Newf("namespace %s holds no store", namespace)
-	}
-	return s.mintCall(openedCall{store: store, userID: userID, namespace: namespace})
+	return s.mintCall(openedCall{store: universe.Store(), userID: userID, namespace: namespace})
 }
 
 // mintCall draws a token for an opened call, and what closes it.
@@ -241,19 +236,18 @@ func declaredSignum(plugin string, routes []*protocol.RouteInfo) *protocol.Signu
 }
 
 // sigilNameOf is a declared route's path in the characters a tool name allows:
-// /kvk/zoek/naam is kvk_zoek_naam.
+// /kvk/zoek/naam is kvk_zoek_naam. Every other character is an underscore, and
+// a tool name does not start with one.
 func sigilNameOf(path string) string {
-	var name []byte
+	name := make([]byte, len(path))
 	for i := 0; i < len(path); i++ {
 		c := path[i]
-		switch {
-		case (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'):
-			name = append(name, c)
-		case len(name) > 0:
-			name = append(name, '_')
+		name[i] = '_'
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
+			name[i] = c
 		}
 	}
-	return string(name)
+	return strings.TrimLeft(string(name), "_")
 }
 
 // pluginSigilRows is one plugin's sigils for the panel, asked of the same lines
@@ -412,60 +406,58 @@ func forwarded(plugin string, held *protocol.Sigil, carried map[string]any, ctx 
 		req.Path = (&url.URL{Path: req.Path, RawQuery: query.Encode()}).String()
 	}
 
-	// A node with no login admits nobody by name, and says nobody.
-	if admitted, gated := auth.AdmissionFrom(ctx); gated {
-		if admitted.Identity != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAsker, Values: []string{admitted.Identity}})
-		}
-		if admitted.UserID != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerUser, Values: []string{admitted.UserID}})
-		}
-		req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerLevel, Values: []string{admitted.LevelName()}})
-		// "i know i minted the oauth specifically for Manus to use and the
-		// token even has a name"
-		//
-		// A connector's token acts as the person and carries no Grant, so which
-		// token asked, and through which client, is read off the admission.
-		did, label := admitted.TokenDID, admitted.TokenLabel
-		if admitted.Grant != nil {
-			did, label = admitted.Grant.DID, admitted.Grant.Label
-		}
-		if did != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerDID, Values: []string{did}})
-		}
-		if label != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerLabel, Values: []string{label}})
-		}
-		if admitted.ClientDID != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerClient, Values: []string{admitted.ClientDID}})
-		}
-	}
+	// Who is asking, each header saying what the admission holds as it holds
+	// it, as on every request the node proxies to a plugin. A node with no
+	// login admits nobody by name, and says nobody.
+	//
+	// "i know i minted the oauth specifically for Manus to use and the
+	// token even has a name"
+	req.Headers = append(req.Headers, grpc.HeadersFor(ctx)...)
 	return req, nil
 }
 
 // refusedBy is a plugin saying no, in the sigil's terms. A plugin refuses with
-// a status and a JSON protocol.Refusal; one that sends no why is read by its
-// status, and one whose body is not a refusal is the plugin failing.
+// a status and a JSON protocol.Refusal; one whose refusal names no why key is
+// read by its status, a why naming no kind of no is refused, and one whose body
+// is not a refusal is the plugin failing.
 func refusedBy(resp *protocol.HTTPResponse) (*protocol.Refusal, error) {
-	var said struct {
-		Why   string `json:"why"`
-		Param string `json:"param"`
-		Says  string `json:"says"`
-	}
+	var said map[string]json.RawMessage
 	if err := json.Unmarshal(resp.GetBody(), &said); err != nil {
 		return nil, errors.Wrapf(err, "the answer is not a refusal: %s", resp.GetBody())
 	}
-	if said.Says == "" {
-		return nil, errors.Newf("the refusal says nothing: %s", resp.GetBody())
+	var says, param string
+	if err := readRefusalKey(said, "says", &says); err != nil {
+		return nil, errors.Wrapf(err, "the refusal does not say: %s", resp.GetBody())
 	}
-	why := said.Why
-	if why == "" {
-		why = whyOf(resp.GetStatusCode())
+	text, err := named.TextOf("the refusal's says", says)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the refusal says nothing: %s", resp.GetBody())
+	}
+	if _, sent := said["param"]; sent {
+		if err := readRefusalKey(said, "param", &param); err != nil {
+			return nil, errors.Wrapf(err, "the refusal's param is not text: %s", resp.GetBody())
+		}
+	}
+	why := whyOf(resp.GetStatusCode())
+	if _, sent := said["why"]; sent {
+		if err := readRefusalKey(said, "why", &why); err != nil {
+			return nil, errors.Wrapf(err, "the refusal's why is not text: %s", resp.GetBody())
+		}
 	}
 	if !slices.Contains(kindsOfNo, why) {
 		return nil, errors.Newf("%q is not a kind of no", why)
 	}
-	return &protocol.Refusal{Why: why, Param: said.Param, Says: said.Says}, nil
+	return &protocol.Refusal{Why: why, Param: param, Says: text.String()}, nil
+}
+
+// readRefusalKey reads one key of a refusal as text, refusing a key that is not
+// there or does not hold text.
+func readRefusalKey(said map[string]json.RawMessage, key string, into *string) error {
+	raw, sent := said[key]
+	if !sent {
+		return errors.Newf("the refusal names no %s", key)
+	}
+	return errors.Wrapf(json.Unmarshal(raw, into), "the refusal's %s is %s", key, raw)
 }
 
 // kindsOfNo is every kind of no a plugin's refusal may say.

@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
@@ -60,23 +61,43 @@ func (b buildSource) String() string {
 }
 
 // parseBuildSource reads owner/repo@branch, with :path when a file is named.
+// Each part is named, or the source is refused naming the part that is not.
 func parseBuildSource(s string, withPath bool) (buildSource, error) {
-	repo, branch, ok := strings.Cut(strings.TrimSpace(s), "@")
-	if !ok || branch == "" {
+	repo, at, ok := strings.Cut(strings.TrimSpace(s), "@")
+	if !ok {
 		return buildSource{}, errors.Newf("%q names no branch: owner/repo@branch", s)
 	}
-	var path string
+	file := buildSource{PathNamed: withPath}
 	if withPath {
-		branch, path, ok = strings.Cut(branch, ":")
-		if !ok || path == "" || branch == "" {
+		var path string
+		at, path, ok = strings.Cut(at, ":")
+		if !ok {
 			return buildSource{}, errors.Newf("%q names no file: owner/repo@branch:path", s)
 		}
+		pathText, err := named.TextOf("the file", path)
+		if err != nil {
+			return buildSource{}, errors.Wrapf(err, "%q names no file: owner/repo@branch:path", s)
+		}
+		file.Path = pathText.String()
 	}
-	owner, name, ok := strings.Cut(repo, "/")
-	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
+	branch, err := named.TextOf("the branch", at)
+	if err != nil {
+		return buildSource{}, errors.Wrapf(err, "%q names no branch: owner/repo@branch", s)
+	}
+	ownerOf, nameOf, ok := strings.Cut(repo, "/")
+	if !ok || strings.Contains(nameOf, "/") {
 		return buildSource{}, errors.Newf("%q names no repository: owner/repo", s)
 	}
-	return buildSource{Owner: owner, Repo: name, Branch: branch, Path: path, PathNamed: withPath}, nil
+	owner, err := named.TextOf("the owner", ownerOf)
+	if err != nil {
+		return buildSource{}, errors.Wrapf(err, "%q names no repository: owner/repo", s)
+	}
+	name, err := named.TextOf("the repository", nameOf)
+	if err != nil {
+		return buildSource{}, errors.Wrapf(err, "%q names no repository: owner/repo", s)
+	}
+	file.Owner, file.Repo, file.Branch = owner.String(), name.String(), branch.String()
+	return file, nil
 }
 
 // pluginBuild is how one plugin is built, as its record says.

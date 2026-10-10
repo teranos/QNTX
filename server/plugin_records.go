@@ -34,15 +34,15 @@ func (s *QNTXServer) pluginRecords() PluginRecords { return PluginRecords{s: s} 
 // PluginRecords is where the plugin layer reads which plugins run.
 func (s *QNTXServer) PluginRecords() grpcplugin.PluginRecords { return s.pluginRecords() }
 
-// actorOf is who a line written for this request is by: the route a person
-// came in by, or the admission's identity.
+// actorOf is who a line written for this request is by: the token that
+// asked, or the identity the admission came in by.
 func actorOf(ctx context.Context) string {
 	admitted, gated := auth.AdmissionFrom(ctx)
 	if !gated {
 		return pluginSource
 	}
-	if actor := admitted.ActsAs(); actor != "" {
-		return actor
+	if token, err := admitted.Token(); err == nil {
+		return token.DID
 	}
 	return admitted.Identity
 }
@@ -164,8 +164,10 @@ func (r PluginRecords) AddPlugin(actor, repo string) (grpcplugin.PluginRecord, e
 	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
 		return grpcplugin.PluginRecord{}, errors.Newf("%q is not a repository URL", repo)
 	}
+	// path.Base names something always; "." and "/" are what it names for a
+	// URL that names no plugin.
 	name := config.PluginNameFromRepo(repo)
-	if name == "" || name == "." || name == "/" {
+	if name == "." || name == "/" {
 		return grpcplugin.PluginRecord{}, errors.Newf("%q names no plugin", repo)
 	}
 	if held, found, err := r.Plugin(name); err != nil {

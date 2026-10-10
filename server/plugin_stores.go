@@ -24,12 +24,10 @@ type standingPlugin struct {
 // names, replacing the one it held. Minted at each Initialize, so a record
 // that moved a plugin moves where it reads and writes.
 func (s *QNTXServer) pluginToken(plugin, namespace string) (string, error) {
+	// A namespace that is served is made with its store (namespaces.NewUniverse).
 	store, err := s.held.OfPlugin(namespace)
 	if err != nil {
 		return "", errors.Wrapf(err, "namespace %s is not served", namespace)
-	}
-	if store == nil {
-		return "", errors.Newf("namespace %s holds no store", namespace)
 	}
 	raw := make([]byte, 32)
 	if drawn, err := rand.Read(raw); err != nil {

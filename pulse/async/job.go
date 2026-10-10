@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/errors"
 )
 
@@ -101,6 +102,23 @@ type Job struct {
 	StartedAt   *time.Time `json:"started_at,omitempty"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// Caller is the caller whose sigil call made the schedule a job runs for: the
+// User, and the namespace they acted in.
+type Caller struct {
+	UserID    string
+	Namespace named.Text
+}
+
+// Caller is who made the schedule this job runs for, or why the job has
+// none: a job no caller made names no namespace.
+func (j *Job) Caller() (Caller, error) {
+	namespace, err := named.TextOf("the namespace of the caller of job "+j.ID, j.Namespace)
+	if err != nil {
+		return Caller{}, errors.Wrapf(err, "job %s (handler %s) was made by no caller", j.ID, j.HandlerName)
+	}
+	return Caller{UserID: j.UserID, Namespace: namespace}, nil
 }
 
 // NewJobWithPayload creates a new generic job with handler name and typed payload.

@@ -207,7 +207,7 @@ func TestAPluginIsToldWhichTokenAsked(t *testing.T) {
 	got = headers(token)
 	assert.Equal(t, []string{"did:key:zgrant"}, got[HeaderAskerDID])
 	assert.Equal(t, []string{"a-script"}, got[HeaderAskerLabel])
-	assert.Empty(t, got[HeaderAskerClient], "a token no client issued was named a client")
+	assert.Equal(t, []string{""}, got[HeaderAskerClient], "a token no client issued was named a client")
 
 	// A person with a passkey is the person, and nothing more.
 	person := auth.Admitted(auth.LevelRoot)
@@ -217,9 +217,9 @@ func TestAPluginIsToldWhichTokenAsked(t *testing.T) {
 	assert.Equal(t, []string{rootAccount}, got[HeaderAsker])
 	assert.Equal(t, []string{"US-ROOT-1"}, got[HeaderAskerUser])
 	assert.Equal(t, []string{string(auth.LevelRoot)}, got[HeaderAskerLevel])
-	assert.Empty(t, got[HeaderAskerDID])
-	assert.Empty(t, got[HeaderAskerLabel])
-	assert.Empty(t, got[HeaderAskerClient])
+	assert.Equal(t, []string{""}, got[HeaderAskerDID])
+	assert.Equal(t, []string{""}, got[HeaderAskerLabel])
+	assert.Equal(t, []string{""}, got[HeaderAskerClient])
 }
 
 // A plugin answering a sigil reads and writes where its caller acts, through
