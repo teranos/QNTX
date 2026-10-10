@@ -49,24 +49,18 @@ func DefaultKeepaliveConfig() KeepaliveConfig {
 	}
 }
 
-// NewKeepaliveConfigFromSettings creates a KeepaliveConfig from configuration values.
-// This is useful for creating config from config.PluginKeepaliveConfig settings.
-// Nil values use defaults; explicit values (including 0) are used literally.
-func NewKeepaliveConfigFromSettings(enabled bool, pingIntervalSecs, pongTimeoutSecs, reconnectAttempts *int) KeepaliveConfig {
-	config := DefaultKeepaliveConfig()
-	config.Enabled = enabled
-
-	if pingIntervalSecs != nil {
-		config.PingInterval = time.Duration(*pingIntervalSecs) * time.Second
+// NewKeepaliveConfigFromSettings creates a KeepaliveConfig from the node's
+// config.PluginKeepaliveConfig, each value used as it was written. The config
+// refuses an enabled keepalive that names no ping interval or pong timeout at
+// load, so a keepalive that runs has both.
+func NewKeepaliveConfigFromSettings(enabled bool, pingIntervalSecs, pongTimeoutSecs, reconnectAttempts int) KeepaliveConfig {
+	return KeepaliveConfig{
+		Enabled:           enabled,
+		PingInterval:      time.Duration(pingIntervalSecs) * time.Second,
+		PongTimeout:       time.Duration(pongTimeoutSecs) * time.Second,
+		ReconnectAttempts: reconnectAttempts,
+		ReconnectBaseWait: DefaultReconnectBaseWait,
 	}
-	if pongTimeoutSecs != nil {
-		config.PongTimeout = time.Duration(*pongTimeoutSecs) * time.Second
-	}
-	if reconnectAttempts != nil {
-		config.ReconnectAttempts = *reconnectAttempts
-	}
-
-	return config
 }
 
 // KeepaliveMetrics tracks connection health metrics

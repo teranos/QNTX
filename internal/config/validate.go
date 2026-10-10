@@ -113,16 +113,17 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Plugin keepalive: validate when enabled (nil = default, 0 is invalid per "zero means zero")
+	// Plugin keepalive: one that is enabled names how often it pings and how
+	// long it waits for a PONG ("zero means zero": no interval is no pinging).
 	if c.Plugin.WebSocket.Keepalive.Enabled {
-		if c.Plugin.WebSocket.Keepalive.PingIntervalSecs != nil && *c.Plugin.WebSocket.Keepalive.PingIntervalSecs <= 0 {
-			return errors.Newf("plugin.websocket.keepalive.ping_interval_secs must be > 0, got %d (omit for default)", *c.Plugin.WebSocket.Keepalive.PingIntervalSecs)
+		if c.Plugin.WebSocket.Keepalive.PingIntervalSecs <= 0 {
+			return errors.Newf("plugin.websocket.keepalive.ping_interval_secs must be > 0 when keepalive is enabled, got %d", c.Plugin.WebSocket.Keepalive.PingIntervalSecs)
 		}
-		if c.Plugin.WebSocket.Keepalive.PongTimeoutSecs != nil && *c.Plugin.WebSocket.Keepalive.PongTimeoutSecs <= 0 {
-			return errors.Newf("plugin.websocket.keepalive.pong_timeout_secs must be > 0, got %d (omit for default)", *c.Plugin.WebSocket.Keepalive.PongTimeoutSecs)
+		if c.Plugin.WebSocket.Keepalive.PongTimeoutSecs <= 0 {
+			return errors.Newf("plugin.websocket.keepalive.pong_timeout_secs must be > 0 when keepalive is enabled, got %d", c.Plugin.WebSocket.Keepalive.PongTimeoutSecs)
 		}
-		if c.Plugin.WebSocket.Keepalive.ReconnectAttempts != nil && *c.Plugin.WebSocket.Keepalive.ReconnectAttempts < 0 {
-			return errors.Newf("plugin.websocket.keepalive.reconnect_attempts must be >= 0, got %d (omit for default)", *c.Plugin.WebSocket.Keepalive.ReconnectAttempts)
+		if c.Plugin.WebSocket.Keepalive.ReconnectAttempts < 0 {
+			return errors.Newf("plugin.websocket.keepalive.reconnect_attempts must be >= 0, got %d", c.Plugin.WebSocket.Keepalive.ReconnectAttempts)
 		}
 	}
 

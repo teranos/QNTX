@@ -139,10 +139,11 @@ QNTX sends PING messages on the gRPC stream and expects PONG responses. This tel
 
 Plugins must read the incoming gRPC stream and reply to PING with PONG (echo the timestamp). Spawn a reader task or thread that checks the message type and responds accordingly.
 
-Failure to respond causes QNTX to log `WebSocket pong timeout`. The keepalive interval and timeout are configurable in `am.toml` under `[plugin.websocket.keepalive]`:
+Failure to respond causes QNTX to log `WebSocket pong timeout`. Keepalive runs when `am.toml` enables it under `[plugin.websocket.keepalive]`; enabled, it names its interval and timeout or the config is refused at load:
 
 ```toml
 [plugin.websocket.keepalive]
+enabled = true
 ping_interval_secs = 30
 pong_timeout_secs = 60
 ```
