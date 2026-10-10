@@ -67,7 +67,7 @@ func (h *Handler) HandleSemanticSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.Service == nil || h.Store == nil {
+	if h.Service == nil {
 		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
 		return
 	}
@@ -272,7 +272,7 @@ func (h *Handler) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.Service == nil || h.Store == nil {
+	if h.Service == nil {
 		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
 		return
 	}
@@ -426,7 +426,7 @@ func (h *Handler) HandleEmbeddingsBySource(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if h.Store == nil || h.Service == nil {
+	if h.Service == nil {
 		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
 		return
 	}
@@ -530,19 +530,17 @@ func (h *Handler) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 
 	// Per-model counts from DB
 	var embCount int
-	if h.Store != nil {
-		perModel, err := h.Store.CountEmbeddingsByModel()
-		if err != nil {
-			h.Logger.Errorw("Failed to count embeddings by model", "error", err)
-		} else {
-			for _, mc := range perModel {
-				embCount += mc.Count
-				resp.Models = append(resp.Models, EmbeddingModelInfo{
-					Name:       mc.Model,
-					Dimensions: mc.Dimensions,
-					Count:      mc.Count,
-				})
-			}
+	perModel, err := h.Store.CountEmbeddingsByModel()
+	if err != nil {
+		h.Logger.Errorw("Failed to count embeddings by model", "error", err)
+	} else {
+		for _, mc := range perModel {
+			embCount += mc.Count
+			resp.Models = append(resp.Models, EmbeddingModelInfo{
+				Name:       mc.Model,
+				Dimensions: mc.Dimensions,
+				Count:      mc.Count,
+			})
 		}
 	}
 	// Include configured models that have zero embeddings yet
@@ -603,10 +601,8 @@ func (h *Handler) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if h.Store != nil {
-		if summary, err := h.Store.GetClusterSummary(); err == nil && summary.NClusters > 0 {
-			resp.ClusterInfo = summary
-		}
+	if summary, err := h.Store.GetClusterSummary(); err == nil && summary.NClusters > 0 {
+		resp.ClusterInfo = summary
 	}
 
 	minCS := appcfg.GetInt("embeddings.min_cluster_size")
@@ -689,11 +685,6 @@ func (h *Handler) HandleUnembeddedPage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleEmbeddingProjections(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if h.Store == nil {
-		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
 		return
 	}
 

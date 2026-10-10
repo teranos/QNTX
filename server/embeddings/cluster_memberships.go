@@ -14,11 +14,6 @@ func (h *Handler) HandleClusterMemberships(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if h.Store == nil {
-		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
-		return
-	}
-
 	raw := r.URL.Query().Get("ids")
 	if raw == "" {
 		http.Error(w, "ids parameter required (comma-separated attestation IDs)", http.StatusBadRequest)

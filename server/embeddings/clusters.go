@@ -29,11 +29,6 @@ func (h *Handler) HandleEmbeddingClusters(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if h.Store == nil {
-		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
-		return
-	}
-
 	details, err := h.Store.GetClusterDetails()
 	if err != nil {
 		h.Logger.Errorw("Failed to get cluster details", "error", err)
@@ -63,11 +58,6 @@ func (h *Handler) HandleEmbeddingClusters(w http.ResponseWriter, r *http.Request
 func (h *Handler) HandleClusterSamples(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if h.Store == nil {
-		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -101,11 +91,6 @@ func (h *Handler) HandleClusterSamples(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleClusterMembers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if h.Store == nil {
-		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -152,11 +137,6 @@ func (h *Handler) HandleClusterMembers(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleClusterTimeline(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if h.Store == nil {
-		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
 		return
 	}
 
