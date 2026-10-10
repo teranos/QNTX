@@ -54,8 +54,8 @@ func (s *QNTXServer) universeFor(admitted auth.Admission, gated bool) (*namespac
 	if !admitted.ReachesAStore() {
 		return nil, namespaces.ReachesNothing{}
 	}
-	namespace := s.namespaceOf(admitted)
-	if namespace == auth.Nowhere {
+	namespace, stands := s.namespaceOf(admitted)
+	if !stands {
 		return nil, namespaces.ReachesNothing{}
 	}
 	return s.held.Universe(admitted, namespace)
@@ -71,6 +71,6 @@ func (s *QNTXServer) universeFor(admitted auth.Admission, gated bool) (*namespac
 //
 // The reading is auth.StandingIn's, which is also what GET /i/ answers, so the
 // rectangle a person sees is the namespace their writes land in.
-func (s *QNTXServer) namespaceOf(admitted auth.Admission) string {
+func (s *QNTXServer) namespaceOf(admitted auth.Admission) (string, bool) {
 	return auth.StandingIn(admitted, s.authHandler.StandingOf(admitted.UserID))
 }

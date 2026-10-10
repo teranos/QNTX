@@ -43,7 +43,7 @@ type Person struct {
 	// namespaces bar draws. Door is where they came in and does not move; this
 	// is where they are. Resolved rather than what they last stepped to, so a
 	// person bound to one namespace reads that one and the rectangle cannot
-	// draw somewhere their writes do not land. Never empty.
+	// draw somewhere their writes do not land. Empty is standing nowhere.
 	Standing string `json:"standing"`
 	// Identity is the route that admitted this request: an account URL or a
 	// did:key. A token carries the identity that minted it.
@@ -169,7 +169,6 @@ func personOf(u User, admitted Admission) Person {
 		Roles:       admitted.Roles(),
 		Namespaces:  admitted.Namespaces,
 		Door:        u.Namespace,
-		Standing:    StandingIn(admitted, u.Standing),
 		Identity:    admitted.Identity,
 		Via:         viaSession,
 		Accounts:    u.Accounts,
@@ -177,6 +176,9 @@ func personOf(u User, admitted Admission) Person {
 	}
 	if admitted.Grant != nil {
 		p.Via = viaToken
+	}
+	if standing, stands := StandingIn(admitted, u.Standing); stands {
+		p.Standing = standing
 	}
 	// A list is a list even when it is empty. Null would read as "the node did
 	// not say" to anything drawing this.
