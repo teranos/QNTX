@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -13,7 +14,7 @@ func TestCreateOriginChecker_AllowAllOrigins(t *testing.T) {
 		AllowAllOrigins: true,
 	}
 
-	checker := CreateOriginChecker(config, nil)
+	checker := CreateOriginChecker(config, zap.NewNop().Sugar())
 
 	// Test various origins - all should be allowed
 	tests := []struct {
@@ -46,7 +47,7 @@ func TestCreateOriginChecker_ExactMatch(t *testing.T) {
 		AllowAllOrigins: false,
 	}
 
-	checker := CreateOriginChecker(config, nil)
+	checker := CreateOriginChecker(config, zap.NewNop().Sugar())
 
 	tests := []struct {
 		name     string
@@ -80,7 +81,7 @@ func TestCreateOriginChecker_WildcardMatch(t *testing.T) {
 		AllowAllOrigins: false,
 	}
 
-	checker := CreateOriginChecker(config, nil)
+	checker := CreateOriginChecker(config, zap.NewNop().Sugar())
 
 	tests := []struct {
 		name     string
@@ -110,7 +111,7 @@ func TestCreateOriginChecker_StarWildcard(t *testing.T) {
 		AllowAllOrigins: false,
 	}
 
-	checker := CreateOriginChecker(config, nil)
+	checker := CreateOriginChecker(config, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest("GET", "/ws", nil)
 	req.Header.Set("Origin", "http://anywhere.com")
@@ -174,7 +175,7 @@ func TestWebSocketConfig_RestrictiveDefault(t *testing.T) {
 	// Verify that default config is secure (restrictive)
 	config := DefaultWebSocketConfig()
 
-	checker := CreateOriginChecker(config, nil)
+	checker := CreateOriginChecker(config, zap.NewNop().Sugar())
 
 	// Should reject non-localhost origins
 	req := httptest.NewRequest("GET", "/ws", nil)
@@ -194,7 +195,7 @@ func TestOriginChecker_EdgeCases(t *testing.T) {
 		AllowAllOrigins: false,
 	}
 
-	checker := CreateOriginChecker(config, nil)
+	checker := CreateOriginChecker(config, zap.NewNop().Sugar())
 
 	tests := []struct {
 		name     string
@@ -230,7 +231,7 @@ func TestWebSocketConfig_MultiplePatterns(t *testing.T) {
 		AllowAllOrigins: false,
 	}
 
-	checker := CreateOriginChecker(config, nil)
+	checker := CreateOriginChecker(config, zap.NewNop().Sugar())
 
 	tests := []struct {
 		name     string
@@ -350,7 +351,7 @@ func TestCreateOriginChecker_WithOrigin_IgnoresRemoteAddr(t *testing.T) {
 		AllowAllOrigins: false,
 	}
 
-	checker := CreateOriginChecker(config, nil)
+	checker := CreateOriginChecker(config, zap.NewNop().Sugar())
 
 	// When Origin header is present, RemoteAddr shouldn't matter
 	req := httptest.NewRequest("GET", "/ws", nil)
@@ -366,7 +367,7 @@ func TestCreateOriginChecker_AllowAllOrigins_BypassesCheck(t *testing.T) {
 		AllowAllOrigins: true,
 	}
 
-	checker := CreateOriginChecker(config, nil)
+	checker := CreateOriginChecker(config, zap.NewNop().Sugar())
 
 	tests := []struct {
 		name       string
