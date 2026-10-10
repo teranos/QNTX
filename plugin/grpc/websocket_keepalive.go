@@ -77,6 +77,9 @@ type KeepaliveMetrics struct {
 	// latencies stores recent ping/pong latencies for averaging
 	latencies []time.Duration
 
+	// sum and average are of latencies, worked out as each one lands
+	sum, average time.Duration
+
 	// maxLatencySamples is the maximum number of latency samples to keep
 	maxLatencySamples int
 
@@ -122,9 +125,23 @@ func (m *KeepaliveMetrics) RecordPong(latency time.Duration) {
 	m.mu.Lock()
 	m.lastPongTime = time.Now()
 	m.latencies = append(m.latencies, latency)
+	m.sum += latency
 	if len(m.latencies) > m.maxLatencySamples {
+		m.sum -= m.latencies[0]
 		m.latencies = m.latencies[1:]
 	}
+	// Worked out here, where a latency has just landed, so it is never an
+	// average of nothing.
+	m.average = m.sum / time.Duration(len(m.latencies))
+	m.mu.Unlock()
+}
+
+// RecordUnmeasuredPong records a pong that answers no ping this side sent, so
+// it says the connection is alive and nothing about its latency.
+func (m *KeepaliveMetrics) RecordUnmeasuredPong() {
+	atomic.AddUint64(&m.totalPongs, 1)
+	m.mu.Lock()
+	m.lastPongTime = time.Now()
 	m.mu.Unlock()
 }
 
@@ -140,20 +157,12 @@ func (m *KeepaliveMetrics) ResetConnectionStart() {
 	m.mu.Unlock()
 }
 
-// GetAverageLatency returns the average ping/pong latency
+// GetAverageLatency returns the average ping/pong latency of the pongs that
+// were measured. Before the first, none was measured and it holds 0.
 func (m *KeepaliveMetrics) GetAverageLatency() time.Duration {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
-	if len(m.latencies) == 0 {
-		return 0
-	}
-
-	var total time.Duration
-	for _, l := range m.latencies {
-		total += l
-	}
-	return total / time.Duration(len(m.latencies))
+	return m.average
 }
 
 // GetConnectionUptime returns how long the connection has been up
@@ -205,6 +214,10 @@ type KeepaliveHandler struct {
 	// lastPong tracks when the last PONG was received
 	lastPong time.Time
 
+	// pending is the pings sent and not yet answered, by the timestamp each
+	// carried. A PONG is measured against the ping it answers.
+	pending map[int64]bool
+
 	// running indicates if the keepalive loop is active
 	running bool
 
@@ -220,6 +233,7 @@ func NewKeepaliveHandler(config KeepaliveConfig, logger *zap.SugaredLogger, plug
 		logger:     logger,
 		pluginName: pluginName,
 		lastPong:   time.Now(),
+		pending:    map[int64]bool{},
 	}
 }
 
@@ -264,10 +278,9 @@ func (h *KeepaliveHandler) Stop() {
 		return
 	}
 
+	// running is only ever set together with cancel, in Start.
 	h.logger.Debug("Stopping keepalive handler")
-	if h.cancel != nil {
-		h.cancel()
-	}
+	h.cancel()
 	h.running = false
 }
 
@@ -278,22 +291,36 @@ func (h *KeepaliveHandler) IsRunning() bool {
 	return h.running
 }
 
-// HandlePong processes a PONG message
+// HandlePong processes a PONG message. Any PONG says the connection is alive;
+// only one answering a ping this side sent says how long the round trip took.
 func (h *KeepaliveHandler) HandlePong(msg *protocol.WebSocketMessage) {
 	h.mu.Lock()
 	h.lastPong = time.Now()
+	answers := h.pending[msg.Timestamp]
+	// A ping sent before the one answered is not answered any more.
+	for sent := range h.pending {
+		if sent <= msg.Timestamp {
+			delete(h.pending, sent)
+		}
+	}
 	h.mu.Unlock()
 
-	// Calculate latency if timestamp is present
-	if msg.Timestamp > 0 {
-		sentTime := time.Unix(0, msg.Timestamp)
-		latency := time.Since(sentTime)
-		h.metrics.RecordPong(latency)
-		h.logger.Debugw("PONG received", "latency", latency)
-	} else {
-		h.metrics.RecordPong(0)
-		h.logger.Debug("PONG received (no timestamp)")
+	if !answers {
+		h.metrics.RecordUnmeasuredPong()
+		h.logger.Debugw("PONG received, answering no ping sent", "timestamp", msg.Timestamp)
+		return
 	}
+	latency := time.Since(time.Unix(0, msg.Timestamp))
+	h.metrics.RecordPong(latency)
+	h.logger.Debugw("PONG received", "latency", latency)
+}
+
+// sent records a ping as sent with timestamp, for the PONG that answers it.
+func (h *KeepaliveHandler) sent(timestamp int64) {
+	h.mu.Lock()
+	h.pending[timestamp] = true
+	h.mu.Unlock()
+	h.metrics.RecordPing()
 }
 
 // HandlePing processes a PING message and returns a PONG response
@@ -328,49 +355,49 @@ func (h *KeepaliveHandler) keepaliveLoop(ctx context.Context, sendPing func(time
 			return
 
 		case <-ticker.C:
-			// Check for pong timeout
+			// No PONG within PongTimeout is a connection considered dead: the
+			// keepalive stops pinging it.
 			if h.CheckTimeout() {
-				h.logger.Warnf("[%s] WebSocket pong timeout — not responding to keepalive", h.pluginName)
-				// Continue sending pings in case the connection recovers
+				h.Stop()
+				h.logger.Warnf("[%s] WebSocket pong timeout — not responding to keepalive, keepalive stopped", h.pluginName)
+				return
 			}
 
 			// Send PING with current timestamp
 			timestamp := time.Now().UnixNano()
-			h.metrics.RecordPing()
+			h.sent(timestamp)
 
+			// A PING that cannot be sent is a stream that is gone.
 			if err := sendPing(timestamp); err != nil {
-				// sacred-error:handled — the pong deadline closes the connection.
-				h.logger.Warnw("Failed to send PING", "error", err)
-				// Don't return, keep trying
-			} else {
-				h.logger.Debug("PING sent")
+				h.Stop()
+				h.logger.Warnw("Failed to send PING, keepalive stopped", "plugin", h.pluginName, "error", err)
+				return
 			}
+			h.logger.Debug("PING sent")
 		}
 	}
 }
 
 // ConnectWithRetry attempts to establish a connection with exponential backoff
+// Each attempt's failure is kept in the error returned; 0 attempts is no
+// connection.
 func (h *KeepaliveHandler) ConnectWithRetry(ctx context.Context, connect func() error) error {
-	var lastErr error
+	failed := errors.Newf("failed after %d reconnect attempts", h.config.ReconnectAttempts)
 
 	for attempt := 0; attempt < h.config.ReconnectAttempts; attempt++ {
 		h.metrics.RecordReconnect()
 
-		if err := connect(); err == nil {
+		err := connect()
+		if err == nil {
 			h.metrics.ResetConnectionStart()
 			h.logger.Infow("Connection established",
 				"attempt", attempt+1,
 				"total_attempts", h.config.ReconnectAttempts,
 			)
 			return nil
-		} else {
-			lastErr = err
-			h.logger.Warnw("Connection attempt failed",
-				"attempt", attempt+1,
-				"total_attempts", h.config.ReconnectAttempts,
-				"error", err,
-			)
 		}
+		failed = errors.WithSecondaryError(failed,
+			errors.Wrapf(err, "attempt %d of %d", attempt+1, h.config.ReconnectAttempts))
 
 		// Calculate backoff with exponential increase
 		backoff := h.config.ReconnectBaseWait * time.Duration(math.Pow(2, float64(attempt)))
@@ -384,5 +411,5 @@ func (h *KeepaliveHandler) ConnectWithRetry(ctx context.Context, connect func() 
 		}
 	}
 
-	return errors.Wrapf(lastErr, "failed after %d reconnect attempts", h.config.ReconnectAttempts)
+	return failed
 }
