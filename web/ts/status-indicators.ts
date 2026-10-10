@@ -238,11 +238,17 @@ class StatusIndicatorManager {
     }
 
     /**
-     * Auto-open the connectivity element on the first failure. Subsequent failures
-     * update the element in place via its own subscribeFailures wiring.
+     * Open the connectivity element on a failure, except on a phone. Every
+     * failure reopened it, and a node down for minutes fails once a second, so
+     * no dismissal held. The failures still reach Sentry through the logger.
+     *
+     * "On mobile it's actively harming user experience in any circumstance it pops up"
+     * "Sentry should have this observability already"
      */
     private setupConnectivityDiagnostic(): void {
+        const phone = window.matchMedia('(max-width: 768px)');
         connectivity.subscribeFailures(() => {
+            if (phone.matches) return;
             spawnConnectivityElement();
         });
     }
