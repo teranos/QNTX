@@ -21,7 +21,7 @@
   jobs.ios = {
     name = "QNTX-App in the iPhone Simulator";
     runs-on = "macos-15";
-    timeout-minutes = 90;
+    timeout-minutes = 110;
     steps = [
       {
         uses = "actions/checkout@v5";
@@ -112,12 +112,26 @@
       }
       {
         "if" = "always()";
+        name = "The same pinned page, in a shell whose web view does not shift its content for the keyboard";
+        # The pinned page slid 35 points as the window shrank from 778 to 743
+        # with the box well above the keyboard: the web view moved its insets.
+        timeout-minutes = 20;
+        run = ''
+          python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a="scroll.bouncesZoom = false\n"; assert a in s; open(p,"w").write(s.replace(a, a+"    scroll.contentInsetAdjustmentBehavior = .never\n"))' sheet/ios/Sources/Sheet.swift
+          (cd qntx && make web)
+          python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index("<meta name=\"viewport\""); b=s.index(">", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index("</head>"); open(p,"w").write(s[:c]+"<style>html, body { height: 100%; overflow: hidden; }</style>"+s[c:])' qntx/internal/server/dist/index.html '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'
+          bash qntx/ci/app-keyboard/run.sh inset
+        '';
+      }
+      {
+        "if" = "always()";
         name = "What the screen said";
         run = ''
           cat verdicts.txt
           grep -q '^without: zoomed$' verdicts.txt || echo "without the line the page did not zoom"
           grep -q '^whole: stayed$' verdicts.txt || echo "QNTX's page did more than bring the keyboard"
-          grep -q '^pinned: stayed$' verdicts.txt || { echo "pinned, QNTX's page still did more than bring the keyboard"; exit 1; }
+          grep -q '^pinned: stayed$' verdicts.txt || echo "pinned, QNTX's page still did more than bring the keyboard"
+          grep -q '^inset: stayed$' verdicts.txt || { echo "with the web view's insets fixed, QNTX's page still did more than bring the keyboard"; exit 1; }
         '';
       }
       {
