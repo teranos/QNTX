@@ -528,8 +528,7 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 		handlerName,
 		sourceURL,
 		payload,
-		0, // Total operations unknown
-		fmt.Sprintf("pulse:%s", scheduled.Id),
+		0,
 	)
 	if err != nil {
 		err = errors.Wrap(err, "failed to create async job")

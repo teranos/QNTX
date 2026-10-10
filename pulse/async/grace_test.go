@@ -66,8 +66,7 @@ func TestGRACEShutdownFlow(t *testing.T) {
 		"test.grace-handler",
 		jobDesc,
 		payloadJSON,
-		10, // total operations
-		"grace-test",
+		10,
 	)
 	if err != nil {
 		t.Fatalf("Failed to create job: %v", err)
@@ -243,7 +242,7 @@ func TestGRACEChildTasksPreserved(t *testing.T) {
 		"actor":  "test-actor",
 	}
 	payloadJSON, _ := json.Marshal(payload)
-	parentJob, err := NewJobWithPayload("test.grace-handler", "parent with children", payloadJSON, 5, "test-actor")
+	parentJob, err := NewJobWithPayload("test.grace-handler", "parent with children", payloadJSON, 5)
 	if err != nil {
 		t.Fatalf("Failed to create parent job: %v", err)
 	}
@@ -259,7 +258,7 @@ func TestGRACEChildTasksPreserved(t *testing.T) {
 			"actor":  "test-actor",
 		}
 		childPayloadJSON, _ := json.Marshal(childPayload)
-		childTask, err := NewJobWithPayload("test.child-handler", fmt.Sprintf("scoring task %d", i), childPayloadJSON, 1, "test-actor")
+		childTask, err := NewJobWithPayload("test.child-handler", fmt.Sprintf("scoring task %d", i), childPayloadJSON, 1)
 		if err != nil {
 			t.Fatalf("Failed to create child task %d: %v", i, err)
 		}

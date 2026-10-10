@@ -11,14 +11,6 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 )
 
-// AttestationItem represents an item that can be converted to an attestation.
-type AttestationItem interface {
-	GetSubject() string
-	GetPredicate() string
-	GetContext() string
-	GetMeta() map[string]string
-}
-
 // AttestationStore defines storage operations for attestations.
 // Implementations can use any backend (SQLite, Postgres, S3, in-memory, etc.)
 type AttestationStore interface {
@@ -36,12 +28,6 @@ type AttestationStore interface {
 
 	// GetAttestations retrieves attestations based on filters
 	GetAttestations(filters AttestationFilter) ([]*types.As, error)
-}
-
-// BatchStore defines batch persistence operations for attestations
-type BatchStore interface {
-	// PersistItems converts AttestationItems to attestations and persists them to storage
-	PersistItems(items []AttestationItem, sourcePrefix string) *PersistenceResult
 }
 
 // BoundedStore defines bounded storage operations that enforce quota limits
@@ -82,14 +68,6 @@ type AttestationFilter struct {
 // EveryRow is the limit of a query that wants every matching row: a high value,
 // said, since a limit of 0 is 0 rows.
 const EveryRow = math.MaxInt32
-
-// PersistenceResult contains the results of a batch persistence operation
-type PersistenceResult struct {
-	PersistedCount int
-	FailureCount   int
-	Errors         []string
-	SuccessRate    float64
-}
 
 // AttestationQueryStore defines query operations for attestation retrieval.
 // This interface abstracts storage-specific query implementations.

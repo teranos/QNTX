@@ -12,5 +12,5 @@ func createTestJob(handlerName, source string, totalOps int) (*Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewJobWithPayload(handlerName, source, payloadJSON, totalOps, "test-system")
+	return NewJobWithPayload(handlerName, source, payloadJSON, totalOps)
 }

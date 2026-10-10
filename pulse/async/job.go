@@ -109,31 +109,25 @@ type Job struct {
 //
 //	payload := BatchImportPayload{SourceURL: "https://...", RecordIDs: []string{"1", "2"}}
 //	payloadJSON, _ := json.Marshal(payload)
-//	job, _ := async.NewJobWithPayload("data.batch-import", "https://...", payloadJSON, 100, "user@example.com")
-func NewJobWithPayload(handlerName string, source string, payload json.RawMessage, totalOps int, actor string) (*Job, error) {
-	return NewChildJobWithPayload(handlerName, source, payload, totalOps, actor, "")
+//	job, _ := async.NewJobWithPayload("data.batch-import", "https://...", payloadJSON, 100)
+func NewJobWithPayload(handlerName string, source string, payload json.RawMessage, totalOps int) (*Job, error) {
+	return NewChildJobWithPayload(handlerName, source, payload, totalOps, "")
 }
 
 // NewChildJobWithPayload creates a new job with an optional parent job ID.
 // Use this when creating child jobs that should be grouped under a parent orchestrator job.
-func NewChildJobWithPayload(handlerName string, source string, payload json.RawMessage, totalOps int, actor string, parentJobID string) (*Job, error) {
+func NewChildJobWithPayload(handlerName string, source string, payload json.RawMessage, totalOps int, parentJobID string) (*Job, error) {
 	if handlerName == "" {
 		err := errors.New("handlerName cannot be empty")
 		err = errors.WithDetail(err, "Handler name is required to create a job")
 		return nil, err
 	}
-	if actor == "" {
-		actor = "system"
-	}
 
-	// Generate unique job ASID
-	// Format: JB + random(2) + handler(5) + random(2) + process(7) + random(2) + source(5) + random(4) + actor(3)
 	jobID, err := identity.GenerateJobID(handlerName, source)
 	if err != nil {
 		err = errors.Wrap(err, "failed to generate job ASID")
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", handlerName))
 		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", source))
-		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", actor))
 		return nil, err
 	}
 
