@@ -1,4 +1,15 @@
-<!-- The page holds itself where it is: whatever scrolls the window, it goes back to the top. -->
+<!-- The page holds itself where it is while a field has the keyboard: where the
+     window stood when the field took focus, it goes back to on any scroll, until
+     the field lets go. A page scrolled before the tap is not moved to the top. -->
 <script>
-    addEventListener('scroll', function () { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); });
+    (function () {
+        var held = null;
+        addEventListener('focusin', function (e) {
+            if (e.target.matches('input, textarea, [contenteditable]')) held = { x: window.scrollX, y: window.scrollY };
+        });
+        addEventListener('focusout', function () { held = null; });
+        addEventListener('scroll', function () {
+            if (held && (window.scrollX !== held.x || window.scrollY !== held.y)) window.scrollTo(held.x, held.y);
+        });
+    })();
 </script>
