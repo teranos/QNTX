@@ -22,7 +22,7 @@ func githubAskSigils() []*protocol.Sigil {
 			Does: "Asks GitHub one thing through GitHubService, as the App's installation where the repository is: a pull request opened, a branch read, a workflow run listed. github operations lists what can be asked and what each takes.",
 			Takes: []*protocol.Param{
 				{Name: "operation", Required: true, Says: "The operation, by its name: CreateAPullRequest."},
-				{Name: "request", Says: "What the operation takes, as a JSON object with GitHub's own names: {\"owner\": \"...\", \"repo\": \"...\"}."},
+				{Name: "request", Required: true, Says: "What the operation takes, as a JSON object with GitHub's own names: {\"owner\": \"...\", \"repo\": \"...\"}, and {} for an operation that takes nothing."},
 			},
 			Gives: []*protocol.Field{
 				{Name: "answer", Says: "What GitHub answered, as the operation gives it."},

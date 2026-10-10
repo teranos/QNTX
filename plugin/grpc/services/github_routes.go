@@ -11,393 +11,393 @@ import (
 // name, each under the page that documents it.
 var githubRoutes = map[string]githubRoute{
 	// https://docs.github.com/en/rest/rate-limit/rate-limit?apiVersion=2026-03-10
-	"RateLimit": {method: http.MethodGet, path: "/rate_limit"},
+	"RateLimit": {method: http.MethodGet, path: "/rate_limit", body: noBody{}},
 	// https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10#get-the-combined-status-for-a-specific-reference
-	"GetTheCombinedStatusForASpecificReference": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{ref}/status", query: []string{"per_page", "page"}},
+	"GetTheCombinedStatusForASpecificReference": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{ref}/status", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10#list-commit-statuses-for-a-reference
-	"ListCommitStatusesForAReference": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{ref}/statuses", query: []string{"per_page", "page"}},
+	"ListCommitStatusesForAReference": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{ref}/statuses", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/commits/statuses?apiVersion=2026-03-10#create-a-commit-status
-	"CreateACommitStatus": {method: http.MethodPost, path: "/repos/{owner}/{repo}/statuses/{sha}", body: []string{"state", "target_url", "description", "context"}},
+	"CreateACommitStatus": {method: http.MethodPost, path: "/repos/{owner}/{repo}/statuses/{sha}", body: jsonBody{"state", "target_url", "description", "context"}},
 	// https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#list-commit-comments-for-a-repository
-	"ListCommitCommentsForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/comments", query: []string{"per_page", "page"}},
+	"ListCommitCommentsForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/comments", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#get-a-commit-comment
-	"GetACommitComment": {method: http.MethodGet, path: "/repos/{owner}/{repo}/comments/{comment_id}"},
+	"GetACommitComment": {method: http.MethodGet, path: "/repos/{owner}/{repo}/comments/{comment_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#update-a-commit-comment
-	"UpdateACommitComment": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/comments/{comment_id}", body: []string{"body"}},
+	"UpdateACommitComment": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/comments/{comment_id}", body: jsonBody{"body"}},
 	// https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#delete-a-commit-comment
-	"DeleteACommitComment": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/comments/{comment_id}"},
+	"DeleteACommitComment": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/comments/{comment_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#list-commit-comments
-	"ListCommitComments": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{commit_sha}/comments", query: []string{"per_page", "page"}},
+	"ListCommitComments": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{commit_sha}/comments", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/commits/comments?apiVersion=2026-03-10#create-a-commit-comment
-	"CreateACommitComment": {method: http.MethodPost, path: "/repos/{owner}/{repo}/commits/{commit_sha}/comments", body: []string{"body", "path", "position", "line"}},
+	"CreateACommitComment": {method: http.MethodPost, path: "/repos/{owner}/{repo}/commits/{commit_sha}/comments", body: jsonBody{"body", "path", "position", "line"}},
 	// https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-commits
-	"ListCommits": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits", query: []string{"sha", "path", "author", "committer", "since", "until", "per_page", "page"}},
+	"ListCommits": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits", query: []string{"sha", "path", "author", "committer", "since", "until", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-branches-for-head-commit
-	"ListBranchesForHEADCommit": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{commit_sha}/branches-where-head"},
+	"ListBranchesForHEADCommit": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{commit_sha}/branches-where-head", body: noBody{}},
 	// https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-pull-requests-associated-with-a-commit
-	"ListPullRequestsAssociatedWithACommit": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{commit_sha}/pulls", query: []string{"per_page", "page"}},
+	"ListPullRequestsAssociatedWithACommit": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{commit_sha}/pulls", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#get-a-commit
-	"GetACommit": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{ref}", query: []string{"page", "per_page"}},
+	"GetACommit": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{ref}", query: []string{"page", "per_page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#compare-two-commits
-	"CompareTwoCommits": {method: http.MethodGet, path: "/repos/{owner}/{repo}/compare/{basehead}", query: []string{"page", "per_page"}},
+	"CompareTwoCommits": {method: http.MethodGet, path: "/repos/{owner}/{repo}/compare/{basehead}", query: []string{"page", "per_page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#list-branches
-	"ListBranches": {method: http.MethodGet, path: "/repos/{owner}/{repo}/branches", query: []string{"protected", "per_page", "page"}},
+	"ListBranches": {method: http.MethodGet, path: "/repos/{owner}/{repo}/branches", query: []string{"protected", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#get-a-branch
-	"GetABranch": {method: http.MethodGet, path: "/repos/{owner}/{repo}/branches/{branch}"},
+	"GetABranch": {method: http.MethodGet, path: "/repos/{owner}/{repo}/branches/{branch}", body: noBody{}},
 	// https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#rename-a-branch
-	"RenameABranch": {method: http.MethodPost, path: "/repos/{owner}/{repo}/branches/{branch}/rename", body: []string{"new_name"}},
+	"RenameABranch": {method: http.MethodPost, path: "/repos/{owner}/{repo}/branches/{branch}/rename", body: jsonBody{"new_name"}},
 	// https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#sync-a-fork-branch-with-the-upstream-repository
-	"SyncAForkBranchWithTheUpstreamRepository": {method: http.MethodPost, path: "/repos/{owner}/{repo}/merge-upstream", body: []string{"branch"}},
+	"SyncAForkBranchWithTheUpstreamRepository": {method: http.MethodPost, path: "/repos/{owner}/{repo}/merge-upstream", body: jsonBody{"branch"}},
 	// https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#merge-a-branch
-	"MergeABranch": {method: http.MethodPost, path: "/repos/{owner}/{repo}/merges", body: []string{"base", "head", "commit_message"}},
+	"MergeABranch": {method: http.MethodPost, path: "/repos/{owner}/{repo}/merges", body: jsonBody{"base", "head", "commit_message"}},
 	// https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10#get-all-requested-reviewers-for-a-pull-request
-	"GetAllRequestedReviewersForAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers"},
+	"GetAllRequestedReviewersForAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers", body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10#request-reviewers-for-a-pull-request
-	"RequestReviewersForAPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers", body: []string{"reviewers", "team_reviewers"}},
+	"RequestReviewersForAPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers", body: jsonBody{"reviewers", "team_reviewers"}},
 	// https://docs.github.com/en/rest/pulls/review-requests?apiVersion=2026-03-10#remove-requested-reviewers-from-a-pull-request
-	"RemoveRequestedReviewersFromAPullRequest": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers", body: []string{"reviewers", "team_reviewers"}},
+	"RemoveRequestedReviewersFromAPullRequest": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers", body: jsonBody{"reviewers", "team_reviewers"}},
 	// https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#list-reviews-for-a-pull-request
-	"ListReviewsForAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews", query: []string{"per_page", "page"}},
+	"ListReviewsForAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#create-a-review-for-a-pull-request
-	"CreateAReviewForAPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews", body: []string{"commit_id", "body", "event", "comments"}},
+	"CreateAReviewForAPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews", body: jsonBody{"commit_id", "body", "event", "comments"}},
 	// https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#get-a-review-for-a-pull-request
-	"GetAReviewForAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}"},
+	"GetAReviewForAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#update-a-review-for-a-pull-request
-	"UpdateAReviewForAPullRequest": {method: http.MethodPut, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", body: []string{"body"}},
+	"UpdateAReviewForAPullRequest": {method: http.MethodPut, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", body: jsonBody{"body"}},
 	// https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#delete-a-pending-review-for-a-pull-request
-	"DeleteAPendingReviewForAPullRequest": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}"},
+	"DeleteAPendingReviewForAPullRequest": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#list-comments-for-a-pull-request-review
-	"ListCommentsForAPullRequestReview": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments", query: []string{"per_page", "page"}},
+	"ListCommentsForAPullRequestReview": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#dismiss-a-review-for-a-pull-request
-	"DismissAReviewForAPullRequest": {method: http.MethodPut, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/dismissals", body: []string{"message", "event"}},
+	"DismissAReviewForAPullRequest": {method: http.MethodPut, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/dismissals", body: jsonBody{"message", "event"}},
 	// https://docs.github.com/en/rest/pulls/reviews?apiVersion=2026-03-10#submit-a-review-for-a-pull-request
-	"SubmitAReviewForAPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/events", body: []string{"body", "event"}},
+	"SubmitAReviewForAPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/events", body: jsonBody{"body", "event"}},
 	// https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#list-review-comments-in-a-repository
-	"ListReviewCommentsInARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/comments", query: []string{"sort", "direction", "since", "per_page", "page"}},
+	"ListReviewCommentsInARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/comments", query: []string{"sort", "direction", "since", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#get-a-review-comment-for-a-pull-request
-	"GetAReviewCommentForAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/comments/{comment_id}"},
+	"GetAReviewCommentForAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/comments/{comment_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#update-a-review-comment-for-a-pull-request
-	"UpdateAReviewCommentForAPullRequest": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/pulls/comments/{comment_id}", body: []string{"body"}},
+	"UpdateAReviewCommentForAPullRequest": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/pulls/comments/{comment_id}", body: jsonBody{"body"}},
 	// https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#delete-a-review-comment-for-a-pull-request
-	"DeleteAReviewCommentForAPullRequest": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/pulls/comments/{comment_id}"},
+	"DeleteAReviewCommentForAPullRequest": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/pulls/comments/{comment_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#list-review-comments-on-a-pull-request
-	"ListReviewCommentsOnAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/comments", query: []string{"sort", "direction", "since", "per_page", "page"}},
+	"ListReviewCommentsOnAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/comments", query: []string{"sort", "direction", "since", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#create-a-review-comment-for-a-pull-request
-	"CreateAReviewCommentForAPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls/{pull_number}/comments", body: []string{"body", "commit_id", "path", "position", "side", "line", "start_line", "start_side", "in_reply_to", "subject_type"}},
+	"CreateAReviewCommentForAPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls/{pull_number}/comments", body: jsonBody{"body", "commit_id", "path", "position", "side", "line", "start_line", "start_side", "in_reply_to", "subject_type"}},
 	// https://docs.github.com/en/rest/pulls/comments?apiVersion=2026-03-10#create-a-reply-for-a-review-comment
-	"CreateAReplyForAReviewComment": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies", body: []string{"body"}},
+	"CreateAReplyForAReviewComment": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies", body: jsonBody{"body"}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-pull-requests
-	"ListPullRequests": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls", query: []string{"state", "head", "base", "sort", "direction", "per_page", "page"}},
+	"ListPullRequests": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls", query: []string{"state", "head", "base", "sort", "direction", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#create-a-pull-request
-	"CreateAPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls", body: []string{"title", "head", "head_repo", "base", "body", "maintainer_can_modify", "draft", "issue"}},
+	"CreateAPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/pulls", body: jsonBody{"title", "head", "head_repo", "base", "body", "maintainer_can_modify", "draft", "issue"}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#get-a-pull-request
-	"GetAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}"},
+	"GetAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}", body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#update-a-pull-request
-	"UpdateAPullRequest": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/pulls/{pull_number}", body: []string{"title", "body", "state", "base", "maintainer_can_modify"}},
+	"UpdateAPullRequest": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/pulls/{pull_number}", body: jsonBody{"title", "body", "state", "base", "maintainer_can_modify"}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-commits-on-a-pull-request
-	"ListCommitsOnAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/commits", query: []string{"per_page", "page"}},
+	"ListCommitsOnAPullRequest": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/commits", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-pull-requests-files
-	"ListPullRequestsFiles": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/files", query: []string{"per_page", "page"}},
+	"ListPullRequestsFiles": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/files", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#check-if-a-pull-request-has-been-merged
-	"CheckIfAPullRequestHasBeenMerged": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/merge"},
+	"CheckIfAPullRequestHasBeenMerged": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/merge", body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#merge-a-pull-request
-	"MergeAPullRequest": {method: http.MethodPut, path: "/repos/{owner}/{repo}/pulls/{pull_number}/merge", body: []string{"commit_title", "commit_message", "sha", "merge_method"}},
+	"MergeAPullRequest": {method: http.MethodPut, path: "/repos/{owner}/{repo}/pulls/{pull_number}/merge", body: jsonBody{"commit_title", "commit_message", "sha", "merge_method"}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#merge-a-pull-request-asynchronously
-	"MergeAPullRequestAsynchronously": {method: http.MethodPut, path: "/repos/{owner}/{repo}/pulls/{pull_number}/merge-async", body: []string{"commit_title", "commit_message", "sha", "merge_method", "merge_action"}},
+	"MergeAPullRequestAsynchronously": {method: http.MethodPut, path: "/repos/{owner}/{repo}/pulls/{pull_number}/merge-async", body: jsonBody{"commit_title", "commit_message", "sha", "merge_method", "merge_action"}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#get-the-result-of-an-asynchronous-merge
-	"GetTheResultOfAnAsynchronousMerge": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/merge-async/{uuid}"},
+	"GetTheResultOfAnAsynchronousMerge": {method: http.MethodGet, path: "/repos/{owner}/{repo}/pulls/{pull_number}/merge-async/{uuid}", body: noBody{}},
 	// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#update-a-pull-request-branch
-	"UpdateAPullRequestBranch": {method: http.MethodPut, path: "/repos/{owner}/{repo}/pulls/{pull_number}/update-branch", body: []string{"expected_head_sha"}},
+	"UpdateAPullRequestBranch": {method: http.MethodPut, path: "/repos/{owner}/{repo}/pulls/{pull_number}/update-branch", body: jsonBody{"expected_head_sha"}},
 	// https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#list-repository-workflows
-	"ListRepositoryWorkflows": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/workflows", query: []string{"per_page", "page"}},
+	"ListRepositoryWorkflows": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/workflows", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#get-a-workflow
-	"GetAWorkflow": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}"},
+	"GetAWorkflow": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#disable-a-workflow
-	"DisableAWorkflow": {method: http.MethodPut, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/disable"},
+	"DisableAWorkflow": {method: http.MethodPut, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/disable", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#create-a-workflow-dispatch-event
-	"CreateAWorkflowDispatchEvent": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches", body: []string{"ref", "inputs"}},
+	"CreateAWorkflowDispatchEvent": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches", body: jsonBody{"ref", "inputs"}},
 	// https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#enable-a-workflow
-	"EnableAWorkflow": {method: http.MethodPut, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable"},
+	"EnableAWorkflow": {method: http.MethodPut, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10#get-workflow-usage
-	"GetWorkflowUsage": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/timing"},
+	"GetWorkflowUsage": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/timing", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#get-a-job-for-a-workflow-run
-	"GetAJobForAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/jobs/{job_id}"},
+	"GetAJobForAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/jobs/{job_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#download-job-logs-for-a-workflow-run
-	"DownloadJobLogsForAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/jobs/{job_id}/logs"},
+	"DownloadJobLogsForAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/jobs/{job_id}/logs", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#list-jobs-for-a-workflow-run-attempt
-	"ListJobsForAWorkflowRunAttempt": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/jobs", query: []string{"per_page", "page"}},
+	"ListJobsForAWorkflowRunAttempt": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/jobs", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2026-03-10#list-jobs-for-a-workflow-run
-	"ListJobsForAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/jobs", query: []string{"filter", "per_page", "page"}},
+	"ListJobsForAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/jobs", query: []string{"filter", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#list-artifacts-for-a-repository
-	"ListArtifactsForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/artifacts", query: []string{"per_page", "page", "name"}},
+	"ListArtifactsForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/artifacts", query: []string{"per_page", "page", "name"}, body: noBody{}},
 	// https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#get-an-artifact
-	"GetAnArtifact": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/artifacts/{artifact_id}"},
+	"GetAnArtifact": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/artifacts/{artifact_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#delete-an-artifact
-	"DeleteAnArtifact": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/actions/artifacts/{artifact_id}"},
+	"DeleteAnArtifact": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/actions/artifacts/{artifact_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#download-an-artifact
-	"DownloadAnArtifact": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}"},
+	"DownloadAnArtifact": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/artifacts?apiVersion=2026-03-10#list-workflow-run-artifacts
-	"ListWorkflowRunArtifacts": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts", query: []string{"per_page", "page", "name", "direction"}},
+	"ListWorkflowRunArtifacts": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts", query: []string{"per_page", "page", "name", "direction"}, body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#re-run-a-job-from-a-workflow-run
-	"ReRunAJobFromAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/jobs/{job_id}/rerun", body: []string{"enable_debug_logging", "enable_debugger"}},
+	"ReRunAJobFromAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/jobs/{job_id}/rerun", body: jsonBody{"enable_debug_logging", "enable_debugger"}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#list-workflow-runs-for-a-repository
-	"ListWorkflowRunsForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs", query: []string{"actor", "branch", "event", "status", "per_page", "page", "created", "exclude_pull_requests", "check_suite_id", "head_sha"}},
+	"ListWorkflowRunsForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs", query: []string{"actor", "branch", "event", "status", "per_page", "page", "created", "exclude_pull_requests", "check_suite_id", "head_sha"}, body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-a-workflow-run
-	"GetAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}", query: []string{"exclude_pull_requests"}},
+	"GetAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}", query: []string{"exclude_pull_requests"}, body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#delete-a-workflow-run
-	"DeleteAWorkflowRun": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/actions/runs/{run_id}"},
+	"DeleteAWorkflowRun": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/actions/runs/{run_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-the-review-history-for-a-workflow-run
-	"GetTheReviewHistoryForAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/approvals"},
+	"GetTheReviewHistoryForAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/approvals", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#approve-a-workflow-run-for-a-fork-pull-request
-	"ApproveAWorkflowRunForAForkPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/approve"},
+	"ApproveAWorkflowRunForAForkPullRequest": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/approve", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-a-workflow-run-attempt
-	"GetAWorkflowRunAttempt": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}", query: []string{"exclude_pull_requests"}},
+	"GetAWorkflowRunAttempt": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}", query: []string{"exclude_pull_requests"}, body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#download-workflow-run-attempt-logs
-	"DownloadWorkflowRunAttemptLogs": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/logs"},
+	"DownloadWorkflowRunAttemptLogs": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/logs", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#cancel-a-workflow-run
-	"CancelAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/cancel"},
+	"CancelAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/cancel", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#review-custom-deployment-protection-rules-for-a-workflow-run
-	"ReviewCustomDeploymentProtectionRulesForAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/deployment_protection_rule"},
+	"ReviewCustomDeploymentProtectionRulesForAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/deployment_protection_rule", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#force-cancel-a-workflow-run
-	"ForceCancelAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel"},
+	"ForceCancelAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#download-workflow-run-logs
-	"DownloadWorkflowRunLogs": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/logs"},
+	"DownloadWorkflowRunLogs": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/logs", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#delete-workflow-run-logs
-	"DeleteWorkflowRunLogs": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/logs"},
+	"DeleteWorkflowRunLogs": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/logs", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-pending-deployments-for-a-workflow-run
-	"GetPendingDeploymentsForAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/pending_deployments"},
+	"GetPendingDeploymentsForAWorkflowRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/pending_deployments", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#review-pending-deployments-for-a-workflow-run
-	"ReviewPendingDeploymentsForAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/pending_deployments", body: []string{"environment_ids", "state", "comment"}},
+	"ReviewPendingDeploymentsForAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/pending_deployments", body: jsonBody{"environment_ids", "state", "comment"}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#re-run-a-workflow
-	"ReRunAWorkflow": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/rerun", body: []string{"enable_debug_logging"}},
+	"ReRunAWorkflow": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/rerun", body: jsonBody{"enable_debug_logging"}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#re-run-failed-jobs-from-a-workflow-run
-	"ReRunFailedJobsFromAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/rerun-failed-jobs", body: []string{"enable_debug_logging"}},
+	"ReRunFailedJobsFromAWorkflowRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/rerun-failed-jobs", body: jsonBody{"enable_debug_logging"}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#get-workflow-run-usage
-	"GetWorkflowRunUsage": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/timing"},
+	"GetWorkflowRunUsage": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/runs/{run_id}/timing", body: noBody{}},
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#list-workflow-runs-for-a-workflow
-	"ListWorkflowRunsForAWorkflow": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs", query: []string{"actor", "branch", "event", "status", "per_page", "page", "created", "exclude_pull_requests", "check_suite_id", "head_sha"}},
+	"ListWorkflowRunsForAWorkflow": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs", query: []string{"actor", "branch", "event", "status", "per_page", "page", "created", "exclude_pull_requests", "check_suite_id", "head_sha"}, body: noBody{}},
 	// https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#create-a-check-run
-	"CreateACheckRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/check-runs", body: []string{"status"}},
+	"CreateACheckRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/check-runs", body: jsonBody{"status"}},
 	// https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#get-a-check-run
-	"GetACheckRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/check-runs/{check_run_id}"},
+	"GetACheckRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/check-runs/{check_run_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#update-a-check-run
-	"UpdateACheckRun": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/check-runs/{check_run_id}", body: []string{"name", "details_url", "external_id", "started_at", "status", "conclusion", "completed_at", "output", "actions"}},
+	"UpdateACheckRun": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/check-runs/{check_run_id}", body: jsonBody{"name", "details_url", "external_id", "started_at", "status", "conclusion", "completed_at", "output", "actions"}},
 	// https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#list-check-run-annotations
-	"ListCheckRunAnnotations": {method: http.MethodGet, path: "/repos/{owner}/{repo}/check-runs/{check_run_id}/annotations", query: []string{"per_page", "page"}},
+	"ListCheckRunAnnotations": {method: http.MethodGet, path: "/repos/{owner}/{repo}/check-runs/{check_run_id}/annotations", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#rerequest-a-check-run
-	"RerequestACheckRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/check-runs/{check_run_id}/rerequest"},
+	"RerequestACheckRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/check-runs/{check_run_id}/rerequest", body: noBody{}},
 	// https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#list-check-runs-in-a-check-suite
-	"ListCheckRunsInACheckSuite": {method: http.MethodGet, path: "/repos/{owner}/{repo}/check-suites/{check_suite_id}/check-runs", query: []string{"check_name", "status", "filter", "per_page", "page"}},
+	"ListCheckRunsInACheckSuite": {method: http.MethodGet, path: "/repos/{owner}/{repo}/check-suites/{check_suite_id}/check-runs", query: []string{"check_name", "status", "filter", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#list-check-runs-for-a-git-reference
-	"ListCheckRunsForAGitReference": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{ref}/check-runs", query: []string{"check_name", "status", "filter", "per_page", "page", "app_id"}},
+	"ListCheckRunsForAGitReference": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{ref}/check-runs", query: []string{"check_name", "status", "filter", "per_page", "page", "app_id"}, body: noBody{}},
 	// https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#create-a-check-suite
-	"CreateACheckSuite": {method: http.MethodPost, path: "/repos/{owner}/{repo}/check-suites", body: []string{"head_sha"}},
+	"CreateACheckSuite": {method: http.MethodPost, path: "/repos/{owner}/{repo}/check-suites", body: jsonBody{"head_sha"}},
 	// https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#update-repository-preferences-for-check-suites
-	"UpdateRepositoryPreferencesForCheckSuites": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/check-suites/preferences", body: []string{"auto_trigger_checks"}},
+	"UpdateRepositoryPreferencesForCheckSuites": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/check-suites/preferences", body: jsonBody{"auto_trigger_checks"}},
 	// https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#get-a-check-suite
-	"GetACheckSuite": {method: http.MethodGet, path: "/repos/{owner}/{repo}/check-suites/{check_suite_id}"},
+	"GetACheckSuite": {method: http.MethodGet, path: "/repos/{owner}/{repo}/check-suites/{check_suite_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#rerequest-a-check-suite
-	"RerequestACheckSuite": {method: http.MethodPost, path: "/repos/{owner}/{repo}/check-suites/{check_suite_id}/rerequest"},
+	"RerequestACheckSuite": {method: http.MethodPost, path: "/repos/{owner}/{repo}/check-suites/{check_suite_id}/rerequest", body: noBody{}},
 	// https://docs.github.com/en/rest/checks/suites?apiVersion=2026-03-10#list-check-suites-for-a-git-reference
-	"ListCheckSuitesForAGitReference": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{ref}/check-suites", query: []string{"app_id", "check_name", "per_page", "page"}},
+	"ListCheckSuitesForAGitReference": {method: http.MethodGet, path: "/repos/{owner}/{repo}/commits/{ref}/check-suites", query: []string{"app_id", "check_name", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#list-issue-comments-for-a-repository
-	"ListIssueCommentsForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues/comments", query: []string{"sort", "direction", "since", "per_page", "page"}},
+	"ListIssueCommentsForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues/comments", query: []string{"sort", "direction", "since", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#get-an-issue-comment
-	"GetAnIssueComment": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues/comments/{comment_id}"},
+	"GetAnIssueComment": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues/comments/{comment_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#update-an-issue-comment
-	"UpdateAnIssueComment": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/issues/comments/{comment_id}", body: []string{"body"}},
+	"UpdateAnIssueComment": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/issues/comments/{comment_id}", body: jsonBody{"body"}},
 	// https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#delete-an-issue-comment
-	"DeleteAnIssueComment": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/issues/comments/{comment_id}"},
+	"DeleteAnIssueComment": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/issues/comments/{comment_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#pin-an-issue-comment
-	"PinAnIssueComment": {method: http.MethodPut, path: "/repos/{owner}/{repo}/issues/comments/{comment_id}/pin"},
+	"PinAnIssueComment": {method: http.MethodPut, path: "/repos/{owner}/{repo}/issues/comments/{comment_id}/pin", body: noBody{}},
 	// https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#unpin-an-issue-comment
-	"UnpinAnIssueComment": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/issues/comments/{comment_id}/pin"},
+	"UnpinAnIssueComment": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/issues/comments/{comment_id}/pin", body: noBody{}},
 	// https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#list-issue-comments
-	"ListIssueComments": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues/{issue_number}/comments", query: []string{"since", "per_page", "page"}},
+	"ListIssueComments": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues/{issue_number}/comments", query: []string{"since", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/issues/comments?apiVersion=2026-03-10#create-an-issue-comment
-	"CreateAnIssueComment": {method: http.MethodPost, path: "/repos/{owner}/{repo}/issues/{issue_number}/comments", body: []string{"body"}},
+	"CreateAnIssueComment": {method: http.MethodPost, path: "/repos/{owner}/{repo}/issues/{issue_number}/comments", body: jsonBody{"body"}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-failed-organization-invitations
-	"ListFailedOrganizationInvitations": {method: http.MethodGet, path: "/orgs/{org}/failed_invitations", query: []string{"per_page", "page"}},
+	"ListFailedOrganizationInvitations": {method: http.MethodGet, path: "/orgs/{org}/failed_invitations", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-pending-organization-invitations
-	"ListPendingOrganizationInvitations": {method: http.MethodGet, path: "/orgs/{org}/invitations", query: []string{"per_page", "page", "role", "invitation_source"}},
+	"ListPendingOrganizationInvitations": {method: http.MethodGet, path: "/orgs/{org}/invitations", query: []string{"per_page", "page", "role", "invitation_source"}, body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#create-an-organization-invitation
-	"CreateAnOrganizationInvitation": {method: http.MethodPost, path: "/orgs/{org}/invitations", body: []string{"invitee_id", "email", "role", "team_ids"}},
+	"CreateAnOrganizationInvitation": {method: http.MethodPost, path: "/orgs/{org}/invitations", body: jsonBody{"invitee_id", "email", "role", "team_ids"}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#cancel-an-organization-invitation
-	"CancelAnOrganizationInvitation": {method: http.MethodDelete, path: "/orgs/{org}/invitations/{invitation_id}"},
+	"CancelAnOrganizationInvitation": {method: http.MethodDelete, path: "/orgs/{org}/invitations/{invitation_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-organization-invitation-teams
-	"ListOrganizationInvitationTeams": {method: http.MethodGet, path: "/orgs/{org}/invitations/{invitation_id}/teams", query: []string{"per_page", "page"}},
+	"ListOrganizationInvitationTeams": {method: http.MethodGet, path: "/orgs/{org}/invitations/{invitation_id}/teams", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-organization-members
-	"ListOrganizationMembers": {method: http.MethodGet, path: "/orgs/{org}/members", query: []string{"filter", "role", "per_page", "page"}},
+	"ListOrganizationMembers": {method: http.MethodGet, path: "/orgs/{org}/members", query: []string{"filter", "role", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#check-organization-membership-for-a-user
-	"CheckOrganizationMembershipForAUser": {method: http.MethodGet, path: "/orgs/{org}/members/{username}"},
+	"CheckOrganizationMembershipForAUser": {method: http.MethodGet, path: "/orgs/{org}/members/{username}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#remove-an-organization-member
-	"RemoveAnOrganizationMember": {method: http.MethodDelete, path: "/orgs/{org}/members/{username}"},
+	"RemoveAnOrganizationMember": {method: http.MethodDelete, path: "/orgs/{org}/members/{username}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#get-organization-membership-for-a-user
-	"GetOrganizationMembershipForAUser": {method: http.MethodGet, path: "/orgs/{org}/memberships/{username}"},
+	"GetOrganizationMembershipForAUser": {method: http.MethodGet, path: "/orgs/{org}/memberships/{username}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#set-organization-membership-for-a-user
-	"SetOrganizationMembershipForAUser": {method: http.MethodPut, path: "/orgs/{org}/memberships/{username}", body: []string{"role"}},
+	"SetOrganizationMembershipForAUser": {method: http.MethodPut, path: "/orgs/{org}/memberships/{username}", body: jsonBody{"role"}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#remove-organization-membership-for-a-user
-	"RemoveOrganizationMembershipForAUser": {method: http.MethodDelete, path: "/orgs/{org}/memberships/{username}"},
+	"RemoveOrganizationMembershipForAUser": {method: http.MethodDelete, path: "/orgs/{org}/memberships/{username}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-public-organization-members
-	"ListPublicOrganizationMembers": {method: http.MethodGet, path: "/orgs/{org}/public_members", query: []string{"per_page", "page"}},
+	"ListPublicOrganizationMembers": {method: http.MethodGet, path: "/orgs/{org}/public_members", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#check-public-organization-membership-for-a-user
-	"CheckPublicOrganizationMembershipForAUser": {method: http.MethodGet, path: "/orgs/{org}/public_members/{username}"},
+	"CheckPublicOrganizationMembershipForAUser": {method: http.MethodGet, path: "/orgs/{org}/public_members/{username}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#set-public-organization-membership-for-the-authenticated-user
-	"SetPublicOrganizationMembershipForTheAuthenticatedUser": {method: http.MethodPut, path: "/orgs/{org}/public_members/{username}"},
+	"SetPublicOrganizationMembershipForTheAuthenticatedUser": {method: http.MethodPut, path: "/orgs/{org}/public_members/{username}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#remove-public-organization-membership-for-the-authenticated-user
-	"RemovePublicOrganizationMembershipForTheAuthenticatedUser": {method: http.MethodDelete, path: "/orgs/{org}/public_members/{username}"},
+	"RemovePublicOrganizationMembershipForTheAuthenticatedUser": {method: http.MethodDelete, path: "/orgs/{org}/public_members/{username}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#list-organization-memberships-for-the-authenticated-user
-	"ListOrganizationMembershipsForTheAuthenticatedUser": {method: http.MethodGet, path: "/user/memberships/orgs", query: []string{"state", "per_page", "page"}},
+	"ListOrganizationMembershipsForTheAuthenticatedUser": {method: http.MethodGet, path: "/user/memberships/orgs", query: []string{"state", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#get-an-organization-membership-for-the-authenticated-user
-	"GetAnOrganizationMembershipForTheAuthenticatedUser": {method: http.MethodGet, path: "/user/memberships/orgs/{org}"},
+	"GetAnOrganizationMembershipForTheAuthenticatedUser": {method: http.MethodGet, path: "/user/memberships/orgs/{org}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/members?apiVersion=2026-03-10#update-an-organization-membership-for-the-authenticated-user
-	"UpdateAnOrganizationMembershipForTheAuthenticatedUser": {method: http.MethodPatch, path: "/user/memberships/orgs/{org}", body: []string{"state"}},
+	"UpdateAnOrganizationMembershipForTheAuthenticatedUser": {method: http.MethodPatch, path: "/user/memberships/orgs/{org}", body: jsonBody{"state"}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-organizations
-	"ListOrganizations": {method: http.MethodGet, path: "/organizations", query: []string{"since", "per_page"}},
+	"ListOrganizations": {method: http.MethodGet, path: "/organizations", query: []string{"since", "per_page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#get-an-organization
-	"GetAnOrganization": {method: http.MethodGet, path: "/orgs/{org}"},
+	"GetAnOrganization": {method: http.MethodGet, path: "/orgs/{org}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#update-an-organization
-	"UpdateAnOrganization": {method: http.MethodPatch, path: "/orgs/{org}", body: []string{"billing_email", "company", "email", "twitter_username", "location", "name", "description", "has_organization_projects", "has_repository_projects", "default_repository_permission", "members_can_create_repositories", "members_can_create_internal_repositories", "members_can_create_private_repositories", "members_can_create_public_repositories", "members_allowed_repository_creation_type", "members_can_create_pages", "members_can_create_public_pages", "members_can_create_private_pages", "members_can_fork_private_repositories", "web_commit_signoff_required", "blog", "advanced_security_enabled_for_new_repositories", "dependabot_alerts_enabled_for_new_repositories", "dependabot_security_updates_enabled_for_new_repositories", "dependency_graph_enabled_for_new_repositories", "secret_scanning_enabled_for_new_repositories", "secret_scanning_push_protection_enabled_for_new_repositories", "secret_scanning_push_protection_custom_link", "deploy_keys_enabled_for_repositories"}},
+	"UpdateAnOrganization": {method: http.MethodPatch, path: "/orgs/{org}", body: jsonBody{"billing_email", "company", "email", "twitter_username", "location", "name", "description", "has_organization_projects", "has_repository_projects", "default_repository_permission", "members_can_create_repositories", "members_can_create_internal_repositories", "members_can_create_private_repositories", "members_can_create_public_repositories", "members_allowed_repository_creation_type", "members_can_create_pages", "members_can_create_public_pages", "members_can_create_private_pages", "members_can_fork_private_repositories", "web_commit_signoff_required", "blog", "advanced_security_enabled_for_new_repositories", "dependabot_alerts_enabled_for_new_repositories", "dependabot_security_updates_enabled_for_new_repositories", "dependency_graph_enabled_for_new_repositories", "secret_scanning_enabled_for_new_repositories", "secret_scanning_push_protection_enabled_for_new_repositories", "secret_scanning_push_protection_custom_link", "deploy_keys_enabled_for_repositories"}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#delete-an-organization
-	"DeleteAnOrganization": {method: http.MethodDelete, path: "/orgs/{org}"},
+	"DeleteAnOrganization": {method: http.MethodDelete, path: "/orgs/{org}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-app-installations-for-an-organization
-	"ListAppInstallationsForAnOrganization": {method: http.MethodGet, path: "/orgs/{org}/installations", query: []string{"per_page", "page"}},
+	"ListAppInstallationsForAnOrganization": {method: http.MethodGet, path: "/orgs/{org}/installations", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#get-immutable-releases-settings-for-an-organization
-	"GetImmutableReleasesSettingsForAnOrganization": {method: http.MethodGet, path: "/orgs/{org}/settings/immutable-releases"},
+	"GetImmutableReleasesSettingsForAnOrganization": {method: http.MethodGet, path: "/orgs/{org}/settings/immutable-releases", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#set-immutable-releases-settings-for-an-organization
-	"SetImmutableReleasesSettingsForAnOrganization": {method: http.MethodPut, path: "/orgs/{org}/settings/immutable-releases", body: []string{"enforced_repositories", "selected_repository_ids"}},
+	"SetImmutableReleasesSettingsForAnOrganization": {method: http.MethodPut, path: "/orgs/{org}/settings/immutable-releases", body: jsonBody{"enforced_repositories", "selected_repository_ids"}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-selected-repositories-for-immutable-releases-enforcement
-	"ListSelectedRepositoriesForImmutableReleasesEnforcement": {method: http.MethodGet, path: "/orgs/{org}/settings/immutable-releases/repositories", query: []string{"page", "per_page"}},
+	"ListSelectedRepositoriesForImmutableReleasesEnforcement": {method: http.MethodGet, path: "/orgs/{org}/settings/immutable-releases/repositories", query: []string{"page", "per_page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#set-selected-repositories-for-immutable-releases-enforcement
-	"SetSelectedRepositoriesForImmutableReleasesEnforcement": {method: http.MethodPut, path: "/orgs/{org}/settings/immutable-releases/repositories", body: []string{"selected_repository_ids"}},
+	"SetSelectedRepositoriesForImmutableReleasesEnforcement": {method: http.MethodPut, path: "/orgs/{org}/settings/immutable-releases/repositories", body: jsonBody{"selected_repository_ids"}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#enable-a-selected-repository-for-immutable-releases-in-an-organization
-	"EnableASelectedRepositoryForImmutableReleasesInAnOrganization": {method: http.MethodPut, path: "/orgs/{org}/settings/immutable-releases/repositories/{repository_id}"},
+	"EnableASelectedRepositoryForImmutableReleasesInAnOrganization": {method: http.MethodPut, path: "/orgs/{org}/settings/immutable-releases/repositories/{repository_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#disable-a-selected-repository-for-immutable-releases-in-an-organization
-	"DisableASelectedRepositoryForImmutableReleasesInAnOrganization": {method: http.MethodDelete, path: "/orgs/{org}/settings/immutable-releases/repositories/{repository_id}"},
+	"DisableASelectedRepositoryForImmutableReleasesInAnOrganization": {method: http.MethodDelete, path: "/orgs/{org}/settings/immutable-releases/repositories/{repository_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#enable-or-disable-a-security-feature-for-an-organization
-	"EnableOrDisableASecurityFeatureForAnOrganization": {method: http.MethodPost, path: "/orgs/{org}/{security_product}/{enablement}", body: []string{"query_suite"}},
+	"EnableOrDisableASecurityFeatureForAnOrganization": {method: http.MethodPost, path: "/orgs/{org}/{security_product}/{enablement}", body: jsonBody{"query_suite"}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-organizations-for-the-authenticated-user
-	"ListOrganizationsForTheAuthenticatedUser": {method: http.MethodGet, path: "/user/orgs", query: []string{"per_page", "page"}},
+	"ListOrganizationsForTheAuthenticatedUser": {method: http.MethodGet, path: "/user/orgs", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/orgs/orgs?apiVersion=2026-03-10#list-organizations-for-a-user
-	"ListOrganizationsForAUser": {method: http.MethodGet, path: "/users/{username}/orgs", query: []string{"per_page", "page"}},
+	"ListOrganizationsForAUser": {method: http.MethodGet, path: "/users/{username}/orgs", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-issues-assigned-to-the-authenticated-user
-	"ListIssuesAssignedToTheAuthenticatedUser": {method: http.MethodGet, path: "/issues", query: []string{"filter", "state", "labels", "sort", "direction", "since", "collab", "orgs", "owned", "pulls", "per_page", "page"}},
+	"ListIssuesAssignedToTheAuthenticatedUser": {method: http.MethodGet, path: "/issues", query: []string{"filter", "state", "labels", "sort", "direction", "since", "collab", "orgs", "owned", "pulls", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-organization-issues-assigned-to-the-authenticated-user
-	"ListOrganizationIssuesAssignedToTheAuthenticatedUser": {method: http.MethodGet, path: "/orgs/{org}/issues", query: []string{"filter", "state", "labels", "type", "sort", "direction", "since", "per_page", "page"}},
+	"ListOrganizationIssuesAssignedToTheAuthenticatedUser": {method: http.MethodGet, path: "/orgs/{org}/issues", query: []string{"filter", "state", "labels", "type", "sort", "direction", "since", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-repository-issues
-	"ListRepositoryIssues": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues", query: []string{"milestone", "state", "assignee", "type", "creator", "mentioned", "issue_field_values", "labels", "sort", "direction", "since", "per_page", "page"}},
+	"ListRepositoryIssues": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues", query: []string{"milestone", "state", "assignee", "type", "creator", "mentioned", "issue_field_values", "labels", "sort", "direction", "since", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#create-an-issue
-	"CreateAnIssue": {method: http.MethodPost, path: "/repos/{owner}/{repo}/issues", body: []string{"title", "body", "milestone", "labels", "assignees", "issue_field_values", "type", "parent_issue_id"}},
+	"CreateAnIssue": {method: http.MethodPost, path: "/repos/{owner}/{repo}/issues", body: jsonBody{"title", "body", "milestone", "labels", "assignees", "issue_field_values", "type", "parent_issue_id"}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#get-an-issue
-	"GetAnIssue": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues/{issue_number}"},
+	"GetAnIssue": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues/{issue_number}", body: noBody{}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#update-an-issue
-	"UpdateAnIssue": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/issues/{issue_number}", body: []string{"title", "body", "state", "state_reason", "duplicate_issue_id", "milestone", "labels", "assignees", "issue_field_values", "type"}},
+	"UpdateAnIssue": {method: http.MethodPatch, path: "/repos/{owner}/{repo}/issues/{issue_number}", body: jsonBody{"title", "body", "state", "state_reason", "duplicate_issue_id", "milestone", "labels", "assignees", "issue_field_values", "type"}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#lock-an-issue
-	"LockAnIssue": {method: http.MethodPut, path: "/repos/{owner}/{repo}/issues/{issue_number}/lock", body: []string{"lock_reason"}},
+	"LockAnIssue": {method: http.MethodPut, path: "/repos/{owner}/{repo}/issues/{issue_number}/lock", body: jsonBody{"lock_reason"}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#unlock-an-issue
-	"UnlockAnIssue": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/issues/{issue_number}/lock"},
+	"UnlockAnIssue": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/issues/{issue_number}/lock", body: noBody{}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-issue-suggestions
-	"ListIssueSuggestions": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues/{issue_number}/suggestions", query: []string{"state", "action", "per_page", "page"}},
+	"ListIssueSuggestions": {method: http.MethodGet, path: "/repos/{owner}/{repo}/issues/{issue_number}/suggestions", query: []string{"state", "action", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#approve-an-issue-suggestion
-	"ApproveAnIssueSuggestion": {method: http.MethodPost, path: "/repos/{owner}/{repo}/issues/{issue_number}/suggestions/{suggestion_id}/approve"},
+	"ApproveAnIssueSuggestion": {method: http.MethodPost, path: "/repos/{owner}/{repo}/issues/{issue_number}/suggestions/{suggestion_id}/approve", body: noBody{}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#dismiss-an-issue-suggestion
-	"DismissAnIssueSuggestion": {method: http.MethodPost, path: "/repos/{owner}/{repo}/issues/{issue_number}/suggestions/{suggestion_id}/dismiss"},
+	"DismissAnIssueSuggestion": {method: http.MethodPost, path: "/repos/{owner}/{repo}/issues/{issue_number}/suggestions/{suggestion_id}/dismiss", body: noBody{}},
 	// https://docs.github.com/en/rest/issues/issues?apiVersion=2026-03-10#list-user-account-issues-assigned-to-the-authenticated-user
-	"ListUserAccountIssuesAssignedToTheAuthenticatedUser": {method: http.MethodGet, path: "/user/issues", query: []string{"filter", "state", "labels", "sort", "direction", "since", "per_page", "page"}},
+	"ListUserAccountIssuesAssignedToTheAuthenticatedUser": {method: http.MethodGet, path: "/user/issues", query: []string{"filter", "state", "labels", "sort", "direction", "since", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-organization-repositories
-	"ListOrganizationRepositories": {method: http.MethodGet, path: "/orgs/{org}/repos", query: []string{"type", "sort", "direction", "per_page", "page"}},
+	"ListOrganizationRepositories": {method: http.MethodGet, path: "/orgs/{org}/repos", query: []string{"type", "sort", "direction", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-an-organization-repository
-	"CreateAnOrganizationRepository": {method: http.MethodPost, path: "/orgs/{org}/repos", body: []string{"name", "description", "homepage", "private", "visibility", "has_issues", "has_projects", "has_wiki", "has_downloads", "is_template", "team_id", "auto_init", "gitignore_template", "license_template", "allow_squash_merge", "allow_merge_commit", "allow_rebase_merge", "allow_auto_merge", "delete_branch_on_merge", "use_squash_pr_title_as_default", "squash_merge_commit_title", "squash_merge_commit_message", "merge_commit_title", "merge_commit_message", "custom_properties"}},
+	"CreateAnOrganizationRepository": {method: http.MethodPost, path: "/orgs/{org}/repos", body: jsonBody{"name", "description", "homepage", "private", "visibility", "has_issues", "has_projects", "has_wiki", "has_downloads", "is_template", "team_id", "auto_init", "gitignore_template", "license_template", "allow_squash_merge", "allow_merge_commit", "allow_rebase_merge", "allow_auto_merge", "delete_branch_on_merge", "use_squash_pr_title_as_default", "squash_merge_commit_title", "squash_merge_commit_message", "merge_commit_title", "merge_commit_message", "custom_properties"}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#get-a-repository
-	"GetARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}"},
+	"GetARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#update-a-repository
-	"UpdateARepository": {method: http.MethodPatch, path: "/repos/{owner}/{repo}", body: []string{"name", "description", "homepage", "private", "visibility", "security_and_analysis", "has_issues", "has_projects", "has_wiki", "has_pull_requests", "pull_request_creation_policy", "is_template", "default_branch", "allow_squash_merge", "allow_merge_commit", "allow_rebase_merge", "allow_auto_merge", "delete_branch_on_merge", "allow_update_branch", "use_squash_pr_title_as_default", "squash_merge_commit_title", "squash_merge_commit_message", "merge_commit_title", "merge_commit_message", "archived", "allow_forking", "web_commit_signoff_required"}},
+	"UpdateARepository": {method: http.MethodPatch, path: "/repos/{owner}/{repo}", body: jsonBody{"name", "description", "homepage", "private", "visibility", "security_and_analysis", "has_issues", "has_projects", "has_wiki", "has_pull_requests", "pull_request_creation_policy", "is_template", "default_branch", "allow_squash_merge", "allow_merge_commit", "allow_rebase_merge", "allow_auto_merge", "delete_branch_on_merge", "allow_update_branch", "use_squash_pr_title_as_default", "squash_merge_commit_title", "squash_merge_commit_message", "merge_commit_title", "merge_commit_message", "archived", "allow_forking", "web_commit_signoff_required"}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#delete-a-repository
-	"DeleteARepository": {method: http.MethodDelete, path: "/repos/{owner}/{repo}"},
+	"DeleteARepository": {method: http.MethodDelete, path: "/repos/{owner}/{repo}", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-activities
-	"ListRepositoryActivities": {method: http.MethodGet, path: "/repos/{owner}/{repo}/activity", query: []string{"direction", "per_page", "before", "after", "ref", "actor", "time_period", "activity_type"}},
+	"ListRepositoryActivities": {method: http.MethodGet, path: "/repos/{owner}/{repo}/activity", query: []string{"direction", "per_page", "before", "after", "ref", "actor", "time_period", "activity_type"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-dependabot-security-updates-are-enabled-for-a-repository
-	"CheckIfDependabotSecurityUpdatesAreEnabledForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/automated-security-fixes"},
+	"CheckIfDependabotSecurityUpdatesAreEnabledForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/automated-security-fixes", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-dependabot-security-updates
-	"EnableDependabotSecurityUpdates": {method: http.MethodPut, path: "/repos/{owner}/{repo}/automated-security-fixes"},
+	"EnableDependabotSecurityUpdates": {method: http.MethodPut, path: "/repos/{owner}/{repo}/automated-security-fixes", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-dependabot-security-updates
-	"DisableDependabotSecurityUpdates": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/automated-security-fixes"},
+	"DisableDependabotSecurityUpdates": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/automated-security-fixes", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-codeowners-errors
-	"ListCODEOWNERSErrors": {method: http.MethodGet, path: "/repos/{owner}/{repo}/codeowners/errors", query: []string{"ref"}},
+	"ListCODEOWNERSErrors": {method: http.MethodGet, path: "/repos/{owner}/{repo}/codeowners/errors", query: []string{"ref"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-contributors
-	"ListRepositoryContributors": {method: http.MethodGet, path: "/repos/{owner}/{repo}/contributors", query: []string{"anon", "per_page", "page"}},
+	"ListRepositoryContributors": {method: http.MethodGet, path: "/repos/{owner}/{repo}/contributors", query: []string{"anon", "per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-a-repository-dispatch-event
-	"CreateARepositoryDispatchEvent": {method: http.MethodPost, path: "/repos/{owner}/{repo}/dispatches", body: []string{"event_type", "client_payload"}},
+	"CreateARepositoryDispatchEvent": {method: http.MethodPost, path: "/repos/{owner}/{repo}/dispatches", body: jsonBody{"event_type", "client_payload"}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#get-the-hash-algorithm-for-a-repository
-	"GetTheHashAlgorithmForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/hash-algorithm"},
+	"GetTheHashAlgorithmForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/hash-algorithm", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-immutable-releases-are-enabled-for-a-repository
-	"CheckIfImmutableReleasesAreEnabledForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/immutable-releases"},
+	"CheckIfImmutableReleasesAreEnabledForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/immutable-releases", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-immutable-releases
-	"EnableImmutableReleases": {method: http.MethodPut, path: "/repos/{owner}/{repo}/immutable-releases"},
+	"EnableImmutableReleases": {method: http.MethodPut, path: "/repos/{owner}/{repo}/immutable-releases", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-immutable-releases
-	"DisableImmutableReleases": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/immutable-releases"},
+	"DisableImmutableReleases": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/immutable-releases", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-languages
-	"ListRepositoryLanguages": {method: http.MethodGet, path: "/repos/{owner}/{repo}/languages"},
+	"ListRepositoryLanguages": {method: http.MethodGet, path: "/repos/{owner}/{repo}/languages", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-private-vulnerability-reporting-is-enabled-for-a-repository
-	"CheckIfPrivateVulnerabilityReportingIsEnabledForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/private-vulnerability-reporting"},
+	"CheckIfPrivateVulnerabilityReportingIsEnabledForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/private-vulnerability-reporting", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-private-vulnerability-reporting-for-a-repository
-	"EnablePrivateVulnerabilityReportingForARepository": {method: http.MethodPut, path: "/repos/{owner}/{repo}/private-vulnerability-reporting"},
+	"EnablePrivateVulnerabilityReportingForARepository": {method: http.MethodPut, path: "/repos/{owner}/{repo}/private-vulnerability-reporting", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-private-vulnerability-reporting-for-a-repository
-	"DisablePrivateVulnerabilityReportingForARepository": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/private-vulnerability-reporting"},
+	"DisablePrivateVulnerabilityReportingForARepository": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/private-vulnerability-reporting", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-tags
-	"ListRepositoryTags": {method: http.MethodGet, path: "/repos/{owner}/{repo}/tags", query: []string{"per_page", "page"}},
+	"ListRepositoryTags": {method: http.MethodGet, path: "/repos/{owner}/{repo}/tags", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-teams
-	"ListRepositoryTeams": {method: http.MethodGet, path: "/repos/{owner}/{repo}/teams", query: []string{"per_page", "page"}},
+	"ListRepositoryTeams": {method: http.MethodGet, path: "/repos/{owner}/{repo}/teams", query: []string{"per_page", "page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#get-all-repository-topics
-	"GetAllRepositoryTopics": {method: http.MethodGet, path: "/repos/{owner}/{repo}/topics", query: []string{"page", "per_page"}},
+	"GetAllRepositoryTopics": {method: http.MethodGet, path: "/repos/{owner}/{repo}/topics", query: []string{"page", "per_page"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#replace-all-repository-topics
-	"ReplaceAllRepositoryTopics": {method: http.MethodPut, path: "/repos/{owner}/{repo}/topics", body: []string{"names"}},
+	"ReplaceAllRepositoryTopics": {method: http.MethodPut, path: "/repos/{owner}/{repo}/topics", body: jsonBody{"names"}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#transfer-a-repository
-	"TransferARepository": {method: http.MethodPost, path: "/repos/{owner}/{repo}/transfer", body: []string{"new_owner", "new_name", "team_ids"}},
+	"TransferARepository": {method: http.MethodPost, path: "/repos/{owner}/{repo}/transfer", body: jsonBody{"new_owner", "new_name", "team_ids"}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#check-if-vulnerability-alerts-are-enabled-for-a-repository
-	"CheckIfVulnerabilityAlertsAreEnabledForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/vulnerability-alerts"},
+	"CheckIfVulnerabilityAlertsAreEnabledForARepository": {method: http.MethodGet, path: "/repos/{owner}/{repo}/vulnerability-alerts", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#enable-vulnerability-alerts
-	"EnableVulnerabilityAlerts": {method: http.MethodPut, path: "/repos/{owner}/{repo}/vulnerability-alerts"},
+	"EnableVulnerabilityAlerts": {method: http.MethodPut, path: "/repos/{owner}/{repo}/vulnerability-alerts", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#disable-vulnerability-alerts
-	"DisableVulnerabilityAlerts": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/vulnerability-alerts"},
+	"DisableVulnerabilityAlerts": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/vulnerability-alerts", body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-a-repository-using-a-template
-	"CreateARepositoryUsingATemplate": {method: http.MethodPost, path: "/repos/{template_owner}/{template_repo}/generate", body: []string{"owner", "name", "description", "include_all_branches", "private"}},
+	"CreateARepositoryUsingATemplate": {method: http.MethodPost, path: "/repos/{template_owner}/{template_repo}/generate", body: jsonBody{"owner", "name", "description", "include_all_branches", "private"}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-public-repositories
-	"ListPublicRepositories": {method: http.MethodGet, path: "/repositories", query: []string{"since"}},
+	"ListPublicRepositories": {method: http.MethodGet, path: "/repositories", query: []string{"since"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repositories-for-the-authenticated-user
-	"ListRepositoriesForTheAuthenticatedUser": {method: http.MethodGet, path: "/user/repos", query: []string{"visibility", "affiliation", "type", "sort", "direction", "per_page", "page", "since", "before"}},
+	"ListRepositoriesForTheAuthenticatedUser": {method: http.MethodGet, path: "/user/repos", query: []string{"visibility", "affiliation", "type", "sort", "direction", "per_page", "page", "since", "before"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#create-a-repository-for-the-authenticated-user
-	"CreateARepositoryForTheAuthenticatedUser": {method: http.MethodPost, path: "/user/repos", body: []string{"name", "description", "homepage", "private", "has_issues", "has_projects", "has_wiki", "has_discussions", "team_id", "auto_init", "gitignore_template", "license_template", "allow_squash_merge", "allow_merge_commit", "allow_rebase_merge", "allow_auto_merge", "delete_branch_on_merge", "squash_merge_commit_title", "squash_merge_commit_message", "merge_commit_title", "merge_commit_message", "has_downloads", "is_template"}},
+	"CreateARepositoryForTheAuthenticatedUser": {method: http.MethodPost, path: "/user/repos", body: jsonBody{"name", "description", "homepage", "private", "has_issues", "has_projects", "has_wiki", "has_discussions", "team_id", "auto_init", "gitignore_template", "license_template", "allow_squash_merge", "allow_merge_commit", "allow_rebase_merge", "allow_auto_merge", "delete_branch_on_merge", "squash_merge_commit_title", "squash_merge_commit_message", "merge_commit_title", "merge_commit_message", "has_downloads", "is_template"}},
 	// https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repositories-for-a-user
-	"ListRepositoriesForAUser": {method: http.MethodGet, path: "/users/{username}/repos", query: []string{"type", "sort", "direction", "per_page", "page"}},
+	"ListRepositoriesForAUser": {method: http.MethodGet, path: "/users/{username}/repos", query: []string{"type", "sort", "direction", "per_page", "page"}, body: noBody{}},
 
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-repository-content
-	"GetRepositoryContent": {method: http.MethodGet, path: "/repos/{owner}/{repo}/contents/{path}", query: []string{"ref"}, slashed: []string{"path"}},
+	"GetRepositoryContent": {method: http.MethodGet, path: "/repos/{owner}/{repo}/contents/{path}", query: []string{"ref"}, slashed: []string{"path"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme
-	"GetARepositoryREADME": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme", query: []string{"ref"}},
+	"GetARepositoryREADME": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme", query: []string{"ref"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#get-a-repository-readme-for-a-directory
-	"GetARepositoryREADMEForADirectory": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme/{dir}", query: []string{"ref"}, slashed: []string{"dir"}},
+	"GetARepositoryREADMEForADirectory": {method: http.MethodGet, path: "/repos/{owner}/{repo}/readme/{dir}", query: []string{"ref"}, slashed: []string{"dir"}, body: noBody{}},
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#create-or-update-file-contents
-	"CreateOrUpdateFileContents": {method: http.MethodPut, path: "/repos/{owner}/{repo}/contents/{path}", body: []string{"message", "content", "sha", "branch"}, slashed: []string{"path"}},
+	"CreateOrUpdateFileContents": {method: http.MethodPut, path: "/repos/{owner}/{repo}/contents/{path}", body: jsonBody{"message", "content", "sha", "branch"}, slashed: []string{"path"}},
 	// https://docs.github.com/en/rest/repos/contents?apiVersion=2026-03-10#delete-a-file
-	"DeleteAFile": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/contents/{path}", body: []string{"message", "sha", "branch"}, slashed: []string{"path"}},
+	"DeleteAFile": {method: http.MethodDelete, path: "/repos/{owner}/{repo}/contents/{path}", body: jsonBody{"message", "sha", "branch"}, slashed: []string{"path"}},
 
 	// https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#create-a-reference
-	"CreateAReference": {method: http.MethodPost, path: "/repos/{owner}/{repo}/git/refs", body: []string{"ref", "sha"}},
+	"CreateAReference": {method: http.MethodPost, path: "/repos/{owner}/{repo}/git/refs", body: jsonBody{"ref", "sha"}},
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#list-deliveries-for-an-app-webhook
-	"ListDeliveriesForAnAppWebhook": {method: http.MethodGet, path: "/app/hook/deliveries", query: []string{"per_page", "cursor", "status"}, asApp: true},
+	"ListDeliveriesForAnAppWebhook": {method: http.MethodGet, path: "/app/hook/deliveries", query: []string{"per_page", "cursor", "status"}, asApp: true, body: noBody{}},
 	// https://docs.github.com/en/rest/apps/webhooks?apiVersion=2026-03-10#redeliver-a-delivery-for-an-app-webhook
-	"RedeliverADeliveryForAnAppWebhook": {method: http.MethodPost, path: "/app/hook/deliveries/{delivery_id}/attempts", asApp: true},
+	"RedeliverADeliveryForAnAppWebhook": {method: http.MethodPost, path: "/app/hook/deliveries/{delivery_id}/attempts", asApp: true, body: noBody{}},
 
 	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#get-a-repository-installation-for-the-authenticated-app
-	"GetARepositoryInstallationForTheAuthenticatedApp": {method: http.MethodGet, path: "/repos/{owner}/{repo}/installation", asApp: true},
+	"GetARepositoryInstallationForTheAuthenticatedApp": {method: http.MethodGet, path: "/repos/{owner}/{repo}/installation", asApp: true, body: noBody{}},
 	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#create-an-installation-access-token-for-an-app
-	"CreateAnInstallationAccessTokenForAnApp": {method: http.MethodPost, path: "/app/installations/{installation_id}/access_tokens", body: []string{"repositories", "repository_ids", "permissions"}, asApp: true, mints: true},
+	"CreateAnInstallationAccessTokenForAnApp": {method: http.MethodPost, path: "/app/installations/{installation_id}/access_tokens", body: jsonBody{"repositories", "repository_ids", "permissions"}, asApp: true, mints: true},
 	// https://docs.github.com/en/rest/apps/apps?apiVersion=2026-03-10#list-installations-for-the-authenticated-app
-	"ListInstallationsForTheAuthenticatedApp": {method: http.MethodGet, path: "/app/installations", query: []string{"per_page", "page", "since", "outdated"}, asApp: true},
+	"ListInstallationsForTheAuthenticatedApp": {method: http.MethodGet, path: "/app/installations", query: []string{"per_page", "page", "since", "outdated"}, asApp: true, body: noBody{}},
 
 	// https://docs.github.com/en/rest/apps/installations?apiVersion=2026-03-10#list-repositories-accessible-to-the-app-installation
-	"ListRepositoriesAccessibleToTheAppInstallation": {method: http.MethodGet, path: "/installation/repositories", query: []string{"per_page", "page"}},
+	"ListRepositoriesAccessibleToTheAppInstallation": {method: http.MethodGet, path: "/installation/repositories", query: []string{"per_page", "page"}, body: noBody{}},
 }
 
 func (s *GitHubServer) GetTheCombinedStatusForASpecificReference(ctx context.Context, req *protocol.GitHubGetTheCombinedStatusForASpecificReferenceRequest) (*protocol.GitHubGetTheCombinedStatusForASpecificReferenceResponse, error) {
