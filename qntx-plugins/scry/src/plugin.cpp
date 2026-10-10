@@ -62,6 +62,7 @@ grpc::Status ScryPlugin::Metadata(grpc::ServerContext* ctx,
                                        protocol::MetadataResponse* resp) {
     resp->set_name("scry");
     resp->set_version(PLUGIN_VERSION);
+    resp->set_qntx_version(">= 0.1.0");
     resp->set_description("Local LLM inference via llama.cpp with Metal acceleration");
     resp->set_author("teranos");
     resp->set_license("MIT");

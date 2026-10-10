@@ -40,7 +40,7 @@ func newMockPlugin(name string) *mockPlugin {
 		metadata: Metadata{
 			Name:        name,
 			Version:     "1.0.0",
-			QNTXVersion: "",
+			QNTXVersion: ">= 0.1.0",
 			Description: fmt.Sprintf("Mock %s plugin", name),
 			Author:      "Test",
 			License:     "MIT",
@@ -125,13 +125,14 @@ func TestRegistry_Register(t *testing.T) {
 		assert.Contains(t, err.Error(), "already registered")
 	})
 
-	t.Run("version compatibility - no constraint", func(t *testing.T) {
+	t.Run("version compatibility - no constraint is refused", func(t *testing.T) {
 		registry := NewRegistry("2.5.3", testLogger(t))
 		plugin := newMockPlugin("test")
-		plugin.metadata.QNTXVersion = "" // No constraint
+		plugin.metadata.QNTXVersion = ""
 
 		err := registry.Register(plugin)
-		assert.NoError(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "QNTX version constraint of plugin test names nothing")
 	})
 
 	t.Run("version compatibility - valid constraint", func(t *testing.T) {
@@ -409,7 +410,13 @@ func TestRegistry_validateVersion(t *testing.T) {
 			name:        "no constraint",
 			qntxVersion: "1.0.0",
 			constraint:  "",
-			wantErr:     false,
+			wantErr:     true,
+		},
+		{
+			name:        "no constraint on a development build",
+			qntxVersion: "dev",
+			constraint:  "",
+			wantErr:     true,
 		},
 		{
 			name:        "exact match",

@@ -50,7 +50,7 @@ func pluginServingServer(t *testing.T, name string) (*QNTXServer, map[auth.Level
 		tokens, testUsers(t), false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 
-	registry := plugin.NewRegistry("test-version", logger)
+	registry := plugin.NewRegistry("0.1.0", logger)
 	registry.PreRegister(name)
 	require.NoError(t, registry.Register(&fakePlugin{name: name}))
 	registry.MarkReady(name)
@@ -122,7 +122,7 @@ type fakePlugin struct {
 }
 
 func (p *fakePlugin) Metadata() plugin.Metadata {
-	return plugin.Metadata{Name: p.name, Version: "0.0.0"}
+	return plugin.Metadata{Name: p.name, Version: "0.0.0", QNTXVersion: ">= 0.0.0"}
 }
 
 func (p *fakePlugin) Initialize(context.Context, plugin.ServiceRegistry) error { return nil }

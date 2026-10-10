@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -382,11 +383,20 @@ func (r *Registry) GetError(name string) (string, bool) {
 	return errMsg, ok
 }
 
-// validateVersion checks if plugin version is compatible with QNTX version
+// validateVersion checks if plugin version is compatible with QNTX version.
+// A plugin that states no constraint is refused: no constraint is not every
+// version.
 func (r *Registry) validateVersion(metadata Metadata) error {
-	if metadata.QNTXVersion == "" {
-		// No version constraint specified
-		return nil
+	stated, err := named.TextOf("the QNTX version constraint of plugin "+metadata.Name, metadata.QNTXVersion)
+	if err != nil {
+		return errors.WithHint(err, "the plugin's metadata must state the QNTX versions it runs on, e.g. \">= 0.1.0\"")
+	}
+
+	// Parse version constraint
+	constraint, err := semver.NewConstraint(stated.String())
+	if err != nil {
+		wrappedErr := errors.Wrapf(err, "invalid version constraint %s", stated)
+		return errors.WithHint(wrappedErr, "plugin specifies invalid version constraint - contact plugin author")
 	}
 
 	// Allow "dev" version without validation (development builds)
@@ -399,13 +409,6 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 	qntxVer, err := semver.NewVersion(r.version)
 	if err != nil {
 		return errors.Wrapf(err, "invalid QNTX version %s", r.version)
-	}
-
-	// Parse version constraint
-	constraint, err := semver.NewConstraint(metadata.QNTXVersion)
-	if err != nil {
-		wrappedErr := errors.Wrapf(err, "invalid version constraint %s", metadata.QNTXVersion)
-		return errors.WithHint(wrappedErr, "plugin specifies invalid version constraint - contact plugin author")
 	}
 
 	// Check compatibility

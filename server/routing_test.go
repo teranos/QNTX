@@ -16,7 +16,7 @@ func TestSetupHTTPRoutes_RegistersAllPlugins(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 
 	// Create test registry with multiple plugins
-	registry := plugin.NewRegistry("test-version", logger)
+	registry := plugin.NewRegistry("0.1.0", logger)
 
 	// Create minimal server with plugin registry
 	srv := &QNTXServer{
@@ -83,7 +83,7 @@ func TestBodyPreservation_CloneDoesNotConsumeBody(t *testing.T) {
 
 func TestRegisterPluginMux_HotSwapRegistersRoutes(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := plugin.NewRegistry("test-version", logger)
+	registry := plugin.NewRegistry("0.1.0", logger)
 
 	srv := &QNTXServer{
 		pluginRegistry: registry,
