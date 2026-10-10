@@ -87,7 +87,7 @@ type PromptExecuteResponse struct {
 // forwardToProviderPlugin re-encodes the request and forwards it to the named plugin's
 // prompt handler. Returns true if forwarded, false if the provider is local or unknown.
 func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Request, providerName string, body any, endpoint string) bool {
-	if router := s.servicesManager.GetLLMRouter(); router != nil && router.HasProvider(providerName) {
+	if router, err := s.servicesManager.GetLLMRouter(); err == nil && router.HasProvider(providerName) {
 		return false
 	}
 	if !s.pluginRegistry.IsReady(providerName) {
@@ -167,7 +167,11 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	aliasResolver := alias.NewResolver(aliasStore)
 
 	// Create AI client based on request or config
-	client := s.createPromptAIClient(providerName, req.Model)
+	client, err := s.createPromptAIClient(providerName, req.Model)
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "No LLM router", http.StatusServiceUnavailable)
+		return
+	}
 
 	// Execute the prompt using one-shot mode
 	promptResults, err := prompt.ExecuteOneShot(
@@ -207,7 +211,7 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 }
 
 // createPromptAIClient creates an AI client for prompt execution
-func (s *QNTXServer) createPromptAIClient(providerName, model string) provider.AIClient {
+func (s *QNTXServer) createPromptAIClient(providerName, model string) (provider.AIClient, error) {
 	return s.createAIClient(providerName, model, "prompt-execute")
 }
 
@@ -261,7 +265,11 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		modelName = doc.Metadata.Model
 	}
 
-	client := s.createAIClient(providerName, modelName, "prompt-direct")
+	client, err := s.createAIClient(providerName, modelName, "prompt-direct")
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "No LLM router", http.StatusServiceUnavailable)
+		return
+	}
 
 	chatReq := s.buildDirectChatRequest(r.Context(), req, promptText, modelName, doc)
 
@@ -701,10 +709,14 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 	respond(w, s.logger, http.StatusCreated, saved)
 }
 
-// createAIClient creates a gRPC-backed AI client for the named provider.
-func (s *QNTXServer) createAIClient(providerName, model, operationType string) provider.AIClient {
-	router := s.servicesManager.GetLLMRouter()
-	return provider.NewGRPCLLMClient(router, providerName)
+// createAIClient creates a gRPC-backed AI client for the named provider, or
+// says why the node has no LLM router to reach it through.
+func (s *QNTXServer) createAIClient(providerName, model, operationType string) (provider.AIClient, error) {
+	router, err := s.servicesManager.GetLLMRouter()
+	if err != nil {
+		return nil, errors.Wrapf(err, "no LLM router to reach provider %s for %s", providerName, operationType)
+	}
+	return provider.NewGRPCLLMClient(router, providerName), nil
 }
 
 // HandlePrompt routes prompt-related requests

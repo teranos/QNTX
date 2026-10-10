@@ -45,7 +45,7 @@ type ServicesManager struct {
 	openRun            atomic.Pointer[OpenRun]
 	fileServiceServer  *grpc.Server
 	llmServer          *grpc.Server
-	llmRouter          *services.LLMServer // Exposed for provider registration after plugin init
+	llm                routing[*services.LLMServer]
 	llmConfig          config.LLMConfig
 	embeddingServer    *grpc.Server
 	embeddingRouter    *services.EmbeddingServer // Exposed for late backend registration
@@ -54,7 +54,7 @@ type ServicesManager struct {
 	groundServer       *grpc.Server
 	groundDBPath       string
 	searchServer       *grpc.Server
-	searchRouter       *services.SearchServer // Exposed for provider registration after plugin init
+	search             routing[*services.SearchServer]
 	fetchServer        *grpc.Server
 	fetchSrv           *services.FetchServer // for version resolver injection
 	fetchCfg           config.FetchConfig
@@ -93,6 +93,13 @@ func (m *ServicesManager) noteDegraded(service string, err error) {
 	m.degraded[service] = err.Error()
 }
 
+// routing is a router providers register with once their plugin is up, or why
+// the node runs without it.
+type routing[R any] struct {
+	router R
+	why    error
+}
+
 // NewServicesManager creates a new services manager. node is the node's DID.
 // Until the node hands over how to mint a run's store token, minting one is
 // refused.
@@ -103,6 +110,8 @@ func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, no
 		node:      node,
 		logger:    logger,
 		degraded:  map[string]string{},
+		llm:       routing[*services.LLMServer]{why: errors.New("the LLM service has not started")},
+		search:    routing[*services.SearchServer]{why: errors.New("the search service has not started")},
 	}
 	notYet := OpenRun(func(_, namespace string) (string, func(), error) {
 		return "", nil, errors.Newf("the node has not handed over how to mint a store token for namespace %s yet", namespace)
@@ -159,6 +168,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	llmAddr, err := m.startLLMService(ctx, store)
 	if err != nil {
 		m.noteDegraded("llm", err)
+		m.llm.why = errors.Wrap(err, "the LLM service did not start")
 		llmAddr = ""
 	}
 
@@ -187,6 +197,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	searchAddr, err := m.startSearchService(ctx)
 	if err != nil {
 		m.noteDegraded("search", err)
+		m.search.why = errors.Wrap(err, "the search service did not start")
 		searchAddr = ""
 	}
 
@@ -338,9 +349,10 @@ func (m *ServicesManager) startLLMService(ctx context.Context, store ats.Attesta
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.llmRouter = services.NewLLMServer(m.llmConfig, store, m.logger)
+	router := services.NewLLMServer(m.llmConfig, store, m.logger)
+	m.llm = routing[*services.LLMServer]{router: router}
 	m.llmServer = grpc.NewServer()
-	protocol.RegisterLLMServiceServer(m.llmServer, m.llmRouter)
+	protocol.RegisterLLMServiceServer(m.llmServer, router)
 
 	m.serve(ctx, "LLM", m.llmServer, listener)
 
@@ -417,9 +429,10 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.searchRouter = services.NewSearchServer(m.logger)
+	router := services.NewSearchServer(m.logger)
+	m.search = routing[*services.SearchServer]{router: router}
 	m.searchServer = grpc.NewServer()
-	protocol.RegisterSearchServiceServer(m.searchServer, m.searchRouter)
+	protocol.RegisterSearchServiceServer(m.searchServer, router)
 
 	m.serve(ctx, "Search", m.searchServer, listener)
 
@@ -521,10 +534,10 @@ func (m *ServicesManager) OpenRunFor(userID, namespace string) (string, func(), 
 	return (*m.openRun.Load())(userID, namespace)
 }
 
-// GetSearchRouter returns the search router for provider registration.
-// Returns nil if the search service is not running.
-func (m *ServicesManager) GetSearchRouter() *services.SearchServer {
-	return m.searchRouter
+// GetSearchRouter returns the search router for provider registration, or
+// why the node runs without one.
+func (m *ServicesManager) GetSearchRouter() (*services.SearchServer, error) {
+	return m.search.router, m.search.why
 }
 
 // CancelATSStreams cancels all active ATSStore streams.
@@ -533,10 +546,10 @@ func (m *ServicesManager) CancelATSStreams() {
 	m.atsStore.CancelStreams()
 }
 
-// GetLLMRouter returns the LLM router for provider registration.
-// Returns nil if the LLM service is not running.
-func (m *ServicesManager) GetLLMRouter() *services.LLMServer {
-	return m.llmRouter
+// GetLLMRouter returns the LLM router for provider registration, or why the
+// node runs without one.
+func (m *ServicesManager) GetLLMRouter() (*services.LLMServer, error) {
+	return m.llm.router, m.llm.why
 }
 
 // GetEmbeddingRouter returns the embedding router for backend registration.

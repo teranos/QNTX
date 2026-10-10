@@ -552,17 +552,21 @@ func (j servicesJoint) join(name string, proxy *ExternalDomainProxy) ([]string, 
 	var roles []string
 	if proxy.IsLLMProvider() {
 		roles = append(roles, "llm-provider")
-		if llmRouter := j.sm.GetLLMRouter(); llmRouter != nil {
-			llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
-			j.m.logger.Debugf("Re-registered LLM provider '%s' after restart", name)
+		llmRouter, err := j.sm.GetLLMRouter()
+		if err != nil {
+			return roles, errors.Wrapf(err, "LLM provider %s is not joined", name)
 		}
+		llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
+		j.m.logger.Debugf("Re-registered LLM provider '%s' after restart", name)
 	}
 	if proxy.IsSearchProvider() {
 		roles = append(roles, "search-provider")
-		if searchRouter := j.sm.GetSearchRouter(); searchRouter != nil {
-			searchRouter.RegisterProvider(name, proxy.SearchServiceClient())
-			j.m.logger.Debugf("Re-registered search provider '%s' after restart", name)
+		searchRouter, err := j.sm.GetSearchRouter()
+		if err != nil {
+			return roles, errors.Wrapf(err, "search provider %s is not joined", name)
 		}
+		searchRouter.RegisterProvider(name, proxy.SearchServiceClient())
+		j.m.logger.Debugf("Re-registered search provider '%s' after restart", name)
 	}
 	j.m.wiringMu.RLock()
 	embeddingReady, pythonReady := j.m.embeddingReady, j.m.pythonReady
@@ -584,17 +588,24 @@ func (j servicesJoint) join(name string, proxy *ExternalDomainProxy) ([]string, 
 
 // part unregisters a plugin's providers so observers stop routing to dead connections.
 func (j servicesJoint) part(name string, proxy *ExternalDomainProxy) error {
+	var partErr error
 	if proxy.IsSearchProvider() {
-		if searchRouter := j.sm.GetSearchRouter(); searchRouter != nil {
+		searchRouter, err := j.sm.GetSearchRouter()
+		if err != nil {
+			partErr = alongside(partErr, errors.Wrapf(err, "search provider %s was never joined", name))
+		} else {
 			searchRouter.UnregisterProvider(name)
 		}
 	}
 	if proxy.IsLLMProvider() {
-		if llmRouter := j.sm.GetLLMRouter(); llmRouter != nil {
+		llmRouter, err := j.sm.GetLLMRouter()
+		if err != nil {
+			partErr = alongside(partErr, errors.Wrapf(err, "LLM provider %s was never joined", name))
+		} else {
 			llmRouter.UnregisterProvider(name)
 		}
 	}
-	return nil
+	return partErr
 }
 
 // comeback is what a plugin that failed is handed back to when it loads again.

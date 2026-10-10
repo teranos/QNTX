@@ -232,10 +232,11 @@ func (s *QNTXServer) Stop() error {
 	// Clear service providers before killing plugins — observers check HasProvider()
 	// and will skip routing once providers are cleared.
 	if s.servicesManager != nil {
-		if searchRouter := s.servicesManager.GetSearchRouter(); searchRouter != nil {
+		// A router the node runs without holds no providers to clear.
+		if searchRouter, err := s.servicesManager.GetSearchRouter(); err == nil {
 			searchRouter.ClearProviders()
 		}
-		if llmRouter := s.servicesManager.GetLLMRouter(); llmRouter != nil {
+		if llmRouter, err := s.servicesManager.GetLLMRouter(); err == nil {
 			llmRouter.ClearProviders()
 		}
 	}

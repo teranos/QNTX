@@ -451,7 +451,7 @@ func (c *Client) handleRichSearch(query string) {
 	searchStrategy := "substring"
 	meiliAnswered := false
 
-	if router := c.server.servicesManager.GetSearchRouter(); router != nil && router.HasProvider() {
+	if router, err := c.server.servicesManager.GetSearchRouter(); err == nil && router.HasProvider() {
 		meiliMatches, err := c.searchMeili(ctx, query, 50)
 		if err != nil {
 			c.server.logger.Warnw("MeiliSearch failed, falling back to substring",
@@ -539,9 +539,9 @@ func (c *Client) handleRichSearch(query string) {
 // Returns matches converted to RichSearchMatch format, or error on failure.
 // The index name is "attestations" — the standard index for attestation rich fields.
 func (c *Client) searchMeili(ctx context.Context, query string, limit int) ([]storage.RichSearchMatch, error) {
-	router := c.server.servicesManager.GetSearchRouter()
-	if router == nil {
-		return nil, errors.New("no search router available")
+	router, err := c.server.servicesManager.GetSearchRouter()
+	if err != nil {
+		return nil, errors.Wrapf(err, "MeiliSearch is not reached for %q", query)
 	}
 
 	resp, err := router.Search(ctx, &protocol.SearchRequest{

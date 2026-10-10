@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2926 in 415 files.
+# 2914 in 414 files.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -75,7 +75,7 @@
 3	cmd/qntx/commands/git.go
 5	cmd/qntx/commands/handler.go
 3	cmd/qntx/commands/server.go
-34	cmd/qntx/main.go
+32	cmd/qntx/main.go
 2	cmd/qntx/tauri_windows.go
 1	crates/ats-duckdb/src/error.rs
 1	crates/ats-duckdb/src/ffi.rs
@@ -168,7 +168,6 @@
 1	internal/util/strings.go
 1	plugin/grpc/client.go
 1	plugin/grpc/config_provider.go
-4	plugin/grpc/discovery.go
 1	plugin/grpc/pulse_handler.go
 2	plugin/grpc/remote_atsstore.go
 1	plugin/grpc/remote_queue.go
@@ -289,7 +288,7 @@
 3	server/claude_git.go
 4	server/claude_login.go
 9	server/claude_turns.go
-21	server/client.go
+19	server/client.go
 6	server/conversation.go
 1	server/db_performance.go
 17	server/db_stats_cache.go
@@ -323,7 +322,7 @@
 3	server/i_sigils.go
 14	server/init.go
 5	server/invitations.go
-22	server/lifecycle.go
+20	server/lifecycle.go
 8	server/mail.go
 14	server/mcp.go
 11	server/namespace_handlers.go
@@ -356,7 +355,7 @@
 14	server/plugin_sigils.go
 1	server/plugin_stores.go
 1	server/pprof.go
-26	server/prompt_handlers.go
+25	server/prompt_handlers.go
 2	server/prose_handlers.go
 5	server/pulse_async_jobs.go
 6	server/pulse_execution_handlers.go
@@ -381,7 +380,7 @@
 2	server/roles_handler.go
 4	server/routes.go
 5	server/routing.go
-11	server/search_observer.go
+10	server/search_observer.go
 5	server/server.go
 5	server/sigil/ask.go
 15	server/sigil/sigil.go

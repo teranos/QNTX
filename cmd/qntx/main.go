@@ -23,6 +23,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -367,7 +368,12 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 						pluginLogger.Infow("Background Initialize completed",
 							"plugin", meta.Name, "version", meta.Version)
 						registry.MarkReady(meta.Name)
-						registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc)
+						if err := registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc); err != nil {
+							registry.MarkFailed(meta.Name, err.Error())
+							acc.SetFailed(meta.Name, err.Error())
+							acc.Emit(meta.Name, grpc.BannerBoot)
+							return
+						}
 						registerPluginHandlers(p, meta, handlerRegistry, db, sm, pluginLogger, acc)
 						if err := defaultServer.ReloadWatchers(); err != nil {
 							pluginLogger.Warnw("Failed to reload watchers after background init",
@@ -390,7 +396,12 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 
 				registry.MarkReady(meta.Name)
 				pluginLogger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
-				registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc)
+				if err := registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc); err != nil {
+					registry.MarkFailed(meta.Name, err.Error())
+					acc.SetFailed(meta.Name, err.Error())
+					acc.Emit(meta.Name, grpc.BannerBoot)
+					return
+				}
 				registerPluginHandlers(p, meta, handlerRegistry, db, sm, pluginLogger, acc)
 			})
 		}
@@ -437,16 +448,19 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 const pluginLoadTimeout = 2 * time.Minute
 
 // registerPluginProviders registers provider services (LLM, VectorSearch, Search, Embedding)
-// for a plugin that has successfully completed Initialize.
-func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *grpc.ServicesManager, srv *server.QNTXServer, logger *zap.SugaredLogger, acc *grpc.PluginAccumulator) {
+// for a plugin that has successfully completed Initialize. A provider whose
+// router the node runs without is refused, and the plugin with it.
+func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *grpc.ServicesManager, srv *server.QNTXServer, logger *zap.SugaredLogger, acc *grpc.PluginAccumulator) error {
 	var roles []string
 	if proxy, ok := p.(*grpc.ExternalDomainProxy); ok && sm != nil {
 		if proxy.IsLLMProvider() {
 			roles = append(roles, "llm-provider")
-			if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
-				llmRouter.RegisterProvider(meta.Name, proxy.LLMServiceClient())
-				logger.Debugw("Registered LLM provider", "plugin", meta.Name)
+			llmRouter, err := sm.GetLLMRouter()
+			if err != nil {
+				return errors.Wrapf(err, "LLM provider %s is not joined", meta.Name)
 			}
+			llmRouter.RegisterProvider(meta.Name, proxy.LLMServiceClient())
+			logger.Debugw("Registered LLM provider", "plugin", meta.Name)
 		}
 		if proxy.IsVectorSearchProvider() {
 			roles = append(roles, "vector-search-provider")
@@ -457,10 +471,12 @@ func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *gr
 		}
 		if proxy.IsSearchProvider() {
 			roles = append(roles, "search-provider")
-			if searchRouter := sm.GetSearchRouter(); searchRouter != nil {
-				searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
-				logger.Debugw("Registered Search provider", "plugin", meta.Name)
+			searchRouter, err := sm.GetSearchRouter()
+			if err != nil {
+				return errors.Wrapf(err, "search provider %s is not joined", meta.Name)
 			}
+			searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
+			logger.Debugw("Registered Search provider", "plugin", meta.Name)
 		}
 		if proxy.IsEmbeddingProvider() {
 			roles = append(roles, "embedding-provider")
@@ -479,6 +495,7 @@ func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *gr
 
 	// Its sigils arrived with Initialize, after the node opened.
 	srv.ServePluginSigils()
+	return nil
 }
 
 // registerPluginHandlers registers Pulse async handlers/schedules and emits the plugin banner.
@@ -580,7 +597,12 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 				}
 				pluginRegistry.MarkReady(meta.Name)
 				logger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
-				registerPluginProviders(p, meta, sm, defaultServer, logger, acc)
+				if err := registerPluginProviders(p, meta, sm, defaultServer, logger, acc); err != nil {
+					pluginRegistry.MarkFailed(meta.Name, err.Error())
+					acc.SetFailed(meta.Name, err.Error())
+					acc.Emit(meta.Name, grpc.BannerBoot)
+					return
+				}
 				registerPluginHandlers(p, meta, handlerRegistry, db, sm, logger, acc)
 			})
 		}
