@@ -138,9 +138,10 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.writeError(w, http.StatusBadRequest, "only a client has a return address")
 		return
 	}
-	// An ATTESTOR acts somewhere. A SUPER token names no namespace.
-	if len(namespaces) == 0 && level != LevelSuper {
-		namespaces = []string{NamespaceDefault}
+	// An ATTESTOR acts where it names. A SUPER token names no namespace.
+	if len(namespaces) == 0 && level == LevelAttestor {
+		h.writeError(w, http.StatusBadRequest, "an "+string(LevelAttestor)+" acts in the namespaces it names, and this named none")
+		return
 	}
 	for _, namespace := range namespaces {
 		// Naming a namespace is crossing into one, which ADR-027 puts at SUPER.

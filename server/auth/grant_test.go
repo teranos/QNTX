@@ -47,7 +47,7 @@ func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
 	ticket, err := h.pendingLogins.open(mastodonAccount)
 	require.NoError(t, err)
 
-	req := mintRequest(`{"expires_at":"never","label":"ingest","level":"ATTESTOR"}`, "")
+	req := mintRequest(`{"expires_at":"never","label":"ingest","level":"ATTESTOR","namespaces":["default"]}`, "")
 	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: ticket})
 	rec := httptest.NewRecorder()
 	mint(h, rec, req)
@@ -82,7 +82,7 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"expires_at":"never","label":"ingest","level":"ATTESTOR"}`, session))
+		`{"expires_at":"never","label":"ingest","level":"ATTESTOR","namespaces":["default"]}`, session))
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var resp struct {
@@ -182,16 +182,29 @@ func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
-// default is where a session mints without naming anything, so an ungoverned
-// deployment keeps working rather than losing tokens entirely.
+// Naming default needs no listed identity, so an ungoverned deployment keeps
+// minting tokens rather than losing them.
 func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
 
 	mint(h, rec, mintRequest(
-		`{"expires_at":"never","label":"ordinary","level":"ATTESTOR"}`, ""))
+		`{"expires_at":"never","label":"ordinary","level":"ATTESTOR","namespaces":["default"]}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+// "nil is nil"
+func TestAnAttestorNamingNoNamespaceIsRefused(t *testing.T) {
+	h, store := grantHandler(t)
+	rec := httptest.NewRecorder()
+
+	mint(h, rec, mintRequest(`{"expires_at":"never","label":"nowhere","level":"ATTESTOR"}`, ""))
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Empty(t, listed, "a token was minted into a namespace nobody named")
 }
 
 // Minting names the kind. A body that names one gets a token of that kind, and
@@ -213,7 +226,7 @@ func TestBothKindsAreMintedAsThemselves(t *testing.T) {
 	// An ATTESTOR names what it may attest, and a SUPER token is not narrowed.
 	for kind, body := range map[Level]string{
 		LevelSuper:    `{"expires_at":"never","label":"mine","level":"SUPER"}`,
-		LevelAttestor: `{"expires_at":"never","label":"theirs","level":"ATTESTOR"}`,
+		LevelAttestor: `{"expires_at":"never","label":"theirs","level":"ATTESTOR","namespaces":["default"]}`,
 	} {
 		h, store := grantHandler(t)
 		rec := httptest.NewRecorder()
