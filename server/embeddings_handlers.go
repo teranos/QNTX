@@ -25,16 +25,12 @@ func (s *QNTXServer) SetupEmbeddingService() {
 func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServiceClient) {
 	svc := serverembeddings.NewPluginEmbeddingServiceFromClient(client, s.logger.Named("plugin-embeddings"))
 
-	// The vectors of the namespace this serves.
-	embStore := s.held.ServedUniverse().Embeddings()
-
+	embStore := s.embeddingStore
 	s.embeddingService = svc
-	s.embeddingStore = embStore
 
 	// Update the handler to use the plugin backend
 	if s.embeddingsHandler != nil {
 		s.embeddingsHandler.Service = svc
-		s.embeddingsHandler.Store = embStore
 		s.embeddingsHandler.ClusterFunc = svc.ClusterHDBSCAN
 	}
 

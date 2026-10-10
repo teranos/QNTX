@@ -1,12 +1,15 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 // A handler that probes on every request costs plugins × requests in gRPC calls
@@ -58,6 +61,12 @@ func TestTheAnswerSaysWhenItWasProbed(t *testing.T) {
 	}
 	holds(t, bareNode().pluginsSignum(), "list", h.list())
 	holds(t, bareNode().pluginsSignum(), "routes", h.routes())
+	holds(t, bareNode().pluginsSignum(), "elements", h.elements(context.Background()))
+	// A width a plugin names is said; one it omits is left out.
+	holds(t, bareNode().pluginsSignum(), "elements", &protocol.PluginElements{Elements: []*protocol.PluginElement{
+		{Plugin: "pty-element", Symbol: "⌨", DefaultWidth: proto.Int32(800), DefaultHeight: proto.Int32(600)},
+		{Plugin: "hello-world", Symbol: "👋"},
+	}})
 }
 
 // An empty result set with nothing said reads as "no plugins". The handler

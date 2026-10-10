@@ -41,10 +41,10 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/plugins/routes"},
 				},
 				{
-					Name:  "elements",
-					Does:  "The canvas elements running plugins define, with where each one's content, style and module are served.",
-					Gives: []*protocol.Field{{Name: "elements", Says: "One row per element definition."}},
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: "/api/plugins/elements"},
+					Name:   "elements",
+					Does:   "The canvas elements running plugins define, with where each one's content, style and module are served.",
+					Answer: "protocol.PluginElements",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/plugins/elements"},
 				},
 				{
 					Name: "add",

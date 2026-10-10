@@ -32,7 +32,7 @@ func (canvasSubsystem) Init(s *QNTXServer) error {
 
 	var canvasOpts []handlers.CanvasHandlerOption
 	if s.watcherEngine != nil {
-		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(s.watcherEngine, s.logger))
+		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(s.watcherEngine))
 	}
 	serverPort := appcfg.DefaultServerPort
 	if s.deps.cfg.Server.Port != nil {
@@ -47,7 +47,7 @@ func (canvasSubsystem) Init(s *QNTXServer) error {
 		canvasOpts = append(canvasOpts, handlers.WithMailer(s.nodeMailer))
 	}
 	canvasOpts = append(canvasOpts, handlers.WithInviteLink(s.inviteLink))
-	s.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
+	s.canvasHandler = handlers.NewCanvasHandler(canvasStore, s.logger, canvasOpts...)
 	s.conversationAssembler = NewConversationAssembler(canvasStore, s.held.ServedUniverse().Queries())
 	s.logger.Debugw("Canvas state handlers initialized")
 	return nil

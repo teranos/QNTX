@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"go.uber.org/zap"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,7 +14,7 @@ import (
 
 // "system namespace should have no canvas"
 func TestANamespaceWithNoCanvasAnswers404(t *testing.T) {
-	handler := NewCanvasHandler(nil, WithCanvasFor(func(*http.Request) (*elementstorage.CanvasStore, error) {
+	handler := NewCanvasHandler(nil, zap.NewNop().Sugar(), WithCanvasFor(func(*http.Request) (*elementstorage.CanvasStore, error) {
 		return nil, errors.Wrap(elementstorage.ErrNoCanvas, "system")
 	}))
 
@@ -38,7 +39,7 @@ func TestANamespaceWithNoCanvasAnswers404(t *testing.T) {
 // "and for every other namespace the canvas needs to be explicitly created and named."
 func TestACanvasIsCreatedAndNamedBeforeItHoldsAnything(t *testing.T) {
 	store := elementstorage.NewCanvasStore(qntxtest.CreateTestDB(t))
-	handler := NewCanvasHandler(nil, WithCanvasFor(func(*http.Request) (*elementstorage.CanvasStore, error) {
+	handler := NewCanvasHandler(nil, zap.NewNop().Sugar(), WithCanvasFor(func(*http.Request) (*elementstorage.CanvasStore, error) {
 		return store, nil
 	}))
 
@@ -84,7 +85,7 @@ func TestTwoNamespacesSeeTheirOwnCanvas(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	handler := NewCanvasHandler(nil, WithCanvasFor(func(r *http.Request) (*elementstorage.CanvasStore, error) {
+	handler := NewCanvasHandler(nil, zap.NewNop().Sugar(), WithCanvasFor(func(r *http.Request) (*elementstorage.CanvasStore, error) {
 		return stores[r.Header.Get("X-Test-Namespace")], nil
 	}))
 

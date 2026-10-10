@@ -17,7 +17,7 @@ func (h *Handler) HandleProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.Service == nil || h.Store == nil {
+	if h.Service == nil {
 		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
 		return
 	}

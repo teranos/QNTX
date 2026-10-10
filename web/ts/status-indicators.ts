@@ -3,7 +3,7 @@
  *
  * Manages status indicators in the system drawer header.
  * Provides a clean interface for adding various status indicators
- * (WebSocket connection, Pulse daemon, future services, etc.)
+ * (WebSocket connection, Pulse, future services, etc.)
  */
 
 import { connectivity, type Admission, type ConnectivityState } from './client';
@@ -212,7 +212,7 @@ class StatusIndicatorManager {
     }
 
     /**
-     * Add Pulse daemon indicator
+     * Add Pulse indicator
      */
     private addPulseIndicator(): void {
         // Pulse starts because the node starts. This reports it and nothing more.
@@ -316,7 +316,7 @@ class StatusIndicatorManager {
     }
 
     /**
-     * Handle Pulse daemon status updates
+     * Handle Pulse status updates
      */
     handlePulseDaemonStatus(data: DaemonStatusMessage): void {
         // Determine state from daemon status

@@ -13,7 +13,7 @@ export async function handleDaemonStatus(data: DaemonStatusMessage): Promise<voi
     // Update pulse panel via custom event (panel listens when open)
     document.dispatchEvent(new CustomEvent('pulse-daemon-status', { detail: data }));
 
-    // Update Pulse daemon status indicator
+    // Update the Pulse status indicator
     const { statusIndicators } = await import('../status-indicators.ts');
     statusIndicators.handlePulseDaemonStatus(data);
 }

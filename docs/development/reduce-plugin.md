@@ -39,4 +39,4 @@ The UMAP model lives in Python process memory. The `DimensionReducer` trait is t
 
 - **Frontend**: Canvas component reading `/api/embeddings/projections`, scatter plot colored by `cluster_id`
 - **Re-projection on re-cluster**: After `POST /api/embeddings/cluster`, auto re-run projection
-- **Pulse scheduling**: Periodic re-clustering + re-projection via the daemon
+- **Pulse scheduling**: Periodic re-clustering + re-projection as a Pulse schedule

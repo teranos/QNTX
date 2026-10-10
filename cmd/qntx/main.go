@@ -408,7 +408,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		defaultServer.SendVaults()
 
 		if daemon == nil {
-			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")
+			pluginLogger.Warnw("Cannot register handlers - the node's Pulse pool is not up yet, will retry")
 			sacred.Go("plugin.retrySetup.noDaemon", func() {
 				retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
 			})

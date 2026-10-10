@@ -501,7 +501,7 @@ func (c *Client) handleRichSearch(query string) {
 	)
 
 	// Semantic search (if embedding service available)
-	if c.server.embeddingService != nil && c.server.embeddingStore != nil {
+	if c.server.embeddingService != nil {
 		semanticMatches, err := c.searchSemantic(query)
 		if err != nil {
 			c.server.logger.Warnw("Semantic search unavailable; results for this query are text-only",

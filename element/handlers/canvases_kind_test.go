@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"go.uber.org/zap"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,7 +15,7 @@ import (
 // "nil is nil"
 func TestACanvasNamingNoKindIsRefused(t *testing.T) {
 	store := elementstorage.NewCanvasStore(qntxtest.CreateTestDB(t))
-	handler := NewCanvasHandler(nil, WithCanvasFor(func(*http.Request) (*elementstorage.CanvasStore, error) {
+	handler := NewCanvasHandler(nil, zap.NewNop().Sugar(), WithCanvasFor(func(*http.Request) (*elementstorage.CanvasStore, error) {
 		return store, nil
 	}))
 	create := func(body string) *httptest.ResponseRecorder {

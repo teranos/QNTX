@@ -116,7 +116,7 @@ func TestEdgeCursor_DeletedWithComposition(t *testing.T) {
 	}
 	t.Cleanup(engine.Stop)
 
-	handler := NewCanvasHandler(canvasStore, WithWatcherEngine(engine, logger))
+	handler := NewCanvasHandler(canvasStore, logger, WithWatcherEngine(engine))
 	ctx := context.Background()
 
 	// Create a composition

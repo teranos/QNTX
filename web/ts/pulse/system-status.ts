@@ -1,7 +1,8 @@
 /**
- * System Status Section - Daemon status
+ * System Status Section - Pulse's status
  *
  * Pulse starts because the node starts, so this section shows and does not set.
+ * Not running here means the node has not said yet.
  */
 
 import { Pulse } from '../sym';
@@ -16,8 +17,8 @@ export function renderSystemStatus(data: DaemonStatusMessage | null): string {
     return `
         <div class="pulse-daemon-status">
             <span class="pulse-daemon-badge ${running ? 'running' : 'stopped'} has-tooltip"
-                  data-tooltip="Pulse daemon status\n${running ? 'Processing scheduled jobs' : 'Not running - jobs will not execute'}">
-                ${running ? `${Pulse} Running` : `${Pulse} Stopped`}
+                  data-tooltip="Pulse runs inside the node\n${running ? 'Processing jobs and schedules' : 'The node has not said yet'}">
+                ${running ? `${Pulse} Running` : `${Pulse} Waiting`}
             </span>
         </div>
     `;
