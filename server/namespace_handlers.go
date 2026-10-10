@@ -181,7 +181,12 @@ func (s *QNTXServer) namespacesDelete(ctx context.Context, sent sigil.Sent) (any
 	if !gated || !admitted.MayEndNamespaces() {
 		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: "ending a namespace is ROOT's"}
 	}
-	if standing := s.namespaceOf(admitted); standing != auth.NamespaceSystem {
+	standing, stands := s.namespaceOf(admitted)
+	if !stands {
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed,
+			Says: "ending a namespace is reached from " + auth.NamespaceSystem + ", and you stand in no namespace"}
+	}
+	if standing != auth.NamespaceSystem {
 		return nil, &protocol.Refusal{Why: sigil.NotAllowed,
 			Says: "ending a namespace is reached from " + auth.NamespaceSystem + ", and you are standing in " + standing}
 	}
@@ -216,7 +221,7 @@ func (s *QNTXServer) namespacesNuke(ctx context.Context, _ sigil.Sent) (any, *pr
 		return nil, refusal
 	}
 	admitted, gated := auth.AdmissionFrom(ctx)
-	if standing := s.namespaceOf(admitted); !gated || standing != auth.NamespaceSystem {
+	if standing, stands := s.namespaceOf(admitted); !gated || !stands || standing != auth.NamespaceSystem {
 		return nil, &protocol.Refusal{Why: sigil.NotAllowed,
 			Says: "nuking " + auth.NamespaceDefault + " is reached from " + auth.NamespaceSystem}
 	}
@@ -239,7 +244,7 @@ func (s *QNTXServer) notStandingIn(ctx context.Context, name string) *protocol.R
 	if !gated {
 		return nil
 	}
-	if standing := s.namespaceOf(admitted); slug.Of(standing) == slug.Of(name) {
+	if standing, stands := s.namespaceOf(admitted); stands && slug.Of(standing) == slug.Of(name) {
 		return &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
 			Says: "you are standing in " + standing + "; step somewhere else first"}
 	}

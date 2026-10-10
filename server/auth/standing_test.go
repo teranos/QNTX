@@ -130,36 +130,42 @@ func TestWhereAPersonIsStanding(t *testing.T) {
 		admitted Admission
 		stepped  string
 		want     string
+		stands   bool
 	}{
 		{
 			what:     "an admission reaching one namespace is in that one",
 			admitted: Admitted(LevelAttestor, "pond"),
 			stepped:  "",
 			want:     "pond",
+			stands:   true,
 		},
 		{
 			what:     "and stepping does not move it",
 			admitted: Admitted(LevelAttestor, "pond"),
 			stepped:  "playground",
 			want:     "pond",
+			stands:   true,
 		},
 		{
 			what:     "ROOT reaches every namespace and stands where it stepped",
 			admitted: Admitted(LevelRoot),
 			stepped:  "playground",
 			want:     "playground",
+			stands:   true,
 		},
 		{
 			what:     "having stepped nowhere, in the default project",
 			admitted: Admitted(LevelSuper),
 			stepped:  "",
 			want:     NamespaceDefault,
+			stands:   true,
 		},
 		{
 			what:     "reaching several, a person stands where they stepped",
 			admitted: Admitted(LevelAttestor, "pond", "playground"),
 			stepped:  "playground",
 			want:     "playground",
+			stands:   true,
 		},
 		{
 			what:     "reaching several, stepping outside them is standing nowhere",
@@ -174,10 +180,26 @@ func TestWhereAPersonIsStanding(t *testing.T) {
 			want:     "",
 		},
 	} {
-		if got := StandingIn(c.admitted, c.stepped); got != c.want {
-			t.Errorf("%s: stands in %q, not %q", c.what, got, c.want)
+		got, stands := StandingIn(c.admitted, c.stepped)
+		if got != c.want || stands != c.stands {
+			t.Errorf("%s: stands in %q (%v), not %q (%v)", c.what, got, stands, c.want, c.stands)
 		}
 	}
+}
+
+// Standing nowhere is no namespace to answer with, and the answer says so
+// rather than naming the empty one.
+func TestStandingNowhereIsRefused(t *testing.T) {
+	h, store, _ := arrivingHandler(t)
+	held, err := store.List()
+	require.NoError(t, err)
+
+	admitted := Admitted(LevelUser)
+	admitted.UserID = held[0].ID
+
+	_, status, err := h.Standing(admitted)
+	require.Error(t, err)
+	assert.Equal(t, http.StatusNotFound, status)
 }
 
 // The rectangle is never on nothing, so the field it is drawn from is never

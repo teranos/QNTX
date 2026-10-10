@@ -21,25 +21,31 @@ import (
 // request acts in, and the rectangle the namespaces bar draws. Two readings of
 // where somebody is standing is a bar that draws one place and a write that
 // lands in another.
-func StandingIn(admitted Admission, standing string) string {
+func StandingIn(admitted Admission, standing string) (string, bool) {
 	if len(admitted.Namespaces) == 1 {
-		return admitted.Namespaces[0]
+		return admitted.Namespaces[0], true
 	}
 	if admitted.ReachesEveryNamespace() {
 		if standing != "" {
-			return standing
+			return standing, true
 		}
-		return NamespaceDefault
+		return NamespaceDefault, true
 	}
 	if admitted.MayActIn(standing) {
-		return standing
+		return standing, true
 	}
-	return Nowhere
+	// Naming no namespace, or several and having stepped outside them.
+	return "", false
 }
 
-// Nowhere is where an admission stands that names no namespace it stepped to.
-// It is no namespace, and no universe answers to it.
-const Nowhere = ""
+// standsIn is where an admission stands, or the refusal of one standing nowhere.
+func standsIn(admitted Admission, standing string) (string, int, error) {
+	namespace, stands := StandingIn(admitted, standing)
+	if !stands {
+		return "", http.StatusNotFound, errors.Newf("%s stands in no namespace: it reaches %v, and stepped to %q", admitted.Identity, admitted.Namespaces, standing)
+	}
+	return namespace, http.StatusOK, nil
+}
 
 // Footing answers whether an admission may stand in a namespace. The stores
 // that know are outside this package, so the answer is handed in, the way
@@ -64,7 +70,7 @@ func (h *Handler) Standing(admitted Admission) (string, int, error) {
 			"user", admitted.UserID, "identity", admitted.Identity, "error", err)
 		return "", status, err
 	}
-	return StandingIn(admitted, u.Standing), http.StatusOK, nil
+	return standsIn(admitted, u.Standing)
 }
 
 // Step moves an admission's person to a namespace and answers where they now
@@ -102,5 +108,5 @@ func (h *Handler) Step(admitted Admission, namespace string) (string, int, error
 	}
 	// Where they now stand, not what they stepped to. A person whose admission
 	// reaches one namespace is still in that one, and the answer says so.
-	return StandingIn(admitted, u.Standing), http.StatusOK, nil
+	return standsIn(admitted, u.Standing)
 }
