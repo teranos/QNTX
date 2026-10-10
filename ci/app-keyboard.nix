@@ -116,9 +116,8 @@
       }
       {
         "if" = "always()";
-        name = "QNTX's own page, never zooming, in a shell that zooms nothing";
+        name = "QNTX's own page, never zooming, in the shell on QNTX-App main, which zooms nothing";
         run = ''
-          git apply qntx/ci/app-keyboard/native.patch
           (cd qntx && make web)
           python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index("<meta name=\"viewport\""); b=s.index(">", a)+1; open(p,"w").write(s[:a]+sys.argv[2]+s[b:])' qntx/internal/server/dist/index.html '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'
           bash qntx/ci/app-keyboard/run.sh whole

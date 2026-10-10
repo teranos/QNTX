@@ -72,15 +72,29 @@ if [ "$seen" != "grey green" ]; then
     exit 1
 fi
 
-# The box, where the Simulator says it is.
-read -r X Y < <(idb ui describe-all --udid "$UDID" --json | python3 -c '
+# The box, where the screen shows it: the white run down the middle of the
+# screenshot, turned from pixels into the points a finger is placed in.
+read -r X Y < <(python3 - "$OUT/$NAME-0-before.png" "$(idb describe --udid "$UDID" --json)" <<'EOF2'
 import json, sys
-for e in json.load(sys.stdin):
-    if e.get("AXLabel") == "probe box" or "ROOT agent" in (e.get("AXValue") or "") + (e.get("AXLabel") or ""):
-        f = e["frame"]
-        print(int(f["x"] + f["width"] / 2), int(f["y"] + f["height"] / 2))
+from PIL import Image
+img = Image.open(sys.argv[1]).convert('RGB')
+points = json.loads(sys.argv[2])["screen_dimensions"]
+scale = img.width / points["width_points"]
+x = img.width // 2
+run = []
+for y in range(img.height // 5, img.height * 3 // 4):
+    r, g, b = img.getpixel((x, y))
+    if r > 235 and g > 235 and b > 235:
+        run.append(y)
+    elif len(run) > 40:
         break
-')
+    else:
+        run = []
+if len(run) <= 40:
+    sys.exit('no box on the screen')
+print(int(x / scale), int((run[0] + run[-1]) / 2 / scale))
+EOF2
+)
 echo "the box is at $X,$Y"
 idb ui tap --udid "$UDID" "$X" "$Y"
 sleep 4
