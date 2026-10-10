@@ -295,7 +295,7 @@ type DefaultServiceRegistry struct {
 	store    ats.AttestationStore
 	config   ConfigProvider
 	queue    QueueService
-	registry *Registry // Reference to plugin registry for metadata lookup
+	registry *Registry // The plugins whose versions their loggers are named with
 }
 
 // ConfigProvider provides configuration for plugins
@@ -304,15 +304,15 @@ type ConfigProvider interface {
 	GetPluginConfig(domain string) Config
 }
 
-// NewServiceRegistry creates a new service registry
-func NewServiceRegistry(db *sql.DB, logger *zap.SugaredLogger, store ats.AttestationStore, config ConfigProvider, queue QueueService) ServiceRegistry {
+// NewServiceRegistry creates a new service registry for the plugins registry holds.
+func NewServiceRegistry(registry *Registry, db *sql.DB, logger *zap.SugaredLogger, store ats.AttestationStore, config ConfigProvider, queue QueueService) ServiceRegistry {
 	return &DefaultServiceRegistry{
 		db:       db,
 		logger:   logger,
 		store:    store,
 		config:   config,
 		queue:    queue,
-		registry: GetDefaultRegistry(), // Access global registry for plugin metadata
+		registry: registry,
 	}
 }
 
@@ -323,16 +323,11 @@ func (r *DefaultServiceRegistry) Database() *sql.DB {
 
 // Logger returns a logger for the specified domain with version information
 func (r *DefaultServiceRegistry) Logger(domain string) *zap.SugaredLogger {
-	// Look up plugin metadata to include version in logger name
+	// A registered plugin's logger carries the version it says it is, as
+	// domain v0.4.3; a domain no plugin is registered under has no version.
 	loggerName := domain
-	if r.registry != nil {
-		if plugin, ok := r.registry.Get(domain); ok {
-			metadata := plugin.Metadata()
-			if metadata.Version != "" {
-				// Format as: domain v0.4.3 (version in separate field for coloring)
-				loggerName = domain + " v" + metadata.Version
-			}
-		}
+	if plugin, ok := r.registry.Get(domain); ok {
+		loggerName = domain + " v" + plugin.Metadata().Version
 	}
 	return r.logger.Named(loggerName)
 }

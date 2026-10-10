@@ -150,18 +150,18 @@ func (r *Registry) InitializeAll(ctx context.Context, services ServiceRegistry) 
 	}
 	sort.Strings(names)
 
-	var failedPlugins []string
+	// Each failure is kept as the plugin's state and error, and returned.
+	var initErr error
 	for _, name := range names {
 		initCtx, cancel := context.WithTimeout(ctx, pluginInitTimeout)
 		err := plugins[name].Initialize(initCtx, services)
 		cancel()
 		if err != nil {
-			r.logger.Errorf("Failed to initialize plugin '%s': %v", name, err)
-			failedPlugins = append(failedPlugins, name)
 			r.mu.Lock()
 			r.states[name] = StateFailed
 			r.errors[name] = err.Error()
 			r.mu.Unlock()
+			initErr = errors.WithSecondaryError(errors.Wrapf(err, "failed to initialize plugin %s", name), initErr)
 			continue
 		}
 		// Set state to running after successful initialization
@@ -169,13 +169,7 @@ func (r *Registry) InitializeAll(ctx context.Context, services ServiceRegistry) 
 		r.states[name] = StateRunning
 		r.mu.Unlock()
 	}
-
-	if len(failedPlugins) > 0 {
-		r.logger.Warnf("Some plugins failed to initialize: %v", failedPlugins)
-		return errors.Newf("failed to initialize %d plugin(s): %v", len(failedPlugins), failedPlugins)
-	}
-
-	return nil
+	return initErr
 }
 
 // ShutdownAll shuts down all registered plugins
@@ -189,28 +183,18 @@ func (r *Registry) ShutdownAll(ctx context.Context) error {
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(names)))
 
-	var realErrs []string
-	var alreadyDead []string
+	var shutdownErr error
 	for _, name := range names {
 		if err := plugins[name].Shutdown(ctx); err != nil {
 			errMsg := err.Error()
 			if strings.Contains(errMsg, "connection refused") || strings.Contains(errMsg, "Unavailable") {
-				alreadyDead = append(alreadyDead, name)
-			} else {
-				realErrs = append(realErrs, name+": "+errMsg)
+				r.logger.Debugf("Plugin %s was already stopped: %s", name, errMsg)
+				continue
 			}
+			shutdownErr = errors.WithSecondaryError(errors.Wrapf(err, "plugin %s did not shut down", name), shutdownErr)
 		}
 	}
-
-	if len(alreadyDead) > 0 {
-		r.logger.Debugf("Plugins already stopped: %v", alreadyDead)
-	}
-
-	if len(realErrs) > 0 {
-		return errors.Newf("shutdown errors: %v", realErrs)
-	}
-
-	return nil
+	return shutdownErr
 }
 
 // HealthCheckAll asks every plugin how it is, concurrently, holding the lock
@@ -436,7 +420,10 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 // Global registry instance (Issue #4: Thread-safe initialization)
 var (
 	defaultRegistry *Registry
-	registryMu      sync.RWMutex
+	// registrySet is whether SetDefaultRegistry has been called: the node
+	// sets its registry once.
+	registrySet bool
+	registryMu  sync.RWMutex
 )
 
 // SetDefaultRegistry sets the global registry (Issue #4: Thread-safe)
@@ -445,10 +432,11 @@ func SetDefaultRegistry(registry *Registry) {
 	registryMu.Lock()
 	defer registryMu.Unlock()
 
-	if defaultRegistry != nil {
+	if registrySet {
 		panic("default registry already initialized - call SetDefaultRegistry only once")
 	}
 	defaultRegistry = registry
+	registrySet = true
 }
 
 // GetDefaultRegistry returns the global registry (Issue #4: Thread-safe read)
@@ -456,37 +444,4 @@ func GetDefaultRegistry() *Registry {
 	registryMu.RLock()
 	defer registryMu.RUnlock()
 	return defaultRegistry
-}
-
-// Register registers a plugin with the global registry (Issue #4: Thread-safe)
-func Register(plugin DomainPlugin) error {
-	registryMu.RLock()
-	defer registryMu.RUnlock()
-
-	if defaultRegistry == nil {
-		return errors.New("default registry not initialized")
-	}
-	return defaultRegistry.Register(plugin)
-}
-
-// Get retrieves a plugin from the global registry (Issue #4: Thread-safe)
-func Get(name string) (DomainPlugin, bool) {
-	registryMu.RLock()
-	defer registryMu.RUnlock()
-
-	if defaultRegistry == nil {
-		return nil, false
-	}
-	return defaultRegistry.Get(name)
-}
-
-// List returns all plugin names from the global registry (Issue #4: Thread-safe)
-func List() []string {
-	registryMu.RLock()
-	defer registryMu.RUnlock()
-
-	if defaultRegistry == nil {
-		return nil
-	}
-	return defaultRegistry.List()
 }
