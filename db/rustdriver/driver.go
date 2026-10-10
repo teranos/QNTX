@@ -132,8 +132,11 @@ func (c *RustConn) Begin() (driver.Tx, error) {
 	// can be active at a time. Without holding across the lifetime, a second
 	// goroutine's Begin() would succeed between Lock/Unlock but hit
 	// "cannot start a transaction within a transaction" on the shared connection.
+	asked := time.Now()
 	c.muWrite.Lock()
+	held := time.Now()
 	result := C.sql_begin(c.store)
+	timed("write", c.caller, "BEGIN IMMEDIATE", asked, held, time.Now())
 	success := bool(result.success)
 	var errMsg string
 	if !success {
@@ -147,7 +150,7 @@ func (c *RustConn) Begin() (driver.Tx, error) {
 	}
 	// muWrite stays locked — Commit/Rollback will unlock it.
 	c.inTx = true
-	return &RustTx{store: c.store, muWrite: c.muWrite, conn: c}, nil
+	return &RustTx{store: c.store, muWrite: c.muWrite, conn: c, held: held}, nil
 }
 
 func (c *RustConn) Close() error {
@@ -160,6 +163,9 @@ type RustTx struct {
 	store   *C.SqliteStore
 	muWrite *sync.Mutex
 	conn    *RustConn
+	// held is when Begin took muWrite, which every writer waits on until the
+	// transaction ends.
+	held time.Time
 }
 
 func (tx *RustTx) Commit() error {
@@ -167,6 +173,7 @@ func (tx *RustTx) Commit() error {
 	defer tx.muWrite.Unlock()
 	tx.conn.inTx = false
 	result := C.sql_commit(tx.store)
+	timed("write", tx.conn.caller, "a transaction, BEGIN to COMMIT", tx.held, tx.held, time.Now())
 	success := bool(result.success)
 	var errMsg string
 	if !success {
@@ -185,6 +192,7 @@ func (tx *RustTx) Rollback() error {
 	defer tx.muWrite.Unlock()
 	tx.conn.inTx = false
 	result := C.sql_rollback(tx.store)
+	timed("write", tx.conn.caller, "a transaction, BEGIN to ROLLBACK", tx.held, tx.held, time.Now())
 	success := bool(result.success)
 	var errMsg string
 	if !success {
@@ -230,14 +238,17 @@ func (s *RustStmt) Exec(args []driver.Value) (driver.Result, error) {
 	defer C.free(unsafe.Pointer(cParams))
 
 	// If inside a transaction, muWrite is already held by Begin() — don't re-lock.
+	asked := time.Now()
 	if !s.conn.inTx {
 		s.muWrite.Lock()
 		defer s.muWrite.Unlock()
 	}
+	held := time.Now()
 	if s.caller != "" {
 		setCaller(s.caller)
 	}
 	result := C.sql_exec(s.store, cSQL, cParams)
+	timed("write", s.caller, s.query, asked, held, time.Now())
 	success := bool(result.success)
 	var errMsg string
 	var lastID, affected int64
@@ -268,6 +279,7 @@ func (s *RustStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 	// Lock appropriately: readConn uses muRead, write conn uses muWrite.
 	// Inside a transaction, muWrite is already held — skip locking.
+	asked := time.Now()
 	if s.readConn != nil {
 		s.muRead.Lock()
 		defer s.muRead.Unlock()
@@ -275,14 +287,17 @@ func (s *RustStmt) Query(args []driver.Value) (driver.Rows, error) {
 		s.muWrite.Lock()
 		defer s.muWrite.Unlock()
 	}
+	held := time.Now()
 	if s.caller != "" {
 		setCaller(s.caller)
 	}
 	var result C.QueryResultC
 	if s.readConn != nil {
 		result = C.read_conn_sql_query(s.readConn, cSQL, cParams)
+		timed("read", s.caller, s.query, asked, held, time.Now())
 	} else {
 		result = C.sql_query(s.store, cSQL, cParams)
+		timed("write", s.caller, s.query, asked, held, time.Now())
 	}
 	var success bool
 	var errMsg, colsJSON, rowsJSON string

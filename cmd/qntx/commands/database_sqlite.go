@@ -44,6 +44,12 @@ func openSqliteDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, a
 	// Register the Rust SQL driver (once per process)
 	driverOnce.Do(func() {
 		rustdriver.Register(rustStore.StorePtr(), rustStore.ReadConnPtr(), rustStore.Mu(), rustStore.MuRead())
+		// Every store this process opens, namespaces' included, goes through the
+		// driver, and a call that holds one names its statement.
+		rustdriver.OnSlowCall(time.Second, func(c rustdriver.SlowCall) {
+			logger.Logger.Warnw("A call into the store was slow",
+				"conn", c.Conn, "caller", c.Caller, "waited", c.Waited, "ran", c.Ran, "sql", c.SQL)
+		})
 	})
 
 	// Open *sql.DB through the Rust driver.
