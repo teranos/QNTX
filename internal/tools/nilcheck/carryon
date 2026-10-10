@@ -1,11 +1,11 @@
 # errors and warnings logged and carried on from, per file. Debt: each number may fall and may not rise.
 # Instead: return the error, or say in a value why carrying on is the answer.
-# 445 in 124 files.
+# 443 in 124 files.
 # cmd/qntx/commands/database_sqlite.go: +1, a call into the store that held it past a second is said with its statement; nothing failed to carry on from.
 
 6	ats/storage/embedding_store.go
 4	ats/storage/new_store_rust.go
-4	ats/storage/rich_search.go
+2	ats/storage/rich_search.go
 1	ats/storage/sqlitecgo/writequeue_cgo.go
 1	ats/storage/subject_warn.go
 1	ats/storage/testutil/ax_helpers.go

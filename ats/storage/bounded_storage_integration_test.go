@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/types"
+	"go.uber.org/zap"
 )
 
 // TestBoundedStorage_16PerActorContext verifies that only 16 attestations
@@ -16,7 +17,7 @@ import (
 func TestBoundedStorage_16PerActorContext(t *testing.T) {
 	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, rustStore, nil)
+	store := NewBoundedStore(db, rustStore, zap.NewNop().Sugar())
 	actor := "test@bounded-storage"
 	subject := "KYSTSN"
 
@@ -53,7 +54,7 @@ func TestBoundedStorage_16PerActorContext(t *testing.T) {
 func TestBoundedStorage_SameActorContextPruning(t *testing.T) {
 	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, rustStore, nil)
+	store := NewBoundedStore(db, rustStore, zap.NewNop().Sugar())
 	actor := "test@bounded-storage"
 	subject := "KYSTSN"
 	context := "10.0" // Same context for all
@@ -93,7 +94,7 @@ func TestBoundedStorage_SameActorContextPruning(t *testing.T) {
 func TestBoundedStorage_DomainScenario(t *testing.T) {
 	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, rustStore, nil)
+	store := NewBoundedStore(db, rustStore, zap.NewNop().Sugar())
 	actor := "test@domain-integration"
 	subject := "KYSTSN"
 
