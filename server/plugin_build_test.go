@@ -35,8 +35,8 @@ func TestBuildOfReadsWhatDatapuntIsBuiltFrom(t *testing.T) {
 		t.Fatalf("core: %+v", b.core)
 	}
 	want := []buildSource{
-		{Owner: "abcd-nl", Repo: "clean", Branch: "main", Path: "competitor.cue"},
-		{Owner: "abcd-nl", Repo: "q.abcd.nl", Branch: "master", Path: "company.cue"},
+		{Owner: "abcd-nl", Repo: "clean", Branch: "main", Path: "competitor.cue", PathNamed: true},
+		{Owner: "abcd-nl", Repo: "q.abcd.nl", Branch: "master", Path: "company.cue", PathNamed: true},
 	}
 	if len(b.inputs) != len(want) || b.inputs[0] != want[0] || b.inputs[1] != want[1] {
 		t.Fatalf("inputs: %+v", b.inputs)
@@ -50,7 +50,7 @@ func TestAFailedBuildsMailNamesEverySourceAndWhy(t *testing.T) {
 	b := pluginBuild{
 		name:   "datapunt",
 		core:   buildSource{Owner: "teranos", Repo: "datapunt", Branch: "main"},
-		inputs: []buildSource{{Owner: "abcd-nl", Repo: "clean", Branch: "main", Path: "competitor.cue"}},
+		inputs: []buildSource{{Owner: "abcd-nl", Repo: "clean", Branch: "main", Path: "competitor.cue", PathNamed: true}},
 	}
 	mail := buildFailureMail(b, []string{"c0ffee"}, errors.New("dub build: <exit 1>"))
 	if mail.Subject != "datapunt did not build" {
