@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3290 in 435 files.
+# 3285 in 435 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -15,6 +15,7 @@
 # From 3339: a closed store says it is closed, rather than its pointer being nil.
 # From 3323: the node runs with its plugin registry, and nothing asks whether it has one.
 # From 3309: the vectors are the namespace's from boot, and only making them waits for a plugin.
+# From 3290: the canvas is handed its logger, whatever else it is handed.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -141,7 +142,7 @@
 4	db/migrate.go
 10	db/rustdriver/driver.go
 1	db/rustdriver/slow.go
-34	element/handlers/canvas.go
+29	element/handlers/canvas.go
 15	element/handlers/canvases.go
 4	element/storage/canvas_store.go
 8	element/storage/canvases.go

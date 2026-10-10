@@ -30,7 +30,7 @@ func makeEdge(from, to, direction string, position int32) *pb.CompositionEdge {
 func TestCanvasHandler_HandleElements_POST(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	item := elementstorage.CanvasElement{
 		ID:     "element-1",
@@ -66,7 +66,7 @@ func TestCanvasHandler_HandleElements_POST(t *testing.T) {
 func TestCanvasHandler_HandleElements_GET_List(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	// Create test elements
 	items := []*elementstorage.CanvasElement{
@@ -102,7 +102,7 @@ func TestCanvasHandler_HandleElements_GET_List(t *testing.T) {
 func TestCanvasHandler_HandleElements_GET_Single(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	item := &elementstorage.CanvasElement{
 		ID:     "element-1",
@@ -137,7 +137,7 @@ func TestCanvasHandler_HandleElements_GET_Single(t *testing.T) {
 func TestCanvasHandler_HandleElements_GET_NotFound(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/canvas/elements/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -152,7 +152,7 @@ func TestCanvasHandler_HandleElements_GET_NotFound(t *testing.T) {
 func TestCanvasHandler_HandleElements_DELETE(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	item := &elementstorage.CanvasElement{
 		ID:     "element-1",
@@ -184,7 +184,7 @@ func TestCanvasHandler_HandleElements_DELETE(t *testing.T) {
 func TestCanvasHandler_HandleElements_DELETE_NotFound(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/canvas/elements/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -199,7 +199,7 @@ func TestCanvasHandler_HandleElements_DELETE_NotFound(t *testing.T) {
 func TestCanvasHandler_HandleElements_DELETE_MissingID(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/canvas/elements", nil)
 	w := httptest.NewRecorder()
@@ -214,7 +214,7 @@ func TestCanvasHandler_HandleElements_DELETE_MissingID(t *testing.T) {
 func TestCanvasHandler_HandleElements_InvalidMethod(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodPut, "/api/canvas/elements", nil)
 	w := httptest.NewRecorder()
@@ -229,7 +229,7 @@ func TestCanvasHandler_HandleElements_InvalidMethod(t *testing.T) {
 func TestCanvasHandler_HandleCompositions_POST(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	// Create elements first (foreign key requirement)
 	if err := store.UpsertElement(context.Background(), &elementstorage.CanvasElement{ID: "element-1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
@@ -275,7 +275,7 @@ func TestCanvasHandler_HandleCompositions_POST(t *testing.T) {
 func TestCanvasHandler_HandleCompositions_GET_List(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	// Create elements first (foreign key requirement)
 	if err := store.UpsertElement(context.Background(), &elementstorage.CanvasElement{ID: "g1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
@@ -331,7 +331,7 @@ func TestCanvasHandler_HandleCompositions_GET_List(t *testing.T) {
 func TestCanvasHandler_HandleCompositions_GET_Single(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	// Create elements first (foreign key requirement)
 	if err := store.UpsertElement(context.Background(), &elementstorage.CanvasElement{ID: "element-1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
@@ -376,7 +376,7 @@ func TestCanvasHandler_HandleCompositions_GET_Single(t *testing.T) {
 func TestCanvasHandler_HandleCompositions_GET_NotFound(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/canvas/compositions/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -391,7 +391,7 @@ func TestCanvasHandler_HandleCompositions_GET_NotFound(t *testing.T) {
 func TestCanvasHandler_HandleCompositions_DELETE(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	// Create elements first (foreign key requirement)
 	if err := store.UpsertElement(context.Background(), &elementstorage.CanvasElement{ID: "element-1", Symbol: "🜶", X: 100, Y: 100}); err != nil {
@@ -433,7 +433,7 @@ func TestCanvasHandler_HandleCompositions_DELETE(t *testing.T) {
 func TestCanvasHandler_HandleCompositions_DELETE_NotFound(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/canvas/compositions/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -448,7 +448,7 @@ func TestCanvasHandler_HandleCompositions_DELETE_NotFound(t *testing.T) {
 func TestCanvasHandler_HandleCompositions_InvalidMethod(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodPut, "/api/canvas/compositions", nil)
 	w := httptest.NewRecorder()
@@ -463,7 +463,7 @@ func TestCanvasHandler_HandleCompositions_InvalidMethod(t *testing.T) {
 func TestCanvasHandler_HandleElements_POST_InvalidJSON(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodPost, "/api/canvas/elements", bytes.NewReader([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
@@ -479,7 +479,7 @@ func TestCanvasHandler_HandleElements_POST_InvalidJSON(t *testing.T) {
 func TestCanvasHandler_HandleCompositions_POST_InvalidJSON(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodPost, "/api/canvas/compositions", bytes.NewReader([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
@@ -498,7 +498,7 @@ func TestCanvasHandler_HandleCompositions_POST_ThreeElements(t *testing.T) {
 
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	// Create three elements (ax, py, prompt)
 	items := []*elementstorage.CanvasElement{
@@ -558,7 +558,7 @@ func TestCanvasHandler_HandleCompositions_GET_PreservesElementOrder(t *testing.T
 
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	// Create elements
 	items := []*elementstorage.CanvasElement{
@@ -628,7 +628,7 @@ func TestCanvasHandler_HandleCompositions_POST_FourElementChain(t *testing.T) {
 
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	// Create four elements
 	items := []*elementstorage.CanvasElement{
@@ -695,7 +695,7 @@ func TestCanvasHandler_HandleCompositions_POST_FourElementChain(t *testing.T) {
 func TestCanvasHandler_HandleMinimizedWindows_POST(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	body := []byte(`{"element_id": "element-1"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/canvas/minimized-windows", bytes.NewReader(body))
@@ -712,7 +712,7 @@ func TestCanvasHandler_HandleMinimizedWindows_POST(t *testing.T) {
 func TestCanvasHandler_HandleMinimizedWindows_POST_MissingElementID(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	body := []byte(`{}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/canvas/minimized-windows", bytes.NewReader(body))
@@ -729,7 +729,7 @@ func TestCanvasHandler_HandleMinimizedWindows_POST_MissingElementID(t *testing.T
 func TestCanvasHandler_HandleMinimizedWindows_GET(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	// Add two minimized windows
 	if err := store.AddMinimizedWindow(context.Background(), "element-1"); err != nil {
@@ -761,7 +761,7 @@ func TestCanvasHandler_HandleMinimizedWindows_GET(t *testing.T) {
 func TestCanvasHandler_HandleMinimizedWindows_DELETE(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	if err := store.AddMinimizedWindow(context.Background(), "element-1"); err != nil {
 		t.Fatalf("AddMinimizedWindow failed: %v", err)
@@ -780,7 +780,7 @@ func TestCanvasHandler_HandleMinimizedWindows_DELETE(t *testing.T) {
 func TestCanvasHandler_HandleMinimizedWindows_DELETE_NotFound(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/canvas/minimized-windows/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -795,7 +795,7 @@ func TestCanvasHandler_HandleMinimizedWindows_DELETE_NotFound(t *testing.T) {
 func TestCanvasHandler_HandleMinimizedWindows_DELETE_MissingID(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/canvas/minimized-windows", nil)
 	w := httptest.NewRecorder()
@@ -810,7 +810,7 @@ func TestCanvasHandler_HandleMinimizedWindows_DELETE_MissingID(t *testing.T) {
 func TestCanvasHandler_HandleMinimizedWindows_InvalidMethod(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := elementstorage.NewCanvasStore(db)
-	handler := NewCanvasHandler(store)
+	handler := NewCanvasHandler(store, zap.NewNop().Sugar())
 
 	req := httptest.NewRequest(http.MethodPut, "/api/canvas/minimized-windows", nil)
 	w := httptest.NewRecorder()
@@ -858,7 +858,7 @@ func setupSEtoSE(t *testing.T) (*CanvasHandler, storage.Watchers, context.Contex
 	}
 	t.Cleanup(engine.Stop)
 
-	handler := NewCanvasHandler(canvasStore, WithWatcherEngine(engine, logger))
+	handler := NewCanvasHandler(canvasStore, logger, WithWatcherEngine(engine))
 	watcherStore := engine.GetStore()
 	ctx := context.Background()
 
@@ -1027,7 +1027,7 @@ func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
 	}
 	t.Cleanup(engine.Stop)
 
-	handler := NewCanvasHandler(canvasStore, WithWatcherEngine(engine, logger))
+	handler := NewCanvasHandler(canvasStore, logger, WithWatcherEngine(engine))
 	watcherStore := engine.GetStore()
 	ctx := context.Background()
 

@@ -35,9 +35,10 @@ type CanvasHandler struct {
 }
 
 // NewCanvasHandler creates a new canvas handler
-func NewCanvasHandler(store *elementstorage.CanvasStore, opts ...CanvasHandlerOption) *CanvasHandler {
+func NewCanvasHandler(store *elementstorage.CanvasStore, logger *zap.SugaredLogger, opts ...CanvasHandlerOption) *CanvasHandler {
 	h := &CanvasHandler{
-		store: store,
+		store:  store,
+		logger: logger,
 	}
 	for _, opt := range opts {
 		opt(h)
@@ -49,10 +50,9 @@ func NewCanvasHandler(store *elementstorage.CanvasStore, opts ...CanvasHandlerOp
 type CanvasHandlerOption func(*CanvasHandler)
 
 // WithWatcherEngine enables meld edge subscription compilation
-func WithWatcherEngine(engine *watcher.Engine, logger *zap.SugaredLogger) CanvasHandlerOption {
+func WithWatcherEngine(engine *watcher.Engine) CanvasHandlerOption {
 	return func(h *CanvasHandler) {
 		h.watcherEngine = engine
-		h.logger = logger
 	}
 }
 
@@ -769,15 +769,11 @@ func elementSymbolToType(symbol string) string {
 // === Helper methods ===
 
 func (h *CanvasHandler) logInfo(format string, args ...any) {
-	if h.logger != nil {
-		h.logger.Infof(format, args...)
-	}
+	h.logger.Infof(format, args...)
 }
 
 func (h *CanvasHandler) logWarn(format string, args ...any) {
-	if h.logger != nil {
-		h.logger.Warnf(format, args...)
-	}
+	h.logger.Warnf(format, args...)
 }
 
 // HandleExportDOM receives rendered DOM HTML from client and writes to docs/demo/index.html
@@ -938,7 +934,7 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 	filename := fmt.Sprintf("canvas-%s.html", canvasID)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
-	if _, err := w.Write([]byte(pluginResp.HTML)); err != nil && h.logger != nil {
+	if _, err := w.Write([]byte(pluginResp.HTML)); err != nil {
 		h.logger.Warnw("Canvas export not delivered", "canvas_id", canvasID, "bytes", len(pluginResp.HTML), "error", err)
 	}
 }
@@ -956,9 +952,7 @@ func (h *CanvasHandler) getServerPort() int {
 		// A QNTX_PORT that will not parse is not port 0. Zero means zero.
 		portNum, err := strconv.Atoi(port)
 		if err != nil {
-			if h.logger != nil {
-				h.logger.Errorw("QNTX_PORT is not a number", "qntx_port", port, "error", err)
-			}
+			h.logger.Errorw("QNTX_PORT is not a number", "qntx_port", port, "error", err)
 			return 0
 		}
 		return portNum
@@ -981,7 +975,7 @@ func (h *CanvasHandler) writeError(w http.ResponseWriter, err error, status int)
 	// bare status and no reason. This is the last place that still knows it.
 	if encErr := json.NewEncoder(w).Encode(map[string]string{
 		"error": err.Error(),
-	}); encErr != nil && h.logger != nil {
+	}); encErr != nil {
 		h.logger.Warnw("Error body not delivered", "status", status, "error", err, "encode_error", encErr)
 	}
 }
