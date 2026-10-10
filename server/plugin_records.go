@@ -147,6 +147,16 @@ func (r PluginRecords) Plugin(name string) (grpcplugin.PluginRecord, bool, error
 	return record, true, nil
 }
 
+// Added is whether somebody added the plugin name.
+func (r PluginRecords) Added(name string) (bool, error) {
+	newest, err := r.newest()
+	if err != nil {
+		return false, err
+	}
+	_, found := newest[name]
+	return found, nil
+}
+
 // AddPlugin records a plugin by its repository URL. It starts disabled.
 func (r PluginRecords) AddPlugin(actor, repo string) (grpcplugin.PluginRecord, error) {
 	repo = strings.TrimSpace(repo)

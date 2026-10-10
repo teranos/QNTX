@@ -369,9 +369,9 @@ func (r *Registry) MarkFailed(name string, reason string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// Whoever marks a plugin failed says why; it is held here for plugins_list.
 	r.states[name] = StateFailed
 	r.errors[name] = reason
-	r.logger.Warnf("Marked plugin '%s' as failed: %s", name, reason)
 }
 
 // GetError returns the error message for a failed plugin, if any.

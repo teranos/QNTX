@@ -512,9 +512,9 @@ func (s *QNTXServer) fetchCore(ctx context.Context, core buildSource, rev, path 
 	if err != nil {
 		return errors.Wrapf(err, "failed to make %s", path)
 	}
-	if _, err := io.Copy(file, body); err != nil {
+	if written, err := io.Copy(file, body); err != nil {
 		sqlclose.Log(file.Close(), s.logger, path)
-		return errors.Wrapf(err, "failed to write %s at %s to %s", core.String(), rev, path)
+		return errors.Wrapf(err, "failed to write %s at %s to %s after %d bytes", core.String(), rev, path, written)
 	}
 	if err := file.Close(); err != nil {
 		return errors.Wrapf(err, "failed to finish writing %s", path)

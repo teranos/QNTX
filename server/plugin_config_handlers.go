@@ -127,7 +127,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	// A plugin nobody added has no record to configure, or to validate for.
-	_, found, err := s.pluginRecords().Plugin(pluginName)
+	found, err := s.pluginRecords().Added(pluginName)
 	if err != nil {
 		s.writeRichError(w, errors.Wrapf(err, "failed to read the record of plugin %s", pluginName), http.StatusInternalServerError)
 		return
