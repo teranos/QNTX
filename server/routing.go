@@ -458,7 +458,7 @@ func (rr *responseRecorder) flush(logger *zap.SugaredLogger) {
 		rr.ResponseWriter.WriteHeader(rr.statusCode)
 	}
 	if len(rr.body) > 0 {
-		if _, err := rr.ResponseWriter.Write(rr.body); err != nil && logger != nil {
+		if _, err := rr.ResponseWriter.Write(rr.body); err != nil {
 			logger.Warnw("Buffered plugin response not delivered",
 				"status", rr.statusCode, "bytes", len(rr.body), "error", err)
 		}

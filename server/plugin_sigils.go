@@ -163,9 +163,7 @@ func (s *QNTXServer) pluginSigna() []sigil.Signum {
 	for _, name := range s.pluginRegistry.ListEnabled() {
 		served, refused := s.pluginSignaOf(name)
 		for _, why := range refused {
-			if s.logger != nil {
-				s.logger.Errorw("a plugin's signum is not served", "plugin", name, "error", why)
-			}
+			s.logger.Errorw("a plugin's signum is not served", "plugin", name, "error", why)
 		}
 		signa = append(signa, served...)
 	}
@@ -307,9 +305,7 @@ func boundUnder(plugin string, handed *protocol.Signum) error {
 func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared bool) sigil.Answer {
 	return func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 		failed := func(err error) (any, *protocol.Refusal) {
-			if s.logger != nil {
-				s.logger.Errorw("a plugin's sigil failed", "plugin", plugin, "sigil", held.GetName(), "error", err)
-			}
+			s.logger.Errorw("a plugin's sigil failed", "plugin", plugin, "sigil", held.GetName(), "error", err)
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: held.GetName() + " of " + plugin + " failed"}
 		}
 
@@ -483,7 +479,7 @@ func (s *QNTXServer) ServePluginSigils() {
 	if s.served == nil {
 		return
 	}
-	if _, err := s.reopenHeld(); err != nil && s.logger != nil {
+	if _, err := s.reopenHeld(); err != nil {
 		s.logger.Errorw("Plugin sigils are not served; what the node serves is unchanged", "error", err)
 	}
 }

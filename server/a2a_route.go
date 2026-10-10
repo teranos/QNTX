@@ -19,9 +19,7 @@ const a2aPrefix = "/a2a/"
 func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	operations, err := a2a.Operations()
 	if err != nil {
-		if s.logger != nil {
-			s.logger.Errorw("the A2A operations did not read from the pinned spec", "error", err)
-		}
+		s.logger.Errorw("the A2A operations did not read from the pinned spec", "error", err)
 		return func(w http.ResponseWriter, _ *http.Request) {
 			writeError(w, http.StatusInternalServerError, "the A2A operations did not read from the pinned spec: "+err.Error())
 		}
@@ -30,9 +28,7 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		return nil, a2a.Unsupported(op)
 	}
 	undelivered := func(what string, err error) {
-		if s.logger != nil {
-			s.logger.Errorw("An A2A response was not delivered", "what", what, "error", err)
-		}
+		s.logger.Errorw("An A2A response was not delivered", "what", what, "error", err)
 	}
 	// The node's card names no tenant, so no agent is served at one.
 	none := func(string) bool { return false }

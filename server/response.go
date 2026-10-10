@@ -23,7 +23,7 @@ func writeJSON(w http.ResponseWriter, status int, data any) error {
 // client. By then the status is on the wire and the caller is gone, so there is
 // nothing left to send and only somewhere to write it down.
 func respond(w http.ResponseWriter, logger *zap.SugaredLogger, status int, data any) {
-	if err := writeJSON(w, status, data); err != nil && logger != nil {
+	if err := writeJSON(w, status, data); err != nil {
 		logger.Errorw("Response body not delivered", "status", status, "error", err)
 	}
 }
@@ -31,7 +31,7 @@ func respond(w http.ResponseWriter, logger *zap.SugaredLogger, status int, data 
 // deliver writes a non-JSON response body, for the same reason respond exists:
 // a body that does not arrive leaves no trace anywhere else.
 func deliver(w http.ResponseWriter, logger *zap.SugaredLogger, body []byte, what string) {
-	if _, err := w.Write(body); err != nil && logger != nil {
+	if _, err := w.Write(body); err != nil {
 		logger.Errorw("Response body not delivered", "what", what, "bytes", len(body), "error", err)
 	}
 }
