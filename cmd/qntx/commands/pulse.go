@@ -34,7 +34,7 @@ Example:
 	},
 }
 
-// PulseStartCmd starts the Pulse daemon
+// PulseStartCmd runs a Pulse queue and scheduler alone, with no handlers
 var PulseStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Run Pulse's queue and scheduler in the foreground",
@@ -47,7 +47,7 @@ handlers registered, until interrupted (Ctrl+C) with GRACE shutdown.`,
 			return errors.Wrap(err, "the workers flag is not registered as an int")
 		}
 
-		fmt.Printf("Starting Pulse daemon with %d worker(s)...\n", workers)
+		fmt.Printf("Starting Pulse outside a node, with %d worker(s) and no handlers...\n", workers)
 
 		// Load configuration
 		cfg, err := config.Load()
@@ -84,7 +84,7 @@ handlers registered, until interrupted (Ctrl+C) with GRACE shutdown.`,
 		ticker := schedule.NewTickerWithContext(ctx, scheduleStore, pool.GetQueue(), pool, nil, tickerCfg, logger.Logger)
 		ticker.Start()
 
-		fmt.Printf("Pulse daemon started\n")
+		fmt.Printf("Pulse started\n")
 		fmt.Printf("  Workers: %d\n", workers)
 		fmt.Printf("  Poll interval: %v\n", poolCfg.PollInterval)
 		fmt.Printf("  Scheduler interval: %v\n", tickerCfg.Interval)
@@ -103,7 +103,7 @@ handlers registered, until interrupted (Ctrl+C) with GRACE shutdown.`,
 
 		cancel() // Clean up parent context
 
-		fmt.Printf("Pulse daemon stopped\n")
+		fmt.Printf("Pulse stopped\n")
 		return nil
 	},
 }
