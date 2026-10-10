@@ -1173,12 +1173,18 @@ type CreateScheduleRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	AuthToken       string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
 	HandlerName     string                 `protobuf:"bytes,2,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`                                                  // Handler to invoke on each tick
-	IntervalSeconds int32                  `protobuf:"varint,3,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`                                     // Execution interval
+	IntervalSeconds int32                  `protobuf:"varint,3,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`                                     // Execution interval: at least one second
 	Payload         []byte                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`                                                                             // Handler-specific data (JSON)
-	Metadata        map[string]string      `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Optional metadata (element_id, plugin, etc.)
-	StoreToken      string                 `protobuf:"bytes,6,opt,name=store_token,json=storeToken,proto3" json:"store_token,omitempty"`                                                     // The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule. Empty is a schedule no caller made.
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	Metadata        map[string]string      `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Metadata (element_id, plugin, etc.), kept as a JSON object
+	// Who made it: the sigil call creating it, or the plugin itself.
+	//
+	// Types that are valid to be assigned to Made:
+	//
+	//	*CreateScheduleRequest_StoreToken
+	//	*CreateScheduleRequest_ByPlugin
+	Made          isCreateScheduleRequest_Made `protobuf_oneof:"made"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateScheduleRequest) Reset() {
@@ -1246,12 +1252,46 @@ func (x *CreateScheduleRequest) GetMetadata() map[string]string {
 	return nil
 }
 
+func (x *CreateScheduleRequest) GetMade() isCreateScheduleRequest_Made {
+	if x != nil {
+		return x.Made
+	}
+	return nil
+}
+
 func (x *CreateScheduleRequest) GetStoreToken() string {
 	if x != nil {
-		return x.StoreToken
+		if x, ok := x.Made.(*CreateScheduleRequest_StoreToken); ok {
+			return x.StoreToken
+		}
 	}
 	return ""
 }
+
+func (x *CreateScheduleRequest) GetByPlugin() bool {
+	if x != nil {
+		if x, ok := x.Made.(*CreateScheduleRequest_ByPlugin); ok {
+			return x.ByPlugin
+		}
+	}
+	return false
+}
+
+type isCreateScheduleRequest_Made interface {
+	isCreateScheduleRequest_Made()
+}
+
+type CreateScheduleRequest_StoreToken struct {
+	StoreToken string `protobuf:"bytes,6,opt,name=store_token,json=storeToken,proto3,oneof"` // The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule.
+}
+
+type CreateScheduleRequest_ByPlugin struct {
+	ByPlugin bool `protobuf:"varint,7,opt,name=by_plugin,json=byPlugin,proto3,oneof"` // The plugin made it in no sigil call: no caller is kept. False is refused.
+}
+
+func (*CreateScheduleRequest_StoreToken) isCreateScheduleRequest_Made() {}
+
+func (*CreateScheduleRequest_ByPlugin) isCreateScheduleRequest_Made() {}
 
 type CreateScheduleResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2367,19 +2407,21 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"updated_at\x18\r \x01(\tR\tupdatedAt\x12(\n" +
 	"\x10created_from_doc\x18\x0e \x01(\tR\x0ecreatedFromDoc\x12\x17\n" +
 	"\auser_id\x18\x0f \x01(\tR\x06userId\x12\x1c\n" +
-	"\tnamespace\x18\x10 \x01(\tR\tnamespaceJ\x04\b\x02\x10\x03R\bats_code\"\xc7\x02\n" +
+	"\tnamespace\x18\x10 \x01(\tR\tnamespaceJ\x04\b\x02\x10\x03R\bats_code\"\xf0\x02\n" +
 	"\x15CreateScheduleRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12)\n" +
 	"\x10interval_seconds\x18\x03 \x01(\x05R\x0fintervalSeconds\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x12I\n" +
-	"\bmetadata\x18\x05 \x03(\v2-.protocol.CreateScheduleRequest.MetadataEntryR\bmetadata\x12\x1f\n" +
-	"\vstore_token\x18\x06 \x01(\tR\n" +
-	"storeToken\x1a;\n" +
+	"\bmetadata\x18\x05 \x03(\v2-.protocol.CreateScheduleRequest.MetadataEntryR\bmetadata\x12!\n" +
+	"\vstore_token\x18\x06 \x01(\tH\x00R\n" +
+	"storeToken\x12\x1d\n" +
+	"\tby_plugin\x18\a \x01(\bH\x00R\bbyPlugin\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"i\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x06\n" +
+	"\x04made\"i\n" +
 	"\x16CreateScheduleResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x1f\n" +
@@ -2584,6 +2626,10 @@ func file_plugin_grpc_protocol_schedule_proto_init() {
 	file_plugin_grpc_protocol_schedule_proto_msgTypes[2].OneofWrappers = []any{}
 	file_plugin_grpc_protocol_schedule_proto_msgTypes[3].OneofWrappers = []any{}
 	file_plugin_grpc_protocol_schedule_proto_msgTypes[6].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_schedule_proto_msgTypes[13].OneofWrappers = []any{
+		(*CreateScheduleRequest_StoreToken)(nil),
+		(*CreateScheduleRequest_ByPlugin)(nil),
+	}
 	file_plugin_grpc_protocol_schedule_proto_msgTypes[23].OneofWrappers = []any{}
 	file_plugin_grpc_protocol_schedule_proto_msgTypes[24].OneofWrappers = []any{}
 	file_plugin_grpc_protocol_schedule_proto_msgTypes[25].OneofWrappers = []any{}

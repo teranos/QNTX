@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/errors"
@@ -71,16 +72,9 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 	}
 
 	// "a schedule remembers who created it and where"
-	var caller Caller
-	if req.StoreToken != "" {
-		var open bool
-		caller, open = s.callerOf(req.StoreToken)
-		if !open {
-			return &protocol.CreateScheduleResponse{
-				Success: false,
-				Error:   fmt.Sprintf("store_token names no open sigil call, so schedule %s has no caller to remember", req.HandlerName),
-			}, nil
-		}
+	caller, err := s.madeBy(req)
+	if err != nil {
+		return &protocol.CreateScheduleResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload
 	}
 
 	// Idempotent: if an active schedule for this handler, made by the same
@@ -106,11 +100,9 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 	}
 
 	// An interval of 0 is no ticking, and a schedule ticks: it names how often.
-	if req.IntervalSeconds <= 0 {
-		return &protocol.CreateScheduleResponse{
-			Success: false,
-			Error:   fmt.Sprintf("a schedule repeats every interval_seconds, and %d repeats never", req.IntervalSeconds),
-		}, nil
+	interval, err := named.CountOf("interval_seconds, how often schedule "+req.HandlerName+" repeats,", int(req.IntervalSeconds))
+	if err != nil {
+		return &protocol.CreateScheduleResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload
 	}
 
 	// Generate schedule ID
@@ -122,21 +114,22 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		}, nil
 	}
 
-	// Serialize metadata to JSON string
-	var metadata string
-	if len(req.Metadata) > 0 {
-		metaBytes, err := json.Marshal(req.Metadata)
-		if err != nil {
-			return &protocol.CreateScheduleResponse{
-				Success: false,
-				Error:   fmt.Sprintf("failed to serialize metadata: %v", err),
-			}, nil
-		}
-		metadata = string(metaBytes)
+	// Metadata is kept as a JSON object: {} for a schedule given none.
+	kept := make(map[string]string, len(req.Metadata))
+	for key, value := range req.Metadata {
+		kept[key] = value
 	}
+	metaBytes, err := json.Marshal(kept)
+	if err != nil {
+		return &protocol.CreateScheduleResponse{
+			Success: false,
+			Error:   fmt.Sprintf("failed to serialize metadata: %v", err),
+		}, nil
+	}
+	metadata := string(metaBytes)
 
 	now := time.Now()
-	nextRun := now.Add(time.Duration(req.IntervalSeconds) * time.Second)
+	nextRun := now.Add(time.Duration(interval.Int()) * time.Second)
 
 	job := &schedule.Job{
 		Id:              scheduleID,
@@ -169,6 +162,25 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		Success:    true,
 		ScheduleId: scheduleID,
 	}, nil
+}
+
+// madeBy is the caller of the sigil call a schedule is made in, or no caller
+// for one the plugin made itself.
+func (s *ScheduleServer) madeBy(req *protocol.CreateScheduleRequest) (Caller, error) {
+	switch made := req.GetMade().(type) {
+	case *protocol.CreateScheduleRequest_StoreToken:
+		caller, open := s.callerOf(made.StoreToken)
+		if !open {
+			return Caller{}, errors.Newf("store_token names no open sigil call, so schedule %s has no caller to remember", req.HandlerName)
+		}
+		return caller, nil
+	case *protocol.CreateScheduleRequest_ByPlugin:
+		if !made.ByPlugin {
+			return Caller{}, errors.Newf("by_plugin is false: schedule %s is made in a sigil call, or by the plugin", req.HandlerName)
+		}
+		return Caller{}, nil
+	}
+	return Caller{}, errors.Newf("schedule %s names who made it: the store_token of a sigil call, or by_plugin", req.HandlerName)
 }
 
 // PauseSchedule pauses an active schedule

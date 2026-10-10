@@ -28,9 +28,13 @@ func scheduleServerWithCalls(t *testing.T, calls map[string]Caller) (*ScheduleSe
 
 func createIn(t *testing.T, s *ScheduleServer, storeToken string) *protocol.CreateScheduleResponse {
 	t.Helper()
-	resp, err := s.CreateSchedule(context.Background(), &protocol.CreateScheduleRequest{
-		AuthToken: scheduleToken, HandlerName: "datapunt/observe", IntervalSeconds: 3600, StoreToken: storeToken,
-	})
+	return createMade(t, s, &protocol.CreateScheduleRequest{Made: &protocol.CreateScheduleRequest_StoreToken{StoreToken: storeToken}})
+}
+
+func createMade(t *testing.T, s *ScheduleServer, req *protocol.CreateScheduleRequest) *protocol.CreateScheduleResponse {
+	t.Helper()
+	req.AuthToken, req.HandlerName, req.IntervalSeconds = scheduleToken, "datapunt/observe", 3600
+	resp, err := s.CreateSchedule(context.Background(), req)
 	require.NoError(t, err)
 	return resp
 }
@@ -81,7 +85,7 @@ func TestAScheduleNamingNoOpenCallIsNotCreated(t *testing.T) {
 func TestAScheduleCreatedOutsideACallHasNoCaller(t *testing.T) {
 	s, store := scheduleServerWithCalls(t, map[string]Caller{})
 
-	resp := createIn(t, s, "")
+	resp := createMade(t, s, &protocol.CreateScheduleRequest{Made: &protocol.CreateScheduleRequest_ByPlugin{ByPlugin: true}})
 	require.True(t, resp.Success, resp.Error)
 
 	job, err := store.GetJob(resp.ScheduleId)
