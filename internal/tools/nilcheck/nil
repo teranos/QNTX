@@ -1,6 +1,7 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3405 in 436 files.
+# 3406 in 437 files.
+# db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
 # ats/types/attestation.go: +1, NamesItsActor refuses a command naming no actor: one check every store's generate path calls, where four filled one in.
@@ -132,6 +133,7 @@
 5	db/connection.go
 4	db/migrate.go
 10	db/rustdriver/driver.go
+1	db/rustdriver/slow.go
 34	element/handlers/canvas.go
 15	element/handlers/canvases.go
 4	element/storage/canvas_store.go
