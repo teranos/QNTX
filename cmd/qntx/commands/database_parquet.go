@@ -92,9 +92,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		return nil, nil, "", nil, errors.Wrapf(err,
 			"failed to open the operational store at %s for the parquet backend", dbPath)
 	}
-	driverOnce.Do(func() {
-		rustdriver.Register(rustStore.StorePtr(), rustStore.ReadConnPtr(), rustStore.Mu(), rustStore.MuRead())
-	})
+	registerDriver(rustStore)
 	database, err := sql.Open("rustsqlite", dbPath)
 	if err != nil {
 		unwindOperational(nil, rustStore)
