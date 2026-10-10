@@ -97,6 +97,14 @@
       }
       {
         "if" = "always()";
+        name = "A bare page that also says user-scalable=no";
+        run = ''
+          sed 's|<!-- VIEWPORT -->|<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">|' qntx/ci/app-keyboard/page.html > qntx/internal/server/dist/index.html
+          bash qntx/ci/app-keyboard/run.sh unscalable
+        '';
+      }
+      {
+        "if" = "always()";
         name = "QNTX's own page, as the app carries it";
         working-directory = "qntx";
         run = "make web";

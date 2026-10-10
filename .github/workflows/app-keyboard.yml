@@ -66,6 +66,11 @@
         },
         {
           "if": "always()",
+          "name": "A bare page that also says user-scalable=no",
+          "run": "sed 's|<!-- VIEWPORT -->|<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">|' qntx/ci/app-keyboard/page.html > qntx/internal/server/dist/index.html\nbash qntx/ci/app-keyboard/run.sh unscalable\n"
+        },
+        {
+          "if": "always()",
           "name": "QNTX's own page, as the app carries it",
           "run": "make web",
           "working-directory": "qntx"
