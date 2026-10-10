@@ -551,7 +551,10 @@ mod tests {
                 "pond",
                 "owner = \"google:104729\"\nenabled = true\ncreated_at = \"2026-08-17T09:00:00Z\"\n",
             );
-            let found = store.definition("pond").expect("definition").expect("defined");
+            let found = store
+                .definition("pond")
+                .expect("definition")
+                .expect("defined");
             assert_eq!(found.record, Record::None);
         }
 
@@ -561,7 +564,11 @@ mod tests {
             store.create("pond", &defined()).expect("create");
             store.set_record("pond", Record::Parquet).expect("give");
             assert_eq!(
-                store.definition("pond").expect("definition").expect("defined").record,
+                store
+                    .definition("pond")
+                    .expect("definition")
+                    .expect("defined")
+                    .record,
                 Record::Parquet
             );
             assert!(store.set_record("pond", Record::Sqlite).is_err());
@@ -580,7 +587,10 @@ mod tests {
             assert!(wrote.ends_with(
                 "[record]\nkind = \"postgres\"\nurl = \"ssm:///q/pond/postgres-url\"\n"
             ));
-            let found = store.definition("pond").expect("definition").expect("defined");
+            let found = store
+                .definition("pond")
+                .expect("definition")
+                .expect("defined");
             assert_eq!(found.record, record);
         }
 
