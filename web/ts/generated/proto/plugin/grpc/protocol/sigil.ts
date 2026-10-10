@@ -96,6 +96,120 @@ export interface SessionTranscript {
   transcript: Transcript | undefined;
 }
 
+/** ClaudeSaid is what claude say answers. */
+export interface ClaudeSaid {
+  /** What it answered. */
+  answer: string;
+  /** Whether Claude Code reports the turn as failed, in the answer's words. */
+  is_error: boolean;
+  /** How Claude Code says the turn ended. */
+  subtype: string;
+  /** The session it was said in. */
+  session: string;
+  /** The model that answered. */
+  model: string;
+  /** The Claude Code that ran. */
+  claude_code: string;
+  /** The permission mode it ran in. */
+  permission_mode: string;
+  /** Each tool it reached for and was not allowed. */
+  denied: string[];
+  /** What Claude Code says the turn cost. */
+  cost_usd: number;
+  /** How long the turn took. */
+  took_ms: number;
+  /** Why a row of the session was not written down, when one was not. */
+  unwritten: string;
+}
+
+/** PiSaid is what pi say answers. */
+export interface PiSaid {
+  /** What it answered. */
+  answer: string;
+  /** Whether the turn ended in error, in the answer's words. */
+  is_error: boolean;
+  /** Why Pi says the turn stopped. */
+  stop: string;
+  /** The session it was said in. */
+  session: string;
+  /** The model that answered. */
+  model: string;
+  /** The Pi that ran. */
+  pi_version: string;
+  /** What Pi says the turn's model calls cost. */
+  cost_usd: number;
+  /** How long the turn took. */
+  took_ms: number;
+  /** Why a row of the session was not written down, when one was not. */
+  unwritten: string;
+}
+
+/** ClaudeAm is what claude am answers. */
+export interface ClaudeAm {
+  /** Its own DID, which signs what it writes down. */
+  did: string;
+  /** The model am.toml names. */
+  model: string;
+  /** The effort am.toml names. */
+  effort: string;
+  /** The permission mode it runs in when whoever speaks names none. */
+  permission_mode: string;
+  /** Every permission mode Claude Code has. */
+  permission_modes: string[];
+  /** The tools it may use without being asked. */
+  allow: string[];
+  /** The session it continues, or empty before anything was said to it. */
+  session: string;
+  /** Whether it is in a turn now. */
+  answering: boolean;
+  /** Where the Claude Code it runs on is, or empty when the node has none. */
+  claude_code: string;
+  /** Why it cannot be spoken to, when it cannot. */
+  not_ready: string;
+  /** Whether Claude Code says it is signed in, by claude login. */
+  signed_in: boolean;
+  /** How it is signed in, as Claude Code names it, or empty when it is not. */
+  auth_method: string;
+}
+
+/** PiAm is what pi am answers. */
+export interface PiAm {
+  /** Its own DID, which signs what it writes down. */
+  did: string;
+  /** The model am.toml names for Pi. */
+  model: string;
+  /** The thinking level am.toml names for Pi. */
+  thinking: string;
+  /** The plugin every model call Pi makes goes through. */
+  gateway: string;
+  /**
+   * The session it continues in Pi, or empty before anything was said to it
+   * there.
+   */
+  session: string;
+  /** Whether it is in a turn in Pi now. */
+  answering: boolean;
+  /** Where the Pi it runs is, or empty when the node has none yet. */
+  pi: string;
+  /** The Pi this build pins. */
+  pi_version: string;
+  /** Why it cannot be spoken to in Pi, when it cannot. */
+  not_ready: string;
+}
+
+/**
+ * NamespaceAgentAm is what agents am and agents set answer: the namespace's
+ * agent, who opted the namespace into it, and who it is in Claude Code.
+ */
+export interface NamespaceAgentAm {
+  /** The namespace it stands in. */
+  namespace: string;
+  /** Who opted the namespace into it. */
+  set_by: string;
+  /** Who the agent is and how it runs. */
+  agent: ClaudeAm | undefined;
+}
+
 /**
  * Follows says which column of a reference each of a signum's fields is. The
  * reference is named, not described: its own schema says what its columns are.

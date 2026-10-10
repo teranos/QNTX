@@ -4,17 +4,19 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 )
 
-func readLines(t *testing.T, s *QNTXServer) linesResponse {
+func readLines(t *testing.T, s *QNTXServer) *protocol.RolesList {
 	t.Helper()
 	answer, refusal := s.rolesList(auth.WithAdmission(context.Background(), rootOf(s)), nil)
 	require.Nil(t, refusal, "roles list refused")
-	return answer.(linesResponse)
+	return answer.(*protocol.RolesList)
 }
 
 // "its a fucking audit trail": every line the gate reads, as written, newest
@@ -24,9 +26,13 @@ func TestTheLinesAreAnsweredAsWritten(t *testing.T) {
 	answer := readLines(t, s)
 
 	// REACH, WRITE, READ, COORDINATOR's READ, and two grants.
-	require.Equal(t, 6, answer.Count)
+	require.Equal(t, uint32(6), answer.GetCount())
 	for i := 1; i < len(answer.Lines); i++ {
-		assert.False(t, answer.Lines[i].At.After(answer.Lines[i-1].At), "the lines are not newest first")
+		at, err := time.Parse(time.RFC3339Nano, answer.Lines[i].GetAt())
+		require.NoError(t, err)
+		before, err := time.Parse(time.RFC3339Nano, answer.Lines[i-1].GetAt())
+		require.NoError(t, err)
+		assert.False(t, at.After(before), "the lines are not newest first")
 	}
 
 	var kinds []string
@@ -45,7 +51,7 @@ func TestARevokeIsKeptBesideTheGrant(t *testing.T) {
 	require.Equal(t, http.StatusCreated, grants(t, s, rootOf(s), revokeFrom("spike", "WORKER")).Code)
 
 	answer := readLines(t, s)
-	require.Equal(t, 7, answer.Count)
+	require.Equal(t, uint32(7), answer.GetCount())
 	newest := answer.Lines[0]
 	assert.Equal(t, []string{"spike"}, newest.Subjects)
 	assert.Equal(t, []string{auth.PredicateRoleRevoked, "WORKER"}, newest.Predicates)

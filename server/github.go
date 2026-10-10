@@ -54,45 +54,6 @@ func (s *QNTXServer) gitHubService() *services.GitHubServer {
 	return s.github
 }
 
-// gitHubNamespace is one namespace's GitHub as the element shows it.
-type gitHubNamespace struct {
-	Namespace string      `json:"namespace"`
-	Source    string      `json:"source"`
-	Login     string      `json:"login,omitempty"`
-	MintedBy  string      `json:"minted_by"`
-	Revoked   bool        `json:"revoked"`
-	AuthOK    bool        `json:"auth_ok"`
-	AuthError string      `json:"auth_error,omitempty"`
-	Rate      *gitHubRate `json:"rate,omitempty"`
-}
-
-// gitHubRate is GitHub's core rate limit for the namespace's token.
-type gitHubRate struct {
-	Limit     int64     `json:"limit"`
-	Remaining int64     `json:"remaining"`
-	Reset     time.Time `json:"reset"`
-}
-
-// gitHubRunner is the runner as the Actions section shows it.
-type gitHubRunner struct {
-	Path    string                  `json:"path"`
-	Enabled bool                    `json:"enabled"`
-	Error   string                  `json:"error,omitempty"`
-	Stats   *grpcplugin.RunnerStats `json:"stats,omitempty"`
-}
-
-// gitHubStatus is the whole of what the GitHub element shows.
-type gitHubStatus struct {
-	Enabled     bool                        `json:"enabled"`
-	Namespaces  []gitHubNamespace           `json:"namespaces"`
-	Runner      gitHubRunner                `json:"runner"`
-	Builds      map[string]PluginBuildState `json:"builds"`
-	Webhook     bool                        `json:"webhook"`
-	WebhookPath string                      `json:"webhook_path"`
-	WebhookURL  string                      `json:"webhook_url"`
-	Follows     []GitHubFollow              `json:"follows"`
-}
-
 // webhookURL is the URL to paste into the App's webhook settings.
 func (s *QNTXServer) webhookURL(path string) string {
 	if s.authHandler == nil {
@@ -117,19 +78,10 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 			Follows: follows,
 			Sigils: []*protocol.Sigil{
 				{
-					Name: "status",
-					Does: "The node's GitHub: whether it is on, each namespace that has it with whether its token works and where it came from, and the Actions runner.",
-					Gives: []*protocol.Field{
-						{Name: "enabled", Says: "Whether GitHub is on for the node."},
-						{Name: "namespaces", Says: "One row per namespace with a GitHub token: its source, whether GitHub accepts it, and its rate limit."},
-						{Name: "runner", Says: "The runner's path, whether it is on, why it is not running when it is not, and its stats."},
-						{Name: "builds", Says: "Per plugin QNTX builds itself: the revs it was last built from, when, whether that changed the plugin, and what failed."},
-						{Name: "webhook", Says: "Whether ROOT generated the App's webhook secret, which is what opens the webhook's path."},
-						{Name: "webhook_path", Says: "Where the App's webhook URL points on this node."},
-						{Name: "webhook_url", Says: "The whole URL to paste into the App's webhook settings."},
-						{Name: "follows", Says: "What a push to a repo's branch dispatches, per follow ROOT set."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: githubPath},
+					Name:   "status",
+					Does:   "The node's GitHub: whether it is on, each namespace that has it with whether its token works and where it came from, and the Actions runner.",
+					Answer: "protocol.GitHubStatus",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: githubPath},
 				},
 				{
 					Name:   "webhook",
@@ -158,8 +110,8 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 						{Name: "path", Required: true, Says: "The runner's directory, the one holding .runner."},
 						enabled,
 					},
-					Gives: []*protocol.Field{{Name: "runner", Says: "The runner as the Actions section shows it."}},
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/runner"},
+					Answer: "protocol.GitHubRunnerSet",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/runner"},
 				},
 				githubFollowSigil(),
 				githubAskSigils()[0],
@@ -184,16 +136,26 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	status := gitHubStatus{
+	status := &protocol.GitHubStatus{
 		Enabled:    settings.Enabled,
-		Namespaces: []gitHubNamespace{},
+		Namespaces: []*protocol.GitHubNamespace{},
 		Runner:     s.runnerStatus(settings),
-		Builds:     s.builds.all(),
+		Builds:     map[string]*protocol.PluginBuild{},
+	}
+	for name, build := range s.builds.all() {
+		status.Builds[name] = &protocol.PluginBuild{Revs: build.Revs, Digest: build.Digest,
+			At: build.At.Format(time.RFC3339Nano), Changed: build.Changed, Error: build.Error}
 	}
 	_, status.Webhook = s.gitHubWebhook()
-	status.WebhookPath, status.WebhookURL = settings.WebhookPath, s.webhookURL(settings.WebhookPath)
-	if status.Follows, err = s.nodeRecords().Follows(); err != nil {
+	status.WebhookPath, status.WebhookUrl = settings.WebhookPath, s.webhookURL(settings.WebhookPath)
+	follows, err := s.nodeRecords().Follows()
+	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	status.Follows = make([]*protocol.GitHubFollow, 0, len(follows))
+	for _, f := range follows {
+		status.Follows = append(status.Follows, &protocol.GitHubFollow{Repo: f.Repo, Branch: f.Branch, Dispatches: f.Dispatches,
+			Workflow: f.Workflow, Ref: f.Ref, Inputs: f.Inputs, Enabled: f.Enabled})
 	}
 	if s.authHandler == nil {
 		return status, nil
@@ -208,7 +170,7 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 	}
 	for _, token := range held {
 		namespace := strings.Join(token.Namespaces, ",")
-		row := gitHubNamespace{
+		row := &protocol.GitHubNamespace{
 			Namespace: namespace,
 			Source:    token.GitHub.Source,
 			Login:     token.GitHub.Login,
@@ -223,14 +185,17 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 		case !said.Success:
 			row.AuthError = said.Error
 		default:
-			row.AuthOK = true
+			row.AuthOk = true
 			if core, ok := said.Resources["core"]; ok {
-				row.Rate = &gitHubRate{Limit: core.Limit, Remaining: core.Remaining, Reset: time.Unix(core.Reset_, 0).UTC()}
+				row.Rate = &protocol.GitHubCoreRate{Limit: uint32(core.Limit), Remaining: uint32(core.Remaining),
+					Reset_: time.Unix(core.Reset_, 0).UTC().Format(time.RFC3339Nano)}
 			}
 		}
 		status.Namespaces = append(status.Namespaces, row)
 	}
-	slices.SortFunc(status.Namespaces, func(a, b gitHubNamespace) int { return strings.Compare(a.Namespace, b.Namespace) })
+	slices.SortFunc(status.Namespaces, func(a, b *protocol.GitHubNamespace) int {
+		return strings.Compare(a.GetNamespace(), b.GetNamespace())
+	})
 	return status, nil
 }
 
@@ -273,7 +238,7 @@ func (s *QNTXServer) githubRunner(ctx context.Context, sent sigil.Sent) (any, *p
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	s.StartRunner()
-	return map[string]gitHubRunner{"runner": s.runnerStatus(settings)}, nil
+	return &protocol.GitHubRunnerSet{Runner: s.runnerStatus(settings)}, nil
 }
 
 func (s *QNTXServer) githubWebhook(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
@@ -308,8 +273,8 @@ func (s *QNTXServer) githubWebhookPath(ctx context.Context, sent sigil.Sent) (an
 }
 
 // runnerStatus is the runner as the Actions section shows it.
-func (s *QNTXServer) runnerStatus(settings GitHubSettings) gitHubRunner {
-	shown := gitHubRunner{Path: settings.RunnerPath, Enabled: settings.RunnerEnabled}
+func (s *QNTXServer) runnerStatus(settings GitHubSettings) *protocol.GitHubRunner {
+	shown := &protocol.GitHubRunner{Path: settings.RunnerPath, Enabled: settings.RunnerEnabled}
 	if !settings.RunnerEnabled {
 		return shown
 	}
@@ -323,9 +288,23 @@ func (s *QNTXServer) runnerStatus(settings GitHubSettings) gitHubRunner {
 		}
 		return shown
 	}
-	stats := runner.Stats()
-	shown.Stats = &stats
+	shown.Stats = runnerStats(runner.Stats())
 	return shown
+}
+
+// runnerStats is the runner's stats as the Actions section is given them.
+func runnerStats(stats grpcplugin.RunnerStats) *protocol.RunnerStats {
+	jobs := make([]string, 0, len(stats.Jobs))
+	for _, at := range stats.Jobs {
+		jobs = append(jobs, at.Format(time.RFC3339Nano))
+	}
+	taken := make([]*protocol.TakenBuild, 0, len(stats.Taken))
+	for _, build := range stats.Taken {
+		taken = append(taken, &protocol.TakenBuild{Plugin: build.Plugin, Archive: build.Archive, Digest: build.Digest,
+			At: build.At.Format(time.RFC3339Nano), Changed: build.Changed, Older: build.Older})
+	}
+	return &protocol.RunnerStats{Path: stats.Path, Name: stats.Name, GithubUrl: stats.GitHubURL,
+		Workspaces: stats.Workspaces, Jobs: jobs, Taken: taken}
 }
 
 // StartRunner watches the runner the node's settings name, or stops watching

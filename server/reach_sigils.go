@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -33,13 +34,10 @@ func (s *QNTXServer) reachSignum() sigil.Signum {
 			Name: "reach",
 			Sigils: []*protocol.Sigil{
 				{
-					Name: "list",
-					Does: "Who reaches what: every runtime reach line as it was written, newest first, and what the compiled-in table says of each path.",
-					Gives: []*protocol.Field{
-						{Name: "lines", Says: "One row per stored line: its id, the paths, who they are opened to, whether it revokes, who wrote it and when. The latest line about a path and a role holds, ROOT's first."},
-						{Name: "compiled", Says: "Each path the compiled-in table names, and the levels it opens it to. Static: no line changes it."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: reachPath},
+					Name:   "list",
+					Does:   "Who reaches what: every runtime reach line as it was written, newest first, and what the compiled-in table says of each path.",
+					Answer: "protocol.ReachList",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: reachPath},
 				},
 				{
 					Name:   "grant",
@@ -65,24 +63,18 @@ func (s *QNTXServer) reachSignum() sigil.Signum {
 	}
 }
 
-// reachLine is one stored reach line, as it was written.
-type reachLine struct {
-	ID      string    `json:"id"`
-	Paths   []string  `json:"paths"`
-	To      []string  `json:"to"`
-	Revokes bool      `json:"revokes"`
-	By      string    `json:"by"`
-	At      time.Time `json:"at"`
-	// NotServed is why the node does not serve this line now, when it does not.
-	NotServed string `json:"not_served,omitempty"`
-}
-
 func (s *QNTXServer) reachList(_ context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
 	compiled, err := reach.Reached()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	lines := []reachLine{}
+	// Ordered by the time itself: the written time orders by whatever offset
+	// it carries.
+	type line struct {
+		at  time.Time
+		row *protocol.ReachLine
+	}
+	var lines []line
 	if s.held != nil && s.held.KeepsSystem() {
 		store, err := s.held.Read(auth.NamespaceSystem)
 		if err != nil {
@@ -96,19 +88,26 @@ func (s *QNTXServer) reachList(_ context.Context, _ sigil.Sent) (any, *protocol.
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
 		for _, as := range found {
-			line, err := reach.ReadLine(as.Subjects, as.Predicates, as.Contexts, as.Actors, as.Timestamp)
+			read, err := reach.ReadLine(as.Subjects, as.Predicates, as.Contexts, as.Actors, as.Timestamp)
 			if err != nil {
 				// A stored line the node does not serve is said, not hidden.
-				lines = append(lines, reachLine{ID: as.ID, Paths: as.Predicates, To: as.Contexts, At: as.Timestamp,
-					By: "not served: " + err.Error()})
+				lines = append(lines, line{at: as.Timestamp, row: &protocol.ReachLine{Id: as.ID, Paths: as.Predicates, To: as.Contexts,
+					At: as.Timestamp.Format(time.RFC3339Nano), By: "not served: " + err.Error()}})
 				continue
 			}
-			lines = append(lines, reachLine{ID: as.ID, Paths: line.Paths, To: line.Roles,
-				Revokes: line.Revoked, By: line.Actor, At: line.At, NotServed: s.notServed(line.Paths)})
+			lines = append(lines, line{at: read.At, row: &protocol.ReachLine{Id: as.ID, Paths: read.Paths, To: read.Roles,
+				Revokes: read.Revoked, By: read.Actor, At: read.At.Format(time.RFC3339Nano), NotServed: s.notServed(read.Paths)}})
 		}
 	}
-	slices.SortFunc(lines, func(a, b reachLine) int { return b.At.Compare(a.At) })
-	return map[string]any{"lines": lines, "compiled": compiled}, nil
+	slices.SortFunc(lines, func(a, b line) int { return b.at.Compare(a.at) })
+	answer := &protocol.ReachList{Lines: make([]*protocol.ReachLine, 0, len(lines)), Compiled: []*protocol.ReachCompiled{}}
+	for _, l := range lines {
+		answer.Lines = append(answer.Lines, l.row)
+	}
+	for _, path := range slices.Sorted(maps.Keys(compiled)) {
+		answer.Compiled = append(answer.Compiled, &protocol.ReachCompiled{Path: path, Levels: compiled[path]})
+	}
+	return answer, nil
 }
 
 // notServed says which of a line's paths nothing answers now, or nothing when

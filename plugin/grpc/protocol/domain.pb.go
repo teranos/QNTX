@@ -1674,6 +1674,886 @@ func (x *PluginAction) GetAction() string {
 	return ""
 }
 
+// SigilReach is who the lines say reaches a sigil over one surface. ROOT
+// reaches everything and is never listed: nothing here, and not anyone, is
+// ROOT only.
+type SigilReach struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Anyone        bool                   `protobuf:"varint,1,opt,name=anyone,proto3" json:"anyone,omitempty"`
+	Levels        []string               `protobuf:"bytes,2,rep,name=levels,proto3" json:"levels,omitempty"`
+	Roles         []string               `protobuf:"bytes,3,rep,name=roles,proto3" json:"roles,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SigilReach) Reset() {
+	*x = SigilReach{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SigilReach) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SigilReach) ProtoMessage() {}
+
+func (x *SigilReach) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SigilReach.ProtoReflect.Descriptor instead.
+func (*SigilReach) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SigilReach) GetAnyone() bool {
+	if x != nil {
+		return x.Anyone
+	}
+	return false
+}
+
+func (x *SigilReach) GetLevels() []string {
+	if x != nil {
+		return x.Levels
+	}
+	return nil
+}
+
+func (x *SigilReach) GetRoles() []string {
+	if x != nil {
+		return x.Roles
+	}
+	return nil
+}
+
+// SigilRow is one sigil a plugin handed the node, as the plugin panel draws it:
+// what it is, and who reaches it over each surface.
+type SigilRow struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Signum string                 `protobuf:"bytes,1,opt,name=signum,proto3" json:"signum,omitempty"`
+	Sigil  string                 `protobuf:"bytes,2,opt,name=sigil,proto3" json:"sigil,omitempty"`
+	Tool   string                 `protobuf:"bytes,3,opt,name=tool,proto3" json:"tool,omitempty"`
+	Method string                 `protobuf:"bytes,4,opt,name=method,proto3" json:"method,omitempty"`
+	Path   string                 `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
+	Does   string                 `protobuf:"bytes,6,opt,name=does,proto3" json:"does,omitempty"`
+	Takes  []*Param               `protobuf:"bytes,7,rep,name=takes,proto3" json:"takes,omitempty"`
+	Gives  []*Field               `protobuf:"bytes,8,rep,name=gives,proto3" json:"gives,omitempty"`
+	// Per surface: http, mcp and a2a.
+	Reach         map[string]*SigilReach `protobuf:"bytes,9,rep,name=reach,proto3" json:"reach,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SigilRow) Reset() {
+	*x = SigilRow{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SigilRow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SigilRow) ProtoMessage() {}
+
+func (x *SigilRow) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SigilRow.ProtoReflect.Descriptor instead.
+func (*SigilRow) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *SigilRow) GetSignum() string {
+	if x != nil {
+		return x.Signum
+	}
+	return ""
+}
+
+func (x *SigilRow) GetSigil() string {
+	if x != nil {
+		return x.Sigil
+	}
+	return ""
+}
+
+func (x *SigilRow) GetTool() string {
+	if x != nil {
+		return x.Tool
+	}
+	return ""
+}
+
+func (x *SigilRow) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *SigilRow) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *SigilRow) GetDoes() string {
+	if x != nil {
+		return x.Does
+	}
+	return ""
+}
+
+func (x *SigilRow) GetTakes() []*Param {
+	if x != nil {
+		return x.Takes
+	}
+	return nil
+}
+
+func (x *SigilRow) GetGives() []*Field {
+	if x != nil {
+		return x.Gives
+	}
+	return nil
+}
+
+func (x *SigilRow) GetReach() map[string]*SigilReach {
+	if x != nil {
+		return x.Reach
+	}
+	return nil
+}
+
+// PluginInfo is one plugin plugins list knows.
+type PluginInfo struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Name        string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Version     string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	QntxVersion string                 `protobuf:"bytes,3,opt,name=qntx_version,json=qntxVersion,proto3" json:"qntx_version,omitempty"`
+	Description string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Author      string                 `protobuf:"bytes,5,opt,name=author,proto3" json:"author,omitempty"`
+	License     string                 `protobuf:"bytes,6,opt,name=license,proto3" json:"license,omitempty"`
+	Healthy     bool                   `protobuf:"varint,7,opt,name=healthy,proto3" json:"healthy,omitempty"`
+	// Whether the last probe saw this plugin. Unprobed is not unhealthy: it
+	// started after the probe was taken.
+	Probed  bool   `protobuf:"varint,8,opt,name=probed,proto3" json:"probed,omitempty"`
+	Message string `protobuf:"bytes,9,opt,name=message,proto3" json:"message,omitempty"`
+	// What the plugin's health said besides, as it crossed gRPC.
+	Details  map[string]string `protobuf:"bytes,10,rep,name=details,proto3" json:"details,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	State    string            `protobuf:"bytes,11,opt,name=state,proto3" json:"state,omitempty"`
+	Pausable bool              `protobuf:"varint,12,opt,name=pausable,proto3" json:"pausable,omitempty"`
+	// Identifies the element module this plugin serves, so the browser can
+	// import a replaced one instead of the module record it already holds for
+	// that URL. Empty for anything not serving a module.
+	ModuleDigest string `protobuf:"bytes,13,opt,name=module_digest,json=moduleDigest,proto3" json:"module_digest,omitempty"`
+	// What the plugin does, as the node serves it (ADR-039).
+	Sigils []*SigilRow `protobuf:"bytes,14,rep,name=sigils,proto3" json:"sigils,omitempty"`
+	// Why a signum it handed is served nowhere.
+	SignaRefused []string `protobuf:"bytes,15,rep,name=signa_refused,json=signaRefused,proto3" json:"signa_refused,omitempty"`
+	// The plugin's record: where it was added from, and whether it is switched
+	// on.
+	Repo          string `protobuf:"bytes,16,opt,name=repo,proto3" json:"repo,omitempty"`
+	Enabled       bool   `protobuf:"varint,17,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginInfo) Reset() {
+	*x = PluginInfo{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginInfo) ProtoMessage() {}
+
+func (x *PluginInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginInfo.ProtoReflect.Descriptor instead.
+func (*PluginInfo) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *PluginInfo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PluginInfo) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *PluginInfo) GetQntxVersion() string {
+	if x != nil {
+		return x.QntxVersion
+	}
+	return ""
+}
+
+func (x *PluginInfo) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *PluginInfo) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+func (x *PluginInfo) GetLicense() string {
+	if x != nil {
+		return x.License
+	}
+	return ""
+}
+
+func (x *PluginInfo) GetHealthy() bool {
+	if x != nil {
+		return x.Healthy
+	}
+	return false
+}
+
+func (x *PluginInfo) GetProbed() bool {
+	if x != nil {
+		return x.Probed
+	}
+	return false
+}
+
+func (x *PluginInfo) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *PluginInfo) GetDetails() map[string]string {
+	if x != nil {
+		return x.Details
+	}
+	return nil
+}
+
+func (x *PluginInfo) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *PluginInfo) GetPausable() bool {
+	if x != nil {
+		return x.Pausable
+	}
+	return false
+}
+
+func (x *PluginInfo) GetModuleDigest() string {
+	if x != nil {
+		return x.ModuleDigest
+	}
+	return ""
+}
+
+func (x *PluginInfo) GetSigils() []*SigilRow {
+	if x != nil {
+		return x.Sigils
+	}
+	return nil
+}
+
+func (x *PluginInfo) GetSignaRefused() []string {
+	if x != nil {
+		return x.SignaRefused
+	}
+	return nil
+}
+
+func (x *PluginInfo) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *PluginInfo) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+// PluginHealthProbe is when the health in plugins list was probed. Health here
+// is a probe with an age. Saying when it was taken is what keeps a stale answer
+// from reading as a current one.
+type PluginHealthProbe struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ProbedAt string                 `protobuf:"bytes,1,opt,name=probed_at,json=probedAt,proto3" json:"probed_at,omitempty"`
+	// How old that probe is.
+	AgeMs         float64 `protobuf:"fixed64,2,opt,name=age_ms,json=ageMs,proto3" json:"age_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginHealthProbe) Reset() {
+	*x = PluginHealthProbe{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginHealthProbe) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginHealthProbe) ProtoMessage() {}
+
+func (x *PluginHealthProbe) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginHealthProbe.ProtoReflect.Descriptor instead.
+func (*PluginHealthProbe) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *PluginHealthProbe) GetProbedAt() string {
+	if x != nil {
+		return x.ProbedAt
+	}
+	return ""
+}
+
+func (x *PluginHealthProbe) GetAgeMs() float64 {
+	if x != nil {
+		return x.AgeMs
+	}
+	return 0
+}
+
+// PluginsList is what plugins list answers.
+type PluginsList struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One row per plugin.
+	Plugins []*PluginInfo `protobuf:"bytes,1,rep,name=plugins,proto3" json:"plugins,omitempty"`
+	// When the health in the rows was probed. Null before the first probe.
+	Health *PluginHealthProbe `protobuf:"bytes,2,opt,name=health,proto3" json:"health,omitempty"`
+	// Why the last probe did not complete, when it did not.
+	HealthProbeFailure string `protobuf:"bytes,3,opt,name=health_probe_failure,json=healthProbeFailure,proto3" json:"health_probe_failure,omitempty"`
+	// Why the node's plugin records did not read, when they did not.
+	RecordsFailure string `protobuf:"bytes,4,opt,name=records_failure,json=recordsFailure,proto3" json:"records_failure,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PluginsList) Reset() {
+	*x = PluginsList{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginsList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginsList) ProtoMessage() {}
+
+func (x *PluginsList) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginsList.ProtoReflect.Descriptor instead.
+func (*PluginsList) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *PluginsList) GetPlugins() []*PluginInfo {
+	if x != nil {
+		return x.Plugins
+	}
+	return nil
+}
+
+func (x *PluginsList) GetHealth() *PluginHealthProbe {
+	if x != nil {
+		return x.Health
+	}
+	return nil
+}
+
+func (x *PluginsList) GetHealthProbeFailure() string {
+	if x != nil {
+		return x.HealthProbeFailure
+	}
+	return ""
+}
+
+func (x *PluginsList) GetRecordsFailure() string {
+	if x != nil {
+		return x.RecordsFailure
+	}
+	return ""
+}
+
+// RouteEndpoint is a core endpoint a plugin's role is asked through.
+type RouteEndpoint struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RouteEndpoint) Reset() {
+	*x = RouteEndpoint{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RouteEndpoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RouteEndpoint) ProtoMessage() {}
+
+func (x *RouteEndpoint) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RouteEndpoint.ProtoReflect.Descriptor instead.
+func (*RouteEndpoint) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *RouteEndpoint) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *RouteEndpoint) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *RouteEndpoint) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+// PluginRoute is what one running plugin serves.
+type PluginRoute struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Http  string                 `protobuf:"bytes,2,opt,name=http,proto3" json:"http,omitempty"`
+	// Its socket path, when it serves one.
+	Ws string `protobuf:"bytes,3,opt,name=ws,proto3" json:"ws,omitempty"`
+	// The roles it plays: llm-provider, search-provider, embedding-provider.
+	Roles         []string         `protobuf:"bytes,4,rep,name=roles,proto3" json:"roles,omitempty"`
+	Handlers      []string         `protobuf:"bytes,5,rep,name=handlers,proto3" json:"handlers,omitempty"`
+	Schedules     uint32           `protobuf:"varint,6,opt,name=schedules,proto3" json:"schedules,omitempty"`
+	Watchers      uint32           `protobuf:"varint,7,opt,name=watchers,proto3" json:"watchers,omitempty"`
+	Endpoints     []*RouteEndpoint `protobuf:"bytes,8,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginRoute) Reset() {
+	*x = PluginRoute{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginRoute) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginRoute) ProtoMessage() {}
+
+func (x *PluginRoute) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginRoute.ProtoReflect.Descriptor instead.
+func (*PluginRoute) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *PluginRoute) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PluginRoute) GetHttp() string {
+	if x != nil {
+		return x.Http
+	}
+	return ""
+}
+
+func (x *PluginRoute) GetWs() string {
+	if x != nil {
+		return x.Ws
+	}
+	return ""
+}
+
+func (x *PluginRoute) GetRoles() []string {
+	if x != nil {
+		return x.Roles
+	}
+	return nil
+}
+
+func (x *PluginRoute) GetHandlers() []string {
+	if x != nil {
+		return x.Handlers
+	}
+	return nil
+}
+
+func (x *PluginRoute) GetSchedules() uint32 {
+	if x != nil {
+		return x.Schedules
+	}
+	return 0
+}
+
+func (x *PluginRoute) GetWatchers() uint32 {
+	if x != nil {
+		return x.Watchers
+	}
+	return 0
+}
+
+func (x *PluginRoute) GetEndpoints() []*RouteEndpoint {
+	if x != nil {
+		return x.Endpoints
+	}
+	return nil
+}
+
+// PluginRoutes is what plugins routes answers.
+type PluginRoutes struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One row per running plugin.
+	Routes        []*PluginRoute `protobuf:"bytes,1,rep,name=routes,proto3" json:"routes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginRoutes) Reset() {
+	*x = PluginRoutes{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginRoutes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginRoutes) ProtoMessage() {}
+
+func (x *PluginRoutes) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginRoutes.ProtoReflect.Descriptor instead.
+func (*PluginRoutes) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *PluginRoutes) GetRoutes() []*PluginRoute {
+	if x != nil {
+		return x.Routes
+	}
+	return nil
+}
+
+// PluginAdded is what plugins add answers.
+type PluginAdded struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The plugin's name.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// The repository it was added from.
+	Repo string `protobuf:"bytes,2,opt,name=repo,proto3" json:"repo,omitempty"`
+	// An added plugin starts disabled.
+	Enabled       bool `protobuf:"varint,3,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginAdded) Reset() {
+	*x = PluginAdded{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginAdded) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginAdded) ProtoMessage() {}
+
+func (x *PluginAdded) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginAdded.ProtoReflect.Descriptor instead.
+func (*PluginAdded) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *PluginAdded) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PluginAdded) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *PluginAdded) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+// PluginChecked is what plugins check answers.
+type PluginChecked struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The plugin's name.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// The repository URL checked.
+	Repo string `protobuf:"bytes,2,opt,name=repo,proto3" json:"repo,omitempty"`
+	// The repository as GitHub names it, owner/repo.
+	Repository string `protobuf:"bytes,3,opt,name=repository,proto3" json:"repository,omitempty"`
+	// Whether GitHub keeps the repository private.
+	Private bool `protobuf:"varint,4,opt,name=private,proto3" json:"private,omitempty"`
+	// The branch the plugin is read from: the tree URL's, or the repository's
+	// default.
+	Ref string `protobuf:"bytes,5,opt,name=ref,proto3" json:"ref,omitempty"`
+	// Where in the repository the plugin is. Empty for a plugin that is the
+	// whole repository.
+	Path string `protobuf:"bytes,6,opt,name=path,proto3" json:"path,omitempty"`
+	// "I expected to also see the plugin README if there is one."
+	Readme string `protobuf:"bytes,7,opt,name=readme,proto3" json:"readme,omitempty"`
+	// Where that README is in the repository.
+	ReadmePath string `protobuf:"bytes,8,opt,name=readme_path,json=readmePath,proto3" json:"readme_path,omitempty"`
+	// What GitHub answered when no README came back.
+	ReadmeSaid    string `protobuf:"bytes,9,opt,name=readme_said,json=readmeSaid,proto3" json:"readme_said,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginChecked) Reset() {
+	*x = PluginChecked{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginChecked) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginChecked) ProtoMessage() {}
+
+func (x *PluginChecked) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginChecked.ProtoReflect.Descriptor instead.
+func (*PluginChecked) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *PluginChecked) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PluginChecked) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *PluginChecked) GetRepository() string {
+	if x != nil {
+		return x.Repository
+	}
+	return ""
+}
+
+func (x *PluginChecked) GetPrivate() bool {
+	if x != nil {
+		return x.Private
+	}
+	return false
+}
+
+func (x *PluginChecked) GetRef() string {
+	if x != nil {
+		return x.Ref
+	}
+	return ""
+}
+
+func (x *PluginChecked) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *PluginChecked) GetReadme() string {
+	if x != nil {
+		return x.Readme
+	}
+	return ""
+}
+
+func (x *PluginChecked) GetReadmePath() string {
+	if x != nil {
+		return x.ReadmePath
+	}
+	return ""
+}
+
+func (x *PluginChecked) GetReadmeSaid() string {
+	if x != nil {
+		return x.ReadmeSaid
+	}
+	return ""
+}
+
 var File_plugin_grpc_protocol_domain_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
@@ -1828,7 +2708,90 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fPluginAction\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05state\x18\x02 \x01(\tR\x05state\x12\x16\n" +
-	"\x06action\x18\x03 \x01(\tR\x06action2\xd3\x04\n" +
+	"\x06action\x18\x03 \x01(\tR\x06action\"R\n" +
+	"\n" +
+	"SigilReach\x12\x16\n" +
+	"\x06anyone\x18\x01 \x01(\bR\x06anyone\x12\x16\n" +
+	"\x06levels\x18\x02 \x03(\tR\x06levels\x12\x14\n" +
+	"\x05roles\x18\x03 \x03(\tR\x05roles\"\xdf\x02\n" +
+	"\bSigilRow\x12\x16\n" +
+	"\x06signum\x18\x01 \x01(\tR\x06signum\x12\x14\n" +
+	"\x05sigil\x18\x02 \x01(\tR\x05sigil\x12\x12\n" +
+	"\x04tool\x18\x03 \x01(\tR\x04tool\x12\x16\n" +
+	"\x06method\x18\x04 \x01(\tR\x06method\x12\x12\n" +
+	"\x04path\x18\x05 \x01(\tR\x04path\x12\x12\n" +
+	"\x04does\x18\x06 \x01(\tR\x04does\x12%\n" +
+	"\x05takes\x18\a \x03(\v2\x0f.protocol.ParamR\x05takes\x12%\n" +
+	"\x05gives\x18\b \x03(\v2\x0f.protocol.FieldR\x05gives\x123\n" +
+	"\x05reach\x18\t \x03(\v2\x1d.protocol.SigilRow.ReachEntryR\x05reach\x1aN\n" +
+	"\n" +
+	"ReachEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12*\n" +
+	"\x05value\x18\x02 \x01(\v2\x14.protocol.SigilReachR\x05value:\x028\x01\"\xcc\x04\n" +
+	"\n" +
+	"PluginInfo\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12!\n" +
+	"\fqntx_version\x18\x03 \x01(\tR\vqntxVersion\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
+	"\x06author\x18\x05 \x01(\tR\x06author\x12\x18\n" +
+	"\alicense\x18\x06 \x01(\tR\alicense\x12\x18\n" +
+	"\ahealthy\x18\a \x01(\bR\ahealthy\x12\x16\n" +
+	"\x06probed\x18\b \x01(\bR\x06probed\x12\x18\n" +
+	"\amessage\x18\t \x01(\tR\amessage\x12;\n" +
+	"\adetails\x18\n" +
+	" \x03(\v2!.protocol.PluginInfo.DetailsEntryR\adetails\x12\x14\n" +
+	"\x05state\x18\v \x01(\tR\x05state\x12\x1a\n" +
+	"\bpausable\x18\f \x01(\bR\bpausable\x12#\n" +
+	"\rmodule_digest\x18\r \x01(\tR\fmoduleDigest\x12*\n" +
+	"\x06sigils\x18\x0e \x03(\v2\x12.protocol.SigilRowR\x06sigils\x12#\n" +
+	"\rsigna_refused\x18\x0f \x03(\tR\fsignaRefused\x12\x12\n" +
+	"\x04repo\x18\x10 \x01(\tR\x04repo\x12\x18\n" +
+	"\aenabled\x18\x11 \x01(\bR\aenabled\x1a:\n" +
+	"\fDetailsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"G\n" +
+	"\x11PluginHealthProbe\x12\x1b\n" +
+	"\tprobed_at\x18\x01 \x01(\tR\bprobedAt\x12\x15\n" +
+	"\x06age_ms\x18\x02 \x01(\x01R\x05ageMs\"\xcd\x01\n" +
+	"\vPluginsList\x12.\n" +
+	"\aplugins\x18\x01 \x03(\v2\x14.protocol.PluginInfoR\aplugins\x123\n" +
+	"\x06health\x18\x02 \x01(\v2\x1b.protocol.PluginHealthProbeR\x06health\x120\n" +
+	"\x14health_probe_failure\x18\x03 \x01(\tR\x12healthProbeFailure\x12'\n" +
+	"\x0frecords_failure\x18\x04 \x01(\tR\x0erecordsFailure\"]\n" +
+	"\rRouteEndpoint\x12\x16\n" +
+	"\x06method\x18\x01 \x01(\tR\x06method\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xe8\x01\n" +
+	"\vPluginRoute\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04http\x18\x02 \x01(\tR\x04http\x12\x0e\n" +
+	"\x02ws\x18\x03 \x01(\tR\x02ws\x12\x14\n" +
+	"\x05roles\x18\x04 \x03(\tR\x05roles\x12\x1a\n" +
+	"\bhandlers\x18\x05 \x03(\tR\bhandlers\x12\x1c\n" +
+	"\tschedules\x18\x06 \x01(\rR\tschedules\x12\x1a\n" +
+	"\bwatchers\x18\a \x01(\rR\bwatchers\x125\n" +
+	"\tendpoints\x18\b \x03(\v2\x17.protocol.RouteEndpointR\tendpoints\"=\n" +
+	"\fPluginRoutes\x12-\n" +
+	"\x06routes\x18\x01 \x03(\v2\x15.protocol.PluginRouteR\x06routes\"O\n" +
+	"\vPluginAdded\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04repo\x18\x02 \x01(\tR\x04repo\x12\x18\n" +
+	"\aenabled\x18\x03 \x01(\bR\aenabled\"\xf1\x01\n" +
+	"\rPluginChecked\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04repo\x18\x02 \x01(\tR\x04repo\x12\x1e\n" +
+	"\n" +
+	"repository\x18\x03 \x01(\tR\n" +
+	"repository\x12\x18\n" +
+	"\aprivate\x18\x04 \x01(\bR\aprivate\x12\x10\n" +
+	"\x03ref\x18\x05 \x01(\tR\x03ref\x12\x12\n" +
+	"\x04path\x18\x06 \x01(\tR\x04path\x12\x16\n" +
+	"\x06readme\x18\a \x01(\tR\x06readme\x12\x1f\n" +
+	"\vreadme_path\x18\b \x01(\tR\n" +
+	"readmePath\x12\x1f\n" +
+	"\vreadme_said\x18\t \x01(\tR\n" +
+	"readmeSaid2\xd3\x04\n" +
 	"\x13DomainPluginService\x127\n" +
 	"\bMetadata\x12\x0f.protocol.Empty\x1a\x1a.protocol.MetadataResponse\x12G\n" +
 	"\n" +
@@ -1856,7 +2819,7 @@ func file_plugin_grpc_protocol_domain_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_domain_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(WebSocketMessage_Type)(0),   // 0: protocol.WebSocketMessage.Type
 	(*Empty)(nil),                // 1: protocol.Empty
@@ -1879,50 +2842,74 @@ var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(*ElementDefResponse)(nil),   // 18: protocol.ElementDefResponse
 	(*ElementDef)(nil),           // 19: protocol.ElementDef
 	(*PluginAction)(nil),         // 20: protocol.PluginAction
-	nil,                          // 21: protocol.InitializeRequest.ConfigEntry
-	nil,                          // 22: protocol.WebSocketMessage.HeadersEntry
-	nil,                          // 23: protocol.HealthResponse.DetailsEntry
-	nil,                          // 24: protocol.ConfigSchemaResponse.FieldsEntry
-	(*Signum)(nil),               // 25: protocol.Signum
+	(*SigilReach)(nil),           // 21: protocol.SigilReach
+	(*SigilRow)(nil),             // 22: protocol.SigilRow
+	(*PluginInfo)(nil),           // 23: protocol.PluginInfo
+	(*PluginHealthProbe)(nil),    // 24: protocol.PluginHealthProbe
+	(*PluginsList)(nil),          // 25: protocol.PluginsList
+	(*RouteEndpoint)(nil),        // 26: protocol.RouteEndpoint
+	(*PluginRoute)(nil),          // 27: protocol.PluginRoute
+	(*PluginRoutes)(nil),         // 28: protocol.PluginRoutes
+	(*PluginAdded)(nil),          // 29: protocol.PluginAdded
+	(*PluginChecked)(nil),        // 30: protocol.PluginChecked
+	nil,                          // 31: protocol.InitializeRequest.ConfigEntry
+	nil,                          // 32: protocol.WebSocketMessage.HeadersEntry
+	nil,                          // 33: protocol.HealthResponse.DetailsEntry
+	nil,                          // 34: protocol.ConfigSchemaResponse.FieldsEntry
+	nil,                          // 35: protocol.SigilRow.ReachEntry
+	nil,                          // 36: protocol.PluginInfo.DetailsEntry
+	(*Signum)(nil),               // 37: protocol.Signum
+	(*Param)(nil),                // 38: protocol.Param
+	(*Field)(nil),                // 39: protocol.Field
 }
 var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
-	21, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
+	31, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
 	6,  // 1: protocol.HTTPRequest.headers:type_name -> protocol.HTTPHeader
 	6,  // 2: protocol.HTTPResponse.headers:type_name -> protocol.HTTPHeader
 	0,  // 3: protocol.WebSocketMessage.type:type_name -> protocol.WebSocketMessage.Type
-	22, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
-	23, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
-	24, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
+	32, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
+	33, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
+	34, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
 	11, // 7: protocol.InitializeResponse.schedules:type_name -> protocol.ScheduleInfo
 	14, // 8: protocol.InitializeResponse.watchers:type_name -> protocol.WatcherRegistration
 	13, // 9: protocol.InitializeResponse.http_routes:type_name -> protocol.RouteInfo
-	25, // 10: protocol.InitializeResponse.signa:type_name -> protocol.Signum
+	37, // 10: protocol.InitializeResponse.signa:type_name -> protocol.Signum
 	17, // 11: protocol.ExecuteJobResponse.log_entries:type_name -> protocol.JobLogEntry
 	19, // 12: protocol.ElementDefResponse.elements:type_name -> protocol.ElementDef
-	10, // 13: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
-	1,  // 14: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
-	3,  // 15: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
-	1,  // 16: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
-	4,  // 17: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
-	7,  // 18: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
-	1,  // 19: protocol.DomainPluginService.Health:input_type -> protocol.Empty
-	1,  // 20: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
-	1,  // 21: protocol.DomainPluginService.RegisterElements:input_type -> protocol.Empty
-	15, // 22: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
-	2,  // 23: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
-	12, // 24: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
-	1,  // 25: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
-	5,  // 26: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
-	7,  // 27: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
-	8,  // 28: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
-	9,  // 29: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
-	18, // 30: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
-	16, // 31: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
-	23, // [23:32] is the sub-list for method output_type
-	14, // [14:23] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	38, // 13: protocol.SigilRow.takes:type_name -> protocol.Param
+	39, // 14: protocol.SigilRow.gives:type_name -> protocol.Field
+	35, // 15: protocol.SigilRow.reach:type_name -> protocol.SigilRow.ReachEntry
+	36, // 16: protocol.PluginInfo.details:type_name -> protocol.PluginInfo.DetailsEntry
+	22, // 17: protocol.PluginInfo.sigils:type_name -> protocol.SigilRow
+	23, // 18: protocol.PluginsList.plugins:type_name -> protocol.PluginInfo
+	24, // 19: protocol.PluginsList.health:type_name -> protocol.PluginHealthProbe
+	26, // 20: protocol.PluginRoute.endpoints:type_name -> protocol.RouteEndpoint
+	27, // 21: protocol.PluginRoutes.routes:type_name -> protocol.PluginRoute
+	10, // 22: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
+	21, // 23: protocol.SigilRow.ReachEntry.value:type_name -> protocol.SigilReach
+	1,  // 24: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
+	3,  // 25: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
+	1,  // 26: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
+	4,  // 27: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
+	7,  // 28: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
+	1,  // 29: protocol.DomainPluginService.Health:input_type -> protocol.Empty
+	1,  // 30: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
+	1,  // 31: protocol.DomainPluginService.RegisterElements:input_type -> protocol.Empty
+	15, // 32: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
+	2,  // 33: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
+	12, // 34: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
+	1,  // 35: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
+	5,  // 36: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
+	7,  // 37: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
+	8,  // 38: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
+	9,  // 39: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
+	18, // 40: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
+	16, // 41: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
+	33, // [33:42] is the sub-list for method output_type
+	24, // [24:33] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_domain_proto_init() }
@@ -1938,7 +2925,7 @@ func file_plugin_grpc_protocol_domain_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_domain_proto_rawDesc), len(file_plugin_grpc_protocol_domain_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   24,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -5,7 +5,7 @@
 // source: plugin/grpc/protocol/domain.proto
 
 /* eslint-disable */
-import type { Signum } from "./sigil";
+import type { Field, Param, Signum } from "./sigil";
 
 export const protobufPackage = "protocol";
 
@@ -381,4 +381,169 @@ export interface PluginAction {
   state: string;
   /** The action taken. */
   action: string;
+}
+
+/**
+ * SigilReach is who the lines say reaches a sigil over one surface. ROOT
+ * reaches everything and is never listed: nothing here, and not anyone, is
+ * ROOT only.
+ */
+export interface SigilReach {
+  anyone: boolean;
+  levels: string[];
+  roles: string[];
+}
+
+/**
+ * SigilRow is one sigil a plugin handed the node, as the plugin panel draws it:
+ * what it is, and who reaches it over each surface.
+ */
+export interface SigilRow {
+  signum: string;
+  sigil: string;
+  tool: string;
+  method: string;
+  path: string;
+  does: string;
+  takes: Param[];
+  gives: Field[];
+  /** Per surface: http, mcp and a2a. */
+  reach: { [key: string]: SigilReach };
+}
+
+export interface SigilRow_ReachEntry {
+  key: string;
+  value: SigilReach | undefined;
+}
+
+/** PluginInfo is one plugin plugins list knows. */
+export interface PluginInfo {
+  name: string;
+  version: string;
+  qntx_version: string;
+  description: string;
+  author: string;
+  license: string;
+  healthy: boolean;
+  /**
+   * Whether the last probe saw this plugin. Unprobed is not unhealthy: it
+   * started after the probe was taken.
+   */
+  probed: boolean;
+  message: string;
+  /** What the plugin's health said besides, as it crossed gRPC. */
+  details: { [key: string]: string };
+  state: string;
+  pausable: boolean;
+  /**
+   * Identifies the element module this plugin serves, so the browser can
+   * import a replaced one instead of the module record it already holds for
+   * that URL. Empty for anything not serving a module.
+   */
+  module_digest: string;
+  /** What the plugin does, as the node serves it (ADR-039). */
+  sigils: SigilRow[];
+  /** Why a signum it handed is served nowhere. */
+  signa_refused: string[];
+  /**
+   * The plugin's record: where it was added from, and whether it is switched
+   * on.
+   */
+  repo: string;
+  enabled: boolean;
+}
+
+export interface PluginInfo_DetailsEntry {
+  key: string;
+  value: string;
+}
+
+/**
+ * PluginHealthProbe is when the health in plugins list was probed. Health here
+ * is a probe with an age. Saying when it was taken is what keeps a stale answer
+ * from reading as a current one.
+ */
+export interface PluginHealthProbe {
+  probed_at: string;
+  /** How old that probe is. */
+  age_ms: number;
+}
+
+/** PluginsList is what plugins list answers. */
+export interface PluginsList {
+  /** One row per plugin. */
+  plugins: PluginInfo[];
+  /** When the health in the rows was probed. Null before the first probe. */
+  health:
+    | PluginHealthProbe
+    | undefined;
+  /** Why the last probe did not complete, when it did not. */
+  health_probe_failure: string;
+  /** Why the node's plugin records did not read, when they did not. */
+  records_failure: string;
+}
+
+/** RouteEndpoint is a core endpoint a plugin's role is asked through. */
+export interface RouteEndpoint {
+  method: string;
+  path: string;
+  description: string;
+}
+
+/** PluginRoute is what one running plugin serves. */
+export interface PluginRoute {
+  name: string;
+  http: string;
+  /** Its socket path, when it serves one. */
+  ws: string;
+  /** The roles it plays: llm-provider, search-provider, embedding-provider. */
+  roles: string[];
+  handlers: string[];
+  schedules: number;
+  watchers: number;
+  endpoints: RouteEndpoint[];
+}
+
+/** PluginRoutes is what plugins routes answers. */
+export interface PluginRoutes {
+  /** One row per running plugin. */
+  routes: PluginRoute[];
+}
+
+/** PluginAdded is what plugins add answers. */
+export interface PluginAdded {
+  /** The plugin's name. */
+  name: string;
+  /** The repository it was added from. */
+  repo: string;
+  /** An added plugin starts disabled. */
+  enabled: boolean;
+}
+
+/** PluginChecked is what plugins check answers. */
+export interface PluginChecked {
+  /** The plugin's name. */
+  name: string;
+  /** The repository URL checked. */
+  repo: string;
+  /** The repository as GitHub names it, owner/repo. */
+  repository: string;
+  /** Whether GitHub keeps the repository private. */
+  private: boolean;
+  /**
+   * The branch the plugin is read from: the tree URL's, or the repository's
+   * default.
+   */
+  ref: string;
+  /**
+   * Where in the repository the plugin is. Empty for a plugin that is the
+   * whole repository.
+   */
+  path: string;
+  /** "I expected to also see the plugin README if there is one." */
+  readme: string;
+  /** Where that README is in the repository. */
+  readme_path: string;
+  /** What GitHub answered when no README came back. */
+  readme_said: string;
 }

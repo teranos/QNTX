@@ -69,23 +69,16 @@ func (s *QNTXServer) paritySignum() sigil.Signum {
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/hold"},
 				},
 				{
-					Name: "storage",
-					Does: "For every thing QNTX persists, whether SQLite and DuckDB each hold it, as make parity read the source this build was made from. It says nothing of this node's own stores.",
-					Gives: []*protocol.Field{
-						{Name: "describes", Says: "What was read: source, the code this build was made from, and never this node."},
-						{Name: "things", Says: "One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go files that reach it with SQL written by hand."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/storage"},
+					Name:   "storage",
+					Does:   "For every thing QNTX persists, whether SQLite and DuckDB each hold it, as make parity read the source this build was made from. It says nothing of this node's own stores.",
+					Answer: "protocol.ParityStorage",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/storage"},
 				},
 				{
-					Name: "follows",
-					Does: "Every signum the node serves, and each reference it can be held to: the ones it declares it follows, and the ones every signum follows by its shape.",
-					Gives: []*protocol.Field{
-						{Name: "signum", Says: "The signum, by name."},
-						{Name: "declares", Says: "The references it declares it follows."},
-						{Name: "by_shape", Says: "The references every signum follows by its shape."},
-					},
-					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/follows"},
+					Name:   "follows",
+					Does:   "Every signum the node serves, and each reference it can be held to: the ones it declares it follows, and the ones every signum follows by its shape.",
+					Answer: "protocol.ParityFollowed",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/parity/follows"},
 				},
 			},
 		},
@@ -170,15 +163,15 @@ func (s *QNTXServer) parityFollows(context.Context, sigil.Sent) (any, *protocol.
 	for _, f := range everySignumFollows() {
 		byShape = append(byShape, f.GetReference())
 	}
-	rows := []map[string]any{}
+	answer := &protocol.ParityFollowed{}
 	for _, signum := range s.signa() {
-		declares := []string{}
+		followed := &protocol.SignumFollowed{Signum: signum.GetName(), ByShape: byShape}
 		for _, f := range signum.GetFollows() {
-			declares = append(declares, f.GetReference())
+			followed.Declares = append(followed.Declares, f.GetReference())
 		}
-		rows = append(rows, map[string]any{"signum": signum.GetName(), "declares": declares, "by_shape": byShape})
+		answer.Signa = append(answer.Signa, followed)
 	}
-	return rows, nil
+	return answer, nil
 }
 
 func (s *QNTXServer) parityStorage(context.Context, sigil.Sent) (any, *protocol.Refusal) {
@@ -186,5 +179,9 @@ func (s *QNTXServer) parityStorage(context.Context, sigil.Sent) (any, *protocol.
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return map[string]any{"describes": "source", "things": things}, nil
+	answer := &protocol.ParityStorage{Describes: "source", Things: make([]*protocol.StoredThing, 0, len(things))}
+	for _, t := range things {
+		answer.Things = append(answer.Things, &protocol.StoredThing{Name: t.Name, Sqlite: t.SQLite, Duckdb: t.DuckDB, Rebuilt: t.Rebuilt, Sites: t.Sites})
+	}
+	return answer, nil
 }

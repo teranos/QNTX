@@ -51,3 +51,168 @@ export interface GitHubWebhookPath {
   /** The whole URL to paste into the App's webhook settings now. */
   url: string;
 }
+
+/** GitHubCoreRate is GitHub's core rate limit for a namespace's token. */
+export interface GitHubCoreRate {
+  limit: number;
+  remaining: number;
+  /** RFC 3339, to the nanosecond. */
+  reset: string;
+}
+
+/** GitHubNamespace is one namespace's GitHub as the element shows it. */
+export interface GitHubNamespace {
+  namespace: string;
+  source: string;
+  login: string;
+  minted_by: string;
+  revoked: boolean;
+  auth_ok: boolean;
+  auth_error: string;
+  /** Null when GitHub did not say. */
+  rate: GitHubCoreRate | undefined;
+}
+
+/**
+ * TakenBuild is one plugin build the runner made and the node took. Mirrors
+ * grpc.TakenBuild.
+ */
+export interface TakenBuild {
+  plugin: string;
+  archive: string;
+  digest: string;
+  /** RFC 3339, to the nanosecond. */
+  at: string;
+  changed: boolean;
+  /**
+   * A build that landed before the installed one was installed, and so is not
+   * installed over it.
+   */
+  older: boolean;
+}
+
+/**
+ * RunnerStats is the runner as its directory says it is now. Mirrors
+ * grpc.RunnerStats.
+ */
+export interface RunnerStats {
+  path: string;
+  name: string;
+  github_url: string;
+  workspaces: string[];
+  /**
+   * When each job the runner ran was last written, oldest first, each RFC
+   * 3339 to the nanosecond.
+   */
+  jobs: string[];
+  taken: TakenBuild[];
+}
+
+/** GitHubRunner is the runner as the Actions section shows it. */
+export interface GitHubRunner {
+  path: string;
+  enabled: boolean;
+  error: string;
+  /** Null when the runner is off or not watched yet. */
+  stats: RunnerStats | undefined;
+}
+
+/**
+ * PluginBuild is what QNTX knows of a plugin it builds itself. Mirrors
+ * server.PluginBuildState.
+ */
+export interface PluginBuild {
+  revs: string[];
+  digest: string;
+  /** RFC 3339, to the nanosecond. */
+  at: string;
+  changed: boolean;
+  error: string;
+}
+
+/**
+ * GitHubStatus is the whole of what the GitHub element shows: what github
+ * status answers.
+ */
+export interface GitHubStatus {
+  /** Whether GitHub is on for the node. */
+  enabled: boolean;
+  /**
+   * One row per namespace with a GitHub token: its source, whether GitHub
+   * accepts it, and its rate limit.
+   */
+  namespaces: GitHubNamespace[];
+  /**
+   * The runner's path, whether it is on, why it is not running when it is
+   * not, and its stats.
+   */
+  runner:
+    | GitHubRunner
+    | undefined;
+  /**
+   * Per plugin QNTX builds itself: the revs it was last built from, when,
+   * whether that changed the plugin, and what failed.
+   */
+  builds: { [key: string]: PluginBuild };
+  /**
+   * Whether ROOT generated the App's webhook secret, which is what opens the
+   * webhook's path.
+   */
+  webhook: boolean;
+  /** Where the App's webhook URL points on this node. */
+  webhook_path: string;
+  /** The whole URL to paste into the App's webhook settings. */
+  webhook_url: string;
+  /** What a push to a repo's branch dispatches, per follow ROOT set. */
+  follows: GitHubFollow[];
+}
+
+export interface GitHubStatus_BuildsEntry {
+  key: string;
+  value: PluginBuild | undefined;
+}
+
+/**
+ * GitHubFollow is a push to repo's branch dispatching workflow of dispatches at
+ * ref. Mirrors server.GitHubFollow.
+ */
+export interface GitHubFollow {
+  repo: string;
+  branch: string;
+  dispatches: string;
+  workflow: string;
+  ref: string;
+  inputs: { [key: string]: string };
+  enabled: boolean;
+}
+
+export interface GitHubFollow_InputsEntry {
+  key: string;
+  value: string;
+}
+
+/** GitHubRunnerSet is what github runner answers. */
+export interface GitHubRunnerSet {
+  /** The runner as the Actions section shows it. */
+  runner: GitHubRunner | undefined;
+}
+
+/**
+ * GitHubOperation is one thing GitHubService can be asked: where it goes on
+ * GitHub and the fields it takes, by GitHub's own names for them.
+ */
+export interface GitHubOperation {
+  operation: string;
+  method: string;
+  path: string;
+  takes: string[];
+}
+
+/** GitHubOperations is what github operations answers. */
+export interface GitHubOperations {
+  /**
+   * One row per operation: its name, its method and path on GitHub, and what
+   * it takes.
+   */
+  operations: GitHubOperation[];
+}

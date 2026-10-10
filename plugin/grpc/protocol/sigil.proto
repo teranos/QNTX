@@ -83,6 +83,116 @@ message SessionTranscript {
   Transcript transcript = 1;
 }
 
+// ClaudeSaid is what claude say answers.
+message ClaudeSaid {
+  // What it answered.
+  string answer = 1;
+  // Whether Claude Code reports the turn as failed, in the answer's words.
+  bool is_error = 2;
+  // How Claude Code says the turn ended.
+  string subtype = 3;
+  // The session it was said in.
+  string session = 4;
+  // The model that answered.
+  string model = 5;
+  // The Claude Code that ran.
+  string claude_code = 6;
+  // The permission mode it ran in.
+  string permission_mode = 7;
+  // Each tool it reached for and was not allowed.
+  repeated string denied = 8;
+  // What Claude Code says the turn cost.
+  double cost_usd = 9;
+  // How long the turn took.
+  double took_ms = 10;
+  // Why a row of the session was not written down, when one was not.
+  string unwritten = 11;
+}
+
+// PiSaid is what pi say answers.
+message PiSaid {
+  // What it answered.
+  string answer = 1;
+  // Whether the turn ended in error, in the answer's words.
+  bool is_error = 2;
+  // Why Pi says the turn stopped.
+  string stop = 3;
+  // The session it was said in.
+  string session = 4;
+  // The model that answered.
+  string model = 5;
+  // The Pi that ran.
+  string pi_version = 6;
+  // What Pi says the turn's model calls cost.
+  double cost_usd = 7;
+  // How long the turn took.
+  double took_ms = 8;
+  // Why a row of the session was not written down, when one was not.
+  string unwritten = 9;
+}
+
+// ClaudeAm is what claude am answers.
+message ClaudeAm {
+  // Its own DID, which signs what it writes down.
+  string did = 1;
+  // The model am.toml names.
+  string model = 2;
+  // The effort am.toml names.
+  string effort = 3;
+  // The permission mode it runs in when whoever speaks names none.
+  string permission_mode = 4;
+  // Every permission mode Claude Code has.
+  repeated string permission_modes = 5;
+  // The tools it may use without being asked.
+  repeated string allow = 6;
+  // The session it continues, or empty before anything was said to it.
+  string session = 7;
+  // Whether it is in a turn now.
+  bool answering = 8;
+  // Where the Claude Code it runs on is, or empty when the node has none.
+  string claude_code = 9;
+  // Why it cannot be spoken to, when it cannot.
+  string not_ready = 10;
+  // Whether Claude Code says it is signed in, by claude login.
+  bool signed_in = 11;
+  // How it is signed in, as Claude Code names it, or empty when it is not.
+  string auth_method = 12;
+}
+
+// PiAm is what pi am answers.
+message PiAm {
+  // Its own DID, which signs what it writes down.
+  string did = 1;
+  // The model am.toml names for Pi.
+  string model = 2;
+  // The thinking level am.toml names for Pi.
+  string thinking = 3;
+  // The plugin every model call Pi makes goes through.
+  string gateway = 4;
+  // The session it continues in Pi, or empty before anything was said to it
+  // there.
+  string session = 5;
+  // Whether it is in a turn in Pi now.
+  bool answering = 6;
+  // Where the Pi it runs is, or empty when the node has none yet.
+  string pi = 7;
+  // The Pi this build pins.
+  string pi_version = 8;
+  // Why it cannot be spoken to in Pi, when it cannot.
+  string not_ready = 9;
+}
+
+// NamespaceAgentAm is what agents am and agents set answer: the namespace's
+// agent, who opted the namespace into it, and who it is in Claude Code.
+message NamespaceAgentAm {
+  // The namespace it stands in.
+  string namespace = 1;
+  // Who opted the namespace into it.
+  string set_by = 2;
+  // Who the agent is and how it runs.
+  ClaudeAm agent = 3;
+}
+
 // Follows says which column of a reference each of a signum's fields is. The
 // reference is named, not described: its own schema says what its columns are.
 message Follows {

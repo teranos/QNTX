@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/errors"
+	"google.golang.org/protobuf/proto"
 )
 
 // A turn is the same in every harness the ROOT agent runs in (ADR-048): who
@@ -31,7 +32,7 @@ type aTurn struct {
 	// not the caller's: a caller that leaves does not stop what it asked for
 	// halfway. It writes each row its stream says happened, and a row of its
 	// failing when it does not answer.
-	run func(t turnRun) (map[string]any, error)
+	run func(t turnRun) (proto.Message, error)
 }
 
 // turnRun is what a harness runs a turn with.
@@ -42,6 +43,9 @@ type turnRun struct {
 	env    []string
 	writes sessionWriter
 	write  func([]*types.As, error)
+	// unwritten is why a row of the session was not written down, when one
+	// was not, as of the rows written so far.
+	unwritten func() string
 }
 
 func (turnRun) now() time.Time { return time.Now() }
@@ -110,7 +114,8 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	told, err := writes.told(says, spokenBy(caller), time.Now())
 	write([]*types.As{told}, err)
 
-	answer, err := t.run(turnRun{says: says, session: session, resumes: resumes, env: itsGit, writes: writes, write: write})
+	answer, err := t.run(turnRun{says: says, session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
+		unwritten: func() string { return unwritten }})
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: t.called + " did not answer: " + err.Error()}
 	}
@@ -119,7 +124,6 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "it answered, and the session it answered in was not kept: " + err.Error()}
 		}
 	}
-	answer["unwritten"] = unwritten
 	return answer, nil
 }
 

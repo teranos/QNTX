@@ -75,6 +75,7 @@ func TestCheckFindsThePluginsDirectoryAndItsReadme(t *testing.T) {
 	assert.Equal(t, "# kern\nParses Ax.", checked.Readme)
 	assert.Equal(t, "qntx-plugins/kern/README.md", checked.ReadmePath)
 	assert.Contains(t, *asked, "/repos/teranos/QNTX/contents/qntx-plugins/kern?ref=main", "the path keeps its slashes")
+	holds(t, s.pluginsSignum(), "check", checked)
 }
 
 // A plugin with no README is still there; what GitHub said is kept.
