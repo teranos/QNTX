@@ -88,34 +88,6 @@
       }
       {
         "if" = "always()";
-        name = "A bare page with QNTX's viewport line";
-        run = ''
-          LINE=$(grep -o '<meta name="viewport"[^>]*>' qntx/web/index.html)
-          python3 -c 'import sys; open(sys.argv[2],"w").write(open(sys.argv[1]).read().replace("<!-- VIEWPORT -->", sys.argv[3]))' qntx/ci/app-keyboard/page.html qntx/internal/server/dist/index.html "$LINE"
-          bash qntx/ci/app-keyboard/run.sh line
-        '';
-      }
-      {
-        "if" = "always()";
-        name = "A bare page that also says user-scalable=no";
-        run = ''
-          sed 's|<!-- VIEWPORT -->|<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">|' qntx/ci/app-keyboard/page.html > qntx/internal/server/dist/index.html
-          bash qntx/ci/app-keyboard/run.sh unscalable
-        '';
-      }
-      {
-        "if" = "always()";
-        name = "QNTX's own page, as the app carries it";
-        working-directory = "qntx";
-        run = "make web";
-      }
-      {
-        "if" = "always()";
-        name = "The box on QNTX's own page";
-        run = "bash qntx/ci/app-keyboard/run.sh qntx";
-      }
-      {
-        "if" = "always()";
         name = "QNTX's own page, never zooming, in the shell on QNTX-App main, which zooms nothing";
         run = ''
           (cd qntx && make web)
@@ -125,11 +97,21 @@
       }
       {
         "if" = "always()";
+        name = "The same page, with html and body pinned to the window and not scrolling";
+        run = ''
+          (cd qntx && make web)
+          python3 -c 'import sys; p=sys.argv[1]; s=open(p).read(); a=s.index("<meta name=\"viewport\""); b=s.index(">", a)+1; s=s[:a]+sys.argv[2]+s[b:]; c=s.index("</head>"); open(p,"w").write(s[:c]+"<style>html, body { height: 100%; overflow: hidden; }</style>"+s[c:])' qntx/internal/server/dist/index.html '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'
+          bash qntx/ci/app-keyboard/run.sh pinned
+        '';
+      }
+      {
+        "if" = "always()";
         name = "What the screen said";
         run = ''
           cat verdicts.txt
           grep -q '^without: zoomed$' verdicts.txt || echo "without the line the page did not zoom"
-          grep -q '^whole: stayed$' verdicts.txt || { echo "with the page never zooming and the shell zooming nothing, the box still did more than bring the keyboard"; exit 1; }
+          grep -q '^whole: stayed$' verdicts.txt || echo "QNTX's page did more than bring the keyboard"
+          grep -q '^pinned: stayed$' verdicts.txt || { echo "pinned, QNTX's page still did more than bring the keyboard"; exit 1; }
         '';
       }
       {

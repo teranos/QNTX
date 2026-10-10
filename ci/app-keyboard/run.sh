@@ -98,15 +98,43 @@ EOF2
 echo "the box is at $X,$Y"
 idb ui tap --udid "$UDID" "$X" "$Y"
 sleep 4
-seen=$(squares "$OUT/$NAME-1-tapped.png")
-echo "after: $seen"
+xcrun simctl io "$UDID" screenshot "$OUT/$NAME-1-tapped.png" > /dev/null
 
-# Red is a zoom whatever the other square says: a zoom can carry it off screen.
-case "$seen" in
-    *" red") verdict="zoomed" ;;
-    "blue green") verdict="stayed" ;;
-    blue*) verdict="moved" ;;
-    *) verdict="box not taken" ;;
-esac
+# Where the squares stand, before and after: the left one's colour says whether
+# the box took the keyboard, the right one's whether the page zoomed, and the
+# row they start on whether anything moved.
+verdict=$(python3 - "$OUT/$NAME-0-before.png" "$OUT/$NAME-1-tapped.png" <<'EOF2'
+import sys
+from PIL import Image
+def look(path):
+    img = Image.open(path).convert('RGB')
+    left = img.width * 30 // 100
+    top, focused, red = None, False, False
+    for y in range(0, img.height // 2):
+        r, g, b = img.getpixel((left, y))
+        grey = abs(r - 128) < 12 and abs(g - 128) < 12 and abs(b - 128) < 12
+        blue = b > 200 and r < 100
+        if top is None and (grey or blue):
+            top = y
+        if blue:
+            focused = True
+        for x in range(0, img.width, 8):
+            r, g, b = img.getpixel((x, y))
+            if r > 190 and g < 30 and b < 30:
+                red = True
+                break
+    return top, focused, red
+before, after = look(sys.argv[1]), look(sys.argv[2])
+print('before top %s, after top %s, focused %s, red %s' % (before[0], after[0], after[1], after[2]), file=sys.stderr)
+if after[2]:
+    print('zoomed')
+elif not after[1]:
+    print('box not taken')
+elif after[0] is None or before[0] is None or abs(after[0] - before[0]) > 3:
+    print('moved')
+else:
+    print('stayed')
+EOF2
+)
 echo "$NAME: $verdict"
 echo "$NAME: $verdict" >> verdicts.txt
