@@ -166,10 +166,6 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 // never fails the thing it records, so a device that is gone stays gone even
 // when the User cannot be written.
 func (h *Handler) dropKeys(route string, dids ...string) {
-	if h.users == nil {
-		return
-	}
-
 	u, found, err := h.users.ByRoute(route)
 	if err != nil || !found {
 		h.logger.Warnw("could not read the User a forgotten device belonged to",

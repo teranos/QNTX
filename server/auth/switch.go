@@ -28,7 +28,7 @@ import (
 // This costs a List of the users table in the operational db (ADR-037), and
 // nothing on S3.
 func (h *Handler) StandingOf(userID string) string {
-	if h == nil || h.users == nil || userID == "" {
+	if h == nil || userID == "" {
 		return ""
 	}
 	u, found, err := h.userByID(userID)
@@ -41,7 +41,7 @@ func (h *Handler) StandingOf(userID string) string {
 // UserByID is the User an id names, for the node's own services: mail goes to a
 // User by id (ADR-041). A node without login keeps no Users, and says so.
 func (h *Handler) UserByID(id string) (User, bool, error) {
-	if h == nil || h.users == nil {
+	if h == nil {
 		return User{}, false, errors.New("this node keeps no Users")
 	}
 	return h.userByID(id)
@@ -49,7 +49,7 @@ func (h *Handler) UserByID(id string) (User, bool, error) {
 
 // Users is every User the node keeps, for the node's own reports (ADR-042).
 func (h *Handler) Users() ([]User, error) {
-	if h == nil || h.users == nil {
+	if h == nil {
 		return nil, errors.New("this node keeps no Users")
 	}
 	held, err := h.users.List()
@@ -97,10 +97,10 @@ func (e NoSuchUser) Error() string {
 }
 
 // switchedOff is who switched off the User an admission speaks for, and empty
-// when nobody did. A node that keeps no Users has nobody to switch; an
-// admission naming no User is a deployment before Users, and is not off.
+// when nobody did. An admission naming no User is a deployment before Users,
+// and is not off.
 func (h *Handler) switchedOff(admitted Admission) (string, error) {
-	if h.users == nil || admitted.UserID == "" {
+	if admitted.UserID == "" {
 		return "", nil
 	}
 	u, found, err := h.userByID(admitted.UserID)

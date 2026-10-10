@@ -131,7 +131,7 @@ func TestGitHubExchangeRefusesAUserWithNoID(t *testing.T) {
 // A GitHub button on a node holding no OAuth client is a button that can only
 // fail, so it is not drawn.
 func TestGitHubIsOfferedOnlyOnceConfigured(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{users: &memUsers{}}
 	_, known := h.providerAt(NamespaceDefault, "github")
 	assert.False(t, known, "github before it is configured")
 

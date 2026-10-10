@@ -25,7 +25,7 @@ func handlerWithDoors(t *testing.T, doors ...Door) *Handler {
 		testLogger(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
 		nil,
-		nil,
+		&memUsers{},
 		false,
 		[]string{mastodonAccount},
 		nil,
@@ -126,7 +126,7 @@ func TestTwoDoorsCannotClaimOneOrigin(t *testing.T) {
 		8770, 8820, 24,
 		testLogger(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		nil, nil, false,
+		nil, &memUsers{}, false,
 		[]string{mastodonAccount},
 		nil,
 	)
@@ -148,7 +148,7 @@ func TestADoorWhoseRPIDDoesNotCoverItsOriginIsRefused(t *testing.T) {
 		8770, 8820, 24,
 		testLogger(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		nil, nil, false,
+		nil, &memUsers{}, false,
 		[]string{mastodonAccount},
 		nil,
 	)

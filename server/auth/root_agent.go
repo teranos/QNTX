@@ -32,14 +32,12 @@ func (h *Handler) HoldNamespaceAgent(raw, did, label, mintedBy, namespace string
 	// Derived from the node's key, so it is the same token for as long as the
 	// namespace keeps its agent: it does not end.
 	issued := IssuedToken{Hash: hash, DID: did, Label: label, MintedBy: mintedBy, Level: LevelToken, Namespaces: []string{namespace}, ExpiresAt: NeverEnds()}
-	if h.users != nil {
-		u, found, err := h.users.ByRoute(mintedBy)
-		if err != nil {
-			return errors.Wrapf(err, "the User %s reaches was not read, so the agent's token was not written", quoteIdentity(mintedBy))
-		}
-		if found {
-			issued.MintedByUser, issued.MintedByDisplayName = u.ID, u.DisplayName
-		}
+	u, found, err := h.users.ByRoute(mintedBy)
+	if err != nil {
+		return errors.Wrapf(err, "the User %s reaches was not read, so the agent's token was not written", quoteIdentity(mintedBy))
+	}
+	if found {
+		issued.MintedByUser, issued.MintedByDisplayName = u.ID, u.DisplayName
 	}
 	id, err := h.tokens.Issue(issued)
 	if err != nil {
@@ -81,14 +79,12 @@ func (h *Handler) HoldRootAgent(raw, did string) error {
 		return errors.New("auth.root_identities names nobody, so there is no ROOT for the ROOT agent to speak for")
 	}
 	issued := IssuedToken{Hash: hash, DID: did, Label: RootAgentLabel, MintedBy: roots[0], Level: LevelRoot, ExpiresAt: NeverEnds()}
-	if h.users != nil {
-		u, found, err := h.users.ByRoute(roots[0])
-		if err != nil {
-			return errors.Wrapf(err, "the User %s reaches was not read, so the ROOT agent's token was not written", quoteIdentity(roots[0]))
-		}
-		if found {
-			issued.MintedByUser, issued.MintedByDisplayName = u.ID, u.DisplayName
-		}
+	u, found, err := h.users.ByRoute(roots[0])
+	if err != nil {
+		return errors.Wrapf(err, "the User %s reaches was not read, so the ROOT agent's token was not written", quoteIdentity(roots[0]))
+	}
+	if found {
+		issued.MintedByUser, issued.MintedByDisplayName = u.ID, u.DisplayName
 	}
 	id, err := h.tokens.Issue(issued)
 	if err != nil {

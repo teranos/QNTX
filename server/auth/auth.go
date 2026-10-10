@@ -121,6 +121,11 @@ type Handler struct {
 // loopback and auth.enabled is true (browsers reject any WebAuthn ceremony
 // whose RPID isn't a registrable domain suffix of the origin).
 func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort int, sessionExpiryHours int, logger *zap.SugaredLogger, corsWrap func(http.HandlerFunc) http.HandlerFunc, tokens TokenStore, users UserStore, secureCookies bool, rootIdentities, bindingSigners []string) (*Handler, error) {
+	// A node with login keeps its Users in the operational db on every backend
+	// (ADR-037): a handler given none is a wiring mistake, not a kind of node.
+	if users == nil {
+		return nil, errors.New("auth was given no User store")
+	}
 	if rpID == "" {
 		rpID = "localhost"
 	}
@@ -406,7 +411,7 @@ func (h *Handler) admittedAsThePerson(grant Grant) Admission {
 // whether that User holds any role in system. A User is reached by any number
 // of routes and a grant names one of them, so it is the User that is asked.
 func (h *Handler) holdingsOf(identity, namespace string) ([]string, bool) {
-	if h.roles == nil || h.users == nil {
+	if h.roles == nil {
 		return nil, false
 	}
 	u, found, err := h.users.ByRoute(identity)

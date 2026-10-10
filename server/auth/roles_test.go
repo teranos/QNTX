@@ -42,7 +42,7 @@ func (m *memRoles) WordLines() ([]WordLine, error) {
 // so "by ROOT" on a line has something to match.
 func handlerHolding(t *testing.T, lines map[string][]RoleLine) (*Handler, *memRoles) {
 	t.Helper()
-	h := &Handler{logger: zap.NewNop().Sugar()}
+	h := &Handler{users: &memUsers{}, logger: zap.NewNop().Sugar()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	kept := &memRoles{lines: lines}
 	h.SetRoleReader(kept)

@@ -21,7 +21,7 @@ func rootAgentToken(t *testing.T) (raw, did string) {
 
 func rootAgentHandler(roots ...string) (*Handler, *memTokenStore) {
 	store := newMemTokenStore()
-	h := &Handler{sessions: newSessionStore(1), tokens: store, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), tokens: store, logger: testLogger()}
 	h.SetIdentities(roots, nil)
 	return h, store
 }
@@ -106,7 +106,7 @@ func TestTheRootAgentSpeaksForSomebodyListed(t *testing.T) {
 }
 
 func TestANodeThatKeepsNoTokensHoldsNoRootAgent(t *testing.T) {
-	h := &Handler{sessions: newSessionStore(1), logger: testLogger()}
+	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), logger: testLogger()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	raw, did := rootAgentToken(t)
 	require.Error(t, h.HoldRootAgent(raw, did))

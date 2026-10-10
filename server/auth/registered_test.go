@@ -10,7 +10,7 @@ import (
 // An account bound at a provider is a person arriving. The node learned who
 // they are and wrote it to a log that rotates; this keeps it.
 func TestBindingAnAccountIsAttested(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	kept := &memAttestor{}
 	attestingNode(t, h, kept)
 
@@ -29,7 +29,7 @@ func TestBindingAnAccountIsAttested(t *testing.T) {
 
 // "when a user registers, we attest it, and in it, an email address may be."
 func TestAHandleIsCarriedWhenThereIsOne(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	kept := &memAttestor{}
 	attestingNode(t, h, kept)
 
@@ -46,7 +46,7 @@ func TestAHandleIsCarriedWhenThereIsOne(t *testing.T) {
 // Which door somebody arrived at. The ceremony reads it where the portal is
 // still on the request, and carries it across the provider's redirect.
 func TestTheDoorIsCarriedIntoTheRecord(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	kept := &memAttestor{}
 	attestingNode(t, h, kept)
 
@@ -60,7 +60,7 @@ func TestTheDoorIsCarriedIntoTheRecord(t *testing.T) {
 // so what bounds the writing is the door, not the caller. A ceremony that
 // reached none records nothing.
 func TestNoDoorIsNoRecord(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	kept := &memAttestor{}
 	attestingNode(t, h, kept)
 
@@ -73,7 +73,7 @@ func TestNoDoorIsNoRecord(t *testing.T) {
 // May be: the provider decides what it hands over, and one that named nobody
 // leaves the field out rather than writing an empty one down as a fact.
 func TestNoHandleIsNoField(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	kept := &memAttestor{}
 	attestingNode(t, h, kept)
 
@@ -86,7 +86,7 @@ func TestNoHandleIsNoField(t *testing.T) {
 
 // An account the provider would not name is nobody anyone can point at.
 func TestAnAccountWithNoIdentifierIsNotAttested(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	kept := &memAttestor{}
 	attestingNode(t, h, kept)
 

@@ -28,7 +28,7 @@ func checkingServer(t *testing.T, readme string) (*QNTXServer, *[]string) {
 	require.NoError(t, err)
 	h, err := auth.New(nil, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		table, nil, false, []string{rootAccount}, nil)
+		table, testUsers(t), false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 	s.authHandler = h
 	keeper, err := h.GitHubKeeper()

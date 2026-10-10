@@ -21,10 +21,6 @@ func (h *Handler) usersCollection(w http.ResponseWriter, r *http.Request, _ Pres
 		h.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	if h.users == nil {
-		h.writeError(w, http.StatusServiceUnavailable, "this node keeps no Users")
-		return
-	}
 	held, err := h.users.List()
 	if err != nil {
 		h.logger.Errorw("could not list Users", "error", err)
@@ -44,10 +40,6 @@ func (h *Handler) usersCollection(w http.ResponseWriter, r *http.Request, _ Pres
 //	POST /auth/users/{id}/name
 //	POST /auth/users/{id}/become
 func (h *Handler) handleUserByID(w http.ResponseWriter, r *http.Request, p Presented) {
-	if h.users == nil {
-		h.writeError(w, http.StatusServiceUnavailable, "this node keeps no Users")
-		return
-	}
 	if r.Method != http.MethodPost {
 		h.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return

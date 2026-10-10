@@ -13,7 +13,7 @@ import (
 
 func handlerWithCreds(t *testing.T) *Handler {
 	t.Helper()
-	return &Handler{
+	return &Handler{users: &memUsers{},
 		creds:    newCredentialStore(qntxtest.CreateTestDB(t), zap.NewNop().Sugar()),
 		sessions: newSessionStore(24),
 		logger:   zap.NewNop().Sugar(),

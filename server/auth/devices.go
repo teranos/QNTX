@@ -17,9 +17,6 @@ import "github.com/go-webauthn/webauthn/webauthn"
 // is the route alone: the first login has nobody to widen to.
 func (h *Handler) routesOf(route string) []string {
 	routes := []string{route}
-	if h.users == nil {
-		return routes
-	}
 	u, found, err := h.users.ByRoute(route)
 	if err != nil {
 		h.logger.Errorw("could not read the User a route reaches; its devices are the route's own",

@@ -123,7 +123,7 @@ func (s *sessionStore) create(identity string, user User) (string, error) {
 }
 
 // userOf returns who this session is and where they came in, which is not the
-// same question as what admitted it. Empty when the deployment keeps no Users.
+// same question as what admitted it. Empty for a session that reached no User.
 func (s *sessionStore) userOf(token string) (userID, displayName, namespace string) {
 	// Anything else in the map is a wiring mistake, and naming nobody is a
 	// better answer to it than panicking inside a request.

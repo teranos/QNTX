@@ -56,7 +56,7 @@ func TestCeremoniesDoNotShareAState(t *testing.T) {
 // Unset, a ceremony reaches this machine. It does not reach wherever the
 // caller said, which is what the header version handed away.
 func TestAnUnsetOriginIsLoopback(t *testing.T) {
-	h := &Handler{loopbackOrigin: "http://127.0.0.1:8770"}
+	h := &Handler{users: &memUsers{}, loopbackOrigin: "http://127.0.0.1:8770"}
 
 	assert.Equal(t, "http://127.0.0.1:8770", h.publicOrigin())
 }
@@ -64,7 +64,7 @@ func TestAnUnsetOriginIsLoopback(t *testing.T) {
 // The redirect_uri decides where a provider delivers an authorization code.
 // Host and X-Forwarded-Host are written by whoever is talking to us.
 func TestNoHeaderReachesTheRedirectURI(t *testing.T) {
-	h := &Handler{loopbackOrigin: "http://127.0.0.1:8770"}
+	h := &Handler{users: &memUsers{}, loopbackOrigin: "http://127.0.0.1:8770"}
 
 	spoofed := httptest.NewRequest(http.MethodGet, "http://backend:8080/auth/binding/start", nil)
 	spoofed.Header.Set("X-Forwarded-Proto", "https")
@@ -82,7 +82,7 @@ func TestNoHeaderReachesTheRedirectURI(t *testing.T) {
 // The page and the API can be different hosts, so the configured origin is
 // used verbatim rather than checked against where the page is.
 func TestAConfiguredOriginIsTakenAsGiven(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{users: &memUsers{}}
 	h.SetPublicOrigin("  https://api.q.example.com/  ")
 
 	assert.Equal(t, "https://api.q.example.com", h.publicOrigin())

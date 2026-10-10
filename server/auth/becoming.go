@@ -165,7 +165,7 @@ func (h *Handler) asBecome(p *Presented) {
 		return
 	}
 	x, being := h.becomings.ofSession(hashOf(p.sessionToken))
-	if !being || h.users == nil {
+	if !being {
 		return
 	}
 	u, found, err := h.userByID(x.user)
