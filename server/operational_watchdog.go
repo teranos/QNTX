@@ -220,7 +220,8 @@ func (s *QNTXServer) rememberRoot(root *atomic.Pointer[services.MailRecipient], 
 		if s.authHandler != nil {
 			u, found, err := s.authHandler.RootUser()
 			if err == nil && found {
-				root.Store(&services.MailRecipient{ID: u.ID, Email: u.PrimaryEmail(), DisabledBy: u.DisabledBy})
+				recipient := services.UserRecipient(u)
+				root.Store(&recipient)
 				return
 			}
 		}

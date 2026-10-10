@@ -143,8 +143,9 @@ grpc::Status GazePlugin::Initialize(grpc::ServerContext* ctx,
 
 grpc::Status GazePlugin::Shutdown(grpc::ServerContext* ctx,
                                    const protocol::Empty* req,
-                                   protocol::Empty* resp) {
+                                   protocol::ShutdownResponse* resp) {
     engines_.clear();
+    resp->set_stopped(true);
     return grpc::Status::OK;
 }
 

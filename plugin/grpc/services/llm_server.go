@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/ratelimit"
 	"github.com/teranos/errors"
@@ -142,16 +143,18 @@ func (s *LLMServer) StreamChat(req *protocol.LLMChatRequest, srv protocol.LLMSer
 			return err
 		}
 
-		// Accumulate for weave
+		// Accumulate for weave. The final chunk names the model.
 		text.WriteString(chunk.GetToken())
-		if chunk.GetModel() != "" {
-			model = chunk.GetModel()
-		}
 		if chunk.GetDone() {
+			model = chunk.GetModel()
 			totalToks = int(chunk.GetTotalTokens())
 		}
-		if chunk.GetSignal() != nil {
-			signals = append(signals, chunk.GetSignal())
+		signal, carried, err := chunk.SignalCarried()
+		if err != nil {
+			return errors.Wrapf(err, "provider %s", providerName)
+		}
+		if carried {
+			signals = append(signals, signal)
 		}
 
 		if err := srv.Send(chunk); err != nil {
@@ -233,57 +236,53 @@ func (s *LLMServer) providerNames() []string {
 // createWeave creates a Weave attestation capturing an LLM interaction.
 // Runs asynchronously — failures are logged, never propagated to the caller.
 func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatRequest, provider, model, responseText string, totalTokens int, signals []*protocol.TokenSignalProto) {
-	prompt := lastUserMessage(req)
-	if prompt == "" && responseText == "" {
+	answered, err := named.TextOf("the model provider "+provider+" answered with", model)
+	if err != nil {
+		s.logger.Warnw("LLM call happened and is not woven: its provider named no model", "provider", provider, "error", err)
 		return
 	}
 
 	attrs := map[string]any{
-		"prompt":       prompt,
+		"prompt":       lastUserMessage(req),
 		"text":         responseText,
-		"model":        model,
+		"model":        answered.String(),
 		"token_count":  totalTokens,
 		"weave_source": provider,
 	}
 
-	// Aggregate signal statistics
-	if len(signals) > 0 {
-		var confSum, entSum float64
-		for _, sig := range signals {
-			confSum += float64(sig.Confidence)
-			entSum += float64(sig.Entropy)
+	// Per-token signal data, and the mean over the tokens so far: a stream
+	// whose tokens carried no signal weaves none.
+	tokens := make([]any, 0, len(signals))
+	var meanConfidence, meanEntropy float64
+	for i, sig := range signals {
+		seen := float64(i + 1)
+		meanConfidence += (float64(sig.Confidence) - meanConfidence) / seen
+		meanEntropy += (float64(sig.Entropy) - meanEntropy) / seen
+		tok := map[string]any{
+			"position":   i,
+			"confidence": sig.Confidence,
+			"entropy":    sig.Entropy,
+			"top_gap":    sig.TopGap,
 		}
-		n := float64(len(signals))
-		attrs["mean_confidence"] = confSum / n
-		attrs["mean_entropy"] = entSum / n
-
-		// Pack per-token signal data
-		tokens := make([]any, 0, len(signals))
-		for i, sig := range signals {
-			tok := map[string]any{
-				"position":   i,
-				"confidence": sig.Confidence,
-				"entropy":    sig.Entropy,
-				"top_gap":    sig.TopGap,
-			}
-			// A token whose provider sent no candidates has none.
-			topK := make([]any, 0, len(sig.TopK))
-			for _, c := range sig.TopK {
-				topK = append(topK, map[string]any{
-					"text": c.Text,
-					"prob": c.Prob,
-				})
-			}
-			tok["top_k"] = topK
-			tokens = append(tokens, tok)
+		// A token whose provider sent no candidates has none.
+		topK := make([]any, 0, len(sig.TopK))
+		for _, c := range sig.TopK {
+			topK = append(topK, map[string]any{
+				"text": c.Text,
+				"prob": c.Prob,
+			})
 		}
+		tok["top_k"] = topK
+		tokens = append(tokens, tok)
+		attrs["mean_confidence"] = meanConfidence
+		attrs["mean_entropy"] = meanEntropy
 		attrs["tokens"] = tokens
 	}
 
 	contextID := fmt.Sprintf("llm:%d", time.Now().UnixNano())
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{"model:" + model},
+		Subjects:   []string{"model:" + answered.String()},
 		Predicates: []string{"Weave"},
 		Contexts:   []string{contextID},
 		Actors:     []string{provider},

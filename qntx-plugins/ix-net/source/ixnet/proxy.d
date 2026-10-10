@@ -896,6 +896,7 @@ private void attestCapture(ProxyState* state,
     cmd.subjects = ["/v1/messages"];
     cmd.predicates = ["captured"];
     cmd.contexts = [reqInfo.model];
+    cmd.byNode = true;
     cmd.source = "ix-net";
     cmd.sourceVersion = PLUGIN_VERSION;
 

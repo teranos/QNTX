@@ -20,16 +20,30 @@ export interface Job {
   /** queued, running, paused, completed, failed, cancelled */
   status: string;
   progress: Progress | undefined;
-  pulse_state: PulseState | undefined;
+  pulse_state?:
+    | PulseState
+    | undefined;
+  /** False is refused. */
+  no_pulse_state?: boolean | undefined;
   error: string;
   parent_job_id: string;
   retry_count: number;
   /** Unix timestamp in seconds */
   created_at: number;
-  /** Unix timestamp in seconds (0 if not started) */
-  started_at: number;
-  /** Unix timestamp in seconds (0 if not completed) */
-  completed_at: number;
+  /** Unix timestamp in seconds */
+  started_at?:
+    | number
+    | undefined;
+  /** False is refused. */
+  not_started?:
+    | boolean
+    | undefined;
+  /** Unix timestamp in seconds */
+  completed_at?:
+    | number
+    | undefined;
+  /** False is refused. */
+  not_completed?: boolean | undefined;
 }
 
 export interface Progress {
@@ -79,10 +93,16 @@ export interface UpdateJobResponse {
 
 export interface ListJobsRequest {
   auth_token: string;
-  /** Optional status filter (empty = all) */
-  status: string;
-  /** Maximum results. If not set, returns all matching jobs. */
-  limit?: number | undefined;
+  /** queued, running, paused, completed, failed, cancelled */
+  status?:
+    | string
+    | undefined;
+  /** False is refused. */
+  every_status?:
+    | boolean
+    | undefined;
+  /** How many jobs at most: 0 is none. */
+  limit: number;
 }
 
 export interface ListJobsResponse {

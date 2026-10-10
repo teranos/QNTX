@@ -16,8 +16,8 @@ service DomainPluginService {
   // See ADR-018 for the full lifecycle contract.
   rpc Initialize(InitializeRequest) returns (InitializeResponse);
 
-  // Shutdown shuts down the plugin
-  rpc Shutdown(Empty) returns (Empty);
+  // Shutdown shuts down the plugin, which answers that it stopped
+  rpc Shutdown(Empty) returns (ShutdownResponse);
 
   // HandleHTTP handles an HTTP request
   rpc HandleHTTP(HTTPRequest) returns (HTTPResponse);
@@ -43,6 +43,11 @@ service DomainPluginService {
 }
 
 message Empty {}
+
+// ShutdownResponse is a plugin saying it stopped.
+message ShutdownResponse {
+  bool stopped = 1;  // The plugin stopped. False is an answer that says it did not.
+}
 
 message MetadataResponse {
   string name = 1;

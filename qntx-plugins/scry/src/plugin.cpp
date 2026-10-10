@@ -151,11 +151,12 @@ grpc::Status ScryPlugin::Initialize(grpc::ServerContext* ctx,
 
 grpc::Status ScryPlugin::Shutdown(grpc::ServerContext* ctx,
                                        const protocol::Empty* req,
-                                       protocol::Empty* resp) {
+                                       protocol::ShutdownResponse* resp) {
     // Wait for background PCA to finish before unloading model
     if (pca_thread_.joinable()) pca_thread_.join();
     engine_.unload();
     std::cout << "[shutdown] Shutdown complete" << std::endl;
+    resp->set_stopped(true);
     return grpc::Status::OK;
 }
 

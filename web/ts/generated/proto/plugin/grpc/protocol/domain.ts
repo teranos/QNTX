@@ -12,6 +12,12 @@ export const protobufPackage = "protocol";
 export interface Empty {
 }
 
+/** ShutdownResponse is a plugin saying it stopped. */
+export interface ShutdownResponse {
+  /** The plugin stopped. False is an answer that says it did not. */
+  stopped: boolean;
+}
+
 export interface MetadataResponse {
   name: string;
   version: string;

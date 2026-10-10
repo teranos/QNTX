@@ -64,7 +64,7 @@ export interface LLMChatChunk {
   token: string;
   /** True on final chunk */
   done: boolean;
-  /** Model name (sent on first or last chunk) */
+  /** Model name: the final chunk names it, others may */
   model: string;
   /** Sent on final chunk */
   prompt_tokens: number;
@@ -72,8 +72,11 @@ export interface LLMChatChunk {
   completion_tokens: number;
   /** Sent on final chunk */
   total_tokens: number;
-  /** Per-token signal data (if available) */
-  signal: TokenSignalProto | undefined;
+  signal?:
+    | TokenSignalProto
+    | undefined;
+  /** False is refused. */
+  no_signal?: boolean | undefined;
 }
 
 export interface TokenSignalProto {

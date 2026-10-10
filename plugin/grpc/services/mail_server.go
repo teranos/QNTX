@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"slices"
 	"sync/atomic"
 	"time"
@@ -13,6 +14,8 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/access"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -38,11 +41,34 @@ const (
 	PredicateMailFailed = "mail:failed"
 )
 
-// MailRecipient is what the mail service reads of a User.
+// MailRecipient is who a mail goes to, as the mail service reads them: the
+// address mail to them goes to, or why no mail goes to them.
 type MailRecipient struct {
 	ID         string
-	Email      string // The User's primary address; empty is a User who gave none.
-	DisabledBy string // Who switched the User off; empty is a User who is on.
+	address    named.Text
+	unsendable error
+}
+
+// UserRecipient is a User as mail reads one: their primary address, unless
+// they are switched off or gave none (ADR-041).
+func UserRecipient(u access.User) MailRecipient {
+	if u.SwitchedOff() {
+		return MailRecipient{ID: u.ID, unsendable: errors.Newf("User %s is switched off by %s", u.ID, u.DisabledBy)}
+	}
+	address, err := named.TextOf("the email address of User "+u.ID, u.PrimaryEmail())
+	return MailRecipient{ID: u.ID, address: address, unsendable: errors.Wrapf(err, "User %s has no email address", u.ID)}
+}
+
+// AddressRecipient is someone mail reaches at an address they gave, under the
+// id the mail is recorded about: an invitation, before there is a User.
+func AddressRecipient(id, email string) MailRecipient {
+	address, err := named.TextOf("the email address of "+id, email)
+	return MailRecipient{ID: id, address: address, unsendable: err}
+}
+
+// Address is where mail to them goes, or why none does.
+func (r MailRecipient) Address() (named.Text, error) {
+	return r.address, r.unsendable
 }
 
 // MailRecipients finds one User by id. False is no User holding it.
@@ -87,13 +113,31 @@ type MailTransport interface {
 
 // MailWiring is what the node hands the mail service once it has it: the
 // Users exist after auth, the node's DID after nodedid, and plugins may call
-// before either.
+// before either. What the node runs without is had with why.
 type MailWiring struct {
-	From       string                      // mail.from. Empty sends nothing.
-	Transport  MailTransport               // Nil is no transport enabled in am.toml.
-	Recipients MailRecipients              // Nil is a node that keeps no Users.
-	Records    func() ats.AttestationStore // Where templates and mail are attested. Always handed.
-	Actor      string                      // The node's DID: who sent the mail.
+	From       Had[named.Text]                      // mail.from
+	Transport  Had[MailTransport]                   // the transport am.toml enables
+	Recipients Had[MailRecipients]                  // the node's Users
+	Records    func() (ats.AttestationStore, error) // where templates and mail are attested
+	Actor      Had[named.Text]                      // the node's DID: who sent the mail
+}
+
+// MailFrom is mail.from, or that am.toml names none, so nothing is sent.
+func MailFrom(from string) Had[named.Text] {
+	address, err := named.TextOf("mail.from in am.toml", from)
+	if err != nil {
+		return HavingNot[named.Text](errors.Wrap(err, "no address to send from: set mail.from in am.toml"))
+	}
+	return Having(address)
+}
+
+// MailActor is the node's DID, who writes what the mail service records.
+func MailActor(did string) Had[named.Text] {
+	actor, err := named.TextOf("the node's DID", did)
+	if err != nil {
+		return HavingNot[named.Text](errors.Wrap(err, "the mail service was wired without the node, so nobody writes what it records"))
+	}
+	return Having(actor)
 }
 
 // MailServer is the MailService gRPC server.
@@ -148,35 +192,39 @@ func (s *MailServer) SetTemplate(_ context.Context, req *protocol.SetMailTemplat
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return refuse(err)
 	}
-	if req.Source == "" {
-		return refuse(errors.New("source is required: the plugin the template belongs to"))
+	source, err := named.TextOf("source, the plugin the template belongs to,", req.Source)
+	if err != nil {
+		return refuse(err)
 	}
-	if req.Name == "" {
-		return refuse(errors.New("name is required"))
+	name, err := named.TextOf("name", req.Name)
+	if err != nil {
+		return refuse(err)
 	}
-	if isQNTXTemplate(req.Name) {
-		return refuse(errors.Newf("%s is one of QNTX's own templates, which a Send names without setting it", req.Name))
+	if isQNTXTemplate(name.String()) {
+		return refuse(errors.Newf("%s is one of QNTX's own templates, which a Send names without setting it", name))
 	}
-	if err := checkMailTemplate(req.Template); err != nil {
-		return refuse(errors.Wrapf(err, "template %s of %s", req.Name, req.Source))
+	parsed, err := parseMail(req.Template)
+	if err != nil {
+		return refuse(errors.Wrapf(err, "template %s of %s", name, source))
 	}
 
 	w, err := s.wiredWith()
 	if err != nil {
 		return refuse(errors.Wrap(err, "the mail service has nowhere to keep a template yet"))
 	}
-	store, err := w.records()
+	store, err := w.Records()
 	if err != nil {
-		return refuse(errors.Wrapf(err, "template %s of %s was not kept", req.Name, req.Source))
+		return refuse(errors.Wrapf(err, "template %s of %s was not kept", name, source))
 	}
 
-	ref := templateRef(req.Source, req.Name)
-	id, err := s.attest(store, w.Actor, ref, PredicateMailTemplate, req.Source, req.Source, map[string]any{
-		"plugin":  req.Source,
-		"name":    req.Name,
-		"subject": req.Template.Subject,
-		"html":    req.Template.Html,
-		"text":    req.Template.Text,
+	ref := templateRef(source.String(), name.String())
+	kept := parsed.source
+	id, err := s.attest(store, w.Actor, ref, PredicateMailTemplate, source.String(), source.String(), map[string]any{
+		"plugin":  source.String(),
+		"name":    name.String(),
+		"subject": kept.GetSubject(),
+		"html":    kept.GetHtml(),
+		"text":    kept.GetText(),
 	})
 	if err != nil {
 		return refuse(errors.Wrapf(err, "template %s was not attested", ref))
@@ -189,13 +237,14 @@ func (s *MailServer) SetTemplate(_ context.Context, req *protocol.SetMailTemplat
 // attest writes one record of the mail service, as the node: the node's own
 // records are written whole, with the node as their actor, the way auth writes
 // what happens at the door.
-func (s *MailServer) attest(store ats.AttestationStore, actor, subject, predicate, context, source string, attrs map[string]any) (string, error) {
+func (s *MailServer) attest(store ats.AttestationStore, node Had[named.Text], subject, predicate, context, source string, attrs map[string]any) (string, error) {
 	id, err := identity.GenerateASUIDWithRetry("AS", subject, predicate, context, store.AttestationExists)
 	if err != nil {
 		return "", errors.Wrapf(err, "no id could be minted for %s of %s", predicate, subject)
 	}
-	if actor == "" {
-		return "", errors.Newf("the mail service was wired without the node, so nobody writes %s of %s", predicate, subject)
+	actor, err := node.Get()
+	if err != nil {
+		return "", errors.Wrapf(err, "%s of %s is not written", predicate, subject)
 	}
 	now := time.Now()
 	if err := store.CreateAttestation(&types.As{
@@ -203,7 +252,7 @@ func (s *MailServer) attest(store ats.AttestationStore, actor, subject, predicat
 		Subjects:   []string{subject},
 		Predicates: []string{predicate},
 		Contexts:   []string{context},
-		Actors:     []string{actor},
+		Actors:     []string{actor.String()},
 		Timestamp:  now,
 		Source:     source,
 		Attributes: s.stamped(source, attrs),
@@ -224,19 +273,26 @@ func (s *MailServer) Send(ctx context.Context, req *protocol.SendMailRequest) (*
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return refuse(err)
 	}
-	if req.Source == "" {
-		return refuse(errors.New("source is required: the plugin sending"))
+	source, err := named.TextOf("source, the plugin sending,", req.Source)
+	if err != nil {
+		return refuse(err)
 	}
-	if req.UserId == "" {
-		return refuse(errors.New("user_id is required: mail goes to a User"))
+	user, err := named.TextOf("user_id, the User mail goes to,", req.UserId)
+	if err != nil {
+		return refuse(err)
 	}
-
-	w, to, err := s.ready(req.UserId)
+	// QNTX's neutral template is named like any other.
+	name, err := named.TextOf("template (QNTX's own are "+NeutralTemplateName+" and "+DarkTemplateName+")", req.Template)
 	if err != nil {
 		return refuse(err)
 	}
 
-	template, ref, err := s.template(w, req.Source, req.Template)
+	w, to, err := s.ready(user.String())
+	if err != nil {
+		return refuse(err)
+	}
+
+	template, ref, err := s.template(w, source.String(), name.String())
 	if err != nil {
 		return refuse(err)
 	}
@@ -250,10 +306,10 @@ func (s *MailServer) Send(ctx context.Context, req *protocol.SendMailRequest) (*
 		return refuse(err)
 	}
 
-	mail := OutgoingMail{From: w.From, To: to, Subject: filled.Subject, HTML: filled.HTML, Text: filled.Text, Inline: inline}
-	messageID, attestationID, sendErr := s.deliver(ctx, w, req.UserId, req.Source, ref, mail)
+	mail := OutgoingMail{From: w.from.String(), To: to.String(), Subject: filled.Subject, HTML: filled.HTML, Text: filled.Text, Inline: inline}
+	messageID, attestationID, sendErr := s.deliver(ctx, w, user.String(), source.String(), ref, mail)
 	if sendErr != nil {
-		return &protocol.SendMailResponse{Success: false, Error: sendErr.Error(), AttestationId: attestationID}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
+		return &protocol.SendMailResponse{Success: false, Error: sendErr.Error(), MessageId: messageID, AttestationId: attestationID}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 	}
 	return &protocol.SendMailResponse{Success: true, MessageId: messageID, AttestationId: attestationID}, nil
 }
@@ -273,28 +329,29 @@ func inlineImages(images []*protocol.MailImage) ([]InlineImage, error) {
 	seen := map[string]bool{}
 	total := 0
 	for i, img := range images {
-		if img.ContentId == "" {
-			return nil, errors.Newf("inline image %d has no content_id: the html shows it by cid:<content_id>", i)
+		cid, err := named.TextOf(fmt.Sprintf("the content_id of inline image %d, by which the html shows it as cid:<content_id>,", i), img.ContentId)
+		if err != nil {
+			return nil, err
 		}
-		if seen[img.ContentId] {
-			return nil, errors.Newf("inline image %d repeats content_id %s", i, img.ContentId)
+		if seen[cid.String()] {
+			return nil, errors.Newf("inline image %d repeats content_id %s", i, cid)
 		}
-		seen[img.ContentId] = true
+		seen[cid.String()] = true
 		if img.ContentType != "image/png" {
-			return nil, errors.Newf("inline image %s is %q: only image/png is accepted", img.ContentId, img.ContentType)
+			return nil, errors.Newf("inline image %s is %q: only image/png is accepted", cid, img.ContentType)
 		}
 		if !bytes.HasPrefix(img.Data, pngSignature) {
-			return nil, errors.Newf("inline image %s is not a PNG: its %d bytes do not begin with the PNG signature", img.ContentId, len(img.Data))
+			return nil, errors.Newf("inline image %s is not a PNG: its %d bytes do not begin with the PNG signature", cid, len(img.Data))
 		}
 		total += len(img.Data)
 		if total > MaxMailImageBytes {
-			return nil, errors.Newf("inline images come to more than %d bytes by image %s", MaxMailImageBytes, img.ContentId)
+			return nil, errors.Newf("inline images come to more than %d bytes by image %s", MaxMailImageBytes, cid)
 		}
-		fileName := img.FileName
-		if fileName == "" {
-			fileName = img.ContentId + ".png"
+		fileName, err := named.TextOf("the file_name of inline image "+cid.String(), img.FileName)
+		if err != nil {
+			return nil, err
 		}
-		inline = append(inline, InlineImage{ContentID: img.ContentId, ContentType: img.ContentType, FileName: fileName, Data: img.Data})
+		inline = append(inline, InlineImage{ContentID: cid.String(), ContentType: img.ContentType, FileName: fileName.String(), Data: img.Data})
 	}
 	return inline, nil
 }
@@ -308,7 +365,7 @@ func (s *MailServer) SendAsNode(ctx context.Context, userID string, m NodeMail) 
 		s.logger.Warnw("Node mail not sent", "mail", m.Name, "user", userID, "error", err)
 		return "", "", err
 	}
-	mail := OutgoingMail{From: w.From, To: to, Subject: m.Subject, HTML: m.HTML, Text: m.Text, Inline: m.Inline}
+	mail := OutgoingMail{From: w.from.String(), To: to.String(), Subject: m.Subject, HTML: m.HTML, Text: m.Text, Inline: m.Inline}
 	return s.deliver(ctx, w, userID, NodeSource, m.Name, mail)
 }
 
@@ -316,36 +373,42 @@ func (s *MailServer) SendAsNode(ctx context.Context, userID string, m NodeMail) 
 // the Users are in does not answer is not held up behind that store.
 func (s *MailServer) SendAsNodeTo(ctx context.Context, u MailRecipient, m NodeMail) (messageID, attestationID string, err error) {
 	w, err := s.wiring()
-	if err == nil {
-		err = sendable(u)
-	}
 	if err != nil {
 		s.logger.Warnw("Node mail not sent", "mail", m.Name, "user", u.ID, "error", err)
 		return "", "", err
 	}
-	mail := OutgoingMail{From: w.From, To: u.Email, Subject: m.Subject, HTML: m.HTML, Text: m.Text, Inline: m.Inline}
+	to, err := u.Address()
+	if err != nil {
+		s.logger.Warnw("Node mail not sent", "mail", m.Name, "user", u.ID, "error", err)
+		return "", "", err
+	}
+	mail := OutgoingMail{From: w.from.String(), To: to.String(), Subject: m.Subject, HTML: m.HTML, Text: m.Text, Inline: m.Inline}
 	return s.deliver(ctx, w, u.ID, NodeSource, m.Name, mail)
 }
 
 // ready is the wiring a send needs and the address it goes to, or why there is
 // none.
-func (s *MailServer) ready(userID string) (*mailSending, string, error) {
+func (s *MailServer) ready(userID string) (*mailSending, named.Text, error) {
 	w, err := s.wiring()
 	if err != nil {
-		return nil, "", err
+		return nil, named.Text{}, err
 	}
 	to, err := s.recipient(w, userID)
 	if err != nil {
-		return nil, "", err
+		return nil, named.Text{}, err
 	}
 	return w, to, nil
 }
 
-// mailSending is the wiring a send goes out by, with the store its record is
-// kept in, read once when the send begins.
+// mailSending is what a send goes out by, read once when the send begins: the
+// address it is from, the transport, the Users, the store its record is kept
+// in, and the node who records it.
 type mailSending struct {
-	*MailWiring
-	store ats.AttestationStore
+	from       named.Text
+	transport  MailTransport
+	recipients MailRecipients
+	store      ats.AttestationStore
+	actor      Had[named.Text]
 }
 
 // wiring is what a send needs besides the User, or why there is none.
@@ -354,36 +417,29 @@ func (s *MailServer) wiring() (*mailSending, error) {
 	if err != nil {
 		return nil, err
 	}
-	if w.Transport == nil {
-		return nil, errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml")
+	transport, err := w.Transport.Get()
+	if err != nil {
+		return nil, err
 	}
-	if w.From == "" {
-		return nil, errors.New("no address to send from: set mail.from in am.toml")
+	from, err := w.From.Get()
+	if err != nil {
+		return nil, err
 	}
-	if w.Recipients == nil {
-		return nil, errors.New("this node keeps no Users, so there is nobody to mail")
+	recipients, err := w.Recipients.Get()
+	if err != nil {
+		return nil, err
 	}
-	store, err := w.records()
+	store, err := w.Records()
 	if err != nil {
 		return nil, errors.Wrap(err, "no mail is sent that cannot be attested")
 	}
-	return &mailSending{MailWiring: w, store: store}, nil
-}
-
-// records is the store the node keeps mail's records in, or that it holds
-// none: the node's own records are not there before the node has them.
-func (w *MailWiring) records() (ats.AttestationStore, error) {
-	store := w.Records()
-	if store == nil {
-		return nil, errors.New("the node holds no store to keep mail's records in")
-	}
-	return store, nil
+	return &mailSending{from: from, transport: transport, recipients: recipients, store: store, actor: w.Actor}, nil
 }
 
 // deliver hands a filled mail to the transport and attests what became of it:
 // mail:sent with the transport's id, or mail:failed with its refusal.
 func (s *MailServer) deliver(ctx context.Context, w *mailSending, userID, source, ref string, mail OutgoingMail) (string, string, error) {
-	messageID, sendErr := w.Transport.Send(ctx, mail)
+	messageID, sendErr := w.transport.Send(ctx, mail)
 
 	attrs := map[string]any{
 		"plugin":   source,
@@ -419,13 +475,15 @@ func (s *MailServer) deliver(ctx context.Context, w *mailSending, userID, source
 		attrs["message_id"] = messageID
 	}
 
-	attestationID, attestErr := s.attest(w.store, w.Actor, userID, predicate, ref, source, attrs)
+	attestationID, attestErr := s.attest(w.store, w.actor, userID, predicate, ref, source, attrs)
 	if attestErr != nil {
 		// The mail left or failed either way; what is lost is the record of it,
-		// and that is said with everything the record would have held.
+		// and that is said with everything the record would have held, and
+		// answered: no mail is sent that cannot be attested.
 		s.logger.Errorw("Mail not attested: the store refused it",
 			"predicate", predicate, "user", userID, "template", ref,
-			"message_id", messageID, "attributes", attrs, "error", attestErr)
+			"message_id", messageID, "attributes", attrs, "error", attestErr, "transport_error", sendErr)
+		return messageID, "", errors.Wrapf(attestErr, "the %s of mail to User %s is not attested", predicate, userID)
 	}
 
 	if sendErr != nil {
@@ -441,38 +499,20 @@ func (s *MailServer) deliver(ctx context.Context, w *mailSending, userID, source
 }
 
 // recipient is the address a User's mail goes to, or why there is none.
-func (s *MailServer) recipient(w *mailSending, userID string) (string, error) {
-	u, found, err := w.Recipients(userID)
+func (s *MailServer) recipient(w *mailSending, userID string) (named.Text, error) {
+	u, found, err := w.recipients(userID)
 	if err != nil {
-		return "", errors.Wrapf(err, "User %s could not be read", userID)
+		return named.Text{}, errors.Wrapf(err, "User %s could not be read", userID)
 	}
 	if !found {
-		return "", errors.Newf("no User %s", userID)
+		return named.Text{}, errors.Newf("no User %s", userID)
 	}
-	u.ID = userID
-	if err := sendable(u); err != nil {
-		return "", err
-	}
-	return u.Email, nil
+	return u.Address()
 }
 
-// sendable is a User mail may go to: switched on, with an address.
-func sendable(u MailRecipient) error {
-	if u.DisabledBy != "" {
-		return errors.Newf("User %s is switched off by %s", u.ID, u.DisabledBy)
-	}
-	if u.Email == "" {
-		return errors.Newf("User %s has no email address", u.ID)
-	}
-	return nil
-}
-
-// template is what a Send is filled from: QNTX's neutral template when it names
-// none, else the newest the plugin set under that name.
+// template is what a Send is filled from: one of QNTX's own by its name, else
+// the newest the plugin set under that name.
 func (s *MailServer) template(w *mailSending, plugin, name string) (*protocol.MailTemplate, string, error) {
-	if name == "" {
-		return NeutralTemplate(), NeutralTemplateName, nil
-	}
 	if isQNTXTemplate(name) {
 		own, err := qntxTemplate(name)
 		return own, name, err

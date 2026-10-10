@@ -95,13 +95,16 @@ impl DomainPluginService for PTYElementService {
         }))
     }
 
-    async fn shutdown(&self, _request: Request<Empty>) -> Result<Response<Empty>, Status> {
+    async fn shutdown(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<ShutdownResponse>, Status> {
         info!("Shutting down PTY element plugin");
 
         // Clean up all PTY sessions
         self.pty_manager.write().shutdown_all();
 
-        Ok(Response::new(Empty {}))
+        Ok(Response::new(ShutdownResponse { stopped: true }))
     }
 
     async fn health(&self, _request: Request<Empty>) -> Result<Response<HealthResponse>, Status> {

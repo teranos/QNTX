@@ -21,7 +21,8 @@ use tracing::{debug, warn};
 
 use super::proto::ats_store_service_client::AtsStoreServiceClient;
 use super::proto::{
-    AttestationCommand, AttestationFilter, GenerateAttestationRequest, GetAttestationsRequest,
+    attestation_command, attestation_filter, ActorNames, AttestationCommand, AttestationFilter,
+    GenerateAttestationRequest, GetAttestationsRequest,
 };
 
 /// A type definition to be attested. Mirrors Go's `types.TypeDef`.
@@ -161,9 +162,9 @@ pub async fn ensure_types(
                 predicates: vec!["type".to_string()],
                 contexts: vec![],
                 actors: vec![],
-                time_start: None,
-                time_end: None,
-                limit: Some(64),
+                from: Some(attestation_filter::From::UnboundedStart(true)),
+                to: Some(attestation_filter::To::UnboundedEnd(true)),
+                limit: 64,
             }),
         };
 
@@ -195,11 +196,14 @@ pub async fn ensure_types(
             subjects: vec![def.name.clone()],
             predicates: vec!["type".to_string()],
             contexts: vec![],
-            actors: vec![def.name.clone()], // Self-certifying: type IS its own actor
-            timestamp: None,
+            // Self-certifying: type IS its own actor
+            by: Some(attestation_command::By::ActorsNamed(ActorNames {
+                names: vec![def.name.clone()],
+            })),
+            when: Some(attestation_command::When::Now(true)),
             attributes: Some(wanted),
             source: source.to_string(),
-            source_version: String::new(),
+            version: Some(attestation_command::Version::VersionFromRegistry(true)),
         };
 
         let req = GenerateAttestationRequest {

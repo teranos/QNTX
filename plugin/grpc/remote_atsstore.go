@@ -5,6 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -50,13 +51,27 @@ func (r *RemoteATSStore) Close() error {
 
 // GenerateAndCreateAttestation creates an attestation via gRPC.
 func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
+	// types.AsCommand says the node authors a command naming no actor, now
+	// for one naming no time, and the registry's version for one naming none;
+	// on the wire each is said.
 	protoCmd := &protocol.AttestationCommand{
-		Subjects:      cmd.Subjects,
-		Predicates:    cmd.Predicates,
-		Contexts:      cmd.Contexts,
-		Actors:        cmd.Actors,
-		Source:        cmd.Source,
-		SourceVersion: cmd.SourceVersion,
+		Subjects:   cmd.Subjects,
+		Predicates: cmd.Predicates,
+		Contexts:   cmd.Contexts,
+		Source:     cmd.Source,
+		By:         &protocol.AttestationCommand_ActorsNamed{ActorsNamed: &protocol.ActorNames{Names: cmd.Actors}},
+		When:       &protocol.AttestationCommand_Timestamp{Timestamp: cmd.Timestamp.UnixMilli()},
+	}
+	if err := cmd.NamesItsActor(); err != nil {
+		protoCmd.By = &protocol.AttestationCommand_ByNode{ByNode: true}
+	}
+	if cmd.Timestamp.IsZero() {
+		protoCmd.When = &protocol.AttestationCommand_Now{Now: true}
+	}
+	if version, err := named.TextOf("source_version", cmd.SourceVersion); err != nil {
+		protoCmd.Version = &protocol.AttestationCommand_VersionFromRegistry{VersionFromRegistry: true}
+	} else {
+		protoCmd.Version = &protocol.AttestationCommand_SourceVersion{SourceVersion: version.String()}
 	}
 
 	attrs, err := protocol.AttributesStruct(cmd.Attributes)
@@ -64,11 +79,6 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *
 		return nil, errors.Wrapf(err, "the attestation of %v is not sent", cmd.Subjects)
 	}
 	protoCmd.Attributes = attrs
-
-	if !cmd.Timestamp.IsZero() {
-		ts := cmd.Timestamp.UnixMilli()
-		protoCmd.Timestamp = &ts
-	}
 
 	req := &protocol.GenerateAttestationRequest{
 		AuthToken: r.authToken,
@@ -105,21 +115,22 @@ func (r *RemoteATSStore) AttestationExists(asid string) bool {
 
 // GetAttestations retrieves attestations via gRPC.
 func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
-	limit := int32(filter.Limit)
+	// ats.AttestationFilter holds an unbounded side by a nil; on the wire it
+	// is said.
 	protoFilter := &protocol.AttestationFilter{
 		Actors:     filter.Actors,
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
-		Limit:      &limit,
+		Limit:      int32(filter.Limit),
+		From:       &protocol.AttestationFilter_UnboundedStart{UnboundedStart: true},
+		To:         &protocol.AttestationFilter_UnboundedEnd{UnboundedEnd: true},
 	}
 	if filter.TimeStart != nil {
-		ms := filter.TimeStart.UnixMilli()
-		protoFilter.TimeStart = &ms
+		protoFilter.From = &protocol.AttestationFilter_TimeStart{TimeStart: filter.TimeStart.UnixMilli()}
 	}
 	if filter.TimeEnd != nil {
-		ms := filter.TimeEnd.UnixMilli()
-		protoFilter.TimeEnd = &ms
+		protoFilter.To = &protocol.AttestationFilter_TimeEnd{TimeEnd: filter.TimeEnd.UnixMilli()}
 	}
 
 	req := &protocol.GetAttestationsRequest{

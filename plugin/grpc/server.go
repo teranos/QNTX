@@ -269,11 +269,11 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 }
 
 // Shutdown shuts down the plugin.
-func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protocol.Empty, error) {
+func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protocol.ShutdownResponse, error) {
 	if err := s.plugin.Shutdown(ctx); err != nil {
 		return nil, errors.Wrapf(err, "plugin %s shutdown failed", s.plugin.Metadata().Name)
 	}
-	return &protocol.Empty{}, nil
+	return &protocol.ShutdownResponse{Stopped: true}, nil
 }
 
 // HandleHTTP handles an HTTP request via gRPC.

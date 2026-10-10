@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/errors"
 )
 
 // Mail is what the node mails on plugins' behalf (ADR-041): the service
@@ -38,15 +39,17 @@ const (
 func (s *QNTXServer) mailWiring() services.MailWiring {
 	s.mailConfig = s.deps.cfg.Mail
 	w := services.MailWiring{
-		From:    s.mailConfig.From,
-		Records: s.mailRecords,
-		Actor:   s.nodeActor(),
+		From:       services.MailFrom(s.mailConfig.From),
+		Transport:  services.HavingNot[services.MailTransport](errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml")),
+		Recipients: services.HavingNot[services.MailRecipients](errors.New("this node keeps no Users, so there is nobody to mail")),
+		Records:    s.mailRecords,
+		Actor:      services.MailActor(s.nodeActor()),
 	}
 	if s.mailConfig.SES.Enabled {
-		w.Transport = services.SESTransport{Region: s.mailConfig.SES.Region}
+		w.Transport = services.Having[services.MailTransport](services.SESTransport{Region: s.mailConfig.SES.Region})
 	}
 	if s.authHandler != nil {
-		w.Recipients = s.mailRecipient
+		w.Recipients = services.Having[services.MailRecipients](s.mailRecipient)
 	}
 	s.logger.Infow("Mail service wired",
 		"ses", s.mailConfig.SES.Enabled,
@@ -58,9 +61,14 @@ func (s *QNTXServer) mailWiring() services.MailWiring {
 
 // mailRecords is where the mail service keeps the templates it fills and the
 // mail it sent: with what the node knows of itself, because a mail names a User
-// and no User is visible below SUPER (ADR-031).
-func (s *QNTXServer) mailRecords() ats.AttestationStore {
-	return s.held.TheNodesOwnRecords()
+// and no User is visible below SUPER (ADR-031). Before the node has its own
+// records, it holds none.
+func (s *QNTXServer) mailRecords() (ats.AttestationStore, error) {
+	store := s.held.TheNodesOwnRecords()
+	if store == nil {
+		return nil, errors.New("this node holds no store the mail service attests into")
+	}
+	return store, nil
 }
 
 // mailRecipient is a User as the mail service reads one: their primary address,
@@ -70,7 +78,7 @@ func (s *QNTXServer) mailRecipient(id string) (services.MailRecipient, bool, err
 	if err != nil || !found {
 		return services.MailRecipient{}, found, err
 	}
-	return services.MailRecipient{ID: u.ID, Email: u.PrimaryEmail(), DisabledBy: u.DisabledBy}, true, nil
+	return services.UserRecipient(u), true, nil
 }
 
 // nodeActor is who the node is when it writes as itself: its DID, which the
@@ -144,9 +152,9 @@ func (s *QNTXServer) mailSent(_ context.Context, sent sigil.Sent) (any, *protoco
 		limit = min(n, storage.MaxAttestationLimit)
 	}
 
-	store := s.mailRecords()
-	if store == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no store the mail service attests into"}
+	store, err := s.mailRecords()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 
 	// One query per predicate: a store may read several in one filter as all
@@ -227,9 +235,9 @@ func (s *QNTXServer) mailTemplates(_ context.Context, _ sigil.Sent) (any, *proto
 		}},
 	}
 
-	store := s.mailRecords()
-	if store == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no store the mail service attests into"}
+	store, err := s.mailRecords()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	found, err := store.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{services.PredicateMailTemplate},
@@ -303,9 +311,9 @@ func (s *QNTXServer) mailAccount(ctx context.Context, _ sigil.Sent) (any, *proto
 
 // "i would have expected to be able to click the main and see exactly what was sent."
 func (s *QNTXServer) mailMessage(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	store := s.mailRecords()
-	if store == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no store the mail service attests into"}
+	store, err := s.mailRecords()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	id, user := sent["id"], sent["user"]
 	for _, predicate := range []string{services.PredicateMailSent, services.PredicateMailFailed} {

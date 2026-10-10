@@ -12,17 +12,36 @@ export interface FetchRequest {
   auth_token: string;
   /** URL to fetch */
   url: string;
-  /** Attestation subjects */
-  subjects: string[];
-  /** Attestation predicate (e.g. "http:get") */
-  predicate: string;
-  /** Attestation context (e.g. the URL itself) */
-  context: string;
-  /** Skip cache, always fetch from remote */
+  /** Skip the record, always fetch from remote */
   fresh: boolean;
-  /** Actor identity for the attestation (e.g. "myplugin:pipeline") */
-  actor: string;
-  /** Plugin name requesting the fetch. Used as attestation source and for automatic version resolution. */
+  attest?:
+    | FetchRecord
+    | undefined;
+  /** Neither attested nor answered from a record. False is refused. */
+  unrecorded?: boolean | undefined;
+}
+
+/**
+ * FetchRecord is the attestation a fetch is kept as. A fetch already attested
+ * under the same subjects and predicate is answered from its record unless
+ * fresh is set.
+ */
+export interface FetchRecord {
+  /** At least one */
+  subjects: string[];
+  /** e.g. "http:get" */
+  predicate: string;
+  /** e.g. the URL itself */
+  context: string;
+  /** e.g. "myplugin:pipeline" */
+  actor?:
+    | string
+    | undefined;
+  /** The node authors it. False is refused. */
+  node?:
+    | boolean
+    | undefined;
+  /** The plugin fetching: the attestation's source, and its version's. */
   source: string;
 }
 

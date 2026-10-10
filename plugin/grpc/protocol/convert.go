@@ -82,3 +82,18 @@ func AttributesStruct(attributes map[string]any) (*structpb.Struct, error) {
 	}
 	return &attrs, nil
 }
+
+// SignalCarried is the signal a chunk carries, and true; false for a chunk
+// that says it carries none. A chunk naming neither is refused.
+func (c *LLMChatChunk) SignalCarried() (*TokenSignalProto, bool, error) {
+	switch carried := c.GetSignalOf().(type) {
+	case *LLMChatChunk_Signal:
+		return carried.Signal, true, nil
+	case *LLMChatChunk_NoSignal:
+		if !carried.NoSignal {
+			return nil, false, errors.New("a chunk says no_signal is false: it carries its signal, or none")
+		}
+		return nil, false, nil
+	}
+	return nil, false, errors.New("a chunk names no signal: signal, or no_signal")
+}

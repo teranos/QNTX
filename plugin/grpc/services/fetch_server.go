@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -28,13 +29,19 @@ type windowLimiter struct {
 	times   []time.Time
 	maxReqs int
 	window  time.Duration
+	// closedErr is why no request is made at all: a window that allows none.
+	closedErr error
 }
 
+// newWindowLimiter allows maxReqs a window: "zero means zero", so a window of
+// none makes no request.
 func newWindowLimiter(maxReqs int, window time.Duration) *windowLimiter {
+	allowed, err := named.CountOf("fetch.max_requests_per_window", maxReqs)
 	return &windowLimiter{
-		times:   make([]time.Time, 0, maxReqs),
-		maxReqs: maxReqs,
-		window:  window,
+		times:     make([]time.Time, 0, allowed.Int()),
+		maxReqs:   allowed.Int(),
+		window:    window,
+		closedErr: errors.Wrapf(err, "fetch allows %d requests per window, so none is made", maxReqs),
 	}
 }
 
@@ -53,8 +60,8 @@ func (w *windowLimiter) usage() (current, max int) {
 
 // wait blocks until a slot is available in the window, or ctx is cancelled.
 func (w *windowLimiter) wait(ctx context.Context) error {
-	if w.maxReqs <= 0 {
-		return errors.Newf("fetch allows %d requests per window, so none is made", w.maxReqs)
+	if w.closedErr != nil {
+		return w.closedErr
 	}
 	for {
 		w.mu.Lock()
@@ -219,10 +226,13 @@ func NewFetchServer(store ats.AttestationStore, authToken, node string, cfg appc
 		versionResolver: noVersions,
 	}
 	s.SetPluginStores(noPluginStanding)
-	// An interval of 0 is no ticking.
-	if pulseSecs > 0 {
-		go s.pulseLoop(time.Duration(pulseSecs) * time.Second)
+	// "0 ticker interval = no ticking"
+	every, err := named.CountOf("fetch.pulse_interval_seconds", pulseSecs)
+	if err != nil {
+		logger.Infow("Fetch pulse does not tick", "why", err.Error())
+		return s
 	}
+	go s.pulseLoop(time.Duration(every.Int()) * time.Second)
 	return s
 }
 
@@ -260,60 +270,147 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 		return &protocol.FetchResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 	}
 
-	if req.Url == "" {
-		return &protocol.FetchResponse{Success: false, Error: "url is required"}, nil
-	}
-
-	// Dedup: return cached attestation if we already fetched this URL
-	if resp, found := s.dedupLookup(store, req); found {
-		return resp, nil
-	}
-
-	if err := s.applyRateLimits(ctx, req.Url); err != nil {
+	target, err := named.TextOf("url", req.Url)
+	if err != nil {
 		return &protocol.FetchResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the refusal travels in the response payload
 	}
 
-	body, statusCode, fetchErr := s.doHTTPGet(ctx, req.Url)
-	if fetchErr != nil {
-		return fetchErr, nil
+	switch record := req.Record.(type) {
+	case *protocol.FetchRequest_Unrecorded:
+		if !record.Unrecorded {
+			return &protocol.FetchResponse{Success: false, Error: "unrecorded is false: a fetch is attested as it names, or unrecorded"}, nil
+		}
+		body, statusCode, fetchErr := s.fetchLive(ctx, target.String())
+		if fetchErr != nil {
+			return fetchErr, nil
+		}
+		return &protocol.FetchResponse{Success: true, Body: string(body), StatusCode: int32(statusCode)}, nil
+	case *protocol.FetchRequest_Attest:
+		as, err := s.fetchRecordOf(target.String(), record.Attest)
+		if err != nil {
+			return &protocol.FetchResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the refusal travels in the response payload
+		}
+		return s.fetchAttested(ctx, store, req.Fresh, as), nil
 	}
+	return &protocol.FetchResponse{Success: false, Error: "a fetch names what becomes of it: attest, or unrecorded"}, nil
+}
 
-	attestID := s.attestFetchResult(ctx, store, req, body, statusCode)
+// fetchLive is the URL fetched from remote, once the rate limits let it go.
+func (s *FetchServer) fetchLive(ctx context.Context, rawURL string) ([]byte, int, *protocol.FetchResponse) {
+	if err := s.applyRateLimits(ctx, rawURL); err != nil {
+		return nil, 0, &protocol.FetchResponse{Success: false, Error: err.Error()}
+	}
+	return s.doHTTPGet(ctx, rawURL)
+}
 
+// fetchAttested answers a fetch from its record when one is kept and fresh is
+// not asked for, else fetches it and attests what came back.
+func (s *FetchServer) fetchAttested(ctx context.Context, store ats.AttestationStore, fresh bool, as fetchRecord) *protocol.FetchResponse {
+	if !fresh {
+		if resp, found := s.dedupLookup(store, as); found {
+			return resp
+		}
+	}
+	body, statusCode, fetchErr := s.fetchLive(ctx, as.url)
+	if fetchErr != nil {
+		return fetchErr
+	}
+	attestID, err := s.attestFetchResult(ctx, store, as, body, statusCode)
+	if err != nil {
+		// The fetch was made; what is answered is that it is not kept.
+		return &protocol.FetchResponse{
+			Success:    false,
+			Error:      err.Error(),
+			Body:       string(body),
+			StatusCode: int32(statusCode),
+		}
+	}
 	return &protocol.FetchResponse{
 		Success:       true,
 		Body:          string(body),
 		StatusCode:    int32(statusCode),
 		AttestationId: attestID,
-	}, nil
+	}
 }
 
-// dedupLookup checks if we already have an attestation for this URL.
-// Returns the cached response and true if found, nil and false otherwise.
-func (s *FetchServer) dedupLookup(store ats.AttestationStore, req *protocol.FetchRequest) (*protocol.FetchResponse, bool) {
-	if req.Predicate == "" || req.Fresh || len(req.Subjects) == 0 {
-		return nil, false
-	}
+// fetchRecord is the attestation a fetch is kept as, each part named.
+type fetchRecord struct {
+	url       string
+	subjects  named.Items[string]
+	predicate named.Text
+	context   named.Text
+	actor     named.Text
+	source    named.Text
+}
 
+// fetchRecordOf reads what a fetch is attested as, or why it cannot be.
+func (s *FetchServer) fetchRecordOf(url string, record *protocol.FetchRecord) (fetchRecord, error) {
+	subjects, err := named.ItemsOf("attest.subjects", record.GetSubjects())
+	if err != nil {
+		return fetchRecord{}, err
+	}
+	predicate, err := named.TextOf("attest.predicate", record.GetPredicate())
+	if err != nil {
+		return fetchRecord{}, err
+	}
+	context, err := named.TextOf("attest.context", record.GetContext())
+	if err != nil {
+		return fetchRecord{}, err
+	}
+	source, err := named.TextOf("attest.source, the plugin fetching,", record.GetSource())
+	if err != nil {
+		return fetchRecord{}, err
+	}
+	actor, err := s.writerOf(record)
+	if err != nil {
+		return fetchRecord{}, err
+	}
+	return fetchRecord{url: url, subjects: subjects, predicate: predicate, context: context, actor: actor, source: source}, nil
+}
+
+// writerOf is who writes a fetch's attestation: the actor the plugin names, or
+// the node, which authors a fetch its plugin asks it to.
+func (s *FetchServer) writerOf(record *protocol.FetchRecord) (named.Text, error) {
+	switch by := record.GetBy().(type) {
+	case *protocol.FetchRecord_Actor:
+		return named.TextOf("attest.actor", by.Actor)
+	case *protocol.FetchRecord_Node:
+		if !by.Node {
+			return named.Text{}, errors.New("attest.node is false: a fetch is written by the actor it names, or by the node")
+		}
+		return named.TextOf("the node's DID", s.node)
+	}
+	return named.Text{}, errors.New("attest names who writes it: an actor, or the node")
+}
+
+// dedupLookup is the record of this URL's fetch, when one is kept: its
+// response, and true. False is none kept, and the URL is fetched live.
+func (s *FetchServer) dedupLookup(store ats.AttestationStore, as fetchRecord) (*protocol.FetchResponse, bool) {
 	results, err := store.GetAttestations(ats.AttestationFilter{
-		Predicates: []string{req.Predicate},
-		Subjects:   req.Subjects,
+		Predicates: []string{as.predicate.String()},
+		Subjects:   as.subjects.All(),
 		Limit:      1,
 	})
 	if err != nil {
 		// A broken store is not a cache miss — the live re-fetch that
 		// follows must not hide that the record could not be read.
 		s.logger.Warnw("Dedup lookup failed; fetching live instead of answering from the record",
-			"url", req.Url, "predicate", req.Predicate, "error", err)
+			"url", as.url, "predicate", as.predicate.String(), "error", err)
 		return nil, false
 	}
-	if len(results) == 0 {
-		return nil, false
+	for _, existing := range results {
+		if resp, same := s.answeredFrom(existing, as.url); same {
+			return resp, true
+		}
 	}
+	return nil, false
+}
 
-	existing := results[0]
+// answeredFrom is a fetch answered from the record of an earlier one, when
+// that record is of the same URL.
+func (s *FetchServer) answeredFrom(existing *types.As, url string) (*protocol.FetchResponse, bool) {
 	existingURL, ok := existing.Attributes["url"].(string)
-	if !ok || existingURL != req.Url {
+	if !ok || existingURL != url {
 		return nil, false
 	}
 
@@ -348,7 +445,7 @@ func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) error 
 	// Global window limit — warn at 80% capacity
 	current, max := s.globalLimiter.usage()
 	if current >= max*4/5 {
-		s.logger.Warnw("Fetch window near capacity",
+		s.logger.Infow("Fetch window near capacity",
 			"current", current,
 			"max", max,
 			"window", s.globalLimiter.window,
@@ -361,7 +458,7 @@ func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) error 
 		return errors.Wrapf(err, "global rate limit wait cancelled for %s", rawURL)
 	}
 	if waited := time.Since(waitStart); waited > 100*time.Millisecond {
-		s.logger.Warnw("Fetch throttled by global rate limit", "waited", waited.Round(time.Millisecond), "url", rawURL)
+		s.logger.Infow("Fetch throttled by global rate limit", "waited", waited.Round(time.Millisecond), "url", rawURL)
 	}
 
 	parsed, err := url.Parse(rawURL)
@@ -431,59 +528,35 @@ func (s *FetchServer) doHTTPGet(ctx context.Context, rawURL string) ([]byte, int
 	return body, resp.StatusCode, nil
 }
 
-// attestFetchResult creates an attestation for the fetch result.
-// Returns the attestation ID, or empty string if attestation was skipped or failed.
-func (s *FetchServer) attestFetchResult(ctx context.Context, store ats.AttestationStore, req *protocol.FetchRequest, body []byte, statusCode int) string {
-	if len(req.Subjects) == 0 || req.Predicate == "" {
-		return ""
-	}
-
-	attCtx := req.Context
-	if attCtx == "" {
-		attCtx = req.Url
-	}
-
+// attestFetchResult attests the fetch result, and names the attestation.
+func (s *FetchServer) attestFetchResult(ctx context.Context, store ats.AttestationStore, as fetchRecord, body []byte, statusCode int) (string, error) {
 	predicates := []string{"http:get"}
-	if req.Predicate != "http:get" {
-		predicates = append(predicates, req.Predicate)
-	}
-
-	// The node authors a fetch its plugin named no actor for.
-	actor := req.Actor
-	if actor == "" {
-		actor = s.node
-	}
-
-	source := req.Source
-	if source == "" {
-		source = "fetch-service"
+	if as.predicate.String() != "http:get" {
+		predicates = append(predicates, as.predicate.String())
 	}
 
 	attrs := map[string]any{
-		"url":         req.Url,
+		"url":         as.url,
 		"response":    string(body),
 		"status_code": statusCode,
 	}
-	if version, known := s.versionResolver(source); known {
+	if version, known := s.versionResolver(as.source.String()); known {
 		attrs["source_version"] = version
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   req.Subjects,
+		Subjects:   as.subjects.All(),
 		Predicates: predicates,
-		Contexts:   []string{attCtx},
-		Actors:     []string{actor},
-		Source:     source,
+		Contexts:   []string{as.context.String()},
+		Actors:     []string{as.actor.String()},
+		Source:     as.source.String(),
 		Attributes: attrs,
 	}
 
 	att, err := store.GenerateAndCreateAttestation(ctx, cmd)
 	if err != nil {
-		s.logger.Warnw("Fetch succeeded but attestation failed",
-			"url", req.Url,
-			"error", err,
-		)
-		return ""
+		s.logger.Warnw("Fetch succeeded but attestation failed", "url", as.url, "error", err)
+		return "", errors.Wrapf(err, "%s was fetched, and its attestation was refused", as.url)
 	}
-	return att.ID
+	return att.ID, nil
 }

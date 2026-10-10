@@ -56,20 +56,12 @@ func (s sheet) add(css string) error {
 			return nil
 		}
 		prelude := strings.TrimSpace(css[:open])
-		depth, end := 1, open+1
-		for ; end < len(css) && depth > 0; end++ {
-			switch css[end] {
-			case '{':
-				depth++
-			case '}':
-				depth--
-			}
-		}
-		if depth != 0 {
+		end, closed := closing(css, open+1, "{", "}")
+		if !closed {
 			return errors.Newf("the block after %q is not closed", prelude)
 		}
-		body := css[open+1 : end-1]
-		css = css[end:]
+		body := css[open+1 : end]
+		css = css[end+1:]
 		if strings.HasPrefix(prelude, "@") {
 			continue
 		}
@@ -125,19 +117,11 @@ func (s sheet) resolve(value string) (string, error) {
 		if at < 0 {
 			return value, nil
 		}
-		depth, end := 1, at+len("var(")
-		for ; end < len(value) && depth > 0; end++ {
-			switch value[end] {
-			case '(':
-				depth++
-			case ')':
-				depth--
-			}
-		}
-		if depth != 0 {
+		end, closed := closing(value, at+len("var("), "(", ")")
+		if !closed {
 			return "", errors.Newf("%q does not close its var(", value)
 		}
-		name, fallback, hasFallback := strings.Cut(value[at+len("var("):end-1], ",")
+		name, fallback, hasFallback := strings.Cut(value[at+len("var("):end], ",")
 		name = strings.TrimSpace(name)
 		replacement, set := s.tokens[name]
 		if !set && !hasFallback {
@@ -146,6 +130,23 @@ func (s sheet) resolve(value string) (string, error) {
 		if !set {
 			replacement = strings.TrimSpace(fallback)
 		}
-		value = value[:at] + replacement + value[end:]
+		value = value[:at] + replacement + value[end+1:]
+	}
+}
+
+// closing is where a bracket opened just before from is closed: the first shut
+// past from with as many opens as shuts between them. False is a bracket that
+// is never closed.
+func closing(text string, from int, open, shut string) (int, bool) {
+	for at := from; ; at++ {
+		next := strings.Index(text[at:], shut)
+		if next < 0 {
+			return at, false
+		}
+		at += next
+		inside := text[from:at]
+		if strings.Count(inside, open) == strings.Count(inside, shut) {
+			return at, true
+		}
 	}
 }

@@ -115,7 +115,7 @@ async function startServer(pluginPath: string, port: number) {
                 if (plugin.shutdown) {
                     await plugin.shutdown();
                 }
-                callback(null, {});
+                callback(null, { stopped: true });
             } catch (error) {
                 console.error(`[Runtime] Shutdown error: ${error}`);
                 callback(error);

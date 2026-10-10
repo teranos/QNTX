@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/embedding"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
@@ -83,11 +84,12 @@ func (s *EmbeddingServer) Embed(ctx context.Context, req *protocol.EmbedRequest)
 		return nil, err
 	}
 
-	if req.Text == "" {
-		return nil, errors.New("text cannot be empty")
+	text, err := named.TextOf("text", req.Text)
+	if err != nil {
+		return nil, err
 	}
 
-	result, err := svc.GenerateEmbedding(req.Text, req.Model)
+	result, err := svc.GenerateEmbedding(text.String(), req.Model)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate embedding")
 	}
@@ -116,11 +118,12 @@ func (s *EmbeddingServer) BatchEmbed(ctx context.Context, req *protocol.BatchEmb
 		return nil, err
 	}
 
-	if len(req.Texts) == 0 {
-		return nil, errors.New("no texts provided")
+	texts, err := named.ItemsOf("texts", req.Texts)
+	if err != nil {
+		return nil, err
 	}
 
-	result, err := svc.GenerateBatchEmbeddings(req.Texts, req.Model)
+	result, err := svc.GenerateBatchEmbeddings(texts.All(), req.Model)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate batch embeddings")
 	}
@@ -203,11 +206,12 @@ func (s *EmbeddingServer) SetClusterLabel(ctx context.Context, req *protocol.Set
 		return nil, err
 	}
 
-	if req.Label == "" {
-		return nil, errors.New("label cannot be empty")
+	label, err := named.TextOf("label", req.Label)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := store.UpdateClusterLabel(int(req.ClusterId), req.Label); err != nil {
+	if err := store.UpdateClusterLabel(int(req.ClusterId), label.String()); err != nil {
 		return nil, errors.Wrapf(err, "failed to set label for cluster %d", req.ClusterId)
 	}
 

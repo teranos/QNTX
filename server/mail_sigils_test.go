@@ -41,13 +41,13 @@ func mailingNode(t *testing.T, transport services.MailTransport) (*QNTXServer, *
 	s := rootKnowingServer(t)
 	mail := services.NewMailServer("token", zap.NewNop().Sugar())
 	mail.Wire(services.MailWiring{
-		From:      "Garden <mail@garden.test>",
-		Transport: transport,
-		Recipients: func(id string) (services.MailRecipient, bool, error) {
-			return services.MailRecipient{ID: id, Email: "tim@defacile.nl"}, true, nil
-		},
+		From:      services.MailFrom("Garden <mail@garden.test>"),
+		Transport: services.Having(transport),
+		Recipients: services.Having[services.MailRecipients](func(id string) (services.MailRecipient, bool, error) {
+			return services.AddressRecipient(id, "tim@defacile.nl"), true, nil
+		}),
 		Records: s.mailRecords,
-		Actor:   "did:key:z6Mkgardennode",
+		Actor:   services.MailActor("did:key:z6Mkgardennode"),
 	})
 	return s, mail
 }
@@ -103,7 +103,7 @@ func TestTheMailWindowListsWhatWasSentAndWhatWasRefused(t *testing.T) {
 
 	for _, subject := range []string{"Welkom", "Tot morgen"} {
 		resp, err := mail.Send(context.Background(), &protocol.SendMailRequest{
-			AuthToken: "token", Source: "garden", UserId: "UStim",
+			AuthToken: "token", Source: "garden", UserId: "UStim", Template: services.NeutralTemplateName,
 			Values: map[string]string{"subject": subject, "body": "Hallo."},
 		})
 		require.NoError(t, err)
@@ -112,14 +112,14 @@ func TestTheMailWindowListsWhatWasSentAndWhatWasRefused(t *testing.T) {
 
 	refused := services.NewMailServer("token", zap.NewNop().Sugar())
 	refused.Wire(services.MailWiring{
-		From: "Garden <mail@garden.test>", Transport: refusing{},
-		Recipients: func(id string) (services.MailRecipient, bool, error) {
-			return services.MailRecipient{ID: id, Email: "tim@defacile.nl"}, true, nil
-		},
-		Records: s.mailRecords, Actor: "did:key:z6Mkgardennode",
+		From: services.MailFrom("Garden <mail@garden.test>"), Transport: services.Having[services.MailTransport](refusing{}),
+		Recipients: services.Having[services.MailRecipients](func(id string) (services.MailRecipient, bool, error) {
+			return services.AddressRecipient(id, "tim@defacile.nl"), true, nil
+		}),
+		Records: s.mailRecords, Actor: services.MailActor("did:key:z6Mkgardennode"),
 	})
 	resp, err := refused.Send(context.Background(), &protocol.SendMailRequest{
-		AuthToken: "token", Source: "garden", UserId: "UStim",
+		AuthToken: "token", Source: "garden", UserId: "UStim", Template: services.NeutralTemplateName,
 		Values: map[string]string{"subject": "Geweigerd", "body": "Hallo."},
 	})
 	require.NoError(t, err)
@@ -261,5 +261,7 @@ func TestTheNodeHandsMailTheFirstAddressAUserSupplied(t *testing.T) {
 	tim, found, err := s.mailRecipient("UStim")
 	require.NoError(t, err)
 	require.True(t, found)
-	assert.Equal(t, "tim@defacile.nl", tim.Email)
+	address, err := tim.Address()
+	require.NoError(t, err)
+	assert.Equal(t, "tim@defacile.nl", address.String())
 }

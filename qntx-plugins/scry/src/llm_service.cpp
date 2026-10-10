@@ -372,6 +372,7 @@ grpc::Status ScryLLMService::StreamChat(grpc::ServerContext* ctx,
         protocol::LLMChatChunk warn_chunk;
         warn_chunk.set_token("\n\n⚠ " + result.warning);
         warn_chunk.set_done(false);
+        warn_chunk.set_no_signal(true);
         warn_chunk.set_model(engine.model_name());
         writer->Write(warn_chunk);
     }
@@ -379,6 +380,7 @@ grpc::Status ScryLLMService::StreamChat(grpc::ServerContext* ctx,
     // Final chunk with totals
     protocol::LLMChatChunk final_chunk;
     final_chunk.set_done(true);
+    final_chunk.set_no_signal(true);
     final_chunk.set_model(engine.model_name());
     final_chunk.set_prompt_tokens(result.prompt_tokens);
     final_chunk.set_completion_tokens(result.completion_tokens);

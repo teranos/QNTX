@@ -203,11 +203,10 @@ func (s *GitHubServer) Ask(ctx context.Context, operation string, request []byte
 	if err != nil {
 		return nil, errors.Wrapf(err, "what %s gives is not a message this build holds", operation)
 	}
+	// What an operation takes is a JSON object, {} for one that takes nothing.
 	req := takes.New().Interface()
-	if len(request) > 0 {
-		if err := protojson.Unmarshal(request, req); err != nil {
-			return nil, NotWhatItTakes{Operation: operation, Why: err.Error()}
-		}
+	if err := protojson.Unmarshal(request, req); err != nil {
+		return nil, NotWhatItTakes{Operation: operation, Why: err.Error()}
 	}
 	resp := gives.New().Interface()
 	s.call(ctx, operation, req, resp)

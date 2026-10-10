@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
@@ -183,7 +184,7 @@ type githubRoute struct {
 	method string
 	path   string
 	query  []string
-	body   []string
+	body   githubPayload
 	// slashed are path parameters that are a path in a repository: each
 	// segment is escaped and the slashes between them stay slashes.
 	slashed []string
@@ -244,12 +245,6 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 		githubFail(resp, fmt.Sprintf("GitHubService %s: %v", rpc, err))
 		return key, false
 	}
-	body, err := githubBody(route, msg)
-	if err != nil {
-		githubFail(resp, fmt.Sprintf("GitHubService %s: %v", rpc, err))
-		return key, false
-	}
-
 	query, err := githubQuery(route, msg)
 	if err != nil {
 		githubFail(resp, fmt.Sprintf("GitHubService %s: %v", rpc, err))
@@ -266,13 +261,9 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 		ctx = context.WithValue(ctx, githubNoFollow{}, true)
 	}
 
-	var reader io.Reader
-	if body != nil {
-		reader = bytes.NewReader(body)
-	}
-	httpReq, err := http.NewRequestWithContext(ctx, route.method, target, reader)
+	httpReq, err := route.body.request(ctx, route.method, target, msg)
 	if err != nil {
-		githubFail(resp, fmt.Sprintf("failed to build GitHub request %s %s: %v", route.method, path, err))
+		githubFail(resp, fmt.Sprintf("GitHubService %s: failed to build GitHub request %s %s: %v", rpc, route.method, path, err))
 		return key, false
 	}
 	// The query is what the route's set fields say; none set is none sent.
@@ -280,14 +271,11 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 	httpReq.Header.Set("Authorization", "Bearer "+token)
 	httpReq.Header.Set("Accept", "application/vnd.github+json")
 	httpReq.Header.Set("X-GitHub-Api-Version", githubAPIVersion)
-	if body != nil {
-		httpReq.Header.Set("Content-Type", "application/json")
-	}
 
 	httpResp, err := s.client.Do(httpReq)
 	if err != nil {
-		s.logger.Warnw("GitHub request failed", "namespace", namespace, "method", route.method, "path", path, "error", err)
 		githubFail(resp, fmt.Sprintf("GitHub %s %s failed: %v", route.method, path, err))
+		s.logger.Warnw("GitHub request failed", "namespace", namespace, "method", route.method, "path", path, "error", err)
 		return key, false
 	}
 	defer func() { sqlclose.Log(httpResp.Body.Close(), s.logger, "the GitHub response body") }()
@@ -303,13 +291,18 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 	}
 
 	if wantsLocation && httpResp.StatusCode == http.StatusFound {
-		location := httpResp.Header.Get("Location")
-		if location == "" {
-			githubFail(resp, fmt.Sprintf("GitHub %s %s answered %d without a Location", route.method, path, httpResp.StatusCode))
+		location, err := named.TextOf(fmt.Sprintf("the Location GitHub %s %s answered %d with", route.method, path, httpResp.StatusCode), httpResp.Header.Get("Location"))
+		if err != nil {
+			githubFail(resp, err.Error())
 			return key, false
 		}
 		answered := resp.ProtoReflect()
-		answered.Set(answered.Descriptor().Fields().ByName("location"), protoreflect.ValueOfString(location))
+		field, err := githubField(answered.Descriptor(), "location")
+		if err != nil {
+			githubFail(resp, err.Error())
+			return key, false
+		}
+		answered.Set(field, protoreflect.ValueOfString(location.String()))
 		githubSucceed(resp)
 		return key, true
 	}
@@ -327,7 +320,12 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 	// A list GitHub pages by cursor says where the next page is in this header.
 	if _, paged := resp.(interface{ GetLink() string }); paged {
 		answered := resp.ProtoReflect()
-		answered.Set(answered.Descriptor().Fields().ByName("link"), protoreflect.ValueOfString(httpResp.Header.Get("Link")))
+		field, err := githubField(answered.Descriptor(), "link")
+		if err != nil {
+			githubFail(resp, err.Error())
+			return key, false
+		}
+		answered.Set(field, protoreflect.ValueOfString(httpResp.Header.Get("Link")))
 	}
 	githubSucceed(resp)
 	return key, true
@@ -373,9 +371,9 @@ func githubPath(route githubRoute, msg protoreflect.Message) (string, error) {
 		open := strings.Index(rest, "{")
 		shut := strings.Index(rest, "}")
 		b.WriteString(rest[:open])
-		fd := msg.Descriptor().Fields().ByName(protoreflect.Name(name))
-		if fd == nil {
-			return "", errors.Newf("path %s names %s, which %s does not have", route.path, name, msg.Descriptor().FullName())
+		fd, err := githubField(msg.Descriptor(), name)
+		if err != nil {
+			return "", errors.Wrapf(err, "path %s", route.path)
 		}
 		if !msg.Has(fd) {
 			return "", errors.Newf("%s is required for %s %s", name, route.method, route.path)
@@ -403,8 +401,11 @@ func githubPath(route githubRoute, msg protoreflect.Message) (string, error) {
 func githubQuery(route githubRoute, msg protoreflect.Message) (string, error) {
 	values := url.Values{}
 	for _, name := range route.query {
-		fd := msg.Descriptor().Fields().ByName(protoreflect.Name(name))
-		if fd == nil || !msg.Has(fd) {
+		fd, err := githubField(msg.Descriptor(), name)
+		if err != nil {
+			return "", errors.Wrapf(err, "the query of %s %s", route.method, route.path)
+		}
+		if !msg.Has(fd) {
 			continue
 		}
 		value, err := githubScalar(msg.Get(fd), fd)
@@ -433,17 +434,33 @@ func githubScalar(v protoreflect.Value, fd protoreflect.FieldDescriptor) (string
 	return "", errors.Newf("%s is a %s, which is no path or query value", fd.FullName(), fd.Kind())
 }
 
-// githubBody is the JSON body of the route's body fields that are set; nil
-// for a route that sends no body.
-func githubBody(route githubRoute, msg protoreflect.Message) ([]byte, error) {
-	if len(route.body) == 0 {
-		return nil, nil
-	}
+// githubPayload is what a route sends GitHub besides its path and query.
+type githubPayload interface {
+	// request is the request to target, carrying what the payload takes from msg.
+	request(ctx context.Context, method, target string, msg protoreflect.Message) (*http.Request, error)
+	// fields are the request fields the payload is written from.
+	fields() []string
+}
+
+// noBody is a route that sends GitHub no body.
+type noBody struct{}
+
+func (noBody) request(ctx context.Context, method, target string, _ protoreflect.Message) (*http.Request, error) {
+	return http.NewRequestWithContext(ctx, method, target, http.NoBody)
+}
+
+func (noBody) fields() []string { return []string{} }
+
+// jsonBody is a route whose body is the JSON of these request fields, those
+// that are set.
+type jsonBody []string
+
+func (b jsonBody) request(ctx context.Context, method, target string, msg protoreflect.Message) (*http.Request, error) {
 	body := map[string]any{}
-	for _, name := range route.body {
-		fd := msg.Descriptor().Fields().ByName(protoreflect.Name(name))
-		if fd == nil {
-			return nil, errors.Newf("body field %s is not in %s", name, msg.Descriptor().FullName())
+	for _, name := range b {
+		fd, err := githubField(msg.Descriptor(), name)
+		if err != nil {
+			return nil, errors.Wrap(err, "the body")
 		}
 		if !msg.Has(fd) {
 			continue
@@ -456,9 +473,28 @@ func githubBody(route githubRoute, msg protoreflect.Message) ([]byte, error) {
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to encode the body of %s %s", route.method, route.path)
+		return nil, errors.Wrapf(err, "failed to encode the body of %s %s", method, target)
 	}
-	return encoded, nil
+	req, err := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(encoded))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return req, nil
+}
+
+func (b jsonBody) fields() []string { return b }
+
+// githubField is the field of a message by its name, or that the message has
+// none by that name.
+func githubField(message protoreflect.MessageDescriptor, name string) (protoreflect.FieldDescriptor, error) {
+	fields := message.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		if string(fields.Get(i).Name()) == name {
+			return fields.Get(i), nil
+		}
+	}
+	return nil, errors.Newf("%s has no field %s", message.FullName(), name)
 }
 
 // githubJSON is a field's value as GitHub's JSON. protojson writes int64 as a
@@ -528,10 +564,14 @@ func githubJSONOne(v protoreflect.Value, fd protoreflect.FieldDescriptor) (any, 
 		})
 		return out, failed
 	case protoreflect.EnumKind:
-		if ev := fd.Enum().Values().ByNumber(v.Enum()); ev != nil {
-			return string(ev.Name()), nil
+		// A number the enum does not declare is refused, not sent as a number.
+		values := fd.Enum().Values()
+		for i := 0; i < values.Len(); i++ {
+			if values.Get(i).Number() == v.Enum() {
+				return string(values.Get(i).Name()), nil
+			}
 		}
-		return int32(v.Enum()), nil
+		return nil, errors.Newf("%s is %d, which %s does not declare", fd.FullName(), v.Enum(), fd.Enum().FullName())
 	case protoreflect.BoolKind, protoreflect.StringKind, protoreflect.BytesKind,
 		protoreflect.FloatKind, protoreflect.DoubleKind,
 		protoreflect.Int32Kind, protoreflect.Int64Kind, protoreflect.Sint32Kind, protoreflect.Sint64Kind,
@@ -573,18 +613,21 @@ func protocCamel(name string) string {
 }
 
 // githubDecode fills resp from a 2xx body. No body (204) is an answer with
-// nothing in it; an array is a list, carried in the response's items.
+// nothing in it: the JSON decoder finds no value before the end. An array is a
+// list, carried in the response's items.
 func githubDecode(raw []byte, resp proto.Message) error {
-	trimmed := bytes.TrimSpace(raw)
-	if len(trimmed) == 0 {
+	var answer json.RawMessage
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&answer); errors.Is(err, io.EOF) {
 		return nil
 	}
-	if trimmed[0] == '[' {
-		if resp.ProtoReflect().Descriptor().Fields().ByName("items") == nil {
-			return errors.Newf("GitHub answered a list, and %s has no items", resp.ProtoReflect().Descriptor().FullName())
+	trimmed := bytes.TrimSpace(raw)
+	if bytes.HasPrefix(trimmed, []byte("[")) {
+		items, err := githubField(resp.ProtoReflect().Descriptor(), "items")
+		if err != nil {
+			return errors.Wrap(err, "GitHub answered a list")
 		}
-		wrapped := make([]byte, 0, len(trimmed)+10)
-		wrapped = append(wrapped, `{"items":`...)
+		wrapped := make([]byte, 0, len(trimmed)+len(items.Name())+4)
+		wrapped = append(wrapped, `{"`+string(items.Name())+`":`...)
 		wrapped = append(wrapped, trimmed...)
 		wrapped = append(wrapped, '}')
 		trimmed = wrapped

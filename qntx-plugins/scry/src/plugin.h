@@ -228,7 +228,7 @@ public:
 
     grpc::Status Shutdown(grpc::ServerContext* ctx,
                           const protocol::Empty* req,
-                          protocol::Empty* resp) override;
+                          protocol::ShutdownResponse* resp) override;
 
     grpc::Status Health(grpc::ServerContext* ctx,
                         const protocol::Empty* req,

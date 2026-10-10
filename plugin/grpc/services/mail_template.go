@@ -6,6 +6,7 @@ import (
 	"strings"
 	texttemplate "text/template"
 
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 )
@@ -49,7 +50,7 @@ const DarkTemplateName = "dark"
 func DarkTemplate() (*protocol.MailTemplate, error) {
 	body := `<div style="padding:0 8px;white-space:pre-line">{{.body}}</div>` +
 		`{{with index . "link"}}<div style="padding:12px 8px 0"><a href="{{.}}" style="color:inherit">{{or (index $ "link_label") .}}</a></div>{{end}}`
-	html, err := DrawMail(MailWindow{Title: "{{.subject}}", Sections: []MailSection{{HTML: body}}})
+	html, err := DrawMail(MailWindow{Title: "{{.subject}}", TitleAlone: true, Sections: []MailSection{{HTML: body, Headless: true}}})
 	if err != nil {
 		return nil, err
 	}
@@ -81,44 +82,66 @@ type FilledMail struct {
 	Text    string
 }
 
-// parsedMail is a template's three parts, parsed. A value a part names and
-// a Send does not hold is an error: missingkey=error on every part.
+// parsedMail is a template's parts, parsed, and the template they were parsed
+// from, which is what is kept. A value a part names and a Send does not hold
+// is an error: missingkey=error on every part.
 type parsedMail struct {
+	source  *protocol.MailTemplate
 	subject *texttemplate.Template
-	html    *htmltemplate.Template
-	text    *texttemplate.Template
+	body    named.Items[mailPart]
 }
 
-// checkMailTemplate refuses a template that cannot be kept. A template is kept
-// as it was sent, and a Send parses it again from the record.
-func checkMailTemplate(t *protocol.MailTemplate) error {
-	_, err := parseMail(t)
-	return err
+// mailPart is one part of a body a mail is sent in, its html or its text.
+type mailPart struct {
+	fill func(values map[string]string, into *FilledMail) error
 }
 
 // parseMail is a template's parts, parsed, or why it cannot be kept: no
 // subject, no body, or a part that does not parse. A request that sent no
-// template sent no subject either.
+// template sent no subject either. A template is kept as it was sent, and a
+// Send parses it again from the record.
 func parseMail(t *protocol.MailTemplate) (parsedMail, error) {
-	if strings.TrimSpace(t.GetSubject()) == "" {
-		return parsedMail{}, errors.New("a template needs a subject")
+	subjectSource, err := named.TextOf("a template's subject", strings.TrimSpace(t.GetSubject()))
+	if err != nil {
+		return parsedMail{}, err
 	}
-	if strings.TrimSpace(t.Html) == "" && strings.TrimSpace(t.Text) == "" {
-		return parsedMail{}, errors.New("a template needs an html or a text body, or both")
-	}
-	subject, err := texttemplate.New("subject").Option("missingkey=error").Parse(t.Subject)
+	subject, err := texttemplate.New("subject").Option("missingkey=error").Parse(subjectSource.String())
 	if err != nil {
 		return parsedMail{}, errors.Wrap(err, "the subject does not parse")
 	}
-	html, err := htmltemplate.New("html").Option("missingkey=error").Parse(t.Html)
-	if err != nil {
-		return parsedMail{}, errors.Wrap(err, "the html does not parse")
+
+	// A part the template leaves blank is a part its mail is not sent in.
+	var parts []mailPart
+	if html, htmlErr := named.TextOf("html", strings.TrimSpace(t.GetHtml())); htmlErr == nil {
+		parsed, err := htmltemplate.New("html").Option("missingkey=error").Parse(html.String())
+		if err != nil {
+			return parsedMail{}, errors.Wrap(err, "the html does not parse")
+		}
+		parts = append(parts, mailPart{fill: func(values map[string]string, into *FilledMail) error {
+			var out bytes.Buffer
+			if err := parsed.Execute(&out, values); err != nil {
+				return errors.Wrap(err, "the html could not be filled")
+			}
+			into.HTML = out.String()
+			return nil
+		}})
 	}
-	text, err := texttemplate.New("text").Option("missingkey=error").Parse(t.Text)
-	if err != nil {
-		return parsedMail{}, errors.Wrap(err, "the text does not parse")
+	if text, textErr := named.TextOf("text", strings.TrimSpace(t.GetText())); textErr == nil {
+		parsed, err := texttemplate.New("text").Option("missingkey=error").Parse(text.String())
+		if err != nil {
+			return parsedMail{}, errors.Wrap(err, "the text does not parse")
+		}
+		parts = append(parts, mailPart{fill: func(values map[string]string, into *FilledMail) error {
+			filled, err := fillText("text", parsed, values)
+			into.Text = filled
+			return err
+		}})
 	}
-	return parsedMail{subject: subject, html: html, text: text}, nil
+	body, err := named.ItemsOf("a template's html or text body", parts)
+	if err != nil {
+		return parsedMail{}, err
+	}
+	return parsedMail{source: t, subject: subject, body: body}, nil
 }
 
 // fillMail fills every part of a template with values.
@@ -131,26 +154,21 @@ func fillMail(t *protocol.MailTemplate, values map[string]string) (FilledMail, e
 	if err != nil {
 		return FilledMail{}, err
 	}
-	subject = strings.TrimSpace(subject)
-	if subject == "" {
-		return FilledMail{}, errors.New("the filled subject is empty")
-	}
-	if strings.ContainsAny(subject, "\r\n") {
-		return FilledMail{}, errors.Newf("the filled subject spans lines: %q", subject)
-	}
-
-	text, err := fillText("text", parsed.text, values)
+	filledSubject, err := named.TextOf("the filled subject", strings.TrimSpace(subject))
 	if err != nil {
 		return FilledMail{}, err
 	}
-
-	// A part the template leaves empty fills empty.
-	var html bytes.Buffer
-	if err := parsed.html.Execute(&html, values); err != nil {
-		return FilledMail{}, errors.Wrap(err, "the html could not be filled")
+	if strings.ContainsAny(filledSubject.String(), "\r\n") {
+		return FilledMail{}, errors.Newf("the filled subject spans lines: %q", filledSubject)
 	}
 
-	return FilledMail{Subject: subject, HTML: html.String(), Text: text}, nil
+	filled := FilledMail{Subject: filledSubject.String()}
+	for _, part := range parsed.body.All() {
+		if err := part.fill(values, &filled); err != nil {
+			return FilledMail{}, err
+		}
+	}
+	return filled, nil
 }
 
 func fillText(part string, parsed *texttemplate.Template, values map[string]string) (string, error) {
