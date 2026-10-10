@@ -25,6 +25,28 @@ func TestRustStore_Lifecycle(t *testing.T) {
 	t.Logf("Rust storage version: %s", version)
 }
 
+// A closed store says so, rather than handing its freed store to Rust, and a
+// second Close frees nothing twice.
+func TestRustStore_ClosedSaysSo(t *testing.T) {
+	store, err := NewMemoryStore()
+	if err != nil {
+		t.Fatalf("NewMemoryStore() error: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("second Close() error: %v", err)
+	}
+
+	if _, err := store.GetAttestation("AS-gone"); err == nil || err.Error() != "store is closed" {
+		t.Errorf("GetAttestation on a closed store: %v", err)
+	}
+	if _, err := store.CountAttestations(); err == nil || err.Error() != "store is closed" {
+		t.Errorf("CountAttestations on a closed store: %v", err)
+	}
+}
+
 func TestRustStore_CreateAndGet(t *testing.T) {
 	store, err := NewMemoryStore()
 	if err != nil {
