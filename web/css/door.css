@@ -624,6 +624,15 @@
     border-color: var(--door-lamp-dim);
 }
 
+/* "It needs to not zoom in when I want to type". iOS Safari zooms the page on
+   focus for a field under 16px, and 44 is Apple's touch target. */
+@media (pointer: coarse) {
+    .door-field input {
+        font-size: 16px;
+        min-height: 44px;
+    }
+}
+
 /* The way back to the door, sitting left of the namespaces it is the same size
    as. A door you cannot get back to is a door you walked out of. */
 .door-latch {
