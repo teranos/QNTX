@@ -937,21 +937,24 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	// Wait for why either direction ended. EOF and the normal closes are a
 	// connection ending; Unavailable is the plugin process killed (restart or
 	// shutdown), expected.
+	// The connection's end is said once, with how it went: as an error when
+	// it ended any other way.
 	err = <-errChan
-	if !errors.Is(err, io.EOF) &&
-		!websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) &&
-		status.Code(err) != codes.Unavailable {
-		h.logger.Errorw("WebSocket proxy error", "error", err)
-	}
-
-	// Log connection metrics
 	metrics := h.keepalive.Metrics()
-	h.logger.Debugw("WebSocket connection closed",
+	ended := []any{
 		"uptime", metrics.GetConnectionUptime(),
 		"pings_sent", metrics.GetTotalPings(),
 		"pongs_received", metrics.GetTotalPongs(),
 		"avg_latency", metrics.GetAverageLatency(),
-	)
+		"ended_by", err,
+	}
+	if !errors.Is(err, io.EOF) &&
+		!websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) &&
+		status.Code(err) != codes.Unavailable {
+		h.logger.Errorw("WebSocket proxy error", ended...)
+		return
+	}
+	h.logger.Debugw("WebSocket connection closed", ended...)
 }
 
 // Health returns the remote plugin's health status.
