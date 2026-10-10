@@ -23,6 +23,19 @@ import (
 
 var driverOnce sync.Once
 
+// registerDriver registers the Rust SQL driver once per process, for either
+// backend. Every store this process opens, namespaces' included, goes through
+// it, and a call that holds one names its statement.
+func registerDriver(rustStore *sqlitecgo.RustStore) {
+	driverOnce.Do(func() {
+		rustdriver.Register(rustStore.StorePtr(), rustStore.ReadConnPtr(), rustStore.Mu(), rustStore.MuRead())
+		rustdriver.OnSlowCall(time.Second, func(c rustdriver.SlowCall) {
+			logger.Logger.Warnw("A call into the store was slow",
+				"conn", c.Conn, "caller", c.Caller, "waited", c.Waited, "ran", c.Ran, "sql", c.SQL)
+		})
+	})
+}
+
 // openSqliteDatabase creates the SQLite-backed setup: Rust owns the SQLite
 // connection, Go's *sql.DB routes all SQL through Rust via the "rustsqlite"
 // driver.
@@ -41,16 +54,7 @@ func openSqliteDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, a
 	// Start priority write queue — POST (high) jumps ahead of plugin writes (low).
 	rustStore.StartWriteQueue(8, 64)
 
-	// Register the Rust SQL driver (once per process)
-	driverOnce.Do(func() {
-		rustdriver.Register(rustStore.StorePtr(), rustStore.ReadConnPtr(), rustStore.Mu(), rustStore.MuRead())
-		// Every store this process opens, namespaces' included, goes through the
-		// driver, and a call that holds one names its statement.
-		rustdriver.OnSlowCall(time.Second, func(c rustdriver.SlowCall) {
-			logger.Logger.Warnw("A call into the store was slow",
-				"conn", c.Conn, "caller", c.Caller, "waited", c.Waited, "ran", c.Ran, "sql", c.SQL)
-		})
-	})
+	registerDriver(rustStore)
 
 	// Open *sql.DB through the Rust driver.
 	// MaxOpenConns(4) lets multiple goroutines reach the driver concurrently.
