@@ -26,8 +26,12 @@ type fakeNamespaces struct {
 	switched   string
 	switchedTo bool
 	deleted    string
-	nuked      bool
-	err        error
+	// given is the name SetRecord was asked about, and givenRecord the
+	// storage it was asked to give.
+	given       string
+	givenRecord storage.NamespaceRecord
+	nuked       bool
+	err         error
 }
 
 func (f *fakeNamespaces) List() ([]storage.Namespace, error) {
@@ -44,6 +48,12 @@ func (f *fakeNamespaces) Create(name string, definition storage.NamespaceDefinit
 func (f *fakeNamespaces) SetEnabled(name string, enabled bool) error {
 	f.switched = name
 	f.switchedTo = enabled
+	return f.err
+}
+
+func (f *fakeNamespaces) SetRecord(name string, record storage.NamespaceRecord) error {
+	f.given = name
+	f.givenRecord = record
 	return f.err
 }
 
@@ -356,6 +366,93 @@ func TestWhoAskedIsWhoOwnsIt(t *testing.T) {
 	}
 	if !fake.defined.Enabled {
 		t.Error("the namespace was created disabled")
+	}
+}
+
+// "what I want is for a Namespace to begin life dbless and enable either
+// SQLite or parquet or Supabase later on"
+func TestANamespaceBeginsWithNoStorage(t *testing.T) {
+	fake := &fakeNamespaces{}
+	s := namespaceServer(t, fake)
+
+	_, refusal := askNamespaces(t, s, callerAt(auth.LevelRoot, ""), "create", sigil.Sent{"name": "pond"})
+
+	if refusal != nil {
+		t.Fatalf("refused: %s", refusal.GetSays())
+	}
+	if fake.defined.Record != (storage.NamespaceRecord{Kind: storage.RecordNone}) {
+		t.Errorf("a new namespace was given %v, want none", fake.defined.Record)
+	}
+}
+
+func TestANamespaceIsGivenTheStorageAskedFor(t *testing.T) {
+	for _, tc := range []struct {
+		sent sigil.Sent
+		want storage.NamespaceRecord
+	}{
+		{sigil.Sent{"name": "pond", "kind": "sqlite"}, storage.NamespaceRecord{Kind: storage.RecordSQLite}},
+		{sigil.Sent{"name": "pond", "kind": "parquet"}, storage.NamespaceRecord{Kind: storage.RecordParquet}},
+		{sigil.Sent{"name": "pond", "kind": "postgres", "url": "ssm:///q/pond/postgres-url"},
+			storage.NamespaceRecord{Kind: storage.RecordPostgres, URL: "ssm:///q/pond/postgres-url"}},
+	} {
+		fake := &fakeNamespaces{}
+		s := namespaceServer(t, fake)
+
+		_, refusal := askNamespaces(t, s, callerAt(auth.LevelRoot, ""), "store", tc.sent)
+
+		if refusal != nil {
+			t.Fatalf("%s refused: %s", tc.sent["kind"], refusal.GetSays())
+		}
+		if fake.given != "pond" || fake.givenRecord != tc.want {
+			t.Errorf("gave %s %v, want pond %v", fake.given, fake.givenRecord, tc.want)
+		}
+	}
+}
+
+func TestStorageThatIsNotOneOfTheKindsIsRefused(t *testing.T) {
+	for _, kind := range []string{"none", "mysql"} {
+		fake := &fakeNamespaces{}
+		s := namespaceServer(t, fake)
+
+		_, refusal := askNamespaces(t, s, callerAt(auth.LevelRoot, ""), "store", sigil.Sent{"name": "pond", "kind": kind})
+
+		if refusal.GetParam() != "kind" {
+			t.Errorf("%s: refusal = %v, want one naming kind", kind, refusal)
+		}
+		if fake.given != "" {
+			t.Errorf("%s reached the store", kind)
+		}
+	}
+}
+
+// The connection string carries the password, and ns.toml is read by whoever
+// reads the location.
+func TestAPostgresRecordNamesItsURLByReference(t *testing.T) {
+	for _, url := range []string{"postgresql://postgres:secret@db.example.supabase.co:5432/postgres", "", "env:"} {
+		fake := &fakeNamespaces{}
+		s := namespaceServer(t, fake)
+
+		_, refusal := askNamespaces(t, s, callerAt(auth.LevelRoot, ""), "store",
+			sigil.Sent{"name": "pond", "kind": "postgres", "url": url})
+
+		if refusal.GetParam() != "url" {
+			t.Errorf("%q: refusal = %v, want one naming url", url, refusal)
+		}
+		if fake.given != "" {
+			t.Errorf("%q reached the store", url)
+		}
+	}
+}
+
+func TestOnlyPostgresNamesAURL(t *testing.T) {
+	fake := &fakeNamespaces{}
+	s := namespaceServer(t, fake)
+
+	_, refusal := askNamespaces(t, s, callerAt(auth.LevelRoot, ""), "store",
+		sigil.Sent{"name": "pond", "kind": "parquet", "url": "env:QNTX_POSTGRES_URL"})
+
+	if refusal.GetParam() != "url" {
+		t.Errorf("refusal = %v, want one naming url", refusal)
 	}
 }
 

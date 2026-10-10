@@ -102,7 +102,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open parquet store at %s", location)
 	}
-	defaultLanding, err := openLanding(dbPath, duckdbcgo.NamespaceDefault, duckStore)
+	defaultLanding, err := openLanding(dbPath, duckdbcgo.NamespaceDefault, parquetRecord{duckStore})
 	if err != nil {
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, err
@@ -116,7 +116,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, errors.Wrapf(err, "failed to open the system store at %s", location)
 	}
-	systemLanding, err := openLanding(dbPath, duckdbcgo.NamespaceSystem, systemDuck)
+	systemLanding, err := openLanding(dbPath, duckdbcgo.NamespaceSystem, parquetRecord{systemDuck})
 	if err != nil {
 		unwindOperational(database, rustStore)
 		return nil, nil, "", nil, err
@@ -145,7 +145,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		ctx, stop := context.WithCancel(context.Background())
 		sent := make(chan struct{})
 		boot = append(boot, sending{stop: stop, sent: sent})
-		sacred.Go("parquet.send."+ns.name, func() { sendEvery(ctx, ns.landing, ns.record, ns.name, sent) })
+		sacred.Go("parquet.send."+ns.name, func() { sendEvery(ctx, ns.landing, parquetRecord{ns.record}, ns.name, sent) })
 	}
 	// Watcher fires have no landing file; their buffer is still in memory.
 	sacred.Go("parquet.periodicFlush", func() {
@@ -168,6 +168,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 		system:      systemStore,
 		namespaces:  namespaces,
 		location:    location,
+		postgresCA:  cfg.Storage.Postgres.CA,
 		dbPath:      dbPath,
 		operational: database,
 		defaultDB:   defaultLanding.db,
@@ -195,6 +196,9 @@ type parquetHandles struct {
 	system     ats.AttestationStore
 	namespaces storage.Namespaces
 	location   string
+	// postgresCA is the certificate a postgres record is verified against,
+	// this node's own: a path on one machine is not written in a namespace.
+	postgresCA string
 	// dbPath is the operational db; each namespace's landing file sits beside it.
 	dbPath string
 	// operational is where the tables that are not attestations still live
@@ -249,11 +253,13 @@ func (h *parquetHandles) CloseAll() {
 // opened is what closing a namespace has to reach: the flusher, and once its
 // last flush is done, every store the namespace opened.
 type opened struct {
-	stop     context.CancelFunc
-	flushed  <-chan struct{}
-	duck     *duckdbcgo.DuckdbStore
-	watchers *duckdbcgo.WatcherStore
-	landing  *landed
+	stop    context.CancelFunc
+	flushed <-chan struct{}
+	// closeRecord closes what the landing file sends to, and recordIs names it.
+	closeRecord func() error
+	recordIs    string
+	watchers    *duckdbcgo.WatcherStore
+	landing     *landed
 }
 
 // landed is a namespace's landing file: the buffer its writes land in, and
@@ -302,20 +308,15 @@ func (l *landed) CreateAttestation(as *types.As) error {
 // A file that has never sent counts everything it holds as sent. Rows a
 // process wrote before this send existed and lost before its flush are in the
 // file and not the record, and this does not look for them.
-func openLanding(dbPath, name string, record *duckdbcgo.DuckdbStore) (*landed, error) {
-	path := landingPath(dbPath, name)
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		return nil, errors.Wrapf(err, "failed to make %s for the landing files", filepath.Dir(path))
-	}
-	store, err := sqlitecgo.NewFileStore(path)
+func openLanding(dbPath, name string, record record) (*landed, error) {
+	landing, err := openLandingFile(dbPath, name)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open the landing file of %s at %s", name, path)
+		return nil, err
 	}
-	db := sql.OpenDB(rustdriver.Connector("namespace:"+name, store.StorePtr(), store.ReadConnPtr(), store.Mu(), store.MuRead()))
-	db.SetMaxOpenConns(4)
-	landing := &landed{RustStore: store, db: db, name: name, sent: storage.FileSentMark{Path: path + ".sent"}}
+	path := landingPath(dbPath, name)
+	store := landing.RustStore
 	fail := func(err error) (*landed, error) {
-		sqlclose.Log(db.Close(), logger.Logger, "the driver of the landing file of "+name)
+		sqlclose.Log(landing.db.Close(), logger.Logger, "the driver of the landing file of "+name)
 		sqlclose.Log(store.Close(), logger.Logger, "the landing file of "+name)
 		return nil, err
 	}
@@ -371,6 +372,22 @@ func openLanding(dbPath, name string, record *duckdbcgo.DuckdbStore) (*landed, e
 	return landing, nil
 }
 
+// openLandingFile opens a namespace's landing file and nothing it sends to: a
+// sqlite namespace's whole storage, and the first half of openLanding.
+func openLandingFile(dbPath, name string) (*landed, error) {
+	path := landingPath(dbPath, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return nil, errors.Wrapf(err, "failed to make %s for the landing files", filepath.Dir(path))
+	}
+	store, err := sqlitecgo.NewFileStore(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open the landing file of %s at %s", name, path)
+	}
+	db := sql.OpenDB(rustdriver.Connector("namespace:"+name, store.StorePtr(), store.ReadConnPtr(), store.Mu(), store.MuRead()))
+	db.SetMaxOpenConns(4)
+	return &landed{RustStore: store, db: db, name: name, sent: storage.FileSentMark{Path: path + ".sent"}}, nil
+}
+
 // WALCheckpointTruncate checkpoints the operational db and every landing file.
 // The pulse checkpoints one handle, and a parquet node keeps a WAL per
 // namespace: a landing file nobody checkpoints grows without bound, and
@@ -404,37 +421,106 @@ func (h *parquetHandles) WALCheckpointTruncate() (busy, walPages, checkpointedPa
 
 // OpenNamespace opens one namespace: its attestations and its watchers, which
 // is what a namespace holds. The server asks the first time a request names one.
-func (h *parquetHandles) OpenNamespace(name string) (*namespaces.Universe, error) {
-	duck, err := duckdbcgo.NewDuckdbStore(h.location, name)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open the %s store at %s", name, h.location)
+//
+// "what I want is for a Namespace to begin life dbless and enable either
+// SQLite or parquet or Supabase later on"
+//
+// Every kind lands a write in the namespace's SQLite file first; the kind is
+// what that file sends to. Its watchers stay at the location whatever the kind.
+func (h *parquetHandles) OpenNamespace(name string, kept storage.NamespaceRecord) (*namespaces.Universe, error) {
+	switch kept.Kind {
+	case storage.RecordNone:
+		return nil, namespaces.NoStorage{Asked: name}
+	case storage.RecordSQLite:
+		return h.stays(name)
+	case storage.RecordParquet:
+		duck, err := duckdbcgo.NewDuckdbStore(h.location, name)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to open the %s store at %s", name, h.location)
+		}
+		u, err := h.sendsTo(name, parquetRecord{duck})
+		if err != nil {
+			return nil, err
+		}
+		h.mu.Lock()
+		h.records[name] = duck
+		h.mu.Unlock()
+		return u, nil
+	case storage.RecordPostgres:
+		pg, err := openPostgresRecord(kept.URL, h.postgresCA, name)
+		if err != nil {
+			return nil, err
+		}
+		return h.sendsTo(name, pg)
 	}
-	landing, err := openLanding(h.dbPath, name, duck)
+	return nil, errors.Newf("%s names a record of kind %q, which this node does not know", name, kept.Kind)
+}
+
+// sendsTo opens a namespace whose landing file sends to r every sendInterval.
+func (h *parquetHandles) sendsTo(name string, r record) (*namespaces.Universe, error) {
+	landing, err := openLanding(h.dbPath, name, r)
 	if err != nil {
-		sqlclose.Log(duck.Close(), logger.Logger, "the parquet store of "+name)
+		sqlclose.Log(r.Close(), logger.Logger, r.what()+" of "+name)
 		return nil, err
 	}
 	watchers, err := duckdbcgo.NewWatcherStore(h.location, name)
 	if err != nil {
+		sqlclose.Log(landing.db.Close(), logger.Logger, "the driver of the landing file of "+name)
 		sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
-		sqlclose.Log(duck.Close(), logger.Logger, "the parquet store of "+name)
+		sqlclose.Log(r.Close(), logger.Logger, r.what()+" of "+name)
 		return nil, errors.Wrapf(err, "failed to open the watchers of %s at %s", name, h.location)
 	}
 
 	// Registered once everything opened, so a failed open leaves nothing running.
-	// Landed rows reach Parquet on this send, the same as the stores opened at boot.
+	// Landed rows reach the record on this send, the same as the stores opened at boot.
 	ctx, stop := context.WithCancel(context.Background())
 	flushed := make(chan struct{})
+	h.register(name, opened{stop: stop, flushed: flushed, closeRecord: r.Close, recordIs: r.what(), watchers: watchers, landing: landing})
+	sacred.Go("parquet.send."+name, func() { sendEvery(ctx, landing, r, name, flushed) })
+	return h.universe(name, landing, watchers)
+}
+
+// stays opens a sqlite namespace: its landing file is the whole of its
+// storage, kept on this node, and sends to nothing.
+func (h *parquetHandles) stays(name string) (*namespaces.Universe, error) {
+	landing, err := openLandingFile(h.dbPath, name)
+	if err != nil {
+		return nil, err
+	}
+	watchers, err := duckdbcgo.NewWatcherStore(h.location, name)
+	if err != nil {
+		sqlclose.Log(landing.db.Close(), logger.Logger, "the driver of the landing file of "+name)
+		sqlclose.Log(landing.Close(), logger.Logger, "the landing file of "+name)
+		return nil, errors.Wrapf(err, "failed to open the watchers of %s at %s", name, h.location)
+	}
+	// Nothing sends, so the last send is already done.
+	flushed := make(chan struct{})
+	close(flushed)
+	h.register(name, opened{
+		stop:        func() {},
+		flushed:     flushed,
+		closeRecord: func() error { return nil },
+		recordIs:    "no record",
+		watchers:    watchers,
+		landing:     landing,
+	})
+	return h.universe(name, landing, watchers)
+}
+
+// register is how a namespace that opened is closed later, and where the
+// checkpoint pulse finds its landing file.
+func (h *parquetHandles) register(name string, was opened) {
 	h.mu.Lock()
+	defer h.mu.Unlock()
 	if h.closing == nil {
 		h.closing = map[string]opened{}
 	}
-	h.closing[name] = opened{stop: stop, flushed: flushed, duck: duck, watchers: watchers, landing: landing}
-	h.landings[name] = landing
-	h.records[name] = duck
-	h.mu.Unlock()
-	sacred.Go("parquet.send."+name, func() { sendEvery(ctx, landing, duck, name, flushed) })
+	h.closing[name] = was
+	h.landings[name] = was.landing
+}
 
+// universe is everything one namespace holds, named at once.
+func (h *parquetHandles) universe(name string, landing *landed, watchers *duckdbcgo.WatcherStore) (*namespaces.Universe, error) {
 	// Prompts are attestations of this namespace, so they land where its
 	// other attestations do and are sent with them.
 	store := storage.NewAtsStore(landing, logger.Logger, name)
@@ -474,7 +560,7 @@ func (h *parquetHandles) CloseNamespace(name string) {
 	// closes, so a delete that follows drains what they wrote.
 	<-was.flushed
 	sqlclose.Log(was.watchers.Close(), logger.Logger, "the watchers of "+name)
-	sqlclose.Log(was.duck.Close(), logger.Logger, "the parquet store of "+name)
+	sqlclose.Log(was.closeRecord(), logger.Logger, was.recordIs+" of "+name)
 	sqlclose.Log(was.landing.db.Close(), logger.Logger, "the driver of the landing file of "+name)
 	sqlclose.Log(was.landing.Close(), logger.Logger, "the landing file of "+name)
 }
@@ -495,7 +581,7 @@ func (h *parquetHandles) EndNamespace(name string) error {
 // The last send is on the way out. A namespace being switched off or deleted
 // is not a namespace being told to lose writes, and a deleted one takes its
 // landing file with it.
-func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbStore, name string, done chan<- struct{}) {
+func sendEvery(ctx context.Context, landing *landed, record record, name string, done chan<- struct{}) {
 	if done != nil {
 		defer close(done)
 	}
@@ -535,11 +621,8 @@ func sendEvery(ctx context.Context, landing *landed, record *duckdbcgo.DuckdbSto
 }
 
 // sendAndCompact sends what the landing file holds past its send mark, then
-// asks for compaction (ADR-024), then says how many files the record holds.
-//
-// A send that wrote grows the file count, so it is the moment the threshold
-// can have been crossed.
-func sendAndCompact(landing *landed, record *duckdbcgo.DuckdbStore) error {
+// lets the record do what it does after a send: Parquet compacts (ADR-024).
+func sendAndCompact(landing *landed, record record) error {
 	name := landing.name
 	store := measure.String(measure.AttrStore, name)
 
@@ -553,12 +636,24 @@ func sendAndCompact(landing *landed, record *duckdbcgo.DuckdbStore) error {
 		return nil
 	}
 	took := time.Since(started)
-	logger.Logger.Infow("Sent to the record", "store", name, "rows", sent, "took", took)
+	logger.Logger.Infow("Sent to the record", "store", name, "record", record.what(), "rows", sent, "took", took)
 	measure.Took(measure.StoreSent, took, store)
 	measure.Sized(measure.StoreSentRows, sent, store)
+	return record.afterSend(name)
+}
 
-	started = time.Now()
-	files, bytes, err := record.Compact()
+// parquetRecord is Parquet at the node's location.
+type parquetRecord struct{ *duckdbcgo.DuckdbStore }
+
+func (parquetRecord) what() string { return "the parquet store" }
+
+// afterSend asks for compaction (ADR-024), then says how many files the record
+// holds. A send that wrote grows the file count, so it is the moment the
+// threshold can have been crossed.
+func (r parquetRecord) afterSend(name string) error {
+	store := measure.String(measure.AttrStore, name)
+	started := time.Now()
+	files, bytes, err := r.Compact()
 	if err != nil {
 		return errors.Wrapf(err, "the record of %s did not compact", name)
 	}
@@ -570,12 +665,25 @@ func sendAndCompact(landing *landed, record *duckdbcgo.DuckdbStore) error {
 		measure.Sized(measure.StoreCompactedBytes, int(bytes), store)
 	}
 
-	count, err := record.FileCount()
+	count, err := r.FileCount()
 	if err != nil {
 		return errors.Wrapf(err, "the record of %s did not say how many files it holds", name)
 	}
 	measure.Gauge(measure.StoreFiles, float64(count), store)
 	return nil
+}
+
+// record is what a namespace's landing file sends to and takes in from: the
+// kind its ns.toml's [record] names. A sqlite namespace has none.
+type record interface {
+	storage.FileWriter
+	storage.RawAttestationStore
+	storage.QueryableStore
+	// afterSend is what the record does once a send wrote to it.
+	afterSend(name string) error
+	Close() error
+	// what names the record where it is logged.
+	what() string
 }
 
 // RecordSpend is what reading the record has cost, per reader, across every

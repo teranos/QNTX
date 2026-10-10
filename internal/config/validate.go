@@ -12,9 +12,8 @@ import (
 // KnownStorageBackends is the set of accepted values for [storage] backend.
 // See ADR-023 (backend selection) and ADR-024 (parquet backend).
 var KnownStorageBackends = map[string]bool{
-	"sqlite":   true,
-	"parquet":  true,
-	"postgres": true,
+	"sqlite":  true,
+	"parquet": true,
 }
 
 // KnownSentryLevels is the set of accepted values for [sentry] min_level.
@@ -31,7 +30,7 @@ var KnownSentryLevels = map[string]bool{
 func (c *Config) Validate() error {
 	// Storage backend must be one of the known values (ADR-023).
 	if !KnownStorageBackends[c.Storage.Backend] {
-		return errors.Newf("storage.backend must be one of [sqlite, parquet, postgres], got %q", c.Storage.Backend)
+		return errors.Newf("storage.backend must be one of [sqlite, parquet], got %q", c.Storage.Backend)
 	}
 
 	// Parquet backend requires a location URL (ADR-024).
@@ -42,17 +41,6 @@ func (c *Config) Validate() error {
 		}
 		if !strings.HasPrefix(loc, "s3://") && !strings.HasPrefix(loc, "file://") {
 			return errors.Newf("storage.parquet.location must start with s3:// or file://, got %q", loc)
-		}
-	}
-
-	// Postgres backend requires its connection string, named and not written.
-	if c.Storage.Backend == "postgres" {
-		named := c.Storage.Postgres.URL
-		if !strings.HasPrefix(named, secretref.SchemeSSM) && !strings.HasPrefix(named, secretref.SchemeEnv) {
-			return errors.Newf("storage.postgres.url must be a %s or %s reference when storage.backend = \"postgres\"", secretref.SchemeSSM, secretref.SchemeEnv)
-		}
-		if err := secretref.Validate(named); err != nil {
-			return errors.Wrap(err, "storage.postgres.url carries the password")
 		}
 	}
 

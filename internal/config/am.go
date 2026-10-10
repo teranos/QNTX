@@ -235,7 +235,7 @@ type OAuthClientConfig struct {
 // StorageConfig selects the storage backend and holds backend-specific config.
 // See ADR-023 for the selection model.
 type StorageConfig struct {
-	Backend  string         `mapstructure:"backend"` // "sqlite" (default), "parquet" or "postgres". Additional backends in subsequent ADRs.
+	Backend  string         `mapstructure:"backend"` // "sqlite" (default) or "parquet". Additional backends in subsequent ADRs.
 	Sqlite   SqliteConfig   `mapstructure:"sqlite"`
 	Parquet  ParquetConfig  `mapstructure:"parquet"`
 	Postgres PostgresConfig `mapstructure:"postgres"`
@@ -256,15 +256,11 @@ type ParquetConfig struct {
 	Location string `mapstructure:"location"`
 }
 
-// PostgresConfig configures the Postgres backend: the record a node's
-// attestations are sent to, on Supabase's free tier. URL is the connection
-// string as an ssm:// or env: reference, since it carries the password. The
-// connection string says whether it is TLS, as libpq's does: sslmode=disable
-// is in the clear, and anything else is verified against the certificate at
-// CA.
+// PostgresConfig is this node's side of a namespace whose record is Postgres:
+// the certificate the server is verified against. Which Postgres a namespace
+// sends to is its own, in its ns.toml; a path on one machine is not.
 type PostgresConfig struct {
-	URL string `mapstructure:"url"`
-	CA  string `mapstructure:"ca"`
+	CA string `mapstructure:"ca"`
 }
 
 // BoundedStorageConfig configures storage limits for attestations.

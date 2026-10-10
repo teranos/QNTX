@@ -336,7 +336,7 @@ message ReachWritten {
   string id = 1;
 }
 
-// NamespaceActedOn is what namespaces disable, enable, delete and nuke answer.
+// NamespaceActedOn is what namespaces disable, enable, store, delete and nuke answer.
 message NamespaceActedOn {
   // The namespace acted on.
   string name = 1;
@@ -484,6 +484,18 @@ message NamespaceDefinition {
   bool enabled = 2;
   // RFC 3339.
   string created_at = 3;
+  // Where its attestations are kept.
+  NamespaceRecord record = 4;
+}
+
+// NamespaceRecord is a namespace's storage, as its ns.toml's [record] says.
+// Mirrors storage.NamespaceRecord.
+message NamespaceRecord {
+  // none, sqlite, parquet or postgres. A namespace begins with none.
+  string kind = 1;
+  // Postgres's connection string as an ssm:// or env: reference, never the
+  // password itself. Only a postgres record carries one.
+  string url = 2;
 }
 
 // Namespace is one namespace at a storage location, and what namespaces

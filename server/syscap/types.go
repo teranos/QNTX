@@ -5,7 +5,7 @@ package syscap
 // Fuzzy fields removed — search will be provided by MeiliSearch (ADR-015).
 type Message struct {
 	Type string `json:"type"` // "system_capabilities"
-	// Store is which store the node keeps (ADR-023) — "sqlite", "parquet" or "postgres".
+	// Store is which store the node keeps (ADR-023) — "sqlite" or "parquet".
 	// Distinct from StorageBackend, which is the implementation behind it.
 	// Namespaces exist only under parquet, and sigma only under sqlite.
 	Store            string `json:"store"`

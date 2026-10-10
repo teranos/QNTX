@@ -868,6 +868,39 @@ pub extern "C" fn duckdb_namespaces_set_enabled(
     })
 }
 
+/// Give `name` its storage: `record_json` is a `Record`, `{"kind": "parquet"}`
+/// and the like. Given once, from none.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_namespaces_set_record(
+    store: *const NamespaceStore,
+    name: *const c_char,
+    record_json: *const c_char,
+) -> StorageResultC {
+    qntx_ffi_common::guarded_result("duckdb_namespaces_set_record", || {
+        const CALL: &str = "duckdb_namespaces_set_record";
+        if store.is_null() {
+            return StorageResultC::error("null namespace store pointer");
+        }
+        let name = match unsafe { cstr_to_str(name) } {
+            Ok(s) => s,
+            Err(e) => return StorageResultC::error(e.crosses(CALL)),
+        };
+        let json = match unsafe { cstr_to_str(record_json) } {
+            Ok(s) => s,
+            Err(e) => return StorageResultC::error(e.crosses(CALL)),
+        };
+        let record: crate::namespace_store::Record = match serde_json::from_str(json) {
+            Ok(r) => r,
+            Err(e) => return StorageResultC::error(DuckdbError::Serde(e).crosses(CALL)),
+        };
+        match unsafe { &*store }.set_record(name, record) {
+            Ok(()) => StorageResultC::ok(),
+            Err(e) => StorageResultC::error(e.crosses(CALL)),
+        }
+    })
+}
+
 /// Empty default without ending it. The one place data leaves, so the level
 /// that reaches it is the caller's to check.
 #[no_mangle]

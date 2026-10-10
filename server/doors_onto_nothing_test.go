@@ -33,6 +33,7 @@ func (h heldNamespaces) List() ([]storage.Namespace, error) {
 
 func (h heldNamespaces) Create(string, storage.NamespaceDefinition) error { return nil }
 func (h heldNamespaces) SetEnabled(string, bool) error                    { return nil }
+func (heldNamespaces) SetRecord(string, storage.NamespaceRecord) error    { return nil }
 func (h heldNamespaces) Delete(string) error                              { return nil }
 func (h heldNamespaces) Nuke() error                                      { return nil }
 

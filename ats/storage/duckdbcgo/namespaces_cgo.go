@@ -114,6 +114,26 @@ func (s *NamespaceStore) SetEnabled(name string, enabled bool) error {
 	return storageResultErr(result, "set enabled on namespace "+name)
 }
 
+// SetRecord gives name its storage, once, from none. The owner, whether it is
+// enabled and the date it was made are kept.
+func (s *NamespaceStore) SetRecord(name string, record storage.NamespaceRecord) error {
+	recordJSON, err := json.Marshal(record)
+	if err != nil {
+		return errors.Wrapf(err, "failed to encode the record of %s", name)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cName := C.CString(name)
+	defer C.free(unsafe.Pointer(cName))
+	cRecord := C.CString(string(recordJSON))
+	defer C.free(unsafe.Pointer(cRecord))
+
+	result := C.duckdb_namespaces_set_record((*C.NamespaceStore)(s.ptr), cName, cRecord)
+	return storageResultErr(result, "set the record of namespace "+name)
+}
+
 // Nuke empties default without ending it. Which level reaches this is the
 // caller's: the store knows what it may do, not who is asking.
 func (s *NamespaceStore) Nuke() error {

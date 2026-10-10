@@ -492,7 +492,7 @@ export interface ReachWritten {
   id: string;
 }
 
-/** NamespaceActedOn is what namespaces disable, enable, delete and nuke answer. */
+/** NamespaceActedOn is what namespaces disable, enable, store, delete and nuke answer. */
 export interface NamespaceActedOn {
   /** The namespace acted on. */
   name: string;
@@ -673,6 +673,22 @@ export interface NamespaceDefinition {
   enabled: boolean;
   /** RFC 3339. */
   created_at: string;
+  /** Where its attestations are kept. */
+  record: NamespaceRecord | undefined;
+}
+
+/**
+ * NamespaceRecord is a namespace's storage, as its ns.toml's [record] says.
+ * Mirrors storage.NamespaceRecord.
+ */
+export interface NamespaceRecord {
+  /** none, sqlite, parquet or postgres. A namespace begins with none. */
+  kind: string;
+  /**
+   * Postgres's connection string as an ssm:// or env: reference, never the
+   * password itself. Only a postgres record carries one.
+   */
+  url: string;
 }
 
 /**

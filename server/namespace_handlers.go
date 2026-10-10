@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
@@ -22,7 +24,7 @@ func (s *QNTXServer) namespacesSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        "namespaces",
-			Description: "The namespaces the node keeps, who owns each and whether it is switched on: listed, made, switched off and on, ended, and default emptied.",
+			Description: "The namespaces the node keeps, who owns each, whether it is switched on and where it keeps its attestations: listed, made, given storage, switched off and on, ended, and default emptied.",
 			Tags:        []string{"namespaces", "tenancy", "ownership"},
 			Sigils: []*protocol.Sigil{
 				{
@@ -37,6 +39,19 @@ func (s *QNTXServer) namespacesSignum() sigil.Signum {
 					Takes:  []*protocol.Param{{Name: "name", Required: true, Says: "The new namespace's name: one path segment."}},
 					Answer: "protocol.Namespace",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces"},
+				},
+				{
+					Name: "store",
+					Does: "Give a namespace its storage: sqlite, parquet or postgres. A namespace begins with none, and is given storage once.",
+					Takes: []*protocol.Param{
+						name,
+						{Name: "kind", Required: true, Says: "Where its attestations are kept.", OneOf: []string{
+							string(storage.RecordSQLite), string(storage.RecordParquet), string(storage.RecordPostgres),
+						}},
+						{Name: "url", Says: "For postgres, its connection string as an ssm:// or env: reference, never the password itself."},
+					},
+					Answer: "protocol.NamespaceActedOn",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/api/namespaces/{name}/store"},
 				},
 				{
 					Name:   "disable",
@@ -76,6 +91,7 @@ func (s *QNTXServer) namespacesSignum() sigil.Signum {
 			"enable": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 				return s.namespacesSwitch(ctx, sent["name"], true)
 			},
+			"store":  s.namespacesStore,
 			"delete": s.namespacesDelete,
 			"nuke":   s.namespacesNuke,
 		},
@@ -104,7 +120,12 @@ func (s *QNTXServer) namespacesList(ctx context.Context, _ sigil.Sent) (any, *pr
 func namespaceMessage(ns storage.Namespace) *protocol.Namespace {
 	answered := &protocol.Namespace{Name: ns.Name, Kinds: ns.Kinds}
 	if definition := ns.Definition; definition != nil {
-		answered.Definition = &protocol.NamespaceDefinition{Owner: definition.Owner, Enabled: definition.Enabled, CreatedAt: definition.CreatedAt}
+		answered.Definition = &protocol.NamespaceDefinition{
+			Owner:     definition.Owner,
+			Enabled:   definition.Enabled,
+			CreatedAt: definition.CreatedAt,
+			Record:    &protocol.NamespaceRecord{Kind: string(definition.Record.Kind), Url: definition.Record.URL},
+		}
 	}
 	return answered
 }
@@ -126,10 +147,13 @@ func (s *QNTXServer) namespacesCreate(ctx context.Context, sent sigil.Sent) (any
 
 	// Who asked is the owner. It does not come from the request, because a
 	// request naming its own owner names somebody else's.
+	// "what I want is for a Namespace to begin life dbless and enable either
+	// SQLite or parquet or Supabase later on"
 	definition := storage.NamespaceDefinition{
 		Owner:     asked,
 		Enabled:   true,
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		Record:    storage.NamespaceRecord{Kind: storage.RecordNone},
 	}
 	if err := namespaces.Create(name, definition); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
@@ -141,7 +165,57 @@ func (s *QNTXServer) namespacesCreate(ctx context.Context, sent sigil.Sent) (any
 
 // namespacesSwitch puts one in or out of service. The store refuses system and
 // default, because a disabled system is a node that cannot read who anybody is.
+//
+// The door held from before the switch would keep serving what was just
+// switched off. Dropped either way: re-enabling reopens it on the next call.
 func (s *QNTXServer) namespacesSwitch(ctx context.Context, name string, enabled bool) (any, *protocol.Refusal) {
+	return s.actOn(ctx, name, func(namespaces storage.Namespaces) error {
+		return namespaces.SetEnabled(name, enabled)
+	}, "namespace switched", "enabled", enabled)
+}
+
+// namespacesStore gives a namespace its storage, once, from none. A postgres
+// record names its connection string by reference: the string carries the
+// password, and ns.toml is read by whoever reads the location.
+//
+// A door held from before had no storage to open. Dropped, so the next call
+// opens the namespace on what it was just given.
+func (s *QNTXServer) namespacesStore(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	// Required, so refused before this is asked when they are not sent.
+	name := sent["name"]
+	kind := storage.RecordKind(sent["kind"])
+	url, named := sent["url"]
+
+	given := storage.NamespaceRecord{Kind: kind}
+	switch kind {
+	case storage.RecordSQLite, storage.RecordParquet:
+		if named {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "url", Says: "only a postgres record names a url, and this is " + string(kind)}
+		}
+	case storage.RecordPostgres:
+		if !strings.HasPrefix(url, secretref.SchemeSSM) && !strings.HasPrefix(url, secretref.SchemeEnv) {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "url",
+				Says: "a postgres record names its connection string as a " + secretref.SchemeSSM + " or " + secretref.SchemeEnv + " reference, since it carries the password"}
+		}
+		if err := secretref.Validate(url); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "url", Says: err.Error()}
+		}
+		given.URL = url
+	case storage.RecordNone:
+		// OneOf refuses it before this is asked: a namespace begins with none,
+		// and giving it none gives it nothing.
+		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "kind", Says: "a namespace begins with none; giving it none gives it nothing"}
+	}
+
+	return s.actOn(ctx, name, func(namespaces storage.Namespaces) error {
+		return namespaces.SetRecord(name, given)
+	}, "namespace given storage", "kind", string(kind))
+}
+
+// actOn is what switching a namespace and giving it storage share: asked of a
+// node that keeps namespaces, never on the one the caller stands in, and the
+// door held from before dropped once the store has done it.
+func (s *QNTXServer) actOn(ctx context.Context, name string, act func(storage.Namespaces) error, did string, what string, was any) (any, *protocol.Refusal) {
 	namespaces, refusal := s.superNamespaces(ctx)
 	if refusal != nil {
 		return nil, refusal
@@ -149,13 +223,11 @@ func (s *QNTXServer) namespacesSwitch(ctx context.Context, name string, enabled 
 	if refusal := s.notStandingIn(ctx, name); refusal != nil {
 		return nil, refusal
 	}
-	if err := namespaces.SetEnabled(name, enabled); err != nil {
+	if err := act(namespaces); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 	}
-	// The door held from before the switch would keep serving what was just
-	// switched off. Dropped either way: re-enabling reopens it on the next call.
 	s.held.Forget(name)
-	s.logger.Infow("namespace switched", "namespace", name, "enabled", enabled, "by", askedBy(ctx))
+	s.logger.Infow(did, "namespace", name, what, was, "by", askedBy(ctx))
 	return &protocol.NamespaceActedOn{Name: name}, nil
 }
 
