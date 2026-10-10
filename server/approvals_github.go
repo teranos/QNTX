@@ -11,7 +11,7 @@ import (
 	"strconv"
 
 	"github.com/teranos/QNTX/ats/watcher"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // gitHubPullRequestEvent is the part of a pull_request event an approval reads.
