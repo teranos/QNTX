@@ -1,23 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3267 in 434 files.
-# db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
-# server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
-# From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
-# ats/types/attestation.go: +1, NamesItsActor refuses a command naming no actor: one check every store's generate path calls, where four filled one in.
-# server/attestation_handlers.go: +1, the node authors what its caller named nobody for.
-# server/quote_removal.go: 7, from 82e8e8cf unbaselined: refusals of no actor, namespace or span, nothing removed ends the run, a count for the note, the daemon check its siblings hold.
-# From 3414: a test against a package-level const or var holding nil, zero or empty counts like one against what it holds; each was there before it was counted.
-# From 3400: auth.New refuses a handler with no User store, and the 23 tests for one that keeps no Users are gone; the header had drifted to 3406 by hand.
-# From 3378: rich search logs, rather than asking first whether it has a logger.
-# From 3368: the server logs, rather than asking first whether it has a logger.
-# From 3355: Pulse runs because the node runs, and nothing asks whether the daemon is there.
-# From 3339: a closed store says it is closed, rather than its pointer being nil.
-# From 3323: the node runs with its plugin registry, and nothing asks whether it has one.
-# From 3309: the vectors are the namespace's from boot, and only making them waits for a plugin.
-# From 3290: the canvas is handed its logger, whatever else it is handed.
-# From 3285: a refusal the caller is told is answered without a nil logger standing for not logging it.
-# From 3283: the services that started are a list, and stopping them is stopping that list.
+# 2926 in 415 files.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -183,51 +166,33 @@
 2	internal/tools/spawncheck/main.go
 6	internal/tools/tagcheck/main.go
 1	internal/util/strings.go
-3	plugin/base.go
-18	plugin/grpc/banner.go
-33	plugin/grpc/client.go
-3	plugin/grpc/config_provider.go
-68	plugin/grpc/discovery.go
-2	plugin/grpc/health_poll.go
-3	plugin/grpc/install.go
-11	plugin/grpc/loader.go
-1	plugin/grpc/logbuffer.go
-1	plugin/grpc/pidfile.go
-2	plugin/grpc/protocol/convert.go
-8	plugin/grpc/pulse_handler.go
-1	plugin/grpc/records.go
-3	plugin/grpc/remote_atsstore.go
-3	plugin/grpc/remote_queue.go
-1	plugin/grpc/remote_schedule.go
-19	plugin/grpc/remote_services.go
-1	plugin/grpc/run.go
-5	plugin/grpc/runner.go
+1	plugin/grpc/client.go
+1	plugin/grpc/config_provider.go
+4	plugin/grpc/discovery.go
+1	plugin/grpc/pulse_handler.go
+2	plugin/grpc/remote_atsstore.go
+1	plugin/grpc/remote_queue.go
 2	plugin/grpc/schedules.go
-8	plugin/grpc/server.go
-19	plugin/grpc/services/atsstore_server.go
-8	plugin/grpc/services/embedding_server.go
-17	plugin/grpc/services/fetch_server.go
-5	plugin/grpc/services/github_installation.go
-19	plugin/grpc/services/github_server.go
-6	plugin/grpc/services/ground_server.go
-2	plugin/grpc/services/llm_queue.go
-12	plugin/grpc/services/llm_server.go
-6	plugin/grpc/services/mail_look.go
-25	plugin/grpc/services/mail_server.go
+7	plugin/grpc/services/atsstore_server.go
+3	plugin/grpc/services/embedding_server.go
+11	plugin/grpc/services/fetch_server.go
+1	plugin/grpc/services/github_installation.go
+10	plugin/grpc/services/github_server.go
+3	plugin/grpc/services/ground_server.go
+1	plugin/grpc/services/llm_queue.go
+5	plugin/grpc/services/llm_server.go
+3	plugin/grpc/services/mail_look.go
+14	plugin/grpc/services/mail_server.go
 5	plugin/grpc/services/mail_ses.go
-5	plugin/grpc/services/mail_sheet.go
-8	plugin/grpc/services/mail_template.go
-9	plugin/grpc/services/queue_server.go
-5	plugin/grpc/services/schedule_server.go
-2	plugin/grpc/services/search_server.go
-10	plugin/grpc/services/vector_search_server.go
-13	plugin/grpc/services_manager.go
-1	plugin/grpc/traffic.go
-11	plugin/grpc/watchers.go
-6	plugin/grpc/websocket_keepalive.go
-9	plugin/grpc/websocket_security.go
-8	plugin/registry.go
-2	plugin/services.go
+4	plugin/grpc/services/mail_sheet.go
+4	plugin/grpc/services/mail_template.go
+8	plugin/grpc/services/queue_server.go
+3	plugin/grpc/services/schedule_server.go
+6	plugin/grpc/services/vector_search_server.go
+1	plugin/grpc/services_manager.go
+4	plugin/grpc/watchers.go
+3	plugin/grpc/websocket_keepalive.go
+1	plugin/registry.go
 4	pulse/async/emitter.go
 3	pulse/async/handler.go
 6	pulse/async/job.go
@@ -351,7 +316,7 @@
 2	server/github_credential.go
 2	server/github_deliveries.go
 1	server/github_parity.go
-4	server/github_webhook.go
+3	server/github_webhook.go
 2	server/ground_bridge.go
 11	server/handlers.go
 4	server/host_gauges.go
@@ -381,15 +346,14 @@
 11	server/parity/tsdecl.go
 5	server/parity_sigils.go
 2	server/pi.go
-21	server/plugin_build.go
-8	server/plugin_check.go
-12	server/plugin_config_handlers.go
-8	server/plugin_handlers.go
+7	server/plugin_build.go
+1	server/plugin_check.go
+8	server/plugin_config_handlers.go
+2	server/plugin_handlers.go
 1	server/plugin_health_cache.go
-3	server/plugin_log_handlers.go
-4	server/plugin_records.go
-2	server/plugin_roots.go
-19	server/plugin_sigils.go
+2	server/plugin_log_handlers.go
+3	server/plugin_records.go
+14	server/plugin_sigils.go
 1	server/plugin_stores.go
 1	server/pprof.go
 26	server/prompt_handlers.go

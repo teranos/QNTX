@@ -1,6 +1,6 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 346 in 155 files.
+# 304 in 135 files.
 
 1	ats/attrs/attrs.go
 1	ats/identity/quickdev.go
@@ -49,24 +49,9 @@
 1	internal/nodedid/store.go
 2	internal/pi/pin.go
 4	internal/testing/database.go
-1	plugin/grpc/build.go
-3	plugin/grpc/client.go
-1	plugin/grpc/config_provider.go
-9	plugin/grpc/discovery.go
-1	plugin/grpc/install.go
-2	plugin/grpc/loader.go
-1	plugin/grpc/pidfile.go
-2	plugin/grpc/pulse_handler.go
-2	plugin/grpc/runner.go
-2	plugin/grpc/schedules.go
+1	plugin/grpc/client.go
 1	plugin/grpc/services/atsstore_server.go
-1	plugin/grpc/services/fileservice_server.go
-1	plugin/grpc/services/github_server.go
-1	plugin/grpc/services/ground_server.go
-2	plugin/grpc/services/llm_server.go
-3	plugin/grpc/services/mail_template.go
-1	plugin/grpc/services_manager.go
-1	plugin/grpc/websocket_security.go
+1	plugin/grpc/services/mail_template.go
 3	pulse/async/store.go
 1	pulse/async/worker.go
 1	pulse/schedule/execution_store.go
@@ -127,11 +112,7 @@
 1	server/parity/prisma.go
 1	server/parity/references.go
 3	server/parity/tsdecl.go
-3	server/plugin_build.go
-1	server/plugin_log_handlers.go
-3	server/plugin_roots.go
-2	server/plugin_sigils.go
-1	server/plugin_stores.go
+1	server/plugin_roots.go
 1	server/pulse_schedules.go
 1	server/ratelimit.go
 1	server/reach_sigils.go
@@ -150,7 +131,6 @@
 1	server/statusline_plugin_row.go
 1	server/sub_auth.go
 1	server/sub_canvas.go
-1	server/sub_plugins.go
 1	server/syscap/parser_qntx.go
 3	server/vault_bind.go
 3	server/vault_send.go
