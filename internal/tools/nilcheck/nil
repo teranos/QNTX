@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3378 in 436 files.
+# 3368 in 436 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -9,6 +9,7 @@
 # server/quote_removal.go: 7, from 82e8e8cf unbaselined: refusals of no actor, namespace or span, nothing removed ends the run, a count for the note, the daemon check its siblings hold.
 # From 3414: a test against a package-level const or var holding nil, zero or empty counts like one against what it holds; each was there before it was counted.
 # From 3400: auth.New refuses a handler with no User store, and the 23 tests for one that keeps no Users are gone; the header had drifted to 3406 by hand.
+# From 3378: rich search logs, rather than asking first whether it has a logger.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -53,7 +54,7 @@
 8	ats/storage/query_store.go
 7	ats/storage/retrieval.go
 2	ats/storage/rfc3339.go
-19	ats/storage/rich_search.go
+9	ats/storage/rich_search.go
 10	ats/storage/rust_backed_store.go
 6	ats/storage/sql_raw_store.go
 1	ats/storage/sqlitecgo/adapter.go

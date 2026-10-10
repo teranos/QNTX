@@ -99,9 +99,7 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 
 	// If no rich fields are discovered, return empty results
 	if len(richStringFields) == 0 {
-		if bs.logger != nil {
-			bs.logger.Debugw("No rich string fields discovered, returning empty results")
-		}
+		bs.logger.Debugw("No rich string fields discovered, returning empty results")
 		return []RichSearchMatch{}, nil
 	}
 
@@ -144,9 +142,7 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 		)
 
 		if err := rows.Scan(&id, &subjectsJSON, &attributesJSON); err != nil {
-			if bs.logger != nil {
-				bs.logger.Warnw("Failed to scan attestation row", "error", err)
-			}
+			bs.logger.Warnw("Failed to scan attestation row", "error", err)
 			continue
 		}
 
@@ -277,11 +273,9 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (_ map[string][]
 	bs.typeFieldsCacheLock.RLock()
 	if bs.typeFieldsCache != nil && time.Since(bs.typeFieldsCacheTime) < typeFieldsCacheTTL {
 		defer bs.typeFieldsCacheLock.RUnlock()
-		if bs.logger != nil {
-			bs.logger.Debugw("Using cached type definitions",
-				"type_count", len(bs.typeFieldsCache),
-				"cache_age", time.Since(bs.typeFieldsCacheTime))
-		}
+		bs.logger.Debugw("Using cached type definitions",
+			"type_count", len(bs.typeFieldsCache),
+			"cache_age", time.Since(bs.typeFieldsCacheTime))
 		return bs.typeFieldsCache, nil
 	}
 	bs.typeFieldsCacheLock.RUnlock()
@@ -319,11 +313,9 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (_ map[string][]
 		attrs.Scan(attrMap, &def)
 		if len(def.RichStringFields) > 0 {
 			typeFields[typeName] = def.RichStringFields
-			if bs.logger != nil {
-				bs.logger.Debugw("Found type with rich fields",
-					"type", typeName,
-					"fields", def.RichStringFields)
-			}
+			bs.logger.Debugw("Found type with rich fields",
+				"type", typeName,
+				"fields", def.RichStringFields)
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -336,10 +328,8 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (_ map[string][]
 	bs.typeFieldsCacheTime = time.Now()
 	bs.typeFieldsCacheLock.Unlock()
 
-	if bs.logger != nil {
-		bs.logger.Debugw("Cached type definitions",
-			"type_count", len(typeFields))
-	}
+	bs.logger.Debugw("Cached type definitions",
+		"type_count", len(typeFields))
 
 	return typeFields, nil
 }
@@ -400,13 +390,13 @@ func (bs *BoundedStore) GetRichFieldsWithStats(overAtMost int) ([]RichFieldInfo,
 
 		// Log but don't fail - field might not exist in any attestation
 		over, err := bs.carriedOver(ctx, carried, since.String)
-		if err != nil && bs.logger != nil {
+		if err != nil {
 			bs.logger.Errorw("When a field was carried is unavailable; this field will show no usage rather than unknown usage", "field", field, "error", err)
 		}
 		var last sql.NullString
 		if err := bs.db.QueryRowContext(ctx,
 			"SELECT MAX(strftime('%Y-%m-%dT%H:%M:%SZ', timestamp)) FROM attestations WHERE"+carried,
-		).Scan(&last); err != nil && bs.logger != nil {
+		).Scan(&last); err != nil {
 			bs.logger.Errorw("When a field was last carried is unavailable; this field will show no usage rather than unknown usage", "field", field, "error", err)
 		}
 
@@ -461,9 +451,7 @@ func (bs *BoundedStore) carriedOver(ctx context.Context, condition, since string
 func (bs *BoundedStore) buildDynamicRichStringFields(ctx context.Context) []string {
 	typeFields, err := bs.getTypeDefinitions(ctx)
 	if err != nil {
-		if bs.logger != nil {
-			bs.logger.Warnw("Failed to query type definitions, no fields available", "error", err)
-		}
+		bs.logger.Warnw("Failed to query type definitions, no fields available", "error", err)
 		return []string{} // No fallback - purely attested
 	}
 
@@ -474,11 +462,9 @@ func (bs *BoundedStore) buildDynamicRichStringFields(ctx context.Context) []stri
 	for typeName, fields := range typeFields {
 		for _, field := range fields {
 			fieldSet[field] = true
-			if bs.logger != nil {
-				bs.logger.Debugw("Added rich field from type",
-					"type", typeName,
-					"field", field)
-			}
+			bs.logger.Debugw("Added rich field from type",
+				"type", typeName,
+				"field", field)
 		}
 	}
 
@@ -489,12 +475,10 @@ func (bs *BoundedStore) buildDynamicRichStringFields(ctx context.Context) []stri
 	}
 	sort.Strings(result)
 
-	if bs.logger != nil {
-		bs.logger.Debugw("Built dynamic rich string fields",
-			"field_count", len(result),
-			"type_count", len(typeFields),
-			"fields", result)
-	}
+	bs.logger.Debugw("Built dynamic rich string fields",
+		"field_count", len(result),
+		"type_count", len(typeFields),
+		"fields", result)
 
 	return result
 }
