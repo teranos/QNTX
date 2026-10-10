@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3407 in 436 files.
+# 3405 in 436 files.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
 # ats/types/attestation.go: +1, NamesItsActor refuses a command naming no actor: one check every store's generate path calls, where four filled one in.
@@ -314,7 +314,7 @@
 3	server/claude_git.go
 4	server/claude_login.go
 9	server/claude_turns.go
-24	server/client.go
+22	server/client.go
 6	server/conversation.go
 1	server/db_performance.go
 17	server/db_stats_cache.go
