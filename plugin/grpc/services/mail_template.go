@@ -81,35 +81,53 @@ type FilledMail struct {
 	Text    string
 }
 
-// checkMailTemplate refuses a template that cannot be kept: no subject, no
-// body, or a part that does not parse. A request that sent no template sent
-// no subject either.
-func checkMailTemplate(t *protocol.MailTemplate) error {
-	if strings.TrimSpace(t.GetSubject()) == "" {
-		return errors.New("a template needs a subject")
-	}
-	if strings.TrimSpace(t.Html) == "" && strings.TrimSpace(t.Text) == "" {
-		return errors.New("a template needs an html or a text body, or both")
-	}
-	if _, err := texttemplate.New("subject").Parse(t.Subject); err != nil {
-		return errors.Wrap(err, "the subject does not parse")
-	}
-	if _, err := htmltemplate.New("html").Parse(t.Html); err != nil {
-		return errors.Wrap(err, "the html does not parse")
-	}
-	if _, err := texttemplate.New("text").Parse(t.Text); err != nil {
-		return errors.Wrap(err, "the text does not parse")
-	}
-	return nil
+// parsedMail is a template's three parts, parsed. A value a part names and
+// a Send does not hold is an error: missingkey=error on every part.
+type parsedMail struct {
+	subject *texttemplate.Template
+	html    *htmltemplate.Template
+	text    *texttemplate.Template
 }
 
-// fillMail fills every part of a template with values. A value a part names
-// and values does not hold is an error: missingkey=error on every part.
+// checkMailTemplate refuses a template that cannot be kept. A template is kept
+// as it was sent, and a Send parses it again from the record.
+func checkMailTemplate(t *protocol.MailTemplate) error {
+	_, err := parseMail(t)
+	return err
+}
+
+// parseMail is a template's parts, parsed, or why it cannot be kept: no
+// subject, no body, or a part that does not parse. A request that sent no
+// template sent no subject either.
+func parseMail(t *protocol.MailTemplate) (parsedMail, error) {
+	if strings.TrimSpace(t.GetSubject()) == "" {
+		return parsedMail{}, errors.New("a template needs a subject")
+	}
+	if strings.TrimSpace(t.Html) == "" && strings.TrimSpace(t.Text) == "" {
+		return parsedMail{}, errors.New("a template needs an html or a text body, or both")
+	}
+	subject, err := texttemplate.New("subject").Option("missingkey=error").Parse(t.Subject)
+	if err != nil {
+		return parsedMail{}, errors.Wrap(err, "the subject does not parse")
+	}
+	html, err := htmltemplate.New("html").Option("missingkey=error").Parse(t.Html)
+	if err != nil {
+		return parsedMail{}, errors.Wrap(err, "the html does not parse")
+	}
+	text, err := texttemplate.New("text").Option("missingkey=error").Parse(t.Text)
+	if err != nil {
+		return parsedMail{}, errors.Wrap(err, "the text does not parse")
+	}
+	return parsedMail{subject: subject, html: html, text: text}, nil
+}
+
+// fillMail fills every part of a template with values.
 func fillMail(t *protocol.MailTemplate, values map[string]string) (FilledMail, error) {
-	if err := checkMailTemplate(t); err != nil {
+	parsed, err := parseMail(t)
+	if err != nil {
 		return FilledMail{}, err
 	}
-	subject, err := fillText("subject", t.Subject, values)
+	subject, err := fillText("subject", parsed.subject, values)
 	if err != nil {
 		return FilledMail{}, err
 	}
@@ -121,29 +139,21 @@ func fillMail(t *protocol.MailTemplate, values map[string]string) (FilledMail, e
 		return FilledMail{}, errors.Newf("the filled subject spans lines: %q", subject)
 	}
 
-	text, err := fillText("text", t.Text, values)
+	text, err := fillText("text", parsed.text, values)
 	if err != nil {
 		return FilledMail{}, err
 	}
 
 	// A part the template leaves empty fills empty.
 	var html bytes.Buffer
-	parsed, err := htmltemplate.New("html").Option("missingkey=error").Parse(t.Html)
-	if err != nil {
-		return FilledMail{}, errors.Wrap(err, "the html does not parse")
-	}
-	if err := parsed.Execute(&html, values); err != nil {
+	if err := parsed.html.Execute(&html, values); err != nil {
 		return FilledMail{}, errors.Wrap(err, "the html could not be filled")
 	}
 
 	return FilledMail{Subject: subject, HTML: html.String(), Text: text}, nil
 }
 
-func fillText(part, body string, values map[string]string) (string, error) {
-	parsed, err := texttemplate.New(part).Option("missingkey=error").Parse(body)
-	if err != nil {
-		return "", errors.Wrapf(err, "the %s does not parse", part)
-	}
+func fillText(part string, parsed *texttemplate.Template, values map[string]string) (string, error) {
 	var out bytes.Buffer
 	if err := parsed.Execute(&out, values); err != nil {
 		return "", errors.Wrapf(err, "the %s could not be filled", part)

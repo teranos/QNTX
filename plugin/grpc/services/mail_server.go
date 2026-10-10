@@ -92,7 +92,7 @@ type MailWiring struct {
 	From       string                      // mail.from. Empty sends nothing.
 	Transport  MailTransport               // Nil is no transport enabled in am.toml.
 	Recipients MailRecipients              // Nil is a node that keeps no Users.
-	Records    func() ats.AttestationStore // Where templates and mail are attested.
+	Records    func() ats.AttestationStore // Where templates and mail are attested. Always handed.
 	Actor      string                      // The node's DID: who sent the mail.
 }
 
@@ -165,12 +165,9 @@ func (s *MailServer) SetTemplate(_ context.Context, req *protocol.SetMailTemplat
 	if err != nil {
 		return refuse(errors.Wrap(err, "the mail service has nowhere to keep a template yet"))
 	}
-	if w.Records == nil {
-		return refuse(errors.New("the mail service was wired with nowhere to keep a template"))
-	}
-	store := w.Records()
-	if store == nil {
-		return refuse(errors.New("the node holds no store to keep the template in"))
+	store, err := w.records()
+	if err != nil {
+		return refuse(errors.Wrapf(err, "template %s of %s was not kept", req.Name, req.Source))
 	}
 
 	ref := templateRef(req.Source, req.Name)
@@ -332,7 +329,7 @@ func (s *MailServer) SendAsNodeTo(ctx context.Context, u MailRecipient, m NodeMa
 
 // ready is the wiring a send needs and the address it goes to, or why there is
 // none.
-func (s *MailServer) ready(userID string) (*MailWiring, string, error) {
+func (s *MailServer) ready(userID string) (*mailSending, string, error) {
 	w, err := s.wiring()
 	if err != nil {
 		return nil, "", err
@@ -344,8 +341,15 @@ func (s *MailServer) ready(userID string) (*MailWiring, string, error) {
 	return w, to, nil
 }
 
+// mailSending is the wiring a send goes out by, with the store its record is
+// kept in, read once when the send begins.
+type mailSending struct {
+	*MailWiring
+	store ats.AttestationStore
+}
+
 // wiring is what a send needs besides the User, or why there is none.
-func (s *MailServer) wiring() (*MailWiring, error) {
+func (s *MailServer) wiring() (*mailSending, error) {
 	w, err := s.wiredWith()
 	if err != nil {
 		return nil, err
@@ -359,15 +363,26 @@ func (s *MailServer) wiring() (*MailWiring, error) {
 	if w.Recipients == nil {
 		return nil, errors.New("this node keeps no Users, so there is nobody to mail")
 	}
-	if w.Records == nil || w.Records() == nil {
-		return nil, errors.New("the node holds no store to attest the mail in, so none is sent")
+	store, err := w.records()
+	if err != nil {
+		return nil, errors.Wrap(err, "no mail is sent that cannot be attested")
 	}
-	return w, nil
+	return &mailSending{MailWiring: w, store: store}, nil
+}
+
+// records is the store the node keeps mail's records in, or that it holds
+// none: the node's own records are not there before the node has them.
+func (w *MailWiring) records() (ats.AttestationStore, error) {
+	store := w.Records()
+	if store == nil {
+		return nil, errors.New("the node holds no store to keep mail's records in")
+	}
+	return store, nil
 }
 
 // deliver hands a filled mail to the transport and attests what became of it:
 // mail:sent with the transport's id, or mail:failed with its refusal.
-func (s *MailServer) deliver(ctx context.Context, w *MailWiring, userID, source, ref string, mail OutgoingMail) (string, string, error) {
+func (s *MailServer) deliver(ctx context.Context, w *mailSending, userID, source, ref string, mail OutgoingMail) (string, string, error) {
 	messageID, sendErr := w.Transport.Send(ctx, mail)
 
 	attrs := map[string]any{
@@ -404,7 +419,7 @@ func (s *MailServer) deliver(ctx context.Context, w *MailWiring, userID, source,
 		attrs["message_id"] = messageID
 	}
 
-	attestationID, attestErr := s.attest(w.Records(), w.Actor, userID, predicate, ref, source, attrs)
+	attestationID, attestErr := s.attest(w.store, w.Actor, userID, predicate, ref, source, attrs)
 	if attestErr != nil {
 		// The mail left or failed either way; what is lost is the record of it,
 		// and that is said with everything the record would have held.
@@ -426,7 +441,7 @@ func (s *MailServer) deliver(ctx context.Context, w *MailWiring, userID, source,
 }
 
 // recipient is the address a User's mail goes to, or why there is none.
-func (s *MailServer) recipient(w *MailWiring, userID string) (string, error) {
+func (s *MailServer) recipient(w *mailSending, userID string) (string, error) {
 	u, found, err := w.Recipients(userID)
 	if err != nil {
 		return "", errors.Wrapf(err, "User %s could not be read", userID)
@@ -454,7 +469,7 @@ func sendable(u MailRecipient) error {
 
 // template is what a Send is filled from: QNTX's neutral template when it names
 // none, else the newest the plugin set under that name.
-func (s *MailServer) template(w *MailWiring, plugin, name string) (*protocol.MailTemplate, string, error) {
+func (s *MailServer) template(w *mailSending, plugin, name string) (*protocol.MailTemplate, string, error) {
 	if name == "" {
 		return NeutralTemplate(), NeutralTemplateName, nil
 	}
@@ -463,7 +478,7 @@ func (s *MailServer) template(w *MailWiring, plugin, name string) (*protocol.Mai
 		return own, name, err
 	}
 	ref := templateRef(plugin, name)
-	kept, found, err := NewestMailTemplate(w.Records(), plugin, name)
+	kept, found, err := NewestMailTemplate(w.store, plugin, name)
 	if err != nil {
 		return nil, ref, err
 	}
