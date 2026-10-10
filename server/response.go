@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -40,7 +41,9 @@ func deliver(w http.ResponseWriter, logger *zap.SugaredLogger, body []byte, what
 // first so it travels the same path as every other failure — a free-form
 // string crossing a boundary is what the axiom forbids.
 func writeError(w http.ResponseWriter, status int, message string) {
-	writeRichError(w, nil, errors.New(message), status)
+	// A refusal the caller is told is answered, not logged as the node failing;
+	// a body that never reaches them is the node's.
+	sendEnvelope(w, logger.Logger, newErrorEnvelope("", errors.New(message)), status)
 }
 
 // writeRichError writes a rich error response with details.
@@ -56,23 +59,26 @@ func writeRichError(w http.ResponseWriter, logger *zap.SugaredLogger, err error,
 func writeErrorEnvelope(w http.ResponseWriter, logger *zap.SugaredLogger, surface string, err error, statusCode int) {
 	envelope := newErrorEnvelope(surface, err)
 
-	if logger != nil {
-		logger.Errorw("Request failed",
-			"error_id", envelope.ID,
-			"surface", surface,
-			"status", statusCode,
-			"error", err,
-			"details", errors.FlattenDetails(err),
-		)
-	}
+	logger.Errorw("Request failed",
+		"error_id", envelope.ID,
+		"surface", surface,
+		"status", statusCode,
+		"error", err,
+		"details", errors.FlattenDetails(err),
+	)
 
+	sendEnvelope(w, logger, envelope, statusCode)
+}
+
+// sendEnvelope puts a failure on the wire. The status is sent before the body,
+// so a body that will not encode is only left to say.
+func sendEnvelope(w http.ResponseWriter, logger *zap.SugaredLogger, envelope ErrorEnvelope, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-QNTX-Error-Id", envelope.ID)
 	w.WriteHeader(statusCode)
-
-	if encErr := json.NewEncoder(w).Encode(envelope); encErr != nil && logger != nil {
+	if err := json.NewEncoder(w).Encode(envelope); err != nil {
 		logger.Errorw("Failed to encode error response",
-			"error_id", envelope.ID, "error", encErr)
+			"error_id", envelope.ID, "status", statusCode, "error", err)
 	}
 }
 
