@@ -29,9 +29,6 @@ type ffiAttestation struct {
 }
 
 func toRustJSON(as *types.As) ([]byte, error) {
-	if as == nil {
-		return nil, errors.New("attestation is nil")
-	}
 	return json.Marshal(ffiAttestation{
 		ID:         as.ID,
 		Subjects:   as.Subjects,

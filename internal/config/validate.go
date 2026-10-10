@@ -47,10 +47,11 @@ func (c *Config) Validate() error {
 
 	// Postgres backend requires its connection string, named and not written.
 	if c.Storage.Backend == "postgres" {
-		if c.Storage.Postgres.URL == "" {
-			return errors.New("storage.postgres.url is required when storage.backend = \"postgres\"")
+		named := c.Storage.Postgres.URL
+		if !strings.HasPrefix(named, secretref.SchemeSSM) && !strings.HasPrefix(named, secretref.SchemeEnv) {
+			return errors.Newf("storage.postgres.url must be a %s or %s reference when storage.backend = \"postgres\"", secretref.SchemeSSM, secretref.SchemeEnv)
 		}
-		if err := secretref.Validate(c.Storage.Postgres.URL); err != nil {
+		if err := secretref.Validate(named); err != nil {
 			return errors.Wrap(err, "storage.postgres.url carries the password")
 		}
 	}

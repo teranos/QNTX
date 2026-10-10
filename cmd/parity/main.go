@@ -120,12 +120,12 @@ func Report(root, crateDir string) ([]Thing, error) {
 		return nil, err
 	}
 	pins := filepath.Join(root, filepath.Dir(parity.StorageFile))
-	pinned, err := parity.Pinned(pins, "sqlite")
+	sqlitePin, err := parity.PinOf(pins, "sqlite")
 	if err != nil {
 		return nil, err
 	}
-	if linked != pinned {
-		return nil, errors.Newf("the node links SQLite %s, %s pins %s", linked, pins, pinned)
+	if linked != sqlitePin.Version {
+		return nil, errors.Newf("the node links SQLite %s, %s pins %s", linked, pins, sqlitePin.Version)
 	}
 	duckdbTables, err := DuckDBSchema()
 	if err != nil {
@@ -135,15 +135,15 @@ func Report(root, crateDir string) ([]Thing, error) {
 	if err != nil {
 		return nil, err
 	}
-	pinnedPostgres, err := parity.Pinned(pins, "postgres")
+	postgresPin, err := parity.PinOf(pins, "postgres")
 	if err != nil {
 		return nil, err
 	}
 	// The server says its major and minor, and the pin is Supabase's release
 	// of them: 17.11 is held to 17.11.0.003.
-	served, _, _ = strings.Cut(served, " ")
-	if !strings.HasPrefix(pinnedPostgres+".", served+".") {
-		return nil, errors.Newf("the Postgres make parity ran is %s, %s pins %s", served, pins, pinnedPostgres)
+	served = strings.SplitN(served, " ", 2)[0]
+	if !strings.HasPrefix(postgresPin.Version+".", served+".") {
+		return nil, errors.Newf("the Postgres make parity ran is %s, %s pins %s", served, pins, postgresPin.Version)
 	}
 	// Most of what ats-duckdb keeps is objects under a prefix, not tables
 	// (ADR-024:40-45). Without these the column could only ever describe

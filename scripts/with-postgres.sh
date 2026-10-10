@@ -34,5 +34,5 @@ trap stop EXIT
     exit 1
 }
 
-export QNTX_POSTGRES_URL="host=$dir user=postgres dbname=postgres"
+export QNTX_POSTGRES_URL="host=$dir user=postgres dbname=postgres sslmode=disable"
 "$@"

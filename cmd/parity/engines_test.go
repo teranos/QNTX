@@ -15,10 +15,11 @@ import (
 // ats-duckdb's build.rs gives the rest of the crate the pin itself.
 func TestTheDuckDBCrateIsHeldToItsPin(t *testing.T) {
 	root := filepath.Join("..", "..")
-	pinned, err := parity.Pinned(filepath.Join(root, filepath.Dir(parity.StorageFile)), "duckdb")
+	pin, err := parity.PinOf(filepath.Join(root, filepath.Dir(parity.StorageFile)), "duckdb")
 	if err != nil {
 		t.Fatal(err)
 	}
+	pinned := pin.Version
 
 	path := filepath.Join(root, "crates", "ats-duckdb", "Cargo.toml")
 	body, err := os.ReadFile(path)
@@ -44,10 +45,11 @@ func TestTheDuckDBCrateIsHeldToItsPin(t *testing.T) {
 // is what Nix builds, so the lock is held to the pin.
 func TestTheSupabasePostgresInputIsHeldToItsPin(t *testing.T) {
 	root := filepath.Join("..", "..")
-	pinned, err := parity.PinnedAt(filepath.Join(root, filepath.Dir(parity.StorageFile)), "postgres")
+	pin, err := parity.PinOf(filepath.Join(root, filepath.Dir(parity.StorageFile)), "postgres")
 	if err != nil {
 		t.Fatal(err)
 	}
+	pinned := pin.Rev
 
 	path := filepath.Join(root, "flake.lock")
 	body, err := os.ReadFile(path)

@@ -87,7 +87,7 @@ func TestTheRecordTakesWhatALandingFileSends(t *testing.T) {
 	if n, err := store.CountAttestations(); err != nil || n != 2 {
 		t.Errorf("CountAttestations = %d, %v; want 2", n, err)
 	}
-	since, err := store.GetAttestations(ats.AttestationFilter{TimeStart: &late})
+	since, err := store.GetAttestations(ats.AttestationFilter{TimeStart: &late, Limit: ats.EveryRow})
 	if err != nil {
 		t.Fatalf("GetAttestations: %v", err)
 	}

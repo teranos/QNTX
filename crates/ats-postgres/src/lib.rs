@@ -18,6 +18,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use ats::attestation::Attestation;
 use ats::storage::{AttestationStore, StoreError};
+use postgres::config::SslMode;
 use postgres::error::SqlState;
 use postgres::types::ToSql;
 use postgres::{Client, NoTls, Row};
@@ -31,34 +32,27 @@ type StoreResult<T> = std::result::Result<T, StoreError>;
 /// Every column of an attestation, in the order rows are read.
 const COLUMNS: &str = "id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did";
 
-/// What a filter query asks for. Same JSON shape as ats-duckdb's and
-/// ats-sqlite's, so the Go side builds one filter for any backend.
-#[derive(Debug, Default, Deserialize)]
+/// What a filter query asks for. A field left out does not constrain the
+/// query; a field given constrains it, an empty list to nothing. The limit is
+/// always given: 0 is no rows.
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct QueryFilter {
-    #[serde(default)]
-    pub subjects: Vec<String>,
-    #[serde(default)]
-    pub predicates: Vec<String>,
-    #[serde(default)]
-    pub contexts: Vec<String>,
-    #[serde(default)]
-    pub actors: Vec<String>,
-    #[serde(default)]
-    pub source: String,
-    #[serde(default)]
+    pub subjects: Option<Vec<String>>,
+    pub predicates: Option<Vec<String>>,
+    pub contexts: Option<Vec<String>>,
+    pub actors: Option<Vec<String>>,
+    pub source: Option<String>,
     pub time_start: Option<i64>,
-    #[serde(default)]
     pub time_end: Option<i64>,
-    #[serde(default)]
-    pub limit: i64,
+    pub limit: u32,
 }
 
 /// The schema a namespace's tables live in, quoted. A namespace is held to
 /// lowercase letters, digits, `-` and `_`, so the quoting has nothing to escape.
 pub fn schema(namespace: &str) -> Result<String> {
-    let fits = !namespace.is_empty()
-        && namespace.len() <= 63
+    // A Postgres identifier is 1 to 63 bytes.
+    let fits = (1..=63).contains(&namespace.len())
         && namespace
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_');
@@ -70,34 +64,41 @@ pub fn schema(namespace: &str) -> Result<String> {
     Ok(format!("\"{namespace}\""))
 }
 
-/// Connect to `url`, over TLS against the CA at `ca` when one is named, and in
-/// the clear when none is.
+/// Connect to `url`. The url says whether it is TLS, as libpq's does:
+/// `sslmode=disable` is in the clear, and anything else verifies the server
+/// against the CA at `ca`.
 pub fn connect(url: &str, ca: &str) -> Result<Client> {
-    if ca.is_empty() {
-        return Client::connect(url, NoTls).map_err(|source| PostgresError::Connect { source });
+    let config: postgres::Config = url
+        .parse()
+        .map_err(|source| PostgresError::Connect { source })?;
+    if config.get_ssl_mode() == SslMode::Disable {
+        return config
+            .connect(NoTls)
+            .map_err(|source| PostgresError::Connect { source });
     }
     let pem = std::fs::read(ca).map_err(|source| PostgresError::ReadCa {
         path: ca.to_string(),
         source,
     })?;
-    let mut roots = rustls::RootCertStore::empty();
-    for cert in rustls::pki_types::CertificateDer::pem_slice_iter(&pem) {
-        let cert = cert.map_err(|e| PostgresError::BadCa {
+    let certs = rustls::pki_types::CertificateDer::pem_slice_iter(&pem)
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|e| PostgresError::BadCa {
             path: ca.to_string(),
             why: format!("{e:?}"),
         })?;
+    let Some(_) = certs.first() else {
+        return Err(PostgresError::NoCa {
+            path: ca.to_string(),
+        });
+    };
+    let mut roots = rustls::RootCertStore::empty();
+    for cert in certs {
         roots.add(cert).map_err(|e| PostgresError::BadCa {
             path: ca.to_string(),
             why: e.to_string(),
         })?;
     }
-    if roots.is_empty() {
-        return Err(PostgresError::BadCa {
-            path: ca.to_string(),
-            why: String::new(),
-        });
-    }
-    let config = rustls::ClientConfig::builder_with_provider(Arc::new(
+    let tls_config = rustls::ClientConfig::builder_with_provider(Arc::new(
         rustls::crypto::ring::default_provider(),
     ))
     .with_safe_default_protocol_versions()
@@ -107,8 +108,10 @@ pub fn connect(url: &str, ca: &str) -> Result<Client> {
     })?
     .with_root_certificates(roots)
     .with_no_client_auth();
-    let tls = tokio_postgres_rustls::MakeRustlsConnect::new(config);
-    Client::connect(url, tls).map_err(|source| PostgresError::Connect { source })
+    let tls = tokio_postgres_rustls::MakeRustlsConnect::new(tls_config);
+    config
+        .connect(tls)
+        .map_err(|source| PostgresError::Connect { source })
 }
 
 /// The tables the migrations leave standing in a namespace, applied by this
@@ -133,7 +136,7 @@ pub struct PostgresStore {
 }
 
 fn backend(e: PostgresError) -> StoreError {
-    StoreError::Backend(e.sacred_json(""))
+    StoreError::Backend(e.sacred_json(None))
 }
 
 fn refused(e: postgres::Error) -> StoreError {
@@ -152,12 +155,13 @@ impl PostgresStore {
         })
     }
 
-    fn client(&self) -> MutexGuard<'_, Client> {
-        // A panic while holding the lock leaves a client mid-statement; the
-        // next statement fails on its own if that broke the connection.
-        self.client
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    /// The connection. A call that panicked holding it left it mid-statement,
+    /// so it is refused rather than handed on.
+    fn client(&self) -> StoreResult<MutexGuard<'_, Client>> {
+        match self.client.lock() {
+            Ok(client) => Ok(client),
+            Err(_poisoned) => Err(backend(PostgresError::Poisoned)),
+        }
     }
 
     /// Attestations matching the filter, newest first.
@@ -168,23 +172,20 @@ impl PostgresStore {
             binds.push(value);
             conds.push(cond.replace('?', &format!("${}", binds.len())));
         };
-        if !filter.subjects.is_empty() {
-            bind("subjects && ?::text[]", Box::new(filter.subjects.clone()));
+        if let Some(subjects) = &filter.subjects {
+            bind("subjects && ?::text[]", Box::new(subjects.clone()));
         }
-        if !filter.predicates.is_empty() {
-            bind(
-                "predicates && ?::text[]",
-                Box::new(filter.predicates.clone()),
-            );
+        if let Some(predicates) = &filter.predicates {
+            bind("predicates && ?::text[]", Box::new(predicates.clone()));
         }
-        if !filter.contexts.is_empty() {
-            bind("contexts && ?::text[]", Box::new(filter.contexts.clone()));
+        if let Some(contexts) = &filter.contexts {
+            bind("contexts && ?::text[]", Box::new(contexts.clone()));
         }
-        if !filter.actors.is_empty() {
-            bind("actors && ?::text[]", Box::new(filter.actors.clone()));
+        if let Some(actors) = &filter.actors {
+            bind("actors && ?::text[]", Box::new(actors.clone()));
         }
-        if !filter.source.is_empty() {
-            bind("source = ?", Box::new(filter.source.clone()));
+        if let Some(source) = &filter.source {
+            bind("source = ?", Box::new(source.clone()));
         }
         if let Some(ts) = filter.time_start {
             bind("timestamp >= ?", Box::new(ts));
@@ -193,19 +194,16 @@ impl PostgresStore {
             bind("timestamp <= ?", Box::new(te));
         }
 
-        let mut sql = format!("SELECT {COLUMNS} FROM {}", self.table);
-        if !conds.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&conds.join(" AND "));
+        let mut sql = format!("SELECT {COLUMNS} FROM {} WHERE TRUE", self.table);
+        for cond in &conds {
+            sql.push_str(" AND ");
+            sql.push_str(cond);
         }
-        sql.push_str(" ORDER BY timestamp DESC");
-        if filter.limit > 0 {
-            // limit is a validated integer — inline safely.
-            sql.push_str(&format!(" LIMIT {}", filter.limit));
-        }
+        // limit is a u32 serde already read — inline safely.
+        sql.push_str(&format!(" ORDER BY timestamp DESC LIMIT {}", filter.limit));
 
         let params: Vec<&(dyn ToSql + Sync)> = binds.iter().map(|b| b.as_ref()).collect();
-        let rows = self.client().query(&sql, &params).map_err(refused)?;
+        let rows = self.client()?.query(&sql, &params).map_err(refused)?;
         rows.iter().map(row_to_attestation).collect()
     }
 
@@ -213,7 +211,7 @@ impl PostgresStore {
     /// record already holds is one a send cut short already wrote, so it is
     /// left as it is. The count is the rows of the batch the record now holds.
     pub fn write_batch(&self, attestations: &[Attestation]) -> StoreResult<usize> {
-        let mut client = self.client();
+        let mut client = self.client()?;
         let mut tx = client.transaction().map_err(refused)?;
         let sql = format!(
             "INSERT INTO {} ({COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (id) DO NOTHING",
@@ -230,19 +228,12 @@ impl PostgresStore {
     }
 }
 
-fn attributes_json(attestation: &Attestation) -> StoreResult<Option<String>> {
-    if attestation.attributes.is_empty() {
-        return Ok(None);
-    }
-    serde_json::to_string(&attestation.attributes)
-        .map(Some)
-        .map_err(|e| backend(PostgresError::Serde(e)))
+/// Attributes are written as the JSON they are, `{}` for none.
+fn attributes_json(attestation: &Attestation) -> StoreResult<String> {
+    serde_json::to_string(&attestation.attributes).map_err(|e| backend(PostgresError::Serde(e)))
 }
 
-fn insert_params<'a>(
-    a: &'a Attestation,
-    attributes: &'a Option<String>,
-) -> [&'a (dyn ToSql + Sync); 11] {
+fn insert_params<'a>(a: &'a Attestation, attributes: &'a String) -> [&'a (dyn ToSql + Sync); 11] {
     [
         &a.id,
         &a.subjects,
@@ -259,12 +250,9 @@ fn insert_params<'a>(
 }
 
 fn row_to_attestation(row: &Row) -> StoreResult<Attestation> {
-    let attributes: Option<String> = row.get(7);
-    let attributes = match attributes {
-        Some(json) => serde_json::from_str::<HashMap<String, serde_json::Value>>(&json)
-            .map_err(|e| backend(PostgresError::Serde(e)))?,
-        None => HashMap::new(),
-    };
+    let attributes: String = row.try_get(7).map_err(refused)?;
+    let attributes = serde_json::from_str::<HashMap<String, serde_json::Value>>(&attributes)
+        .map_err(|e| backend(PostgresError::Serde(e)))?;
     Ok(Attestation {
         id: row.get(0),
         subjects: row.get(1),
@@ -288,7 +276,7 @@ impl AttestationStore for PostgresStore {
             self.table
         );
         match self
-            .client()
+            .client()?
             .execute(&sql, &insert_params(&attestation, &attributes))
         {
             Ok(_) => Ok(()),
@@ -301,20 +289,21 @@ impl AttestationStore for PostgresStore {
 
     fn get(&self, id: &str) -> StoreResult<Option<Attestation>> {
         let sql = format!("SELECT {COLUMNS} FROM {} WHERE id = $1", self.table);
-        let row = self.client().query_opt(&sql, &[&id]).map_err(refused)?;
+        let row = self.client()?.query_opt(&sql, &[&id]).map_err(refused)?;
         row.as_ref().map(row_to_attestation).transpose()
     }
 
     fn exists(&self, id: &str) -> StoreResult<bool> {
         let sql = format!("SELECT EXISTS (SELECT 1 FROM {} WHERE id = $1)", self.table);
-        let row = self.client().query_one(&sql, &[&id]).map_err(refused)?;
+        let row = self.client()?.query_one(&sql, &[&id]).map_err(refused)?;
         Ok(row.get(0))
     }
 
     fn delete(&mut self, id: &str) -> StoreResult<bool> {
         let sql = format!("DELETE FROM {} WHERE id = $1", self.table);
-        let rows = self.client().execute(&sql, &[&id]).map_err(refused)?;
-        Ok(rows > 0)
+        let rows = self.client()?.execute(&sql, &[&id]).map_err(refused)?;
+        // id is the primary key, so a delete removes one row or none.
+        Ok(rows == 1)
     }
 
     fn update(&mut self, attestation: Attestation) -> StoreResult<()> {
@@ -324,30 +313,31 @@ impl AttestationStore for PostgresStore {
             self.table
         );
         let rows = self
-            .client()
+            .client()?
             .execute(&sql, &insert_params(&attestation, &attributes))
             .map_err(refused)?;
-        if rows == 0 {
-            return Err(StoreError::NotFound(attestation.id.clone()));
+        // id is the primary key, so an update reaches one row or none.
+        if rows == 1 {
+            return Ok(());
         }
-        Ok(())
+        Err(StoreError::NotFound(attestation.id.clone()))
     }
 
     fn ids(&self) -> StoreResult<Vec<String>> {
         let sql = format!("SELECT id FROM {} ORDER BY id", self.table);
-        let rows = self.client().query(&sql, &[]).map_err(refused)?;
+        let rows = self.client()?.query(&sql, &[]).map_err(refused)?;
         Ok(rows.iter().map(|row| row.get(0)).collect())
     }
 
     fn count(&self) -> StoreResult<usize> {
         let sql = format!("SELECT count(*) FROM {}", self.table);
-        let count: i64 = self.client().query_one(&sql, &[]).map_err(refused)?.get(0);
+        let count: i64 = self.client()?.query_one(&sql, &[]).map_err(refused)?.get(0);
         usize::try_from(count).map_err(|e| StoreError::InvalidData(e.to_string()))
     }
 
     fn clear(&mut self) -> StoreResult<()> {
         let sql = format!("DELETE FROM {}", self.table);
-        self.client().execute(&sql, &[]).map_err(refused)?;
+        self.client()?.execute(&sql, &[]).map_err(refused)?;
         Ok(())
     }
 }
