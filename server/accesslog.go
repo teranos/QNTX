@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // statusRecorder remembers what was written, because a 502 nobody recorded is

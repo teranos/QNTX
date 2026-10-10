@@ -9,7 +9,7 @@ package duckdbcgo
 */
 import "C"
 
-import "github.com/teranos/errors"
+import errors "github.com/teranos/sacred-error"
 
 // SchemaTables is the tables ats-duckdb's migrations leave standing, applied
 // by its own runner in the DuckDB it links.

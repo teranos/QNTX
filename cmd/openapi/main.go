@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/server/reach"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Where the document is written. It lives beside the package that serves it,

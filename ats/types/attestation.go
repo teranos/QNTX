@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/logger"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // As represents an attestation - a verifiable claim about subjects,

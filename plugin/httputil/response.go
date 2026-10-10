@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // WriteJSON writes a JSON response with the given status code. The status is

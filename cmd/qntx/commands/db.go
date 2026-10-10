@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/syscap"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // DbCmd represents the db (database) command

@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

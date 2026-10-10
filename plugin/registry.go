@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

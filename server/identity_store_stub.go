@@ -5,7 +5,7 @@ package server
 import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/nodedid"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // newIdentityStore has no backend to open in this build. A parquet deployment

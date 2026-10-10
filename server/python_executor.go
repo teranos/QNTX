@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // grpcPythonExecutor adapts a gRPC PythonServiceClient to the watcher engine's PythonExecutor interface.

@@ -16,7 +16,7 @@ import (
 	fositeoauth2 "github.com/ory/fosite/handler/oauth2"
 	"github.com/ory/fosite/handler/pkce"
 	enigma "github.com/ory/fosite/token/hmac"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // The authorize endpoint is the homeward journey with a client for a door.

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

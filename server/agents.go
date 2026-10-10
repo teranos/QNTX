@@ -37,7 +37,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/sigil"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // An AGENT line in a namespace says which agent the namespace opted into; its

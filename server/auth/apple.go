@@ -14,7 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // appleIdentityPrefix qualifies the sub in auth.root_identities, for the

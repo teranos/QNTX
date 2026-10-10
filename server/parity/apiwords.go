@@ -6,7 +6,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // A schema that says nothing of its own models may be spoken for by the

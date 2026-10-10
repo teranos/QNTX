@@ -10,7 +10,7 @@ import (
 	elementstorage "github.com/teranos/QNTX/element/storage"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Made is what a namespace is made of.

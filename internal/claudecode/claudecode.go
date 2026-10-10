@@ -14,7 +14,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/server/parity"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // releases is where Anthropic serves Claude Code, a binary per version and

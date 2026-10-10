@@ -7,7 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // openParquetDatabase stub — this binary was built without -tags rustduckdb,

@@ -11,7 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/sqlclose"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // SQLRawStore is a RawAttestationStore over Go's *sql.DB: the attestations

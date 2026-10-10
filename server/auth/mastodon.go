@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 func mastodonAuthorize(ctx context.Context, host, redirectURI string) (string, providerState, error) {

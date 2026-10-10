@@ -64,7 +64,7 @@ logger.Errorw("failed to open the store", "namespace", ns)
 // string that happens to contain an error.
 logger.Errorw("failed to open the store", "error", err.Error())
 
-// The issue groups on the error and carries the stack that github.com/teranos/errors
+// The issue groups on the error and carries the stack that github.com/teranos/sacred-error
 // put on it at the point it was wrapped.
 logger.Errorw("failed to open the store", "namespace", ns, "error", err)
 ```

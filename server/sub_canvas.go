@@ -10,7 +10,7 @@ import (
 	elementstorage "github.com/teranos/QNTX/element/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 type canvasSubsystem struct{}

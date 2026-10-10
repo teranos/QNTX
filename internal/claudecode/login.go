@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/internal/agentenv"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Signing in is Claude Code's own flow, run headless (ADR-048): `claude auth

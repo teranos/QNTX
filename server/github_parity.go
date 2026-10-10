@@ -5,7 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/parity"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // GitHubService (ADR-043) is GitHub's REST API as GitHub describes it: each

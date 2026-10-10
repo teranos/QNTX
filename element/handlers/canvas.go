@@ -16,7 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	elementstorage "github.com/teranos/QNTX/element/storage"
 	"github.com/teranos/QNTX/internal/admission"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

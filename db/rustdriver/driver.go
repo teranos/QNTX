@@ -33,7 +33,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Register registers the "rustsqlite" driver with database/sql.

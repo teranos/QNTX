@@ -4,7 +4,7 @@ package storage
 
 import (
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

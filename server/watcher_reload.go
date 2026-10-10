@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/watcher"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // pendingUpsert captures the post-DB-write state needed for post-reload processing.

@@ -12,7 +12,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Note: Rich string fields are discovered dynamically from type definition attestations.
