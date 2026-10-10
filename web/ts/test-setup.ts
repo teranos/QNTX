@@ -132,6 +132,10 @@ if (USE_JSDOM) {
     // @ts-ignore
     globalThis.CustomEvent = window.CustomEvent;
     // @ts-ignore
+    globalThis.ResizeObserver = window.ResizeObserver;
+    // @ts-ignore
+    globalThis.MouseEvent = window.MouseEvent;
+    // @ts-ignore
     if (!globalThis.CSS) {
         // @ts-ignore
         globalThis.CSS = { escape: (s: string) => s.replace(/([^\w-])/g, '\\$1') };

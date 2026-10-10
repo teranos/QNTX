@@ -439,11 +439,7 @@ export function namespacesField(container: HTMLElement, t: TokenInfo): HTMLEleme
         // tile has a size. The rectangle is placed whenever the tiles are laid
         // out: when they first get a size, and whenever the window changes it.
         const onTheTile = () => place(rectangle, tiles.querySelector<HTMLElement>('.namespace-tile.standing'));
-        if (typeof ResizeObserver !== 'undefined') {
-            new ResizeObserver(onTheTile).observe(tiles);
-        } else {
-            requestAnimationFrame(onTheTile);
-        }
+        new ResizeObserver(onTheTile).observe(tiles);
     }
     return row;
 }
