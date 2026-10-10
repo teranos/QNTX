@@ -356,15 +356,46 @@ export interface ElementDef {
   content_path: string;
   /** CSSPath is an optional HTTP path to a stylesheet for this element type */
   css_path: string;
-  /** DefaultWidth and DefaultHeight in pixels (0 = use system default) */
-  default_width: number;
-  default_height: number;
+  /**
+   * DefaultWidth and DefaultHeight in pixels. "For 'use default', omit the
+   * field."
+   */
+  default_width?: number | undefined;
+  default_height?:
+    | number
+    | undefined;
   /**
    * ModulePath is the HTTP path to a JS/TS module exporting a render function.
    * When set, the frontend dynamically imports it with SDK injection,
    * bypassing the server-rendered HTML pipeline.
    */
   module_path: string;
+}
+
+/**
+ * PluginElement is one element definition a running plugin makes, with where
+ * its content, style and module are served.
+ */
+export interface PluginElement {
+  plugin: string;
+  symbol: string;
+  title: string;
+  label: string;
+  content_url: string;
+  css_url: string;
+  module_url: string;
+  /**
+   * In pixels, when the plugin names one: "For 'use default', omit the
+   * field."
+   */
+  default_width?: number | undefined;
+  default_height?: number | undefined;
+}
+
+/** PluginElements is what plugins elements answers. */
+export interface PluginElements {
+  /** One row per element definition. */
+  elements: PluginElement[];
 }
 
 /**

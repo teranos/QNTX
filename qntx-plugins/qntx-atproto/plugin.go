@@ -28,6 +28,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
+	"google.golang.org/protobuf/proto"
 )
 
 // Plugin is the AT Protocol domain plugin implementation.
@@ -50,7 +51,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "atproto",
-			Version:     "0.4.3",
+			Version:     "0.4.4",
 			QNTXVersion: ">= 0.1.0",
 			Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 			Author:      "QNTX Team",
@@ -330,8 +331,8 @@ func (p *Plugin) RegisterElements() []plugin.ElementDef {
 			Label:         "atproto-feed",
 			ContentPath:   "/feed-element",
 			CSSPath:       "/feed-element.css",
-			DefaultWidth:  500,
-			DefaultHeight: 600,
+			DefaultWidth:  proto.Int32(500),
+			DefaultHeight: proto.Int32(600),
 		},
 	}
 }
