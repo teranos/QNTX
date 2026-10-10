@@ -189,8 +189,21 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	// Set total for progress tracking
 	job.Progress.Total = len(result.Attestations)
 
-	// Create AI client (using frontmatter metadata or payload overrides)
-	client := h.createAIClient(payload, doc)
+	providerName, err := ProviderNamed(payload.Provider)
+	if err != nil {
+		return errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+	}
+	client := provider.NewGRPCLLMClient(h.llmRouter, providerName)
+	// The model asked for: the payload's, else the prompt's own. Neither is the
+	// provider's choice, and the result is then the provider's.
+	model := payload.Model
+	if model == "" {
+		model = doc.Metadata.Model
+	}
+	author := providerName
+	if model != "" {
+		author = model
+	}
 
 	// Process each attestation
 	var results []Result
@@ -223,11 +236,8 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 			UserPrompt:   prompt,
 		}
 
-		// Model (already handled by createAIClient, but set on request for consistency)
-		if payload.Model != "" {
-			chatReq.Model = &payload.Model
-		} else if doc.Metadata.Model != "" {
-			chatReq.Model = &doc.Metadata.Model
+		if model != "" {
+			chatReq.Model = &model
 		}
 
 		// Temperature from frontmatter
@@ -248,8 +258,8 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 			err = errors.Wrapf(err, "LLM call failed for attestation %s", as.ID)
 			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
 			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("Provider: %s", payload.Provider))
-			err = errors.WithDetail(err, fmt.Sprintf("Model: %s", payload.Model))
+			err = errors.WithDetail(err, fmt.Sprintf("Provider: %s", providerName))
+			err = errors.WithDetail(err, fmt.Sprintf("Model: %s", model))
 			err = errors.WithDetail(err, fmt.Sprintf("Duration: %dms", duration.Milliseconds()))
 			err = errors.WithDetail(err, fmt.Sprintf("Processing: %d of %d", i+1, len(result.Attestations)))
 			err = errors.WithDetail(err, fmt.Sprintf("Prompt length: %d chars", len(prompt)))
@@ -271,7 +281,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		)
 
 		// Create result attestation
-		resultAs, err := h.createResultAttestation(&as, resp.Content, payload)
+		resultAs, err := h.createResultAttestation(&as, resp.Content, payload, author)
 		if err != nil {
 			err = errors.Wrapf(err, "failed to create result attestation for %s", as.ID)
 			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
@@ -315,21 +325,17 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	return nil
 }
 
-// createAIClient creates the appropriate AI client based on payload and frontmatter configuration
-// Priority: payload.Provider > config default
-//
-// createAIClient creates an AI client for prompt execution.
-// All LLM providers are gRPC plugins — requires an LLM router on the handler.
-func (h *Handler) createAIClient(payload Payload, doc *PromptDocument) provider.AIClient {
-	providerName := payload.Provider
-	if providerName == "" {
-		providerName = config.GetString("llm.provider")
+// ProviderNamed is the LLM plugin a prompt runs on: the one the caller names,
+// else llm.provider in am.toml. Neither is refused, since a name made up here
+// is a plugin nobody installed.
+func ProviderNamed(named string) (string, error) {
+	if named != "" {
+		return named, nil
 	}
-	if providerName == "" {
-		providerName = "openrouter"
+	if configured := config.GetString("llm.provider"); configured != "" {
+		return configured, nil
 	}
-
-	return provider.NewGRPCLLMClient(h.llmRouter, providerName)
+	return "", errors.New("no LLM provider is named: the prompt names none, and neither does llm.provider in am.toml")
 }
 
 // createResultAttestation creates an attestation from the LLM response
@@ -337,30 +343,19 @@ func (h *Handler) createResultAttestation(
 	sourceAs *types.As,
 	response string,
 	payload Payload,
+	author string,
 ) (*types.As, error) {
 	predicate := payload.ResultPredicate
 	if predicate == "" {
 		predicate = "prompt-result"
 	}
 
+	// The model that answered, or the provider when no model was asked for.
 	actor := payload.ResultActor
 	if actor == "" {
-		// Use model from payload, or fall back to provider name
-		model := payload.Model
-		if model == "" {
-			model = payload.Provider
-		}
-		if model == "" {
-			model = config.GetString("llm.provider")
-		}
-		if model == "" {
-			model = "unknown"
-		}
-
+		actor = author
 		if payload.PromptID != "" {
-			actor = model + "@" + payload.PromptID
-		} else {
-			actor = model
+			actor = author + "@" + payload.PromptID
 		}
 	}
 

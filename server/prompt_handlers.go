@@ -15,7 +15,6 @@ import (
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/types"
-	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 )
@@ -85,18 +84,6 @@ type PromptExecuteResponse struct {
 	Error            string   `json:"error,omitempty"`
 }
 
-// resolveProvider returns the effective AI provider name.
-// Explicit request value takes priority, then llm.provider config, then openrouter default.
-func resolveProvider(explicit string) string {
-	if explicit != "" {
-		return explicit
-	}
-	if configured := appcfg.GetString("llm.provider"); configured != "" {
-		return configured
-	}
-	return "openrouter"
-}
-
 // forwardToProviderPlugin re-encodes the request and forwards it to the named plugin's
 // prompt handler. Returns true if forwarded, false if the provider is local or unknown.
 func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Request, providerName string, body any, endpoint string) bool {
@@ -134,7 +121,12 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if s.forwardToProviderPlugin(w, r, resolveProvider(req.Provider), req, "/prompt/execute") {
+	providerName, err := prompt.ProviderNamed(req.Provider)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if s.forwardToProviderPlugin(w, r, providerName, req, "/prompt/execute") {
 		return
 	}
 
@@ -175,7 +167,7 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	aliasResolver := alias.NewResolver(aliasStore)
 
 	// Create AI client based on request or config
-	client := s.createPromptAIClient(resolveProvider(req.Provider), req.Model)
+	client := s.createPromptAIClient(providerName, req.Model)
 
 	// Execute the prompt using one-shot mode
 	promptResults, err := prompt.ExecuteOneShot(
@@ -239,7 +231,12 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 
 	// If provider matches a running plugin, forward the entire request to it.
 	// The plugin handles frontmatter, attachments, attestations, and the LLM call.
-	if s.forwardToProviderPlugin(w, r, resolveProvider(req.Provider), req, "/prompt/direct") {
+	providerName, err := prompt.ProviderNamed(req.Provider)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if s.forwardToProviderPlugin(w, r, providerName, req, "/prompt/direct") {
 		return
 	}
 
@@ -264,7 +261,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		modelName = doc.Metadata.Model
 	}
 
-	client := s.createAIClient(resolveProvider(req.Provider), modelName, "prompt-direct")
+	client := s.createAIClient(providerName, modelName, "prompt-direct")
 
 	chatReq := s.buildDirectChatRequest(r.Context(), req, promptText, modelName, doc)
 

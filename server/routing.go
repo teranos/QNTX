@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/errors"
@@ -371,7 +372,11 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 // handleLLMWebSocket resolves the active LLM provider and proxies the WebSocket
 // connection to it. The UI connects to /ws/llm without knowing the plugin name.
 func (s *QNTXServer) handleLLMWebSocket(w http.ResponseWriter, r *http.Request) {
-	provider := resolveProvider("")
+	provider, err := prompt.ProviderNamed("")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
 	r.URL.Path = "/ws/" + provider
 	s.handlePluginWebSocket(w, r)
 }
