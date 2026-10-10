@@ -62,7 +62,7 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 
 	// Embed sigmas that were created by Rust FFI (bypassed Go observer).
 	// Without this, sigmas never get embeddings and clusters dissolve on sweep.
-	if sigmasCreated > 0 && h.server.embeddingStore != nil {
+	if sigmasCreated > 0 && h.server.embeddingService != nil {
 		h.embedSigmas()
 	}
 

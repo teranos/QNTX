@@ -13,7 +13,7 @@ import (
 // setupEmbeddingReclusterSchedule registers the recluster handler and auto-creates
 // a Pulse schedule if embeddings.recluster_interval_seconds > 0.
 func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
-	if s.embeddingService == nil || s.embeddingStore == nil {
+	if s.embeddingService == nil {
 		return
 	}
 
@@ -108,7 +108,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 // setupEmbeddingReprojectSchedule registers the reproject handler and auto-creates
 // a Pulse schedule if embeddings.reproject_interval_seconds > 0.
 func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
-	if s.embeddingService == nil || s.embeddingStore == nil {
+	if s.embeddingService == nil {
 		return
 	}
 

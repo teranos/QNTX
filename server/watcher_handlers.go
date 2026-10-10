@@ -313,9 +313,7 @@ func (s *QNTXServer) initWatcherEngine() error {
 	// In that case, init.go reconnects after embedding init.
 	if s.embeddingService != nil {
 		s.watcherEngine.SetEmbeddingService(&watcherEmbeddingAdapter{svc: s.embeddingService})
-		if s.embeddingStore != nil {
-			s.watcherEngine.SetEmbeddingSearcher(&watcherSearchAdapter{store: s.embeddingStore})
-		}
+		s.watcherEngine.SetEmbeddingSearcher(&watcherSearchAdapter{store: s.embeddingStore})
 	}
 
 	// The engine holds the watchers of one universe — Held.Served(), the

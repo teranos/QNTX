@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3309 in 435 files.
+# 3290 in 435 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -14,6 +14,7 @@
 # From 3355: Pulse runs because the node runs, and nothing asks whether the daemon is there.
 # From 3339: a closed store says it is closed, rather than its pointer being nil.
 # From 3323: the node runs with its plugin registry, and nothing asks whether it has one.
+# From 3309: the vectors are the namespace's from boot, and only making them waits for a plugin.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -320,7 +321,7 @@
 3	server/claude_git.go
 4	server/claude_login.go
 9	server/claude_turns.go
-22	server/client.go
+21	server/client.go
 6	server/conversation.go
 1	server/db_performance.go
 17	server/db_stats_cache.go
@@ -328,19 +329,19 @@
 14	server/distill_pulse.go
 8	server/element_config_handlers.go
 10	server/element_module_handlers.go
-8	server/embeddings/cluster_handler.go
-2	server/embeddings/cluster_memberships.go
+7	server/embeddings/cluster_handler.go
+1	server/embeddings/cluster_memberships.go
 23	server/embeddings/clustering.go
-9	server/embeddings/clusters.go
+5	server/embeddings/clusters.go
 2	server/embeddings/handler.go
-38	server/embeddings/handlers.go
+32	server/embeddings/handlers.go
 12	server/embeddings/observer.go
 6	server/embeddings/plugin_service.go
-7	server/embeddings/project_handler.go
+6	server/embeddings/project_handler.go
 5	server/embeddings/projection.go
 12	server/embeddings/pulse.go
 4	server/embeddings_handlers.go
-8	server/embeddings_pulse.go
+6	server/embeddings_pulse.go
 4	server/exposure.go
 1	server/files.go
 12	server/github.go
@@ -435,7 +436,7 @@
 3	server/sub_agent.go
 8	server/sub_auth.go
 6	server/sub_canvas.go
-9	server/sub_embedding.go
+7	server/sub_embedding.go
 1	server/sub_plugins.go
 1	server/sub_store_proof.go
 2	server/sub_ticker.go
@@ -448,5 +449,5 @@
 2	server/vault_fill.go
 10	server/vault_send.go
 35	server/watcher_handler.go
-14	server/watcher_handlers.go
+13	server/watcher_handlers.go
 5	server/watcher_reload.go

@@ -10,6 +10,9 @@ func (embeddingSubsystem) Name() string { return "embedding" }
 
 func (embeddingSubsystem) Init(s *QNTXServer) error {
 	s.groundDBPath = s.deps.cfg.GroundDBPath
+	// The vectors are the served namespace's from boot; only the service that
+	// makes them waits for an embedding_provider plugin.
+	s.embeddingStore = s.held.ServedUniverse().Embeddings()
 	s.SetupEmbeddingService()
 
 	// Use the primary rustsqlite connection for reads — the Rust driver
@@ -44,7 +47,7 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 			router.SetService(s.embeddingService)
 		}
 	}
-	if s.embeddingStore != nil && s.servicesManager != nil {
+	if s.servicesManager != nil {
 		if router := s.servicesManager.GetEmbeddingRouter(); router != nil {
 			router.SetStore(s.embeddingStore)
 		}
@@ -53,9 +56,7 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 	// Wire embedding service into watcher engine now that it's available
 	if s.embeddingService != nil && s.watcherEngine != nil {
 		s.watcherEngine.SetEmbeddingService(&watcherEmbeddingAdapter{svc: s.embeddingService})
-		if s.embeddingStore != nil {
-			s.watcherEngine.SetEmbeddingSearcher(&watcherSearchAdapter{store: s.embeddingStore})
-		}
+		s.watcherEngine.SetEmbeddingSearcher(&watcherSearchAdapter{store: s.embeddingStore})
 		if err := s.watcherEngine.ReloadWatchers(); err != nil {
 			s.logger.Errorw("Embedding watchers are not live; they will not fire until QNTX restarts", "error", err)
 		}
