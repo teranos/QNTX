@@ -593,3 +593,160 @@ export interface VaultStates {
    */
   folders: VaultFolderState[];
 }
+
+/** ReachLine is one stored reach line, as it was written. */
+export interface ReachLine {
+  id: string;
+  paths: string[];
+  to: string[];
+  revokes: boolean;
+  by: string;
+  /** RFC 3339, to the nanosecond. */
+  at: string;
+  /** Why the node does not serve this line now, when it does not. */
+  not_served: string;
+}
+
+/**
+ * ReachCompiled is one path the compiled-in table names, and the levels it
+ * opens it to.
+ */
+export interface ReachCompiled {
+  path: string;
+  levels: string[];
+}
+
+/** ReachList is what reach list answers. */
+export interface ReachList {
+  /**
+   * One row per stored line: its id, the paths, who they are opened to,
+   * whether it revokes, who wrote it and when. The latest line about a path
+   * and a role holds, ROOT's first.
+   */
+  lines: ReachLine[];
+  /**
+   * Each path the compiled-in table names, and the levels it opens it to.
+   * Static: no line changes it.
+   */
+  compiled: ReachCompiled[];
+}
+
+/**
+ * RoleLine is one attestation the gate reads, as it was written: the five
+ * slots, when, and who. It is read out loud as X is Y of Z by W.
+ */
+export interface RoleLine {
+  id: string;
+  subjects: string[];
+  predicates: string[];
+  contexts: string[];
+  actors: string[];
+  /**
+   * The writer, the actor the node put first: a token's name when that actor
+   * is a token's DID, otherwise the identity as written. by_token is that
+   * token's id, the way to its element, and empty for a person.
+   */
+  by: string;
+  by_token: string;
+  /** RFC 3339, to the nanosecond. */
+  at: string;
+}
+
+/** RolesList is what roles list answers. */
+export interface RolesList {
+  /**
+   * One row per line: its slots, who wrote it, the token that did if one
+   * did, and when.
+   */
+  lines: RoleLine[];
+  /** How many lines there are. */
+  count: number;
+}
+
+/**
+ * NamespaceDefinition is what a namespace's ns.toml says (ADR-026). The owner
+ * is an identity inside QNTX; the DID that proves you reach it is outside.
+ * Mirrors storage.NamespaceDefinition.
+ */
+export interface NamespaceDefinition {
+  owner: string;
+  enabled: boolean;
+  /** RFC 3339. */
+  created_at: string;
+}
+
+/**
+ * Namespace is one namespace at a storage location, and what namespaces
+ * create answers. Mirrors storage.Namespace.
+ */
+export interface Namespace {
+  /** The namespace. */
+  name: string;
+  /**
+   * Its owner, that it is switched on, and when it was made. Null for one
+   * nobody wrote a ns.toml for: it is real, so it is listed.
+   */
+  definition:
+    | NamespaceDefinition
+    | undefined;
+  /** The kinds it holds: attestations, watchers, schedules, tokens. */
+  kinds: string[];
+}
+
+/**
+ * NamespacesList names the count, so an empty list and a backend that keeps
+ * none are visibly different answers: what namespaces list answers.
+ */
+export interface NamespacesList {
+  /** One row per namespace. */
+  namespaces: Namespace[];
+  /**
+   * How many there are, so none and a backend that keeps none are different
+   * answers.
+   */
+  count: number;
+}
+
+/**
+ * StoredThing is one thing QNTX persists, as make parity read it. Mirrors
+ * parity.Stored.
+ */
+export interface StoredThing {
+  name: string;
+  sqlite: boolean;
+  duckdb: boolean;
+  /** Rebuilt rows cascade from attestations, so a take-in rebuilds them. */
+  rebuilt: boolean;
+  /** The Go files that reach this thing with hand-written SQL. */
+  sites: string[];
+}
+
+/** SignumFollowed is one signum, and the references it can be held to. */
+export interface SignumFollowed {
+  /** The signum, by name. */
+  signum: string;
+  /** The references it declares it follows. */
+  declares: string[];
+  /** The references every signum follows by its shape. */
+  by_shape: string[];
+}
+
+/** ParityFollowed is what parity follows answers. */
+export interface ParityFollowed {
+  /** Every signum the node serves. */
+  signa: SignumFollowed[];
+}
+
+/** ParityStorage is what parity storage answers. */
+export interface ParityStorage {
+  /**
+   * What was read: source, the code this build was made from, and never this
+   * node.
+   */
+  describes: string;
+  /**
+   * One per thing, by name: sqlite, duckdb, rebuilt by a take-in, and the Go
+   * files that reach it with SQL written by hand.
+   */
+  things: StoredThing[];
+}

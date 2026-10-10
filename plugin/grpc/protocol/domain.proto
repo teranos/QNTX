@@ -346,3 +346,140 @@ message PluginAction {
   // The action taken.
   string action = 3;
 }
+
+// SigilReach is who the lines say reaches a sigil over one surface. ROOT
+// reaches everything and is never listed: nothing here, and not anyone, is
+// ROOT only.
+message SigilReach {
+  bool anyone = 1;
+  repeated string levels = 2;
+  repeated string roles = 3;
+}
+
+// SigilRow is one sigil a plugin handed the node, as the plugin panel draws it:
+// what it is, and who reaches it over each surface.
+message SigilRow {
+  string signum = 1;
+  string sigil = 2;
+  string tool = 3;
+  string method = 4;
+  string path = 5;
+  string does = 6;
+  repeated Param takes = 7;
+  repeated Field gives = 8;
+  // Per surface: http, mcp and a2a.
+  map<string, SigilReach> reach = 9;
+}
+
+// PluginInfo is one plugin plugins list knows.
+message PluginInfo {
+  string name = 1;
+  string version = 2;
+  string qntx_version = 3;
+  string description = 4;
+  string author = 5;
+  string license = 6;
+  bool healthy = 7;
+  // Whether the last probe saw this plugin. Unprobed is not unhealthy: it
+  // started after the probe was taken.
+  bool probed = 8;
+  string message = 9;
+  // What the plugin's health said besides, as it crossed gRPC.
+  map<string, string> details = 10;
+  string state = 11;
+  bool pausable = 12;
+  // Identifies the element module this plugin serves, so the browser can
+  // import a replaced one instead of the module record it already holds for
+  // that URL. Empty for anything not serving a module.
+  string module_digest = 13;
+  // What the plugin does, as the node serves it (ADR-039).
+  repeated SigilRow sigils = 14;
+  // Why a signum it handed is served nowhere.
+  repeated string signa_refused = 15;
+  // The plugin's record: where it was added from, and whether it is switched
+  // on.
+  string repo = 16;
+  bool enabled = 17;
+}
+
+// PluginHealthProbe is when the health in plugins list was probed. Health here
+// is a probe with an age. Saying when it was taken is what keeps a stale answer
+// from reading as a current one.
+message PluginHealthProbe {
+  string probed_at = 1;
+  // How old that probe is.
+  double age_ms = 2;
+}
+
+// PluginsList is what plugins list answers.
+message PluginsList {
+  // One row per plugin.
+  repeated PluginInfo plugins = 1;
+  // When the health in the rows was probed. Null before the first probe.
+  PluginHealthProbe health = 2;
+  // Why the last probe did not complete, when it did not.
+  string health_probe_failure = 3;
+  // Why the node's plugin records did not read, when they did not.
+  string records_failure = 4;
+}
+
+// RouteEndpoint is a core endpoint a plugin's role is asked through.
+message RouteEndpoint {
+  string method = 1;
+  string path = 2;
+  string description = 3;
+}
+
+// PluginRoute is what one running plugin serves.
+message PluginRoute {
+  string name = 1;
+  string http = 2;
+  // Its socket path, when it serves one.
+  string ws = 3;
+  // The roles it plays: llm-provider, search-provider, embedding-provider.
+  repeated string roles = 4;
+  repeated string handlers = 5;
+  uint32 schedules = 6;
+  uint32 watchers = 7;
+  repeated RouteEndpoint endpoints = 8;
+}
+
+// PluginRoutes is what plugins routes answers.
+message PluginRoutes {
+  // One row per running plugin.
+  repeated PluginRoute routes = 1;
+}
+
+// PluginAdded is what plugins add answers.
+message PluginAdded {
+  // The plugin's name.
+  string name = 1;
+  // The repository it was added from.
+  string repo = 2;
+  // An added plugin starts disabled.
+  bool enabled = 3;
+}
+
+// PluginChecked is what plugins check answers.
+message PluginChecked {
+  // The plugin's name.
+  string name = 1;
+  // The repository URL checked.
+  string repo = 2;
+  // The repository as GitHub names it, owner/repo.
+  string repository = 3;
+  // Whether GitHub keeps the repository private.
+  bool private = 4;
+  // The branch the plugin is read from: the tree URL's, or the repository's
+  // default.
+  string ref = 5;
+  // Where in the repository the plugin is. Empty for a plugin that is the
+  // whole repository.
+  string path = 6;
+  // "I expected to also see the plugin README if there is one."
+  string readme = 7;
+  // Where that README is in the repository.
+  string readme_path = 8;
+  // What GitHub answered when no README came back.
+  string readme_said = 9;
+}

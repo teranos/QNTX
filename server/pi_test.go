@@ -46,13 +46,13 @@ func runningPiToo(t *testing.T) (s *QNTXServer, claudeRan, piRan string) {
 	return s, claudeRan, piRan
 }
 
-func sayingToPi(s *QNTXServer, sent sigil.Sent) (map[string]any, *protocol.Refusal) {
+func sayingToPi(s *QNTXServer, sent sigil.Sent) (*protocol.PiSaid, *protocol.Refusal) {
 	asked := httptest.NewRequest(http.MethodPost, "/api/pi/say", nil)
 	answer, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.piHarness(), sent)
 	if refused != nil {
 		return nil, refused
 	}
-	return answer.(map[string]any), nil
+	return answer.(*protocol.PiSaid), nil
 }
 
 // What is said in the Pi element is answered by Pi, which reaches the node's
@@ -63,16 +63,16 @@ func TestWhatIsSaidToPiIsAnsweredByPi(t *testing.T) {
 
 	answer, refused := sayingToPi(s, sigil.Sent{"says": "how long has the box been up?"})
 	require.Nil(t, refused)
-	assert.Equal(t, "Up 3 days.", answer["answer"])
-	assert.Equal(t, false, answer["is_error"])
-	assert.Equal(t, "anthropic/claude-sonnet-4.6", answer["model"])
+	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
+	assert.False(t, answer.GetIsError())
+	assert.Equal(t, "anthropic/claude-sonnet-4.6", answer.GetModel())
 	holds(t, s.harnessSignum(s.piHarness()), "say", answer)
 
 	args := ranWith(t, ran, "0", "args")
 	assert.Equal(t, "json", after(args, "--mode"))
 	assert.Equal(t, "qntx/anthropic/claude-sonnet-4.6", after(args, "--model"))
 	assert.Equal(t, "low", after(args, "--thinking"))
-	assert.Equal(t, answer["session"], after(args, "--session-id"))
+	assert.Equal(t, answer.GetSession(), after(args, "--session-id"))
 	assert.Contains(t, after(args, "--append-system-prompt"), s.rootAgent.did)
 
 	env := ranWith(t, ran, "0", "env")
@@ -100,7 +100,7 @@ func TestClaudeCodeAndPiAreTwoSessionsOfOneAgent(t *testing.T) {
 	require.Nil(t, refused)
 	inPi, refused := sayingToPi(s, sigil.Sent{"says": "how long has the box been up?"})
 	require.Nil(t, refused)
-	assert.NotEqual(t, inClaude["session"], inPi["session"])
+	assert.NotEqual(t, inClaude.GetSession(), inPi.GetSession())
 
 	system, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestPiAnswersWhileClaudeCodeIsInATurn(t *testing.T) {
 
 	answer, refused := sayingToPi(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
-	assert.Equal(t, "Up 3 days.", answer["answer"])
+	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
 }
 
 // piSessionSaid is the agent's session in Pi as pi session reads it.
@@ -162,11 +162,11 @@ func TestPiSaysWhoItIs(t *testing.T) {
 	s, _, _ := runningPiToo(t)
 	is, refused := s.harnessAm(s.piHarness())
 	require.Nil(t, refused)
-	am := is.(map[string]any)
-	assert.Equal(t, s.rootAgent.did, am["did"])
-	assert.Equal(t, "anthropic/claude-sonnet-4.6", am["model"])
-	assert.Equal(t, "openrouter-qntx", am["gateway"])
-	assert.Equal(t, pi.PinnedVersion, am["pi_version"])
+	am := is.(*protocol.PiAm)
+	assert.Equal(t, s.rootAgent.did, am.GetDid())
+	assert.Equal(t, "anthropic/claude-sonnet-4.6", am.GetModel())
+	assert.Equal(t, "openrouter-qntx", am.GetGateway())
+	assert.Equal(t, pi.PinnedVersion, am.GetPiVersion())
 	holds(t, s.harnessSignum(s.piHarness()), "am", am)
 	require.NoError(t, s.harnessSignum(s.piHarness()).Check())
 }

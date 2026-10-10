@@ -247,48 +247,23 @@ func sigilNameOf(path string) string {
 	return string(name)
 }
 
-// sigilRow is one sigil a plugin handed the node, as the plugin panel draws it:
-// what it is, and who reaches it over each surface.
-type sigilRow struct {
-	Signum string             `json:"signum"`
-	Sigil  string             `json:"sigil"`
-	Tool   string             `json:"tool"`
-	Method string             `json:"method"`
-	Path   string             `json:"path"`
-	Does   string             `json:"does"`
-	Takes  []*protocol.Param  `json:"takes"`
-	Gives  []*protocol.Field  `json:"gives"`
-	Reach  map[string]reached `json:"reach"`
-}
-
-// reached is who the lines say reaches a sigil over one surface. ROOT reaches
-// everything and is never listed: nothing here, and not anyone, is ROOT only.
-type reached struct {
-	Anyone bool     `json:"anyone"`
-	Levels []string `json:"levels"`
-	Roles  []string `json:"roles"`
-}
-
 // pluginSigilRows is one plugin's sigils for the panel, asked of the same lines
 // the gate is given, and why any signum it handed is not served.
-func (s *QNTXServer) pluginSigilRows(name string) ([]sigilRow, []string) {
+func (s *QNTXServer) pluginSigilRows(name string) ([]*protocol.SigilRow, []string) {
 	served, refused := s.pluginSignaOf(name)
-	var rows []sigilRow
+	var rows []*protocol.SigilRow
 	for _, signum := range served {
 		for _, held := range signum.GetSigils() {
-			row := sigilRow{
+			row := &protocol.SigilRow{
 				Signum: signum.GetName(), Sigil: held.GetName(), Tool: toolNameOf(signum.GetName(), held),
 				Method: held.GetHttp().GetMethod(), Path: held.GetHttp().GetPath(), Does: held.GetDoes(),
-				Takes: held.GetTakes(), Gives: held.GetGives(), Reach: map[string]reached{},
+				Takes: held.GetTakes(), Gives: held.GetGives(), Reach: map[string]*protocol.SigilReach{},
 			}
 			for _, surface := range []string{reach.OverHTTP, reach.OverMCP, reach.OverA2A} {
 				reaching, anyone := s.reachingOver(surface, heldBy{signum: signum.GetName(), sigil: held})
-				who := reached{Anyone: anyone, Levels: []string{}, Roles: reaching.Roles()}
+				who := &protocol.SigilReach{Anyone: anyone, Roles: reaching.Roles()}
 				for _, level := range reaching.Beyond() {
 					who.Levels = append(who.Levels, string(level))
-				}
-				if who.Roles == nil {
-					who.Roles = []string{}
 				}
 				row.Reach[surface] = who
 			}

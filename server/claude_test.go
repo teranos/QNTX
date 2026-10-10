@@ -141,13 +141,13 @@ func runningTheRootAgent(t *testing.T, named appcfg.RootAgentConfig) (s *QNTXSer
 	return s, ran
 }
 
-func saying(s *QNTXServer, sent sigil.Sent) (map[string]any, *protocol.Refusal) {
+func saying(s *QNTXServer, sent sigil.Sent) (*protocol.ClaudeSaid, *protocol.Refusal) {
 	asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
 	answer, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.claudeHarness(), sent)
 	if refused != nil {
 		return nil, refused
 	}
-	return answer.(map[string]any), nil
+	return answer.(*protocol.ClaudeSaid), nil
 }
 
 var opusLow = appcfg.RootAgentConfig{
@@ -161,11 +161,11 @@ func TestWhatIsSaidToTheRootAgentIsAnsweredByClaudeCode(t *testing.T) {
 
 	answer, refused := saying(s, sigil.Sent{"says": "how long has the box been up?"})
 	require.Nil(t, refused)
-	assert.Equal(t, "Up 3 days.", answer["answer"])
-	assert.Equal(t, false, answer["is_error"])
-	assert.Equal(t, "claude-opus-5-5", answer["model"])
-	assert.Equal(t, "dontAsk", answer["permission_mode"])
-	assert.Equal(t, []string{"Write"}, answer["denied"])
+	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
+	assert.False(t, answer.GetIsError())
+	assert.Equal(t, "claude-opus-5-5", answer.GetModel())
+	assert.Equal(t, "dontAsk", answer.GetPermissionMode())
+	assert.Equal(t, []string{"Write"}, answer.GetDenied())
 	holds(t, s.harnessSignum(s.claudeHarness()), "say", answer)
 
 	args := ranWith(t, ran, "0", "args")
@@ -174,7 +174,7 @@ func TestWhatIsSaidToTheRootAgentIsAnsweredByClaudeCode(t *testing.T) {
 	assert.Equal(t, "low", after(args, "--effort"))
 	assert.Equal(t, "dontAsk", after(args, "--permission-mode"))
 	assert.Equal(t, "Bash,Read,mcp__qntx", after(args, "--allowedTools"))
-	assert.Equal(t, answer["session"], after(args, "--session-id"))
+	assert.Equal(t, answer.GetSession(), after(args, "--session-id"))
 	assert.Contains(t, after(args, "--append-system-prompt"), s.rootAgent.did)
 
 	env := ranWith(t, ran, "0", "env")
@@ -195,9 +195,9 @@ func TestTheRootAgentContinuesItsOneSession(t *testing.T) {
 	second, refused := saying(s, sigil.Sent{"says": "what did I ask you to remember?"})
 	require.Nil(t, refused)
 
-	assert.Equal(t, first["session"], second["session"])
+	assert.Equal(t, first.GetSession(), second.GetSession())
 	again := ranWith(t, ran, "1", "args")
-	assert.Equal(t, first["session"], after(again, "--resume"))
+	assert.Equal(t, first.GetSession(), after(again, "--resume"))
 	assert.NotContains(t, again, "--session-id")
 }
 
@@ -274,7 +274,7 @@ func TestThePermissionModeIsNamedByWhoeverSpeaks(t *testing.T) {
 
 	answer, refused := saying(s, sigil.Sent{"says": "plan it", "permission_mode": "plan"})
 	require.Nil(t, refused)
-	assert.Equal(t, "plan", answer["permission_mode"])
+	assert.Equal(t, "plan", answer.GetPermissionMode())
 	assert.Equal(t, "plan", after(ranWith(t, ran, "0", "args"), "--permission-mode"))
 
 	// am.toml that gives none leaves it to the speaker, and nothing is assumed.
@@ -295,7 +295,9 @@ func TestWhoSpokeToTheRootAgentIsWrittenDown(t *testing.T) {
 
 	answer, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.claudeHarness(), sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
-	session, _ := answer.(map[string]any)["session"].(string)
+	said, held := answer.(*protocol.ClaudeSaid)
+	require.True(t, held)
+	session := said.GetSession()
 
 	told, err := s.held.TheNodesOwnRecords().GetAttestations(ats.AttestationFilter{
 		Contexts: []string{"session:" + session}, Predicates: []string{"UserPromptSubmit"}, Limit: 5})
@@ -353,41 +355,41 @@ func TestTheRootAgentSaysWhoItIs(t *testing.T) {
 
 	before, refused := s.harnessAm(s.claudeHarness())
 	require.Nil(t, refused)
-	is := before.(map[string]any)
-	assert.Equal(t, s.rootAgent.did, is["did"])
-	assert.Equal(t, "claude-opus-5-5", is["model"])
-	assert.Equal(t, "low", is["effort"])
-	assert.Equal(t, "dontAsk", is["permission_mode"])
-	assert.Equal(t, appcfg.PermissionModes, is["permission_modes"])
-	assert.Equal(t, "", is["session"])
+	is := before.(*protocol.ClaudeAm)
+	assert.Equal(t, s.rootAgent.did, is.GetDid())
+	assert.Equal(t, "claude-opus-5-5", is.GetModel())
+	assert.Equal(t, "low", is.GetEffort())
+	assert.Equal(t, "dontAsk", is.GetPermissionMode())
+	assert.Equal(t, appcfg.PermissionModes, is.GetPermissionModes())
+	assert.Equal(t, "", is.GetSession())
 	holds(t, s.harnessSignum(s.claudeHarness()), "am", is)
 
 	answer, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
 	after, refused := s.harnessAm(s.claudeHarness())
 	require.Nil(t, refused)
-	assert.Equal(t, answer["session"], after.(map[string]any)["session"])
+	assert.Equal(t, answer.GetSession(), after.(*protocol.ClaudeAm).GetSession())
 }
 
 // While it is answering, it says so and in which session, so what it is doing
 // can be read as it does it, from the first thing ever said to it.
 func TestTheRootAgentSaysWhenItIsAnswering(t *testing.T) {
 	s, _ := runningTheRootAgent(t, opusLow)
-	am := func() map[string]any {
+	am := func() *protocol.ClaudeAm {
 		is, refused := s.harnessAm(s.claudeHarness())
 		require.Nil(t, refused)
-		return is.(map[string]any)
+		return is.(*protocol.ClaudeAm)
 	}
-	assert.Equal(t, false, am()["answering"])
+	assert.False(t, am().GetAnswering())
 
 	s.rootAgent.in(s.claudeHarness()).answering.Store(&turnInSession{session: "s-first"})
 	during := am()
-	assert.Equal(t, true, during["answering"])
-	assert.Equal(t, "s-first", during["session"])
+	assert.True(t, during.GetAnswering())
+	assert.Equal(t, "s-first", during.GetSession())
 
 	_, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
-	assert.Equal(t, false, am()["answering"], "a turn that ended is still said to be going")
+	assert.False(t, am().GetAnswering(), "a turn that ended is still said to be going")
 }
 
 // Its DID is its own: derived from the node's key, and not the node's.

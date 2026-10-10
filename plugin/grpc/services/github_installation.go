@@ -214,20 +214,11 @@ func (s *GitHubServer) Ask(ctx context.Context, operation string, request []byte
 	return answered, errors.Wrapf(err, "what %s answered did not marshal", operation)
 }
 
-// GitHubOperation is one thing GitHubService can be asked: where it goes on
-// GitHub and the fields it takes, by GitHub's own names for them.
-type GitHubOperation struct {
-	Name   string   `json:"operation"`
-	Method string   `json:"method"`
-	Path   string   `json:"path"`
-	Takes  []string `json:"takes"`
-}
-
 // GitHubOperations is everything GitHubService can be asked, by name.
 // namespace is left out: it is GitHubService's own, and not GitHub's.
-func GitHubOperations() []GitHubOperation {
+func GitHubOperations() []*protocol.GitHubOperation {
 	methods := githubService().Methods()
-	var operations []GitHubOperation
+	operations := []*protocol.GitHubOperation{}
 	for i := 0; i < methods.Len(); i++ {
 		method := methods.Get(i)
 		route, routed := githubRoutes[string(method.Name())]
@@ -241,13 +232,13 @@ func GitHubOperations() []GitHubOperation {
 				takes = append(takes, name)
 			}
 		}
-		operations = append(operations, GitHubOperation{Name: string(method.Name()), Method: route.method, Path: route.path, Takes: takes})
+		operations = append(operations, &protocol.GitHubOperation{Operation: string(method.Name()), Method: route.method, Path: route.path, Takes: takes})
 	}
-	slices.SortFunc(operations, func(a, b GitHubOperation) int {
-		if a.Name < b.Name {
+	slices.SortFunc(operations, func(a, b *protocol.GitHubOperation) int {
+		if a.GetOperation() < b.GetOperation() {
 			return -1
 		}
-		if a.Name > b.Name {
+		if a.GetOperation() > b.GetOperation() {
 			return 1
 		}
 		return 0

@@ -49,47 +49,32 @@ func readGitHubSource(repo string) (gitHubSource, error) {
 	return source, nil
 }
 
-// checkedPlugin is what Check found.
-type checkedPlugin struct {
-	Name       string `json:"name"`
-	Repo       string `json:"repo"`
-	Repository string `json:"repository"`
-	Private    bool   `json:"private"`
-	Ref        string `json:"ref"`
-	Path       string `json:"path,omitempty"`
-	// "I expected to also see the plugin README if there is one."
-	Readme     string `json:"readme,omitempty"`
-	ReadmePath string `json:"readme_path,omitempty"`
-	// ReadmeSaid is what GitHub answered when no README came back.
-	ReadmeSaid string `json:"readme_said,omitempty"`
-}
-
 // checkPlugin asks GitHub, as the node, whether repo is there. Nothing is
 // written, installed or downloaded.
-func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (checkedPlugin, error) {
+func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.PluginChecked, error) {
 	repo = strings.TrimSpace(repo)
 	name := config.PluginNameFromRepo(repo)
 	if name == "" || name == "." || name == "/" {
-		return checkedPlugin{}, errors.Newf("%q names no plugin", repo)
+		return nil, errors.Newf("%q names no plugin", repo)
 	}
 	source, err := readGitHubSource(repo)
 	if err != nil {
-		return checkedPlugin{}, err
+		return nil, err
 	}
 	// The node's own GitHub is system's, named.
 	found, err := s.gitHubService().GetARepository(ctx, &protocol.GitHubGetARepositoryRequest{
 		Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo})
 	if err != nil {
-		return checkedPlugin{}, errors.Wrapf(err, "GitHubService did not answer for %s/%s", source.Owner, source.Repo)
+		return nil, errors.Wrapf(err, "GitHubService did not answer for %s/%s", source.Owner, source.Repo)
 	}
 	if !found.Success {
-		return checkedPlugin{}, errors.Newf("%s/%s: %s", source.Owner, source.Repo, found.Error)
+		return nil, errors.Newf("%s/%s: %s", source.Owner, source.Repo, found.Error)
 	}
 	ref := source.Ref
 	if ref == "" {
 		ref = found.DefaultBranch
 	}
-	checked := checkedPlugin{
+	checked := &protocol.PluginChecked{
 		Name: name, Repo: repo, Repository: found.FullName, Private: found.Private,
 		Ref: ref, Path: source.Path,
 	}
@@ -98,25 +83,25 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (checkedPlugi
 		held, err := s.gitHubService().GetRepositoryContent(ctx, &protocol.GitHubGetRepositoryContentRequest{
 			Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo, Path: source.Path, Ref: ref})
 		if err != nil {
-			return checkedPlugin{}, errors.Wrapf(err, "GitHubService did not answer for %s in %s at %s", source.Path, found.FullName, ref)
+			return nil, errors.Wrapf(err, "GitHubService did not answer for %s in %s at %s", source.Path, found.FullName, ref)
 		}
 		if !held.Success {
-			return checkedPlugin{}, errors.Newf("%s is not in %s at %s: %s", source.Path, found.FullName, ref, held.Error)
+			return nil, errors.Newf("%s is not in %s at %s: %s", source.Path, found.FullName, ref, held.Error)
 		}
 		// A directory answers with its entries; a file answers with itself.
 		if held.Type != "" {
-			return checkedPlugin{}, errors.Newf("%s in %s at %s is a %s, and a plugin is a directory", source.Path, found.FullName, ref, held.Type)
+			return nil, errors.Newf("%s in %s at %s is a %s, and a plugin is a directory", source.Path, found.FullName, ref, held.Type)
 		}
 	}
 
 	readme, err := s.pluginReadme(ctx, source, ref)
 	if err != nil {
-		return checkedPlugin{}, err
+		return nil, err
 	}
 	if readme.Success {
 		text, err := readmeText(readme)
 		if err != nil {
-			return checkedPlugin{}, errors.Wrapf(err, "the README at %s in %s at %s does not read", readme.Path, found.FullName, ref)
+			return nil, errors.Wrapf(err, "the README at %s in %s at %s does not read", readme.Path, found.FullName, ref)
 		}
 		checked.Readme, checked.ReadmePath = text, readme.Path
 	} else {

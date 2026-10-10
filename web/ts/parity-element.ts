@@ -283,7 +283,7 @@ export function createParityElement(): Element {
                 );
             };
 
-            apiJson<Follows[]>('/api/parity/follows').then(rows => {
+            apiJson<{ signa: Follows[] }>('/api/parity/follows').then(({ signa: rows }) => {
                 for (const row of rows) {
                     const option = document.createElement('option');
                     option.value = row.signum;

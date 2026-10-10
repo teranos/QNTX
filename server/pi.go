@@ -7,6 +7,7 @@ import (
 	"github.com/teranos/QNTX/internal/pi"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
+	"google.golang.org/protobuf/proto"
 )
 
 // The ROOT agent in Pi, its other harness (ADR-048).
@@ -24,39 +25,21 @@ func (s *QNTXServer) piHarness() *harness {
 		sayDoes:     "Says something to the ROOT agent in Pi and gives what it answered. It is its session in Pi, beside the one in Claude Code, read with pi session.",
 		amDoes:      "Who the ROOT agent is in Pi and how the node runs it there.",
 		sessionDoes: "The ROOT agent's session in Pi, whole: everything said to it there, as a transcript.",
-		sayGives: []*protocol.Field{
-			{Name: "answer", Says: "What it answered."},
-			{Name: "is_error", Says: "Whether the turn ended in error, in the answer's words."},
-			{Name: "stop", Says: "Why Pi says the turn stopped."},
-			{Name: "session", Says: "The session it was said in."},
-			{Name: "model", Says: "The model that answered."},
-			{Name: "pi_version", Says: "The Pi that ran."},
-			{Name: "cost_usd", Says: "What Pi says the turn's model calls cost."},
-			{Name: "took_ms", Says: "How long the turn took."},
-			{Name: "unwritten", Says: "Why a row of the session was not written down, when one was not."},
-		},
-		amGives: []*protocol.Field{
-			{Name: "did", Says: "Its own DID, which signs what it writes down."},
-			{Name: "model", Says: "The model am.toml names for Pi."},
-			{Name: "thinking", Says: "The thinking level am.toml names for Pi."},
-			{Name: "gateway", Says: "The plugin every model call Pi makes goes through."},
-			{Name: "session", Says: "The session it continues in Pi, or empty before anything was said to it there."},
-			{Name: "answering", Says: "Whether it is in a turn in Pi now."},
-			{Name: "pi", Says: "Where the Pi it runs is, or empty when the node has none yet."},
-			{Name: "pi_version", Says: "The Pi this build pins."},
-			{Name: "not_ready", Says: "Why it cannot be spoken to in Pi, when it cannot."},
-		},
-		named:    func() bool { return named().Named() },
-		absent:   s.thereIsNoPi,
-		pathKey:  "pi",
-		fetching: "Pi is still being built",
-		spec:     func() agentSpec { return agentSpec{} },
+		sayAnswer:   "protocol.PiSaid",
+		amAnswer:    "protocol.PiAm",
+		named:       func() bool { return named().Named() },
+		absent:      s.thereIsNoPi,
+		fetching:    "Pi is still being built",
+		spec:        func() agentSpec { return agentSpec{} },
 		part: func(_ context.Context, _ sigil.Sent, agent *rootAgent, _ agentSpec) (aTurn, *protocol.Refusal) {
 			return s.piPart(named(), agent), nil
 		},
-		am: func(is map[string]any, _ *rootAgent, _ agentSpec) {
+		am: func(is agentIn, _ *rootAgent, _ agentSpec) proto.Message {
 			pin := named()
-			is["model"], is["thinking"], is["gateway"], is["pi_version"] = pin.Model, pin.Thinking, pin.Gateway, pi.PinnedVersion
+			return &protocol.PiAm{
+				Did: is.did, Model: pin.Model, Thinking: pin.Thinking, Gateway: pin.Gateway,
+				Session: is.session, Answering: is.answering, Pi: is.path, PiVersion: pi.PinnedVersion, NotReady: is.notReady,
+			}
 		},
 	}
 }
@@ -81,17 +64,17 @@ func (s *QNTXServer) piPart(named appcfg.PiConfig, agent *rootAgent) aTurn {
 			}
 			return kept, nil
 		},
-		run: func(t turnRun) (map[string]any, error) {
+		run: func(t turnRun) (proto.Message, error) {
 			said := s.piSaid(agent, named, binary, t.session, t.says, t.env)
 			answer, err := said.Run(s.ctx, func(e pi.Event) { t.write(t.writes.rowsOfPi(e, t.now())) })
 			if err != nil {
 				t.write(t.writes.rowsOfPi(pi.Event{Type: "message_end", Message: &pi.Message{Role: "assistant", StopReason: "error", ErrorMessage: err.Error()}}, t.now()))
 				return nil, err
 			}
-			return map[string]any{
-				"answer": answer.Text, "is_error": answer.IsError, "stop": answer.Stop,
-				"session": t.session, "model": answer.Model, "pi_version": pi.PinnedVersion,
-				"cost_usd": answer.CostUSD, "took_ms": answer.Took.Milliseconds(),
+			return &protocol.PiSaid{
+				Answer: answer.Text, IsError: answer.IsError, Stop: answer.Stop,
+				Session: t.session, Model: answer.Model, PiVersion: pi.PinnedVersion,
+				CostUsd: answer.CostUSD, TookMs: float64(answer.Took.Milliseconds()), Unwritten: t.unwritten(),
 			}, nil
 		},
 	}

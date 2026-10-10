@@ -312,7 +312,7 @@
 4	server/builtin_executor.go
 2	server/checkpoint_pulse.go
 29	server/ci_pulse.go
-13	server/claude.go
+11	server/claude.go
 3	server/claude_git.go
 4	server/claude_login.go
 9	server/claude_turns.go
@@ -353,7 +353,7 @@
 28	server/lifecycle.go
 8	server/mail.go
 14	server/mcp.go
-12	server/namespace_handlers.go
+11	server/namespace_handlers.go
 2	server/namespace_run.go
 8	server/namespace_watchers.go
 19	server/namespaces/held.go
@@ -376,12 +376,12 @@
 21	server/plugin_build.go
 8	server/plugin_check.go
 12	server/plugin_config_handlers.go
-10	server/plugin_handlers.go
+8	server/plugin_handlers.go
 2	server/plugin_health_cache.go
 3	server/plugin_log_handlers.go
 4	server/plugin_records.go
 2	server/plugin_roots.go
-25	server/plugin_sigils.go
+24	server/plugin_sigils.go
 1	server/plugin_stores.go
 1	server/pprof.go
 27	server/prompt_handlers.go

@@ -80,11 +80,22 @@ func callerAt(level auth.Level, standing string) context.Context {
 }
 
 // askNamespaces asks one namespaces sigil, as every surface does.
+// askNamespaces asks one sigil as every surface does (sigil.Ask): what it
+// takes is refused before what answers it is asked.
 func askNamespaces(t *testing.T, s *QNTXServer, ctx context.Context, name string, sent sigil.Sent) (any, *protocol.Refusal) {
 	t.Helper()
-	answer, held := s.namespacesSignum().Answers[name]
+	signum := s.namespacesSignum()
+	answer, held := signum.Answers[name]
 	if !held {
 		t.Fatalf("namespaces has no sigil %s", name)
+	}
+	for _, declared := range signum.GetSigils() {
+		if declared.GetName() != name {
+			continue
+		}
+		if refusal := sigil.Refuses(declared, sent); refusal != nil {
+			return nil, refusal
+		}
 	}
 	return answer(ctx, sent)
 }
@@ -308,8 +319,8 @@ func TestRootListsNamespaces(t *testing.T) {
 	if !fake.listed {
 		t.Error("the store was never asked")
 	}
-	if listed := answer.(listNamespacesResponse); listed.Count != 1 {
-		t.Errorf("count = %d, want 1", listed.Count)
+	if listed := answer.(*protocol.NamespacesList); listed.GetCount() != 1 {
+		t.Errorf("count = %d, want 1", listed.GetCount())
 	}
 }
 

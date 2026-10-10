@@ -282,10 +282,6 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 	with := func(params ...*protocol.Param) []*protocol.Param {
 		return append([]*protocol.Param{namespace}, params...)
 	}
-	amGives := append([]*protocol.Field{
-		{Name: "namespace", Says: "The namespace it stands in."},
-		{Name: "set_by", Says: "Who opted the namespace into it."},
-	}, h.amGives...)
 	login := s.loginSigil(h)
 	login.sigil.Takes = with(login.sigil.Takes...)
 	login.sigil.Http = &protocol.Endpoint{Method: http.MethodPost, Path: at + "/login"}
@@ -305,23 +301,23 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 						&protocol.Param{Name: "permission_mode", Required: true, OneOf: appcfg.PermissionModes, Says: "The permission mode it runs in when whoever speaks names none."},
 						&protocol.Param{Name: "allow", Says: "The tools it may use without being asked, by Claude Code's own names, comma-separated."},
 					),
-					Gives: amGives,
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: at},
+					Answer: "protocol.NamespaceAgentAm",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at},
 				},
 				{
-					Name:  "am",
-					Does:  "Who the namespace's agent is and how it runs.",
-					Takes: with(),
-					Gives: amGives,
-					Http:  &protocol.Endpoint{Method: http.MethodGet, Path: at},
+					Name:   "am",
+					Does:   "Who the namespace's agent is and how it runs.",
+					Takes:  with(),
+					Answer: "protocol.NamespaceAgentAm",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: at},
 				},
 				login.sigil,
 				{
-					Name:  "say",
-					Does:  "Says something to the namespace's agent and gives what it answered. One session that continues, shared by everyone who has reach on the namespace, written down in the namespace by the agent as it goes.",
-					Takes: with(append([]*protocol.Param{{Name: "says", Required: true, Says: "What is said to it."}}, h.sayTakes...)...),
-					Gives: h.sayGives,
-					Http:  &protocol.Endpoint{Method: http.MethodPost, Path: at + "/say"},
+					Name:   "say",
+					Does:   "Says something to the namespace's agent and gives what it answered. One session that continues, shared by everyone who has reach on the namespace, written down in the namespace by the agent as it goes.",
+					Takes:  with(append([]*protocol.Param{{Name: "says", Required: true, Says: "What is said to it."}}, h.sayTakes...)...),
+					Answer: h.sayAnswer,
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/say"},
 				},
 				{
 					Name:   "session",
@@ -375,9 +371,11 @@ func (s *QNTXServer) agentsAm(ctx context.Context, sent sigil.Sent) (any, *proto
 	if refused != nil {
 		return nil, refused
 	}
-	is := s.amOf(s.claudeHarness(), held.agent, held.line.spec)
-	is["namespace"], is["set_by"] = held.agent.namespace, held.line.setBy
-	return is, nil
+	am, isClaude := s.amOf(s.claudeHarness(), held.agent, held.line.spec).(*protocol.ClaudeAm)
+	if !isClaude {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the namespace agent in " + held.agent.namespace + " did not answer as Claude Code"}
+	}
+	return &protocol.NamespaceAgentAm{Namespace: held.agent.namespace, SetBy: held.line.setBy, Agent: am}, nil
 }
 
 func (s *QNTXServer) agentsLogin(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {

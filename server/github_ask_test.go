@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/plugin/grpc/services"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 )
 
@@ -74,11 +74,9 @@ func TestGitHubListsItsOperations(t *testing.T) {
 	s, _ := appHoldingServer(t, "write")
 	got, refused := answer(t, s, "operations", sigil.Sent{})
 	require.Nil(t, refused)
-	listed, ok := got.(map[string]any)["operations"].([]services.GitHubOperation)
-	require.True(t, ok)
 	var names []string
-	for _, op := range listed {
-		names = append(names, op.Name)
+	for _, op := range got.(*protocol.GitHubOperations).GetOperations() {
+		names = append(names, op.GetOperation())
 	}
 	assert.Contains(t, names, "CreateAPullRequest")
 	assert.Contains(t, names, "ListWorkflowRunsForARepository")
