@@ -69,6 +69,25 @@ const QuoteRemovedPredicate = "quote:removed"
 // QuoteRemovalHandlerName is the built-in the row above reaches.
 const QuoteRemovalHandlerName = "quote.removal"
 
+// StandingApproval tells the pages that an approval moved: asked, checked,
+// answered, merged or closed (ADR-052). The approvals element reads the lines
+// again; the row announcing one is not what it draws.
+const StandingApproval = "standing-approval"
+
+// The lines an approval is made of, about a pull request by its name
+// (owner/repo#n). One spelling, shared with server/approvals.go.
+const (
+	ApprovalAsked    = "approval:asked"
+	ApprovalChecked  = "approval:checked"
+	ApprovalAnswered = "approval:answered"
+	ApprovalMerged   = "approval:merged"
+	ApprovalClosed   = "approval:closed"
+	ApprovalFailed   = "approval:failed"
+)
+
+// ApprovalPredicates is every one of them, for a read of the whole record.
+var ApprovalPredicates = []string{ApprovalAsked, ApprovalChecked, ApprovalAnswered, ApprovalMerged, ApprovalClosed, ApprovalFailed}
+
 // standing is the table. Unexported and copied on the way out: a caller that
 // could reach the rows could edit what every node is born with.
 var standing = []storage.Watcher{
@@ -126,6 +145,17 @@ var standing = []storage.Watcher{
 		ActionType:        storage.ActionTypeBuiltinExecute,
 		ActionData:        `{"handler_name":"` + QuoteRemovalHandlerName + `"}`,
 		MaxFiresPerSecond: 10,
+		Enabled:           true,
+	},
+	{
+		ID:   StandingApproval,
+		Name: "an approval moved",
+		// The page holds the roll it drew; told, it reads the lines again and
+		// moves what moved. Without this it shows the approvals of when it
+		// opened, until somebody reloads it by hand.
+		Filter:            types.AxFilter{Predicates: ApprovalPredicates},
+		ActionType:        storage.ActionTypeTell,
+		MaxFiresPerSecond: 0,
 		Enabled:           true,
 	},
 }

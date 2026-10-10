@@ -12,6 +12,7 @@ import { describe, test, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { STANDING_ELEMENT_PUBLISHED } from './plugin-provided-elements';
+import { STANDING_APPROVAL } from '../../approvals-standing';
 
 const STANDING_GO = resolve(import.meta.dir, '../../../../ats/watcher/standing.go');
 
@@ -41,5 +42,13 @@ describe('standing watcher ids', () => {
     test('the id is in the table, not only declared beside it', () => {
         const source = readFileSync(STANDING_GO, 'utf8');
         expect(source).toContain('ID:   StandingElementPublished');
+    });
+
+    test('the approvals element routes on the id Go broadcasts an approval under', () => {
+        const source = readFileSync(STANDING_GO, 'utf8');
+        const declared = goConst(source, 'StandingApproval');
+        expect(declared).toBeDefined();
+        expect(STANDING_APPROVAL).toBe(declared!);
+        expect(source).toContain('ID:   StandingApproval');
     });
 });
