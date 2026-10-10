@@ -4,7 +4,7 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // sheet is what QNTX's stylesheets say: the tokens :root sets, and the

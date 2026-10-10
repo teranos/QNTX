@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // The datasets a question is asked of, as the Sentry API names them.

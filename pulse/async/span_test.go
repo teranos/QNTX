@@ -8,7 +8,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ============================================================================

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // tokenNeverEnds is what a mint says for a token that does not end.

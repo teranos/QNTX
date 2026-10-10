@@ -3,7 +3,7 @@ package db
 import (
 	"database/sql"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Undone rolls a transaction back and folds a rollback that itself failed into

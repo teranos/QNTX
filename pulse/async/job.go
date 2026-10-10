@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // JobStatus represents the current state of a job

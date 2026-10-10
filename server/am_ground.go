@@ -13,7 +13,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "THE STARS, QNTX, IT CAN ONLY REALLY TELL YOU ABOUT SOME MINOR THINGS, LIKE HOW MANY TIMES IT WROTE DEFERRED NEW BACK OR ITS OWN UPTIME"

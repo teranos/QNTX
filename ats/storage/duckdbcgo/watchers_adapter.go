@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Watchers presents the parquet watcher store as storage.Watchers, which is

@@ -12,7 +12,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/sentryread"
 	"github.com/teranos/QNTX/plugin/grpc/services"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // The weekly report as a mail (ADR-042): html for the reader, text for a client

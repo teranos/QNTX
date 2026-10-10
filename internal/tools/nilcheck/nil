@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3267 in 434 files.
+# 3261 in 433 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -18,6 +18,7 @@
 # From 3290: the canvas is handed its logger, whatever else it is handed.
 # From 3285: a refusal the caller is told is answered without a nil logger standing for not logging it.
 # From 3283: the services that started are a list, and stopping them is stopping that list.
+# From 3267: the Sacred Error shape went to teranos/sacred-error with its 6, moved and not burned.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -172,7 +173,6 @@
 5	internal/measure/measure.go
 1	internal/nodedid/handlers.go
 13	internal/pi/run.go
-6	internal/sacred/error.go
 2	internal/sacred/group.go
 2	internal/sacred/spawn.go
 7	internal/secretref/secretref.go

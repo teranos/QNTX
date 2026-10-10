@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/teranos/QNTX/internal/slug"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // landingPath is where a namespace's landing file is: beside the operational

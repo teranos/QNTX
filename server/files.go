@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	pb "github.com/teranos/QNTX/element/proto"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // maxUploadSize limits file uploads to 50MB — sized for large PDFs while staying

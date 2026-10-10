@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Site is one place in Go that names a thing in SQL.

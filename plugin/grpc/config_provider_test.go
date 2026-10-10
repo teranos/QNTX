@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

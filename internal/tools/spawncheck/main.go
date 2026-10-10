@@ -29,7 +29,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // skipDirs are not this repository's code to answer for, or are build output.

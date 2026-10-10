@@ -23,7 +23,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/syscap"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // WebSocket timeout constants following Gorilla best practices

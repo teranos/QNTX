@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ErrorContext indicates the environment where parser errors will be displayed

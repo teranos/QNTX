@@ -6,7 +6,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

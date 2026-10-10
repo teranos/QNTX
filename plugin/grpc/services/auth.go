@@ -3,7 +3,7 @@ package services
 import (
 	"crypto/subtle"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ValidateToken performs constant-time comparison of authentication tokens.

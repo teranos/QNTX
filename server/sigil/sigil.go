@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "the tool is equivalent to 1 sigil each"

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/sigil"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Reading where you stand and stepping are two sigils on one path. Before,

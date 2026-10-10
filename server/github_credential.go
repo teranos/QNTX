@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/teranos/QNTX/plugin/grpc/services"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // What carries a push from this node (ADR-048, Its git): a token the node

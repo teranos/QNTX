@@ -12,7 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // readable is the same rule the filter path applies: an attestation is in

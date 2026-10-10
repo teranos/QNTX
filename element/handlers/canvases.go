@@ -10,7 +10,7 @@ import (
 	elementstorage "github.com/teranos/QNTX/element/storage"
 	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/plugin/grpc/services"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "given a namespace there can be multiple canvasses"

@@ -1,9 +1,10 @@
 package async
 
 import (
-	"errors"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
+
+	qntxtest "github.com/teranos/QNTX/internal/testing"
+	errors "github.com/teranos/sacred-error"
 
 	"go.uber.org/zap/zaptest"
 )

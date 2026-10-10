@@ -9,7 +9,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"gopkg.in/yaml.v3"
 )
 

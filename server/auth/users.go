@@ -5,7 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/internal/access"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // What minted a did:key, and the User records, live in internal/access,

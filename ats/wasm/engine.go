@@ -22,7 +22,7 @@ import (
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"sync"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 )

@@ -3,7 +3,7 @@ package storage
 import (
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // A timestamp column that parses itself.

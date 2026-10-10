@@ -11,7 +11,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // SetupEmbeddingService is a no-op — embedding service is provided by plugins.

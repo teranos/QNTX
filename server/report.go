@@ -13,7 +13,7 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // The weekly report (ADR-042): what the node was over the last week, mailed to

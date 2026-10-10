@@ -15,7 +15,7 @@ import (
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 func init() {

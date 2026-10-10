@@ -14,7 +14,7 @@ import (
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/ratelimit"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

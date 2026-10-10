@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 func atprotoConfirm(ctx context.Context, host, identifier, secret string) (account, error) {

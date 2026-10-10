@@ -8,7 +8,7 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/internal/sqlclose"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "given a namespace there can be multiple canvasses"

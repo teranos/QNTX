@@ -14,8 +14,7 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"github.com/teranos/QNTX/internal/sacred"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // readBack parses a record the crate answered with, refusing a field no Go
@@ -52,7 +51,7 @@ func crossed(said *C.char) error {
 		return nil
 	}
 	defer C.duckdb_string_free(said)
-	return sacred.Decode(C.GoString(said))
+	return errors.Decode(C.GoString(said))
 }
 
 // reasonf is crossed with context for a constructor that answered NULL. A
@@ -79,5 +78,5 @@ func failed(said *C.char, format string, args ...any) error {
 	if said == nil {
 		return errors.Newf(format+", and the reason was not recorded", args...)
 	}
-	return errors.Wrapf(sacred.Decode(C.GoString(said)), format, args...)
+	return errors.Wrapf(errors.Decode(C.GoString(said)), format, args...)
 }

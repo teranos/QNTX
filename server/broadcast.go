@@ -19,7 +19,7 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // audience is who a message reaches, named: every client, the clients in one

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // UnimplementedContracts names the things that exist only as a promise: a Go

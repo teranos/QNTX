@@ -9,7 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/wasm"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // parseAxQueryDispatch uses the WASM-compiled ats parser with temporal resolution.

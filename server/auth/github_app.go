@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // githubAppDrift backdates the JWT, as GitHub asks, so a clock behind GitHub's
