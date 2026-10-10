@@ -153,7 +153,7 @@ func (s *QNTXServer) askOperationalStore(p operationalPatience, clock watchClock
 			s.turnAwayHeaviest()
 			s.logger.Errorw("The operational store has not answered for "+p.sentry.String(),
 				"asked_at", asked, "pool", s.operationalPool().String(), "dies_at", p.die,
-				"turned_away", s.turnedAway())
+				"turned_away", s.turnedAway(), "in_the_pool", inThePool())
 		case <-mail:
 			mail = clock.After(p.mailEvery)
 			waited := clock.Now().Sub(asked)
