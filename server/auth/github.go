@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // githubIdentityPrefix qualifies the id in auth.root_identities, for the reason

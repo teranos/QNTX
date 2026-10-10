@@ -31,7 +31,7 @@ import (
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server"
 	"github.com/teranos/QNTX/server/namespaces"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // operationalDBPath is where the parquet backend keeps the tables that are

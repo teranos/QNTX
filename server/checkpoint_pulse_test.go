@@ -7,7 +7,7 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // TestCheckpointWithoutACheckpointerFails is the axiom. A run that cannot do

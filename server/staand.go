@@ -22,7 +22,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/sigil"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // A stand answers on /s/{market}/{slug} (ADR-035): a public pixel that records

@@ -5,7 +5,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // PluginNameFromRepo derives the plugin name from a repo URL: the last path

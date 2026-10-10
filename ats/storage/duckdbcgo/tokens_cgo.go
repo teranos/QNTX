@@ -20,7 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/teranos/QNTX/internal/access"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Defined once in server/auth, where Caller carries a namespace.

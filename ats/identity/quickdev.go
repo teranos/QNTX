@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // QuickDev mints its ids in Go: the prefix keeps what kind of thing an id

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // llmQueue is a priority-aware concurrency limiter.

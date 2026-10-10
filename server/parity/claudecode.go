@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // manifest.json is Anthropic's own for the pinned version: the one place the

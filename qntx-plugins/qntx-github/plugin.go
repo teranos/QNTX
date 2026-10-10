@@ -21,7 +21,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "github",
-			Version:     "0.1.7",
+			Version:     "0.1.8",
 			QNTXVersion: ">= 0.1.0",
 			Description: "GitHub integration for repository events and automation",
 			Author:      "QNTX Team",

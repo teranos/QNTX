@@ -9,7 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Query constants for querying attestations

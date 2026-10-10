@@ -5,7 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/server/openapi"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // openapiServed is the document this node serves: the written one, with this

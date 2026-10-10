@@ -9,7 +9,7 @@ import (
 
 	elementstorage "github.com/teranos/QNTX/element/storage"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "system namespace should have no canvas"

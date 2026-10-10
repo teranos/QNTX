@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // joinPublic is the User somebody makes by walking up to a door.

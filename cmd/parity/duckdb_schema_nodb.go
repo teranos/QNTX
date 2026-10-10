@@ -2,7 +2,7 @@
 
 package main
 
-import "github.com/teranos/errors"
+import errors "github.com/teranos/sacred-error"
 
 // DuckDBSchema needs DuckDB: the tables are what ats-duckdb's runner leaves in
 // the DuckDB the node links, and without the rustduckdb tag this build links

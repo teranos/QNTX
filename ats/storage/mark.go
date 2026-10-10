@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // FileMark is a Mark kept in a file beside the operational db: one RFC3339

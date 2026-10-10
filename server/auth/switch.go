@@ -3,7 +3,7 @@ package auth
 import (
 	"net/http"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "user should be able to disable their acc, but reawaken (enable) it later as well"

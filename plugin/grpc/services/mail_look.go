@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/web"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "it just needs to fit with the rest of qntx"

@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

@@ -21,7 +21,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Opener opens one namespace: everything it holds, named at once. A backend

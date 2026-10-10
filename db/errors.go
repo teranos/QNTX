@@ -3,7 +3,7 @@ package db
 import (
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ErrDatabaseClosed is returned when operations are attempted on a closed database.

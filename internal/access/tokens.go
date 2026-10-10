@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // TokenPrefix marks a raw token as this node's (ADR-025:16).

@@ -4,7 +4,7 @@ import (
 	"crypto/ed25519"
 
 	"github.com/teranos/QNTX/internal/access"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // EncodeDIDKey renders an ed25519 public key as a did:key identifier.

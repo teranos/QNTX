@@ -6,7 +6,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage/duckdbcgo"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // newTokenRecord returns the record behind the access_tokens table (ADR-037):

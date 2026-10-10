@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 func TestOpen(t *testing.T) {
@@ -51,7 +51,7 @@ func TestOpen(t *testing.T) {
 		assert.Nil(t, db)
 
 		// Verify error has stack trace (from errors package)
-		stackTrace := errors.GetStack(err)
+		stackTrace := errors.GetReportableStackTrace(err)
 		assert.NotNil(t, stackTrace, "error should have stack trace from errors.Wrap")
 	})
 

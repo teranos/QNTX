@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // JobHandler defines the interface for executing a specific job type.

@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

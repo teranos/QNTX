@@ -7,7 +7,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/teranos/QNTX/internal/logger"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ConfigWatcher watches config files for changes and triggers reload callbacks

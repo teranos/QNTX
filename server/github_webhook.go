@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/internal/sacred"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // The App's webhook is at a path ROOT sets under githubWebhookPrefix, the one

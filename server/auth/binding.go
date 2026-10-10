@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/internal/access"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // SignedBinding is laye's wire shape (access.SignedBinding).

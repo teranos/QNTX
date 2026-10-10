@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // An OpenAPI description read as a reference: each operation is a model named

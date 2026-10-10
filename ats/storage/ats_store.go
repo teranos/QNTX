@@ -8,7 +8,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // AtsStore is the backend-agnostic wrapper: it takes a RawAttestationStore

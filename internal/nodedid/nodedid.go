@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 
 	"github.com/mr-tron/base58"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

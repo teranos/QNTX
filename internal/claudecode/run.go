@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/agentenv"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Said is one thing said to a session of Claude Code, and how it is run for it.

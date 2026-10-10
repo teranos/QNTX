@@ -3,7 +3,7 @@ package auth
 import (
 	"net/http"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "the Self glyph has a lot about the node itself, but nothing about the User

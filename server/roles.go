@@ -8,7 +8,7 @@ import (
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // mayGrantEvery asks, for every role a grant line names and the one namespace

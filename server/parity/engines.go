@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "We should pin our storage backends in Nix and deal with it through parity

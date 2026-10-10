@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ParseAsCommand parses CLI arguments into an AsCommand. An attestation that

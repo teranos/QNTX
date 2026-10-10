@@ -8,7 +8,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/sigil"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // GitHubService through sigils (ADR-048, Its git): what a plugin asks over

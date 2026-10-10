@@ -10,7 +10,7 @@ import (
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 const (

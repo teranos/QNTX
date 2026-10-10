@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // What git asks of the node (ADR-048, Its git). An agent holds no GitHub

@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Base provides default implementations for common plugin boilerplate.
