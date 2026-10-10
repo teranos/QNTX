@@ -70,7 +70,11 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 	// more, and a warning is the only trace. That is how a weekly job kept
 	// firing after its decorator was deleted, so it fails the setup instead.
 	for _, id := range staleIDs {
-		if _, err := db.Exec(`UPDATE scheduled_pulse_jobs SET state = 'deleted', updated_at = ? WHERE id = ?`, time.Now(), id); err != nil {
+		pruned, err := db.Exec(`UPDATE scheduled_pulse_jobs SET state = 'deleted', updated_at = ? WHERE id = ?`, time.Now(), id)
+		if err != nil {
+			return errors.Wrapf(err, "failed to prune stale schedule %s for plugin %s — it will keep running", id, pluginName)
+		}
+		if err := oneRow(pruned); err != nil {
 			return errors.Wrapf(err, "failed to prune stale schedule %s for plugin %s — it will keep running", id, pluginName)
 		}
 		logger.Infow("Pruned stale plugin schedule", "plugin", pluginName, "schedule_id", id)
@@ -122,13 +126,16 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 					"old_interval", existingInterval,
 					"new_interval", s.IntervalSeconds,
 				)
-				_, err := db.Exec(`
+				updated, err := db.Exec(`
 					UPDATE scheduled_pulse_jobs
 					SET interval_seconds = ?, updated_at = ?
 					WHERE id = ?
 				`, s.IntervalSeconds, time.Now(), existingID)
 				if err != nil {
 					return errors.Wrapf(err, "failed to update schedule interval for handler %s", s.HandlerName)
+				}
+				if err := oneRow(updated); err != nil {
+					return errors.Wrapf(err, "failed to update the interval of schedule %s for handler %s", existingID, s.HandlerName)
 				}
 			} else {
 				logger.Debugw("Schedule already exists with same interval",

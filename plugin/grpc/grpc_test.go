@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/teranos/QNTX/ats/types"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -97,12 +99,18 @@ func (p *mockPlugin) Health(ctx context.Context) pluginpkg.HealthStatus {
 	return p.healthStatus
 }
 
-// mockServiceRegistry for testing
+// mockServiceRegistry for testing. Like the node's, it has a database, which
+// is where a plugin's watchers are written.
 type mockServiceRegistry struct {
 	logger *zap.SugaredLogger
+	db     *sql.DB
 }
 
-func (m *mockServiceRegistry) Database() *sql.DB                           { return nil }
+func newMockServices(t *testing.T, logger *zap.SugaredLogger) *mockServiceRegistry {
+	return &mockServiceRegistry{logger: logger, db: qntxtest.CreateTestDB(t)}
+}
+
+func (m *mockServiceRegistry) Database() *sql.DB                           { return m.db }
 func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger     { return m.logger }
 func (m *mockServiceRegistry) Config(domain string) pluginpkg.Config       { return &mockConfig{} }
 func (m *mockServiceRegistry) ATSStore() ats.AttestationStore              { return nil }
@@ -404,7 +412,7 @@ func TestExternalDomainProxy_Initialize(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 }
@@ -441,7 +449,7 @@ func TestExternalDomainProxy_RegisterHTTP(t *testing.T) {
 	defer proxy.Close()
 
 	// Initialize first to set up HTTP handlers on the server side
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 
@@ -470,7 +478,8 @@ func TestExternalDomainProxy_ImplementsDomainPlugin(t *testing.T) {
 
 func TestRemoteServiceRegistry_Database(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, nil)
+	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, newMockPlugin())
+	require.NoError(t, err)
 
 	// Should return nil and log warning
 	db := registry.Database()
@@ -479,25 +488,33 @@ func TestRemoteServiceRegistry_Database(t *testing.T) {
 
 func TestRemoteServiceRegistry_ATSStore(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, nil)
+	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, newMockPlugin())
+	require.NoError(t, err)
 
-	// Should return nil and log warning
+	// A registry handed no endpoint still hands a store; what it refuses is
+	// each call, which cannot reach the node.
 	store := registry.ATSStore()
-	assert.Nil(t, store)
+	require.NotNil(t, store)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err = store.GenerateAndCreateAttestation(ctx, &types.AsCommand{Subjects: []string{"s"}})
+	assert.Error(t, err)
 }
 
 func TestRemoteServiceRegistry_Queue(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, nil)
+	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, newMockPlugin())
+	require.NoError(t, err)
 
-	// Should return nil and log warning
+	// A registry handed no endpoint still hands a queue, whose calls fail.
 	queue := registry.Queue()
-	assert.Nil(t, queue)
+	require.NotNil(t, queue)
 }
 
 func TestRemoteServiceRegistry_Logger(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, nil)
+	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, newMockPlugin())
+	require.NoError(t, err)
 
 	pluginLogger := registry.Logger("test")
 	assert.NotNil(t, pluginLogger)
@@ -510,7 +527,8 @@ func TestRemoteServiceRegistry_Config(t *testing.T) {
 		"enabled": "true",
 		"count":   "42",
 	}
-	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", config, logger, nil)
+	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", config, logger, newMockPlugin())
+	require.NoError(t, err)
 
 	cfg := registry.Config("test")
 	assert.Equal(t, "value1", cfg.GetString("key1"))
@@ -574,7 +592,7 @@ func TestPluginClientServer_FullIntegration(t *testing.T) {
 	assert.Equal(t, "mock", meta.Name)
 
 	// Test 2: Initialize
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 
@@ -608,7 +626,7 @@ func TestPluginClientServer_HTTPProxying(t *testing.T) {
 	defer proxy.Close()
 
 	// Initialize to set up HTTP handlers
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	proxy.Initialize(context.Background(), services)
 
 	// Create test server with proxy handlers
@@ -945,7 +963,7 @@ func TestPluginServer_WebSocketStreaming(t *testing.T) {
 	defer proxy.Close()
 
 	// Initialize plugin
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 

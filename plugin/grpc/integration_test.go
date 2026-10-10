@@ -61,7 +61,7 @@ func TestCriticalPath_PluginLifecycle(t *testing.T) {
 	proxy := plugins[0]
 
 	// 4. Initialize plugin
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 	assert.True(t, plugin.initCalled)
@@ -115,7 +115,7 @@ func TestCriticalPath_MultiPluginCoordination(t *testing.T) {
 	require.Len(t, plugins, 3)
 
 	// Initialize all
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	for _, p := range plugins {
 		err := p.Initialize(context.Background(), services)
 		require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestCriticalPath_ErrorRecovery(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 
 	// Should fail gracefully
 	err = proxy.Initialize(context.Background(), services)
@@ -183,7 +183,7 @@ func TestConcurrent_MixedOperations(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 
@@ -251,7 +251,7 @@ func TestConcurrent_InitializeRace(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 
 	// Try to initialize concurrently from multiple goroutines
 	const workers = 10
@@ -298,7 +298,7 @@ func TestConcurrent_ShutdownRace(t *testing.T) {
 	proxy, err := NewExternalDomainProxy(addr, logger)
 	require.NoError(t, err)
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	proxy.Initialize(context.Background(), services)
 
 	// Start ongoing operations
@@ -352,7 +352,7 @@ func TestCrash_ServerUnresponsive(t *testing.T) {
 	proxy, err := NewExternalDomainProxy(addr, logger)
 	require.NoError(t, err)
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 
@@ -1014,7 +1014,7 @@ func TestUIPlugin_AuctionElementContent(t *testing.T) {
 	// Create and initialize book plugin
 	bookPlugin := NewBookPlugin()
 	ctx := context.Background()
-	mockServices := &mockServiceRegistry{logger: logger}
+	mockServices := newMockServices(t, logger)
 	err := bookPlugin.Initialize(ctx, mockServices)
 	require.NoError(t, err)
 

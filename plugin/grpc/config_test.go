@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestRemoteConfigWithViper(t *testing.T) {
@@ -119,8 +120,8 @@ func TestRemoteConfigWithViper(t *testing.T) {
 		assert.Equal(t, []string{"single-value"}, rc.GetStringSlice("single"))
 
 		// Empty and nonexistent
-		assert.Nil(t, rc.GetStringSlice("nonexistent"))
-		assert.Nil(t, rc.GetStringSlice("empty")) // Empty string returns nil
+		assert.Empty(t, rc.GetStringSlice("nonexistent"))
+		assert.Empty(t, rc.GetStringSlice("empty")) // A string holding no value holds no list
 	})
 
 	t.Run("Get and Set", func(t *testing.T) {
@@ -239,7 +240,7 @@ func TestRemoteServiceRegistryConfig(t *testing.T) {
 			"port":     "3000",
 		}
 
-		registry := NewRemoteServiceRegistry(
+		registry, err := NewRemoteServiceRegistry(
 			context.Background(),
 			"localhost:50051",
 			"localhost:50052",
@@ -250,9 +251,10 @@ func TestRemoteServiceRegistryConfig(t *testing.T) {
 			"", // search
 			"test-token",
 			configMap,
-			nil, // logger
-			nil, // plugin
+			zap.NewNop().Sugar(),
+			newMockPlugin(),
 		)
+		require.NoError(t, err)
 
 		config := registry.Config("test-domain")
 		require.NotNil(t, config)

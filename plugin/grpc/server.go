@@ -68,50 +68,9 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 		return errors.Wrapf(err, "invalid port in address: %s", addr)
 	}
 
-	const maxAttempts = 64
-	var listener net.Listener
-	var actualPort int
-
-	// Try to bind to a port, incrementing on failure
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		tryPort := startPort + attempt
-		tryAddr := net.JoinHostPort(host, strconv.Itoa(tryPort))
-
-		listener, err = net.Listen("tcp", tryAddr)
-		if err == nil {
-			// Successfully bound to port
-			actualPort = tryPort
-			if attempt > 0 {
-				s.logger.Infow("Port conflict resolved",
-					"requested_port", startPort,
-					"attempts", attempt+1,
-					"actual_port", actualPort)
-			}
-			break
-		}
-
-		// Check if error is "address already in use"
-		if isAddressInUse(err) {
-			if attempt == 0 {
-				s.logger.Warnw("Requested port already in use, trying next port",
-					"requested_port", startPort,
-					"trying_port", tryPort+1)
-			} else if (attempt+1)%10 == 0 {
-				// Log every 10 attempts to avoid spam
-				s.logger.Warnw("Still searching for available port",
-					"requested_port", startPort,
-					"attempts", attempt+1,
-					"trying_port", tryPort+1)
-			}
-			continue
-		}
-
-		// Different error, not port conflict
-		return errors.Wrapf(err, "failed to listen on %s (attempt %d/%d)", tryAddr, attempt+1, maxAttempts)
-	}
-
-	if listener == nil {
-		return errors.Newf("failed to find available port after %d attempts starting from %d", maxAttempts, startPort)
+	listener, actualPort, err := s.listen(host, startPort)
+	if err != nil {
+		return err
 	}
 
 	actualAddr := net.JoinHostPort(host, strconv.Itoa(actualPort))
@@ -153,6 +112,35 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	return nil
 }
 
+// listenAttempts is how many ports listen tries, from the one asked for up.
+const listenAttempts = 64
+
+// listen binds the first port free from startPort up, trying listenAttempts.
+func (s *PluginServer) listen(host string, startPort int) (net.Listener, int, error) {
+	for attempt := 0; attempt < listenAttempts; attempt++ {
+		tryPort := startPort + attempt
+		tryAddr := net.JoinHostPort(host, strconv.Itoa(tryPort))
+
+		listener, err := net.Listen("tcp", tryAddr)
+		if err == nil {
+			if tryPort != startPort {
+				s.logger.Infow("Port conflict resolved",
+					"requested_port", startPort,
+					"attempts", attempt+1,
+					"actual_port", tryPort)
+			}
+			return listener, tryPort, nil
+		}
+
+		// Different error, not port conflict. A port in use is tried past,
+		// and the port it came to is said once it is bound.
+		if !isAddressInUse(err) {
+			return nil, tryPort, errors.Wrapf(err, "failed to listen on %s (attempt %d/%d)", tryAddr, attempt+1, listenAttempts)
+		}
+	}
+	return nil, startPort, errors.Newf("failed to find available port after %d attempts starting from %d", listenAttempts, startPort)
+}
+
 // isAddressInUse checks if the error is due to address already in use.
 func isAddressInUse(err error) bool {
 	if err == nil {
@@ -187,27 +175,20 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		// Create a remote service registry with service endpoints
 		// Pass the context for proper cancellation propagation in gRPC calls
 		// Inject service endpoints into config for direct plugin access
-		pluginConfig := make(map[string]string, len(req.Config)+2)
+		// Each endpoint and the token are handed on as the node handed them.
+		pluginConfig := make(map[string]string, len(req.Config)+4)
 		for k, v := range req.Config {
 			pluginConfig[k] = v
 		}
-		if req.EmbeddingEndpoint != "" {
-			pluginConfig["_embedding_endpoint"] = req.EmbeddingEndpoint
-		}
+		pluginConfig["_embedding_endpoint"] = req.EmbeddingEndpoint
 		// A Go plugin reaches MailService by dialing this with the auth token
 		// (ADR-041), the way qntx-atproto dials the embedding endpoint.
-		if req.MailEndpoint != "" {
-			pluginConfig["_mail_endpoint"] = req.MailEndpoint
-		}
+		pluginConfig["_mail_endpoint"] = req.MailEndpoint
 		// A plugin answering a sigil presents the call's token to the store here.
-		if req.AtsStoreEndpoint != "" {
-			pluginConfig["_ats_store_endpoint"] = req.AtsStoreEndpoint
-		}
-		if req.AuthToken != "" {
-			pluginConfig["_auth_token"] = req.AuthToken
-		}
+		pluginConfig["_ats_store_endpoint"] = req.AtsStoreEndpoint
+		pluginConfig["_auth_token"] = req.AuthToken
 
-		s.services = NewRemoteServiceRegistry(
+		services, err := NewRemoteServiceRegistry(
 			ctx,
 			req.AtsStoreEndpoint,
 			req.QueueEndpoint,
@@ -221,6 +202,11 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 			s.logger,
 			s.plugin, // Pass plugin reference for metadata lookup
 		)
+		if err != nil {
+			s.initErr = errors.Wrapf(err, "plugin %s has no services to reach the node by", s.plugin.Metadata().Name)
+			return
+		}
+		s.services = services
 
 		// Initialize the plugin
 		if err := s.plugin.Initialize(ctx, s.services); err != nil {
@@ -407,7 +393,7 @@ func (s *PluginServer) HandleWebSocket(stream protocol.DomainPluginService_Handl
 				Timestamp: msg.Timestamp,
 			}
 			if err := stream.Send(closeMsg); err != nil {
-				s.logger.Errorw("Failed to send CLOSE message", "error", err)
+				return errors.Wrap(err, "failed to send CLOSE acknowledgment")
 			}
 			return nil
 		}

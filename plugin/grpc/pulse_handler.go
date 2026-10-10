@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
@@ -64,9 +65,6 @@ func (h *PluginProxyHandler) Execute(ctx context.Context, job *async.Job) error 
 
 	// A job a caller's schedule started runs where that caller acted, as them.
 	if job.Namespace != "" {
-		if h.openRun == nil {
-			return errors.Newf("job %s runs in namespace %s and nothing can mint its store token", job.ID, job.Namespace)
-		}
 		token, done, err := h.openRun(job.UserID, job.Namespace)
 		if err != nil {
 			return errors.Wrapf(err, "no store token for job %s in namespace %s", job.ID, job.Namespace)
@@ -83,67 +81,76 @@ func (h *PluginProxyHandler) Execute(ctx context.Context, job *async.Job) error 
 	}
 
 	// Write plugin logs to task_logs table (even on failure)
-	h.writeLogs(job.ID, resp.LogEntries)
+	if err := h.writeLogs(job.ID, resp.LogEntries); err != nil {
+		return errors.Wrapf(err, "the log of job %s (handler %s) was not kept", job.ID, h.handlerName)
+	}
 
-	// Stamp plugin version directly on the DB record.
+	// Stamp plugin version directly on the DB record, as the plugin said it.
 	// Can't rely on the worker to persist this — CompleteJob/FailJob re-fetch from DB,
 	// discarding any in-memory mutations the handler made to the job struct.
-	if resp.PluginVersion != "" {
-		job.PluginVersion = resp.PluginVersion
-		if _, err := h.db.Exec(`UPDATE async_ix_jobs SET plugin_version = ? WHERE id = ?`, resp.PluginVersion, job.ID); err != nil {
-			h.logger.Errorw("Job has no plugin version recorded; which build ran it is now unknowable", "job_id", job.ID, "version", resp.PluginVersion, "error", err)
-		}
+	// A job whose version is not recorded is one where which build ran it is
+	// unknowable, so it fails.
+	job.PluginVersion = resp.PluginVersion
+	stamped, err := h.db.Exec(`UPDATE async_ix_jobs SET plugin_version = ? WHERE id = ?`, resp.PluginVersion, job.ID)
+	if err != nil {
+		return errors.Wrapf(err, "job %s has no plugin version %q recorded", job.ID, resp.PluginVersion)
+	}
+	if err := oneRow(stamped); err != nil {
+		return errors.Wrapf(err, "job %s has no plugin version %q recorded", job.ID, resp.PluginVersion)
 	}
 
 	if !resp.Success {
-		if resp.Error != "" {
-			return errors.Newf("plugin execution error (job=%s, handler=%s): %s", job.ID, h.handlerName, resp.Error)
-		}
-		return errors.Newf("plugin execution failed with no error message (job=%s, handler=%s)", job.ID, h.handlerName)
+		return errors.Newf("plugin execution failed (job=%s, handler=%s): %q", job.ID, h.handlerName, resp.Error)
 	}
 
-	if resp.ProgressTotal > 0 {
-		job.Progress = async.Progress{
-			Current: int(resp.ProgressCurrent),
-			Total:   int(resp.ProgressTotal),
-		}
+	// The progress the plugin said, as it said it.
+	job.Progress = async.Progress{
+		Current: int(resp.ProgressCurrent),
+		Total:   int(resp.ProgressTotal),
 	}
 
 	return nil
 }
 
-// writeLogs persists plugin log entries to the task_logs table.
-func (h *PluginProxyHandler) writeLogs(jobID string, entries []*protocol.JobLogEntry) {
-	if len(entries) == 0 {
-		return
+// oneRow is a write that touched exactly one row, or why it did not.
+func oneRow(result sql.Result) error {
+	n, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "rows written not known")
 	}
+	if n != 1 {
+		return errors.Newf("%d rows written where one was meant", n)
+	}
+	return nil
+}
 
-	for _, entry := range entries {
+// writeLogs persists plugin log entries to the task_logs table, each with
+// the metadata it carried, as it carried it.
+func (h *PluginProxyHandler) writeLogs(jobID string, entries []*protocol.JobLogEntry) error {
+	for i, entry := range entries {
 		// The time a line was said is the plugin's to say. Stamping it with when it
-		// arrived would put it after the job that said it.
+		// arrived would put it after the job that said it. A line saying no
+		// time, or not one in RFC 3339, is not written.
 		ts := entry.Timestamp
-		if ts == "" {
-			h.logger.Errorw("A plugin's job log line says no time, so it is not written to task_logs",
+		said, err := time.Parse(time.RFC3339, ts)
+		if err != nil {
+			h.logger.Errorw("A plugin's job log line says no RFC 3339 time, so it is not written to task_logs",
 				"job_id", jobID, "plugin", h.pluginName, "handler", h.handlerName,
-				"stage", entry.Stage, "level", entry.Level, "message", entry.Message)
+				"timestamp", ts, "stage", entry.Stage, "level", entry.Level, "message", entry.Message,
+				"error", err)
 			continue
 		}
 
-		var metaPtr *string
-		if entry.Metadata != "" {
-			metaPtr = &entry.Metadata
-		}
-
-		_, err := h.db.Exec(
+		written, err := h.db.Exec(
 			`INSERT INTO task_logs (job_id, stage, timestamp, level, message, metadata) VALUES (?, ?, ?, ?, ?, ?)`,
-			jobID, entry.Stage, ts, entry.Level, entry.Message, metaPtr,
+			jobID, entry.Stage, said.Format(time.RFC3339Nano), entry.Level, entry.Message, entry.Metadata,
 		)
 		if err != nil {
-			h.logger.Warnw("Failed to write plugin task log",
-				"job_id", jobID,
-				"handler", h.handlerName,
-				"error", err,
-			)
+			return errors.Wrapf(err, "line %d of job %s (stage %s) not written to task_logs", i, jobID, entry.Stage)
+		}
+		if err := oneRow(written); err != nil {
+			return errors.Wrapf(err, "line %d of job %s (stage %s) not written to task_logs", i, jobID, entry.Stage)
 		}
 	}
+	return nil
 }

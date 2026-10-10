@@ -69,10 +69,8 @@ func (r *RemoteQueue) Enqueue(job *async.Job) error {
 		return errors.Newf("enqueue failed: %s", resp.Error)
 	}
 
-	// Update job with server-assigned ID if provided
-	if resp.JobId != "" {
-		job.ID = resp.JobId
-	}
+	// The queue answers every enqueue it took with the ID it gave the job.
+	job.ID = resp.JobId
 
 	return nil
 }
@@ -91,10 +89,6 @@ func (r *RemoteQueue) GetJob(id string) (*async.Job, error) {
 
 	if !resp.Success {
 		return nil, errors.Newf("get job failed: %s", resp.Error)
-	}
-
-	if resp.Job == nil {
-		return nil, errors.New("job not found")
 	}
 
 	job, err := services.ProtoToJob(resp.Job)
@@ -155,8 +149,7 @@ func (r *RemoteQueue) ListJobs(status *async.JobStatus, limit int) ([]*async.Job
 	for i, protoJob := range resp.Jobs {
 		job, err := services.ProtoToJob(protoJob)
 		if err != nil {
-			r.logger.Warnw("Failed to convert job", "error", err, "index", i)
-			continue
+			return nil, errors.Wrapf(err, "job %s at %d of the list did not convert", protoJob.GetId(), i)
 		}
 		jobs[i] = job
 	}
