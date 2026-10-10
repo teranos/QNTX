@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/teranos/QNTX/internal/sacred"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/errors"
 )
 
@@ -45,6 +47,9 @@ type Turn struct {
 	HandedOn int `json:"handed_on"`
 
 	home string
+	// ended says once the process running it has ended: off its own Wait for
+	// the node that started it, and off the process itself for one taking it up.
+	ended <-chan error
 }
 
 // Apart is how Claude Code is started apart from the node: a unit of its own
@@ -91,8 +96,9 @@ func (s Said) Start(apart Apart) (*Turn, error) {
 	}
 	if apart.systemd {
 		turn.PID, err = turn.startUnit(apart, s.Binary, args, env)
+		turn.ended = exited(turn.PID)
 	} else {
-		turn.PID, err = turn.startProcess(s.Binary, args, env)
+		turn.PID, turn.ended, err = turn.startProcess(s.Binary, args, env)
 	}
 	if err != nil {
 		return nil, err
@@ -116,27 +122,28 @@ func TurnLeftIn(home string) (*Turn, bool, error) {
 	if err := json.Unmarshal(kept, turn); err != nil {
 		return nil, false, errors.Wrapf(err, "the turn left in %s is not one: %s", home, kept)
 	}
+	turn.ended = exited(turn.PID)
 	return turn, true, nil
 }
 
 // Follow reads what the turn prints until it ends, handing on each message not
 // handed on before. ctx ending stops the reading and not the turn, which stays
 // kept for the next node to take up.
-func (t *Turn) Follow(ctx context.Context, each func(Message)) (Answer, error) {
+func (t *Turn) Follow(ctx context.Context, each func(Message)) (_ Answer, err error) {
 	stream, err := os.Open(t.path(streamFile))
 	if err != nil {
 		return Answer{}, errors.Wrap(err, "the turn's stream did not open")
 	}
-	defer func() { stream.Close() }()
+	defer func() { err = sqlclose.With(err, stream.Close(), "the turn's stream") }()
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return Answer{}, errors.Wrap(err, "the turn's stream cannot be watched")
 	}
-	defer func() { watcher.Close() }()
+	defer func() { err = sqlclose.With(err, watcher.Close(), "the watch on the turn's stream") }()
 	if err := watcher.Add(t.path(streamFile)); err != nil {
 		return Answer{}, errors.Wrap(err, "the turn's stream cannot be watched")
 	}
-	gone := exited(t.PID)
+	gone := t.ended
 
 	read := reading{turn: t, each: each}
 	for {
@@ -205,29 +212,37 @@ func (t *Turn) said() string {
 
 // startProcess starts it as a process of its own session, printing to the
 // turn's files: the node's process group ending does not end it.
-func (t *Turn) startProcess(binary string, args, env []string) (int, error) {
+func (t *Turn) startProcess(binary string, args, env []string) (_ int, _ <-chan error, err error) {
 	stdout, err := os.OpenFile(t.path(streamFile), os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		return 0, errors.Wrap(err, "the turn's stream did not open to be written")
+		return 0, nil, errors.Wrap(err, "the turn's stream did not open to be written")
 	}
-	defer func() { stdout.Close() }()
+	defer func() { err = sqlclose.With(err, stdout.Close(), "the node's hold on the turn's stream") }()
 	stderr, err := os.OpenFile(t.path(stderrFile), os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		return 0, errors.Wrap(err, "the turn's stderr did not open to be written")
+		return 0, nil, errors.Wrap(err, "the turn's stderr did not open to be written")
 	}
-	defer func() { stderr.Close() }()
+	defer func() { err = sqlclose.With(err, stderr.Close(), "the node's hold on the turn's stderr") }()
 
 	cmd := exec.Command(binary, args...)
 	cmd.Dir, cmd.Env = filepath.Join(t.home, "work"), env
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
-		return 0, errors.Wrapf(err, "could not start %s", binary)
+		return 0, nil, errors.Wrapf(err, "could not start %s", binary)
 	}
-	// Reaped here while this node runs. A node that starts later is not its
-	// parent, and reads its ending off the process itself.
-	go func() { cmd.Wait() }()
-	return cmd.Process.Pid, nil
+	// Its parent reaps it and is told it ended. How it exited is not how the
+	// turn went: the stream and stderr say that.
+	ended := make(chan error, 1)
+	sacred.Go("claudecode.turn.wait", func() {
+		waitErr := cmd.Wait()
+		var exit *exec.ExitError
+		if errors.As(waitErr, &exit) {
+			waitErr = nil
+		}
+		ended <- errors.Wrapf(waitErr, "the turn's process %d was not waited for", cmd.Process.Pid)
+	})
+	return cmd.Process.Pid, ended, nil
 }
 
 // startUnit starts it as a transient unit of its own. Its environment is

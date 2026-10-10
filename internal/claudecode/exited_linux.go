@@ -3,6 +3,8 @@
 package claudecode
 
 import (
+	"github.com/teranos/QNTX/internal/sacred"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/errors"
 	"golang.org/x/sys/unix"
 )
@@ -20,17 +22,20 @@ func exited(pid int) <-chan error {
 		ended <- errors.Wrapf(err, "process %d cannot be watched", pid)
 		return ended
 	}
-	go func() {
-		defer func() { unix.Close(fd) }()
-		polled := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
-		for {
-			ready, pollErr := unix.Poll(polled, -1)
-			if errors.Is(pollErr, unix.EINTR) || (pollErr == nil && ready < 1) {
-				continue
-			}
-			ended <- errors.Wrapf(pollErr, "process %d stopped being watched", pid)
-			return
-		}
-	}()
+	sacred.Go("claudecode.exited", func() {
+		ended <- sqlclose.With(pollOn(fd, pid), unix.Close(fd), "the pidfd watching the turn's process")
+	})
 	return ended
+}
+
+// pollOn waits for the process fd is the pidfd of to end.
+func pollOn(fd, pid int) error {
+	polled := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
+	for {
+		ready, pollErr := unix.Poll(polled, -1)
+		if errors.Is(pollErr, unix.EINTR) || (pollErr == nil && ready < 1) {
+			continue
+		}
+		return errors.Wrapf(pollErr, "process %d stopped being watched", pid)
+	}
 }
