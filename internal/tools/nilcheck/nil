@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3283 in 434 files.
+# 3267 in 434 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -17,6 +17,7 @@
 # From 3309: the vectors are the namespace's from boot, and only making them waits for a plugin.
 # From 3290: the canvas is handed its logger, whatever else it is handed.
 # From 3285: a refusal the caller is told is answered without a nil logger standing for not logging it.
+# From 3283: the services that started are a list, and stopping them is stopping that list.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -220,7 +221,7 @@
 5	plugin/grpc/services/schedule_server.go
 2	plugin/grpc/services/search_server.go
 10	plugin/grpc/services/vector_search_server.go
-29	plugin/grpc/services_manager.go
+13	plugin/grpc/services_manager.go
 1	plugin/grpc/traffic.go
 11	plugin/grpc/watchers.go
 6	plugin/grpc/websocket_keepalive.go
