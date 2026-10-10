@@ -101,18 +101,36 @@ type MailServer struct {
 	protocol.UnimplementedMailServiceServer
 	authToken       string
 	logger          *zap.SugaredLogger
-	wired           atomic.Pointer[MailWiring]
+	wired           atomic.Pointer[mailWired]
 	versionResolver atomic.Pointer[VersionResolver]
+}
+
+// mailWired is what the service sends with, or why it has nothing yet.
+type mailWired struct {
+	wiring MailWiring
+	err    error // the service not wired yet
 }
 
 // NewMailServer creates the mail service. It sends nothing until Wire.
 func NewMailServer(authToken string, logger *zap.SugaredLogger) *MailServer {
-	return &MailServer{authToken: authToken, logger: logger}
+	s := &MailServer{authToken: authToken, logger: logger}
+	s.wired.Store(&mailWired{err: errors.New("the mail service is not wired yet: the node has not finished starting")})
+	s.SetVersionResolver(noVersions)
+	return s
 }
 
 // Wire hands the service what it sends with.
 func (s *MailServer) Wire(w MailWiring) {
-	s.wired.Store(&w)
+	s.wired.Store(&mailWired{wiring: w})
+}
+
+// wiredWith is what Wire handed the service, or that it has not been yet.
+func (s *MailServer) wiredWith() (*MailWiring, error) {
+	wired := s.wired.Load()
+	if err := wired.err; err != nil {
+		return nil, err
+	}
+	return &wired.wiring, nil
 }
 
 // SetVersionResolver stamps source_version on what the service attests.
@@ -143,9 +161,12 @@ func (s *MailServer) SetTemplate(_ context.Context, req *protocol.SetMailTemplat
 		return refuse(errors.Wrapf(err, "template %s of %s", req.Name, req.Source))
 	}
 
-	w := s.wired.Load()
-	if w == nil || w.Records == nil {
-		return refuse(errors.New("the mail service has nowhere to keep a template yet"))
+	w, err := s.wiredWith()
+	if err != nil {
+		return refuse(errors.Wrap(err, "the mail service has nowhere to keep a template yet"))
+	}
+	if w.Records == nil {
+		return refuse(errors.New("the mail service was wired with nowhere to keep a template"))
 	}
 	store := w.Records()
 	if store == nil {
@@ -325,9 +346,9 @@ func (s *MailServer) ready(userID string) (*MailWiring, string, error) {
 
 // wiring is what a send needs besides the User, or why there is none.
 func (s *MailServer) wiring() (*MailWiring, error) {
-	w := s.wired.Load()
-	if w == nil {
-		return nil, errors.New("the mail service is not wired yet: the node has not finished starting")
+	w, err := s.wiredWith()
+	if err != nil {
+		return nil, err
 	}
 	if w.Transport == nil {
 		return nil, errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml")
@@ -362,20 +383,19 @@ func (s *MailServer) deliver(ctx context.Context, w *MailWiring, userID, source,
 	//
 	// The images are kept whole beside the html that shows them, so the mail
 	// can be shown again as it went out, graphs and all.
-	if len(mail.Inline) > 0 {
-		images := make([]any, 0, len(mail.Inline))
-		for _, img := range mail.Inline {
-			sum := sha256.Sum256(img.Data)
-			images = append(images, map[string]any{
-				"content_id":   img.ContentID,
-				"content_type": img.ContentType,
-				"file_name":    img.FileName,
-				"sha256":       hex.EncodeToString(sum[:]),
-				"data":         base64.StdEncoding.EncodeToString(img.Data),
-			})
-		}
-		attrs["images"] = images
+	// A mail that carried none keeps none.
+	images := make([]any, 0, len(mail.Inline))
+	for _, img := range mail.Inline {
+		sum := sha256.Sum256(img.Data)
+		images = append(images, map[string]any{
+			"content_id":   img.ContentID,
+			"content_type": img.ContentType,
+			"file_name":    img.FileName,
+			"sha256":       hex.EncodeToString(sum[:]),
+			"data":         base64.StdEncoding.EncodeToString(img.Data),
+		})
 	}
+	attrs["images"] = images
 	predicate := PredicateMailSent
 	if sendErr != nil {
 		predicate = PredicateMailFailed
@@ -465,16 +485,17 @@ func NewestMailTemplate(store ats.AttestationStore, plugin, name string) (*proto
 		return nil, false, errors.Wrapf(err, "template %s could not be read", ref)
 	}
 	var newest *types.As
+	found := false
 	for _, as := range kept {
 		// A store may match a subject loosely; a template is its exact name.
 		if !slices.Contains(as.Subjects, ref) {
 			continue
 		}
-		if newest == nil || as.Timestamp.After(newest.Timestamp) {
-			newest = as
+		if !found || as.Timestamp.After(newest.Timestamp) {
+			newest, found = as, true
 		}
 	}
-	if newest == nil {
+	if !found {
 		return nil, false, nil
 	}
 	return TemplateOf(newest), true, nil
@@ -498,10 +519,8 @@ func templateRef(plugin, name string) string {
 
 // stamped adds the version of the plugin a record came from.
 func (s *MailServer) stamped(source string, attrs map[string]any) map[string]any {
-	if resolver := s.versionResolver.Load(); resolver != nil && *resolver != nil {
-		if v := (*resolver)(source); v != "" {
-			attrs["source_version"] = v
-		}
+	if version, known := (*s.versionResolver.Load())(source); known {
+		attrs["source_version"] = version
 	}
 	return attrs
 }

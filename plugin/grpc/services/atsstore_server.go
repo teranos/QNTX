@@ -16,9 +16,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// VersionResolver maps a source name to its running version.
-// Returns "" if the source is unknown.
-type VersionResolver func(source string) string
+// VersionResolver maps a source name to its running version. False is a
+// source the node runs no plugin by.
+type VersionResolver func(source string) (version string, known bool)
+
+// noVersions is the node before it hands its plugin registry over: no source's
+// version is known yet.
+func noVersions(string) (string, bool) { return "", false }
 
 // CallStores is the store of the caller a plugin is answering, by the token the
 // node handed the plugin for that one call. False is no call open under it.
@@ -28,6 +32,14 @@ type CallStores func(token string) (ats.AttestationStore, bool)
 // the node handed that plugin at Initialize (ADR-046). False is no plugin
 // standing under it.
 type PluginStores func(token string) (ats.AttestationStore, bool)
+
+// noCallOpen is the node before it hands its open calls over: it has handed no
+// plugin a call's token yet, so no call is open.
+func noCallOpen(string) (ats.AttestationStore, bool) { return nil, false }
+
+// noPluginStanding is the node before it hands its standing plugins over: it
+// has handed no plugin a token of its own yet, so none stands.
+func noPluginStanding(string) (ats.AttestationStore, bool) { return nil, false }
 
 // ATSStoreServer implements the ATSStoreService gRPC server
 type ATSStoreServer struct {
@@ -50,14 +62,18 @@ type ATSStoreServer struct {
 // NewATSStoreServer creates a new ATS store gRPC server. node is the node's DID.
 func NewATSStoreServer(store ats.AttestationStore, authToken, node string, logger *zap.SugaredLogger) *ATSStoreServer {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &ATSStoreServer{
-		store:        store,
-		authToken:    authToken,
-		node:         node,
-		logger:       logger,
-		streamCtx:    ctx,
-		streamCancel: cancel,
+	s := &ATSStoreServer{
+		store:           store,
+		authToken:       authToken,
+		node:            node,
+		logger:          logger,
+		versionResolver: noVersions,
+		streamCtx:       ctx,
+		streamCancel:    cancel,
 	}
+	s.SetCallStores(noCallOpen)
+	s.SetPluginStores(noPluginStanding)
+	return s
 }
 
 // SetVersionResolver sets the function used to resolve plugin versions from source names.
@@ -79,18 +95,14 @@ func (s *ATSStoreServer) SetPluginStores(plugins PluginStores) {
 // the caller's for a call's token, the namespace a plugin stands in for that
 // plugin's own token, and none for anything else.
 func (s *ATSStoreServer) storeFor(token string) (ats.AttestationStore, error) {
-	if ValidateToken(token, s.authToken) == nil {
+	if err := ValidateToken(token, s.authToken); err == nil {
 		return s.store, nil
 	}
-	if calls := s.calls.Load(); calls != nil {
-		if store, open := (*calls)(token); open {
-			return store, nil
-		}
+	if store, open := (*s.calls.Load())(token); open {
+		return store, nil
 	}
-	if plugins := s.plugins.Load(); plugins != nil {
-		if store, standing := (*plugins)(token); standing {
-			return store, nil
-		}
+	if store, standing := (*s.plugins.Load())(token); standing {
+		return store, nil
 	}
 	return nil, errors.New("invalid authentication token")
 }
@@ -162,15 +174,8 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 		}, nil
 	}
 
-	if req.Command == nil {
-		return &protocol.GenerateAttestationResponse{
-			Success: false,
-			Error:   "command is nil",
-		}, nil
-	}
-
-	// Convert protobuf command to types.AsCommand
-	cmd, err := s.protoToCommand(req.Command)
+	// A request carrying no command names no source, and is refused for it.
+	cmd, err := s.protoToCommand(req.GetCommand())
 	if err != nil {
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
@@ -181,7 +186,7 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 	// Generate and create the attestation
 	as, err := store.GenerateAndCreateAttestation(ctx, cmd)
 	if err != nil {
-		s.logger.Errorw("GenerateAndCreateAttestation failed", "source", req.Command.Source, "error", err)
+		s.logger.Errorw("GenerateAndCreateAttestation failed", "source", cmd.Source, "error", err)
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
 			Error:   fmt.Sprintf("failed to generate attestation: %v", err),
@@ -209,13 +214,6 @@ func (s *ATSStoreServer) BatchGenerateAndCreateAttestations(ctx context.Context,
 		return &protocol.BatchGenerateAttestationResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
-		}, nil
-	}
-
-	if len(req.Commands) == 0 {
-		return &protocol.BatchGenerateAttestationResponse{
-			Success: true,
-			Created: 0,
 		}, nil
 	}
 
@@ -335,8 +333,8 @@ func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequ
 
 	// Check if streams were cancelled (plugin restart in progress)
 	ctx := s.getStreamCtx()
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	filter, err := protoToFilter(req.Filter)
@@ -350,10 +348,10 @@ func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequ
 	}
 
 	// Check again after query — plugin may have been killed while we held the mutex
-	if ctx.Err() != nil {
+	if err := ctx.Err(); err != nil {
 		s.logger.Debugw("Stream cancelled after query, discarding results",
 			"results", len(attestations))
-		return ctx.Err()
+		return err
 	}
 
 	s.logger.Debugw("GetAttestationsStream",
@@ -362,8 +360,8 @@ func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequ
 		"subjects", filter.Subjects)
 
 	for _, as := range attestations {
-		if ctx.Err() != nil {
-			return ctx.Err()
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 		protoAtt, err := protocol.AttestationFromTypes(as)
 		if err != nil {
@@ -378,30 +376,29 @@ func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequ
 }
 
 func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error) {
-	attributes := make(map[string]any)
-	if proto.Attributes != nil {
-		attributes = proto.Attributes.AsMap()
-	}
-
-	timestamp := time.Now()
-	if proto.Timestamp != nil && *proto.Timestamp != 0 {
-		timestamp = time.UnixMilli(*proto.Timestamp)
-	}
-
 	// Source is how an attestation was made: a plugin that does not say is
-	// refused rather than written as some plugin.
-	source := proto.Source
+	// refused rather than written as some plugin. A request that carries no
+	// command says no source either.
+	source := proto.GetSource()
 	if source == "" {
-		return nil, errors.Newf("the command about %v names no source; set source to the plugin's name", proto.Subjects)
+		return nil, errors.Newf("the command about %v names no source; set source to the plugin's name", proto.GetSubjects())
+	}
+
+	// No attributes sent is a command with none: AsMap reads an absent Struct
+	// as no fields.
+	attributes := proto.GetAttributes().AsMap()
+
+	// A timestamp of 0 is the epoch, as said.
+	timestamp := time.Now()
+	if proto.Timestamp != nil {
+		timestamp = time.UnixMilli(*proto.Timestamp)
 	}
 
 	// Stamp source_version: prefer explicit value from proto, fall back to registry lookup
 	if proto.SourceVersion != "" {
 		attributes["source_version"] = proto.SourceVersion
-	} else if s.versionResolver != nil {
-		if v := s.versionResolver(source); v != "" {
-			attributes["source_version"] = v
-		}
+	} else if version, known := s.versionResolver(source); known {
+		attributes["source_version"] = version
 	}
 
 	// "the node"

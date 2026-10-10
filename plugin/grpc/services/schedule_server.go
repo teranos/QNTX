@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"sync/atomic"
@@ -10,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -36,12 +38,18 @@ type ScheduleServer struct {
 
 // NewScheduleServer creates a new schedule gRPC server
 func NewScheduleServer(store *schedule.Store, authToken string, logger *zap.SugaredLogger) *ScheduleServer {
-	return &ScheduleServer{
+	s := &ScheduleServer{
 		store:     store,
 		authToken: authToken,
 		logger:    logger,
 	}
+	s.SetCallers(noCaller)
+	return s
 }
+
+// noCaller is the node before it hands its open calls over: it has handed no
+// plugin a call's token yet, so no call is open.
+func noCaller(string) (Caller, bool) { return Caller{}, false }
 
 // SetCallers hands the server the callers of the calls plugins are answering.
 func (s *ScheduleServer) SetCallers(callers Callers) {
@@ -50,10 +58,7 @@ func (s *ScheduleServer) SetCallers(callers Callers) {
 
 // callerOf is the caller of the open call a store token names.
 func (s *ScheduleServer) callerOf(token string) (Caller, bool) {
-	if callers := s.callers.Load(); callers != nil {
-		return (*callers)(token)
-	}
-	return Caller{}, false
+	return (*s.callers.Load())(token)
 }
 
 // CreateSchedule creates a new recurring schedule in Pulse
@@ -80,8 +85,16 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 
 	// Idempotent: if an active schedule for this handler, made by the same
 	// caller in the same namespace, already exists, return it
+	// The store says none is there by sql.ErrNoRows; any other failure is not
+	// a schedule being absent, and creating one over it would make a second.
 	existing, err := s.store.GetActiveByHandlerName(req.HandlerName, caller.UserID, caller.Namespace)
-	if err == nil && existing != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return &protocol.CreateScheduleResponse{
+			Success: false,
+			Error:   fmt.Sprintf("failed to look for an active schedule of handler %s: %v", req.HandlerName, err),
+		}, nil
+	}
+	if err == nil {
 		s.logger.Debugw("Schedule already exists for handler, returning existing",
 			"schedule_id", existing.Id,
 			"handler", req.HandlerName,

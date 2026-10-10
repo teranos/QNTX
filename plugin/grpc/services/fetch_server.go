@@ -182,10 +182,8 @@ func (s *FetchServer) storeFor(token string) (ats.AttestationStore, error) {
 	if err == nil {
 		return s.store, nil
 	}
-	if plugins := s.plugins.Load(); plugins != nil {
-		if store, standing := (*plugins)(token); standing {
-			return store, nil
-		}
+	if store, standing := (*s.plugins.Load())(token); standing {
+		return store, nil
 	}
 	return nil, err
 }
@@ -210,7 +208,10 @@ func NewFetchServer(store ats.AttestationStore, authToken, node string, cfg appc
 		domainLimiter: newRateLimiter(),
 		globalLimiter: newWindowLimiter(maxReqs, time.Duration(windowSecs)*time.Second),
 		stopPulse:     make(chan struct{}),
+
+		versionResolver: noVersions,
 	}
+	s.SetPluginStores(noPluginStanding)
 	// An interval of 0 is no ticking.
 	if pulseSecs > 0 {
 		go s.pulseLoop(time.Duration(pulseSecs) * time.Second)
@@ -261,8 +262,8 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 		return resp, nil
 	}
 
-	if refusal := s.applyRateLimits(ctx, req.Url); refusal != nil {
-		return refusal, nil
+	if err := s.applyRateLimits(ctx, req.Url); err != nil {
+		return &protocol.FetchResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the refusal travels in the response payload
 	}
 
 	body, statusCode, fetchErr := s.doHTTPGet(ctx, req.Url)
@@ -334,10 +335,9 @@ func (s *FetchServer) dedupLookup(store ats.AttestationStore, req *protocol.Fetc
 	}, true
 }
 
-// applyRateLimits enforces global, domain, and path rate limits.
-// A refusal comes back as the response to send; nil means proceed — the
-// error return this had carried nothing the response did not.
-func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) *protocol.FetchResponse {
+// applyRateLimits enforces global, domain, and path rate limits, and says
+// which limit refused the fetch, and for which target.
+func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) error {
 	// Global window limit — warn at 80% capacity
 	current, max := s.globalLimiter.usage()
 	if current >= max*4/5 {
@@ -351,7 +351,7 @@ func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) *proto
 	waitStart := time.Now()
 	if err := s.globalLimiter.wait(ctx); err != nil {
 		s.logger.Warnw("Fetch dropped: rate limit wait cancelled", "url", rawURL, "error", err)
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("global rate limit wait cancelled: %v", err)}
+		return errors.Wrapf(err, "global rate limit wait cancelled for %s", rawURL)
 	}
 	if waited := time.Since(waitStart); waited > 100*time.Millisecond {
 		s.logger.Warnw("Fetch throttled by global rate limit", "waited", waited.Round(time.Millisecond), "url", rawURL)
@@ -359,18 +359,18 @@ func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) *proto
 
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("invalid URL %s: %v", rawURL, err)}
+		return errors.Wrapf(err, "invalid URL %s", rawURL)
 	}
 
 	// Three limiters, three distinct refusals — a caller reading "rate limit
 	// wait cancelled" must be able to tell which limit and which target.
 	if err := s.domainLimiter.wait(ctx, parsed.Host, 334*time.Millisecond); err != nil {
 		s.logger.Warnw("Fetch dropped: domain rate limit wait cancelled", "url", rawURL, "host", parsed.Host, "error", err)
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("domain rate limit wait cancelled for %s: %v", parsed.Host, err)}
+		return errors.Wrapf(err, "domain rate limit wait cancelled for %s", parsed.Host)
 	}
 	if err := s.pathLimiter.wait(ctx, parsed.Host+parsed.Path, 1*time.Second); err != nil {
 		s.logger.Warnw("Fetch dropped: path rate limit wait cancelled", "url", rawURL, "path", parsed.Host+parsed.Path, "error", err)
-		return &protocol.FetchResponse{Success: false, Error: fmt.Sprintf("path rate limit wait cancelled for %s: %v", parsed.Host+parsed.Path, err)}
+		return errors.Wrapf(err, "path rate limit wait cancelled for %s", parsed.Host+parsed.Path)
 	}
 
 	return nil
@@ -457,10 +457,8 @@ func (s *FetchServer) attestFetchResult(ctx context.Context, store ats.Attestati
 		"response":    string(body),
 		"status_code": statusCode,
 	}
-	if s.versionResolver != nil {
-		if v := s.versionResolver(source); v != "" {
-			attrs["source_version"] = v
-		}
+	if version, known := s.versionResolver(source); known {
+		attrs["source_version"] = version
 	}
 
 	cmd := &types.AsCommand{

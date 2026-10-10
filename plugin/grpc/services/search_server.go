@@ -19,16 +19,23 @@ import (
 type SearchServer struct {
 	protocol.UnimplementedSearchServiceServer
 
-	mu       sync.RWMutex
-	provider protocol.SearchServiceClient
-	name     string // provider name for logging
-	logger   *zap.SugaredLogger
+	mu          sync.RWMutex
+	provider    protocol.SearchServiceClient
+	name        string // provider name for logging
+	providerErr error  // no provider registered
+	logger      *zap.SugaredLogger
+}
+
+// noSearchProvider is the search server with no provider registered.
+func noSearchProvider() error {
+	return status.Error(codes.Unavailable, "no search provider registered")
 }
 
 // NewSearchServer creates a new search routing server. Starts empty — provider registers after init.
 func NewSearchServer(logger *zap.SugaredLogger) *SearchServer {
 	return &SearchServer{
-		logger: logger,
+		providerErr: noSearchProvider(),
+		logger:      logger,
 	}
 }
 
@@ -37,8 +44,7 @@ func (s *SearchServer) RegisterProvider(name string, client protocol.SearchServi
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.provider = client
-	s.name = name
+	s.provider, s.name, s.providerErr = client, name, nil
 	s.logger.Debugw("Search provider registered", "provider", name)
 }
 
@@ -49,8 +55,7 @@ func (s *SearchServer) UnregisterProvider(name string) {
 	defer s.mu.Unlock()
 
 	if s.name == name {
-		s.provider = nil
-		s.name = ""
+		s.clear()
 		s.logger.Debugw("Search provider unregistered", "provider", name)
 	}
 }
@@ -60,15 +65,19 @@ func (s *SearchServer) UnregisterProvider(name string) {
 func (s *SearchServer) ClearProviders() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.provider = nil
-	s.name = ""
+	s.clear()
+}
+
+// clear forgets the provider (must be called with lock held).
+func (s *SearchServer) clear() {
+	s.provider, s.name, s.providerErr = nil, "", noSearchProvider()
 }
 
 // HasProvider returns true if a search provider is registered.
 func (s *SearchServer) HasProvider() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.provider != nil
+	return s.providerErr == nil
 }
 
 // Search routes a search request to the provider plugin.
@@ -136,9 +145,5 @@ func (s *SearchServer) getProvider() (protocol.SearchServiceClient, string, erro
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if s.provider == nil {
-		return nil, "", status.Error(codes.Unavailable, "no search provider registered")
-	}
-
-	return s.provider, s.name, nil
+	return s.provider, s.name, s.providerErr
 }

@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"go.uber.org/zap"
 )
 
 // "the node"
 //
 // authors what a plugin named no actor for: the plugin wrote through it.
 func TestTheNodeAuthorsWhatAPluginNamedNoActorFor(t *testing.T) {
-	s := &ATSStoreServer{node: "did:key:znode"}
+	s := NewATSStoreServer(nil, "", "did:key:znode", zap.NewNop().Sugar())
 
 	cmd, err := s.protoToCommand(&protocol.AttestationCommand{
 		Subjects:   []string{"batch"},
@@ -29,7 +30,7 @@ func TestTheNodeAuthorsWhatAPluginNamedNoActorFor(t *testing.T) {
 // Two actors can make contradictory claims and both are valid, so what a plugin
 // names stands.
 func TestPluginActorIsKeptWhenNamed(t *testing.T) {
-	s := &ATSStoreServer{node: "did:key:znode"}
+	s := NewATSStoreServer(nil, "", "did:key:znode", zap.NewNop().Sugar())
 
 	cmd, err := s.protoToCommand(&protocol.AttestationCommand{
 		Subjects:   []string{"batch"},
