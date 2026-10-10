@@ -509,9 +509,9 @@ type watcherPluginAdapter struct {
 }
 
 func (a *watcherPluginAdapter) ExecutePluginJob(ctx context.Context, pluginName string, handlerName string, payload []byte) ([]byte, error) {
-	pm := a.server.getPluginManager()
-	if pm == nil {
-		return nil, errors.Newf("no plugin manager available, cannot execute plugin %s", pluginName)
+	pm, err := a.server.getPluginManager()
+	if err != nil {
+		return nil, errors.Wrapf(err, "plugin %s handler %s cannot be executed", pluginName, handlerName)
 	}
 
 	dp, ok := pm.GetPlugin(pluginName)
@@ -541,8 +541,8 @@ func (a *watcherPluginAdapter) ExecutePluginJob(ctx context.Context, pluginName 
 }
 
 func (a *watcherPluginAdapter) IsPluginLoaded(pluginName string) bool {
-	pm := a.server.getPluginManager()
-	if pm == nil {
+	pm, err := a.server.getPluginManager()
+	if err != nil {
 		return false
 	}
 	_, ok := pm.GetPlugin(pluginName)

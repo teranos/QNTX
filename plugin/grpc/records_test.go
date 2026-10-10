@@ -54,7 +54,7 @@ func TestAConfigValueOfTheWrongTypeIsSaid(t *testing.T) {
 	SetPluginRecords(heldRecords{"pyre": {Name: "pyre", Config: map[string]string{"poll_interval": "often"}}})
 	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
-	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
+	config := NewConfigProvider(noServices, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
 	assert.Equal(t, 0, config.GetInt("poll_interval"))
 	err := config.(interface{ Err() error }).Err()
 	require.Error(t, err)
@@ -67,7 +67,7 @@ func TestAPluginWhoseRecordIsUnreadableDoesNotInitialize(t *testing.T) {
 	SetPluginRecords(unreadableRecords{})
 	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 	logger := zaptest.NewLogger(t).Sugar()
-	services := plugin.NewServiceRegistry(plugin.NewRegistry("test", logger), nil, logger, nil, NewConfigProvider(nil, nil, logger), nil)
+	services := plugin.NewServiceRegistry(plugin.NewRegistry("test", logger), nil, logger, nil, NewConfigProvider(noServices, nil, logger), nil)
 
 	proxy := &ExternalDomainProxy{metadata: plugin.Metadata{Name: "pyre"}, logger: logger}
 	err := proxy.doInitialize(context.Background(), services)
@@ -81,7 +81,7 @@ func TestAnUnreadableRecordIsSaidWhenConfigIsAsked(t *testing.T) {
 	SetPluginRecords(unreadableRecords{})
 	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
-	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
+	config := NewConfigProvider(noServices, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
 	assert.Empty(t, config.GetKeys())
 	err := config.(interface{ Err() error }).Err()
 	require.Error(t, err)
@@ -93,7 +93,7 @@ func TestAPluginWithNoRecordIsNotHandedAConfig(t *testing.T) {
 	SetPluginRecords(heldRecords{})
 	t.Cleanup(func() { SetPluginRecords(nil) })
 
-	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
+	config := NewConfigProvider(noServices, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
 	assert.Empty(t, config.GetKeys())
 	err := config.(interface{ Err() error }).Err()
 	require.Error(t, err)

@@ -22,9 +22,13 @@ func TestStoppingTheNodeStopsWatchingPlugins(t *testing.T) {
 	testStore, _ := createTestStore(t)
 
 	pm := grpcplugin.NewPluginManager(zap.NewNop().Sugar(), zap.NewNop().Sugar(), "")
-	previous := grpcplugin.GetDefaultPluginManager()
-	grpcplugin.SetDefaultPluginManager(pm)
-	t.Cleanup(func() { grpcplugin.SetDefaultPluginManager(previous) })
+	previous := handedManaging()
+	HandPluginManager(pm)
+	t.Cleanup(func() {
+		handedPluginManagerMu.Lock()
+		defer handedPluginManagerMu.Unlock()
+		handedPluginManager = previous
+	})
 
 	srv, err := NewQNTXServer(testDB, servingOne(testDB, testStore), dbPath, 0)
 	require.NoError(t, err)

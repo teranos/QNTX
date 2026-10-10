@@ -2,10 +2,12 @@ package server
 
 import (
 	"path/filepath"
+	"sync"
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/errors"
 )
 
 type pluginServicesSubsystem struct{}
@@ -33,20 +35,23 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	servicesManager := grpcplugin.NewServicesManager(s.deps.cfg.LLM, s.deps.cfg.Fetch, s.nodeDID.DID, s.logger)
 	filesDir := filepath.Join(filepath.Dir(s.dbPath), "files")
 
-	endpoints, err := servicesManager.Start(s.ctx, s.held.Served(), queue, s.scheduleStore, filesDir, s.deps.cfg.GroundDBPath)
+	// Services that did not start are held with why: each plugin asking for
+	// one in its Initialize is refused with it, and the node boots without.
+	var endpoints grpcplugin.Endpoints
+	started, err := servicesManager.Start(s.ctx, s.held.Served(), queue, s.scheduleStore, filesDir, s.deps.cfg.GroundDBPath)
 	if err != nil {
-		s.logger.Errorw("Plugin services did not start; every plugin runs without ATS, queue or schedule access", "error", err)
-		endpoints = nil
+		endpoints = grpcplugin.UnservedEndpoints(errors.Wrap(err, "the node's plugin services did not start, so no plugin has ATS, queue or schedule access"))
 	} else {
+		endpoints = grpcplugin.ServedEndpoints(*started)
 		s.logger.Debugw("Plugin services started",
-			"ats_store", endpoints.ATSStoreAddress,
-			"queue", endpoints.QueueAddress,
-			"schedule", endpoints.ScheduleAddress,
-			"file_service", endpoints.FileServiceAddress,
-			"llm", endpoints.LLMAddress,
-			"embedding", endpoints.EmbeddingAddress,
-			"search", endpoints.SearchAddress,
-			"mail", endpoints.MailAddress,
+			"ats_store", started.ATSStoreAddress,
+			"queue", started.QueueAddress,
+			"schedule", started.ScheduleAddress,
+			"file_service", started.FileServiceAddress,
+			"llm", started.LLMAddress,
+			"embedding", started.EmbeddingAddress,
+			"search", started.SearchAddress,
+			"mail", started.MailAddress,
 		)
 	}
 
@@ -81,9 +86,11 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	s.servicesManager = servicesManager
 	s.services = services
 
-	// Wire services manager to plugin manager for LLM provider re-registration after restart.
-	if s.pluginManager != nil {
-		s.pluginManager.SetServicesManager(servicesManager)
+	// Wire services manager to plugin manager for LLM provider re-registration
+	// after restart. A node running without a plugin manager has nothing to
+	// wire, and says why to whoever asks it for one.
+	if pm, err := s.getPluginManager(); err == nil {
+		pm.SetServicesManager(servicesManager)
 	}
 
 	// Log plugin registry state — plugins load asynchronously, so the manager
@@ -99,4 +106,43 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	}
 
 	return nil
+}
+
+// pluginManaging is the node's plugin manager, or why the node runs without
+// one.
+type pluginManaging struct {
+	manager *grpcplugin.PluginManager
+	why     error
+}
+
+var (
+	handedPluginManagerMu sync.RWMutex
+	handedPluginManager   = pluginManaging{why: errors.New("no plugin manager was handed to the node")}
+)
+
+// HandPluginManager hands the node the plugin manager it runs plugins with.
+func HandPluginManager(manager *grpcplugin.PluginManager) {
+	handedPluginManagerMu.Lock()
+	defer handedPluginManagerMu.Unlock()
+	handedPluginManager = pluginManaging{manager: manager}
+}
+
+// RunWithoutPluginManager says the node runs no plugins, and why: every
+// request for one is answered with it.
+func RunWithoutPluginManager(why error) {
+	handedPluginManagerMu.Lock()
+	defer handedPluginManagerMu.Unlock()
+	handedPluginManager = pluginManaging{why: why}
+}
+
+// handedManaging is the plugin manager the node was handed, or why it has none.
+func handedManaging() pluginManaging {
+	handedPluginManagerMu.RLock()
+	defer handedPluginManagerMu.RUnlock()
+	return handedPluginManager
+}
+
+// getPluginManager returns the plugin manager, or why the node runs without one.
+func (s *QNTXServer) getPluginManager() (*grpcplugin.PluginManager, error) {
+	return s.pluginManager.manager, s.pluginManager.why
 }

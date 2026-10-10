@@ -112,6 +112,8 @@ func answeredAsJSON(t *testing.T, answer any) map[string]any {
 // publishing an empty one that reads as "no plugins".
 func TestNoProbeYetIsNotAnEmptyAnswer(t *testing.T) {
 	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar()}
+	// As NewQNTXServer holds it before the refresher's first probe.
+	s.pluginHealthCache.Store(notProbed())
 
 	results, at, failure := s.pluginHealth()
 	if results != nil {

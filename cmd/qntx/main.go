@@ -139,8 +139,8 @@ func initializePluginRegistry() {
 	// Load configuration to determine which plugins to load
 	cfg, err := config.Load()
 	if err != nil {
-		// If config fails to load, warn but continue with no plugins
-		pluginLogger.Warnw("Failed to load configuration, no plugins will be loaded", "error", err)
+		// The node boots without plugins, and says why to whoever asks for one.
+		server.RunWithoutPluginManager(errors.Wrap(err, "the configuration did not load, so the node runs no plugin manager"))
 		return
 	}
 
@@ -153,6 +153,7 @@ func initializePluginRegistry() {
 	logPath := cfg.GetLogPath(config.GetServerPort())
 	manager.SetLogDir(filepath.Dir(logPath))
 	grpc.SetDefaultPluginManager(manager)
+	server.HandPluginManager(manager)
 
 	// Plugin loading is deferred until the server signals it's ready.
 	// The server calls onReady after migrations, routes, and HTTP listener

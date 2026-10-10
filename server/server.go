@@ -74,7 +74,7 @@ type QNTXServer struct {
 	logger              *zap.SugaredLogger
 	consoleBuffer       *ConsoleBuffer              // Browser console log buffer for debugging (dev mode only)
 	pluginRegistry      *plugin.Registry            // Domain plugin registry
-	pluginManager       *grpcplugin.PluginManager   // Plugin process manager
+	pluginManager       pluginManaging              // Plugin process manager, or why the node has none
 	services            plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
 	// What the mail service was wired with (ADR-041), read back by the mail
@@ -351,20 +351,6 @@ func GetDefaultServer() *QNTXServer {
 	defaultServerMu.RLock()
 	defer defaultServerMu.RUnlock()
 	return defaultServer
-}
-
-// getPluginManager returns the plugin manager, falling back to the global default
-// if the server's field is nil (happens when plugins load asynchronously after server creation).
-// When falling back, lazily wires servicesManager so LLM provider re-registration works on restart.
-func (s *QNTXServer) getPluginManager() *grpcplugin.PluginManager {
-	if s.pluginManager != nil {
-		return s.pluginManager
-	}
-	pm := grpcplugin.GetDefaultPluginManager()
-	if pm != nil && s.servicesManager != nil {
-		pm.SetServicesManager(s.servicesManager)
-	}
-	return pm
 }
 
 // GetServices returns the service registry for plugins

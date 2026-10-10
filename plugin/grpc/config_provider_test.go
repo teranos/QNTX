@@ -10,19 +10,27 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestNewConfigProvider_WithoutEndpoints(t *testing.T) {
-	provider := NewConfigProvider(nil, nil, zap.NewNop().Sugar())
-	require.NotNil(t, provider)
+// noServices is a node whose plugin services did not start.
+var noServices = UnservedEndpoints(errors.New("this test serves no plugin services"))
 
-	config := provider.GetPluginConfig("testdomain")
+// A plugin asking for an endpoint on a node whose plugin services did not
+// start is told why, and is not handed an empty address as if one were served.
+func TestNewConfigProvider_WithoutEndpoints(t *testing.T) {
+	SetPluginRecords(heldRecords{"testdomain": {Name: "testdomain", Config: map[string]string{}}})
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
+
+	config := NewConfigProvider(noServices, nil, zap.NewNop().Sugar()).GetPluginConfig("testdomain")
 	require.NotNil(t, config)
 
-	// Without endpoints, service keys return empty
 	assert.Equal(t, "", config.GetString("_llm_endpoint"))
+	err := config.(interface{ Err() error }).Err()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "this test serves no plugin services")
+	assert.Contains(t, err.Error(), "_llm_endpoint")
 }
 
 func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
-	endpoints := &ServiceEndpoints{
+	endpoints := ServedEndpoints(ServiceEndpoints{
 		ATSStoreAddress:     "localhost:9001",
 		QueueAddress:        "localhost:9002",
 		ScheduleAddress:     "localhost:9003",
@@ -34,7 +42,7 @@ func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 		SearchAddress:       "localhost:9009",
 		MailAddress:         "localhost:9010",
 		AuthToken:           "test-token-123",
-	}
+	})
 
 	provider := NewConfigProvider(endpoints, nil, zap.NewNop().Sugar())
 	config := provider.GetPluginConfig("anydomain")
@@ -63,9 +71,9 @@ func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 }
 
 func TestNewConfigProvider_GetAlsoInjectsEndpoints(t *testing.T) {
-	endpoints := &ServiceEndpoints{
+	endpoints := ServedEndpoints(ServiceEndpoints{
 		LLMAddress: "localhost:5555",
-	}
+	})
 
 	provider := NewConfigProvider(endpoints, nil, zap.NewNop().Sugar())
 	config := provider.GetPluginConfig("x")
@@ -83,7 +91,7 @@ func TestAPluginIsHandedTheConfigItsRecordHolds(t *testing.T) {
 	}}})
 	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
-	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
+	config := NewConfigProvider(noServices, nil, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
 	assert.ElementsMatch(t, []string{"token", "poll_interval", "verbose"}, config.GetKeys())
 	assert.Equal(t, "ssm:///q/box/token", config.Get("token"))
 	assert.Equal(t, 300, config.GetInt("poll_interval"))
@@ -97,7 +105,7 @@ func TestAPluginsConfigIsItsRecord(t *testing.T) {
 	SetPluginRecords(heldRecords{"pyre": {Name: "pyre", Config: map[string]string{}}})
 	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
-	config := NewConfigProvider(nil, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
+	config := NewConfigProvider(noServices, nil, zap.NewNop().Sugar()).GetPluginConfig("pyre")
 	assert.Empty(t, config.GetKeys())
 	assert.Equal(t, 0, config.GetInt("poll_interval"))
 }
@@ -113,7 +121,7 @@ func TestAPluginStandingInANamespaceIsHandedItsOwnToken(t *testing.T) {
 		return plugin + "@" + namespace, nil
 	}
 
-	provider := NewConfigProvider(&ServiceEndpoints{AuthToken: "shared"}, minted, zap.NewNop().Sugar())
+	provider := NewConfigProvider(ServedEndpoints(ServiceEndpoints{AuthToken: "shared"}), minted, zap.NewNop().Sugar())
 	assert.Equal(t, "cleanAPI@Clean", provider.GetPluginConfig("cleanAPI").GetString("_auth_token"))
 }
 
@@ -129,7 +137,7 @@ func TestAPluginNamingNoNamespaceIsHandedNoToken(t *testing.T) {
 		return plugin + "@" + namespace, nil
 	}
 
-	config := NewConfigProvider(&ServiceEndpoints{AuthToken: "shared"}, minted, zap.NewNop().Sugar()).GetPluginConfig("datapunt")
+	config := NewConfigProvider(ServedEndpoints(ServiceEndpoints{AuthToken: "shared"}), minted, zap.NewNop().Sugar()).GetPluginConfig("datapunt")
 	assert.Equal(t, "", config.GetString("_auth_token"), "a plugin naming no namespace was handed a token")
 	assert.NoError(t, config.(interface{ Err() error }).Err(), "a plugin naming no namespace was refused its start")
 }
@@ -143,7 +151,7 @@ func TestATokenTheNodeCannotMintFailsTheInitialize(t *testing.T) {
 		return "", errors.Newf("namespace %s is not served", namespace)
 	}
 
-	config := NewConfigProvider(&ServiceEndpoints{AuthToken: "shared"}, refused, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
+	config := NewConfigProvider(ServedEndpoints(ServiceEndpoints{AuthToken: "shared"}), refused, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
 	assert.Equal(t, "", config.GetString("_auth_token"))
 	err := config.(interface{ Err() error }).Err()
 	require.Error(t, err, "a token the node could not mint was not said")
@@ -161,7 +169,7 @@ func TestAnEmptyNamespaceIsTheNodesToRefuse(t *testing.T) {
 		return "", errors.Newf("namespace %q is not served", namespace)
 	}
 
-	config := NewConfigProvider(&ServiceEndpoints{AuthToken: "shared"}, refused, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
+	config := NewConfigProvider(ServedEndpoints(ServiceEndpoints{AuthToken: "shared"}), refused, zap.NewNop().Sugar()).GetPluginConfig("cleanAPI")
 	assert.Equal(t, "", config.GetString("_auth_token"))
 	assert.Equal(t, []string{""}, asked, "an empty namespace was not handed to the node")
 	require.Error(t, config.(interface{ Err() error }).Err(), "an empty namespace started the plugin standing nowhere")

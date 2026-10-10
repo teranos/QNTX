@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -47,7 +48,8 @@ func rootKnowingServer(t *testing.T) *QNTXServer {
 	daemon := async.NewWorkerPool(db, &appcfg.Config{}, async.DefaultWorkerPoolConfig(), zap.NewNop().Sugar())
 	s := &QNTXServer{nodeDB: db, authHandler: h, logger: zap.NewNop().Sugar(), daemon: daemon,
 		pluginRegistry: plugin.GetDefaultRegistry(),
-		nodeDID:        &nodedid.Handler{DID: "did:key:z6Mkgardennode"}}
+		nodeDID:        &nodedid.Handler{DID: "did:key:z6Mkgardennode"},
+		pluginManager:  pluginManaging{why: errors.New("this test runs no plugin manager")}}
 	s.held = servingOne(db, store)
 	s.held.SetSystem(oneNamespace("system", system))
 	return s

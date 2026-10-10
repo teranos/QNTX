@@ -369,9 +369,9 @@ func (s *QNTXServer) buildLanded(name string) {
 		s.logger.Infow("A build landed for a plugin that is not enabled; it runs once enabled", "plugin", name, "known", found)
 		return
 	}
-	pm := s.getPluginManager()
-	if pm == nil {
-		s.logger.Errorw("A build landed and there is no plugin manager to run it", "plugin", name)
+	pm, err := s.getPluginManager()
+	if err != nil {
+		s.logger.Errorw("A build landed and there is no plugin manager to run it", "plugin", name, "error", err)
 		return
 	}
 	s.pluginMuxes.Delete(name)

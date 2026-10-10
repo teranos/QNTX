@@ -6,6 +6,7 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -37,9 +38,9 @@ func TestServerWithPluginManager(t *testing.T) {
 	// Create and set a plugin manager globally (simulating main.go behavior)
 	logger := zap.NewNop().Sugar()
 	manager := grpcplugin.NewPluginManager(logger, logger, "")
-	grpcplugin.SetDefaultPluginManager(manager)
+	HandPluginManager(manager)
 	t.Cleanup(func() {
-		grpcplugin.SetDefaultPluginManager(nil) // Clean up global state
+		RunWithoutPluginManager(errors.New("the test that handed a plugin manager ended")) // Clean up global state
 	})
 
 	server, err := NewQNTXServer(db, servingOne(db, store), "test.db", 1)
@@ -48,11 +49,12 @@ func TestServerWithPluginManager(t *testing.T) {
 	}
 
 	// Verify plugin manager was picked up from global storage
-	if server.pluginManager == nil {
-		t.Error("Plugin manager should be set when global manager exists")
+	held, err := server.getPluginManager()
+	if err != nil {
+		t.Fatalf("Plugin manager should be set when one was handed: %v", err)
 	}
-	if server.pluginManager != manager {
-		t.Error("Plugin manager should match the globally set manager")
+	if held != manager {
+		t.Error("Plugin manager should match the handed manager")
 	}
 }
 
@@ -79,9 +81,9 @@ func TestServerServicesRegistry(t *testing.T) {
 	// Set plugin manager globally (simulating main.go behavior)
 	logger := zap.NewNop().Sugar()
 	manager := grpcplugin.NewPluginManager(logger, logger, "")
-	grpcplugin.SetDefaultPluginManager(manager)
+	HandPluginManager(manager)
 	t.Cleanup(func() {
-		grpcplugin.SetDefaultPluginManager(nil)
+		RunWithoutPluginManager(errors.New("the test that handed a plugin manager ended"))
 	})
 
 	server, err := NewQNTXServer(db, servingOne(db, store), "test.db", 1)

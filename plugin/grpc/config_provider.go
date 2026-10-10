@@ -20,10 +20,33 @@ const PluginNamespaceKey = "namespace"
 // in the error it returns.
 type PluginTokens func(plugin, namespace string) (string, error)
 
+// Endpoints is the node's plugin service endpoints, or why the node runs
+// without them.
+type Endpoints struct {
+	served ServiceEndpoints
+	why    error
+}
+
+// ServedEndpoints is the endpoints of plugin services that started.
+func ServedEndpoints(served ServiceEndpoints) Endpoints {
+	return Endpoints{served: served}
+}
+
+// UnservedEndpoints is a node whose plugin services did not start, and why.
+func UnservedEndpoints(why error) Endpoints {
+	return Endpoints{why: why}
+}
+
+// Served is the endpoints, or why the node runs without them.
+func (e Endpoints) Served() (ServiceEndpoints, error) {
+	return e.served, e.why
+}
+
 // NewConfigProvider creates a ConfigProvider that hands each plugin the config
-// its record holds and injects gRPC service endpoints for plugin discovery.
-// Pass nil endpoints if no services are available.
-func NewConfigProvider(endpoints *ServiceEndpoints, tokens PluginTokens, logger *zap.SugaredLogger) plugin.ConfigProvider {
+// its record holds and injects gRPC service endpoints for plugin discovery. A
+// plugin asking for an endpoint on a node whose services did not start is
+// told why.
+func NewConfigProvider(endpoints Endpoints, tokens PluginTokens, logger *zap.SugaredLogger) plugin.ConfigProvider {
 	return &configProvider{
 		endpoints: endpoints,
 		tokens:    tokens,
@@ -33,7 +56,7 @@ func NewConfigProvider(endpoints *ServiceEndpoints, tokens PluginTokens, logger 
 
 // configProvider wraps plugin records with service endpoint injection.
 type configProvider struct {
-	endpoints *ServiceEndpoints
+	endpoints Endpoints
 	tokens    PluginTokens
 	logger    *zap.SugaredLogger
 }
@@ -52,7 +75,7 @@ func (p *configProvider) GetPluginConfig(domain string) plugin.Config {
 // sees, intercepting underscore-prefixed service keys to return gRPC addresses.
 type configWithEndpoints struct {
 	domain    string
-	endpoints *ServiceEndpoints
+	endpoints Endpoints
 	tokens    PluginTokens
 	logger    *zap.SugaredLogger
 	// readErr is every failure to hand the plugin its config, kept for Err.
@@ -184,35 +207,34 @@ func (c *configWithEndpoints) GetKeys() []string {
 }
 
 // endpointValue returns a service endpoint value for underscore-prefixed keys.
+// On a node whose plugin services did not start, asking for one is kept for
+// Err, naming why.
 func (c *configWithEndpoints) endpointValue(key string) (string, bool) {
-	if c.endpoints == nil {
+	read, service := endpointKeys[key]
+	if !service {
 		return "", false
 	}
-	switch key {
-	case "_ats_store_endpoint":
-		return c.endpoints.ATSStoreAddress, true
-	case "_queue_endpoint":
-		return c.endpoints.QueueAddress, true
-	case "_schedule_endpoint":
-		return c.endpoints.ScheduleAddress, true
-	case "_file_service_endpoint":
-		return c.endpoints.FileServiceAddress, true
-	case "_llm_endpoint":
-		return c.endpoints.LLMAddress, true
-	case "_embedding_endpoint":
-		return c.endpoints.EmbeddingAddress, true
-	case "_vector_search_endpoint":
-		return c.endpoints.VectorSearchAddress, true
-	case "_ground_endpoint":
-		return c.endpoints.GroundAddress, true
-	case "_search_endpoint":
-		return c.endpoints.SearchAddress, true
-	case "_fetch_endpoint":
-		return c.endpoints.FetchAddress, true
-	case "_mail_endpoint":
-		return c.endpoints.MailAddress, true
-	case "_auth_token":
-		return c.authToken(), true
+	served, err := c.endpoints.Served()
+	if err != nil {
+		c.failed(errors.Wrapf(err, "plugin %s asked for %s", c.domain, key))
+		return "", true
 	}
-	return "", false
+	return read(c, served), true
+}
+
+// endpointKeys are the underscore-prefixed keys a plugin's config answers with
+// what the node serves it.
+var endpointKeys = map[string]func(*configWithEndpoints, ServiceEndpoints) string{
+	"_ats_store_endpoint":     func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.ATSStoreAddress },
+	"_queue_endpoint":         func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.QueueAddress },
+	"_schedule_endpoint":      func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.ScheduleAddress },
+	"_file_service_endpoint":  func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.FileServiceAddress },
+	"_llm_endpoint":           func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.LLMAddress },
+	"_embedding_endpoint":     func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.EmbeddingAddress },
+	"_vector_search_endpoint": func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.VectorSearchAddress },
+	"_ground_endpoint":        func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.GroundAddress },
+	"_search_endpoint":        func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.SearchAddress },
+	"_fetch_endpoint":         func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.FetchAddress },
+	"_mail_endpoint":          func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.MailAddress },
+	"_auth_token":             func(c *configWithEndpoints, _ ServiceEndpoints) string { return c.authToken() },
 }

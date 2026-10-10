@@ -10,10 +10,17 @@ import (
 const pluginHealthRefreshInterval = 5 * time.Second
 
 // cachedPluginHealth is a probe, and it says when it was taken. A snapshot with
-// no time on it cannot be told from a current answer.
+// no time on it cannot be told from a current answer. Before the first probe
+// completes it is held as that, saying so.
 type cachedPluginHealth struct {
 	results map[string]plugin.HealthStatus
 	at      time.Time
+	failure string
+}
+
+// notProbed is the plugin health a node holds until its first probe completes.
+func notProbed() *cachedPluginHealth {
+	return &cachedPluginHealth{failure: "no probe has completed yet"}
 }
 
 // startPluginHealthRefresher probes plugin health on a ticker instead of once
@@ -52,8 +59,5 @@ func (s *QNTXServer) refreshPluginHealth() {
 // whether the last probe failed. Nothing here reaches a plugin.
 func (s *QNTXServer) pluginHealth() (map[string]plugin.HealthStatus, time.Time, string) {
 	snapshot := s.pluginHealthCache.Load()
-	if snapshot == nil {
-		return nil, time.Time{}, "no probe has completed yet"
-	}
-	return snapshot.results, snapshot.at, ""
+	return snapshot.results, snapshot.at, snapshot.failure
 }

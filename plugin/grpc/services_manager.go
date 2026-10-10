@@ -526,11 +526,9 @@ func (m *ServicesManager) SetOpenRun(open OpenRun) {
 	m.openRun.Store(&open)
 }
 
-// OpenRunFor mints a run's store token, or says why none can be.
+// OpenRunFor mints a run's store token, or says why none can be: until the
+// node hands over how, NewServicesManager's refusal answers.
 func (m *ServicesManager) OpenRunFor(userID, namespace string) (string, func(), error) {
-	if m == nil {
-		return "", nil, errors.Newf("no services manager to mint a store token for namespace %s", namespace)
-	}
 	return (*m.openRun.Load())(userID, namespace)
 }
 

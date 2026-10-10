@@ -10,7 +10,6 @@ import (
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/plugin"
-	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/namespaces"
@@ -22,7 +21,7 @@ import (
 // Available to subsystems via s.deps during Init.
 type serverDependencies struct {
 	daemon        *async.WorkerPool
-	pluginManager *grpcplugin.PluginManager
+	pluginManager pluginManaging
 	cfg           *appcfg.Config
 }
 
@@ -152,6 +151,7 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		cancel:          cancel,
 	}
 	server.verbosity.Store(int32(verbosity))
+	server.pluginHealthCache.Store(notProbed())
 	server.state.Store(int32(ServerStateRunning))
 
 	// A namespace runs its own steps when it starts, and a namespace opened
@@ -163,11 +163,6 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 	openPulseReadDB(server)
 
 	SetDefaultServer(server)
-
-	// Plugin manager debug log
-	serverLogger.Debugw("Plugin manager check",
-		"plugin_manager_is_nil", server.pluginManager == nil,
-		"services_is_nil", server.services == nil)
 
 	// Run subsystems in order. Each one's time is measured, so a slow boot
 	// names the step that was slow (ADR-024, The floor). One that completes is
@@ -213,7 +208,7 @@ func createServerDependencies(db *sql.DB, cfg *appcfg.Config, serverLogger *zap.
 	daemon := async.NewWorkerPool(db, cfg, async.DefaultWorkerPoolConfig(), serverLogger)
 	serverLogger.Debugw("Daemon created", "duration_ms", time.Since(daemonStart).Milliseconds())
 
-	pluginManager := grpcplugin.GetDefaultPluginManager()
+	pluginManager := handedManaging()
 
 	serverLogger.Debugw("All dependencies created", "total_duration_ms", time.Since(start).Milliseconds())
 

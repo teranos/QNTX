@@ -417,9 +417,9 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin resumed")
 
 	case "restart":
-		pm := s.getPluginManager()
-		if pm == nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin manager not available"}
+		pm, err := s.getPluginManager()
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
 		record, found, recordErr := s.pluginRecords().Plugin(name)
 		if recordErr != nil {
@@ -454,9 +454,9 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 		}()
 
 	case "enable":
-		pm := s.getPluginManager()
-		if pm == nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin manager not available"}
+		pm, err := s.getPluginManager()
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
 		if err := s.pluginRecords().EnablePlugin(actorOf(ctx), name, true); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
@@ -481,9 +481,9 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin enabled")
 
 	case "disable":
-		pm := s.getPluginManager()
-		if pm == nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Plugin manager not available"}
+		pm, err := s.getPluginManager()
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
 		if err := s.pluginRecords().EnablePlugin(actorOf(ctx), name, false); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}

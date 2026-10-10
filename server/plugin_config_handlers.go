@@ -67,9 +67,10 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// A plugin that is not running has no schema to say; its config is still its record's.
+	// A plugin that is not running has no schema to say; its config is still its
+	// record's. A node running without a plugin manager runs no plugin.
 	var schema map[string]any
-	if pm := s.getPluginManager(); pm != nil {
+	if pm, err := s.getPluginManager(); err == nil {
 		if pluginClient, ok := pm.GetPlugin(pluginName); ok {
 			// Try to get schema from plugin
 			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -165,10 +166,11 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	// A running plugin says what its config may hold; one that is not running
-	// has nobody to ask, so its config is taken as written.
-	pm := s.getPluginManager()
+	// has nobody to ask, so its config is taken as written. A node running
+	// without a plugin manager runs no plugin.
+	pm, managerErr := s.getPluginManager()
 	var running bool
-	if pm != nil {
+	if managerErr == nil {
 		if proxy, ok := pm.GetPlugin(pluginName); ok {
 			running = true
 			if extProxy, ok := proxy.(*grpcplugin.ExternalDomainProxy); ok {
@@ -179,11 +181,11 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 					s.writeRichError(w, errors.Wrapf(err, "failed to validate the config of plugin %s", pluginName), http.StatusInternalServerError)
 					return
 				}
-				if validationErrs := validateConfigAgainstSchema(config, schema.Fields); len(validationErrs) > 0 {
+				if refused, err := validateConfigAgainstSchema(config, schema.Fields); err != nil {
 					respond(w, s.logger, http.StatusBadRequest, map[string]any{
 						"success": false,
 						"message": "Configuration validation failed",
-						"errors":  validationErrs,
+						"errors":  refused,
 					})
 					return
 				}
@@ -226,15 +228,26 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 // configFieldTypes are the types a plugin's config schema names a field as.
 var configFieldTypes = []string{"string", "integer", "number", "boolean"}
 
-// validateConfigAgainstSchema validates config values against plugin schema constraints
-func validateConfigAgainstSchema(settings map[string]string, schema map[string]*protocol.ConfigFieldSchema) map[string]string {
-	errors := make(map[string]string)
+// validateConfigAgainstSchema validates config values against plugin schema
+// constraints: what each refused field is told, and the refusal of them all.
+func validateConfigAgainstSchema(settings map[string]string, schema map[string]*protocol.ConfigFieldSchema) (map[string]string, error) {
+	fields := make(map[string]string)
+	var refusedErr error
+	refuse := func(fieldName, why string) {
+		fields[fieldName] = why
+		refusal := errors.Newf("%s: %s", fieldName, why)
+		if refusedErr == nil {
+			refusedErr = refusal
+			return
+		}
+		refusedErr = errors.WithSecondaryError(refusedErr, refusal)
+	}
 
 	// Check all required fields are present
 	for fieldName, fieldSchema := range schema {
 		if fieldSchema.Required {
 			if value, exists := settings[fieldName]; !exists || value == "" {
-				errors[fieldName] = "This field is required"
+				refuse(fieldName, "This field is required")
 				continue
 			}
 		}
@@ -249,13 +262,13 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 		}
 		fieldSchema, schemaExists := schema[fieldName]
 		if !schemaExists {
-			errors[fieldName] = "Unknown configuration field"
+			refuse(fieldName, "Unknown configuration field")
 			continue
 		}
 
 		// A type the schema names that is none of these is refused.
 		if !slices.Contains(configFieldTypes, fieldSchema.Type) {
-			errors[fieldName] = fmt.Sprintf("Unknown field type: %s", fieldSchema.Type)
+			refuse(fieldName, fmt.Sprintf("Unknown field type: %s", fieldSchema.Type))
 			continue
 		}
 		switch fieldSchema.Type {
@@ -264,7 +277,7 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 		case "integer":
 			intVal, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
-				errors[fieldName] = "Must be a valid integer"
+				refuse(fieldName, "Must be a valid integer")
 				continue
 			}
 
@@ -272,11 +285,11 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 			if fieldSchema.MinValue != "" {
 				minVal, err := strconv.ParseInt(fieldSchema.MinValue, 10, 64)
 				if err != nil {
-					errors[fieldName] = fmt.Sprintf("The plugin's schema says min_value %q, which is not an integer", fieldSchema.MinValue)
+					refuse(fieldName, fmt.Sprintf("The plugin's schema says min_value %q, which is not an integer", fieldSchema.MinValue))
 					continue
 				}
 				if intVal < minVal {
-					errors[fieldName] = fmt.Sprintf("Must be at least %s", fieldSchema.MinValue)
+					refuse(fieldName, fmt.Sprintf("Must be at least %s", fieldSchema.MinValue))
 					continue
 				}
 			}
@@ -285,11 +298,11 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 			if fieldSchema.MaxValue != "" {
 				maxVal, err := strconv.ParseInt(fieldSchema.MaxValue, 10, 64)
 				if err != nil {
-					errors[fieldName] = fmt.Sprintf("The plugin's schema says max_value %q, which is not an integer", fieldSchema.MaxValue)
+					refuse(fieldName, fmt.Sprintf("The plugin's schema says max_value %q, which is not an integer", fieldSchema.MaxValue))
 					continue
 				}
 				if intVal > maxVal {
-					errors[fieldName] = fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue)
+					refuse(fieldName, fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue))
 					continue
 				}
 			}
@@ -297,7 +310,7 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 		case "number":
 			floatVal, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				errors[fieldName] = "Must be a valid number"
+				refuse(fieldName, "Must be a valid number")
 				continue
 			}
 
@@ -305,11 +318,11 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 			if fieldSchema.MinValue != "" {
 				minVal, err := strconv.ParseFloat(fieldSchema.MinValue, 64)
 				if err != nil {
-					errors[fieldName] = fmt.Sprintf("The plugin's schema says min_value %q, which is not a number", fieldSchema.MinValue)
+					refuse(fieldName, fmt.Sprintf("The plugin's schema says min_value %q, which is not a number", fieldSchema.MinValue))
 					continue
 				}
 				if floatVal < minVal {
-					errors[fieldName] = fmt.Sprintf("Must be at least %s", fieldSchema.MinValue)
+					refuse(fieldName, fmt.Sprintf("Must be at least %s", fieldSchema.MinValue))
 					continue
 				}
 			}
@@ -318,22 +331,22 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 			if fieldSchema.MaxValue != "" {
 				maxVal, err := strconv.ParseFloat(fieldSchema.MaxValue, 64)
 				if err != nil {
-					errors[fieldName] = fmt.Sprintf("The plugin's schema says max_value %q, which is not a number", fieldSchema.MaxValue)
+					refuse(fieldName, fmt.Sprintf("The plugin's schema says max_value %q, which is not a number", fieldSchema.MaxValue))
 					continue
 				}
 				if floatVal > maxVal {
-					errors[fieldName] = fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue)
+					refuse(fieldName, fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue))
 					continue
 				}
 			}
 
 		case "boolean":
 			if value != "true" && value != "false" {
-				errors[fieldName] = "Must be 'true' or 'false'"
+				refuse(fieldName, "Must be 'true' or 'false'")
 				continue
 			}
 		}
 	}
 
-	return errors
+	return fields, refusedErr
 }

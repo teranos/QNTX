@@ -21,9 +21,9 @@ func (s *QNTXServer) HandlePluginLogs(w http.ResponseWriter, r *http.Request) {
 	// no log buffer is refused below.
 	pluginName := r.PathValue("name")
 
-	pm := s.getPluginManager()
-	if pm == nil {
-		writeError(w, http.StatusServiceUnavailable, "plugin manager not available")
+	pm, err := s.getPluginManager()
+	if err != nil {
+		s.writeRichError(w, errors.Wrapf(err, "the log of plugin %s cannot be streamed", pluginName), http.StatusServiceUnavailable)
 		return
 	}
 

@@ -8,14 +8,14 @@ import (
 )
 
 func TestTheBuildKeysAndTheNamespaceAreNotThePluginsToValidate(t *testing.T) {
-	errs := validateConfigAgainstSchema(map[string]string{
+	errs, refused := validateConfigAgainstSchema(map[string]string{
 		buildCore:                     "teranos/datapunt@main",
 		buildCommand:                  "dub build",
 		grpcplugin.PluginNamespaceKey: "Clean",
 		"typo":                        "x",
 	}, map[string]*protocol.ConfigFieldSchema{})
-	if len(errs) != 1 || errs["typo"] == "" {
-		t.Fatalf("errors: %v", errs)
+	if len(errs) != 1 || errs["typo"] == "" || refused == nil {
+		t.Fatalf("errors: %v (%v)", errs, refused)
 	}
 }
 
@@ -183,13 +183,16 @@ func TestValidateConfigAgainstSchema(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			errors := validateConfigAgainstSchema(tt.config, tt.schema)
+			errors, refused := validateConfigAgainstSchema(tt.config, tt.schema)
 
 			if tt.wantNoErrors {
-				if len(errors) > 0 {
-					t.Errorf("Expected no errors, got: %v", errors)
+				if len(errors) > 0 || refused != nil {
+					t.Errorf("Expected no errors, got: %v (%v)", errors, refused)
 				}
 				return
+			}
+			if refused == nil {
+				t.Errorf("Expected the config to be refused, fields: %v", errors)
 			}
 
 			// Check that we got the expected errors
