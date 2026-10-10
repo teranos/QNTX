@@ -92,7 +92,7 @@ func TestTheNodeNamesItsRootAgentAndTheGateKnowsIt(t *testing.T) {
 	require.NoError(t, err)
 	h, err := auth.New(db, "localhost", nil, 8770, 8820, 24, zaptest.NewLogger(t).Sugar(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		tokens, nil, false, []string{rootAccount}, nil)
+		tokens, testUsers(t), false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 	node := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
 	s := &QNTXServer{authHandler: h, nodeDID: &nodedid.Handler{PrivateKey: node}, logger: zaptest.NewLogger(t).Sugar()}

@@ -14,7 +14,7 @@ import (
 func grantHandler(t *testing.T) (*Handler, *memTokenStore) {
 	t.Helper()
 	store := newMemTokenStore()
-	return &Handler{
+	return &Handler{users: &memUsers{},
 		tokens:   store,
 		sessions: newSessionStore(24),
 		logger:   testLogger(),

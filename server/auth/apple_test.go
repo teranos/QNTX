@@ -297,7 +297,7 @@ func TestAppleExchangeRefusesAKeyThatCannotSign(t *testing.T) {
 // Half a client — a Services ID with no team, no key id, or no key — is the
 // same button.
 func TestAppleIsOfferedOnlyOnceConfigured(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	_, known := h.providerAt(NamespaceDefault, "apple")
 	assert.False(t, known, "apple before it is configured")
 
@@ -324,7 +324,7 @@ func TestAppleIsOfferedOnlyOnceConfigured(t *testing.T) {
 // Google and Apple are offered side by side, and neither grows a copy of the
 // other into the shared list.
 func TestAppleAndGoogleAreOfferedTogether(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	h.SetGoogleClient("client-id", "client-secret")
 	h.SetAppleClient("com.example.qntx.web", "DEF123GHIJ", "ABC123DEFG", "key")
 
@@ -339,7 +339,7 @@ func TestAppleAndGoogleAreOfferedTogether(t *testing.T) {
 
 // A door brings its own Apple client the way it brings its own Google one.
 func TestADoorConsentsUnderItsOwnAppleClient(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	h.SetAppleClient("com.example.qntx.web", "DEF123GHIJ", "ABC123DEFG", "the-nodes-key")
 	h.doors.set(map[string]*door{
 		"https://garden.example": {
@@ -369,7 +369,7 @@ func TestADoorConsentsUnderItsOwnAppleClient(t *testing.T) {
 // An apple: entry in auth.root_identities is a way in the setup can offer as a
 // single press, the way google: is.
 func TestAnAppleEntryIsClaimable(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	h.SetAppleClient("com.example.qntx.web", "DEF123GHIJ", "ABC123DEFG", "key")
 
 	id, ok := h.claimable("apple:001234.abcd")

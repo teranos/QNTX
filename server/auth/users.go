@@ -45,10 +45,6 @@ type UserStore interface {
 // the ROOT User (ADR-031), so a claim that could not write one has claimed
 // nothing, and admitting the browser anyway leaves it signed in as nobody.
 func (h *Handler) joinUser(route string, matched *SignedBinding, layeDID string) (User, error) {
-	if h.users == nil {
-		return User{}, nil
-	}
-
 	u, found, err := h.users.ByRoute(route)
 	if err != nil {
 		return User{}, errors.Wrapf(err, "failed to read the User %q reaches", route)
@@ -85,13 +81,9 @@ func (h *Handler) joinUser(route string, matched *SignedBinding, layeDID string)
 }
 
 // userFor resolves the User a route reaches, for carrying into a session. A
-// deployment with no store, or a route nothing holds, gives the zero User —
-// this is a lookup, and failing it is not a reason to refuse a login.
+// route nothing holds gives the zero User — this is a lookup, and failing it is
+// not a reason to refuse a login.
 func (h *Handler) userFor(route string) User {
-	if h.users == nil {
-		return User{}
-	}
-
 	u, found, err := h.users.ByRoute(route)
 	if err != nil {
 		h.logger.Errorw("could not read the User a session belongs to", "route", route, "error", err)
@@ -110,7 +102,7 @@ func (h *Handler) userFor(route string) User {
 // (ADR-030), so it is where the device key lands. The same finger derives the
 // same key, which is why enrolling twice is not two keys.
 func (h *Handler) joinDeviceKey(route, ownerDID string) {
-	if h.users == nil || ownerDID == "" {
+	if ownerDID == "" {
 		return
 	}
 

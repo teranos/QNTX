@@ -12,7 +12,7 @@ import (
 // its own, pond did not.
 func twoDoors(t *testing.T) *Handler {
 	t.Helper()
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	h.SetGoogleClient("the-nodes-client", "the-nodes-secret")
 	h.doors.set(map[string]*door{
 		"https://garden.example": {
@@ -60,7 +60,7 @@ func TestADoorWithNoClientFallsBackToTheNodes(t *testing.T) {
 // A door can offer a provider the node itself has no client for. Nothing about
 // the node's configuration is a ceiling on what a door may open.
 func TestADoorMayOfferWhatTheNodeCannot(t *testing.T) {
-	h := &Handler{logger: testLogger()}
+	h := &Handler{users: &memUsers{}, logger: testLogger()}
 	h.doors.set(map[string]*door{
 		"https://garden.example": {
 			namespace: "garden",

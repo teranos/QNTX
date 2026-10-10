@@ -49,7 +49,7 @@ func TestEveryProviderDescribesItsForm(t *testing.T) {
 }
 
 func TestProvidersNeedingNoConfigAreAlwaysOffered(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{users: &memUsers{}}
 	for _, id := range []string{"mastodon", "atproto"} {
 		_, known := h.providerAt(NamespaceDefault, id)
 		assert.True(t, known, id)
@@ -61,7 +61,7 @@ func TestProvidersNeedingNoConfigAreAlwaysOffered(t *testing.T) {
 // A Google button on a node holding no OAuth client is a button that can only
 // fail, so the node does not draw one.
 func TestGoogleIsOfferedOnlyOnceConfigured(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{users: &memUsers{}}
 	_, known := h.providerAt(NamespaceDefault, "google")
 	assert.False(t, known, "google before it is configured")
 
@@ -82,7 +82,7 @@ func TestGoogleIsOfferedOnlyOnceConfigured(t *testing.T) {
 // finds Google already there and every door grows another copy.
 func TestOfferingGoogleLeavesTheSharedListAlone(t *testing.T) {
 	before := len(providers)
-	h := &Handler{}
+	h := &Handler{users: &memUsers{}}
 	h.SetGoogleClient("client-id", "client-secret")
 	assert.Len(t, h.offeredAt(NamespaceDefault), before+1)
 	assert.Len(t, providers, before)
@@ -90,7 +90,7 @@ func TestOfferingGoogleLeavesTheSharedListAlone(t *testing.T) {
 
 // Where a ceremony happens is the provider's to say when it never asked.
 func TestAProviderThatAsksForNoHostTakesNone(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{users: &memUsers{}}
 	h.SetGoogleClient("client-id", "client-secret")
 	google, ok := h.providerAt(NamespaceDefault, "google")
 	require.True(t, ok)

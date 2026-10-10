@@ -93,10 +93,6 @@ func (h *Handler) claimable(route string) (setupIdentity, bool) {
 // claimed reports whether any User exists. A store that cannot be read counts
 // as claimed: refusing to open the door is better than opening it on a guess.
 func (h *Handler) claimed() bool {
-	if h.users == nil {
-		return true
-	}
-
 	held, err := h.users.List()
 	if err != nil {
 		h.logger.Errorw("could not read the Users, so the node is treated as claimed", "error", err)

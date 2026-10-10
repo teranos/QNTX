@@ -14,9 +14,6 @@ import (
 // Every other User the node holds was put there by somebody. This one arrived,
 // proved an account at a provider, and that is the whole of what it took.
 func (h *Handler) joinPublic(acct account, door string) (User, error) {
-	if h.users == nil {
-		return User{}, errors.New("this node keeps no Users, so a registration has nowhere to go")
-	}
 	if acct.CanonicalID == "" {
 		return User{}, errors.New("the provider named no account, so there is nobody to register")
 	}
@@ -81,7 +78,7 @@ func (h *Handler) joinPublic(acct account, door string) (User, error) {
 // a route reaches: a USER, who came in by ROOT's invitation, or a public
 // registration. No User, no rung, and the caller refuses on the empty answer.
 func (h *Handler) userLevelOf(route string) Level {
-	if h.users == nil || route == "" {
+	if route == "" {
 		return ""
 	}
 	u, found, err := h.users.ByRoute(route)

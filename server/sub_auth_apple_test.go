@@ -35,7 +35,7 @@ func offeredProviders(t *testing.T, h *auth.Handler) []string {
 func bareAuthHandler(t *testing.T) *auth.Handler {
 	t.Helper()
 	passthrough := func(next http.HandlerFunc) http.HandlerFunc { return next }
-	h, err := auth.New(nil, "", nil, 8080, 8080, 24, zap.NewNop().Sugar(), passthrough, nil, nil, false, nil, nil)
+	h, err := auth.New(nil, "", nil, 8080, 8080, 24, zap.NewNop().Sugar(), passthrough, nil, testUsers(t), false, nil, nil)
 	require.NoError(t, err)
 	return h
 }

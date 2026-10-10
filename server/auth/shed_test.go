@@ -24,7 +24,7 @@ func TestTheHeaviestTokenIsTurnedAwayAndLetBackIn(t *testing.T) {
 	require.NoError(t, err)
 
 	shed := NewShed(5 * time.Second)
-	h := &Handler{sessions: newSessionStore(1), tokens: store, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), tokens: store, logger: testLogger()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	h.SetShed(shed)
 	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +69,7 @@ func TestASessionIsNeverTurnedAway(t *testing.T) {
 	token, err := sessions.create(mastodonAccount, User{ID: "UStim"})
 	require.NoError(t, err)
 
-	h := &Handler{sessions: sessions, tokens: newMemTokenStore(), logger: testLogger()}
+	h := &Handler{users: &memUsers{}, sessions: sessions, tokens: newMemTokenStore(), logger: testLogger()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	h.SetShed(shed)
 

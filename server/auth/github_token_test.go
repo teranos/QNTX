@@ -92,7 +92,7 @@ func TestAGitHubTokenIsNeverListed(t *testing.T) {
 // The node spends a GITHUB token at GitHub. Presented to a route, it is
 // nothing.
 func TestAGitHubTokenIsNotABearer(t *testing.T) {
-	h := &Handler{logger: zap.NewNop().Sugar()}
+	h := &Handler{users: &memUsers{}, logger: zap.NewNop().Sugar()}
 	_, admitted := h.admissionOf(Presented{Bearer: &Grant{Level: LevelGitHub, MintedBy: "github:1"}})
 	assert.False(t, admitted)
 }
@@ -122,7 +122,7 @@ func TestAnExpiringGitHubTokenIsRefreshedBeforeItIsSpent(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	h := &Handler{logger: zap.NewNop().Sugar(), tokens: table}
+	h := &Handler{users: &memUsers{}, logger: zap.NewNop().Sugar(), tokens: table}
 	h.SetGitHubClient("client-id", "client-secret")
 
 	token, key, err := h.GitHubToken(context.Background(), NamespaceSystem)
@@ -144,7 +144,7 @@ func TestAnExpiringGitHubTokenIsRefreshedBeforeItIsSpent(t *testing.T) {
 func TestANamespaceWithNoGitHubIsRefused(t *testing.T) {
 	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), &countingTokens{})
 	require.NoError(t, err)
-	h := &Handler{logger: zap.NewNop().Sugar(), tokens: table}
+	h := &Handler{users: &memUsers{}, logger: zap.NewNop().Sugar(), tokens: table}
 
 	_, _, err = h.GitHubToken(context.Background(), "clean")
 	require.Error(t, err)
@@ -160,7 +160,7 @@ func TestNamingNoNamespaceSpendsNoGitHubToken(t *testing.T) {
 	require.NoError(t, err)
 	_, err = table.KeepGitHub(NamespaceSystem, "github:1", GitHubSecret{Token: "ghu_node", Source: GitHubSourceOAuth})
 	require.NoError(t, err)
-	h := &Handler{logger: zap.NewNop().Sugar(), tokens: table}
+	h := &Handler{users: &memUsers{}, logger: zap.NewNop().Sugar(), tokens: table}
 
 	_, _, err = h.GitHubToken(context.Background(), "")
 	require.Error(t, err, "an unnamed namespace was handed the system namespace's GitHub token")
@@ -171,7 +171,7 @@ func TestNamingNoNamespaceSpendsNoGitHubToken(t *testing.T) {
 func TestROOTGeneratesTheWebhookSecret(t *testing.T) {
 	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), &countingTokens{})
 	require.NoError(t, err)
-	h := &Handler{logger: zap.NewNop().Sugar(), tokens: table}
+	h := &Handler{users: &memUsers{}, logger: zap.NewNop().Sugar(), tokens: table}
 
 	_, found, err := h.GitHubWebhook()
 	require.NoError(t, err)
@@ -204,7 +204,7 @@ func TestROOTGeneratesTheWebhookSecret(t *testing.T) {
 func TestTheNodesGitHubIsROOTs(t *testing.T) {
 	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), &countingTokens{})
 	require.NoError(t, err)
-	h := &Handler{logger: zap.NewNop().Sugar(), tokens: table}
+	h := &Handler{users: &memUsers{}, logger: zap.NewNop().Sugar(), tokens: table}
 	h.identities.set([]string{"github:1739143"}, nil)
 
 	h.keepNodeGitHub("github", account{CanonicalID: "github:42", github: &GitHubSecret{Token: "ghu_stranger", Source: GitHubSourceOAuth}})

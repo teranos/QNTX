@@ -19,6 +19,16 @@ const (
 	gardenerRoute = "google:110169484474386276334"
 )
 
+// testUsers is the users table of a migrated test db, holding nobody yet: the
+// User store every node with login keeps (ADR-037).
+func testUsers(t *testing.T) auth.UserStore {
+	t.Helper()
+	_, db := createTestStore(t)
+	users, _, err := auth.OpenUserTable(db, nil)
+	require.NoError(t, err)
+	return users
+}
+
 // A node that knows one ROOT account, so a grant has somebody who may write it.
 func rootKnowingServer(t *testing.T) *QNTXServer {
 	t.Helper()
@@ -27,7 +37,7 @@ func rootKnowingServer(t *testing.T) *QNTXServer {
 
 	h, err := auth.New(nil, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		nil, nil, false, []string{rootAccount}, nil)
+		nil, testUsers(t), false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 
 	s := &QNTXServer{nodeDB: db, authHandler: h, logger: zap.NewNop().Sugar(),

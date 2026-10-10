@@ -229,11 +229,6 @@ func refuseName(u User, displayName string) (string, bool) {
 // arrivingUser resolves the caller to the User a half-admission reaches, and
 // writes the refusal itself when there is none.
 func (h *Handler) arrivingUser(w http.ResponseWriter, r *http.Request) (User, string, bool) {
-	if h.users == nil {
-		h.writeError(w, http.StatusServiceUnavailable, "no User store")
-		return User{}, "", false
-	}
-
 	// A session, and not the half-admission laye leaves behind. A display_name
 	// is settled once and can never be taken back, and an admission nobody
 	// finished must not leave a permanent mark.

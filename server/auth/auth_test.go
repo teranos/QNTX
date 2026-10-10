@@ -142,7 +142,7 @@ func TestMiddlewareAllowsValidSession(t *testing.T) {
 	sessions := newSessionStore(1)
 	token, _ := sessions.create(mastodonAccount, User{})
 
-	h := &Handler{sessions: sessions, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, sessions: sessions, logger: testLogger()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -162,7 +162,7 @@ func TestAnEmptyListAdmitsNobody(t *testing.T) {
 	sessions := newSessionStore(1)
 	token, _ := sessions.create(mastodonAccount, User{})
 
-	h := &Handler{sessions: sessions, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, sessions: sessions, logger: testLogger()}
 	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -177,7 +177,7 @@ func TestAnEmptyListAdmitsNobody(t *testing.T) {
 
 func TestMiddlewareRedirectsPageRequest(t *testing.T) {
 	sessions := newSessionStore(1)
-	h := &Handler{sessions: sessions}
+	h := &Handler{users: &memUsers{}, sessions: sessions}
 	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -192,7 +192,7 @@ func TestMiddlewareRedirectsPageRequest(t *testing.T) {
 
 func TestMiddlewareRejectsAPIRequest(t *testing.T) {
 	sessions := newSessionStore(1)
-	h := &Handler{sessions: sessions}
+	h := &Handler{users: &memUsers{}, sessions: sessions}
 	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -209,7 +209,7 @@ func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 	token, _ := sessions.create("", User{})
 	time.Sleep(5 * time.Millisecond)
 
-	h := &Handler{sessions: sessions}
+	h := &Handler{users: &memUsers{}, sessions: sessions}
 	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -225,14 +225,14 @@ func TestMiddlewareRejectsExpiredSession(t *testing.T) {
 // --- Session cookie Secure flag ---
 
 func TestSetSessionCookieSecureWhenConfigured(t *testing.T) {
-	h := &Handler{secureCookies: true}
+	h := &Handler{users: &memUsers{}, secureCookies: true}
 	rec := httptest.NewRecorder()
 	h.setSessionCookie(rec, "tok")
 	assertCookieSecure(t, rec, true)
 }
 
 func TestSetSessionCookieNotSecureByDefault(t *testing.T) {
-	h := &Handler{secureCookies: false}
+	h := &Handler{users: &memUsers{}, secureCookies: false}
 	rec := httptest.NewRecorder()
 	h.setSessionCookie(rec, "tok")
 	assertCookieSecure(t, rec, false)
@@ -448,7 +448,7 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: mastodonAccount, Level: LevelAttestor})
 	require.NoError(t, err)
 
-	h := &Handler{
+	h := &Handler{users: &memUsers{},
 		sessions: newSessionStore(1),
 		tokens:   store,
 		logger:   testLogger(),
@@ -473,7 +473,7 @@ func TestPresentingABearerRecordsItsUse(t *testing.T) {
 	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", MintedBy: mastodonAccount, Level: LevelAttestor})
 	require.NoError(t, err)
 
-	h := &Handler{sessions: newSessionStore(1), tokens: store, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), tokens: store, logger: testLogger()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -502,7 +502,7 @@ func TestGetTokenAnswersTheRolesAndWordsItHolds(t *testing.T) {
 	store := newMemTokenStore()
 	_, id, err := store.Create(NewToken{Label: "pond-sensor", MintedBy: mastodonAccount, Level: LevelAttestor, Namespaces: []string{"clean"}})
 	require.NoError(t, err)
-	h := &Handler{tokens: store, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, tokens: store, logger: testLogger()}
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	h.SetRoleReader(&memRoles{
 		lines: map[string][]RoleLine{"clean": {{
@@ -542,7 +542,7 @@ func TestSuperListsAndReadsTokensAndChangesNone(t *testing.T) {
 	raw, id, err := store.Create(NewToken{Label: "SUPERANALYTICS", MintedBy: mastodonAccount, Level: LevelSuper})
 	require.NoError(t, err)
 
-	h := &Handler{
+	h := &Handler{users: &memUsers{},
 		tokens:   store,
 		sessions: newSessionStore(1),
 		logger:   testLogger(),
@@ -578,7 +578,7 @@ func TestSuperListsAndReadsTokensAndChangesNone(t *testing.T) {
 
 func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	store := newMemTokenStore()
-	h := &Handler{tokens: store, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
 		strings.NewReader(`{"expires_at":"never","label":"laptop-cron","level":"ATTESTOR","namespaces":["default"],"scope":{"write":["ingested"]}}`))
@@ -606,7 +606,7 @@ func TestANameIsHeldByOneToken(t *testing.T) {
 	_, id, err := store.Create(NewToken{Label: "pond-sensor", MintedBy: mastodonAccount})
 	require.NoError(t, err)
 	require.NoError(t, store.Revoke(id))
-	h := &Handler{tokens: store, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
 		strings.NewReader(`{"expires_at":"never","label":"pond-sensor","level":"ATTESTOR","namespaces":["default"]}`))
@@ -626,7 +626,7 @@ func TestHandleListTokensExcludesRaw(t *testing.T) {
 	_, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil})
 	require.NoError(t, err)
 
-	h := &Handler{tokens: store, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, tokens: store, logger: testLogger()}
 	req := httptest.NewRequest(http.MethodGet, "/auth/tokens", nil)
 	rec := httptest.NewRecorder()
 
@@ -644,7 +644,7 @@ func TestHandleRevokeTokenBlocksFutureLookups(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, store.lookupOK(sha256Hex(raw)))
 
-	h := &Handler{tokens: store, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, tokens: store, logger: testLogger()}
 	req := httptest.NewRequest(http.MethodDelete, "/auth/tokens/"+id, nil)
 	rec := httptest.NewRecorder()
 
@@ -663,7 +663,7 @@ func TestHandleEnableTokenRestoresIt(t *testing.T) {
 	require.NoError(t, store.Revoke(id))
 	require.False(t, store.lookupOK(sha256Hex(raw)))
 
-	h := &Handler{tokens: store, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, tokens: store, logger: testLogger()}
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens/"+id+"/enable", nil)
 	rec := httptest.NewRecorder()
 
@@ -681,7 +681,7 @@ func TestTokenByIDRejectsWrongMethods(t *testing.T) {
 	_, id, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil})
 	require.NoError(t, err)
 
-	h := &Handler{tokens: store, logger: testLogger()}
+	h := &Handler{users: &memUsers{}, tokens: store, logger: testLogger()}
 
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodDelete, "/auth/tokens/" + id + "/enable"},

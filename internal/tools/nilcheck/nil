@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 3406 in 437 files.
+# 3378 in 436 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -8,6 +8,7 @@
 # server/attestation_handlers.go: +1, the node authors what its caller named nobody for.
 # server/quote_removal.go: 7, from 82e8e8cf unbaselined: refusals of no actor, namespace or span, nothing removed ends the run, a count for the note, the daemon check its siblings hold.
 # From 3414: a test against a package-level const or var holding nil, zero or empty counts like one against what it holds; each was there before it was counted.
+# From 3400: auth.New refuses a handler with no User store, and the 23 tests for one that keeps no Users are gone; the header had drifted to 3406 by hand.
 
 6	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -263,50 +264,49 @@
 1	server/answers.go
 31	server/attestation_handlers.go
 5	server/auth/apple.go
-11	server/auth/arrive.go
+10	server/auth/arrive.go
 3	server/auth/atproto.go
 7	server/auth/attest.go
 23	server/auth/auth.go
-17	server/auth/becoming.go
+16	server/auth/becoming.go
 4	server/auth/binding.go
 1	server/auth/ceremony_owner.go
 9	server/auth/client_doors.go
 6	server/auth/credentials.go
-1	server/auth/devices.go
 17	server/auth/doors.go
-4	server/auth/forget.go
+3	server/auth/forget.go
 3	server/auth/github.go
 3	server/auth/github_app.go
 14	server/auth/github_token.go
 2	server/auth/google.go
 9	server/auth/handlers.go
 28	server/auth/handlers_tokens.go
-5	server/auth/handlers_users.go
+3	server/auth/handlers_users.go
 3	server/auth/homeward.go
-25	server/auth/invitation.go
+23	server/auth/invitation.go
 4	server/auth/laye.go
 4	server/auth/mastodon.go
 1	server/auth/may_register.go
 20	server/auth/oauth.go
 2	server/auth/owner_match.go
-8	server/auth/person.go
+6	server/auth/person.go
 3	server/auth/picture.go
 4	server/auth/presented.go
 9	server/auth/providers.go
-9	server/auth/public_user.go
+7	server/auth/public_user.go
 1	server/auth/refusals.go
 15	server/auth/roles.go
-6	server/auth/root_agent.go
+4	server/auth/root_agent.go
 7	server/auth/sessions.go
-6	server/auth/setup.go
+5	server/auth/setup.go
 1	server/auth/shed.go
 17	server/auth/sign_binding.go
 4	server/auth/standing.go
-9	server/auth/switch.go
+5	server/auth/switch.go
 3	server/auth/token_strategy.go
 1	server/auth/tokens.go
 13	server/auth/tokens_table.go
-6	server/auth/users.go
+3	server/auth/users.go
 9	server/auth/users_table.go
 20	server/broadcast.go
 4	server/builtin_executor.go
