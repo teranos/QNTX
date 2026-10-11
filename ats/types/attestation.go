@@ -60,6 +60,16 @@ type VersionNamed struct {
 // command's source.
 type VersionFromRegistry struct{}
 
+// VersionOf is the version a plugin outside this module names, which cannot
+// make a named.Text itself. A version naming nothing is refused.
+func VersionOf(version string) (VersionNamed, error) {
+	text, err := named.TextOf("the source version", version)
+	if err != nil {
+		return VersionNamed{}, err
+	}
+	return VersionNamed{Version: text}, nil
+}
+
 func (VersionNamed) stampsSourceVersion()        {}
 func (VersionFromRegistry) stampsSourceVersion() {}
 
@@ -76,6 +86,24 @@ type ActorsNamed struct {
 // ActorNamed is the one actor a command names.
 func ActorNamed(actor named.Text) ActorsNamed {
 	return ActorsNamed{Actors: named.ItemOf(actor.String())}
+}
+
+// ActorsOf are the actors a plugin outside this module names, which cannot
+// make named.Items itself. Naming nobody, or an actor that is empty, is refused.
+func ActorsOf(actors ...string) (ActorsNamed, error) {
+	names := make([]string, 0, len(actors))
+	for _, actor := range actors {
+		text, err := named.TextOf("an actor", actor)
+		if err != nil {
+			return ActorsNamed{}, err
+		}
+		names = append(names, text.String())
+	}
+	items, err := named.ItemsOf("the actors", names)
+	if err != nil {
+		return ActorsNamed{}, err
+	}
+	return ActorsNamed{Actors: items}, nil
 }
 
 // "the node"
