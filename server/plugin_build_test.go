@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"github.com/teranos/QNTX/plugin"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/services"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

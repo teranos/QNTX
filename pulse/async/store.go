@@ -6,7 +6,7 @@ import (
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Store handles persistence of async IX jobs

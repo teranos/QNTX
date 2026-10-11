@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/internal/agentenv"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Signing in is Claude Code's own flow, run headless (ADR-048): `claude auth
@@ -178,21 +178,28 @@ type Status struct {
 	APIProvider string `json:"apiProvider"`
 }
 
-// StatusOf asks Claude Code whether the agent under home is signed in.
+// StatusOf asks Claude Code whether the agent under home is signed in. Signed
+// out, Claude Code says so and exits 1: that exit with its answer is the
+// answer, and an exit 1 with no answer is still a failure.
 func StatusOf(ctx context.Context, binary, home string) (Status, error) {
 	cmd := exec.CommandContext(ctx, binary, "auth", "status", "--json")
 	cmd.Dir, cmd.Env = home, environment(home)
-	out, err := cmd.Output()
-	if err != nil {
+	out, exitErr := cmd.Output()
+	if exitErr != nil {
 		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			return Status{}, errors.Wrapf(err, "claude auth status failed, saying: %s", strings.TrimSpace(string(exit.Stderr)))
+		if !errors.As(exitErr, &exit) {
+			return Status{}, errors.Wrap(exitErr, "claude auth status did not run")
 		}
-		return Status{}, errors.Wrap(err, "claude auth status did not run")
+		if exit.ExitCode() != 1 {
+			return Status{}, errors.Wrapf(exitErr, "claude auth status failed, saying: %s", strings.TrimSpace(string(out)+"\n"+string(exit.Stderr)))
+		}
 	}
 	var status Status
 	if err := json.Unmarshal(out, &status); err != nil {
 		return Status{}, errors.Wrapf(err, "claude auth status did not answer JSON: %s", strings.TrimSpace(string(out)))
+	}
+	if exitErr != nil && status.SignedIn {
+		return Status{}, errors.Wrapf(exitErr,"claude auth status exited 1 and said it is signed in: %s", strings.TrimSpace(string(out)))
 	}
 	return status, nil
 }

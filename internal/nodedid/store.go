@@ -4,7 +4,7 @@ import (
 	"crypto/ed25519"
 	"database/sql"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 type store struct {

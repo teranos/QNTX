@@ -10,7 +10,7 @@ import (
 	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // openSqliteDatabase is QuickDev's SQLite, without ATS: migrated by Go's

@@ -47,7 +47,7 @@ import (
 	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/server/parity"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Thing is something QNTX persists, and where it is kept.

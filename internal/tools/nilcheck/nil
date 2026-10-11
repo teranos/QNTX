@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2708 in 381 files.
+# 2702 in 380 files.
 
 5	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -158,7 +158,6 @@
 1	internal/named/pointer.go
 1	internal/nodedid/handlers.go
 13	internal/pi/run.go
-6	internal/sacred/error.go
 2	internal/sacred/group.go
 2	internal/sacred/spawn.go
 7	internal/secretref/secretref.go

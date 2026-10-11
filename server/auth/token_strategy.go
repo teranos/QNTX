@@ -9,7 +9,7 @@ import (
 	"github.com/ory/fosite"
 	fositeoauth2 "github.com/ory/fosite/handler/oauth2"
 	"github.com/teranos/QNTX/internal/access"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "ory/fosite is what we're going to use"

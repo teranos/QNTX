@@ -5,7 +5,7 @@
 // "nil is nil"
 package named
 
-import "github.com/teranos/errors"
+import errors "github.com/teranos/sacred-error"
 
 // Text is text that holds something.
 type Text struct {

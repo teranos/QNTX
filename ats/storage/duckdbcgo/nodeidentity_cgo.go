@@ -18,7 +18,7 @@ import (
 	"unsafe"
 
 	"github.com/teranos/QNTX/internal/nodedid"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // IdentityStore is the parquet-backend implementation of nodedid.IdentityStore.

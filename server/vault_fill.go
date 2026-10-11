@@ -27,7 +27,7 @@ import (
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // vaultFilling holds one filling of the vault at a time, so two never write

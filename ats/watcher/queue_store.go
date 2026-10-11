@@ -7,7 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/db"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // QueueEntry represents a single entry in the watcher execution queue.

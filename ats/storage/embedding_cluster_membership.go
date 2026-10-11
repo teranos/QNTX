@@ -1,6 +1,6 @@
 package storage
 
-import "github.com/teranos/errors"
+import errors "github.com/teranos/sacred-error"
 import "github.com/teranos/QNTX/internal/sqlclose"
 
 // ClusterMembership maps an attestation source_id to its cluster identity.

@@ -7,7 +7,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 type pluginServicesSubsystem struct{}

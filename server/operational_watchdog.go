@@ -11,7 +11,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/services"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // How often the node asks whether it can still read what it cannot run without.

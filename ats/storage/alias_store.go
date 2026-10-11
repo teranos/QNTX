@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/db"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // AliasStore handles simple alias mappings

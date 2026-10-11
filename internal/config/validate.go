@@ -6,7 +6,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/internal/slug"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // KnownStorageBackends is the set of accepted values for [storage] backend.

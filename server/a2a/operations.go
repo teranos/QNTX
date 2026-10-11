@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/server/parity"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"

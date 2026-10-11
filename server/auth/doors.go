@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // A door is a domain people arrive at, and the namespace they arrive in

@@ -4,7 +4,7 @@ import (
 	"net/url"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // servedOverTLS reports whether a browser reaches this deployment over TLS.

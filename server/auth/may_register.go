@@ -1,6 +1,6 @@
 package auth
 
-import "github.com/teranos/errors"
+import errors "github.com/teranos/sacred-error"
 
 // mayRegister decides whether this request may enrol a passkey. A deployment
 // is never open: enrolling needs an identity that has been admitted, and a

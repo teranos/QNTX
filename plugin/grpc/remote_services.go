@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

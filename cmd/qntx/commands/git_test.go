@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // minting stands in for the node: it keeps what was asked and answers a token.

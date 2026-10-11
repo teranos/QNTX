@@ -13,7 +13,7 @@ import (
 
 	"github.com/hashicorp/go-getter"
 	"github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

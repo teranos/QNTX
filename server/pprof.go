@@ -6,7 +6,7 @@ import (
 	netpprof "net/http/pprof"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // pprofPrefix is what net/http/pprof's init() registers on

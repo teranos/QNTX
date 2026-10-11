@@ -9,7 +9,7 @@ import (
 	"encoding/hex"
 
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // standingPlugin is what a plugin's token holds: the plugin, the namespace its

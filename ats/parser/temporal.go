@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // timeNow is a variable that can be mocked for testing

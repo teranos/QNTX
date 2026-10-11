@@ -16,7 +16,7 @@ import (
 	"unsafe"
 
 	"github.com/teranos/QNTX/internal/access"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // UserStore is the parquet-backend implementation of auth.UserStore (ADR-031).

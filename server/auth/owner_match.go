@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // A passkey stands on several devices, and each derives its own key from it.

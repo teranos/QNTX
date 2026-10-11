@@ -4,7 +4,6 @@ package grpc
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap/zaptest"
 )
 

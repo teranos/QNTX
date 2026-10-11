@@ -16,7 +16,7 @@ import (
 	"unsafe"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ScheduleStore is the parquet-backend schedule store, held by the Rust crate:

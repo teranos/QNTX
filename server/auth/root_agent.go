@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // RootAgentLabel is the ROOT agent's token by name: what the tokens list shows

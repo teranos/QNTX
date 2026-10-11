@@ -10,7 +10,7 @@
 //	execID, err := identity.GenerateExecutionID()
 package identity
 
-import "github.com/teranos/errors"
+import errors "github.com/teranos/sacred-error"
 
 // GenerateASUID generates an Attestation System Unique ID with the given prefix.
 // Prefix is typically "AS" for attestations.

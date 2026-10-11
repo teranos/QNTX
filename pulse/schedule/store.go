@@ -11,7 +11,7 @@ import (
 	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 const (

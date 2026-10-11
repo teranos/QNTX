@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/teranos/QNTX/internal/nodedid"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Same caveat as tokens_cgo_test.go: `make test` builds with rustsqlite, not

@@ -4,7 +4,7 @@ package identity
 
 import (
 	"github.com/teranos/QNTX/ats/wasm"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // generateASUID generates an ASUID via the Rust WASM engine.

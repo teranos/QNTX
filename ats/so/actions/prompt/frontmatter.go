@@ -3,7 +3,7 @@ package prompt
 import (
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"gopkg.in/yaml.v3"
 )
 

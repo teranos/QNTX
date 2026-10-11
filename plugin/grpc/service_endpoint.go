@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // endpointKind is whether a service answers, or the node runs without it.

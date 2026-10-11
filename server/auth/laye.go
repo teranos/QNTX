@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Single-use and short-lived, so a signature proves possession now rather

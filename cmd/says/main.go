@@ -10,7 +10,7 @@ import (
 	"os"
 
 	"github.com/teranos/QNTX/server/parity"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // githubOperations is where the operations our messages name are written, in

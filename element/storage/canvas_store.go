@@ -8,7 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/db"
 	pb "github.com/teranos/QNTX/element/proto"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ErrNotFound is returned when a canvas entity (element, composition, minimized window) does not exist.

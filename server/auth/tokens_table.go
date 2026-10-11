@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/teranos/QNTX/internal/sqlclose"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // An access token lives in the operational db (ADR-037). Before this the gate

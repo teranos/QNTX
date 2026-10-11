@@ -1,0 +1,38 @@
+<!-- What the run taps and reads. Everything stands at a fixed distance from the
+     top, not a share of a window the keyboard shortens. The box sits high, where no keyboard covers it,
+     so the page has no reason to move. Two squares say what happened: the left
+     turns blue once the box has the keyboard, so a missed tap is never read as
+     a pass; the right is green while the page is at its own scale and red from
+     the moment it is not. -->
+<style>
+    #probe-says { position: fixed; left: 10%; width: 80%; top: 260px; height: 44px; font: 12px monospace; box-sizing: border-box; z-index: 2147483647; }
+    .probe-light { position: fixed; top: 90px; width: 80px; height: 80px; z-index: 2147483647; }
+    #probe-focus { left: calc(30% - 40px); background: #808080; }
+    #probe-focus.focused { background: #2962ff; }
+    #probe-scale { left: calc(70% - 40px); background: #00c853; }
+    #probe-scale.zoomed { background: #d50000; }
+</style>
+<div id="probe-focus" class="probe-light"></div>
+<div id="probe-scale" class="probe-light"></div>
+<div id="probe-numbers" style="position: fixed; left: 5%; top: 190px; z-index: 2147483647; font: 600 15px monospace; color: #ffd600; background: #000; padding: 2px 4px;"></div>
+<textarea id="probe-says" aria-label="probe box" placeholder="Say something to the ROOT agent"></textarea>
+<script>
+    (function () {
+        var box = document.getElementById('probe-says');
+        box.addEventListener('focus', function () { document.getElementById('probe-focus').classList.add('focused'); });
+        function look() {
+            if (window.visualViewport && window.visualViewport.scale > 1.01) document.getElementById('probe-scale').classList.add('zoomed');
+        }
+        window.visualViewport.addEventListener('resize', look);
+        window.visualViewport.addEventListener('scroll', look);
+        setInterval(look, 100);
+        // What moved, said in numbers a screenshot can read: the page's height
+        // against the window's, how far the page scrolled, how far the view slid.
+        setInterval(function () {
+            var vv = window.visualViewport;
+            document.getElementById('probe-numbers').textContent =
+                'doc ' + document.scrollingElement.scrollHeight + ' win ' + window.innerHeight +
+                ' scrollY ' + Math.round(window.scrollY) + ' vvTop ' + Math.round(vv.offsetTop) + ' vvH ' + Math.round(vv.height);
+        }, 100);
+    })();
+</script>

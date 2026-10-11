@@ -5,7 +5,7 @@ import (
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ExecutionStore handles persistence of job execution history

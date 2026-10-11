@@ -4,7 +4,7 @@ package parser
 
 import (
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // parseAxQueryDispatch returns an error when WASM parser is not available.

@@ -1,6 +1,6 @@
 package named
 
-import "github.com/teranos/errors"
+import errors "github.com/teranos/sacred-error"
 
 // Items is a list that holds at least one thing.
 type Items[T any] struct {

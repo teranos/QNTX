@@ -2,7 +2,7 @@
 
 package identity
 
-import "github.com/teranos/errors"
+import errors "github.com/teranos/sacred-error"
 
 func generateASUID(prefix, subject, predicate, context string) (string, error) {
 	return "", errors.New("ASUID generation requires qntxwasm build tag")

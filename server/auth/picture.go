@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/sqlclose"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "the user has a small picture via its auth, did you know that?"

@@ -13,7 +13,7 @@ import (
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // 1.0.0 BLOCKER (#1091): a vault is set up on the box by hand, outside the node.

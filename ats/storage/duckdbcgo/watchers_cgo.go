@@ -16,7 +16,7 @@ import (
 	"unsafe"
 
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // WatcherStore is the parquet-backend watcher store, held by the Rust crate:

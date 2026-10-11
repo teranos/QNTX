@@ -7,7 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/sacred"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 const writeQueueTimeout = 30 * time.Second

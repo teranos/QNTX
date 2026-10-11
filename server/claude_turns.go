@@ -10,7 +10,7 @@ import (
 	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/internal/claudecode"
 	"github.com/teranos/QNTX/internal/pi"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // sessionWriter writes an agent's session down as the agent (ADR-048): the

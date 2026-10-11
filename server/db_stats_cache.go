@@ -16,7 +16,7 @@ import (
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/syscap"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // WriteLockInspector exposes write lock holder diagnostics.

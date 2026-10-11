@@ -484,7 +484,7 @@ import (
     "encoding/json"
     "net/http"
 
-    "github.com/teranos/errors"
+    errors "github.com/teranos/sacred-error"
 )
 
 // HandleCanvasSnapshot renders a canvas to HTML via TypeScript plugin

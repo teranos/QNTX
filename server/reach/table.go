@@ -12,7 +12,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Each line is an `as`. REACH is what the line is about, the quoted paths are

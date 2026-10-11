@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ffiAttestation is the JSON shape shared between Go and Rust at the FFI boundary.

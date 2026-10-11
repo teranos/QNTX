@@ -6,7 +6,7 @@ import (
 	"database/sql"
 
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // openDatabase is unavailable without CGO — requires Rust SQLite driver.

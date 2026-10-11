@@ -14,7 +14,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 func init() {

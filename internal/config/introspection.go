@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ConfigSource represents where a configuration value came from

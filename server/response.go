@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/teranos/QNTX/internal/logger"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

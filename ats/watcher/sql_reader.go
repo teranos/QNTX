@@ -8,7 +8,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/db/rustdriver"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // SQLReader adapts *sql.DB to the AttestationReader interface.

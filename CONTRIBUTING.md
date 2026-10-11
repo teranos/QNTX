@@ -18,7 +18,7 @@ Thank you.
 - Focus on "why" not "what" in comments
 - Document reality, not aspiration
 - Incorporate your words verbatim into comments and commits.
-- Use error wrapping with context (see [teranos/errors](https://github.com/teranos/errors))
+- Use error wrapping with context (see [teranos/sacred-error](https://github.com/teranos/sacred-error))
 - Strict TDD
 
 ## Documentation

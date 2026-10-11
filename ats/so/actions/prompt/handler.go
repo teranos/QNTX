@@ -16,7 +16,7 @@ import (
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // HandlerName is the registered name for the prompt handler

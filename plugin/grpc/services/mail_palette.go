@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ColorOf reads a colour the way web/css writes one, "#rrggbb" or

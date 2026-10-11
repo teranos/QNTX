@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ProseEntry represents a prose content file or directory

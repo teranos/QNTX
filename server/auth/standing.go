@@ -3,7 +3,7 @@ package auth
 import (
 	"net/http"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Where a person is standing, and moving them there.

@@ -10,7 +10,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/sacred"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 

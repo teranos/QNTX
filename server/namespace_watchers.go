@@ -8,7 +8,7 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/namespaces"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // keepEngine holds the watcher engine of one namespace.

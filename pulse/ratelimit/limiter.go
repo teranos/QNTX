@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Limiter enforces max calls per time window using sliding window algorithm

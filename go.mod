@@ -40,6 +40,7 @@ require (
 	github.com/cockroachdb/errors v1.12.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/ory/fosite v0.49.0
+	github.com/teranos/sacred-error v0.0.0-20261010164404-b510f6387028
 )
 
 require (
@@ -187,7 +188,6 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/teranos/errors v0.1.0
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect

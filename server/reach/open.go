@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Answering is a handler offered by the path it would answer on.

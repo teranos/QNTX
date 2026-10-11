@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // urlEncode is the only escaping any provider does, named so the form bodies

@@ -16,7 +16,7 @@ import (
 	"github.com/ory/fosite"
 	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/internal/measure"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 
 	_ "embed"

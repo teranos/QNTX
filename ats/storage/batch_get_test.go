@@ -1,10 +1,10 @@
 package storage
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/teranos/QNTX/ats/types"
+	errors "github.com/teranos/sacred-error"
 )
 
 var errRead = errors.New("backend could not be read")

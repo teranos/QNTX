@@ -12,7 +12,7 @@ import (
 	"github.com/bluesky-social/indigo/lex/util"
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/teranos/QNTX/plugin/httputil"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // registerHTTPHandlers registers all HTTP handlers for the atproto domain.

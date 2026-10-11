@@ -18,7 +18,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // DomainPlugin defines the interface that all domain plugins must implement.

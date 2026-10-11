@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 const (

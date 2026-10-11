@@ -16,7 +16,7 @@ import (
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/util"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // NOTE: Ticker is now domain-agnostic (Issue #152 resolved)

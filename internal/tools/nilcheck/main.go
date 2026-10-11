@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // The words the failure is met with.

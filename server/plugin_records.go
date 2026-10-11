@@ -18,7 +18,7 @@ import (
 	"github.com/teranos/QNTX/internal/named"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/server/auth"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 const (

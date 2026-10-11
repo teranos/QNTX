@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // ObjectPrefixes returns the things the parquet backend holds as objects

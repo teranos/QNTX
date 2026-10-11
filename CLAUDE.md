@@ -64,7 +64,9 @@ TODO: sweep every repository and file for the old am.toml way of managing QNTX p
 ### Code Quality
 
 - **CRITICAL**: In errors, logs, and messages. If variables exist in scope (URLs, paths, IDs, status codes), reference them.
-Use `github.com/teranos/errors` for go (wraps cockroachdb/errors). Always wrap with context:
+Use `errors "github.com/teranos/sacred-error"` for go, the one error package: the Sacred Error shape, and building and wrapping over cockroachdb/errors. Always wrap with context:
+
+"but i want sacred-error to be the one"
 
 ```go
 if err := os.ReadFile(configPath); err != nil {
@@ -72,7 +74,7 @@ if err := os.ReadFile(configPath); err != nil {
 }
 ```
 
-See [github.com/teranos/errors](https://github.com/teranos/errors) for full documentation.
+See [github.com/teranos/sacred-error](https://github.com/teranos/sacred-error) and its `ERROR.md`.
 
 ### Testing
 

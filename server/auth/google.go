@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // googleIdentityPrefix qualifies the sub in auth.root_identities. Google names

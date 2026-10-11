@@ -16,7 +16,7 @@ import (
 	"github.com/teranos/QNTX/element"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/sqlclose"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // An element's UI is an attestation, and this is how one is written.

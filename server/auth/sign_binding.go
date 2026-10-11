@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // A ceremony is a person waiting in front of a provider. Ten minutes is long

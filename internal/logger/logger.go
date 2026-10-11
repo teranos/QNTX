@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

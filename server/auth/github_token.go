@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/teranos/QNTX/internal/access"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // How a GITHUB token came to be, which the GitHub element shows.

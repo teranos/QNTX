@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/ory/fosite"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // A client is a door (ADR-025). A door in am.toml is answered by the origin

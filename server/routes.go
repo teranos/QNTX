@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/internal/measure"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"

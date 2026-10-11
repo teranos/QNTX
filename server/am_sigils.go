@@ -10,7 +10,7 @@ import (
 	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/syscap"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // getAxUpgrader creates a WebSocket upgrader with origin checking from config

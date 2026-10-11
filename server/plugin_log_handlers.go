@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // HandlePluginLogs streams plugin log entries via Server-Sent Events.

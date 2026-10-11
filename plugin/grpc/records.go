@@ -3,7 +3,7 @@ package grpc
 import (
 	"sync"
 
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // PluginRecord is a plugin as the node knows it (ADR-043). The plugin element

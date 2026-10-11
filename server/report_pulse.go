@@ -12,7 +12,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
-	"github.com/teranos/errors"
+	errors "github.com/teranos/sacred-error"
 )
 
 // The weekly report on a Pulse schedule (ADR-042), and the one act that sends
