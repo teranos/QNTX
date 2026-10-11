@@ -52,13 +52,13 @@ func mintedIn(t *testing.T, store *memTokenStore, label, namespace string) strin
 // A token acting where the asking node was registered: live, and who.
 func TestANodeLearnsWhoATokenInItsNamespaceIs(t *testing.T) {
 	h, store, key, did := registered(t)
-	token := mintedIn(t, store, "ground-writer", "ground")
+	token := mintedIn(t, store, "ground-writer", NamespaceDefault)
 
 	answer := introspected(t, h, key, did, "one", token)
 	assert.True(t, answer.Active)
 	assert.Equal(t, nodeOrigin, answer.Issuer)
 	assert.Equal(t, mastodonAccount, answer.Subject)
-	assert.Equal(t, []string{"ground"}, answer.Namespaces)
+	assert.Equal(t, []string{NamespaceDefault}, answer.Namespaces)
 	assert.Equal(t, "ground-writer", answer.Label)
 	assert.Equal(t, string(LevelAttestor), answer.Level)
 	assert.Equal(t, "Bearer", answer.TokenType)
@@ -77,7 +77,7 @@ func TestANodeLearnsNothingOfATokenElsewhere(t *testing.T) {
 // Revoked here is revoked wherever it is presented.
 func TestARevokedTokenIsInactiveToTheAskingNode(t *testing.T) {
 	h, store, key, did := registered(t)
-	token := mintedIn(t, store, "ground-writer", "ground")
+	token := mintedIn(t, store, "ground-writer", NamespaceDefault)
 	grant, live := store.Lookup(sha256Hex(token))
 	require.True(t, live)
 	require.NoError(t, store.Revoke(grant.ID))
@@ -94,7 +94,7 @@ func TestATokenNobodyIssuedIsInactive(t *testing.T) {
 // Only a node that proves itself asks.
 func TestAskingWithoutSigningIsRefused(t *testing.T) {
 	h, store, _, _ := registered(t)
-	token := mintedIn(t, store, "ground-writer", "ground")
+	token := mintedIn(t, store, "ground-writer", NamespaceDefault)
 	form := url.Values{}
 	form.Set("token", token)
 	r := httptest.NewRequest(http.MethodPost, introspectPath, strings.NewReader(form.Encode()))
@@ -108,7 +108,7 @@ func TestAskingWithoutSigningIsRefused(t *testing.T) {
 func TestAskingAsANodeWithAnotherKeyIsRefused(t *testing.T) {
 	h, store, _, did := registered(t)
 	stranger, _ := otherNode(t)
-	token := mintedIn(t, store, "ground-writer", "ground")
+	token := mintedIn(t, store, "ground-writer", NamespaceDefault)
 	w := httptest.NewRecorder()
 	h.handleIntrospect(w, introspectRequest(did, assertion(t, stranger, did, nodeOrigin+tokenPath, "one", time.Now().Add(time.Minute)), token))
 	assert.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())

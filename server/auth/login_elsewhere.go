@@ -14,11 +14,9 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// A node whose people log in at another node (auth.login_at): the passkey is
-// done there, and the code that comes back is exchanged here, signing as this
-// node's did:key. The other node says who it is; this node's list says if they are in.
-
-// "k should be delegating auth to the node entirely to q"
+// A peer's people log in at the primary (nodes.primary): the passkey is done
+// there, and the code that comes back is exchanged here, signing as this
+// node's did:key. The primary says who it is; this node's list says if they are in.
 
 // elsewherePath is where this node's login sends somebody on their way.
 const elsewherePath = "/auth/elsewhere"
@@ -40,19 +38,24 @@ type elsewhereJourneys struct {
 	byState sync.Map
 }
 
-// SetLoginAt names the node this node's people log in at, or none. A value
-// that is not an absolute origin is refused rather than read as none.
-func (h *Handler) SetLoginAt(origin string) error {
+// SetPrimary names the primary node, or none: people log in there, and the
+// tokens it issued are accepted here. A value that is not an absolute origin
+// is refused rather than read as none.
+func (h *Handler) SetPrimary(origin string) error {
 	trimmed := strings.TrimSuffix(strings.TrimSpace(origin), "/")
 	parsed, err := url.Parse(trimmed)
 	if err != nil {
-		return errors.Wrapf(err, "auth.login_at %q does not parse as an origin", origin)
+		return errors.Wrapf(err, "nodes.primary %q does not parse as an origin", origin)
 	}
 	if !parsed.IsAbs() && names(trimmed) {
-		return errors.Newf("auth.login_at %q is not an absolute origin such as https://api.example.com", origin)
+		return errors.Newf("nodes.primary %q is not an absolute origin such as https://api.example.com", origin)
 	}
 	h.loginAt = trimmed
 	h.logsInElsewhere = parsed.IsAbs()
+	h.issuers = h.issuers[:0]
+	if parsed.IsAbs() {
+		h.issuers = append(h.issuers, trimmed)
+	}
 	return nil
 }
 
