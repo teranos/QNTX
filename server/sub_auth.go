@@ -300,6 +300,12 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := authHandler.SetLoginAt(s.deps.cfg.Auth.LoginAt); err != nil {
 		return err
 	}
+	// The nodes that are clients of this one.
+	for _, node := range s.deps.cfg.Auth.Nodes {
+		if err := authHandler.DeclareNode(node.DID, node.Origin); err != nil {
+			return err
+		}
+	}
 	// Every other door am.toml names. The node's own relying party is
 	// already the door onto default; a door that cannot work is refused here
 	// rather than when somebody arrives at it, and one bad door does not take

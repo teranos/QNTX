@@ -85,13 +85,15 @@ type Handler struct {
 	// Every node's client assertion the token endpoint accepted, until it expires.
 	assertions spentAssertions
 	// auth.issuers: the nodes whose tokens this one also accepts, and what they said of each.
-	issuers  []string
-	issued   issuedAnswers
+	issuers []string
+	issued  issuedAnswers
 	// auth.login_at: the node this node's people log in at, and who is on their way there.
 	loginAt         string
 	logsInElsewhere bool
 	elsewhere       elsewhereJourneys
-	tokens          TokenStore // ADR-025: bearer token path; may be nil during init
+	// auth.nodes: the nodes that are clients of this one, by did:key.
+	nodes    map[string]Client
+	tokens   TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
 	// read back out of the system store. Nil until the store is up, and a nil
@@ -302,7 +304,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// A client authenticates at the token endpoint and nowhere else
 		// (ADR-025). The secret an app holds is not a credential that reaches
 		// a route, whoever minted it.
-		if grant.Level == LevelOAuth || grant.Level == LevelNode {
+		if grant.Level == LevelOAuth {
 			h.logger.Infow("Bearer token refused",
 				"did", grant.DID,
 				"reason", "a client is not a bearer")
@@ -544,8 +546,6 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// to both. A write is a session's alone: minting, revoking, enabling a
 	// token, switching a person off or on. SUPER lists and reads.
 	mux.answer("/auth/tokens", h.readOrSession(h.tokensCollection))
-	// Another node registered as a client by its own did:key, a session's alone.
-	mux.answer(nodesPath, h.sessionOnly(h.handleRegisterNode))
 	mux.answer("/auth/tokens/", h.readOrSession(h.handleTokenByID))
 	mux.answer("/auth/users", h.readOrSession(h.usersCollection))
 	mux.answer("/auth/users/", h.readOrSession(h.handleUserByID))

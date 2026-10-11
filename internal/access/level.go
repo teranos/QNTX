@@ -36,10 +36,6 @@ const (
 	// and nowhere else, so no reach line names it and the middleware refuses
 	// it as a bearer.
 	LevelOAuth Level = "OAUTH"
-	// LevelNode is a kind and not a rung: another node registered as a client
-	// by its own did:key. It signs for its own token and is sent no code; no
-	// secret exists for it, and the middleware refuses it as a bearer.
-	LevelNode Level = "NODE"
 	// LevelRefresh is a kind and not a rung. A refresh token is written down
 	// the way every token is, so it survives a restart and revocation reaches
 	// it — but it is spent at the token endpoint for a new access token and

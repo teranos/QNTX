@@ -10,16 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// "k should be delegating auth to the node entirely to q"
-// "so i can use my name user to get onto k"
-
 // A node whose people log in at another: its login sends them there, the
 // passkey is done there, and the code that comes back is a session here.
 
-// kapteynOrigin is where the node whose people log in elsewhere answers.
-const kapteynOrigin = "https://kapteyn.node.test"
+// elsewhereOrigin is where the node whose people log in elsewhere answers.
+const elsewhereOrigin = "https://elsewhere.node.test"
 
-// loginElsewhere is the issuer serving its routes with the node registered at
+// loginElsewhere is the issuer serving its routes with the node declared at
 // it, and the node logging its people in there.
 func loginElsewhere(t *testing.T) (issuer, node *Handler) {
 	t.Helper()
@@ -35,7 +32,7 @@ func loginElsewhere(t *testing.T) (issuer, node *Handler) {
 	node = handlerWithDoors(t)
 	node.tokens = newMemTokenStore()
 	node.nodeKey = key
-	node.configuredOrigin = kapteynOrigin
+	node.configuredOrigin = elsewhereOrigin
 	require.NoError(t, node.SetLoginAt(served.URL))
 	return issuer, node
 }
@@ -68,7 +65,7 @@ func sentToTheIssuer(t *testing.T, issuer, node *Handler, going string) *url.URL
 	require.Equal(t, http.StatusSeeOther, done.Code, done.Body.String())
 	back, err := url.Parse(done.Header().Get("Location"))
 	require.NoError(t, err)
-	require.Equal(t, kapteynOrigin+elsewhereBackPath, back.Scheme+"://"+back.Host+back.Path)
+	require.Equal(t, elsewhereOrigin+elsewhereBackPath, back.Scheme+"://"+back.Host+back.Path)
 	return back
 }
 

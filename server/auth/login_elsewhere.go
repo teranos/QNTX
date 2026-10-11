@@ -18,8 +18,6 @@ import (
 // done there, and the code that comes back is exchanged here, signing as this
 // node's did:key. The other node says who it is; this node's list says if they are in.
 
-// "k should be delegating auth to the node entirely to q"
-
 // elsewherePath is where this node's login sends somebody on their way.
 const elsewherePath = "/auth/elsewhere"
 

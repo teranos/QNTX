@@ -24,8 +24,7 @@ type Client struct {
 	// issued through it acts.
 	Namespace     string
 	ReturnAddress string
-	// Node is another node registered by its own did:key (LevelNode): it asks
-	// for its own token and is sent no code.
+	// Node is another node auth.nodes declares by its did:key.
 	Node bool
 }
 
@@ -36,6 +35,9 @@ type Client struct {
 // The list is read whole. A client is looked up once per authorize request,
 // which is a person walking up, and the store is small.
 func (h *Handler) clientByDID(did string) (Client, bool) {
+	if node, declared := h.nodes[did]; declared {
+		return node, true
+	}
 	if h.tokens == nil || did == "" {
 		return Client{}, false
 	}
@@ -45,7 +47,7 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 		return Client{}, false
 	}
 	for _, t := range listed {
-		if t.DID != did || (t.Level != LevelOAuth && t.Level != LevelNode) {
+		if t.DID != did || t.Level != LevelOAuth {
 			continue
 		}
 		if t.RevokedAt != nil || expiredAt(t.ExpiresAt) {
@@ -61,7 +63,6 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 			MintedBy:      t.MintedBy,
 			Namespace:     namespace,
 			ReturnAddress: t.ReturnAddress,
-			Node:          t.Level == LevelNode,
 		}, true
 	}
 	return Client{}, false

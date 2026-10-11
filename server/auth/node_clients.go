@@ -3,9 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/ed25519"
-	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,20 +16,15 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// A node is a client of another node, registered by its own did:key. It
-// proves itself by signing with that key (RFC 7523 §2.2), so no secret exists.
+// A node is a client of another node, declared in auth.nodes by its own
+// did:key. It proves itself by signing with that key (RFC 7523 §2.2), so no
+// secret exists.
 
 // "every QNTX node is an OAuth server and an OAuth client. Nodes authenticate
 // to each other only through OAuth, over the public internet, with no network trusted"
 
-// nodesPath is where ROOT registers another node as a client of this one.
-const nodesPath = "/auth/nodes"
-
 // clientAssertionType is RFC 7523 §2.2's client_assertion_type.
 const clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
-
-// grantClientCredentials is the grant a node asks for its token with.
-const grantClientCredentials = "client_credentials"
 
 // assertionMaxLife is how far ahead an assertion may say it expires: its
 // replay window. A node signs a fresh one for every request.
@@ -135,143 +128,35 @@ func names(word string) bool {
 	return strings.IndexFunc(word, unicode.IsLetter) >= 0
 }
 
-// handleRegisterNode writes another node as a client of this one, behind a
-// session. POST /auth/nodes {"label", "did", "namespace", "return_address",
-// "expires_at"}. The return address is the node's own way back for the people
-// it sends here to log in.
-func (h *Handler) handleRegisterNode(w http.ResponseWriter, r *http.Request, p Presented) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	var req struct {
-		Label         string `json:"label"`
-		DID           string `json:"did"`
-		Namespace     string `json:"namespace"`
-		ReturnAddress string `json:"return_address"`
-		ExpiresAt     string `json:"expires_at"`
-	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
-		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON: "+err.Error())
-		return
-	}
-	label, did, namespace := strings.TrimSpace(req.Label), strings.TrimSpace(req.DID), strings.TrimSpace(req.Namespace)
-	if !names(label) {
-		h.writeError(w, http.StatusBadRequest, "a node is registered under a label, which roles are granted to, and this named "+label)
-		return
-	}
-	if !names(namespace) {
-		h.writeError(w, http.StatusBadRequest, "a node acts in the one namespace it is registered in, and this named "+namespace)
-		return
-	}
-	returnAddress := strings.TrimSpace(req.ReturnAddress)
-	if err := returnable(returnAddress); err != nil {
-		h.writeError(w, http.StatusBadRequest, "a node is sent back the people it sends here: "+err.Error())
-		return
-	}
+// DeclareNode makes another node a client of this one, as auth.nodes names
+// it: its did:key, and the origin its people are sent back to.
+func (h *Handler) DeclareNode(did, origin string) error {
+	did = strings.TrimSpace(did)
 	key, err := DecodeUserDID(did)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "the did is not an ed25519 did:key: "+err.Error())
-		return
+		return errors.Wrapf(err, "auth.nodes names %q, which is not an ed25519 did:key", did)
 	}
 	if len(key) != ed25519.PublicKeySize {
-		h.writeError(w, http.StatusBadRequest, "the did names a key that is not an ed25519 public key")
-		return
+		return errors.Newf("auth.nodes names %q, whose key is not an ed25519 public key", did)
 	}
-	if held, already := h.clientByDID(did); already {
-		h.writeError(w, http.StatusConflict, did+" is already a client of this node, as "+held.Label)
-		return
+	origin = strings.TrimSuffix(strings.TrimSpace(origin), "/")
+	parsed, err := url.Parse(origin)
+	if err != nil || !parsed.IsAbs() || parsed.Scheme+"://"+parsed.Host != origin || !names(parsed.Scheme) {
+		return errors.Newf("auth.nodes names %s at %q, which is not an origin such as https://node.example.com", did, origin)
 	}
-	listed, err := h.tokens.List()
-	if err != nil {
-		h.writeError(w, http.StatusInternalServerError, "the token store did not answer: "+err.Error())
-		return
+	if _, held := h.nodes[did]; held {
+		return errors.Newf("auth.nodes names %s twice", did)
 	}
-	for _, other := range listed {
-		if other.Label == label {
-			h.writeError(w, http.StatusConflict, "a token is already named "+label+": "+other.ID)
-			return
-		}
+	nodes := map[string]Client{did: {
+		DID:           did,
+		Label:         parsed.Host,
+		Namespace:     NamespaceDefault,
+		ReturnAddress: origin + elsewhereBackPath,
+		Node:          true,
+	}}
+	for held, node := range h.nodes {
+		nodes[held] = node
 	}
-	mintedBy, admitted := p.Admitted()
-	if !admitted {
-		h.writeError(w, http.StatusUnauthorized, "no session")
-		return
-	}
-	expiresAt, err := expiryOf(req.ExpiresAt)
-	if err != nil {
-		h.writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	// The row is keyed by a hash like every token, of bytes drawn and dropped: nothing presents it.
-	unheld := make([]byte, tokenSeedBytes)
-	drawn, err := rand.Read(unheld)
-	if err != nil || drawn != tokenSeedBytes {
-		h.writeError(w, http.StatusInternalServerError, "no row could be drawn for the node")
-		return
-	}
-	id, err := h.tokens.Issue(IssuedToken{
-		Hash:                sha256Hex(hex.EncodeToString(unheld)),
-		DID:                 did,
-		Label:               label,
-		MintedBy:            mintedBy,
-		MintedByUser:        p.UserID,
-		MintedByDisplayName: p.DisplayName,
-		Level:               LevelNode,
-		Namespaces:          []string{namespace},
-		ExpiresAt:           expiresAt,
-		ReturnAddress:       returnAddress,
-	})
-	if err != nil {
-		h.attest(PredicateUnanswered, mintedBy, map[string]any{
-			"asked": "token store", "doing": "register a node", "did": did, "error": err.Error(),
-		})
-		h.writeError(w, http.StatusInternalServerError, "the node was not written: "+err.Error())
-		return
-	}
-	h.attest(PredicateMinted, mintedBy, map[string]any{
-		"token": id, "label": label, "level": string(LevelNode), "namespaces": []string{namespace}, "did": did,
-	})
-	h.writeJSON(w, http.StatusOK, map[string]any{
-		"id":         id,
-		"label":      label,
-		"did":        did,
-		"minted_by":  mintedBy,
-		"level":      string(LevelNode),
-		"namespaces": []string{namespace},
-		"expires_at": expiresAt.UTC().Format(time.RFC3339Nano),
-	})
-}
-
-// issueNodeToken writes the token a node asked for. The node speaks as itself:
-// it holds roles by its client's label, in the namespace its client is in.
-func (s *oauthStore) issueNodeToken(signature string, session *TokenSession, client Client) error {
-	// It answers to whoever registered it, the way every token answers to its minter (ADR-025).
-	if !s.h.stillAdmitted(client.MintedBy) {
-		return errors.WithStack(fosite.ErrAccessDenied.WithHintf("%s, who registered %s, is no longer admitted", client.MintedBy, client.DID))
-	}
-	until := session.GetExpiresAt(fosite.AccessToken)
-	if until.IsZero() {
-		return errors.WithStack(fosite.ErrServerError.WithHint("a node's token says nothing of when it ends, and was not written"))
-	}
-	id, err := s.h.tokens.Issue(IssuedToken{
-		Hash:       signature,
-		DID:        session.DID,
-		Label:      client.Label,
-		MintedBy:   client.MintedBy,
-		Level:      LevelAttestor,
-		Namespaces: []string{client.Namespace},
-		ExpiresAt:  &until,
-	})
-	if err != nil {
-		s.h.attest(PredicateUnanswered, client.MintedBy, map[string]any{
-			"asked": "token store", "doing": "issue", "client": client.DID, "error": err.Error(),
-		})
-		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
-	}
-	s.h.attest(PredicateMinted, client.MintedBy, map[string]any{
-		"token": id, "label": client.Label, "level": string(LevelAttestor),
-		"namespaces": []string{client.Namespace}, "client": client.DID, "did": session.DID,
-	})
+	h.nodes = nodes
 	return nil
 }

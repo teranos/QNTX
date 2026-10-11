@@ -737,11 +737,6 @@
         "ANYONE"
       ]
     },
-    "/auth/nodes": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
     "/auth/register/begin": {
       "x-qntx-reach": [
         "ANYONE"
