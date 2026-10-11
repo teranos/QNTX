@@ -103,10 +103,12 @@ describe('Tim: ROOT reads the node\'s GitHub', () => {
                 workspaces: ['datapunt', 'garden'],
                 jobs: ['2026-09-26T09:00:00Z', '2026-09-27T10:00:00Z', '2026-09-28T13:04:05Z'],
                 taken: [{ plugin: 'garden', archive: 'qntx-garden-plugin-0.2.0-linux-amd64.tar.gz', digest: 'ab12', at: '2026-09-28T13:05:00Z', changed: true }],
+                unread: ['the runner\'s jobs were not listed from /opt/actions-runner/_diag'],
             },
         }), reload);
         expect(container.textContent).toContain('box-1');
         expect(container.textContent).toContain('datapunt, garden');
+        expect(container.textContent).toContain('the runner\'s jobs were not listed');
         const jobs = container.querySelector('.github-runner-jobs');
         expect(jobs?.textContent).toContain('Jobs');
         expect(jobs?.querySelector('.sparkline-row')?.textContent).toContain('box-1');

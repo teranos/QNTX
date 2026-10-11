@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/teranos/QNTX/ats/types"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -48,7 +49,7 @@ func TestCompileSubscriptions_AxToPy(t *testing.T) {
 	}
 
 	// Create the AX element's watcher (as ax-element.ts would via WebSocket)
-	axWatcher := &storage.Watcher{
+	axWatcher := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                "ax-element-ax-element-1",
 		Name:              "AX Element: contact",
 		AxQuery:           "contact",
@@ -278,7 +279,7 @@ func TestCompileSubscriptions_StaleEdgeCleanup(t *testing.T) {
 	}
 
 	// Create AX watcher (as ax-element.ts would)
-	axWatcher := &storage.Watcher{
+	axWatcher := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                "ax-element-ax-1",
 		Name:              "AX Element: contact",
 		AxQuery:           "contact",

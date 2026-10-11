@@ -120,6 +120,7 @@ func TestHandlerRegistry_PhoneBook(t *testing.T) {
 
 		// Incoming call for tech support
 		job := &Job{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "call-001",
 			HandlerName: "tech-support",
 			Source:      "customer-hotline",
@@ -239,6 +240,7 @@ func TestHandlerRegistry_PhoneBook(t *testing.T) {
 
 		// Call unknown department
 		job := &Job{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "call-002",
 			HandlerName: "unknown-department",
 			Source:      "customer",

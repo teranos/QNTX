@@ -103,6 +103,8 @@ async function startServer(pluginPath: string, port: number) {
                 callback(null, {
                     handler_names: plugin.handler_names || [],
                     schedules: plugin.schedules || [],
+                    // A TypeScript plugin declares no routes, so serves no sigils.
+                    sigils_from: 'SIGILS_FROM_NONE',
                 });
             } catch (error) {
                 console.error(`[Runtime] Initialize error: ${error}`);
@@ -115,7 +117,7 @@ async function startServer(pluginPath: string, port: number) {
                 if (plugin.shutdown) {
                     await plugin.shutdown();
                 }
-                callback(null, {});
+                callback(null, { stopped: true });
             } catch (error) {
                 console.error(`[Runtime] Shutdown error: ${error}`);
                 callback(error);

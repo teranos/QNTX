@@ -73,12 +73,22 @@ func batchMatchStructural(as *types.As, watchers []*storage.Watcher) map[string]
 			Actors:           w.Filter.Actors,
 			AttributeFilters: w.AttributeFilters,
 		}
-		if w.Filter.TimeStart != nil {
-			ms := w.Filter.TimeStart.UnixMilli()
+		// A watcher whose filter names neither side of its time range is
+		// refused by the Go matcher, which says so.
+		start, starts, err := w.Filter.TimeStart.At("start")
+		if err != nil {
+			return batchMatchStructuralGo(as, watchers)
+		}
+		end, ends, err := w.Filter.TimeEnd.At("end")
+		if err != nil {
+			return batchMatchStructuralGo(as, watchers)
+		}
+		if starts {
+			ms := start.UnixMilli()
 			f.TimeStartMs = &ms
 		}
-		if w.Filter.TimeEnd != nil {
-			ms := w.Filter.TimeEnd.UnixMilli()
+		if ends {
+			ms := end.UnixMilli()
 			f.TimeEndMs = &ms
 		}
 		filters = append(filters, f)

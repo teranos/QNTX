@@ -25,8 +25,20 @@ type PluginRecords interface {
 
 var (
 	recordsMu sync.RWMutex
-	records   PluginRecords
+	records   PluginRecords = recordsNotHanded{}
 )
+
+// recordsNotHanded is the plugin layer before the server hands it the node's
+// records: it knows no plugin, and asking it about one is refused.
+type recordsNotHanded struct{}
+
+func (recordsNotHanded) Plugins() ([]PluginRecord, error) {
+	return nil, errors.New("the node has not handed the plugin layer its plugin records yet")
+}
+
+func (recordsNotHanded) Plugin(name string) (PluginRecord, bool, error) {
+	return PluginRecord{}, false, errors.Newf("the node has not handed the plugin layer its plugin records yet, so plugin %s has none to read", name)
+}
 
 // SetPluginRecords hands the plugin layer the node's records. The server sets
 // them once its store is open.
@@ -36,15 +48,13 @@ func SetPluginRecords(r PluginRecords) {
 	records = r
 }
 
-// pluginRecord is one plugin's record. False is a plugin with no record, or a
-// node whose records are not set yet; a record that could not be read is the error.
+// pluginRecord is one plugin's record. False is a plugin with no record; a
+// record that could not be read, or a node that has not handed its records
+// over yet, is the error.
 func pluginRecord(name string) (PluginRecord, bool, error) {
 	recordsMu.RLock()
 	held := records
 	recordsMu.RUnlock()
-	if held == nil {
-		return PluginRecord{}, false, nil
-	}
 	record, found, err := held.Plugin(name)
 	if err != nil {
 		return PluginRecord{}, false, errors.Wrapf(err, "failed to read the record of plugin %s", name)

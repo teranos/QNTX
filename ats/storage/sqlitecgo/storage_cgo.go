@@ -571,9 +571,6 @@ func (rs *RustStore) putLocked(jsonBytes []byte) error {
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation (implements ats.AttestationStore).
 func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
-	if err := cmd.NamesItsActor(); err != nil {
-		return nil, err
-	}
 	// Use first subject, predicate, and context for vanity generation
 	subject := "_"
 	if len(cmd.Subjects) > 0 {
@@ -599,7 +596,10 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	}
 
 	// Convert to As struct
-	as := cmd.ToAs(asid, "")
+	as, err := cmd.ToAs(asid, "")
+	if err != nil {
+		return nil, err
+	}
 
 	// Serialize outside the lock
 	jsonBytes, err := toRustJSON(as)
@@ -636,33 +636,63 @@ type rustQueryFilter struct {
 	Limit int `json:"limit"`
 }
 
-// unixMilli is a time pointer as Unix milliseconds, nil staying nil.
-func unixMilli(t *time.Time) *int64 {
-	if t == nil {
-		return nil
+// rustTimes is a query's time range as Rust reads it: Unix milliseconds on a
+// bounded side, the field left out on an unbounded one. windowed is whether
+// the range starts at a time.
+type rustTimes struct {
+	from, to *int64
+	windowed bool
+}
+
+// rustRange is a query's time range as Rust reads it. A side naming neither
+// is refused.
+func rustRange(start, end types.TimeBound) (rustTimes, error) {
+	startAt, starts, err := start.At("start")
+	if err != nil {
+		return rustTimes{}, err
 	}
-	ms := t.UnixMilli()
-	return &ms
+	endAt, ends, err := end.At("end")
+	if err != nil {
+		return rustTimes{}, err
+	}
+	times := rustTimes{windowed: starts}
+	if starts {
+		ms := startAt.UnixMilli()
+		times.from = &ms
+	}
+	if ends {
+		ms := endAt.UnixMilli()
+		times.to = &ms
+	}
+	return times, nil
 }
 
 // GetAttestations retrieves attestations based on filters (implements ats.AttestationStore).
 func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
+	times, err := rustRange(filter.TimeStart, filter.TimeEnd)
+	if err != nil {
+		return nil, err
+	}
 	return rs.query(rustQueryFilter{
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
 		Actors:     filter.Actors,
 		Source:     filter.Source,
-		TimeStart:  unixMilli(filter.TimeStart),
-		TimeEnd:    unixMilli(filter.TimeEnd),
+		TimeStart:  times.from,
+		TimeEnd:    times.to,
 		Limit:      filter.Limit,
-	}, "storage_query "+slowQueryKey(filter), false)
+	}, "storage_query "+slowQueryKey(filter, times.windowed), false)
 }
 
 // QueryFilter executes a full AxFilter query through Rust FFI.
 // Rust builds the SQL and executes it.
 func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
-	return rs.query(axAsRust(filter), "query_filter", false)
+	rustFilter, err := axAsRust(filter)
+	if err != nil {
+		return nil, err
+	}
+	return rs.query(rustFilter, "query_filter", false)
 }
 
 // QueryFilterResolved executes the whole ax read path in Rust: alias expansion,
@@ -675,20 +705,28 @@ func (rs *RustStore) QueryFilter(filter types.AxFilter) ([]*types.As, error) {
 // GetAttestations, whose callers — the REST API, the watcher engine — read
 // unresolved rows and must keep doing so.
 func (rs *RustStore) QueryFilterResolved(filter types.AxFilter) ([]*types.As, error) {
-	return rs.query(axAsRust(filter), "query_filter_resolved", true)
+	rustFilter, err := axAsRust(filter)
+	if err != nil {
+		return nil, err
+	}
+	return rs.query(rustFilter, "query_filter_resolved", true)
 }
 
 // axAsRust is an AxFilter as Rust reads it.
-func axAsRust(filter types.AxFilter) rustQueryFilter {
+func axAsRust(filter types.AxFilter) (rustQueryFilter, error) {
+	times, err := rustRange(filter.TimeStart, filter.TimeEnd)
+	if err != nil {
+		return rustQueryFilter{}, err
+	}
 	return rustQueryFilter{
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
 		Actors:     filter.Actors,
-		TimeStart:  unixMilli(filter.TimeStart),
-		TimeEnd:    unixMilli(filter.TimeEnd),
+		TimeStart:  times.from,
+		TimeEnd:    times.to,
 		Limit:      filter.Limit,
-	}
+	}, nil
 }
 
 // query asks a read connection when one is free, else the store under the

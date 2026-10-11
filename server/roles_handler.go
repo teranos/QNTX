@@ -55,7 +55,7 @@ func (s *QNTXServer) rolesList(_ context.Context, _ sigil.Sent) (any, *protocol.
 	}
 	// One scan. The store's ceiling, newest first, so a node past it loses
 	// the oldest lines rather than the ones that decide.
-	found, err := store.GetAttestations(ats.AttestationFilter{Limit: storage.MaxAttestationLimit})
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: storage.MaxAttestationLimit})
 	if err != nil {
 		s.logger.Errorw("the lines were not read", "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}

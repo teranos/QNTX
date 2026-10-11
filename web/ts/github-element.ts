@@ -58,6 +58,8 @@ export interface RunnerStats {
     /** When each job the runner ran was last written, oldest first. */
     jobs: string[];
     taken: TakenBuild[];
+    /** What of the runner's directory could not be read, and why. */
+    unread: string[];
 }
 
 /** The runner as the Actions section shows it. */
@@ -373,6 +375,8 @@ export function renderActions(container: HTMLElement, runner: GitHubRunner, relo
         renderSparklines(over, 'Jobs', [{ name: st.name || st.path, times: jobs }], windowOf(jobs));
         s.appendChild(over);
         s.appendChild(takenTable(st.taken));
+        // What the stats above leave out, because it could not be read.
+        for (const why of st.unread) s.appendChild(errorText(why));
     }
 
     container.appendChild(s);

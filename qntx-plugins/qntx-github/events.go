@@ -138,11 +138,13 @@ func (p *Plugin) attestPullRequestEvent(ctx context.Context, store ats.Attestati
 	}
 
 	cmd := &types.AsCommand{
+		By:            types.ByNode{},
+		When:          types.Now{},
 		Subjects:      []string{pr.HTMLURL},
 		Predicates:    []string{"pr-merged"},
 		Contexts:      []string{"github"},
 		Source:        p.Metadata().Name,
-		SourceVersion: p.Metadata().Version,
+		SourceVersion: types.VersionFromRegistry{},
 		Attributes:    attrs,
 	}
 
@@ -175,11 +177,13 @@ func (p *Plugin) attestReleaseEvent(ctx context.Context, store ats.AttestationSt
 	}
 
 	cmd := &types.AsCommand{
+		By:            types.ByNode{},
+		When:          types.Now{},
 		Subjects:      []string{release.HTMLURL},
 		Predicates:    []string{"released"},
 		Contexts:      []string{"github"},
 		Source:        p.Metadata().Name,
-		SourceVersion: p.Metadata().Version,
+		SourceVersion: types.VersionFromRegistry{},
 		Attributes:    attrs,
 	}
 
@@ -219,11 +223,13 @@ func (p *Plugin) attestIssueEvent(ctx context.Context, store ats.AttestationStor
 	}
 
 	cmd := &types.AsCommand{
+		By:            types.ByNode{},
+		When:          types.Now{},
 		Subjects:      []string{issue.HTMLURL},
 		Predicates:    []string{predicate},
 		Contexts:      []string{"github"},
 		Source:        p.Metadata().Name,
-		SourceVersion: p.Metadata().Version,
+		SourceVersion: types.VersionFromRegistry{},
 		Attributes:    attrs,
 	}
 
@@ -265,11 +271,13 @@ func (p *Plugin) attestPushEvent(ctx context.Context, store ats.AttestationStore
 	}
 
 	cmd := &types.AsCommand{
+		By:            types.ByNode{},
+		When:          types.Now{},
 		Subjects:      []string{event.Repo.URL + "/tree/" + branch},
 		Predicates:    []string{"pushed"},
 		Contexts:      []string{"github"},
 		Source:        p.Metadata().Name,
-		SourceVersion: p.Metadata().Version,
+		SourceVersion: types.VersionFromRegistry{},
 		Attributes:    attrs,
 	}
 

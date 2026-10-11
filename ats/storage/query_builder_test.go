@@ -150,8 +150,8 @@ func TestBuildTemporalFilters(t *testing.T) {
 
 	t.Run("with start time", func(t *testing.T) {
 		qb := &queryBuilder{}
-		filter := types.AxFilter{
-			TimeStart: &now,
+		filter := types.AxFilter{TimeEnd: types.Unbounded(),
+			TimeStart: types.BoundAt(now),
 		}
 		qb.buildTemporalFilters(filter)
 
@@ -162,8 +162,8 @@ func TestBuildTemporalFilters(t *testing.T) {
 
 	t.Run("with end time", func(t *testing.T) {
 		qb := &queryBuilder{}
-		filter := types.AxFilter{
-			TimeEnd: &later,
+		filter := types.AxFilter{TimeStart: types.Unbounded(),
+			TimeEnd: types.BoundAt(later),
 		}
 		qb.buildTemporalFilters(filter)
 
@@ -175,8 +175,8 @@ func TestBuildTemporalFilters(t *testing.T) {
 	t.Run("with both start and end", func(t *testing.T) {
 		qb := &queryBuilder{}
 		filter := types.AxFilter{
-			TimeStart: &now,
-			TimeEnd:   &later,
+			TimeStart: types.BoundAt(now),
+			TimeEnd:   types.BoundAt(later),
 		}
 		qb.buildTemporalFilters(filter)
 
@@ -186,7 +186,7 @@ func TestBuildTemporalFilters(t *testing.T) {
 
 	t.Run("with neither", func(t *testing.T) {
 		qb := &queryBuilder{}
-		filter := types.AxFilter{}
+		filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()}
 		qb.buildTemporalFilters(filter)
 
 		assert.Equal(t, 0, len(qb.whereClauses))

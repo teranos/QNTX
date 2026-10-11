@@ -51,26 +51,26 @@ type WatcherFire struct {
 
 // WatcherResponse represents a watcher in API responses
 type WatcherResponse struct {
-	ID                string   `json:"id"`
-	Name              string   `json:"name"`
-	Subjects          []string `json:"subjects,omitempty"`
-	Predicates        []string `json:"predicates,omitempty"`
-	Contexts          []string `json:"contexts,omitempty"`
-	Actors            []string `json:"actors,omitempty"`
-	TimeStart         string   `json:"time_start,omitempty"`
-	TimeEnd           string   `json:"time_end,omitempty"`
-	ActionType        string   `json:"action_type"`
-	ActionData        string   `json:"action_data"`
-	SemanticQuery     string   `json:"semantic_query,omitempty"`
-	SemanticThreshold float32  `json:"semantic_threshold,omitempty"`
-	MaxFiresPerSecond int      `json:"max_fires_per_second"`
-	Enabled           bool     `json:"enabled"`
-	CreatedAt         string   `json:"created_at"`
-	UpdatedAt         string   `json:"updated_at"`
-	LastFiredAt       string   `json:"last_fired_at,omitempty"`
-	FireCount         int64    `json:"fire_count"`
-	ErrorCount        int64    `json:"error_count"`
-	LastError         string   `json:"last_error,omitempty"`
+	ID                string          `json:"id"`
+	Name              string          `json:"name"`
+	Subjects          []string        `json:"subjects,omitempty"`
+	Predicates        []string        `json:"predicates,omitempty"`
+	Contexts          []string        `json:"contexts,omitempty"`
+	Actors            []string        `json:"actors,omitempty"`
+	TimeStart         types.TimeBound `json:"time_start"` // RFC3339, or "unbounded"
+	TimeEnd           types.TimeBound `json:"time_end"`   // RFC3339, or "unbounded"
+	ActionType        string          `json:"action_type"`
+	ActionData        string          `json:"action_data"`
+	SemanticQuery     string          `json:"semantic_query,omitempty"`
+	SemanticThreshold float32         `json:"semantic_threshold,omitempty"`
+	MaxFiresPerSecond int             `json:"max_fires_per_second"`
+	Enabled           bool            `json:"enabled"`
+	CreatedAt         string          `json:"created_at"`
+	UpdatedAt         string          `json:"updated_at"`
+	LastFiredAt       string          `json:"last_fired_at,omitempty"`
+	FireCount         int64           `json:"fire_count"`
+	ErrorCount        int64           `json:"error_count"`
+	LastError         string          `json:"last_error,omitempty"`
 
 	// The last fires, newest first, when ?fires=N asked for them. A count says
 	// how often; these say which attestations and when.
@@ -108,12 +108,7 @@ func watcherToResponse(w *storage.Watcher) WatcherResponse {
 		LastError:         w.LastError,
 	}
 
-	if w.Filter.TimeStart != nil {
-		resp.TimeStart = w.Filter.TimeStart.Format(time.RFC3339)
-	}
-	if w.Filter.TimeEnd != nil {
-		resp.TimeEnd = w.Filter.TimeEnd.Format(time.RFC3339)
-	}
+	resp.TimeStart, resp.TimeEnd = w.Filter.TimeStart, w.Filter.TimeEnd
 	if w.LastFiredAt != nil {
 		resp.LastFiredAt = w.LastFiredAt.Format(time.RFC3339)
 	}
@@ -509,9 +504,9 @@ type watcherPluginAdapter struct {
 }
 
 func (a *watcherPluginAdapter) ExecutePluginJob(ctx context.Context, pluginName string, handlerName string, payload []byte) ([]byte, error) {
-	pm := a.server.getPluginManager()
-	if pm == nil {
-		return nil, errors.Newf("no plugin manager available, cannot execute plugin %s", pluginName)
+	pm, err := a.server.getPluginManager()
+	if err != nil {
+		return nil, errors.Wrapf(err, "plugin %s handler %s cannot be executed", pluginName, handlerName)
 	}
 
 	dp, ok := pm.GetPlugin(pluginName)
@@ -528,6 +523,7 @@ func (a *watcherPluginAdapter) ExecutePluginJob(ctx context.Context, pluginName 
 		JobId:       fmt.Sprintf("watcher-%d", time.Now().UnixNano()),
 		HandlerName: handlerName,
 		Payload:     payload,
+		Made:        &protocol.ExecuteJobRequest_NoCaller{NoCaller: true},
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "gRPC ExecuteJob failed for plugin %s handler %s", pluginName, handlerName)
@@ -540,11 +536,14 @@ func (a *watcherPluginAdapter) ExecutePluginJob(ctx context.Context, pluginName 
 	return resp.Result, nil
 }
 
+// IsPluginLoaded is whether the node runs a plugin by this name. A node running
+// no plugin manager runs none.
 func (a *watcherPluginAdapter) IsPluginLoaded(pluginName string) bool {
-	pm := a.server.getPluginManager()
-	if pm == nil {
-		return false
+	switch managing := a.server.pluginManager.(type) {
+	case managerRuns:
+		_, ok := managing.manager.GetPlugin(pluginName)
+		return ok
+	case noPluginManager:
 	}
-	_, ok := pm.GetPlugin(pluginName)
-	return ok
+	return false
 }

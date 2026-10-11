@@ -42,8 +42,8 @@ type DomainPluginServiceClient interface {
 	// Called once per process lifetime. Plugins must handle re-init: stop previous state first.
 	// See ADR-018 for the full lifecycle contract.
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error)
-	// Shutdown shuts down the plugin
-	Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	// Shutdown shuts down the plugin, which answers that it stopped
+	Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ShutdownResponse, error)
 	// HandleHTTP handles an HTTP request
 	HandleHTTP(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*HTTPResponse, error)
 	// HandleWebSocket handles a WebSocket connection (bidirectional streaming).
@@ -90,9 +90,9 @@ func (c *domainPluginServiceClient) Initialize(ctx context.Context, in *Initiali
 	return out, nil
 }
 
-func (c *domainPluginServiceClient) Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+func (c *domainPluginServiceClient) Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ShutdownResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(ShutdownResponse)
 	err := c.cc.Invoke(ctx, DomainPluginService_Shutdown_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -175,8 +175,8 @@ type DomainPluginServiceServer interface {
 	// Called once per process lifetime. Plugins must handle re-init: stop previous state first.
 	// See ADR-018 for the full lifecycle contract.
 	Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error)
-	// Shutdown shuts down the plugin
-	Shutdown(context.Context, *Empty) (*Empty, error)
+	// Shutdown shuts down the plugin, which answers that it stopped
+	Shutdown(context.Context, *Empty) (*ShutdownResponse, error)
 	// HandleHTTP handles an HTTP request
 	HandleHTTP(context.Context, *HTTPRequest) (*HTTPResponse, error)
 	// HandleWebSocket handles a WebSocket connection (bidirectional streaming).
@@ -209,7 +209,7 @@ func (UnimplementedDomainPluginServiceServer) Metadata(context.Context, *Empty) 
 func (UnimplementedDomainPluginServiceServer) Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Initialize not implemented")
 }
-func (UnimplementedDomainPluginServiceServer) Shutdown(context.Context, *Empty) (*Empty, error) {
+func (UnimplementedDomainPluginServiceServer) Shutdown(context.Context, *Empty) (*ShutdownResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Shutdown not implemented")
 }
 func (UnimplementedDomainPluginServiceServer) HandleHTTP(context.Context, *HTTPRequest) (*HTTPResponse, error) {

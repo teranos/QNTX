@@ -69,10 +69,8 @@ func (r *RemoteQueue) Enqueue(job *async.Job) error {
 		return errors.Newf("enqueue failed: %s", resp.Error)
 	}
 
-	// Update job with server-assigned ID if provided
-	if resp.JobId != "" {
-		job.ID = resp.JobId
-	}
+	// The queue answers every enqueue it took with the ID it gave the job.
+	job.ID = resp.JobId
 
 	return nil
 }
@@ -91,10 +89,6 @@ func (r *RemoteQueue) GetJob(id string) (*async.Job, error) {
 
 	if !resp.Success {
 		return nil, errors.Newf("get job failed: %s", resp.Error)
-	}
-
-	if resp.Job == nil {
-		return nil, errors.New("job not found")
 	}
 
 	job, err := services.ProtoToJob(resp.Job)
@@ -128,19 +122,25 @@ func (r *RemoteQueue) UpdateJob(job *async.Job) error {
 	return nil
 }
 
-// ListJobs lists jobs with optional status filter via gRPC.
-func (r *RemoteQueue) ListJobs(status *async.JobStatus, limit int) ([]*async.Job, error) {
-	protoLimit := int32(limit)
-	req := &protocol.ListJobsRequest{
+// ListJobs lists the newest jobs in one status via gRPC.
+func (r *RemoteQueue) ListJobs(status async.JobStatus, limit int) ([]*async.Job, error) {
+	return r.listJobs(&protocol.ListJobsRequest{
 		AuthToken: r.authToken,
-		Limit:     &protoLimit,
-	}
+		Which:     &protocol.ListJobsRequest_Status{Status: string(status)},
+		Limit:     int32(limit),
+	})
+}
 
-	// Add status filter if provided
-	if status != nil {
-		req.Status = string(*status)
-	}
+// ListEveryJob lists the newest jobs in every status via gRPC.
+func (r *RemoteQueue) ListEveryJob(limit int) ([]*async.Job, error) {
+	return r.listJobs(&protocol.ListJobsRequest{
+		AuthToken: r.authToken,
+		Which:     &protocol.ListJobsRequest_EveryStatus{EveryStatus: true},
+		Limit:     int32(limit),
+	})
+}
 
+func (r *RemoteQueue) listJobs(req *protocol.ListJobsRequest) ([]*async.Job, error) {
 	resp, err := r.client.ListJobs(r.ctx, req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list jobs")
@@ -155,8 +155,7 @@ func (r *RemoteQueue) ListJobs(status *async.JobStatus, limit int) ([]*async.Job
 	for i, protoJob := range resp.Jobs {
 		job, err := services.ProtoToJob(protoJob)
 		if err != nil {
-			r.logger.Warnw("Failed to convert job", "error", err, "index", i)
-			continue
+			return nil, errors.Wrapf(err, "job %s at %d of the list did not convert", protoJob.GetId(), i)
 		}
 		jobs[i] = job
 	}

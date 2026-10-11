@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -43,15 +44,20 @@ var runnerOwn = map[string]bool{"_actions": true, "_tool": true, "_temp": true}
 // BuildPlugin is the plugin a build archive is of, when it is a build for this
 // platform: qntx-<name>-plugin-<version>-<os>-<arch>.tar.gz.
 func BuildPlugin(file string) (string, bool) {
+	if !isBuild(file) {
+		return "", false
+	}
+	rest := strings.TrimPrefix(filepath.Base(file), "qntx-")
+	return rest[:strings.LastIndex(rest, "-plugin-")], true
+}
+
+// isBuild is whether file is named as a plugin build for this platform. A
+// plugin's name starts the file after qntx-; one starting with "-" names no
+// plugin, and installing it would unpack over every plugin's directory.
+func isBuild(file string) bool {
 	rest, ok := strings.CutPrefix(filepath.Base(file), "qntx-")
-	if !ok || !strings.HasSuffix(rest, pluginAssetSuffix()) {
-		return "", false
-	}
-	at := strings.LastIndex(rest, "-plugin-")
-	if at <= 0 {
-		return "", false
-	}
-	return rest[:at], true
+	return ok && strings.HasSuffix(rest, pluginAssetSuffix()) &&
+		strings.Contains(rest, "-plugin-") && !strings.HasPrefix(rest, "-")
 }
 
 // Runner is an Actions runner's directory on this box.
@@ -60,6 +66,9 @@ type Runner struct {
 
 	mu    sync.Mutex
 	taken []TakenBuild
+	// faults is what the watch could not do, said where the runner is shown:
+	// the watch runs on its own, with no caller to hand an error to.
+	faults []string
 }
 
 // TakenBuild is a build QNTX installed from the runner.
@@ -77,8 +86,13 @@ type TakenBuild struct {
 // OpenRunner is the runner at path, or an error naming why there is none.
 func OpenRunner(path string) (*Runner, error) {
 	path = filepath.Clean(strings.TrimSpace(path))
-	if _, err := os.Stat(filepath.Join(path, runnerFile)); err != nil {
-		return nil, errors.Wrapf(err, "no runner at %s: %s is not there", path, filepath.Join(path, runnerFile))
+	registration := filepath.Join(path, runnerFile)
+	info, err := os.Stat(registration)
+	if err != nil {
+		return nil, errors.Wrapf(err, "no runner at %s: %s is not there", path, registration)
+	}
+	if info.IsDir() {
+		return nil, errors.Newf("no runner at %s: %s is a directory, not a runner's registration", path, registration)
 	}
 	return &Runner{path: path}, nil
 }
@@ -98,11 +112,16 @@ func (r *Runner) Take(digestFile string, logger *zap.SugaredLogger) (TakenBuild,
 	if err != nil {
 		return TakenBuild{}, errors.Wrapf(err, "failed to read the digest %s", digestFile)
 	}
-	fields := strings.Fields(string(said))
-	if len(fields) == 0 || len(fields[0]) != sha256.Size*2 {
-		return TakenBuild{}, errors.Newf("%s holds no sha256 digest", digestFile)
+	// sha256sum writes the digest, then the file it is of.
+	var first string
+	if read, err := fmt.Sscan(string(said), &first); err != nil {
+		return TakenBuild{}, errors.Wrapf(err, "%s holds no sha256 digest (%d fields read)", digestFile, read)
 	}
-	want := strings.ToLower(fields[0])
+	sum, err := hex.DecodeString(first)
+	if err != nil || len(sum) != sha256.Size {
+		return TakenBuild{}, errors.Newf("%s holds no sha256 digest: %q is not %d hex bytes", digestFile, first, sha256.Size)
+	}
+	want := hex.EncodeToString(sum)
 
 	archive, err := os.ReadFile(archivePath)
 	if err != nil {
@@ -202,7 +221,7 @@ func (r *Runner) Watch(ctx context.Context, landed func(name string), logger *za
 	sacred.Go("plugin.runner.watch", func() {
 		defer func() {
 			if err := watcher.Close(); err != nil {
-				logger.Warnw("The runner watch did not close", "runner", r.path, "error", err)
+				r.fault("the watch did not close: " + err.Error())
 			}
 		}()
 		pending := map[string]*time.Timer{}
@@ -240,12 +259,12 @@ func (r *Runner) Watch(ctx context.Context, landed func(name string), logger *za
 				if !open {
 					return
 				}
-				if event.Op&fsnotify.Create != 0 {
+				if event.Has(fsnotify.Create) {
 					if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
 						// What landed in it before its watch was added raised no event.
 						var inside []string
 						if err := r.watchUnder(watcher, event.Name, depthUnder(work, event.Name), &inside); err != nil {
-							logger.Errorw("A new workspace under the runner is not watched", "path", event.Name, "error", err)
+							r.fault("a new workspace " + event.Name + " is not watched: " + err.Error())
 						}
 						for _, digestFile := range inside {
 							take(digestFile)
@@ -253,7 +272,7 @@ func (r *Runner) Watch(ctx context.Context, landed func(name string), logger *za
 						continue
 					}
 				}
-				if event.Op&(fsnotify.Create|fsnotify.Write) == 0 || !isBuildDigest(event.Name) {
+				if (!event.Has(fsnotify.Create) && !event.Has(fsnotify.Write)) || !isBuildDigest(event.Name) {
 					continue
 				}
 				take(event.Name)
@@ -266,11 +285,15 @@ func (r *Runner) Watch(ctx context.Context, landed func(name string), logger *za
 
 // isBuildDigest is whether a file is the .sha256 of a plugin build for this platform.
 func isBuildDigest(path string) bool {
-	if !strings.HasSuffix(path, digestSuffix) {
-		return false
-	}
-	_, ok := BuildPlugin(strings.TrimSuffix(path, digestSuffix))
-	return ok
+	archive, isDigest := strings.CutSuffix(path, digestSuffix)
+	return isDigest && isBuild(archive)
+}
+
+// fault keeps what the watch could not do, for Stats to show.
+func (r *Runner) fault(what string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.faults = append(r.faults, time.Now().Format(time.RFC3339)+" "+what)
 }
 
 // watchUnder watches dir and the directories under it down to workspaceDepth,
@@ -310,6 +333,26 @@ func depthUnder(work, path string) int {
 	return len(strings.Split(rel, string(filepath.Separator)))
 }
 
+// readRegistration is the runner's name and repository, as its registration
+// says them.
+func (r *Runner) readRegistration(stats *RunnerStats) error {
+	registeredPath := filepath.Join(r.path, runnerFile)
+	raw, err := os.ReadFile(registeredPath)
+	if err != nil {
+		return errors.Wrapf(err, "the runner's name and repository were not read from %s", registeredPath)
+	}
+	var registered struct {
+		AgentName string `json:"agentName"`
+		GitHubURL string `json:"gitHubUrl"`
+	}
+	// The runner is a .NET program, and a UTF-8 byte order mark is not JSON.
+	if err := json.Unmarshal(bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF}), &registered); err != nil {
+		return errors.Wrapf(err, "%s does not read as the runner's registration", registeredPath)
+	}
+	stats.Name, stats.GitHubURL = registered.AgentName, registered.GitHubURL
+	return nil
+}
+
 // RunnerStats is what the GitHub element shows of the runner, read off its directory.
 type RunnerStats struct {
 	Path       string   `json:"path"`
@@ -319,42 +362,54 @@ type RunnerStats struct {
 	// Jobs is when each job the runner ran was last written, oldest first.
 	Jobs  []time.Time  `json:"jobs"`
 	Taken []TakenBuild `json:"taken"`
+	// Faults is what the watch could not do, oldest first.
+	Faults []string `json:"faults"`
+	// Unread is what of the runner's directory could not be read now, and why:
+	// what the stats above leave out.
+	Unread []string `json:"unread"`
 }
 
 // Stats is the runner as its directory says it is now.
 func (r *Runner) Stats() RunnerStats {
-	stats := RunnerStats{Path: r.path, Workspaces: []string{}, Jobs: []time.Time{}, Taken: []TakenBuild{}}
-	if raw, err := os.ReadFile(filepath.Join(r.path, runnerFile)); err == nil {
-		var registered struct {
-			AgentName string `json:"agentName"`
-			GitHubURL string `json:"gitHubUrl"`
-		}
-		// The runner is a .NET program, and a UTF-8 byte order mark is not JSON.
-		if json.Unmarshal(bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF}), &registered) == nil {
-			stats.Name, stats.GitHubURL = registered.AgentName, registered.GitHubURL
+	stats := RunnerStats{Path: r.path, Workspaces: []string{}, Jobs: []time.Time{}, Taken: []TakenBuild{}, Faults: []string{}, Unread: []string{}}
+	unread := func(err error) { stats.Unread = append(stats.Unread, err.Error()) }
+
+	if err := r.readRegistration(&stats); err != nil {
+		unread(err)
+	}
+
+	workPath := filepath.Join(r.path, runnerWork)
+	workspaces, err := os.ReadDir(workPath)
+	if err != nil {
+		unread(errors.Wrapf(err, "the runner's workspaces were not listed from %s", workPath))
+	}
+	for _, entry := range workspaces {
+		if entry.IsDir() && !runnerOwn[entry.Name()] {
+			stats.Workspaces = append(stats.Workspaces, entry.Name())
 		}
 	}
-	if entries, err := os.ReadDir(filepath.Join(r.path, runnerWork)); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir() && !runnerOwn[entry.Name()] {
-				stats.Workspaces = append(stats.Workspaces, entry.Name())
-			}
-		}
-	}
+
 	// A job leaves a Worker_<time>.log in _diag.
-	if entries, err := os.ReadDir(filepath.Join(r.path, "_diag")); err == nil {
-		for _, entry := range entries {
-			if !strings.HasPrefix(entry.Name(), "Worker_") {
-				continue
-			}
-			if info, err := entry.Info(); err == nil {
-				stats.Jobs = append(stats.Jobs, info.ModTime())
-			}
-		}
-		sort.Slice(stats.Jobs, func(i, j int) bool { return stats.Jobs[i].Before(stats.Jobs[j]) })
+	diagPath := filepath.Join(r.path, "_diag")
+	logs, err := os.ReadDir(diagPath)
+	if err != nil {
+		unread(errors.Wrapf(err, "the runner's jobs were not listed from %s", diagPath))
 	}
+	for _, entry := range logs {
+		if !strings.HasPrefix(entry.Name(), "Worker_") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			unread(errors.Wrapf(err, "when job log %s was written was not read", filepath.Join(diagPath, entry.Name())))
+			continue
+		}
+		stats.Jobs = append(stats.Jobs, info.ModTime())
+	}
+	sort.Slice(stats.Jobs, func(i, j int) bool { return stats.Jobs[i].Before(stats.Jobs[j]) })
 	r.mu.Lock()
 	stats.Taken = append(stats.Taken, r.taken...)
+	stats.Faults = append(stats.Faults, r.faults...)
 	r.mu.Unlock()
 	return stats
 }

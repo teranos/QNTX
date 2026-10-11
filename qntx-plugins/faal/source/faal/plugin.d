@@ -244,7 +244,8 @@ InitializeResponse initialize(ref const InitializeRequest req) {
             cmd.subjects = ["faal-test"];
             cmd.predicates = ["ats-probe"];
             cmd.contexts = ["chaos-test"];
-            cmd.actors = ["faal"];
+            cmd.actorsNamed.names = ["faal"];
+            cmd.now = true;
             cmd.source = "faal";
             cmd.sourceVersion = PLUGIN_VERSION;
 
@@ -301,7 +302,8 @@ InitializeResponse initialize(ref const InitializeRequest req) {
                     cmd.subjects = ["faal-flood"];
                     cmd.predicates = ["ats-flood"];
                     cmd.contexts = ["chaos-test"];
-                    cmd.actors = ["faal"];
+                    cmd.actorsNamed.names = ["faal"];
+                    cmd.now = true;
                     cmd.source = "faal";
                     cmd.sourceVersion = PLUGIN_VERSION;
 
@@ -367,6 +369,9 @@ InitializeResponse initialize(ref const InitializeRequest req) {
                     auto filter = AttestationFilter();
                     filter.predicates = ["ats-flood"];
                     filter.contexts = ["chaos-test"];
+                    filter.limit = int.max;
+                    filter.unboundedStart = true;
+                    filter.unboundedEnd = true;
 
                     auto request = GetAttestationsRequest();
                     request.authToken = token;
@@ -434,7 +439,8 @@ InitializeResponse initialize(ref const InitializeRequest req) {
                         cmd.subjects = ["faal-flood"];
                         cmd.predicates = ["ats-flood"];
                         cmd.contexts = ["chaos-test"];
-                        cmd.actors = ["faal"];
+                        cmd.actorsNamed.names = ["faal"];
+                        cmd.now = true;
                         cmd.source = "faal";
                         cmd.sourceVersion = PLUGIN_VERSION;
 
@@ -461,6 +467,9 @@ InitializeResponse initialize(ref const InitializeRequest req) {
                         auto filter = AttestationFilter();
                         filter.predicates = ["ats-flood"];
                         filter.contexts = ["chaos-test"];
+                        filter.limit = int.max;
+                        filter.unboundedStart = true;
+                        filter.unboundedEnd = true;
 
                         auto request = GetAttestationsRequest();
                         request.authToken = token;
@@ -514,6 +523,8 @@ InitializeResponse initialize(ref const InitializeRequest req) {
     state.initialized = true;
 
     InitializeResponse resp;
+    // faal declares no routes, and serves no sigils.
+    resp.sigilsFrom = SIGILS_FROM_NONE;
     return resp;
 }
 
@@ -589,7 +600,7 @@ void registerHandlers(ref GrpcServer server) {
 
     server.registerHandler("/protocol.DomainPluginService/Shutdown", (const ubyte[] _) {
         shutdown();
-        return encode(Empty());
+        return encode(ShutdownResponse(true));
     });
 
     server.registerHandler("/protocol.DomainPluginService/HandleHTTP", (const ubyte[] data) {

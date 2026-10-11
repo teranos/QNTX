@@ -64,8 +64,7 @@ func renderReport(r Report) (services.NodeMail, error) {
 	return services.NodeMail{
 		Name:    reportHandlerName,
 		Subject: "QNTX week " + start + " to " + end,
-		HTML:    html,
-		Text:    renderReportText(r),
+		Bodies:  []services.MailBody{services.HTMLBody(html), services.TextBody(renderReportText(r))},
 		Inline:  images,
 	}, nil
 }
@@ -80,11 +79,11 @@ func renderReport(r Report) (services.NodeMail, error) {
 // part, labelled rows in each.
 
 func said(err string) services.MailRow {
-	return services.MailRow{Value: err, State: services.RowUnwell}
+	return services.MailRow{Value: err, Unlabelled: true, State: services.RowUnwell}
 }
 
 func none() services.MailRow {
-	return services.MailRow{Value: "None.", State: services.RowNote}
+	return services.MailRow{Value: "None.", Unlabelled: true, State: services.RowNote}
 }
 
 func reportWindow(r Report, drawn map[string]bool) services.MailWindow {
@@ -138,8 +137,9 @@ func reportWindow(r Report, drawn map[string]bool) services.MailWindow {
 	sections = append(sections, failures)
 
 	return services.MailWindow{
-		Title:    "QNTX week " + r.Window.Start.UTC().Format("2006-01-02 15:04") + " to " + r.Window.End.UTC().Format("2006-01-02 15:04") + " UTC",
-		Sections: sections,
+		TitleAlone: true,
+		Title:      "QNTX week " + r.Window.Start.UTC().Format("2006-01-02 15:04") + " to " + r.Window.End.UTC().Format("2006-01-02 15:04") + " UTC",
+		Sections:   sections,
 	}
 }
 
@@ -167,12 +167,12 @@ func sentrySections(r Report, drawn map[string]bool) []services.MailSection {
 		case g.s.Err != "":
 			s.Rows = []services.MailRow{said(g.s.Err)}
 		case !drawn[g.id]:
-			s.Rows = []services.MailRow{{Value: "No samples.", State: services.RowNote}}
+			s.Rows = []services.MailRow{{Value: "No samples.", Unlabelled: true, State: services.RowNote}}
 		default:
 			s.HTML = `<img src="cid:` + g.id + `" width="` + fmt.Sprint(graphWidth) + `" height="` + fmt.Sprint(graphHeight) + `" alt="` + g.title + ` over 7 days" style="display:block;width:100%;max-width:` + fmt.Sprint(graphWidth) + `px;height:auto;margin:0 0 4px">`
 			mean, lo, hi, n := seriesStats(g.s.Points)
 			if n == 0 {
-				s.Rows = []services.MailRow{{Value: "No samples.", State: services.RowNote}}
+				s.Rows = []services.MailRow{{Value: "No samples.", Unlabelled: true, State: services.RowNote}}
 			} else {
 				s.Rows = []services.MailRow{
 					{Label: "Mean:", Value: fmt.Sprintf("%.1f%%", mean)},

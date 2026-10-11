@@ -29,7 +29,7 @@ func (h *StatusLineHandler) pluginRow(name string) ([]StatusItem, bool) {
 
 	healthy := false
 	if h.health != nil {
-		results, _, _ := h.health()
+		results := healthOf(h.health())
 		healthy = well(results[name].Healthy, string(h.registry.GetAllStates()[name]))
 	}
 	meta := p.Metadata()

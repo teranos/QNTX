@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/internal/named"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -70,7 +71,7 @@ type Job struct {
 	Source        string          `json:"source"`            // For deduplication and logging
 	Status        JobStatus       `json:"status"`
 	Progress      Progress        `json:"progress,omitempty"`
-	PulseState    *PulseState     `json:"pulse_state,omitempty"`
+	Pulse         Pulse           `json:"-"` // The pulse state it carries, or that it carries none; JSON says it as pulse_state
 	Error         string          `json:"error,omitempty"`
 	ErrorDetails  []string        `json:"error_details,omitempty"`  // Structured error context from errors.GetAllDetails()
 	PluginVersion string          `json:"plugin_version,omitempty"` // Version of plugin that executed this job
@@ -92,15 +93,72 @@ type Job struct {
 	ExecTraceContext string `json:"exec_trace_context,omitempty"`
 	ExecTraceBaggage string `json:"exec_trace_baggage,omitempty"`
 
-	// UserID and Namespace are the caller of the sigil call that created the
-	// schedule this job runs for. Empty is a job no caller made.
+	// MadeBy is who made the schedule this job runs for: a caller, or no
+	// caller. UserID and Namespace are that caller and where they acted.
+	MadeBy    MadeBy `json:"made_by"`
 	UserID    string `json:"user_id,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
 
-	CreatedAt   time.Time  `json:"created_at"`
-	StartedAt   *time.Time `json:"started_at,omitempty"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	Started   Moment    `json:"-"` // When it started, or that it has not; JSON says it as started_at
+	Completed Moment    `json:"-"` // When it completed, or that it has not; JSON says it as completed_at
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// MadeBy is who a job, or the schedule that starts it, says made it, as its
+// column holds it.
+type MadeBy string
+
+const (
+	// MadeByCaller is a caller, in a sigil call: the User, and the namespace
+	// they acted in, are kept with it.
+	MadeByCaller MadeBy = "caller"
+	// MadeByNoCaller is no caller: the node, or a plugin itself.
+	MadeByNoCaller MadeBy = "no caller"
+)
+
+// MadeByOf is who a column says made a job or a schedule. Anything but a
+// caller or no caller is refused.
+func MadeByOf(said string) (MadeBy, error) {
+	switch made := MadeBy(said); made {
+	case MadeByCaller, MadeByNoCaller:
+		return made, nil
+	}
+	return "", errors.Newf("made_by is %q: a caller, or no caller", said)
+}
+
+// Made is who made the schedule a job runs for: a Caller, or NoCaller.
+type Made interface {
+	madeTheSchedule()
+}
+
+// Caller is the caller whose sigil call made the schedule a job runs for: the
+// User, and the namespace they acted in.
+type Caller struct {
+	UserID    string
+	Namespace named.Text
+}
+
+// NoCaller is a job no caller made: the node, or a plugin itself.
+type NoCaller struct{}
+
+func (Caller) madeTheSchedule()   {}
+func (NoCaller) madeTheSchedule() {}
+
+// Made is who made the schedule this job runs for, as it says. A job a caller
+// made naming no namespace, or one naming neither, is refused.
+func (j *Job) Made() (Made, error) {
+	switch j.MadeBy {
+	case MadeByCaller:
+		namespace, err := named.TextOf("the namespace of the caller of job "+j.ID, j.Namespace)
+		if err != nil {
+			return nil, errors.Wrapf(err, "job %s (handler %s) was made by a caller", j.ID, j.HandlerName)
+		}
+		return Caller{UserID: j.UserID, Namespace: namespace}, nil
+	case MadeByNoCaller:
+		return NoCaller{}, nil
+	}
+	return nil, errors.Newf("job %s (handler %s) says it was made by %q: a caller, or no caller", j.ID, j.HandlerName, j.MadeBy)
 }
 
 // NewJobWithPayload creates a new generic job with handler name and typed payload.
@@ -140,7 +198,11 @@ func NewChildJobWithPayload(handlerName string, source string, payload json.RawM
 		Status:      JobStatusQueued,
 		Progress:    Progress{Current: 0, Total: totalOps},
 		ParentJobID: parentJobID,
+		MadeBy:      MadeByNoCaller,
+		Pulse:       NoPulse(),
 		CreatedAt:   now,
+		Started:     NotYet(),
+		Completed:   NotYet(),
 		UpdatedAt:   now,
 	}, nil
 }
@@ -149,7 +211,7 @@ func NewChildJobWithPayload(handlerName string, source string, payload json.RawM
 func (j *Job) Start() {
 	now := time.Now()
 	j.Status = JobStatusRunning
-	j.StartedAt = &now
+	j.Started = At(now)
 	j.UpdatedAt = now
 }
 
@@ -157,27 +219,21 @@ func (j *Job) Start() {
 func (j *Job) Pause(reason string) {
 	j.Status = JobStatusPaused
 	j.UpdatedAt = time.Now()
-	if j.PulseState != nil {
-		j.PulseState.IsPaused = true
-		j.PulseState.PauseReason = reason
-	}
+	j.Pulse = j.Pulse.paused(true, reason)
 }
 
 // Resume marks the job as running again
 func (j *Job) Resume() {
 	j.Status = JobStatusRunning
 	j.UpdatedAt = time.Now()
-	if j.PulseState != nil {
-		j.PulseState.IsPaused = false
-		j.PulseState.PauseReason = ""
-	}
+	j.Pulse = j.Pulse.paused(false, "")
 }
 
 // Complete marks the job as completed
 func (j *Job) Complete() {
 	now := time.Now()
 	j.Status = JobStatusCompleted
-	j.CompletedAt = &now
+	j.Completed = At(now)
 	j.UpdatedAt = now
 }
 
@@ -187,7 +243,7 @@ func (j *Job) Fail(err error) {
 	j.Status = JobStatusFailed
 	j.Error = err.Error()
 	j.ErrorDetails = errors.GetAllDetails(err)
-	j.CompletedAt = &now
+	j.Completed = At(now)
 	j.UpdatedAt = now
 }
 
@@ -196,7 +252,7 @@ func (j *Job) Cancel(reason string) {
 	now := time.Now()
 	j.Status = JobStatusCancelled
 	j.Error = reason
-	j.CompletedAt = &now
+	j.Completed = At(now)
 	j.UpdatedAt = now
 }
 
@@ -207,22 +263,45 @@ func (j *Job) UpdateProgress(current int) {
 }
 
 // UpdatePulseState updates the pulse state
-func (j *Job) UpdatePulseState(state *PulseState) {
-	j.PulseState = state
+func (j *Job) UpdatePulseState(state PulseState) {
+	j.Pulse = Pulsed(state)
 	j.UpdatedAt = time.Now()
 }
 
-// MarshalPulseState converts PulseState to JSON string
-func MarshalPulseState(state *PulseState) (string, error) {
-	if state == nil {
-		return "", nil
-	}
-	data, err := json.Marshal(state)
+// MarshalJSON is a job as the web has always read it: a pulse state, a start
+// and a completion only when the job has them. A job naming neither side of
+// one is refused.
+func (j Job) MarshalJSON() ([]byte, error) {
+	type fields Job
+	out := struct {
+		fields
+		PulseState  *PulseState `json:"pulse_state,omitempty"`
+		StartedAt   *time.Time  `json:"started_at,omitempty"`
+		CompletedAt *time.Time  `json:"completed_at,omitempty"`
+	}{fields: fields(j)}
+
+	state, held, err := j.Pulse.State("job " + j.ID)
 	if err != nil {
-		err = errors.Wrap(err, "failed to marshal pulse state")
-		return "", err
+		return nil, err
 	}
-	return string(data), nil
+	if held {
+		out.PulseState = &state
+	}
+	started, startedYet, err := j.Started.When("the start of job " + j.ID)
+	if err != nil {
+		return nil, err
+	}
+	if startedYet {
+		out.StartedAt = &started
+	}
+	completed, completedYet, err := j.Completed.When("the completion of job " + j.ID)
+	if err != nil {
+		return nil, err
+	}
+	if completedYet {
+		out.CompletedAt = &completed
+	}
+	return json.Marshal(out)
 }
 
 // UnmarshalPulseState converts JSON string to PulseState. Emptiness is the

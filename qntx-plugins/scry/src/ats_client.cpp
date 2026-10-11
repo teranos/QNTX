@@ -45,7 +45,8 @@ bool AtsClient::create_weave(const std::string& model_name,
     cmd->add_subjects("model:" + model_name);
     cmd->add_predicates("Weave");
     cmd->add_contexts(context_id);
-    cmd->add_actors("scry");
+    cmd->mutable_actors_named()->add_names("scry");
+    cmd->set_now(true);
     cmd->set_source("scry");
     cmd->set_source_version(PLUGIN_VERSION);
 

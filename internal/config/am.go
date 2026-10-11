@@ -369,12 +369,14 @@ type PluginWebSocketConfig struct {
 	Keepalive PluginKeepaliveConfig `mapstructure:"keepalive"`
 }
 
-// PluginKeepaliveConfig configures WebSocket keepalive behavior
+// PluginKeepaliveConfig configures WebSocket keepalive behavior. A node whose
+// config does not enable it runs no keepalive; one that does names its ping
+// interval and pong timeout, or is refused at load.
 type PluginKeepaliveConfig struct {
-	Enabled           bool `mapstructure:"enabled"`            // Enable keepalive (default: true)
-	PingIntervalSecs  *int `mapstructure:"ping_interval_secs"` // Seconds between PING messages (nil = default 30)
-	PongTimeoutSecs   *int `mapstructure:"pong_timeout_secs"`  // Seconds to wait for PONG (nil = default 60)
-	ReconnectAttempts *int `mapstructure:"reconnect_attempts"` // Number of reconnect attempts (nil = default 3)
+	Enabled           bool `mapstructure:"enabled"`            // Run keepalive
+	PingIntervalSecs  int  `mapstructure:"ping_interval_secs"` // Seconds between PING messages; required when enabled
+	PongTimeoutSecs   int  `mapstructure:"pong_timeout_secs"`  // Seconds to wait for PONG; required when enabled
+	ReconnectAttempts int  `mapstructure:"reconnect_attempts"` // Reconnect attempts on connection loss; 0 is none
 }
 
 // EmbeddingsConfig configures the embedding service for semantic search

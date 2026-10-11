@@ -217,7 +217,8 @@ func durSimilar(a, b time.Duration) bool {
 
 // slowQueryKey builds a stable key from a query filter, stripping volatile
 // fields (timestamps, limit) so repeated queries collapse in the collector.
-func slowQueryKey(f ats.AttestationFilter) string {
+// windowed is whether the query's time range starts at a time.
+func slowQueryKey(f ats.AttestationFilter, windowed bool) string {
 	var parts []string
 	if len(f.Subjects) > 0 {
 		parts = append(parts, "s="+strings.Join(f.Subjects, ","))
@@ -234,7 +235,7 @@ func slowQueryKey(f ats.AttestationFilter) string {
 	if f.Source != "" {
 		parts = append(parts, "src="+f.Source)
 	}
-	if f.TimeStart != nil {
+	if windowed {
 		parts = append(parts, "t=window")
 	}
 	if len(parts) == 0 {

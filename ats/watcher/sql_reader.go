@@ -49,7 +49,7 @@ func (r *SQLReader) GetAttestation(id string) (_ *types.As, err error) {
 // GetAttestations answers the engine's filter by building the SQL for it.
 // Naming the driver's caller belongs here, where the driver is.
 func (r *SQLReader) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
-	query, args := storage.BuildFilterQuery(types.AxFilter{
+	query, args, err := storage.BuildFilterQuery(types.AxFilter{
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
@@ -58,6 +58,9 @@ func (r *SQLReader) GetAttestations(filter ats.AttestationFilter) ([]*types.As, 
 		TimeEnd:    filter.TimeEnd,
 		Limit:      filter.Limit,
 	})
+	if err != nil {
+		return nil, err
+	}
 	rustdriver.SetCaller("watcher-historical")
 	return r.QueryAttestationsRaw(query, args)
 }

@@ -3,7 +3,7 @@ use qntx_grpc::plugin::proto::domain_plugin_service_server::DomainPluginService;
 use qntx_grpc::plugin::proto::{
     ConfigSchemaResponse, ElementDefResponse, Empty, ExecuteJobRequest, ExecuteJobResponse,
     HealthResponse, HttpRequest, HttpResponse, InitializeRequest, InitializeResponse,
-    MetadataResponse, WebSocketMessage,
+    MetadataResponse, ShutdownResponse, SigilsFrom, WebSocketMessage,
 };
 use std::sync::Arc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -108,6 +108,8 @@ impl DomainPluginService for MeiliPluginService {
             schedules: vec![],
             llm_provider: false,
             search_provider: true,
+            // Search is served to QNTX as a provider, not as sigils.
+            sigils_from: SigilsFrom::None as i32,
             ..Default::default()
         }))
     }
@@ -173,9 +175,12 @@ impl DomainPluginService for MeiliPluginService {
         Err(Status::unimplemented("No async jobs"))
     }
 
-    async fn shutdown(&self, _request: Request<Empty>) -> Result<Response<Empty>, Status> {
+    async fn shutdown(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<ShutdownResponse>, Status> {
         info!("qntx-meili shutting down");
-        Ok(Response::new(Empty {}))
+        Ok(Response::new(ShutdownResponse { stopped: true }))
     }
 
     async fn config_schema(

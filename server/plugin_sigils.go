@@ -6,11 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
@@ -27,6 +30,7 @@ import (
 // signaHolder is a plugin that handed the node signa, and the one way it is
 // asked. grpc.ExternalDomainProxy is one.
 type signaHolder interface {
+	GetSigilsFrom() protocol.SigilsFrom
 	GetSigna() []*protocol.Signum
 	GetHTTPRoutes() []*protocol.RouteInfo
 	AnswerHTTP(ctx context.Context, req *protocol.HTTPRequest) (*protocol.HTTPResponse, error)
@@ -65,20 +69,26 @@ type openedCall struct {
 	namespace string
 }
 
+// callRefused is a caller who reaches no namespace, said as the refusal the
+// sigil answers with.
+type callRefused struct {
+	refusal *protocol.Refusal
+	cause   error
+}
+
+func (c callRefused) Error() string { return c.cause.Error() }
+
 // openCall is a token for one call a plugin answers, reaching the store of the
 // namespace its caller acts in, and what closes it once the plugin has answered.
-// A caller who reaches no store is refused, and the refusal carries why.
-func (s *QNTXServer) openCall(admitted auth.Admission) (string, func(), *protocol.Refusal, error) {
+// A caller who reaches no namespace is refused with a callRefused, which carries why.
+func (s *QNTXServer) openCall(admitted auth.Admission) (string, func(), error) {
 	universe, err := s.universeFor(admitted, true)
 	if err != nil {
-		return "", nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: err.Error()}, err
+		return "", nil, callRefused{refusal: &protocol.Refusal{Why: sigil.NotAllowed, Says: err.Error()}, cause: err}
 	}
-	store := universe.Store()
-	if store == nil {
-		return "", nil, nil, errors.New("the caller's namespace holds no store")
-	}
-	token, done, err := s.mintCall(openedCall{store: store, userID: admitted.UserID, namespace: universe.Name()})
-	return token, done, nil, err
+	// A universe is made with its store (namespaces.NewUniverse refuses one
+	// without), so the caller's namespace has one.
+	return s.mintCall(openedCall{store: universe.Store(), userID: admitted.UserID, namespace: universe.Name()})
 }
 
 type callDoneKey struct{}
@@ -91,8 +101,8 @@ func (s *QNTXServer) callFor(ctx context.Context) context.Context {
 	if !gated {
 		return ctx
 	}
-	token, done, refusal, err := s.openCall(admitted)
-	if refusal != nil || err != nil {
+	token, done, err := s.openCall(admitted)
+	if err != nil {
 		return ctx
 	}
 	caller, open := s.callerOf(token)
@@ -112,18 +122,14 @@ func (s *QNTXServer) openRun(userID, namespace string) (string, func(), error) {
 	if err != nil {
 		return "", nil, errors.Wrapf(err, "namespace %s of User %s is not served", namespace, userID)
 	}
-	store := universe.Store()
-	if store == nil {
-		return "", nil, errors.Newf("namespace %s holds no store", namespace)
-	}
-	return s.mintCall(openedCall{store: store, userID: userID, namespace: namespace})
+	return s.mintCall(openedCall{store: universe.Store(), userID: userID, namespace: namespace})
 }
 
 // mintCall draws a token for an opened call, and what closes it.
 func (s *QNTXServer) mintCall(call openedCall) (string, func(), error) {
 	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", nil, errors.Wrap(err, "no token could be drawn for the call")
+	if drawn, err := rand.Read(raw); err != nil {
+		return "", nil, errors.Wrapf(err, "no token could be drawn for the call: %d of %d bytes drawn", drawn, len(raw))
 	}
 	token := hex.EncodeToString(raw)
 	s.callStores.Store(token, call)
@@ -154,54 +160,76 @@ func (s *QNTXServer) callerOf(token string) (services.Caller, bool) {
 // signum is named after the plugin and binds only paths under /api/{plugin}/,
 // because a reach line names a signum by its name and a sigil by its path: a
 // plugin naming another's would be reached by whoever reaches that one. A
-// signum that does not is said in the log and served nowhere.
+// signum that does not is served nowhere, and why is said in the plugin's
+// signa_refused in plugins_list (pluginSigilRows).
 func (s *QNTXServer) pluginSigna() []sigil.Signum {
 	var signa []sigil.Signum
 	for _, name := range s.pluginRegistry.ListEnabled() {
-		served, refused := s.pluginSignaOf(name)
-		for _, why := range refused {
-			s.logger.Errorw("a plugin's signum is not served", "plugin", name, "error", why)
-		}
-		signa = append(signa, served...)
+		signa = append(signa, s.pluginSignaOf(name).served...)
 	}
 	return signa
 }
 
-// pluginSignaOf is what one ready plugin handed the node: the signa it serves,
-// and why it serves none of the rest.
-func (s *QNTXServer) pluginSignaOf(name string) (served []sigil.Signum, refused []string) {
+// handedSigna is what one plugin handed the node: the signa it serves, and why
+// it serves none of the rest.
+type handedSigna struct {
+	served  []sigil.Signum
+	refused []string
+}
+
+// pluginSignaOf is what one ready plugin handed the node.
+func (s *QNTXServer) pluginSignaOf(name string) handedSigna {
+	var handed handedSigna
 	if !s.pluginRegistry.IsReady(name) {
-		return nil, nil
+		return handed
 	}
 	p, ok := s.pluginRegistry.Get(name)
 	if !ok {
-		return nil, nil
+		return handed
 	}
 	holder, holds := p.(signaHolder)
 	if !holds {
-		return nil, nil
+		return handed
 	}
-	signa, declared := holder.GetSigna(), false
-	if len(signa) == 0 && len(holder.GetHTTPRoutes()) > 0 {
-		signa, declared = []*protocol.Signum{declaredSignum(name, holder.GetHTTPRoutes())}, true
+	signa, declared, err := signaOf(name, holder)
+	if err != nil {
+		handed.refused = append(handed.refused, err.Error())
+		return handed
 	}
-	for _, handed := range signa {
-		if err := boundUnder(name, handed); err != nil {
-			refused = append(refused, err.Error())
+	for _, signum := range signa {
+		if err := boundUnder(name, signum); err != nil {
+			handed.refused = append(handed.refused, err.Error())
 			continue
 		}
 		answers := map[string]sigil.Answer{}
-		for _, held := range handed.GetSigils() {
+		for _, held := range signum.GetSigils() {
 			answers[held.GetName()] = s.pluginAnswer(name, held, declared)
 		}
-		signum := sigil.Signum{Signum: handed, Answers: answers, Declared: declared}
-		if err := signum.Check(); err != nil {
-			refused = append(refused, err.Error())
+		served := sigil.Signum{Signum: signum, Answers: answers, Declared: declared}
+		if err := served.Check(); err != nil {
+			handed.refused = append(handed.refused, err.Error())
 			continue
 		}
-		served = append(served, signum)
+		handed.served = append(handed.served, served)
 	}
-	return served, refused
+	return handed
+}
+
+// signaOf is the signa a plugin's sigils are taken from, where it said they
+// are: its own signa, or its declared routes as one signum named after it
+// (declared), or none. A plugin naming none of these is refused.
+func signaOf(name string, holder signaHolder) ([]*protocol.Signum, bool, error) {
+	switch holder.GetSigilsFrom() {
+	case protocol.SigilsFrom_SIGILS_FROM_SIGNA:
+		return holder.GetSigna(), false, nil
+	case protocol.SigilsFrom_SIGILS_FROM_HTTP_ROUTES:
+		return []*protocol.Signum{declaredSignum(name, holder.GetHTTPRoutes())}, true, nil
+	case protocol.SigilsFrom_SIGILS_FROM_NONE:
+		return []*protocol.Signum{}, false, nil
+	case protocol.SigilsFrom_SIGILS_FROM_UNNAMED:
+		return nil, false, errors.Newf("plugin %s names no source of its sigils: built against a QNTX older than this node, it is served none until rebuilt", name)
+	}
+	return nil, false, errors.Newf("plugin %s takes its sigils from %d, which this node does not know", name, holder.GetSigilsFrom())
 }
 
 // declaredSignum is a plugin that declares routes as its own signum (ADR-001):
@@ -227,25 +255,25 @@ func declaredSignum(plugin string, routes []*protocol.RouteInfo) *protocol.Signu
 }
 
 // sigilNameOf is a declared route's path in the characters a tool name allows:
-// /kvk/zoek/naam is kvk_zoek_naam.
+// /kvk/zoek/naam is kvk_zoek_naam. Every other character is an underscore, and
+// a tool name does not start with one.
 func sigilNameOf(path string) string {
-	var name []byte
+	name := make([]byte, len(path))
 	for i := 0; i < len(path); i++ {
 		c := path[i]
-		switch {
-		case (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'):
-			name = append(name, c)
-		case len(name) > 0:
-			name = append(name, '_')
+		name[i] = '_'
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
+			name[i] = c
 		}
 	}
-	return string(name)
+	return strings.TrimLeft(string(name), "_")
 }
 
 // pluginSigilRows is one plugin's sigils for the panel, asked of the same lines
 // the gate is given, and why any signum it handed is not served.
 func (s *QNTXServer) pluginSigilRows(name string) ([]*protocol.SigilRow, []string) {
-	served, refused := s.pluginSignaOf(name)
+	handed := s.pluginSignaOf(name)
+	served, refused := handed.served, handed.refused
 	var rows []*protocol.SigilRow
 	for _, signum := range served {
 		for _, held := range signum.GetSigils() {
@@ -315,12 +343,14 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared 
 			return failed(errors.Newf("%s cannot be asked a sigil", plugin))
 		}
 
+		// A declared route is handed what arrived whole; a sigil, what was sent.
 		carried := map[string]any{}
-		for name, value := range sent {
-			carried[name] = value
-		}
 		if declared {
-			carried = sigil.Arrived(ctx)
+			maps.Copy(carried, sigil.Arrived(ctx))
+		} else {
+			for name, value := range sent {
+				carried[name] = value
+			}
 		}
 		req, err := forwarded(plugin, held, carried, ctx)
 		if err != nil {
@@ -330,9 +360,10 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared 
 		// A stranger on an ANYONE sigil is asked through and handed no store:
 		// only an admitted caller has a namespace to act in.
 		if admitted, gated := auth.AdmissionFrom(ctx); gated {
-			token, done, notYours, err := s.openCall(admitted)
-			if notYours != nil {
-				return nil, notYours
+			token, done, err := s.openCall(admitted)
+			var notYours callRefused
+			if errors.As(err, &notYours) {
+				return nil, notYours.refusal
 			}
 			if err != nil {
 				return failed(err)
@@ -378,80 +409,78 @@ func forwarded(plugin string, held *protocol.Sigil, carried map[string]any, ctx 
 		Path:   strings.TrimPrefix(held.GetHttp().GetPath(), "/api/"+plugin),
 	}
 	if carriesBody(method) {
-		if carried == nil {
-			carried = map[string]any{}
-		}
 		body, err := json.Marshal(carried)
 		if err != nil {
 			return nil, errors.Wrapf(err, "what was sent to %s did not marshal", held.GetName())
 		}
 		req.Body = body
 		req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: "Content-Type", Values: []string{"application/json"}})
-	} else if len(carried) > 0 {
+	} else {
+		// The path with what was carried as its query, which a URL leaves off
+		// when nothing was.
 		query := url.Values{}
 		for name, value := range carried {
 			query.Set(name, fmt.Sprint(value))
 		}
-		req.Path += "?" + query.Encode()
+		req.Path = (&url.URL{Path: req.Path, RawQuery: query.Encode()}).String()
 	}
 
-	// A node with no login admits nobody by name, and says nobody.
-	if admitted, gated := auth.AdmissionFrom(ctx); gated {
-		if admitted.Identity != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAsker, Values: []string{admitted.Identity}})
-		}
-		if admitted.UserID != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerUser, Values: []string{admitted.UserID}})
-		}
-		req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerLevel, Values: []string{admitted.LevelName()}})
-		// "i know i minted the oauth specifically for Manus to use and the
-		// token even has a name"
-		//
-		// A connector's token acts as the person and carries no Grant, so which
-		// token asked, and through which client, is read off the admission.
-		did, label := admitted.TokenDID, admitted.TokenLabel
-		if admitted.Grant != nil {
-			did, label = admitted.Grant.DID, admitted.Grant.Label
-		}
-		if did != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerDID, Values: []string{did}})
-		}
-		if label != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerLabel, Values: []string{label}})
-		}
-		if admitted.ClientDID != "" {
-			req.Headers = append(req.Headers, &protocol.HTTPHeader{Name: HeaderAskerClient, Values: []string{admitted.ClientDID}})
-		}
-	}
+	// Who is asking, each header saying what the admission holds as it holds
+	// it, as on every request the node proxies to a plugin. A node with no
+	// login admits nobody by name, and says nobody.
+	//
+	// "i know i minted the oauth specifically for Manus to use and the
+	// token even has a name"
+	req.Headers = append(req.Headers, grpc.HeadersFor(ctx)...)
 	return req, nil
 }
 
 // refusedBy is a plugin saying no, in the sigil's terms. A plugin refuses with
-// a status and a JSON protocol.Refusal; one that sends no why is read by its
-// status, and one whose body is not a refusal is the plugin failing.
+// a status and a JSON protocol.Refusal; one whose refusal names no why key is
+// read by its status, a why naming no kind of no is refused, and one whose body
+// is not a refusal is the plugin failing.
 func refusedBy(resp *protocol.HTTPResponse) (*protocol.Refusal, error) {
-	var said struct {
-		Why   string `json:"why"`
-		Param string `json:"param"`
-		Says  string `json:"says"`
-	}
+	var said map[string]json.RawMessage
 	if err := json.Unmarshal(resp.GetBody(), &said); err != nil {
 		return nil, errors.Wrapf(err, "the answer is not a refusal: %s", resp.GetBody())
 	}
-	if said.Says == "" {
-		return nil, errors.Newf("the refusal says nothing: %s", resp.GetBody())
+	var says, param string
+	if err := readRefusalKey(said, "says", &says); err != nil {
+		return nil, errors.Wrapf(err, "the refusal does not say: %s", resp.GetBody())
 	}
-	why := said.Why
-	switch why {
-	case "", sigil.Missing, sigil.NotOneOf, sigil.Invalid, sigil.NotFound, sigil.NotAllowed, sigil.Failed:
-	default:
+	text, err := named.TextOf("the refusal's says", says)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the refusal says nothing: %s", resp.GetBody())
+	}
+	if _, sent := said["param"]; sent {
+		if err := readRefusalKey(said, "param", &param); err != nil {
+			return nil, errors.Wrapf(err, "the refusal's param is not text: %s", resp.GetBody())
+		}
+	}
+	why := whyOf(resp.GetStatusCode())
+	if _, sent := said["why"]; sent {
+		if err := readRefusalKey(said, "why", &why); err != nil {
+			return nil, errors.Wrapf(err, "the refusal's why is not text: %s", resp.GetBody())
+		}
+	}
+	if !slices.Contains(kindsOfNo, why) {
 		return nil, errors.Newf("%q is not a kind of no", why)
 	}
-	if why == "" {
-		why = whyOf(resp.GetStatusCode())
-	}
-	return &protocol.Refusal{Why: why, Param: said.Param, Says: said.Says}, nil
+	return &protocol.Refusal{Why: why, Param: param, Says: text.String()}, nil
 }
+
+// readRefusalKey reads one key of a refusal as text, refusing a key that is not
+// there or does not hold text.
+func readRefusalKey(said map[string]json.RawMessage, key string, into *string) error {
+	raw, sent := said[key]
+	if !sent {
+		return errors.Newf("the refusal names no %s", key)
+	}
+	return errors.Wrapf(json.Unmarshal(raw, into), "the refusal's %s is %s", key, raw)
+}
+
+// kindsOfNo is every kind of no a plugin's refusal may say.
+var kindsOfNo = []string{sigil.Missing, sigil.NotOneOf, sigil.Invalid, sigil.NotFound, sigil.NotAllowed, sigil.Failed}
 
 // whyOf is the kind of no a plugin's status says, when it says no other.
 func whyOf(status int32) string {
@@ -469,14 +498,18 @@ func whyOf(status int32) string {
 // ServePluginSigils serves again with the signa every ready plugin holds now.
 // A plugin's sigils arrive with its Initialize, after the node has opened, and
 // a restart may hand different ones.
+//
+// The node has opened by then: plugins load on onReady, which Start fires
+// once open has built what the node serves, and a restart is of a plugin
+// loaded so.
 func (s *QNTXServer) ServePluginSigils() {
 	s.opening.Lock()
 	defer s.opening.Unlock()
 	s.answerSigils()
-	if s.served == nil {
+	unnamed, err := s.reopenHeld()
+	if err != nil {
+		s.logger.Errorw("Plugin sigils are not served; what the node serves is unchanged", "error", err)
 		return
 	}
-	if _, err := s.reopenHeld(); err != nil {
-		s.logger.Errorw("Plugin sigils are not served; what the node serves is unchanged", "error", err)
-	}
+	s.logger.Debugw("Plugin sigils served", "unnamed", unnamed)
 }

@@ -14,8 +14,14 @@ import (
 // the structured response plugins are written to read. The nilerr
 // suppressions point here; AttestationExists is the exception (no error field).
 func ValidateToken(providedToken, storedToken string) error {
-	if subtle.ConstantTimeCompare([]byte(providedToken), []byte(storedToken)) != 1 {
+	if !sameToken(providedToken, storedToken) {
 		return errors.New("invalid authentication token")
 	}
 	return nil
+}
+
+// sameToken is whether the token provided is the one stored, compared in
+// constant time.
+func sameToken(providedToken, storedToken string) bool {
+	return subtle.ConstantTimeCompare([]byte(providedToken), []byte(storedToken)) == 1
 }

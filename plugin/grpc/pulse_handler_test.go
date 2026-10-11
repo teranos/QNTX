@@ -2,11 +2,13 @@ package grpc
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/internal/config"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
@@ -23,6 +25,7 @@ func TestWriteLogs(t *testing.T) {
 	// Create a job so the FK constraint on task_logs is satisfied
 	store := async.NewStore(db)
 	job := &async.Job{
+		Pulse: async.NoPulse(), Started: async.NotYet(), Completed: async.NotYet(),
 		ID:          "JOB_test_write_logs",
 		HandlerName: "test.handler",
 		Source:      "test",
@@ -55,7 +58,7 @@ func TestWriteLogs(t *testing.T) {
 		},
 	}
 
-	handler.writeLogs(job.ID, entries)
+	require.NoError(t, handler.writeLogs(job.ID, entries))
 
 	// Verify logs were written
 	rows, err := db.Query(`SELECT stage, level, message, metadata FROM task_logs WHERE job_id = ? ORDER BY id`, job.ID)
@@ -81,7 +84,9 @@ func TestWriteLogs(t *testing.T) {
 	assert.Equal(t, "timeline-sync", logs[0].stage)
 	assert.Equal(t, "info", logs[0].level)
 	assert.Equal(t, "Starting timeline sync", logs[0].message)
-	assert.Nil(t, logs[0].metadata)
+	// The metadata a line carried, as it carried it: none is none.
+	require.NotNil(t, logs[0].metadata)
+	assert.Equal(t, "", *logs[0].metadata)
 
 	assert.Equal(t, "Timeline sync completed", logs[1].message)
 	require.NotNil(t, logs[1].metadata)
@@ -117,8 +122,8 @@ func TestWriteLogsEmpty(t *testing.T) {
 	handler := NewPluginProxyHandler("test", "handler", nil, db, logger, nil)
 
 	// Empty entries should be a no-op (no panic, no DB writes)
-	handler.writeLogs("JOB_nonexistent", nil)
-	handler.writeLogs("JOB_nonexistent", []*protocol.JobLogEntry{})
+	require.NoError(t, handler.writeLogs("JOB_nonexistent", nil))
+	require.NoError(t, handler.writeLogs("JOB_nonexistent", []*protocol.JobLogEntry{}))
 
 	var count int
 	require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM task_logs`).Scan(&count))
@@ -128,8 +133,9 @@ func TestWriteLogsEmpty(t *testing.T) {
 // runPlugin is a plugin that keeps the job requests it is handed.
 type runPlugin struct {
 	protocol.DomainPluginServiceClient
-	handed []*protocol.ExecuteJobRequest
-	during func(*protocol.ExecuteJobRequest)
+	handed  []*protocol.ExecuteJobRequest
+	during  func(*protocol.ExecuteJobRequest)
+	version string
 }
 
 func (p *runPlugin) ExecuteJob(_ context.Context, req *protocol.ExecuteJobRequest, _ ...grpc.CallOption) (*protocol.ExecuteJobResponse, error) {
@@ -137,7 +143,7 @@ func (p *runPlugin) ExecuteJob(_ context.Context, req *protocol.ExecuteJobReques
 	if p.during != nil {
 		p.during(req)
 	}
-	return &protocol.ExecuteJobResponse{Success: true}, nil
+	return &protocol.ExecuteJobResponse{Success: true, PluginVersion: p.version}, nil
 }
 
 // A run of a caller's schedule is handed a store token for the namespace that
@@ -151,29 +157,77 @@ func TestARunOfACallersScheduleCarriesTheirStoreTokenAndUser(t *testing.T) {
 	}
 	p := &runPlugin{}
 	var openDuring bool
-	p.during = func(req *protocol.ExecuteJobRequest) { _, openDuring = open[req.StoreToken] }
+	p.during = func(req *protocol.ExecuteJobRequest) { _, openDuring = open[req.GetCaller().GetStoreToken()] }
 	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), openRun)
 
-	err := h.Execute(context.Background(), &async.Job{ID: "JBtim", UserID: "UStim", Namespace: "defacile"})
+	err := h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBtim", MadeBy: async.MadeByCaller, UserID: "UStim", Namespace: "defacile"}))
 	require.NoError(t, err)
 
 	require.Len(t, p.handed, 1)
-	assert.Equal(t, "run-token", p.handed[0].StoreToken)
-	assert.Equal(t, "UStim", p.handed[0].UserId)
+	caller, isCaller := p.handed[0].GetMade().(*protocol.ExecuteJobRequest_Caller)
+	require.True(t, isCaller, "a caller's run was handed %#v", p.handed[0].GetMade())
+	assert.Equal(t, "run-token", caller.Caller.GetStoreToken())
+	assert.Equal(t, "UStim", caller.Caller.GetUserId())
 	assert.True(t, openDuring, "the run's token was not open while the plugin ran")
 	assert.Empty(t, open, "the run's token outlived the run")
 }
 
-// A job no caller made is handed no store token.
+// A job no caller made says so, and is handed no store token.
 func TestARunNoCallerMadeCarriesNoStoreToken(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	p := &runPlugin{}
+	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), NewServicesManager(config.LLMConfig{}, config.FetchConfig{}, "did:key:znode", zap.NewNop().Sugar()).OpenRunFor)
+
+	require.NoError(t, h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBnobody", MadeBy: async.MadeByNoCaller})))
+	require.Len(t, p.handed, 1)
+	assert.Equal(t, &protocol.ExecuteJobRequest_NoCaller{NoCaller: true}, p.handed[0].GetMade())
+}
+
+// "Name every meaning": a job naming neither a caller nor no caller is
+// refused, not run as the plugin.
+func TestARunNamingNoMakerIsRefused(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	p := &runPlugin{}
 	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), nil)
 
-	require.NoError(t, h.Execute(context.Background(), &async.Job{ID: "JBnobody"}))
-	require.Len(t, p.handed, 1)
-	assert.Empty(t, p.handed[0].StoreToken)
-	assert.Empty(t, p.handed[0].UserId)
+	require.Error(t, h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBunsaid"})))
+	assert.Empty(t, p.handed, "a run naming no maker reached the plugin")
+}
+
+// jobIn is job, held by the queue as a worker would find it.
+func jobIn(t *testing.T, db *sql.DB, job *async.Job) *async.Job {
+	t.Helper()
+	job.HandlerName = "datapunt/observe"
+	job.Pulse, job.Started, job.Completed = async.NoPulse(), async.NotYet(), async.NotYet()
+	job.Source = "test"
+	job.Status = "queued"
+	job.CreatedAt = time.Now()
+	job.UpdatedAt = time.Now()
+	require.NoError(t, async.NewStore(db).CreateJob(job))
+	return job
+}
+
+// The version a plugin says it ran as is kept on the job's row.
+func TestARunKeepsThePluginVersionOnTheJob(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	p := &runPlugin{version: "0.4.3"}
+	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), nil)
+
+	require.NoError(t, h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBversion", MadeBy: async.MadeByNoCaller})))
+	var version string
+	require.NoError(t, db.QueryRow(`SELECT plugin_version FROM async_ix_jobs WHERE id = ?`, "JBversion").Scan(&version))
+	assert.Equal(t, "0.4.3", version)
+}
+
+// A run of a job the queue holds no row for has no version recorded, and fails.
+func TestARunOfAJobWithNoRowFails(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	p := &runPlugin{version: "0.4.3"}
+	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), nil)
+
+	err := h.Execute(context.Background(), &async.Job{ID: "JBnowhere"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "JBnowhere")
 }
 
 // A run whose namespace the node no longer serves does not run elsewhere.

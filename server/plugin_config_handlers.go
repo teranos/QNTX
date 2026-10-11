@@ -2,12 +2,13 @@ package server
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/internal/named"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	errors "github.com/teranos/sacred-error"
@@ -15,7 +16,7 @@ import (
 
 const (
 	// internalKeyPrefix marks internal config keys that should not be exposed via API
-	internalKeyPrefix = '_'
+	internalKeyPrefix = "_"
 )
 
 // writeRichErrorMethod is a method wrapper for writeRichError that uses the server's logger.
@@ -28,28 +29,22 @@ func (s *QNTXServer) writeRichError(w http.ResponseWriter, err error, statusCode
 // GET /api/plugins/{name}/config - Get plugin configuration
 // PUT /api/plugins/{name}/config - Update plugin configuration
 func (s *QNTXServer) HandlePluginConfig(w http.ResponseWriter, r *http.Request) {
-	// Parse plugin name from path: /api/plugins/{name}/config
-	path := strings.TrimPrefix(r.URL.Path, "/api/plugins/")
-	path = strings.TrimSuffix(path, "/config")
-	pluginName := path
+	// The mux's {name} is a whole path segment, so it names a plugin; one
+	// nobody added is refused by its record.
+	pluginName := r.PathValue("name")
 
-	if pluginName == "" {
-		err := errors.WithDetail(
-			errors.New("plugin name required in URL path"),
-			"The URL path must include the plugin name: /api/plugins/{name}/config",
-		)
-		s.writeRichError(w, err, http.StatusBadRequest)
+	// A plugin's config is read and written; any other method is refused.
+	answers := map[string]func(http.ResponseWriter, *http.Request, string){
+		http.MethodGet: s.handleGetPluginConfig,
+		http.MethodPut: s.handleUpdatePluginConfig,
+	}
+	answer, answered := answers[r.Method]
+	if !answered {
+		w.Header().Set("Allow", "GET, PUT")
+		s.writeRichError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
 		return
 	}
-
-	switch r.Method {
-	case http.MethodGet:
-		s.handleGetPluginConfig(w, r, pluginName)
-	case http.MethodPut:
-		s.handleUpdatePluginConfig(w, r, pluginName)
-	default:
-		s.writeRichError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
-	}
+	answer(w, r, pluginName)
 }
 
 // handleGetPluginConfig returns the configuration a plugin's record holds, and
@@ -66,41 +61,49 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 	}
 	settings := make(map[string]string, len(record.Config))
 	for key, value := range record.Config {
-		if len(key) > 0 && key[0] != internalKeyPrefix {
+		if !strings.HasPrefix(key, internalKeyPrefix) {
 			settings[key] = value
 		}
 	}
 
-	// A plugin that is not running has no schema to say; its config is still its record's.
+	// A plugin that is not running has no schema to say; its config is still its
+	// record's. A node running without a plugin manager runs no plugin.
 	var schema map[string]any
-	if pm := s.getPluginManager(); pm != nil {
-		if pluginClient, ok := pm.GetPlugin(pluginName); ok {
+	switch managing := s.pluginManager.(type) {
+	case noPluginManager:
+	case managerRuns:
+		if pluginClient, ok := managing.manager.GetPlugin(pluginName); ok {
 			// Try to get schema from plugin
 			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 			defer cancel()
 
 			// Type assert to ExternalDomainProxy to access ConfigSchema
 			if proxy, ok := pluginClient.(*grpcplugin.ExternalDomainProxy); ok {
-				if schemaResp, err := proxy.ConfigSchema(ctx); err == nil && schemaResp != nil {
-					// Convert protobuf schema to JSON-friendly map
-					schema = make(map[string]any)
-					for fieldName, fieldSchema := range schemaResp.Fields {
-						schema[fieldName] = map[string]any{
-							"type":          fieldSchema.Type,
-							"description":   fieldSchema.Description,
-							"default_value": fieldSchema.DefaultValue,
-							"required":      fieldSchema.Required,
-							"min_value":     fieldSchema.MinValue,
-							"max_value":     fieldSchema.MaxValue,
-							"pattern":       fieldSchema.Pattern,
-							"element_type":  fieldSchema.ElementType,
-						}
-					}
-				} else if err != nil {
-					wrappedErr := errors.Wrap(err, "ConfigSchema RPC failed")
-					s.logger.Warnw("Failed to get config schema from plugin", "plugin", pluginName, "error", err)
-					s.writeRichError(w, wrappedErr, http.StatusServiceUnavailable)
+				schemaResp, err := proxy.ConfigSchema(ctx)
+				if err != nil {
+					s.writeRichError(w, errors.Wrapf(err, "ConfigSchema RPC of plugin %s failed", pluginName), http.StatusServiceUnavailable)
 					return
+				}
+				// Convert protobuf schema to JSON-friendly map
+				schema = make(map[string]any)
+				for fieldName, fieldSchema := range schemaResp.GetFields() {
+					field := map[string]any{
+						"type":          fieldSchema.Type,
+						"description":   fieldSchema.Description,
+						"default_value": fieldSchema.DefaultValue,
+						"required":      fieldSchema.Required,
+						"pattern":       fieldSchema.Pattern,
+						"element_type":  fieldSchema.ElementType,
+					}
+					// The form holds a value to the bounds a field names. One
+					// naming none is refused when the config is written.
+					if least, bounded := fieldSchema.GetMin().(*protocol.ConfigFieldSchema_MinValue); bounded {
+						field["min_value"] = least.MinValue
+					}
+					if most, bounded := fieldSchema.GetMax().(*protocol.ConfigFieldSchema_MaxValue); bounded {
+						field["max_value"] = most.MaxValue
+					}
+					schema[fieldName] = field
 				}
 			} else {
 				// Not an external gRPC plugin
@@ -129,41 +132,69 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 // and reinitializes the plugin with it when it is running. A plugin that is not
 // running is configured all the same, and starts with this config.
 func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Request, pluginName string) {
-	var req struct {
-		Config   map[string]string `json:"config"`
-		Validate bool              `json:"validate"` // If true, validate config without applying
-	}
-
-	if err := readJSON(w, r, &req); err != nil {
+	var body map[string]json.RawMessage
+	if err := readJSON(w, r, &body); err != nil {
 		return
 	}
 
-	if req.Config == nil {
-		s.writeRichError(w, errors.New("config field required"), http.StatusBadRequest)
+	// A plugin nobody added has no record to configure, or to validate for.
+	found, err := s.pluginRecords().Added(pluginName)
+	if err != nil {
+		s.writeRichError(w, errors.Wrapf(err, "failed to read the record of plugin %s", pluginName), http.StatusInternalServerError)
 		return
+	}
+	if !found {
+		s.writeRichError(w, errors.Newf("plugin %q was never added: press + in the plugin element", pluginName), http.StatusNotFound)
+		return
+	}
+
+	// The config is what the record holds after: {} is a plugin with no keys,
+	// and a body naming none, or naming null, says nothing to write.
+	raw, named := body["config"]
+	if !named {
+		s.writeRichError(w, errors.Newf("the config of plugin %s was not sent: the body names no config", pluginName), http.StatusBadRequest)
+		return
+	}
+	if string(raw) == "null" {
+		s.writeRichError(w, errors.Newf("the config of plugin %s was sent as null: send {} for a plugin with no keys", pluginName), http.StatusBadRequest)
+		return
+	}
+	var config map[string]string
+	if err := json.Unmarshal(raw, &config); err != nil {
+		s.writeRichError(w, errors.Wrapf(err, "the config of plugin %s is not an object of text values", pluginName), http.StatusBadRequest)
+		return
+	}
+	// validate asks whether the config would be taken, without writing it.
+	var validate bool
+	if raw, named := body["validate"]; named {
+		if err := json.Unmarshal(raw, &validate); err != nil {
+			s.writeRichError(w, errors.Wrapf(err, "validate of plugin %s's config is not true or false", pluginName), http.StatusBadRequest)
+			return
+		}
 	}
 
 	// A running plugin says what its config may hold; one that is not running
-	// has nobody to ask, so its config is taken as written.
-	pm := s.getPluginManager()
+	// has nobody to ask, so its config is taken as written. A node running
+	// without a plugin manager runs no plugin.
 	var running bool
-	if pm != nil {
-		if proxy, ok := pm.GetPlugin(pluginName); ok {
+	switch managing := s.pluginManager.(type) {
+	case noPluginManager:
+	case managerRuns:
+		if proxy, ok := managing.manager.GetPlugin(pluginName); ok {
 			running = true
 			if extProxy, ok := proxy.(*grpcplugin.ExternalDomainProxy); ok {
 				ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 				schema, err := extProxy.ConfigSchema(ctx)
 				cancel()
 				if err != nil {
-					s.logger.Errorw("Failed to get config schema", "error", err, "plugin", pluginName)
 					s.writeRichError(w, errors.Wrapf(err, "failed to validate the config of plugin %s", pluginName), http.StatusInternalServerError)
 					return
 				}
-				if validationErrs := validateConfigAgainstSchema(req.Config, schema.Fields); len(validationErrs) > 0 {
+				if refused, err := validateConfigAgainstSchema(config, schema.Fields); err != nil {
 					respond(w, s.logger, http.StatusBadRequest, map[string]any{
 						"success": false,
 						"message": "Configuration validation failed",
-						"errors":  validationErrs,
+						"errors":  refused,
 					})
 					return
 				}
@@ -171,7 +202,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	if req.Validate {
+	if validate {
 		respond(w, s.logger, http.StatusOK, map[string]any{
 			"valid":   true,
 			"plugin":  pluginName,
@@ -180,8 +211,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := s.pluginRecords().ConfigurePlugin(actorOf(r.Context()), pluginName, req.Config); err != nil {
-		s.logger.Errorw("Failed to update plugin config", "error", err, "plugin", pluginName)
+	if err := s.pluginRecords().ConfigurePlugin(actorOf(r.Context()), pluginName, config); err != nil {
 		s.writeRichError(w, errors.Wrapf(err, "failed to write the config of plugin %s", pluginName), http.StatusBadRequest)
 		return
 	}
@@ -190,13 +220,13 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 
+		pm, err := s.getPluginManager()
+		if err != nil {
+			s.writeRichError(w, errors.Wrapf(err, "the config of plugin %s was saved, and the plugin was not reinitialized with it", pluginName), http.StatusInternalServerError)
+			return
+		}
 		if err := pm.ReinitializePlugin(ctx, pluginName, s.services); err != nil {
-			s.logger.Errorw("Failed to reinitialize plugin", "error", err, "plugin", pluginName)
-			respond(w, s.logger, http.StatusInternalServerError, map[string]any{
-				"success": false,
-				"message": "Configuration saved but plugin reinitialization failed: " + err.Error(),
-				"plugin":  pluginName,
-			})
+			s.writeRichError(w, errors.Wrapf(err, "the config of plugin %s was saved, and the plugin was not reinitialized with it", pluginName), http.StatusInternalServerError)
 			return
 		}
 	}
@@ -205,25 +235,47 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		"success": true,
 		"message": "Plugin configuration updated successfully",
 		"plugin":  pluginName,
-		"config":  req.Config,
+		"config":  config,
 	})
 }
 
-// validateConfigAgainstSchema validates config values against plugin schema constraints
-func validateConfigAgainstSchema(settings map[string]string, schema map[string]*protocol.ConfigFieldSchema) map[string]string {
-	errors := make(map[string]string)
+// validateConfigAgainstSchema validates config values against plugin schema
+// constraints: what each refused field is told, and the refusal of them all.
+func validateConfigAgainstSchema(settings map[string]string, schema map[string]*protocol.ConfigFieldSchema) (map[string]string, error) {
+	fields := make(map[string]string)
+	var refusedErr error
+	refuse := func(fieldName, why string) {
+		fields[fieldName] = why
+		refusal := errors.Newf("%s: %s", fieldName, why)
+		if refusedErr == nil {
+			refusedErr = refusal
+			return
+		}
+		refusedErr = errors.WithSecondaryError(refusedErr, refusal)
+	}
 
-	// Check all required fields are present
+	// A required field is there and holds something, and what it holds is
+	// what its type says.
 	for fieldName, fieldSchema := range schema {
-		if fieldSchema.Required {
-			if value, exists := settings[fieldName]; !exists || value == "" {
-				errors[fieldName] = "This field is required"
-				continue
-			}
+		if !fieldSchema.Required {
+			continue
+		}
+		value, exists := settings[fieldName]
+		if !exists {
+			refuse(fieldName, "This field is required")
+			continue
+		}
+		held, err := named.TextOf(fieldName, value)
+		if err != nil {
+			refuse(fieldName, "This field is required: "+err.Error())
+			continue
+		}
+		if err := checkConfigValue(held.String(), fieldSchema); err != nil {
+			refuse(fieldName, err.Error())
 		}
 	}
 
-	// Validate each provided config value
+	// Every other value is one the schema names, and is what its type says.
 	for fieldName, value := range settings {
 		// How QNTX builds the plugin, and where it stands, are QNTX's, not the
 		// plugin's to validate.
@@ -232,77 +284,92 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 		}
 		fieldSchema, schemaExists := schema[fieldName]
 		if !schemaExists {
-			errors[fieldName] = "Unknown configuration field"
+			refuse(fieldName, "Unknown configuration field")
 			continue
 		}
-
-		// Validate by type
-		switch fieldSchema.Type {
-		case "integer":
-			intVal, err := strconv.ParseInt(value, 10, 64)
-			if err != nil {
-				errors[fieldName] = "Must be a valid integer"
-				continue
-			}
-
-			// Check min_value constraint
-			if fieldSchema.MinValue != "" {
-				minVal, err := strconv.ParseInt(fieldSchema.MinValue, 10, 64)
-				if err == nil && intVal < minVal {
-					errors[fieldName] = fmt.Sprintf("Must be at least %s", fieldSchema.MinValue)
-					continue
-				}
-			}
-
-			// Check max_value constraint
-			if fieldSchema.MaxValue != "" {
-				maxVal, err := strconv.ParseInt(fieldSchema.MaxValue, 10, 64)
-				if err == nil && intVal > maxVal {
-					errors[fieldName] = fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue)
-					continue
-				}
-			}
-
-		case "number":
-			floatVal, err := strconv.ParseFloat(value, 64)
-			if err != nil {
-				errors[fieldName] = "Must be a valid number"
-				continue
-			}
-
-			// Check min_value constraint
-			if fieldSchema.MinValue != "" {
-				minVal, err := strconv.ParseFloat(fieldSchema.MinValue, 64)
-				if err == nil && floatVal < minVal {
-					errors[fieldName] = fmt.Sprintf("Must be at least %s", fieldSchema.MinValue)
-					continue
-				}
-			}
-
-			// Check max_value constraint
-			if fieldSchema.MaxValue != "" {
-				maxVal, err := strconv.ParseFloat(fieldSchema.MaxValue, 64)
-				if err == nil && floatVal > maxVal {
-					errors[fieldName] = fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue)
-					continue
-				}
-			}
-
-		case "boolean":
-			if value != "true" && value != "false" {
-				errors[fieldName] = "Must be 'true' or 'false'"
-				continue
-			}
-
-		case "string":
-			// String type - no additional validation needed
-			// Could add min_length/max_length in future if needed
-
-		default:
-			// Unknown type - shouldn't happen if schema is valid
-			errors[fieldName] = fmt.Sprintf("Unknown field type: %s", fieldSchema.Type)
+		// Checked above, as the text it holds.
+		if fieldSchema.Required {
+			continue
+		}
+		if err := checkConfigValue(value, fieldSchema); err != nil {
+			refuse(fieldName, err.Error())
 		}
 	}
 
-	return errors
+	return fields, refusedErr
+}
+
+// checkConfigValue refuses a value that is not what its field's type says, or
+// is past a bound the field names. A type the schema names that is none of
+// string, integer, number and boolean is refused.
+func checkConfigValue(value string, fieldSchema *protocol.ConfigFieldSchema) error {
+	switch fieldSchema.Type {
+	case "string":
+		// Any text is a string.
+		return nil
+	case "integer":
+		intVal, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return errors.New("Must be a valid integer")
+		}
+		parse := func(limit string) (int64, error) { return strconv.ParseInt(limit, 10, 64) }
+		if err := atLeast(intVal, fieldSchema, parse, "an integer"); err != nil {
+			return err
+		}
+		return atMost(intVal, fieldSchema, parse, "an integer")
+	case "number":
+		floatVal, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return errors.New("Must be a valid number")
+		}
+		parse := func(limit string) (float64, error) { return strconv.ParseFloat(limit, 64) }
+		if err := atLeast(floatVal, fieldSchema, parse, "a number"); err != nil {
+			return err
+		}
+		return atMost(floatVal, fieldSchema, parse, "a number")
+	case "boolean":
+		if value != "true" && value != "false" {
+			return errors.New("Must be 'true' or 'false'")
+		}
+		return nil
+	}
+	return errors.Newf("Unknown field type: %s", fieldSchema.Type)
+}
+
+// atLeast refuses a value under the least the field takes. A number field
+// naming neither its least value nor that it has none is refused.
+func atLeast[T int64 | float64](value T, fieldSchema *protocol.ConfigFieldSchema, parse func(string) (T, error), as string) error {
+	switch least := fieldSchema.GetMin().(type) {
+	case *protocol.ConfigFieldSchema_MinValue:
+		limit, err := parse(least.MinValue)
+		if err != nil {
+			return errors.Newf("The plugin's schema says min_value %q, which is not %s", least.MinValue, as)
+		}
+		if value < limit {
+			return errors.Newf("Must be at least %s", least.MinValue)
+		}
+		return nil
+	case *protocol.ConfigFieldSchema_UnboundedBelow:
+		return nil
+	}
+	return errors.Newf("The plugin's schema names no min_value for this field, and not that it is unbounded below")
+}
+
+// atMost refuses a value over the greatest the field takes. A number field
+// naming neither its greatest value nor that it has none is refused.
+func atMost[T int64 | float64](value T, fieldSchema *protocol.ConfigFieldSchema, parse func(string) (T, error), as string) error {
+	switch most := fieldSchema.GetMax().(type) {
+	case *protocol.ConfigFieldSchema_MaxValue:
+		limit, err := parse(most.MaxValue)
+		if err != nil {
+			return errors.Newf("The plugin's schema says max_value %q, which is not %s", most.MaxValue, as)
+		}
+		if value > limit {
+			return errors.Newf("Must be at most %s", most.MaxValue)
+		}
+		return nil
+	case *protocol.ConfigFieldSchema_UnboundedAbove:
+		return nil
+	}
+	return errors.Newf("The plugin's schema names no max_value for this field, and not that it is unbounded above")
 }

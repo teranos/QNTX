@@ -25,9 +25,9 @@ func (s *Store) CreateJob(job *Job) error {
 		return errors.New("job.HandlerName cannot be empty")
 	}
 
-	pulseStateJSON, err := MarshalPulseState(job.PulseState)
+	pulseStateJSON, err := job.Pulse.column("job " + job.ID)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal pulse state")
+		return err
 	}
 
 	var errorDetailsJSON sql.NullString
@@ -47,9 +47,9 @@ func (s *Store) CreateJob(job *Job) error {
 			parent_job_id, retry_count,
 			plugin_version,
 			trace_context, trace_baggage,
-			user_id, namespace,
+			made_by, user_id, namespace,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	// exec_trace_* is absent on purpose: it is written when the job runs, by
 	// SetExecutionTrace, and a job being created has not run.
@@ -75,6 +75,7 @@ func (s *Store) CreateJob(job *Job) error {
 		job.PluginVersion,
 		job.TraceContext,
 		job.TraceBaggage,
+		job.MadeBy,
 		job.UserID,
 		job.Namespace,
 		job.CreatedAt,
@@ -142,9 +143,9 @@ func (s *Store) UpdateJob(job *Job) error {
 		return errors.New("job.HandlerName cannot be empty")
 	}
 
-	pulseStateJSON, err := MarshalPulseState(job.PulseState)
+	pulseStateJSON, err := job.Pulse.column("job " + job.ID)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal pulse state")
+		return err
 	}
 
 	var errorDetailsJSON sql.NullString
@@ -176,6 +177,14 @@ func (s *Store) UpdateJob(job *Job) error {
 
 	handlerName := sql.NullString{String: job.HandlerName, Valid: job.HandlerName != ""}
 	payload := sql.NullString{String: string(job.Payload), Valid: len(job.Payload) > 0}
+	startedAt, err := job.Started.column("the start of job " + job.ID)
+	if err != nil {
+		return err
+	}
+	completedAt, err := job.Completed.column("the completion of job " + job.ID)
+	if err != nil {
+		return err
+	}
 
 	_, err = s.db.Exec(query,
 		handlerName,
@@ -188,8 +197,8 @@ func (s *Store) UpdateJob(job *Job) error {
 		errorDetailsJSON,
 		job.RetryCount,
 		job.PluginVersion,
-		job.StartedAt,
-		job.CompletedAt,
+		startedAt,
+		completedAt,
 		job.UpdatedAt,
 		job.ID,
 	)
@@ -201,20 +210,17 @@ func (s *Store) UpdateJob(job *Job) error {
 	return nil
 }
 
-// ListJobs returns all jobs, optionally filtered by status
-func (s *Store) ListJobs(status *JobStatus, limit int) (_ []*Job, err error) {
-	var query string
-	var args []any
+// ListJobs is the newest jobs in one status, up to limit.
+func (s *Store) ListJobs(status JobStatus, limit int) ([]*Job, error) {
+	return s.listJobs(`SELECT `+StandardJobSelectColumns()+` FROM async_ix_jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?`, status, limit)
+}
 
-	baseQuery := `SELECT ` + StandardJobSelectColumns() + ` FROM async_ix_jobs`
-	if status != nil {
-		query = baseQuery + ` WHERE status = ? ORDER BY created_at DESC LIMIT ?`
-		args = []any{*status, limit}
-	} else {
-		query = baseQuery + ` ORDER BY created_at DESC LIMIT ?`
-		args = []any{limit}
-	}
+// ListEveryJob is the newest jobs in every status, up to limit.
+func (s *Store) ListEveryJob(limit int) ([]*Job, error) {
+	return s.listJobs(`SELECT `+StandardJobSelectColumns()+` FROM async_ix_jobs ORDER BY created_at DESC LIMIT ?`, limit)
+}
 
+func (s *Store) listJobs(query string, args ...any) (_ []*Job, err error) {
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list jobs")

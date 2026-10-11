@@ -49,7 +49,7 @@ func (s *QNTXServer) handleGetElementConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	subject := fmt.Sprintf("%s-element-%s", plugin, elementID)
-	attestations, err := store.GetAttestations(ats.AttestationFilter{
+	attestations, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects:   []string{subject},
 		Predicates: []string{"configured"},
 		Limit:      1,
@@ -101,6 +101,8 @@ func (s *QNTXServer) handleSetElementConfig(w http.ResponseWriter, r *http.Reque
 		Subjects:   []string{subject},
 		Predicates: []string{"configured"},
 		Contexts:   []string{"_"},
+		By:         types.ByNode{},
+		When:       types.Now{},
 		Attributes: req.Config,
 		Source:     fmt.Sprintf("%s-ui", req.Plugin),
 	}

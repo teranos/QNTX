@@ -26,10 +26,11 @@ const (
 // html/template. A value a template names and the Send does not is a refusal,
 // never an empty space in a mail that went out.
 type MailTemplate struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Subject       string                 `protobuf:"bytes,1,opt,name=subject,proto3" json:"subject,omitempty"`
-	Html          string                 `protobuf:"bytes,2,opt,name=html,proto3" json:"html,omitempty"`
-	Text          string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Subject string                 `protobuf:"bytes,1,opt,name=subject,proto3" json:"subject,omitempty"`
+	// The bodies a mail is sent in, each named: its html, its text, or both. A
+	// template naming none is refused, and so is one naming a body twice.
+	Bodies        []*MailTemplateBody `protobuf:"bytes,4,rep,name=bodies,proto3" json:"bodies,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -71,19 +72,95 @@ func (x *MailTemplate) GetSubject() string {
 	return ""
 }
 
-func (x *MailTemplate) GetHtml() string {
+func (x *MailTemplate) GetBodies() []*MailTemplateBody {
 	if x != nil {
-		return x.Html
+		return x.Bodies
+	}
+	return nil
+}
+
+// MailTemplateBody is one body a mail is sent in, named by what it is.
+type MailTemplateBody struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Is:
+	//
+	//	*MailTemplateBody_Html
+	//	*MailTemplateBody_Text
+	Is            isMailTemplateBody_Is `protobuf_oneof:"is"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MailTemplateBody) Reset() {
+	*x = MailTemplateBody{}
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MailTemplateBody) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MailTemplateBody) ProtoMessage() {}
+
+func (x *MailTemplateBody) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MailTemplateBody.ProtoReflect.Descriptor instead.
+func (*MailTemplateBody) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *MailTemplateBody) GetIs() isMailTemplateBody_Is {
+	if x != nil {
+		return x.Is
+	}
+	return nil
+}
+
+func (x *MailTemplateBody) GetHtml() string {
+	if x != nil {
+		if x, ok := x.Is.(*MailTemplateBody_Html); ok {
+			return x.Html
+		}
 	}
 	return ""
 }
 
-func (x *MailTemplate) GetText() string {
+func (x *MailTemplateBody) GetText() string {
 	if x != nil {
-		return x.Text
+		if x, ok := x.Is.(*MailTemplateBody_Text); ok {
+			return x.Text
+		}
 	}
 	return ""
 }
+
+type isMailTemplateBody_Is interface {
+	isMailTemplateBody_Is()
+}
+
+type MailTemplateBody_Html struct {
+	Html string `protobuf:"bytes,1,opt,name=html,proto3,oneof"`
+}
+
+type MailTemplateBody_Text struct {
+	Text string `protobuf:"bytes,2,opt,name=text,proto3,oneof"`
+}
+
+func (*MailTemplateBody_Html) isMailTemplateBody_Is() {}
+
+func (*MailTemplateBody_Text) isMailTemplateBody_Is() {}
 
 type SetMailTemplateRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -97,7 +174,7 @@ type SetMailTemplateRequest struct {
 
 func (x *SetMailTemplateRequest) Reset() {
 	*x = SetMailTemplateRequest{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -109,7 +186,7 @@ func (x *SetMailTemplateRequest) String() string {
 func (*SetMailTemplateRequest) ProtoMessage() {}
 
 func (x *SetMailTemplateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -122,7 +199,7 @@ func (x *SetMailTemplateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetMailTemplateRequest.ProtoReflect.Descriptor instead.
 func (*SetMailTemplateRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{1}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SetMailTemplateRequest) GetAuthToken() string {
@@ -164,7 +241,7 @@ type SetMailTemplateResponse struct {
 
 func (x *SetMailTemplateResponse) Reset() {
 	*x = SetMailTemplateResponse{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -176,7 +253,7 @@ func (x *SetMailTemplateResponse) String() string {
 func (*SetMailTemplateResponse) ProtoMessage() {}
 
 func (x *SetMailTemplateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -189,7 +266,7 @@ func (x *SetMailTemplateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetMailTemplateResponse.ProtoReflect.Descriptor instead.
 func (*SetMailTemplateResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{2}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SetMailTemplateResponse) GetSuccess() bool {
@@ -227,7 +304,7 @@ type SendMailRequest struct {
 
 func (x *SendMailRequest) Reset() {
 	*x = SendMailRequest{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -239,7 +316,7 @@ func (x *SendMailRequest) String() string {
 func (*SendMailRequest) ProtoMessage() {}
 
 func (x *SendMailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -252,7 +329,7 @@ func (x *SendMailRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMailRequest.ProtoReflect.Descriptor instead.
 func (*SendMailRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{3}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SendMailRequest) GetAuthToken() string {
@@ -311,7 +388,7 @@ type MailImage struct {
 
 func (x *MailImage) Reset() {
 	*x = MailImage{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -323,7 +400,7 @@ func (x *MailImage) String() string {
 func (*MailImage) ProtoMessage() {}
 
 func (x *MailImage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -336,7 +413,7 @@ func (x *MailImage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailImage.ProtoReflect.Descriptor instead.
 func (*MailImage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *MailImage) GetContentId() string {
@@ -379,7 +456,7 @@ type SendMailResponse struct {
 
 func (x *SendMailResponse) Reset() {
 	*x = SendMailResponse{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -391,7 +468,7 @@ func (x *SendMailResponse) String() string {
 func (*SendMailResponse) ProtoMessage() {}
 
 func (x *SendMailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,7 +481,7 @@ func (x *SendMailResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMailResponse.ProtoReflect.Descriptor instead.
 func (*SendMailResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SendMailResponse) GetSuccess() bool {
@@ -455,7 +532,7 @@ type MailRow struct {
 
 func (x *MailRow) Reset() {
 	*x = MailRow{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +544,7 @@ func (x *MailRow) String() string {
 func (*MailRow) ProtoMessage() {}
 
 func (x *MailRow) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +557,7 @@ func (x *MailRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailRow.ProtoReflect.Descriptor instead.
 func (*MailRow) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{6}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *MailRow) GetId() string {
@@ -566,7 +643,7 @@ type MailSent struct {
 
 func (x *MailSent) Reset() {
 	*x = MailSent{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -578,7 +655,7 @@ func (x *MailSent) String() string {
 func (*MailSent) ProtoMessage() {}
 
 func (x *MailSent) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -591,7 +668,7 @@ func (x *MailSent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailSent.ProtoReflect.Descriptor instead.
 func (*MailSent) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{7}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *MailSent) GetMails() []*MailRow {
@@ -614,7 +691,7 @@ type MailKeptImage struct {
 
 func (x *MailKeptImage) Reset() {
 	*x = MailKeptImage{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[8]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -626,7 +703,7 @@ func (x *MailKeptImage) String() string {
 func (*MailKeptImage) ProtoMessage() {}
 
 func (x *MailKeptImage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[8]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -639,7 +716,7 @@ func (x *MailKeptImage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailKeptImage.ProtoReflect.Descriptor instead.
 func (*MailKeptImage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{8}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *MailKeptImage) GetContentId() string {
@@ -687,7 +764,7 @@ type MailWhole struct {
 
 func (x *MailWhole) Reset() {
 	*x = MailWhole{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -699,7 +776,7 @@ func (x *MailWhole) String() string {
 func (*MailWhole) ProtoMessage() {}
 
 func (x *MailWhole) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -712,7 +789,7 @@ func (x *MailWhole) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailWhole.ProtoReflect.Descriptor instead.
 func (*MailWhole) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{9}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *MailWhole) GetId() string {
@@ -826,7 +903,7 @@ type MailMessage struct {
 
 func (x *MailMessage) Reset() {
 	*x = MailMessage{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -838,7 +915,7 @@ func (x *MailMessage) String() string {
 func (*MailMessage) ProtoMessage() {}
 
 func (x *MailMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -851,7 +928,7 @@ func (x *MailMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailMessage.ProtoReflect.Descriptor instead.
 func (*MailMessage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{10}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *MailMessage) GetMail() *MailWhole {
@@ -866,21 +943,21 @@ type MailTemplateRow struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// RFC 3339, to the nanosecond.
-	At            string   `protobuf:"bytes,2,opt,name=at,proto3" json:"at,omitempty"`
-	Plugin        string   `protobuf:"bytes,3,opt,name=plugin,proto3" json:"plugin,omitempty"`
-	Version       string   `protobuf:"bytes,4,opt,name=version,proto3" json:"version,omitempty"`
-	Name          string   `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
-	Subject       string   `protobuf:"bytes,6,opt,name=subject,proto3" json:"subject,omitempty"`
-	Html          string   `protobuf:"bytes,7,opt,name=html,proto3" json:"html,omitempty"`
-	Text          string   `protobuf:"bytes,8,opt,name=text,proto3" json:"text,omitempty"`
-	Values        []string `protobuf:"bytes,9,rep,name=values,proto3" json:"values,omitempty"`
+	At      string   `protobuf:"bytes,2,opt,name=at,proto3" json:"at,omitempty"`
+	Plugin  string   `protobuf:"bytes,3,opt,name=plugin,proto3" json:"plugin,omitempty"`
+	Version string   `protobuf:"bytes,4,opt,name=version,proto3" json:"version,omitempty"`
+	Name    string   `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
+	Subject string   `protobuf:"bytes,6,opt,name=subject,proto3" json:"subject,omitempty"`
+	Values  []string `protobuf:"bytes,9,rep,name=values,proto3" json:"values,omitempty"`
+	// The bodies the template's mail is sent in, each named.
+	Bodies        []*MailTemplateBody `protobuf:"bytes,10,rep,name=bodies,proto3" json:"bodies,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MailTemplateRow) Reset() {
 	*x = MailTemplateRow{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -892,7 +969,7 @@ func (x *MailTemplateRow) String() string {
 func (*MailTemplateRow) ProtoMessage() {}
 
 func (x *MailTemplateRow) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -905,7 +982,7 @@ func (x *MailTemplateRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailTemplateRow.ProtoReflect.Descriptor instead.
 func (*MailTemplateRow) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{11}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *MailTemplateRow) GetId() string {
@@ -950,23 +1027,16 @@ func (x *MailTemplateRow) GetSubject() string {
 	return ""
 }
 
-func (x *MailTemplateRow) GetHtml() string {
-	if x != nil {
-		return x.Html
-	}
-	return ""
-}
-
-func (x *MailTemplateRow) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
 func (x *MailTemplateRow) GetValues() []string {
 	if x != nil {
 		return x.Values
+	}
+	return nil
+}
+
+func (x *MailTemplateRow) GetBodies() []*MailTemplateBody {
+	if x != nil {
+		return x.Bodies
 	}
 	return nil
 }
@@ -982,7 +1052,7 @@ type NodeMail struct {
 
 func (x *NodeMail) Reset() {
 	*x = NodeMail{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -994,7 +1064,7 @@ func (x *NodeMail) String() string {
 func (*NodeMail) ProtoMessage() {}
 
 func (x *NodeMail) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1007,7 +1077,7 @@ func (x *NodeMail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeMail.ProtoReflect.Descriptor instead.
 func (*NodeMail) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{12}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *NodeMail) GetName() string {
@@ -1027,14 +1097,14 @@ func (x *NodeMail) GetSays() string {
 // MailTemplates is what mail templates answers.
 type MailTemplates struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// QNTX's own template, filled when a plugin names none: its subject, html
-	// and text, and the values it takes.
+	// QNTX's own template, filled when a plugin names none: its subject and
+	// bodies, and the values it takes.
 	Neutral *MailTemplateRow `protobuf:"bytes,1,opt,name=neutral,proto3" json:"neutral,omitempty"`
 	// QNTX's own template drawn as a QNTX window, filled when a plugin names
-	// dark: its subject, html and text, and the values it takes.
+	// dark: its subject and bodies, and the values it takes.
 	Dark *MailTemplateRow `protobuf:"bytes,2,opt,name=dark,proto3" json:"dark,omitempty"`
 	// One row per plugin and name: its attestation, when it was set, the
-	// plugin, its version, the name, and the subject, html and text.
+	// plugin, its version, the name, and the subject and bodies.
 	Templates []*MailTemplateRow `protobuf:"bytes,3,rep,name=templates,proto3" json:"templates,omitempty"`
 	// The mail the node writes itself, whole: not filled from any template, and
 	// named here so it is not missing.
@@ -1045,7 +1115,7 @@ type MailTemplates struct {
 
 func (x *MailTemplates) Reset() {
 	*x = MailTemplates{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[13]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1057,7 +1127,7 @@ func (x *MailTemplates) String() string {
 func (*MailTemplates) ProtoMessage() {}
 
 func (x *MailTemplates) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[13]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1070,7 +1140,7 @@ func (x *MailTemplates) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailTemplates.ProtoReflect.Descriptor instead.
 func (*MailTemplates) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{13}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *MailTemplates) GetNeutral() *MailTemplateRow {
@@ -1112,7 +1182,7 @@ type MailSES struct {
 
 func (x *MailSES) Reset() {
 	*x = MailSES{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[14]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1124,7 +1194,7 @@ func (x *MailSES) String() string {
 func (*MailSES) ProtoMessage() {}
 
 func (x *MailSES) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[14]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1137,7 +1207,7 @@ func (x *MailSES) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailSES.ProtoReflect.Descriptor instead.
 func (*MailSES) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{14}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *MailSES) GetEnabled() bool {
@@ -1170,7 +1240,7 @@ type SESAccount struct {
 
 func (x *SESAccount) Reset() {
 	*x = SESAccount{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[15]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1182,7 +1252,7 @@ func (x *SESAccount) String() string {
 func (*SESAccount) ProtoMessage() {}
 
 func (x *SESAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[15]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1195,7 +1265,7 @@ func (x *SESAccount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SESAccount.ProtoReflect.Descriptor instead.
 func (*SESAccount) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{15}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SESAccount) GetRegion() string {
@@ -1268,7 +1338,7 @@ type MailAccount struct {
 
 func (x *MailAccount) Reset() {
 	*x = MailAccount{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[16]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1280,7 +1350,7 @@ func (x *MailAccount) String() string {
 func (*MailAccount) ProtoMessage() {}
 
 func (x *MailAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[16]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1293,7 +1363,7 @@ func (x *MailAccount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailAccount.ProtoReflect.Descriptor instead.
 func (*MailAccount) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{16}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *MailAccount) GetFrom() string {
@@ -1340,7 +1410,7 @@ type MailReport struct {
 
 func (x *MailReport) Reset() {
 	*x = MailReport{}
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[17]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1352,7 +1422,7 @@ func (x *MailReport) String() string {
 func (*MailReport) ProtoMessage() {}
 
 func (x *MailReport) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[17]
+	mi := &file_plugin_grpc_protocol_mail_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1365,7 +1435,7 @@ func (x *MailReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MailReport.ProtoReflect.Descriptor instead.
 func (*MailReport) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{17}
+	return file_plugin_grpc_protocol_mail_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *MailReport) GetTo() string {
@@ -1393,11 +1463,14 @@ var File_plugin_grpc_protocol_mail_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_mail_proto_rawDesc = "" +
 	"\n" +
-	"\x1fplugin/grpc/protocol/mail.proto\x12\bprotocol\"P\n" +
+	"\x1fplugin/grpc/protocol/mail.proto\x12\bprotocol\"t\n" +
 	"\fMailTemplate\x12\x18\n" +
-	"\asubject\x18\x01 \x01(\tR\asubject\x12\x12\n" +
-	"\x04html\x18\x02 \x01(\tR\x04html\x12\x12\n" +
-	"\x04text\x18\x03 \x01(\tR\x04text\"\x97\x01\n" +
+	"\asubject\x18\x01 \x01(\tR\asubject\x122\n" +
+	"\x06bodies\x18\x04 \x03(\v2\x1a.protocol.MailTemplateBodyR\x06bodiesJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\x04htmlR\x04text\"D\n" +
+	"\x10MailTemplateBody\x12\x14\n" +
+	"\x04html\x18\x01 \x01(\tH\x00R\x04html\x12\x14\n" +
+	"\x04text\x18\x02 \x01(\tH\x00R\x04textB\x04\n" +
+	"\x02is\"\x97\x01\n" +
 	"\x16SetMailTemplateRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x16\n" +
@@ -1469,17 +1542,17 @@ const file_plugin_grpc_protocol_mail_proto_rawDesc = "" +
 	"\x04text\x18\r \x01(\tR\x04text\x12/\n" +
 	"\x06images\x18\x0e \x03(\v2\x17.protocol.MailKeptImageR\x06images\"6\n" +
 	"\vMailMessage\x12'\n" +
-	"\x04mail\x18\x01 \x01(\v2\x13.protocol.MailWholeR\x04mail\"\xd1\x01\n" +
+	"\x04mail\x18\x01 \x01(\v2\x13.protocol.MailWholeR\x04mail\"\xf5\x01\n" +
 	"\x0fMailTemplateRow\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x0e\n" +
 	"\x02at\x18\x02 \x01(\tR\x02at\x12\x16\n" +
 	"\x06plugin\x18\x03 \x01(\tR\x06plugin\x12\x18\n" +
 	"\aversion\x18\x04 \x01(\tR\aversion\x12\x12\n" +
 	"\x04name\x18\x05 \x01(\tR\x04name\x12\x18\n" +
-	"\asubject\x18\x06 \x01(\tR\asubject\x12\x12\n" +
-	"\x04html\x18\a \x01(\tR\x04html\x12\x12\n" +
-	"\x04text\x18\b \x01(\tR\x04text\x12\x16\n" +
-	"\x06values\x18\t \x03(\tR\x06values\"2\n" +
+	"\asubject\x18\x06 \x01(\tR\asubject\x12\x16\n" +
+	"\x06values\x18\t \x03(\tR\x06values\x122\n" +
+	"\x06bodies\x18\n" +
+	" \x03(\v2\x1a.protocol.MailTemplateBodyR\x06bodiesJ\x04\b\a\x10\bJ\x04\b\b\x10\tR\x04htmlR\x04text\"2\n" +
 	"\bNodeMail\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04says\x18\x02 \x01(\tR\x04says\"\xd4\x01\n" +
@@ -1529,50 +1602,53 @@ func file_plugin_grpc_protocol_mail_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_mail_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_plugin_grpc_protocol_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_plugin_grpc_protocol_mail_proto_goTypes = []any{
 	(*MailTemplate)(nil),            // 0: protocol.MailTemplate
-	(*SetMailTemplateRequest)(nil),  // 1: protocol.SetMailTemplateRequest
-	(*SetMailTemplateResponse)(nil), // 2: protocol.SetMailTemplateResponse
-	(*SendMailRequest)(nil),         // 3: protocol.SendMailRequest
-	(*MailImage)(nil),               // 4: protocol.MailImage
-	(*SendMailResponse)(nil),        // 5: protocol.SendMailResponse
-	(*MailRow)(nil),                 // 6: protocol.MailRow
-	(*MailSent)(nil),                // 7: protocol.MailSent
-	(*MailKeptImage)(nil),           // 8: protocol.MailKeptImage
-	(*MailWhole)(nil),               // 9: protocol.MailWhole
-	(*MailMessage)(nil),             // 10: protocol.MailMessage
-	(*MailTemplateRow)(nil),         // 11: protocol.MailTemplateRow
-	(*NodeMail)(nil),                // 12: protocol.NodeMail
-	(*MailTemplates)(nil),           // 13: protocol.MailTemplates
-	(*MailSES)(nil),                 // 14: protocol.MailSES
-	(*SESAccount)(nil),              // 15: protocol.SESAccount
-	(*MailAccount)(nil),             // 16: protocol.MailAccount
-	(*MailReport)(nil),              // 17: protocol.MailReport
-	nil,                             // 18: protocol.SendMailRequest.ValuesEntry
+	(*MailTemplateBody)(nil),        // 1: protocol.MailTemplateBody
+	(*SetMailTemplateRequest)(nil),  // 2: protocol.SetMailTemplateRequest
+	(*SetMailTemplateResponse)(nil), // 3: protocol.SetMailTemplateResponse
+	(*SendMailRequest)(nil),         // 4: protocol.SendMailRequest
+	(*MailImage)(nil),               // 5: protocol.MailImage
+	(*SendMailResponse)(nil),        // 6: protocol.SendMailResponse
+	(*MailRow)(nil),                 // 7: protocol.MailRow
+	(*MailSent)(nil),                // 8: protocol.MailSent
+	(*MailKeptImage)(nil),           // 9: protocol.MailKeptImage
+	(*MailWhole)(nil),               // 10: protocol.MailWhole
+	(*MailMessage)(nil),             // 11: protocol.MailMessage
+	(*MailTemplateRow)(nil),         // 12: protocol.MailTemplateRow
+	(*NodeMail)(nil),                // 13: protocol.NodeMail
+	(*MailTemplates)(nil),           // 14: protocol.MailTemplates
+	(*MailSES)(nil),                 // 15: protocol.MailSES
+	(*SESAccount)(nil),              // 16: protocol.SESAccount
+	(*MailAccount)(nil),             // 17: protocol.MailAccount
+	(*MailReport)(nil),              // 18: protocol.MailReport
+	nil,                             // 19: protocol.SendMailRequest.ValuesEntry
 }
 var file_plugin_grpc_protocol_mail_proto_depIdxs = []int32{
-	0,  // 0: protocol.SetMailTemplateRequest.template:type_name -> protocol.MailTemplate
-	18, // 1: protocol.SendMailRequest.values:type_name -> protocol.SendMailRequest.ValuesEntry
-	4,  // 2: protocol.SendMailRequest.inline:type_name -> protocol.MailImage
-	6,  // 3: protocol.MailSent.mails:type_name -> protocol.MailRow
-	8,  // 4: protocol.MailWhole.images:type_name -> protocol.MailKeptImage
-	9,  // 5: protocol.MailMessage.mail:type_name -> protocol.MailWhole
-	11, // 6: protocol.MailTemplates.neutral:type_name -> protocol.MailTemplateRow
-	11, // 7: protocol.MailTemplates.dark:type_name -> protocol.MailTemplateRow
-	11, // 8: protocol.MailTemplates.templates:type_name -> protocol.MailTemplateRow
-	12, // 9: protocol.MailTemplates.node:type_name -> protocol.NodeMail
-	14, // 10: protocol.MailAccount.ses:type_name -> protocol.MailSES
-	15, // 11: protocol.MailAccount.account:type_name -> protocol.SESAccount
-	1,  // 12: protocol.MailService.SetTemplate:input_type -> protocol.SetMailTemplateRequest
-	3,  // 13: protocol.MailService.Send:input_type -> protocol.SendMailRequest
-	2,  // 14: protocol.MailService.SetTemplate:output_type -> protocol.SetMailTemplateResponse
-	5,  // 15: protocol.MailService.Send:output_type -> protocol.SendMailResponse
-	14, // [14:16] is the sub-list for method output_type
-	12, // [12:14] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	1,  // 0: protocol.MailTemplate.bodies:type_name -> protocol.MailTemplateBody
+	0,  // 1: protocol.SetMailTemplateRequest.template:type_name -> protocol.MailTemplate
+	19, // 2: protocol.SendMailRequest.values:type_name -> protocol.SendMailRequest.ValuesEntry
+	5,  // 3: protocol.SendMailRequest.inline:type_name -> protocol.MailImage
+	7,  // 4: protocol.MailSent.mails:type_name -> protocol.MailRow
+	9,  // 5: protocol.MailWhole.images:type_name -> protocol.MailKeptImage
+	10, // 6: protocol.MailMessage.mail:type_name -> protocol.MailWhole
+	1,  // 7: protocol.MailTemplateRow.bodies:type_name -> protocol.MailTemplateBody
+	12, // 8: protocol.MailTemplates.neutral:type_name -> protocol.MailTemplateRow
+	12, // 9: protocol.MailTemplates.dark:type_name -> protocol.MailTemplateRow
+	12, // 10: protocol.MailTemplates.templates:type_name -> protocol.MailTemplateRow
+	13, // 11: protocol.MailTemplates.node:type_name -> protocol.NodeMail
+	15, // 12: protocol.MailAccount.ses:type_name -> protocol.MailSES
+	16, // 13: protocol.MailAccount.account:type_name -> protocol.SESAccount
+	2,  // 14: protocol.MailService.SetTemplate:input_type -> protocol.SetMailTemplateRequest
+	4,  // 15: protocol.MailService.Send:input_type -> protocol.SendMailRequest
+	3,  // 16: protocol.MailService.SetTemplate:output_type -> protocol.SetMailTemplateResponse
+	6,  // 17: protocol.MailService.Send:output_type -> protocol.SendMailResponse
+	16, // [16:18] is the sub-list for method output_type
+	14, // [14:16] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_mail_proto_init() }
@@ -1580,13 +1656,17 @@ func file_plugin_grpc_protocol_mail_proto_init() {
 	if File_plugin_grpc_protocol_mail_proto != nil {
 		return
 	}
+	file_plugin_grpc_protocol_mail_proto_msgTypes[1].OneofWrappers = []any{
+		(*MailTemplateBody_Html)(nil),
+		(*MailTemplateBody_Text)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_mail_proto_rawDesc), len(file_plugin_grpc_protocol_mail_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

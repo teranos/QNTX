@@ -14,7 +14,6 @@ import (
 
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
-	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -209,8 +208,11 @@ func (s *QNTXServer) Stop() error {
 
 	// A plugin closing is not a plugin failing: health polling restarted
 	// plugins mid-shutdown, and the stop hung until systemd killed it.
-	if pm := grpcplugin.GetDefaultPluginManager(); pm != nil {
-		pm.StopWatching()
+	// A node running without a plugin manager has no plugins to stop watching.
+	switch managing := s.pluginManager.(type) {
+	case managerRuns:
+		managing.manager.StopWatching()
+	case noPluginManager:
 	}
 
 	// Stop daemon FIRST before stopping server goroutines
@@ -232,12 +234,8 @@ func (s *QNTXServer) Stop() error {
 	// Clear service providers before killing plugins — observers check HasProvider()
 	// and will skip routing once providers are cleared.
 	if s.servicesManager != nil {
-		if searchRouter := s.servicesManager.GetSearchRouter(); searchRouter != nil {
-			searchRouter.ClearProviders()
-		}
-		if llmRouter := s.servicesManager.GetLLMRouter(); llmRouter != nil {
-			llmRouter.ClearProviders()
-		}
+		// A router the node runs without holds no providers to clear.
+		s.servicesManager.ClearProviders()
 	}
 
 	// Shutdown plugins and gRPC services

@@ -8,6 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -18,12 +19,34 @@ import (
 // Uses CreateOrReplace for idempotency — safe across plugin restarts.
 // Prunes stale watchers that the plugin no longer declares.
 // See ADR-018 for the full watcher lifecycle.
+//
+// Declaring nothing is a declaration: it withdraws every watcher the plugin
+// declared before. A watcher naming a handler the plugin does not declare
+// would never have its job run, so it is refused.
 func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protocol.WatcherRegistration, handlerNames []string, logger *zap.SugaredLogger) error {
-	if len(registrations) > 0 {
-		logger.Debugw("Setting up plugin watchers",
-			"plugin", pluginName,
-			"count", len(registrations),
-		)
+	logger.Debugw("Setting up plugin watchers",
+		"plugin", pluginName,
+		"count", len(registrations),
+	)
+
+	// Build handler name set for validation
+	declaredHandlers := make(map[string]bool, len(handlerNames))
+	for _, h := range handlerNames {
+		declaredHandlers[h] = true
+	}
+
+	// Refused before anything is pruned or written
+	termsOf := make(map[string]named.Count, len(registrations))
+	for _, reg := range registrations {
+		if !declaredHandlers[reg.HandlerName] {
+			return errors.Newf("watcher %s of plugin %s names handler %q, which the plugin does not declare (it declares %v), so ExecuteJob would never be called",
+				reg.Id, pluginName, reg.HandlerName, handlerNames)
+		}
+		terms, err := filterTerms(reg)
+		if err != nil {
+			return errors.Wrapf(err, "watcher %s of plugin %s is refused", reg.Id, pluginName)
+		}
+		termsOf[reg.Id] = terms
 	}
 
 	ws := storage.NewWatcherStore(db)
@@ -41,7 +64,6 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 	if err != nil {
 		return errors.Wrapf(err, "failed to list watchers for pruning plugin %s", pluginName)
 	}
-	var pruned int
 	for _, w := range existing {
 		if w.ActionType != storage.ActionTypePluginExecute {
 			continue
@@ -52,38 +74,16 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 		if declaredIDs[w.ID] {
 			continue
 		}
-		// Stale watcher — plugin no longer declares it
+		// Stale watcher — plugin no longer declares it. One that is not
+		// pruned keeps firing for a declaration withdrawn.
 		if err := ws.Delete(ctx, w.ID); err != nil {
-			logger.Warnw("Failed to prune stale plugin watcher",
-				"plugin", pluginName,
-				"watcher_id", w.ID,
-				"error", err)
-		} else {
-			pruned++
+			return errors.Wrapf(err, "failed to prune stale watcher %s of plugin %s — it will keep firing", w.ID, pluginName)
 		}
-	}
-	if pruned > 0 {
-		logger.Infow("Pruned stale plugin watchers",
-			"plugin", pluginName,
-			"count", pruned)
-	}
-
-	// Build handler name set for validation
-	declaredHandlers := make(map[string]bool, len(handlerNames))
-	for _, h := range handlerNames {
-		declaredHandlers[h] = true
+		logger.Infow("Pruned stale plugin watcher", "plugin", pluginName, "watcher_id", w.ID)
 	}
 
 	// Register current watchers
 	for _, reg := range registrations {
-		if len(handlerNames) > 0 && !declaredHandlers[reg.HandlerName] {
-			logger.Warnw("Watcher references undeclared handler_name — ExecuteJob will never be called",
-				"plugin", pluginName,
-				"watcher_id", reg.Id,
-				"handler_name", reg.HandlerName,
-				"declared_handlers", handlerNames,
-			)
-		}
 		watcherID := fmt.Sprintf("%s-%s", pluginName, reg.Id)
 
 		actionData, err := json.Marshal(storage.PluginExecuteAction{
@@ -97,7 +97,7 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 		w := &storage.Watcher{
 			ID:   watcherID,
 			Name: fmt.Sprintf("%s/%s", pluginName, reg.Id),
-			Filter: types.AxFilter{
+			Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				Subjects:   reg.Subjects,
 				Predicates: reg.Predicates,
 				Contexts:   reg.Contexts,
@@ -117,6 +117,7 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 			"plugin", pluginName,
 			"watcher_id", watcherID,
 			"handler", reg.HandlerName,
+			"filter_terms", termsOf[reg.Id].Int(),
 			"predicates", reg.Predicates,
 			"contexts", reg.Contexts,
 			"max_fires_per_second", reg.MaxFiresPerSecond,
@@ -124,17 +125,6 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 	}
 
 	return nil
-}
-
-// CountUnfilteredWatchers returns how many watcher registrations have no filter fields set.
-func CountUnfilteredWatchers(watchers []*protocol.WatcherRegistration) int {
-	count := 0
-	for _, w := range watchers {
-		if len(w.Subjects) == 0 && len(w.Predicates) == 0 && len(w.Contexts) == 0 && len(w.Actors) == 0 {
-			count++
-		}
-	}
-	return count
 }
 
 // WatcherNames extracts watcher IDs from registrations.
@@ -146,12 +136,51 @@ func WatcherNames(watchers []*protocol.WatcherRegistration) []string {
 	return names
 }
 
-// UnfilteredWatcherNames returns IDs of watchers with no filter fields set.
+// filterTerms is how many subjects, predicates, contexts and actors a watcher
+// filters on. A filter naming none is refused: it is not every attestation.
+func filterTerms(reg *protocol.WatcherRegistration) (named.Count, error) {
+	return named.CountOf("the filter of watcher "+reg.GetId(),
+		len(reg.GetSubjects())+len(reg.GetPredicates())+len(reg.GetContexts())+len(reg.GetActors()))
+}
+
+// watcherFilter is what a watcher's filter names: its terms, or nothing, and
+// the refusal of it.
+type watcherFilter interface {
+	saysWhatItFilters()
+}
+
+// filtered is a filter naming at least one term.
+type filtered struct {
+	terms named.Count
+}
+
+// unfiltered is a filter naming nothing, which SetupPluginWatchers refuses.
+type unfiltered struct {
+	refused error
+}
+
+func (filtered) saysWhatItFilters()   {}
+func (unfiltered) saysWhatItFilters() {}
+
+// filterOf is what a watcher's filter names, or its refusal for naming
+// nothing.
+func filterOf(reg *protocol.WatcherRegistration) watcherFilter {
+	terms, err := filterTerms(reg)
+	if err != nil {
+		return unfiltered{refused: err}
+	}
+	return filtered{terms: terms}
+}
+
+// UnfilteredWatcherNames returns IDs of watchers whose filter names nothing,
+// which SetupPluginWatchers refuses.
 func UnfilteredWatcherNames(watchers []*protocol.WatcherRegistration) []string {
 	var names []string
 	for _, w := range watchers {
-		if len(w.Subjects) == 0 && len(w.Predicates) == 0 && len(w.Contexts) == 0 && len(w.Actors) == 0 {
+		switch filterOf(w).(type) {
+		case unfiltered:
 			names = append(names, w.GetId())
+		case filtered:
 		}
 	}
 	return names

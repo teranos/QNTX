@@ -117,7 +117,7 @@ func rangeName(name string) string {
 type StatusLineHandler struct {
 	registry *plugin.Registry
 	logger   *zap.SugaredLogger
-	health   func() (map[string]plugin.HealthStatus, time.Time, string)
+	health   func() pluginProbe
 	// The watcher store, fetched per request because a backend supplies it
 	// after this handler is built. Nil draws no failure items.
 	watchers func() storage.Watchers
@@ -139,7 +139,7 @@ type StatusLineHandler struct {
 
 // NewStatusLineHandler builds the handler behind /statusline.
 func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
-	health func() (map[string]plugin.HealthStatus, time.Time, string),
+	health func() pluginProbe,
 	watchers func() storage.Watchers, handlerFailures func() *handlerFailureLog,
 	node StatusLineNode) *StatusLineHandler {
 	return &StatusLineHandler{
@@ -458,7 +458,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 	// The last probe, not a fresh one. Probing per request cost gRPC calls and
 	// held the registry's read lock across them.
-	healthResults, _, _ := h.health()
+	healthResults := healthOf(h.health())
 	stateResults := h.registry.GetAllStates()
 
 	type entry struct {
@@ -562,7 +562,7 @@ func (h *StatusLineHandler) item(ctx context.Context, name string) (any, *protoc
 
 	// The row truncates a long name to fit tmux's range argument, so what comes
 	// back is a prefix rather than the whole of it.
-	health, _, _ := h.health()
+	health := healthOf(h.health())
 	states := h.registry.GetAllStates()
 
 	full := ""

@@ -62,7 +62,7 @@ func TestEngine_LoadWatchers(t *testing.T) {
 		ActionData:        "print('hello')",
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter: types.AxFilter{
+		Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects: []string{"user:123"},
 		},
 	}
@@ -74,10 +74,10 @@ func TestEngine_LoadWatchers(t *testing.T) {
 		ActionData:        "print('world')",
 		MaxFiresPerSecond: 105,
 		Enabled:           false,
-		Filter:            types.AxFilter{Predicates: []string{"disabled"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"disabled"}},
 	}
 
-	axQueryWatcher := &storage.Watcher{
+	axQueryWatcher := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                "ax-query-1",
 		Name:              "AX Query Watcher",
 		ActionType:        storage.ActionTypePython,
@@ -140,7 +140,7 @@ func TestEngine_MatchesFilter(t *testing.T) {
 		ActionData:        "pass",
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter: types.AxFilter{
+		Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects:   []string{"user:123", "user:456"},
 			Predicates: []string{"login", "logout"},
 			Contexts:   []string{"web"},
@@ -259,7 +259,7 @@ func TestEngine_RateLimiting(t *testing.T) {
 		ActionData:        "pass",
 		MaxFiresPerSecond: 60, // 1 per second
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
@@ -313,7 +313,7 @@ func TestEngine_ExecutePython(t *testing.T) {
 		ActionData:        "print(attestation['id'])",
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
@@ -373,7 +373,7 @@ func TestEngine_ExecuteWebhook(t *testing.T) {
 		ActionData:        server.URL + "/webhook",
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
@@ -447,7 +447,7 @@ func TestEngine_QueryHistoricalMatches(t *testing.T) {
 		ActionData:        "pass",
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter: types.AxFilter{
+		Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Predicates: []string{"login"},
 		},
 	}
@@ -497,8 +497,8 @@ func TestEngine_TimeFilters(t *testing.T) {
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
 		Filter: types.AxFilter{
-			TimeStart: &past,
-			TimeEnd:   &future,
+			TimeStart: types.BoundAt(past),
+			TimeEnd:   types.BoundAt(future),
 		},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
@@ -573,7 +573,7 @@ func TestEngine_ZeroMaxFiresPerSecond(t *testing.T) {
 		ActionData:        "pass",
 		MaxFiresPerSecond: 0, // Zero means zero - no fires allowed
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
@@ -643,7 +643,7 @@ func TestEngine_NoSharedMutation(t *testing.T) {
 			ActionData:        server.URL,
 			MaxFiresPerSecond: 105,
 			Enabled:           true,
-			Filter:            types.AxFilter{Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
+			Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
 		}
 		if err := store.Create(context.Background(), w); err != nil {
 			t.Fatalf("Create watcher %d failed: %v", i, err)
@@ -707,7 +707,7 @@ func TestEngine_GetParseError_SuccessfulWatcher(t *testing.T) {
 
 	// Create watcher with valid AX query
 	store := storage.NewWatcherStore(db)
-	validWatcher := &storage.Watcher{
+	validWatcher := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                "valid-query-watcher",
 		Name:              "Valid Query Watcher",
 		ActionType:        storage.ActionTypePython,
@@ -781,7 +781,7 @@ func TestEngine_ExecutePlugin(t *testing.T) {
 		ActionData:        string(actionData),
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
@@ -835,7 +835,7 @@ func TestEngine_ExecutePlugin_NotConfigured(t *testing.T) {
 		ActionData:        string(actionData),
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test", "action", "webhook-test", "commit", "original-predicate"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
@@ -889,7 +889,7 @@ func TestEngine_AttributeFilter_Equals(t *testing.T) {
 		ActionData:        string(actionData),
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"PostToolUse"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"PostToolUse"}},
 		AttributeFilters: []storage.AttributeFilter{
 			{Path: "tool_name", Op: "equals", Value: "Bash"},
 		},
@@ -953,7 +953,7 @@ func TestEngine_AttributeFilter_ContainsNestedPath(t *testing.T) {
 		ActionData:        string(actionData),
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"PostToolUse"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"PostToolUse"}},
 		AttributeFilters: []storage.AttributeFilter{
 			{Path: "tool_input.command", Op: "contains", Value: "git commit"},
 		},

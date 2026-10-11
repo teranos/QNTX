@@ -220,7 +220,8 @@ func (s *QNTXServer) rememberRoot(root *atomic.Pointer[services.MailRecipient], 
 		if s.authHandler != nil {
 			u, found, err := s.authHandler.RootUser()
 			if err == nil && found {
-				root.Store(&services.MailRecipient{ID: u.ID, Email: u.PrimaryEmail(), DisabledBy: u.DisabledBy})
+				recipient := services.UserRecipient(u)
+				root.Store(&recipient)
 				return
 			}
 		}
@@ -235,9 +236,9 @@ func (s *QNTXServer) rememberRoot(root *atomic.Pointer[services.MailRecipient], 
 // mailRoot mails ROOT off the watch, so a slow transport does not hold the
 // watch up; a mail that cannot go says why.
 func (s *QNTXServer) mailRoot(root *services.MailRecipient, m services.NodeMail) {
-	if s.nodeMailer == nil || root == nil {
-		s.logger.Errorw("The operational store is not answering in time and ROOT is not mailed",
-			"mail", m.Subject, "has_mail", s.nodeMailer != nil, "knows_root", root != nil)
+	if root == nil {
+		s.logger.Errorw("The operational store is not answering in time and ROOT is not mailed: no ROOT is known",
+			"mail", m.Subject)
 		return
 	}
 	to := *root
@@ -251,7 +252,7 @@ func (s *QNTXServer) mailRoot(root *services.MailRecipient, m services.NodeMail)
 // lastWords mails ROOT that the node stops, and waits at most p.lastWords for
 // it: past that the process ends with the mail unsent.
 func (s *QNTXServer) lastWords(p operationalPatience, root *services.MailRecipient, m services.NodeMail) {
-	if s.nodeMailer == nil || root == nil {
+	if root == nil {
 		s.mailRoot(root, m)
 		return
 	}
@@ -295,8 +296,7 @@ func stalledMail(waited time.Duration, p operationalPatience, pool operationalPo
 	return services.NodeMail{
 		Name:    "operational.stalled",
 		Subject: subject,
-		Text:    text.String(),
-		HTML:    "<pre>" + html.EscapeString(text.String()) + "</pre>",
+		Bodies:  []services.MailBody{services.TextBody(text.String()), services.HTMLBody("<pre>" + html.EscapeString(text.String()) + "</pre>")},
 	}
 }
 
@@ -314,7 +314,6 @@ func recoveredMail(stalled, answered time.Time, longest time.Duration, lifted []
 	return services.NodeMail{
 		Name:    "operational.recovered",
 		Subject: fmt.Sprintf("The operational store answers again, after %s", took),
-		Text:    text.String(),
-		HTML:    "<pre>" + html.EscapeString(text.String()) + "</pre>",
+		Bodies:  []services.MailBody{services.TextBody(text.String()), services.HTMLBody("<pre>" + html.EscapeString(text.String()) + "</pre>")},
 	}
 }

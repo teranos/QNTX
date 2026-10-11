@@ -42,8 +42,11 @@ func (b *builtinExecutor) ExecuteBuiltin(ctx context.Context, handlerName string
 		Payload:     payload,
 		Source:      "watcher",
 		Status:      async.JobStatusRunning,
+		MadeBy:      async.MadeByNoCaller,
 		CreatedAt:   now,
-		StartedAt:   &now,
+		Pulse:       async.NoPulse(),
+		Started:     async.At(now),
+		Completed:   async.NotYet(),
 		UpdatedAt:   now,
 	}
 

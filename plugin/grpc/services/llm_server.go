@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/ratelimit"
 	errors "github.com/teranos/sacred-error"
@@ -31,38 +32,34 @@ import (
 type LLMServer struct {
 	protocol.UnimplementedLLMServiceServer
 
-	mu              sync.RWMutex
-	providers       map[string]protocol.LLMServiceClient // provider name → client
-	defaultProvider string
-	queue           *llmQueue
-	limiter         *ratelimit.Limiter
-	store           ats.AttestationStore // nil = weave creation disabled
-	logger          *zap.SugaredLogger
+	mu        sync.RWMutex
+	providers map[string]protocol.LLMServiceClient // provider name → client
+	queue     *llmQueue
+	limiter   *ratelimit.Limiter
+	store     ats.AttestationStore // where every call is woven
+	logger    *zap.SugaredLogger
 }
 
 // NewLLMServer creates a new LLM routing server. Starts empty — providers register after init.
-// store may be nil to disable weave attestation creation.
+// Every call that answers is woven into store.
 func NewLLMServer(cfg config.LLMConfig, store ats.AttestationStore, logger *zap.SugaredLogger) *LLMServer {
 	return &LLMServer{
 		providers: make(map[string]protocol.LLMServiceClient),
-		queue:     newLLMQueue(cfg.MaxConcurrent, cfg.MaxQueueDepth, time.Duration(cfg.CooldownSeconds)*time.Second),
+		queue:     newLLMQueue(cfg.MaxConcurrent, cfg.MaxQueueDepth, time.Duration(cfg.CooldownSeconds)*time.Second, logger),
 		store:     store,
 		limiter:   ratelimit.NewLimiter(cfg.MaxCallsPerMinute),
 		logger:    logger,
 	}
 }
 
-// RegisterProvider adds a provider plugin's client connection.
-// If this is the first provider, it becomes the default.
+// RegisterProvider adds a provider plugin's client connection. A call reaches
+// it by naming it: no provider stands in for another.
 func (s *LLMServer) RegisterProvider(name string, client protocol.LLMServiceClient) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.providers[name] = client
-	if s.defaultProvider == "" {
-		s.defaultProvider = name
-	}
-	s.logger.Debugw("LLM provider registered", "provider", name, "is_default", s.defaultProvider == name)
+	s.logger.Debugw("LLM provider registered", "provider", name)
 }
 
 // ClearProviders removes all providers. Called during server shutdown
@@ -71,7 +68,6 @@ func (s *LLMServer) ClearProviders() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.providers = make(map[string]protocol.LLMServiceClient)
-	s.defaultProvider = ""
 }
 
 // UnregisterProvider removes a provider plugin's client connection.
@@ -81,15 +77,7 @@ func (s *LLMServer) UnregisterProvider(name string) {
 	defer s.mu.Unlock()
 
 	delete(s.providers, name)
-	if s.defaultProvider == name {
-		s.defaultProvider = ""
-		// Promote another provider if available
-		for k := range s.providers {
-			s.defaultProvider = k
-			break
-		}
-	}
-	s.logger.Debugw("LLM provider unregistered", "provider", name, "new_default", s.defaultProvider)
+	s.logger.Debugw("LLM provider unregistered", "provider", name)
 }
 
 // HasProvider returns true if the named provider is registered.
@@ -128,12 +116,12 @@ func (s *LLMServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*pr
 // Accumulates token signals from each chunk and creates a weave attestation
 // when the stream completes, so every provider gets observability for free.
 func (s *LLMServer) StreamChat(req *protocol.LLMChatRequest, srv protocol.LLMService_StreamChatServer) error {
-	_, providerName, err := s.resolveProvider(req.Provider)
+	client, providerName, err := s.resolveProvider(req.Provider)
 	if err != nil {
 		return err
 	}
 
-	clientStream, release, err := s.StreamChatClient(srv.Context(), req)
+	clientStream, release, err := s.streamFrom(srv.Context(), client, providerName, req)
 	if err != nil {
 		return err
 	}
@@ -155,16 +143,18 @@ func (s *LLMServer) StreamChat(req *protocol.LLMChatRequest, srv protocol.LLMSer
 			return err
 		}
 
-		// Accumulate for weave
+		// Accumulate for weave. The final chunk names the model.
 		text.WriteString(chunk.GetToken())
-		if chunk.GetModel() != "" {
-			model = chunk.GetModel()
-		}
 		if chunk.GetDone() {
+			model = chunk.GetModel()
 			totalToks = int(chunk.GetTotalTokens())
 		}
-		if chunk.GetSignal() != nil {
-			signals = append(signals, chunk.GetSignal())
+		signal, carried, err := chunk.SignalCarried()
+		if err != nil {
+			return errors.Wrapf(err, "provider %s", providerName)
+		}
+		if carried {
+			signals = append(signals, signal)
 		}
 
 		if err := srv.Send(chunk); err != nil {
@@ -187,7 +177,12 @@ func (s *LLMServer) StreamChatClient(ctx context.Context, req *protocol.LLMChatR
 	if err != nil {
 		return nil, nil, err
 	}
+	return s.streamFrom(ctx, client, providerName, req)
+}
 
+// streamFrom opens a stream on the provider a call resolved to, once a
+// concurrency slot is free.
+func (s *LLMServer) streamFrom(ctx context.Context, client protocol.LLMServiceClient, providerName string, req *protocol.LLMChatRequest) (protocol.LLMService_StreamChatClient, func(), error) {
 	if err := s.gate(ctx, req.Priority); err != nil {
 		return nil, nil, err
 	}
@@ -201,29 +196,16 @@ func (s *LLMServer) StreamChatClient(ctx context.Context, req *protocol.LLMChatR
 	return stream, s.queue.Release, nil
 }
 
-// resolveProvider returns the LLM client for the given provider name (or default).
+// resolveProvider returns the LLM client of the provider a call names. A call
+// naming none, or one not registered, is refused: no other provider answers
+// in its place.
 func (s *LLMServer) resolveProvider(name string) (protocol.LLMServiceClient, string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if len(s.providers) == 0 {
-		return nil, "", errors.New("no LLM providers registered")
-	}
-
-	if name == "" {
-		name = s.defaultProvider
-	}
-
 	client, ok := s.providers[name]
 	if !ok {
-		// Stale config or typo — fall back to default provider instead of failing
-		if name != s.defaultProvider && s.defaultProvider != "" {
-			client, ok = s.providers[s.defaultProvider]
-			if ok {
-				return client, s.defaultProvider, nil
-			}
-		}
-		return nil, "", errors.Newf("LLM provider %q not found (available: %v)", name, s.providerNames())
+		return nil, "", errors.Newf("LLM provider %q is not registered (registered: %v); a call names the provider it runs on", name, s.providerNames())
 	}
 
 	return client, name, nil
@@ -235,10 +217,6 @@ func (s *LLMServer) resolveProvider(name string) (protocol.LLMServiceClient, str
 func (s *LLMServer) gate(ctx context.Context, priority int32) error {
 	if err := s.limiter.Wait(ctx); err != nil {
 		return status.Errorf(codes.ResourceExhausted, "LLM rate limit: %v", err)
-	}
-	active, queued := s.queue.Stats()
-	if queued > 0 {
-		s.logger.Infow("LLM request queued", "priority", priority, "active", active, "queued", queued)
 	}
 	if err := s.queue.Acquire(ctx, priority); err != nil {
 		return status.Errorf(codes.ResourceExhausted, "LLM queue: %v", err)
@@ -258,75 +236,74 @@ func (s *LLMServer) providerNames() []string {
 // createWeave creates a Weave attestation capturing an LLM interaction.
 // Runs asynchronously — failures are logged, never propagated to the caller.
 func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatRequest, provider, model, responseText string, totalTokens int, signals []*protocol.TokenSignalProto) {
-	if s.store == nil {
-		return
-	}
-
-	prompt := lastUserMessage(req)
-	if prompt == "" && responseText == "" {
+	answered, err := named.TextOf("the model provider "+provider+" answered with", model)
+	if err != nil {
+		s.logger.Warnw("LLM call happened and is not woven: its provider named no model", "provider", provider, "error", err)
 		return
 	}
 
 	attrs := map[string]any{
-		"prompt":       prompt,
+		"prompt":       lastUserMessage(req),
 		"text":         responseText,
-		"model":        model,
+		"model":        answered.String(),
 		"token_count":  totalTokens,
 		"weave_source": provider,
 	}
 
-	// Aggregate signal statistics
-	if len(signals) > 0 {
-		var confSum, entSum float64
-		for _, sig := range signals {
-			confSum += float64(sig.Confidence)
-			entSum += float64(sig.Entropy)
+	// Per-token signal data, and the mean over the tokens so far: a stream
+	// whose tokens carried no signal weaves none.
+	tokens := make([]any, 0, len(signals))
+	var meanConfidence, meanEntropy float64
+	for i, sig := range signals {
+		seen := float64(i + 1)
+		meanConfidence += (float64(sig.Confidence) - meanConfidence) / seen
+		meanEntropy += (float64(sig.Entropy) - meanEntropy) / seen
+		tok := map[string]any{
+			"position":   i,
+			"confidence": sig.Confidence,
+			"entropy":    sig.Entropy,
+			"top_gap":    sig.TopGap,
 		}
-		n := float64(len(signals))
-		attrs["mean_confidence"] = confSum / n
-		attrs["mean_entropy"] = entSum / n
-
-		// Pack per-token signal data
-		tokens := make([]any, 0, len(signals))
-		for i, sig := range signals {
-			tok := map[string]any{
-				"position":   i,
-				"confidence": sig.Confidence,
-				"entropy":    sig.Entropy,
-				"top_gap":    sig.TopGap,
-			}
-			if len(sig.TopK) > 0 {
-				topK := make([]any, 0, len(sig.TopK))
-				for _, c := range sig.TopK {
-					topK = append(topK, map[string]any{
-						"text": c.Text,
-						"prob": c.Prob,
-					})
-				}
-				tok["top_k"] = topK
-			}
-			tokens = append(tokens, tok)
+		// A token whose provider sent no candidates has none.
+		topK := make([]any, 0, len(sig.TopK))
+		for _, c := range sig.TopK {
+			topK = append(topK, map[string]any{
+				"text": c.Text,
+				"prob": c.Prob,
+			})
 		}
+		tok["top_k"] = topK
+		tokens = append(tokens, tok)
+		attrs["mean_confidence"] = meanConfidence
+		attrs["mean_entropy"] = meanEntropy
 		attrs["tokens"] = tokens
 	}
 
 	contextID := fmt.Sprintf("llm:%d", time.Now().UnixNano())
 
+	weaver, err := named.TextOf("the provider of the call to "+answered.String(), provider)
+	if err != nil {
+		s.logger.Warnw("LLM call happened and is not woven: it names no provider", "model", model, "error", err)
+		return
+	}
 	cmd := &types.AsCommand{
-		Subjects:   []string{"model:" + model},
+		Subjects:   []string{"model:" + answered.String()},
 		Predicates: []string{"Weave"},
 		Contexts:   []string{contextID},
-		Actors:     []string{provider},
+		By:         types.ActorNamed(weaver),
+		When:       types.Now{},
 		Source:     "llm",
 		Attributes: attrs,
 	}
 
 	go func() {
-		if _, err := s.store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
+		woven, err := s.store.GenerateAndCreateAttestation(ctx, cmd)
+		if err != nil {
 			s.logger.Errorw("LLM call happened but was not attested; the spend is missing from the record", "provider", provider, "model", model, "error", err)
-		} else {
-			measure.Count(measure.Woven, 1)
+			return
 		}
+		measure.Count(measure.Woven, 1)
+		s.logger.Debugw("LLM call woven", "provider", provider, "model", model, "attestation", woven.ID)
 	}()
 }
 

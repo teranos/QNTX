@@ -30,6 +30,18 @@ type nodeMailer interface {
 	SendAsNodeTo(ctx context.Context, u services.MailRecipient, m services.NodeMail) (messageID, attestationID string, err error)
 }
 
+// notMailing is the node's mail while it has no mail service, and why: each
+// mail asked of it is refused with that.
+type notMailing struct{ why error }
+
+func (n notMailing) SendAsNode(context.Context, string, services.NodeMail) (string, string, error) {
+	return "", "", n.why
+}
+
+func (n notMailing) SendAsNodeTo(context.Context, services.MailRecipient, services.NodeMail) (string, string, error) {
+	return "", "", n.why
+}
+
 type reportHandler struct{ server *QNTXServer }
 
 func (h *reportHandler) Name() string { return reportHandlerName }
@@ -41,9 +53,6 @@ func (h *reportHandler) Execute(ctx context.Context, _ *async.Job) error {
 
 // sendReport gathers the week ending now and mails it to the ROOT User.
 func (s *QNTXServer) sendReport(ctx context.Context) (*protocol.MailReport, error) {
-	if s.nodeMailer == nil {
-		return nil, errors.New("the mail service did not start, so the report is not sent")
-	}
 	root, found, err := s.authHandler.RootUser()
 	if err != nil {
 		return nil, errors.Wrap(err, "the report has nobody to go to")
@@ -75,11 +84,6 @@ func (s *QNTXServer) setupWeeklyReport(cfg *appcfg.Config) {
 	s.sentryConfig = cfg.Sentry
 	if _, why := s.sentryReader(s.ctx); why != nil {
 		s.logger.Infow("The weekly report leaves Sentry out until this is so", "reason", why)
-	}
-	if s.servicesManager != nil {
-		if mail := s.servicesManager.MailServer(); mail != nil {
-			s.nodeMailer = mail
-		}
 	}
 	if s.held == nil {
 		return
@@ -115,6 +119,7 @@ func (s *QNTXServer) setupWeeklyReport(cfg *appcfg.Config) {
 
 	now := time.Now()
 	job := &schedule.Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              fmt.Sprintf("SPJ_report_%d", now.Unix()),
 		HandlerName:     reportHandlerName,
 		IntervalSeconds: int32(interval),

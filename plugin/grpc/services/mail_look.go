@@ -55,15 +55,15 @@ func readLook() (look, error) {
 		return look{}, err
 	}
 	var l look
-	var failed error
+	var readErr error
 	prop := func(into *string, selector, property string) {
-		if failed == nil {
-			*into, failed = s.prop(selector, property)
+		if readErr == nil {
+			*into, readErr = s.prop(selector, property)
 		}
 	}
 	token := func(into *string, name string) {
-		if failed == nil {
-			*into, failed = s.token(name)
+		if readErr == nil {
+			*into, readErr = s.token(name)
 		}
 	}
 
@@ -105,8 +105,8 @@ func readLook() (look, error) {
 	token(&l.graphRule, "--border-on-dark")
 	token(&l.graphFill, "--element-status-success-bg")
 	token(&l.graphLine, "--accent-on-dark")
-	if failed != nil {
-		return look{}, errors.Wrap(failed, "a mail cannot be drawn from web/css")
+	if readErr != nil {
+		return look{}, errors.Wrap(readErr, "a mail cannot be drawn from web/css")
 	}
 
 	// A mail client that reads no rgba would drop the window; the colour the
@@ -125,21 +125,24 @@ func readLook() (look, error) {
 
 // MailWindow is one window of a mail QNTX draws.
 type MailWindow struct {
-	Symbol   string // one of web/ts/sym.ts; empty draws the title alone
-	Title    string
-	Sections []MailSection
+	Symbol     string // one of web/ts/sym.ts, drawn before the title
+	TitleAlone bool   // the title drawn without a symbol
+	Title      string
+	Sections   []MailSection
 }
 
 // MailSection is an element section: a heading, then what it holds.
 type MailSection struct {
-	Title string    // empty draws no heading
-	HTML  string    // placed as it is, before the rows: an image, a paragraph
-	Rows  []MailRow // drawn as .element-row
+	Title    string    // drawn as the heading
+	Headless bool      // no heading is drawn: what the section holds stands alone
+	HTML     string    // placed as it is, before the rows: an image, a paragraph
+	Rows     []MailRow // drawn as .element-row
 }
 
 // MailRow is an element row: a label on the left, its value on the right.
 type MailRow struct {
 	Label, Value string
+	Unlabelled   bool // the value stands where a label would
 	State        RowState
 	Key          bool // a key read character by character, as .element-did: it breaks anywhere
 }
@@ -187,10 +190,10 @@ func (l look) window1(b *strings.Builder, w MailWindow) {
 	// Fixed, so the window is as wide as the screen and not as wide as a graph.
 	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="` + l.window + `" style="background-color:` + l.window + `;margin:0 0 ` + l.sectionGap + `;table-layout:fixed">
 <tr><td style="height:` + l.barHeight + `;padding:` + l.barPadding + `;border-bottom:` + l.barBorder + `;font-family:` + l.mono + `;font-size:` + l.titleSize + `;font-weight:` + l.titleWeight + `;color:` + l.titleColor + `">`)
-	if w.Symbol != "" {
-		b.WriteString(html.EscapeString(w.Symbol) + `<span style="padding-left:` + l.barGap + `">` + html.EscapeString(w.Title) + `</span>`)
-	} else {
+	if w.TitleAlone {
 		b.WriteString(html.EscapeString(w.Title))
+	} else {
+		b.WriteString(html.EscapeString(w.Symbol) + `<span style="padding-left:` + l.barGap + `">` + html.EscapeString(w.Title) + `</span>`)
 	}
 	b.WriteString(`</td></tr>
 <tr><td style="padding:` + l.windowPadding + `"><div style="padding:` + l.contentPadding + `;font-family:` + l.mono + `;font-size:` + l.size + `;line-height:` + l.lineHeight + `">
@@ -203,7 +206,7 @@ func (l look) window1(b *strings.Builder, w MailWindow) {
 
 func (l look) section(b *strings.Builder, s MailSection) {
 	b.WriteString(`<div style="margin-bottom:` + l.sectionGap + `">`)
-	if s.Title != "" {
+	if !s.Headless {
 		b.WriteString(`<div style="margin:` + l.headingMargin + `;padding:` + l.headingPadding + `;font-size:` + l.headingSize + `;font-weight:` + l.headingWeight + `;color:` + l.headingColor + `">` + html.EscapeString(s.Title) + `</div>`)
 	}
 	b.WriteString(s.HTML)
@@ -228,10 +231,10 @@ func (l look) section(b *strings.Builder, s MailSection) {
 			wrap = "word-break:" + l.keyBreak
 		}
 		b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom:` + border + `"><tr>`)
-		if r.Label != "" {
-			b.WriteString(`<td valign="top" style="padding:` + l.rowPadding + `;color:` + l.labelColor + `;font-size:` + l.labelSize + `">` + html.EscapeString(r.Label) + `</td>`)
-		} else {
+		if r.Unlabelled {
 			align = "left"
+		} else {
+			b.WriteString(`<td valign="top" style="padding:` + l.rowPadding + `;color:` + l.labelColor + `;font-size:` + l.labelSize + `">` + html.EscapeString(r.Label) + `</td>`)
 		}
 		b.WriteString(`<td valign="top" align="` + align + `" style="padding:` + l.rowPadding + `;color:` + value + `;text-align:` + align + `;` + wrap + `">` + html.EscapeString(r.Value) + `</td></tr></table>`)
 	}

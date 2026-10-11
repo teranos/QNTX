@@ -68,50 +68,9 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 		return errors.Wrapf(err, "invalid port in address: %s", addr)
 	}
 
-	const maxAttempts = 64
-	var listener net.Listener
-	var actualPort int
-
-	// Try to bind to a port, incrementing on failure
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		tryPort := startPort + attempt
-		tryAddr := net.JoinHostPort(host, strconv.Itoa(tryPort))
-
-		listener, err = net.Listen("tcp", tryAddr)
-		if err == nil {
-			// Successfully bound to port
-			actualPort = tryPort
-			if attempt > 0 {
-				s.logger.Infow("Port conflict resolved",
-					"requested_port", startPort,
-					"attempts", attempt+1,
-					"actual_port", actualPort)
-			}
-			break
-		}
-
-		// Check if error is "address already in use"
-		if isAddressInUse(err) {
-			if attempt == 0 {
-				s.logger.Warnw("Requested port already in use, trying next port",
-					"requested_port", startPort,
-					"trying_port", tryPort+1)
-			} else if (attempt+1)%10 == 0 {
-				// Log every 10 attempts to avoid spam
-				s.logger.Warnw("Still searching for available port",
-					"requested_port", startPort,
-					"attempts", attempt+1,
-					"trying_port", tryPort+1)
-			}
-			continue
-		}
-
-		// Different error, not port conflict
-		return errors.Wrapf(err, "failed to listen on %s (attempt %d/%d)", tryAddr, attempt+1, maxAttempts)
-	}
-
-	if listener == nil {
-		return errors.Newf("failed to find available port after %d attempts starting from %d", maxAttempts, startPort)
+	listener, actualPort, err := s.listen(host, startPort)
+	if err != nil {
+		return err
 	}
 
 	actualAddr := net.JoinHostPort(host, strconv.Itoa(actualPort))
@@ -153,11 +112,38 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	return nil
 }
 
-// isAddressInUse checks if the error is due to address already in use.
-func isAddressInUse(err error) bool {
-	if err == nil {
-		return false
+// listenAttempts is how many ports listen tries, from the one asked for up.
+const listenAttempts = 64
+
+// listen binds the first port free from startPort up, trying listenAttempts.
+func (s *PluginServer) listen(host string, startPort int) (net.Listener, int, error) {
+	for attempt := 0; attempt < listenAttempts; attempt++ {
+		tryPort := startPort + attempt
+		tryAddr := net.JoinHostPort(host, strconv.Itoa(tryPort))
+
+		listener, err := net.Listen("tcp", tryAddr)
+		if err == nil {
+			if tryPort != startPort {
+				s.logger.Infow("Port conflict resolved",
+					"requested_port", startPort,
+					"attempts", attempt+1,
+					"actual_port", tryPort)
+			}
+			return listener, tryPort, nil
+		}
+
+		// Different error, not port conflict. A port in use is tried past,
+		// and the port it came to is said once it is bound.
+		if !isAddressInUse(err) {
+			return nil, tryPort, errors.Wrapf(err, "failed to listen on %s (attempt %d/%d)", tryAddr, attempt+1, listenAttempts)
+		}
 	}
+	return nil, startPort, errors.Newf("failed to find available port after %d attempts starting from %d", listenAttempts, startPort)
+}
+
+// isAddressInUse checks if the error listening is due to address already in
+// use.
+func isAddressInUse(err error) bool {
 	// Check for common "address already in use" errors across platforms
 	errStr := err.Error()
 	return strings.Contains(errStr, "address already in use") ||
@@ -187,40 +173,45 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		// Create a remote service registry with service endpoints
 		// Pass the context for proper cancellation propagation in gRPC calls
 		// Inject service endpoints into config for direct plugin access
-		pluginConfig := make(map[string]string, len(req.Config)+2)
+		// Each endpoint and the token are handed on as the node handed them.
+		pluginConfig := make(map[string]string, len(req.Config)+4)
 		for k, v := range req.Config {
 			pluginConfig[k] = v
 		}
-		if req.EmbeddingEndpoint != "" {
-			pluginConfig["_embedding_endpoint"] = req.EmbeddingEndpoint
-		}
-		// A Go plugin reaches MailService by dialing this with the auth token
-		// (ADR-041), the way qntx-atproto dials the embedding endpoint.
-		if req.MailEndpoint != "" {
-			pluginConfig["_mail_endpoint"] = req.MailEndpoint
+		// A Go plugin reaches MailService by dialing its endpoint with the auth
+		// token (ADR-041), the way qntx-atproto dials the embedding endpoint:
+		// each is under _<service>_endpoint, or why the node runs without it
+		// under _<service>_not_running.
+		for service, handed := range map[string]*protocol.ServiceEndpoint{
+			"embedding": req.EmbeddingEndpoint,
+			"mail":      req.MailEndpoint,
+		} {
+			key, value := EndpointFrom(service, handed).configKey(service)
+			pluginConfig[key] = value
 		}
 		// A plugin answering a sigil presents the call's token to the store here.
-		if req.AtsStoreEndpoint != "" {
-			pluginConfig["_ats_store_endpoint"] = req.AtsStoreEndpoint
-		}
-		if req.AuthToken != "" {
-			pluginConfig["_auth_token"] = req.AuthToken
-		}
+		pluginConfig["_ats_store_endpoint"] = req.AtsStoreEndpoint
+		pluginConfig["_auth_token"] = req.AuthToken
 
-		s.services = NewRemoteServiceRegistry(
+		services, err := NewRemoteServiceRegistry(
 			ctx,
 			req.AtsStoreEndpoint,
 			req.QueueEndpoint,
 			req.ScheduleEndpoint,
 			req.FileServiceEndpoint,
-			req.LlmEndpoint,
-			req.VectorSearchEndpoint,
-			req.SearchEndpoint,
+			EndpointFrom("llm", req.LlmEndpoint),
+			EndpointFrom("vector search", req.VectorSearchEndpoint),
+			EndpointFrom("search", req.SearchEndpoint),
 			req.AuthToken,
 			pluginConfig,
 			s.logger,
 			s.plugin, // Pass plugin reference for metadata lookup
 		)
+		if err != nil {
+			s.initErr = errors.Wrapf(err, "plugin %s has no services to reach the node by", s.plugin.Metadata().Name)
+			return
+		}
+		s.services = services
 
 		// Initialize the plugin
 		if err := s.plugin.Initialize(ctx, s.services); err != nil {
@@ -263,9 +254,13 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		handlerNames = ha.GetHandlerNames()
 	}
 
+	// A Go plugin's sigils are the routes it declares, and one declaring none
+	// serves none.
 	var routes []*protocol.RouteInfo
+	sigilsFrom := protocol.SigilsFrom_SIGILS_FROM_NONE
 	if rd, ok := s.plugin.(routeDeclarer); ok {
 		routes = rd.DeclaredRoutes()
+		sigilsFrom = protocol.SigilsFrom_SIGILS_FROM_HTTP_ROUTES
 	}
 
 	_, isLLMProvider := s.plugin.(plugin.LLMProvider)
@@ -279,15 +274,16 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		SearchProvider:    isSearchProvider,
 		EmbeddingProvider: isEmbeddingProvider,
 		HttpRoutes:        routes,
+		SigilsFrom:        sigilsFrom,
 	}, nil
 }
 
 // Shutdown shuts down the plugin.
-func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protocol.Empty, error) {
+func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protocol.ShutdownResponse, error) {
 	if err := s.plugin.Shutdown(ctx); err != nil {
 		return nil, errors.Wrapf(err, "plugin %s shutdown failed", s.plugin.Metadata().Name)
 	}
-	return &protocol.Empty{}, nil
+	return &protocol.ShutdownResponse{Stopped: true}, nil
 }
 
 // HandleHTTP handles an HTTP request via gRPC.
@@ -407,7 +403,7 @@ func (s *PluginServer) HandleWebSocket(stream protocol.DomainPluginService_Handl
 				Timestamp: msg.Timestamp,
 			}
 			if err := stream.Send(closeMsg); err != nil {
-				s.logger.Errorw("Failed to send CLOSE message", "error", err)
+				return errors.Wrap(err, "failed to send CLOSE acknowledgment")
 			}
 			return nil
 		}
@@ -447,16 +443,27 @@ func (s *PluginServer) ConfigSchema(ctx context.Context, _ *protocol.Empty) (*pr
 	fields := make(map[string]*protocol.ConfigFieldSchema, len(schema))
 
 	for name, field := range schema {
-		fields[name] = &protocol.ConfigFieldSchema{
+		said := &protocol.ConfigFieldSchema{
 			Type:         field.Type,
 			Description:  field.Description,
 			DefaultValue: field.DefaultValue,
 			Required:     field.Required,
-			MinValue:     field.MinValue,
-			MaxValue:     field.MaxValue,
 			Pattern:      field.Pattern,
 			ElementType:  field.ElementType,
 		}
+		// A field that is no number has no bounds, and says none; the node
+		// refuses a number field that names neither a bound nor none.
+		field.Min.Read(
+			func(value string) { said.Min = &protocol.ConfigFieldSchema_MinValue{MinValue: value} },
+			func() { said.Min = &protocol.ConfigFieldSchema_UnboundedBelow{UnboundedBelow: &protocol.Unbounded{}} },
+			func() {},
+		)
+		field.Max.Read(
+			func(value string) { said.Max = &protocol.ConfigFieldSchema_MaxValue{MaxValue: value} },
+			func() { said.Max = &protocol.ConfigFieldSchema_UnboundedAbove{UnboundedAbove: &protocol.Unbounded{}} },
+			func() {},
+		)
+		fields[name] = said
 	}
 
 	return &protocol.ConfigSchemaResponse{
@@ -481,16 +488,21 @@ func (s *PluginServer) RegisterElements(ctx context.Context, _ *protocol.Empty) 
 	protoElements := make([]*protocol.ElementDef, len(elementDefs))
 
 	for i, def := range elementDefs {
-		protoElements[i] = &protocol.ElementDef{
+		element := &protocol.ElementDef{
 			Symbol:        def.Symbol,
 			Title:         def.Title,
 			Label:         def.Label,
-			ContentPath:   def.ContentPath,
-			CssPath:       def.CSSPath,
+			CssPaths:      def.CSSPaths,
 			DefaultWidth:  def.DefaultWidth,
 			DefaultHeight: def.DefaultHeight,
-			ModulePath:    def.ModulePath,
 		}
+		if err := def.Drawn.Read(
+			func(path string) { element.Drawn = &protocol.ElementDef_ContentPath{ContentPath: path} },
+			func(path string) { element.Drawn = &protocol.ElementDef_ModulePath{ModulePath: path} },
+		); err != nil {
+			return nil, errors.Wrapf(err, "plugin %s element %s", s.plugin.Metadata().Name, def.Symbol)
+		}
+		protoElements[i] = element
 	}
 
 	return &protocol.ElementDefResponse{

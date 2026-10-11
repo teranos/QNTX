@@ -8,10 +8,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestLLMQueue_ImmediateAcquire(t *testing.T) {
-	q := newLLMQueue(2, 8, 0)
+	q := newLLMQueue(2, 8, 0, zap.NewNop().Sugar())
 
 	require.NoError(t, q.Acquire(context.Background(), 0))
 	require.NoError(t, q.Acquire(context.Background(), 0))
@@ -29,7 +30,7 @@ func TestLLMQueue_ImmediateAcquire(t *testing.T) {
 }
 
 func TestLLMQueue_BlocksWhenFull(t *testing.T) {
-	q := newLLMQueue(1, 8, 0)
+	q := newLLMQueue(1, 8, 0, zap.NewNop().Sugar())
 
 	require.NoError(t, q.Acquire(context.Background(), 0))
 
@@ -42,7 +43,7 @@ func TestLLMQueue_BlocksWhenFull(t *testing.T) {
 }
 
 func TestLLMQueue_PriorityOrdering(t *testing.T) {
-	q := newLLMQueue(1, 8, 0)
+	q := newLLMQueue(1, 8, 0, zap.NewNop().Sugar())
 
 	// Fill the single slot
 	require.NoError(t, q.Acquire(context.Background(), 0))
@@ -92,7 +93,7 @@ func TestLLMQueue_PriorityOrdering(t *testing.T) {
 }
 
 func TestLLMQueue_ContextCancelWhileWaiting(t *testing.T) {
-	q := newLLMQueue(1, 8, 0)
+	q := newLLMQueue(1, 8, 0, zap.NewNop().Sugar())
 	require.NoError(t, q.Acquire(context.Background(), 0))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -125,7 +126,7 @@ func TestLLMQueue_ContextCancelWhileWaiting(t *testing.T) {
 
 // A queue depth of 0 queues nobody: with every slot taken, the next is refused.
 func TestLLMQueue_ADepthOfZeroQueuesNobody(t *testing.T) {
-	q := newLLMQueue(1, 0, 0)
+	q := newLLMQueue(1, 0, 0, zap.NewNop().Sugar())
 	require.NoError(t, q.Acquire(context.Background(), 0))
 
 	err := q.Acquire(context.Background(), 0)
@@ -135,7 +136,7 @@ func TestLLMQueue_ADepthOfZeroQueuesNobody(t *testing.T) {
 }
 
 func TestLLMQueue_RejectsWhenQueueFull(t *testing.T) {
-	q := newLLMQueue(1, 2, 0) // 1 active slot, max 2 waiters
+	q := newLLMQueue(1, 2, 0, zap.NewNop().Sugar()) // 1 active slot, max 2 waiters
 
 	// Fill the active slot
 	require.NoError(t, q.Acquire(context.Background(), 0))
@@ -163,4 +164,34 @@ func TestLLMQueue_RejectsWhenQueueFull(t *testing.T) {
 	// Drain
 	q.Release()
 	wg.Wait()
+}
+
+// Leaving the front of the line hands the free slot to whoever is next.
+func TestLLMQueue_LeavingTheFrontServesTheNext(t *testing.T) {
+	q := newLLMQueue(1, 8, 0, zap.NewNop().Sugar())
+	require.NoError(t, q.Acquire(context.Background(), 0))
+
+	front, cancelFront := context.WithCancel(context.Background())
+	frontDone := make(chan error, 1)
+	go func() { frontDone <- q.Acquire(front, 0) }()
+	time.Sleep(10 * time.Millisecond)
+
+	nextDone := make(chan error, 1)
+	go func() { nextDone <- q.Acquire(context.Background(), 5) }()
+	time.Sleep(10 * time.Millisecond)
+
+	cancelFront()
+	require.ErrorIs(t, <-frontDone, context.Canceled)
+
+	q.Release()
+	select {
+	case err := <-nextDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("the slot freed while the next request waited was not given to it")
+	}
+	active, queued := q.Stats()
+	assert.Equal(t, 1, active)
+	assert.Equal(t, 0, queued)
+	q.Release()
 }

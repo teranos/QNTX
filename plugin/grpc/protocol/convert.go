@@ -1,10 +1,13 @@
 package protocol
 
 import (
+	"encoding/json"
+	"maps"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
 	errors "github.com/teranos/sacred-error"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -26,11 +29,6 @@ func ErrUnknownHandler(handlerName string) error {
 
 // ToTypes converts a proto Attestation to types.As.
 func (p *Attestation) ToTypes() *types.As {
-	attributes := make(map[string]any)
-	if p.Attributes != nil {
-		attributes = p.Attributes.AsMap()
-	}
-
 	return &types.As{
 		ID:         p.Id,
 		Subjects:   p.Subjects,
@@ -39,7 +37,7 @@ func (p *Attestation) ToTypes() *types.As {
 		Actors:     p.Actors,
 		Timestamp:  time.UnixMilli(p.Timestamp),
 		Source:     p.Source,
-		Attributes: attributes,
+		Attributes: p.GetAttributes().AsMap(),
 		CreatedAt:  time.UnixMilli(p.CreatedAt),
 		Signature:  p.Signature,
 		SignerDID:  p.SignerDid,
@@ -48,16 +46,9 @@ func (p *Attestation) ToTypes() *types.As {
 
 // AttestationFromTypes converts a types.As to a proto Attestation.
 func AttestationFromTypes(as *types.As) (*Attestation, error) {
-	var attrs *structpb.Struct
-	if len(as.Attributes) > 0 {
-		// Convert Go types to protobuf-compatible types ([]string → []interface{})
-		converted := convertToProtoCompatible(as.Attributes)
-
-		var err error
-		attrs, err = structpb.NewStruct(converted)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to convert attributes to protobuf Struct")
-		}
+	attrs, err := AttributesStruct(as.Attributes)
+	if err != nil {
+		return nil, errors.Wrapf(err, "attestation %s", as.ID)
 	}
 
 	return &Attestation{
@@ -75,37 +66,34 @@ func AttestationFromTypes(as *types.As) (*Attestation, error) {
 	}, nil
 }
 
-// convertToProtoCompatible recursively converts Go types to protobuf-compatible types.
-// Specifically converts []string to []interface{} which structpb.NewStruct requires.
-func convertToProtoCompatible(m map[string]any) map[string]any {
-	result := make(map[string]any, len(m))
-	for k, v := range m {
-		result[k] = convertValue(v)
+// AttributesStruct is attributes as a protobuf Struct, read through their JSON:
+// what JSON holds the Struct holds, and a value JSON cannot hold is refused.
+// Attributes holding none are an empty Struct.
+func AttributesStruct(attributes map[string]any) (*structpb.Struct, error) {
+	held := make(map[string]any, len(attributes))
+	maps.Copy(held, attributes)
+	raw, err := json.Marshal(held)
+	if err != nil {
+		return nil, errors.Wrapf(err, "attributes %v have no JSON form", attributes)
 	}
-	return result
+	var attrs structpb.Struct
+	if err := protojson.Unmarshal(raw, &attrs); err != nil {
+		return nil, errors.Wrapf(err, "attributes %s have no protobuf Struct form", raw)
+	}
+	return &attrs, nil
 }
 
-func convertValue(v any) any {
-	switch val := v.(type) {
-	case []string:
-		// Convert []string to []interface{}
-		result := make([]any, len(val))
-		for i, s := range val {
-			result[i] = s
+// SignalCarried is the signal a chunk carries, and true; false for a chunk
+// that says it carries none. A chunk naming neither is refused.
+func (c *LLMChatChunk) SignalCarried() (*TokenSignalProto, bool, error) {
+	switch carried := c.GetSignalOf().(type) {
+	case *LLMChatChunk_Signal:
+		return carried.Signal, true, nil
+	case *LLMChatChunk_NoSignal:
+		if !carried.NoSignal {
+			return nil, false, errors.New("a chunk says no_signal is false: it carries its signal, or none")
 		}
-		return result
-	case map[string]any:
-		// Recursively convert nested maps
-		return convertToProtoCompatible(val)
-	case []any:
-		// Recursively convert slice elements
-		result := make([]any, len(val))
-		for i, item := range val {
-			result[i] = convertValue(item)
-		}
-		return result
-	default:
-		// Other types (string, int, float64, bool) are already compatible
-		return v
+		return nil, false, nil
 	}
+	return nil, false, errors.New("a chunk names no signal: signal, or no_signal")
 }

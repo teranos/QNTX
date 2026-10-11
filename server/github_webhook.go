@@ -103,7 +103,7 @@ func (p gitHubPush) moves(b pluginBuild) bool {
 		if !strings.EqualFold(source.Owner+"/"+source.Repo, p.Repository.FullName) || source.Branch != p.branch() {
 			continue
 		}
-		if source.Path == "" || p.touched(source.Path) {
+		if !source.PathNamed || p.touched(source.Path) {
 			return true
 		}
 	}

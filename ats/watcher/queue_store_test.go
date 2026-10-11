@@ -24,7 +24,7 @@ func createTestWatchers(t *testing.T, db *sql.DB, ids ...string) {
 			ActionData:        "http://localhost",
 			MaxFiresPerSecond: 60,
 			Enabled:           true,
-			Filter:            types.AxFilter{Predicates: []string{"test"}},
+			Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 		})
 		if err != nil {
 			t.Fatalf("createTestWatchers(%s): %v", id, err)

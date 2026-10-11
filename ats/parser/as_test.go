@@ -13,6 +13,7 @@ func TestParseAsCommand(t *testing.T) {
 		name     string
 		args     []string
 		expected types.AsCommand
+		actors   []string
 		wantErr  bool
 	}{
 		{
@@ -59,8 +60,8 @@ func TestParseAsCommand(t *testing.T) {
 				Subjects:   []string{"ALICE"},
 				Predicates: []string{"researcher"},
 				Contexts:   []string{"MIT"},
-				Actors:     []string{"registry-system"},
 			},
+			actors: []string{"registry-system"},
 		},
 		{
 			name: "with multiple actors",
@@ -69,8 +70,8 @@ func TestParseAsCommand(t *testing.T) {
 				Subjects:   []string{"DAVE"},
 				Predicates: []string{"consultant"},
 				Contexts:   []string{"STARTUP"},
-				Actors:     []string{"hr-system", "verification-bot"},
 			},
+			actors: []string{"hr-system", "verification-bot"},
 		},
 		{
 			name: "with explicit date",
@@ -144,9 +145,9 @@ func TestParseAsCommand(t *testing.T) {
 				Subjects:   []string{"NEO", "TYMA"},
 				Predicates: []string{"employees", "contractors"},
 				Contexts:   []string{"ACME", "QNTX"},
-				Actors:     []string{"hr-system"},
 				// Timestamp will be 2025-01-15
 			},
+			actors: []string{"hr-system"},
 		},
 		// Error cases
 		{
@@ -191,43 +192,41 @@ func TestParseAsCommand(t *testing.T) {
 				t.Errorf("ParseAsCommand() contexts = %v, want %v", result.Contexts, tt.expected.Contexts)
 			}
 
-			// Check actors (if specified) - note: LLM actor may be automatically added
-			if len(tt.expected.Actors) > 0 {
-				// For tests with expected actors, check that they're all present (LLM actor may be added)
-				for _, expectedActor := range tt.expected.Actors {
-					found := false
-					for _, resultActor := range result.Actors {
-						if resultActor == expectedActor {
-							found = true
-							break
-						}
-					}
-					if !found {
-						t.Errorf("ParseAsCommand() missing expected actor %s in %v", expectedActor, result.Actors)
-					}
+			// Actors named by `by` stand; no `by` is made by the node: the
+			// parser invents no actor.
+			switch by := result.By.(type) {
+			case types.ActorsNamed:
+				if !equalStringSlices(by.Actors.All(), tt.actors) {
+					t.Errorf("ParseAsCommand() actors = %v, want %v", by.Actors.All(), tt.actors)
 				}
+			case types.ByNode:
+				if len(tt.actors) != 0 {
+					t.Errorf("ParseAsCommand() is made by the node, want actors %v", tt.actors)
+				}
+			default:
+				t.Errorf("ParseAsCommand() says no one made it: %T", result.By)
 			}
 
-			// No by names no actor: the parser invents none.
-			if len(tt.expected.Actors) == 0 && len(result.Actors) != 0 {
-				t.Errorf("ParseAsCommand() named no actor and got %v", result.Actors)
+			when, err := result.MadeAt()
+			if err != nil {
+				t.Fatalf("ParseAsCommand() names no time: %v", err)
 			}
 
 			// Check timestamp for specific date tests
 			if strings.Contains(tt.name, "2025-01-15") {
 				expected := time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC)
-				if !result.Timestamp.Equal(expected) {
-					t.Errorf("ParseAsCommand() timestamp = %v, want %v", result.Timestamp, expected)
+				if !when.Equal(expected) {
+					t.Errorf("ParseAsCommand() timestamp = %v, want %v", when, expected)
 				}
 			}
 
 			// Check timestamp for yesterday test
 			if strings.Contains(tt.name, "yesterday") {
 				yesterday := time.Now().AddDate(0, 0, -1)
-				if result.Timestamp.Year() != yesterday.Year() ||
-					result.Timestamp.Month() != yesterday.Month() ||
-					result.Timestamp.Day() != yesterday.Day() {
-					t.Errorf("ParseAsCommand() timestamp should be yesterday, got %v", result.Timestamp)
+				if when.Year() != yesterday.Year() ||
+					when.Month() != yesterday.Month() ||
+					when.Day() != yesterday.Day() {
+					t.Errorf("ParseAsCommand() timestamp should be yesterday, got %v", when)
 				}
 			}
 		})
@@ -362,15 +361,18 @@ func TestParseTimeExpression(t *testing.T) {
 	}
 }
 
-// An attestation that says no `by` names no actor: the parser does not read one
-// off whoever runs the process.
+// An attestation that says no `by` is made by the node: the parser does not
+// read an actor off whoever runs the process.
 func TestAnAttestationSayingNoByNamesNoActor(t *testing.T) {
 	cmd, err := ParseAsCommand([]string{"ALICE", "is", "author"})
 	if err != nil {
 		t.Fatalf("ParseAsCommand: %v", err)
 	}
-	if len(cmd.Actors) != 0 {
-		t.Errorf("an attestation saying no by names %v", cmd.Actors)
+	if by, isNode := cmd.By.(types.ByNode); !isNode {
+		t.Errorf("an attestation saying no by is made by %#v", by)
+	}
+	if _, isNow := cmd.When.(types.Now); !isNow {
+		t.Errorf("an attestation saying no on is made at %#v", cmd.When)
 	}
 }
 

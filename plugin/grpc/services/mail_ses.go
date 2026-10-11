@@ -7,6 +7,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+	"github.com/teranos/QNTX/internal/named"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -19,23 +20,21 @@ import (
 // credentials it first read, and a host whose credentials rotate would go on
 // presenting expired ones.
 type SESTransport struct {
-	Region string // Empty = the AWS default chain's region.
+	// mail.ses.region. Left out of am.toml, the AWS chain names the region:
+	// its own loader reads an empty region as none given.
+	Region string
 }
 
 func (t SESTransport) client(ctx context.Context) (*sesv2.Client, string, error) {
-	var opts []func(*awsconfig.LoadOptions) error
-	if t.Region != "" {
-		opts = append(opts, awsconfig.WithRegion(t.Region))
-	}
-	cfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(t.Region))
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to load AWS credentials to reach SES")
 	}
-	if cfg.Region == "" {
-		err := errors.New("no AWS region to reach SES in")
+	region, err := named.TextOf("the AWS region to reach SES in", cfg.Region)
+	if err != nil {
 		return nil, "", errors.WithHint(err, "set mail.ses.region in am.toml, or AWS_REGION for the node")
 	}
-	return sesv2.NewFromConfig(cfg), cfg.Region, nil
+	return sesv2.NewFromConfig(cfg), region.String(), nil
 }
 
 // Send hands one mail to SES and names the id SES gave it.
@@ -45,12 +44,19 @@ func (t SESTransport) Send(ctx context.Context, m OutgoingMail) (string, error) 
 		return "", err
 	}
 
+	// The mail goes out in each body it names.
 	body := &sestypes.Body{}
-	if m.HTML != "" {
-		body.Html = &sestypes.Content{Data: aws.String(m.HTML), Charset: aws.String("UTF-8")}
-	}
-	if m.Text != "" {
-		body.Text = &sestypes.Content{Data: aws.String(m.Text), Charset: aws.String("UTF-8")}
+	for _, b := range m.Bodies.All() {
+		content := &sestypes.Content{Data: aws.String(b.Content), Charset: aws.String("UTF-8")}
+		switch b.Kind {
+		case MailHTML:
+			body.Html = content
+			continue
+		case MailText:
+			body.Text = content
+			continue
+		}
+		return "", errors.Newf("the mail to %s names a %q body, which SES does not send", m.To, b.Kind)
 	}
 
 	// An inline image is referenced from the html by cid:<ContentID>.
@@ -104,16 +110,19 @@ func (t SESTransport) Account(ctx context.Context) (SESAccount, error) {
 	if err != nil {
 		return SESAccount{}, errors.Wrapf(err, "SES in %s did not say what the account is", region)
 	}
-	account := SESAccount{
+	// An answer naming no quota is not an account with a quota of 0. The SDK
+	// hands the quota as a pointer, and one at nothing is refused.
+	quota, err := named.Pointed("the sending quota SES in "+region+" answered for the account with", out.SendQuota)
+	if err != nil {
+		return SESAccount{}, err
+	}
+	return SESAccount{
 		Region:            region,
 		ProductionAccess:  out.ProductionAccessEnabled,
 		SendingEnabled:    out.SendingEnabled,
 		EnforcementStatus: aws.ToString(out.EnforcementStatus),
-	}
-	if q := out.SendQuota; q != nil {
-		account.Max24HourSend = q.Max24HourSend
-		account.MaxSendRate = q.MaxSendRate
-		account.SentLast24Hours = q.SentLast24Hours
-	}
-	return account, nil
+		Max24HourSend:     quota.Max24HourSend,
+		MaxSendRate:       quota.MaxSendRate,
+		SentLast24Hours:   quota.SentLast24Hours,
+	}, nil
 }

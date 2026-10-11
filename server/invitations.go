@@ -7,8 +7,8 @@ import "strings"
 // wireInvitations hands the auth handler the node's mail and the page an
 // invitation's links open on: the first rp_origin, as a canvas invitation's.
 func (s *QNTXServer) wireInvitations() {
-	if s.authHandler == nil || s.nodeMailer == nil {
-		s.logger.Warnw("Invitations send no mail", "has_auth", s.authHandler != nil, "has_mail", s.nodeMailer != nil)
+	if s.authHandler == nil {
+		s.logger.Warnw("Invitations send no mail: this node has no login")
 		return
 	}
 	page := ""

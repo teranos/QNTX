@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 
@@ -17,44 +18,41 @@ import (
 type PluginHandler struct {
 	registry *plugin.Registry
 	logger   *zap.SugaredLogger
-	// health reads the last probe: the results, when it was taken, and why the
-	// most recent attempt failed if it did. It reaches no plugin.
-	health func() (map[string]plugin.HealthStatus, time.Time, string)
+	// health reads the last probe and when it was taken, or why none has
+	// completed. It reaches no plugin.
+	health func() pluginProbe
 	// sigils is one plugin's sigils, with who reaches each, and why any signum
-	// it handed is not served. Nil on a node that serves no plugin sigils.
+	// it handed is not served.
 	sigils func(name string) ([]*protocol.SigilRow, []string)
-	// records is every plugin the node knows, running or not. Nil lists only
-	// what the registry holds.
+	// records is every plugin the node knows, running or not.
 	records func() ([]plugingrpc.PluginRecord, error)
 }
 
 // NewPluginHandler creates a handler for plugin info endpoints.
 func NewPluginHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
-	health func() (map[string]plugin.HealthStatus, time.Time, string)) *PluginHandler {
-	return &PluginHandler{registry: registry, logger: logger, health: health}
+	health func() pluginProbe,
+	sigils func(name string) ([]*protocol.SigilRow, []string),
+	records func() ([]plugingrpc.PluginRecord, error)) *PluginHandler {
+	return &PluginHandler{registry: registry, logger: logger, health: health, sigils: sigils, records: records}
 }
 
 // list is every installed plugin and its status: plugins_list's answer.
 func (h *PluginHandler) list() *protocol.PluginsList {
 	answer := &protocol.PluginsList{Plugins: []*protocol.PluginInfo{}}
-	if h.registry == nil {
-		return answer
-	}
 
 	// Read the last probe rather than making one. Probing here cost gRPC calls
 	// per request and held the registry's read lock across them.
-	healthResults, probedAt, probeFailure := h.health()
+	probe := h.health()
+	healthResults := healthOf(probe)
 	stateResults := h.registry.GetAllStates()
 
 	known := map[string]plugingrpc.PluginRecord{}
-	if h.records != nil {
-		held, err := h.records()
-		if err != nil {
-			answer.RecordsFailure = err.Error()
-		}
-		for _, record := range held {
-			known[record.Name] = record
-		}
+	held, err := h.records()
+	if err != nil {
+		answer.RecordsFailure = err.Error()
+	}
+	for _, record := range held {
+		known[record.Name] = record
 	}
 
 	// A plugin that serves a canvas module can say which one. Asked of the
@@ -91,9 +89,7 @@ func (h *PluginHandler) list() *protocol.PluginsList {
 		if digester, serves := p.(moduleDigester); serves {
 			info.ModuleDigest = digester.ModuleDigest()
 		}
-		if h.sigils != nil {
-			info.Sigils, info.SignaRefused = h.sigils(name)
-		}
+		info.Sigils, info.SignaRefused = h.sigils(name)
 		info.Repo, info.Enabled = known[name].Repo, known[name].Enabled
 		answer.Plugins = append(answer.Plugins, info)
 	}
@@ -135,13 +131,15 @@ func (h *PluginHandler) list() *protocol.PluginsList {
 
 	// Health here is a probe with an age. Saying when it was taken is what keeps
 	// a stale answer from reading as a current one.
-	if !probedAt.IsZero() {
-		answer.Health = &protocol.PluginHealthProbe{
-			ProbedAt: probedAt.UTC().Format(time.RFC3339),
-			AgeMs:    float64(time.Since(probedAt).Milliseconds()),
-		}
+	switch held := probe.(type) {
+	case probed:
+		answer.Probe = &protocol.PluginsList_Health{Health: &protocol.PluginHealthProbe{
+			ProbedAt: held.at.UTC().Format(time.RFC3339),
+			AgeMs:    float64(time.Since(held.at).Milliseconds()),
+		}}
+	case notProbedYet:
+		answer.Probe = &protocol.PluginsList_HealthProbeFailure{HealthProbeFailure: held.why}
 	}
-	answer.HealthProbeFailure = probeFailure
 	return answer
 }
 
@@ -156,11 +154,8 @@ func healthDetails(details map[string]any) map[string]string {
 }
 
 // routes is what each running plugin serves: plugins_routes's answer.
-func (h *PluginHandler) routes() *protocol.PluginRoutes {
+func (h *PluginHandler) routes() (*protocol.PluginRoutes, error) {
 	answer := &protocol.PluginRoutes{Routes: []*protocol.PluginRoute{}}
-	if h.registry == nil {
-		return answer
-	}
 
 	for _, name := range h.registry.List() {
 		p, ok := h.registry.Get(name)
@@ -173,9 +168,13 @@ func (h *PluginHandler) routes() *protocol.PluginRoutes {
 			Http: "/api/" + name + "/",
 		}
 
-		// Check WebSocket registration
+		// A plugin's socket is the handler it serves at /ws/{name}, where the
+		// node looks for it.
 		wsHandlers, err := p.RegisterWebSocket()
-		if err == nil && len(wsHandlers) > 0 {
+		if err != nil {
+			return nil, errors.Wrapf(err, "plugin %s did not say what it serves over WebSocket", name)
+		}
+		if _, serves := wsHandlers["/ws/"+name]; serves {
 			route.Ws = "/ws/" + name
 		}
 
@@ -203,16 +202,13 @@ func (h *PluginHandler) routes() *protocol.PluginRoutes {
 		answer.Routes = append(answer.Routes, route)
 	}
 
-	return answer
+	return answer, nil
 }
 
 // elements is the element definitions running plugins make: plugins_elements's
 // answer. A sigil gives an object, so the rows are under elements.
 func (h *PluginHandler) elements(ctx context.Context) *protocol.PluginElements {
 	answer := &protocol.PluginElements{Elements: []*protocol.PluginElement{}}
-	if h.registry == nil {
-		return answer
-	}
 
 	// Iterate through all plugins and get their element definitions
 	for _, name := range h.registry.List() {
@@ -236,37 +232,47 @@ func (h *PluginHandler) elements(ctx context.Context) *protocol.PluginElements {
 		// Get element definitions from plugin
 		resp, err := provider.RegisterElements(ctx)
 		if err != nil {
-			h.logger.Debugw("Plugin does not provide element definitions",
-				"plugin", name,
-				"error", err)
+			answer.Refused = append(answer.Refused, errors.Wrapf(err, "plugin %s made no element definitions", name).Error())
 			continue
 		}
 
-		// Convert to response format
+		// Convert to response format: each path the plugin names is served
+		// under /api/{plugin}.
 		for _, def := range resp.Elements {
-			contentURL := fmt.Sprintf("/api/%s%s", name, def.ContentPath)
-			cssURL := ""
-			if def.CssPath != "" {
-				cssURL = fmt.Sprintf("/api/%s%s", name, def.CssPath)
-			}
-			moduleURL := ""
-			if def.ModulePath != "" {
-				moduleURL = fmt.Sprintf("/api/%s%s", name, def.ModulePath)
-			}
-
-			answer.Elements = append(answer.Elements, &protocol.PluginElement{
+			element := &protocol.PluginElement{
 				Plugin:        name,
 				Symbol:        def.Symbol,
 				Title:         def.Title,
 				Label:         def.Label,
-				ContentUrl:    contentURL,
-				CssUrl:        cssURL,
-				ModuleUrl:     moduleURL,
+				CssUrls:       make([]string, 0, len(def.CssPaths)),
 				DefaultWidth:  def.DefaultWidth,
 				DefaultHeight: def.DefaultHeight,
-			})
+			}
+			for _, cssPath := range def.CssPaths {
+				element.CssUrls = append(element.CssUrls, fmt.Sprintf("/api/%s%s", name, cssPath))
+			}
+			if err := drawFrom(name, def, element); err != nil {
+				answer.Refused = append(answer.Refused, errors.Wrapf(err, "plugin %s element %s", name, def.Symbol).Error())
+				continue
+			}
+			answer.Elements = append(answer.Elements, element)
 		}
 	}
 
 	return answer
+}
+
+// drawFrom sets where element draws its content from: the HTML fragment or
+// the module def names, served under /api/{plugin}. A definition naming
+// neither is refused.
+func drawFrom(plugin string, def *protocol.ElementDef, element *protocol.PluginElement) error {
+	switch drawn := def.GetDrawn().(type) {
+	case *protocol.ElementDef_ContentPath:
+		element.Drawn = &protocol.PluginElement_ContentUrl{ContentUrl: fmt.Sprintf("/api/%s%s", plugin, drawn.ContentPath)}
+		return nil
+	case *protocol.ElementDef_ModulePath:
+		element.Drawn = &protocol.PluginElement_ModuleUrl{ModuleUrl: fmt.Sprintf("/api/%s%s", plugin, drawn.ModulePath)}
+		return nil
+	}
+	return errors.New("it draws its content from neither a content_path nor a module_path")
 }

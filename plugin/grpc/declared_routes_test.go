@@ -45,7 +45,7 @@ func TestExternalDomainProxy_KeepsDeclaredRoutes(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	require.NoError(t, proxy.Initialize(context.Background(), &mockServiceRegistry{logger: logger}))
+	require.NoError(t, proxy.Initialize(context.Background(), newMockServices(t, logger)))
 
 	got := proxy.GetHTTPRoutes()
 	require.Len(t, got, len(declared))

@@ -85,18 +85,15 @@ func (qb *queryBuilder) buildActorFilter(actors []string) {
 // BuildFilterQuery builds a SQL query from an AxFilter, returning the full SELECT
 // with WHERE clauses and ORDER BY. Used by the watcher engine to push structural
 // filters into SQL instead of loading the entire table.
-func BuildFilterQuery(filter types.AxFilter) (string, []any) {
+func BuildFilterQuery(filter types.AxFilter) (string, []any, error) {
 	qb := &queryBuilder{}
 	qb.buildSubjectFilter(filter.Subjects)
 	qb.buildPredicateFilter(filter.Predicates)
 	qb.buildContextFilter(filter.Contexts)
 	qb.buildActorFilter(filter.Actors)
 
-	if filter.TimeStart != nil {
-		qb.addClause("timestamp >= ?", filter.TimeStart.UTC().Format(time.RFC3339))
-	}
-	if filter.TimeEnd != nil {
-		qb.addClause("timestamp <= ?", filter.TimeEnd.UTC().Format(time.RFC3339))
+	if err := qb.buildTimeRange(filter.TimeStart, filter.TimeEnd, "timestamp >= ?"); err != nil {
+		return "", nil, err
 	}
 
 	query := AttestationSelectQuery
@@ -107,7 +104,30 @@ func BuildFilterQuery(filter types.AxFilter) (string, []any) {
 
 	query += limitClause(filter.Limit)
 
-	return query, qb.args
+	return query, qb.args, nil
+}
+
+// buildTimeRange adds a clause for each side of a time range that is
+// bounded: from (inclusive or not, as startClause says) and up to and
+// including its end. Timestamps are stored as UTC RFC3339 strings by the
+// Rust backend, so they are compared as such. A side naming neither is
+// refused.
+func (qb *queryBuilder) buildTimeRange(start, end types.TimeBound, startClause string) error {
+	startAt, starts, err := start.At("start")
+	if err != nil {
+		return err
+	}
+	endAt, ends, err := end.At("end")
+	if err != nil {
+		return err
+	}
+	if starts {
+		qb.addClause(startClause, startAt.UTC().Format(time.RFC3339))
+	}
+	if ends {
+		qb.addClause("timestamp <= ?", endAt.UTC().Format(time.RFC3339))
+	}
+	return nil
 }
 
 // limitClause is a query's LIMIT: 0 is 0 rows, ats.EveryRow is every row, and
@@ -122,14 +142,8 @@ func limitClause(limit int) string {
 // buildTemporalFilters adds timestamp range filters
 // Timestamps are stored as UTC RFC3339 strings by the Rust backend,
 // so we compare against UTC RFC3339 formatted strings.
-func (qb *queryBuilder) buildTemporalFilters(filter types.AxFilter) {
-	// TimeStart is exclusive (>) to exclude exact boundary matches
-	if filter.TimeStart != nil {
-		qb.addClause("timestamp > ?", filter.TimeStart.UTC().Format(time.RFC3339))
-	}
-
-	// TimeEnd is inclusive (<=) to include items up to and including the end time
-	if filter.TimeEnd != nil {
-		qb.addClause("timestamp <= ?", filter.TimeEnd.UTC().Format(time.RFC3339))
-	}
+func (qb *queryBuilder) buildTemporalFilters(filter types.AxFilter) error {
+	// TimeStart is exclusive (>) to exclude exact boundary matches; TimeEnd is
+	// inclusive (<=) to include items up to and including the end time.
+	return qb.buildTimeRange(filter.TimeStart, filter.TimeEnd, "timestamp > ?")
 }

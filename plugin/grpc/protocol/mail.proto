@@ -22,8 +22,19 @@ service MailService {
 // never an empty space in a mail that went out.
 message MailTemplate {
   string subject = 1;
-  string html = 2;
-  string text = 3;
+  reserved 2, 3;
+  reserved "html", "text";
+  // The bodies a mail is sent in, each named: its html, its text, or both. A
+  // template naming none is refused, and so is one naming a body twice.
+  repeated MailTemplateBody bodies = 4;
+}
+
+// MailTemplateBody is one body a mail is sent in, named by what it is.
+message MailTemplateBody {
+  oneof is {
+    string html = 1;
+    string text = 2;
+  }
 }
 
 message SetMailTemplateRequest {
@@ -131,9 +142,11 @@ message MailTemplateRow {
   string version = 4;
   string name = 5;
   string subject = 6;
-  string html = 7;
-  string text = 8;
+  reserved 7, 8;
+  reserved "html", "text";
   repeated string values = 9;
+  // The bodies the template's mail is sent in, each named.
+  repeated MailTemplateBody bodies = 10;
 }
 
 // NodeMail is one mail the node writes itself, whole.
@@ -144,14 +157,14 @@ message NodeMail {
 
 // MailTemplates is what mail templates answers.
 message MailTemplates {
-  // QNTX's own template, filled when a plugin names none: its subject, html
-  // and text, and the values it takes.
+  // QNTX's own template, filled when a plugin names none: its subject and
+  // bodies, and the values it takes.
   MailTemplateRow neutral = 1;
   // QNTX's own template drawn as a QNTX window, filled when a plugin names
-  // dark: its subject, html and text, and the values it takes.
+  // dark: its subject and bodies, and the values it takes.
   MailTemplateRow dark = 2;
   // One row per plugin and name: its attestation, when it was set, the
-  // plugin, its version, the name, and the subject, html and text.
+  // plugin, its version, the name, and the subject and bodies.
   repeated MailTemplateRow templates = 3;
   // The mail the node writes itself, whole: not filled from any template, and
   // named here so it is not missing.

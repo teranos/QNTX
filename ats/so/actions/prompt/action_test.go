@@ -21,26 +21,26 @@ func TestParseAction(t *testing.T) {
 		},
 		{
 			name:    "empty so_actions",
-			filter:  &types.AxFilter{},
+			filter:  &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 			wantNil: true,
 		},
 		{
 			name: "non-prompt action",
-			filter: &types.AxFilter{
+			filter: &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				SoActions: []string{"csv"},
 			},
 			wantNil: true,
 		},
 		{
 			name: "prompt with no template",
-			filter: &types.AxFilter{
+			filter: &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				SoActions: []string{"prompt"},
 			},
 			wantErr: true,
 		},
 		{
 			name: "simple template",
-			filter: &types.AxFilter{
+			filter: &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				SoActions: []string{"prompt", "Summarize:", "{{subject}}"},
 			},
 			want: &Action{
@@ -49,7 +49,7 @@ func TestParseAction(t *testing.T) {
 		},
 		{
 			name: "quoted template",
-			filter: &types.AxFilter{
+			filter: &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				SoActions: []string{"prompt", `"Analyze {{subject}} in context {{context}}"`},
 			},
 			want: &Action{
@@ -58,7 +58,7 @@ func TestParseAction(t *testing.T) {
 		},
 		{
 			name: "template with system prompt",
-			filter: &types.AxFilter{
+			filter: &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				SoActions: []string{"prompt", "{{subject}}", "with", "You", "are", "helpful"},
 			},
 			want: &Action{
@@ -68,7 +68,7 @@ func TestParseAction(t *testing.T) {
 		},
 		{
 			name: "template with model",
-			filter: &types.AxFilter{
+			filter: &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				SoActions: []string{"prompt", "{{subject}}", "model", "gpt-4"},
 			},
 			want: &Action{
@@ -78,7 +78,7 @@ func TestParseAction(t *testing.T) {
 		},
 		{
 			name: "template with provider",
-			filter: &types.AxFilter{
+			filter: &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				SoActions: []string{"prompt", "{{subject}}", "provider", "local"},
 			},
 			want: &Action{
@@ -88,7 +88,7 @@ func TestParseAction(t *testing.T) {
 		},
 		{
 			name: "full options",
-			filter: &types.AxFilter{
+			filter: &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				SoActions: []string{
 					"prompt", "{{subject}}", "is", "{{predicate}}",
 					"with", "Be", "concise",
@@ -107,7 +107,7 @@ func TestParseAction(t *testing.T) {
 		},
 		{
 			name: "invalid template placeholder",
-			filter: &types.AxFilter{
+			filter: &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				SoActions: []string{"prompt", "{{invalid_field}}"},
 			},
 			wantErr: true,
@@ -173,10 +173,10 @@ func TestIsPromptAction(t *testing.T) {
 		want   bool
 	}{
 		{"nil filter", nil, false},
-		{"empty filter", &types.AxFilter{}, false},
-		{"csv action", &types.AxFilter{SoActions: []string{"csv"}}, false},
-		{"prompt action", &types.AxFilter{SoActions: []string{"prompt", "{{subject}}"}}, true},
-		{"PROMPT uppercase", &types.AxFilter{SoActions: []string{"PROMPT", "{{subject}}"}}, true},
+		{"empty filter", &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()}, false},
+		{"csv action", &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), SoActions: []string{"csv"}}, false},
+		{"prompt action", &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), SoActions: []string{"prompt", "{{subject}}"}}, true},
+		{"PROMPT uppercase", &types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), SoActions: []string{"PROMPT", "{{subject}}"}}, true},
 	}
 
 	for _, tt := range tests {
@@ -197,7 +197,7 @@ func TestToPayload(t *testing.T) {
 		ResultPredicate: "summary",
 	}
 
-	filter := types.AxFilter{
+	filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects:   []string{"ALICE"},
 		Predicates: []string{"speaks"},
 		SoActions:  []string{"prompt", "{{subject}}"},
@@ -245,7 +245,7 @@ func TestToPayloadJSON(t *testing.T) {
 		Template: "{{subject}}",
 	}
 
-	filter := types.AxFilter{
+	filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects: []string{"BOB"},
 	}
 

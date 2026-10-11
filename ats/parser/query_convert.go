@@ -42,6 +42,9 @@ func convertRustQuery(rq *rustAxQuery) (*types.AxFilter, error) {
 	filter := &types.AxFilter{
 		Limit:  100,
 		Format: "table",
+		// A query naming no time is unbounded on both sides.
+		TimeStart: types.Unbounded(),
+		TimeEnd:   types.Unbounded(),
 	}
 
 	filter.Subjects = nilIfEmpty(uppercaseTokens(rq.Subjects))
@@ -66,7 +69,7 @@ func resolveTemporalClause(tc *rustTemporalClause, filter *types.AxFilter) error
 		if err != nil {
 			return errors.Wrapf(err, "invalid 'since' expression: %s", *tc.Since)
 		}
-		filter.TimeStart = t
+		filter.TimeStart = types.BoundAt(*t)
 	}
 
 	if tc.Until != nil {
@@ -74,7 +77,7 @@ func resolveTemporalClause(tc *rustTemporalClause, filter *types.AxFilter) error
 		if err != nil {
 			return errors.Wrapf(err, "invalid 'until' expression: %s", *tc.Until)
 		}
-		filter.TimeEnd = t
+		filter.TimeEnd = types.BoundAt(*t)
 	}
 
 	if tc.On != nil {
@@ -84,8 +87,8 @@ func resolveTemporalClause(tc *rustTemporalClause, filter *types.AxFilter) error
 		}
 		startOfDay := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 		endOfDay := startOfDay.Add(24 * time.Hour)
-		filter.TimeStart = &startOfDay
-		filter.TimeEnd = &endOfDay
+		filter.TimeStart = types.BoundAt(startOfDay)
+		filter.TimeEnd = types.BoundAt(endOfDay)
 	}
 
 	if tc.Between != nil {
@@ -97,8 +100,8 @@ func resolveTemporalClause(tc *rustTemporalClause, filter *types.AxFilter) error
 		if err != nil {
 			return err
 		}
-		filter.TimeStart = tStart
-		filter.TimeEnd = tEnd
+		filter.TimeStart = types.BoundAt(*tStart)
+		filter.TimeEnd = types.BoundAt(*tEnd)
 	}
 
 	return nil

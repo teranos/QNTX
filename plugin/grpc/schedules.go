@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -28,9 +29,10 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 	// Build set of namespaced handler names this plugin currently declares
 	declaredHandlers := make(map[string]bool, len(schedules))
 	for _, s := range schedules {
-		if s.IntervalSeconds > 0 {
-			declaredHandlers[PluginHandlerName(pluginName, s.HandlerName)] = true
+		if s.IntervalSeconds < 0 {
+			return errors.Newf("plugin %s schedules %s every %d seconds: an interval is not fewer than none", pluginName, s.HandlerName, s.IntervalSeconds)
 		}
+		declaredHandlers[PluginHandlerName(pluginName, s.HandlerName)] = true
 	}
 
 	// Prune stale schedules owned by this plugin that are no longer declared.
@@ -70,24 +72,17 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 	// more, and a warning is the only trace. That is how a weekly job kept
 	// firing after its decorator was deleted, so it fails the setup instead.
 	for _, id := range staleIDs {
-		if _, err := db.Exec(`UPDATE scheduled_pulse_jobs SET state = 'deleted', updated_at = ? WHERE id = ?`, time.Now(), id); err != nil {
+		pruned, err := db.Exec(`UPDATE scheduled_pulse_jobs SET state = 'deleted', updated_at = ? WHERE id = ?`, time.Now(), id)
+		if err != nil {
+			return errors.Wrapf(err, "failed to prune stale schedule %s for plugin %s — it will keep running", id, pluginName)
+		}
+		if err := oneRow(pruned); err != nil {
 			return errors.Wrapf(err, "failed to prune stale schedule %s for plugin %s — it will keep running", id, pluginName)
 		}
 		logger.Infow("Pruned stale plugin schedule", "plugin", pluginName, "schedule_id", id)
 	}
 
 	for _, s := range schedules {
-		// An interval of 0 is no ticking, whatever enabled_by_default says: a
-		// schedule that runs names how often.
-		if s.IntervalSeconds <= 0 {
-			logger.Infow("A plugin schedule with no interval does not tick",
-				"plugin", pluginName,
-				"handler", s.HandlerName,
-				"interval_seconds", s.IntervalSeconds,
-				"enabled_by_default", s.EnabledByDefault,
-			)
-			continue
-		}
 
 		// Check if schedule already exists.
 		//
@@ -122,13 +117,16 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 					"old_interval", existingInterval,
 					"new_interval", s.IntervalSeconds,
 				)
-				_, err := db.Exec(`
+				updated, err := db.Exec(`
 					UPDATE scheduled_pulse_jobs
 					SET interval_seconds = ?, updated_at = ?
 					WHERE id = ?
 				`, s.IntervalSeconds, time.Now(), existingID)
 				if err != nil {
 					return errors.Wrapf(err, "failed to update schedule interval for handler %s", s.HandlerName)
+				}
+				if err := oneRow(updated); err != nil {
+					return errors.Wrapf(err, "failed to update the interval of schedule %s for handler %s", existingID, s.HandlerName)
 				}
 			} else {
 				logger.Debugw("Schedule already exists with same interval",
@@ -177,6 +175,7 @@ func createPluginSchedule(db *sql.DB, pluginName string, s *protocol.ScheduleInf
 	now := time.Now()
 	nextRunAt := now // For immediate first run
 	if err := schedule.NewStore(db).CreateJob(&schedule.Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              jobID,
 		HandlerName:     PluginHandlerName(pluginName, s.HandlerName),
 		IntervalSeconds: s.IntervalSeconds,

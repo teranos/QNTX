@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -265,7 +266,8 @@ func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
 			Subjects:   []string{collectorID},
 			Predicates: []string{"wants"},
 			Contexts:   []string{bookID},
-			Actors:     []string{collectorID},
+			When:       types.Now{},
+			By:         types.ActorsNamed{Actors: named.ItemOf(collectorID)},
 		}
 		if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			return err
@@ -287,7 +289,8 @@ func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
 			Subjects:   []string{seller},
 			Predicates: []string{"offers"},
 			Contexts:   []string{bookID},
-			Actors:     []string{seller},
+			When:       types.Now{},
+			By:         types.ActorsNamed{Actors: named.ItemOf(seller)},
 		}
 		if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			return err
@@ -330,7 +333,7 @@ func (p *BookPlugin) findMatches(ctx context.Context, collectorID string, wanted
 	// Query all attestations to find matches
 	// In production, we'd use more specific filters, but current implementation
 	// only supports Actor filter, so we query all and filter in-memory
-	filter := ats.AttestationFilter{
+	filter := ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Limit: 1000,
 	}
 	attestations, err := store.GetAttestations(filter)
@@ -553,8 +556,8 @@ func (p *BookPlugin) RegisterElements() []plugin.ElementDef {
 			Symbol:        "📚",
 			Title:         "Book Auction",
 			Label:         "book-auction",
-			ContentPath:   "/auction",
-			CSSPath:       "/auction.css",
+			Drawn:         plugin.ContentAt("/auction"),
+			CSSPaths:      []string{"/auction.css"},
 			DefaultWidth:  proto.Int32(600),
 			DefaultHeight: proto.Int32(400),
 		},

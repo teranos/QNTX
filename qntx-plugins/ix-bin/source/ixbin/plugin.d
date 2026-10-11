@@ -76,6 +76,8 @@ InitializeResponse initialize(ref const InitializeRequest req) {
 
     InitializeResponse resp;
     resp.handlerNames = ["ix-bin.ingest"];
+    // ix-bin declares no routes, and serves no sigils.
+    resp.sigilsFrom = SIGILS_FROM_NONE;
     return resp;
 }
 
@@ -332,7 +334,7 @@ void registerHandlers(ref GrpcServer server) {
 
     server.registerHandler("/protocol.DomainPluginService/Shutdown", (const ubyte[] _) {
         shutdown();
-        return encode(Empty());
+        return encode(ShutdownResponse(true));
     });
 
     server.registerHandler("/protocol.DomainPluginService/HandleHTTP", (const ubyte[] data) {

@@ -558,6 +558,7 @@
     protocol.GitHubIssuesCommentsReactionRollup.plus_1 → reaction-rollup.plus_1, which the schema does not have
     protocol.GitHubIssuesCommentsReactionRollup.minus_1 → reaction-rollup.minus_1, which the schema does not have
     protocol.GitHubGetRepositoryContentResponse.items → GET /repos/{owner}/{repo}/contents/{path} 200.items, which the schema does not have
+    protocol.GitHubGetRepositoryContentResponse.answered → GET /repos/{owner}/{repo}/contents/{path} 200.answered, which the schema does not have
     protocol.GitHubPullsReviewsReactionRollup.plus_1 → reaction-rollup.plus_1, which the schema does not have
     protocol.GitHubPullsReviewsReactionRollup.minus_1 → reaction-rollup.minus_1, which the schema does not have
     content-file._links is required, and nothing follows it

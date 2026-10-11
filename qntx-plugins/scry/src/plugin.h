@@ -15,7 +15,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.37.11"
+#define PLUGIN_VERSION "0.37.13"
 
 // Forward declarations
 struct llama_model;
@@ -228,7 +228,7 @@ public:
 
     grpc::Status Shutdown(grpc::ServerContext* ctx,
                           const protocol::Empty* req,
-                          protocol::Empty* resp) override;
+                          protocol::ShutdownResponse* resp) override;
 
     grpc::Status Health(grpc::ServerContext* ctx,
                         const protocol::Empty* req,

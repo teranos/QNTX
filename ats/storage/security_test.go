@@ -46,7 +46,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		// Query should treat the malicious string as literal predicate value
 		executor := NewExecutor(testDB, rq)
-		results, err := executor.ExecuteAsk(context.Background(), types.AxFilter{Limit: ats.EveryRow,
+		results, err := executor.ExecuteAsk(context.Background(), types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: ats.EveryRow,
 			Predicates: []string{"' OR '1'='1"},
 		})
 		require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		// Query for literal "100% Coverage" should not act as wildcard
 		executor := NewExecutor(testDB, rq)
-		results, err := executor.ExecuteAsk(context.Background(), types.AxFilter{Limit: ats.EveryRow,
+		results, err := executor.ExecuteAsk(context.Background(), types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: ats.EveryRow,
 			Subjects: []string{"100% Coverage"},
 		})
 		require.NoError(t, err)
@@ -107,7 +107,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		// Query for "user_id" should not match "userXid"
 		executor := NewExecutor(testDB, rq)
-		results, err := executor.ExecuteAsk(context.Background(), types.AxFilter{Limit: ats.EveryRow,
+		results, err := executor.ExecuteAsk(context.Background(), types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: ats.EveryRow,
 			Subjects: []string{"user_id"},
 		})
 		require.NoError(t, err)

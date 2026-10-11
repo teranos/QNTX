@@ -51,7 +51,7 @@ func servedForTest(t *testing.T) *QNTXServer {
 
 	logger := zaptest.NewLogger(t).Sugar()
 	srv := &QNTXServer{
-		pluginRegistry: plugin.NewRegistry("test-version", logger),
+		pluginRegistry: plugin.NewRegistry("0.1.0", logger),
 		logger:         logger,
 		rlAuth:         newRateLimitGroup(100, 100),
 		rlWS:           newRateLimitGroup(100, 100),

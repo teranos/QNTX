@@ -17,6 +17,8 @@ package plugin
 import (
 	"context"
 	"net/http"
+
+	errors "github.com/teranos/sacred-error"
 )
 
 // DomainPlugin defines the interface that all domain plugins must implement.
@@ -134,10 +136,47 @@ type ConfigField struct {
 	Description  string // Human-readable description
 	DefaultValue string // Default value as string
 	Required     bool   // Whether field is required
-	MinValue     string // For numbers: minimum value
-	MaxValue     string // For numbers: maximum value
+	Min          Bound  // For integers and numbers: the least value taken, or none
+	Max          Bound  // For integers and numbers: the greatest value taken, or none
 	Pattern      string // For strings: regex validation pattern
 	ElementType  string // For arrays: element type
+}
+
+// boundKind is whether a number field is limited on a side.
+type boundKind int
+
+const (
+	boundAt boundKind = iota + 1
+	unbounded
+)
+
+// Bound is a limit a number field is held to, or that it has none on that
+// side. One made by neither names nothing, and a number field holding it is
+// refused by the node.
+type Bound struct {
+	how boundKind
+	at  string
+}
+
+// BoundAt is a limit of value, as the field's type reads it.
+func BoundAt(value string) Bound { return Bound{how: boundAt, at: value} }
+
+// Unbounded is a field with no limit on that side.
+func Unbounded() Bound { return Bound{how: unbounded} }
+
+// Read hands the limit to at, says to none that there is none, or says to
+// neither that the Bound was made by neither: what a field that is no number
+// holds, and what the node refuses for one that is.
+func (b Bound) Read(at func(value string), none func(), neither func()) {
+	switch b.how {
+	case boundAt:
+		at(b.at)
+		return
+	case unbounded:
+		none()
+		return
+	}
+	neither()
 }
 
 // UIPlugin is an optional interface for plugins that provide custom element types.
@@ -201,26 +240,56 @@ type ElementDef struct {
 	// Label is a short identifier for logs and the spawn menu.
 	Label string
 
-	// ContentPath is the HTTP path (relative to /api/{plugin}/) that
-	// returns the HTML fragment for this element's content area.
-	// The frontend GETs this path with ?element_id={id}&content={encoded}
-	// and mounts the response HTML into the element element.
-	// Used for server-rendered HTML elements. Ignored when ModulePath is set.
-	ContentPath string
+	// Drawn is how the element's content is drawn: ContentAt or ModuleAt.
+	Drawn Drawn
 
-	// CSSPath is an optional HTTP path to a stylesheet for this element type.
-	// Loaded once when the first element of this type is created.
-	CSSPath string
-
-	// ModulePath is the HTTP path (relative to /api/{plugin}/) to a
-	// TypeScript/JavaScript module that exports a render function.
-	// When set, the frontend dynamically imports this module and injects
-	// an ElementUI instance, bypassing the server-rendered HTML pipeline.
-	// The module must export: render(element, ui) => HTMLElement
-	ModulePath string
+	// CSSPaths are the HTTP paths (relative to /api/{plugin}/) to the
+	// stylesheets of this element type, each loaded once when the first
+	// element of this type is created.
+	CSSPaths []string
 
 	// DefaultWidth and DefaultHeight in pixels. "For 'use default', omit the
 	// field": nil is omitted.
 	DefaultWidth  *int32
 	DefaultHeight *int32
+}
+
+// drawnKind is how an element's content is drawn.
+type drawnKind int
+
+const (
+	drawnFromContent drawnKind = iota + 1
+	drawnByModule
+)
+
+// Drawn is how a plugin's element draws its content: an HTML fragment served
+// at a path, or a module exporting a render function. One made by neither
+// names nothing, and an element holding it is refused.
+type Drawn struct {
+	how  drawnKind
+	path string
+}
+
+// ContentAt is an element whose content is the HTML fragment served at path
+// (relative to /api/{plugin}/). The frontend GETs the path with
+// ?element_id={id}&content={encoded} and mounts the HTML into the element.
+func ContentAt(path string) Drawn { return Drawn{how: drawnFromContent, path: path} }
+
+// ModuleAt is an element drawn by the TypeScript/JavaScript module served at
+// path (relative to /api/{plugin}/). The frontend imports it and injects an
+// ElementUI; the module must export render(element, ui) => HTMLElement.
+func ModuleAt(path string) Drawn { return Drawn{how: drawnByModule, path: path} }
+
+// Read hands the path to content or to module, whichever the element is drawn
+// by. A Drawn made by neither is refused.
+func (d Drawn) Read(content func(path string), module func(path string)) error {
+	switch d.how {
+	case drawnFromContent:
+		content(d.path)
+		return nil
+	case drawnByModule:
+		module(d.path)
+		return nil
+	}
+	return errors.Newf("the element is drawn by neither content nor a module (kind %d)", d.how)
 }

@@ -1,6 +1,6 @@
 # default: branches and _ => arms, per file. Debt: each number may fall and may not rise.
 # Instead: name every case; an unknown value is refused, not let through.
-# 163 in 113 files.
+# 151 in 104 files.
 
 1	ats/parser/error.go
 1	ats/parser/temporal.go
@@ -47,13 +47,6 @@
 1	internal/secretref/secretref.go
 1	internal/sqlclose/sqlclose.go
 2	internal/tools/nilcheck/main.go
-1	plugin/grpc/client.go
-1	plugin/grpc/protocol/convert.go
-1	plugin/grpc/run.go
-3	plugin/grpc/services/github_server.go
-1	plugin/grpc/services/mail_sheet.go
-1	plugin/grpc/traffic.go
-1	plugin/grpc/websocket_security.go
 1	pulse/async/error.go
 1	pulse/async/job.go
 1	pulse/async/system_metrics.go
@@ -95,8 +88,6 @@
 1	server/parity/prisma.go
 1	server/parity/references.go
 1	server/parity_sigils.go
-2	server/plugin_config_handlers.go
-1	server/plugin_sigils.go
 2	server/prompt_handlers.go
 2	server/pulse_schedules.go
 1	server/quote_provenance.go

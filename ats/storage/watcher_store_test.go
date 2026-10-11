@@ -18,7 +18,7 @@ func TestWatcherStore_Create(t *testing.T) {
 	watcher := &storage.Watcher{
 		ID:   "test-watcher-1",
 		Name: "Test Watcher",
-		Filter: types.AxFilter{
+		Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects:   []string{"user:123"},
 			Predicates: []string{"logged_in"},
 		},
@@ -69,7 +69,7 @@ func TestWatcherStore_CreateDuplicate(t *testing.T) {
 		ActionType: storage.ActionTypePython,
 		ActionData: "pass",
 		Enabled:    true,
-		Filter:     types.AxFilter{Predicates: []string{"test"}},
+		Filter:     types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 	}
 
 	ctx := context.Background()
@@ -104,7 +104,7 @@ func TestWatcherStore_Get(t *testing.T) {
 		ActionType: storage.ActionTypeWebhook,
 		ActionData: "https://example.com/webhook",
 		Enabled:    false,
-		Filter:     types.AxFilter{Predicates: []string{"test"}},
+		Filter:     types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 	}
 
 	if err := store.Create(ctx, watcher); err != nil {
@@ -136,7 +136,7 @@ func TestWatcherStore_Update(t *testing.T) {
 		ActionType: storage.ActionTypePython,
 		ActionData: "print('original')",
 		Enabled:    true,
-		Filter: types.AxFilter{
+		Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects: []string{"original"},
 		},
 	}
@@ -196,7 +196,7 @@ func TestWatcherStore_Delete(t *testing.T) {
 		ActionType: storage.ActionTypePython,
 		ActionData: "pass",
 		Enabled:    true,
-		Filter:     types.AxFilter{Predicates: []string{"test"}},
+		Filter:     types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 	}
 
 	if err := store.Create(ctx, watcher); err != nil {
@@ -240,7 +240,7 @@ func TestWatcherStore_List(t *testing.T) {
 			ActionType: storage.ActionTypePython,
 			ActionData: "pass",
 			Enabled:    true,
-			Filter:     types.AxFilter{Predicates: []string{"test"}},
+			Filter:     types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 		},
 		{
 			ID:         "list-test-2",
@@ -248,7 +248,7 @@ func TestWatcherStore_List(t *testing.T) {
 			ActionType: storage.ActionTypePython,
 			ActionData: "pass",
 			Enabled:    false,
-			Filter:     types.AxFilter{Predicates: []string{"test"}},
+			Filter:     types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 		},
 		{
 			ID:         "list-test-3",
@@ -256,7 +256,7 @@ func TestWatcherStore_List(t *testing.T) {
 			ActionType: storage.ActionTypeWebhook,
 			ActionData: "https://example.com",
 			Enabled:    true,
-			Filter:     types.AxFilter{Predicates: []string{"test"}},
+			Filter:     types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 		},
 	}
 
@@ -309,8 +309,8 @@ func TestWatcherStore_TimeFilters(t *testing.T) {
 		ActionData: "pass",
 		Enabled:    true,
 		Filter: types.AxFilter{
-			TimeStart: &now,
-			TimeEnd:   &future,
+			TimeStart: types.BoundAt(now),
+			TimeEnd:   types.BoundAt(future),
 		},
 	}
 
@@ -323,16 +323,16 @@ func TestWatcherStore_TimeFilters(t *testing.T) {
 		t.Fatalf("Get failed: %v", err)
 	}
 
-	if retrieved.Filter.TimeStart == nil {
-		t.Error("TimeStart was not persisted")
-	} else if !retrieved.Filter.TimeStart.Equal(now) {
-		t.Errorf("TimeStart mismatch: got %v, want %v", retrieved.Filter.TimeStart, now)
+	if start, bounded, err := retrieved.Filter.TimeStart.At("start"); err != nil || !bounded {
+		t.Errorf("TimeStart was not persisted: bounded %v, %v", bounded, err)
+	} else if !start.Equal(now) {
+		t.Errorf("TimeStart mismatch: got %v, want %v", start, now)
 	}
 
-	if retrieved.Filter.TimeEnd == nil {
-		t.Error("TimeEnd was not persisted")
-	} else if !retrieved.Filter.TimeEnd.Equal(future) {
-		t.Errorf("TimeEnd mismatch: got %v, want %v", retrieved.Filter.TimeEnd, future)
+	if end, bounded, err := retrieved.Filter.TimeEnd.At("end"); err != nil || !bounded {
+		t.Errorf("TimeEnd was not persisted: bounded %v, %v", bounded, err)
+	} else if !end.Equal(future) {
+		t.Errorf("TimeEnd mismatch: got %v, want %v", end, future)
 	}
 }
 
@@ -347,7 +347,7 @@ func TestWatcherStore_ComplexFilter(t *testing.T) {
 		ActionType: storage.ActionTypePython,
 		ActionData: "pass",
 		Enabled:    true,
-		Filter: types.AxFilter{
+		Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects:   []string{"user:123", "user:456", "user:789"},
 			Predicates: []string{"logged_in", "logged_out"},
 			Contexts:   []string{"web", "mobile"},
@@ -390,7 +390,7 @@ func TestWatcherStore_UpdateStats(t *testing.T) {
 		ActionType: storage.ActionTypePython,
 		ActionData: "pass",
 		Enabled:    true,
-		Filter:     types.AxFilter{Predicates: []string{"test"}},
+		Filter:     types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 	}
 
 	if err := store.Create(ctx, watcher); err != nil {
@@ -448,7 +448,7 @@ func TestWatcherStore_CreateOrReplace_NewWatcher(t *testing.T) {
 		ActionData:        "print('new')",
 		MaxFiresPerSecond: 60,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"test"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 	}
 
 	err := store.CreateOrReplace(ctx, watcher)
@@ -480,7 +480,7 @@ func TestWatcherStore_CreateOrReplace_Idempotent(t *testing.T) {
 		ActionData:        "print('v1')",
 		MaxFiresPerSecond: 60,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"test"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 	}
 
 	if err := store.CreateOrReplace(ctx, original); err != nil {
@@ -495,7 +495,7 @@ func TestWatcherStore_CreateOrReplace_Idempotent(t *testing.T) {
 		ActionData:        "print('v2')",
 		MaxFiresPerSecond: 120,
 		Enabled:           false,
-		Filter:            types.AxFilter{Predicates: []string{"test"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"test"}},
 	}
 
 	if err := store.CreateOrReplace(ctx, replacement); err != nil {
@@ -542,19 +542,19 @@ func TestWatcherStore_CreateOrReplace_Validation(t *testing.T) {
 	ctx := context.Background()
 
 	// Empty ID
-	err := store.CreateOrReplace(ctx, &storage.Watcher{Name: "X", ActionType: storage.ActionTypePython})
+	err := store.CreateOrReplace(ctx, &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()}, Name: "X", ActionType: storage.ActionTypePython})
 	if err == nil {
 		t.Error("Expected error for empty ID")
 	}
 
 	// Empty Name
-	err = store.CreateOrReplace(ctx, &storage.Watcher{ID: "x", ActionType: storage.ActionTypePython})
+	err = store.CreateOrReplace(ctx, &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()}, ID: "x", ActionType: storage.ActionTypePython})
 	if err == nil {
 		t.Error("Expected error for empty Name")
 	}
 
 	// Empty ActionType
-	err = store.CreateOrReplace(ctx, &storage.Watcher{ID: "x", Name: "X"})
+	err = store.CreateOrReplace(ctx, &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()}, ID: "x", Name: "X"})
 	if err == nil {
 		t.Error("Expected error for empty ActionType")
 	}
@@ -566,7 +566,7 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a standalone SE watcher (should NOT be found)
-	standalone := &storage.Watcher{
+	standalone := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                "se-element-se-target-123",
 		Name:              "SE Standalone",
 		ActionType:        storage.ActionTypeSemanticMatch,
@@ -584,7 +584,7 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 		"composition_id":    "comp-1",
 		"source_element_id": "se-source-456",
 	})
-	compound := &storage.Watcher{
+	compound := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                        "meld-edge-comp-1-se-source-456-se-target-123",
 		Name:                      "Meld: SE→SE",
 		ActionType:                storage.ActionTypeSemanticMatch,
@@ -607,7 +607,7 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 		"composition_id":      "comp-2",
 		"source_element_id":   "se-source-456",
 	})
-	nonCompound := &storage.Watcher{
+	nonCompound := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                "meld-edge-comp-2-se-source-456-py-element-789",
 		Name:              "Meld: SE→py",
 		ActionType:        storage.ActionTypeElementExecute,
@@ -657,7 +657,7 @@ func TestWatcherStore_RecentErrorFires(t *testing.T) {
 	mk := func(id, name string) {
 		w := &storage.Watcher{
 			ID: id, Name: name,
-			Filter:     types.AxFilter{Subjects: []string{"s"}},
+			Filter:     types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{"s"}},
 			ActionType: storage.ActionTypePython, ActionData: "pass",
 			Enabled: true,
 		}

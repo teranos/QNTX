@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 
@@ -47,7 +48,8 @@ func rootKnowingServer(t *testing.T) *QNTXServer {
 	daemon := async.NewWorkerPool(db, &appcfg.Config{}, async.DefaultWorkerPoolConfig(), zap.NewNop().Sugar())
 	s := &QNTXServer{nodeDB: db, authHandler: h, logger: zap.NewNop().Sugar(), daemon: daemon,
 		pluginRegistry: plugin.GetDefaultRegistry(),
-		nodeDID:        &nodedid.Handler{DID: "did:key:z6Mkgardennode"}}
+		nodeDID:        &nodedid.Handler{DID: "did:key:z6Mkgardennode"},
+		pluginManager:  noPluginManager{why: errors.New("this test runs no plugin manager")}}
 	s.held = servingOne(db, store)
 	s.held.SetSystem(oneNamespace("system", system))
 	return s
@@ -59,7 +61,7 @@ func systemHolds(t *testing.T, s *QNTXServer) []*types.As {
 	t.Helper()
 	sys, err := s.held.Read(auth.NamespaceSystem)
 	require.NoError(t, err)
-	held, err := sys.GetAttestations(ats.AttestationFilter{Limit: 10})
+	held, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 10})
 	require.NoError(t, err)
 	return held
 }
@@ -112,7 +114,7 @@ func TestAGrantIsWrittenWhereTheNodeKeepsItsOwn(t *testing.T) {
 	rec := grants(t, s, root, workerGrant)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 
-	inGarden, err := s.held.Served().GetAttestations(ats.AttestationFilter{Limit: 10})
+	inGarden, err := s.held.Served().GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 10})
 	require.NoError(t, err)
 	assert.Empty(t, inGarden, "a grant landed in the namespace its writer was in")
 

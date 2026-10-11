@@ -11,6 +11,7 @@ import (
 	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -35,34 +36,32 @@ func NewGroundServer(dbPath string, authToken string, logger *zap.SugaredLogger)
 
 // WriteToGround inserts an attestation into Ground's SQLite database
 func (s *GroundServer) WriteToGround(ctx context.Context, req *protocol.WriteToGroundRequest) (*protocol.WriteToGroundResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	refused := func(err error) (*protocol.WriteToGroundResponse, error) {
 		return &protocol.WriteToGroundResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),
 		}, nil
 	}
-
-	if s.dbPath == "" {
-		return &protocol.WriteToGroundResponse{
-			Success: false,
-			Error:   "ground_db_path not configured",
-		}, nil
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+		return refused(err)
 	}
 
-	// Generate ASID from request fields
-	subject := "_"
-	if len(req.Subjects) > 0 {
-		subject = req.Subjects[0]
+	// What Ground is told is about something, says something of it, in some
+	// context; a write naming none of one is refused, not written about "_".
+	subjects, err := named.ItemsOf("subjects", req.Subjects)
+	if err != nil {
+		return refused(err)
 	}
-	predicate := "_"
-	if len(req.Predicates) > 0 {
-		predicate = req.Predicates[0]
+	predicates, err := named.ItemsOf("predicates", req.Predicates)
+	if err != nil {
+		return refused(err)
 	}
-	ctxStr := "_"
-	if len(req.Contexts) > 0 {
-		ctxStr = req.Contexts[0]
+	contexts, err := named.ItemsOf("contexts", req.Contexts)
+	if err != nil {
+		return refused(err)
 	}
-	asid, err := identity.GenerateASUID("AS", subject, predicate, ctxStr)
+
+	asid, err := identity.GenerateASUID("AS", subjects.First(), predicates.First(), contexts.First())
 	if err != nil {
 		return &protocol.WriteToGroundResponse{
 			Success: false,
@@ -70,17 +69,15 @@ func (s *GroundServer) WriteToGround(ctx context.Context, req *protocol.WriteToG
 		}, nil
 	}
 
-	attributes := make(map[string]any)
-	if req.Attributes != nil {
-		attributes = req.Attributes.AsMap()
-	}
+	// No attributes sent is a write with none: AsMap reads an absent Struct as no fields.
+	attributes := req.GetAttributes().AsMap()
 
 	now := time.Now()
 	as := &types.As{
 		ID:         asid,
-		Subjects:   req.Subjects,
-		Predicates: req.Predicates,
-		Contexts:   req.Contexts,
+		Subjects:   subjects.All(),
+		Predicates: predicates.All(),
+		Contexts:   contexts.All(),
 		Actors:     req.Actors,
 		Timestamp:  now,
 		Source:     req.Source,
@@ -88,7 +85,8 @@ func (s *GroundServer) WriteToGround(ctx context.Context, req *protocol.WriteToG
 		CreatedAt:  now,
 	}
 
-	if err := writeToGroundDB(s.dbPath, as); err != nil {
+	written, err := writeToGroundDB(s.dbPath, as)
+	if err != nil {
 		s.logger.Warnw("Failed to write to Ground db via gRPC", "path", s.dbPath, "asid", as.ID, "error", err)
 		return &protocol.WriteToGroundResponse{
 			Success: false,
@@ -96,7 +94,8 @@ func (s *GroundServer) WriteToGround(ctx context.Context, req *protocol.WriteToG
 		}, nil
 	}
 
-	s.logger.Infow("Wrote deferred news to Ground db via gRPC", "path", s.dbPath, "asid", as.ID, "source", as.Source)
+	// INSERT OR IGNORE: an attestation Ground already holds is written as 0 rows.
+	s.logger.Infow("Wrote deferred news to Ground db via gRPC", "path", s.dbPath, "asid", as.ID, "source", as.Source, "rows", written)
 
 	return &protocol.WriteToGroundResponse{
 		Success: true,
@@ -108,10 +107,6 @@ func (s *GroundServer) WriteToGround(ctx context.Context, req *protocol.WriteToG
 func (s *GroundServer) ReadUndelivered(ctx context.Context, req *protocol.ReadUndeliveredRequest) (_ *protocol.ReadUndeliveredResponse, err error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.ReadUndeliveredResponse{Error: err.Error()}, nil
-	}
-
-	if s.dbPath == "" {
-		return &protocol.ReadUndeliveredResponse{Error: "ground_db_path not configured"}, nil
 	}
 
 	db, err := sql.Open("sqlite3", s.dbPath+"?_journal_mode=WAL&_busy_timeout=5000&mode=ro")
@@ -169,11 +164,12 @@ func (s *GroundServer) ReadUndelivered(ctx context.Context, req *protocol.ReadUn
 	return &protocol.ReadUndeliveredResponse{Detail: detail}, nil
 }
 
-// writeToGroundDB inserts an attestation into Ground's SQLite database.
-func writeToGroundDB(dbPath string, as *types.As) (err error) {
+// writeToGroundDB inserts an attestation into Ground's SQLite database, and
+// says how many rows that wrote.
+func writeToGroundDB(dbPath string, as *types.As) (written int64, err error) {
 	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
-		return errors.Wrapf(err, "failed to open Ground db at %s", dbPath)
+		return 0, errors.Wrapf(err, "failed to open Ground db at %s", dbPath)
 	}
 	defer func() { err = sqlclose.With(err, db.Close(), "the ground db") }()
 
@@ -198,10 +194,10 @@ func writeToGroundDB(dbPath string, as *types.As) (err error) {
 	actors := encode("actors", as.Actors)
 	attributes := encode("attributes", as.Attributes)
 	if encodeErr != nil {
-		return encodeErr
+		return 0, encodeErr
 	}
 
-	_, err = db.Exec(`INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at)
+	result, err := db.Exec(`INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		as.ID,
 		subjects,
@@ -214,8 +210,11 @@ func writeToGroundDB(dbPath string, as *types.As) (err error) {
 		as.CreatedAt.UTC().Format("2006-01-02 15:04:05"),
 	)
 	if err != nil {
-		return errors.Wrapf(err, "ground db insert failed for %s", as.ID)
+		return 0, errors.Wrapf(err, "ground db insert failed for %s", as.ID)
 	}
-
-	return nil
+	written, err = result.RowsAffected()
+	if err != nil {
+		return 0, errors.Wrapf(err, "ground db did not say how many rows %s wrote", as.ID)
+	}
+	return written, nil
 }

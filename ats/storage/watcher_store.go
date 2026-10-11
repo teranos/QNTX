@@ -144,6 +144,37 @@ func NewWatcherStore(db *sql.DB) *WatcherStore {
 	return &WatcherStore{db: db}
 }
 
+// watcherTimes is a watcher's time range as its columns hold it: RFC3339 on
+// a bounded side, NULL on an unbounded one, and whether either side is
+// bounded.
+type watcherTimes struct {
+	start, end *string
+	bounded    bool
+}
+
+// timeColumns is a filter's time range as the watcher columns hold it. A side
+// naming neither is refused.
+func timeColumns(f types.AxFilter) (watcherTimes, error) {
+	startAt, starts, err := f.TimeStart.At("start")
+	if err != nil {
+		return watcherTimes{}, err
+	}
+	endAt, ends, err := f.TimeEnd.At("end")
+	if err != nil {
+		return watcherTimes{}, err
+	}
+	times := watcherTimes{bounded: starts || ends}
+	if starts {
+		s := startAt.Format(time.RFC3339Nano)
+		times.start = &s
+	}
+	if ends {
+		s := endAt.Format(time.RFC3339Nano)
+		times.end = &s
+	}
+	return times, nil
+}
+
 // validateWatcher checks common invariants before persisting.
 func validateWatcher(w *Watcher) error {
 	if w.ID == "" {
@@ -160,7 +191,11 @@ func validateWatcher(w *Watcher) error {
 	}
 	// A watcher must declare what it watches — at least one filter dimension
 	hasStructural := len(w.Filter.Subjects) > 0 || len(w.Filter.Predicates) > 0 || len(w.Filter.Contexts) > 0 || len(w.Filter.Actors) > 0
-	hasTemporal := w.Filter.TimeStart != nil || w.Filter.TimeEnd != nil
+	times, err := timeColumns(w.Filter)
+	if err != nil {
+		return errors.Wrapf(err, "watcher %q", w.ID)
+	}
+	hasTemporal := times.bounded
 	hasQuery := w.AxQuery != "" || w.SemanticQuery != ""
 	hasAttrFilters := len(w.AttributeFilters) > 0
 	if !hasStructural && !hasTemporal && !hasQuery && !hasAttrFilters {
@@ -207,15 +242,11 @@ func (ws *WatcherStore) insert(ctx context.Context, w *Watcher, verb, what strin
 		return errors.Wrap(err, "failed to marshal actors")
 	}
 
-	var timeStart, timeEnd *string
-	if w.Filter.TimeStart != nil {
-		s := w.Filter.TimeStart.Format(time.RFC3339Nano)
-		timeStart = &s
+	times, err := timeColumns(w.Filter)
+	if err != nil {
+		return errors.Wrapf(err, "watcher %s", w.ID)
 	}
-	if w.Filter.TimeEnd != nil {
-		s := w.Filter.TimeEnd.Format(time.RFC3339Nano)
-		timeEnd = &s
-	}
+	timeStart, timeEnd := times.start, times.end
 
 	attrFiltersText, err := marshalAttributeFilters(w.AttributeFilters)
 	if err != nil {
@@ -325,15 +356,11 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		return errors.Wrap(err, "failed to marshal actors")
 	}
 
-	var timeStart, timeEnd *string
-	if w.Filter.TimeStart != nil {
-		s := w.Filter.TimeStart.Format(time.RFC3339Nano)
-		timeStart = &s
+	times, err := timeColumns(w.Filter)
+	if err != nil {
+		return errors.Wrapf(err, "watcher %s", w.ID)
 	}
-	if w.Filter.TimeEnd != nil {
-		s := w.Filter.TimeEnd.Format(time.RFC3339Nano)
-		timeEnd = &s
-	}
+	timeStart, timeEnd := times.start, times.end
 
 	var lastFiredAt *string
 	if w.LastFiredAt != nil {
@@ -598,20 +625,21 @@ func scanWatcherFields(scan func(dest ...any) error) (*Watcher, error) {
 		}
 	}
 
-	// Parse timestamps
+	// Parse timestamps: a column holding none is a side left unbounded.
+	w.Filter.TimeStart, w.Filter.TimeEnd = types.Unbounded(), types.Unbounded()
 	if timeStart.Valid {
 		t, err := time.Parse(time.RFC3339Nano, timeStart.String)
 		if err != nil {
 			return nil, errors.Wrapf(err, "invalid time_start timestamp for watcher %s: %s", w.ID, timeStart.String)
 		}
-		w.Filter.TimeStart = &t
+		w.Filter.TimeStart = types.BoundAt(t)
 	}
 	if timeEnd.Valid {
 		t, err := time.Parse(time.RFC3339Nano, timeEnd.String)
 		if err != nil {
 			return nil, errors.Wrapf(err, "invalid time_end timestamp for watcher %s: %s", w.ID, timeEnd.String)
 		}
-		w.Filter.TimeEnd = &t
+		w.Filter.TimeEnd = types.BoundAt(t)
 	}
 
 	// Set query strings

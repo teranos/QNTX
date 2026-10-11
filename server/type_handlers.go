@@ -42,7 +42,7 @@ func (s *QNTXServer) HandleTypes(w http.ResponseWriter, r *http.Request) {
 // handleGetTypes returns all type attestations
 func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 	// Query all type attestations through the store (Rust FFI)
-	filter := ats.AttestationFilter{
+	filter := ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Predicates: []string{"type"},
 		Limit:      ats.EveryRow,
 	}
@@ -88,7 +88,7 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 // handleGetType returns a specific type attestation
 func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeName string) {
 	// Query through the store (Rust FFI)
-	filter := ats.AttestationFilter{
+	filter := ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects:   []string{typeName},
 		Predicates: []string{"type"},
 		Limit:      1,

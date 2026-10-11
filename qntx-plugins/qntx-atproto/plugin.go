@@ -51,7 +51,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "atproto",
-			Version:     "0.4.5",
+			Version:     "0.4.7",
 			QNTXVersion: ">= 0.1.0",
 			Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 			Author:      "QNTX Team",
@@ -329,8 +329,8 @@ func (p *Plugin) RegisterElements() []plugin.ElementDef {
 			Symbol:        "🦋",
 			Title:         "AT Protocol Feed",
 			Label:         "atproto-feed",
-			ContentPath:   "/feed-element",
-			CSSPath:       "/feed-element.css",
+			Drawn:         plugin.ContentAt("/feed-element"),
+			CSSPaths:      []string{"/feed-element.css"},
 			DefaultWidth:  proto.Int32(500),
 			DefaultHeight: proto.Int32(600),
 		},

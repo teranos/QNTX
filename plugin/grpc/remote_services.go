@@ -11,32 +11,28 @@ import (
 	"github.com/spf13/viper"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 
 // RemoteServiceRegistry provides service access for gRPC plugins.
 // gRPC plugins receive this registry with endpoints to connect back to QNTX.
 // Services are accessed via gRPC clients that connect to the endpoints.
+//
+// Each client is made when the registry is, for the endpoint the node handed.
+// A gRPC client connects when first called. A service the node says it runs
+// without is one whose every call is refused with why, not a nil to ask about.
 type RemoteServiceRegistry struct {
-	ctx                  context.Context // Parent context for cancellation
-	atsStoreEndpoint     string
-	queueEndpoint        string
-	scheduleEndpoint     string
-	fileServiceEndpoint  string
-	llmEndpoint          string
-	vectorSearchEndpoint string
-	searchEndpoint       string
-	authToken            string
-	config               map[string]string
-	logger               *zap.SugaredLogger
-	atsStoreClient       ats.AttestationStore       // Lazy-initialized gRPC client
-	queueClient          plugin.QueueService        // Lazy-initialized gRPC client
-	scheduleClient       plugin.ScheduleService     // Lazy-initialized gRPC client
-	fileServiceClient    plugin.FileService         // Lazy-initialized gRPC client
-	llmClient            plugin.LLMService          // Lazy-initialized gRPC client
-	vectorSearchClient   plugin.VectorSearchService // Lazy-initialized gRPC client
-	searchClient         plugin.SearchService       // Lazy-initialized gRPC client
-	pluginRef            plugin.DomainPlugin        // Reference to plugin for metadata lookup
+	config             map[string]string
+	logger             *zap.SugaredLogger
+	atsStoreClient     *RemoteATSStore
+	queueClient        *RemoteQueue
+	scheduleClient     *RemoteSchedule
+	fileServiceClient  *RemoteFileService
+	llmClient          plugin.LLMService
+	vectorSearchClient plugin.VectorSearchService
+	searchClient       plugin.SearchService
+	pluginRef          plugin.DomainPlugin // Reference to plugin for metadata lookup
 }
 
 // NewRemoteServiceRegistry creates a new remote service registry.
@@ -49,28 +45,39 @@ func NewRemoteServiceRegistry(
 	queueEndpoint string,
 	scheduleEndpoint string,
 	fileServiceEndpoint string,
-	llmEndpoint string,
-	vectorSearchEndpoint string,
-	searchEndpoint string,
+	llmEndpoint ServiceEndpoint,
+	vectorSearchEndpoint ServiceEndpoint,
+	searchEndpoint ServiceEndpoint,
 	authToken string,
 	config map[string]string,
 	logger *zap.SugaredLogger,
 	pluginRef plugin.DomainPlugin,
-) *RemoteServiceRegistry {
-	return &RemoteServiceRegistry{
-		ctx:                  context.Background(),
-		atsStoreEndpoint:     atsStoreEndpoint,
-		queueEndpoint:        queueEndpoint,
-		scheduleEndpoint:     scheduleEndpoint,
-		fileServiceEndpoint:  fileServiceEndpoint,
-		llmEndpoint:          llmEndpoint,
-		vectorSearchEndpoint: vectorSearchEndpoint,
-		searchEndpoint:       searchEndpoint,
-		authToken:            authToken,
-		config:               config,
-		logger:               logger,
-		pluginRef:            pluginRef,
+) (*RemoteServiceRegistry, error) {
+	outlives := context.Background()
+	r := &RemoteServiceRegistry{config: config, logger: logger, pluginRef: pluginRef}
+	var err error
+	if r.atsStoreClient, err = NewRemoteATSStore(outlives, atsStoreEndpoint, authToken, logger); err != nil {
+		return nil, errors.Wrapf(err, "no ATSStore client for %q", atsStoreEndpoint)
 	}
+	if r.queueClient, err = NewRemoteQueue(outlives, queueEndpoint, authToken, logger); err != nil {
+		return nil, errors.Wrapf(err, "no Queue client for %q", queueEndpoint)
+	}
+	if r.scheduleClient, err = NewRemoteSchedule(outlives, scheduleEndpoint, authToken, logger); err != nil {
+		return nil, errors.Wrapf(err, "no Schedule client for %q", scheduleEndpoint)
+	}
+	if r.fileServiceClient, err = NewRemoteFileService(outlives, fileServiceEndpoint, authToken, logger); err != nil {
+		return nil, errors.Wrapf(err, "no FileService client for %q", fileServiceEndpoint)
+	}
+	if r.llmClient, err = llmAt(outlives, llmEndpoint, logger); err != nil {
+		return nil, errors.Wrapf(err, "no LLM client for %s", llmEndpoint)
+	}
+	if r.vectorSearchClient, err = vectorSearchAt(outlives, vectorSearchEndpoint, authToken, logger); err != nil {
+		return nil, errors.Wrapf(err, "no VectorSearch client for %s", vectorSearchEndpoint)
+	}
+	if r.searchClient, err = searchAt(outlives, searchEndpoint, logger); err != nil {
+		return nil, errors.Wrapf(err, "no Search client for %s", searchEndpoint)
+	}
+	return r, nil
 }
 
 // Database returns nil for remote plugins.
@@ -82,18 +89,10 @@ func (r *RemoteServiceRegistry) Database() *sql.DB {
 	return nil
 }
 
-// Logger returns a logger for the specified domain with version information.
+// Logger returns a logger for the specified domain with version information,
+// named as: domain v0.4.3
 func (r *RemoteServiceRegistry) Logger(domain string) *zap.SugaredLogger {
-	// Look up plugin metadata to include version in logger name
-	loggerName := domain
-	if r.pluginRef != nil {
-		metadata := r.pluginRef.Metadata()
-		if metadata.Version != "" {
-			// Format as: domain v0.4.3
-			loggerName = domain + " v" + metadata.Version
-		}
-	}
-	return r.logger.Named(loggerName)
+	return r.logger.Named(domain + " v" + r.pluginRef.Metadata().Version)
 }
 
 // Config returns plugin-specific configuration.
@@ -102,100 +101,37 @@ func (r *RemoteServiceRegistry) Config(domain string) plugin.Config {
 }
 
 // ATSStore returns a gRPC client for ATSStore operations.
-// The client is lazy-initialized on first access.
 func (r *RemoteServiceRegistry) ATSStore() ats.AttestationStore {
-	if r.atsStoreClient == nil && r.atsStoreEndpoint != "" {
-		client, err := NewRemoteATSStore(r.ctx, r.atsStoreEndpoint, r.authToken, r.logger)
-		if err != nil {
-			r.logger.Errorw("Failed to create ATSStore client", "error", err)
-			return nil
-		}
-		r.atsStoreClient = client
-	}
 	return r.atsStoreClient
 }
 
 // Queue returns a gRPC client for Queue operations.
-// The client is lazy-initialized on first access.
 func (r *RemoteServiceRegistry) Queue() plugin.QueueService {
-	if r.queueClient == nil && r.queueEndpoint != "" {
-		client, err := NewRemoteQueue(r.ctx, r.queueEndpoint, r.authToken, r.logger)
-		if err != nil {
-			r.logger.Errorw("Failed to create Queue client", "error", err)
-			return nil
-		}
-		r.queueClient = client
-	}
 	return r.queueClient
 }
 
 // Schedule returns a gRPC client for Schedule operations.
-// The client is lazy-initialized on first access.
 func (r *RemoteServiceRegistry) Schedule() plugin.ScheduleService {
-	if r.scheduleClient == nil && r.scheduleEndpoint != "" {
-		client, err := NewRemoteSchedule(r.ctx, r.scheduleEndpoint, r.authToken, r.logger)
-		if err != nil {
-			r.logger.Errorw("Failed to create Schedule client", "error", err)
-			return nil
-		}
-		r.scheduleClient = client
-	}
 	return r.scheduleClient
 }
 
 // FileService returns a gRPC client for file operations.
-// The client is lazy-initialized on first access.
 func (r *RemoteServiceRegistry) FileService() plugin.FileService {
-	if r.fileServiceClient == nil && r.fileServiceEndpoint != "" {
-		client, err := NewRemoteFileService(r.ctx, r.fileServiceEndpoint, r.authToken, r.logger)
-		if err != nil {
-			r.logger.Errorw("Failed to create FileService client", "error", err)
-			return nil
-		}
-		r.fileServiceClient = client
-	}
 	return r.fileServiceClient
 }
 
 // LLM returns a gRPC client for LLM operations.
-// The client is lazy-initialized on first access.
 func (r *RemoteServiceRegistry) LLM() plugin.LLMService {
-	if r.llmClient == nil && r.llmEndpoint != "" {
-		client, err := NewRemoteLLM(r.ctx, r.llmEndpoint, r.logger)
-		if err != nil {
-			r.logger.Errorw("Failed to create LLM client", "error", err)
-			return nil
-		}
-		r.llmClient = client
-	}
 	return r.llmClient
 }
 
 // VectorSearch returns a gRPC client for vector search operations.
-// The client is lazy-initialized on first access.
 func (r *RemoteServiceRegistry) VectorSearch() plugin.VectorSearchService {
-	if r.vectorSearchClient == nil && r.vectorSearchEndpoint != "" {
-		client, err := NewRemoteVectorSearch(r.ctx, r.vectorSearchEndpoint, r.authToken, r.logger)
-		if err != nil {
-			r.logger.Errorw("Failed to create VectorSearch client", "error", err)
-			return nil
-		}
-		r.vectorSearchClient = client
-	}
 	return r.vectorSearchClient
 }
 
 // Search returns a gRPC client for Search operations.
-// The client is lazy-initialized on first access.
 func (r *RemoteServiceRegistry) Search() plugin.SearchService {
-	if r.searchClient == nil && r.searchEndpoint != "" {
-		client, err := NewRemoteSearch(r.ctx, r.searchEndpoint, r.logger)
-		if err != nil {
-			r.logger.Errorw("Failed to create Search client", "error", err)
-			return nil
-		}
-		r.searchClient = client
-	}
 	return r.searchClient
 }
 
@@ -228,76 +164,81 @@ func (c *remoteConfig) GetInt(key string) int {
 	return c.viper.GetInt(key)
 }
 
+// GetBool reads yes, y and on as true, no, n and off as false, and anything
+// else as viper parses a bool: 1, t, T, TRUE, true, True, 0, f, F, FALSE,
+// false, False.
 func (c *remoteConfig) GetBool(key string) bool {
-	// First try viper's native bool parsing
-	// Viper accepts: 1, t, T, TRUE, true, True, 0, f, F, FALSE, false, False
-	if val := c.viper.Get(key); val != nil {
-		// Check if it's already a bool
-		if b, ok := val.(bool); ok {
-			return b
-		}
-
-		// If it's a string, check for additional permissive values
-		if s, ok := val.(string); ok {
-			lower := strings.ToLower(s)
-			// Additional permissive values
-			if lower == "yes" || lower == "y" || lower == "on" {
-				return true
-			}
-			if lower == "no" || lower == "n" || lower == "off" {
-				return false
-			}
-		}
+	switch strings.ToLower(c.viper.GetString(key)) {
+	case "yes", "y", "on":
+		return true
+	case "no", "n", "off":
+		return false
 	}
-
-	// Fall back to viper's GetBool for standard parsing
 	return c.viper.GetBool(key)
 }
 
+// GetStringSlice reads a list held as a list, or a string holding a JSON
+// array or comma separated values. Anything else is as viper casts it.
 func (c *remoteConfig) GetStringSlice(key string) []string {
-	val := c.viper.Get(key)
-	if val == nil {
-		return nil
-	}
-
-	// If it's already a slice, return it
-	if slice, ok := val.([]string); ok {
-		return slice
-	}
-
-	// If it's an interface slice, convert to string slice
-	if slice, ok := val.([]any); ok {
-		result := make([]string, len(slice))
-		for i, v := range slice {
+	switch val := c.viper.Get(key).(type) {
+	case []string:
+		return val
+	case []any:
+		result := make([]string, len(val))
+		for i, v := range val {
 			result[i] = fmt.Sprintf("%v", v)
 		}
 		return result
+	case string:
+		return listIn(val)
 	}
+	return c.viper.GetStringSlice(key)
+}
 
-	// If it's a string, check if it's JSON array or CSV
-	if str, ok := val.(string); ok {
-		if str == "" {
-			return nil
-		}
+// listIn is the list a string holds: a JSON array, or values separated by
+// commas, each trimmed. A string holding no value holds no list.
+func listIn(str string) []string {
+	return listOf(str).values()
+}
 
-		// Try parsing as JSON array first
-		if strings.HasPrefix(str, "[") {
-			var slice []string
-			if err := json.Unmarshal([]byte(str), &slice); err == nil {
-				return slice
-			}
-		}
+// listSaid is how a string holds a list: as a JSON array, or as values
+// separated by commas.
+type listSaid interface {
+	values() []string
+}
 
-		// Otherwise split by comma
-		parts := strings.Split(str, ",")
-		// Trim spaces from each part
-		for i, part := range parts {
-			parts[i] = strings.TrimSpace(part)
-		}
-		return parts
+// jsonArray is a string beginning with [ that reads as a JSON array.
+type jsonArray struct {
+	held []string
+}
+
+// commaSeparated is a string whose commas separate its values, and, for one
+// beginning with [, why it does not read as a JSON array.
+type commaSeparated struct {
+	str     string
+	notJSON error
+}
+
+func (a jsonArray) values() []string { return a.held }
+
+func (c commaSeparated) values() []string {
+	parts := strings.FieldsFunc(c.str, func(r rune) bool { return r == ',' })
+	for i, part := range parts {
+		parts[i] = strings.TrimSpace(part)
 	}
+	return parts
+}
 
-	return nil
+// listOf is how a string holds its list.
+func listOf(str string) listSaid {
+	if !strings.HasPrefix(str, "[") {
+		return commaSeparated{str: str, notJSON: errors.Newf("%q does not begin with [", str)}
+	}
+	var slice []string
+	if err := json.Unmarshal([]byte(str), &slice); err != nil {
+		return commaSeparated{str: str, notJSON: err}
+	}
+	return jsonArray{held: slice}
 }
 
 func (c *remoteConfig) Get(key string) any {

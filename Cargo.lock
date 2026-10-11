@@ -4306,7 +4306,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-meili"
-version = "0.8.9"
+version = "0.8.11"
 dependencies = [
  "clap",
  "meilisearch-sdk",
@@ -4340,7 +4340,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-pty-element"
-version = "0.1.16"
+version = "0.1.18"
 dependencies = [
  "chrono",
  "clap",
@@ -4364,7 +4364,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-reduce-plugin"
-version = "0.3.6"
+version = "0.3.8"
 dependencies = [
  "clap",
  "parking_lot",

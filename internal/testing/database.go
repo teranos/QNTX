@@ -108,10 +108,10 @@ func (s *sqlTestStore) GenerateAndCreateAttestation(ctx context.Context, cmd *ty
 		return nil, err
 	}
 
-	if err := cmd.NamesItsActor(); err != nil {
+	as, err := cmd.ToAs(asid, "")
+	if err != nil {
 		return nil, err
 	}
-	as := cmd.ToAs(asid, "")
 	if err := s.CreateAttestation(as); err != nil {
 		return nil, err
 	}

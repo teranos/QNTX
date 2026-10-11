@@ -41,9 +41,17 @@ func Run(p plugin.DomainPlugin, defaultPort int) {
 	// Sync on a terminal answers ENOTTY, an error that means nothing here.
 	logger := SetupLogger(*logLevel)
 
-	addr := *address
-	if addr == "" {
-		addr = fmt.Sprintf("127.0.0.1:%d", *port)
+	// The address a plugin serves on is the one it was told; told only a port,
+	// it serves on that port of the loopback.
+	given := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { given[f.Name] = true })
+	addr := fmt.Sprintf("127.0.0.1:%d", *port)
+	if given["address"] {
+		if given["port"] {
+			logger.Errorw("Told both an address and a port; serve on one", "address", *address, "port", *port)
+			os.Exit(2)
+		}
+		addr = *address
 	}
 
 	server := NewPluginServer(p, logger)
@@ -73,18 +81,13 @@ func Run(p plugin.DomainPlugin, defaultPort int) {
 	logger.Info("Plugin shutdown complete")
 }
 
-// SetupLogger creates a zap SugaredLogger with the given log level.
+// SetupLogger creates a zap SugaredLogger with the given log level. A level
+// zap does not know stops the plugin: it is not read as info.
 func SetupLogger(level string) *zap.SugaredLogger {
-	var zapLevel zapcore.Level
-	switch level {
-	case "debug":
-		zapLevel = zapcore.DebugLevel
-	case "warn":
-		zapLevel = zapcore.WarnLevel
-	case "error":
-		zapLevel = zapcore.ErrorLevel
-	default:
-		zapLevel = zapcore.InfoLevel
+	zapLevel, err := zapcore.ParseLevel(level)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Log level %q is not one of debug, info, warn, error: %v\n", level, err)
+		os.Exit(2)
 	}
 
 	config := zap.NewProductionConfig()

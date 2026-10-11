@@ -38,58 +38,38 @@ func TestDefaultKeepaliveConfig(t *testing.T) {
 }
 
 func TestNewKeepaliveConfigFromSettings(t *testing.T) {
-	// Helper to create int pointers
-	intPtr := func(v int) *int { return &v }
-
 	tests := []struct {
 		name              string
 		enabled           bool
-		pingIntervalSecs  *int
-		pongTimeoutSecs   *int
-		reconnectAttempts *int
+		pingIntervalSecs  int
+		pongTimeoutSecs   int
+		reconnectAttempts int
 		wantPingInterval  time.Duration
 		wantPongTimeout   time.Duration
 		wantReconnect     int
 	}{
 		{
-			name:              "all defaults (nil)",
-			enabled:           true,
-			pingIntervalSecs:  nil,
-			pongTimeoutSecs:   nil,
-			reconnectAttempts: nil,
-			wantPingInterval:  DefaultPingInterval,
-			wantPongTimeout:   DefaultPongTimeout,
-			wantReconnect:     DefaultReconnectAttempts,
-		},
-		{
-			name:              "explicit zero means zero",
-			enabled:           true,
-			pingIntervalSecs:  intPtr(0),
-			pongTimeoutSecs:   intPtr(0),
-			reconnectAttempts: intPtr(0),
-			wantPingInterval:  0,
-			wantPongTimeout:   0,
-			wantReconnect:     0,
+			name:    "not enabled, nothing named",
+			enabled: false,
 		},
 		{
 			name:              "custom values",
-			enabled:           false,
-			pingIntervalSecs:  intPtr(15),
-			pongTimeoutSecs:   intPtr(45),
-			reconnectAttempts: intPtr(5),
+			enabled:           true,
+			pingIntervalSecs:  15,
+			pongTimeoutSecs:   45,
+			reconnectAttempts: 5,
 			wantPingInterval:  15 * time.Second,
 			wantPongTimeout:   45 * time.Second,
 			wantReconnect:     5,
 		},
 		{
-			name:              "mixed custom and defaults",
-			enabled:           true,
-			pingIntervalSecs:  intPtr(20),
-			pongTimeoutSecs:   nil,
-			reconnectAttempts: nil,
-			wantPingInterval:  20 * time.Second,
-			wantPongTimeout:   DefaultPongTimeout,
-			wantReconnect:     DefaultReconnectAttempts,
+			name:             "no reconnect attempts is none",
+			enabled:          true,
+			pingIntervalSecs: 20,
+			pongTimeoutSecs:  60,
+			wantPingInterval: 20 * time.Second,
+			wantPongTimeout:  60 * time.Second,
+			wantReconnect:    0,
 		},
 	}
 
@@ -242,7 +222,7 @@ func TestKeepaliveHandler_StartStop(t *testing.T) {
 	config := KeepaliveConfig{
 		Enabled:      true,
 		PingInterval: 50 * time.Millisecond,
-		PongTimeout:  100 * time.Millisecond,
+		PongTimeout:  time.Second,
 	}
 
 	handler := NewKeepaliveHandler(config, logger, "test")
@@ -319,8 +299,9 @@ func TestKeepaliveHandler_HandlePong(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger, "test")
 
-	// Send a pong with timestamp from 100ms ago
+	// A ping sent 100ms ago, answered now
 	sentTime := time.Now().Add(-100 * time.Millisecond)
+	handler.sent(sentTime.UnixNano())
 	pongMsg := &protocol.WebSocketMessage{
 		Type:      protocol.WebSocketMessage_PONG,
 		Timestamp: sentTime.UnixNano(),
@@ -348,7 +329,7 @@ func TestKeepaliveHandler_HandlePongWithoutTimestamp(t *testing.T) {
 
 	handler.HandlePong(pongMsg)
 
-	// Should still record pong
+	// Should still record pong, and measure no latency: it answers no ping
 	metrics := handler.Metrics()
 	assert.Equal(t, uint64(1), metrics.GetTotalPongs())
 	assert.Equal(t, time.Duration(0), metrics.GetAverageLatency())
@@ -400,6 +381,53 @@ func TestKeepaliveHandler_CheckTimeout(t *testing.T) {
 
 	// Should not be timed out anymore
 	assert.False(t, handler.CheckTimeout())
+}
+
+// No PONG within PongTimeout is a connection considered dead: the keepalive
+// stops pinging it.
+func TestKeepaliveHandler_PongTimeoutStopsTheKeepalive(t *testing.T) {
+	skipIfShort(t)
+	logger := zaptest.NewLogger(t).Sugar()
+	handler := NewKeepaliveHandler(KeepaliveConfig{
+		Enabled:      true,
+		PingInterval: 20 * time.Millisecond,
+		PongTimeout:  30 * time.Millisecond,
+	}, logger, "test")
+
+	var pingCount int32
+	handler.Start(context.Background(), func(int64) error {
+		atomic.AddInt32(&pingCount, 1)
+		return nil
+	})
+	time.Sleep(150 * time.Millisecond)
+
+	assert.False(t, handler.IsRunning())
+	sent := atomic.LoadInt32(&pingCount)
+	time.Sleep(60 * time.Millisecond)
+	assert.Equal(t, sent, atomic.LoadInt32(&pingCount))
+}
+
+// A PING that cannot be sent ends the keepalive.
+func TestKeepaliveHandler_AFailedPingStopsTheKeepalive(t *testing.T) {
+	skipIfShort(t)
+	logger := zaptest.NewLogger(t).Sugar()
+	handler := NewKeepaliveHandler(KeepaliveConfig{
+		Enabled:      true,
+		PingInterval: 10 * time.Millisecond,
+		PongTimeout:  time.Second,
+	}, logger, "test")
+
+	handler.Start(context.Background(), func(int64) error { return errors.New("stream gone") })
+	time.Sleep(50 * time.Millisecond)
+	assert.False(t, handler.IsRunning())
+}
+
+// Zero attempts is no connection.
+func TestKeepaliveHandler_ConnectWithRetry_ZeroAttempts(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	handler := NewKeepaliveHandler(KeepaliveConfig{ReconnectAttempts: 0}, logger, "test")
+	err := handler.ConnectWithRetry(context.Background(), func() error { return nil })
+	require.Error(t, err)
 }
 
 func TestKeepaliveHandler_ConnectWithRetry_Success(t *testing.T) {
@@ -532,6 +560,7 @@ func TestKeepaliveHandler_DoubleStartIgnored(t *testing.T) {
 	config := KeepaliveConfig{
 		Enabled:      true,
 		PingInterval: 50 * time.Millisecond,
+		PongTimeout:  time.Second,
 	}
 
 	handler := NewKeepaliveHandler(config, logger, "test")

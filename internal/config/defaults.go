@@ -119,8 +119,6 @@ func SetDefaults(v *viper.Viper) {
 		pluginPaths = append(pluginPaths, "qntx-plugins")
 	}
 	v.SetDefault("plugin.paths", pluginPaths)
-	v.SetDefault("plugin.websocket.keepalive.enabled", true)
-	// ping_interval_secs, pong_timeout_secs, reconnect_attempts are optional: nil = defaults (30, 60, 3) in plugin/grpc/websocket_keepalive.go
 
 	// Ground database auto-detection — Ground always stores at ~/.local/share/ground/ground.db
 	if groundDB := findGroundDB(); groundDB != "" {

@@ -16,8 +16,8 @@ service DomainPluginService {
   // See ADR-018 for the full lifecycle contract.
   rpc Initialize(InitializeRequest) returns (InitializeResponse);
 
-  // Shutdown shuts down the plugin
-  rpc Shutdown(Empty) returns (Empty);
+  // Shutdown shuts down the plugin, which answers that it stopped
+  rpc Shutdown(Empty) returns (ShutdownResponse);
 
   // HandleHTTP handles an HTTP request
   rpc HandleHTTP(HTTPRequest) returns (HTTPResponse);
@@ -43,6 +43,11 @@ service DomainPluginService {
 }
 
 message Empty {}
+
+// ShutdownResponse is a plugin saying it stopped.
+message ShutdownResponse {
+  bool stopped = 1;  // The plugin stopped. False is an answer that says it did not.
+}
 
 message MetadataResponse {
   string name = 1;
@@ -86,33 +91,48 @@ message InitializeRequest {
   // Provides: Read stored files (for multimodal attachments)
   string file_service_endpoint = 6;
 
+  // The services below are ones the node boots without, when one does not
+  // start: each is where it answers, or why the node runs without it.
+  reserved 7 to 13;
+
   // llm_endpoint: gRPC endpoint for [LLMService](https://qntx.sbvh.nl/api/grpc-llm.html)
   // Provides: Provider-agnostic LLM chat (routed through core to provider plugins)
-  string llm_endpoint = 7;
+  ServiceEndpoint llm_endpoint = 14;
 
   // embedding_endpoint: gRPC endpoint for [EmbeddingService](https://qntx.sbvh.nl/api/grpc-embedding.html)
   // Provides: Text-to-vector embedding generation
-  string embedding_endpoint = 8;
+  ServiceEndpoint embedding_endpoint = 15;
 
   // vector_search_endpoint: gRPC endpoint for [VectorSearchService](https://qntx.sbvh.nl/api/grpc-vectorsearch.html)
   // Provides: Nearest-neighbor search over dense vector indexes (ADR-016)
-  string vector_search_endpoint = 9;
+  ServiceEndpoint vector_search_endpoint = 16;
 
   // ground_endpoint: gRPC endpoint for [GroundService](https://qntx.sbvh.nl/api/grpc-ground.html)
   // Provides: Write attestations to Ground's deferred news database
-  string ground_endpoint = 10;
+  ServiceEndpoint ground_endpoint = 17;
 
   // search_endpoint: gRPC endpoint for [SearchService](https://qntx.sbvh.nl/api/grpc-search.html)
   // Provides: Full-text search over indexed documents (routed through core to provider plugin)
-  string search_endpoint = 11;
+  ServiceEndpoint search_endpoint = 18;
 
   // fetch_endpoint: gRPC endpoint for [FetchService](https://qntx.sbvh.nl/api/grpc-fetch.html)
   // Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay pure orchestration
-  string fetch_endpoint = 12;
+  ServiceEndpoint fetch_endpoint = 19;
 
   // mail_endpoint: gRPC endpoint for MailService (plugin/grpc/protocol/mail.proto, ADR-041)
   // Provides: mail to a User, from the plugin's template — QNTX sends and attests
-  string mail_endpoint = 13;
+  ServiceEndpoint mail_endpoint = 20;
+}
+
+// ServiceEndpoint is where a service the node runs for plugins answers, or why
+// the node runs without it. One naming neither is refused.
+message ServiceEndpoint {
+  oneof state {
+    // The service answers here: "host:port".
+    string address = 1;
+    // Why the node runs without the service.
+    string not_running = 2;
+  }
 }
 
 message HTTPRequest {
@@ -162,6 +182,9 @@ message ConfigSchemaResponse {
   map<string, ConfigFieldSchema> fields = 1;
 }
 
+// Unbounded is a number field that has no limit on that side.
+message Unbounded {}
+
 message ConfigFieldSchema {
   // Field type: "string", "number", "boolean", "array"
   string type = 1;
@@ -175,11 +198,23 @@ message ConfigFieldSchema {
   // Whether this field is required
   bool required = 4;
 
-  // For number types: minimum value (optional)
-  string min_value = 5;
+  // For integer and number types: the least value the field takes, or that it
+  // has none. A number field naming neither is refused.
+  oneof min {
+    // The least value, as the field's type reads it.
+    string min_value = 5;
+    // The field has no least value.
+    Unbounded unbounded_below = 9;
+  }
 
-  // For number types: maximum value (optional)
-  string max_value = 6;
+  // For integer and number types: the greatest value the field takes, or that
+  // it has none. A number field naming neither is refused.
+  oneof max {
+    // The greatest value, as the field's type reads it.
+    string max_value = 6;
+    // The field has no greatest value.
+    Unbounded unbounded_above = 10;
+  }
 
   // For string types: validation pattern (regex, optional)
   string pattern = 7;
@@ -241,6 +276,22 @@ message InitializeResponse {
   // under /api/{plugin}/ and answered by HandleHTTP there; the node serves it as
   // an endpoint and an MCP tool, behind the same gate as its own.
   repeated Signum signa = 10;
+
+  // Where the node takes this plugin's sigils from. A plugin naming none is
+  // served no sigils, and told why in its signa_refused.
+  SigilsFrom sigils_from = 11;
+}
+
+// SigilsFrom is where a plugin's sigils are taken from.
+enum SigilsFrom {
+  // Named by nothing; refused.
+  SIGILS_FROM_UNNAMED = 0;
+  // signa, as the plugin hands them.
+  SIGILS_FROM_SIGNA = 1;
+  // http_routes, each a sigil of one signum named after the plugin (ADR-001).
+  SIGILS_FROM_HTTP_ROUTES = 2;
+  // The plugin serves no sigils.
+  SIGILS_FROM_NONE = 3;
 }
 
 // RouteInfo is one route a plugin declares.
@@ -269,8 +320,20 @@ message ExecuteJobRequest {
   string handler_name = 2;     // Which handler to invoke
   bytes payload = 3;           // Job-specific data (JSON)
   optional int64 timeout_secs = 4;  // Execution timeout. If not set, no timeout.
-  string store_token = 5;      // Reaches the store of the namespace the schedule's creator acted in, for this run. Empty is a job no caller made.
-  string user_id = 6;          // The User whose sigil call created the schedule
+  reserved 5, 6;
+  reserved "store_token", "user_id";
+  // Who made the schedule this run is for: a caller, as whom it runs, or no
+  // caller, and the plugin runs it as itself.
+  oneof made {
+    JobCaller caller = 7;
+    bool no_caller = 8;        // No caller made it. False is refused.
+  }
+}
+
+// JobCaller is the caller whose sigil call made the schedule a run is for.
+message JobCaller {
+  string store_token = 1;      // Reaches the store of the namespace the caller acted in, for this run
+  string user_id = 2;          // The User whose sigil call created the schedule
 }
 
 // ExecuteJobResponse is returned after job execution
@@ -318,22 +381,26 @@ message ElementDef {
   // Label is a short identifier for logs and the spawn menu
   string label = 3;
 
-  // ContentPath is the HTTP path (relative to /api/{plugin}/) that
-  // returns the HTML fragment for this element's content area
-  string content_path = 4;
+  // How the element's content is drawn. One naming neither is refused.
+  oneof drawn {
+    // ContentPath is the HTTP path (relative to /api/{plugin}/) that
+    // returns the HTML fragment for this element's content area
+    string content_path = 4;
 
-  // CSSPath is an optional HTTP path to a stylesheet for this element type
-  string css_path = 5;
+    // ModulePath is the HTTP path (relative to /api/{plugin}/) to a JS/TS
+    // module exporting a render function. The frontend dynamically imports it
+    // with SDK injection, bypassing the server-rendered HTML pipeline.
+    string module_path = 8;
+  }
+
+  // CSSPaths are the HTTP paths to the stylesheets of this element type, each
+  // loaded with it.
+  repeated string css_paths = 5;
 
   // DefaultWidth and DefaultHeight in pixels. "For 'use default', omit the
   // field."
   optional int32 default_width = 6;
   optional int32 default_height = 7;
-
-  // ModulePath is the HTTP path to a JS/TS module exporting a render function.
-  // When set, the frontend dynamically imports it with SDK injection,
-  // bypassing the server-rendered HTML pipeline.
-  string module_path = 8;
 }
 
 // PluginElement is one element definition a running plugin makes, with where
@@ -343,9 +410,14 @@ message PluginElement {
   string symbol = 2;
   string title = 3;
   string label = 4;
-  string content_url = 5;
-  string css_url = 6;
-  string module_url = 7;
+  // Where the element's content is drawn from: an HTML fragment, or a module
+  // exporting a render function.
+  oneof drawn {
+    string content_url = 5;
+    string module_url = 7;
+  }
+  // The stylesheets loaded with the element.
+  repeated string css_urls = 6;
   // In pixels, when the plugin names one: "For 'use default', omit the
   // field."
   optional int32 default_width = 8;
@@ -356,6 +428,8 @@ message PluginElement {
 message PluginElements {
   // One row per element definition.
   repeated PluginElement elements = 1;
+  // Why each element definition a plugin made that is not a row is not one.
+  repeated string refused = 2;
 }
 
 // PluginAction is what plugins pause, resume, restart, enable and disable
@@ -438,10 +512,14 @@ message PluginHealthProbe {
 message PluginsList {
   // One row per plugin.
   repeated PluginInfo plugins = 1;
-  // When the health in the rows was probed. Null before the first probe.
-  PluginHealthProbe health = 2;
-  // Why the last probe did not complete, when it did not.
-  string health_probe_failure = 3;
+  // The health in the rows: when it was probed, or why no probe has
+  // completed.
+  oneof probe {
+    // When the health in the rows was probed.
+    PluginHealthProbe health = 2;
+    // Why no probe has completed.
+    string health_probe_failure = 3;
+  }
   // Why the node's plugin records did not read, when they did not.
   string records_failure = 4;
 }

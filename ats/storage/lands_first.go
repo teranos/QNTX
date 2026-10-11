@@ -60,10 +60,10 @@ func TakeIn(first, record RawAttestationStore, mark Mark) (TakenIn, error) {
 	if err != nil {
 		return done, errors.Wrap(err, "the operational db did not say how many attestations it holds")
 	}
-	filter := ats.AttestationFilter{Limit: ats.EveryRow}
+	filter := ats.AttestationFilter{Limit: ats.EveryRow, TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()}
 	if marked && held > 0 {
 		done.Since = since
-		filter.TimeStart = &since
+		filter.TimeStart = types.BoundAt(since)
 	} else {
 		done.Whole = true
 	}

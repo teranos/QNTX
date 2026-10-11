@@ -9,7 +9,26 @@ import type { Field, Param, Signum } from "./sigil";
 
 export const protobufPackage = "protocol";
 
+/** SigilsFrom is where a plugin's sigils are taken from. */
+export enum SigilsFrom {
+  /** SIGILS_FROM_UNNAMED - Named by nothing; refused. */
+  SIGILS_FROM_UNNAMED = 0,
+  /** SIGILS_FROM_SIGNA - signa, as the plugin hands them. */
+  SIGILS_FROM_SIGNA = 1,
+  /** SIGILS_FROM_HTTP_ROUTES - http_routes, each a sigil of one signum named after the plugin (ADR-001). */
+  SIGILS_FROM_HTTP_ROUTES = 2,
+  /** SIGILS_FROM_NONE - The plugin serves no sigils. */
+  SIGILS_FROM_NONE = 3,
+  UNRECOGNIZED = -1,
+}
+
 export interface Empty {
+}
+
+/** ShutdownResponse is a plugin saying it stopped. */
+export interface ShutdownResponse {
+  /** The plugin stopped. False is an answer that says it did not. */
+  stopped: boolean;
 }
 
 export interface MetadataResponse {
@@ -65,42 +84,67 @@ export interface InitializeRequest {
    * llm_endpoint: gRPC endpoint for [LLMService](https://qntx.sbvh.nl/api/grpc-llm.html)
    * Provides: Provider-agnostic LLM chat (routed through core to provider plugins)
    */
-  llm_endpoint: string;
+  llm_endpoint:
+    | ServiceEndpoint
+    | undefined;
   /**
    * embedding_endpoint: gRPC endpoint for [EmbeddingService](https://qntx.sbvh.nl/api/grpc-embedding.html)
    * Provides: Text-to-vector embedding generation
    */
-  embedding_endpoint: string;
+  embedding_endpoint:
+    | ServiceEndpoint
+    | undefined;
   /**
    * vector_search_endpoint: gRPC endpoint for [VectorSearchService](https://qntx.sbvh.nl/api/grpc-vectorsearch.html)
    * Provides: Nearest-neighbor search over dense vector indexes (ADR-016)
    */
-  vector_search_endpoint: string;
+  vector_search_endpoint:
+    | ServiceEndpoint
+    | undefined;
   /**
    * ground_endpoint: gRPC endpoint for [GroundService](https://qntx.sbvh.nl/api/grpc-ground.html)
    * Provides: Write attestations to Ground's deferred news database
    */
-  ground_endpoint: string;
+  ground_endpoint:
+    | ServiceEndpoint
+    | undefined;
   /**
    * search_endpoint: gRPC endpoint for [SearchService](https://qntx.sbvh.nl/api/grpc-search.html)
    * Provides: Full-text search over indexed documents (routed through core to provider plugin)
    */
-  search_endpoint: string;
+  search_endpoint:
+    | ServiceEndpoint
+    | undefined;
   /**
    * fetch_endpoint: gRPC endpoint for [FetchService](https://qntx.sbvh.nl/api/grpc-fetch.html)
    * Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay pure orchestration
    */
-  fetch_endpoint: string;
+  fetch_endpoint:
+    | ServiceEndpoint
+    | undefined;
   /**
    * mail_endpoint: gRPC endpoint for MailService (plugin/grpc/protocol/mail.proto, ADR-041)
    * Provides: mail to a User, from the plugin's template — QNTX sends and attests
    */
-  mail_endpoint: string;
+  mail_endpoint: ServiceEndpoint | undefined;
 }
 
 export interface InitializeRequest_ConfigEntry {
   key: string;
   value: string;
+}
+
+/**
+ * ServiceEndpoint is where a service the node runs for plugins answers, or why
+ * the node runs without it. One naming neither is refused.
+ */
+export interface ServiceEndpoint {
+  /** The service answers here: "host:port". */
+  address?:
+    | string
+    | undefined;
+  /** Why the node runs without the service. */
+  not_running?: string | undefined;
 }
 
 export interface HTTPRequest {
@@ -173,6 +217,10 @@ export interface ConfigSchemaResponse_FieldsEntry {
   value: ConfigFieldSchema | undefined;
 }
 
+/** Unbounded is a number field that has no limit on that side. */
+export interface Unbounded {
+}
+
 export interface ConfigFieldSchema {
   /** Field type: "string", "number", "boolean", "array" */
   type: string;
@@ -182,10 +230,22 @@ export interface ConfigFieldSchema {
   default_value: string;
   /** Whether this field is required */
   required: boolean;
-  /** For number types: minimum value (optional) */
-  min_value: string;
-  /** For number types: maximum value (optional) */
-  max_value: string;
+  /** The least value, as the field's type reads it. */
+  min_value?:
+    | string
+    | undefined;
+  /** The field has no least value. */
+  unbounded_below?:
+    | Unbounded
+    | undefined;
+  /** The greatest value, as the field's type reads it. */
+  max_value?:
+    | string
+    | undefined;
+  /** The field has no greatest value. */
+  unbounded_above?:
+    | Unbounded
+    | undefined;
   /** For string types: validation pattern (regex, optional) */
   pattern: string;
   /** For array types: element type (optional) */
@@ -256,6 +316,11 @@ export interface InitializeResponse {
    * an endpoint and an MCP tool, behind the same gate as its own.
    */
   signa: Signum[];
+  /**
+   * Where the node takes this plugin's sigils from. A plugin naming none is
+   * served no sigils, and told why in its signa_refused.
+   */
+  sigils_from: SigilsFrom;
 }
 
 /** RouteInfo is one route a plugin declares. */
@@ -298,10 +363,17 @@ export interface ExecuteJobRequest {
   /** Job-specific data (JSON) */
   payload: Uint8Array;
   /** Execution timeout. If not set, no timeout. */
-  timeout_secs?:
-    | number
+  timeout_secs?: number | undefined;
+  caller?:
+    | JobCaller
     | undefined;
-  /** Reaches the store of the namespace the schedule's creator acted in, for this run. Empty is a job no caller made. */
+  /** No caller made it. False is refused. */
+  no_caller?: boolean | undefined;
+}
+
+/** JobCaller is the caller whose sigil call made the schedule a run is for. */
+export interface JobCaller {
+  /** Reaches the store of the namespace the caller acted in, for this run */
   store_token: string;
   /** The User whose sigil call created the schedule */
   user_id: string;
@@ -353,23 +425,28 @@ export interface ElementDef {
    * ContentPath is the HTTP path (relative to /api/{plugin}/) that
    * returns the HTML fragment for this element's content area
    */
-  content_path: string;
-  /** CSSPath is an optional HTTP path to a stylesheet for this element type */
-  css_path: string;
+  content_path?:
+    | string
+    | undefined;
+  /**
+   * ModulePath is the HTTP path (relative to /api/{plugin}/) to a JS/TS
+   * module exporting a render function. The frontend dynamically imports it
+   * with SDK injection, bypassing the server-rendered HTML pipeline.
+   */
+  module_path?:
+    | string
+    | undefined;
+  /**
+   * CSSPaths are the HTTP paths to the stylesheets of this element type, each
+   * loaded with it.
+   */
+  css_paths: string[];
   /**
    * DefaultWidth and DefaultHeight in pixels. "For 'use default', omit the
    * field."
    */
   default_width?: number | undefined;
-  default_height?:
-    | number
-    | undefined;
-  /**
-   * ModulePath is the HTTP path to a JS/TS module exporting a render function.
-   * When set, the frontend dynamically imports it with SDK injection,
-   * bypassing the server-rendered HTML pipeline.
-   */
-  module_path: string;
+  default_height?: number | undefined;
 }
 
 /**
@@ -381,9 +458,12 @@ export interface PluginElement {
   symbol: string;
   title: string;
   label: string;
-  content_url: string;
-  css_url: string;
-  module_url: string;
+  content_url?: string | undefined;
+  module_url?:
+    | string
+    | undefined;
+  /** The stylesheets loaded with the element. */
+  css_urls: string[];
   /**
    * In pixels, when the plugin names one: "For 'use default', omit the
    * field."
@@ -396,6 +476,8 @@ export interface PluginElement {
 export interface PluginElements {
   /** One row per element definition. */
   elements: PluginElement[];
+  /** Why each element definition a plugin made that is not a row is not one. */
+  refused: string[];
 }
 
 /**
@@ -504,12 +586,14 @@ export interface PluginHealthProbe {
 export interface PluginsList {
   /** One row per plugin. */
   plugins: PluginInfo[];
-  /** When the health in the rows was probed. Null before the first probe. */
-  health:
+  /** When the health in the rows was probed. */
+  health?:
     | PluginHealthProbe
     | undefined;
-  /** Why the last probe did not complete, when it did not. */
-  health_probe_failure: string;
+  /** Why no probe has completed. */
+  health_probe_failure?:
+    | string
+    | undefined;
   /** Why the node's plugin records did not read, when they did not. */
   records_failure: string;
 }

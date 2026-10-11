@@ -62,6 +62,7 @@ grpc::Status ScryPlugin::Metadata(grpc::ServerContext* ctx,
                                        protocol::MetadataResponse* resp) {
     resp->set_name("scry");
     resp->set_version(PLUGIN_VERSION);
+    resp->set_qntx_version(">= 0.1.0");
     resp->set_description("Local LLM inference via llama.cpp with Metal acceleration");
     resp->set_author("teranos");
     resp->set_license("MIT");
@@ -145,16 +146,20 @@ grpc::Status ScryPlugin::Initialize(grpc::ServerContext* ctx,
     // This plugin is an LLM provider
     resp->set_llm_provider(true);
 
+    // It declares no routes, and serves no sigils.
+    resp->set_sigils_from(protocol::SIGILS_FROM_NONE);
+
     return grpc::Status::OK;
 }
 
 grpc::Status ScryPlugin::Shutdown(grpc::ServerContext* ctx,
                                        const protocol::Empty* req,
-                                       protocol::Empty* resp) {
+                                       protocol::ShutdownResponse* resp) {
     // Wait for background PCA to finish before unloading model
     if (pca_thread_.joinable()) pca_thread_.join();
     engine_.unload();
     std::cout << "[shutdown] Shutdown complete" << std::endl;
+    resp->set_stopped(true);
     return grpc::Status::OK;
 }
 

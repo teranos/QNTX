@@ -347,6 +347,11 @@ private template getProtoNum(T, size_t i) {
 
 struct Empty {}
 
+/// A plugin saying it stopped: the answer to Shutdown.
+struct ShutdownResponse {
+    @Proto(1) bool stopped;
+}
+
 struct MetadataResponse {
     @Proto(1) string name;
     @Proto(2) string version_;
@@ -373,9 +378,15 @@ struct ScheduleInfo {
     @Proto(5) string atsCode;
 }
 
+/// Where the node takes a plugin's sigils from: SigilsFrom in domain.proto.
+enum int SIGILS_FROM_SIGNA       = 1;
+enum int SIGILS_FROM_HTTP_ROUTES = 2;
+enum int SIGILS_FROM_NONE        = 3;
+
 struct InitializeResponse {
     @Proto(1) string[] handlerNames;
     @Proto(2) ScheduleInfo[] schedules;
+    @Proto(11) int sigilsFrom;
 }
 
 struct HTTPRequest {
@@ -451,13 +462,19 @@ struct ExecuteJobResponse {
 // ATS Store protocol messages (mirrors atsstore.proto)
 // ---------------------------------------------------------------------------
 
+// Each oneof of the command names one side: its actors, and now.
 struct AttestationCommand {
     @Proto(1) string[] subjects;
     @Proto(2) string[] predicates;
     @Proto(3) string[] contexts;
-    @Proto(4) string[] actors;
+    @Proto(12) ActorNames actorsNamed; // oneof by
+    @Proto(9) bool now;                // oneof when: when the node writes it
     @Proto(7) string source;
     @Proto(8) string sourceVersion;
+}
+
+struct ActorNames {
+    @Proto(1) string[] names;
 }
 
 struct GenerateAttestationRequest {
@@ -475,6 +492,9 @@ struct AttestationFilter {
     @Proto(2) @Repeated string[] predicates;
     @Proto(3) @Repeated string[] contexts;
     @Proto(4) @Repeated string[] actors;
+    @Proto(7) int limit;          // 0 is none; every row is int.max
+    @Proto(8) bool unboundedStart; // oneof from
+    @Proto(9) bool unboundedEnd;   // oneof to
 }
 
 struct GetAttestationsRequest {

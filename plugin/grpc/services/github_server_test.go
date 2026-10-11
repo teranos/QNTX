@@ -354,7 +354,7 @@ func TestGitHubEveryRPCRouted(t *testing.T) {
 
 			// Every request field is routed; none is silently dropped.
 			routed := map[string]bool{"namespace": true}
-			for _, name := range append(append(route.pathFields(), route.query...), route.body...) {
+			for _, name := range append(append(route.pathFields(), route.query...), route.body.fields()...) {
 				require.NotNil(t, sent.Descriptor().Fields().ByName(protoreflect.Name(name)), "route names %s, not in %s", name, sent.Descriptor().FullName())
 				routed[name] = true
 			}
@@ -373,7 +373,7 @@ func TestGitHubEveryRPCRouted(t *testing.T) {
 			require.Len(t, *seen, 1)
 			assert.Equal(t, route.method, (*seen)[0].Method)
 			assert.Equal(t, filledPath(route.path, sent), (*seen)[0].Path)
-			if len(route.body) > 0 {
+			if _, sendsJSON := route.body.(jsonBody); sendsJSON {
 				assert.True(t, json.Valid([]byte((*seen)[0].Body)), "body is JSON: %s", (*seen)[0].Body)
 			}
 		})

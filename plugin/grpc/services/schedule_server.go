@@ -2,14 +2,18 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"sync/atomic"
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 
@@ -36,12 +40,18 @@ type ScheduleServer struct {
 
 // NewScheduleServer creates a new schedule gRPC server
 func NewScheduleServer(store *schedule.Store, authToken string, logger *zap.SugaredLogger) *ScheduleServer {
-	return &ScheduleServer{
+	s := &ScheduleServer{
 		store:     store,
 		authToken: authToken,
 		logger:    logger,
 	}
+	s.SetCallers(noCaller)
+	return s
 }
+
+// noCaller is the node before it hands its open calls over: it has handed no
+// plugin a call's token yet, so no call is open.
+func noCaller(string) (Caller, bool) { return Caller{}, false }
 
 // SetCallers hands the server the callers of the calls plugins are answering.
 func (s *ScheduleServer) SetCallers(callers Callers) {
@@ -50,10 +60,7 @@ func (s *ScheduleServer) SetCallers(callers Callers) {
 
 // callerOf is the caller of the open call a store token names.
 func (s *ScheduleServer) callerOf(token string) (Caller, bool) {
-	if callers := s.callers.Load(); callers != nil {
-		return (*callers)(token)
-	}
-	return Caller{}, false
+	return (*s.callers.Load())(token)
 }
 
 // CreateSchedule creates a new recurring schedule in Pulse
@@ -66,22 +73,23 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 	}
 
 	// "a schedule remembers who created it and where"
-	var caller Caller
-	if req.StoreToken != "" {
-		var open bool
-		caller, open = s.callerOf(req.StoreToken)
-		if !open {
-			return &protocol.CreateScheduleResponse{
-				Success: false,
-				Error:   fmt.Sprintf("store_token names no open sigil call, so schedule %s has no caller to remember", req.HandlerName),
-			}, nil
-		}
+	caller, madeBy, err := s.madeBy(req)
+	if err != nil {
+		return &protocol.CreateScheduleResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload
 	}
 
 	// Idempotent: if an active schedule for this handler, made by the same
 	// caller in the same namespace, already exists, return it
+	// The store says none is there by sql.ErrNoRows; any other failure is not
+	// a schedule being absent, and creating one over it would make a second.
 	existing, err := s.store.GetActiveByHandlerName(req.HandlerName, caller.UserID, caller.Namespace)
-	if err == nil && existing != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return &protocol.CreateScheduleResponse{
+			Success: false,
+			Error:   fmt.Sprintf("failed to look for an active schedule of handler %s: %v", req.HandlerName, err),
+		}, nil
+	}
+	if err == nil {
 		s.logger.Debugw("Schedule already exists for handler, returning existing",
 			"schedule_id", existing.Id,
 			"handler", req.HandlerName,
@@ -93,11 +101,9 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 	}
 
 	// An interval of 0 is no ticking, and a schedule ticks: it names how often.
-	if req.IntervalSeconds <= 0 {
-		return &protocol.CreateScheduleResponse{
-			Success: false,
-			Error:   fmt.Sprintf("a schedule repeats every interval_seconds, and %d repeats never", req.IntervalSeconds),
-		}, nil
+	interval, err := named.CountOf("interval_seconds, how often schedule "+req.HandlerName+" repeats,", int(req.IntervalSeconds))
+	if err != nil {
+		return &protocol.CreateScheduleResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload
 	}
 
 	// Generate schedule ID
@@ -109,21 +115,22 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		}, nil
 	}
 
-	// Serialize metadata to JSON string
-	var metadata string
-	if len(req.Metadata) > 0 {
-		metaBytes, err := json.Marshal(req.Metadata)
-		if err != nil {
-			return &protocol.CreateScheduleResponse{
-				Success: false,
-				Error:   fmt.Sprintf("failed to serialize metadata: %v", err),
-			}, nil
-		}
-		metadata = string(metaBytes)
+	// Metadata is kept as a JSON object: {} for a schedule given none.
+	kept := make(map[string]string, len(req.Metadata))
+	for key, value := range req.Metadata {
+		kept[key] = value
 	}
+	metaBytes, err := json.Marshal(kept)
+	if err != nil {
+		return &protocol.CreateScheduleResponse{
+			Success: false,
+			Error:   fmt.Sprintf("failed to serialize metadata: %v", err),
+		}, nil
+	}
+	metadata := string(metaBytes)
 
 	now := time.Now()
-	nextRun := now.Add(time.Duration(req.IntervalSeconds) * time.Second)
+	nextRun := now.Add(time.Duration(interval.Int()) * time.Second)
 
 	job := &schedule.Job{
 		Id:              scheduleID,
@@ -135,6 +142,7 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		Metadata:        metadata,
 		UserId:          caller.UserID,
 		Namespace:       caller.Namespace,
+		MadeBy:          string(madeBy),
 	}
 
 	if err := s.store.CreateJob(job); err != nil {
@@ -156,6 +164,25 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		Success:    true,
 		ScheduleId: scheduleID,
 	}, nil
+}
+
+// madeBy is the caller of the sigil call a schedule is made in, or no caller
+// for one the plugin made itself, which keeps no User and no namespace.
+func (s *ScheduleServer) madeBy(req *protocol.CreateScheduleRequest) (Caller, async.MadeBy, error) {
+	switch made := req.GetMade().(type) {
+	case *protocol.CreateScheduleRequest_StoreToken:
+		caller, open := s.callerOf(made.StoreToken)
+		if !open {
+			return Caller{}, "", errors.Newf("store_token names no open sigil call, so schedule %s has no caller to remember", req.HandlerName)
+		}
+		return caller, async.MadeByCaller, nil
+	case *protocol.CreateScheduleRequest_ByPlugin:
+		if !made.ByPlugin {
+			return Caller{}, "", errors.Newf("by_plugin is false: schedule %s is made in a sigil call, or by the plugin", req.HandlerName)
+		}
+		return Caller{}, async.MadeByNoCaller, nil
+	}
+	return Caller{}, "", errors.Newf("schedule %s names who made it: the store_token of a sigil call, or by_plugin", req.HandlerName)
 }
 
 // PauseSchedule pauses an active schedule

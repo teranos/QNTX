@@ -340,9 +340,11 @@ func (h *CanvasHandler) invite(w http.ResponseWriter, r *http.Request, store *el
 	_, _, err = h.mailer.SendAsNode(r.Context(), invitee.ID, services.NodeMail{
 		Name:    "canvas-invitation",
 		Subject: inviter + " invites you to own the canvas " + canvas.Name,
-		Text:    inviter + " invites you to own the canvas " + canvas.Name + ".\n\nAccept it here: " + link + "\n",
-		HTML: "<p>" + htmlEscape(inviter) + " invites you to own the canvas <b>" + htmlEscape(canvas.Name) + "</b>.</p>" +
-			"<p><a href=\"" + htmlEscape(link) + "\">Accept the invitation</a></p>",
+		Bodies: []services.MailBody{
+			services.TextBody(inviter + " invites you to own the canvas " + canvas.Name + ".\n\nAccept it here: " + link + "\n"),
+			services.HTMLBody("<p>" + htmlEscape(inviter) + " invites you to own the canvas <b>" + htmlEscape(canvas.Name) + "</b>.</p>" +
+				"<p><a href=\"" + htmlEscape(link) + "\">Accept the invitation</a></p>"),
+		},
 	})
 	if err != nil {
 		h.writeError(w, errors.Wrap(err, "the invitation was written, and the mail was not sent"), http.StatusBadGateway)
@@ -386,8 +388,10 @@ func (h *CanvasHandler) acceptInvitation(w http.ResponseWriter, r *http.Request,
 		if _, _, err := h.mailer.SendAsNode(r.Context(), inv.Inviter, services.NodeMail{
 			Name:    "canvas-invitation-accepted",
 			Subject: invitee + " now owns the canvas " + canvas.Name + " with you",
-			Text:    invitee + " accepted your invitation and now owns the canvas " + canvas.Name + " with you.\n",
-			HTML:    "<p>" + htmlEscape(invitee) + " accepted your invitation and now owns the canvas <b>" + htmlEscape(canvas.Name) + "</b> with you.</p>",
+			Bodies: []services.MailBody{
+				services.TextBody(invitee + " accepted your invitation and now owns the canvas " + canvas.Name + " with you.\n"),
+				services.HTMLBody("<p>" + htmlEscape(invitee) + " accepted your invitation and now owns the canvas <b>" + htmlEscape(canvas.Name) + "</b> with you.</p>"),
+			},
 		}); err != nil {
 			h.logWarn("The inviter %s was not told %s accepted: %v", inv.Inviter, admitted.UserID, err)
 		}

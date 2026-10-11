@@ -334,13 +334,20 @@ type LLMChatChunk struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Token            string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`                                                // The generated token text
 	Done             bool                   `protobuf:"varint,2,opt,name=done,proto3" json:"done,omitempty"`                                                 // True on final chunk
-	Model            string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`                                                // Model name (sent on first or last chunk)
+	Model            string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`                                                // Model name: the final chunk names it, others may
 	PromptTokens     int32                  `protobuf:"varint,4,opt,name=prompt_tokens,json=promptTokens,proto3" json:"prompt_tokens,omitempty"`             // Sent on final chunk
 	CompletionTokens int32                  `protobuf:"varint,5,opt,name=completion_tokens,json=completionTokens,proto3" json:"completion_tokens,omitempty"` // Sent on final chunk
 	TotalTokens      int32                  `protobuf:"varint,6,opt,name=total_tokens,json=totalTokens,proto3" json:"total_tokens,omitempty"`                // Sent on final chunk
-	Signal           *TokenSignalProto      `protobuf:"bytes,7,opt,name=signal,proto3" json:"signal,omitempty"`                                              // Per-token signal data (if available)
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Per-token signal data, or that this chunk carries none. A chunk naming
+	// neither is refused.
+	//
+	// Types that are valid to be assigned to SignalOf:
+	//
+	//	*LLMChatChunk_Signal
+	//	*LLMChatChunk_NoSignal
+	SignalOf      isLLMChatChunk_SignalOf `protobuf_oneof:"signal_of"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LLMChatChunk) Reset() {
@@ -415,12 +422,46 @@ func (x *LLMChatChunk) GetTotalTokens() int32 {
 	return 0
 }
 
-func (x *LLMChatChunk) GetSignal() *TokenSignalProto {
+func (x *LLMChatChunk) GetSignalOf() isLLMChatChunk_SignalOf {
 	if x != nil {
-		return x.Signal
+		return x.SignalOf
 	}
 	return nil
 }
+
+func (x *LLMChatChunk) GetSignal() *TokenSignalProto {
+	if x != nil {
+		if x, ok := x.SignalOf.(*LLMChatChunk_Signal); ok {
+			return x.Signal
+		}
+	}
+	return nil
+}
+
+func (x *LLMChatChunk) GetNoSignal() bool {
+	if x != nil {
+		if x, ok := x.SignalOf.(*LLMChatChunk_NoSignal); ok {
+			return x.NoSignal
+		}
+	}
+	return false
+}
+
+type isLLMChatChunk_SignalOf interface {
+	isLLMChatChunk_SignalOf()
+}
+
+type LLMChatChunk_Signal struct {
+	Signal *TokenSignalProto `protobuf:"bytes,7,opt,name=signal,proto3,oneof"`
+}
+
+type LLMChatChunk_NoSignal struct {
+	NoSignal bool `protobuf:"varint,8,opt,name=no_signal,json=noSignal,proto3,oneof"` // False is refused.
+}
+
+func (*LLMChatChunk_Signal) isLLMChatChunk_SignalOf() {}
+
+func (*LLMChatChunk_NoSignal) isLLMChatChunk_SignalOf() {}
 
 type TokenSignalProto struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
@@ -673,15 +714,17 @@ const file_plugin_grpc_protocol_llm_proto_rawDesc = "" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12#\n" +
 	"\rprompt_tokens\x18\x03 \x01(\x05R\fpromptTokens\x12+\n" +
 	"\x11completion_tokens\x18\x04 \x01(\x05R\x10completionTokens\x12!\n" +
-	"\ftotal_tokens\x18\x05 \x01(\x05R\vtotalTokens\"\xf7\x01\n" +
+	"\ftotal_tokens\x18\x05 \x01(\x05R\vtotalTokens\"\xa5\x02\n" +
 	"\fLLMChatChunk\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x12\n" +
 	"\x04done\x18\x02 \x01(\bR\x04done\x12\x14\n" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x12#\n" +
 	"\rprompt_tokens\x18\x04 \x01(\x05R\fpromptTokens\x12+\n" +
 	"\x11completion_tokens\x18\x05 \x01(\x05R\x10completionTokens\x12!\n" +
-	"\ftotal_tokens\x18\x06 \x01(\x05R\vtotalTokens\x122\n" +
-	"\x06signal\x18\a \x01(\v2\x1a.protocol.TokenSignalProtoR\x06signal\"\x8a\x02\n" +
+	"\ftotal_tokens\x18\x06 \x01(\x05R\vtotalTokens\x124\n" +
+	"\x06signal\x18\a \x01(\v2\x1a.protocol.TokenSignalProtoH\x00R\x06signal\x12\x1d\n" +
+	"\tno_signal\x18\b \x01(\bH\x00R\bnoSignalB\v\n" +
+	"\tsignal_of\"\x8a\x02\n" +
 	"\x10TokenSignalProto\x12\x1e\n" +
 	"\n" +
 	"confidence\x18\x01 \x01(\x02R\n" +
@@ -752,6 +795,10 @@ func init() { file_plugin_grpc_protocol_llm_proto_init() }
 func file_plugin_grpc_protocol_llm_proto_init() {
 	if File_plugin_grpc_protocol_llm_proto != nil {
 		return
+	}
+	file_plugin_grpc_protocol_llm_proto_msgTypes[4].OneofWrappers = []any{
+		(*LLMChatChunk_Signal)(nil),
+		(*LLMChatChunk_NoSignal)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

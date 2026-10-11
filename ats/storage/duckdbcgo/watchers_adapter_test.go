@@ -20,7 +20,7 @@ func sampleWatcher(id string) *storage.Watcher {
 	return &storage.Watcher{
 		ID:                id,
 		Name:              "watcher " + id,
-		Filter:            types.AxFilter{Predicates: []string{"thing:happened"}, Contexts: []string{"here"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"thing:happened"}, Contexts: []string{"here"}},
 		ActionType:        storage.ActionTypeWebhook,
 		ActionData:        "http://127.0.0.1:1/hook",
 		MaxFiresPerSecond: 8,

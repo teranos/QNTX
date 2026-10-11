@@ -522,7 +522,7 @@ func (s *QNTXServer) staandStands(market, slug string) bool {
 	// Query by the key alone and settle create against delete here: a store's
 	// filter may AND several predicates rather than OR them, so asking for both
 	// at once can match neither.
-	found, err := sys.GetAttestations(ats.AttestationFilter{Subjects: []string{key}, Limit: 200})
+	found, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{key}, Limit: 200})
 	if err != nil {
 		return false
 	}
@@ -801,7 +801,7 @@ func (s *QNTXServer) writeStaandDef(ctx context.Context, market, slug, predicate
 // definitions are read from system, the latest line per stand decides, and a
 // stand whose latest is a delete is left out. Each live stand is then filled
 // with the activity read from the market it feeds.
-func (s *QNTXServer) liveStaands(since, until *time.Time) ([]*protocol.Staand, error) {
+func (s *QNTXServer) liveStaands(since, until types.TimeBound) ([]*protocol.Staand, error) {
 	sys, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
 		return nil, err
@@ -809,11 +809,11 @@ func (s *QNTXServer) liveStaands(since, until *time.Time) ([]*protocol.Staand, e
 
 	// Two single-predicate queries rather than one naming both, because a store
 	// may AND the predicates of a filter rather than OR them.
-	created, err := sys.GetAttestations(ats.AttestationFilter{Predicates: []string{staandCreated}, Limit: 1000})
+	created, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{staandCreated}, Limit: 1000})
 	if err != nil {
 		return nil, err
 	}
-	deleted, err := sys.GetAttestations(ats.AttestationFilter{Predicates: []string{staandDeleted}, Limit: 1000})
+	deleted, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{staandDeleted}, Limit: 1000})
 	if err != nil {
 		return nil, err
 	}
@@ -952,23 +952,23 @@ func staandDimensions() []string {
 // staandRange is the window a read covers, in AX's own words: since and until
 // take `yesterday`, `last monday` or an ISO stamp alike (ADR-036). Absent is
 // unbounded, which is what a stand's whole life is.
-func staandRange(sent sigil.Sent) (*time.Time, *time.Time, *protocol.Refusal) {
-	var since, until *time.Time
+func staandRange(sent sigil.Sent) (types.TimeBound, types.TimeBound, *protocol.Refusal) {
+	since, until := types.Unbounded(), types.Unbounded()
 	if v := sent["since"]; v != "" {
 		t, err := parser.ParseTemporalExpression(v)
 		if err != nil {
-			return nil, nil, &protocol.Refusal{Why: sigil.Invalid, Param: "since",
+			return types.TimeBound{}, types.TimeBound{}, &protocol.Refusal{Why: sigil.Invalid, Param: "since",
 				Says: errors.Wrapf(err, "since %q is not a time", v).Error()}
 		}
-		since = t
+		since = types.BoundAt(*t)
 	}
 	if v := sent["until"]; v != "" {
 		t, err := parser.ParseTemporalExpression(v)
 		if err != nil {
-			return nil, nil, &protocol.Refusal{Why: sigil.Invalid, Param: "until",
+			return types.TimeBound{}, types.TimeBound{}, &protocol.Refusal{Why: sigil.Invalid, Param: "until",
 				Says: errors.Wrapf(err, "until %q is not a time", v).Error()}
 		}
-		until = t
+		until = types.BoundAt(*t)
 	}
 	return since, until, nil
 }
@@ -1022,7 +1022,7 @@ func (s *QNTXServer) staandsMetrics(_ context.Context, sent sigil.Sent) (any, *p
 // found, and a store that does not answer is the node's own failure: what went
 // wrong goes to the log with what was being read, and the caller is told only
 // that it did.
-func (s *QNTXServer) staandArrivals(reading, market, slug string, since, until *time.Time) ([]*types.As, *protocol.Refusal) {
+func (s *QNTXServer) staandArrivals(reading, market, slug string, since, until types.TimeBound) ([]*types.As, *protocol.Refusal) {
 	store, err := s.held.Read(market)
 	if err != nil {
 		s.logger.Errorw("could not open a market for "+reading,
@@ -1234,7 +1234,7 @@ func (t *staandTally) sites() []string {
 // slug on a reserved attribute (staandSlugAttr) and their source is the stand;
 // definitions live in system, so nothing here is a definition. The context is
 // the page URL, so its host is the site that reported.
-func (s *QNTXServer) staandActivity(market string, since, until *time.Time) map[string]*staandTally {
+func (s *QNTXServer) staandActivity(market string, since, until types.TimeBound) map[string]*staandTally {
 	tally := map[string]*staandTally{}
 	store, err := s.held.Read(market)
 	if err != nil {

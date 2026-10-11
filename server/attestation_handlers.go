@@ -192,35 +192,37 @@ func pageOf(v string) (limit int, errMsg string) {
 // "3 days ago", "2025-01-15"). on spans the full day its expression falls on,
 // matching the ax grammar's on clause; temporal is one clause there, so on
 // combined with since or until is refused rather than guessed at.
+// A side no parameter names is unbounded, as an ax query naming no time is.
 // Returns an error message, or empty string if valid.
-func parseTemporalParams(since, until, on string) (start, end *time.Time, errMsg string) {
+func parseTemporalParams(since, until, on string) (start, end types.TimeBound, errMsg string) {
 	if on != "" && (since != "" || until != "") {
-		return nil, nil, fmt.Sprintf("on=%s names a single day and cannot combine with since/until", on)
+		return types.TimeBound{}, types.TimeBound{}, fmt.Sprintf("on=%s names a single day and cannot combine with since/until", on)
 	}
 
 	if on != "" {
 		t, err := parser.ParseTemporalExpression(on)
 		if err != nil {
-			return nil, nil, fmt.Sprintf("invalid on expression %q: %v", on, err)
+			return types.TimeBound{}, types.TimeBound{}, fmt.Sprintf("invalid on expression %q: %v", on, err)
 		}
 		startOfDay := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 		endOfDay := startOfDay.Add(24 * time.Hour)
-		return &startOfDay, &endOfDay, ""
+		return types.BoundAt(startOfDay), types.BoundAt(endOfDay), ""
 	}
 
+	start, end = types.Unbounded(), types.Unbounded()
 	if since != "" {
 		t, err := parser.ParseTemporalExpression(since)
 		if err != nil {
-			return nil, nil, fmt.Sprintf("invalid since expression %q: %v", since, err)
+			return types.TimeBound{}, types.TimeBound{}, fmt.Sprintf("invalid since expression %q: %v", since, err)
 		}
-		start = t
+		start = types.BoundAt(*t)
 	}
 	if until != "" {
 		t, err := parser.ParseTemporalExpression(until)
 		if err != nil {
-			return nil, nil, fmt.Sprintf("invalid until expression %q: %v", until, err)
+			return types.TimeBound{}, types.TimeBound{}, fmt.Sprintf("invalid until expression %q: %v", until, err)
 		}
-		end = t
+		end = types.BoundAt(*t)
 	}
 	return start, end, ""
 }

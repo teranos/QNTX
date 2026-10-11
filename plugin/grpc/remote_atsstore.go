@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // RemoteATSStore is a gRPC client wrapper for the attestation store.
@@ -51,27 +50,29 @@ func (r *RemoteATSStore) Close() error {
 
 // GenerateAndCreateAttestation creates an attestation via gRPC.
 func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
+	// On the wire a command says who made it, when, and its version, as
+	// types.AsCommand names each.
 	protoCmd := &protocol.AttestationCommand{
-		Subjects:      cmd.Subjects,
-		Predicates:    cmd.Predicates,
-		Contexts:      cmd.Contexts,
-		Actors:        cmd.Actors,
-		Source:        cmd.Source,
-		SourceVersion: cmd.SourceVersion,
+		Subjects:   cmd.Subjects,
+		Predicates: cmd.Predicates,
+		Contexts:   cmd.Contexts,
+		Source:     cmd.Source,
+	}
+	if err := sayActors(cmd, protoCmd); err != nil {
+		return nil, err
+	}
+	if err := sayWhen(cmd, protoCmd); err != nil {
+		return nil, err
+	}
+	if err := sayVersion(cmd, protoCmd); err != nil {
+		return nil, err
 	}
 
-	if len(cmd.Attributes) > 0 {
-		attrs, err := structpb.NewStruct(cmd.Attributes)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to convert attributes to Struct")
-		}
-		protoCmd.Attributes = attrs
+	attrs, err := protocol.AttributesStruct(cmd.Attributes)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the attestation of %v is not sent", cmd.Subjects)
 	}
-
-	if !cmd.Timestamp.IsZero() {
-		ts := cmd.Timestamp.UnixMilli()
-		protoCmd.Timestamp = &ts
-	}
+	protoCmd.Attributes = attrs
 
 	req := &protocol.GenerateAttestationRequest{
 		AuthToken: r.authToken,
@@ -88,6 +89,48 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *
 	}
 
 	return resp.Attestation.ToTypes(), nil
+}
+
+// sayActors says on the wire who a command names as having made it: its
+// actors, or the node. A command naming neither is refused.
+func sayActors(cmd *types.AsCommand, protoCmd *protocol.AttestationCommand) error {
+	switch by := cmd.By.(type) {
+	case types.ActorsNamed:
+		protoCmd.By = &protocol.AttestationCommand_ActorsNamed{ActorsNamed: &protocol.ActorNames{Names: by.Actors.All()}}
+		return nil
+	case types.ByNode:
+		protoCmd.By = &protocol.AttestationCommand_ByNode{ByNode: true}
+		return nil
+	}
+	return errors.Newf("the attestation of %v from %s names who made it: its actors, or the node", cmd.Subjects, cmd.Source)
+}
+
+// sayWhen says on the wire when a command names it was made: a time, or now.
+// A command naming neither is refused.
+func sayWhen(cmd *types.AsCommand, protoCmd *protocol.AttestationCommand) error {
+	switch when := cmd.When.(type) {
+	case types.At:
+		protoCmd.When = &protocol.AttestationCommand_Timestamp{Timestamp: when.Time.UnixMilli()}
+		return nil
+	case types.Now:
+		protoCmd.When = &protocol.AttestationCommand_Now{Now: true}
+		return nil
+	}
+	return errors.Newf("the attestation of %v from %s names no time: a time, or now", cmd.Subjects, cmd.Source)
+}
+
+// sayVersion says on the wire the version a command names: its own, or the
+// registry's. A command naming neither is refused.
+func sayVersion(cmd *types.AsCommand, protoCmd *protocol.AttestationCommand) error {
+	switch version := cmd.SourceVersion.(type) {
+	case types.VersionNamed:
+		protoCmd.Version = &protocol.AttestationCommand_SourceVersion{SourceVersion: version.Version.String()}
+		return nil
+	case types.VersionFromRegistry:
+		protoCmd.Version = &protocol.AttestationCommand_VersionFromRegistry{VersionFromRegistry: true}
+		return nil
+	}
+	return errors.Newf("the attestation of %v from %s names no version: its own, or the registry's", cmd.Subjects, cmd.Source)
 }
 
 // AttestationExists checks if an attestation exists via gRPC.
@@ -108,21 +151,30 @@ func (r *RemoteATSStore) AttestationExists(asid string) bool {
 
 // GetAttestations retrieves attestations via gRPC.
 func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
-	limit := int32(filter.Limit)
+	// Each side of the time range is said on the wire as the filter names
+	// it; a side naming neither is refused.
+	start, starts, err := filter.TimeStart.At("start")
+	if err != nil {
+		return nil, err
+	}
+	end, ends, err := filter.TimeEnd.At("end")
+	if err != nil {
+		return nil, err
+	}
 	protoFilter := &protocol.AttestationFilter{
 		Actors:     filter.Actors,
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
-		Limit:      &limit,
+		Limit:      int32(filter.Limit),
+		From:       &protocol.AttestationFilter_UnboundedStart{UnboundedStart: true},
+		To:         &protocol.AttestationFilter_UnboundedEnd{UnboundedEnd: true},
 	}
-	if filter.TimeStart != nil {
-		ms := filter.TimeStart.UnixMilli()
-		protoFilter.TimeStart = &ms
+	if starts {
+		protoFilter.From = &protocol.AttestationFilter_TimeStart{TimeStart: start.UnixMilli()}
 	}
-	if filter.TimeEnd != nil {
-		ms := filter.TimeEnd.UnixMilli()
-		protoFilter.TimeEnd = &ms
+	if ends {
+		protoFilter.To = &protocol.AttestationFilter_TimeEnd{TimeEnd: end.UnixMilli()}
 	}
 
 	req := &protocol.GetAttestationsRequest{

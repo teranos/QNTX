@@ -70,8 +70,14 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 			},
 		},
 		Answers: map[string]sigil.Answer{
-			"list":   func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return s.pluginHandler.list(), nil },
-			"routes": func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return s.pluginHandler.routes(), nil },
+			"list": func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return s.pluginHandler.list(), nil },
+			"routes": func(context.Context, sigil.Sent) (any, *protocol.Refusal) {
+				routes, err := s.pluginHandler.routes()
+				if err != nil {
+					return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+				}
+				return routes, nil
+			},
 			"elements": func(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
 				return s.pluginHandler.elements(ctx), nil
 			},

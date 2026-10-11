@@ -46,6 +46,7 @@ grpc::Status GazePlugin::Metadata(grpc::ServerContext* ctx,
                                    protocol::MetadataResponse* resp) {
     resp->set_name("gaze");
     resp->set_version(PLUGIN_VERSION);
+    resp->set_qntx_version(">= 0.1.0");
     resp->set_description("Production LLM inference via llama.cpp with Metal acceleration");
     resp->set_author("teranos");
     resp->set_license("MIT");
@@ -137,13 +138,17 @@ grpc::Status GazePlugin::Initialize(grpc::ServerContext* ctx,
     status_route->set_path("/status");
     status_route->set_description("Returns JSON with state, version, model count, and current activity");
 
+    // Its sigils are the routes it declares.
+    resp->set_sigils_from(protocol::SIGILS_FROM_HTTP_ROUTES);
+
     return grpc::Status::OK;
 }
 
 grpc::Status GazePlugin::Shutdown(grpc::ServerContext* ctx,
                                    const protocol::Empty* req,
-                                   protocol::Empty* resp) {
+                                   protocol::ShutdownResponse* resp) {
     engines_.clear();
+    resp->set_stopped(true);
     return grpc::Status::OK;
 }
 

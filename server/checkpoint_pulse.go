@@ -108,6 +108,7 @@ func (s *QNTXServer) setupCheckpointSchedule() {
 
 	now := time.Now()
 	job := &schedule.Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              fmt.Sprintf("SPJ_checkpoint_%d", now.Unix()),
 		HandlerName:     checkpointHandlerName,
 		IntervalSeconds: 300, // every 5 minutes

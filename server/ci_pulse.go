@@ -700,7 +700,8 @@ func ciStatusSince(store namespaces.Reading, since time.Time) ([]*types.As, erro
 	}
 	found, err := store.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{watcher.CIPushedPredicate},
-		TimeStart:  &since,
+		TimeStart:  types.BoundAt(since),
+		TimeEnd:    types.Unbounded(),
 		Limit:      100,
 	})
 	if err != nil {
@@ -795,7 +796,8 @@ func (s *QNTXServer) setupCIWatch() {
 			continue
 		}
 		sacred.Go("ci.watch rearm "+as.ID, func() {
-			job := &async.Job{ID: "rearm:" + as.ID, HandlerName: watcher.CIWatchHandlerName, Payload: payload, Source: rearmSource}
+			job := &async.Job{ID: "rearm:" + as.ID, HandlerName: watcher.CIWatchHandlerName, Payload: payload, Source: rearmSource,
+				MadeBy: async.MadeByNoCaller, Pulse: async.NoPulse(), Started: async.At(time.Now()), Completed: async.NotYet()}
 			if err := h.Execute(s.ctx, job); err != nil {
 				s.noteHandlerFailure(HandlerFailure{Handler: watcher.CIWatchHandlerName, ExecutionID: job.ID,
 					Error: err.Error(), Details: errors.GetAllDetails(err)})

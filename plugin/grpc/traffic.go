@@ -41,10 +41,8 @@ func newTraffic() *Traffic {
 // routeOf names a call by the route it matches, so ids in a path do not
 // become rows of their own.
 func routeOf(method, path string, declared []*protocol.RouteInfo) string {
+	// Both sides lose a trailing slash, so "/" is "" on both and matches.
 	path = strings.TrimSuffix(path, "/")
-	if path == "" {
-		path = "/"
-	}
 	for _, r := range declared {
 		if r.GetMethod() == method && strings.TrimSuffix(r.GetPath(), "/") == path {
 			return method + " " + r.GetPath()
@@ -54,15 +52,15 @@ func routeOf(method, path string, declared []*protocol.RouteInfo) string {
 }
 
 // outcomeOf is a status in a word, the closed set AttrOutcome carries.
+// The three ranges are every status there is.
 func outcomeOf(status int) string {
-	switch {
-	case status >= 500:
+	if status >= 500 {
 		return "5xx"
-	case status >= 400:
-		return "4xx"
-	default:
-		return "ok"
 	}
+	if status >= 400 {
+		return "4xx"
+	}
+	return "ok"
 }
 
 func (t *Traffic) record(route string, status int, took time.Duration, at time.Time) {

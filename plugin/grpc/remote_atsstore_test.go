@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
@@ -78,6 +79,32 @@ func TestRemoteATSStore_CreateAttestation(t *testing.T) {
 	assert.True(t, exists)
 }
 
+// "nil is nil": a plugin's command names the version it is stamped with, its
+// own or the registry's; one naming neither is not sent.
+func TestRemoteATSStore_ACommandNamesItsVersion(t *testing.T) {
+	store, _ := qntxtest.CreateTestStore(t)
+	addr, cleanup := startATSStoreServer(t, store, "test-token")
+	defer cleanup()
+	client, err := NewRemoteATSStore(context.Background(), addr, "test-token", zaptest.NewLogger(t).Sugar())
+	require.NoError(t, err)
+	defer client.Close()
+
+	version, err := named.TextOf("version", "1.2.3")
+	require.NoError(t, err)
+	as, err := client.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
+		Subjects: []string{"alice"}, By: types.ActorsNamed{Actors: named.ItemOf("test@user")}, When: types.Now{}, Source: "test",
+		SourceVersion: types.VersionNamed{Version: version},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "1.2.3", as.Attributes["source_version"])
+
+	_, err = client.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
+		Subjects: []string{"alice"}, By: types.ActorsNamed{Actors: named.ItemOf("test@user")}, When: types.Now{}, Source: "test",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "names no version")
+}
+
 func TestATSStoreServer_GenerateAndCreate_NilCommand(t *testing.T) {
 	store, _ := qntxtest.CreateTestStore(t)
 
@@ -101,7 +128,7 @@ func TestATSStoreServer_GenerateAndCreate_NilCommand(t *testing.T) {
 	})
 	require.NoError(t, err, "RPC should not return transport error")
 	assert.False(t, resp.Success)
-	assert.Contains(t, resp.Error, "nil")
+	assert.Contains(t, resp.Error, "source of the command")
 }
 
 func TestATSStoreServer_GenerateAndCreate_ValidCommand(t *testing.T) {
@@ -126,8 +153,10 @@ func TestATSStoreServer_GenerateAndCreate_ValidCommand(t *testing.T) {
 			Subjects:   []string{"test-subject"},
 			Predicates: []string{"test-predicate"},
 			Contexts:   []string{"test-context"},
-			Actors:     []string{"test-actor"},
+			By:         &protocol.AttestationCommand_ActorsNamed{ActorsNamed: &protocol.ActorNames{Names: []string{"test-actor"}}},
+			When:       &protocol.AttestationCommand_Now{Now: true},
 			Source:     "test",
+			Version:    &protocol.AttestationCommand_SourceVersion{SourceVersion: "1.0.0"},
 		},
 	})
 	require.NoError(t, err, "RPC should not return transport error")

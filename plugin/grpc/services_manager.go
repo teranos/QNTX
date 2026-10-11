@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -20,21 +19,25 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ServiceEndpoints holds the addresses of running service servers
+// ServiceEndpoints is where each service the node runs for plugins answers,
+// or why the node runs without it, and the token plugins reach them with.
 type ServiceEndpoints struct {
-	ATSStoreAddress     string
-	QueueAddress        string
-	ScheduleAddress     string
-	FileServiceAddress  string
-	LLMAddress          string
-	EmbeddingAddress    string
-	VectorSearchAddress string
-	GroundAddress       string
-	SearchAddress       string
-	FetchAddress        string
-	MailAddress         string
-	AuthToken           string
+	ATSStore     ServiceEndpoint
+	Queue        ServiceEndpoint
+	Schedule     ServiceEndpoint
+	FileService  ServiceEndpoint
+	LLM          ServiceEndpoint
+	Embedding    ServiceEndpoint
+	VectorSearch ServiceEndpoint
+	Ground       ServiceEndpoint
+	Search       ServiceEndpoint
+	Fetch        ServiceEndpoint
+	Mail         ServiceEndpoint
+	AuthToken    string
 }
+
+// Endpoints is the endpoints as they are: what a fixed set of them holds.
+func (e ServiceEndpoints) Endpoints() ServiceEndpoints { return e }
 
 // ServicesManager manages gRPC service servers for plugin callbacks
 type ServicesManager struct {
@@ -46,7 +49,7 @@ type ServicesManager struct {
 	openRun            atomic.Pointer[OpenRun]
 	fileServiceServer  *grpc.Server
 	llmServer          *grpc.Server
-	llmRouter          *services.LLMServer // Exposed for provider registration after plugin init
+	llm                routing[*services.LLMServer]
 	llmConfig          config.LLMConfig
 	embeddingServer    *grpc.Server
 	embeddingRouter    *services.EmbeddingServer // Exposed for late backend registration
@@ -55,165 +58,193 @@ type ServicesManager struct {
 	groundServer       *grpc.Server
 	groundDBPath       string
 	searchServer       *grpc.Server
-	searchRouter       *services.SearchServer // Exposed for provider registration after plugin init
+	search             routing[*services.SearchServer]
 	fetchServer        *grpc.Server
 	fetchSrv           *services.FetchServer // for version resolver injection
 	fetchCfg           config.FetchConfig
 	node               string // The node's DID, who writes what a plugin named no actor for
 	mailServer         *grpc.Server
 	mailSrv            *services.MailServer // wired once the node has Users and its DID
-	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
 	// running is every service server that started, in the order it did.
 	running []*grpc.Server
 
-	// Services that failed to start, by name. QNTX boots without them, so the
-	// reason has to outlive the boot — a plugin failing to reach one later is
-	// the moment this needs to be readable.
-	degradedMu sync.Mutex
-	degraded   map[string]string
+	// Where each service answers, or why the node runs without it. QNTX boots
+	// without a service that did not start, and runs on without one that
+	// stopped serving, so the reason outlives both: a plugin initialized after
+	// is handed it in place of an address.
+	endpointsMu sync.Mutex
+	endpoints   ServiceEndpoints
 }
 
-// Degraded returns the services that failed to start and why.
-func (m *ServicesManager) Degraded() map[string]string {
-	m.degradedMu.Lock()
-	defer m.degradedMu.Unlock()
-	out := make(map[string]string, len(m.degraded))
-	for name, reason := range m.degraded {
-		out[name] = reason
-	}
-	return out
+// Endpoints is where each service answers now, or why the node runs without it.
+func (m *ServicesManager) Endpoints() ServiceEndpoints {
+	m.endpointsMu.Lock()
+	defer m.endpointsMu.Unlock()
+	return m.endpoints
 }
 
-// noteDegraded records a service QNTX will run without, loudly.
-func (m *ServicesManager) noteDegraded(service string, err error) {
-	m.logger.Errorw("Service did not start; plugins will not have it",
+// degrade is the endpoint of a service QNTX runs without: why it does, said
+// loudly, and handed to every plugin in place of an address.
+func (m *ServicesManager) degrade(service string, err error) ServiceEndpoint {
+	m.logger.Errorw("Service is not running; plugins are told why when they ask for it",
 		"service", service, "error", err)
-	m.degradedMu.Lock()
-	defer m.degradedMu.Unlock()
-	if m.degraded == nil {
-		m.degraded = make(map[string]string)
-	}
-	m.degraded[service] = err.Error()
+	return NotRunning(errors.Wrapf(err, "the %s service is not running", service))
+}
+
+// routing is a router providers register with once their plugin is up, or why
+// the node runs without it.
+type routing[R any] interface {
+	// routes is the router, or why the node runs without it.
+	routes() (R, error)
+}
+
+// routed is the router the node runs.
+type routed[R any] struct {
+	router R
+}
+
+// unrouted is a node running without the router, and why.
+type unrouted[R any] struct {
+	why error
+}
+
+func (r routed[R]) routes() (R, error) { return r.router, nil }
+
+func (u unrouted[R]) routes() (R, error) {
+	var none R
+	return none, u.why
 }
 
 // NewServicesManager creates a new services manager. node is the node's DID.
+// Until the node hands over how to mint a run's store token, minting one is
+// refused.
 func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, node string, logger *zap.SugaredLogger) *ServicesManager {
-	return &ServicesManager{
+	m := &ServicesManager{
 		llmConfig: llmCfg,
 		fetchCfg:  fetchCfg,
 		node:      node,
 		logger:    logger,
+		llm:       unrouted[*services.LLMServer]{why: errors.New("the LLM service has not started")},
+		search:    unrouted[*services.SearchServer]{why: errors.New("the search service has not started")},
 	}
+	notYet := OpenRun(func(_, namespace string) (string, func(), error) {
+		return "", nil, errors.Newf("the node has not handed over how to mint a store token for namespace %s yet", namespace)
+	})
+	m.openRun.Store(&notYet)
+	return m
 }
 
 // Start starts the gRPC service servers with dynamic port allocation.
 // filesDir is the path to stored files (for the FileService).
-// groundDBPath is the path to Ground's SQLite database (empty = Ground service disabled).
-func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore, queue *async.Queue, scheduleStore *schedule.Store, filesDir string, groundDBPath string) (*ServiceEndpoints, error) {
+// groundDBPath is the path to Ground's SQLite database; with none, the Ground
+// service refuses each write, saying ground_db_path is not configured.
+//
+// The services the node hands things to after Start (the ATS store, schedule,
+// fetch and mail services) are made before any listens, so each is there
+// whether or not its server came to serve.
+//
+// The ATS store, queue, schedule and file services are what every plugin is
+// joined by, so one that does not start fails Start. Each other one that does
+// not start is held with why, and the node boots without it.
+func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore, queue *async.Queue, scheduleStore *schedule.Store, filesDir string, groundDBPath string) error {
 	m.groundDBPath = groundDBPath
-	// Generate authentication token
-	authToken, err := generateAuthToken()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate auth token for plugin services")
-	}
+	// The token plugins reach every service with
+	authToken := rand.Text()
+	m.atsStore = services.NewATSStoreServer(store, authToken, m.node, m.logger)
+	m.scheduleSrv = services.NewScheduleServer(scheduleStore, authToken, m.logger)
+	m.fetchSrv = services.NewFetchServer(store, authToken, m.node, m.fetchCfg, m.logger)
+	m.mailSrv = services.NewMailServer(authToken, m.logger)
+
+	m.endpointsMu.Lock()
+	defer m.endpointsMu.Unlock()
+	m.endpoints.AuthToken = authToken
 
 	// Start ATSStore service
-	atsStoreAddr, err := m.startATSStoreService(ctx, store, authToken)
+	atsStoreAddr, err := m.startATSStoreService(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to start ATS store service")
+		return errors.Wrap(err, "failed to start ATS store service")
 	}
+	m.endpoints.ATSStore = ServingAt(atsStoreAddr)
 
 	// Start Queue service
 	queueAddr, err := m.startQueueService(ctx, queue, authToken)
 	if err != nil {
 		m.stopRunning()
-		return nil, errors.Wrap(err, "failed to start queue service")
+		return errors.Wrap(err, "failed to start queue service")
 	}
+	m.endpoints.Queue = ServingAt(queueAddr)
 
 	// Start Schedule service
-	scheduleAddr, err := m.startScheduleService(ctx, scheduleStore, authToken)
+	scheduleAddr, err := m.startScheduleService(ctx)
 	if err != nil {
 		m.stopRunning()
-		return nil, errors.Wrap(err, "failed to start schedule service")
+		return errors.Wrap(err, "failed to start schedule service")
 	}
+	m.endpoints.Schedule = ServingAt(scheduleAddr)
 
 	// Start File service
 	fileServiceAddr, err := m.startFileService(ctx, filesDir, authToken)
 	if err != nil {
 		m.stopRunning()
-		return nil, errors.Wrap(err, "failed to start file service")
+		return errors.Wrap(err, "failed to start file service")
 	}
+	m.endpoints.FileService = ServingAt(fileServiceAddr)
 
 	// Start LLM service (starts empty, providers register after plugin init)
-	llmAddr, err := m.startLLMService(ctx, store)
-	if err != nil {
-		m.noteDegraded("llm", err)
-		llmAddr = ""
-	}
+	m.endpoints.LLM = m.startOptional("llm", func() (string, error) {
+		addr, err := m.startLLMService(ctx, store)
+		if err != nil {
+			m.llm = unrouted[*services.LLMServer]{why: errors.Wrap(err, "the LLM service did not start")}
+		}
+		return addr, err
+	})
 
 	// Start Embedding service (starts empty, backend registers after embedding engine init)
-	embeddingAddr, err := m.startEmbeddingService(ctx, authToken)
-	if err != nil {
-		m.noteDegraded("embedding", err)
-		embeddingAddr = ""
-	}
+	m.endpoints.Embedding = m.startOptional("embedding", func() (string, error) {
+		return m.startEmbeddingService(ctx, authToken)
+	})
 
 	// Start VectorSearch service (starts empty, provider registers after plugin init)
-	vectorSearchAddr, err := m.startVectorSearchService(ctx, authToken)
-	if err != nil {
-		m.noteDegraded("vectorsearch", err)
-		vectorSearchAddr = ""
-	}
+	m.endpoints.VectorSearch = m.startOptional("vectorsearch", func() (string, error) {
+		return m.startVectorSearchService(ctx, authToken)
+	})
 
-	// Start Ground service (only if ground_db_path is configured)
-	groundAddr := ""
-	if groundDBPath != "" {
-		var groundErr error
-		groundAddr, groundErr = m.startGroundService(ctx, groundDBPath, authToken)
-		if groundErr != nil {
-			m.noteDegraded("ground", groundErr)
-			groundAddr = ""
-		}
-	}
+	// Start Ground service
+	m.endpoints.Ground = m.startOptional("ground", func() (string, error) {
+		return m.startGroundService(ctx, groundDBPath, authToken)
+	})
 
 	// Start Search service (starts empty, provider registers after plugin init)
-	searchAddr, err := m.startSearchService(ctx)
-	if err != nil {
-		m.noteDegraded("search", err)
-		searchAddr = ""
-	}
+	m.endpoints.Search = m.startOptional("search", func() (string, error) {
+		addr, err := m.startSearchService(ctx)
+		if err != nil {
+			m.search = unrouted[*services.SearchServer]{why: errors.Wrap(err, "the search service did not start")}
+		}
+		return addr, err
+	})
 
 	// Start Fetch service
-	fetchAddr, err := m.startFetchService(ctx, store, authToken)
-	if err != nil {
-		m.noteDegraded("fetch", err)
-		fetchAddr = ""
-	}
+	m.endpoints.Fetch = m.startOptional("fetch", func() (string, error) {
+		return m.startFetchService(ctx)
+	})
 
 	// Start Mail service (sends nothing until the node wires it: ADR-041)
-	mailAddr, err := m.startMailService(ctx, authToken)
+	m.endpoints.Mail = m.startOptional("mail", func() (string, error) {
+		return m.startMailService(ctx)
+	})
+
+	return nil
+}
+
+// startOptional starts a service the node boots without when it does not
+// start: where it answers, or why the node runs without it.
+func (m *ServicesManager) startOptional(service string, start func() (string, error)) ServiceEndpoint {
+	addr, err := start()
 	if err != nil {
-		m.noteDegraded("mail", err)
-		mailAddr = ""
+		return m.degrade(service, errors.Wrap(err, "it did not start"))
 	}
-
-	m.endpoints = ServiceEndpoints{
-		ATSStoreAddress:     atsStoreAddr,
-		QueueAddress:        queueAddr,
-		ScheduleAddress:     scheduleAddr,
-		FileServiceAddress:  fileServiceAddr,
-		LLMAddress:          llmAddr,
-		EmbeddingAddress:    embeddingAddr,
-		VectorSearchAddress: vectorSearchAddr,
-		GroundAddress:       groundAddr,
-		SearchAddress:       searchAddr,
-		FetchAddress:        fetchAddr,
-		MailAddress:         mailAddr,
-		AuthToken:           authToken,
-	}
-
-	return &m.endpoints, nil
+	return ServingAt(addr)
 }
 
 // serve runs one gRPC service: it answers on the listener until that closes,
@@ -224,8 +255,11 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 // plugin a way to stop everything else running on it. Ten services had a
 // hand-written copy of this pair, twenty of the eighty-eight goroutines the
 // node could die inside without saying anything.
+//
+// A service that stops serving is one plugins run without from then on: at
+// is its endpoint, and becomes why.
 func (m *ServicesManager) serve(
-	ctx context.Context, name string, server *grpc.Server, listener net.Listener,
+	ctx context.Context, name string, server *grpc.Server, listener net.Listener, at *ServiceEndpoint,
 ) {
 	m.running = append(m.running, server)
 	sacred.Go("grpc."+name+".shutdown", func() {
@@ -235,13 +269,16 @@ func (m *ServicesManager) serve(
 	})
 	sacred.Go("grpc."+name+".serve", func() {
 		if err := server.Serve(listener); err != nil {
-			m.logger.Errorw("gRPC service stopped serving", "service", name, "error", err)
+			stopped := m.degrade(name, errors.Wrapf(err, "it stopped serving at %s", listener.Addr()))
+			m.endpointsMu.Lock()
+			defer m.endpointsMu.Unlock()
+			*at = stopped
 		}
 	})
 }
 
 // startATSStoreService starts the ATSStore gRPC service
-func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.AttestationStore, authToken string) (string, error) {
+func (m *ServicesManager) startATSStoreService(ctx context.Context) (string, error) {
 	// Listen on dynamic port
 	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -251,10 +288,9 @@ func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.At
 
 	// Create gRPC server
 	m.atsStoreServer = grpc.NewServer()
-	m.atsStore = services.NewATSStoreServer(store, authToken, m.node, m.logger)
 	protocol.RegisterATSStoreServiceServer(m.atsStoreServer, m.atsStore)
 
-	m.serve(ctx, "ATSStore", m.atsStoreServer, listener)
+	m.serve(ctx, "ATSStore", m.atsStoreServer, listener, &m.endpoints.ATSStore)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("ATSStore service started", "address", addr)
@@ -276,7 +312,7 @@ func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Qu
 	queueServer := services.NewQueueServer(queue, authToken, m.logger)
 	protocol.RegisterQueueServiceServer(m.queueServer, queueServer)
 
-	m.serve(ctx, "Queue", m.queueServer, listener)
+	m.serve(ctx, "Queue", m.queueServer, listener, &m.endpoints.Queue)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Queue service started", "address", addr)
@@ -285,7 +321,7 @@ func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Qu
 }
 
 // startScheduleService starts the Schedule gRPC service
-func (m *ServicesManager) startScheduleService(ctx context.Context, store *schedule.Store, authToken string) (string, error) {
+func (m *ServicesManager) startScheduleService(ctx context.Context) (string, error) {
 	// Listen on dynamic port
 	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -295,10 +331,9 @@ func (m *ServicesManager) startScheduleService(ctx context.Context, store *sched
 
 	// Create gRPC server
 	m.scheduleServer = grpc.NewServer()
-	m.scheduleSrv = services.NewScheduleServer(store, authToken, m.logger)
 	protocol.RegisterScheduleServiceServer(m.scheduleServer, m.scheduleSrv)
 
-	m.serve(ctx, "Schedule", m.scheduleServer, listener)
+	m.serve(ctx, "Schedule", m.scheduleServer, listener, &m.endpoints.Schedule)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Schedule service started", "address", addr)
@@ -317,7 +352,7 @@ func (m *ServicesManager) startFileService(ctx context.Context, filesDir string,
 	fileServer := services.NewFileServiceServer(filesDir, authToken, m.logger)
 	protocol.RegisterFileServiceServer(m.fileServiceServer, fileServer)
 
-	m.serve(ctx, "File", m.fileServiceServer, listener)
+	m.serve(ctx, "File", m.fileServiceServer, listener, &m.endpoints.FileService)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("File service started", "address", addr)
@@ -333,11 +368,12 @@ func (m *ServicesManager) startLLMService(ctx context.Context, store ats.Attesta
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.llmRouter = services.NewLLMServer(m.llmConfig, store, m.logger)
+	router := services.NewLLMServer(m.llmConfig, store, m.logger)
+	m.llm = routed[*services.LLMServer]{router: router}
 	m.llmServer = grpc.NewServer()
-	protocol.RegisterLLMServiceServer(m.llmServer, m.llmRouter)
+	protocol.RegisterLLMServiceServer(m.llmServer, router)
 
-	m.serve(ctx, "LLM", m.llmServer, listener)
+	m.serve(ctx, "LLM", m.llmServer, listener, &m.endpoints.LLM)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("LLM service started", "address", addr)
@@ -357,7 +393,7 @@ func (m *ServicesManager) startEmbeddingService(ctx context.Context, authToken s
 	m.embeddingServer = grpc.NewServer()
 	protocol.RegisterEmbeddingServiceServer(m.embeddingServer, m.embeddingRouter)
 
-	m.serve(ctx, "Embedding", m.embeddingServer, listener)
+	m.serve(ctx, "Embedding", m.embeddingServer, listener, &m.endpoints.Embedding)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Embedding service started", "address", addr)
@@ -377,7 +413,7 @@ func (m *ServicesManager) startVectorSearchService(ctx context.Context, authToke
 	m.vectorSearchServer = grpc.NewServer()
 	protocol.RegisterVectorSearchServiceServer(m.vectorSearchServer, m.vectorSearchRouter)
 
-	m.serve(ctx, "VectorSearch", m.vectorSearchServer, listener)
+	m.serve(ctx, "VectorSearch", m.vectorSearchServer, listener, &m.endpoints.VectorSearch)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("VectorSearch service started", "address", addr)
@@ -396,7 +432,7 @@ func (m *ServicesManager) startGroundService(ctx context.Context, dbPath string,
 	groundServer := services.NewGroundServer(dbPath, authToken, m.logger)
 	protocol.RegisterGroundServiceServer(m.groundServer, groundServer)
 
-	m.serve(ctx, "Ground", m.groundServer, listener)
+	m.serve(ctx, "Ground", m.groundServer, listener, &m.endpoints.Ground)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Ground service started", "address", addr)
@@ -412,11 +448,12 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.searchRouter = services.NewSearchServer(m.logger)
+	router := services.NewSearchServer(m.logger)
+	m.search = routed[*services.SearchServer]{router: router}
 	m.searchServer = grpc.NewServer()
-	protocol.RegisterSearchServiceServer(m.searchServer, m.searchRouter)
+	protocol.RegisterSearchServiceServer(m.searchServer, router)
 
-	m.serve(ctx, "Search", m.searchServer, listener)
+	m.serve(ctx, "Search", m.searchServer, listener, &m.endpoints.Search)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Search service started", "address", addr)
@@ -424,17 +461,16 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 	return addr, nil
 }
 
-func (m *ServicesManager) startFetchService(ctx context.Context, store ats.AttestationStore, authToken string) (string, error) {
+func (m *ServicesManager) startFetchService(ctx context.Context) (string, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.fetchSrv = services.NewFetchServer(store, authToken, m.node, m.fetchCfg, m.logger)
 	m.fetchServer = grpc.NewServer()
 	protocol.RegisterFetchServiceServer(m.fetchServer, m.fetchSrv)
 
-	m.serve(ctx, "Fetch", m.fetchServer, listener)
+	m.serve(ctx, "Fetch", m.fetchServer, listener, &m.endpoints.Fetch)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Fetch service started", "address", addr)
@@ -442,17 +478,16 @@ func (m *ServicesManager) startFetchService(ctx context.Context, store ats.Attes
 	return addr, nil
 }
 
-func (m *ServicesManager) startMailService(ctx context.Context, authToken string) (string, error) {
+func (m *ServicesManager) startMailService(ctx context.Context) (string, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.mailSrv = services.NewMailServer(authToken, m.logger)
 	m.mailServer = grpc.NewServer()
 	protocol.RegisterMailServiceServer(m.mailServer, m.mailSrv)
 
-	m.serve(ctx, "Mail", m.mailServer, listener)
+	m.serve(ctx, "Mail", m.mailServer, listener, &m.endpoints.Mail)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Mail service started", "address", addr)
@@ -461,7 +496,7 @@ func (m *ServicesManager) startMailService(ctx context.Context, authToken string
 }
 
 // MailServer is the mail service, for what the node mails in its own name
-// (ADR-042). Nil when it did not start.
+// (ADR-042). Made by Start whether or not its server came to serve plugins.
 func (m *ServicesManager) MailServer() *services.MailServer {
 	return m.mailSrv
 }
@@ -469,51 +504,35 @@ func (m *ServicesManager) MailServer() *services.MailServer {
 // SetMail hands the mail service what it sends with. Until then a plugin
 // asking to send is told the node has not finished starting.
 func (m *ServicesManager) SetMail(w services.MailWiring) {
-	if m.mailSrv != nil {
-		m.mailSrv.Wire(w)
-	}
+	m.mailSrv.Wire(w)
 }
 
 // SetVersionResolver installs a source→version resolver on ATSStore and Fetch services.
 // Call after plugin registry is populated so attestations carry source_version automatically.
 func (m *ServicesManager) SetVersionResolver(resolver services.VersionResolver) {
-	if m.atsStore != nil {
-		m.atsStore.SetVersionResolver(resolver)
-	}
-	if m.fetchSrv != nil {
-		m.fetchSrv.SetVersionResolver(resolver)
-	}
-	if m.mailSrv != nil {
-		m.mailSrv.SetVersionResolver(resolver)
-	}
+	m.atsStore.SetVersionResolver(resolver)
+	m.fetchSrv.SetVersionResolver(resolver)
+	m.mailSrv.SetVersionResolver(resolver)
 }
 
 // SetCallStores hands the ATS store service the stores of the calls plugins are
 // answering, so a plugin reads and writes where its caller acts.
 func (m *ServicesManager) SetCallStores(calls services.CallStores) {
-	if m.atsStore != nil {
-		m.atsStore.SetCallStores(calls)
-	}
+	m.atsStore.SetCallStores(calls)
 }
 
 // SetPluginStores hands the ATS store and fetch services the stores of the
 // namespaces plugins stand in, by the tokens the node handed them (ADR-046).
 func (m *ServicesManager) SetPluginStores(plugins services.PluginStores) {
-	if m.atsStore != nil {
-		m.atsStore.SetPluginStores(plugins)
-	}
-	if m.fetchSrv != nil {
-		m.fetchSrv.SetPluginStores(plugins)
-	}
+	m.atsStore.SetPluginStores(plugins)
+	m.fetchSrv.SetPluginStores(plugins)
 }
 
 // SetCallers hands the schedule service the callers of the calls plugins are
 // answering, so a schedule created during one remembers who created it and
 // where.
 func (m *ServicesManager) SetCallers(callers services.Callers) {
-	if m.scheduleSrv != nil {
-		m.scheduleSrv.SetCallers(callers)
-	}
+	m.scheduleSrv.SetCallers(callers)
 }
 
 // OpenRun mints a store token for one run of a job, reaching the store of the
@@ -526,36 +545,65 @@ func (m *ServicesManager) SetOpenRun(open OpenRun) {
 	m.openRun.Store(&open)
 }
 
-// OpenRunFor mints a run's store token, or says why none can be.
+// OpenRunFor mints a run's store token, or says why none can be: until the
+// node hands over how, NewServicesManager's refusal answers.
 func (m *ServicesManager) OpenRunFor(userID, namespace string) (string, func(), error) {
-	if m == nil {
-		return "", nil, errors.Newf("no services manager to mint a store token for namespace %s", namespace)
-	}
-	open := m.openRun.Load()
-	if open == nil {
-		return "", nil, errors.Newf("the node has not handed over how to mint a store token for namespace %s yet", namespace)
-	}
-	return (*open)(userID, namespace)
+	return (*m.openRun.Load())(userID, namespace)
 }
 
-// GetSearchRouter returns the search router for provider registration.
-// Returns nil if the search service is not running.
-func (m *ServicesManager) GetSearchRouter() *services.SearchServer {
-	return m.searchRouter
+// GetSearchRouter returns the search router for provider registration, or
+// why the node runs without one.
+func (m *ServicesManager) GetSearchRouter() (*services.SearchServer, error) {
+	return m.search.routes()
+}
+
+// SearchProvides is whether search is answered: the node runs its search
+// router, and a provider registered with it.
+func (m *ServicesManager) SearchProvides() bool {
+	switch search := m.search.(type) {
+	case routed[*services.SearchServer]:
+		return search.router.HasProvider()
+	case unrouted[*services.SearchServer]:
+	}
+	return false
+}
+
+// LLMProvides is whether the provider by this name answers through the
+// node's LLM router: the node runs it, and the provider registered with it.
+func (m *ServicesManager) LLMProvides(providerName string) bool {
+	switch llm := m.llm.(type) {
+	case routed[*services.LLMServer]:
+		return llm.router.HasProvider(providerName)
+	case unrouted[*services.LLMServer]:
+	}
+	return false
+}
+
+// ClearProviders forgets every search and LLM provider, so nothing routes to
+// a plugin being stopped. A router the node runs without holds none.
+func (m *ServicesManager) ClearProviders() {
+	switch search := m.search.(type) {
+	case routed[*services.SearchServer]:
+		search.router.ClearProviders()
+	case unrouted[*services.SearchServer]:
+	}
+	switch llm := m.llm.(type) {
+	case routed[*services.LLMServer]:
+		llm.router.ClearProviders()
+	case unrouted[*services.LLMServer]:
+	}
 }
 
 // CancelATSStreams cancels all active ATSStore streams.
 // Called during plugin restart to free the database mutex before launching the new process.
 func (m *ServicesManager) CancelATSStreams() {
-	if m.atsStore != nil {
-		m.atsStore.CancelStreams()
-	}
+	m.atsStore.CancelStreams()
 }
 
-// GetLLMRouter returns the LLM router for provider registration.
-// Returns nil if the LLM service is not running.
-func (m *ServicesManager) GetLLMRouter() *services.LLMServer {
-	return m.llmRouter
+// GetLLMRouter returns the LLM router for provider registration, or why the
+// node runs without one.
+func (m *ServicesManager) GetLLMRouter() (*services.LLMServer, error) {
+	return m.llm.routes()
 }
 
 // GetEmbeddingRouter returns the embedding router for backend registration.
@@ -584,18 +632,4 @@ func (m *ServicesManager) stopRunning() {
 	for _, server := range m.running {
 		server.Stop()
 	}
-}
-
-// GetEndpoints returns the service endpoints
-func (m *ServicesManager) GetEndpoints() *ServiceEndpoints {
-	return &m.endpoints
-}
-
-// generateAuthToken generates a random authentication token
-func generateAuthToken() (string, error) {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(bytes), nil
 }

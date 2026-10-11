@@ -38,7 +38,7 @@ func TestMultiValueHeaders_SetCookie(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 
@@ -84,7 +84,7 @@ func TestMultiValueHeaders_Accept(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 
@@ -135,7 +135,7 @@ func TestSingleValueHeaders_NoRegression(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 
@@ -208,7 +208,7 @@ func TestHeaderCaseSensitivity(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 
@@ -301,7 +301,7 @@ func TestAsker_TheNodeSaysWhoIsAsking(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	require.NoError(t, proxy.Initialize(context.Background(), services))
 
 	mux := http.NewServeMux()

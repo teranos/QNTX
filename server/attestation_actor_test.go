@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
@@ -47,7 +48,7 @@ func actorsOf(t *testing.T, store ats.AttestationStore, rec *httptest.ResponseRe
 	if err := json.Unmarshal(rec.Body.Bytes(), &said); err != nil {
 		t.Fatalf("the response did not parse: %v", err)
 	}
-	found, err := store.GetAttestations(ats.AttestationFilter{Limit: 10})
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 10})
 	if err != nil {
 		t.Fatalf("GetAttestations: %v", err)
 	}
@@ -133,7 +134,7 @@ func TestATimestampOfZeroIsZero(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
 	}
-	found, err := store.GetAttestations(ats.AttestationFilter{Limit: 1})
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 1})
 	if err != nil || len(found) != 1 {
 		t.Fatalf("read back %v, %v", found, err)
 	}

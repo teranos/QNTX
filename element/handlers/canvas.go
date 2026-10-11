@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"net/http"
 	"os"
@@ -611,7 +612,7 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, canvas *elemen
 				return errors.Wrap(err, "failed to marshal action data")
 			}
 
-			w := &storage.Watcher{
+			w := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 				ID:                        watcherID,
 				Name:                      fmt.Sprintf("Meld: %s → %s", edge.From, edge.To),
 				ActionType:                storage.ActionTypeSemanticMatch,
@@ -652,7 +653,7 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, canvas *elemen
 			return errors.Wrap(err, "failed to marshal action data")
 		}
 
-		w := &storage.Watcher{
+		w := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 			ID:                watcherID,
 			Name:              fmt.Sprintf("Meld: %s → %s", edge.From, edge.To),
 			ActionType:        storage.ActionTypeElementExecute,

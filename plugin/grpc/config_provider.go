@@ -16,14 +16,44 @@ import (
 const PluginNamespaceKey = "namespace"
 
 // PluginTokens is how the node mints a plugin its own store token for the
-// namespace its record names. Nil is a node that hands every plugin the shared
-// token, whatever its record names.
+// namespace its record names. A node that mints none for a namespace says so
+// in the error it returns.
 type PluginTokens func(plugin, namespace string) (string, error)
 
+// Endpoints is the node's plugin service endpoints, or why the node runs
+// without them.
+type Endpoints struct {
+	served func() (ServiceEndpoints, error)
+}
+
+// EndpointSource says where each of the node's plugin services answers now:
+// the ServicesManager that started them, or a fixed ServiceEndpoints.
+type EndpointSource interface {
+	Endpoints() ServiceEndpoints
+}
+
+// ServedEndpoints is the endpoints of plugin services that started, read from
+// served each time a plugin asks, so a service that stopped since is handed
+// as stopped.
+func ServedEndpoints(served EndpointSource) Endpoints {
+	return Endpoints{served: func() (ServiceEndpoints, error) { return served.Endpoints(), nil }}
+}
+
+// UnservedEndpoints is a node whose plugin services did not start, and why.
+func UnservedEndpoints(why error) Endpoints {
+	return Endpoints{served: func() (ServiceEndpoints, error) { return ServiceEndpoints{}, why }}
+}
+
+// Served is the endpoints, or why the node runs without them.
+func (e Endpoints) Served() (ServiceEndpoints, error) {
+	return e.served()
+}
+
 // NewConfigProvider creates a ConfigProvider that hands each plugin the config
-// its record holds and injects gRPC service endpoints for plugin discovery.
-// Pass nil endpoints if no services are available.
-func NewConfigProvider(endpoints *ServiceEndpoints, tokens PluginTokens, logger *zap.SugaredLogger) plugin.ConfigProvider {
+// its record holds and injects gRPC service endpoints for plugin discovery. A
+// plugin asking for an endpoint on a node whose services did not start is
+// told why.
+func NewConfigProvider(endpoints Endpoints, tokens PluginTokens, logger *zap.SugaredLogger) plugin.ConfigProvider {
 	return &configProvider{
 		endpoints: endpoints,
 		tokens:    tokens,
@@ -33,7 +63,7 @@ func NewConfigProvider(endpoints *ServiceEndpoints, tokens PluginTokens, logger 
 
 // configProvider wraps plugin records with service endpoint injection.
 type configProvider struct {
-	endpoints *ServiceEndpoints
+	endpoints Endpoints
 	tokens    PluginTokens
 	logger    *zap.SugaredLogger
 }
@@ -52,61 +82,76 @@ func (p *configProvider) GetPluginConfig(domain string) plugin.Config {
 // sees, intercepting underscore-prefixed service keys to return gRPC addresses.
 type configWithEndpoints struct {
 	domain    string
-	endpoints *ServiceEndpoints
+	endpoints Endpoints
 	tokens    PluginTokens
 	logger    *zap.SugaredLogger
-	// readErr is the first failure to read the plugin's record, kept for Err.
+	// readErr is every failure to hand the plugin its config, kept for Err.
 	readErr error
+	// recordFailureSaid is whether why the record handed no config is kept in
+	// readErr: each read of it fails the same way, and is said once.
+	recordFailureSaid bool
 }
 
 // held is the plugin's config as its record holds it. The interface has no
-// error to return, so a record that could not be read is said once and kept.
+// error to return, so a record that could not be read, or a plugin with no
+// record, is kept once for Err.
 func (c *configWithEndpoints) held() map[string]string {
-	record, _, err := pluginRecord(c.domain)
-	if err != nil && c.readErr == nil {
-		c.readErr = err
-		c.logger.Errorw("Plugin handed no config: its record was not read", "plugin", c.domain, "error", err)
+	record, found, err := pluginRecord(c.domain)
+	if err != nil {
+		c.recordFailed(errors.Wrapf(err, "plugin %s handed no config: its record was not read", c.domain))
+		return record.Config
+	}
+	if !found {
+		c.recordFailed(errors.Newf("plugin %s handed no config: it has no record, so nothing says its config", c.domain))
 	}
 	return record.Config
 }
 
-// Err is why the plugin's record could not be read, so Initialize fails with
-// it rather than starting the plugin with no config.
+// recordFailed keeps why the record handed no config, once.
+func (c *configWithEndpoints) recordFailed(err error) {
+	if c.recordFailureSaid {
+		return
+	}
+	c.recordFailureSaid = true
+	c.failed(err)
+}
+
+// Err is every reason the plugin was not handed its config, so Initialize
+// fails with it rather than starting the plugin with no config.
 func (c *configWithEndpoints) Err() error { return c.readErr }
 
-// failed keeps the first failure for Err, and says it.
+// failed keeps a failure for Err, the first as the error and each after it
+// beside the first.
 func (c *configWithEndpoints) failed(err error) {
 	if c.readErr == nil {
 		c.readErr = err
+		return
 	}
-	c.logger.Errorw("Plugin handed no config", "plugin", c.domain, "error", err)
+	c.readErr = errors.WithSecondaryError(c.readErr, err)
 }
 
 // authToken is the token the plugin reaches the node's services with: its own,
-// for the namespace its record names (ADR-046). A record naming none stands
-// nowhere and is handed none, not the shared token on the served store: it
-// acts only where a caller acts, through the call's own token.
+// for the namespace its record names (ADR-046). A record without the key
+// stands nowhere and is handed none, not the shared token on the served store:
+// it acts only where a caller acts, through the call's own token. A namespace
+// the key names is the node's to mint for or refuse, an empty one included.
 func (c *configWithEndpoints) authToken() string {
-	namespace := strings.TrimSpace(c.held()[PluginNamespaceKey])
-	if namespace == "" {
+	raw, named := c.held()[PluginNamespaceKey]
+	if !named {
 		return ""
 	}
-	if c.tokens == nil {
-		c.failed(errors.Newf("plugin %s stands in %s and this node mints no token for it", c.domain, namespace))
-		return ""
-	}
+	namespace := strings.TrimSpace(raw)
 	token, err := c.tokens(c.domain, namespace)
 	if err != nil {
-		c.failed(errors.Wrapf(err, "plugin %s stands in %s", c.domain, namespace))
+		c.failed(errors.Wrapf(err, "plugin %s stands in %q", c.domain, namespace))
 		return ""
 	}
 	return token
 }
 
-// unread says a value that does not read as the type asked for.
+// unread keeps a value that does not read as the type asked for, for Err.
 func (c *configWithEndpoints) unread(key, raw, as string, err error) {
-	c.logger.Errorw("Plugin config value does not read as "+as,
-		"plugin", c.domain, "key", key, "value", raw, "error", err)
+	c.failed(errors.Wrapf(err, "plugin %s config %s value %q does not read as %s", c.domain, key, raw, as))
 }
 
 func (c *configWithEndpoints) GetString(key string) string {
@@ -166,11 +211,10 @@ func (c *configWithEndpoints) Get(key string) any {
 	return nil
 }
 
-// Set leaves the record as it is, and says so: the plugin element is what
-// writes a record.
+// Set leaves the record as it is, and keeps that for Err: the plugin element
+// is what writes a record.
 func (c *configWithEndpoints) Set(key string, value any) {
-	c.logger.Errorw("Plugin config not set: a plugin's config is written in the plugin element",
-		"plugin", c.domain, "key", key, "value", value)
+	c.failed(errors.Newf("plugin %s config %s not set to %v: a plugin's config is written in the plugin element", c.domain, key, value))
 }
 
 func (c *configWithEndpoints) GetKeys() []string {
@@ -182,36 +226,45 @@ func (c *configWithEndpoints) GetKeys() []string {
 	return keys
 }
 
+// ServiceEndpoints is where each of the node's plugin services answers, or
+// why it does not, for the plugin's Initialize; or why the node runs none.
+func (c *configWithEndpoints) ServiceEndpoints() (ServiceEndpoints, error) {
+	served, err := c.endpoints.Served()
+	if err != nil {
+		return ServiceEndpoints{}, errors.Wrapf(err, "plugin %s asked for the node's service endpoints", c.domain)
+	}
+	return served, nil
+}
+
 // endpointValue returns a service endpoint value for underscore-prefixed keys.
+// On a node whose plugin services did not start, or whose service asked for
+// is not running, asking for one is kept for Err, naming why.
 func (c *configWithEndpoints) endpointValue(key string) (string, bool) {
-	if c.endpoints == nil {
+	read, service := endpointKeys[key]
+	if !service {
 		return "", false
 	}
-	switch key {
-	case "_ats_store_endpoint":
-		return c.endpoints.ATSStoreAddress, true
-	case "_queue_endpoint":
-		return c.endpoints.QueueAddress, true
-	case "_schedule_endpoint":
-		return c.endpoints.ScheduleAddress, true
-	case "_file_service_endpoint":
-		return c.endpoints.FileServiceAddress, true
-	case "_llm_endpoint":
-		return c.endpoints.LLMAddress, true
-	case "_embedding_endpoint":
-		return c.endpoints.EmbeddingAddress, true
-	case "_vector_search_endpoint":
-		return c.endpoints.VectorSearchAddress, true
-	case "_ground_endpoint":
-		return c.endpoints.GroundAddress, true
-	case "_search_endpoint":
-		return c.endpoints.SearchAddress, true
-	case "_fetch_endpoint":
-		return c.endpoints.FetchAddress, true
-	case "_mail_endpoint":
-		return c.endpoints.MailAddress, true
-	case "_auth_token":
-		return c.authToken(), true
+	served, err := c.endpoints.Served()
+	if err != nil {
+		c.failed(errors.Wrapf(err, "plugin %s asked for %s", c.domain, key))
+		return "", true
 	}
-	return "", false
+	value, err := read(c, served)
+	if err != nil {
+		c.failed(errors.Wrapf(err, "plugin %s asked for %s", c.domain, key))
+		return "", true
+	}
+	return value, true
+}
+
+// endpointKeys are the underscore-prefixed keys a plugin's config answers with
+// what the node serves it: the services every plugin is joined by, and the
+// token it reaches them with. The services the node boots without are handed
+// as ServiceEndpoints, which say why one is not running.
+var endpointKeys = map[string]func(*configWithEndpoints, ServiceEndpoints) (string, error){
+	"_ats_store_endpoint":    func(_ *configWithEndpoints, e ServiceEndpoints) (string, error) { return e.ATSStore.Address() },
+	"_queue_endpoint":        func(_ *configWithEndpoints, e ServiceEndpoints) (string, error) { return e.Queue.Address() },
+	"_schedule_endpoint":     func(_ *configWithEndpoints, e ServiceEndpoints) (string, error) { return e.Schedule.Address() },
+	"_file_service_endpoint": func(_ *configWithEndpoints, e ServiceEndpoints) (string, error) { return e.FileService.Address() },
+	"_auth_token":            func(c *configWithEndpoints, _ ServiceEndpoints) (string, error) { return c.authToken(), nil },
 }

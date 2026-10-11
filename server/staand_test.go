@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -75,9 +76,9 @@ func define(t *testing.T, sys ats.AttestationStore, market, slug string, at time
 		Subjects:   []string{market + "/" + slug},
 		Predicates: []string{staandCreated},
 		Contexts:   []string{"system"},
-		Actors:     []string{"root"},
+		By:         types.ActorsNamed{Actors: named.ItemOf("root")},
 		Source:     "cli",
-		Timestamp:  at,
+		When:       types.At{Time: at},
 	})
 	if err != nil {
 		t.Fatalf("define %q: %v", slug, err)
@@ -90,9 +91,9 @@ func undefine(t *testing.T, sys ats.AttestationStore, market, slug string, at ti
 		Subjects:   []string{market + "/" + slug},
 		Predicates: []string{staandDeleted},
 		Contexts:   []string{"system"},
-		Actors:     []string{"root"},
+		By:         types.ActorsNamed{Actors: named.ItemOf("root")},
 		Source:     "cli",
-		Timestamp:  at,
+		When:       types.At{Time: at},
 	})
 	if err != nil {
 		t.Fatalf("undefine %q: %v", slug, err)
@@ -119,7 +120,7 @@ func fire(s *QNTXServer, path, referer string) *httptest.ResponseRecorder {
 
 func arrivalsFor(t *testing.T, store ats.AttestationStore, subject string) []*types.As {
 	t.Helper()
-	found, err := store.GetAttestations(ats.AttestationFilter{Subjects: []string{subject}, Limit: 10})
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{subject}, Limit: 10})
 	if err != nil {
 		t.Fatalf("GetAttestations: %v", err)
 	}
@@ -478,7 +479,7 @@ func TestAWalkIsOneSittingWhenTheHitSaysWhich(t *testing.T) {
 	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
 	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&visit=SITTING-02", "https://clean.example/")
 
-	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{Source: staandSource, Limit: 100})
+	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Source: staandSource, Limit: 100})
 	if err != nil {
 		t.Fatalf("GetAttestations: %v", err)
 	}
@@ -514,7 +515,7 @@ func TestAVisitIsDerivedFromItsArrivals(t *testing.T) {
 	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001&visit=SITTING-01&e=hover", "https://clean.example/prices")
 	fire(s, "/s/clean/boutique?page=/only&v=WHO-000002&visit=SITTING-02", "https://clean.example/only")
 
-	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{Source: staandSource, Limit: 100})
+	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Source: staandSource, Limit: 100})
 	if err != nil {
 		t.Fatalf("GetAttestations: %v", err)
 	}

@@ -43,9 +43,7 @@ func (canvasSubsystem) Init(s *QNTXServer) error {
 	if s.authHandler != nil {
 		canvasOpts = append(canvasOpts, handlers.WithPeople(peopleOf{s.authHandler}))
 	}
-	if s.nodeMailer != nil {
-		canvasOpts = append(canvasOpts, handlers.WithMailer(s.nodeMailer))
-	}
+	canvasOpts = append(canvasOpts, handlers.WithMailer(s.nodeMailer))
 	canvasOpts = append(canvasOpts, handlers.WithInviteLink(s.inviteLink))
 	s.canvasHandler = handlers.NewCanvasHandler(canvasStore, s.logger, canvasOpts...)
 	s.conversationAssembler = NewConversationAssembler(canvasStore, s.held.ServedUniverse().Queries())

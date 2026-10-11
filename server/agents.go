@@ -78,7 +78,7 @@ func (s *QNTXServer) agentLineOf(namespace string) (agentLine, bool, error) {
 	if err != nil {
 		return agentLine{}, false, errors.Wrapf(err, "failed to read the %s line of %s", agentLineSubject, namespace)
 	}
-	found, err := reading.GetAttestations(ats.AttestationFilter{Subjects: []string{agentLineSubject}, Limit: ats.EveryRow})
+	found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{agentLineSubject}, Limit: ats.EveryRow})
 	if err != nil {
 		return agentLine{}, false, errors.Wrapf(err, "failed to read the %s line of %s", agentLineSubject, namespace)
 	}

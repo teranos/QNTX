@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/teranos/QNTX/ats/types"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -51,7 +52,7 @@ func TestCriticalPath_PluginLifecycle(t *testing.T) {
 
 	// 3. Load plugin from address
 	configs := []PluginConfig{
-		{Name: "critical-test", Enabled: true, Address: addr},
+		{Name: "critical-test", Enabled: true, Source: RunningAt(addr)},
 	}
 	err := manager.LoadPlugins(context.Background(), configs)
 	require.NoError(t, err)
@@ -61,7 +62,7 @@ func TestCriticalPath_PluginLifecycle(t *testing.T) {
 	proxy := plugins[0]
 
 	// 4. Initialize plugin
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 	assert.True(t, plugin.initCalled)
@@ -104,9 +105,9 @@ func TestCriticalPath_MultiPluginCoordination(t *testing.T) {
 	// Load all plugins
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "plugin1", Enabled: true, Address: addr1},
-		{Name: "plugin2", Enabled: true, Address: addr2},
-		{Name: "plugin3", Enabled: true, Address: addr3},
+		{Name: "plugin1", Enabled: true, Source: RunningAt(addr1)},
+		{Name: "plugin2", Enabled: true, Source: RunningAt(addr2)},
+		{Name: "plugin3", Enabled: true, Source: RunningAt(addr3)},
 	}
 	err := manager.LoadPlugins(context.Background(), configs)
 	require.NoError(t, err)
@@ -115,7 +116,7 @@ func TestCriticalPath_MultiPluginCoordination(t *testing.T) {
 	require.Len(t, plugins, 3)
 
 	// Initialize all
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	for _, p := range plugins {
 		err := p.Initialize(context.Background(), services)
 		require.NoError(t, err)
@@ -151,7 +152,7 @@ func TestCriticalPath_ErrorRecovery(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 
 	// Should fail gracefully
 	err = proxy.Initialize(context.Background(), services)
@@ -183,7 +184,7 @@ func TestConcurrent_MixedOperations(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 
@@ -251,7 +252,7 @@ func TestConcurrent_InitializeRace(t *testing.T) {
 	require.NoError(t, err)
 	defer proxy.Close()
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 
 	// Try to initialize concurrently from multiple goroutines
 	const workers = 10
@@ -298,7 +299,7 @@ func TestConcurrent_ShutdownRace(t *testing.T) {
 	proxy, err := NewExternalDomainProxy(addr, logger)
 	require.NoError(t, err)
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	proxy.Initialize(context.Background(), services)
 
 	// Start ongoing operations
@@ -352,7 +353,7 @@ func TestCrash_ServerUnresponsive(t *testing.T) {
 	proxy, err := NewExternalDomainProxy(addr, logger)
 	require.NoError(t, err)
 
-	services := &mockServiceRegistry{logger: logger}
+	services := newMockServices(t, logger)
 	err = proxy.Initialize(context.Background(), services)
 	require.NoError(t, err)
 
@@ -421,8 +422,8 @@ func TestCrash_PartialFailure(t *testing.T) {
 
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "plugin1", Enabled: true, Address: addr1},
-		{Name: "plugin2", Enabled: true, Address: addr2},
+		{Name: "plugin1", Enabled: true, Source: RunningAt(addr1)},
+		{Name: "plugin2", Enabled: true, Source: RunningAt(addr2)},
 	}
 	err := manager.LoadPlugins(context.Background(), configs)
 	require.NoError(t, err)
@@ -460,7 +461,7 @@ func TestCrash_GracefulDegradation(t *testing.T) {
 
 	// Try to load plugin that doesn't exist
 	configs := []PluginConfig{
-		{Name: "nonexistent", Enabled: true, Address: "localhost:59999"},
+		{Name: "nonexistent", Enabled: true, Source: RunningAt("localhost:59999")},
 	}
 
 	// Should not return error (resilient loading) but log and continue
@@ -670,13 +671,13 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 
 	// 3. Start gRPC services for plugin callbacks
 	servicesManager := NewServicesManager(config.LLMConfig{MaxConcurrent: 1, MaxCallsPerMinute: 60}, config.FetchConfig{}, "did:key:znode", logger)
-	endpoints, err := servicesManager.Start(ctx, store, queue, nil, t.TempDir(), t.TempDir())
-	require.NoError(t, err)
+	require.NoError(t, servicesManager.Start(ctx, store, queue, nil, t.TempDir(), t.TempDir()))
 	defer servicesManager.Shutdown()
+	endpoints := servicesManager.Endpoints()
 
 	logger.Infow("Started plugin services",
-		"ats_store", endpoints.ATSStoreAddress,
-		"queue", endpoints.QueueAddress,
+		"ats_store", endpoints.ATSStore,
+		"queue", endpoints.Queue,
 	)
 
 	// 4. Create and start book plugin server
@@ -722,7 +723,7 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 	require.NoError(t, err)
 
 	// 9. Verify attestations were created in database
-	filter := ats.AttestationFilter{Limit: 100}
+	filter := ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 100}
 	attestations, err := store.GetAttestations(filter)
 	require.NoError(t, err)
 
@@ -1000,8 +1001,8 @@ func TestUIPlugin_RegisterElements(t *testing.T) {
 	assert.Equal(t, "📚", item.Symbol)
 	assert.Equal(t, "Book Auction", item.Title)
 	assert.Equal(t, "book-auction", item.Label)
-	assert.Equal(t, "/auction", item.ContentPath)
-	assert.Equal(t, "/auction.css", item.CssPath)
+	assert.Equal(t, "/auction", item.GetContentPath())
+	assert.Equal(t, []string{"/auction.css"}, item.CssPaths)
 	assert.Equal(t, int32(600), item.GetDefaultWidth())
 	assert.Equal(t, int32(400), item.GetDefaultHeight())
 
@@ -1014,7 +1015,7 @@ func TestUIPlugin_AuctionElementContent(t *testing.T) {
 	// Create and initialize book plugin
 	bookPlugin := NewBookPlugin()
 	ctx := context.Background()
-	mockServices := &mockServiceRegistry{logger: logger}
+	mockServices := newMockServices(t, logger)
 	err := bookPlugin.Initialize(ctx, mockServices)
 	require.NoError(t, err)
 

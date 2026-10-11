@@ -302,7 +302,7 @@ func TestWhoSpokeToTheRootAgentIsWrittenDown(t *testing.T) {
 	require.True(t, held)
 	session := said.GetSession()
 
-	told, err := s.held.TheNodesOwnRecords().GetAttestations(ats.AttestationFilter{
+	told, err := s.held.TheNodesOwnRecords().GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Contexts: []string{"session:" + session}, Predicates: []string{"UserPromptSubmit"}, Limit: 5})
 	require.NoError(t, err)
 	require.Len(t, told, 1)

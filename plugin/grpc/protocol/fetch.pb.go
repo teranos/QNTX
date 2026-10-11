@@ -22,15 +22,18 @@ const (
 )
 
 type FetchRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
-	Url           string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`             // URL to fetch
-	Subjects      []string               `protobuf:"bytes,3,rep,name=subjects,proto3" json:"subjects,omitempty"`   // Attestation subjects
-	Predicate     string                 `protobuf:"bytes,4,opt,name=predicate,proto3" json:"predicate,omitempty"` // Attestation predicate (e.g. "http:get")
-	Context       string                 `protobuf:"bytes,5,opt,name=context,proto3" json:"context,omitempty"`     // Attestation context (e.g. the URL itself)
-	Fresh         bool                   `protobuf:"varint,6,opt,name=fresh,proto3" json:"fresh,omitempty"`        // Skip cache, always fetch from remote
-	Actor         string                 `protobuf:"bytes,7,opt,name=actor,proto3" json:"actor,omitempty"`         // Actor identity for the attestation (e.g. "myplugin:pipeline")
-	Source        string                 `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`       // Plugin name requesting the fetch. Used as attestation source and for automatic version resolution.
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AuthToken string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
+	Url       string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`      // URL to fetch
+	Fresh     bool                   `protobuf:"varint,6,opt,name=fresh,proto3" json:"fresh,omitempty"` // Skip the record, always fetch from remote
+	// What becomes of the fetch: attested as named, or not recorded at all. A
+	// request naming neither is refused.
+	//
+	// Types that are valid to be assigned to Record:
+	//
+	//	*FetchRequest_Attest
+	//	*FetchRequest_Unrecorded
+	Record        isFetchRequest_Record `protobuf_oneof:"record"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -79,27 +82,6 @@ func (x *FetchRequest) GetUrl() string {
 	return ""
 }
 
-func (x *FetchRequest) GetSubjects() []string {
-	if x != nil {
-		return x.Subjects
-	}
-	return nil
-}
-
-func (x *FetchRequest) GetPredicate() string {
-	if x != nil {
-		return x.Predicate
-	}
-	return ""
-}
-
-func (x *FetchRequest) GetContext() string {
-	if x != nil {
-		return x.Context
-	}
-	return ""
-}
-
 func (x *FetchRequest) GetFresh() bool {
 	if x != nil {
 		return x.Fresh
@@ -107,19 +89,165 @@ func (x *FetchRequest) GetFresh() bool {
 	return false
 }
 
-func (x *FetchRequest) GetActor() string {
+func (x *FetchRequest) GetRecord() isFetchRequest_Record {
 	if x != nil {
-		return x.Actor
+		return x.Record
+	}
+	return nil
+}
+
+func (x *FetchRequest) GetAttest() *FetchRecord {
+	if x != nil {
+		if x, ok := x.Record.(*FetchRequest_Attest); ok {
+			return x.Attest
+		}
+	}
+	return nil
+}
+
+func (x *FetchRequest) GetUnrecorded() bool {
+	if x != nil {
+		if x, ok := x.Record.(*FetchRequest_Unrecorded); ok {
+			return x.Unrecorded
+		}
+	}
+	return false
+}
+
+type isFetchRequest_Record interface {
+	isFetchRequest_Record()
+}
+
+type FetchRequest_Attest struct {
+	Attest *FetchRecord `protobuf:"bytes,9,opt,name=attest,proto3,oneof"`
+}
+
+type FetchRequest_Unrecorded struct {
+	Unrecorded bool `protobuf:"varint,10,opt,name=unrecorded,proto3,oneof"` // Neither attested nor answered from a record. False is refused.
+}
+
+func (*FetchRequest_Attest) isFetchRequest_Record() {}
+
+func (*FetchRequest_Unrecorded) isFetchRequest_Record() {}
+
+// FetchRecord is the attestation a fetch is kept as. A fetch already attested
+// under the same subjects and predicate is answered from its record unless
+// fresh is set.
+type FetchRecord struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Subjects  []string               `protobuf:"bytes,1,rep,name=subjects,proto3" json:"subjects,omitempty"`   // At least one
+	Predicate string                 `protobuf:"bytes,2,opt,name=predicate,proto3" json:"predicate,omitempty"` // e.g. "http:get"
+	Context   string                 `protobuf:"bytes,3,opt,name=context,proto3" json:"context,omitempty"`     // e.g. the URL itself
+	// Who wrote it: an actor the plugin names, or the node.
+	//
+	// Types that are valid to be assigned to By:
+	//
+	//	*FetchRecord_Actor
+	//	*FetchRecord_Node
+	By            isFetchRecord_By `protobuf_oneof:"by"`
+	Source        string           `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"` // The plugin fetching: the attestation's source, and its version's.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchRecord) Reset() {
+	*x = FetchRecord{}
+	mi := &file_plugin_grpc_protocol_fetch_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchRecord) ProtoMessage() {}
+
+func (x *FetchRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_fetch_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchRecord.ProtoReflect.Descriptor instead.
+func (*FetchRecord) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_fetch_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *FetchRecord) GetSubjects() []string {
+	if x != nil {
+		return x.Subjects
+	}
+	return nil
+}
+
+func (x *FetchRecord) GetPredicate() string {
+	if x != nil {
+		return x.Predicate
 	}
 	return ""
 }
 
-func (x *FetchRequest) GetSource() string {
+func (x *FetchRecord) GetContext() string {
+	if x != nil {
+		return x.Context
+	}
+	return ""
+}
+
+func (x *FetchRecord) GetBy() isFetchRecord_By {
+	if x != nil {
+		return x.By
+	}
+	return nil
+}
+
+func (x *FetchRecord) GetActor() string {
+	if x != nil {
+		if x, ok := x.By.(*FetchRecord_Actor); ok {
+			return x.Actor
+		}
+	}
+	return ""
+}
+
+func (x *FetchRecord) GetNode() bool {
+	if x != nil {
+		if x, ok := x.By.(*FetchRecord_Node); ok {
+			return x.Node
+		}
+	}
+	return false
+}
+
+func (x *FetchRecord) GetSource() string {
 	if x != nil {
 		return x.Source
 	}
 	return ""
 }
+
+type isFetchRecord_By interface {
+	isFetchRecord_By()
+}
+
+type FetchRecord_Actor struct {
+	Actor string `protobuf:"bytes,4,opt,name=actor,proto3,oneof"` // e.g. "myplugin:pipeline"
+}
+
+type FetchRecord_Node struct {
+	Node bool `protobuf:"varint,5,opt,name=node,proto3,oneof"` // The node authors it. False is refused.
+}
+
+func (*FetchRecord_Actor) isFetchRecord_By() {}
+
+func (*FetchRecord_Node) isFetchRecord_By() {}
 
 type FetchResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -134,7 +262,7 @@ type FetchResponse struct {
 
 func (x *FetchResponse) Reset() {
 	*x = FetchResponse{}
-	mi := &file_plugin_grpc_protocol_fetch_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_fetch_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -146,7 +274,7 @@ func (x *FetchResponse) String() string {
 func (*FetchResponse) ProtoMessage() {}
 
 func (x *FetchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_fetch_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_fetch_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -159,7 +287,7 @@ func (x *FetchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchResponse.ProtoReflect.Descriptor instead.
 func (*FetchResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_fetch_proto_rawDescGZIP(), []int{1}
+	return file_plugin_grpc_protocol_fetch_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *FetchResponse) GetSuccess() bool {
@@ -201,17 +329,26 @@ var File_plugin_grpc_protocol_fetch_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_fetch_proto_rawDesc = "" +
 	"\n" +
-	" plugin/grpc/protocol/fetch.proto\x12\bprotocol\"\xd7\x01\n" +
+	" plugin/grpc/protocol/fetch.proto\x12\bprotocol\"\xfd\x01\n" +
 	"\fFetchRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x10\n" +
-	"\x03url\x18\x02 \x01(\tR\x03url\x12\x1a\n" +
-	"\bsubjects\x18\x03 \x03(\tR\bsubjects\x12\x1c\n" +
-	"\tpredicate\x18\x04 \x01(\tR\tpredicate\x12\x18\n" +
-	"\acontext\x18\x05 \x01(\tR\acontext\x12\x14\n" +
-	"\x05fresh\x18\x06 \x01(\bR\x05fresh\x12\x14\n" +
-	"\x05actor\x18\a \x01(\tR\x05actor\x12\x16\n" +
-	"\x06source\x18\b \x01(\tR\x06source\"\x9b\x01\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12\x14\n" +
+	"\x05fresh\x18\x06 \x01(\bR\x05fresh\x12/\n" +
+	"\x06attest\x18\t \x01(\v2\x15.protocol.FetchRecordH\x00R\x06attest\x12 \n" +
+	"\n" +
+	"unrecorded\x18\n" +
+	" \x01(\bH\x00R\n" +
+	"unrecordedB\b\n" +
+	"\x06recordJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06J\x04\b\a\x10\bJ\x04\b\b\x10\tR\bsubjectsR\tpredicateR\acontextR\x05actorR\x06source\"\xad\x01\n" +
+	"\vFetchRecord\x12\x1a\n" +
+	"\bsubjects\x18\x01 \x03(\tR\bsubjects\x12\x1c\n" +
+	"\tpredicate\x18\x02 \x01(\tR\tpredicate\x12\x18\n" +
+	"\acontext\x18\x03 \x01(\tR\acontext\x12\x16\n" +
+	"\x05actor\x18\x04 \x01(\tH\x00R\x05actor\x12\x14\n" +
+	"\x04node\x18\x05 \x01(\bH\x00R\x04node\x12\x16\n" +
+	"\x06source\x18\x06 \x01(\tR\x06sourceB\x04\n" +
+	"\x02by\"\x9b\x01\n" +
 	"\rFetchResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x12\n" +
@@ -234,19 +371,21 @@ func file_plugin_grpc_protocol_fetch_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_fetch_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_fetch_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_plugin_grpc_protocol_fetch_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_plugin_grpc_protocol_fetch_proto_goTypes = []any{
 	(*FetchRequest)(nil),  // 0: protocol.FetchRequest
-	(*FetchResponse)(nil), // 1: protocol.FetchResponse
+	(*FetchRecord)(nil),   // 1: protocol.FetchRecord
+	(*FetchResponse)(nil), // 2: protocol.FetchResponse
 }
 var file_plugin_grpc_protocol_fetch_proto_depIdxs = []int32{
-	0, // 0: protocol.FetchService.Fetch:input_type -> protocol.FetchRequest
-	1, // 1: protocol.FetchService.Fetch:output_type -> protocol.FetchResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: protocol.FetchRequest.attest:type_name -> protocol.FetchRecord
+	0, // 1: protocol.FetchService.Fetch:input_type -> protocol.FetchRequest
+	2, // 2: protocol.FetchService.Fetch:output_type -> protocol.FetchResponse
+	2, // [2:3] is the sub-list for method output_type
+	1, // [1:2] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_fetch_proto_init() }
@@ -254,13 +393,21 @@ func file_plugin_grpc_protocol_fetch_proto_init() {
 	if File_plugin_grpc_protocol_fetch_proto != nil {
 		return
 	}
+	file_plugin_grpc_protocol_fetch_proto_msgTypes[0].OneofWrappers = []any{
+		(*FetchRequest_Attest)(nil),
+		(*FetchRequest_Unrecorded)(nil),
+	}
+	file_plugin_grpc_protocol_fetch_proto_msgTypes[1].OneofWrappers = []any{
+		(*FetchRecord_Actor)(nil),
+		(*FetchRecord_Node)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_fetch_proto_rawDesc), len(file_plugin_grpc_protocol_fetch_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

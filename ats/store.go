@@ -6,7 +6,6 @@ package ats
 import (
 	"context"
 	"math"
-	"time"
 
 	"github.com/teranos/QNTX/ats/types"
 )
@@ -55,14 +54,14 @@ type AliasResolver interface {
 
 // AttestationFilter represents filters for querying attestations
 type AttestationFilter struct {
-	Actors     []string   // Filter by actors (OR logic)
-	Subjects   []string   // Filter by subjects (OR logic)
-	Predicates []string   // Filter by predicates (OR logic)
-	Contexts   []string   // Filter by contexts (OR logic)
-	Source     string     // Filter by source (exact match, e.g., "cli", "distill")
-	TimeStart  *time.Time // Temporal range start
-	TimeEnd    *time.Time // Temporal range end
-	Limit      int        // How many rows: 0 is none, and every row is EveryRow
+	Actors     []string        // Filter by actors (OR logic)
+	Subjects   []string        // Filter by subjects (OR logic)
+	Predicates []string        // Filter by predicates (OR logic)
+	Contexts   []string        // Filter by contexts (OR logic)
+	Source     string          // Filter by source (exact match, e.g., "cli", "distill")
+	TimeStart  types.TimeBound // Where the time range starts: a time, or unbounded
+	TimeEnd    types.TimeBound // Where the time range ends: a time, or unbounded
+	Limit      int             // How many rows: 0 is none, and every row is EveryRow
 }
 
 // EveryRow is the limit of a query that wants every matching row: a high value,

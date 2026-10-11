@@ -176,24 +176,30 @@ export interface ScheduledJob {
   /** RFC3339 timestamp */
   updated_at: string;
   created_from_doc: string;
-  /** The User whose sigil call created it; empty is none */
+  /** The User whose sigil call created it, when made_by is "caller" */
   user_id: string;
-  /** The namespace that caller acted in; empty is none */
+  /** The namespace that caller acted in, when made_by is "caller" */
   namespace: string;
+  /** Who made it: "caller", in a sigil call, or "no caller". Anything else is refused. */
+  made_by: string;
 }
 
 export interface CreateScheduleRequest {
   auth_token: string;
   /** Handler to invoke on each tick */
   handler_name: string;
-  /** Execution interval */
+  /** Execution interval: at least one second */
   interval_seconds: number;
   /** Handler-specific data (JSON) */
   payload: Uint8Array;
-  /** Optional metadata (element_id, plugin, etc.) */
+  /** Metadata (element_id, plugin, etc.), kept as a JSON object */
   metadata: { [key: string]: string };
-  /** The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule. Empty is a schedule no caller made. */
-  store_token: string;
+  /** The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule. */
+  store_token?:
+    | string
+    | undefined;
+  /** The plugin made it in no sigil call: no caller is kept. False is refused. */
+  by_plugin?: boolean | undefined;
 }
 
 export interface CreateScheduleRequest_MetadataEntry {

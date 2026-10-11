@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/named"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -33,29 +34,139 @@ type As struct {
 //
 // TODO(#605): Rename to As (and As → Attestation) for clarity.
 type AsCommand struct {
-	Subjects      []string       `json:"subjects"`                 // Entities being attested about
-	Predicates    []string       `json:"predicates"`               // What is being claimed (optional, defaults to ["_"])
-	Contexts      []string       `json:"contexts"`                 // Optional "of" context (defaults to ["_"])
-	Actors        []string       `json:"actors"`                   // Who made the attestation; a store refuses a command naming none
-	Timestamp     time.Time      `json:"timestamp"`                // When attestation was made (optional, uses now)
-	Source        string         `json:"source,omitempty"`         // Source of attestation (e.g., "cli", "github", "atproto")
-	SourceVersion string         `json:"source_version,omitempty"` // Version of the source that created this attestation
-	Attributes    map[string]any `json:"attributes,omitempty"`     // Arbitrary JSON
+	Subjects      []string       `json:"subjects"`             // Entities being attested about
+	Predicates    []string       `json:"predicates"`           // What is being claimed (optional, defaults to ["_"])
+	Contexts      []string       `json:"contexts"`             // Optional "of" context (defaults to ["_"])
+	By            Authors        `json:"-"`                    // Who made the attestation: the actors it names, or the node
+	When          Moment         `json:"-"`                    // When the attestation was made: a time it names, or now
+	Source        string         `json:"source,omitempty"`     // Source of attestation (e.g., "cli", "github", "atproto")
+	SourceVersion SourceVersion  `json:"-"`                    // The version of the source a plugin's command is stamped with
+	Attributes    map[string]any `json:"attributes,omitempty"` // Arbitrary JSON
+}
+
+// SourceVersion is the version an attestation a plugin sends is stamped
+// with: the one its command names, or the one the node's registry holds for
+// its source. A command a plugin sends naming neither is refused.
+type SourceVersion interface {
+	stampsSourceVersion()
+}
+
+// VersionNamed is the version a command names.
+type VersionNamed struct {
+	Version named.Text
+}
+
+// VersionFromRegistry is the version the node's registry holds for the
+// command's source.
+type VersionFromRegistry struct{}
+
+// VersionOf is the version a plugin outside this module names, which cannot
+// make a named.Text itself. A version naming nothing is refused.
+func VersionOf(version string) (VersionNamed, error) {
+	text, err := named.TextOf("the source version", version)
+	if err != nil {
+		return VersionNamed{}, err
+	}
+	return VersionNamed{Version: text}, nil
+}
+
+func (VersionNamed) stampsSourceVersion()        {}
+func (VersionFromRegistry) stampsSourceVersion() {}
+
+// Authors is who a command says made it: the actors it names, or the node.
+type Authors interface {
+	saysWhoMadeIt()
+}
+
+// ActorsNamed are the actors a command names, at least one.
+type ActorsNamed struct {
+	Actors named.Items[string]
+}
+
+// ActorNamed is the one actor a command names.
+func ActorNamed(actor named.Text) ActorsNamed {
+	return ActorsNamed{Actors: named.ItemOf(actor.String())}
+}
+
+// ActorsOf are the actors a plugin outside this module names, which cannot
+// make named.Items itself. Naming nobody, or an actor that is empty, is refused.
+func ActorsOf(actors ...string) (ActorsNamed, error) {
+	names := make([]string, 0, len(actors))
+	for _, actor := range actors {
+		text, err := named.TextOf("an actor", actor)
+		if err != nil {
+			return ActorsNamed{}, err
+		}
+		names = append(names, text.String())
+	}
+	items, err := named.ItemsOf("the actors", names)
+	if err != nil {
+		return ActorsNamed{}, err
+	}
+	return ActorsNamed{Actors: items}, nil
 }
 
 // "the node"
 //
 // authors what its caller named nobody for, naming itself where it writes. A
-// store is not the node, so it refuses a command that names no actor.
-func (cmd *AsCommand) NamesItsActor() error {
-	if len(cmd.Actors) == 0 {
-		return errors.Newf("an attestation about %v names no actor, and a store does not invent one", cmd.Subjects)
-	}
-	return nil
+// store is not the node, so it refuses a command made by the node.
+type ByNode struct{}
+
+func (ActorsNamed) saysWhoMadeIt() {}
+func (ByNode) saysWhoMadeIt()      {}
+
+// Moment is when a command says it was made: the time it names, or now.
+type Moment interface {
+	saysWhen()
 }
 
-// ToAs converts an AsCommand to an As struct with generated ASID and source
-func (cmd *AsCommand) ToAs(asid, source string) *As {
+// At is the time a command names.
+type At struct {
+	Time time.Time
+}
+
+// Now is when the command is written.
+type Now struct{}
+
+func (At) saysWhen()  {}
+func (Now) saysWhen() {}
+
+// NamedActors are the actors a command names. A store is not the node, so a
+// command made by the node, or naming nobody, is refused.
+func (cmd *AsCommand) NamedActors() ([]string, error) {
+	switch by := cmd.By.(type) {
+	case ActorsNamed:
+		return by.Actors.All(), nil
+	case ByNode:
+		return nil, errors.Newf("an attestation about %v is made by the node, and a store is not the node: it does not invent an actor", cmd.Subjects)
+	}
+	return nil, errors.Newf("an attestation about %v names no actor, and a store does not invent one", cmd.Subjects)
+}
+
+// MadeAt is when a command says it was made: the time it names, or now as it
+// is written. A command saying neither is refused.
+func (cmd *AsCommand) MadeAt() (time.Time, error) {
+	switch when := cmd.When.(type) {
+	case At:
+		return when.Time, nil
+	case Now:
+		return time.Now(), nil
+	}
+	return time.Time{}, errors.Newf("an attestation about %v names no time: a time, or now", cmd.Subjects)
+}
+
+// ToAs converts an AsCommand to an As struct with generated ASID and source.
+// A command naming no actor, or no time, is refused.
+func (cmd *AsCommand) ToAs(asid, source string) (*As, error) {
+	actors, err := cmd.NamedActors()
+	if err != nil {
+		return nil, err
+	}
+	ts, err := cmd.MadeAt()
+	if err != nil {
+		return nil, err
+	}
+
 	// Set defaults for empty arrays
 	predicates := cmd.Predicates
 	if len(predicates) == 0 {
@@ -79,22 +190,17 @@ func (cmd *AsCommand) ToAs(asid, source string) *As {
 		effectiveSource = "cli"
 	}
 
-	ts := cmd.Timestamp
-	if ts.IsZero() {
-		ts = time.Now()
-	}
-
 	return &As{
 		ID:         asid,
 		Subjects:   cmd.Subjects,
 		Predicates: predicates,
 		Contexts:   contexts,
-		Actors:     cmd.Actors,
+		Actors:     actors,
 		Timestamp:  ts,
 		Source:     effectiveSource,
 		Attributes: cmd.Attributes,
 		CreatedAt:  time.Now(),
-	}
+	}, nil
 }
 
 // IsExistenceAttestation returns true if this is a simple existence attestation
@@ -115,15 +221,15 @@ func (as *As) GetCartesianCount() int {
 
 // AxFilter represents the parsed CLI command for querying attestations
 type AxFilter struct {
-	Subjects   []string   `json:"subjects"`   // Specific entities to ask about
-	Predicates []string   `json:"predicates"` // What predicates to match
-	Contexts   []string   `json:"contexts"`   // What contexts to match
-	Actors     []string   `json:"actors"`     // Filter by specific actors
-	TimeStart  *time.Time `json:"time_start"` // Temporal range start
-	TimeEnd    *time.Time `json:"time_end"`   // Temporal range end
-	Limit      int        `json:"limit"`      // Maximum results
-	Format     string     `json:"format"`     // Output format: table, json
-	SoActions  []string   `json:"so_actions"` // Actions to perform after query: ex csv, summarize, etc
+	Subjects   []string  `json:"subjects"`   // Specific entities to ask about
+	Predicates []string  `json:"predicates"` // What predicates to match
+	Contexts   []string  `json:"contexts"`   // What contexts to match
+	Actors     []string  `json:"actors"`     // Filter by specific actors
+	TimeStart  TimeBound `json:"time_start"` // Where the time range starts: a time, or unbounded
+	TimeEnd    TimeBound `json:"time_end"`   // Where the time range ends: a time, or unbounded
+	Limit      int       `json:"limit"`      // Maximum results
+	Format     string    `json:"format"`     // Output format: table, json
+	SoActions  []string  `json:"so_actions"` // Actions to perform after query: ex csv, summarize, etc
 }
 
 // AxResult represents the result of an ax query

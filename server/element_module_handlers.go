@@ -114,7 +114,7 @@ func (s *QNTXServer) handleElementIndex(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	held, err := store.GetAttestations(ats.AttestationFilter{
+	held, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Predicates: []string{ElementModulePredicate},
 		Limit:      elementIndexLimit,
 	})
@@ -167,7 +167,7 @@ func (s *QNTXServer) handleOneElementModule(w http.ResponseWriter, r *http.Reque
 	}
 
 	subject := ElementSubjectPrefix + name
-	held, err := store.GetAttestations(ats.AttestationFilter{
+	held, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects:   []string{subject},
 		Predicates: []string{ElementModulePredicate},
 		Limit:      1,

@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -9,6 +10,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// logFile is a plugin's own log file for a test.
+func logFile(t *testing.T) *os.File {
+	f, err := os.CreateTemp(t.TempDir(), "plugin-*.log")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, f.Close()) })
+	return f
+}
 
 func makeEntry(i int) LogEntry {
 	return LogEntry{
@@ -21,8 +30,8 @@ func makeEntry(i int) LogEntry {
 
 func TestLogBuffer_RecentOnEmpty(t *testing.T) {
 	buf := NewLogBuffer(10)
-	assert.Nil(t, buf.Recent(10))
-	assert.Nil(t, buf.Recent(0))
+	assert.Empty(t, buf.Recent(10))
+	assert.Empty(t, buf.Recent(0))
 }
 
 func TestLogBuffer_WriteAndRecent(t *testing.T) {
@@ -188,6 +197,8 @@ func TestLogBuffer_ConcurrentWrites(t *testing.T) {
 func TestPluginLogger_WritesToLogBuffer(t *testing.T) {
 	buf := NewLogBuffer(10)
 	logger := &pluginLogger{
+		file:      logFile(t),
+		stream:    stdoutStream,
 		level:     "info",
 		logBuffer: buf,
 	}
@@ -206,6 +217,8 @@ func TestPluginLogger_WritesToLogBuffer(t *testing.T) {
 func TestPluginLogger_JSONLevelExtraction(t *testing.T) {
 	buf := NewLogBuffer(10)
 	logger := &pluginLogger{
+		file:      logFile(t),
+		stream:    stdoutStream,
 		level:     "info",
 		logBuffer: buf,
 	}
@@ -220,7 +233,9 @@ func TestPluginLogger_JSONLevelExtraction(t *testing.T) {
 func TestPluginLogger_StderrSource(t *testing.T) {
 	buf := NewLogBuffer(10)
 	logger := &pluginLogger{
-		level:     "error", // stderr logger has level "error"
+		file:      logFile(t),
+		stream:    stderrStream,
+		level:     "error",
 		logBuffer: buf,
 	}
 

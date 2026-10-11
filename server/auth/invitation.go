@@ -404,15 +404,17 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 
 	// The invitee holds no User yet: the mail goes to the address, recorded
 	// under the invitation.
-	if _, _, err := h.inviteMailer.SendAsNodeTo(r.Context(), services.MailRecipient{ID: "invitation:" + id, Email: email}, services.NodeMail{
+	if _, _, err := h.inviteMailer.SendAsNodeTo(r.Context(), services.AddressRecipient("invitation:"+id, email), services.NodeMail{
 		Name:    "invitation",
 		Subject: inviter + " invites you to QNTX",
-		Text: inviter + " invites you to QNTX.\n\nSign in with " + signsIn + ":\n" + link + "\n\n" +
-			"No password is set at QNTX.\n",
-		HTML: "<p>" + htmlEscape(inviter) + " invites you to QNTX.</p>" +
-			"<p>Sign in with <b>" + htmlEscape(signsIn) + "</b>.</p>" +
-			"<p><a href=\"" + htmlEscape(link) + "\">Accept the invitation</a></p>" +
-			"<p>No password is set at QNTX.</p>",
+		Bodies: []services.MailBody{
+			services.TextBody(inviter + " invites you to QNTX.\n\nSign in with " + signsIn + ":\n" + link + "\n\n" +
+				"No password is set at QNTX.\n"),
+			services.HTMLBody("<p>" + htmlEscape(inviter) + " invites you to QNTX.</p>" +
+				"<p>Sign in with <b>" + htmlEscape(signsIn) + "</b>.</p>" +
+				"<p><a href=\"" + htmlEscape(link) + "\">Accept the invitation</a></p>" +
+				"<p>No password is set at QNTX.</p>"),
+		},
 	}); err != nil {
 		h.logger.Errorw("invitation written, invitee's mail not sent", "invitation", id, "email", email, "error", err)
 		h.writeError(w, http.StatusBadGateway, "the invitation "+id+" was written and the mail to "+email+" was not sent: "+err.Error())
@@ -422,10 +424,12 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 	if _, _, err := h.inviteMailer.SendAsNode(r.Context(), p.UserID, services.NodeMail{
 		Name:    "invitation-sent",
 		Subject: "You invited " + invitee,
-		Text: "You invited " + invitee + " to sign in with " + signsIn + ".\n\n" +
-			"Cancel the invitation:\n" + cancel + "\n",
-		HTML: "<p>You invited <b>" + htmlEscape(invitee) + "</b> to sign in with " + htmlEscape(signsIn) + ".</p>" +
-			"<p><a href=\"" + htmlEscape(cancel) + "\">Cancel the invitation</a></p>",
+		Bodies: []services.MailBody{
+			services.TextBody("You invited " + invitee + " to sign in with " + signsIn + ".\n\n" +
+				"Cancel the invitation:\n" + cancel + "\n"),
+			services.HTMLBody("<p>You invited <b>" + htmlEscape(invitee) + "</b> to sign in with " + htmlEscape(signsIn) + ".</p>" +
+				"<p><a href=\"" + htmlEscape(cancel) + "\">Cancel the invitation</a></p>"),
+		},
 	}); err != nil {
 		h.logger.Errorw("invitation sent to the invitee, ROOT's copy not sent", "invitation", id, "user", p.UserID, "error", err)
 		h.writeError(w, http.StatusBadGateway, "the invitation went to "+email+" and your copy with the cancel was not sent: "+err.Error())

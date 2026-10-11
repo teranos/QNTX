@@ -176,7 +176,7 @@ func (s *QNTXServer) namespacePrompts(namespace string) ([]string, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "opening %s to read its prompts", namespace)
 	}
-	found, err := store.GetAttestations(ats.AttestationFilter{Predicates: quotePromptPredicates, Limit: quotePromptsCeiling})
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: quotePromptPredicates, Limit: quotePromptsCeiling})
 	if err != nil {
 		return nil, errors.Wrapf(err, "reading the prompts of %s", namespace)
 	}

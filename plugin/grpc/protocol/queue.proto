@@ -29,13 +29,23 @@ message Job {
   Progress progress = 6;
   reserved 7, 8;
   reserved "cost_estimate", "cost_actual";
-  PulseState pulse_state = 9;
+  // The job's pacing, or that it carries none.
+  oneof pulse {
+    PulseState pulse_state = 9;
+    bool no_pulse_state = 16;   // False is refused.
+  }
   string error = 10;
   string parent_job_id = 11;
   int32 retry_count = 12;
   int64 created_at = 13;        // Unix timestamp in seconds
-  int64 started_at = 14;        // Unix timestamp in seconds (0 if not started)
-  int64 completed_at = 15;      // Unix timestamp in seconds (0 if not completed)
+  oneof started {
+    int64 started_at = 14;      // Unix timestamp in seconds
+    bool not_started = 17;      // False is refused.
+  }
+  oneof completed {
+    int64 completed_at = 15;    // Unix timestamp in seconds
+    bool not_completed = 18;    // False is refused.
+  }
 }
 
 message Progress {
@@ -86,8 +96,12 @@ message UpdateJobResponse {
 
 message ListJobsRequest {
   string auth_token = 1;
-  string status = 2;            // Optional status filter (empty = all)
-  optional int32 limit = 3;     // Maximum results. If not set, returns all matching jobs.
+  // Which jobs: those in one status, or in every status. Naming neither is refused.
+  oneof which {
+    string status = 2;          // queued, running, paused, completed, failed, cancelled
+    bool every_status = 4;      // False is refused.
+  }
+  int32 limit = 3;              // How many jobs at most: 0 is none.
 }
 
 message ListJobsResponse {

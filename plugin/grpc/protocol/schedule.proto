@@ -172,17 +172,22 @@ message ScheduledJob {
   string created_at = 12;    // RFC3339 timestamp
   string updated_at = 13;    // RFC3339 timestamp
   string created_from_doc = 14;
-  string user_id = 15;       // The User whose sigil call created it; empty is none
-  string namespace = 16;     // The namespace that caller acted in; empty is none
+  string user_id = 15;       // The User whose sigil call created it, when made_by is "caller"
+  string namespace = 16;     // The namespace that caller acted in, when made_by is "caller"
+  string made_by = 17;       // Who made it: "caller", in a sigil call, or "no caller". Anything else is refused.
 }
 
 message CreateScheduleRequest {
   string auth_token = 1;
   string handler_name = 2;      // Handler to invoke on each tick
-  int32 interval_seconds = 3;   // Execution interval
+  int32 interval_seconds = 3;   // Execution interval: at least one second
   bytes payload = 4;            // Handler-specific data (JSON)
-  map<string, string> metadata = 5;  // Optional metadata (element_id, plugin, etc.)
-  string store_token = 6;       // The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule. Empty is a schedule no caller made.
+  map<string, string> metadata = 5;  // Metadata (element_id, plugin, etc.), kept as a JSON object
+  // Who made it: the sigil call creating it, or the plugin itself.
+  oneof made {
+    string store_token = 6;     // The X-Qntx-Store-Token of the sigil call creating it. Its caller's User and namespace are kept with the schedule.
+    bool by_plugin = 7;         // The plugin made it in no sigil call: no caller is kept. False is refused.
+  }
 }
 
 message CreateScheduleResponse {

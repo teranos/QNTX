@@ -67,13 +67,23 @@ func (s *QNTXServer) handleGetJobChildren(w http.ResponseWriter, r *http.Request
 			child.Error = job.Error
 		}
 
-		if job.StartedAt != nil {
-			started := job.StartedAt.Format(time.RFC3339)
+		startedAt, startedYet, err := job.Started.When("the start of child job " + job.ID)
+		if err != nil {
+			writeWrappedError(w, s.logger, err, "failed to read child jobs", http.StatusInternalServerError)
+			return
+		}
+		if startedYet {
+			started := startedAt.Format(time.RFC3339)
 			child.StartedAt = &started
 		}
 
-		if job.CompletedAt != nil {
-			completed := job.CompletedAt.Format(time.RFC3339)
+		completedAt, completedYet, err := job.Completed.When("the completion of child job " + job.ID)
+		if err != nil {
+			writeWrappedError(w, s.logger, err, "failed to read child jobs", http.StatusInternalServerError)
+			return
+		}
+		if completedYet {
+			completed := completedAt.Format(time.RFC3339)
 			child.CompletedAt = &completed
 		}
 

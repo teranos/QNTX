@@ -78,18 +78,18 @@ test('the neutral template and each plugin template are shown as source, never r
     const templates: MailTemplates = {
         neutral: {
             id: '', at: '', plugin: 'qntx', version: '', name: 'neutral',
-            subject: '{{.subject}}', html: '<p>{{.body}}</p>', text: '{{.body}}',
+            subject: '{{.subject}}', bodies: [{ html: '<p>{{.body}}</p>' }, { text: '{{.body}}' }],
             values: ['subject', 'body'],
         },
         dark: {
             id: '', at: '', plugin: 'qntx', version: '', name: 'dark',
-            subject: '{{.subject}}', html: '<table><tr><td>{{.body}}</td></tr></table>', text: '{{.body}}',
+            subject: '{{.subject}}', bodies: [{ html: '<table><tr><td>{{.body}}</td></tr></table>' }, { text: '{{.body}}' }],
             values: ['subject', 'body'],
         },
         templates: [{
             id: 'AS-GARDEN-HARVEST', at: '2026-09-24T14:00:00Z', plugin: 'garden', version: '0.4.1',
             name: 'harvest-ready', subject: 'Harvest ready on {{.date}}',
-            html: '<p>Pick on {{.date}}.</p>', text: 'Pick on {{.date}}.', values: [],
+            bodies: [{ html: '<p>Pick on {{.date}}.</p>' }, { text: 'Pick on {{.date}}.' }], values: [],
         }],
         node: [{ name: 'report.weekly', says: 'The weekly report to the ROOT User, written whole by the node.' }],
     };

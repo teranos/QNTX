@@ -129,7 +129,7 @@ func (e *Engine) applyEdgeCursor(w *storage.Watcher) {
 	}
 
 	// Set TimeStart to cursor timestamp so matchesFilter skips already-processed attestations
-	w.Filter.TimeStart = &lastProcessedAt
+	w.Filter.TimeStart = types.BoundAt(lastProcessedAt)
 }
 
 // updateEdgeCursor records the last processed attestation for a meld-edge watcher.

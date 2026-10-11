@@ -40,14 +40,16 @@ func mailingNode(t *testing.T, transport services.MailTransport) (*QNTXServer, *
 	t.Helper()
 	s := rootKnowingServer(t)
 	mail := services.NewMailServer("token", zap.NewNop().Sugar())
+	// Every plugin these tests mail for runs, at 0.1.0.
+	mail.SetVersionResolver(func(string) (string, bool) { return "0.1.0", true })
 	mail.Wire(services.MailWiring{
-		From:      "Garden <mail@garden.test>",
-		Transport: transport,
-		Recipients: func(id string) (services.MailRecipient, bool, error) {
-			return services.MailRecipient{ID: id, Email: "tim@defacile.nl"}, true, nil
-		},
+		From:      services.MailFrom("Garden <mail@garden.test>"),
+		Transport: services.Having(transport),
+		Recipients: services.Having[services.MailRecipients](func(id string) (services.MailRecipient, bool, error) {
+			return services.AddressRecipient(id, "tim@defacile.nl"), true, nil
+		}),
 		Records: s.mailRecords,
-		Actor:   "did:key:z6Mkgardennode",
+		Actor:   services.MailActor("did:key:z6Mkgardennode"),
 	})
 	return s, mail
 }
@@ -103,7 +105,7 @@ func TestTheMailWindowListsWhatWasSentAndWhatWasRefused(t *testing.T) {
 
 	for _, subject := range []string{"Welkom", "Tot morgen"} {
 		resp, err := mail.Send(context.Background(), &protocol.SendMailRequest{
-			AuthToken: "token", Source: "garden", UserId: "UStim",
+			AuthToken: "token", Source: "garden", UserId: "UStim", Template: services.NeutralTemplateName,
 			Values: map[string]string{"subject": subject, "body": "Hallo."},
 		})
 		require.NoError(t, err)
@@ -111,15 +113,16 @@ func TestTheMailWindowListsWhatWasSentAndWhatWasRefused(t *testing.T) {
 	}
 
 	refused := services.NewMailServer("token", zap.NewNop().Sugar())
+	refused.SetVersionResolver(func(string) (string, bool) { return "0.1.0", true })
 	refused.Wire(services.MailWiring{
-		From: "Garden <mail@garden.test>", Transport: refusing{},
-		Recipients: func(id string) (services.MailRecipient, bool, error) {
-			return services.MailRecipient{ID: id, Email: "tim@defacile.nl"}, true, nil
-		},
-		Records: s.mailRecords, Actor: "did:key:z6Mkgardennode",
+		From: services.MailFrom("Garden <mail@garden.test>"), Transport: services.Having[services.MailTransport](refusing{}),
+		Recipients: services.Having[services.MailRecipients](func(id string) (services.MailRecipient, bool, error) {
+			return services.AddressRecipient(id, "tim@defacile.nl"), true, nil
+		}),
+		Records: s.mailRecords, Actor: services.MailActor("did:key:z6Mkgardennode"),
 	})
 	resp, err := refused.Send(context.Background(), &protocol.SendMailRequest{
-		AuthToken: "token", Source: "garden", UserId: "UStim",
+		AuthToken: "token", Source: "garden", UserId: "UStim", Template: services.NeutralTemplateName,
 		Values: map[string]string{"subject": "Geweigerd", "body": "Hallo."},
 	})
 	require.NoError(t, err)
@@ -154,7 +157,7 @@ func TestTheMailWindowShowsTheNeutralTemplateAndEachPluginsNewest(t *testing.T) 
 	for _, subject := range []string{"Eerste", "Tweede"} {
 		set, err := mail.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
 			AuthToken: "token", Source: "garden", Name: "reminder",
-			Template: &protocol.MailTemplate{Subject: subject, Text: "Tot morgen."},
+			Template: &protocol.MailTemplate{Subject: subject, Bodies: []*protocol.MailTemplateBody{services.TemplateText("Tot morgen.")}},
 		})
 		require.NoError(t, err)
 		require.True(t, set.Success, set.Error)
@@ -166,14 +169,14 @@ func TestTheMailWindowShowsTheNeutralTemplateAndEachPluginsNewest(t *testing.T) 
 
 	neutral := answer.(*protocol.MailTemplates).GetNeutral()
 	assert.Equal(t, services.NeutralTemplateName, neutral.GetName())
-	assert.Equal(t, services.NeutralTemplate().Html, neutral.GetHtml())
+	assert.True(t, proto.Equal(&protocol.MailTemplate{Bodies: services.NeutralTemplate().GetBodies()}, &protocol.MailTemplate{Bodies: neutral.GetBodies()}), "the neutral template is listed with its bodies")
 
 	// "why not? i want it to be listed there as well"
 	dark := answer.(*protocol.MailTemplates).GetDark()
 	own, err := services.DarkTemplate()
 	require.NoError(t, err)
 	assert.Equal(t, services.DarkTemplateName, dark.GetName())
-	assert.Equal(t, own.Html, dark.GetHtml())
+	assert.True(t, proto.Equal(&protocol.MailTemplate{Bodies: own.GetBodies()}, &protocol.MailTemplate{Bodies: dark.GetBodies()}), "the dark template is listed with its bodies")
 
 	templates := answer.(*protocol.MailTemplates).GetTemplates()
 	require.Len(t, templates, 1, "a template set twice is one template")
@@ -187,8 +190,8 @@ func TestOneMailIsReadBackWholeAsItWasSent(t *testing.T) {
 	s, mail := mailingNode(t, &kept{})
 
 	_, attestationID, err := mail.SendAsNode(context.Background(), "UStim", services.NodeMail{
-		Name: "report.weekly", Subject: "Week 39", Text: "The week.",
-		HTML:   `<p>The week.</p><img src="cid:cpu">`,
+		Name: "report.weekly", Subject: "Week 39",
+		Bodies: []services.MailBody{services.TextBody("The week."), services.HTMLBody(`<p>The week.</p><img src="cid:cpu">`)},
 		Inline: []services.InlineImage{{ContentID: "cpu", ContentType: "image/png", FileName: "cpu.png", Data: []byte{0x89, 'P', 'N', 'G'}}},
 	})
 	require.NoError(t, err)
@@ -261,5 +264,7 @@ func TestTheNodeHandsMailTheFirstAddressAUserSupplied(t *testing.T) {
 	tim, found, err := s.mailRecipient("UStim")
 	require.NoError(t, err)
 	require.True(t, found)
-	assert.Equal(t, "tim@defacile.nl", tim.Email)
+	address, err := tim.Address()
+	require.NoError(t, err)
+	assert.Equal(t, "tim@defacile.nl", address.String())
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	errors "github.com/teranos/sacred-error"
@@ -18,25 +17,19 @@ func (s *QNTXServer) HandlePluginLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse plugin name from path: /api/plugins/{name}/logs
-	path := strings.TrimPrefix(r.URL.Path, "/api/plugins/")
-	pluginName := strings.TrimSuffix(path, "/logs")
+	// The mux's {name} is a whole path segment, so it names a plugin; one with
+	// no log buffer is refused below.
+	pluginName := r.PathValue("name")
 
-	if pluginName == "" {
-		writeError(w, http.StatusBadRequest, "plugin name required in URL path")
+	pm, err := s.getPluginManager()
+	if err != nil {
+		s.writeRichError(w, errors.Wrapf(err, "the log of plugin %s cannot be streamed", pluginName), http.StatusServiceUnavailable)
 		return
 	}
 
-	pm := s.getPluginManager()
-	if pm == nil {
-		writeError(w, http.StatusServiceUnavailable, "plugin manager not available")
-		return
-	}
-
-	buf := pm.GetLogBuffer(pluginName)
-	if buf == nil {
-		writeError(w, http.StatusNotFound,
-			fmt.Sprintf("no log buffer for plugin '%s' (remote plugins don't have local logs)", pluginName))
+	buf, err := pm.GetLogBuffer(pluginName)
+	if err != nil {
+		s.writeRichError(w, errors.Wrapf(err, "the log of plugin %s cannot be streamed", pluginName), http.StatusNotFound)
 		return
 	}
 
@@ -91,8 +84,8 @@ func writeSSEEntry(w http.ResponseWriter, entry grpcplugin.LogEntry) error {
 	if err != nil {
 		return errors.Wrapf(err, "log entry from %s could not be encoded", entry.Source)
 	}
-	if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
-		return errors.Wrap(err, "the log stream could not be written to")
+	if written, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+		return errors.Wrapf(err, "the log stream could not be written to: %d of %d bytes of an entry from %s went out", written, len(data)+len("data: \n\n"), entry.Source)
 	}
 	return nil
 }

@@ -66,9 +66,6 @@ func (b *LogBuffer) Recent(n int) []LogEntry {
 	if n > b.count {
 		n = b.count
 	}
-	if n == 0 {
-		return nil
-	}
 
 	result := make([]LogEntry, n)
 	// Start position: oldest of the n entries we want

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/teranos/QNTX/ats/types"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -875,7 +876,7 @@ func setupSEtoSE(t *testing.T) (*CanvasHandler, storage.Watchers, context.Contex
 	}
 
 	// Create standalone watchers (simulating what the frontend does)
-	se1Watcher := &storage.Watcher{
+	se1Watcher := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                "se-element-se-1",
 		Name:              "SE: science",
 		ActionType:        storage.ActionTypeSemanticMatch,
@@ -884,7 +885,7 @@ func setupSEtoSE(t *testing.T) (*CanvasHandler, storage.Watchers, context.Contex
 		MaxFiresPerSecond: 60,
 		Enabled:           true,
 	}
-	se2Watcher := &storage.Watcher{
+	se2Watcher := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                "se-element-se-2",
 		Name:              "SE: about teaching",
 		ActionType:        storage.ActionTypeSemanticMatch,
@@ -1044,8 +1045,8 @@ func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
 
 	// Create standalone watchers
 	for _, w := range []*storage.Watcher{
-		{ID: "se-element-se-1", Name: "SE: science", ActionType: storage.ActionTypeSemanticMatch, SemanticQuery: "science", SemanticThreshold: 0.4, MaxFiresPerSecond: 60, Enabled: true},
-		{ID: "se-element-se-2", Name: "SE: teaching", ActionType: storage.ActionTypeSemanticMatch, SemanticQuery: "about teaching", SemanticThreshold: 0.5, MaxFiresPerSecond: 60, Enabled: true},
+		{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()}, ID: "se-element-se-1", Name: "SE: science", ActionType: storage.ActionTypeSemanticMatch, SemanticQuery: "science", SemanticThreshold: 0.4, MaxFiresPerSecond: 60, Enabled: true},
+		{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()}, ID: "se-element-se-2", Name: "SE: teaching", ActionType: storage.ActionTypeSemanticMatch, SemanticQuery: "about teaching", SemanticThreshold: 0.5, MaxFiresPerSecond: 60, Enabled: true},
 	} {
 		if err := watcherStore.Create(ctx, w); err != nil {
 			t.Fatalf("Create watcher %s failed: %v", w.ID, err)

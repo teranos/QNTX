@@ -12,8 +12,10 @@ import (
 
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/internal/named"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
@@ -34,15 +36,17 @@ func (s *QNTXServer) pluginRecords() PluginRecords { return PluginRecords{s: s} 
 // PluginRecords is where the plugin layer reads which plugins run.
 func (s *QNTXServer) PluginRecords() grpcplugin.PluginRecords { return s.pluginRecords() }
 
-// actorOf is who a line written for this request is by: the route a person
-// came in by, or the admission's identity.
+// actorOf is who a line written for this request is by: the token that
+// asked, or the identity the admission came in by.
 func actorOf(ctx context.Context) string {
 	admitted, gated := auth.AdmissionFrom(ctx)
 	if !gated {
 		return pluginSource
 	}
-	if actor := admitted.ActsAs(); actor != "" {
-		return actor
+	switch asker := admitted.Asker().(type) {
+	case admission.TokenAsked:
+		return asker.Grant.DID
+	case admission.NoTokenAsked:
 	}
 	return admitted.Identity
 }
@@ -84,9 +88,12 @@ func (r PluginRecords) pluginLine(actor string, record grpcplugin.PluginRecord) 
 // error naming the line, never a plugin missing part of what was written.
 func asPluginRecord(as *types.As) (grpcplugin.PluginRecord, error) {
 	record := grpcplugin.PluginRecord{Name: as.Predicates[0], Config: map[string]string{}}
-	if len(as.Contexts) > 0 {
-		record.Repo = as.Contexts[0]
+	// pluginLine writes the repository a plugin was added from as the one context.
+	if len(as.Contexts) != 1 {
+		return grpcplugin.PluginRecord{}, errors.Newf("%s line %s about %s: contexts are %v, not the one repository it was added from",
+			pluginSubject, as.ID, record.Name, as.Contexts)
 	}
+	record.Repo = as.Contexts[0]
 	enabled, ok := as.Attributes["enabled"].(bool)
 	if !ok {
 		return grpcplugin.PluginRecord{}, errors.Newf("%s line %s about %s: enabled is %v, not true or false",
@@ -144,21 +151,42 @@ func (r PluginRecords) Plugin(name string) (grpcplugin.PluginRecord, bool, error
 	return record, true, nil
 }
 
+// Added is whether somebody added the plugin name.
+func (r PluginRecords) Added(name string) (bool, error) {
+	newest, err := r.newest()
+	if err != nil {
+		return false, err
+	}
+	_, found := newest[name]
+	return found, nil
+}
+
 // AddPlugin records a plugin by its repository URL. It starts disabled.
 func (r PluginRecords) AddPlugin(actor, repo string) (grpcplugin.PluginRecord, error) {
 	repo = strings.TrimSpace(repo)
 	parsed, err := url.Parse(repo)
-	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
-		return grpcplugin.PluginRecord{}, errors.Newf("%q is not a repository URL", repo)
+	if err != nil {
+		return grpcplugin.PluginRecord{}, errors.Wrapf(err, "%q is not a repository URL", repo)
 	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return grpcplugin.PluginRecord{}, errors.Newf("%q is not a repository URL: its scheme is %q, not https or http", repo, parsed.Scheme)
+	}
+	// The host is where the plugin is built from, so a URL naming none is no
+	// repository.
+	host, err := named.TextOf("the host of "+repo, parsed.Host)
+	if err != nil {
+		return grpcplugin.PluginRecord{}, errors.Wrapf(err, "%q is not a repository URL", repo)
+	}
+	// path.Base names something always; "." and "/" are what it names for a
+	// URL that names no plugin.
 	name := config.PluginNameFromRepo(repo)
-	if name == "" || name == "." || name == "/" {
-		return grpcplugin.PluginRecord{}, errors.Newf("%q names no plugin", repo)
+	if name == "." || name == "/" {
+		return grpcplugin.PluginRecord{}, errors.Newf("%q on %s names no plugin", repo, host)
 	}
 	if held, found, err := r.Plugin(name); err != nil {
 		return grpcplugin.PluginRecord{}, err
 	} else if found {
-		return grpcplugin.PluginRecord{}, errors.Newf("plugin %s is already added, from %s", name, held.Repo)
+		return grpcplugin.PluginRecord{}, errors.Newf("plugin %s is already added, from %s, and %q on %s names it again", name, held.Repo, repo, host)
 	}
 	record := grpcplugin.PluginRecord{Name: name, Repo: repo, Config: map[string]string{}}
 	if err := r.pluginLine(actor, record); err != nil {

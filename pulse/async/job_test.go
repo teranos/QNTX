@@ -110,7 +110,7 @@ func TestJobStateTransitions(t *testing.T) {
 	if job.Status != JobStatusRunning {
 		t.Errorf("After Start(), status = %v, want %v", job.Status, JobStatusRunning)
 	}
-	if job.StartedAt == nil {
+	if _, err := job.Started.Time("the start"); err != nil {
 		t.Error("After Start(), StartedAt should be set")
 	}
 	t.Log("  ✓ Mission started - frame-perfect execution begins")
@@ -134,7 +134,7 @@ func TestJobStateTransitions(t *testing.T) {
 	if job.Status != JobStatusCompleted {
 		t.Errorf("After Complete(), status = %v, want %v", job.Status, JobStatusCompleted)
 	}
-	if job.CompletedAt == nil {
+	if _, err := job.Completed.Time("the completion"); err != nil {
 		t.Error("After Complete(), CompletedAt should be set")
 	}
 	t.Log("  ✓ Mission complete - speedrun saved!")
@@ -161,7 +161,7 @@ func TestJobFailure(t *testing.T) {
 	if job.Error != testErr {
 		t.Errorf("After Fail(), error = %v, want %v", job.Error, testErr)
 	}
-	if job.CompletedAt == nil {
+	if _, err := job.Completed.Time("the completion"); err != nil {
 		t.Error("After Fail(), CompletedAt should be set")
 	}
 	t.Log("  ✓ Mission failed gracefully - error logged for retry")
@@ -215,25 +215,24 @@ func TestPulseState(t *testing.T) {
 		t.Fatalf("Failed to create job: %v", err)
 	}
 
-	if job.PulseState != nil {
-		t.Error("Initial pulse state should be nil")
+	if _, held, err := job.Pulse.State("the new job"); err != nil || held {
+		t.Errorf("A new job carries no pulse state, and says so: held %v, %v", held, err)
 	}
 
 	// Update pulse state - tracking API limits
-	pulseState := &PulseState{
+	job.UpdatePulseState(PulseState{
 		CallsThisMinute: 45,
 		CallsRemaining:  15,
 		IsPaused:        false,
+	})
+	state, held, err := job.Pulse.State("the job")
+	if err != nil || !held {
+		t.Fatalf("Pulse state should be set: held %v, %v", held, err)
 	}
-
-	job.UpdatePulseState(pulseState)
-	if job.PulseState == nil {
-		t.Fatal("Pulse state should be set")
+	if state.CallsRemaining != 15 {
+		t.Errorf("Pulse state calls_remaining = %v, want 15", state.CallsRemaining)
 	}
-	if job.PulseState.CallsRemaining != 15 {
-		t.Errorf("Pulse state calls_remaining = %v, want 15", job.PulseState.CallsRemaining)
-	}
-	t.Logf("  ✓ Pulse state: %d calls this minute", job.PulseState.CallsThisMinute)
+	t.Logf("  ✓ Pulse state: %d calls this minute", state.CallsThisMinute)
 }
 
 func TestJobPayload(t *testing.T) {
@@ -288,17 +287,26 @@ func TestMarshalUnmarshalPulseState(t *testing.T) {
 	}
 
 	// Marshal to JSON
-	json, err := MarshalPulseState(original)
+	column, err := Pulsed(*original).column("the job")
 	if err != nil {
-		t.Fatalf("MarshalPulseState() error = %v", err)
+		t.Fatalf("column() error = %v", err)
 	}
-	if json == "" {
-		t.Error("MarshalPulseState() returned empty string")
+	if !column.Valid {
+		t.Error("a pulse state was kept as NULL")
 	}
 	t.Log("  ✓ Pulse state serialized to JSON")
 
+	// A job carrying none is kept as NULL; one naming neither is refused.
+	none, err := NoPulse().column("the job")
+	if err != nil || none.Valid {
+		t.Errorf("no pulse state was kept as %v, %v", none, err)
+	}
+	if _, err := (Pulse{}).column("the job"); err == nil {
+		t.Error("a pulse naming neither side was kept")
+	}
+
 	// Unmarshal from JSON
-	restored, err := UnmarshalPulseState(json)
+	restored, err := UnmarshalPulseState(column.String)
 	if err != nil {
 		t.Fatalf("UnmarshalPulseState() error = %v", err)
 	}
@@ -560,4 +568,39 @@ func TestTaskAggregation(t *testing.T) {
 	}
 
 	t.Log("  ✓ Aggregation complete: 3/5 workers done, 1 failed")
+}
+
+// "nil is nil": a job says in JSON the start, completion and pulse state it
+// has, the shape the web has always read, and a job naming neither side of
+// one is refused rather than written as not started.
+func TestAJobSaysInJSONWhatItHas(t *testing.T) {
+	job, err := createTestJob("test.json", "json", 1)
+	if err != nil {
+		t.Fatalf("Failed to create job: %v", err)
+	}
+	queued, err := json.Marshal(job)
+	if err != nil {
+		t.Fatalf("a new job did not marshal: %v", err)
+	}
+	for _, key := range []string{`"started_at"`, `"completed_at"`, `"pulse_state"`} {
+		if strings.Contains(string(queued), key) {
+			t.Errorf("a new job says %s: %s", key, queued)
+		}
+	}
+
+	job.Start()
+	job.UpdatePulseState(PulseState{CallsRemaining: 3})
+	running, err := json.Marshal(job)
+	if err != nil {
+		t.Fatalf("a running job did not marshal: %v", err)
+	}
+	for _, key := range []string{`"started_at"`, `"pulse_state":{"calls_remaining":3}`, `"id":"` + job.ID + `"`} {
+		if !strings.Contains(string(running), key) {
+			t.Errorf("a running job does not say %s: %s", key, running)
+		}
+	}
+
+	if _, err := json.Marshal(&Job{ID: "JBneither"}); err == nil {
+		t.Error("a job naming neither side of its start was marshalled")
+	}
 }

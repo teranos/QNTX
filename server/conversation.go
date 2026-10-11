@@ -79,7 +79,7 @@ func (a *ConversationAssembler) AssembleMessages(ctx context.Context, elementID 
 	// Query prompt-result attestations for each upstream element
 	var allResults []*types.As
 	for _, id := range upstreamIDs {
-		filter := types.AxFilter{
+		filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Contexts:   []string{id},
 			Predicates: []string{"prompt-result"},
 			Limit:      10,

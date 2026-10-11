@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -15,14 +16,34 @@ import (
 type VectorSearchServer struct {
 	protocol.UnimplementedVectorSearchServiceServer
 	mu        sync.RWMutex
-	service   protocol.VectorSearchServiceClient
+	backing   vectorBacking
 	authToken string
 	logger    *zap.SugaredLogger
 }
 
+// vectorBacking is what serves vector search: a registered backend, or none
+// yet, and why.
+type vectorBacking interface {
+	backsVectorSearch()
+}
+
+// vectorBackend is the registered vector search backend.
+type vectorBackend struct {
+	client protocol.VectorSearchServiceClient
+}
+
+// noVectorBackend is no backend registered yet, and why.
+type noVectorBackend struct {
+	why error
+}
+
+func (vectorBackend) backsVectorSearch()   {}
+func (noVectorBackend) backsVectorSearch() {}
+
 // NewVectorSearchServer creates a new vector search gRPC server.
 func NewVectorSearchServer(authToken string, logger *zap.SugaredLogger) *VectorSearchServer {
 	return &VectorSearchServer{
+		backing:   noVectorBackend{why: errors.New("vector search service not initialized")},
 		authToken: authToken,
 		logger:    logger,
 	}
@@ -32,7 +53,7 @@ func NewVectorSearchServer(authToken string, logger *zap.SugaredLogger) *VectorS
 func (s *VectorSearchServer) SetService(client protocol.VectorSearchServiceClient) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.service = client
+	s.backing = vectorBackend{client: client}
 	s.logger.Infow("VectorSearch gRPC service backend registered")
 }
 
@@ -40,7 +61,25 @@ func (s *VectorSearchServer) SetService(client protocol.VectorSearchServiceClien
 func (s *VectorSearchServer) HasProvider() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.service != nil
+	switch s.backing.(type) {
+	case vectorBackend:
+		return true
+	case noVectorBackend:
+	}
+	return false
+}
+
+// backend is the registered vector search backend, or why there is none yet.
+func (s *VectorSearchServer) backend() (protocol.VectorSearchServiceClient, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	switch backing := s.backing.(type) {
+	case vectorBackend:
+		return backing.client, nil
+	case noVectorBackend:
+		return nil, backing.why
+	}
+	return nil, errors.Newf("vector search names neither a backend nor why it has none: %T", s.backing)
 }
 
 // Search finds the nearest neighbors to a query vector in a named index.
@@ -49,22 +88,26 @@ func (s *VectorSearchServer) Search(ctx context.Context, req *protocol.VectorSea
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, errors.New("vector search service not initialized")
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
 	}
 
-	if req.Index == "" {
-		return nil, errors.New("index name cannot be empty")
+	index, err := named.TextOf("index", req.Index)
+	if err != nil {
+		return nil, err
 	}
-	if len(req.QueryVector) == 0 {
-		return nil, errors.New("query vector cannot be empty")
+	query, err := named.ItemsOf("query vector", req.QueryVector)
+	if err != nil {
+		return nil, err
 	}
 
-	return svc.Search(ctx, req)
+	return svc.Search(ctx, &protocol.VectorSearchRequest{
+		AuthToken:   req.AuthToken,
+		Index:       index.String(),
+		QueryVector: query.All(),
+		TopK:        req.TopK,
+	})
 }
 
 // AddVectors inserts vectors into a named index.
@@ -73,22 +116,25 @@ func (s *VectorSearchServer) AddVectors(ctx context.Context, req *protocol.AddVe
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, errors.New("vector search service not initialized")
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
 	}
 
-	if req.Index == "" {
-		return nil, errors.New("index name cannot be empty")
+	index, err := named.TextOf("index", req.Index)
+	if err != nil {
+		return nil, err
 	}
-	if len(req.Vectors) == 0 {
-		return nil, errors.New("no vectors provided")
+	vectors, err := named.ItemsOf("vectors", req.Vectors)
+	if err != nil {
+		return nil, err
 	}
 
-	return svc.AddVectors(ctx, req)
+	return svc.AddVectors(ctx, &protocol.AddVectorsRequest{
+		AuthToken: req.AuthToken,
+		Index:     index.String(),
+		Vectors:   vectors.All(),
+	})
 }
 
 // CreateIndex creates a new named vector index.
@@ -97,20 +143,23 @@ func (s *VectorSearchServer) CreateIndex(ctx context.Context, req *protocol.Crea
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, errors.New("vector search service not initialized")
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
 	}
 
-	if req.Name == "" {
-		return nil, errors.New("index name cannot be empty")
+	name, err := named.TextOf("index name", req.Name)
+	if err != nil {
+		return nil, err
 	}
-	if req.Dimensions <= 0 {
-		return nil, errors.Newf("dimensions must be positive, got %d", req.Dimensions)
+	dimensions, err := named.CountOf("dimensions", int(req.Dimensions))
+	if err != nil {
+		return nil, err
 	}
 
-	return svc.CreateIndex(ctx, req)
+	return svc.CreateIndex(ctx, &protocol.CreateIndexRequest{
+		AuthToken:  req.AuthToken,
+		Name:       name.String(),
+		Dimensions: int32(dimensions.Int()),
+	})
 }

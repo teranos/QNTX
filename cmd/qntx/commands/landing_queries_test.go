@@ -87,7 +87,7 @@ func requireAxFinds(t *testing.T, landing *landed, u *namespaces.Universe) {
 		Source:     "test",
 	}))
 
-	found, err := u.Queries().ExecuteAxQuery(context.Background(), types.AxFilter{Predicates: []string{"ripples"}, Limit: ats.EveryRow})
+	found, err := u.Queries().ExecuteAxQuery(context.Background(), types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"ripples"}, Limit: ats.EveryRow})
 	require.NoError(t, err)
 	require.Len(t, found, 1, "the attestation is in %s's file and ax did not find it", u.Name())
 	require.Equal(t, "AS-RIPPLE", found[0].ID)

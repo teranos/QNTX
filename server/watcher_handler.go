@@ -269,6 +269,9 @@ func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Requ
 			Predicates: req.Predicates,
 			Contexts:   req.Contexts,
 			Actors:     req.Actors,
+			// A side the request names no time for is unbounded.
+			TimeStart: types.Unbounded(),
+			TimeEnd:   types.Unbounded(),
 		},
 		ActionType:        storage.ActionType(req.ActionType),
 		ActionData:        req.ActionData,
@@ -292,7 +295,7 @@ func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Requ
 			writeRichError(w, h.logger, errors.Wrap(err, "invalid time_start format (use RFC3339)"), http.StatusBadRequest)
 			return
 		}
-		watcher.Filter.TimeStart = &t
+		watcher.Filter.TimeStart = types.BoundAt(t)
 	}
 	if req.TimeEnd != "" {
 		t, err := time.Parse(time.RFC3339, req.TimeEnd)
@@ -300,7 +303,7 @@ func (h *WatcherHandler) handleCreateWatcher(w http.ResponseWriter, r *http.Requ
 			writeRichError(w, h.logger, errors.Wrap(err, "invalid time_end format (use RFC3339)"), http.StatusBadRequest)
 			return
 		}
-		watcher.Filter.TimeEnd = &t
+		watcher.Filter.TimeEnd = types.BoundAt(t)
 	}
 
 	// Create watcher
@@ -376,7 +379,7 @@ func (h *WatcherHandler) handleUpdateWatcher(w http.ResponseWriter, r *http.Requ
 			writeRichError(w, h.logger, errors.Wrap(err, "invalid time_start format"), http.StatusBadRequest)
 			return
 		}
-		existing.Filter.TimeStart = &t
+		existing.Filter.TimeStart = types.BoundAt(t)
 	}
 	if req.TimeEnd != "" {
 		t, err := time.Parse(time.RFC3339, req.TimeEnd)
@@ -384,7 +387,7 @@ func (h *WatcherHandler) handleUpdateWatcher(w http.ResponseWriter, r *http.Requ
 			writeRichError(w, h.logger, errors.Wrap(err, "invalid time_end format"), http.StatusBadRequest)
 			return
 		}
-		existing.Filter.TimeEnd = &t
+		existing.Filter.TimeEnd = types.BoundAt(t)
 	}
 	if req.SemanticQuery != "" {
 		existing.SemanticQuery = req.SemanticQuery

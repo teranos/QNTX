@@ -78,3 +78,39 @@ func TestANameHoldingNothingCountsLikeWhatItHolds(t *testing.T) {
 		}
 	}
 }
+
+// An answer to the caller is not a log carried on from.
+func TestAnswerToTheCallerIsNotALog(t *testing.T) {
+	for source, counted := range map[string]bool{
+		`logger.Errorw("failed", "error", err)`: true,
+		`h.logger.Warnf("slow")`:                true,
+		`http.Error(w, "refused", 400)`:         false,
+	} {
+		expr, err := parser.ParseExpr(source)
+		if err != nil {
+			t.Fatalf("%s does not parse: %v", source, err)
+		}
+		if got := logs(&ast.ExprStmt{X: expr}); got != counted {
+			t.Errorf("%s counted %v, want %v", source, got, counted)
+		}
+	}
+}
+
+// A log, then the caller answered, then out, is not carrying on.
+func TestAnsweringOnTheWayOutStillLeaves(t *testing.T) {
+	for source, counted := range map[string]bool{
+		"func f() { logger.Errorw(\"x\"); http.Error(w, \"x\", 500); return }": false,
+		"func f() { logger.Errorw(\"x\"); http.Error(w, \"x\", 500) }":         true,
+		"func f() { logger.Errorw(\"x\"); next() }":                            true,
+	} {
+		file, err := parser.ParseFile(token.NewFileSet(), "f.go", "package p\n"+source, 0)
+		if err != nil {
+			t.Fatalf("%s does not parse: %v", source, err)
+		}
+		hits := found{}
+		readGo(token.NewFileSet(), file, "f.go", hits, func(ast.Expr) bool { return false })
+		if got := len(hits["carryon"]) > 0; got != counted {
+			t.Errorf("%s counted %v, want %v", source, got, counted)
+		}
+	}
+}

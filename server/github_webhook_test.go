@@ -103,7 +103,7 @@ func TestAPushMovesTheBuildsItsRepoAndBranchFeed(t *testing.T) {
 	b := pluginBuild{
 		name:   "datapunt",
 		core:   buildSource{Owner: "teranos", Repo: "datapunt", Branch: "main"},
-		inputs: []buildSource{{Owner: "abcd-nl", Repo: "clean", Branch: "main", Path: "competitor.cue"}},
+		inputs: []buildSource{{Owner: "abcd-nl", Repo: "clean", Branch: "main", Path: "competitor.cue", PathNamed: true}},
 	}
 	push := func(raw string) gitHubPush {
 		var p gitHubPush
