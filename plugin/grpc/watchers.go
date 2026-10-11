@@ -143,26 +143,44 @@ func filterTerms(reg *protocol.WatcherRegistration) (named.Count, error) {
 		len(reg.GetSubjects())+len(reg.GetPredicates())+len(reg.GetContexts())+len(reg.GetActors()))
 }
 
-// filteredWatchers is how many terms each watcher's filter names, for the
-// watchers whose filter names any.
-func filteredWatchers(watchers []*protocol.WatcherRegistration) map[string]named.Count {
-	counted := make(map[string]named.Count, len(watchers))
-	for _, w := range watchers {
-		if terms, err := filterTerms(w); err == nil {
-			counted[w.GetId()] = terms
-		}
+// watcherFilter is what a watcher's filter names: its terms, or nothing, and
+// the refusal of it.
+type watcherFilter interface {
+	saysWhatItFilters()
+}
+
+// filtered is a filter naming at least one term.
+type filtered struct {
+	terms named.Count
+}
+
+// unfiltered is a filter naming nothing, which SetupPluginWatchers refuses.
+type unfiltered struct {
+	refused error
+}
+
+func (filtered) saysWhatItFilters()   {}
+func (unfiltered) saysWhatItFilters() {}
+
+// filterOf is what a watcher's filter names, or its refusal for naming
+// nothing.
+func filterOf(reg *protocol.WatcherRegistration) watcherFilter {
+	terms, err := filterTerms(reg)
+	if err != nil {
+		return unfiltered{refused: err}
 	}
-	return counted
+	return filtered{terms: terms}
 }
 
 // UnfilteredWatcherNames returns IDs of watchers whose filter names nothing,
 // which SetupPluginWatchers refuses.
 func UnfilteredWatcherNames(watchers []*protocol.WatcherRegistration) []string {
-	filtered := filteredWatchers(watchers)
 	var names []string
 	for _, w := range watchers {
-		if _, counted := filtered[w.GetId()]; !counted {
+		switch filterOf(w).(type) {
+		case unfiltered:
 			names = append(names, w.GetId())
+		case filtered:
 		}
 	}
 	return names
