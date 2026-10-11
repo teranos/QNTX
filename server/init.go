@@ -147,8 +147,11 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		rlPublic:        newRateLimitGroup(rl.PublicRate, rl.PublicBurst),
 		rlStaand:        newRateLimitGroup(rl.StaandRate, rl.StaandBurst),
 		rlOpened:        newRateLimitGroup(rl.OpenedRate, rl.OpenedBurst),
-		ctx:             ctx,
-		cancel:          cancel,
+		// The node's mail is its mail service's, which starts with the
+		// plugin services.
+		nodeMailer: notMailing{why: errors.New("the node's mail service has not started: it starts with the plugin services")},
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 	server.verbosity.Store(int32(verbosity))
 	server.pluginHealthCache.Store(notProbed())

@@ -85,7 +85,8 @@ type QNTXServer struct {
 	// node started is read by the next report.
 	sentryConfig      config.SentryConfig
 	sentryEnvironment string
-	// What sends the node's own mail; nil when the mail service did not start.
+	// What sends the node's own mail: the mail service, or, until the plugin
+	// services make it, what refuses each mail saying so.
 	nodeMailer nodeMailer
 	// The node's GitHubService (ADR-043), made on first use.
 	githubOnce sync.Once

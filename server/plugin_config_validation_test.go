@@ -38,15 +38,15 @@ func TestValidateConfigAgainstSchema(t *testing.T) {
 				"max_workers": {
 					Type:         "integer",
 					Required:     true,
-					MinValue:     "1",
-					MaxValue:     "16",
+					Min:          &protocol.ConfigFieldSchema_MinValue{MinValue: "1"},
+					Max:          &protocol.ConfigFieldSchema_MaxValue{MaxValue: "16"},
 					DefaultValue: "4",
 				},
 				"timeout_secs": {
 					Type:         "integer",
 					Required:     true,
-					MinValue:     "1",
-					MaxValue:     "300",
+					Min:          &protocol.ConfigFieldSchema_MinValue{MinValue: "1"},
+					Max:          &protocol.ConfigFieldSchema_MaxValue{MaxValue: "300"},
 					DefaultValue: "30",
 				},
 				"enable_debug": {
@@ -70,11 +70,57 @@ func TestValidateConfigAgainstSchema(t *testing.T) {
 				"timeout_secs": {
 					Type:     "integer",
 					Required: true,
+					Min:      &protocol.ConfigFieldSchema_UnboundedBelow{UnboundedBelow: &protocol.Unbounded{}},
+					Max:      &protocol.ConfigFieldSchema_UnboundedAbove{UnboundedAbove: &protocol.Unbounded{}},
 				},
 			},
 			wantErrors: map[string]string{
 				"max_workers": "This field is required",
 			},
+		},
+		{
+			name: "required field holding nothing",
+			config: map[string]string{
+				"api_key": "",
+			},
+			schema: map[string]*protocol.ConfigFieldSchema{
+				"api_key": {
+					Type:     "string",
+					Required: true,
+				},
+			},
+			wantErrors: map[string]string{
+				"api_key": "This field is required: api_key names nothing",
+			},
+		},
+		{
+			name: "number field naming no bounds",
+			config: map[string]string{
+				"ratio": "0.5",
+			},
+			schema: map[string]*protocol.ConfigFieldSchema{
+				"ratio": {
+					Type: "number",
+					Max:  &protocol.ConfigFieldSchema_UnboundedAbove{UnboundedAbove: &protocol.Unbounded{}},
+				},
+			},
+			wantErrors: map[string]string{
+				"ratio": "The plugin's schema names no min_value for this field, and not that it is unbounded below",
+			},
+		},
+		{
+			name: "number field unbounded on both sides",
+			config: map[string]string{
+				"ratio": "12345.5",
+			},
+			schema: map[string]*protocol.ConfigFieldSchema{
+				"ratio": {
+					Type: "number",
+					Min:  &protocol.ConfigFieldSchema_UnboundedBelow{UnboundedBelow: &protocol.Unbounded{}},
+					Max:  &protocol.ConfigFieldSchema_UnboundedAbove{UnboundedAbove: &protocol.Unbounded{}},
+				},
+			},
+			wantNoErrors: true,
 		},
 		{
 			name: "integer out of range - exceeds max",
@@ -83,9 +129,9 @@ func TestValidateConfigAgainstSchema(t *testing.T) {
 			},
 			schema: map[string]*protocol.ConfigFieldSchema{
 				"max_workers": {
-					Type:     "integer",
-					MinValue: "1",
-					MaxValue: "16",
+					Type: "integer",
+					Min:  &protocol.ConfigFieldSchema_MinValue{MinValue: "1"},
+					Max:  &protocol.ConfigFieldSchema_MaxValue{MaxValue: "16"},
 				},
 			},
 			wantErrors: map[string]string{
@@ -99,9 +145,9 @@ func TestValidateConfigAgainstSchema(t *testing.T) {
 			},
 			schema: map[string]*protocol.ConfigFieldSchema{
 				"timeout_secs": {
-					Type:     "integer",
-					MinValue: "1",
-					MaxValue: "300",
+					Type: "integer",
+					Min:  &protocol.ConfigFieldSchema_MinValue{MinValue: "1"},
+					Max:  &protocol.ConfigFieldSchema_MaxValue{MaxValue: "300"},
 				},
 			},
 			wantErrors: map[string]string{

@@ -3,13 +3,12 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/internal/named"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
@@ -86,16 +85,23 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 				// Convert protobuf schema to JSON-friendly map
 				schema = make(map[string]any)
 				for fieldName, fieldSchema := range schemaResp.GetFields() {
-					schema[fieldName] = map[string]any{
+					field := map[string]any{
 						"type":          fieldSchema.Type,
 						"description":   fieldSchema.Description,
 						"default_value": fieldSchema.DefaultValue,
 						"required":      fieldSchema.Required,
-						"min_value":     fieldSchema.MinValue,
-						"max_value":     fieldSchema.MaxValue,
 						"pattern":       fieldSchema.Pattern,
 						"element_type":  fieldSchema.ElementType,
 					}
+					// The form holds a value to the bounds a field names. One
+					// naming none is refused when the config is written.
+					if least, bounded := fieldSchema.GetMin().(*protocol.ConfigFieldSchema_MinValue); bounded {
+						field["min_value"] = least.MinValue
+					}
+					if most, bounded := fieldSchema.GetMax().(*protocol.ConfigFieldSchema_MaxValue); bounded {
+						field["max_value"] = most.MaxValue
+					}
+					schema[fieldName] = field
 				}
 			} else {
 				// Not an external gRPC plugin
@@ -225,9 +231,6 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	})
 }
 
-// configFieldTypes are the types a plugin's config schema names a field as.
-var configFieldTypes = []string{"string", "integer", "number", "boolean"}
-
 // validateConfigAgainstSchema validates config values against plugin schema
 // constraints: what each refused field is told, and the refusal of them all.
 func validateConfigAgainstSchema(settings map[string]string, schema map[string]*protocol.ConfigFieldSchema) (map[string]string, error) {
@@ -243,17 +246,28 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 		refusedErr = errors.WithSecondaryError(refusedErr, refusal)
 	}
 
-	// Check all required fields are present
+	// A required field is there and holds something, and what it holds is
+	// what its type says.
 	for fieldName, fieldSchema := range schema {
-		if fieldSchema.Required {
-			if value, exists := settings[fieldName]; !exists || value == "" {
-				refuse(fieldName, "This field is required")
-				continue
-			}
+		if !fieldSchema.Required {
+			continue
+		}
+		value, exists := settings[fieldName]
+		if !exists {
+			refuse(fieldName, "This field is required")
+			continue
+		}
+		held, err := named.TextOf(fieldName, value)
+		if err != nil {
+			refuse(fieldName, "This field is required: "+err.Error())
+			continue
+		}
+		if err := checkConfigValue(held.String(), fieldSchema); err != nil {
+			refuse(fieldName, err.Error())
 		}
 	}
 
-	// Validate each provided config value
+	// Every other value is one the schema names, and is what its type says.
 	for fieldName, value := range settings {
 		// How QNTX builds the plugin, and where it stands, are QNTX's, not the
 		// plugin's to validate.
@@ -265,88 +279,89 @@ func validateConfigAgainstSchema(settings map[string]string, schema map[string]*
 			refuse(fieldName, "Unknown configuration field")
 			continue
 		}
-
-		// A type the schema names that is none of these is refused.
-		if !slices.Contains(configFieldTypes, fieldSchema.Type) {
-			refuse(fieldName, fmt.Sprintf("Unknown field type: %s", fieldSchema.Type))
+		// Checked above, as the text it holds.
+		if fieldSchema.Required {
 			continue
 		}
-		switch fieldSchema.Type {
-		case "string":
-			// Any text is a string.
-		case "integer":
-			intVal, err := strconv.ParseInt(value, 10, 64)
-			if err != nil {
-				refuse(fieldName, "Must be a valid integer")
-				continue
-			}
-
-			// Check min_value constraint
-			if fieldSchema.MinValue != "" {
-				minVal, err := strconv.ParseInt(fieldSchema.MinValue, 10, 64)
-				if err != nil {
-					refuse(fieldName, fmt.Sprintf("The plugin's schema says min_value %q, which is not an integer", fieldSchema.MinValue))
-					continue
-				}
-				if intVal < minVal {
-					refuse(fieldName, fmt.Sprintf("Must be at least %s", fieldSchema.MinValue))
-					continue
-				}
-			}
-
-			// Check max_value constraint
-			if fieldSchema.MaxValue != "" {
-				maxVal, err := strconv.ParseInt(fieldSchema.MaxValue, 10, 64)
-				if err != nil {
-					refuse(fieldName, fmt.Sprintf("The plugin's schema says max_value %q, which is not an integer", fieldSchema.MaxValue))
-					continue
-				}
-				if intVal > maxVal {
-					refuse(fieldName, fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue))
-					continue
-				}
-			}
-
-		case "number":
-			floatVal, err := strconv.ParseFloat(value, 64)
-			if err != nil {
-				refuse(fieldName, "Must be a valid number")
-				continue
-			}
-
-			// Check min_value constraint
-			if fieldSchema.MinValue != "" {
-				minVal, err := strconv.ParseFloat(fieldSchema.MinValue, 64)
-				if err != nil {
-					refuse(fieldName, fmt.Sprintf("The plugin's schema says min_value %q, which is not a number", fieldSchema.MinValue))
-					continue
-				}
-				if floatVal < minVal {
-					refuse(fieldName, fmt.Sprintf("Must be at least %s", fieldSchema.MinValue))
-					continue
-				}
-			}
-
-			// Check max_value constraint
-			if fieldSchema.MaxValue != "" {
-				maxVal, err := strconv.ParseFloat(fieldSchema.MaxValue, 64)
-				if err != nil {
-					refuse(fieldName, fmt.Sprintf("The plugin's schema says max_value %q, which is not a number", fieldSchema.MaxValue))
-					continue
-				}
-				if floatVal > maxVal {
-					refuse(fieldName, fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue))
-					continue
-				}
-			}
-
-		case "boolean":
-			if value != "true" && value != "false" {
-				refuse(fieldName, "Must be 'true' or 'false'")
-				continue
-			}
+		if err := checkConfigValue(value, fieldSchema); err != nil {
+			refuse(fieldName, err.Error())
 		}
 	}
 
 	return fields, refusedErr
+}
+
+// checkConfigValue refuses a value that is not what its field's type says, or
+// is past a bound the field names. A type the schema names that is none of
+// string, integer, number and boolean is refused.
+func checkConfigValue(value string, fieldSchema *protocol.ConfigFieldSchema) error {
+	switch fieldSchema.Type {
+	case "string":
+		// Any text is a string.
+		return nil
+	case "integer":
+		intVal, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return errors.New("Must be a valid integer")
+		}
+		parse := func(limit string) (int64, error) { return strconv.ParseInt(limit, 10, 64) }
+		if err := atLeast(intVal, fieldSchema, parse, "an integer"); err != nil {
+			return err
+		}
+		return atMost(intVal, fieldSchema, parse, "an integer")
+	case "number":
+		floatVal, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return errors.New("Must be a valid number")
+		}
+		parse := func(limit string) (float64, error) { return strconv.ParseFloat(limit, 64) }
+		if err := atLeast(floatVal, fieldSchema, parse, "a number"); err != nil {
+			return err
+		}
+		return atMost(floatVal, fieldSchema, parse, "a number")
+	case "boolean":
+		if value != "true" && value != "false" {
+			return errors.New("Must be 'true' or 'false'")
+		}
+		return nil
+	}
+	return errors.Newf("Unknown field type: %s", fieldSchema.Type)
+}
+
+// atLeast refuses a value under the least the field takes. A number field
+// naming neither its least value nor that it has none is refused.
+func atLeast[T int64 | float64](value T, fieldSchema *protocol.ConfigFieldSchema, parse func(string) (T, error), as string) error {
+	switch least := fieldSchema.GetMin().(type) {
+	case *protocol.ConfigFieldSchema_MinValue:
+		limit, err := parse(least.MinValue)
+		if err != nil {
+			return errors.Newf("The plugin's schema says min_value %q, which is not %s", least.MinValue, as)
+		}
+		if value < limit {
+			return errors.Newf("Must be at least %s", least.MinValue)
+		}
+		return nil
+	case *protocol.ConfigFieldSchema_UnboundedBelow:
+		return nil
+	}
+	return errors.Newf("The plugin's schema names no min_value for this field, and not that it is unbounded below")
+}
+
+// atMost refuses a value over the greatest the field takes. A number field
+// naming neither its greatest value nor that it has none is refused.
+func atMost[T int64 | float64](value T, fieldSchema *protocol.ConfigFieldSchema, parse func(string) (T, error), as string) error {
+	switch most := fieldSchema.GetMax().(type) {
+	case *protocol.ConfigFieldSchema_MaxValue:
+		limit, err := parse(most.MaxValue)
+		if err != nil {
+			return errors.Newf("The plugin's schema says max_value %q, which is not %s", most.MaxValue, as)
+		}
+		if value > limit {
+			return errors.Newf("Must be at most %s", most.MaxValue)
+		}
+		return nil
+	case *protocol.ConfigFieldSchema_UnboundedAbove:
+		return nil
+	}
+	return errors.Newf("The plugin's schema names no max_value for this field, and not that it is unbounded above")
 }

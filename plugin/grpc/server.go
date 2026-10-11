@@ -180,10 +180,17 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		for k, v := range req.Config {
 			pluginConfig[k] = v
 		}
-		pluginConfig["_embedding_endpoint"] = req.EmbeddingEndpoint
-		// A Go plugin reaches MailService by dialing this with the auth token
-		// (ADR-041), the way qntx-atproto dials the embedding endpoint.
-		pluginConfig["_mail_endpoint"] = req.MailEndpoint
+		// A Go plugin reaches MailService by dialing its endpoint with the auth
+		// token (ADR-041), the way qntx-atproto dials the embedding endpoint:
+		// each is under _<service>_endpoint, or why the node runs without it
+		// under _<service>_not_running.
+		for service, handed := range map[string]*protocol.ServiceEndpoint{
+			"embedding": req.EmbeddingEndpoint,
+			"mail":      req.MailEndpoint,
+		} {
+			key, value := EndpointFrom(service, handed).configKey(service)
+			pluginConfig[key] = value
+		}
 		// A plugin answering a sigil presents the call's token to the store here.
 		pluginConfig["_ats_store_endpoint"] = req.AtsStoreEndpoint
 		pluginConfig["_auth_token"] = req.AuthToken
@@ -194,9 +201,9 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 			req.QueueEndpoint,
 			req.ScheduleEndpoint,
 			req.FileServiceEndpoint,
-			req.LlmEndpoint,
-			req.VectorSearchEndpoint,
-			req.SearchEndpoint,
+			EndpointFrom("llm", req.LlmEndpoint),
+			EndpointFrom("vector search", req.VectorSearchEndpoint),
+			EndpointFrom("search", req.SearchEndpoint),
 			req.AuthToken,
 			pluginConfig,
 			s.logger,
@@ -249,9 +256,13 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		handlerNames = ha.GetHandlerNames()
 	}
 
+	// A Go plugin's sigils are the routes it declares, and one declaring none
+	// serves none.
 	var routes []*protocol.RouteInfo
+	sigilsFrom := protocol.SigilsFrom_SIGILS_FROM_NONE
 	if rd, ok := s.plugin.(routeDeclarer); ok {
 		routes = rd.DeclaredRoutes()
+		sigilsFrom = protocol.SigilsFrom_SIGILS_FROM_HTTP_ROUTES
 	}
 
 	_, isLLMProvider := s.plugin.(plugin.LLMProvider)
@@ -265,6 +276,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		SearchProvider:    isSearchProvider,
 		EmbeddingProvider: isEmbeddingProvider,
 		HttpRoutes:        routes,
+		SigilsFrom:        sigilsFrom,
 	}, nil
 }
 
@@ -433,16 +445,27 @@ func (s *PluginServer) ConfigSchema(ctx context.Context, _ *protocol.Empty) (*pr
 	fields := make(map[string]*protocol.ConfigFieldSchema, len(schema))
 
 	for name, field := range schema {
-		fields[name] = &protocol.ConfigFieldSchema{
+		said := &protocol.ConfigFieldSchema{
 			Type:         field.Type,
 			Description:  field.Description,
 			DefaultValue: field.DefaultValue,
 			Required:     field.Required,
-			MinValue:     field.MinValue,
-			MaxValue:     field.MaxValue,
 			Pattern:      field.Pattern,
 			ElementType:  field.ElementType,
 		}
+		// A field that is no number has no bounds, and says none; the node
+		// refuses a number field that names neither a bound nor none.
+		field.Min.Read(
+			func(value string) { said.Min = &protocol.ConfigFieldSchema_MinValue{MinValue: value} },
+			func() { said.Min = &protocol.ConfigFieldSchema_UnboundedBelow{UnboundedBelow: &protocol.Unbounded{}} },
+			func() {},
+		)
+		field.Max.Read(
+			func(value string) { said.Max = &protocol.ConfigFieldSchema_MaxValue{MaxValue: value} },
+			func() { said.Max = &protocol.ConfigFieldSchema_UnboundedAbove{UnboundedAbove: &protocol.Unbounded{}} },
+			func() {},
+		)
+		fields[name] = said
 	}
 
 	return &protocol.ConfigSchemaResponse{
@@ -467,16 +490,21 @@ func (s *PluginServer) RegisterElements(ctx context.Context, _ *protocol.Empty) 
 	protoElements := make([]*protocol.ElementDef, len(elementDefs))
 
 	for i, def := range elementDefs {
-		protoElements[i] = &protocol.ElementDef{
+		element := &protocol.ElementDef{
 			Symbol:        def.Symbol,
 			Title:         def.Title,
 			Label:         def.Label,
-			ContentPath:   def.ContentPath,
-			CssPath:       def.CSSPath,
+			CssPaths:      def.CSSPaths,
 			DefaultWidth:  def.DefaultWidth,
 			DefaultHeight: def.DefaultHeight,
-			ModulePath:    def.ModulePath,
 		}
+		if err := def.Drawn.Read(
+			func(path string) { element.Drawn = &protocol.ElementDef_ContentPath{ContentPath: path} },
+			func(path string) { element.Drawn = &protocol.ElementDef_ModulePath{ModulePath: path} },
+		); err != nil {
+			return nil, errors.Wrapf(err, "plugin %s element %s", s.plugin.Metadata().Name, def.Symbol)
+		}
+		protoElements[i] = element
 	}
 
 	return &protocol.ElementDefResponse{

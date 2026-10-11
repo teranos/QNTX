@@ -23,23 +23,30 @@ type PluginTokens func(plugin, namespace string) (string, error)
 // Endpoints is the node's plugin service endpoints, or why the node runs
 // without them.
 type Endpoints struct {
-	served ServiceEndpoints
-	why    error
+	served func() (ServiceEndpoints, error)
 }
 
-// ServedEndpoints is the endpoints of plugin services that started.
-func ServedEndpoints(served ServiceEndpoints) Endpoints {
-	return Endpoints{served: served}
+// EndpointSource says where each of the node's plugin services answers now:
+// the ServicesManager that started them, or a fixed ServiceEndpoints.
+type EndpointSource interface {
+	Endpoints() ServiceEndpoints
+}
+
+// ServedEndpoints is the endpoints of plugin services that started, read from
+// served each time a plugin asks, so a service that stopped since is handed
+// as stopped.
+func ServedEndpoints(served EndpointSource) Endpoints {
+	return Endpoints{served: func() (ServiceEndpoints, error) { return served.Endpoints(), nil }}
 }
 
 // UnservedEndpoints is a node whose plugin services did not start, and why.
 func UnservedEndpoints(why error) Endpoints {
-	return Endpoints{why: why}
+	return Endpoints{served: func() (ServiceEndpoints, error) { return ServiceEndpoints{}, why }}
 }
 
 // Served is the endpoints, or why the node runs without them.
 func (e Endpoints) Served() (ServiceEndpoints, error) {
-	return e.served, e.why
+	return e.served()
 }
 
 // NewConfigProvider creates a ConfigProvider that hands each plugin the config
@@ -206,9 +213,19 @@ func (c *configWithEndpoints) GetKeys() []string {
 	return keys
 }
 
+// ServiceEndpoints is where each of the node's plugin services answers, or
+// why it does not, for the plugin's Initialize; or why the node runs none.
+func (c *configWithEndpoints) ServiceEndpoints() (ServiceEndpoints, error) {
+	served, err := c.endpoints.Served()
+	if err != nil {
+		return ServiceEndpoints{}, errors.Wrapf(err, "plugin %s asked for the node's service endpoints", c.domain)
+	}
+	return served, nil
+}
+
 // endpointValue returns a service endpoint value for underscore-prefixed keys.
-// On a node whose plugin services did not start, asking for one is kept for
-// Err, naming why.
+// On a node whose plugin services did not start, or whose service asked for
+// is not running, asking for one is kept for Err, naming why.
 func (c *configWithEndpoints) endpointValue(key string) (string, bool) {
 	read, service := endpointKeys[key]
 	if !service {
@@ -219,22 +236,22 @@ func (c *configWithEndpoints) endpointValue(key string) (string, bool) {
 		c.failed(errors.Wrapf(err, "plugin %s asked for %s", c.domain, key))
 		return "", true
 	}
-	return read(c, served), true
+	value, err := read(c, served)
+	if err != nil {
+		c.failed(errors.Wrapf(err, "plugin %s asked for %s", c.domain, key))
+		return "", true
+	}
+	return value, true
 }
 
 // endpointKeys are the underscore-prefixed keys a plugin's config answers with
-// what the node serves it.
-var endpointKeys = map[string]func(*configWithEndpoints, ServiceEndpoints) string{
-	"_ats_store_endpoint":     func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.ATSStoreAddress },
-	"_queue_endpoint":         func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.QueueAddress },
-	"_schedule_endpoint":      func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.ScheduleAddress },
-	"_file_service_endpoint":  func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.FileServiceAddress },
-	"_llm_endpoint":           func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.LLMAddress },
-	"_embedding_endpoint":     func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.EmbeddingAddress },
-	"_vector_search_endpoint": func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.VectorSearchAddress },
-	"_ground_endpoint":        func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.GroundAddress },
-	"_search_endpoint":        func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.SearchAddress },
-	"_fetch_endpoint":         func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.FetchAddress },
-	"_mail_endpoint":          func(_ *configWithEndpoints, e ServiceEndpoints) string { return e.MailAddress },
-	"_auth_token":             func(c *configWithEndpoints, _ ServiceEndpoints) string { return c.authToken() },
+// what the node serves it: the services every plugin is joined by, and the
+// token it reaches them with. The services the node boots without are handed
+// as ServiceEndpoints, which say why one is not running.
+var endpointKeys = map[string]func(*configWithEndpoints, ServiceEndpoints) (string, error){
+	"_ats_store_endpoint":    func(_ *configWithEndpoints, e ServiceEndpoints) (string, error) { return e.ATSStore.Address() },
+	"_queue_endpoint":        func(_ *configWithEndpoints, e ServiceEndpoints) (string, error) { return e.Queue.Address() },
+	"_schedule_endpoint":     func(_ *configWithEndpoints, e ServiceEndpoints) (string, error) { return e.Schedule.Address() },
+	"_file_service_endpoint": func(_ *configWithEndpoints, e ServiceEndpoints) (string, error) { return e.FileService.Address() },
+	"_auth_token":            func(c *configWithEndpoints, _ ServiceEndpoints) (string, error) { return c.authToken(), nil },
 }

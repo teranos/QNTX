@@ -229,37 +229,47 @@ func (h *PluginHandler) elements(ctx context.Context) *protocol.PluginElements {
 		// Get element definitions from plugin
 		resp, err := provider.RegisterElements(ctx)
 		if err != nil {
-			h.logger.Debugw("Plugin does not provide element definitions",
-				"plugin", name,
-				"error", err)
+			answer.Refused = append(answer.Refused, errors.Wrapf(err, "plugin %s made no element definitions", name).Error())
 			continue
 		}
 
-		// Convert to response format
+		// Convert to response format: each path the plugin names is served
+		// under /api/{plugin}.
 		for _, def := range resp.Elements {
-			contentURL := fmt.Sprintf("/api/%s%s", name, def.ContentPath)
-			cssURL := ""
-			if def.CssPath != "" {
-				cssURL = fmt.Sprintf("/api/%s%s", name, def.CssPath)
-			}
-			moduleURL := ""
-			if def.ModulePath != "" {
-				moduleURL = fmt.Sprintf("/api/%s%s", name, def.ModulePath)
-			}
-
-			answer.Elements = append(answer.Elements, &protocol.PluginElement{
+			element := &protocol.PluginElement{
 				Plugin:        name,
 				Symbol:        def.Symbol,
 				Title:         def.Title,
 				Label:         def.Label,
-				ContentUrl:    contentURL,
-				CssUrl:        cssURL,
-				ModuleUrl:     moduleURL,
+				CssUrls:       make([]string, 0, len(def.CssPaths)),
 				DefaultWidth:  def.DefaultWidth,
 				DefaultHeight: def.DefaultHeight,
-			})
+			}
+			for _, cssPath := range def.CssPaths {
+				element.CssUrls = append(element.CssUrls, fmt.Sprintf("/api/%s%s", name, cssPath))
+			}
+			if err := drawFrom(name, def, element); err != nil {
+				answer.Refused = append(answer.Refused, errors.Wrapf(err, "plugin %s element %s", name, def.Symbol).Error())
+				continue
+			}
+			answer.Elements = append(answer.Elements, element)
 		}
 	}
 
 	return answer
+}
+
+// drawFrom sets where element draws its content from: the HTML fragment or
+// the module def names, served under /api/{plugin}. A definition naming
+// neither is refused.
+func drawFrom(plugin string, def *protocol.ElementDef, element *protocol.PluginElement) error {
+	switch drawn := def.GetDrawn().(type) {
+	case *protocol.ElementDef_ContentPath:
+		element.Drawn = &protocol.PluginElement_ContentUrl{ContentUrl: fmt.Sprintf("/api/%s%s", plugin, drawn.ContentPath)}
+		return nil
+	case *protocol.ElementDef_ModulePath:
+		element.Drawn = &protocol.PluginElement_ModuleUrl{ModuleUrl: fmt.Sprintf("/api/%s%s", plugin, drawn.ModulePath)}
+		return nil
+	}
+	return errors.New("it draws its content from neither a content_path nor a module_path")
 }

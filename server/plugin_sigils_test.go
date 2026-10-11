@@ -23,6 +23,7 @@ import (
 // hands it with whatever the test set, and keeping what it was handed.
 type sigilPlugin struct {
 	fakePlugin
+	from   protocol.SigilsFrom
 	signa  []*protocol.Signum
 	routes []*protocol.RouteInfo
 	answer *protocol.HTTPResponse
@@ -30,6 +31,8 @@ type sigilPlugin struct {
 	// during is what the plugin does while the call is open, before answering.
 	during func(*protocol.HTTPRequest)
 }
+
+func (p *sigilPlugin) GetSigilsFrom() protocol.SigilsFrom { return p.from }
 
 func (p *sigilPlugin) GetSigna() []*protocol.Signum { return p.signa }
 
@@ -102,6 +105,7 @@ func TestAPluginsSigilIsServedOnItsPath(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
 		signa:      []*protocol.Signum{stubSignum("stub")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
 		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
 	}
 	srv, tokens := sigilServingServer(t, p)
@@ -161,6 +165,7 @@ func TestAPluginIsToldWhoIsAsking(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
 		signa:      []*protocol.Signum{stubSignum("stub")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
 		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
 	}
 	srv, tokens := sigilServingServer(t, p)
@@ -228,6 +233,7 @@ func TestAPluginIsHandedTheStoreOfItsCallersNamespace(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
 		signa:      []*protocol.Signum{stubSignum("stub")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
 		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
 	}
 	srv, tokens := sigilServingServer(t, p)
@@ -255,6 +261,7 @@ func TestAPluginIsToldTheNamespaceOfItsCall(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
 		signa:      []*protocol.Signum{stubSignum("stub")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
 		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
 	}
 	srv, tokens := sigilServingServer(t, p)
@@ -275,6 +282,7 @@ func TestAPluginsSigilIsATool(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
 		signa:      []*protocol.Signum{stubSignum("stub")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
 		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":false}`)},
 	}
 	srv, _ := sigilServingServer(t, p)
@@ -318,6 +326,7 @@ func TestAPluginsSigilIsATool(t *testing.T) {
 func TestAPluginsDeclaredRoutesAreItsSigils(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
+		from:       protocol.SigilsFrom_SIGILS_FROM_HTTP_ROUTES,
 		routes: []*protocol.RouteInfo{
 			{Method: http.MethodPost, Path: "/book/new", Description: "Start a booking."},
 			{Method: http.MethodPost, Path: "/kvk/zoek/naam", Description: "Find companies by trade name."},
@@ -393,6 +402,7 @@ func TestAPluginsOwnSignaAreServedOverItsRoutes(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
 		signa:      []*protocol.Signum{stubSignum("stub")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
 		routes:     []*protocol.RouteInfo{{Method: http.MethodPost, Path: "/book/new", Description: "Start a booking."}},
 	}
 	srv, _ := sigilServingServer(t, p)
@@ -419,7 +429,7 @@ func TestAPluginsSignumThatIsNotItsOwnIsNotServed(t *testing.T) {
 		}}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			p := &sigilPlugin{fakePlugin: fakePlugin{name: "stub"}, signa: []*protocol.Signum{handed}}
+			p := &sigilPlugin{fakePlugin: fakePlugin{name: "stub"}, from: protocol.SigilsFrom_SIGILS_FROM_SIGNA, signa: []*protocol.Signum{handed}}
 			srv, _ := sigilServingServer(t, p)
 			for _, signum := range srv.checkedSigna() {
 				assert.NotSame(t, handed, signum.Signum, "a signum that is not the plugin's own was served")
@@ -435,6 +445,7 @@ func TestThePanelIsToldEachSigilAndWhoReachesIt(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
 		signa:      []*protocol.Signum{stubSignum("stub")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
 	}
 	srv, _ := sigilServingServer(t, p)
 
@@ -471,6 +482,7 @@ func TestASigilAPluginNoLongerHandsIsNotServed(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
 		signa:      []*protocol.Signum{stubSignum("stub")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
 	}
 	srv, _ := sigilServingServer(t, p)
 	require.True(t, srv.answering["/api/stub/read"].Gates)
@@ -487,6 +499,7 @@ func TestASignumTheTableNamesIsReachedBySuper(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "datapunt"},
 		signa:      []*protocol.Signum{stubSignum("datapunt")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
 		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
 	}
 	srv, tokens := sigilServingServer(t, p)
@@ -511,6 +524,7 @@ func TestACallsTokenNamesItsCallerAndARunReachesTheirNamespace(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
 		signa:      []*protocol.Signum{stubSignum("stub")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
 		answer:     &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true}`)},
 	}
 	srv, tokens := sigilServingServer(t, p)
@@ -541,7 +555,7 @@ func TestACallsTokenNamesItsCallerAndARunReachesTheirNamespace(t *testing.T) {
 // A plugin answering over HTTP is handed its caller's call, the way a sigil
 // is; a stranger is handed none.
 func TestAPluginOverHTTPIsHandedItsCallersCall(t *testing.T) {
-	p := &sigilPlugin{fakePlugin: fakePlugin{name: "stub"}, signa: []*protocol.Signum{stubSignum("stub")}}
+	p := &sigilPlugin{fakePlugin: fakePlugin{name: "stub"}, from: protocol.SigilsFrom_SIGILS_FROM_SIGNA, signa: []*protocol.Signum{stubSignum("stub")}}
 	srv, _ := sigilServingServer(t, p)
 
 	stranger := srv.callFor(context.Background())
@@ -571,6 +585,7 @@ func TestAPluginOverHTTPIsHandedItsCallersCall(t *testing.T) {
 func TestAPluginThatDeclaresItsRoutesIsOfferedOnlyThem(t *testing.T) {
 	p := &sigilPlugin{
 		fakePlugin: fakePlugin{name: "stub"},
+		from:       protocol.SigilsFrom_SIGILS_FROM_HTTP_ROUTES,
 		routes:     []*protocol.RouteInfo{{Method: http.MethodPost, Path: "/book/new", Description: "Start a booking."}},
 	}
 	srv, _ := sigilServingServer(t, p)

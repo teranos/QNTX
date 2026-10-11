@@ -671,13 +671,13 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 
 	// 3. Start gRPC services for plugin callbacks
 	servicesManager := NewServicesManager(config.LLMConfig{MaxConcurrent: 1, MaxCallsPerMinute: 60}, config.FetchConfig{}, "did:key:znode", logger)
-	endpoints, err := servicesManager.Start(ctx, store, queue, nil, t.TempDir(), t.TempDir())
-	require.NoError(t, err)
+	require.NoError(t, servicesManager.Start(ctx, store, queue, nil, t.TempDir(), t.TempDir()))
 	defer servicesManager.Shutdown()
+	endpoints := servicesManager.Endpoints()
 
 	logger.Infow("Started plugin services",
-		"ats_store", endpoints.ATSStoreAddress,
-		"queue", endpoints.QueueAddress,
+		"ats_store", endpoints.ATSStore,
+		"queue", endpoints.Queue,
 	)
 
 	// 4. Create and start book plugin server
@@ -1001,8 +1001,8 @@ func TestUIPlugin_RegisterElements(t *testing.T) {
 	assert.Equal(t, "📚", item.Symbol)
 	assert.Equal(t, "Book Auction", item.Title)
 	assert.Equal(t, "book-auction", item.Label)
-	assert.Equal(t, "/auction", item.ContentPath)
-	assert.Equal(t, "/auction.css", item.CssPath)
+	assert.Equal(t, "/auction", item.GetContentPath())
+	assert.Equal(t, []string{"/auction.css"}, item.CssPaths)
 	assert.Equal(t, int32(600), item.GetDefaultWidth())
 	assert.Equal(t, int32(400), item.GetDefaultHeight())
 

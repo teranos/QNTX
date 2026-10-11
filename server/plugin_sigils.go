@@ -30,6 +30,7 @@ import (
 // signaHolder is a plugin that handed the node signa, and the one way it is
 // asked. grpc.ExternalDomainProxy is one.
 type signaHolder interface {
+	GetSigilsFrom() protocol.SigilsFrom
 	GetSigna() []*protocol.Signum
 	GetHTTPRoutes() []*protocol.RouteInfo
 	AnswerHTTP(ctx context.Context, req *protocol.HTTPRequest) (*protocol.HTTPResponse, error)
@@ -190,9 +191,10 @@ func (s *QNTXServer) pluginSignaOf(name string) handedSigna {
 	if !holds {
 		return handed
 	}
-	signa, declared := holder.GetSigna(), false
-	if len(signa) == 0 && len(holder.GetHTTPRoutes()) > 0 {
-		signa, declared = []*protocol.Signum{declaredSignum(name, holder.GetHTTPRoutes())}, true
+	signa, declared, err := signaOf(name, holder)
+	if err != nil {
+		handed.refused = append(handed.refused, err.Error())
+		return handed
 	}
 	for _, signum := range signa {
 		if err := boundUnder(name, signum); err != nil {
@@ -211,6 +213,23 @@ func (s *QNTXServer) pluginSignaOf(name string) handedSigna {
 		handed.served = append(handed.served, served)
 	}
 	return handed
+}
+
+// signaOf is the signa a plugin's sigils are taken from, where it said they
+// are: its own signa, or its declared routes as one signum named after it
+// (declared), or none. A plugin naming none of these is refused.
+func signaOf(name string, holder signaHolder) ([]*protocol.Signum, bool, error) {
+	switch holder.GetSigilsFrom() {
+	case protocol.SigilsFrom_SIGILS_FROM_SIGNA:
+		return holder.GetSigna(), false, nil
+	case protocol.SigilsFrom_SIGILS_FROM_HTTP_ROUTES:
+		return []*protocol.Signum{declaredSignum(name, holder.GetHTTPRoutes())}, true, nil
+	case protocol.SigilsFrom_SIGILS_FROM_NONE:
+		return []*protocol.Signum{}, false, nil
+	case protocol.SigilsFrom_SIGILS_FROM_UNNAMED:
+		return nil, false, errors.Newf("plugin %s names no source of its sigils: built against a QNTX older than this node, it is served none until rebuilt", name)
+	}
+	return nil, false, errors.Newf("plugin %s takes its sigils from %d, which this node does not know", name, holder.GetSigilsFrom())
 }
 
 // declaredSignum is a plugin that declares routes as its own signum (ADR-001):
@@ -479,13 +498,14 @@ func whyOf(status int32) string {
 // ServePluginSigils serves again with the signa every ready plugin holds now.
 // A plugin's sigils arrive with its Initialize, after the node has opened, and
 // a restart may hand different ones.
+//
+// The node has opened by then: plugins load on onReady, which Start fires
+// once open has built what the node serves, and a restart is of a plugin
+// loaded so.
 func (s *QNTXServer) ServePluginSigils() {
 	s.opening.Lock()
 	defer s.opening.Unlock()
 	s.answerSigils()
-	if s.served == nil {
-		return
-	}
 	unnamed, err := s.reopenHeld()
 	if err != nil {
 		s.logger.Errorw("Plugin sigils are not served; what the node serves is unchanged", "error", err)

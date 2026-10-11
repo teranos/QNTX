@@ -647,10 +647,7 @@ func buildFailureMail(b pluginBuild, revs []string, failed error) services.NodeM
 
 // mailBuildFailure mails ROOT that b did not build, and says so when it cannot.
 func (s *QNTXServer) mailBuildFailure(ctx context.Context, b pluginBuild, revs []string, failed error, logger *zap.SugaredLogger) {
-	if s.nodeMailer == nil || s.authHandler == nil {
-		logger.Errorw("A plugin did not build and the node has no mail to say so with", "plugin", b.name)
-		return
-	}
+	// A node with no login keeps no Users, and says so here.
 	root, found, err := s.authHandler.RootUser()
 	if err != nil || !found {
 		logger.Errorw("A plugin did not build and there is no ROOT User to mail", "plugin", b.name, "error", err)

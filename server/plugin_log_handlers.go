@@ -27,10 +27,9 @@ func (s *QNTXServer) HandlePluginLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	buf := pm.GetLogBuffer(pluginName)
-	if buf == nil {
-		writeError(w, http.StatusNotFound,
-			fmt.Sprintf("no log buffer for plugin '%s' (remote plugins don't have local logs)", pluginName))
+	buf, err := pm.GetLogBuffer(pluginName)
+	if err != nil {
+		s.writeRichError(w, errors.Wrapf(err, "the log of plugin %s cannot be streamed", pluginName), http.StatusNotFound)
 		return
 	}
 

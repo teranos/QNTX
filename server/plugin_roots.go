@@ -11,6 +11,7 @@ import (
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
 )
 
 // A plugin the node builds loads from the Nix store: its program loader and
@@ -83,12 +84,13 @@ func rootStorePaths(ctx context.Context, nixStore, binary string, data []byte, r
 	var fetched []string
 	collected := false
 	for _, path := range storePathsIn(data) {
-		// A path a collection took is not there; one that does not stat for
-		// another reason is not known to be either.
-		_, statErr := os.Stat(path)
-		taken := errors.Is(statErr, fs.ErrNotExist)
-		if statErr != nil && !taken {
-			return fetched, collected, errors.Wrapf(statErr, "%s names %s, and whether it is there did not read", binary, path)
+		// A path a collection took is not there; one whose being there cannot
+		// be asked for another reason is not known to be either. Access asks
+		// only that, so nothing comes back to leave unread.
+		thereErr := unix.Access(path, unix.F_OK)
+		taken := errors.Is(thereErr, fs.ErrNotExist)
+		if thereErr != nil && !taken {
+			return fetched, collected, errors.Wrapf(thereErr, "%s names %s, and whether it is there did not read", binary, path)
 		}
 		if err := runBuild(ctx, roots, nil, nixStore, "--realise", path, "--add-root", filepath.Join(roots, filepath.Base(path))); err != nil {
 			return fetched, collected, errors.Wrapf(err, "%s names %s, and it was not kept", binary, path)

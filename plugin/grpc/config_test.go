@@ -245,10 +245,10 @@ func TestRemoteServiceRegistryConfig(t *testing.T) {
 			"localhost:50051",
 			"localhost:50052",
 			"localhost:50053",
-			"", // file service
-			"", // llm
-			"", // vector search
-			"", // search
+			"",        // file service
+			notServed, // llm
+			notServed, // vector search
+			notServed, // search
 			"test-token",
 			configMap,
 			zap.NewNop().Sugar(),

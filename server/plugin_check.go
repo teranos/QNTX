@@ -96,9 +96,8 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 		if !held.Success {
 			return nil, errors.Newf("%s is not in %s at %s: %s", source.Path, found.FullName, ref, held.Error)
 		}
-		// A directory answers with its entries; a file answers with itself.
-		if held.Type != "" {
-			return nil, errors.Newf("%s in %s at %s is a %s, and a plugin is a directory", source.Path, found.FullName, ref, held.Type)
+		if err := aDirectory(held); err != nil {
+			return nil, errors.Wrapf(err, "%s in %s at %s", source.Path, found.FullName, ref)
 		}
 	}
 
@@ -116,6 +115,20 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 		checked.ReadmeSaid = readme.Error
 	}
 	return checked, nil
+}
+
+// aDirectory refuses what GitHub answered with anything but a directory's
+// entries: a plugin is a directory.
+func aDirectory(held *protocol.GitHubGetRepositoryContentResponse) error {
+	switch held.GetAnswered() {
+	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY:
+		return nil
+	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_ONE:
+		return errors.Newf("is a %s, and a plugin is a directory", held.GetType())
+	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED:
+		return errors.New("is answered by GitHubService without saying what GitHub answered with")
+	}
+	return errors.Newf("is answered by GitHubService as %d, which this node does not know", held.GetAnswered())
 }
 
 // pluginReadme is the README of the plugin's directory, or of the repository

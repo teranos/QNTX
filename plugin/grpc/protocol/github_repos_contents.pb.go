@@ -22,6 +22,59 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// GitHubReposContentsAnswer is what GitHub answered a contents request with.
+type GitHubReposContentsAnswer int32
+
+const (
+	// Not read off an answer; refused.
+	GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED GitHubReposContentsAnswer = 0
+	// A directory: its entries are in items.
+	GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY GitHubReposContentsAnswer = 1
+	// One file, symlink or submodule, named in type.
+	GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_ONE GitHubReposContentsAnswer = 2
+)
+
+// Enum value maps for GitHubReposContentsAnswer.
+var (
+	GitHubReposContentsAnswer_name = map[int32]string{
+		0: "GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED",
+		1: "GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY",
+		2: "GITHUB_REPOS_CONTENTS_ANSWER_ONE",
+	}
+	GitHubReposContentsAnswer_value = map[string]int32{
+		"GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED":   0,
+		"GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY": 1,
+		"GITHUB_REPOS_CONTENTS_ANSWER_ONE":       2,
+	}
+)
+
+func (x GitHubReposContentsAnswer) Enum() *GitHubReposContentsAnswer {
+	p := new(GitHubReposContentsAnswer)
+	*p = x
+	return p
+}
+
+func (x GitHubReposContentsAnswer) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (GitHubReposContentsAnswer) Descriptor() protoreflect.EnumDescriptor {
+	return file_plugin_grpc_protocol_github_repos_contents_proto_enumTypes[0].Descriptor()
+}
+
+func (GitHubReposContentsAnswer) Type() protoreflect.EnumType {
+	return &file_plugin_grpc_protocol_github_repos_contents_proto_enumTypes[0]
+}
+
+func (x GitHubReposContentsAnswer) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use GitHubReposContentsAnswer.Descriptor instead.
+func (GitHubReposContentsAnswer) EnumDescriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP(), []int{0}
+}
+
 // One entry of a directory GitHub lists.
 type GitHubReposContentsEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -210,21 +263,25 @@ func (x *GitHubGetRepositoryContentRequest) GetRef() string {
 }
 
 type GitHubGetRepositoryContentResponse struct {
-	state         protoimpl.MessageState      `protogen:"open.v1"`
-	Success       bool                        `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	Error         string                      `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	Items         []*GitHubReposContentsEntry `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
-	Type          string                      `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
-	Encoding      string                      `protobuf:"bytes,5,opt,name=encoding,proto3" json:"encoding,omitempty"`
-	Size          int64                       `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
-	Name          string                      `protobuf:"bytes,7,opt,name=name,proto3" json:"name,omitempty"`
-	Path          string                      `protobuf:"bytes,8,opt,name=path,proto3" json:"path,omitempty"`
-	Content       string                      `protobuf:"bytes,9,opt,name=content,proto3" json:"content,omitempty"`
-	Sha           string                      `protobuf:"bytes,10,opt,name=sha,proto3" json:"sha,omitempty"`
-	Url           string                      `protobuf:"bytes,11,opt,name=url,proto3" json:"url,omitempty"`
-	GitUrl        string                      `protobuf:"bytes,12,opt,name=git_url,json=gitUrl,proto3" json:"git_url,omitempty"`
-	HtmlUrl       string                      `protobuf:"bytes,13,opt,name=html_url,json=htmlUrl,proto3" json:"html_url,omitempty"`
-	DownloadUrl   string                      `protobuf:"bytes,14,opt,name=download_url,json=downloadUrl,proto3" json:"download_url,omitempty"`
+	state       protoimpl.MessageState      `protogen:"open.v1"`
+	Success     bool                        `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error       string                      `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	Items       []*GitHubReposContentsEntry `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	Type        string                      `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	Encoding    string                      `protobuf:"bytes,5,opt,name=encoding,proto3" json:"encoding,omitempty"`
+	Size        int64                       `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
+	Name        string                      `protobuf:"bytes,7,opt,name=name,proto3" json:"name,omitempty"`
+	Path        string                      `protobuf:"bytes,8,opt,name=path,proto3" json:"path,omitempty"`
+	Content     string                      `protobuf:"bytes,9,opt,name=content,proto3" json:"content,omitempty"`
+	Sha         string                      `protobuf:"bytes,10,opt,name=sha,proto3" json:"sha,omitempty"`
+	Url         string                      `protobuf:"bytes,11,opt,name=url,proto3" json:"url,omitempty"`
+	GitUrl      string                      `protobuf:"bytes,12,opt,name=git_url,json=gitUrl,proto3" json:"git_url,omitempty"`
+	HtmlUrl     string                      `protobuf:"bytes,13,opt,name=html_url,json=htmlUrl,proto3" json:"html_url,omitempty"`
+	DownloadUrl string                      `protobuf:"bytes,14,opt,name=download_url,json=downloadUrl,proto3" json:"download_url,omitempty"`
+	// What GitHub answered with, which the node reads off the answer's shape:
+	// GitHub answers a directory with its entries, in items, and anything else
+	// with itself, its kind in type.
+	Answered      GitHubReposContentsAnswer `protobuf:"varint,15,opt,name=answered,proto3,enum=protocol.GitHubReposContentsAnswer" json:"answered,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -355,6 +412,13 @@ func (x *GitHubGetRepositoryContentResponse) GetDownloadUrl() string {
 		return x.DownloadUrl
 	}
 	return ""
+}
+
+func (x *GitHubGetRepositoryContentResponse) GetAnswered() GitHubReposContentsAnswer {
+	if x != nil {
+		return x.Answered
+	}
+	return GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED
 }
 
 // PUT /repos/{owner}/{repo}/contents/{path}
@@ -989,7 +1053,7 @@ const file_plugin_grpc_protocol_github_repos_contents_proto_rawDesc = "" +
 	"\x05owner\x18\x02 \x01(\tR\x05owner\x12\x12\n" +
 	"\x04repo\x18\x03 \x01(\tR\x04repo\x12\x12\n" +
 	"\x04path\x18\x04 \x01(\tR\x04path\x12\x10\n" +
-	"\x03ref\x18\x05 \x01(\tR\x03ref\"\x8f\x03\n" +
+	"\x03ref\x18\x05 \x01(\tR\x03ref\"\xd0\x03\n" +
 	"\"GitHubGetRepositoryContentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x128\n" +
@@ -1005,7 +1069,8 @@ const file_plugin_grpc_protocol_github_repos_contents_proto_rawDesc = "" +
 	"\x03url\x18\v \x01(\tR\x03url\x12\x17\n" +
 	"\agit_url\x18\f \x01(\tR\x06gitUrl\x12\x19\n" +
 	"\bhtml_url\x18\r \x01(\tR\ahtmlUrl\x12!\n" +
-	"\fdownload_url\x18\x0e \x01(\tR\vdownloadUrl\"\xe3\x01\n" +
+	"\fdownload_url\x18\x0e \x01(\tR\vdownloadUrl\x12?\n" +
+	"\banswered\x18\x0f \x01(\x0e2#.protocol.GitHubReposContentsAnswerR\banswered\"\xe3\x01\n" +
 	"'GitHubCreateOrUpdateFileContentsRequest\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x14\n" +
 	"\x05owner\x18\x02 \x01(\tR\x05owner\x12\x12\n" +
@@ -1057,7 +1122,11 @@ const file_plugin_grpc_protocol_github_repos_contents_proto_rawDesc = "" +
 	" \x01(\tR\x03url\x12\x17\n" +
 	"\agit_url\x18\v \x01(\tR\x06gitUrl\x12\x19\n" +
 	"\bhtml_url\x18\f \x01(\tR\ahtmlUrl\x12!\n" +
-	"\fdownload_url\x18\r \x01(\tR\vdownloadUrlB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\fdownload_url\x18\r \x01(\tR\vdownloadUrl*\x97\x01\n" +
+	"\x19GitHubReposContentsAnswer\x12(\n" +
+	"$GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED\x10\x00\x12*\n" +
+	"&GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY\x10\x01\x12$\n" +
+	" GITHUB_REPOS_CONTENTS_ANSWER_ONE\x10\x02B.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_github_repos_contents_proto_rawDescOnce sync.Once
@@ -1071,30 +1140,33 @@ func file_plugin_grpc_protocol_github_repos_contents_proto_rawDescGZIP() []byte 
 	return file_plugin_grpc_protocol_github_repos_contents_proto_rawDescData
 }
 
+var file_plugin_grpc_protocol_github_repos_contents_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_plugin_grpc_protocol_github_repos_contents_proto_goTypes = []any{
-	(*GitHubReposContentsEntry)(nil),                       // 0: protocol.GitHubReposContentsEntry
-	(*GitHubGetRepositoryContentRequest)(nil),              // 1: protocol.GitHubGetRepositoryContentRequest
-	(*GitHubGetRepositoryContentResponse)(nil),             // 2: protocol.GitHubGetRepositoryContentResponse
-	(*GitHubCreateOrUpdateFileContentsRequest)(nil),        // 3: protocol.GitHubCreateOrUpdateFileContentsRequest
-	(*GitHubCreateOrUpdateFileContentsResponse)(nil),       // 4: protocol.GitHubCreateOrUpdateFileContentsResponse
-	(*GitHubDeleteAFileRequest)(nil),                       // 5: protocol.GitHubDeleteAFileRequest
-	(*GitHubDeleteAFileResponse)(nil),                      // 6: protocol.GitHubDeleteAFileResponse
-	(*GitHubGetARepositoryREADMERequest)(nil),              // 7: protocol.GitHubGetARepositoryREADMERequest
-	(*GitHubGetARepositoryREADMEForADirectoryRequest)(nil), // 8: protocol.GitHubGetARepositoryREADMEForADirectoryRequest
-	(*GitHubGetARepositoryREADMEResponse)(nil),             // 9: protocol.GitHubGetARepositoryREADMEResponse
-	(*structpb.Struct)(nil),                                // 10: google.protobuf.Struct
+	(GitHubReposContentsAnswer)(0),                         // 0: protocol.GitHubReposContentsAnswer
+	(*GitHubReposContentsEntry)(nil),                       // 1: protocol.GitHubReposContentsEntry
+	(*GitHubGetRepositoryContentRequest)(nil),              // 2: protocol.GitHubGetRepositoryContentRequest
+	(*GitHubGetRepositoryContentResponse)(nil),             // 3: protocol.GitHubGetRepositoryContentResponse
+	(*GitHubCreateOrUpdateFileContentsRequest)(nil),        // 4: protocol.GitHubCreateOrUpdateFileContentsRequest
+	(*GitHubCreateOrUpdateFileContentsResponse)(nil),       // 5: protocol.GitHubCreateOrUpdateFileContentsResponse
+	(*GitHubDeleteAFileRequest)(nil),                       // 6: protocol.GitHubDeleteAFileRequest
+	(*GitHubDeleteAFileResponse)(nil),                      // 7: protocol.GitHubDeleteAFileResponse
+	(*GitHubGetARepositoryREADMERequest)(nil),              // 8: protocol.GitHubGetARepositoryREADMERequest
+	(*GitHubGetARepositoryREADMEForADirectoryRequest)(nil), // 9: protocol.GitHubGetARepositoryREADMEForADirectoryRequest
+	(*GitHubGetARepositoryREADMEResponse)(nil),             // 10: protocol.GitHubGetARepositoryREADMEResponse
+	(*structpb.Struct)(nil),                                // 11: google.protobuf.Struct
 }
 var file_plugin_grpc_protocol_github_repos_contents_proto_depIdxs = []int32{
-	0,  // 0: protocol.GitHubGetRepositoryContentResponse.items:type_name -> protocol.GitHubReposContentsEntry
-	10, // 1: protocol.GitHubCreateOrUpdateFileContentsResponse.content:type_name -> google.protobuf.Struct
-	10, // 2: protocol.GitHubCreateOrUpdateFileContentsResponse.commit:type_name -> google.protobuf.Struct
-	10, // 3: protocol.GitHubDeleteAFileResponse.commit:type_name -> google.protobuf.Struct
-	4,  // [4:4] is the sub-list for method output_type
-	4,  // [4:4] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	1,  // 0: protocol.GitHubGetRepositoryContentResponse.items:type_name -> protocol.GitHubReposContentsEntry
+	0,  // 1: protocol.GitHubGetRepositoryContentResponse.answered:type_name -> protocol.GitHubReposContentsAnswer
+	11, // 2: protocol.GitHubCreateOrUpdateFileContentsResponse.content:type_name -> google.protobuf.Struct
+	11, // 3: protocol.GitHubCreateOrUpdateFileContentsResponse.commit:type_name -> google.protobuf.Struct
+	11, // 4: protocol.GitHubDeleteAFileResponse.commit:type_name -> google.protobuf.Struct
+	5,  // [5:5] is the sub-list for method output_type
+	5,  // [5:5] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_github_repos_contents_proto_init() }
@@ -1107,13 +1179,14 @@ func file_plugin_grpc_protocol_github_repos_contents_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_github_repos_contents_proto_rawDesc), len(file_plugin_grpc_protocol_github_repos_contents_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_plugin_grpc_protocol_github_repos_contents_proto_goTypes,
 		DependencyIndexes: file_plugin_grpc_protocol_github_repos_contents_proto_depIdxs,
+		EnumInfos:         file_plugin_grpc_protocol_github_repos_contents_proto_enumTypes,
 		MessageInfos:      file_plugin_grpc_protocol_github_repos_contents_proto_msgTypes,
 	}.Build()
 	File_plugin_grpc_protocol_github_repos_contents_proto = out.File

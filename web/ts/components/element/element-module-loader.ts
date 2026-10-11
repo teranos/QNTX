@@ -28,9 +28,9 @@ export async function createPluginElementFromModule(
     item: Element,
     def: PluginElementDef
 ): Promise<HTMLElement> {
-    // Load CSS if provided (cached globally)
-    if (def.css_url) {
-        loadPluginCSS(def.css_url);
+    // Load each stylesheet the element names (cached globally)
+    for (const url of def.css_urls) {
+        loadPluginCSS(url);
     }
 
     const moduleUrl = def.module_url!;

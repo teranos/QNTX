@@ -8,6 +8,17 @@
 
 export const protobufPackage = "protocol";
 
+/** GitHubReposContentsAnswer is what GitHub answered a contents request with. */
+export enum GitHubReposContentsAnswer {
+  /** GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED - Not read off an answer; refused. */
+  GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED = 0,
+  /** GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY - A directory: its entries are in items. */
+  GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY = 1,
+  /** GITHUB_REPOS_CONTENTS_ANSWER_ONE - One file, symlink or submodule, named in type. */
+  GITHUB_REPOS_CONTENTS_ANSWER_ONE = 2,
+  UNRECOGNIZED = -1,
+}
+
 /** One entry of a directory GitHub lists. */
 export interface GitHubReposContentsEntry {
   type: string;
@@ -48,6 +59,12 @@ export interface GitHubGetRepositoryContentResponse {
   git_url: string;
   html_url: string;
   download_url: string;
+  /**
+   * What GitHub answered with, which the node reads off the answer's shape:
+   * GitHub answers a directory with its entries, in items, and anything else
+   * with itself, its kind in type.
+   */
+  answered: GitHubReposContentsAnswer;
 }
 
 /** PUT /repos/{owner}/{repo}/contents/{path} */

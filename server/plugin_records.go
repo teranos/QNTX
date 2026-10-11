@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/internal/named"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/errors"
@@ -161,19 +162,28 @@ func (r PluginRecords) Added(name string) (bool, error) {
 func (r PluginRecords) AddPlugin(actor, repo string) (grpcplugin.PluginRecord, error) {
 	repo = strings.TrimSpace(repo)
 	parsed, err := url.Parse(repo)
-	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
-		return grpcplugin.PluginRecord{}, errors.Newf("%q is not a repository URL", repo)
+	if err != nil {
+		return grpcplugin.PluginRecord{}, errors.Wrapf(err, "%q is not a repository URL", repo)
+	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return grpcplugin.PluginRecord{}, errors.Newf("%q is not a repository URL: its scheme is %q, not https or http", repo, parsed.Scheme)
+	}
+	// The host is where the plugin is built from, so a URL naming none is no
+	// repository.
+	host, err := named.TextOf("the host of "+repo, parsed.Host)
+	if err != nil {
+		return grpcplugin.PluginRecord{}, errors.Wrapf(err, "%q is not a repository URL", repo)
 	}
 	// path.Base names something always; "." and "/" are what it names for a
 	// URL that names no plugin.
 	name := config.PluginNameFromRepo(repo)
 	if name == "." || name == "/" {
-		return grpcplugin.PluginRecord{}, errors.Newf("%q names no plugin", repo)
+		return grpcplugin.PluginRecord{}, errors.Newf("%q on %s names no plugin", repo, host)
 	}
 	if held, found, err := r.Plugin(name); err != nil {
 		return grpcplugin.PluginRecord{}, err
 	} else if found {
-		return grpcplugin.PluginRecord{}, errors.Newf("plugin %s is already added, from %s", name, held.Repo)
+		return grpcplugin.PluginRecord{}, errors.Newf("plugin %s is already added, from %s, and %q on %s names it again", name, held.Repo, repo, host)
 	}
 	record := grpcplugin.PluginRecord{Name: name, Repo: repo, Config: map[string]string{}}
 	if err := r.pluginLine(actor, record); err != nil {
