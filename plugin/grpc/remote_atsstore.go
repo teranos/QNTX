@@ -50,21 +50,19 @@ func (r *RemoteATSStore) Close() error {
 
 // GenerateAndCreateAttestation creates an attestation via gRPC.
 func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
-	// types.AsCommand says the node authors a command naming no actor, and now
-	// for one naming no time; on the wire each is said. Its version it names.
+	// On the wire a command says who made it, when, and its version, as
+	// types.AsCommand names each.
 	protoCmd := &protocol.AttestationCommand{
 		Subjects:   cmd.Subjects,
 		Predicates: cmd.Predicates,
 		Contexts:   cmd.Contexts,
 		Source:     cmd.Source,
-		By:         &protocol.AttestationCommand_ActorsNamed{ActorsNamed: &protocol.ActorNames{Names: cmd.Actors}},
-		When:       &protocol.AttestationCommand_Timestamp{Timestamp: cmd.Timestamp.UnixMilli()},
 	}
-	if err := cmd.NamesItsActor(); err != nil {
-		protoCmd.By = &protocol.AttestationCommand_ByNode{ByNode: true}
+	if err := sayActors(cmd, protoCmd); err != nil {
+		return nil, err
 	}
-	if cmd.Timestamp.IsZero() {
-		protoCmd.When = &protocol.AttestationCommand_Now{Now: true}
+	if err := sayWhen(cmd, protoCmd); err != nil {
+		return nil, err
 	}
 	if err := sayVersion(cmd, protoCmd); err != nil {
 		return nil, err
@@ -91,6 +89,34 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *
 	}
 
 	return resp.Attestation.ToTypes(), nil
+}
+
+// sayActors says on the wire who a command names as having made it: its
+// actors, or the node. A command naming neither is refused.
+func sayActors(cmd *types.AsCommand, protoCmd *protocol.AttestationCommand) error {
+	switch by := cmd.By.(type) {
+	case types.ActorsNamed:
+		protoCmd.By = &protocol.AttestationCommand_ActorsNamed{ActorsNamed: &protocol.ActorNames{Names: by.Actors.All()}}
+		return nil
+	case types.ByNode:
+		protoCmd.By = &protocol.AttestationCommand_ByNode{ByNode: true}
+		return nil
+	}
+	return errors.Newf("the attestation of %v from %s names who made it: its actors, or the node", cmd.Subjects, cmd.Source)
+}
+
+// sayWhen says on the wire when a command names it was made: a time, or now.
+// A command naming neither is refused.
+func sayWhen(cmd *types.AsCommand, protoCmd *protocol.AttestationCommand) error {
+	switch when := cmd.When.(type) {
+	case types.At:
+		protoCmd.When = &protocol.AttestationCommand_Timestamp{Timestamp: when.Time.UnixMilli()}
+		return nil
+	case types.Now:
+		protoCmd.When = &protocol.AttestationCommand_Now{Now: true}
+		return nil
+	}
+	return errors.Newf("the attestation of %v from %s names no time: a time, or now", cmd.Subjects, cmd.Source)
 }
 
 // sayVersion says on the wire the version a command names: its own, or the

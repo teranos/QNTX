@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 )
 
 // An attestation nobody claimed stands on its own id. That default is what the
@@ -18,8 +19,8 @@ func TestGenerateKeepsTheActorItWasGiven(t *testing.T) {
 		Subjects:   []string{"batch"},
 		Predicates: []string{"crawl-timeout"},
 		Contexts:   []string{"levi:batch"},
-		Actors:     []string{"collector"},
-		Timestamp:  time.Now(),
+		By:         types.ActorsNamed{Actors: named.ItemOf("collector")},
+		When:       types.At{Time: time.Now()},
 		Source:     "collector",
 	})
 	if err != nil {
@@ -45,7 +46,8 @@ func TestGenerateRefusesAnAttestationNamingNoActor(t *testing.T) {
 		Subjects:   []string{"batch"},
 		Predicates: []string{"crawl-timeout"},
 		Contexts:   []string{"levi:batch"},
-		Timestamp:  time.Now(),
+		By:         types.ByNode{},
+		When:       types.At{Time: time.Now()},
 		Source:     "collector",
 	})
 	if err == nil {
@@ -62,8 +64,8 @@ func TestGenerateKeepsAnActorThatIsItsOwnSubject(t *testing.T) {
 	as, err := store.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
 		Subjects:   []string{"labeled"},
 		Predicates: []string{"type"},
-		Actors:     []string{"labeled"},
-		Timestamp:  time.Now(),
+		By:         types.ActorsNamed{Actors: named.ItemOf("labeled")},
+		When:       types.At{Time: time.Now()},
 		Source:     "cluster-labeling",
 	})
 	if err != nil {

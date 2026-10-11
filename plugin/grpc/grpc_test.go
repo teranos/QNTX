@@ -508,7 +508,7 @@ func TestRemoteServiceRegistry_ATSStore(t *testing.T) {
 	require.NotNil(t, store)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err = store.GenerateAndCreateAttestation(ctx, &types.AsCommand{Subjects: []string{"s"}})
+	_, err = store.GenerateAndCreateAttestation(ctx, &types.AsCommand{Subjects: []string{"s"}, By: types.ByNode{}, When: types.Now{}})
 	assert.Error(t, err)
 }
 

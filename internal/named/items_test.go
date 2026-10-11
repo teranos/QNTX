@@ -19,3 +19,9 @@ func TestNoItemsAreRefusedNamingWhatWasEmpty(t *testing.T) {
 	assert.Equal(t, []string{"a", "b"}, items.All())
 	assert.Equal(t, "a", items.First())
 }
+
+func TestOneItemIsItems(t *testing.T) {
+	items := ItemOf("a")
+	assert.Equal(t, []string{"a"}, items.All())
+	assert.Equal(t, "a", items.First())
+}

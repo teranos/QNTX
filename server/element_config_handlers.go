@@ -101,6 +101,8 @@ func (s *QNTXServer) handleSetElementConfig(w http.ResponseWriter, r *http.Reque
 		Subjects:   []string{subject},
 		Predicates: []string{"configured"},
 		Contexts:   []string{"_"},
+		By:         types.ByNode{},
+		When:       types.Now{},
 		Attributes: req.Config,
 		Source:     fmt.Sprintf("%s-ui", req.Plugin),
 	}

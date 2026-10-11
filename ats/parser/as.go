@@ -5,11 +5,13 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/errors"
 )
 
 // ParseAsCommand parses CLI arguments into an AsCommand. An attestation that
-// says no `by` names no actor here: whoever writes it names who wrote it.
+// says no `by` is made by the node: whoever writes it names who wrote it. One
+// that says no `on` is made now.
 // Grammar: qntx as SUBJECTS [is PREDICATES] [of CONTEXTS] [by ACTOR] [on DATE]
 func ParseAsCommand(args []string) (*types.AsCommand, error) {
 	if len(args) == 0 {
@@ -20,8 +22,8 @@ func ParseAsCommand(args []string) (*types.AsCommand, error) {
 		Subjects:   []string{},
 		Predicates: []string{},
 		Contexts:   []string{},
-		Actors:     []string{},
-		Timestamp:  time.Now(),
+		By:         types.ByNode{},
+		When:       types.Now{},
 		Attributes: make(map[string]any),
 	}
 
@@ -129,14 +131,26 @@ func parseAsTokens(tokens []string, cmd *types.AsCommand) error {
 		case "contexts":
 			cmd.Contexts = append(cmd.Contexts, strings.ToUpper(token))
 		case "actors":
-			cmd.Actors = append(cmd.Actors, token)
+			var actors []string
+			switch by := cmd.By.(type) {
+			case types.ActorsNamed:
+				actors = append(by.Actors.All(), token)
+			case types.ByNode:
+				// the first actor `by` names
+				actors = []string{token}
+			}
+			said, err := named.ItemsOf("by", actors)
+			if err != nil {
+				return err
+			}
+			cmd.By = types.ActorsNamed{Actors: said}
 		case "timestamp":
 			// Parse timestamp (simplified for now)
 			parsedTime, err := parseTimeExpression(token)
 			if err != nil {
 				return errors.Wrapf(err, "invalid timestamp '%s'", token)
 			}
-			cmd.Timestamp = parsedTime
+			cmd.When = types.At{Time: parsedTime}
 			state = "subjects" // Reset to subjects for any remaining tokens
 		}
 

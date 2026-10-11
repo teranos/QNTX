@@ -92,14 +92,14 @@ func TestRemoteATSStore_ACommandNamesItsVersion(t *testing.T) {
 	version, err := named.TextOf("version", "1.2.3")
 	require.NoError(t, err)
 	as, err := client.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
-		Subjects: []string{"alice"}, Actors: []string{"test@user"}, Source: "test",
+		Subjects: []string{"alice"}, By: types.ActorsNamed{Actors: named.ItemOf("test@user")}, When: types.Now{}, Source: "test",
 		SourceVersion: types.VersionNamed{Version: version},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "1.2.3", as.Attributes["source_version"])
 
 	_, err = client.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
-		Subjects: []string{"alice"}, Actors: []string{"test@user"}, Source: "test",
+		Subjects: []string{"alice"}, By: types.ActorsNamed{Actors: named.ItemOf("test@user")}, When: types.Now{}, Source: "test",
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "names no version")

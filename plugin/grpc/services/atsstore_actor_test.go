@@ -25,8 +25,12 @@ func TestTheNodeAuthorsWhatAPluginAsksItTo(t *testing.T) {
 		t.Fatalf("protoToCommand: %v", err)
 	}
 
-	if len(cmd.Actors) != 1 || cmd.Actors[0] != "did:key:znode" {
-		t.Errorf("a plugin asking the node to write should be written by the node, got %v", cmd.Actors)
+	actors, err := cmd.NamedActors()
+	if err != nil {
+		t.Fatalf("a command the node writes names no actor: %v", err)
+	}
+	if len(actors) != 1 || actors[0] != "did:key:znode" {
+		t.Errorf("a plugin asking the node to write should be written by the node, got %v", actors)
 	}
 }
 
@@ -86,7 +90,11 @@ func TestPluginActorIsKeptWhenNamed(t *testing.T) {
 		t.Fatalf("protoToCommand: %v", err)
 	}
 
-	if len(cmd.Actors) != 1 || cmd.Actors[0] != "did:key:z6Mkalice" {
-		t.Errorf("a named actor should stand, got %v", cmd.Actors)
+	actors, err := cmd.NamedActors()
+	if err != nil {
+		t.Fatalf("a command naming its actor names none: %v", err)
+	}
+	if len(actors) != 1 || actors[0] != "did:key:z6Mkalice" {
+		t.Errorf("a named actor should stand, got %v", actors)
 	}
 }

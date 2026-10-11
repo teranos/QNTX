@@ -121,9 +121,6 @@ func (s *AtsStore) GetAttestationsByIDs(ids []string) ([]*types.As, error) {
 // self-certifying attestation. Backend-agnostic; uses AttestationExists to
 // check collisions.
 func (s *AtsStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
-	if err := cmd.NamesItsActor(); err != nil {
-		return nil, err
-	}
 	checkExists := func(asid string) bool { return s.raw.AttestationExists(asid) }
 
 	subject := firstOr(cmd.Subjects, "_")
@@ -135,7 +132,10 @@ func (s *AtsStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.
 		return nil, errors.Wrap(err, "failed to generate vanity ASID")
 	}
 
-	as := cmd.ToAs(asid, "")
+	as, err := cmd.ToAs(asid, "")
+	if err != nil {
+		return nil, err
+	}
 	if err := s.CreateAttestation(as); err != nil {
 		return nil, errors.Wrap(err, "failed to create attestation")
 	}

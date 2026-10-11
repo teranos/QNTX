@@ -392,14 +392,14 @@ func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*ty
 	// as no fields.
 	attributes := proto.GetAttributes().AsMap()
 
-	timestamp, err := commandTime(proto)
+	when, err := commandTime(proto)
 	if err != nil {
 		return nil, err
 	}
 	if err := s.stampVersion(proto, source.String(), attributes); err != nil {
 		return nil, err
 	}
-	actors, err := s.commandActors(proto)
+	by, err := s.commandActors(proto)
 	if err != nil {
 		return nil, err
 	}
@@ -408,8 +408,8 @@ func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*ty
 		Subjects:   proto.Subjects,
 		Predicates: proto.Predicates,
 		Contexts:   proto.Contexts,
-		Actors:     actors,
-		Timestamp:  timestamp,
+		By:         by,
+		When:       when,
 		Attributes: attributes,
 		Source:     source.String(),
 	}, nil
@@ -417,17 +417,17 @@ func (s *ATSStoreServer) protoToCommand(proto *protocol.AttestationCommand) (*ty
 
 // commandTime is when a command says it was made: the time it names, or now.
 // A timestamp of 0 is the epoch, as said.
-func commandTime(proto *protocol.AttestationCommand) (time.Time, error) {
+func commandTime(proto *protocol.AttestationCommand) (types.Moment, error) {
 	switch when := proto.GetWhen().(type) {
 	case *protocol.AttestationCommand_Timestamp:
-		return time.UnixMilli(when.Timestamp), nil
+		return types.At{Time: time.UnixMilli(when.Timestamp)}, nil
 	case *protocol.AttestationCommand_Now:
 		if !when.Now {
-			return time.Time{}, errors.Newf("the command about %v says now is false: it names a timestamp, or now", proto.GetSubjects())
+			return nil, errors.Newf("the command about %v says now is false: it names a timestamp, or now", proto.GetSubjects())
 		}
-		return time.Now(), nil
+		return types.Now{}, nil
 	}
-	return time.Time{}, errors.Newf("the command about %v names no time: a timestamp, or now", proto.GetSubjects())
+	return nil, errors.Newf("the command about %v names no time: a timestamp, or now", proto.GetSubjects())
 }
 
 // stampVersion stamps source_version: as the plugin says it, or as the
@@ -457,14 +457,14 @@ func (s *ATSStoreServer) stampVersion(proto *protocol.AttestationCommand, source
 
 // commandActors are who a command says made it: the actors it names, or the
 // node.
-func (s *ATSStoreServer) commandActors(proto *protocol.AttestationCommand) ([]string, error) {
+func (s *ATSStoreServer) commandActors(proto *protocol.AttestationCommand) (types.Authors, error) {
 	switch by := proto.GetBy().(type) {
 	case *protocol.AttestationCommand_ActorsNamed:
 		actors, err := named.ItemsOf(fmt.Sprintf("the actors of the command about %v", proto.GetSubjects()), by.ActorsNamed.GetNames())
 		if err != nil {
 			return nil, err
 		}
-		return actors.All(), nil
+		return types.ActorsNamed{Actors: actors}, nil
 	case *protocol.AttestationCommand_ByNode:
 		// "the node"
 		//
@@ -472,7 +472,11 @@ func (s *ATSStoreServer) commandActors(proto *protocol.AttestationCommand) ([]st
 		if !by.ByNode {
 			return nil, errors.Newf("the command about %v says by_node is false: it names its actors, or the node", proto.GetSubjects())
 		}
-		return []string{s.node}, nil
+		node, err := named.TextOf(fmt.Sprintf("the node's DID, who writes the command about %v", proto.GetSubjects()), s.node)
+		if err != nil {
+			return nil, err
+		}
+		return types.ActorNamed(node), nil
 	}
 	return nil, errors.Newf("the command about %v names who made it: its actors, or by_node", proto.GetSubjects())
 }

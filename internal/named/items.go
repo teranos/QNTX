@@ -25,3 +25,8 @@ func (i Items[T]) All() []T {
 func (i Items[T]) First() T {
 	return i.items[0]
 }
+
+// ItemOf is Items of the one item: one is never none.
+func ItemOf[T any](item T) Items[T] {
+	return Items[T]{items: []T{item}}
+}

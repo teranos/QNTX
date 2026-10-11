@@ -571,9 +571,6 @@ func (rs *RustStore) putLocked(jsonBytes []byte) error {
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation (implements ats.AttestationStore).
 func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
-	if err := cmd.NamesItsActor(); err != nil {
-		return nil, err
-	}
 	// Use first subject, predicate, and context for vanity generation
 	subject := "_"
 	if len(cmd.Subjects) > 0 {
@@ -599,7 +596,10 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	}
 
 	// Convert to As struct
-	as := cmd.ToAs(asid, "")
+	as, err := cmd.ToAs(asid, "")
+	if err != nil {
+		return nil, err
+	}
 
 	// Serialize outside the lock
 	jsonBytes, err := toRustJSON(as)

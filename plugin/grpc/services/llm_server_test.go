@@ -78,7 +78,9 @@ func TestLLMServer_ExplicitProvider(t *testing.T) {
 	assert.Equal(t, int32(42), resp.TotalTokens)
 
 	woven := <-store.woven
-	assert.Equal(t, []string{"b"}, woven.Actors)
+	actors, err := woven.NamedActors()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"b"}, actors)
 	assert.Equal(t, "from-b", woven.Attributes["text"])
 }
 

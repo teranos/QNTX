@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -265,7 +266,8 @@ func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
 			Subjects:   []string{collectorID},
 			Predicates: []string{"wants"},
 			Contexts:   []string{bookID},
-			Actors:     []string{collectorID},
+			When:       types.Now{},
+			By:         types.ActorsNamed{Actors: named.ItemOf(collectorID)},
 		}
 		if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			return err
@@ -287,7 +289,8 @@ func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
 			Subjects:   []string{seller},
 			Predicates: []string{"offers"},
 			Contexts:   []string{bookID},
-			Actors:     []string{seller},
+			When:       types.Now{},
+			By:         types.ActorsNamed{Actors: named.ItemOf(seller)},
 		}
 		if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			return err

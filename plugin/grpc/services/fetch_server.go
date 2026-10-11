@@ -548,7 +548,8 @@ func (s *FetchServer) attestFetchResult(ctx context.Context, store ats.Attestati
 		Subjects:   as.subjects.All(),
 		Predicates: predicates,
 		Contexts:   []string{as.context.String()},
-		Actors:     []string{as.actor.String()},
+		By:         types.ActorNamed(as.actor),
+		When:       types.Now{},
 		Source:     as.source.String(),
 		Attributes: attrs,
 	}

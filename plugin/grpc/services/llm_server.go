@@ -281,11 +281,17 @@ func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatReques
 
 	contextID := fmt.Sprintf("llm:%d", time.Now().UnixNano())
 
+	weaver, err := named.TextOf("the provider of the call to "+answered.String(), provider)
+	if err != nil {
+		s.logger.Warnw("LLM call happened and is not woven: it names no provider", "model", model, "error", err)
+		return
+	}
 	cmd := &types.AsCommand{
 		Subjects:   []string{"model:" + answered.String()},
 		Predicates: []string{"Weave"},
 		Contexts:   []string{contextID},
-		Actors:     []string{provider},
+		By:         types.ActorNamed(weaver),
+		When:       types.Now{},
 		Source:     "llm",
 		Attributes: attrs,
 	}

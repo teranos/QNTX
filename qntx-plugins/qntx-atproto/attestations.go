@@ -5,7 +5,18 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 )
+
+// by is the DID an attestation names as having made it; a DID naming nothing
+// is refused, naming what it was.
+func by(what, did string) (types.Authors, error) {
+	actor, err := named.TextOf(what, did)
+	if err != nil {
+		return nil, err
+	}
+	return types.ActorNamed(actor), nil
+}
 
 // collectionFromURI extracts the collection from an AT URI.
 // at://did:plc:xxx/app.bsky.feed.post/abc123 → app.bsky.feed.post
@@ -36,6 +47,8 @@ func (p *Plugin) attestSessionStatus(status, pdsHost, identity, errMsg string) {
 	cmd := &types.AsCommand{
 		Subjects:      []string{identity},
 		Predicates:    []string{status},
+		By:            types.ByNode{},
+		When:          types.Now{},
 		Source:        p.Metadata().Name,
 		SourceVersion: types.VersionFromRegistry{},
 		Attributes:    attrs,
@@ -53,8 +66,15 @@ func (p *Plugin) attestPost(did, uri, cid, text string) {
 		return
 	}
 
+	poster, err := by("the DID that posted "+uri, did)
+	if err != nil {
+		logger := p.Services().Logger("atproto")
+		logger.Errorw("The post happened but was not attested; it is missing from the record", "uri", uri, "error", err)
+		return
+	}
 	cmd := &types.AsCommand{
-		Actors:        []string{did},
+		By:            poster,
+		When:          types.Now{},
 		Subjects:      []string{uri},
 		Predicates:    []string{"posted"},
 		Contexts:      []string{collectionFromURI(uri)},
@@ -78,8 +98,15 @@ func (p *Plugin) attestFollow(actorDID, subjectDID, uri string) {
 		return
 	}
 
+	follower, err := by("the DID that followed "+subjectDID, actorDID)
+	if err != nil {
+		logger := p.Services().Logger("atproto")
+		logger.Errorw("The follow happened but was not attested; it is missing from the record", "subject", subjectDID, "error", err)
+		return
+	}
 	cmd := &types.AsCommand{
-		Actors:        []string{actorDID},
+		By:            follower,
+		When:          types.Now{},
 		Subjects:      []string{subjectDID},
 		Predicates:    []string{"following"},
 		Contexts:      []string{collectionFromURI(uri)},
@@ -102,8 +129,15 @@ func (p *Plugin) attestLike(actorDID, subjectURI, uri string) {
 		return
 	}
 
+	liker, err := by("the DID that liked "+subjectURI, actorDID)
+	if err != nil {
+		logger := p.Services().Logger("atproto")
+		logger.Errorw("The like happened but was not attested; it is missing from the record", "subject_uri", subjectURI, "error", err)
+		return
+	}
 	cmd := &types.AsCommand{
-		Actors:        []string{actorDID},
+		By:            liker,
+		When:          types.Now{},
 		Subjects:      []string{subjectURI},
 		Predicates:    []string{"liked"},
 		Contexts:      []string{collectionFromURI(uri)},
@@ -129,6 +163,8 @@ func (p *Plugin) attestResolve(handle, did string) {
 	cmd := &types.AsCommand{
 		Subjects:      []string{handle},
 		Predicates:    []string{"resolved-to"},
+		By:            types.ByNode{},
+		When:          types.Now{},
 		Source:        p.Metadata().Name,
 		SourceVersion: types.VersionFromRegistry{},
 		Attributes: map[string]interface{}{
@@ -156,8 +192,13 @@ func (p *Plugin) attestTimelinePost(ctx context.Context, uri, authorDID, authorH
 		attrs["text"] = text
 	}
 
+	author, err := by("the author of "+uri, authorDID)
+	if err != nil {
+		return err
+	}
 	cmd := &types.AsCommand{
-		Actors:        []string{authorDID},
+		By:            author,
+		When:          types.Now{},
 		Subjects:      []string{uri},
 		Predicates:    []string{"appeared-in-timeline"},
 		Contexts:      []string{collectionFromURI(uri)},

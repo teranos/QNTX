@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -75,9 +76,9 @@ func define(t *testing.T, sys ats.AttestationStore, market, slug string, at time
 		Subjects:   []string{market + "/" + slug},
 		Predicates: []string{staandCreated},
 		Contexts:   []string{"system"},
-		Actors:     []string{"root"},
+		By:         types.ActorsNamed{Actors: named.ItemOf("root")},
 		Source:     "cli",
-		Timestamp:  at,
+		When:       types.At{Time: at},
 	})
 	if err != nil {
 		t.Fatalf("define %q: %v", slug, err)
@@ -90,9 +91,9 @@ func undefine(t *testing.T, sys ats.AttestationStore, market, slug string, at ti
 		Subjects:   []string{market + "/" + slug},
 		Predicates: []string{staandDeleted},
 		Contexts:   []string{"system"},
-		Actors:     []string{"root"},
+		By:         types.ActorsNamed{Actors: named.ItemOf("root")},
 		Source:     "cli",
-		Timestamp:  at,
+		When:       types.At{Time: at},
 	})
 	if err != nil {
 		t.Fatalf("undefine %q: %v", slug, err)
