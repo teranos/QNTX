@@ -294,6 +294,12 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// auth.rp_origins — a deployment can serve the page and the API on
 	// different hosts, and a real one does.
 	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
+	// The nodes whose tokens this one accepts too, asked about each by introspection.
+	authHandler.SetIssuers(s.deps.cfg.Auth.Issuers)
+	// The node this one's people log in at, if any.
+	if err := authHandler.SetLoginAt(s.deps.cfg.Auth.LoginAt); err != nil {
+		return err
+	}
 	// Every other door am.toml names. The node's own relying party is
 	// already the door onto default; a door that cannot work is refused here
 	// rather than when somebody arrives at it, and one bad door does not take

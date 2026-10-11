@@ -1,6 +1,26 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2702 in 380 files.
+# 2701 in 380 files.
+# db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
+# server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
+# From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
+# ats/types/attestation.go: +1, NamesItsActor refuses a command naming no actor: one check every store's generate path calls, where four filled one in.
+# server/attestation_handlers.go: +1, the node authors what its caller named nobody for.
+# server/quote_removal.go: 7, from 82e8e8cf unbaselined: refusals of no actor, namespace or span, nothing removed ends the run, a count for the note, the daemon check its siblings hold.
+# From 3414: a test against a package-level const or var holding nil, zero or empty counts like one against what it holds; each was there before it was counted.
+# From 3400: auth.New refuses a handler with no User store, and the 23 tests for one that keeps no Users are gone; the header had drifted to 3406 by hand.
+# From 3378: rich search logs, rather than asking first whether it has a logger.
+# From 3368: the server logs, rather than asking first whether it has a logger.
+# From 3355: Pulse runs because the node runs, and nothing asks whether the daemon is there.
+# From 3339: a closed store says it is closed, rather than its pointer being nil.
+# From 3323: the node runs with its plugin registry, and nothing asks whether it has one.
+# From 3309: the vectors are the namespace's from boot, and only making them waits for a plugin.
+# From 3290: the canvas is handed its logger, whatever else it is handed.
+# From 3285: a refusal the caller is told is answered without a nil logger standing for not logging it.
+# From 3283: the services that started are a list, and stopping them is stopping that list.
+# From 3267: the Sacred Error shape went to teranos/sacred-error with its 6, moved and not burned.
+# internal/named: +3, items.go, named.go and pointer.go each hold the one check that refuses an empty value where it is made, so what holds one never asks again.
+# From 3260: the plugin code gives nothing a meaning, and its 635 absences fall to none.
 
 5	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -253,7 +273,7 @@
 5	server/auth/switch.go
 3	server/auth/token_strategy.go
 1	server/auth/tokens.go
-13	server/auth/tokens_table.go
+12	server/auth/tokens_table.go
 3	server/auth/users.go
 9	server/auth/users_table.go
 18	server/broadcast.go

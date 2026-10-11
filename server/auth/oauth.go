@@ -87,6 +87,8 @@ func (h *Handler) oauth() fosite.OAuth2Provider {
 			// A client's secret is the raw token it was minted as, checked by
 			// the lookup every bearer gets.
 			ClientSecretsHasher: h.ClientSecrets(),
+			// A node signs as its did:key, which fosite's own strategy refuses (EdDSA).
+			ClientAuthenticationStrategy: h.authenticateClient,
 		}
 		store := &oauthStore{ClientDoors: h.ClientDoors(), h: h, codes: map[string]*parkedCode{}, pkce: map[string]fosite.Requester{}}
 		h.oauthStore.Store(store)
@@ -95,6 +97,7 @@ func (h *Handler) oauth() fosite.OAuth2Provider {
 			compose.OAuth2AuthorizeExplicitFactory,
 			compose.OAuth2PKCEFactory,
 			compose.OAuth2RefreshTokenGrantFactory,
+			compose.OAuth2ClientCredentialsGrantFactory,
 		)
 	})
 	return h.oauthProvider
@@ -281,6 +284,12 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 	if !ok {
 		return errors.WithStack(fosite.ErrInvalidClient.WithHintf("the client %s no longer answers", request.GetClient().GetID()))
 	}
+	// fosite hands the store a sanitized request, which no longer says its
+	// grant. A node with nobody at the passkey asked for its own token; one
+	// a person said yes through is given a token that is the person.
+	if client.Node && !session.SaidYes {
+		return s.issueNodeToken(signature, session, client)
+	}
 	level := s.h.levelOf(session.MintedBy)
 	if level == "" {
 		return errors.WithStack(fosite.ErrAccessDenied.WithHintf("%s is no longer admitted, so no token speaks for them", session.MintedBy))
@@ -451,6 +460,8 @@ func (s *oauthStore) GetRefreshTokenSession(_ context.Context, signature string,
 		// The client's, as it is now: a client moved since is where the
 		// connector acts from this refresh on.
 		Namespace: client.Namespace,
+		// A refresh token is only ever the person who said yes.
+		SaidYes: true,
 	}
 	session.SetExpiresAt(fosite.RefreshToken, until)
 	request := fosite.NewRequest()
@@ -502,8 +513,19 @@ func namespacesOf(session *TokenSession) []string {
 	return []string{session.Namespace}
 }
 
-// clientFor is the client as fosite holds it.
+// clientFor is the client as fosite holds it. A node asks for its own token,
+// and is sent a code for the people it sends here to log in, at its own way
+// back. It signs as its key each time, so it is handed no refresh token.
 func clientFor(found Client) *fosite.DefaultClient {
+	if found.Node {
+		return &fosite.DefaultClient{
+			ID:            found.DID,
+			Secret:        []byte(found.DID),
+			RedirectURIs:  []string{found.ReturnAddress},
+			GrantTypes:    []string{grantClientCredentials, "authorization_code"},
+			ResponseTypes: []string{"code"},
+		}
+	}
 	return &fosite.DefaultClient{
 		ID:            found.DID,
 		Secret:        []byte(found.DID),
@@ -691,6 +713,7 @@ func (h *Handler) handleAuthorizeDone(w http.ResponseWriter, r *http.Request) {
 		MintedByUser:        held.userID,
 		MintedByDisplayName: held.name,
 		Namespace:           client.Namespace,
+		SaidYes:             true,
 	}
 	response, err := provider.NewAuthorizeResponse(ctx, parked.request, session)
 	if err != nil {

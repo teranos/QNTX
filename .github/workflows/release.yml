@@ -150,10 +150,6 @@
         "matrix": {
           "include": [
             {
-              "arch": "amd64",
-              "runner": "macos-13"
-            },
-            {
               "arch": "arm64",
               "runner": "macos-14"
             }
@@ -186,7 +182,7 @@
           "name": "Create Release",
           "uses": "softprops/action-gh-release@v2",
           "with": {
-            "body": "## QNTX ${{ steps.version.outputs.version }}\n\n### Installation\n\n**Nix (Recommended):**\n```bash\nnix profile install github:teranos/QNTX/${{ github.ref_name }}\n```\n\n**Docker:**\n```bash\ndocker pull ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}\n```\n\n**Manual Download:**\nDownload the appropriate binary for your platform below, extract it, and add to your PATH.\n\n### Binaries\n\n**Linux:**\n- amd64: `qntx-${{ steps.version.outputs.version }}-linux-amd64.tar.gz`\n- arm64: `qntx-${{ steps.version.outputs.version }}-linux-arm64.tar.gz`\n\n**macOS:**\n- Intel (x64): `qntx-${{ steps.version.outputs.version }}-darwin-amd64.tar.gz`\n- Apple Silicon (ARM): `qntx-${{ steps.version.outputs.version }}-darwin-arm64.tar.gz`\n\n### Desktop App (Tauri)\n\n**macOS:** `QNTX-${{ steps.version.outputs.version }}-macos-arm64.tar.gz`\n",
+            "body": "## QNTX ${{ steps.version.outputs.version }}\n\n### Installation\n\n**Nix (Recommended):**\n```bash\nnix profile install github:teranos/QNTX/${{ github.ref_name }}\n```\n\n**Docker:**\n```bash\ndocker pull ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}\n```\n\n**Manual Download:**\nDownload the appropriate binary for your platform below, extract it, and add to your PATH.\n\n### Binaries\n\n**Linux:**\n- amd64: `qntx-${{ steps.version.outputs.version }}-linux-amd64.tar.gz`\n- arm64: `qntx-${{ steps.version.outputs.version }}-linux-arm64.tar.gz`\n\n**macOS:**\n- Apple Silicon (ARM): `qntx-${{ steps.version.outputs.version }}-darwin-arm64.tar.gz`\n\n### Desktop App (Tauri)\n\n**macOS:** `QNTX-${{ steps.version.outputs.version }}-macos-arm64.tar.gz`\n",
             "draft": false,
             "generate_release_notes": true,
             "name": "QNTX ${{ steps.version.outputs.version }}",

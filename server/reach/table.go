@@ -50,6 +50,12 @@ REACH is '/auth/authorize' '/auth/authorize/done'                         of ANY
 # The client comes for its token with the code and its secret, holding no
 # session: the secret is the credential, checked at the endpoint itself.
 REACH is '/auth/token'                                                    of ANYONE
+# Another node asks whether a token this one issued is live, holding no session:
+# its signed assertion is the credential, checked at the endpoint itself.
+REACH is '/auth/introspect'                                               of ANYONE
+# A node whose people log in at another sends them there and takes them back,
+# before they hold any session here.
+REACH is '/auth/elsewhere' '/auth/elsewhere/back'                         of ANYONE
 # The GitHub App's webhook, at the path ROOT sets under /github/. The
 # delivery's signature is the credential; every other path answers nobody.
 REACH is '/github/'                                                       of ANYONE
@@ -91,6 +97,9 @@ REACH is '/g/'                                                            of ANY
 # alone, gated by the handler and not by this line.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT SUPER
 REACH is '/auth/users' '/auth/users/'                                     of ROOT SUPER
+# Another node registered as a client by its own did:key: ROOT's, and a
+# session's alone, gated by the handler.
+REACH is '/auth/nodes'                                                    of ROOT
 # ROOT invites a friend (ADR-031). The list and the invite are ROOT's, gated by
 # the handler; the link the friend was mailed is read by whoever holds it,
 # before they hold any session, and the cancel is ROOT's session's.

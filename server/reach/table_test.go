@@ -103,11 +103,27 @@ func TestTheCeremonyIsGrantedToAnyone(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/auth/login", "/auth/login/begin", "/auth/laye/verify"} {
+	for _, path := range []string{"/auth/login", "/auth/login/begin", "/auth/laye/verify", "/auth/elsewhere", "/auth/elsewhere/back"} {
 		row, said := granted[path]
 		require.True(t, said, path+" is granted to nobody at all")
 		assert.True(t, row.anyone, path+" asks who is calling before letting them log in")
 	}
+}
+
+// A node asking about a token holds no session, and nobody but ROOT registers
+// one. Unlined, introspection was ROOT's and no node could ever ask.
+func TestANodeAsksWithoutASessionAndRootRegistersIt(t *testing.T) {
+	granted, err := readReaches(reachTable)
+	require.NoError(t, err)
+
+	row, said := granted["/auth/introspect"]
+	require.True(t, said, "/auth/introspect is granted to nobody at all")
+	assert.True(t, row.anyone, "/auth/introspect asks a node for a session it cannot hold")
+
+	row, said = granted["/auth/nodes"]
+	require.True(t, said, "/auth/nodes is granted to nobody at all")
+	assert.False(t, row.anyone, "/auth/nodes is served without asking who is calling")
+	assert.Empty(t, row.reach.Beyond(), "somebody beside ROOT registers a node")
 }
 
 // Whoever is logged in may see the User the node resolved them to, and a

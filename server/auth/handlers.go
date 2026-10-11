@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -28,6 +29,11 @@ func (u *ownerUser) WebAuthnDisplayName() string                { return "QNTX O
 func (u *ownerUser) WebAuthnCredentials() []webauthn.Credential { return u.credentials }
 
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
+	// A node whose people log in elsewhere has no login of its own to show.
+	if h.logsInElsewhere {
+		http.Redirect(w, r, elsewherePath+"?return="+url.QueryEscape(r.URL.Query().Get("return")), http.StatusSeeOther)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if _, err := w.Write(loginHTML); err != nil {
 		h.logger.Warnw("The login page was not delivered", "error", err)

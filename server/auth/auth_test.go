@@ -321,8 +321,9 @@ func (m *memTokenStore) Issue(spec IssuedToken) (string, error) {
 			Namespaces:          spec.Namespaces,
 			// The flow issued this through a client, under a request. A
 			// refresh is answered from both.
-			ClientDID: spec.ClientDID,
-			RequestID: spec.RequestID,
+			ClientDID:     spec.ClientDID,
+			RequestID:     spec.RequestID,
+			ReturnAddress: spec.ReturnAddress,
 		},
 		createdAt: time.Now().UTC(),
 		expiresAt: spec.ExpiresAt,
