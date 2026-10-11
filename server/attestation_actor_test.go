@@ -21,18 +21,29 @@ const (
 // writingAs posts one attestation through the real handler as the given caller.
 func writingAs(t *testing.T, caller *auth.Admission, body string) (ats.AttestationStore, *httptest.ResponseRecorder) {
 	t.Helper()
+	s, store := writingServer(t)
+	return store, postAs(s, caller, body)
+}
+
+// writingServer is a node with a store to write to and nothing else.
+func writingServer(t *testing.T) (*QNTXServer, ats.AttestationStore) {
+	t.Helper()
 	store, db := createTestStore(t)
 	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), nodeDB: db, logger: zap.NewNop().Sugar(),
 		nodeDID: &nodedid.Handler{DID: nodeDID}}
 	s.held = servingOne(db, store)
+	return s, store
+}
 
+// postAs posts one attestation to s through the real handler as the given caller.
+func postAs(s *QNTXServer, caller *auth.Admission, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/attestations", jsonBody(body))
 	if caller != nil {
 		req = req.WithContext(auth.WithAdmission(req.Context(), *caller))
 	}
 	rec := httptest.NewRecorder()
 	s.handleCreateAttestation(rec, req)
-	return store, rec
+	return rec
 }
 
 // actorsOf reads back the actors the handler wrote — `by` in AX.

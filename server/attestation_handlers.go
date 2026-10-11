@@ -403,6 +403,33 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("%s: %v", req.ID, err))
 		return
 	}
+	// "this person wrote it": the key it was signed with is one the person
+	// admitted holds. A request naming no person names nobody who wrote it.
+	if claim == signing.Signed {
+		admitted, ok := auth.AdmissionFrom(r.Context())
+		if !ok {
+			writeError(w, http.StatusForbidden, fmt.Sprintf(
+				"%s is signed by %s, and this request is admitted as no person who could hold it", req.ID, req.SignerDID))
+			return
+		}
+		writer, found, err := s.authHandler.UserByID(admitted.UserID)
+		if err != nil {
+			writeWrappedError(w, s.logger, err,
+				fmt.Sprintf("the User %q who signed %s was not read", admitted.UserID, req.ID),
+				http.StatusInternalServerError)
+			return
+		}
+		if !found {
+			writeError(w, http.StatusForbidden, fmt.Sprintf(
+				"%s is signed by %s, and %s is admitted as no User this node keeps", req.ID, req.SignerDID, admitted.Identity))
+			return
+		}
+		if !writer.HoldsKey(req.SignerDID) {
+			writeError(w, http.StatusForbidden, fmt.Sprintf(
+				"%s is signed by %s, a key User %s does not hold", req.ID, req.SignerDID, writer.ID))
+			return
+		}
+	}
 
 	// Validate required fields
 	if len(req.Subjects) == 0 {

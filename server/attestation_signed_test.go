@@ -6,7 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
-	"strings"
+	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/server/auth"
+	"go.uber.org/zap"
 )
 
 // signedBody is an attestation the way a browser sends one it signed: the
@@ -61,17 +63,45 @@ func signedBody(t *testing.T, actors []string, edit func(map[string]any)) (strin
 	return string(raw), did
 }
 
+const timsAccount = "https://mastodon.example/@tim"
+
+// personSession is Tim, admitted by his account and reaching his User.
 func personSession() *auth.Admission {
 	session := auth.Admitted(auth.LevelSuper)
-	session.Identity = "https://mastodon.example/@tim"
+	session.Identity = timsAccount
+	session.UserID = "UStim"
 	return &session
+}
+
+// signingAs posts as writingAs does, on a node that keeps Tim, who holds keys.
+func signingAs(t *testing.T, caller *auth.Admission, body string, keys ...string) (ats.AttestationStore, *httptest.ResponseRecorder) {
+	t.Helper()
+	s, store := writingServer(t)
+	users, _, err := auth.OpenUserTable(s.nodeDB, nil)
+	if err != nil {
+		t.Fatalf("OpenUserTable: %v", err)
+	}
+	tim := auth.User{ID: "UStim", Level: auth.LevelSuper}
+	for _, did := range keys {
+		tim.Keys = append(tim.Keys, auth.UserKey{DID: did, Origin: auth.OriginBrowser})
+	}
+	if err := users.Put(tim); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	s.authHandler, err = auth.New(nil, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
+		func(next http.HandlerFunc) http.HandlerFunc { return next },
+		nil, users, false, []string{timsAccount}, nil)
+	if err != nil {
+		t.Fatalf("auth.New: %v", err)
+	}
+	return store, postAs(s, caller, body)
 }
 
 // The node signs nothing on a writer's behalf: what the browser signed is
 // stored as it signed it, and still verifies when read back.
 func TestASignedAttestationIsStoredAsSigned(t *testing.T) {
 	body, did := signedBody(t, []string{"tim"}, nil)
-	store, rec := writingAs(t, personSession(), body)
+	store, rec := signingAs(t, personSession(), body, did)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
 	}
@@ -88,40 +118,70 @@ func TestASignedAttestationIsStoredAsSigned(t *testing.T) {
 	}
 }
 
+// "this person wrote it": a key the person admitted does not hold is not
+// theirs to have signed with, however good the signature.
+func TestASignatureByAKeyThePersonDoesNotHoldIsRefused(t *testing.T) {
+	body, _ := signedBody(t, []string{"tim"}, nil)
+	_, rec := signingAs(t, personSession(), body, "did:key:zsomeoneelse")
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestASignedAttestationFromNoUserIsRefused(t *testing.T) {
+	body, did := signedBody(t, []string{"tim"}, nil)
+	stranger := personSession()
+	stranger.UserID = "USnobody"
+	_, rec := signingAs(t, stranger, body, did)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// A node without login admits nobody, so nobody is named to have signed.
+func TestASignedAttestationOnANodeWithoutLoginIsRefused(t *testing.T) {
+	body, _ := signedBody(t, []string{"tim"}, nil)
+	_, rec := writingAs(t, nil, body)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// A bearer token names the route that minted it and no User, so nobody is
+// named to hold the key.
+func TestASignedAttestationThroughATokenIsRefused(t *testing.T) {
+	body, did := signedBody(t, []string{tokenDID, "ground"}, nil)
+	_, rec := signingAs(t, tokenAdmission(), body, did)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestASignatureNotOverWhatCameIsRefused(t *testing.T) {
-	body, _ := signedBody(t, []string{"tim"}, func(b map[string]any) { b["source"] = "elsewhere" })
-	_, rec := writingAs(t, personSession(), body)
+	body, did := signedBody(t, []string{"tim"}, func(b map[string]any) { b["source"] = "elsewhere" })
+	_, rec := signingAs(t, personSession(), body, did)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestASignerDIDThatNamesNoKeyIsRefused(t *testing.T) {
-	body, _ := signedBody(t, []string{"tim"}, func(b map[string]any) { b["signer_did"] = "did:web:example.com" })
-	_, rec := writingAs(t, personSession(), body)
+	const notAKey = "did:web:example.com"
+	body, _ := signedBody(t, []string{"tim"}, func(b map[string]any) { b["signer_did"] = notAKey })
+	_, rec := signingAs(t, personSession(), body, notAKey)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
 	}
 }
 
-// A token is its own actor, and the node would put its DID first. Under a
-// signature it cannot, so the signer is told to name it.
-func TestASignedAttestationMissingTheTokenIsRefused(t *testing.T) {
-	body, _ := signedBody(t, []string{"ground"}, nil)
-	_, rec := writingAs(t, tokenAdmission(), body)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
-	}
-	if !strings.Contains(rec.Body.String(), tokenDID) {
-		t.Fatalf("the refusal does not name the actor the signer must include: %s", rec.Body.String())
-	}
-}
+// A token that already names its own DID first is not given it twice.
+func TestATokenNamingItselfFirstIsNamedOnce(t *testing.T) {
+	store, rec := writingAs(t, tokenAdmission(),
+		`{"subjects":["qntx"],"predicates":["noted"],"actors":["`+tokenDID+`","ground"]}`)
 
-func TestASignedAttestationNamingTheTokenFirstIsStored(t *testing.T) {
-	body, _ := signedBody(t, []string{tokenDID, "ground"}, nil)
-	_, rec := writingAs(t, tokenAdmission(), body)
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	actors := actorsOf(t, store, rec)
+	if !slices.Equal(actors, []string{tokenDID, "ground"}) {
+		t.Fatalf("actors = %v, want the token's DID once, leading", actors)
 	}
 }
 
@@ -139,8 +199,8 @@ func TestASignedAttestationNamesWhatTheNodeWouldFillIn(t *testing.T) {
 			if name == "no actors" {
 				actors = []string{}
 			}
-			body, _ := signedBody(t, actors, edit)
-			_, rec := writingAs(t, personSession(), body)
+			body, did := signedBody(t, actors, edit)
+			_, rec := signingAs(t, personSession(), body, did)
 			if rec.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
 			}
