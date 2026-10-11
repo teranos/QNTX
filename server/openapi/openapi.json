@@ -680,6 +680,11 @@
         "ANYONE"
       ]
     },
+    "/auth/introspect": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/invitations": {
       "x-qntx-reach": [
         "ROOT",
@@ -720,6 +725,11 @@
     "/auth/logout": {
       "x-qntx-reach": [
         "ANYONE"
+      ]
+    },
+    "/auth/nodes": {
+      "x-qntx-reach": [
+        "ROOT"
       ]
     },
     "/auth/register/begin": {
