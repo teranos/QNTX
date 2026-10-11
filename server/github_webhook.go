@@ -150,8 +150,15 @@ func (s *QNTXServer) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusUnauthorized, "the delivery is not signed with the App's webhook secret")
 		return
 	}
-	if r.Header.Get("X-GitHub-Event") != "push" {
-		w.WriteHeader(http.StatusNoContent)
+	if event := r.Header.Get("X-GitHub-Event"); event != "push" {
+		// A pull request, its checks and main's CI are what approvals read
+		// (ADR-052). Every other event is taken and nothing is done with it.
+		touched, err := s.approvalsFromGitHub(r.Context(), event, body)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		respond(w, s.logger, http.StatusOK, map[string][]string{"approvals": touched})
 		return
 	}
 	var push gitHubPush

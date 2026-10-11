@@ -47,6 +47,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// What git's credential helper asks when an agent pushes (ADR-048).
 	s.answer(githubCredentialPath, s.HandleGitHubCredential)
 
+	// The human's answer to an approval (ADR-052): a route, no sigil and no
+	// tool; the reach table names it of ROOT.
+	s.answer(approvalsAnswerPath, s.HandleApprovalAnswer)
+
 	// A staand answers the public pixel on /s/{namespace}/{slug} (ADR-035). The
 	// handler reads the market and the slug off the path.
 	s.answer(staandPathPrefix, s.HandleStaand)
