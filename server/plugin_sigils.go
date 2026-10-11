@@ -498,13 +498,14 @@ func whyOf(status int32) string {
 // ServePluginSigils serves again with the signa every ready plugin holds now.
 // A plugin's sigils arrive with its Initialize, after the node has opened, and
 // a restart may hand different ones.
+//
+// The node has opened by then: plugins load on onReady, which Start fires
+// once open has built what the node serves, and a restart is of a plugin
+// loaded so.
 func (s *QNTXServer) ServePluginSigils() {
 	s.opening.Lock()
 	defer s.opening.Unlock()
 	s.answerSigils()
-	if s.served == nil {
-		return
-	}
 	unnamed, err := s.reopenHeld()
 	if err != nil {
 		s.logger.Errorw("Plugin sigils are not served; what the node serves is unchanged", "error", err)

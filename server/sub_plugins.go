@@ -82,6 +82,9 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	// Mail to a User on a plugin's behalf (ADR-041): the Users exist once auth
 	// has run, and the node's DID once nodedid has.
 	servicesManager.SetMail(s.mailWiring())
+	// The node's own mail goes by the same service (ADR-042), which Start made
+	// whether or not its server came to serve plugins.
+	s.nodeMailer = servicesManager.MailServer()
 
 	s.servicesManager = servicesManager
 	s.services = services
