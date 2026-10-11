@@ -96,7 +96,7 @@ func (s *ATSStoreServer) SetPluginStores(plugins PluginStores) {
 // the caller's for a call's token, the namespace a plugin stands in for that
 // plugin's own token, and none for anything else.
 func (s *ATSStoreServer) storeFor(token string) (ats.AttestationStore, error) {
-	if err := ValidateToken(token, s.authToken); err == nil {
+	if sameToken(token, s.authToken) {
 		return s.store, nil
 	}
 	if store, open := (*s.calls.Load())(token); open {

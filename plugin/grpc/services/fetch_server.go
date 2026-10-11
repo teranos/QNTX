@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net/http"
@@ -29,19 +28,41 @@ type windowLimiter struct {
 	times   []time.Time
 	maxReqs int
 	window  time.Duration
-	// closedErr is why no request is made at all: a window that allows none.
-	closedErr error
 }
+
+// fetchWindow is how many fetches a window allows: some, waited for in turn,
+// or none, and why.
+type fetchWindow interface {
+	// usage is how many requests the window holds now, and how many it allows.
+	usage() (current, max int)
+	// wait blocks until the window allows a request, or says why it does not.
+	wait(ctx context.Context) error
+	// length is how long the window is.
+	length() time.Duration
+}
+
+// closedWindow is a window that allows no request at all, and why.
+type closedWindow struct {
+	why    error
+	window time.Duration
+}
+
+func (c closedWindow) usage() (current, max int)  { return 0, 0 }
+func (c closedWindow) wait(context.Context) error { return c.why }
+func (c closedWindow) length() time.Duration      { return c.window }
+func (w *windowLimiter) length() time.Duration    { return w.window }
 
 // newWindowLimiter allows maxReqs a window: "zero means zero", so a window of
 // none makes no request.
-func newWindowLimiter(maxReqs int, window time.Duration) *windowLimiter {
+func newWindowLimiter(maxReqs int, window time.Duration) fetchWindow {
 	allowed, err := named.CountOf("fetch.max_requests_per_window", maxReqs)
+	if err != nil {
+		return closedWindow{why: errors.Wrapf(err, "fetch allows %d requests per window, so none is made", maxReqs), window: window}
+	}
 	return &windowLimiter{
-		times:     make([]time.Time, 0, allowed.Int()),
-		maxReqs:   allowed.Int(),
-		window:    window,
-		closedErr: errors.Wrapf(err, "fetch allows %d requests per window, so none is made", maxReqs),
+		times:   make([]time.Time, 0, allowed.Int()),
+		maxReqs: allowed.Int(),
+		window:  window,
 	}
 }
 
@@ -60,9 +81,6 @@ func (w *windowLimiter) usage() (current, max int) {
 
 // wait blocks until a slot is available in the window, or ctx is cancelled.
 func (w *windowLimiter) wait(ctx context.Context) error {
-	if w.closedErr != nil {
-		return w.closedErr
-	}
 	for {
 		w.mu.Lock()
 		now := time.Now()
@@ -170,7 +188,7 @@ type FetchServer struct {
 	logger          *zap.SugaredLogger
 	pathLimiter     *rateLimiter
 	domainLimiter   *rateLimiter
-	globalLimiter   *windowLimiter
+	globalLimiter   fetchWindow
 	stats           fetchStats
 	stopPulse       chan struct{}
 	versionResolver VersionResolver
@@ -280,9 +298,9 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 		if !record.Unrecorded {
 			return &protocol.FetchResponse{Success: false, Error: "unrecorded is false: a fetch is attested as it names, or unrecorded"}, nil
 		}
-		body, statusCode, fetchErr := s.fetchLive(ctx, target.String())
-		if fetchErr != nil {
-			return fetchErr, nil
+		body, statusCode, err := s.fetchLive(ctx, target.String())
+		if err != nil {
+			return &protocol.FetchResponse{Success: false, Error: err.Error(), StatusCode: int32(statusCode)}, nil //nolint:nilerr // the failure travels in the response payload
 		}
 		return &protocol.FetchResponse{Success: true, Body: string(body), StatusCode: int32(statusCode)}, nil
 	case *protocol.FetchRequest_Attest:
@@ -296,9 +314,9 @@ func (s *FetchServer) Fetch(ctx context.Context, req *protocol.FetchRequest) (*p
 }
 
 // fetchLive is the URL fetched from remote, once the rate limits let it go.
-func (s *FetchServer) fetchLive(ctx context.Context, rawURL string) ([]byte, int, *protocol.FetchResponse) {
+func (s *FetchServer) fetchLive(ctx context.Context, rawURL string) ([]byte, int, error) {
 	if err := s.applyRateLimits(ctx, rawURL); err != nil {
-		return nil, 0, &protocol.FetchResponse{Success: false, Error: err.Error()}
+		return nil, 0, err
 	}
 	return s.doHTTPGet(ctx, rawURL)
 }
@@ -311,9 +329,9 @@ func (s *FetchServer) fetchAttested(ctx context.Context, store ats.AttestationSt
 			return resp
 		}
 	}
-	body, statusCode, fetchErr := s.fetchLive(ctx, as.url)
-	if fetchErr != nil {
-		return fetchErr
+	body, statusCode, err := s.fetchLive(ctx, as.url)
+	if err != nil {
+		return &protocol.FetchResponse{Success: false, Error: err.Error(), StatusCode: int32(statusCode)}
 	}
 	attestID, err := s.attestFetchResult(ctx, store, as, body, statusCode)
 	if err != nil {
@@ -448,7 +466,7 @@ func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) error 
 		s.logger.Infow("Fetch window near capacity",
 			"current", current,
 			"max", max,
-			"window", s.globalLimiter.window,
+			"window", s.globalLimiter.length(),
 			"config", "fetch.max_requests_per_window / fetch.window_seconds",
 		)
 	}
@@ -480,52 +498,60 @@ func (s *FetchServer) applyRateLimits(ctx context.Context, rawURL string) error 
 	return nil
 }
 
-// doHTTPGet performs the HTTP GET request, reads the body, and handles gzip fallback.
-// Returns body bytes, status code, or an error response.
-func (s *FetchServer) doHTTPGet(ctx context.Context, rawURL string) ([]byte, int, *protocol.FetchResponse) {
+// doHTTPGet performs the HTTP GET request, reads the body, and handles gzip
+// fallback. Returns the body and status code, or why there is none and the
+// status code when one came back.
+func (s *FetchServer) doHTTPGet(ctx context.Context, rawURL string) ([]byte, int, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, 0, &protocol.FetchResponse{
-			Success: false,
-			Error:   fmt.Sprintf("failed to create request for %s: %v", rawURL, err),
-		}
+		return nil, 0, errors.Wrapf(err, "failed to create request for %s", rawURL)
 	}
 
 	resp, err := s.client.Do(httpReq)
 	if err != nil {
 		s.stats.recordError()
-		return nil, 0, &protocol.FetchResponse{
-			Success: false,
-			Error:   fmt.Sprintf("failed to fetch %s: %v", rawURL, err),
-		}
+		return nil, 0, errors.Wrapf(err, "failed to fetch %s", rawURL)
 	}
 	defer func() { sqlclose.Log(resp.Body.Close(), s.logger, "the fetched response body") }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		s.stats.recordError()
-		return nil, resp.StatusCode, &protocol.FetchResponse{
-			Success:    false,
-			Error:      fmt.Sprintf("failed to read response body from %s: %v", rawURL, err),
-			StatusCode: int32(resp.StatusCode),
-		}
+		return nil, resp.StatusCode, errors.Wrapf(err, "failed to read response body from %s", rawURL)
 	}
 
 	// Go's http.Transport strips Content-Encoding: gzip but sometimes fails
 	// to decompress, leaving raw gzip bytes in the body. Detect by magic bytes
 	// and decompress manually — gzip bytes corrupt string attestation attributes.
+	// A body that begins as gzip and does not decompress is refused, not kept
+	// as the raw bytes.
 	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
-		gz, gzErr := gzip.NewReader(bytes.NewReader(body))
-		if gzErr == nil {
-			if decompressed, readErr := io.ReadAll(gz); readErr == nil {
-				body = decompressed
-			}
-			sqlclose.Log(gz.Close(), s.logger, "the gzip reader")
+		decompressed, err := gunzip(body)
+		if err != nil {
+			s.stats.recordError()
+			return nil, resp.StatusCode, errors.Wrapf(err, "the body from %s begins as gzip (%d bytes) and does not decompress", rawURL, len(body))
 		}
+		body = decompressed
 	}
 
 	s.stats.recordRequest(len(body))
 	return body, resp.StatusCode, nil
+}
+
+// gunzip is what gzipped bytes decompress to.
+func gunzip(gzipped []byte) ([]byte, error) {
+	gz, err := gzip.NewReader(bytes.NewReader(gzipped))
+	if err != nil {
+		return nil, err
+	}
+	decompressed, err := io.ReadAll(gz)
+	if err != nil {
+		return nil, errors.WithSecondaryError(err, gz.Close())
+	}
+	if err := gz.Close(); err != nil {
+		return nil, err
+	}
+	return decompressed, nil
 }
 
 // attestFetchResult attests the fetch result, and names the attestation.

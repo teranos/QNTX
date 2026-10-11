@@ -141,11 +141,9 @@ func (s *PluginServer) listen(host string, startPort int) (net.Listener, int, er
 	return nil, startPort, errors.Newf("failed to find available port after %d attempts starting from %d", listenAttempts, startPort)
 }
 
-// isAddressInUse checks if the error is due to address already in use.
+// isAddressInUse checks if the error listening is due to address already in
+// use.
 func isAddressInUse(err error) bool {
-	if err == nil {
-		return false
-	}
 	// Check for common "address already in use" errors across platforms
 	errStr := err.Error()
 	return strings.Contains(errStr, "address already in use") ||
