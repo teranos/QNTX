@@ -29,6 +29,19 @@ func mintable(asked string) (Level, bool) {
 	return "", false
 }
 
+// expiryOf is when a token ends, as a mint says it: a moment, or never, named.
+func expiryOf(asked string) (*time.Time, error) {
+	said := strings.TrimSpace(asked)
+	if said == tokenNeverEnds {
+		return NeverEnds(), nil
+	}
+	t, err := time.Parse(time.RFC3339, said)
+	if err != nil {
+		return nil, errors.New("expires_at is when the token ends, as RFC3339, or " + tokenNeverEnds + " for one that does not; this said " + strconv.Quote(said))
+	}
+	return &t, nil
+}
+
 // returnable is whether an address can be sent a code: absolute, and no
 // fragment, because a fragment never reaches the server the address names.
 func returnable(address string) error {
@@ -152,17 +165,10 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		}
 	}
 
-	// A token says when it ends: a moment, or never, named.
-	said := strings.TrimSpace(req.ExpiresAt)
-	expiresAt := NeverEnds()
-	if said != tokenNeverEnds {
-		t, err := time.Parse(time.RFC3339, said)
-		if err != nil {
-			h.writeError(w, http.StatusBadRequest,
-				"expires_at is when the token ends, as RFC3339, or "+tokenNeverEnds+" for one that does not; this said "+strconv.Quote(said))
-			return
-		}
-		expiresAt = &t
+	expiresAt, err := expiryOf(req.ExpiresAt)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	// The minting session already carries who it belongs to, so recording the

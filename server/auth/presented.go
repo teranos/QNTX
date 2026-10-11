@@ -105,6 +105,9 @@ func (h *Handler) presented(r *http.Request) Presented {
 				// Last used is what a revocation is watched by (ADR-025), and
 				// nothing wrote it.
 				h.touch(hash, grant.DID)
+			} else if grant, live := h.issuedElsewhere(raw); live {
+				// Issued by auth.issuer, which said so; this node's own lines admit it.
+				p.Bearer = &grant
 			}
 		}
 		return p
