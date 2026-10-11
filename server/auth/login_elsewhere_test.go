@@ -33,7 +33,7 @@ func loginElsewhere(t *testing.T) (issuer, node *Handler) {
 	node.tokens = newMemTokenStore()
 	node.nodeKey = key
 	node.configuredOrigin = elsewhereOrigin
-	require.NoError(t, node.SetLoginAt(served.URL))
+	require.NoError(t, node.SetPrimary(served.URL))
 	return issuer, node
 }
 
@@ -164,6 +164,6 @@ func TestANodeThatLogsInHereSendsNobodyElsewhere(t *testing.T) {
 // An origin that is not one is said at startup.
 func TestALoginElsewhereThatIsNoOriginIsRefused(t *testing.T) {
 	node := handlerWithDoors(t)
-	assert.Error(t, node.SetLoginAt("api.node.test"))
-	assert.NoError(t, node.SetLoginAt(""))
+	assert.Error(t, node.SetPrimary("api.node.test"))
+	assert.NoError(t, node.SetPrimary(""))
 }

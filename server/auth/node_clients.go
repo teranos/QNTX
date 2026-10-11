@@ -16,7 +16,7 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// A node is a client of another node, declared in auth.nodes by its own
+// A peer is a client of the primary, declared in nodes.peers by its own
 // did:key. It proves itself by signing with that key (RFC 7523 §2.2), so no
 // secret exists.
 
@@ -128,35 +128,52 @@ func names(word string) bool {
 	return strings.IndexFunc(word, unicode.IsLetter) >= 0
 }
 
-// DeclareNode makes another node a client of this one, as auth.nodes names
-// it: its did:key, and the origin its people are sent back to.
-func (h *Handler) DeclareNode(did, origin string) error {
-	did = strings.TrimSpace(did)
+// DeclarePeer makes a peer a client of this node, as nodes.peers names it:
+// what it is called here, its did:key, and the origin it answers at.
+func (h *Handler) DeclarePeer(name, did, origin string) error {
+	name, did = strings.TrimSpace(name), strings.TrimSpace(did)
+	if !names(name) || strings.ContainsAny(name, "/?#") {
+		return errors.Newf("nodes.peers names %s as %q, which is no name a path can carry", did, name)
+	}
 	key, err := DecodeUserDID(did)
 	if err != nil {
-		return errors.Wrapf(err, "auth.nodes names %q, which is not an ed25519 did:key", did)
+		return errors.Wrapf(err, "nodes.peers names %q, which is not an ed25519 did:key", did)
 	}
 	if len(key) != ed25519.PublicKeySize {
-		return errors.Newf("auth.nodes names %q, whose key is not an ed25519 public key", did)
+		return errors.Newf("nodes.peers names %q, whose key is not an ed25519 public key", did)
 	}
 	origin = strings.TrimSuffix(strings.TrimSpace(origin), "/")
 	parsed, err := url.Parse(origin)
 	if err != nil || !parsed.IsAbs() || parsed.Scheme+"://"+parsed.Host != origin || !names(parsed.Scheme) {
-		return errors.Newf("auth.nodes names %s at %q, which is not an origin such as https://node.example.com", did, origin)
+		return errors.Newf("nodes.peers names %s at %q, which is not an origin such as https://node.example.com", did, origin)
 	}
 	if _, held := h.nodes[did]; held {
-		return errors.Newf("auth.nodes names %s twice", did)
+		return errors.Newf("nodes.peers names %s twice", did)
 	}
-	nodes := map[string]Client{did: {
+	if held, named := h.peerNamed(name); named {
+		return errors.Newf("nodes.peers names %s and %s both %s", held.DID, did, name)
+	}
+	peers := map[string]Client{did: {
 		DID:           did,
-		Label:         parsed.Host,
+		Label:         name,
 		Namespace:     NamespaceDefault,
 		ReturnAddress: origin + elsewhereBackPath,
+		Origin:        parsed,
 		Node:          true,
 	}}
-	for held, node := range h.nodes {
-		nodes[held] = node
+	for held, peer := range h.nodes {
+		peers[held] = peer
 	}
-	h.nodes = nodes
+	h.nodes = peers
 	return nil
+}
+
+// peerNamed is the peer nodes.peers calls name, or false.
+func (h *Handler) peerNamed(name string) (Client, bool) {
+	for _, peer := range h.nodes {
+		if peer.Label == name {
+			return peer, true
+		}
+	}
+	return Client{}, false
 }

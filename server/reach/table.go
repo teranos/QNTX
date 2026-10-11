@@ -56,6 +56,8 @@ REACH is '/auth/introspect'                                               of ANY
 # A node whose people log in at another sends them there and takes them back,
 # before they hold any session here.
 REACH is '/auth/elsewhere' '/auth/elsewhere/back'                         of ANYONE
+# The primary carries a request for a peer to it: the peer decides who is in.
+REACH is '/n/'                                                            of ANYONE
 # The GitHub App's webhook, at the path ROOT sets under /github/. The
 # delivery's signature is the credential; every other path answers nobody.
 REACH is '/github/'                                                       of ANYONE

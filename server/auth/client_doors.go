@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"net/url"
 	"time"
 
 	"github.com/ory/fosite"
@@ -24,7 +25,9 @@ type Client struct {
 	// issued through it acts.
 	Namespace     string
 	ReturnAddress string
-	// Node is another node auth.nodes declares by its did:key.
+	// Origin is where a peer answers, which requests for it are carried to.
+	Origin *url.URL
+	// Node is a peer nodes.peers declares by its did:key.
 	Node bool
 }
 

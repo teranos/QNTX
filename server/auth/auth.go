@@ -84,14 +84,16 @@ type Handler struct {
 	oauthStore atomic.Pointer[oauthStore]
 	// Every node's client assertion the token endpoint accepted, until it expires.
 	assertions spentAssertions
-	// auth.issuers: the nodes whose tokens this one also accepts, and what they said of each.
+	// nodes.primary: whose tokens this one also accepts, and what it said of each.
 	issuers []string
 	issued  issuedAnswers
-	// auth.login_at: the node this node's people log in at, and who is on their way there.
+	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt         string
 	logsInElsewhere bool
 	elsewhere       elsewhereJourneys
-	// auth.nodes: the nodes that are clients of this one, by did:key.
+	// nodes.peers: this primary's peers, by did:key and by name, and the
+	// tokens people are carried to them with.
+	carried  carriedTokens
 	nodes    map[string]Client
 	tokens   TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor Attestor   // records admissions; nil until the store is up
@@ -512,6 +514,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// A node whose people log in at another sends them there and takes them back.
 	mux.answer(elsewherePath, h.handleElsewhere)
 	mux.answer(elsewhereBackPath, h.handleElsewhereBack)
+	// The primary carries a request for a peer to it, and the peer decides who is in.
+	mux.answer(peerPath, h.handlePeer)
 	// Discovery documents: how a client that has never seen this node finds
 	// its doors without being configured by hand.
 	mux.answer(authorizationServerPath, h.handleAuthorizationServerMetadata)

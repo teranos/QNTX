@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,8 +15,8 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// The nodes whose tokens this node also accepts (auth.issuers). A bearer this
-// node did not issue is asked about at each, this node signing as its own
+// The primary's tokens are accepted here too (nodes.primary). A bearer this
+// node did not issue is asked about there, this node signing as its own
 // did:key, and the answer is admitted by this node's own lines.
 
 // issuedAnswerTTL is how long an issuer's answer about one token is kept. The
@@ -63,14 +62,6 @@ func (a *issuedAnswers) keep(hash string, answer issuedAnswer, now time.Time) {
 		return true
 	})
 	a.byToken.Store(hash, answer)
-}
-
-// SetIssuers names the nodes whose tokens this node accepts as well as its own.
-func (h *Handler) SetIssuers(origins []string) {
-	h.issuers = h.issuers[:0]
-	for _, origin := range origins {
-		h.issuers = append(h.issuers, strings.TrimSuffix(strings.TrimSpace(origin), "/"))
-	}
 }
 
 // issuedElsewhere is the grant a token one of the issuers issued stands for,

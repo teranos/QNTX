@@ -871,6 +871,12 @@
       ],
       "x-qntx-prefix": true
     },
+    "/n/": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ],
+      "x-qntx-prefix": true
+    },
     "/openapi.json": {
       "x-qntx-reach": [
         "ROOT",

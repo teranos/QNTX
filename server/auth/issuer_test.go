@@ -28,7 +28,7 @@ func issuerAndNode(t *testing.T) (issuer *Handler, store *memTokenStore, node *H
 	node = handlerWithDoors(t)
 	node.tokens = newMemTokenStore()
 	node.nodeKey = key
-	node.SetIssuers([]string{served.URL})
+	require.NoError(t, node.SetPrimary(served.URL))
 	return issuer, store, node
 }
 

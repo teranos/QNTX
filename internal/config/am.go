@@ -17,6 +17,7 @@ type Config struct {
 	Distill      DistillConfig    `mapstructure:"distill"`
 	Sentry       SentryConfig     `mapstructure:"sentry"`
 	Node         NodeConfig       `mapstructure:"node"`
+	Nodes        NodesConfig      `mapstructure:"nodes"`
 	Agent        AgentConfig      `mapstructure:"agent"`
 	GroundDBPath string           `mapstructure:"ground_db_path"` // Path to Ground's database for deferred news delivery
 }
@@ -74,6 +75,22 @@ var PermissionModes = []string{"acceptEdits", "auto", "bypassPermissions", "manu
 type NodeConfig struct {
 	Name        string `mapstructure:"name"`        // What the node is called.
 	Description string `mapstructure:"description"` // What the node is for, in words.
+}
+
+// NodesConfig is the other nodes this one knows. A node with neither stands on its own.
+type NodesConfig struct {
+	// Primary is the primary node's origin (e.g. "https://api.example.com"),
+	// on a peer of it: people log in there, and its tokens are accepted here.
+	// While it is down this node keeps going, and nobody new logs in.
+	Primary string       `mapstructure:"primary"`
+	Peers   []PeerConfig `mapstructure:"peers"` // On the primary: its peers, one line each.
+}
+
+// PeerConfig is one peer of the primary.
+type PeerConfig struct {
+	Name   string `mapstructure:"name"`   // What it is called here.
+	DID    string `mapstructure:"did"`    // Its did:key, which it signs as.
+	Origin string `mapstructure:"origin"` // Where it answers; its people are sent back to origin + /auth/elsewhere/back.
 }
 
 // SentryConfig points the node's logs at a Sentry project.
@@ -163,18 +180,9 @@ type AuthConfig struct {
 	RPOrigins          []string              `mapstructure:"rp_origins"`           // WebAuthn Relying Party origins — full URLs (e.g. ["https://qntx.example.com"]). Omitted = ["https://" + rp_id]. Empty, or rp_id empty or "localhost" = loopback URLs derived from server.port / server.frontend_port. These are the door onto "default", so an app's scheme ("qntx://door") belongs here as well; it is a return address, and the relying party never sees it.
 	RootIdentities     []string              `mapstructure:"root_identities"`      // Identities with full access. Either a did:key (a public key — the signature proves possession) or a provider account URL, which requires a binding signed by one of binding_signers. Empty = no identity may log in this way. Required when server.bind_address is non-loopback and auth.enabled is true.
 	BindingSigners     []string              `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
-	Issuers            []string              `mapstructure:"issuers"`              // The nodes whose tokens this node also accepts (e.g. ["https://api.example.com"]). A bearer this node did not issue is asked about at each, this node signing as its own did:key, and admitted by this node's own lines. Left out, this node accepts only the tokens it issued.
-	LoginAt            string                `mapstructure:"login_at"`             // The node this node's people log in at (e.g. "https://api.example.com"), whose auth.nodes names this node. The login page sends them there and a session here is what comes back, for whoever root_identities admits. Left out, people log in here.
-	Nodes              []NodeClientConfig    `mapstructure:"nodes"`                // The nodes that are clients of this one: each logs its people in here and asks here about tokens, signing as its did:key. One line each: nodes = [{ did = "did:key:…", origin = "https://node.example.com" }].
 	PublicOrigin       string                `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Left out, this machine's loopback origin; it is never read off a request.
 	Provider           ProviderConfig        `mapstructure:"provider"`             // Per-provider credentials the operator holds. A provider absent here is one that needs nothing: Mastodon registers its own app mid-ceremony, atproto spends a password the person types.
 	Door               map[string]DoorConfig `mapstructure:"door"`                 // Front doors, keyed by the slug of the namespace behind each — the name lowercased, because a TOML key arrives lowercase and a namespace keeps the name it was created with. A namespace absent here has no door, which is every namespace today. rp_id and rp_origins above are the door onto "default" and are not repeated here.
-}
-
-// NodeClientConfig is another node, a client of this one.
-type NodeClientConfig struct {
-	DID    string `mapstructure:"did"`    // Its did:key, which it signs as.
-	Origin string `mapstructure:"origin"` // Where it answers; its people are sent back to origin + /auth/elsewhere/back.
 }
 
 // DoorConfig is one front door: a domain people arrive at, and the namespace

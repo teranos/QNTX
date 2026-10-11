@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A node is a client of another node, declared in auth.nodes by its own
+// A peer is a client of the primary, declared in nodes.peers by its own
 // did:key, and it proves itself by signing with that key. No secret exists anywhere.
 
 // otherNode is a node's DID key: what it publishes at /.well-known/did.json.
@@ -33,9 +33,12 @@ func registered(t *testing.T) (*Handler, *memTokenStore, ed25519.PrivateKey, str
 	t.Helper()
 	h, store, _ := authorizingHandler(t)
 	key, did := otherNode(t)
-	require.NoError(t, h.DeclareNode(did, elsewhereOrigin))
+	require.NoError(t, h.DeclarePeer(peerName, did, elsewhereOrigin))
 	return h, store, key, did
 }
+
+// peerName is what the primary calls its peer.
+const peerName = "elsewhere"
 
 // nodeReturn is where a node is sent back the people it sent to log in.
 const nodeReturn = elsewhereOrigin + elsewhereBackPath
@@ -90,7 +93,7 @@ func TestAnAssertionLastingPastItsWindowIsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, asking(h, did, assertion(t, key, did, nodeOrigin+tokenPath, "one", time.Now().Add(time.Hour))))
 }
 
-// A node not in auth.nodes is nobody here, whatever it signs.
+// A node not in nodes.peers is nobody here, whatever it signs.
 func TestANodeNotDeclaredIsRefused(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
 	key, did := otherNode(t)
@@ -101,7 +104,7 @@ func TestANodeNotDeclaredIsRefused(t *testing.T) {
 func TestNoClientGetsATokenOfItsOwn(t *testing.T) {
 	h, store, appDID := authorizingHandler(t)
 	key, nodeDID := otherNode(t)
-	require.NoError(t, h.DeclareNode(nodeDID, elsewhereOrigin))
+	require.NoError(t, h.DeclarePeer(peerName, nodeDID, elsewhereOrigin))
 
 	app := url.Values{}
 	app.Set("grant_type", "client_credentials")
@@ -137,16 +140,21 @@ func TestANodeIsSentPeopleBackOnlyAtItsOrigin(t *testing.T) {
 	assert.Equal(t, http.StatusFound, home.Code, home.Body.String())
 }
 
-// What auth.nodes refuses, at startup.
-func TestDeclaringANodeSaysWhatItRefuses(t *testing.T) {
+// What nodes.peers refuses, at startup.
+func TestDeclaringAPeerSaysWhatItRefuses(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
 	_, did := otherNode(t)
-	assert.Error(t, h.DeclareNode("did:web:node.example", elsewhereOrigin), "not a did:key")
-	assert.Error(t, h.DeclareNode("", elsewhereOrigin), "no did")
-	assert.Error(t, h.DeclareNode(did, ""), "no origin")
-	assert.Error(t, h.DeclareNode(did, "elsewhere.node.test"), "not an absolute origin")
-	require.NoError(t, h.DeclareNode(did, elsewhereOrigin+"/"))
-	assert.Error(t, h.DeclareNode(did, elsewhereOrigin), "the same node twice")
+	_, other := otherNode(t)
+	assert.Error(t, h.DeclarePeer(peerName, "did:web:node.example", elsewhereOrigin), "not a did:key")
+	assert.Error(t, h.DeclarePeer(peerName, "", elsewhereOrigin), "no did")
+	assert.Error(t, h.DeclarePeer(peerName, did, ""), "no origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, "elsewhere.node.test"), "not an absolute origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, elsewhereOrigin+"/somewhere"), "a path is no origin")
+	assert.Error(t, h.DeclarePeer("", did, elsewhereOrigin), "no name")
+	assert.Error(t, h.DeclarePeer("a/b", did, elsewhereOrigin), "a name a path cannot carry")
+	require.NoError(t, h.DeclarePeer(peerName, did, elsewhereOrigin+"/"))
+	assert.Error(t, h.DeclarePeer("again", did, elsewhereOrigin), "the same peer twice")
+	assert.Error(t, h.DeclarePeer(peerName, other, elsewhereOrigin), "two peers by one name")
 
 	client, ok := h.clientByDID(did)
 	require.True(t, ok)
