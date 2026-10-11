@@ -53,6 +53,9 @@ REACH is '/auth/token'                                                    of ANY
 # Another node asks whether a token this one issued is live, holding no session:
 # its signed assertion is the credential, checked at the endpoint itself.
 REACH is '/auth/introspect'                                               of ANYONE
+# A node whose people log in at another sends them there and takes them back,
+# before they hold any session here.
+REACH is '/auth/elsewhere' '/auth/elsewhere/back'                         of ANYONE
 # The GitHub App's webhook, at the path ROOT sets under /github/. The
 # delivery's signature is the credential; every other path answers nobody.
 REACH is '/github/'                                                       of ANYONE

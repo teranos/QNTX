@@ -96,6 +96,9 @@ type IssuedToken struct {
 	ExpiresAt           *time.Time
 	// ClientDID is the client the flow issued this through.
 	ClientDID string
+	// ReturnAddress is a client's: an app's, or a node's own way back for
+	// the people it sends to log in.
+	ReturnAddress string
 	// RequestID is the fosite request this was issued under. Rotation and
 	// revocation arrive naming it rather than a hash, so the record carries
 	// it or the two cannot be joined after a restart.

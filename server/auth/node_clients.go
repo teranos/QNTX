@@ -136,17 +136,20 @@ func names(word string) bool {
 }
 
 // handleRegisterNode writes another node as a client of this one, behind a
-// session. POST /auth/nodes {"label", "did", "namespace", "expires_at"}.
+// session. POST /auth/nodes {"label", "did", "namespace", "return_address",
+// "expires_at"}. The return address is the node's own way back for the people
+// it sends here to log in.
 func (h *Handler) handleRegisterNode(w http.ResponseWriter, r *http.Request, p Presented) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	var req struct {
-		Label     string `json:"label"`
-		DID       string `json:"did"`
-		Namespace string `json:"namespace"`
-		ExpiresAt string `json:"expires_at"`
+		Label         string `json:"label"`
+		DID           string `json:"did"`
+		Namespace     string `json:"namespace"`
+		ReturnAddress string `json:"return_address"`
+		ExpiresAt     string `json:"expires_at"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
 		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON: "+err.Error())
@@ -159,6 +162,11 @@ func (h *Handler) handleRegisterNode(w http.ResponseWriter, r *http.Request, p P
 	}
 	if !names(namespace) {
 		h.writeError(w, http.StatusBadRequest, "a node acts in the one namespace it is registered in, and this named "+namespace)
+		return
+	}
+	returnAddress := strings.TrimSpace(req.ReturnAddress)
+	if err := returnable(returnAddress); err != nil {
+		h.writeError(w, http.StatusBadRequest, "a node is sent back the people it sends here: "+err.Error())
 		return
 	}
 	key, err := DecodeUserDID(did)
@@ -212,6 +220,7 @@ func (h *Handler) handleRegisterNode(w http.ResponseWriter, r *http.Request, p P
 		Level:               LevelNode,
 		Namespaces:          []string{namespace},
 		ExpiresAt:           expiresAt,
+		ReturnAddress:       returnAddress,
 	})
 	if err != nil {
 		h.attest(PredicateUnanswered, mintedBy, map[string]any{
