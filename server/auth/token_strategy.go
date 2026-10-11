@@ -45,6 +45,9 @@ type TokenSession struct {
 	// Namespace is the door the client was minted at (ADR-032), which is
 	// where the token acts.
 	Namespace string `json:"namespace"`
+	// SaidYes is a person at the passkey. A node asking for a token with
+	// nobody at one is given its own.
+	SaidYes bool `json:"said_yes"`
 }
 
 // Clone is the whole session rather than the half a promoted method copies.

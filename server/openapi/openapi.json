@@ -670,12 +670,27 @@
         "ANYONE"
       ]
     },
+    "/auth/elsewhere": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/elsewhere/back": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/forget": {
       "x-qntx-reach": [
         "ANYONE"
       ]
     },
     "/auth/forget/begin": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/introspect": {
       "x-qntx-reach": [
         "ANYONE"
       ]
@@ -720,6 +735,11 @@
     "/auth/logout": {
       "x-qntx-reach": [
         "ANYONE"
+      ]
+    },
+    "/auth/nodes": {
+      "x-qntx-reach": [
+        "ROOT"
       ]
     },
     "/auth/register/begin": {

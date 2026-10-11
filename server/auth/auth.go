@@ -87,7 +87,11 @@ type Handler struct {
 	// auth.issuers: the nodes whose tokens this one also accepts, and what they said of each.
 	issuers  []string
 	issued   issuedAnswers
-	tokens   TokenStore // ADR-025: bearer token path; may be nil during init
+	// auth.login_at: the node this node's people log in at, and who is on their way there.
+	loginAt         string
+	logsInElsewhere bool
+	elsewhere       elsewhereJourneys
+	tokens          TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
 	// read back out of the system store. Nil until the store is up, and a nil
@@ -503,6 +507,9 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(tokenPath, h.handleToken)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
+	// A node whose people log in at another sends them there and takes them back.
+	mux.answer(elsewherePath, h.handleElsewhere)
+	mux.answer(elsewhereBackPath, h.handleElsewhereBack)
 	// Discovery documents: how a client that has never seen this node finds
 	// its doors without being configured by hand.
 	mux.answer(authorizationServerPath, h.handleAuthorizationServerMetadata)
