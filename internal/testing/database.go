@@ -67,7 +67,8 @@ func CreateTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
 }
 
 // sqlTestStore implements ats.AttestationStore using raw SQL.
-// Test-only: no signing, no observers, no bounded enforcement.
+// Test-only: no signing, no observers, no bounded enforcement. A signature it
+// is given is kept and read back, as the Rust store keeps one.
 // Note: GetAttestations uses LIKE-based matching, not exact array membership
 // like the real Rust backend. Tests may pass here for patterns that would
 // behave differently against RustBackedStore.
@@ -119,7 +120,7 @@ func (s *sqlTestStore) GenerateAndCreateAttestation(ctx context.Context, cmd *ty
 }
 
 func (s *sqlTestStore) GetAttestations(filters ats.AttestationFilter) (_ []*types.As, err error) {
-	query := `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at FROM attestations`
+	query := `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did FROM attestations`
 	var clauses []string
 	var args []any
 
@@ -172,10 +173,11 @@ func (s *sqlTestStore) GetAttestations(filters ats.AttestationFilter) (_ []*type
 	for rows.Next() {
 		var a types.As
 		var subjJSON, predJSON, ctxJSON, actJSON string
-		var attrJSON sql.NullString
-		if err := rows.Scan(&a.ID, &subjJSON, &predJSON, &ctxJSON, &actJSON, &a.Timestamp, &a.Source, &attrJSON, &a.CreatedAt); err != nil {
+		var attrJSON, signerDID sql.NullString
+		if err := rows.Scan(&a.ID, &subjJSON, &predJSON, &ctxJSON, &actJSON, &a.Timestamp, &a.Source, &attrJSON, &a.CreatedAt, &a.Signature, &signerDID); err != nil {
 			return nil, err
 		}
+		a.SignerDID = signerDID.String
 		// A decode that fails silently hands the test an attestation with
 		// empty fields, and the test then asserts against the wrong shape.
 		for field, dst := range map[string]any{
@@ -232,8 +234,8 @@ func (s *sqlTestStore) insertAttestation(as *types.As) error {
 	}
 
 	_, err := s.db.Exec(
-		`INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		as.ID,
 		string(subjectsJSON),
 		string(predicatesJSON),
@@ -243,6 +245,8 @@ func (s *sqlTestStore) insertAttestation(as *types.As) error {
 		as.Source,
 		string(attrsJSON),
 		createdAt,
+		as.Signature,
+		as.SignerDID,
 	)
 	if err != nil {
 		return err

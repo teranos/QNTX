@@ -21,6 +21,7 @@ workspace = true
 qntx-proto.workspace = true
 ats = { workspace = true, default-features = false, features = ["wasm"] }
 ats-id = { path = "../ats-id" }
+ats-sign = { path = "../ats-sign" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

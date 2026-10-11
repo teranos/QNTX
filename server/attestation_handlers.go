@@ -16,10 +16,12 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
+	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Attestation size limits.
@@ -329,6 +331,15 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	respond(w, s.logger, http.StatusOK, map[string]any{"results": results})
 }
 
+// ledBy is the actors with lead first, named once: a caller who already put
+// it first has it there, and is not given it twice.
+func ledBy(lead string, named []string) []string {
+	if slices.Equal(named[:min(len(named), 1)], []string{lead}) {
+		return named
+	}
+	return append([]string{lead}, named...)
+}
+
 // isList says whether a body's first value is a JSON array.
 func isList(body []byte) bool {
 	trimmed := bytes.TrimSpace(body)
@@ -377,11 +388,49 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		Timestamp  *int64         `json:"timestamp"` // Unix seconds; left out is now, and 0 is 1970
 		Source     string         `json:"source"`
 		Attributes map[string]any `json:"attributes"`
+		Signature  []byte         `json:"signature"`
+		SignerDID  string         `json:"signer_did"`
 	}
 
 	if err := json.Unmarshal(raw, &req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 		return
+	}
+
+	// A signature is the writer's own, so the node signs nothing on its behalf
+	// and stores what was signed as it was signed: the id, the moment and the
+	// actors are the signer's to name, not the node's to fill in.
+	claim, err := signing.Claimed(req.Signature, req.SignerDID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("%s: %v", req.ID, err))
+		return
+	}
+	// "this person wrote it": the key it was signed with is one the person
+	// admitted holds. A request naming no person names nobody who wrote it.
+	if claim == signing.Signed {
+		admitted, ok := auth.AdmissionFrom(r.Context())
+		if !ok {
+			writeError(w, http.StatusForbidden, fmt.Sprintf(
+				"%s is signed by %s, and this request is admitted as no person who could hold it", req.ID, req.SignerDID))
+			return
+		}
+		writer, found, err := s.authHandler.UserByID(admitted.UserID)
+		if err != nil {
+			writeWrappedError(w, s.logger, err,
+				fmt.Sprintf("the User %q who signed %s was not read", admitted.UserID, req.ID),
+				http.StatusInternalServerError)
+			return
+		}
+		if !found {
+			writeError(w, http.StatusForbidden, fmt.Sprintf(
+				"%s is signed by %s, and %s is admitted as no User this node keeps", req.ID, req.SignerDID, admitted.Identity))
+			return
+		}
+		if !writer.HoldsKey(req.SignerDID) {
+			writeError(w, http.StatusForbidden, fmt.Sprintf(
+				"%s is signed by %s, a key User %s does not hold", req.ID, req.SignerDID, writer.ID))
+			return
+		}
 	}
 
 	// Validate required fields
@@ -502,11 +551,11 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		// they came in by, so a read of their own rows has something to match.
 		switch {
 		case admitted.ActsAs() != "":
-			actors = append([]string{admitted.ActsAs()}, req.Actors...)
+			actors = ledBy(admitted.ActsAs(), req.Actors)
 		case writesRole:
 			// A ROOT session carries no grant, so the line would name no
 			// granter — and a grant whose actor is nobody cannot outrank one.
-			actors = append([]string{admitted.Identity}, req.Actors...)
+			actors = ledBy(admitted.Identity, req.Actors)
 		}
 	}
 	// "the node"
@@ -514,6 +563,14 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 	// authors what its caller named nobody for.
 	if len(actors) == 0 {
 		actors = []string{s.nodeActor()}
+	}
+	// The actors are under the signature, so the node puts none in: the signer
+	// names them as the node would write them.
+	if claim == signing.Signed && !slices.Equal(actors, req.Actors) {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf(
+			"%s is signed by %s naming actors %v, and this node writes it as %v: the signer names them so",
+			req.ID, req.SignerDID, req.Actors, actors))
+		return
 	}
 
 	// Roles are kept where the node keeps what it knows about itself, whatever
@@ -537,6 +594,11 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 	// Auto-generate vanity ASID when client omits ID
 	existsAt := time.Now()
 	if req.ID == "" {
+		if claim == signing.Signed {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf(
+				"an attestation signed by %s names its id: the node generates none under a signature", req.SignerDID))
+			return
+		}
 		subject := req.Subjects[0]
 		predicate := req.Predicates[0]
 		context := "_"
@@ -568,6 +630,10 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 	ts := time.Now()
 	if said := req.Timestamp; said != nil {
 		ts = time.Unix(*said, 0)
+	} else if claim == signing.Signed {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf(
+			"%s is signed by %s and names no timestamp: the node sets none under a signature", req.ID, req.SignerDID))
+		return
 	}
 
 	as := &types.As{
@@ -580,6 +646,19 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		Source:     req.Source,
 		Attributes: req.Attributes,
 		CreatedAt:  time.Now(),
+		Signature:  req.Signature,
+		SignerDID:  req.SignerDID,
+	}
+	if claim == signing.Signed {
+		if err := signing.Verify(as); err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, signing.ErrInvalidSignature) {
+				status = http.StatusBadRequest
+			}
+			writeWrappedError(w, s.logger, err,
+				"signature not verified", status)
+			return
+		}
 	}
 
 	// Use high priority so POST jumps ahead of queued plugin writes.

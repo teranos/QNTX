@@ -3,12 +3,15 @@ package signing
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/mr-tron/base58"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/access"
+	errors "github.com/teranos/sacred-error"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -26,17 +29,119 @@ func testAttestation() *types.As {
 
 func testSigner() *Signer {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
-	did := encodeDIDKeyForTest(pub)
-	return NewSigner(priv, did)
+	return NewSigner(priv, access.EncodeDIDKey(pub))
 }
 
-// encodeDIDKeyForTest mirrors nodedid.encodeDIDKey
-func encodeDIDKeyForTest(pub ed25519.PublicKey) string {
-	buf := make([]byte, 2+len(pub))
-	buf[0] = 0xed
-	buf[1] = 0x01
-	copy(buf[2:], pub)
-	return "did:key:z" + base58.Encode(buf)
+// canonicalVector is one of testdata/canonical.json: an attestation as the
+// wire carries it, and the bytes Go's encoding/json gave it before
+// crates/ats-sign wrote them. Rust is tested against the same file.
+type canonicalVector struct {
+	Name      string          `json:"name"`
+	Wire      json.RawMessage `json:"wire"`
+	Canonical string          `json:"canonical"`
+}
+
+func canonicalVectors(t *testing.T) []canonicalVector {
+	t.Helper()
+	raw, err := os.ReadFile("testdata/canonical.json")
+	if err != nil {
+		t.Fatalf("read testdata/canonical.json: %v", err)
+	}
+	var vectors []canonicalVector
+	if err := json.Unmarshal(raw, &vectors); err != nil {
+		t.Fatalf("parse testdata/canonical.json: %v", err)
+	}
+	return vectors
+}
+
+// asFromWire reads a vector as a node holds it after the wire: attributes
+// decoded into map[string]any, the timestamp from milliseconds.
+func asFromWire(t *testing.T, v canonicalVector) *types.As {
+	t.Helper()
+	var w struct {
+		ID         string         `json:"id"`
+		Subjects   []string       `json:"subjects"`
+		Predicates []string       `json:"predicates"`
+		Contexts   []string       `json:"contexts"`
+		Actors     []string       `json:"actors"`
+		Timestamp  int64          `json:"timestamp"`
+		Source     string         `json:"source"`
+		Attributes map[string]any `json:"attributes"`
+	}
+	if err := json.Unmarshal(v.Wire, &w); err != nil {
+		t.Fatalf("%s: parse wire: %v", v.Name, err)
+	}
+	return &types.As{
+		ID: w.ID, Subjects: w.Subjects, Predicates: w.Predicates, Contexts: w.Contexts,
+		Actors: w.Actors, Timestamp: time.UnixMilli(w.Timestamp), Source: w.Source,
+		Attributes: w.Attributes,
+	}
+}
+
+func TestCanonicalJSONWritesTheVectors(t *testing.T) {
+	for _, v := range canonicalVectors(t) {
+		got, err := CanonicalJSON(asFromWire(t, v))
+		if err != nil {
+			t.Fatalf("%s: %v", v.Name, err)
+		}
+		if string(got) != v.Canonical {
+			t.Errorf("%s:\n got  %s\n want %s", v.Name, got, v.Canonical)
+		}
+	}
+}
+
+// TestSignaturesMatchTheVectors pins the signature a fixed key makes over each
+// vector, which laye-p2p's key is tested against too: a browser's signature is
+// the node's for the same bytes.
+func TestSignaturesMatchTheVectors(t *testing.T) {
+	raw, err := os.ReadFile("testdata/signatures.json")
+	if err != nil {
+		t.Fatalf("read testdata/signatures.json: %v", err)
+	}
+	var fixture struct {
+		SeedHex    string `json:"seed_hex"`
+		Signatures []struct {
+			Name         string `json:"name"`
+			SignatureHex string `json:"signature_hex"`
+		} `json:"signatures"`
+	}
+	if err := json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatalf("parse testdata/signatures.json: %v", err)
+	}
+	seed, err := hex.DecodeString(fixture.SeedHex)
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	key := ed25519.NewKeyFromSeed(seed)
+	signer := NewSigner(key, access.EncodeDIDKey(key.Public().(ed25519.PublicKey)))
+
+	want := map[string]string{}
+	for _, s := range fixture.Signatures {
+		want[s.Name] = s.SignatureHex
+	}
+	for _, v := range canonicalVectors(t) {
+		as := asFromWire(t, v)
+		if err := signer.Sign(as); err != nil {
+			t.Fatalf("%s: sign: %v", v.Name, err)
+		}
+		if got := hex.EncodeToString(as.Signature); got != want[v.Name] {
+			t.Errorf("%s: signature %s, want %s", v.Name, got, want[v.Name])
+		}
+		if err := Verify(as); err != nil {
+			t.Errorf("%s: verify: %v", v.Name, err)
+		}
+	}
+}
+
+func TestVerifyNamesAnInvalidSignature(t *testing.T) {
+	as := testAttestation()
+	if err := testSigner().Sign(as); err != nil {
+		t.Fatalf("Sign failed: %v", err)
+	}
+	as.Source = "elsewhere"
+	if err := Verify(as); !errors.Is(err, ErrInvalidSignature) {
+		t.Fatalf("Verify = %v, want ErrInvalidSignature", err)
+	}
 }
 
 func TestSignAndVerify(t *testing.T) {
@@ -140,7 +245,7 @@ func TestCanonicalJSONExcludesCreatedAt(t *testing.T) {
 
 func TestDecodeDIDKeyRoundTrip(t *testing.T) {
 	pub, _, _ := ed25519.GenerateKey(rand.Reader)
-	did := encodeDIDKeyForTest(pub)
+	did := access.EncodeDIDKey(pub)
 
 	decoded, err := DecodeDIDKey(did)
 	if err != nil {

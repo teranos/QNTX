@@ -254,6 +254,30 @@ func (e *Engine) GenerateRandomID(length int) (string, error) {
 	return result.ID, nil
 }
 
+// CanonicalAttestation is the bytes an attestation's signature is over, as
+// crates/ats-sign writes them. wire is the attestation ats/signing marshals,
+// timestamp in milliseconds.
+func (e *Engine) CanonicalAttestation(wire []byte) ([]byte, error) {
+	raw, err := e.Call("canonical_attestation", string(wire))
+	if err != nil {
+		return nil, err
+	}
+
+	var answer map[string]string
+	if err := json.Unmarshal([]byte(raw), &answer); err != nil {
+		return nil, errors.Wrapf(err, "unmarshal canonical_attestation result: %s", raw)
+	}
+	if why, refused := answer["error"]; refused {
+		return nil, errors.Newf("canonical_attestation: %s", why)
+	}
+	canonical, answered := answer["canonical"]
+	if !answered {
+		return nil, errors.Newf("canonical_attestation answered neither canonical bytes nor an error: %s", raw)
+	}
+
+	return []byte(canonical), nil
+}
+
 // GetWASMSize returns the size of the embedded WASM module in bytes.
 func GetWASMSize() int {
 	return len(wasmBytes)

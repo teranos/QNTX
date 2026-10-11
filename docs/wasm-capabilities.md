@@ -12,6 +12,7 @@ All four steps done:
 - Attestation CRUD — persists client-side via IndexedDB; used by ax-element, ts-element
 - Identity (ASUID) — used by ts-element
 - Cosine similarity
+- Attestation signing — the canonical bytes and did:key are `crates/ats-sign`'s; Go reaches them through wazero, and the browser signs with laye-p2p's key (`sign_attestation`); used by ts-element. `ats/signing/testdata` holds the vectors Go and Rust are both tested against
 
 ## In Rust, partially wired
 

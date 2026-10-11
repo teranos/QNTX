@@ -485,6 +485,28 @@ mod wazero {
         write_result(&ats_id::normalize_for_lookup(input))
     }
 
+    /// The bytes an attestation's signature is over (crates/ats-sign).
+    /// Input: the wire `ats/signing` marshals — `timestamp` in milliseconds.
+    /// Returns packed u64 pointing to `{"canonical":"..."}` or `{"error":"..."}`.
+    #[no_mangle]
+    pub extern "C" fn canonical_attestation(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&canonical_attestation_impl(input))
+    }
+
+    fn canonical_attestation_impl(input: &str) -> String {
+        let canonical = match ats_sign::Signable::from_wire_json(input)
+            .and_then(|signable| signable.canonical_json())
+        {
+            Ok(canonical) => canonical,
+            Err(e) => return error_json(&e.to_string()),
+        };
+        match serde_json::to_string(&serde_json::json!({ "canonical": canonical })) {
+            Ok(json) => json,
+            Err(e) => error_json(&format!("canonical bytes did not serialize: {e}")),
+        }
+    }
+
     // ============================================================================
     // Tests
     // ============================================================================
@@ -512,6 +534,25 @@ mod wazero {
             assert!(parsed["error"].is_null(), "unexpected error: {}", result);
             assert_eq!(parsed["total_analyzed"], 1);
             assert_eq!(parsed["conflicts"][0]["conflict_type"], "Evolution");
+        }
+
+        #[test]
+        fn canonical_attestation_writes_what_go_wrote() {
+            let vectors: Vec<serde_json::Value> =
+                serde_json::from_str(include_str!("../../../ats/signing/testdata/canonical.json"))
+                    .unwrap();
+            for v in vectors {
+                let result = canonical_attestation_impl(&v["wire"].to_string());
+                let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+                assert_eq!(parsed["canonical"], v["canonical"], "{}", v["name"]);
+            }
+        }
+
+        #[test]
+        fn canonical_attestation_refuses_what_does_not_read() {
+            let result = canonical_attestation_impl(r#"{"id":"AS-1"}"#);
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"].is_string(), "{result}");
         }
 
         #[test]

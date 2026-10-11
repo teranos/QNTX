@@ -1,5 +1,3 @@
-const ED25519_PUB: [u8; 2] = [0xed, 0x01];
-
 /// The key a passkey belongs to, derived from the authenticator's PRF output.
 /// Nothing is stored: the same biometric gives the same seed, which gives the
 /// same key, which is what lets a credential say whose it is.
@@ -9,12 +7,9 @@ pub fn keypair_from_seed(seed: &[u8]) -> Option<libp2p_identity::ed25519::Keypai
     Some(libp2p_identity::ed25519::Keypair::from(secret))
 }
 
-pub fn encode(pubkey: &[u8; 32]) -> String {
-    let mut buf = Vec::with_capacity(ED25519_PUB.len() + pubkey.len());
-    buf.extend_from_slice(&ED25519_PUB);
-    buf.extend_from_slice(pubkey);
-    format!("did:key:z{}", bs58::encode(buf).into_string())
-}
+/// The did:key this public key is named by — the one encoding, which the node
+/// decodes a signer with.
+pub use ats_sign::didkey::encode;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

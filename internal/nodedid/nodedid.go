@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/mr-tron/base58"
+	"github.com/teranos/QNTX/internal/access"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
@@ -80,23 +80,12 @@ func generate() (*Identity, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate ed25519 keypair")
 	}
-	did := encodeDIDKey(pub)
+	did := access.EncodeDIDKey(pub)
 	return &Identity{
 		PrivateKey: priv,
 		PublicKey:  pub,
 		DID:        did,
 	}, nil
-}
-
-// encodeDIDKey encodes an ed25519 public key as a did:key identifier.
-// Format: did:key:z + base58btc(0xed 0x01 + 32-byte pubkey)
-func encodeDIDKey(pub ed25519.PublicKey) string {
-	// Multicodec prefix for ed25519-pub: 0xed, 0x01
-	buf := make([]byte, 2+len(pub))
-	buf[0] = 0xed
-	buf[1] = 0x01
-	copy(buf[2:], pub)
-	return "did:key:z" + base58.Encode(buf)
 }
 
 type didDocument struct {

@@ -513,6 +513,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ats-sign"
+version = "0.2.44"
+dependencies = [
+ "bs58",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.19",
+]
+
+[[package]]
 name = "ats-sqlite"
 version = "0.2.44"
 dependencies = [
@@ -538,6 +548,7 @@ version = "0.4.0"
 dependencies = [
  "ats-id",
  "ats-indexeddb",
+ "ats-sign",
  "console_error_panic_hook",
  "js-sys",
  "qntx-ats",
@@ -2777,6 +2788,7 @@ dependencies = [
 name = "laye-p2p"
 version = "0.0.0"
 dependencies = [
+ "ats-sign",
  "bs58",
  "futures",
  "js-sys",

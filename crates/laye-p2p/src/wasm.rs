@@ -153,6 +153,43 @@ pub fn sign(bytes: Vec<u8>) -> Vec<u8> {
     }
 }
 
+/// The signature over an attestation, proto JSON as the browser holds it, with
+/// this browser's key. Empty when nothing was signed, with why in errors().
+#[wasm_bindgen]
+pub fn sign_attestation(attestation_json: String) -> Vec<u8> {
+    match sign_attestation_inner(&attestation_json) {
+        Ok(sig) => sig,
+        Err(err) => {
+            errpipe::emit(err);
+            Vec::new()
+        }
+    }
+}
+
+fn sign_attestation_inner(attestation_json: &str) -> Result<Vec<u8>, LayeError> {
+    STATE.with(|s| {
+        let st = s.borrow();
+        let net = st.net.as_ref().ok_or_else(|| {
+            build(
+                Severity::Error,
+                SURFACE,
+                "sign-attestation-preinit",
+                "sign_attestation called before init",
+                "STATE.net is None",
+            )
+        })?;
+        crate::attest::sign_attestation(net.keypair(), attestation_json).map_err(|e| {
+            build(
+                Severity::Error,
+                SURFACE,
+                "sign-attestation-failed",
+                "the attestation was not signed",
+                e.to_string(),
+            )
+        })
+    })
+}
+
 /// JSON array of SignedBinding — the external identities bound to this key.
 #[wasm_bindgen]
 pub fn bindings() -> String {
