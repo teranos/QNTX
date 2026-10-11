@@ -153,7 +153,7 @@ var standing = []storage.Watcher{
 		// The page holds the roll it drew; told, it reads the lines again and
 		// moves what moved. Without this it shows the approvals of when it
 		// opened, until somebody reloads it by hand.
-		Filter:            types.AxFilter{Predicates: ApprovalPredicates},
+		Filter:            types.AxFilter{Predicates: ApprovalPredicates, TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ActionType:        storage.ActionTypeTell,
 		MaxFiresPerSecond: 0,
 		Enabled:           true,
