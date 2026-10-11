@@ -33,8 +33,9 @@ export function bufferEncode(buffer: ArrayBuffer): string {
 }
 
 /** The 32 bytes the authenticator derives for this credential, or null when it
- *  will not — most platforms only evaluate the PRF on a subsequent get. */
-async function prfSeed(credential: PublicKeyCredential): Promise<Uint8Array | null> {
+ *  will not — most platforms only evaluate the PRF on a subsequent get. That
+ *  get answers the challenge the node issued for this enrolment (§13.4.3). */
+async function prfSeed(credential: PublicKeyCredential, challenge: ArrayBuffer): Promise<Uint8Array | null> {
     const onCreate = (credential.getClientExtensionResults() as any).prf;
     if (onCreate?.results?.first) {
         return new Uint8Array(onCreate.results.first);
@@ -45,7 +46,7 @@ async function prfSeed(credential: PublicKeyCredential): Promise<Uint8Array | nu
 
     const asserted = await navigator.credentials.get({
         publicKey: {
-            challenge: crypto.getRandomValues(new Uint8Array(32)),
+            challenge,
             allowCredentials: [{ id: credential.rawId, type: 'public-key' }],
             extensions: { prf: { eval: { first: PRF_SALT } } } as any,
         },
@@ -119,7 +120,7 @@ export async function enrolPasskey(say: Say): Promise<Finished> {
     if (!await layeWhenReady()) {
         throw new Error('laye is still starting — the key cannot be derived yet');
     }
-    const seed = await prfSeed(credential);
+    const seed = await prfSeed(credential, options.publicKey.challenge);
     if (seed === null) {
         throw new Error('this authenticator cannot derive a key, so the passkey would belong to nobody');
     }
