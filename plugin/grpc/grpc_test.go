@@ -121,7 +121,18 @@ func (m *mockServiceRegistry) LLM() pluginpkg.LLMService                   { ret
 func (m *mockServiceRegistry) VectorSearch() pluginpkg.VectorSearchService { return nil }
 func (m *mockServiceRegistry) Search() pluginpkg.SearchService             { return nil }
 
+// notServed is a service a test's node runs without.
+var notServed = NotRunning(errors.New("this test runs no such service"))
+
 type mockConfig struct{}
+
+// ServiceEndpoints hands a node running none of the services it boots without.
+func (c *mockConfig) ServiceEndpoints() (ServiceEndpoints, error) {
+	return ServiceEndpoints{
+		LLM: notServed, Embedding: notServed, VectorSearch: notServed, Ground: notServed,
+		Search: notServed, Fetch: notServed, Mail: notServed,
+	}, nil
+}
 
 func (c *mockConfig) GetString(key string) string        { return "" }
 func (c *mockConfig) GetInt(key string) int              { return 0 }
@@ -478,7 +489,7 @@ func TestExternalDomainProxy_ImplementsDomainPlugin(t *testing.T) {
 
 func TestRemoteServiceRegistry_Database(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, newMockPlugin())
+	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", notServed, notServed, notServed, "", nil, logger, newMockPlugin())
 	require.NoError(t, err)
 
 	// Should return nil and log warning
@@ -488,7 +499,7 @@ func TestRemoteServiceRegistry_Database(t *testing.T) {
 
 func TestRemoteServiceRegistry_ATSStore(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, newMockPlugin())
+	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", notServed, notServed, notServed, "", nil, logger, newMockPlugin())
 	require.NoError(t, err)
 
 	// A registry handed no endpoint still hands a store; what it refuses is
@@ -503,7 +514,7 @@ func TestRemoteServiceRegistry_ATSStore(t *testing.T) {
 
 func TestRemoteServiceRegistry_Queue(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, newMockPlugin())
+	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", notServed, notServed, notServed, "", nil, logger, newMockPlugin())
 	require.NoError(t, err)
 
 	// A registry handed no endpoint still hands a queue, whose calls fail.
@@ -513,7 +524,7 @@ func TestRemoteServiceRegistry_Queue(t *testing.T) {
 
 func TestRemoteServiceRegistry_Logger(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, newMockPlugin())
+	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", notServed, notServed, notServed, "", nil, logger, newMockPlugin())
 	require.NoError(t, err)
 
 	pluginLogger := registry.Logger("test")
@@ -527,7 +538,7 @@ func TestRemoteServiceRegistry_Config(t *testing.T) {
 		"enabled": "true",
 		"count":   "42",
 	}
-	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", config, logger, newMockPlugin())
+	registry, err := NewRemoteServiceRegistry(context.Background(), "", "", "", "", notServed, notServed, notServed, "", config, logger, newMockPlugin())
 	require.NoError(t, err)
 
 	cfg := registry.Config("test")

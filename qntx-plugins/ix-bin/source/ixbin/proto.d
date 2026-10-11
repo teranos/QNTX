@@ -364,9 +364,15 @@ struct ScheduleInfo {
     @Proto(5) string atsCode;
 }
 
+/// Where the node takes a plugin's sigils from: SigilsFrom in domain.proto.
+enum int SIGILS_FROM_SIGNA       = 1;
+enum int SIGILS_FROM_HTTP_ROUTES = 2;
+enum int SIGILS_FROM_NONE        = 3;
+
 struct InitializeResponse {
     @Proto(1) string[] handlerNames;
     @Proto(2) ScheduleInfo[] schedules;
+    @Proto(11) int sigilsFrom;
 }
 
 struct HTTPRequest {

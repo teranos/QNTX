@@ -38,20 +38,20 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	// Services that did not start are held with why: each plugin asking for
 	// one in its Initialize is refused with it, and the node boots without.
 	var endpoints grpcplugin.Endpoints
-	started, err := servicesManager.Start(s.ctx, s.held.Served(), queue, s.scheduleStore, filesDir, s.deps.cfg.GroundDBPath)
-	if err != nil {
+	if err := servicesManager.Start(s.ctx, s.held.Served(), queue, s.scheduleStore, filesDir, s.deps.cfg.GroundDBPath); err != nil {
 		endpoints = grpcplugin.UnservedEndpoints(errors.Wrap(err, "the node's plugin services did not start, so no plugin has ATS, queue or schedule access"))
 	} else {
-		endpoints = grpcplugin.ServedEndpoints(*started)
+		endpoints = grpcplugin.ServedEndpoints(servicesManager)
+		started := servicesManager.Endpoints()
 		s.logger.Debugw("Plugin services started",
-			"ats_store", started.ATSStoreAddress,
-			"queue", started.QueueAddress,
-			"schedule", started.ScheduleAddress,
-			"file_service", started.FileServiceAddress,
-			"llm", started.LLMAddress,
-			"embedding", started.EmbeddingAddress,
-			"search", started.SearchAddress,
-			"mail", started.MailAddress,
+			"ats_store", started.ATSStore,
+			"queue", started.Queue,
+			"schedule", started.Schedule,
+			"file_service", started.FileService,
+			"llm", started.LLM,
+			"embedding", started.Embedding,
+			"search", started.Search,
+			"mail", started.Mail,
 		)
 	}
 

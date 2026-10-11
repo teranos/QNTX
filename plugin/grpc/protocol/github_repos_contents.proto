@@ -47,6 +47,20 @@ message GitHubGetRepositoryContentResponse {
   string git_url = 12;
   string html_url = 13;
   string download_url = 14;
+  // What GitHub answered with, which the node reads off the answer's shape:
+  // GitHub answers a directory with its entries, in items, and anything else
+  // with itself, its kind in type.
+  GitHubReposContentsAnswer answered = 15;
+}
+
+// GitHubReposContentsAnswer is what GitHub answered a contents request with.
+enum GitHubReposContentsAnswer {
+  // Not read off an answer; refused.
+  GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED = 0;
+  // A directory: its entries are in items.
+  GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY = 1;
+  // One file, symlink or submodule, named in type.
+  GITHUB_REPOS_CONTENTS_ANSWER_ONE = 2;
 }
 
 // PUT /repos/{owner}/{repo}/contents/{path}

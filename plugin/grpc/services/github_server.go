@@ -313,9 +313,27 @@ func (s *GitHubServer) call(ctx context.Context, rpc string, req, resp proto.Mes
 		return key, false
 	}
 
-	if err := githubDecode(raw, resp); err != nil {
+	listed, err := githubDecode(raw, resp)
+	if err != nil {
 		githubFail(resp, fmt.Sprintf("failed to decode GitHub %s %s answer (%d): %v", route.method, path, httpResp.StatusCode, err))
 		return key, false
+	}
+	// A contents answer says which GitHub answered with: a directory is
+	// answered by its entries, a list, and anything else by itself.
+	if _, contents := resp.(interface {
+		GetAnswered() protocol.GitHubReposContentsAnswer
+	}); contents {
+		answered := resp.ProtoReflect()
+		field, err := githubField(answered.Descriptor(), "answered")
+		if err != nil {
+			githubFail(resp, err.Error())
+			return key, false
+		}
+		kind := protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_ONE
+		if listed {
+			kind = protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY
+		}
+		answered.Set(field, protoreflect.ValueOfEnum(kind.Number()))
 	}
 	// A list GitHub pages by cursor says where the next page is in this header.
 	if _, paged := resp.(interface{ GetLink() string }); paged {
@@ -612,19 +630,21 @@ func protocCamel(name string) string {
 	return b.String()
 }
 
-// githubDecode fills resp from a 2xx body. No body (204) is an answer with
-// nothing in it: the JSON decoder finds no value before the end. An array is a
-// list, carried in the response's items.
-func githubDecode(raw []byte, resp proto.Message) error {
+// githubDecode fills resp from a 2xx body, and says whether GitHub answered
+// with a list. No body (204) is an answer with nothing in it: the JSON decoder
+// finds no value before the end. An array is a list, carried in the
+// response's items.
+func githubDecode(raw []byte, resp proto.Message) (bool, error) {
 	var answer json.RawMessage
 	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&answer); errors.Is(err, io.EOF) {
-		return nil
+		return false, nil
 	}
 	trimmed := bytes.TrimSpace(raw)
-	if bytes.HasPrefix(trimmed, []byte("[")) {
+	listed := bytes.HasPrefix(trimmed, []byte("["))
+	if listed {
 		items, err := githubField(resp.ProtoReflect().Descriptor(), "items")
 		if err != nil {
-			return errors.Wrap(err, "GitHub answered a list")
+			return listed, errors.Wrap(err, "GitHub answered a list")
 		}
 		wrapped := make([]byte, 0, len(trimmed)+len(items.Name())+4)
 		wrapped = append(wrapped, `{"`+string(items.Name())+`":`...)
@@ -632,7 +652,7 @@ func githubDecode(raw []byte, resp proto.Message) error {
 		wrapped = append(wrapped, '}')
 		trimmed = wrapped
 	}
-	return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(trimmed, resp)
+	return listed, protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(trimmed, resp)
 }
 
 // githubMessage is what GitHub said in a refusal: its message, or the body as

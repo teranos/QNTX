@@ -146,6 +146,9 @@ grpc::Status ScryPlugin::Initialize(grpc::ServerContext* ctx,
     // This plugin is an LLM provider
     resp->set_llm_provider(true);
 
+    // It declares no routes, and serves no sigils.
+    resp->set_sigils_from(protocol::SIGILS_FROM_NONE);
+
     return grpc::Status::OK;
 }
 

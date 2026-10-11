@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
@@ -22,26 +23,25 @@ func TestNewConfigProvider_WithoutEndpoints(t *testing.T) {
 	config := NewConfigProvider(noServices, nil, zap.NewNop().Sugar()).GetPluginConfig("testdomain")
 	require.NotNil(t, config)
 
-	assert.Equal(t, "", config.GetString("_llm_endpoint"))
+	assert.Equal(t, "", config.GetString("_ats_store_endpoint"))
 	err := config.(interface{ Err() error }).Err()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "this test serves no plugin services")
-	assert.Contains(t, err.Error(), "_llm_endpoint")
+	assert.Contains(t, err.Error(), "_ats_store_endpoint")
+
+	_, err = config.(endpointsHanded).ServiceEndpoints()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "this test serves no plugin services")
 }
 
 func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 	endpoints := ServedEndpoints(ServiceEndpoints{
-		ATSStoreAddress:     "localhost:9001",
-		QueueAddress:        "localhost:9002",
-		ScheduleAddress:     "localhost:9003",
-		FileServiceAddress:  "localhost:9004",
-		LLMAddress:          "localhost:9005",
-		EmbeddingAddress:    "localhost:9006",
-		VectorSearchAddress: "localhost:9007",
-		GroundAddress:       "localhost:9008",
-		SearchAddress:       "localhost:9009",
-		MailAddress:         "localhost:9010",
-		AuthToken:           "test-token-123",
+		ATSStore:    ServingAt("localhost:9001"),
+		Queue:       ServingAt("localhost:9002"),
+		Schedule:    ServingAt("localhost:9003"),
+		FileService: ServingAt("localhost:9004"),
+		LLM:         ServingAt("localhost:9005"),
+		AuthToken:   "test-token-123",
 	})
 
 	provider := NewConfigProvider(endpoints, nil, zap.NewNop().Sugar())
@@ -55,12 +55,6 @@ func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 		{"_queue_endpoint", "localhost:9002"},
 		{"_schedule_endpoint", "localhost:9003"},
 		{"_file_service_endpoint", "localhost:9004"},
-		{"_llm_endpoint", "localhost:9005"},
-		{"_embedding_endpoint", "localhost:9006"},
-		{"_vector_search_endpoint", "localhost:9007"},
-		{"_ground_endpoint", "localhost:9008"},
-		{"_search_endpoint", "localhost:9009"},
-		{"_mail_endpoint", "localhost:9010"},
 	}
 
 	for _, tc := range cases {
@@ -68,17 +62,45 @@ func TestNewConfigProvider_InjectsEndpoints(t *testing.T) {
 			assert.Equal(t, tc.want, config.GetString(tc.key))
 		})
 	}
+
+	served, err := config.(endpointsHanded).ServiceEndpoints()
+	require.NoError(t, err)
+	llm, err := served.LLM.Address()
+	require.NoError(t, err)
+	assert.Equal(t, "localhost:9005", llm)
 }
 
-func TestNewConfigProvider_GetAlsoInjectsEndpoints(t *testing.T) {
-	endpoints := ServedEndpoints(ServiceEndpoints{
-		LLMAddress: "localhost:5555",
-	})
+// A service the node runs without is handed to a plugin as why, in place of
+// an address; one the node named nothing for is refused, not handed as empty.
+func TestAServiceTheNodeRunsWithoutIsHandedAsWhy(t *testing.T) {
+	why := errors.New("the mail service did not start: port taken")
+	req := &protocol.InitializeRequest{}
+	SetPluginRecords(heldRecords{"x": {Name: "x", Config: map[string]string{}}})
+	t.Cleanup(func() { SetPluginRecords(recordsNotHanded{}) })
 
-	provider := NewConfigProvider(endpoints, nil, zap.NewNop().Sugar())
-	config := provider.GetPluginConfig("x")
+	every := ServiceEndpoints{
+		LLM: ServingAt("localhost:1"), Embedding: ServingAt("localhost:2"), VectorSearch: ServingAt("localhost:3"),
+		Ground: ServingAt("localhost:4"), Search: ServingAt("localhost:5"), Fetch: ServingAt("localhost:6"),
+		Mail: NotRunning(why),
+	}
+	config := NewConfigProvider(ServedEndpoints(every), nil, zap.NewNop().Sugar()).GetPluginConfig("x")
+	require.NoError(t, handOptionalEndpoints(req, config))
+	assert.Equal(t, "localhost:1", req.GetLlmEndpoint().GetAddress())
+	assert.Equal(t, why.Error(), req.GetMailEndpoint().GetNotRunning())
 
-	assert.Equal(t, "localhost:5555", config.Get("_llm_endpoint"))
+	_, err := EndpointFrom("mail", req.GetMailEndpoint()).Address()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "port taken")
+
+	_, err = EndpointFrom("ground", nil).Address()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "named no ground endpoint")
+
+	unnamed := ServiceEndpoints{LLM: ServingAt("localhost:1")}
+	config = NewConfigProvider(ServedEndpoints(unnamed), nil, zap.NewNop().Sugar()).GetPluginConfig("x")
+	err = handOptionalEndpoints(&protocol.InitializeRequest{}, config)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "names no address and no reason")
 }
 
 // A plugin is handed the config the plugin element saved in its record, a

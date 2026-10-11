@@ -2,7 +2,8 @@ use crate::handlers::{HandlerContext, ReduceState};
 use crate::proto::{
     domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, ElementDefResponse,
     Empty, ExecuteJobRequest, ExecuteJobResponse, HealthResponse, HttpRequest, HttpResponse,
-    InitializeRequest, InitializeResponse, MetadataResponse, ShutdownResponse, WebSocketMessage,
+    InitializeRequest, InitializeResponse, MetadataResponse, ShutdownResponse, SigilsFrom,
+    WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -75,6 +76,8 @@ impl DomainPluginService for ReducePluginService {
             search_provider: false,
             vector_search_provider: false,
             watchers: vec![],
+            // Reduce answers jobs and HTTP, and declares no routes as sigils.
+            sigils_from: SigilsFrom::None as i32,
             ..Default::default()
         }))
     }

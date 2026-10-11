@@ -138,6 +138,9 @@ grpc::Status GazePlugin::Initialize(grpc::ServerContext* ctx,
     status_route->set_path("/status");
     status_route->set_description("Returns JSON with state, version, model count, and current activity");
 
+    // Its sigils are the routes it declares.
+    resp->set_sigils_from(protocol::SIGILS_FROM_HTTP_ROUTES);
+
     return grpc::Status::OK;
 }
 

@@ -63,6 +63,10 @@ type ExternalDomainProxy struct {
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
 
+	// sigilsFrom is where the plugin said, at Initialize, its sigils are taken
+	// from: its signa, its declared routes, or nowhere.
+	sigilsFrom protocol.SigilsFrom
+
 	// signa is what this plugin does, as signa (ADR-039), populated during
 	// Initialize. The node serves each sigil and hands it to HandleHTTP.
 	signa []*protocol.Signum
@@ -251,6 +255,12 @@ func (c *ExternalDomainProxy) PythonServiceClient() protocol.PythonServiceClient
 	return protocol.NewPythonServiceClient(c.conn)
 }
 
+// GetSigilsFrom returns where the plugin said, at Initialize, its sigils are
+// taken from.
+func (c *ExternalDomainProxy) GetSigilsFrom() protocol.SigilsFrom {
+	return c.sigilsFrom
+}
+
 // GetSigna returns the signa this plugin handed the node during Initialize.
 func (c *ExternalDomainProxy) GetSigna() []*protocol.Signum {
 	return c.signa
@@ -382,19 +392,12 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		config[key] = pluginConfig.GetString(key)
 	}
 
-	// The service endpoints and token, as the node's config hands them: a
-	// service the node is not running is handed as it is.
+	// The services every plugin is joined by, and the token, as the node's
+	// config hands them: one the node is not running fails Err below.
 	atsStoreEndpoint := pluginConfig.GetString("_ats_store_endpoint")
 	queueEndpoint := pluginConfig.GetString("_queue_endpoint")
 	scheduleEndpoint := pluginConfig.GetString("_schedule_endpoint")
 	fileServiceEndpoint := pluginConfig.GetString("_file_service_endpoint")
-	llmEndpoint := pluginConfig.GetString("_llm_endpoint")
-	embeddingEndpoint := pluginConfig.GetString("_embedding_endpoint")
-	vectorSearchEndpoint := pluginConfig.GetString("_vector_search_endpoint")
-	groundEndpoint := pluginConfig.GetString("_ground_endpoint")
-	searchEndpoint := pluginConfig.GetString("_search_endpoint")
-	fetchEndpoint := pluginConfig.GetString("_fetch_endpoint")
-	mailEndpoint := pluginConfig.GetString("_mail_endpoint")
 	authToken := pluginConfig.GetString("_auth_token")
 	// A token the node could not mint for the namespace the plugin stands in
 	// fails the Initialize here, rather than starting the plugin on no token.
@@ -422,19 +425,17 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	}
 
 	req := &protocol.InitializeRequest{
-		AtsStoreEndpoint:     atsStoreEndpoint,
-		QueueEndpoint:        queueEndpoint,
-		ScheduleEndpoint:     scheduleEndpoint,
-		FileServiceEndpoint:  fileServiceEndpoint,
-		LlmEndpoint:          llmEndpoint,
-		EmbeddingEndpoint:    embeddingEndpoint,
-		VectorSearchEndpoint: vectorSearchEndpoint,
-		GroundEndpoint:       groundEndpoint,
-		SearchEndpoint:       searchEndpoint,
-		FetchEndpoint:        fetchEndpoint,
-		MailEndpoint:         mailEndpoint,
-		AuthToken:            authToken,
-		Config:               config,
+		AtsStoreEndpoint:    atsStoreEndpoint,
+		QueueEndpoint:       queueEndpoint,
+		ScheduleEndpoint:    scheduleEndpoint,
+		FileServiceEndpoint: fileServiceEndpoint,
+		AuthToken:           authToken,
+		Config:              config,
+	}
+	// Each service the node boots without is handed as where it answers, or
+	// why the node runs without it.
+	if err := handOptionalEndpoints(req, pluginConfig); err != nil {
+		return errors.Wrapf(err, "plugin %s was not handed the node's service endpoints", c.metadata.Name)
 	}
 
 	c.logger.Debugw("Sending Initialize RPC to plugin",
@@ -443,13 +444,13 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"queue_endpoint", queueEndpoint,
 		"schedule_endpoint", scheduleEndpoint,
 		"file_service_endpoint", fileServiceEndpoint,
-		"llm_endpoint", llmEndpoint,
-		"embedding_endpoint", embeddingEndpoint,
-		"vector_search_endpoint", vectorSearchEndpoint,
-		"ground_endpoint", groundEndpoint,
-		"search_endpoint", searchEndpoint,
-		"fetch_endpoint", fetchEndpoint,
-		"mail_endpoint", mailEndpoint,
+		"llm_endpoint", req.LlmEndpoint,
+		"embedding_endpoint", req.EmbeddingEndpoint,
+		"vector_search_endpoint", req.VectorSearchEndpoint,
+		"ground_endpoint", req.GroundEndpoint,
+		"search_endpoint", req.SearchEndpoint,
+		"fetch_endpoint", req.FetchEndpoint,
+		"mail_endpoint", req.MailEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)
@@ -476,6 +477,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store embedding provider capability
 	c.embeddingProvider = resp.GetEmbeddingProvider()
 
+	c.sigilsFrom = resp.GetSigilsFrom()
 	c.signa = resp.GetSigna()
 	c.httpRoutes = resp.GetHttpRoutes()
 
@@ -686,6 +688,45 @@ func withQuery(path, rawQuery string) string {
 }
 
 // configErr is why a plugin config could not be handed, for a config that
+// endpointsHanded is a plugin config that hands the node's service endpoints.
+type endpointsHanded interface {
+	ServiceEndpoints() (ServiceEndpoints, error)
+}
+
+// handOptionalEndpoints sets on req where each service the node boots without
+// answers, or why the node runs without it. A config handing no endpoints is
+// refused, naming its type.
+func handOptionalEndpoints(req *protocol.InitializeRequest, config plugin.Config) error {
+	handed, hands := config.(endpointsHanded)
+	if !hands {
+		return errors.Newf("its config is a %T, which hands no service endpoints", config)
+	}
+	endpoints, err := handed.ServiceEndpoints()
+	if err != nil {
+		return err
+	}
+	for _, service := range []struct {
+		name string
+		at   ServiceEndpoint
+		into **protocol.ServiceEndpoint
+	}{
+		{"llm", endpoints.LLM, &req.LlmEndpoint},
+		{"embedding", endpoints.Embedding, &req.EmbeddingEndpoint},
+		{"vector search", endpoints.VectorSearch, &req.VectorSearchEndpoint},
+		{"ground", endpoints.Ground, &req.GroundEndpoint},
+		{"search", endpoints.Search, &req.SearchEndpoint},
+		{"fetch", endpoints.Fetch, &req.FetchEndpoint},
+		{"mail", endpoints.Mail, &req.MailEndpoint},
+	} {
+		endpoint, err := service.at.toProto(service.name)
+		if err != nil {
+			return err
+		}
+		*service.into = endpoint
+	}
+	return nil
+}
+
 // keeps one.
 func configErr(config plugin.Config) error {
 	if keeps, says := config.(interface{ Err() error }); says {

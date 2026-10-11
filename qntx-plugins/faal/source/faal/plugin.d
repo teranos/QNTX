@@ -523,6 +523,8 @@ InitializeResponse initialize(ref const InitializeRequest req) {
     state.initialized = true;
 
     InitializeResponse resp;
+    // faal declares no routes, and serves no sigils.
+    resp.sigilsFrom = SIGILS_FROM_NONE;
     return resp;
 }
 

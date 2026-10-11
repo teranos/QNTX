@@ -20,8 +20,8 @@ import (
 // Services are accessed via gRPC clients that connect to the endpoints.
 //
 // Each client is made when the registry is, for the endpoint the node handed.
-// A gRPC client connects when first called, so a service the node is not
-// running is a client whose calls fail, saying so, not a nil to ask about.
+// A gRPC client connects when first called. A service the node says it runs
+// without is one whose every call is refused with why, not a nil to ask about.
 type RemoteServiceRegistry struct {
 	config             map[string]string
 	logger             *zap.SugaredLogger
@@ -29,9 +29,9 @@ type RemoteServiceRegistry struct {
 	queueClient        *RemoteQueue
 	scheduleClient     *RemoteSchedule
 	fileServiceClient  *RemoteFileService
-	llmClient          *RemoteLLM
-	vectorSearchClient *RemoteVectorSearch
-	searchClient       *RemoteSearch
+	llmClient          plugin.LLMService
+	vectorSearchClient plugin.VectorSearchService
+	searchClient       plugin.SearchService
 	pluginRef          plugin.DomainPlugin // Reference to plugin for metadata lookup
 }
 
@@ -45,9 +45,9 @@ func NewRemoteServiceRegistry(
 	queueEndpoint string,
 	scheduleEndpoint string,
 	fileServiceEndpoint string,
-	llmEndpoint string,
-	vectorSearchEndpoint string,
-	searchEndpoint string,
+	llmEndpoint ServiceEndpoint,
+	vectorSearchEndpoint ServiceEndpoint,
+	searchEndpoint ServiceEndpoint,
 	authToken string,
 	config map[string]string,
 	logger *zap.SugaredLogger,
@@ -68,14 +68,14 @@ func NewRemoteServiceRegistry(
 	if r.fileServiceClient, err = NewRemoteFileService(outlives, fileServiceEndpoint, authToken, logger); err != nil {
 		return nil, errors.Wrapf(err, "no FileService client for %q", fileServiceEndpoint)
 	}
-	if r.llmClient, err = NewRemoteLLM(outlives, llmEndpoint, logger); err != nil {
-		return nil, errors.Wrapf(err, "no LLM client for %q", llmEndpoint)
+	if r.llmClient, err = llmAt(outlives, llmEndpoint, logger); err != nil {
+		return nil, errors.Wrapf(err, "no LLM client for %s", llmEndpoint)
 	}
-	if r.vectorSearchClient, err = NewRemoteVectorSearch(outlives, vectorSearchEndpoint, authToken, logger); err != nil {
-		return nil, errors.Wrapf(err, "no VectorSearch client for %q", vectorSearchEndpoint)
+	if r.vectorSearchClient, err = vectorSearchAt(outlives, vectorSearchEndpoint, authToken, logger); err != nil {
+		return nil, errors.Wrapf(err, "no VectorSearch client for %s", vectorSearchEndpoint)
 	}
-	if r.searchClient, err = NewRemoteSearch(outlives, searchEndpoint, logger); err != nil {
-		return nil, errors.Wrapf(err, "no Search client for %q", searchEndpoint)
+	if r.searchClient, err = searchAt(outlives, searchEndpoint, logger); err != nil {
+		return nil, errors.Wrapf(err, "no Search client for %s", searchEndpoint)
 	}
 	return r, nil
 }

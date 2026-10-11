@@ -19,21 +19,25 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ServiceEndpoints holds the addresses of running service servers
+// ServiceEndpoints is where each service the node runs for plugins answers,
+// or why the node runs without it, and the token plugins reach them with.
 type ServiceEndpoints struct {
-	ATSStoreAddress     string
-	QueueAddress        string
-	ScheduleAddress     string
-	FileServiceAddress  string
-	LLMAddress          string
-	EmbeddingAddress    string
-	VectorSearchAddress string
-	GroundAddress       string
-	SearchAddress       string
-	FetchAddress        string
-	MailAddress         string
-	AuthToken           string
+	ATSStore     ServiceEndpoint
+	Queue        ServiceEndpoint
+	Schedule     ServiceEndpoint
+	FileService  ServiceEndpoint
+	LLM          ServiceEndpoint
+	Embedding    ServiceEndpoint
+	VectorSearch ServiceEndpoint
+	Ground       ServiceEndpoint
+	Search       ServiceEndpoint
+	Fetch        ServiceEndpoint
+	Mail         ServiceEndpoint
+	AuthToken    string
 }
+
+// Endpoints is the endpoints as they are: what a fixed set of them holds.
+func (e ServiceEndpoints) Endpoints() ServiceEndpoints { return e }
 
 // ServicesManager manages gRPC service servers for plugin callbacks
 type ServicesManager struct {
@@ -61,36 +65,31 @@ type ServicesManager struct {
 	node               string // The node's DID, who writes what a plugin named no actor for
 	mailServer         *grpc.Server
 	mailSrv            *services.MailServer // wired once the node has Users and its DID
-	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
 	// running is every service server that started, in the order it did.
 	running []*grpc.Server
 
-	// Services that failed to start, by name. QNTX boots without them, so the
-	// reason has to outlive the boot — a plugin failing to reach one later is
-	// the moment this needs to be readable.
-	degradedMu sync.Mutex
-	degraded   map[string]string
+	// Where each service answers, or why the node runs without it. QNTX boots
+	// without a service that did not start, and runs on without one that
+	// stopped serving, so the reason outlives both: a plugin initialized after
+	// is handed it in place of an address.
+	endpointsMu sync.Mutex
+	endpoints   ServiceEndpoints
 }
 
-// Degraded returns the services that failed to start and why.
-func (m *ServicesManager) Degraded() map[string]string {
-	m.degradedMu.Lock()
-	defer m.degradedMu.Unlock()
-	out := make(map[string]string, len(m.degraded))
-	for name, reason := range m.degraded {
-		out[name] = reason
-	}
-	return out
+// Endpoints is where each service answers now, or why the node runs without it.
+func (m *ServicesManager) Endpoints() ServiceEndpoints {
+	m.endpointsMu.Lock()
+	defer m.endpointsMu.Unlock()
+	return m.endpoints
 }
 
-// noteDegraded records a service QNTX will run without, loudly.
-func (m *ServicesManager) noteDegraded(service string, err error) {
-	m.logger.Errorw("Service did not start; plugins will not have it",
+// degrade is the endpoint of a service QNTX runs without: why it does, said
+// loudly, and handed to every plugin in place of an address.
+func (m *ServicesManager) degrade(service string, err error) ServiceEndpoint {
+	m.logger.Errorw("Service is not running; plugins are told why when they ask for it",
 		"service", service, "error", err)
-	m.degradedMu.Lock()
-	defer m.degradedMu.Unlock()
-	m.degraded[service] = err.Error()
+	return NotRunning(errors.Wrapf(err, "the %s service is not running", service))
 }
 
 // routing is a router providers register with once their plugin is up, or why
@@ -109,7 +108,6 @@ func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, no
 		fetchCfg:  fetchCfg,
 		node:      node,
 		logger:    logger,
-		degraded:  map[string]string{},
 		llm:       routing[*services.LLMServer]{why: errors.New("the LLM service has not started")},
 		search:    routing[*services.SearchServer]{why: errors.New("the search service has not started")},
 	}
@@ -128,7 +126,11 @@ func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, no
 // The services the node hands things to after Start (the ATS store, schedule,
 // fetch and mail services) are made before any listens, so each is there
 // whether or not its server came to serve.
-func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore, queue *async.Queue, scheduleStore *schedule.Store, filesDir string, groundDBPath string) (*ServiceEndpoints, error) {
+//
+// The ATS store, queue, schedule and file services are what every plugin is
+// joined by, so one that does not start fails Start. Each other one that does
+// not start is held with why, and the node boots without it.
+func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore, queue *async.Queue, scheduleStore *schedule.Store, filesDir string, groundDBPath string) error {
 	m.groundDBPath = groundDBPath
 	// The token plugins reach every service with
 	authToken := rand.Text()
@@ -137,100 +139,95 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	m.fetchSrv = services.NewFetchServer(store, authToken, m.node, m.fetchCfg, m.logger)
 	m.mailSrv = services.NewMailServer(authToken, m.logger)
 
+	m.endpointsMu.Lock()
+	defer m.endpointsMu.Unlock()
+	m.endpoints.AuthToken = authToken
+
 	// Start ATSStore service
 	atsStoreAddr, err := m.startATSStoreService(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to start ATS store service")
+		return errors.Wrap(err, "failed to start ATS store service")
 	}
+	m.endpoints.ATSStore = ServingAt(atsStoreAddr)
 
 	// Start Queue service
 	queueAddr, err := m.startQueueService(ctx, queue, authToken)
 	if err != nil {
 		m.stopRunning()
-		return nil, errors.Wrap(err, "failed to start queue service")
+		return errors.Wrap(err, "failed to start queue service")
 	}
+	m.endpoints.Queue = ServingAt(queueAddr)
 
 	// Start Schedule service
 	scheduleAddr, err := m.startScheduleService(ctx)
 	if err != nil {
 		m.stopRunning()
-		return nil, errors.Wrap(err, "failed to start schedule service")
+		return errors.Wrap(err, "failed to start schedule service")
 	}
+	m.endpoints.Schedule = ServingAt(scheduleAddr)
 
 	// Start File service
 	fileServiceAddr, err := m.startFileService(ctx, filesDir, authToken)
 	if err != nil {
 		m.stopRunning()
-		return nil, errors.Wrap(err, "failed to start file service")
+		return errors.Wrap(err, "failed to start file service")
 	}
+	m.endpoints.FileService = ServingAt(fileServiceAddr)
 
 	// Start LLM service (starts empty, providers register after plugin init)
-	llmAddr, err := m.startLLMService(ctx, store)
-	if err != nil {
-		m.noteDegraded("llm", err)
-		m.llm.why = errors.Wrap(err, "the LLM service did not start")
-		llmAddr = ""
-	}
+	m.endpoints.LLM = m.startOptional("llm", func() (string, error) {
+		addr, err := m.startLLMService(ctx, store)
+		if err != nil {
+			m.llm.why = errors.Wrap(err, "the LLM service did not start")
+		}
+		return addr, err
+	})
 
 	// Start Embedding service (starts empty, backend registers after embedding engine init)
-	embeddingAddr, err := m.startEmbeddingService(ctx, authToken)
-	if err != nil {
-		m.noteDegraded("embedding", err)
-		embeddingAddr = ""
-	}
+	m.endpoints.Embedding = m.startOptional("embedding", func() (string, error) {
+		return m.startEmbeddingService(ctx, authToken)
+	})
 
 	// Start VectorSearch service (starts empty, provider registers after plugin init)
-	vectorSearchAddr, err := m.startVectorSearchService(ctx, authToken)
-	if err != nil {
-		m.noteDegraded("vectorsearch", err)
-		vectorSearchAddr = ""
-	}
+	m.endpoints.VectorSearch = m.startOptional("vectorsearch", func() (string, error) {
+		return m.startVectorSearchService(ctx, authToken)
+	})
 
 	// Start Ground service
-	groundAddr, err := m.startGroundService(ctx, groundDBPath, authToken)
-	if err != nil {
-		m.noteDegraded("ground", err)
-		groundAddr = ""
-	}
+	m.endpoints.Ground = m.startOptional("ground", func() (string, error) {
+		return m.startGroundService(ctx, groundDBPath, authToken)
+	})
 
 	// Start Search service (starts empty, provider registers after plugin init)
-	searchAddr, err := m.startSearchService(ctx)
-	if err != nil {
-		m.noteDegraded("search", err)
-		m.search.why = errors.Wrap(err, "the search service did not start")
-		searchAddr = ""
-	}
+	m.endpoints.Search = m.startOptional("search", func() (string, error) {
+		addr, err := m.startSearchService(ctx)
+		if err != nil {
+			m.search.why = errors.Wrap(err, "the search service did not start")
+		}
+		return addr, err
+	})
 
 	// Start Fetch service
-	fetchAddr, err := m.startFetchService(ctx)
-	if err != nil {
-		m.noteDegraded("fetch", err)
-		fetchAddr = ""
-	}
+	m.endpoints.Fetch = m.startOptional("fetch", func() (string, error) {
+		return m.startFetchService(ctx)
+	})
 
 	// Start Mail service (sends nothing until the node wires it: ADR-041)
-	mailAddr, err := m.startMailService(ctx)
+	m.endpoints.Mail = m.startOptional("mail", func() (string, error) {
+		return m.startMailService(ctx)
+	})
+
+	return nil
+}
+
+// startOptional starts a service the node boots without when it does not
+// start: where it answers, or why the node runs without it.
+func (m *ServicesManager) startOptional(service string, start func() (string, error)) ServiceEndpoint {
+	addr, err := start()
 	if err != nil {
-		m.noteDegraded("mail", err)
-		mailAddr = ""
+		return m.degrade(service, errors.Wrap(err, "it did not start"))
 	}
-
-	m.endpoints = ServiceEndpoints{
-		ATSStoreAddress:     atsStoreAddr,
-		QueueAddress:        queueAddr,
-		ScheduleAddress:     scheduleAddr,
-		FileServiceAddress:  fileServiceAddr,
-		LLMAddress:          llmAddr,
-		EmbeddingAddress:    embeddingAddr,
-		VectorSearchAddress: vectorSearchAddr,
-		GroundAddress:       groundAddr,
-		SearchAddress:       searchAddr,
-		FetchAddress:        fetchAddr,
-		MailAddress:         mailAddr,
-		AuthToken:           authToken,
-	}
-
-	return &m.endpoints, nil
+	return ServingAt(addr)
 }
 
 // serve runs one gRPC service: it answers on the listener until that closes,
@@ -241,8 +238,11 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 // plugin a way to stop everything else running on it. Ten services had a
 // hand-written copy of this pair, twenty of the eighty-eight goroutines the
 // node could die inside without saying anything.
+//
+// A service that stops serving is one plugins run without from then on: at
+// is its endpoint, and becomes why.
 func (m *ServicesManager) serve(
-	ctx context.Context, name string, server *grpc.Server, listener net.Listener,
+	ctx context.Context, name string, server *grpc.Server, listener net.Listener, at *ServiceEndpoint,
 ) {
 	m.running = append(m.running, server)
 	sacred.Go("grpc."+name+".shutdown", func() {
@@ -251,9 +251,11 @@ func (m *ServicesManager) serve(
 		server.GracefulStop()
 	})
 	sacred.Go("grpc."+name+".serve", func() {
-		// A service that stops serving is one plugins run without from then on.
 		if err := server.Serve(listener); err != nil {
-			m.noteDegraded(name, errors.Wrapf(err, "gRPC service %s stopped serving at %s", name, listener.Addr()))
+			stopped := m.degrade(name, errors.Wrapf(err, "it stopped serving at %s", listener.Addr()))
+			m.endpointsMu.Lock()
+			defer m.endpointsMu.Unlock()
+			*at = stopped
 		}
 	})
 }
@@ -271,7 +273,7 @@ func (m *ServicesManager) startATSStoreService(ctx context.Context) (string, err
 	m.atsStoreServer = grpc.NewServer()
 	protocol.RegisterATSStoreServiceServer(m.atsStoreServer, m.atsStore)
 
-	m.serve(ctx, "ATSStore", m.atsStoreServer, listener)
+	m.serve(ctx, "ATSStore", m.atsStoreServer, listener, &m.endpoints.ATSStore)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("ATSStore service started", "address", addr)
@@ -293,7 +295,7 @@ func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Qu
 	queueServer := services.NewQueueServer(queue, authToken, m.logger)
 	protocol.RegisterQueueServiceServer(m.queueServer, queueServer)
 
-	m.serve(ctx, "Queue", m.queueServer, listener)
+	m.serve(ctx, "Queue", m.queueServer, listener, &m.endpoints.Queue)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Queue service started", "address", addr)
@@ -314,7 +316,7 @@ func (m *ServicesManager) startScheduleService(ctx context.Context) (string, err
 	m.scheduleServer = grpc.NewServer()
 	protocol.RegisterScheduleServiceServer(m.scheduleServer, m.scheduleSrv)
 
-	m.serve(ctx, "Schedule", m.scheduleServer, listener)
+	m.serve(ctx, "Schedule", m.scheduleServer, listener, &m.endpoints.Schedule)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Schedule service started", "address", addr)
@@ -333,7 +335,7 @@ func (m *ServicesManager) startFileService(ctx context.Context, filesDir string,
 	fileServer := services.NewFileServiceServer(filesDir, authToken, m.logger)
 	protocol.RegisterFileServiceServer(m.fileServiceServer, fileServer)
 
-	m.serve(ctx, "File", m.fileServiceServer, listener)
+	m.serve(ctx, "File", m.fileServiceServer, listener, &m.endpoints.FileService)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("File service started", "address", addr)
@@ -354,7 +356,7 @@ func (m *ServicesManager) startLLMService(ctx context.Context, store ats.Attesta
 	m.llmServer = grpc.NewServer()
 	protocol.RegisterLLMServiceServer(m.llmServer, router)
 
-	m.serve(ctx, "LLM", m.llmServer, listener)
+	m.serve(ctx, "LLM", m.llmServer, listener, &m.endpoints.LLM)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("LLM service started", "address", addr)
@@ -374,7 +376,7 @@ func (m *ServicesManager) startEmbeddingService(ctx context.Context, authToken s
 	m.embeddingServer = grpc.NewServer()
 	protocol.RegisterEmbeddingServiceServer(m.embeddingServer, m.embeddingRouter)
 
-	m.serve(ctx, "Embedding", m.embeddingServer, listener)
+	m.serve(ctx, "Embedding", m.embeddingServer, listener, &m.endpoints.Embedding)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Embedding service started", "address", addr)
@@ -394,7 +396,7 @@ func (m *ServicesManager) startVectorSearchService(ctx context.Context, authToke
 	m.vectorSearchServer = grpc.NewServer()
 	protocol.RegisterVectorSearchServiceServer(m.vectorSearchServer, m.vectorSearchRouter)
 
-	m.serve(ctx, "VectorSearch", m.vectorSearchServer, listener)
+	m.serve(ctx, "VectorSearch", m.vectorSearchServer, listener, &m.endpoints.VectorSearch)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("VectorSearch service started", "address", addr)
@@ -413,7 +415,7 @@ func (m *ServicesManager) startGroundService(ctx context.Context, dbPath string,
 	groundServer := services.NewGroundServer(dbPath, authToken, m.logger)
 	protocol.RegisterGroundServiceServer(m.groundServer, groundServer)
 
-	m.serve(ctx, "Ground", m.groundServer, listener)
+	m.serve(ctx, "Ground", m.groundServer, listener, &m.endpoints.Ground)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Ground service started", "address", addr)
@@ -434,7 +436,7 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 	m.searchServer = grpc.NewServer()
 	protocol.RegisterSearchServiceServer(m.searchServer, router)
 
-	m.serve(ctx, "Search", m.searchServer, listener)
+	m.serve(ctx, "Search", m.searchServer, listener, &m.endpoints.Search)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Search service started", "address", addr)
@@ -451,7 +453,7 @@ func (m *ServicesManager) startFetchService(ctx context.Context) (string, error)
 	m.fetchServer = grpc.NewServer()
 	protocol.RegisterFetchServiceServer(m.fetchServer, m.fetchSrv)
 
-	m.serve(ctx, "Fetch", m.fetchServer, listener)
+	m.serve(ctx, "Fetch", m.fetchServer, listener, &m.endpoints.Fetch)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Fetch service started", "address", addr)
@@ -468,7 +470,7 @@ func (m *ServicesManager) startMailService(ctx context.Context) (string, error) 
 	m.mailServer = grpc.NewServer()
 	protocol.RegisterMailServiceServer(m.mailServer, m.mailSrv)
 
-	m.serve(ctx, "Mail", m.mailServer, listener)
+	m.serve(ctx, "Mail", m.mailServer, listener, &m.endpoints.Mail)
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("Mail service started", "address", addr)
@@ -576,9 +578,4 @@ func (m *ServicesManager) stopRunning() {
 	for _, server := range m.running {
 		server.Stop()
 	}
-}
-
-// GetEndpoints returns the service endpoints
-func (m *ServicesManager) GetEndpoints() *ServiceEndpoints {
-	return &m.endpoints
 }

@@ -91,6 +91,8 @@ impl DomainPluginService for PTYElementService {
         Ok(Response::new(InitializeResponse {
             handler_names: vec![],
             schedules: vec![],
+            // A terminal is an element, and serves no sigils.
+            sigils_from: SigilsFrom::None as i32,
             ..Default::default()
         }))
     }
@@ -193,11 +195,12 @@ impl DomainPluginService for PTYElementService {
             symbol: "⌨".to_string(),
             title: "Terminal".to_string(),
             label: "pty".to_string(),
-            content_path: String::new(),
-            css_path: "/xterm.css".to_string(),
+            drawn: Some(element_def::Drawn::ModulePath(
+                "/pty-element-module.js".to_string(),
+            )),
+            css_paths: vec!["/xterm.css".to_string()],
             default_width: Some(800),
             default_height: Some(600),
-            module_path: "/pty-element-module.js".to_string(),
         }];
 
         Ok(Response::new(ElementDefResponse { elements }))

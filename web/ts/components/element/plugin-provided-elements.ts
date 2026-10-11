@@ -29,7 +29,8 @@ export interface PluginElementDef {
     title: string;
     label: string;
     content_url: string;
-    css_url?: string;
+    /** The stylesheets loaded with the element: none is an element styled by nothing of its own. */
+    css_urls: string[];
     module_url?: string;
     default_width?: number;
     default_height?: number;
