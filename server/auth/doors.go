@@ -144,6 +144,7 @@ func (h *Handler) SetDoors(configured []Door) error {
 			RPDisplayName: "QNTX",
 			RPID:          configuredDoor.RPID,
 			RPOrigins:     webOrigins(configuredDoor.Origins),
+			Timeouts:      ceremonyTimeouts(),
 		})
 		if err != nil {
 			return errors.Wrapf(err, "the door onto %q has no relying party (rp_id=%q)", configuredDoor.Namespace, configuredDoor.RPID)

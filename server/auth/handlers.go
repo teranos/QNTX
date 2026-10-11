@@ -13,12 +13,9 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// ownerUserID keys the ceremony a browser has in progress.
-const ownerUserID = "qntx-owner"
-
 // legacyUserHandle is the user handle every passkey made before per-User
 // handles was made under (migration 078).
-const legacyUserHandle = ownerUserID
+const legacyUserHandle = "qntx-owner"
 
 // maxCeremonyBodyBytes bounds a ceremony response. An attestation object plus
 // a DID proof is kilobytes; anything past this is not a ceremony.
@@ -143,7 +140,8 @@ func (h *Handler) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.mayRegister(h.presented(r)); err != nil {
+	p := h.presented(r)
+	if err := h.mayRegister(p); err != nil {
 		h.logger.Warnw("Passkey enrolment refused", "error", err)
 		h.writeError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -156,32 +154,32 @@ func (h *Handler) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 
 	// The passkey is made for the User this enrolment speaks for, under their
 	// own id: a handle shared by two accounts makes the second evict the first.
-	enrolling, ok := h.presented(r).Enrolling()
+	route, ok := p.Enrolling()
 	if !ok {
 		h.writeError(w, http.StatusUnauthorized, errRefused.Error())
 		return
 	}
-	person, found, err := h.users.ByRoute(enrolling)
+	person, found, err := h.users.ByRoute(route)
 	if err != nil {
 		h.writeError(w, http.StatusInternalServerError, "the User store did not answer")
-		h.logger.Errorw("could not read the User a passkey is enrolled for", "route", enrolling, "error", err)
+		h.logger.Errorw("could not read the User a passkey is enrolled for", "route", route, "error", err)
 		return
 	}
 	if !found {
-		h.refusePasskey(w, "enrolment", enrolling, "no User holds this route",
-			"nobody is reached by this account", "no User holds "+enrolling)
+		h.refusePasskey(w, "enrolment", route, "no User holds this route",
+			"nobody is reached by this account", "no User holds "+route)
 		return
 	}
 	// Every passkey this person already holds at this door, so an authenticator
 	// holding one makes no second (§5.4 excludeCredentials).
-	held, err := h.devicesOf(arrived.namespace, enrolling)
+	held, err := h.devicesOf(arrived.namespace, route)
 	if err != nil {
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
-		h.logger.Errorw("could not read the passkeys a User already holds", "route", enrolling, "error", err)
+		h.logger.Errorw("could not read the passkeys a User already holds", "route", route, "error", err)
 		return
 	}
 
-	user := &passkeyUser{handle: []byte(person.ID), name: passkeyName(person, enrolling)}
+	user := &passkeyUser{handle: []byte(person.ID), name: passkeyName(person, route)}
 	options, session, err := arrived.rp.BeginRegistration(user,
 		// Enrolment makes a passkey on the device enrolling. Firefox 156 below
 		// macOS 26.4 sends a PRF enrolment that does not ask for the platform to
@@ -196,7 +194,7 @@ func (h *Handler) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ceremonies.Store(ownerUserID, session)
+	h.ceremonies.begin(enrolling(p), session)
 	h.writeJSON(w, http.StatusOK, options)
 }
 
@@ -208,14 +206,9 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 
 	p := h.presented(r)
 
-	sessionVal, ok := h.ceremonies.LoadAndDelete(ownerUserID)
+	session, ok := h.ceremonies.finish(enrolling(p))
 	if !ok {
 		h.writeError(w, http.StatusBadRequest, "no registration ceremony")
-		return
-	}
-	session, isCeremony := sessionVal.(*webauthn.SessionData)
-	if !isCeremony {
-		h.writeError(w, http.StatusInternalServerError, "the registration ceremony record was not a ceremony")
 		return
 	}
 
@@ -399,7 +392,7 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ceremonies.Store(ownerUserID, session)
+	h.ceremonies.begin(signingIn(h.presented(r)), session)
 	h.writeJSON(w, http.StatusOK, options)
 }
 
@@ -416,14 +409,9 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionVal, ok := h.ceremonies.LoadAndDelete(ownerUserID)
+	session, ok := h.ceremonies.finish(signingIn(p))
 	if !ok {
 		h.writeError(w, http.StatusBadRequest, "no login ceremony")
-		return
-	}
-	session, isCeremony := sessionVal.(*webauthn.SessionData)
-	if !isCeremony {
-		h.writeError(w, http.StatusInternalServerError, "the login ceremony record was not a ceremony")
 		return
 	}
 

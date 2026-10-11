@@ -79,10 +79,16 @@ func (a authenticator) answer(t *testing.T, rpID, challenge, userHandle string) 
 	return parsed
 }
 
-// signingIn begins a login at the garden door and answers it with a.
-func signingIn(t *testing.T, h *Handler, a authenticator, userHandle string) error {
+// beginSignIn begins a login at the garden door for one half-admitted
+// browser, and gives back its cookie and the challenge it was issued.
+func beginSignIn(t *testing.T, h *Handler) (*http.Cookie, string) {
 	t.Helper()
-	begun := ceremonyAt(t, h, "/auth/login/begin", gardenOrigin)
+	browser := halfAdmitted(t, h)
+	r := httptest.NewRequest(http.MethodPost, "/auth/login/begin", nil)
+	r.Header.Set("Origin", gardenOrigin)
+	r.AddCookie(browser)
+	begun := httptest.NewRecorder()
+	h.handleLoginBegin(begun, r)
 	require.Equal(t, http.StatusOK, begun.Code, begun.Body.String())
 	var options struct {
 		PublicKey struct {
@@ -90,11 +96,15 @@ func signingIn(t *testing.T, h *Handler, a authenticator, userHandle string) err
 		} `json:"publicKey"`
 	}
 	require.NoError(t, json.Unmarshal(begun.Body.Bytes(), &options))
+	return browser, options.PublicKey.Challenge
+}
 
-	held, ok := h.ceremonies.LoadAndDelete(ownerUserID)
+// answeringASignIn begins a login at the garden door and answers it with a.
+func answeringASignIn(t *testing.T, h *Handler, a authenticator, userHandle string) error {
+	t.Helper()
+	browser, challenge := beginSignIn(t, h)
+	session, ok := h.ceremonies.finish(signingIn(Presented{pendingToken: browser.Value}))
 	require.True(t, ok)
-	session, isSession := held.(*webauthn.SessionData)
-	require.True(t, isSession)
 
 	r := httptest.NewRequest(http.MethodPost, "/auth/login/finish", nil)
 	r.Header.Set("Origin", gardenOrigin)
@@ -103,7 +113,7 @@ func signingIn(t *testing.T, h *Handler, a authenticator, userHandle string) err
 	creds, err := h.devicesOf(arrived.namespace, mastodonAccount)
 	require.NoError(t, err)
 
-	_, err = h.validateAssertion(arrived.rp, *session, a.answer(t, "garden.test", options.PublicKey.Challenge, userHandle), creds)
+	_, err = h.validateAssertion(arrived.rp, *session, a.answer(t, "garden.test", challenge, userHandle), creds)
 	return err
 }
 
@@ -116,7 +126,7 @@ func TestAPasskeySignsInUnderTheHandleItWasMadeUnder(t *testing.T) {
 	require.NoError(t, h.creds.saveAt(laptop.credential(t), "did:key:zlaptop", mastodonAccount, "garden", "US-ONE"))
 	require.NoError(t, h.creds.saveAt(phone.credential(t), "did:key:zphone", mastodonAccount, "garden", legacyUserHandle))
 
-	assert.NoError(t, signingIn(t, h, laptop, "US-ONE"), "a passkey made under the User's id")
-	assert.NoError(t, signingIn(t, h, phone, legacyUserHandle), "a passkey made before handles were the User's")
-	assert.Error(t, signingIn(t, h, laptop, legacyUserHandle), "a handle the passkey was not made under")
+	assert.NoError(t, answeringASignIn(t, h, laptop, "US-ONE"), "a passkey made under the User's id")
+	assert.NoError(t, answeringASignIn(t, h, phone, legacyUserHandle), "a passkey made before handles were the User's")
+	assert.Error(t, answeringASignIn(t, h, laptop, legacyUserHandle), "a handle the passkey was not made under")
 }
