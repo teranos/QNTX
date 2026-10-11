@@ -96,7 +96,6 @@ in
               - arm64: `qntx-''${{ steps.version.outputs.version }}-linux-arm64.tar.gz`
 
               **macOS:**
-              - Intel (x64): `qntx-''${{ steps.version.outputs.version }}-darwin-amd64.tar.gz`
               - Apple Silicon (ARM): `qntx-''${{ steps.version.outputs.version }}-darwin-arm64.tar.gz`
 
               ### Desktop App (Tauri)
@@ -235,11 +234,9 @@ in
       needs = "create-release";
       "if" = "always()"; # Run even if create-release is skipped
       permissions.contents = "write";
+      # No amd64: no runner ever took a macos-13 job, and it held every release
+      # queued for 24h.
       strategy.matrix.include = [
-        {
-          arch = "amd64";
-          runner = "macos-13";
-        }
         {
           arch = "arm64";
           runner = "macos-14";
@@ -260,7 +257,7 @@ in
         {
           name = "Setup Go";
           uses = "actions/setup-go@v5";
-          "with".go-version = "1.24";
+          "with".go-version-file = "go.mod";
         }
 
         {

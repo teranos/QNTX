@@ -78,11 +78,6 @@ sudo mv qntx /usr/local/bin/
 
 **macOS:**
 ```bash
-# Intel (x64)
-curl -LO https://github.com/teranos/QNTX/releases/latest/download/qntx-VERSION-darwin-amd64.tar.gz
-tar -xzf qntx-VERSION-darwin-amd64.tar.gz
-sudo mv qntx /usr/local/bin/
-
 # Apple Silicon (ARM)
 curl -LO https://github.com/teranos/QNTX/releases/latest/download/qntx-VERSION-darwin-arm64.tar.gz
 tar -xzf qntx-VERSION-darwin-arm64.tar.gz
@@ -103,7 +98,7 @@ sha256sum -c qntx-VERSION-linux-amd64.tar.gz.sha256
 
 **Available Platforms:**
 - Linux (amd64, arm64)
-- macOS (Intel, Apple Silicon)
+- macOS (Apple Silicon)
 
 Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
 
@@ -223,7 +218,7 @@ qntx am show
 |----------|-------------|---------|---------|
 | Linux | amd64 | GitHub Releases, Nix, Docker, Source | ✅ |
 | Linux | arm64 | GitHub Releases, Nix, Docker, Source | ✅ |
-| macOS | Intel (x64) | GitHub Releases, Nix, Source | ✅ |
+| macOS | Intel (x64) | Nix, Source | ✅ |
 | macOS | Apple Silicon (ARM) | GitHub Releases, Nix, Source | ✅ |
 
 This is the node. The app is [QNTX-App](https://github.com/teranos/QNTX-App).
