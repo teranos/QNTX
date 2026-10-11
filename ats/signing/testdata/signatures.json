@@ -1,0 +1,29 @@
+{
+  "seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+  "signatures": [
+    {
+      "name": "no attributes",
+      "signature_hex": "c82af974e08bfd61d865214636e05eecff6f405a2aba37367991f37ee2923578cfb70f410b5c38a341ab51c7f2548e226ab5647abee86c5c8f68127f9645e302"
+    },
+    {
+      "name": "empty attributes are left out",
+      "signature_hex": "106b4c30806031cc2ac947d37ff842b6225cd998bf0559109fc1318b72b6768d818f0a1a53ef86678568cba38fa613fe353b85fd640bf319af7b23e2c22f9600"
+    },
+    {
+      "name": "html and quotes escape as Go escapes them",
+      "signature_hex": "b918ee9723bab512c77cf70eed2a6daea6c15ce1b8d2c689cd77def0c9b54ff2c25caa8f2c6b038dce04a79c77454339394e8619cd50bd77521811ae0ba9da04"
+    },
+    {
+      "name": "control characters and line separators",
+      "signature_hex": "a4af23dc521e694e8903dd715aaa5d609b29c518b561955b2edba002144c3de40e9dc1fecf3606295385e9d86f5a3caf79f54685d4da01eb54ce2aac4a508d0b"
+    },
+    {
+      "name": "numbers print as Go prints a float64",
+      "signature_hex": "c6b788dd2fc5ae3b4cd5c57d44ab9bece4fd7ce1ebd54c18b160c7957d4e99398e48dae9aee5e4986687896d4f31b20b59516c4840fb1374f863f49b4b984d0b"
+    },
+    {
+      "name": "nested values and key order",
+      "signature_hex": "e62ef76fae7ef155631b874c40e43363436396822751951bc561d4eaeeaf599a7aeaa7f3e5dcc6f02eb62b5850ae6682beaaf1d5dfe3ea55609ba6d00c948b0f"
+    }
+  ]
+}

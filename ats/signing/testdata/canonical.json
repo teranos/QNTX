@@ -1,0 +1,166 @@
+[
+  {
+    "name": "no attributes",
+    "wire": {
+      "id": "AS-1",
+      "subjects": [
+        "alice"
+      ],
+      "predicates": [
+        "knows"
+      ],
+      "contexts": [
+        "work"
+      ],
+      "actors": [
+        "bob"
+      ],
+      "timestamp": 1735689600000,
+      "source": "test"
+    },
+    "canonical": "{\"id\":\"AS-1\",\"subjects\":[\"alice\"],\"predicates\":[\"knows\"],\"contexts\":[\"work\"],\"actors\":[\"bob\"],\"timestamp\":1735689600000,\"source\":\"test\"}"
+  },
+  {
+    "name": "empty attributes are left out",
+    "wire": {
+      "id": "AS-2",
+      "subjects": [
+        "a"
+      ],
+      "predicates": [
+        "p"
+      ],
+      "contexts": [],
+      "actors": [],
+      "timestamp": 0,
+      "source": "",
+      "attributes": {}
+    },
+    "canonical": "{\"id\":\"AS-2\",\"subjects\":[\"a\"],\"predicates\":[\"p\"],\"contexts\":[],\"actors\":[],\"timestamp\":0,\"source\":\"\"}"
+  },
+  {
+    "name": "html and quotes escape as Go escapes them",
+    "wire": {
+      "id": "AS-\u003c3\u003e",
+      "subjects": [
+        "a\u0026b",
+        "\"q\"",
+        "back\\slash"
+      ],
+      "predicates": [
+        "\u003cp\u003e"
+      ],
+      "contexts": [
+        "_"
+      ],
+      "actors": [
+        "x"
+      ],
+      "timestamp": -1,
+      "source": "s\u0026s",
+      "attributes": {
+        "z\u003c": "\u003c/script\u003e",
+        "a\u003e": "\u0026amp;"
+      }
+    },
+    "canonical": "{\"id\":\"AS-\\u003c3\\u003e\",\"subjects\":[\"a\\u0026b\",\"\\\"q\\\"\",\"back\\\\slash\"],\"predicates\":[\"\\u003cp\\u003e\"],\"contexts\":[\"_\"],\"actors\":[\"x\"],\"timestamp\":-1,\"source\":\"s\\u0026s\",\"attributes\":{\"a\\u003e\":\"\\u0026amp;\",\"z\\u003c\":\"\\u003c/script\\u003e\"}}"
+  },
+  {
+    "name": "control characters and line separators",
+    "wire": {
+      "id": "AS-c",
+      "subjects": [
+        "\b\f\n\r\t",
+        "\u0001\u001f\u007f",
+        "\u2028\u2029"
+      ],
+      "predicates": [
+        "é",
+        "😀"
+      ],
+      "contexts": [],
+      "actors": [],
+      "timestamp": 1,
+      "source": "\u0000"
+    },
+    "canonical": "{\"id\":\"AS-c\",\"subjects\":[\"\\b\\f\\n\\r\\t\",\"\\u0001\\u001f\",\"\\u2028\\u2029\"],\"predicates\":[\"é\",\"😀\"],\"contexts\":[],\"actors\":[],\"timestamp\":1,\"source\":\"\\u0000\"}"
+  },
+  {
+    "name": "numbers print as Go prints a float64",
+    "wire": {
+      "id": "AS-n",
+      "subjects": [
+        "n"
+      ],
+      "predicates": [
+        "p"
+      ],
+      "contexts": [],
+      "actors": [],
+      "timestamp": 1735689600123,
+      "source": "t",
+      "attributes": {
+        "zero": 0,
+        "negzero": -0,
+        "one": 1,
+        "neg": -1,
+        "half": 1.5,
+        "tenth": 0.1,
+        "third": 0.3333333333333333,
+        "e20": 1e20,
+        "e21": 1e21,
+        "e21b": 1.5e21,
+        "micro": 0.000001,
+        "belowmicro": 0.0000001,
+        "small": 1.234e-7,
+        "tiny": 5e-324,
+        "max": 1.7976931348623157e308,
+        "bigint": 123456789012345678,
+        "u64": 18446744073709551615,
+        "hundred": 100,
+        "e100": 1e100,
+        "neg_e_minus": -2.5e-10,
+        "pi": 3.141592653589793
+      }
+    },
+    "canonical": "{\"id\":\"AS-n\",\"subjects\":[\"n\"],\"predicates\":[\"p\"],\"contexts\":[],\"actors\":[],\"timestamp\":1735689600123,\"source\":\"t\",\"attributes\":{\"belowmicro\":1e-7,\"bigint\":123456789012345680,\"e100\":1e+100,\"e20\":100000000000000000000,\"e21\":1e+21,\"e21b\":1.5e+21,\"half\":1.5,\"hundred\":100,\"max\":1.7976931348623157e+308,\"micro\":0.000001,\"neg\":-1,\"neg_e_minus\":-2.5e-10,\"negzero\":-0,\"one\":1,\"pi\":3.141592653589793,\"small\":1.234e-7,\"tenth\":0.1,\"third\":0.3333333333333333,\"tiny\":5e-324,\"u64\":18446744073709552000,\"zero\":0}}"
+  },
+  {
+    "name": "nested values and key order",
+    "wire": {
+      "id": "AS-o",
+      "subjects": [
+        "o"
+      ],
+      "predicates": [
+        "p"
+      ],
+      "contexts": [],
+      "actors": [],
+      "timestamp": 2,
+      "source": "t",
+      "attributes": {
+        "b": 1,
+        "a": {
+          "y": [
+            1,
+            "two",
+            null,
+            true,
+            false,
+            {
+              "k": "v",
+              "K": "V"
+            }
+          ],
+          "x": {}
+        },
+        "B": [],
+        "é": "accent",
+        "aa": null,
+        "": "empty key"
+      }
+    },
+    "canonical": "{\"id\":\"AS-o\",\"subjects\":[\"o\"],\"predicates\":[\"p\"],\"contexts\":[],\"actors\":[],\"timestamp\":2,\"source\":\"t\",\"attributes\":{\"\":\"empty key\",\"B\":[],\"a\":{\"x\":{},\"y\":[1,\"two\",null,true,false,{\"K\":\"V\",\"k\":\"v\"}]},\"aa\":null,\"b\":1,\"é\":\"accent\"}}"
+  }
+]

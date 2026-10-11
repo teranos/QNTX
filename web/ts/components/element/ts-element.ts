@@ -20,6 +20,7 @@ import { connectivity } from '../../client';
 import { createElementUI } from './element-ui';
 import { putAttestation, queryAttestations, parseQuery, generateASUID, EVERY_ROW } from '../../ats-wasm';
 import type { Attestation } from '../../ats-wasm';
+import { signAttestation } from '../../laye';
 
 export const TS_DEFAULT_CODE = `// Generate a random attestation — each run creates a unique ASUID
 const subjects = ["alice", "bob", "charlie", "diana", "eve"]
@@ -81,6 +82,12 @@ function buildQntxApi(outputLines: string[]) {
                 signature: '' as unknown as Uint8Array, // base64 string for proto JSON wire format
                 signer_did: '',
             };
+
+            // Signed here, with this browser's key, or not written: the node
+            // verifies it and signs nothing on the browser's behalf.
+            const { signature, signer_did } = await signAttestation(attestation);
+            attestation.signature = signature as unknown as Uint8Array;
+            attestation.signer_did = signer_did;
 
             await putAttestation(attestation);
 

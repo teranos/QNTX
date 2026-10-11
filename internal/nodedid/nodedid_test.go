@@ -72,16 +72,6 @@ func TestIdentityStoreContract(t *testing.T) {
 	assert.Equal(t, h1.PrivateKey, h2.PrivateKey)
 }
 
-func TestDIDKeyEncoding(t *testing.T) {
-	pub, _, err := ed25519.GenerateKey(nil)
-	require.NoError(t, err)
-
-	did := encodeDIDKey(pub)
-	assert.True(t, strings.HasPrefix(did, "did:key:z"))
-	// z + base58btc(2 byte prefix + 32 byte key) should be reasonably long
-	assert.Greater(t, len(did), 40)
-}
-
 func TestDIDDocument(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	h, err := New(db, testLogger())

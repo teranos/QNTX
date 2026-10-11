@@ -176,6 +176,31 @@ export function sign(bytes: Uint8Array): Uint8Array {
     return laye.sign(bytes);
 }
 
+/** An ed25519 signature is 64 bytes; laye answers anything else when it signed nothing. */
+const ED25519_SIGNATURE_BYTES = 64;
+
+/**
+ * What an attestation carries for the node to verify rather than sign on this
+ * browser's behalf: the signature over the bytes the node checks, made with
+ * the key that never leaves this tab, and the did:key naming that key.
+ *
+ * Throws when there is no key to sign with, so nothing is written unsigned.
+ */
+export async function signAttestation(attestation: { id: string }): Promise<{ signature: string; signer_did: string }> {
+    if (!await whenReady()) {
+        throw new Error(`laye did not start, so ${attestation.id} has no key to be signed with`);
+    }
+    const signature = laye.sign_attestation(JSON.stringify(attestation));
+    if (signature.length !== ED25519_SIGNATURE_BYTES) {
+        throw new Error(`laye did not sign ${attestation.id}: ${laye.errors()}`);
+    }
+    let binary = '';
+    for (const b of signature) {
+        binary += String.fromCharCode(b);
+    }
+    return { signature: btoa(binary), signer_did: laye.did() };
+}
+
 /**
  * did:key for an authenticator's PRF output. Derived, never stored — the same
  * biometric gives the same seed and so the same DID. Empty on a seed that is

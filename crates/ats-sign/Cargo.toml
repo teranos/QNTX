@@ -1,0 +1,18 @@
+[package]
+name = "ats-sign"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The bytes an attestation is signed over, and the did:key that names who signed them"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+# float_roundtrip: a number in attributes is read to the float64 Go reads, or
+# the bytes signed in one place are not the bytes verified in the other.
+serde_json = { workspace = true, features = ["float_roundtrip"] }
+bs58 = "=0.5.1"
+thiserror = { workspace = true }

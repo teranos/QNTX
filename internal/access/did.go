@@ -23,7 +23,7 @@ func EncodeDIDKey(pub ed25519.PublicKey) string {
 // DecodeUserDID extracts the ed25519 public key a did:key names.
 func DecodeUserDID(did string) (ed25519.PublicKey, error) {
 	if len(did) < len(didKeyPrefix) || did[:len(didKeyPrefix)] != didKeyPrefix {
-		return nil, errors.Newf("user identity %q is not a did:key", did)
+		return nil, errors.Newf("%q is not a did:key", did)
 	}
 	decoded, err := base58.Decode(did[len(didKeyPrefix):])
 	if err != nil {

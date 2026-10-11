@@ -5,6 +5,7 @@ members = [
     "crates/ats-duckdb",
     "crates/ats-id",
     "crates/ats-indexeddb",
+    "crates/ats-sign",
     "crates/ats-sqlite",
     "crates/ats-wasm",
     "crates/laye-error",

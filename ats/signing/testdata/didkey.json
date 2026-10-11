@@ -1,0 +1,18 @@
+[
+  {
+    "public_key_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+    "did": "did:key:z6MkeTG3bFFSLYVU7VqhgZxqr6YzpaGrQtFMh1uvqGy1vDnP"
+  },
+  {
+    "public_key_hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+    "did": "did:key:z6MkeXCES4onVW4up9Qgz1KRnZsKmGufcaZxF6Zpv2w5QwUK"
+  },
+  {
+    "public_key_hex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "did": "did:key:z6MkwgaR63138bEEgad7uk993KMX54vBA6KTB4sFhCPnSB2e"
+  },
+  {
+    "public_key_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+    "did": "did:key:z6MktwupdmLXVVqTzCw4i46r4uGyosGXRnR3XjN4Zq7oMMsw"
+  }
+]
