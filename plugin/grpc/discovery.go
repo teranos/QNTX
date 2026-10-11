@@ -168,8 +168,9 @@ type running interface {
 	interrupt() error
 	// closeLog closes the plugin's own log file.
 	closeLog() error
-	// logs is the ring of its recent output, for live streaming.
-	logs() *LogBuffer
+	// logs is the ring of its recent output, for live streaming, or why
+	// there is none.
+	logs() (*LogBuffer, error)
 }
 
 // attachedPlugin is a plugin something else runs: QNTX reaches it at its
@@ -180,7 +181,9 @@ func (attachedPlugin) stop() error      { return nil }
 func (attachedPlugin) abandon() error   { return nil }
 func (attachedPlugin) interrupt() error { return nil }
 func (attachedPlugin) closeLog() error  { return nil }
-func (attachedPlugin) logs() *LogBuffer { return nil }
+func (attachedPlugin) logs() (*LogBuffer, error) {
+	return nil, errors.New("QNTX did not launch it, so its output is not kept here")
+}
 
 // launchedPlugin is a plugin process QNTX started, its output kept in its own
 // log file and a ring for live streaming.
@@ -270,7 +273,7 @@ func (p *launchedPlugin) closeLog() error {
 	return errors.Wrapf(p.logFile.Close(), "failed to close the plugin log %s", p.logFile.Name())
 }
 
-func (p *launchedPlugin) logs() *LogBuffer { return p.logBuffer }
+func (p *launchedPlugin) logs() (*LogBuffer, error) { return p.logBuffer, nil }
 
 const (
 	// DefaultPluginBasePort is the starting port for plugin allocation
@@ -1144,16 +1147,21 @@ func (m *PluginManager) GetPlugin(name string) (plugin.DomainPlugin, bool) {
 	return nil, false
 }
 
-// GetLogBuffer returns the log buffer for a managed plugin.
-// Returns nil if the plugin doesn't exist or has no log buffer (e.g., remote plugins).
-func (m *PluginManager) GetLogBuffer(name string) *LogBuffer {
+// GetLogBuffer returns the log buffer of a running plugin, or why it has none:
+// it is not running, or QNTX did not launch it.
+func (m *PluginManager) GetLogBuffer(name string) (*LogBuffer, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if p, ok := m.plugins[name]; ok {
-		return p.proc.logs()
+	p, ok := m.plugins[name]
+	if !ok {
+		return nil, errors.Newf("plugin %s is not running", name)
 	}
-	return nil
+	buf, err := p.proc.logs()
+	if err != nil {
+		return nil, errors.Wrapf(err, "plugin %s at %s has no log buffer", name, p.pluginCfg.Source)
+	}
+	return buf, nil
 }
 
 // GetFailedPlugins returns a map of plugin names to error messages for plugins that failed to load.
