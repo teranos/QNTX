@@ -1,6 +1,6 @@
 # errors and warnings logged and carried on from, per file. Debt: each number may fall and may not rise.
 # Instead: return the error, or say in a value why carrying on is the answer.
-# 315 in 100 files.
+# 314 in 99 files.
 
 6	ats/storage/embedding_store.go
 4	ats/storage/new_store_rust.go
@@ -21,7 +21,6 @@
 1	internal/nodedid/handlers.go
 2	internal/sacred/spawn.go
 1	internal/sqlclose/sqlclose.go
-1	plugin/grpc/services_manager.go
 4	pulse/async/emitter.go
 1	pulse/async/error.go
 10	pulse/async/worker.go
