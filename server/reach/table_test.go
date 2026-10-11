@@ -103,7 +103,7 @@ func TestTheCeremonyIsGrantedToAnyone(t *testing.T) {
 	granted, err := readReaches(reachTable)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/auth/login", "/auth/login/begin", "/auth/laye/verify"} {
+	for _, path := range []string{"/auth/login", "/auth/login/begin", "/auth/laye/verify", "/auth/elsewhere", "/auth/elsewhere/back"} {
 		row, said := granted[path]
 		require.True(t, said, path+" is granted to nobody at all")
 		assert.True(t, row.anyone, path+" asks who is calling before letting them log in")

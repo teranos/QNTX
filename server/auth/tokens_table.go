@@ -151,14 +151,10 @@ func (t *TokenTable) Create(spec NewToken) (string, string, error) {
 		Level:               spec.Level,
 		Namespaces:          spec.Namespaces,
 		ExpiresAt:           spec.ExpiresAt,
+		ReturnAddress:       spec.ReturnAddress,
 	})
 	if err != nil {
 		return "", "", err
-	}
-	if spec.ReturnAddress != "" {
-		if err := t.change(id, func(held *TokenRecord) { held.ReturnAddress = spec.ReturnAddress }); err != nil {
-			return "", "", err
-		}
 	}
 	return raw, id, nil
 }
@@ -178,6 +174,7 @@ func (t *TokenTable) Issue(spec IssuedToken) (string, error) {
 		Level:               string(spec.Level),
 		Namespaces:          spec.Namespaces,
 		ClientDID:           spec.ClientDID,
+		ReturnAddress:       spec.ReturnAddress,
 		RequestID:           spec.RequestID,
 		// The lines say what a token may touch (ADR-034). The two lists stay on
 		// the record so what was written before still reads, and carry nothing.

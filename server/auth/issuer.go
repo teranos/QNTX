@@ -98,22 +98,31 @@ func (h *Handler) issuedElsewhere(raw string) (Grant, bool) {
 	return Grant{}, false
 }
 
-// askIssuer introspects one token at an issuer, signing as this node.
-func (h *Handler) askIssuer(issuer, raw string, now time.Time) (Grant, bool, error) {
+// ownDID is the did:key this node signs as.
+func (h *Handler) ownDID() (string, error) {
 	if len(h.nodeKey) != ed25519.PrivateKeySize {
-		return Grant{}, false, errors.New("this node has no DID key to sign as, so it cannot ask")
+		return "", errors.New("this node has no DID key to sign as, so it cannot ask")
 	}
 	public, ok := h.nodeKey.Public().(ed25519.PublicKey)
 	if !ok {
-		return Grant{}, false, errors.New("this node's DID key has no ed25519 public half")
+		return "", errors.New("this node's DID key has no ed25519 public half")
 	}
-	did := EncodeDIDKey(public)
+	return EncodeDIDKey(public), nil
+}
+
+// asserted is this node's did and an assertion signed as it, made out to an
+// issuer's token endpoint (RFC 7523 §2.2).
+func (h *Handler) asserted(issuer string, now time.Time) (did, signed string, err error) {
+	did, err = h.ownDID()
+	if err != nil {
+		return "", "", err
+	}
 	jti := make([]byte, assertionIDBytes)
 	drawn, err := rand.Read(jti)
 	if err != nil || drawn != assertionIDBytes {
-		return Grant{}, false, errors.New("no assertion id could be drawn")
+		return "", "", errors.New("no assertion id could be drawn")
 	}
-	signed, err := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.RegisteredClaims{
+	signed, err = jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.RegisteredClaims{
 		Issuer:    did,
 		Subject:   did,
 		Audience:  jwt.ClaimStrings{issuer + tokenPath},
@@ -122,7 +131,16 @@ func (h *Handler) askIssuer(issuer, raw string, now time.Time) (Grant, bool, err
 		ID:        hex.EncodeToString(jti),
 	}).SignedString(h.nodeKey)
 	if err != nil {
-		return Grant{}, false, errors.Wrap(err, "the assertion was not signed")
+		return "", "", errors.Wrap(err, "the assertion was not signed")
+	}
+	return did, signed, nil
+}
+
+// askIssuer introspects one token at an issuer, signing as this node.
+func (h *Handler) askIssuer(issuer, raw string, now time.Time) (Grant, bool, error) {
+	did, signed, err := h.asserted(issuer, now)
+	if err != nil {
+		return Grant{}, false, err
 	}
 	form := url.Values{}
 	form.Set("token", raw)

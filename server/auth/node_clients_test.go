@@ -38,9 +38,16 @@ func registered(t *testing.T) (*Handler, *memTokenStore, ed25519.PrivateKey, str
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 	rec := httptest.NewRecorder()
-	registerAt(h, rec, `{"label":"kapteyn","did":"`+did+`","namespace":"ground","expires_at":"never"}`, session)
+	registerAt(h, rec, nodeRegistration("kapteyn", did), session)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	return h, store, key, did
+}
+
+// nodeReturn is where a node is sent back the people it sent to log in.
+const nodeReturn = kapteynOrigin + elsewhereBackPath
+
+func nodeRegistration(label, did string) string {
+	return `{"label":"` + label + `","did":"` + did + `","namespace":"ground","return_address":"` + nodeReturn + `","expires_at":"never"}`
 }
 
 // registerAt is POST /auth/nodes, behind the session gate it is routed behind.
@@ -204,13 +211,17 @@ func TestAnAppClientGetsNoTokenOfItsOwn(t *testing.T) {
 	assert.NotEqual(t, http.StatusOK, w.Code, w.Body.String())
 }
 
-// A node is sent no code, so nobody is sent home on its behalf.
-func TestNobodyIsSentHomeForANode(t *testing.T) {
+// A node is sent the people it sent to log in, and only at its own return address.
+func TestANodeIsSentPeopleBackOnlyWhereItWasRegistered(t *testing.T) {
 	h, _, _, did := registered(t)
 	_, challenge := pkcePair()
 	w := httptest.NewRecorder()
 	h.handleAuthorize(w, authorizeRequest(did, appReturn, challenge))
 	assert.NotEqual(t, http.StatusFound, w.Code, w.Body.String())
+
+	home := httptest.NewRecorder()
+	h.handleAuthorize(home, authorizeRequest(did, nodeReturn, challenge))
+	assert.Equal(t, http.StatusFound, home.Code, home.Body.String())
 }
 
 // What registering a node refuses.
@@ -220,12 +231,15 @@ func TestRegisteringANodeSaysWhatItRefuses(t *testing.T) {
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
+	back := `"return_address":"` + nodeReturn + `",`
 	for name, body := range map[string]string{
-		"not a did:key":    `{"label":"n","did":"did:web:kapteyn.example","namespace":"ground","expires_at":"never"}`,
-		"no did":           `{"label":"n","namespace":"ground","expires_at":"never"}`,
-		"no namespace":     `{"label":"n","did":"` + did + `","expires_at":"never"}`,
-		"no label":         `{"did":"` + did + `","namespace":"ground","expires_at":"never"}`,
-		"no stated expiry": `{"label":"n","did":"` + did + `","namespace":"ground"}`,
+		"not a did:key":       `{"label":"n","did":"did:web:kapteyn.example","namespace":"ground",` + back + `"expires_at":"never"}`,
+		"no did":              `{"label":"n","namespace":"ground",` + back + `"expires_at":"never"}`,
+		"no namespace":        `{"label":"n","did":"` + did + `",` + back + `"expires_at":"never"}`,
+		"no label":            `{"did":"` + did + `","namespace":"ground",` + back + `"expires_at":"never"}`,
+		"no stated expiry":    `{"label":"n","did":"` + did + `","namespace":"ground",` + back[:len(back)-1] + `}`,
+		"no return address":   `{"label":"n","did":"` + did + `","namespace":"ground","expires_at":"never"}`,
+		"a relative return":   `{"label":"n","did":"` + did + `","namespace":"ground","return_address":"/auth/elsewhere/back","expires_at":"never"}`,
 	} {
 		rec := httptest.NewRecorder()
 		registerAt(h, rec, body, session)
@@ -238,7 +252,7 @@ func TestABearerRegistersNoNode(t *testing.T) {
 	h, store, _ := authorizingHandler(t)
 	_, did := otherNode(t)
 	token := mintedIn(t, store, "ingest", "ground")
-	req := httptest.NewRequest(http.MethodPost, nodesPath, strings.NewReader(`{"label":"kapteyn","did":"`+did+`","namespace":"ground","expires_at":"never"}`))
+	req := httptest.NewRequest(http.MethodPost, nodesPath, strings.NewReader(nodeRegistration("kapteyn", did)))
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	h.sessionOnly(h.handleRegisterNode)(rec, req)
@@ -252,7 +266,7 @@ func TestRegisteringANodeHandsBackNoSecret(t *testing.T) {
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 	rec := httptest.NewRecorder()
-	registerAt(h, rec, `{"label":"kapteyn","did":"`+did+`","namespace":"ground","expires_at":"never"}`, session)
+	registerAt(h, rec, nodeRegistration("kapteyn", did), session)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	var answer map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &answer))
@@ -261,6 +275,6 @@ func TestRegisteringANodeHandsBackNoSecret(t *testing.T) {
 	assert.Equal(t, string(LevelNode), answer["level"])
 
 	again := httptest.NewRecorder()
-	registerAt(h, again, `{"label":"kapteyn-again","did":"`+did+`","namespace":"ground","expires_at":"never"}`, session)
+	registerAt(h, again, nodeRegistration("kapteyn-again", did), session)
 	assert.Equal(t, http.StatusConflict, again.Code, again.Body.String())
 }
