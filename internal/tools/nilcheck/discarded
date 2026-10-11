@@ -1,6 +1,6 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 300 in 131 files.
+# 297 in 130 files.
 
 1	ats/attrs/attrs.go
 1	ats/identity/quickdev.go
@@ -122,9 +122,8 @@
 1	server/signa.go
 3	server/staand.go
 4	server/statusline_handler_failures.go
-6	server/statusline_handlers.go
+4	server/statusline_handlers.go
 2	server/statusline_plugin_frames.go
-1	server/statusline_plugin_row.go
 1	server/sub_auth.go
 1	server/sub_canvas.go
 1	server/syscap/parser_qntx.go

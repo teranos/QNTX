@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2710 in 382 files.
+# 2709 in 382 files.
 
 5	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -54,7 +54,7 @@
 1	ats/storage/sqlitecgo/writequeue_cgo.go
 4	ats/storage/subject_warn.go
 15	ats/storage/watcher_store.go
-8	ats/types/attestation.go
+7	ats/types/attestation.go
 6	ats/types/type_definitions.go
 3	ats/types_said.go
 16	ats/wasm/engine.go
@@ -155,6 +155,7 @@
 5	internal/measure/measure.go
 1	internal/named/items.go
 1	internal/named/named.go
+1	internal/named/pointer.go
 1	internal/nodedid/handlers.go
 13	internal/pi/run.go
 6	internal/sacred/error.go
@@ -169,7 +170,6 @@
 6	internal/tools/tagcheck/main.go
 1	internal/util/strings.go
 1	plugin/grpc/services/llm_queue.go
-1	plugin/grpc/services/mail_ses.go
 4	pulse/async/emitter.go
 3	pulse/async/handler.go
 3	pulse/async/job.go
