@@ -15,19 +15,37 @@ import (
 // plugin initializes (same lazy pattern as EmbeddingServer).
 type VectorSearchServer struct {
 	protocol.UnimplementedVectorSearchServiceServer
-	mu         sync.RWMutex
-	service    protocol.VectorSearchServiceClient
-	serviceErr error // the backend not registered yet
-	authToken  string
-	logger     *zap.SugaredLogger
+	mu        sync.RWMutex
+	backing   vectorBacking
+	authToken string
+	logger    *zap.SugaredLogger
 }
+
+// vectorBacking is what serves vector search: a registered backend, or none
+// yet, and why.
+type vectorBacking interface {
+	backsVectorSearch()
+}
+
+// vectorBackend is the registered vector search backend.
+type vectorBackend struct {
+	client protocol.VectorSearchServiceClient
+}
+
+// noVectorBackend is no backend registered yet, and why.
+type noVectorBackend struct {
+	why error
+}
+
+func (vectorBackend) backsVectorSearch()   {}
+func (noVectorBackend) backsVectorSearch() {}
 
 // NewVectorSearchServer creates a new vector search gRPC server.
 func NewVectorSearchServer(authToken string, logger *zap.SugaredLogger) *VectorSearchServer {
 	return &VectorSearchServer{
-		serviceErr: errors.New("vector search service not initialized"),
-		authToken:  authToken,
-		logger:     logger,
+		backing:   noVectorBackend{why: errors.New("vector search service not initialized")},
+		authToken: authToken,
+		logger:    logger,
 	}
 }
 
@@ -35,7 +53,7 @@ func NewVectorSearchServer(authToken string, logger *zap.SugaredLogger) *VectorS
 func (s *VectorSearchServer) SetService(client protocol.VectorSearchServiceClient) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.service, s.serviceErr = client, nil
+	s.backing = vectorBackend{client: client}
 	s.logger.Infow("VectorSearch gRPC service backend registered")
 }
 
@@ -43,14 +61,25 @@ func (s *VectorSearchServer) SetService(client protocol.VectorSearchServiceClien
 func (s *VectorSearchServer) HasProvider() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.serviceErr == nil
+	switch s.backing.(type) {
+	case vectorBackend:
+		return true
+	case noVectorBackend:
+	}
+	return false
 }
 
 // backend is the registered vector search backend, or why there is none yet.
 func (s *VectorSearchServer) backend() (protocol.VectorSearchServiceClient, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.service, s.serviceErr
+	switch backing := s.backing.(type) {
+	case vectorBackend:
+		return backing.client, nil
+	case noVectorBackend:
+		return nil, backing.why
+	}
+	return nil, errors.Newf("vector search names neither a backend nor why it has none: %T", s.backing)
 }
 
 // Search finds the nearest neighbors to a query vector in a named index.

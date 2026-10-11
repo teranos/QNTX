@@ -655,15 +655,23 @@ func githubDecode(raw []byte, resp proto.Message) (bool, error) {
 	return listed, protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(trimmed, resp)
 }
 
-// githubMessage is what GitHub said in a refusal: its message, or the body as
-// it came, quoted, so a body that said nothing reads as "".
+// githubMessage is what GitHub said in a refusal: its message, or, for a body
+// that is not JSON or names no message, the body as it came, quoted, so a body
+// that said nothing reads as "".
 func githubMessage(raw []byte) string {
 	var said map[string]any
-	if err := json.Unmarshal(raw, &said); err == nil {
-		if message, given := said["message"].(string); given {
-			return message
-		}
+	if err := json.Unmarshal(raw, &said); err != nil {
+		return bodyAsItCame(raw)
 	}
+	message, given := said["message"].(string)
+	if !given {
+		return bodyAsItCame(raw)
+	}
+	return message
+}
+
+// bodyAsItCame is a body GitHub sent, quoted, its first 500 bytes.
+func bodyAsItCame(raw []byte) string {
 	text := strings.TrimSpace(string(raw))
 	if len(text) > 500 {
 		text = text[:500]

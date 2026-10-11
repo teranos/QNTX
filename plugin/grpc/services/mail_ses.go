@@ -111,11 +111,10 @@ func (t SESTransport) Account(ctx context.Context) (SESAccount, error) {
 		return SESAccount{}, errors.Wrapf(err, "SES in %s did not say what the account is", region)
 	}
 	// An answer naming no quota is not an account with a quota of 0. The SDK
-	// hands the quota as a pointer, so its absence is asked of the pointer,
-	// once, and refused.
-	quota := out.SendQuota
-	if quota == nil {
-		return SESAccount{}, errors.Newf("SES in %s answered for the account without its sending quota", region)
+	// hands the quota as a pointer, and one at nothing is refused.
+	quota, err := named.Pointed("the sending quota SES in "+region+" answered for the account with", out.SendQuota)
+	if err != nil {
+		return SESAccount{}, err
 	}
 	return SESAccount{
 		Region:            region,

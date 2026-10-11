@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/errors"
 	"go.uber.org/zap"
 )
 
@@ -82,14 +84,10 @@ func (s *FileServiceServer) ReadFileBase64(ctx context.Context, req *protocol.Re
 		}, nil
 	}
 	info, statErr := os.Stat(path)
-	if statErr == nil && info.IsDir() {
-		return &protocol.ReadFileResponse{
-			Success: false,
-			Error:   fmt.Sprintf("file ID %q names a directory, not a stored file", req.FileId),
-		}, nil
-	}
-	if statErr != nil {
-		// Try globbing for id.* (bare UUID without extension)
+	switch {
+	case errors.Is(statErr, fs.ErrNotExist):
+		// A bare UUID, without its extension, names no file itself: id.* is
+		// looked for.
 		// Glob only fails on a malformed pattern, so the ID is malformed —
 		// which is not the same answer as the file being absent.
 		matches, globErr := filepath.Glob(filepath.Join(s.filesDir, fileID+".*"))
@@ -106,6 +104,16 @@ func (s *FileServiceServer) ReadFileBase64(ctx context.Context, req *protocol.Re
 			}, nil
 		}
 		path = matches[0]
+	case statErr != nil:
+		return &protocol.ReadFileResponse{
+			Success: false,
+			Error:   fmt.Sprintf("file ID %q could not be looked at: %v", req.FileId, statErr),
+		}, nil
+	case info.IsDir():
+		return &protocol.ReadFileResponse{
+			Success: false,
+			Error:   fmt.Sprintf("file ID %q names a directory, not a stored file", req.FileId),
+		}, nil
 	}
 
 	data, err := os.ReadFile(path)
