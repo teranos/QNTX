@@ -129,8 +129,9 @@ func names(word string) bool {
 }
 
 // DeclarePeer makes a peer a client of this node, as nodes.peers names it:
-// what it is called here, its did:key, and the origin it answers at.
-func (h *Handler) DeclarePeer(name, did, origin string) error {
+// what it is called here, its did:key, the origin it answers at, and the
+// origin its people's browsers come back to.
+func (h *Handler) DeclarePeer(name, did, origin, returnAddress string) error {
 	name, did = strings.TrimSpace(name), strings.TrimSpace(did)
 	if !names(name) || strings.ContainsAny(name, "/?#") {
 		return errors.Newf("nodes.peers names %s as %q, which is no name a path can carry", did, name)
@@ -142,10 +143,15 @@ func (h *Handler) DeclarePeer(name, did, origin string) error {
 	if len(key) != ed25519.PublicKeySize {
 		return errors.Newf("nodes.peers names %q, whose key is not an ed25519 public key", did)
 	}
-	origin = strings.TrimSuffix(strings.TrimSpace(origin), "/")
-	parsed, err := url.Parse(origin)
-	if err != nil || !parsed.IsAbs() || parsed.Scheme+"://"+parsed.Host != origin || !names(parsed.Scheme) {
-		return errors.Newf("nodes.peers names %s at %q, which is not an origin such as https://node.example.com", did, origin)
+	parsed, err := peerOrigin(did, "origin", origin)
+	if err != nil {
+		return err
+	}
+	// A peer only its own machine opens is reached here over a tunnel, and by
+	// its browser at a loopback host: the one plain http a code may be sent to.
+	returnTo, err := peerOrigin(did, "return_address", returnAddress)
+	if err != nil {
+		return err
 	}
 	if _, held := h.nodes[did]; held {
 		return errors.Newf("nodes.peers names %s twice", did)
@@ -157,7 +163,7 @@ func (h *Handler) DeclarePeer(name, did, origin string) error {
 		DID:           did,
 		Label:         name,
 		Namespace:     NamespaceDefault,
-		ReturnAddress: origin + elsewhereBackPath,
+		ReturnAddress: returnTo.String() + elsewhereBackPath,
 		Origin:        parsed,
 		Node:          true,
 	}}
@@ -166,6 +172,17 @@ func (h *Handler) DeclarePeer(name, did, origin string) error {
 	}
 	h.nodes = peers
 	return nil
+}
+
+// peerOrigin reads one of a peer's origins as nodes.peers wrote it: a scheme
+// and a host, nothing after.
+func peerOrigin(did, field, written string) (*url.URL, error) {
+	origin := strings.TrimSuffix(strings.TrimSpace(written), "/")
+	parsed, err := url.Parse(origin)
+	if err != nil || !parsed.IsAbs() || parsed.Scheme+"://"+parsed.Host != origin || !names(parsed.Scheme) {
+		return nil, errors.Newf("nodes.peers names %s with %s %q, which is not an origin such as https://node.example.com", did, field, written)
+	}
+	return parsed, nil
 }
 
 // peerNamed is the peer nodes.peers calls name, or false.

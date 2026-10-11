@@ -33,7 +33,7 @@ func registered(t *testing.T) (*Handler, *memTokenStore, ed25519.PrivateKey, str
 	t.Helper()
 	h, store, _ := authorizingHandler(t)
 	key, did := otherNode(t)
-	require.NoError(t, h.DeclarePeer(peerName, did, elsewhereOrigin))
+	require.NoError(t, h.DeclarePeer(peerName, did, elsewhereOrigin, elsewhereOrigin))
 	return h, store, key, did
 }
 
@@ -104,7 +104,7 @@ func TestANodeNotDeclaredIsRefused(t *testing.T) {
 func TestNoClientGetsATokenOfItsOwn(t *testing.T) {
 	h, store, appDID := authorizingHandler(t)
 	key, nodeDID := otherNode(t)
-	require.NoError(t, h.DeclarePeer(peerName, nodeDID, elsewhereOrigin))
+	require.NoError(t, h.DeclarePeer(peerName, nodeDID, elsewhereOrigin, elsewhereOrigin))
 
 	app := url.Values{}
 	app.Set("grant_type", "client_credentials")
@@ -140,21 +140,46 @@ func TestANodeIsSentPeopleBackOnlyAtItsOrigin(t *testing.T) {
 	assert.Equal(t, http.StatusFound, home.Code, home.Body.String())
 }
 
+// A peer reached over a tunnel is opened at a loopback host by its own browser,
+// and a code goes to plain http only there (RFC 8252 §8.3).
+func TestAPeerOverATunnelIsSentPeopleBackAtItsReturnAddress(t *testing.T) {
+	h, _, _ := authorizingHandler(t)
+	_, did := otherNode(t)
+	const tunnel, loopback = "http://10.0.0.2:8770", "http://peer.localhost:8770"
+	require.NoError(t, h.DeclarePeer(peerName, did, tunnel, loopback))
+	_, challenge := pkcePair()
+
+	refused := httptest.NewRecorder()
+	h.handleAuthorize(refused, authorizeRequest(did, tunnel+elsewhereBackPath, challenge))
+	assert.NotEqual(t, http.StatusFound, refused.Code, refused.Body.String())
+
+	home := httptest.NewRecorder()
+	h.handleAuthorize(home, authorizeRequest(did, loopback+elsewhereBackPath, challenge))
+	assert.Equal(t, http.StatusFound, home.Code, home.Body.String())
+
+	client, ok := h.clientByDID(did)
+	require.True(t, ok)
+	assert.Equal(t, tunnel, client.Origin.String(), "requests are still carried to the tunnel")
+}
+
 // What nodes.peers refuses, at startup.
 func TestDeclaringAPeerSaysWhatItRefuses(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
 	_, did := otherNode(t)
 	_, other := otherNode(t)
-	assert.Error(t, h.DeclarePeer(peerName, "did:web:node.example", elsewhereOrigin), "not a did:key")
-	assert.Error(t, h.DeclarePeer(peerName, "", elsewhereOrigin), "no did")
-	assert.Error(t, h.DeclarePeer(peerName, did, ""), "no origin")
-	assert.Error(t, h.DeclarePeer(peerName, did, "elsewhere.node.test"), "not an absolute origin")
-	assert.Error(t, h.DeclarePeer(peerName, did, elsewhereOrigin+"/somewhere"), "a path is no origin")
-	assert.Error(t, h.DeclarePeer("", did, elsewhereOrigin), "no name")
-	assert.Error(t, h.DeclarePeer("a/b", did, elsewhereOrigin), "a name a path cannot carry")
-	require.NoError(t, h.DeclarePeer(peerName, did, elsewhereOrigin+"/"))
-	assert.Error(t, h.DeclarePeer("again", did, elsewhereOrigin), "the same peer twice")
-	assert.Error(t, h.DeclarePeer(peerName, other, elsewhereOrigin), "two peers by one name")
+	assert.Error(t, h.DeclarePeer(peerName, "did:web:node.example", elsewhereOrigin, elsewhereOrigin), "not a did:key")
+	assert.Error(t, h.DeclarePeer(peerName, "", elsewhereOrigin, elsewhereOrigin), "no did")
+	assert.Error(t, h.DeclarePeer(peerName, did, "", elsewhereOrigin), "no origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, "elsewhere.node.test", elsewhereOrigin), "not an absolute origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, elsewhereOrigin+"/somewhere", elsewhereOrigin), "a path is no origin")
+	assert.Error(t, h.DeclarePeer("", did, elsewhereOrigin, elsewhereOrigin), "no name")
+	assert.Error(t, h.DeclarePeer("a/b", did, elsewhereOrigin, elsewhereOrigin), "a name a path cannot carry")
+	assert.Error(t, h.DeclarePeer(peerName, did, elsewhereOrigin, ""), "no return address")
+	assert.Error(t, h.DeclarePeer(peerName, did, elsewhereOrigin, "peer.localhost"), "a return address that is not an origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, elsewhereOrigin, "http://peer.localhost/back"), "a return address with a path")
+	require.NoError(t, h.DeclarePeer(peerName, did, elsewhereOrigin+"/", elsewhereOrigin))
+	assert.Error(t, h.DeclarePeer("again", did, elsewhereOrigin, elsewhereOrigin), "the same peer twice")
+	assert.Error(t, h.DeclarePeer(peerName, other, elsewhereOrigin, elsewhereOrigin), "two peers by one name")
 
 	client, ok := h.clientByDID(did)
 	require.True(t, ok)

@@ -88,9 +88,10 @@ type NodesConfig struct {
 
 // PeerConfig is one peer of the primary.
 type PeerConfig struct {
-	Name   string `mapstructure:"name"`   // What it is called here.
-	DID    string `mapstructure:"did"`    // Its did:key, which it signs as.
-	Origin string `mapstructure:"origin"` // Where it answers; its people are sent back to origin + /auth/elsewhere/back.
+	Name          string `mapstructure:"name"`           // What it is called here.
+	DID           string `mapstructure:"did"`            // Its did:key, which it signs as.
+	Origin        string `mapstructure:"origin"`         // Where it answers.
+	ReturnAddress string `mapstructure:"return_address"` // Where its people are sent back to, + /auth/elsewhere/back.
 }
 
 // SentryConfig points the node's logs at a Sentry project.
