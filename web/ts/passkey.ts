@@ -68,6 +68,16 @@ async function refusal(response: Response): Promise<Error> {
     return new Error(detail.error ?? `the node answered ${response.status} ${response.statusText}`);
 }
 
+/** Where the passkey may be made. The node asks for this device's own store;
+ *  a browser that has none reaches a phone instead, which WebAuthn counts as a
+ *  cross-platform authenticator (§6.2), and an absent attachment accepts any
+ *  (§5.4.4). A browser with a store of its own is asked exactly as the node said. */
+export function madeWhere(options: any, ownStore: boolean): any {
+    if (ownStore || !options.publicKey.authenticatorSelection) return options;
+    const { authenticatorAttachment, ...selection } = options.publicKey.authenticatorSelection;
+    return { ...options, publicKey: { ...options.publicKey, authenticatorSelection: selection } };
+}
+
 /** What a finished ceremony answers. `return` is present for a browser that
  *  came from a door: the session is held for that door, and this is where to
  *  take it. */
@@ -99,8 +109,10 @@ export async function enrolPasskey(say: Say): Promise<Finished> {
         );
     }
 
+    const ownStore = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+
     say('Waiting for biometric...');
-    const credential = await navigator.credentials.create(options) as PublicKeyCredential;
+    const credential = await navigator.credentials.create(madeWhere(options, ownStore)) as PublicKeyCredential;
     const attestationResponse = credential.response as AuthenticatorAttestationResponse;
 
     say('Deriving this device’s key...');
