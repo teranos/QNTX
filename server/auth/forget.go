@@ -3,12 +3,10 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/go-webauthn/webauthn/protocol"
-	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 // Walking back out of the door, and taking the device with you.
@@ -57,7 +55,7 @@ func (h *Handler) handleForgetBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ceremonies.Store(ownerUserID, session)
+	h.ceremonies.begin(forgetting(h.presented(r)), session)
 	h.writeJSON(w, http.StatusOK, options)
 }
 
@@ -83,18 +81,9 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionVal, held := h.ceremonies.LoadAndDelete(ownerUserID)
+	session, held := h.ceremonies.finish(forgetting(p))
 	if !held {
 		h.writeError(w, http.StatusBadRequest, "no forget ceremony")
-		return
-	}
-	// Anything else under that key is a wiring mistake. Refusing to forget is a
-	// better answer to it than panicking inside a request.
-	session, isSession := sessionVal.(*webauthn.SessionData)
-	if !isSession {
-		h.logger.Errorw("the ceremony store held something that is not a WebAuthn session",
-			"route", route, "held", fmt.Sprintf("%T", sessionVal))
-		h.writeError(w, http.StatusInternalServerError, "the ceremony store held the wrong type")
 		return
 	}
 

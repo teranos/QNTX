@@ -1,6 +1,6 @@
 # errors and warnings logged and carried on from, per file. Debt: each number may fall and may not rise.
 # Instead: return the error, or say in a value why carrying on is the answer.
-# 314 in 99 files.
+# 313 in 99 files.
 # cmd/qntx/commands/database_sqlite.go: +1, a call into the store that held it past a second is said with its statement; nothing failed to carry on from.
 # From 437: the plugin code returns what it used to log and carry on from.
 
@@ -39,7 +39,7 @@
 1	server/attestation_handlers.go
 1	server/auth/attest.go
 1	server/auth/auth.go
-10	server/auth/forget.go
+9	server/auth/forget.go
 25	server/auth/handlers.go
 2	server/auth/handlers_tokens.go
 1	server/auth/handlers_users.go

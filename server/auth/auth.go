@@ -107,7 +107,7 @@ type Handler struct {
 	// What roles has read, per namespace. The node is the only writer of a
 	// grant, so a write is what drops it.
 	held          heldRoles
-	ceremonies    sync.Map // ownerUserID -> *webauthn.SessionData
+	ceremonies    ceremonies
 	secureCookies bool     // true when auth.rp_origins says a browser reaches this over https
 	refused       refusals // what the status line reports about callers turned away
 	shed          *Shed    // the callers turned away while the node is slow; nil turns nobody away
@@ -157,6 +157,7 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 		RPDisplayName: "QNTX",
 		RPID:          rpID,
 		RPOrigins:     webOrigins(rpOrigins),
+		Timeouts:      ceremonyTimeouts(),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create WebAuthn instance")
@@ -664,6 +665,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 				// written by unauthenticated callers and expire on read, which
 				// is never for anything abandoned.
 				h.layeChallenges.sweep()
+				h.ceremonies.sweep(time.Now())
 				h.bindingFlows.sweep()
 				h.pendingLogins.sweep()
 				h.sweepSignedBindings()
