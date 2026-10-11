@@ -253,6 +253,10 @@ func (s *MailServer) attest(store ats.AttestationStore, node Had[named.Text], su
 	if err != nil {
 		return "", errors.Wrapf(err, "%s of %s is not written", predicate, subject)
 	}
+	stamped, err := s.stamped(source, attrs)
+	if err != nil {
+		return "", errors.Wrapf(err, "%s of %s is not written", predicate, subject)
+	}
 	now := time.Now()
 	if err := store.CreateAttestation(&types.As{
 		ID:         id,
@@ -262,7 +266,7 @@ func (s *MailServer) attest(store ats.AttestationStore, node Had[named.Text], su
 		Actors:     []string{actor.String()},
 		Timestamp:  now,
 		Source:     source,
-		Attributes: s.stamped(source, attrs),
+		Attributes: stamped,
 		CreatedAt:  now,
 	}); err != nil {
 		return "", err
@@ -646,10 +650,17 @@ func templateRef(plugin, name string) string {
 	return plugin + "/" + name
 }
 
-// stamped adds the version of the plugin a record came from.
-func (s *MailServer) stamped(source string, attrs map[string]any) map[string]any {
-	if version, known := (*s.versionResolver.Load())(source); known {
-		attrs["source_version"] = version
+// stamped adds the version of the plugin a record came from. What the node
+// mails in its own name comes from no plugin, and has no plugin version; a
+// source the node runs no plugin by is refused.
+func (s *MailServer) stamped(source string, attrs map[string]any) (map[string]any, error) {
+	if source == NodeSource {
+		return attrs, nil
 	}
-	return attrs
+	version, known := (*s.versionResolver.Load())(source)
+	if !known {
+		return nil, errors.Newf("the node runs no plugin %s, so the registry has no version to stamp its mail with", source)
+	}
+	attrs["source_version"] = version
+	return attrs, nil
 }

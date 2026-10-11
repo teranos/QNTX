@@ -40,6 +40,8 @@ func mailingNode(t *testing.T, transport services.MailTransport) (*QNTXServer, *
 	t.Helper()
 	s := rootKnowingServer(t)
 	mail := services.NewMailServer("token", zap.NewNop().Sugar())
+	// Every plugin these tests mail for runs, at 0.1.0.
+	mail.SetVersionResolver(func(string) (string, bool) { return "0.1.0", true })
 	mail.Wire(services.MailWiring{
 		From:      services.MailFrom("Garden <mail@garden.test>"),
 		Transport: services.Having(transport),
@@ -111,6 +113,7 @@ func TestTheMailWindowListsWhatWasSentAndWhatWasRefused(t *testing.T) {
 	}
 
 	refused := services.NewMailServer("token", zap.NewNop().Sugar())
+	refused.SetVersionResolver(func(string) (string, bool) { return "0.1.0", true })
 	refused.Wire(services.MailWiring{
 		From: services.MailFrom("Garden <mail@garden.test>"), Transport: services.Having[services.MailTransport](refusing{}),
 		Recipients: services.Having[services.MailRecipients](func(id string) (services.MailRecipient, bool, error) {

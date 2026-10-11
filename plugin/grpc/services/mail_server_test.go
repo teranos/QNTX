@@ -55,6 +55,8 @@ func wiredMailBy(t *testing.T, transport Had[MailTransport], users ...MailRecipi
 		held[u.ID] = u
 	}
 	s := NewMailServer(mailToken, zap.NewNop().Sugar())
+	// Every plugin these tests mail for runs, at 0.1.0.
+	s.SetVersionResolver(func(string) (string, bool) { return "0.1.0", true })
 	s.Wire(MailWiring{
 		From:      MailFrom(mailFrom),
 		Transport: transport,

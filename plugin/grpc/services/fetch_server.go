@@ -210,14 +210,13 @@ func (s *FetchServer) SetPluginStores(plugins PluginStores) {
 // shared token, the namespace a plugin stands in for that plugin's own token
 // (ADR-046), and none for anything else.
 func (s *FetchServer) storeFor(token string) (ats.AttestationStore, error) {
-	err := ValidateToken(token, s.authToken)
-	if err == nil {
+	if sameToken(token, s.authToken) {
 		return s.store, nil
 	}
 	if store, standing := (*s.plugins.Load())(token); standing {
 		return store, nil
 	}
-	return nil, err
+	return nil, errors.New("invalid authentication token")
 }
 
 // NewFetchServer takes the fetch config as said: its defaults are am.toml's
@@ -566,9 +565,13 @@ func (s *FetchServer) attestFetchResult(ctx context.Context, store ats.Attestati
 		"response":    string(body),
 		"status_code": statusCode,
 	}
-	if version, known := s.versionResolver(as.source.String()); known {
-		attrs["source_version"] = version
+	// A fetch is stamped with the version of the plugin that made it. A source
+	// the node runs no plugin by has no version to stamp, and is refused.
+	version, known := s.versionResolver(as.source.String())
+	if !known {
+		return "", errors.Newf("%s was fetched for %s, and the node runs no plugin %s, so the registry has no version to stamp it with", as.url, as.source, as.source)
 	}
+	attrs["source_version"] = version
 
 	cmd := &types.AsCommand{
 		Subjects:   as.subjects.All(),
