@@ -63,7 +63,7 @@ func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, r *ht
 		TokenEndpoint:                              issuer + tokenPath,
 		IntrospectionEndpoint:                      issuer + introspectPath,
 		ResponseTypesSupported:                     []string{"code"},
-		GrantTypesSupported:                        []string{"authorization_code", "refresh_token", grantClientCredentials},
+		GrantTypesSupported:                        []string{"authorization_code", "refresh_token"},
 		TokenEndpointAuthMethodsSupported:          []string{"client_secret_basic", "client_secret_post", "private_key_jwt"},
 		CodeChallengeMethodsSupported:              []string{"S256"},
 		TokenEndpointAuthSigningAlgValuesSupported: []string{jwt.SigningMethodEdDSA.Alg()},

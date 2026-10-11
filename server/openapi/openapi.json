@@ -737,11 +737,6 @@
         "ANYONE"
       ]
     },
-    "/auth/nodes": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
     "/auth/register/begin": {
       "x-qntx-reach": [
         "ANYONE"
@@ -873,6 +868,12 @@
         "ROOT",
         "SUPER",
         "TOKEN"
+      ],
+      "x-qntx-prefix": true
+    },
+    "/n/": {
+      "x-qntx-reach": [
+        "ANYONE"
       ],
       "x-qntx-prefix": true
     },
