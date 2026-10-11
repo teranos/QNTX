@@ -9,7 +9,6 @@ import (
 
 	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/internal/slug"
-	"github.com/teranos/errors"
 )
 
 type (
@@ -156,19 +155,41 @@ func (a Admission) Roles() []string {
 // ATTESTOR token, or somebody who walked up to a door. ROOT, SUPER and a
 // SUPER token stand above the lines and are narrowed by nothing.
 func (a Admission) belowTheLadder() bool {
-	if token, err := a.Token(); err == nil {
-		return token.Scoped()
+	switch asker := a.Asker().(type) {
+	case TokenAsked:
+		return asker.Grant.Scoped()
+	case NoTokenAsked:
+		return reachesNothingAlone(a.level)
 	}
-	return reachesNothingAlone(a.level)
+	// Asker is TokenAsked or NoTokenAsked, and nothing else; were it another,
+	// it is decided by lines rather than standing above them.
+	return true
 }
 
-// Token is the token that made the request, or why none did: a session and a
-// connector admitted as the person carry none.
-func (a Admission) Token() (Grant, error) {
+// Asker is what made the request: a token, or no token, which is a session
+// or a connector admitted as the person it speaks for.
+type Asker interface {
+	askedTheRequest()
+}
+
+// TokenAsked is a request a token made.
+type TokenAsked struct {
+	Grant Grant
+}
+
+// NoTokenAsked is a request no token made: a session, or a connector admitted
+// as the person it speaks for.
+type NoTokenAsked struct{}
+
+func (TokenAsked) askedTheRequest()   {}
+func (NoTokenAsked) askedTheRequest() {}
+
+// Asker is what made this request. Grant is present only when a token did.
+func (a Admission) Asker() Asker {
 	if a.Grant == nil {
-		return Grant{}, errors.Newf("no token made this request: %s was admitted by a session or as the person a connector speaks for", a.Identity)
+		return NoTokenAsked{}
 	}
-	return *a.Grant, nil
+	return TokenAsked{Grant: *a.Grant}
 }
 
 // MayRead reports whether this admission may read attestations with a
@@ -215,11 +236,13 @@ func (a Admission) OwnOnly() bool {
 // admission that signs nothing, which is ROOT and everyone above the ladder
 // writing without a role.
 func (a Admission) ActsAs() string {
-	if token, err := a.Token(); err == nil {
-		return token.DID
-	}
-	if len(a.roles) > 0 {
-		return a.Identity
+	switch asker := a.Asker().(type) {
+	case TokenAsked:
+		return asker.Grant.DID
+	case NoTokenAsked:
+		if len(a.roles) > 0 {
+			return a.Identity
+		}
 	}
 	return ""
 }

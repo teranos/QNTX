@@ -345,8 +345,10 @@ func askerFrom(ctx context.Context) []*protocol.HTTPHeader {
 	add("X-Qntx-Asker-Level", admitted.LevelName())
 	// A token that asked is named; a connector's is the one it presented.
 	did, label := admitted.TokenDID, admitted.TokenLabel
-	if token, err := admitted.Token(); err == nil {
-		did, label = token.DID, token.Label
+	switch asker := admitted.Asker().(type) {
+	case admission.TokenAsked:
+		did, label = asker.Grant.DID, asker.Grant.Label
+	case admission.NoTokenAsked:
 	}
 	add("X-Qntx-Asker-Did", did)
 	add("X-Qntx-Asker-Label", label)

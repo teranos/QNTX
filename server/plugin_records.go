@@ -12,6 +12,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/named"
@@ -42,8 +43,10 @@ func actorOf(ctx context.Context) string {
 	if !gated {
 		return pluginSource
 	}
-	if token, err := admitted.Token(); err == nil {
-		return token.DID
+	switch asker := admitted.Asker().(type) {
+	case admission.TokenAsked:
+		return asker.Grant.DID
+	case admission.NoTokenAsked:
 	}
 	return admitted.Identity
 }
