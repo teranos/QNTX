@@ -48,7 +48,7 @@ func (h *Handler) handleForgetBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	options, session, err := arrived.rp.BeginLogin(&ownerUser{credentials: creds})
+	options, session, err := arrived.rp.BeginLogin(&passkeyUser{credentials: creds})
 	if err != nil {
 		h.logger.Errorw("WebAuthn BeginLogin failed for a forget", "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the ceremony was not started: "+err.Error())
@@ -125,7 +125,7 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	credential, err := arrived.rp.ValidateLogin(&ownerUser{credentials: creds}, *session, parsed)
+	credential, err := h.validateAssertion(arrived.rp, *session, parsed, creds)
 	if err != nil {
 		h.logger.Errorw("the forget assertion did not validate", "error", err)
 		h.writeError(w, http.StatusUnauthorized, "the assertion did not validate")

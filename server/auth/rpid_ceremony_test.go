@@ -42,6 +42,7 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 
 	db := qntxtest.CreateTestDB(t)
 	passthroughCors := func(h http.HandlerFunc) http.HandlerFunc { return h }
+	tim := User{ID: "US-TIM", Level: LevelRoot, Accounts: []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}}}
 
 	h, err := New(
 		db,
@@ -53,7 +54,7 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 		testLogger(),
 		passthroughCors,
 		nil,                       // token store not exercised by RPID ceremony tests
-		&memUsers{},               // User store - admission is not reached by these tests
+		&memUsers{held: []User{tim}}, // the User the passkey is made for
 		false,                     // secureCookies — cookie flag not exercised here
 		[]string{mastodonAccount}, // rootIdentities — enrolment is admitted or it does not happen
 		nil,                       // bindingSigners
@@ -156,8 +157,9 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 	// ceremony needs one to speak for: a key route, held by its User.
 	route := EncodeDIDKey(ownerPub)
 	h.SetIdentities([]string{route}, nil)
-	h.users = &memUsers{held: []User{{ID: "US-TIM", Level: LevelRoot, Keys: []UserKey{{DID: route, Origin: OriginBrowser}}}}}
-	sessionToken, err := h.sessions.create(route, User{ID: "US-TIM"})
+	tim.Keys = []UserKey{{DID: route, Origin: OriginBrowser}}
+	h.users = &memUsers{held: []User{tim}}
+	sessionToken, err := h.sessions.create(route, tim)
 	require.NoError(t, err)
 
 	// --- POST /auth/register/finish ---
@@ -170,4 +172,10 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, finishRec.Code,
 		"server-side WebAuthn verification rejected the ceremony; body=%s", finishRec.Body.String())
+
+	// The passkey is made under its User's id, which the authenticator keys it by (§5.4.3).
+	handle, held, err := h.creds.userHandleOf(credentialID)
+	require.NoError(t, err)
+	require.True(t, held)
+	require.Equal(t, "US-TIM", handle)
 }

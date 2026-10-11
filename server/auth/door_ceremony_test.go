@@ -58,6 +58,7 @@ func rpOffered(t *testing.T, body []byte) string {
 // Running it against the node's own would hand the browser an rp id it refuses.
 func TestARegistrationRunsAgainstTheDoorItArrivedAt(t *testing.T) {
 	h := handlerWithDoors(t, garden())
+	h.users = &memUsers{held: []User{{ID: "US-ONE", Level: LevelRoot, Accounts: []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}}}}}
 
 	atVak := ceremonyAt(t, h, "/auth/register/begin", "https://portal.garden.test")
 	require.Equal(t, http.StatusOK, atVak.Code, atVak.Body.String())
@@ -73,7 +74,7 @@ func TestARegistrationRunsAgainstTheDoorItArrivedAt(t *testing.T) {
 // somewhere else.
 func TestALoginSeesOnlyItsOwnDoorsCredentials(t *testing.T) {
 	h := handlerWithDoors(t, garden())
-	require.NoError(t, h.creds.saveAt(credential("at-default"), "did:key:zone", mastodonAccount, NamespaceDefault))
+	require.NoError(t, h.creds.saveAt(credential("at-default"), "did:key:zone", mastodonAccount, NamespaceDefault, legacyUserHandle))
 
 	atOwn := ceremonyAt(t, h, "/auth/login/begin", "https://q.sbvh.nl")
 	assert.Equal(t, http.StatusOK, atOwn.Code, atOwn.Body.String())
@@ -107,8 +108,8 @@ func credentialsOffered(t *testing.T, body []byte) []string {
 // alone. Somebody else's device sits at the same door and is not offered.
 func TestALoginIsOfferedTheAdmittedIdentitysDevices(t *testing.T) {
 	h := handlerWithDoors(t, garden())
-	require.NoError(t, h.creds.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, NamespaceDefault))
-	require.NoError(t, h.creds.saveAt(credential("phone"), "did:key:zphone", "apple:001750", NamespaceDefault))
+	require.NoError(t, h.creds.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, NamespaceDefault, legacyUserHandle))
+	require.NoError(t, h.creds.saveAt(credential("phone"), "did:key:zphone", "apple:001750", NamespaceDefault, legacyUserHandle))
 
 	offered := ceremonyAt(t, h, "/auth/login/begin", "https://q.sbvh.nl")
 	require.Equal(t, http.StatusOK, offered.Code, offered.Body.String())
@@ -128,9 +129,9 @@ func TestALoginIsOfferedEveryDeviceOfTheUser(t *testing.T) {
 		{Provider: "mastodon", CanonicalID: mastodonAccount},
 		{Provider: "apple", CanonicalID: "apple:001750"},
 	}}}}
-	require.NoError(t, h.creds.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, NamespaceDefault))
-	require.NoError(t, h.creds.saveAt(credential("phone"), "did:key:zphone", "apple:001750", NamespaceDefault))
-	require.NoError(t, h.creds.saveAt(credential("stranger"), "did:key:zother", "google:stranger", NamespaceDefault))
+	require.NoError(t, h.creds.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, NamespaceDefault, legacyUserHandle))
+	require.NoError(t, h.creds.saveAt(credential("phone"), "did:key:zphone", "apple:001750", NamespaceDefault, legacyUserHandle))
+	require.NoError(t, h.creds.saveAt(credential("stranger"), "did:key:zother", "google:stranger", NamespaceDefault, legacyUserHandle))
 
 	offered := ceremonyAt(t, h, "/auth/login/begin", "https://q.sbvh.nl")
 	require.Equal(t, http.StatusOK, offered.Code, offered.Body.String())
@@ -145,10 +146,48 @@ func TestALoginIsOfferedEveryDeviceOfTheUser(t *testing.T) {
 	assert.True(t, held)
 }
 
+// A passkey is made for the User enrolling, under their own id and name
+// (§5.4.3), and an authenticator already holding one of theirs makes no
+// second (§5.4 excludeCredentials). A stranger's passkey is not named.
+func TestARegistrationIsForItsUserAndExcludesTheirPasskeys(t *testing.T) {
+	h := handlerWithDoors(t, garden())
+	h.users = &memUsers{held: []User{{ID: "US-ONE", Level: LevelRoot, EmailAddresses: []string{"one@example.test"},
+		Accounts: []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}}}}}
+	require.NoError(t, h.creds.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, "garden", "US-ONE"))
+	require.NoError(t, h.creds.saveAt(credential("stranger"), "did:key:zother", "google:stranger", "garden", "US-TWO"))
+
+	begun := ceremonyAt(t, h, "/auth/register/begin", "https://portal.garden.test")
+	require.Equal(t, http.StatusOK, begun.Code, begun.Body.String())
+	var options struct {
+		PublicKey struct {
+			User struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			} `json:"user"`
+			ExcludeCredentials []struct {
+				ID string `json:"id"`
+			} `json:"excludeCredentials"`
+		} `json:"publicKey"`
+	}
+	require.NoError(t, json.Unmarshal(begun.Body.Bytes(), &options))
+	assert.Equal(t, base64.RawURLEncoding.EncodeToString([]byte("US-ONE")), options.PublicKey.User.ID)
+	assert.Equal(t, "one@example.test", options.PublicKey.User.Name)
+	require.Len(t, options.PublicKey.ExcludeCredentials, 1)
+	assert.Equal(t, base64.RawURLEncoding.EncodeToString([]byte("laptop")), options.PublicKey.ExcludeCredentials[0].ID)
+}
+
+// A route no User holds has nobody to make a passkey for.
+func TestARegistrationForARouteNoUserHoldsIsRefused(t *testing.T) {
+	h := handlerWithDoors(t, garden())
+	h.users = &memUsers{}
+	refused := ceremonyAt(t, h, "/auth/register/begin", "https://portal.garden.test")
+	assert.Equal(t, http.StatusForbidden, refused.Code, refused.Body.String())
+}
+
 // An origin no door claims reaches no ceremony, and is told nothing about why.
 func TestACeremonyFromAnUnclaimedOriginIsRefused(t *testing.T) {
 	h := handlerWithDoors(t, garden())
-	require.NoError(t, h.creds.saveAt(credential("at-default"), "did:key:zone", mastodonAccount, NamespaceDefault))
+	require.NoError(t, h.creds.saveAt(credential("at-default"), "did:key:zone", mastodonAccount, NamespaceDefault, legacyUserHandle))
 
 	for _, path := range []string{"/auth/register/begin", "/auth/login/begin"} {
 		refused := ceremonyAt(t, h, path, "https://somewhere.else.example")

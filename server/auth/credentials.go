@@ -27,20 +27,21 @@ func keyOf(credID []byte) string {
 }
 
 // save enrols a credential at the node's own door, which is the one onto
-// default. Reach for saveAt when the door is known.
+// default, under the handle every passkey made before per-User handles carries.
 func (s *credentialStore) save(cred webauthn.Credential, ownerDID, admittedAs string) error {
-	return s.saveAt(cred, ownerDID, admittedAs, NamespaceDefault)
+	return s.saveAt(cred, ownerDID, admittedAs, NamespaceDefault, legacyUserHandle)
 }
 
-// saveAt enrols a credential at one door. The door is where the key was made,
-// and a key made at one door is refused by every browser at any other.
-func (s *credentialStore) saveAt(cred webauthn.Credential, ownerDID, admittedAs, door string) error {
+// saveAt enrols a credential at one door, under the user handle it was made
+// for. The door is where the key was made, and a key made at one door is
+// refused by every browser at any other.
+func (s *credentialStore) saveAt(cred webauthn.Credential, ownerDID, admittedAs, door, userHandle string) error {
 	id := keyOf(cred.ID)
 	_, err := s.db.Exec(
-		`INSERT INTO webauthn_credentials (id, credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state, owner_did, admitted_as, door)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO webauthn_credentials (id, credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state, owner_did, admitted_as, door, user_handle)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, cred.ID, cred.PublicKey, cred.AttestationType, cred.Authenticator.AAGUID, cred.Authenticator.SignCount,
-		cred.Flags.BackupEligible, cred.Flags.BackupState, ownerDID, admittedAs, door,
+		cred.Flags.BackupEligible, cred.Flags.BackupState, ownerDID, admittedAs, door, userHandle,
 	)
 	if err != nil {
 		return errors.Wrapf(err, "failed to save credential %s for %s at door %q (admitted as %q)", id, ownerDID, door, admittedAs)
@@ -106,6 +107,21 @@ func (s *credentialStore) doorOf(credID []byte) (string, error) {
 		return "", errors.Wrapf(err, "failed to read the door credential %s was made at", id)
 	}
 	return door, nil
+}
+
+// userHandleOf returns the user handle a credential was made under, and false
+// when the node holds no such key.
+func (s *credentialStore) userHandleOf(credID []byte) (string, bool, error) {
+	id := keyOf(credID)
+	var handle string
+	err := s.db.QueryRow(`SELECT user_handle FROM webauthn_credentials WHERE id = ?`, id).Scan(&handle)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, errors.Wrapf(err, "failed to read the user handle credential %s was made under", id)
+	}
+	return handle, true, nil
 }
 
 // admittedAs returns the identity whose session enrolled this credential — the
