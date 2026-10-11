@@ -218,7 +218,6 @@ qntx am show
 |----------|-------------|---------|---------|
 | Linux | amd64 | GitHub Releases, Nix, Docker, Source | ✅ |
 | Linux | arm64 | GitHub Releases, Nix, Docker, Source | ✅ |
-| macOS | Intel (x64) | Nix, Source | ✅ |
 | macOS | Apple Silicon (ARM) | GitHub Releases, Nix, Source | ✅ |
 
 This is the node. The app is [QNTX-App](https://github.com/teranos/QNTX-App).

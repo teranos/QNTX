@@ -13,7 +13,7 @@ Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
   https://github.com/teranos/QNTX/releases/download/branch-<name>-latest/qntx-<name>-linux-<arch>.tar.gz
   ```
   For deployments that want the tip of a branch (e.g. a staging host tracking `main`) without waiting for a tag.
-- macOS CLI tarballs on tagged releases: `qntx-{version}-darwin-arm64.tar.gz`, built on a `macos-14` runner. No Intel build: no runner ever took a `macos-13` job. QNTX-App consumes these.
+- macOS CLI tarballs on tagged releases: `qntx-{version}-darwin-arm64.tar.gz`, built on a `macos-14` runner. QNTX-App consumes these.
 - The web bundle, built by `.github/workflows/deploy-web.yml` and called by whoever is deploying it.
 
 Branch and tag tarballs have the same shape. Linux only, because Linux is what gets deployed.

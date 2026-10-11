@@ -234,8 +234,6 @@ in
       needs = "create-release";
       "if" = "always()"; # Run even if create-release is skipped
       permissions.contents = "write";
-      # No amd64: no runner ever took a macos-13 job, and it held every release
-      # queued for 24h.
       strategy.matrix.include = [
         {
           arch = "arm64";
