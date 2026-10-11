@@ -62,15 +62,15 @@ mod tests {
     /// seed, same bytes, same signature (ats/signing/testdata).
     #[test]
     fn signs_as_the_node_signs() {
-        let vectors: Vec<Vector> = serde_json::from_str(include_str!(
-            "../../../ats/signing/testdata/canonical.json"
-        ))
-        .unwrap();
+        let vectors: Vec<Vector> =
+            serde_json::from_str(include_str!("../../../ats/signing/testdata/canonical.json"))
+                .unwrap();
         let fixture: Signatures = serde_json::from_str(include_str!(
             "../../../ats/signing/testdata/signatures.json"
         ))
         .unwrap();
-        let keypair = Keypair::from(crate::didkey::keypair_from_seed(&bytes(&fixture.seed_hex)).unwrap());
+        let keypair =
+            Keypair::from(crate::didkey::keypair_from_seed(&bytes(&fixture.seed_hex)).unwrap());
 
         for v in vectors {
             let want = fixture

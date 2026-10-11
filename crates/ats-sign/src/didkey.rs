@@ -25,9 +25,11 @@ pub fn encode(public_key: &[u8; 32]) -> String {
 
 /// The ed25519 public key a did:key names.
 pub fn decode(did: &str) -> Result<[u8; 32], DidKeyError> {
-    let body = did.strip_prefix(PREFIX).ok_or_else(|| DidKeyError::NotDidKey {
-        did: did.to_string(),
-    })?;
+    let body = did
+        .strip_prefix(PREFIX)
+        .ok_or_else(|| DidKeyError::NotDidKey {
+            did: did.to_string(),
+        })?;
     let bytes = bs58::decode(body)
         .into_vec()
         .map_err(|e| DidKeyError::NotBase58 {
@@ -110,10 +112,10 @@ mod tests {
             decode("did:key:z1"),
             Err(DidKeyError::Length { .. })
         ));
-        let secp = format!("did:key:z{}", bs58::encode([0xe7, 0x01, 1, 2]).into_string());
-        assert!(matches!(
-            decode(&secp),
-            Err(DidKeyError::NotEd25519 { .. })
-        ));
+        let secp = format!(
+            "did:key:z{}",
+            bs58::encode([0xe7, 0x01, 1, 2]).into_string()
+        );
+        assert!(matches!(decode(&secp), Err(DidKeyError::NotEd25519 { .. })));
     }
 }

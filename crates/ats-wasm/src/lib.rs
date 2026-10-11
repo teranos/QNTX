@@ -538,10 +538,9 @@ mod wazero {
 
         #[test]
         fn canonical_attestation_writes_what_go_wrote() {
-            let vectors: Vec<serde_json::Value> = serde_json::from_str(include_str!(
-                "../../../ats/signing/testdata/canonical.json"
-            ))
-            .unwrap();
+            let vectors: Vec<serde_json::Value> =
+                serde_json::from_str(include_str!("../../../ats/signing/testdata/canonical.json"))
+                    .unwrap();
             for v in vectors {
                 let result = canonical_attestation_impl(&v["wire"].to_string());
                 let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();

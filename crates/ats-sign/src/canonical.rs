@@ -104,7 +104,9 @@ impl Signable {
 fn as_go_reads(value: Value) -> Result<Value, CanonicalError> {
     Ok(match value {
         Value::Number(n) => {
-            let what = || CanonicalError::NotAFloat64 { what: n.to_string() };
+            let what = || CanonicalError::NotAFloat64 {
+                what: n.to_string(),
+            };
             let f = n.as_f64().ok_or_else(what)?;
             Value::Number(Number::from_f64(f).ok_or_else(what)?)
         }
@@ -179,10 +181,7 @@ mod tests {
     }
 
     fn vectors() -> Vec<Vector> {
-        serde_json::from_str(include_str!(
-            "../../../ats/signing/testdata/canonical.json"
-        ))
-        .unwrap()
+        serde_json::from_str(include_str!("../../../ats/signing/testdata/canonical.json")).unwrap()
     }
 
     #[test]
