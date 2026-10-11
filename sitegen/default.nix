@@ -52,7 +52,6 @@ let
   downloads = [
     { platform = "Linux x86_64"; asset = "qntx-linux-amd64.tar.gz"; }
     { platform = "Linux ARM64"; asset = "qntx-linux-arm64.tar.gz"; }
-    { platform = "macOS Intel"; asset = "qntx-darwin-amd64.tar.gz"; }
     { platform = "macOS Apple Silicon"; asset = "qntx-darwin-arm64.tar.gz"; }
     { platform = "Windows x86_64"; asset = "qntx-windows-amd64.zip"; }
   ];
