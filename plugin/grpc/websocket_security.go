@@ -151,8 +151,34 @@ var localhostNames = []string{"localhost", "ip6-localhost", "ip6-loopback"}
 // isLocalhost checks if the given host is a localhost address: an IP in the
 // loopback range, or one of localhostNames.
 func isLocalhost(host string) bool {
-	if ip, err := netip.ParseAddr(host); err == nil {
-		return ip.IsLoopback()
+	return hostOf(host).local()
+}
+
+// hostSaid is what a host is: an IP, or a name, which does not read as one.
+type hostSaid interface {
+	// local is whether the host is this machine.
+	local() bool
+}
+
+// ipHost is a host that is an IP.
+type ipHost struct {
+	ip netip.Addr
+}
+
+// namedHost is a host that is a name, and why it is not an IP.
+type namedHost struct {
+	name  string
+	notIP error
+}
+
+func (h ipHost) local() bool    { return h.ip.IsLoopback() }
+func (h namedHost) local() bool { return slices.Contains(localhostNames, h.name) }
+
+// hostOf is what a host is.
+func hostOf(host string) hostSaid {
+	ip, err := netip.ParseAddr(host)
+	if err != nil {
+		return namedHost{name: host, notIP: err}
 	}
-	return slices.Contains(localhostNames, host)
+	return ipHost{ip: ip}
 }

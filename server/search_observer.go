@@ -79,8 +79,12 @@ func (o *SearchIndexObserver) ensureIndex(router *services.SearchServer) {
 
 // OnAttestationCreated indexes the attestation into MeiliSearch if it has rich text.
 func (o *SearchIndexObserver) OnAttestationCreated(as *types.As) {
+	if !o.servicesManager.SearchProvides() {
+		return
+	}
 	router, err := o.servicesManager.GetSearchRouter()
-	if err != nil || !router.HasProvider() {
+	if err != nil {
+		o.logger.Errorw("A search provider answers and the search router is not reached; the attestation is not indexed", "attestation", as.ID, "error", err)
 		return
 	}
 

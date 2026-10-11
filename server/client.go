@@ -451,7 +451,7 @@ func (c *Client) handleRichSearch(query string) {
 	searchStrategy := "substring"
 	meiliAnswered := false
 
-	if router, err := c.server.servicesManager.GetSearchRouter(); err == nil && router.HasProvider() {
+	if c.server.servicesManager.SearchProvides() {
 		meiliMatches, err := c.searchMeili(ctx, query, 50)
 		if err != nil {
 			c.server.logger.Warnw("MeiliSearch failed, falling back to substring",

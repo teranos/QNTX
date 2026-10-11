@@ -87,7 +87,7 @@ type PromptExecuteResponse struct {
 // forwardToProviderPlugin re-encodes the request and forwards it to the named plugin's
 // prompt handler. Returns true if forwarded, false if the provider is local or unknown.
 func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Request, providerName string, body any, endpoint string) bool {
-	if router, err := s.servicesManager.GetLLMRouter(); err == nil && router.HasProvider(providerName) {
+	if s.servicesManager.LLMProvides(providerName) {
 		return false
 	}
 	if !s.pluginRegistry.IsReady(providerName) {

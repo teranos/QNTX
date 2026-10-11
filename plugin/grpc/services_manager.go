@@ -94,9 +94,26 @@ func (m *ServicesManager) degrade(service string, err error) ServiceEndpoint {
 
 // routing is a router providers register with once their plugin is up, or why
 // the node runs without it.
-type routing[R any] struct {
+type routing[R any] interface {
+	// routes is the router, or why the node runs without it.
+	routes() (R, error)
+}
+
+// routed is the router the node runs.
+type routed[R any] struct {
 	router R
-	why    error
+}
+
+// unrouted is a node running without the router, and why.
+type unrouted[R any] struct {
+	why error
+}
+
+func (r routed[R]) routes() (R, error) { return r.router, nil }
+
+func (u unrouted[R]) routes() (R, error) {
+	var none R
+	return none, u.why
 }
 
 // NewServicesManager creates a new services manager. node is the node's DID.
@@ -108,8 +125,8 @@ func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, no
 		fetchCfg:  fetchCfg,
 		node:      node,
 		logger:    logger,
-		llm:       routing[*services.LLMServer]{why: errors.New("the LLM service has not started")},
-		search:    routing[*services.SearchServer]{why: errors.New("the search service has not started")},
+		llm:       unrouted[*services.LLMServer]{why: errors.New("the LLM service has not started")},
+		search:    unrouted[*services.SearchServer]{why: errors.New("the search service has not started")},
 	}
 	notYet := OpenRun(func(_, namespace string) (string, func(), error) {
 		return "", nil, errors.Newf("the node has not handed over how to mint a store token for namespace %s yet", namespace)
@@ -178,7 +195,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	m.endpoints.LLM = m.startOptional("llm", func() (string, error) {
 		addr, err := m.startLLMService(ctx, store)
 		if err != nil {
-			m.llm.why = errors.Wrap(err, "the LLM service did not start")
+			m.llm = unrouted[*services.LLMServer]{why: errors.Wrap(err, "the LLM service did not start")}
 		}
 		return addr, err
 	})
@@ -202,7 +219,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	m.endpoints.Search = m.startOptional("search", func() (string, error) {
 		addr, err := m.startSearchService(ctx)
 		if err != nil {
-			m.search.why = errors.Wrap(err, "the search service did not start")
+			m.search = unrouted[*services.SearchServer]{why: errors.Wrap(err, "the search service did not start")}
 		}
 		return addr, err
 	})
@@ -352,7 +369,7 @@ func (m *ServicesManager) startLLMService(ctx context.Context, store ats.Attesta
 	}
 
 	router := services.NewLLMServer(m.llmConfig, store, m.logger)
-	m.llm = routing[*services.LLMServer]{router: router}
+	m.llm = routed[*services.LLMServer]{router: router}
 	m.llmServer = grpc.NewServer()
 	protocol.RegisterLLMServiceServer(m.llmServer, router)
 
@@ -432,7 +449,7 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 	}
 
 	router := services.NewSearchServer(m.logger)
-	m.search = routing[*services.SearchServer]{router: router}
+	m.search = routed[*services.SearchServer]{router: router}
 	m.searchServer = grpc.NewServer()
 	protocol.RegisterSearchServiceServer(m.searchServer, router)
 
@@ -537,7 +554,44 @@ func (m *ServicesManager) OpenRunFor(userID, namespace string) (string, func(), 
 // GetSearchRouter returns the search router for provider registration, or
 // why the node runs without one.
 func (m *ServicesManager) GetSearchRouter() (*services.SearchServer, error) {
-	return m.search.router, m.search.why
+	return m.search.routes()
+}
+
+// SearchProvides is whether search is answered: the node runs its search
+// router, and a provider registered with it.
+func (m *ServicesManager) SearchProvides() bool {
+	switch search := m.search.(type) {
+	case routed[*services.SearchServer]:
+		return search.router.HasProvider()
+	case unrouted[*services.SearchServer]:
+	}
+	return false
+}
+
+// LLMProvides is whether the provider by this name answers through the
+// node's LLM router: the node runs it, and the provider registered with it.
+func (m *ServicesManager) LLMProvides(providerName string) bool {
+	switch llm := m.llm.(type) {
+	case routed[*services.LLMServer]:
+		return llm.router.HasProvider(providerName)
+	case unrouted[*services.LLMServer]:
+	}
+	return false
+}
+
+// ClearProviders forgets every search and LLM provider, so nothing routes to
+// a plugin being stopped. A router the node runs without holds none.
+func (m *ServicesManager) ClearProviders() {
+	switch search := m.search.(type) {
+	case routed[*services.SearchServer]:
+		search.router.ClearProviders()
+	case unrouted[*services.SearchServer]:
+	}
+	switch llm := m.llm.(type) {
+	case routed[*services.LLMServer]:
+		llm.router.ClearProviders()
+	case unrouted[*services.LLMServer]:
+	}
 }
 
 // CancelATSStreams cancels all active ATSStore streams.
@@ -549,7 +603,7 @@ func (m *ServicesManager) CancelATSStreams() {
 // GetLLMRouter returns the LLM router for provider registration, or why the
 // node runs without one.
 func (m *ServicesManager) GetLLMRouter() (*services.LLMServer, error) {
-	return m.llm.router, m.llm.why
+	return m.llm.routes()
 }
 
 // GetEmbeddingRouter returns the embedding router for backend registration.

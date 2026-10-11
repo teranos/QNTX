@@ -235,12 +235,7 @@ func (s *QNTXServer) Stop() error {
 	// and will skip routing once providers are cleared.
 	if s.servicesManager != nil {
 		// A router the node runs without holds no providers to clear.
-		if searchRouter, err := s.servicesManager.GetSearchRouter(); err == nil {
-			searchRouter.ClearProviders()
-		}
-		if llmRouter, err := s.servicesManager.GetLLMRouter(); err == nil {
-			llmRouter.ClearProviders()
-		}
+		s.servicesManager.ClearProviders()
 	}
 
 	// Shutdown plugins and gRPC services
