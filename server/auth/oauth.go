@@ -286,7 +286,7 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 	}
 	// fosite hands the store a sanitized request, which no longer says its
 	// grant; a node's only grant is its own token, so the client says it.
-	if client.isNodeClient() {
+	if client.Node {
 		return s.issueNodeToken(signature, session, client)
 	}
 	level := s.h.levelOf(session.MintedBy)
@@ -513,7 +513,7 @@ func namespacesOf(session *TokenSession) []string {
 // clientFor is the client as fosite holds it. A node asks for its own token
 // and is sent nothing, so it has the one grant and no redirect.
 func clientFor(found Client) *fosite.DefaultClient {
-	if found.isNodeClient() {
+	if found.Node {
 		return &fosite.DefaultClient{
 			ID:         found.DID,
 			Secret:     []byte(found.DID),

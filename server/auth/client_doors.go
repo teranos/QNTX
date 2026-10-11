@@ -24,6 +24,9 @@ type Client struct {
 	// issued through it acts.
 	Namespace     string
 	ReturnAddress string
+	// Node is another node registered by its own did:key (LevelNode): it asks
+	// for its own token and is sent no code.
+	Node bool
 }
 
 // clientByDID is the live client this DID names, or false. A revoked or
@@ -42,7 +45,7 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 		return Client{}, false
 	}
 	for _, t := range listed {
-		if t.DID != did || t.Level != LevelOAuth {
+		if t.DID != did || (t.Level != LevelOAuth && t.Level != LevelNode) {
 			continue
 		}
 		if t.RevokedAt != nil || expiredAt(t.ExpiresAt) {
@@ -58,6 +61,7 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 			MintedBy:      t.MintedBy,
 			Namespace:     namespace,
 			ReturnAddress: t.ReturnAddress,
+			Node:          t.Level == LevelNode,
 		}, true
 	}
 	return Client{}, false

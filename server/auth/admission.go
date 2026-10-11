@@ -24,6 +24,7 @@ const (
 	LevelPublicRegistration = access.LevelPublicRegistration
 	LevelUser               = access.LevelUser
 	LevelOAuth              = access.LevelOAuth
+	LevelNode               = access.LevelNode
 	LevelRefresh            = access.LevelRefresh
 	LevelGitHub             = access.LevelGitHub
 )

@@ -2,7 +2,6 @@ package auth
 
 import (
 	"net/http"
-	"slices"
 	"time"
 )
 
@@ -51,17 +50,13 @@ func (h *Handler) handleIntrospect(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusUnauthorized, "the asking node did not prove itself")
 		return
 	}
+	// The assertion verified against a client, so the token store answered.
 	asker, ok := h.clientByDID(asked.GetID())
-	if !ok || !asker.isNodeClient() {
+	if !ok || !asker.Node {
 		h.writeError(w, http.StatusUnauthorized, "only a node asks about tokens")
 		return
 	}
-	token := r.PostForm.Get("token")
-	if token == "" || h.tokens == nil {
-		h.writeJSON(w, http.StatusOK, introspection{})
-		return
-	}
-	grant, live := h.tokens.Lookup(sha256Hex(token))
+	grant, live := h.tokens.Lookup(sha256Hex(r.PostForm.Get("token")))
 	if !live {
 		h.writeJSON(w, http.StatusOK, introspection{})
 		return
@@ -71,8 +66,8 @@ func (h *Handler) handleIntrospect(w http.ResponseWriter, r *http.Request) {
 		h.writeJSON(w, http.StatusOK, introspection{})
 		return
 	}
-	// No namespace is every namespace, by level (ADR-027); otherwise it has to be the asker's.
-	if len(admitted.Namespaces) > 0 && !slices.Contains(admitted.Namespaces, asker.Namespace) {
+	// Where the asking node was registered, or every namespace by level (ADR-027).
+	if !admitted.MayActIn(asker.Namespace) {
 		h.logger.Infow("Introspection answered inactive",
 			"asker", asker.DID, "asker_namespace", asker.Namespace, "token_namespaces", admitted.Namespaces)
 		h.writeJSON(w, http.StatusOK, introspection{})
