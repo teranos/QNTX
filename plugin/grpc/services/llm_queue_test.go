@@ -165,3 +165,33 @@ func TestLLMQueue_RejectsWhenQueueFull(t *testing.T) {
 	q.Release()
 	wg.Wait()
 }
+
+// Leaving the front of the line hands the free slot to whoever is next.
+func TestLLMQueue_LeavingTheFrontServesTheNext(t *testing.T) {
+	q := newLLMQueue(1, 8, 0, zap.NewNop().Sugar())
+	require.NoError(t, q.Acquire(context.Background(), 0))
+
+	front, cancelFront := context.WithCancel(context.Background())
+	frontDone := make(chan error, 1)
+	go func() { frontDone <- q.Acquire(front, 0) }()
+	time.Sleep(10 * time.Millisecond)
+
+	nextDone := make(chan error, 1)
+	go func() { nextDone <- q.Acquire(context.Background(), 5) }()
+	time.Sleep(10 * time.Millisecond)
+
+	cancelFront()
+	require.ErrorIs(t, <-frontDone, context.Canceled)
+
+	q.Release()
+	select {
+	case err := <-nextDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("the slot freed while the next request waited was not given to it")
+	}
+	active, queued := q.Stats()
+	assert.Equal(t, 1, active)
+	assert.Equal(t, 0, queued)
+	q.Release()
+}

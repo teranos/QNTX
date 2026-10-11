@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2709 in 382 files.
+# 2708 in 381 files.
 
 5	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -169,7 +169,6 @@
 2	internal/tools/spawncheck/main.go
 6	internal/tools/tagcheck/main.go
 1	internal/util/strings.go
-1	plugin/grpc/services/llm_queue.go
 4	pulse/async/emitter.go
 3	pulse/async/handler.go
 3	pulse/async/job.go
