@@ -29,6 +29,19 @@ func mintable(asked string) (Level, bool) {
 	return "", false
 }
 
+// expiryOf is when a token ends, as a mint says it: a moment, or never, named.
+func expiryOf(asked string) (*time.Time, string) {
+	said := strings.TrimSpace(asked)
+	if said == tokenNeverEnds {
+		return NeverEnds(), ""
+	}
+	t, err := time.Parse(time.RFC3339, said)
+	if err != nil {
+		return nil, "expires_at is when the token ends, as RFC3339, or " + tokenNeverEnds + " for one that does not; this said " + strconv.Quote(said)
+	}
+	return &t, ""
+}
+
 // returnable is whether an address can be sent a code: absolute, and no
 // fragment, because a fragment never reaches the server the address names.
 func returnable(address string) error {
@@ -68,6 +81,8 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		Namespaces []string `json:"namespaces,omitempty"`
 		// Where a client's codes go. A client's, and only a client's.
 		ReturnAddress string `json:"return_address,omitempty"`
+		// The did:key of a node registered as a client: its own key, so no secret is drawn.
+		DID string `json:"did,omitempty"`
 	}
 	// Bounded like every other body in this package. A session holder is not a
 	// stranger, but a label is a string and nothing capped how long.
@@ -117,6 +132,11 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 
 	returnAddress := strings.TrimSpace(req.ReturnAddress)
 	namespaces := req.Namespaces
+	nodeDID := strings.TrimSpace(req.DID)
+	if nodeDID != "" {
+		h.registerNode(w, p, req.Label, nodeDID, level, namespaces, returnAddress, req.ExpiresAt)
+		return
+	}
 	if level == LevelOAuth {
 		// A client is a door (ADR-025): ROOT writes its return address here the
 		// way it writes a door's origin in am.toml. Its connector acts in the one
@@ -152,17 +172,10 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		}
 	}
 
-	// A token says when it ends: a moment, or never, named.
-	said := strings.TrimSpace(req.ExpiresAt)
-	expiresAt := NeverEnds()
-	if said != tokenNeverEnds {
-		t, err := time.Parse(time.RFC3339, said)
-		if err != nil {
-			h.writeError(w, http.StatusBadRequest,
-				"expires_at is when the token ends, as RFC3339, or "+tokenNeverEnds+" for one that does not; this said "+strconv.Quote(said))
-			return
-		}
-		expiresAt = &t
+	expiresAt, why := expiryOf(req.ExpiresAt)
+	if why != "" {
+		h.writeError(w, http.StatusBadRequest, why)
+		return
 	}
 
 	// The minting session already carries who it belongs to, so recording the

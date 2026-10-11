@@ -87,6 +87,8 @@ func (h *Handler) oauth() fosite.OAuth2Provider {
 			// A client's secret is the raw token it was minted as, checked by
 			// the lookup every bearer gets.
 			ClientSecretsHasher: h.ClientSecrets(),
+			// A node signs as its did:key, which fosite's own strategy refuses (EdDSA).
+			ClientAuthenticationStrategy: h.authenticateClient,
 		}
 		store := &oauthStore{ClientDoors: h.ClientDoors(), h: h, codes: map[string]*parkedCode{}, pkce: map[string]fosite.Requester{}}
 		h.oauthStore.Store(store)
@@ -95,6 +97,7 @@ func (h *Handler) oauth() fosite.OAuth2Provider {
 			compose.OAuth2AuthorizeExplicitFactory,
 			compose.OAuth2PKCEFactory,
 			compose.OAuth2RefreshTokenGrantFactory,
+			compose.OAuth2ClientCredentialsGrantFactory,
 		)
 	})
 	return h.oauthProvider
@@ -280,6 +283,11 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 	client, ok := s.h.clientByDID(request.GetClient().GetID())
 	if !ok {
 		return errors.WithStack(fosite.ErrInvalidClient.WithHintf("the client %s no longer answers", request.GetClient().GetID()))
+	}
+	// fosite hands the store a sanitized request, which no longer says its
+	// grant; a node's only grant is its own token, so the client says it.
+	if client.isNodeClient() {
+		return s.issueNodeToken(signature, session, client)
 	}
 	level := s.h.levelOf(session.MintedBy)
 	if level == "" {
@@ -502,8 +510,16 @@ func namespacesOf(session *TokenSession) []string {
 	return []string{session.Namespace}
 }
 
-// clientFor is the client as fosite holds it.
+// clientFor is the client as fosite holds it. A node asks for its own token
+// and is sent nothing, so it has the one grant and no redirect.
 func clientFor(found Client) *fosite.DefaultClient {
+	if found.isNodeClient() {
+		return &fosite.DefaultClient{
+			ID:         found.DID,
+			Secret:     []byte(found.DID),
+			GrantTypes: []string{grantClientCredentials},
+		}
+	}
 	return &fosite.DefaultClient{
 		ID:            found.DID,
 		Secret:        []byte(found.DID),

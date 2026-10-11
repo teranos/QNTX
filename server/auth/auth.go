@@ -82,6 +82,8 @@ type Handler struct {
 	// Held atomically: the sweep goroutine reads it without ever calling
 	// oauth(), so sync.Once orders nothing between them.
 	oauthStore atomic.Pointer[oauthStore]
+	// Every node's client assertion the token endpoint accepted, until it expires.
+	assertions spentAssertions
 	tokens     TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor   Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,

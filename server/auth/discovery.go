@@ -1,6 +1,10 @@
 package auth
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/golang-jwt/jwt/v5"
+)
 
 // Discovery documents: two JSON files at fixed paths that a client reads
 // before it sends anybody anywhere. They are how a client that has never
@@ -27,6 +31,8 @@ type authorizationServerMetadata struct {
 	GrantTypesSupported               []string `json:"grant_types_supported"`
 	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`
 	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`
+	// A node signs its assertion with its did:key, which is ed25519.
+	TokenEndpointAuthSigningAlgValuesSupported []string `json:"token_endpoint_auth_signing_alg_values_supported"`
 }
 
 // protectedResourceMetadata is RFC 9728 §2, the members this node has an
@@ -51,13 +57,14 @@ func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, r *ht
 	}
 	issuer := h.publicOrigin()
 	h.writeJSON(w, http.StatusOK, authorizationServerMetadata{
-		Issuer:                            issuer,
-		AuthorizationEndpoint:             issuer + authorizePath,
-		TokenEndpoint:                     issuer + tokenPath,
-		ResponseTypesSupported:            []string{"code"},
-		GrantTypesSupported:               []string{"authorization_code", "refresh_token"},
-		TokenEndpointAuthMethodsSupported: []string{"client_secret_basic", "client_secret_post"},
-		CodeChallengeMethodsSupported:     []string{"S256"},
+		Issuer:                                     issuer,
+		AuthorizationEndpoint:                      issuer + authorizePath,
+		TokenEndpoint:                              issuer + tokenPath,
+		ResponseTypesSupported:                     []string{"code"},
+		GrantTypesSupported:                        []string{"authorization_code", "refresh_token", grantClientCredentials},
+		TokenEndpointAuthMethodsSupported:          []string{"client_secret_basic", "client_secret_post", "private_key_jwt"},
+		CodeChallengeMethodsSupported:              []string{"S256"},
+		TokenEndpointAuthSigningAlgValuesSupported: []string{jwt.SigningMethodEdDSA.Alg()},
 	})
 }
 
