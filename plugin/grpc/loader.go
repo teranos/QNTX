@@ -133,18 +133,23 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 		expandedPaths = append(expandedPaths, expanded)
 	}
 
-	// Search for plugin binary
+	// Search for plugin binary. Each candidate not taken says why, in the
+	// refusal when none is.
+	var passed []string
+	pass := func(err error) { passed = append(passed, err.Error()) }
 	for _, searchPath := range expandedPaths {
 		for _, binaryName := range pluginBinaryNames(name) {
 			candidate := filepath.Join(searchPath, binaryName)
 			fileInfo, err := os.Stat(candidate)
 			if err != nil {
+				pass(err)
 				continue
 			}
 
 			if fileInfo.IsDir() {
 				// A TypeScript plugin directory: package.json marks it, plugin.ts runs it.
-				if pluginTs, ok := typeScriptPluginInDir(candidate); ok {
+				pluginTs, tsErr := typeScriptPluginInDir(candidate)
+				if tsErr == nil {
 					logger.Debugf("Found '%s' TypeScript plugin: %s", name, pluginTs)
 					return PluginConfig{Name: name, Enabled: true, Source: LaunchBinary(pluginTs)}, nil
 				}
@@ -153,12 +158,14 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 				// the directory with its private libraries beside it, found
 				// via an $ORIGIN-relative RPATH. QNTX's own release is
 				// packaged this way; plugins may be too.
-				if binary, ok := nativePluginInDir(candidate, name); ok {
+				binary, treeErr := nativePluginInDir(candidate, name)
+				if treeErr == nil {
 					logger.Debugf("Found '%s' plugin tree: %s", name, binary)
 					return PluginConfig{Name: name, Enabled: true, Source: LaunchBinary(binary)}, nil
 				}
 
 				// Not a valid plugin directory, continue searching
+				pass(alongside(tsErr, treeErr))
 				continue
 			}
 
@@ -171,11 +178,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 			// Issue #137: This doesn't work on Windows where executability is by extension
 			binary, err := exec.LookPath(candidate)
 			if err != nil {
-				logger.Debugw("Found plugin binary but it does not run",
-					"plugin", name,
-					"path", candidate,
-					"error", err,
-				)
+				pass(errors.Wrapf(err, "%s is there and does not run", candidate))
 				continue
 			}
 
@@ -184,7 +187,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 		}
 	}
 
-	err := errors.Newf("plugin binary not found in search paths: %s", strings.Join(expandedPaths, ", "))
+	err := errors.Newf("plugin binary not found in search paths: %s (%s)", strings.Join(expandedPaths, ", "), strings.Join(passed, "; "))
 	return PluginConfig{}, errors.WithHintf(err, "the runner installs a build of '%s' when its workflow's package step lands one; or install the binary to one of those paths, or add its path to [plugin] paths", name)
 }
 
@@ -196,37 +199,45 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 // alternative is a single file that must find its libraries on the host, which
 // only holds when the host and the build machine agree — the assumption that
 // makes a binary built on one distro fail to exec on another.
-func nativePluginInDir(dir, name string) (string, bool) {
+func nativePluginInDir(dir, name string) (string, error) {
+	var notRun error
 	for _, candidate := range pluginBinaryNames(name) {
 		path, err := exec.LookPath(filepath.Join(dir, candidate))
 		if err != nil {
+			notRun = alongside(notRun, err)
 			continue
 		}
-		return path, true
+		return path, nil
 	}
-
-	return "", false
+	return "", errors.WithSecondaryError(errors.Newf("%s holds no plugin binary that runs", dir), notRun)
 }
 
 // typeScriptPluginInDir is the plugin.ts of a directory whose package.json
-// says "qntx-plugin": true.
-func typeScriptPluginInDir(dir string) (string, bool) {
-	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
+// says "qntx-plugin": true, or why the directory is not that.
+func typeScriptPluginInDir(dir string) (string, error) {
+	pkgPath := filepath.Join(dir, "package.json")
+	data, err := os.ReadFile(pkgPath)
 	if err != nil {
-		return "", false
+		return "", err
 	}
 	var pkg struct {
 		QNTXPlugin bool `json:"qntx-plugin"`
 	}
-	if err := json.Unmarshal(data, &pkg); err != nil || !pkg.QNTXPlugin {
-		return "", false
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return "", errors.Wrapf(err, "%s does not read as a package.json", pkgPath)
+	}
+	if !pkg.QNTXPlugin {
+		return "", errors.Newf("%s does not say \"qntx-plugin\": true", pkgPath)
 	}
 	pluginTs := filepath.Join(dir, "plugin.ts")
 	info, err := os.Stat(pluginTs)
-	if err != nil || info.IsDir() {
-		return "", false
+	if err != nil {
+		return "", err
 	}
-	return pluginTs, true
+	if info.IsDir() {
+		return "", errors.Newf("%s is a directory, not the plugin's plugin.ts", pluginTs)
+	}
+	return pluginTs, nil
 }
 
 // pluginBinaryNames lists the file names a plugin binary may have, most

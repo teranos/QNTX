@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"os/exec"
@@ -65,16 +66,21 @@ func alongside(err, alsoErr error) error {
 }
 
 // isPackageJSONPlugin checks whether path, or the directory a file at path is
-// in, holds a package.json with the qntx-plugin marker.
-func isPackageJSONPlugin(path string, info os.FileInfo) bool {
+// in, holds a package.json with the qntx-plugin marker. A directory with no
+// package.json holds none; one that does not read is refused.
+func isPackageJSONPlugin(path string, info os.FileInfo) (bool, error) {
 	dir := filepath.Dir(path)
 	if info.IsDir() {
 		dir = path
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
+	pkgPath := filepath.Join(dir, "package.json")
+	data, err := os.ReadFile(pkgPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
 	if err != nil {
-		return false
+		return false, errors.Wrapf(err, "whether %s is a TypeScript plugin did not read", path)
 	}
 
 	var pkg struct {
@@ -82,10 +88,10 @@ func isPackageJSONPlugin(path string, info os.FileInfo) bool {
 	}
 
 	if err := json.Unmarshal(data, &pkg); err != nil {
-		return false
+		return false, errors.Wrapf(err, "%s does not read as a package.json", pkgPath)
 	}
 
-	return pkg.QNTXPlugin
+	return pkg.QNTXPlugin, nil
 }
 
 // PluginConfig is a plugin the manager loads: its name, where it runs from,
@@ -973,7 +979,11 @@ func (m *PluginManager) launchPlugin(ctx context.Context, pluginCfg PluginConfig
 
 	// Detect TypeScript plugins and wrap with Bun runtime
 	var cmd *exec.Cmd
-	isTypeScriptPlugin := strings.HasSuffix(binary, ".ts") || isPackageJSONPlugin(binary, info)
+	packaged, err := isPackageJSONPlugin(binary, info)
+	if err != nil {
+		return nil, 0, errors.Wrapf(err, "plugin %s is not launched", pluginCfg.Name)
+	}
+	isTypeScriptPlugin := strings.HasSuffix(binary, ".ts") || packaged
 
 	if isTypeScriptPlugin {
 		// TypeScript plugin - launch via Bun runtime
