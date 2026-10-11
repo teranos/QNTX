@@ -123,7 +123,7 @@ func (s *QNTXServer) transcriptsRead(ctx context.Context, sent sigil.Sent) (any,
 	if sent["session"] == "" {
 		var events []*types.As
 		for _, predicate := range transcriptPredicates {
-			found, err := store.GetAttestations(ats.AttestationFilter{Predicates: []string{predicate}, Limit: maxTranscriptRead})
+			found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: maxTranscriptRead})
 			if err != nil {
 				return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not read " + predicate + ": " + err.Error()}
 			}
@@ -150,7 +150,7 @@ func (s *QNTXServer) transcriptsRead(ctx context.Context, sent sigil.Sent) (any,
 func sessionsIn(store namespaces.Reading, sessions []string, limit int) ([]transcript, *protocol.Refusal) {
 	var events []*types.As
 	for _, session := range sessions {
-		found, err := store.GetAttestations(ats.AttestationFilter{Contexts: []string{"session:" + session}, Limit: maxTranscriptRead})
+		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Contexts: []string{"session:" + session}, Limit: maxTranscriptRead})
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not read session " + session + ": " + err.Error()}
 		}

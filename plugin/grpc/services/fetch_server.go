@@ -386,7 +386,7 @@ func (s *FetchServer) writerOf(record *protocol.FetchRecord) (named.Text, error)
 // dedupLookup is the record of this URL's fetch, when one is kept: its
 // response, and true. False is none kept, and the URL is fetched live.
 func (s *FetchServer) dedupLookup(store ats.AttestationStore, as fetchRecord) (*protocol.FetchResponse, bool) {
-	results, err := store.GetAttestations(ats.AttestationFilter{
+	results, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Predicates: []string{as.predicate.String()},
 		Subjects:   as.subjects.All(),
 		Limit:      1,

@@ -330,7 +330,7 @@ func (p *BookPlugin) findMatches(ctx context.Context, collectorID string, wanted
 	// Query all attestations to find matches
 	// In production, we'd use more specific filters, but current implementation
 	// only supports Actor filter, so we query all and filter in-memory
-	filter := ats.AttestationFilter{
+	filter := ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Limit: 1000,
 	}
 	attestations, err := store.GetAttestations(filter)

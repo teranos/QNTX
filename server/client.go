@@ -806,7 +806,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	}
 
 	// Create watcher struct — detect SE element (semantic query) vs AX element (structured query)
-	watcher := &storage.Watcher{
+	watcher := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                watcherID,
 		Name:              msg.WatcherName,
 		MaxFiresPerSecond: config.GetInt("watcher.max_fires_per_second"),

@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/teranos/QNTX/ats/types"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -722,7 +723,7 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 	require.NoError(t, err)
 
 	// 9. Verify attestations were created in database
-	filter := ats.AttestationFilter{Limit: 100}
+	filter := ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 100}
 	attestations, err := store.GetAttestations(filter)
 	require.NoError(t, err)
 

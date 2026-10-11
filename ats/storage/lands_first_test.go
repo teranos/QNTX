@@ -46,8 +46,12 @@ func (r *rawInOrder) CountAttestations() (int, error)             { return len(r
 func (r *rawInOrder) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
 	r.queries++
 	out := make([]*types.As, 0, len(r.held))
+	since, bounded, err := filter.TimeStart.At("start")
+	if err != nil {
+		return nil, err
+	}
 	for _, as := range r.held {
-		if filter.TimeStart != nil && as.Timestamp.Before(*filter.TimeStart) {
+		if bounded && as.Timestamp.Before(since) {
 			continue
 		}
 		out = append(out, as)

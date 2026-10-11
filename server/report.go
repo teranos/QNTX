@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/sentryread"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
@@ -193,7 +194,7 @@ func (s *QNTXServer) attestationsPerNamespace(w sentryread.Window) ([]namespaceC
 // counts by time, and no read pages past limit, so a window that fills a read
 // is split in two and each half counted.
 func attestationsMadeIn(store namespaces.Reading, start, end time.Time, limit int) (int, error) {
-	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: &start, TimeEnd: &end, Limit: limit})
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.BoundAt(start), TimeEnd: types.BoundAt(end), Limit: limit})
 	if err != nil {
 		return 0, errors.Wrapf(err, "reading %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 	}
@@ -292,8 +293,8 @@ func startsOf(store namespaces.Reading, node string, w sentryread.Window) (int, 
 	found, err := store.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{PredicateStarted},
 		Subjects:   []string{node},
-		TimeStart:  &w.Start,
-		TimeEnd:    &w.End,
+		TimeStart:  types.BoundAt(w.Start),
+		TimeEnd:    types.BoundAt(w.End),
 		Limit:      ats.EveryRow,
 	})
 	if err != nil {

@@ -78,7 +78,7 @@ var standing = []storage.Watcher{
 		// An element's module is an attestation, and a page holds the module it
 		// imported. Without this the page shows the element that was published
 		// before it loaded, until somebody reloads it by hand.
-		Filter:            types.AxFilter{Predicates: []string{element.ModulePredicate}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{element.ModulePredicate}},
 		ActionType:        storage.ActionTypeTell,
 		MaxFiresPerSecond: 0,
 		Enabled:           true,
@@ -88,7 +88,7 @@ var standing = []storage.Watcher{
 		Name: "a push landed on a branch with CI",
 		// The laptop cannot be reached from here, so the run is waited on here
 		// and the result goes back on the status line the laptop already polls.
-		Filter:            types.AxFilter{Predicates: []string{CIPushedPredicate}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{CIPushedPredicate}},
 		ActionType:        storage.ActionTypeBuiltinExecute,
 		ActionData:        `{"handler_name":"` + CIWatchHandlerName + `"}`,
 		MaxFiresPerSecond: 10,
@@ -100,7 +100,7 @@ var standing = []storage.Watcher{
 		// The walk moved on and this row is the only record an outcome is
 		// owed. Waited on here by the run's name; the laptop asked github for
 		// it every five seconds before.
-		Filter:            types.AxFilter{Predicates: []string{DispatchSentPredicate}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{DispatchSentPredicate}},
 		ActionType:        storage.ActionTypeBuiltinExecute,
 		ActionData:        `{"handler_name":"` + CIWatchHandlerName + `"}`,
 		MaxFiresPerSecond: 10,
@@ -111,7 +111,7 @@ var standing = []storage.Watcher{
 		Name: "a write carried quoted spans",
 		// The write passed on the laptop; whether anybody said the words is
 		// asked here, of the prompts this namespace holds.
-		Filter:            types.AxFilter{Predicates: []string{QuoteClaimedPredicate}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{QuoteClaimedPredicate}},
 		ActionType:        storage.ActionTypeBuiltinExecute,
 		ActionData:        `{"handler_name":"` + QuoteProvenanceHandlerName + `"}`,
 		MaxFiresPerSecond: 10,
@@ -122,7 +122,7 @@ var standing = []storage.Watcher{
 		Name: "a commit took quoted spans out",
 		// The commit landed on the laptop; whether what it took out was the
 		// person's words is asked here, of the prompts this namespace holds.
-		Filter:            types.AxFilter{Predicates: []string{QuoteRemovedPredicate}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{QuoteRemovedPredicate}},
 		ActionType:        storage.ActionTypeBuiltinExecute,
 		ActionData:        `{"handler_name":"` + QuoteRemovalHandlerName + `"}`,
 		MaxFiresPerSecond: 10,

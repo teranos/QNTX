@@ -184,7 +184,9 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 	qb.buildPredicateFilter(filter.Predicates)
 	qb.buildContextFilter(filter.Contexts)
 	qb.buildActorFilter(filter.Actors)
-	qb.buildTemporalFilters(filter)
+	if err := qb.buildTemporalFilters(filter); err != nil {
+		return nil, err
+	}
 
 	query := AttestationSelectQuery
 	if len(qb.whereClauses) > 0 {

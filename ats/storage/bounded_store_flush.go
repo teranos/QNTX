@@ -4,6 +4,7 @@ package storage
 
 import (
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/errors"
 )
 
@@ -21,7 +22,7 @@ func (bs *BoundedStore) FlushEnforcement() error {
 	allSubjects := []string{}
 
 	// Query all attestations to collect dimensions
-	all, err := rbs.rust.GetAttestations(ats.AttestationFilter{Limit: ats.EveryRow})
+	all, err := rbs.rust.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: ats.EveryRow})
 	if err != nil {
 		return errors.Wrap(err, "failed to list attestations for enforcement flush")
 	}

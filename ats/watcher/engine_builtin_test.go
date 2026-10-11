@@ -52,7 +52,7 @@ func TestEngine_ExecuteBuiltin(t *testing.T) {
 		ActionData:        `{"handler_name":"test.builtin"}`,
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"builtin-test"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"builtin-test"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
@@ -144,7 +144,7 @@ func TestEngine_ExecuteBuiltin_UnknownNameIsRecorded(t *testing.T) {
 		ActionData:        `{"handler_name":"nobody.home"}`,
 		MaxFiresPerSecond: 105,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"builtin-unknown"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"builtin-unknown"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)

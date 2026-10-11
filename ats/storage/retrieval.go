@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
-	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
@@ -39,11 +38,8 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) (_ []*types.As, 
 		qb.addClause("source = ?", filters.Source)
 	}
 
-	if filters.TimeStart != nil {
-		qb.addClause("timestamp >= ?", filters.TimeStart.UTC().Format(time.RFC3339))
-	}
-	if filters.TimeEnd != nil {
-		qb.addClause("timestamp <= ?", filters.TimeEnd.UTC().Format(time.RFC3339))
+	if err := qb.buildTimeRange(filters.TimeStart, filters.TimeEnd, "timestamp >= ?"); err != nil {
+		return nil, err
 	}
 
 	// Add WHERE clause if we have filters

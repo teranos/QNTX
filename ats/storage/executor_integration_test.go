@@ -103,7 +103,7 @@ func TestAxExecutorBasicQueries(t *testing.T) {
 	}{
 		{
 			name: "query by subject",
-			filter: types.AxFilter{
+			filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				Subjects: []string{"ALICE"},
 				Limit:    10,
 			},
@@ -112,7 +112,7 @@ func TestAxExecutorBasicQueries(t *testing.T) {
 		},
 		{
 			name: "query by context",
-			filter: types.AxFilter{
+			filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				Contexts: []string{"RESEARCH_LAB"},
 				Limit:    10,
 			},
@@ -121,7 +121,7 @@ func TestAxExecutorBasicQueries(t *testing.T) {
 		},
 		{
 			name: "query by actor",
-			filter: types.AxFilter{
+			filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				Actors: []string{"hr"},
 				Limit:  10,
 			},
@@ -130,7 +130,7 @@ func TestAxExecutorBasicQueries(t *testing.T) {
 		},
 		{
 			name: "no filters - return all",
-			filter: types.AxFilter{
+			filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				Limit: 10,
 			},
 			expectedMinCount: 5,
@@ -183,8 +183,8 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 	}{
 		{
 			name: "filter by start time",
-			filter: types.AxFilter{
-				TimeStart: &startTime,
+			filter: types.AxFilter{TimeEnd: types.Unbounded(),
+				TimeStart: types.BoundAt(startTime),
 				Limit:     10,
 			},
 			// TimeStart is inclusive: an attestation exactly at the boundary matches.
@@ -198,8 +198,8 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 		},
 		{
 			name: "filter by end time",
-			filter: types.AxFilter{
-				TimeEnd: &endTime,
+			filter: types.AxFilter{TimeStart: types.Unbounded(),
+				TimeEnd: types.BoundAt(endTime),
 				Limit:   10,
 			},
 			expected: []string{"test1", "test2", "test3", "test4"}, // Up to 2024-01-04
@@ -207,8 +207,8 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 		{
 			name: "filter by time range",
 			filter: types.AxFilter{
-				TimeStart: &startTime,
-				TimeEnd:   &endTime,
+				TimeStart: types.BoundAt(startTime),
+				TimeEnd:   types.BoundAt(endTime),
 				Limit:     10,
 			},
 			expected: []string{"test4", "test3", "test2"}, // TimeStart inclusive, TimeEnd inclusive
@@ -297,7 +297,7 @@ func TestAxExecutorLimitHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
+			result, err := executor.ExecuteAsk(context.Background(), types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				Limit: tt.limit,
 			})
 			require.NoError(t, err)
@@ -319,20 +319,20 @@ func TestAxExecutorEdgeCases(t *testing.T) {
 	}{
 		{
 			name: "empty filter",
-			filter: types.AxFilter{
+			filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				Limit: 10,
 			},
 		},
 		{
 			name: "nonexistent subject",
-			filter: types.AxFilter{
+			filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				Subjects: []string{"NONEXISTENT"},
 				Limit:    10,
 			},
 		},
 		{
 			name: "nonexistent predicate",
-			filter: types.AxFilter{
+			filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				Predicates: []string{"nonexistent"},
 				Limit:      10,
 			},

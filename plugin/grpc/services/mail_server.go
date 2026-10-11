@@ -550,7 +550,7 @@ func (s *MailServer) template(w *mailSending, plugin, name string) (*protocol.Ma
 // NewestMailTemplate is the newest template a plugin set under a name.
 func NewestMailTemplate(store ats.AttestationStore, plugin, name string) (*protocol.MailTemplate, bool, error) {
 	ref := templateRef(plugin, name)
-	kept, err := store.GetAttestations(ats.AttestationFilter{
+	kept, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects:   []string{ref},
 		Predicates: []string{PredicateMailTemplate},
 		Limit:      1000,

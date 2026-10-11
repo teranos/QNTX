@@ -97,6 +97,9 @@ func convertResolvedOutput(out *resolvedOutput) (*types.AxFilter, error) {
 	filter := &types.AxFilter{
 		Limit:  100,
 		Format: "table",
+		// A query naming no time is unbounded on both sides.
+		TimeStart: types.Unbounded(),
+		TimeEnd:   types.Unbounded(),
 	}
 
 	filter.Subjects = nilIfEmpty(uppercaseTokens(out.Subjects))
@@ -108,23 +111,23 @@ func convertResolvedOutput(out *resolvedOutput) (*types.AxFilter, error) {
 	if out.Temporal != nil {
 		if out.Temporal.Since != nil {
 			t := time.UnixMilli(*out.Temporal.Since)
-			filter.TimeStart = &t
+			filter.TimeStart = types.BoundAt(t)
 		}
 		if out.Temporal.Until != nil {
 			t := time.UnixMilli(*out.Temporal.Until)
-			filter.TimeEnd = &t
+			filter.TimeEnd = types.BoundAt(t)
 		}
 		if out.Temporal.On != nil {
 			start := time.UnixMilli(out.Temporal.On.StartMs)
 			end := time.UnixMilli(out.Temporal.On.EndMs)
-			filter.TimeStart = &start
-			filter.TimeEnd = &end
+			filter.TimeStart = types.BoundAt(start)
+			filter.TimeEnd = types.BoundAt(end)
 		}
 		if out.Temporal.Between != nil {
 			start := time.UnixMilli(out.Temporal.Between.StartMs)
 			end := time.UnixMilli(out.Temporal.Between.EndMs)
-			filter.TimeStart = &start
-			filter.TimeEnd = &end
+			filter.TimeStart = types.BoundAt(start)
+			filter.TimeEnd = types.BoundAt(end)
 		}
 	}
 

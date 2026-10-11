@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/ats/types"
 	"net/http"
 	"testing"
 
@@ -179,7 +180,7 @@ func TestTheWordsARoleMaySayAreLinesToo(t *testing.T) {
 	rec = grants(t, s, worker, `{"subjects":["pond"],"predicates":["visit:assigned"],"contexts":["default"]}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 
-	written, err := s.held.Served().GetAttestations(ats.AttestationFilter{Predicates: []string{"visit:done"}, Limit: 10})
+	written, err := s.held.Served().GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"visit:done"}, Limit: 10})
 	require.NoError(t, err)
 	require.Len(t, written, 1)
 	assert.Equal(t, []string{gardenerRoute}, written[0].Actors, "a person holding a role signs as the route they came in by")

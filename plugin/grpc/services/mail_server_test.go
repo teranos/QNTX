@@ -70,7 +70,7 @@ func wiredMailBy(t *testing.T, transport Had[MailTransport], users ...MailRecipi
 
 func attested(t *testing.T, store ats.AttestationStore, predicate string) []*types.As {
 	t.Helper()
-	found, err := store.GetAttestations(ats.AttestationFilter{Predicates: []string{predicate}, Limit: 100})
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: 100})
 	require.NoError(t, err)
 	return found
 }

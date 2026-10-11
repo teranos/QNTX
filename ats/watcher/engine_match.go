@@ -2,9 +2,11 @@ package watcher
 
 import (
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/sacred"
 	"golang.org/x/time/rate"
 )
@@ -286,10 +288,12 @@ func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher) bool {
 	if len(filter.Actors) > 0 && !hasOverlap(filter.Actors, as.Actors) {
 		return false
 	}
-	if filter.TimeStart != nil && as.Timestamp.Before(*filter.TimeStart) {
+	within, err := withinTime(as.Timestamp, filter)
+	if err != nil {
+		e.logger.Warnw("Watcher not matched: its filter does not say its time range", "watcher_id", watcher.ID, "error", err)
 		return false
 	}
-	if filter.TimeEnd != nil && as.Timestamp.After(*filter.TimeEnd) {
+	if !within {
 		return false
 	}
 
@@ -446,6 +450,27 @@ func batchMatchStructuralGo(as *types.As, watchers []*storage.Watcher) map[strin
 	return matched
 }
 
+// withinTime is whether t falls in a filter's time range: from its start and
+// up to and including its end, on each side that is bounded. A side naming
+// neither is refused.
+func withinTime(t time.Time, f *types.AxFilter) (bool, error) {
+	start, starts, err := f.TimeStart.At("start")
+	if err != nil {
+		return false, err
+	}
+	end, ends, err := f.TimeEnd.At("end")
+	if err != nil {
+		return false, err
+	}
+	if starts && t.Before(start) {
+		return false, nil
+	}
+	if ends && t.After(end) {
+		return false, nil
+	}
+	return true, nil
+}
+
 // matchesFilterStandalone checks structural filter match without requiring an Engine receiver.
 func matchesFilterStandalone(as *types.As, watcher *storage.Watcher) bool {
 	filter := &watcher.Filter
@@ -462,10 +487,12 @@ func matchesFilterStandalone(as *types.As, watcher *storage.Watcher) bool {
 	if len(filter.Actors) > 0 && !hasOverlap(filter.Actors, as.Actors) {
 		return false
 	}
-	if filter.TimeStart != nil && as.Timestamp.Before(*filter.TimeStart) {
+	within, err := withinTime(as.Timestamp, filter)
+	if err != nil {
+		logger.Logger.Warnw("Watcher not matched: its filter does not say its time range", "watcher_id", watcher.ID, "error", err)
 		return false
 	}
-	if filter.TimeEnd != nil && as.Timestamp.After(*filter.TimeEnd) {
+	if !within {
 		return false
 	}
 	for _, af := range watcher.AttributeFilters {

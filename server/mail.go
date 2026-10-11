@@ -167,7 +167,7 @@ func (s *QNTXServer) mailSent(_ context.Context, sent sigil.Sent) (any, *protoco
 	}
 	var mails []mail
 	for _, predicate := range []string{services.PredicateMailSent, services.PredicateMailFailed} {
-		found, err := store.GetAttestations(ats.AttestationFilter{Predicates: []string{predicate}, Limit: limit})
+		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: limit})
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the mail " + predicate + " could not be read: " + err.Error()}
 		}
@@ -239,7 +239,7 @@ func (s *QNTXServer) mailTemplates(_ context.Context, _ sigil.Sent) (any, *proto
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	found, err := store.GetAttestations(ats.AttestationFilter{
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Predicates: []string{services.PredicateMailTemplate},
 		Limit:      ats.EveryRow,
 	})
@@ -320,7 +320,7 @@ func (s *QNTXServer) mailMessage(_ context.Context, sent sigil.Sent) (any, *prot
 	}
 	id, user := sent["id"], sent["user"]
 	for _, predicate := range []string{services.PredicateMailSent, services.PredicateMailFailed} {
-		found, err := store.GetAttestations(ats.AttestationFilter{
+		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Predicates: []string{predicate},
 			Subjects:   []string{user},
 			Limit:      ats.EveryRow,

@@ -97,7 +97,7 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 		w := &storage.Watcher{
 			ID:   watcherID,
 			Name: fmt.Sprintf("%s/%s", pluginName, reg.Id),
-			Filter: types.AxFilter{
+			Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 				Subjects:   reg.Subjects,
 				Predicates: reg.Predicates,
 				Contexts:   reg.Contexts,

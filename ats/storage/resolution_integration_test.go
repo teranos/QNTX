@@ -58,7 +58,7 @@ func TestAttestationResolution(t *testing.T) {
 
 	// Test Evolution scenario: same actor, different times (DOZER)
 	t.Run("evolution_resolution", func(t *testing.T) {
-		filter := types.AxFilter{
+		filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects: []string{"DOZER"},
 			Contexts: []string{"RESEARCH_LAB"},
 			Limit:    100,
@@ -91,7 +91,7 @@ func TestAttestationResolution(t *testing.T) {
 		require.NoError(t, err, "Failed to insert verification test data")
 		require.NoError(t, qntxtest.SyncJunctionTables(db))
 
-		filter := types.AxFilter{
+		filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects:   []string{"LINK"},
 			Predicates: []string{"engineer"},
 			Contexts:   []string{"ACME"},
@@ -120,7 +120,7 @@ func TestAttestationResolution(t *testing.T) {
 		require.NoError(t, err, "Failed to insert conflict test data")
 		require.NoError(t, qntxtest.SyncJunctionTables(db))
 
-		filter := types.AxFilter{
+		filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects: []string{"NIOBE"},
 			Contexts: []string{"STARTUP"},
 			Limit:    100,
@@ -148,7 +148,7 @@ func TestResolutionPerformance(t *testing.T) {
 
 	// Test that smart resolution doesn't significantly slow down queries
 	// Note: Performance benchmarking should use b.Run with testing.B for accurate metrics
-	filter := types.AxFilter{
+	filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Predicates: []string{"engineer"},
 		Limit:      100,
 	}
@@ -178,7 +178,7 @@ func TestResolutionWithAliases(t *testing.T) {
 	executor := NewExecutor(db, rq)
 
 	// Test that resolution works with alias resolution
-	filter := types.AxFilter{
+	filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects: []string{"DOZER_ALIAS"}, // Query using alias
 		Limit:    100,
 	}
@@ -200,7 +200,7 @@ func TestResolutionEdgeCases(t *testing.T) {
 
 	// Test empty query
 	t.Run("empty_query", func(t *testing.T) {
-		filter := types.AxFilter{Limit: 10}
+		filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 10}
 		result, err := executor.ExecuteAsk(context.Background(), filter)
 		require.NoError(t, err, "Empty query should not fail")
 
@@ -210,7 +210,7 @@ func TestResolutionEdgeCases(t *testing.T) {
 
 	// Test nonexistent subject
 	t.Run("nonexistent_subject", func(t *testing.T) {
-		filter := types.AxFilter{
+		filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects: []string{"NONEXISTENT_SUBJECT"},
 			Limit:    10,
 		}
@@ -223,7 +223,7 @@ func TestResolutionEdgeCases(t *testing.T) {
 
 	// Test single attestation (no conflicts possible)
 	t.Run("single_attestation", func(t *testing.T) {
-		filter := types.AxFilter{
+		filter := types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects:   []string{"NEO"},
 			Predicates: []string{"_"}, // Existence only
 			Limit:      10,

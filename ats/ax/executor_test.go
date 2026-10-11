@@ -112,7 +112,7 @@ func TestExecuteAsk_LoggerInvoked(t *testing.T) {
 		Logger: zap.New(core).Sugar(),
 	})
 
-	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
+	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Predicates: []string{"engineer"},
 		Subjects:   []string{"JOHN"},
 	})
@@ -139,7 +139,7 @@ func TestExecuteAsk_NoLoggerNoPanic(t *testing.T) {
 	executor := NewAxExecutor(&resolvedQueryStore{supported: true}, newResolver())
 	assert.Nil(t, executor.logger, "Logger should be nil by default")
 
-	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
+	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Predicates: []string{"test"},
 	})
 	require.NoError(t, err, "ExecuteAsk should not fail without logger")
@@ -149,7 +149,7 @@ func TestExecuteAsk_NoLoggerNoPanic(t *testing.T) {
 func TestExecuteAsk_StoreWithoutResolvedPathErrors(t *testing.T) {
 	executor := NewAxExecutor(&unresolvedQueryStore{}, newResolver())
 
-	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
+	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects: []string{"ALICE"},
 	})
 
@@ -163,7 +163,7 @@ func TestExecuteAsk_UnwiredStoreErrors(t *testing.T) {
 	// querier set behind it.
 	executor := NewAxExecutor(&resolvedQueryStore{supported: false}, newResolver())
 
-	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{
+	_, err := executor.ExecuteAsk(context.Background(), types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects: []string{"ALICE"},
 	})
 
@@ -185,7 +185,7 @@ func TestExecuteAsk_SummarySkipsExistencePlaceholders(t *testing.T) {
 		},
 	}
 
-	result, err := NewAxExecutor(store, newResolver()).ExecuteAsk(context.Background(), types.AxFilter{})
+	result, err := NewAxExecutor(store, newResolver()).ExecuteAsk(context.Background(), types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()})
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, result.Summary.TotalAttestations)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
@@ -67,7 +68,8 @@ func ugReadings(store ats.AttestationStore, since time.Time) (sessions, windows 
 	found, err := store.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{ugReadingPredicate},
 		Actors:     []string{ugActor},
-		TimeStart:  &since,
+		TimeStart:  types.BoundAt(since),
+		TimeEnd:    types.Unbounded(),
 		Limit:      ugReadingsLimit,
 	})
 	if err != nil {

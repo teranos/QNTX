@@ -700,7 +700,8 @@ func ciStatusSince(store namespaces.Reading, since time.Time) ([]*types.As, erro
 	}
 	found, err := store.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{watcher.CIPushedPredicate},
-		TimeStart:  &since,
+		TimeStart:  types.BoundAt(since),
+		TimeEnd:    types.Unbounded(),
 		Limit:      100,
 	})
 	if err != nil {

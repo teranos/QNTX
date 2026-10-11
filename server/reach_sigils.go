@@ -80,7 +80,7 @@ func (s *QNTXServer) reachList(_ context.Context, _ sigil.Sent) (any, *protocol.
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
-		found, err := store.GetAttestations(ats.AttestationFilter{
+		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects: []string{reach.Subject},
 			Limit:    ats.EveryRow,
 		})

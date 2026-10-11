@@ -268,12 +268,22 @@ func (s *DuckdbStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As
 		Source:     filter.Source,
 		Limit:      filter.Limit,
 	}
-	if filter.TimeStart != nil {
-		ms := filter.TimeStart.UnixMilli()
+	// Rust reads an unbounded side as the field left out; a side naming
+	// neither is refused.
+	start, starts, err := filter.TimeStart.At("start")
+	if err != nil {
+		return nil, err
+	}
+	end, ends, err := filter.TimeEnd.At("end")
+	if err != nil {
+		return nil, err
+	}
+	if starts {
+		ms := start.UnixMilli()
 		rustFilter.TimeStart = &ms
 	}
-	if filter.TimeEnd != nil {
-		ms := filter.TimeEnd.UnixMilli()
+	if ends {
+		ms := end.UnixMilli()
 		rustFilter.TimeEnd = &ms
 	}
 

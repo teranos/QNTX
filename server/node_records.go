@@ -58,7 +58,7 @@ func newestLines(s *QNTXServer, subject, kept string) (map[string]*types.As, err
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read the %s lines in %s", subject, where)
 	}
-	found, err := reading.GetAttestations(ats.AttestationFilter{
+	found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects: []string{subject},
 		Limit:    ats.EveryRow,
 	})

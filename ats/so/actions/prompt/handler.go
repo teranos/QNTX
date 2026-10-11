@@ -163,7 +163,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	// Apply temporal cursor filter for incremental processing
 	filter := payload.AxFilter
 	if payload.TemporalCursor != nil && !payload.TemporalCursor.IsZero() {
-		filter.TimeStart = payload.TemporalCursor
+		filter.TimeStart = types.BoundAt(*payload.TemporalCursor)
 	}
 
 	// Execute ax query

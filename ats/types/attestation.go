@@ -135,15 +135,15 @@ func (as *As) GetCartesianCount() int {
 
 // AxFilter represents the parsed CLI command for querying attestations
 type AxFilter struct {
-	Subjects   []string   `json:"subjects"`   // Specific entities to ask about
-	Predicates []string   `json:"predicates"` // What predicates to match
-	Contexts   []string   `json:"contexts"`   // What contexts to match
-	Actors     []string   `json:"actors"`     // Filter by specific actors
-	TimeStart  *time.Time `json:"time_start"` // Temporal range start
-	TimeEnd    *time.Time `json:"time_end"`   // Temporal range end
-	Limit      int        `json:"limit"`      // Maximum results
-	Format     string     `json:"format"`     // Output format: table, json
-	SoActions  []string   `json:"so_actions"` // Actions to perform after query: ex csv, summarize, etc
+	Subjects   []string  `json:"subjects"`   // Specific entities to ask about
+	Predicates []string  `json:"predicates"` // What predicates to match
+	Contexts   []string  `json:"contexts"`   // What contexts to match
+	Actors     []string  `json:"actors"`     // Filter by specific actors
+	TimeStart  TimeBound `json:"time_start"` // Where the time range starts: a time, or unbounded
+	TimeEnd    TimeBound `json:"time_end"`   // Where the time range ends: a time, or unbounded
+	Limit      int       `json:"limit"`      // Maximum results
+	Format     string    `json:"format"`     // Output format: table, json
+	SoActions  []string  `json:"so_actions"` // Actions to perform after query: ex csv, summarize, etc
 }
 
 // AxResult represents the result of an ax query

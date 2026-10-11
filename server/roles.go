@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/ats/types"
 	"slices"
 	"strings"
 
@@ -55,7 +56,7 @@ func (r roleLines) WordLines() ([]auth.WordLine, error) {
 	}
 	var lines []auth.WordLine
 	for _, subject := range []string{auth.SubjectWrite, auth.SubjectRead} {
-		found, err := store.GetAttestations(ats.AttestationFilter{
+		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Subjects: []string{subject},
 			Limit:    ats.EveryRow,
 		})
@@ -93,7 +94,7 @@ func (s *QNTXServer) runtime() reach.Runtime {
 			"error", err)
 		return runtime
 	}
-	found, err := store.GetAttestations(ats.AttestationFilter{
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Subjects: []string{reach.Subject},
 		Limit:    ats.EveryRow,
 	})
@@ -138,7 +139,7 @@ func (r roleLines) RoleLines(namespace string) ([]auth.RoleLine, error) {
 	// One predicate at a time. A filter naming both is an `and` on some
 	// backends, and no line is ever both.
 	for _, predicate := range []string{auth.PredicateRoleGranted, auth.PredicateRoleRevoked} {
-		found, err := store.GetAttestations(ats.AttestationFilter{
+		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 			Predicates: []string{predicate},
 			// The store's own ceiling, said out loud. Newest first, so a
 			// deployment past it loses the oldest lines rather than the ones

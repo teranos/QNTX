@@ -61,7 +61,7 @@ func systemHolds(t *testing.T, s *QNTXServer) []*types.As {
 	t.Helper()
 	sys, err := s.held.Read(auth.NamespaceSystem)
 	require.NoError(t, err)
-	held, err := sys.GetAttestations(ats.AttestationFilter{Limit: 10})
+	held, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 10})
 	require.NoError(t, err)
 	return held
 }
@@ -114,7 +114,7 @@ func TestAGrantIsWrittenWhereTheNodeKeepsItsOwn(t *testing.T) {
 	rec := grants(t, s, root, workerGrant)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 
-	inGarden, err := s.held.Served().GetAttestations(ats.AttestationFilter{Limit: 10})
+	inGarden, err := s.held.Served().GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 10})
 	require.NoError(t, err)
 	assert.Empty(t, inGarden, "a grant landed in the namespace its writer was in")
 

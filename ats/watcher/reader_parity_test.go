@@ -112,7 +112,7 @@ func TestHistoricalMatchesReadThroughTheBackend(t *testing.T) {
 		ActionData:        "http://127.0.0.1:1/never-called",
 		MaxFiresPerSecond: 1,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"ads:declared"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"ads:declared"}},
 	}
 	if err := storage.NewWatcherStore(db).Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)

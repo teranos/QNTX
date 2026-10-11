@@ -2,8 +2,10 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
@@ -30,7 +32,7 @@ func TestAPluginQueryNamesHowManyRowsAndItsTimeRange(t *testing.T) {
 	if err != nil || filter.Limit != ats.EveryRow {
 		t.Fatalf("every row read as %d, %v", filter.Limit, err)
 	}
-	if filter.TimeStart != nil || filter.TimeEnd != nil {
+	if filter.TimeStart != types.Unbounded() || filter.TimeEnd != types.Unbounded() {
 		t.Fatalf("an unbounded range read as %v to %v", filter.TimeStart, filter.TimeEnd)
 	}
 
@@ -38,7 +40,7 @@ func TestAPluginQueryNamesHowManyRowsAndItsTimeRange(t *testing.T) {
 	bounded.From = &protocol.AttestationFilter_TimeStart{TimeStart: 1000}
 	bounded.To = &protocol.AttestationFilter_TimeEnd{TimeEnd: 2000}
 	filter, err = protoToFilter(bounded)
-	if err != nil || filter.TimeStart.UnixMilli() != 1000 || filter.TimeEnd.UnixMilli() != 2000 {
+	if err != nil || filter.TimeStart != types.BoundAt(time.UnixMilli(1000)) || filter.TimeEnd != types.BoundAt(time.UnixMilli(2000)) {
 		t.Fatalf("a bounded range read as %v to %v, %v", filter.TimeStart, filter.TimeEnd, err)
 	}
 

@@ -40,7 +40,7 @@ func TestEdgeCursor_AppliedOnReload(t *testing.T) {
 		"source_element_id":   "ax-source",
 	})
 
-	w := &storage.Watcher{
+	w := &storage.Watcher{Filter: types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()},
 		ID:                "meld-edge-comp-1-ax-source-py-target",
 		Name:              "test edge",
 		Enabled:           true,
@@ -75,12 +75,13 @@ func TestEdgeCursor_AppliedOnReload(t *testing.T) {
 		t.Fatalf("Watcher %s not found after reload", w.ID)
 	}
 
-	if loaded.Filter.TimeStart == nil {
-		t.Fatal("Expected TimeStart to be set from cursor, got nil")
+	start, bounded, err := loaded.Filter.TimeStart.At("start")
+	if err != nil || !bounded {
+		t.Fatalf("Expected TimeStart to be set from cursor: bounded %v, %v", bounded, err)
 	}
 
-	if !loaded.Filter.TimeStart.Equal(cursorTime) {
-		t.Errorf("TimeStart = %v, want %v", loaded.Filter.TimeStart, cursorTime)
+	if !start.Equal(cursorTime) {
+		t.Errorf("TimeStart = %v, want %v", start, cursorTime)
 	}
 
 	// Verify an attestation BEFORE the cursor is rejected

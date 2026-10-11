@@ -497,38 +497,35 @@ func protoToFilter(proto *protocol.AttestationFilter) (ats.AttestationFilter, er
 	if err != nil {
 		return ats.AttestationFilter{}, err
 	}
-	// ats.AttestationFilter holds an unbounded side by a nil.
+	// ats.AttestationFilter names each side the same way.
 	filter.TimeStart, filter.TimeEnd = start, end
 	return filter, nil
 }
 
-// filterStart is where a query's time range starts, or nil for unbounded,
-// which is how ats.AttestationFilter holds it.
-func filterStart(proto *protocol.AttestationFilter) (*time.Time, error) {
+// filterStart is where a query's time range starts, or that it is unbounded.
+func filterStart(proto *protocol.AttestationFilter) (types.TimeBound, error) {
 	switch from := proto.GetFrom().(type) {
 	case *protocol.AttestationFilter_TimeStart:
-		t := time.UnixMilli(from.TimeStart)
-		return &t, nil
+		return types.BoundAt(time.UnixMilli(from.TimeStart)), nil
 	case *protocol.AttestationFilter_UnboundedStart:
 		if !from.UnboundedStart {
-			return nil, errors.New("unbounded_start is false: a query names where its time range starts, or that it is unbounded")
+			return types.TimeBound{}, errors.New("unbounded_start is false: a query names where its time range starts, or that it is unbounded")
 		}
-		return nil, nil
+		return types.Unbounded(), nil
 	}
-	return nil, errors.New("a query names where its time range starts: time_start, or unbounded_start")
+	return types.TimeBound{}, errors.New("a query names where its time range starts: time_start, or unbounded_start")
 }
 
-// filterEnd is where a query's time range ends, or nil for unbounded.
-func filterEnd(proto *protocol.AttestationFilter) (*time.Time, error) {
+// filterEnd is where a query's time range ends, or that it is unbounded.
+func filterEnd(proto *protocol.AttestationFilter) (types.TimeBound, error) {
 	switch to := proto.GetTo().(type) {
 	case *protocol.AttestationFilter_TimeEnd:
-		t := time.UnixMilli(to.TimeEnd)
-		return &t, nil
+		return types.BoundAt(time.UnixMilli(to.TimeEnd)), nil
 	case *protocol.AttestationFilter_UnboundedEnd:
 		if !to.UnboundedEnd {
-			return nil, errors.New("unbounded_end is false: a query names where its time range ends, or that it is unbounded")
+			return types.TimeBound{}, errors.New("unbounded_end is false: a query names where its time range ends, or that it is unbounded")
 		}
-		return nil, nil
+		return types.Unbounded(), nil
 	}
-	return nil, errors.New("a query names where its time range ends: time_end, or unbounded_end")
+	return types.TimeBound{}, errors.New("a query names where its time range ends: time_end, or unbounded_end")
 }

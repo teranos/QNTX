@@ -125,8 +125,16 @@ func (r *RemoteATSStore) AttestationExists(asid string) bool {
 
 // GetAttestations retrieves attestations via gRPC.
 func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
-	// ats.AttestationFilter holds an unbounded side by a nil; on the wire it
-	// is said.
+	// Each side of the time range is said on the wire as the filter names
+	// it; a side naming neither is refused.
+	start, starts, err := filter.TimeStart.At("start")
+	if err != nil {
+		return nil, err
+	}
+	end, ends, err := filter.TimeEnd.At("end")
+	if err != nil {
+		return nil, err
+	}
 	protoFilter := &protocol.AttestationFilter{
 		Actors:     filter.Actors,
 		Subjects:   filter.Subjects,
@@ -136,11 +144,11 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 		From:       &protocol.AttestationFilter_UnboundedStart{UnboundedStart: true},
 		To:         &protocol.AttestationFilter_UnboundedEnd{UnboundedEnd: true},
 	}
-	if filter.TimeStart != nil {
-		protoFilter.From = &protocol.AttestationFilter_TimeStart{TimeStart: filter.TimeStart.UnixMilli()}
+	if starts {
+		protoFilter.From = &protocol.AttestationFilter_TimeStart{TimeStart: start.UnixMilli()}
 	}
-	if filter.TimeEnd != nil {
-		protoFilter.To = &protocol.AttestationFilter_TimeEnd{TimeEnd: filter.TimeEnd.UnixMilli()}
+	if ends {
+		protoFilter.To = &protocol.AttestationFilter_TimeEnd{TimeEnd: end.UnixMilli()}
 	}
 
 	req := &protocol.GetAttestationsRequest{

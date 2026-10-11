@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
@@ -53,7 +54,7 @@ func TestABatchIsAnsweredOnePerAttestation(t *testing.T) {
 		}
 	}
 
-	found, err := store.GetAttestations(ats.AttestationFilter{Limit: 10})
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 10})
 	if err != nil {
 		t.Fatalf("GetAttestations: %v", err)
 	}

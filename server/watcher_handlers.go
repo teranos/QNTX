@@ -51,26 +51,26 @@ type WatcherFire struct {
 
 // WatcherResponse represents a watcher in API responses
 type WatcherResponse struct {
-	ID                string   `json:"id"`
-	Name              string   `json:"name"`
-	Subjects          []string `json:"subjects,omitempty"`
-	Predicates        []string `json:"predicates,omitempty"`
-	Contexts          []string `json:"contexts,omitempty"`
-	Actors            []string `json:"actors,omitempty"`
-	TimeStart         string   `json:"time_start,omitempty"`
-	TimeEnd           string   `json:"time_end,omitempty"`
-	ActionType        string   `json:"action_type"`
-	ActionData        string   `json:"action_data"`
-	SemanticQuery     string   `json:"semantic_query,omitempty"`
-	SemanticThreshold float32  `json:"semantic_threshold,omitempty"`
-	MaxFiresPerSecond int      `json:"max_fires_per_second"`
-	Enabled           bool     `json:"enabled"`
-	CreatedAt         string   `json:"created_at"`
-	UpdatedAt         string   `json:"updated_at"`
-	LastFiredAt       string   `json:"last_fired_at,omitempty"`
-	FireCount         int64    `json:"fire_count"`
-	ErrorCount        int64    `json:"error_count"`
-	LastError         string   `json:"last_error,omitempty"`
+	ID                string          `json:"id"`
+	Name              string          `json:"name"`
+	Subjects          []string        `json:"subjects,omitempty"`
+	Predicates        []string        `json:"predicates,omitempty"`
+	Contexts          []string        `json:"contexts,omitempty"`
+	Actors            []string        `json:"actors,omitempty"`
+	TimeStart         types.TimeBound `json:"time_start"` // RFC3339, or "unbounded"
+	TimeEnd           types.TimeBound `json:"time_end"`   // RFC3339, or "unbounded"
+	ActionType        string          `json:"action_type"`
+	ActionData        string          `json:"action_data"`
+	SemanticQuery     string          `json:"semantic_query,omitempty"`
+	SemanticThreshold float32         `json:"semantic_threshold,omitempty"`
+	MaxFiresPerSecond int             `json:"max_fires_per_second"`
+	Enabled           bool            `json:"enabled"`
+	CreatedAt         string          `json:"created_at"`
+	UpdatedAt         string          `json:"updated_at"`
+	LastFiredAt       string          `json:"last_fired_at,omitempty"`
+	FireCount         int64           `json:"fire_count"`
+	ErrorCount        int64           `json:"error_count"`
+	LastError         string          `json:"last_error,omitempty"`
 
 	// The last fires, newest first, when ?fires=N asked for them. A count says
 	// how often; these say which attestations and when.
@@ -108,12 +108,7 @@ func watcherToResponse(w *storage.Watcher) WatcherResponse {
 		LastError:         w.LastError,
 	}
 
-	if w.Filter.TimeStart != nil {
-		resp.TimeStart = w.Filter.TimeStart.Format(time.RFC3339)
-	}
-	if w.Filter.TimeEnd != nil {
-		resp.TimeEnd = w.Filter.TimeEnd.Format(time.RFC3339)
-	}
+	resp.TimeStart, resp.TimeEnd = w.Filter.TimeStart, w.Filter.TimeEnd
 	if w.LastFiredAt != nil {
 		resp.LastFiredAt = w.LastFiredAt.Format(time.RFC3339)
 	}

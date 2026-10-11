@@ -480,7 +480,7 @@ func emitClusterLifecycleAttestation(atsStore ats.AttestationStore, ev storage.C
 // Delivery acks are written by Ground into Ground's DB, so we check there.
 func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string, groundDBPath string, logger *zap.SugaredLogger) string {
 	// Find the latest deferred:cluster-update in QNTX's store
-	deferred, err := atsStore.GetAttestations(ats.AttestationFilter{
+	deferred, err := atsStore.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Predicates: []string{"deferred:cluster-update"},
 		Contexts:   []string{projectCtx},
 		Limit:      1,

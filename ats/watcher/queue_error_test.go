@@ -43,7 +43,7 @@ func TestDrainReportsRefusedQueueWrite(t *testing.T) {
 		ActionData:        target.URL + "/webhook",
 		MaxFiresPerSecond: 100,
 		Enabled:           true,
-		Filter:            types.AxFilter{Predicates: []string{"drain-error"}},
+		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"drain-error"}},
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
