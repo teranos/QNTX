@@ -51,7 +51,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "atproto",
-			Version:     "0.4.4",
+			Version:     "0.4.5",
 			QNTXVersion: ">= 0.1.0",
 			Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 			Author:      "QNTX Team",

@@ -37,7 +37,7 @@ func (p *Plugin) attestSessionStatus(status, pdsHost, identity, errMsg string) {
 		Subjects:      []string{identity},
 		Predicates:    []string{status},
 		Source:        p.Metadata().Name,
-		SourceVersion: p.Metadata().Version,
+		SourceVersion: types.VersionFromRegistry{},
 		Attributes:    attrs,
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
@@ -59,7 +59,7 @@ func (p *Plugin) attestPost(did, uri, cid, text string) {
 		Predicates:    []string{"posted"},
 		Contexts:      []string{collectionFromURI(uri)},
 		Source:        p.Metadata().Name,
-		SourceVersion: p.Metadata().Version,
+		SourceVersion: types.VersionFromRegistry{},
 		Attributes: map[string]interface{}{
 			"cid":  cid,
 			"text": text,
@@ -84,7 +84,7 @@ func (p *Plugin) attestFollow(actorDID, subjectDID, uri string) {
 		Predicates:    []string{"following"},
 		Contexts:      []string{collectionFromURI(uri)},
 		Source:        p.Metadata().Name,
-		SourceVersion: p.Metadata().Version,
+		SourceVersion: types.VersionFromRegistry{},
 		Attributes: map[string]interface{}{
 			"uri": uri,
 		},
@@ -108,7 +108,7 @@ func (p *Plugin) attestLike(actorDID, subjectURI, uri string) {
 		Predicates:    []string{"liked"},
 		Contexts:      []string{collectionFromURI(uri)},
 		Source:        p.Metadata().Name,
-		SourceVersion: p.Metadata().Version,
+		SourceVersion: types.VersionFromRegistry{},
 		Attributes: map[string]interface{}{
 			"uri": uri,
 		},
@@ -130,7 +130,7 @@ func (p *Plugin) attestResolve(handle, did string) {
 		Subjects:      []string{handle},
 		Predicates:    []string{"resolved-to"},
 		Source:        p.Metadata().Name,
-		SourceVersion: p.Metadata().Version,
+		SourceVersion: types.VersionFromRegistry{},
 		Attributes: map[string]interface{}{
 			"did": did,
 		},
@@ -162,7 +162,7 @@ func (p *Plugin) attestTimelinePost(ctx context.Context, uri, authorDID, authorH
 		Predicates:    []string{"appeared-in-timeline"},
 		Contexts:      []string{collectionFromURI(uri)},
 		Source:        p.Metadata().Name,
-		SourceVersion: p.Metadata().Version,
+		SourceVersion: types.VersionFromRegistry{},
 		Attributes:    attrs,
 	}
 	if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {

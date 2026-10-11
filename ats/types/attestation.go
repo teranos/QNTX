@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/errors"
 )
 
@@ -33,15 +34,34 @@ type As struct {
 //
 // TODO(#605): Rename to As (and As → Attestation) for clarity.
 type AsCommand struct {
-	Subjects      []string       `json:"subjects"`                 // Entities being attested about
-	Predicates    []string       `json:"predicates"`               // What is being claimed (optional, defaults to ["_"])
-	Contexts      []string       `json:"contexts"`                 // Optional "of" context (defaults to ["_"])
-	Actors        []string       `json:"actors"`                   // Who made the attestation; a store refuses a command naming none
-	Timestamp     time.Time      `json:"timestamp"`                // When attestation was made (optional, uses now)
-	Source        string         `json:"source,omitempty"`         // Source of attestation (e.g., "cli", "github", "atproto")
-	SourceVersion string         `json:"source_version,omitempty"` // Version of the source that created this attestation
-	Attributes    map[string]any `json:"attributes,omitempty"`     // Arbitrary JSON
+	Subjects      []string       `json:"subjects"`             // Entities being attested about
+	Predicates    []string       `json:"predicates"`           // What is being claimed (optional, defaults to ["_"])
+	Contexts      []string       `json:"contexts"`             // Optional "of" context (defaults to ["_"])
+	Actors        []string       `json:"actors"`               // Who made the attestation; a store refuses a command naming none
+	Timestamp     time.Time      `json:"timestamp"`            // When attestation was made (optional, uses now)
+	Source        string         `json:"source,omitempty"`     // Source of attestation (e.g., "cli", "github", "atproto")
+	SourceVersion SourceVersion  `json:"-"`                    // The version of the source a plugin's command is stamped with
+	Attributes    map[string]any `json:"attributes,omitempty"` // Arbitrary JSON
 }
+
+// SourceVersion is the version an attestation a plugin sends is stamped
+// with: the one its command names, or the one the node's registry holds for
+// its source. A command a plugin sends naming neither is refused.
+type SourceVersion interface {
+	stampsSourceVersion()
+}
+
+// VersionNamed is the version a command names.
+type VersionNamed struct {
+	Version named.Text
+}
+
+// VersionFromRegistry is the version the node's registry holds for the
+// command's source.
+type VersionFromRegistry struct{}
+
+func (VersionNamed) stampsSourceVersion()        {}
+func (VersionFromRegistry) stampsSourceVersion() {}
 
 // "the node"
 //

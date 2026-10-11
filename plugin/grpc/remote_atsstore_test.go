@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/named"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
@@ -76,6 +77,32 @@ func TestRemoteATSStore_CreateAttestation(t *testing.T) {
 	// Verify it exists
 	exists := client.AttestationExists("test-id-123")
 	assert.True(t, exists)
+}
+
+// "nil is nil": a plugin's command names the version it is stamped with, its
+// own or the registry's; one naming neither is not sent.
+func TestRemoteATSStore_ACommandNamesItsVersion(t *testing.T) {
+	store, _ := qntxtest.CreateTestStore(t)
+	addr, cleanup := startATSStoreServer(t, store, "test-token")
+	defer cleanup()
+	client, err := NewRemoteATSStore(context.Background(), addr, "test-token", zaptest.NewLogger(t).Sugar())
+	require.NoError(t, err)
+	defer client.Close()
+
+	version, err := named.TextOf("version", "1.2.3")
+	require.NoError(t, err)
+	as, err := client.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
+		Subjects: []string{"alice"}, Actors: []string{"test@user"}, Source: "test",
+		SourceVersion: types.VersionNamed{Version: version},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "1.2.3", as.Attributes["source_version"])
+
+	_, err = client.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
+		Subjects: []string{"alice"}, Actors: []string{"test@user"}, Source: "test",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "names no version")
 }
 
 func TestATSStoreServer_GenerateAndCreate_NilCommand(t *testing.T) {

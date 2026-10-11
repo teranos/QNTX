@@ -5,7 +5,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -51,9 +50,8 @@ func (r *RemoteATSStore) Close() error {
 
 // GenerateAndCreateAttestation creates an attestation via gRPC.
 func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
-	// types.AsCommand says the node authors a command naming no actor, now
-	// for one naming no time, and the registry's version for one naming none;
-	// on the wire each is said.
+	// types.AsCommand says the node authors a command naming no actor, and now
+	// for one naming no time; on the wire each is said. Its version it names.
 	protoCmd := &protocol.AttestationCommand{
 		Subjects:   cmd.Subjects,
 		Predicates: cmd.Predicates,
@@ -68,10 +66,8 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *
 	if cmd.Timestamp.IsZero() {
 		protoCmd.When = &protocol.AttestationCommand_Now{Now: true}
 	}
-	if version, err := named.TextOf("source_version", cmd.SourceVersion); err != nil {
-		protoCmd.Version = &protocol.AttestationCommand_VersionFromRegistry{VersionFromRegistry: true}
-	} else {
-		protoCmd.Version = &protocol.AttestationCommand_SourceVersion{SourceVersion: version.String()}
+	if err := sayVersion(cmd, protoCmd); err != nil {
+		return nil, err
 	}
 
 	attrs, err := protocol.AttributesStruct(cmd.Attributes)
@@ -95,6 +91,20 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *
 	}
 
 	return resp.Attestation.ToTypes(), nil
+}
+
+// sayVersion says on the wire the version a command names: its own, or the
+// registry's. A command naming neither is refused.
+func sayVersion(cmd *types.AsCommand, protoCmd *protocol.AttestationCommand) error {
+	switch version := cmd.SourceVersion.(type) {
+	case types.VersionNamed:
+		protoCmd.Version = &protocol.AttestationCommand_SourceVersion{SourceVersion: version.Version.String()}
+		return nil
+	case types.VersionFromRegistry:
+		protoCmd.Version = &protocol.AttestationCommand_VersionFromRegistry{VersionFromRegistry: true}
+		return nil
+	}
+	return errors.Newf("the attestation of %v from %s names no version: its own, or the registry's", cmd.Subjects, cmd.Source)
 }
 
 // AttestationExists checks if an attestation exists via gRPC.
