@@ -29,6 +29,7 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 	t.Run("mission control creates emitter", func(t *testing.T) {
 		// Mission Control sets up reporting for a new mission
 		job := &Job{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "mission-001",
 			HandlerName: "test.satellite-deployment",
 			Source:      "starlink-batch-42",
@@ -51,6 +52,7 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 	t.Run("mission control reports stage transitions", func(t *testing.T) {
 		// Create a mission and save it to database
 		job := &Job{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "mission-002",
 			HandlerName: "test.rocket-launch",
 			Source:      "falcon-9",
@@ -79,6 +81,7 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 	t.Run("mission control reports batch progress", func(t *testing.T) {
 		// Create a mission
 		job := &Job{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "mission-003",
 			HandlerName: "test.satellite-deployment",
 			Source:      "starlink",
@@ -117,6 +120,7 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 	t.Run("mission control reports single item progress", func(t *testing.T) {
 		// Create a mission
 		job := &Job{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "mission-004",
 			HandlerName: "test.item-evaluation",
 			Source:      "applications",
@@ -154,6 +158,7 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 
 	t.Run("mission control logs informational messages", func(t *testing.T) {
 		job := &Job{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "mission-005",
 			HandlerName: "test.weather-monitoring",
 			Source:      "weather-station",
@@ -173,6 +178,7 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 	t.Run("mission control reports errors", func(t *testing.T) {
 		// Create a mission
 		job := &Job{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "mission-006",
 			HandlerName: "test.rocket-launch",
 			Source:      "falcon-heavy",

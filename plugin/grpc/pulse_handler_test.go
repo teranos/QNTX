@@ -25,6 +25,7 @@ func TestWriteLogs(t *testing.T) {
 	// Create a job so the FK constraint on task_logs is satisfied
 	store := async.NewStore(db)
 	job := &async.Job{
+		Pulse: async.NoPulse(), Started: async.NotYet(), Completed: async.NotYet(),
 		ID:          "JOB_test_write_logs",
 		HandlerName: "test.handler",
 		Source:      "test",
@@ -185,6 +186,7 @@ func TestARunNoCallerMadeCarriesNoStoreToken(t *testing.T) {
 func jobIn(t *testing.T, db *sql.DB, job *async.Job) *async.Job {
 	t.Helper()
 	job.HandlerName = "datapunt/observe"
+	job.Pulse, job.Started, job.Completed = async.NoPulse(), async.NotYet(), async.NotYet()
 	job.Source = "test"
 	job.Status = "queued"
 	job.CreatedAt = time.Now()

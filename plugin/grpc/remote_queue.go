@@ -122,19 +122,25 @@ func (r *RemoteQueue) UpdateJob(job *async.Job) error {
 	return nil
 }
 
-// ListJobs lists jobs with optional status filter via gRPC.
-func (r *RemoteQueue) ListJobs(status *async.JobStatus, limit int) ([]*async.Job, error) {
-	req := &protocol.ListJobsRequest{
+// ListJobs lists the newest jobs in one status via gRPC.
+func (r *RemoteQueue) ListJobs(status async.JobStatus, limit int) ([]*async.Job, error) {
+	return r.listJobs(&protocol.ListJobsRequest{
+		AuthToken: r.authToken,
+		Which:     &protocol.ListJobsRequest_Status{Status: string(status)},
+		Limit:     int32(limit),
+	})
+}
+
+// ListEveryJob lists the newest jobs in every status via gRPC.
+func (r *RemoteQueue) ListEveryJob(limit int) ([]*async.Job, error) {
+	return r.listJobs(&protocol.ListJobsRequest{
 		AuthToken: r.authToken,
 		Which:     &protocol.ListJobsRequest_EveryStatus{EveryStatus: true},
 		Limit:     int32(limit),
-	}
+	})
+}
 
-	// plugin.QueueService says every status by a nil status.
-	if status != nil {
-		req.Which = &protocol.ListJobsRequest_Status{Status: string(*status)}
-	}
-
+func (r *RemoteQueue) listJobs(req *protocol.ListJobsRequest) ([]*async.Job, error) {
 	resp, err := r.client.ListJobs(r.ctx, req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list jobs")

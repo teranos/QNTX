@@ -22,8 +22,11 @@ type QueueService interface {
 	// UpdateJob updates a job's state
 	UpdateJob(job *async.Job) error
 
-	// ListJobs lists jobs with optional status filter
-	ListJobs(status *async.JobStatus, limit int) ([]*async.Job, error)
+	// ListJobs lists the newest jobs in one status, up to limit.
+	ListJobs(status async.JobStatus, limit int) ([]*async.Job, error)
+
+	// ListEveryJob lists the newest jobs in every status, up to limit.
+	ListEveryJob(limit int) ([]*async.Job, error)
 }
 
 // ScheduleService defines runtime schedule management for plugins.

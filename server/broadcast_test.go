@@ -71,8 +71,9 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 		Status:       async.JobStatusFailed,
 		Error:        handlerErr.Error(),
 		ErrorDetails: errors.GetAllDetails(handlerErr),
-		StartedAt:    &startTime,
-		CompletedAt:  &completedTime,
+		Pulse:        async.NoPulse(),
+		Started:      async.At(startTime),
+		Completed:    async.At(completedTime),
 		CreatedAt:    now,
 		UpdatedAt:    completedTime,
 	}

@@ -176,12 +176,12 @@ func (s *QueueServer) listed(req *protocol.ListJobsRequest) ([]*async.Job, error
 			return nil, err
 		}
 		status := async.JobStatus(given.String())
-		return s.queue.ListJobs(&status, limit)
+		return s.queue.ListJobs(status, limit)
 	case *protocol.ListJobsRequest_EveryStatus:
 		if !which.EveryStatus {
 			return nil, errors.New("every_status is false: a listing names a status, or every status")
 		}
-		return s.queue.ListJobs(nil, limit)
+		return s.queue.ListEveryJob(limit)
 	}
 	return nil, errors.New("a listing names which jobs: a status, or every_status")
 }
@@ -189,15 +189,15 @@ func (s *QueueServer) listed(req *protocol.ListJobsRequest) ([]*async.Job, error
 // Helper functions for conversion
 
 func ProtoToJob(proto *protocol.Job) (*async.Job, error) {
-	pulseState, err := pulseStateOf(proto)
+	pulse, err := pulseOf(proto)
 	if err != nil {
 		return nil, err
 	}
-	startedAt, err := momentOf(proto.GetId(), "started", proto.GetStarted())
+	started, err := momentOf(proto.GetId(), "started", proto.GetStarted())
 	if err != nil {
 		return nil, err
 	}
-	completedAt, err := momentOf(proto.GetId(), "completed", proto.GetCompleted())
+	completed, err := momentOf(proto.GetId(), "completed", proto.GetCompleted())
 	if err != nil {
 		return nil, err
 	}
@@ -212,64 +212,61 @@ func ProtoToJob(proto *protocol.Job) (*async.Job, error) {
 			Current: int(proto.Progress.Current),
 			Total:   int(proto.Progress.Total),
 		},
-		PulseState:  pulseState,
+		Pulse:       pulse,
 		Error:       proto.Error,
 		ParentJobID: proto.ParentJobId,
 		RetryCount:  int(proto.RetryCount),
 		CreatedAt:   time.Unix(proto.CreatedAt, 0),
-		StartedAt:   startedAt,
-		CompletedAt: completedAt,
+		Started:     started,
+		Completed:   completed,
 	}
 
 	return job, nil
 }
 
-// pulseStateOf is a job's pacing as async holds it: none for a job that says
-// it carries none.
-func pulseStateOf(proto *protocol.Job) (*async.PulseState, error) {
+// pulseOf is a job's pacing as async holds it: its pulse state, or none for a
+// job that says it carries none.
+func pulseOf(proto *protocol.Job) (async.Pulse, error) {
 	switch pulse := proto.GetPulse().(type) {
 	case *protocol.Job_PulseState:
-		return &async.PulseState{
+		return async.Pulsed(async.PulseState{
 			CallsThisMinute: int(pulse.PulseState.GetCallsThisMinute()),
 			CallsRemaining:  int(pulse.PulseState.GetCallsRemaining()),
 			IsPaused:        pulse.PulseState.GetIsPaused(),
 			PauseReason:     pulse.PulseState.GetPauseReason(),
-		}, nil
+		}), nil
 	case *protocol.Job_NoPulseState:
 		if !pulse.NoPulseState {
-			return nil, errors.Newf("job %s: no_pulse_state is false: a job carries its pulse state, or none", proto.GetId())
+			return async.Pulse{}, errors.Newf("job %s: no_pulse_state is false: a job carries its pulse state, or none", proto.GetId())
 		}
-		return nil, nil
+		return async.NoPulse(), nil
 	}
-	return nil, errors.Newf("job %s names no pulse state: pulse_state, or no_pulse_state", proto.GetId())
+	return async.Pulse{}, errors.Newf("job %s names no pulse state: pulse_state, or no_pulse_state", proto.GetId())
 }
 
-// momentOf is when a job started or completed, as async holds it: no time for
-// a job that says it has not yet.
-func momentOf(id, what string, moment any) (*time.Time, error) {
+// momentOf is when a job started or completed, as async holds it: not yet for
+// a job that says it has not.
+func momentOf(id, what string, moment any) (async.Moment, error) {
 	switch at := moment.(type) {
 	case *protocol.Job_StartedAt:
-		t := time.Unix(at.StartedAt, 0)
-		return &t, nil
+		return async.At(time.Unix(at.StartedAt, 0)), nil
 	case *protocol.Job_CompletedAt:
-		t := time.Unix(at.CompletedAt, 0)
-		return &t, nil
+		return async.At(time.Unix(at.CompletedAt, 0)), nil
 	case *protocol.Job_NotStarted:
 		if !at.NotStarted {
-			return nil, errors.Newf("job %s: not_started is false: a job names when it started, or that it has not", id)
+			return async.Moment{}, errors.Newf("job %s: not_started is false: a job names when it started, or that it has not", id)
 		}
-		return nil, nil
+		return async.NotYet(), nil
 	case *protocol.Job_NotCompleted:
 		if !at.NotCompleted {
-			return nil, errors.Newf("job %s: not_completed is false: a job names when it completed, or that it has not", id)
+			return async.Moment{}, errors.Newf("job %s: not_completed is false: a job names when it completed, or that it has not", id)
 		}
-		return nil, nil
+		return async.NotYet(), nil
 	}
-	return nil, errors.Newf("job %s does not say whether it %s", id, what)
+	return async.Moment{}, errors.Newf("job %s does not say whether it %s", id, what)
 }
 
 func JobToProto(job *async.Job) (*protocol.Job, error) {
-
 	protoJob := &protocol.Job{
 		Id:          job.ID,
 		HandlerName: job.HandlerName,
@@ -289,21 +286,33 @@ func JobToProto(job *async.Job) (*protocol.Job, error) {
 		Completed:   &protocol.Job_NotCompleted{NotCompleted: true},
 	}
 
-	// async holds a job with no pulse state, and one not yet started or
-	// completed, by a nil; on the wire each is named.
-	if job.PulseState != nil {
+	// async names a job's pulse state, start and completion, or that it has
+	// none yet; on the wire each is named the same way.
+	state, held, err := job.Pulse.State("job " + job.ID)
+	if err != nil {
+		return nil, err
+	}
+	if held {
 		protoJob.Pulse = &protocol.Job_PulseState{PulseState: &protocol.PulseState{
-			CallsThisMinute: int32(job.PulseState.CallsThisMinute),
-			CallsRemaining:  int32(job.PulseState.CallsRemaining),
-			IsPaused:        job.PulseState.IsPaused,
-			PauseReason:     job.PulseState.PauseReason,
+			CallsThisMinute: int32(state.CallsThisMinute),
+			CallsRemaining:  int32(state.CallsRemaining),
+			IsPaused:        state.IsPaused,
+			PauseReason:     state.PauseReason,
 		}}
 	}
-	if job.StartedAt != nil {
-		protoJob.Started = &protocol.Job_StartedAt{StartedAt: job.StartedAt.Unix()}
+	started, startedYet, err := job.Started.When("the start of job " + job.ID)
+	if err != nil {
+		return nil, err
 	}
-	if job.CompletedAt != nil {
-		protoJob.Completed = &protocol.Job_CompletedAt{CompletedAt: job.CompletedAt.Unix()}
+	if startedYet {
+		protoJob.Started = &protocol.Job_StartedAt{StartedAt: started.Unix()}
+	}
+	completed, completedYet, err := job.Completed.When("the completion of job " + job.ID)
+	if err != nil {
+		return nil, err
+	}
+	if completedYet {
+		protoJob.Completed = &protocol.Job_CompletedAt{CompletedAt: completed.Unix()}
 	}
 
 	return protoJob, nil

@@ -22,15 +22,15 @@ func TestTheErrorsHandlersFailedWithMostInAWindow(t *testing.T) {
 	hourAgo := now.Add(-time.Hour)
 
 	jobs := []*Job{
-		{ID: "a1", HandlerName: "garden.water", Status: JobStatusFailed, Error: "account refused", UpdatedAt: hourAgo},
-		{ID: "a2", HandlerName: "garden.water", Status: JobStatusFailed, Error: "account refused", UpdatedAt: hourAgo},
-		{ID: "a3", HandlerName: "garden.water", Status: JobStatusFailed, Error: "account refused", UpdatedAt: hourAgo.Add(time.Minute)},
-		{ID: "a4", HandlerName: "garden.water", Status: JobStatusFailed, Error: "pump dry", UpdatedAt: hourAgo},
-		{ID: "i1", HandlerName: "garden.prune", Status: JobStatusFailed, Error: "inventory refused", UpdatedAt: hourAgo},
-		{ID: "i2", HandlerName: "garden.prune", Status: JobStatusFailed, Error: "inventory refused", UpdatedAt: hourAgo},
-		{ID: "old", HandlerName: "garden.seed", Status: JobStatusFailed, Error: "last month", UpdatedAt: now.Add(-10 * 24 * time.Hour)},
-		{ID: "cut", HandlerName: "garden.harvest", Status: JobStatusFailed, Error: OrphanedError, UpdatedAt: hourAgo},
-		{ID: "ok", HandlerName: "garden.water", Status: JobStatusCompleted, UpdatedAt: hourAgo},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "a1", HandlerName: "garden.water", Status: JobStatusFailed, Error: "account refused", UpdatedAt: hourAgo},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "a2", HandlerName: "garden.water", Status: JobStatusFailed, Error: "account refused", UpdatedAt: hourAgo},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "a3", HandlerName: "garden.water", Status: JobStatusFailed, Error: "account refused", UpdatedAt: hourAgo.Add(time.Minute)},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "a4", HandlerName: "garden.water", Status: JobStatusFailed, Error: "pump dry", UpdatedAt: hourAgo},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "i1", HandlerName: "garden.prune", Status: JobStatusFailed, Error: "inventory refused", UpdatedAt: hourAgo},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "i2", HandlerName: "garden.prune", Status: JobStatusFailed, Error: "inventory refused", UpdatedAt: hourAgo},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "old", HandlerName: "garden.seed", Status: JobStatusFailed, Error: "last month", UpdatedAt: now.Add(-10 * 24 * time.Hour)},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "cut", HandlerName: "garden.harvest", Status: JobStatusFailed, Error: OrphanedError, UpdatedAt: hourAgo},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "ok", HandlerName: "garden.water", Status: JobStatusCompleted, UpdatedAt: hourAgo},
 	}
 	for _, j := range jobs {
 		j.CreatedAt = j.UpdatedAt

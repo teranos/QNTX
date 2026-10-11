@@ -221,7 +221,7 @@ func (wp *WorkerPool) Start() {
 func (wp *WorkerPool) recoverOrphanedJobs() error {
 	// Find all jobs that are still marked as "running"
 	runningStatus := JobStatusRunning
-	orphanedJobs, err := wp.queue.store.ListJobs(&runningStatus, MaxOrphanedJobsToRecover)
+	orphanedJobs, err := wp.queue.store.ListJobs(runningStatus, MaxOrphanedJobsToRecover)
 	if err != nil {
 		err = errors.Wrap(err, "failed to list running jobs")
 		err = errors.WithDetail(err, fmt.Sprintf("Status: %s", runningStatus))
@@ -267,8 +267,7 @@ const OrphanedError = "orphaned: server restart while running"
 func (wp *WorkerPool) failOrphanedJob(job *Job) error {
 	job.Status = JobStatusFailed
 	job.Error = OrphanedError
-	now := time.Now()
-	job.CompletedAt = &now
+	job.Completed = At(time.Now())
 
 	if err := wp.queue.UpdateJob(job); err != nil {
 		err = errors.Wrapf(err, "failed to fail orphaned job %s", job.ID)
@@ -675,7 +674,7 @@ func (wp *WorkerPool) updateJobPulseState(job *Job) {
 	}
 
 	callsInWindow, callsRemaining := wp.rateLimiter.Stats()
-	job.UpdatePulseState(&PulseState{
+	job.UpdatePulseState(PulseState{
 		CallsThisMinute: callsInWindow,
 		CallsRemaining:  callsRemaining,
 		IsPaused:        false,

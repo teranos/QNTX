@@ -110,14 +110,14 @@ func (s *QNTXServer) handleListAsyncJobs(w http.ResponseWriter, r *http.Request)
 	}
 	allJobs = append(allJobs, activeJobs...)
 
-	completedJobs, err := queue.ListJobs(asyncJobStatusPtr(async.JobStatusCompleted), limit)
+	completedJobs, err := queue.ListJobs(async.JobStatusCompleted, limit)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "failed to list completed jobs", http.StatusInternalServerError)
 		return
 	}
 	allJobs = append(allJobs, completedJobs...)
 
-	failedJobs, err := queue.ListJobs(asyncJobStatusPtr(async.JobStatusFailed), limit)
+	failedJobs, err := queue.ListJobs(async.JobStatusFailed, limit)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "failed to list failed jobs", http.StatusInternalServerError)
 		return

@@ -416,6 +416,7 @@ func TestCronosCheckRateLimitWithNilLimiter(t *testing.T) {
 
 	// Create a test job
 	job := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_NO_RATE_LIMIT",
 		HandlerName: "test.handler",
 		Source:      "no_limit.html",

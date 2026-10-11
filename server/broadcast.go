@@ -198,14 +198,22 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 		return
 	}
 
-	// Calculate duration
-	var durationMs int
-	if job.StartedAt != nil && job.CompletedAt != nil {
-		durationMs = int(job.CompletedAt.Sub(*job.StartedAt).Milliseconds())
+	// A job completes or fails after the queue started it: its duration is
+	// from one to the other. A job saying it has not done either has none.
+	started, err := job.Started.Time("the start of job " + job.ID)
+	if err != nil {
+		s.logger.Warnw("Pulse execution not updated: the job has no duration", "async_job_id", job.ID, "execution_id", execution.Id, "error", err)
+		return
 	}
+	completed, err := job.Completed.Time("the completion of job " + job.ID)
+	if err != nil {
+		s.logger.Warnw("Pulse execution not updated: the job has no duration", "async_job_id", job.ID, "execution_id", execution.Id, "error", err)
+		return
+	}
+	durationMs := int(completed.Sub(started).Milliseconds())
 
 	// Update execution record based on job status
-	completedAt := job.CompletedAt.Format(time.RFC3339)
+	completedAt := completed.Format(time.RFC3339)
 	execution.CompletedAt = &completedAt
 	duration32 := int32(durationMs)
 	execution.DurationMs = &duration32

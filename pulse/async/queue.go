@@ -95,7 +95,7 @@ func (q *Queue) Dequeue() (*Job, error) {
 
 	// Get the oldest queued job
 	queuedStatus := JobStatusQueued
-	jobs, err := q.store.ListJobs(&queuedStatus, 1)
+	jobs, err := q.store.ListJobs(queuedStatus, 1)
 	if err != nil {
 		err = errors.Wrap(err, "failed to get queued jobs")
 		err = errors.WithDetail(err, fmt.Sprintf("Status filter: %s", queuedStatus))
@@ -363,12 +363,20 @@ func (q *Queue) DeleteJobWithChildren(jobID string) error {
 	return nil
 }
 
-// ListJobs returns jobs, optionally filtered by status
-func (q *Queue) ListJobs(status *JobStatus, limit int) ([]*Job, error) {
+// ListJobs is the newest jobs in one status, up to limit.
+func (q *Queue) ListJobs(status JobStatus, limit int) ([]*Job, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
 	return q.store.ListJobs(status, limit)
+}
+
+// ListEveryJob is the newest jobs in every status, up to limit.
+func (q *Queue) ListEveryJob(limit int) ([]*Job, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	return q.store.ListEveryJob(limit)
 }
 
 // FailedHandlersSince is the handlers whose jobs failed since a time, most

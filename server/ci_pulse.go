@@ -795,7 +795,8 @@ func (s *QNTXServer) setupCIWatch() {
 			continue
 		}
 		sacred.Go("ci.watch rearm "+as.ID, func() {
-			job := &async.Job{ID: "rearm:" + as.ID, HandlerName: watcher.CIWatchHandlerName, Payload: payload, Source: rearmSource}
+			job := &async.Job{ID: "rearm:" + as.ID, HandlerName: watcher.CIWatchHandlerName, Payload: payload, Source: rearmSource,
+				Pulse: async.NoPulse(), Started: async.At(time.Now()), Completed: async.NotYet()}
 			if err := h.Execute(s.ctx, job); err != nil {
 				s.noteHandlerFailure(HandlerFailure{Handler: watcher.CIWatchHandlerName, ExecutionID: job.ID,
 					Error: err.Error(), Details: errors.GetAllDetails(err)})

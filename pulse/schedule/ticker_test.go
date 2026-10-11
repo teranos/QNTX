@@ -146,7 +146,7 @@ func TestCheckJobs_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify async job was created
-	jobs, err := queue.ListJobs(nil, 100)
+	jobs, err := queue.ListEveryJob(100)
 	require.NoError(t, err)
 	assert.Greater(t, len(jobs), 0, "At least one async job should be created")
 
@@ -187,7 +187,7 @@ func TestCheckJobs_FailsWithoutHandlerName(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify NO async job was created (because handler was missing)
-	jobs, err := queue.ListJobs(nil, 100)
+	jobs, err := queue.ListEveryJob(100)
 	require.NoError(t, err)
 	assert.Equal(t, 0, len(jobs), "No async jobs should be created when handler_name is missing")
 }
@@ -323,7 +323,7 @@ func TestCheckJobs_ZeroIntervalNeverRuns(t *testing.T) {
 	ticker := NewTicker(store, queue, nil, &mockBroadcaster{}, DefaultTickerConfig(), logger.Logger)
 	require.NoError(t, ticker.checkScheduledJobs(now))
 
-	jobs, err := queue.ListJobs(nil, 100)
+	jobs, err := queue.ListEveryJob(100)
 	require.NoError(t, err)
 	assert.Empty(t, jobs, "a schedule with interval 0 ran")
 	held, err := store.GetJob("SPJ_zero_interval")

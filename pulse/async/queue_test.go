@@ -33,6 +33,7 @@ func TestTASBotEnqueuesJob(t *testing.T) {
 
 	// TAS Bot creates a job
 	job := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_TASBOT_001",
 		HandlerName: "test.jd-extraction",
 		Source:      "speedrun_jd.html",
@@ -61,6 +62,7 @@ func TestYugiDequeuesJob(t *testing.T) {
 
 	// First, TAS Bot enqueues a job for Yugi
 	job := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_YUGI_001",
 		HandlerName: "test.jd-extraction",
 		Source:      "card_ability.html",
@@ -101,6 +103,7 @@ func TestTASBotJobPriority(t *testing.T) {
 
 	// TAS Bot enqueues low-priority job
 	lowPriorityJob := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_LOW_PRIORITY",
 		HandlerName: "test.jd-extraction",
 		Source:      "slow_strat.html",
@@ -113,6 +116,7 @@ func TestTASBotJobPriority(t *testing.T) {
 	// TAS Bot enqueues high-priority job (after low-priority)
 	time.Sleep(10 * time.Millisecond) // Ensure different timestamps
 	highPriorityJob := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_HIGH_PRIORITY",
 		HandlerName: "test.jd-extraction",
 		Source:      "fast_strat.html",
@@ -167,6 +171,7 @@ func TestCronosPausedJob(t *testing.T) {
 
 	// TAS Bot enqueues a job
 	job := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_PAUSED_001",
 		HandlerName: "test.jd-extraction",
 		Source:      "paused.html",
@@ -211,6 +216,7 @@ func TestTASBotResumeJob(t *testing.T) {
 
 	// Create, dequeue, and pause a job
 	job := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_RESUME_001",
 		HandlerName: "test.jd-extraction",
 		Source:      "resume.html",
@@ -258,6 +264,7 @@ func TestYugiJobStateTransitions(t *testing.T) {
 
 	// TAS Bot creates a job
 	job := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_TRANSFORM_001",
 		HandlerName: "test.jd-extraction",
 		Source:      "transform.html",
@@ -278,7 +285,7 @@ func TestYugiJobStateTransitions(t *testing.T) {
 
 	// Yugi completes the job (running → completed)
 	dequeuedJob.Status = "completed"
-	dequeuedJob.CompletedAt = timePtr(time.Now())
+	dequeuedJob.Completed = At(time.Now())
 	err = queue.UpdateJob(dequeuedJob)
 	if err != nil {
 		t.Fatalf("Yugi failed to update job to completed: %v", err)
@@ -298,6 +305,7 @@ func TestTASBotFailJob(t *testing.T) {
 
 	// Create a job
 	job := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_FAIL_001",
 		HandlerName: "test.jd-extraction",
 		Source:      "fail.html",
@@ -327,6 +335,7 @@ func TestCronosScheduledJob(t *testing.T) {
 
 	// Cronos creates a job with scheduled status
 	job := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_SCHEDULED_001",
 		HandlerName: "test.jd-extraction",
 		Source:      "future.html",
@@ -361,9 +370,9 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 	// TAS Bot enqueues multiple jobs in sequence
 	// NOTE: Currently the queue is LIFO (Last-In-First-Out) due to DESC ordering
 	jobs := []Job{
-		{ID: "JOB_INT_001", HandlerName: "test.jd-extraction", Source: "first.html", Status: "queued", CreatedAt: time.Now()},
-		{ID: "JOB_INT_002", HandlerName: "test.jd-extraction", Source: "second.html", Status: "queued", CreatedAt: time.Now().Add(time.Millisecond)},
-		{ID: "JOB_INT_003", HandlerName: "test.jd-extraction", Source: "third.html", Status: "queued", CreatedAt: time.Now().Add(2 * time.Millisecond)},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_001", HandlerName: "test.jd-extraction", Source: "first.html", Status: "queued", CreatedAt: time.Now()},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_002", HandlerName: "test.jd-extraction", Source: "second.html", Status: "queued", CreatedAt: time.Now().Add(time.Millisecond)},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_003", HandlerName: "test.jd-extraction", Source: "third.html", Status: "queued", CreatedAt: time.Now().Add(2 * time.Millisecond)},
 	}
 
 	for _, job := range jobs {
@@ -417,6 +426,7 @@ func TestYugiCompletesJob(t *testing.T) {
 
 	// TAS Bot enqueues a job
 	job := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_YUGI_COMPLETE",
 		HandlerName: "test.complete-handler",
 		Source:      "duel_complete.html",
@@ -452,7 +462,7 @@ func TestYugiCompletesJob(t *testing.T) {
 		t.Errorf("Expected status 'completed', got '%s'", completedJob.Status)
 	}
 
-	if completedJob.CompletedAt == nil {
+	if _, err := completedJob.Completed.Time("the completion"); err != nil {
 		t.Error("Expected CompletedAt to be set")
 	}
 
@@ -471,6 +481,7 @@ func TestTASBotListsJobs(t *testing.T) {
 	// Create jobs with different statuses
 	jobs := []*Job{
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "JOB_LIST_QUEUED_1",
 			HandlerName: "test.handler",
 			Source:      "source1.html",
@@ -478,6 +489,7 @@ func TestTASBotListsJobs(t *testing.T) {
 			CreatedAt:   time.Now(),
 		},
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "JOB_LIST_RUNNING",
 			HandlerName: "test.handler",
 			Source:      "source2.html",
@@ -485,6 +497,7 @@ func TestTASBotListsJobs(t *testing.T) {
 			CreatedAt:   time.Now(),
 		},
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "JOB_LIST_COMPLETED",
 			HandlerName: "test.handler",
 			Source:      "source3.html",
@@ -492,6 +505,7 @@ func TestTASBotListsJobs(t *testing.T) {
 			CreatedAt:   time.Now(),
 		},
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "JOB_LIST_QUEUED_2",
 			HandlerName: "test.handler",
 			Source:      "source4.html",
@@ -509,7 +523,7 @@ func TestTASBotListsJobs(t *testing.T) {
 
 	// List only queued jobs
 	queuedStatus := JobStatusQueued
-	queuedJobs, err := queue.ListJobs(&queuedStatus, 10)
+	queuedJobs, err := queue.ListJobs(queuedStatus, 10)
 	if err != nil {
 		t.Fatalf("Failed to list queued jobs: %v", err)
 	}
@@ -542,6 +556,7 @@ func TestYugiFindsDuplicateCard(t *testing.T) {
 
 	// Enqueue first job
 	job1 := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_UNIQUE_001",
 		HandlerName: "test.jd-extraction",
 		Source:      "https://example.com/job/123",
@@ -609,6 +624,7 @@ func TestAbrahamAndIsaac(t *testing.T) {
 
 	// Abraham creates parent job
 	parentJob := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_ABRAHAM",
 		HandlerName: "test.jd-ingestion",
 		Source:      "mount_moriah.html",
@@ -624,6 +640,7 @@ func TestAbrahamAndIsaac(t *testing.T) {
 	// Isaac and other children (various task states)
 	childJobs := []*Job{
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "TASK_ISAAC_QUEUED",
 			HandlerName: "test.candidate-scoring",
 			Source:      "Score: Isaac (bound for sacrifice)",
@@ -632,6 +649,7 @@ func TestAbrahamAndIsaac(t *testing.T) {
 			CreatedAt:   time.Now(),
 		},
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "TASK_ISAAC_RUNNING",
 			HandlerName: "test.candidate-scoring",
 			Source:      "Score: Isaac (wood upon back)",
@@ -640,6 +658,7 @@ func TestAbrahamAndIsaac(t *testing.T) {
 			CreatedAt:   time.Now(),
 		},
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "TASK_ISAAC_PAUSED",
 			HandlerName: "test.candidate-scoring",
 			Source:      "Score: Isaac (altar prepared)",
@@ -648,6 +667,7 @@ func TestAbrahamAndIsaac(t *testing.T) {
 			CreatedAt:   time.Now(),
 		},
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "TASK_BLESSED_COMPLETE",
 			HandlerName: "test.candidate-scoring",
 			Source:      "Score: Already blessed",
@@ -728,6 +748,7 @@ func TestConcurrentDeletion(t *testing.T) {
 	parentJobs := []*Job{}
 	for i := 0; i < 5; i++ {
 		parentJob := &Job{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          fmt.Sprintf("JOB_BABEL_PARENT_%d", i),
 			HandlerName: "test.tower-builder",
 			Source:      fmt.Sprintf("tower_level_%d.html", i),
@@ -742,6 +763,7 @@ func TestConcurrentDeletion(t *testing.T) {
 		// Create 3 children for each parent
 		for j := 0; j < 3; j++ {
 			childJob := &Job{
+				Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 				ID:          fmt.Sprintf("TASK_BABEL_CHILD_%d_%d", i, j),
 				HandlerName: "test.brick-layer",
 				Source:      fmt.Sprintf("Brick layer %d-%d", i, j),
@@ -832,6 +854,7 @@ func TestErrorDetailPropagation(t *testing.T) {
 	queue := NewQueue(db)
 
 	job := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_ERROR_DETAILS",
 		HandlerName: "test.git-ingest",
 		Source:      "https://github.com/user/repo",
@@ -901,6 +924,7 @@ func TestVacanciesScraperChildJobsContinue(t *testing.T) {
 
 	// Noah creates the parent job (building the ark = scraping vacancies page)
 	parentJob := &Job{
+		Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 		ID:          "JOB_NOAH_VACANCIES",
 		HandlerName: "role.vacancies-scraper",
 		Source:      "https://example.com/jobs/",
@@ -916,6 +940,7 @@ func TestVacanciesScraperChildJobsContinue(t *testing.T) {
 	// Create child jobs (JD ingestion jobs = animals leaving the ark)
 	childJobs := []*Job{
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "JOB_DOVE_JD_001",
 			HandlerName: "role.jd-ingestion",
 			Source:      "https://example.com/jobs/frontend-engineer",
@@ -924,6 +949,7 @@ func TestVacanciesScraperChildJobsContinue(t *testing.T) {
 			CreatedAt:   time.Now(),
 		},
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "JOB_RAVEN_JD_002",
 			HandlerName: "role.jd-ingestion",
 			Source:      "https://example.com/jobs/backend-engineer",
@@ -932,6 +958,7 @@ func TestVacanciesScraperChildJobsContinue(t *testing.T) {
 			CreatedAt:   time.Now(),
 		},
 		{
+			Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
 			ID:          "JOB_PIGEON_PAGINATION_001",
 			HandlerName: "role.vacancies-scraper",
 			Source:      "https://example.com/jobs/page/2",

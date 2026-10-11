@@ -187,7 +187,7 @@ func (s *QNTXServer) loadJobHistoryForClient(client *Client) ([]*async.Job, erro
 	}
 	allJobs = append(allJobs, activeJobs...)
 
-	completedJobs, err := queue.ListJobs(asyncJobStatusPtr(async.JobStatusCompleted), 50)
+	completedJobs, err := queue.ListJobs(async.JobStatusCompleted, 50)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load completed jobs")
 	}
@@ -381,12 +381,6 @@ func (s *QNTXServer) attestationStoreFailing() bool {
 	}
 	_, failed := cached.response["error"]
 	return failed
-}
-
-// asyncJobStatusPtr returns a pointer to a JobStatus value
-// Helper for calling queue.ListJobs which requires *JobStatus
-func asyncJobStatusPtr(status async.JobStatus) *async.JobStatus {
-	return &status
 }
 
 // pluginAction is the answer of the plugins signum's pause, resume, restart,
