@@ -98,42 +98,67 @@ func TestCredentialSaveAndRetrieve(t *testing.T) {
 	assert.Equal(t, cred.Authenticator.AAGUID, creds[0].Authenticator.AAGUID)
 }
 
-// A credential the node offers says it is a platform passkey. Without that,
-// Firefox 156 below macOS 26.4 takes a PRF sign-in to its security-key stack
-// and never asks macOS for the passkey.
-func TestAnOfferedCredentialIsAPlatformPasskey(t *testing.T) {
+// A credential is offered with the transports its authenticator reported
+// (§7.1 step 27, §5.8.3): a platform passkey internal and hybrid, which
+// Firefox 156 below macOS 26.4 needs, and a security key its own.
+func TestAnOfferedCredentialCarriesTheTransportsItReported(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := newCredentialStore(db, testLogger())
-	require.NoError(t, store.save(webauthn.Credential{
-		ID:              []byte("platform-passkey"),
-		PublicKey:       []byte("pub"),
-		AttestationType: "none",
-		Authenticator:   webauthn.Authenticator{AAGUID: []byte("aaguid")},
-	}, "did:key:zowner", mastodonAccount))
+	platform := []protocol.AuthenticatorTransport{protocol.Internal, protocol.Hybrid}
+	key := []protocol.AuthenticatorTransport{protocol.USB, protocol.NFC}
+	require.NoError(t, store.save(webauthn.Credential{ID: []byte("platform"), PublicKey: []byte("pub"), Transport: platform}, "did:key:zone", mastodonAccount))
+	require.NoError(t, store.save(webauthn.Credential{ID: []byte("key"), PublicKey: []byte("pub"), Transport: key}, "did:key:ztwo", mastodonAccount))
 
 	creds, err := store.doorCredentials(NamespaceDefault)
+	require.NoError(t, err)
+	offered := map[string][]protocol.AuthenticatorTransport{}
+	for _, c := range creds {
+		offered[string(c.ID)] = c.Transport
+	}
+	assert.Equal(t, platform, offered["platform"])
+	assert.Equal(t, key, offered["key"])
+}
+
+// A credential recorded before transports were kept was a platform passkey,
+// and is offered as one (migration 079).
+func TestACredentialFromBeforeTransportsIsOfferedAsAPlatformPasskey(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	_, err := db.Exec(`INSERT INTO webauthn_credentials (id, credential_id, public_key, attestation_type, owner_did, admitted_as) VALUES ('6f6c64', X'6f6c64', X'00', 'none', 'did:key:zold', ?)`, mastodonAccount)
+	require.NoError(t, err)
+
+	creds, err := newCredentialStore(db, testLogger()).doorCredentials(NamespaceDefault)
 	require.NoError(t, err)
 	require.Len(t, creds, 1)
 	assert.Equal(t, []protocol.AuthenticatorTransport{protocol.Internal, protocol.Hybrid}, creds[0].Transport)
 }
 
-func TestCredentialUpdateSignCount(t *testing.T) {
+// A sign-in records its counter and backup state, and user verification once
+// it has happened (§7.2 step 24). Verification is never unlearnt.
+func TestASignInRecordsWhatTheCredentialAnsweredWith(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := newCredentialStore(db, testLogger())
-
 	cred := webauthn.Credential{
-		ID:              []byte("sign-count-test"),
-		PublicKey:       []byte("pub"),
-		AttestationType: "none",
-		Authenticator:   webauthn.Authenticator{AAGUID: []byte("aaguid"), SignCount: 5},
+		ID:            []byte("answering"),
+		PublicKey:     []byte("pub"),
+		Flags:         webauthn.CredentialFlags{BackupEligible: true},
+		Authenticator: webauthn.Authenticator{SignCount: 5},
 	}
 	require.NoError(t, store.save(cred, "did:key:zowner", mastodonAccount))
 
-	require.NoError(t, store.updateSignCount(cred.ID, 10))
+	cred.Authenticator.SignCount = 10
+	cred.Flags.BackupState = true
+	cred.Flags.UserVerified = true
+	require.NoError(t, store.answered(cred))
+	cred.Flags.UserVerified = false
+	require.NoError(t, store.answered(cred))
 
 	creds, err := store.doorCredentials(NamespaceDefault)
 	require.NoError(t, err)
 	assert.Equal(t, uint32(10), creds[0].Authenticator.SignCount)
+	assert.True(t, creds[0].Flags.BackupState)
+	var uvInitialized bool
+	require.NoError(t, db.QueryRow(`SELECT uv_initialized FROM webauthn_credentials WHERE id = ?`, keyOf(cred.ID)).Scan(&uvInitialized))
+	assert.True(t, uvInitialized)
 }
 
 // --- Middleware ---

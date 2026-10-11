@@ -139,6 +139,8 @@ export async function enrolPasskey(say: Say): Promise<Finished> {
             response: {
                 attestationObject: bufferEncode(attestationResponse.attestationObject),
                 clientDataJSON: bufferEncode(attestationResponse.clientDataJSON),
+                // §7.1 step 27: the node keeps how this authenticator is reached.
+                transports: attestationResponse.getTransports(),
             },
             user_did: proofDID,
             user_did_signature: bufferEncode(proofSig.buffer as ArrayBuffer),
