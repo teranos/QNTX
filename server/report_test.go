@@ -170,7 +170,7 @@ func TestTheReportRendersEverySectionWithItsGraphs(t *testing.T) {
 	assert.Equal(t, reportHandlerName, mail.Name)
 	require.Len(t, mail.Inline, 3)
 	for _, img := range mail.Inline {
-		assert.Contains(t, mail.HTML, `src="cid:`+img.ContentID+`"`)
+		assert.Contains(t, nodeBody(t, mail, services.MailHTML), `src="cid:`+img.ContentID+`"`)
 		_, err := png.Decode(bytes.NewReader(img.Data))
 		require.NoError(t, err, img.ContentID)
 	}
@@ -179,12 +179,12 @@ func TestTheReportRendersEverySectionWithItsGraphs(t *testing.T) {
 		"Downtime", "CPU over 7 days", "Memory over 7 days", "Swap over 7 days", "Network over 7 days",
 		"boot.subsystem.took over 7 days", "Query took over 7 days", "Top 3 4xx", "Top 3 5xx", "Top 3 handler failures",
 	} {
-		assert.Contains(t, mail.HTML, section)
-		assert.Contains(t, mail.Text, section)
+		assert.Contains(t, nodeBody(t, mail, services.MailHTML), section)
+		assert.Contains(t, nodeBody(t, mail, services.MailText), section)
 	}
-	assert.Contains(t, mail.HTML, "Restarts:")
-	assert.Contains(t, mail.Text, "Node restarts")
-	assert.Contains(t, mail.Text, "no query's text is recorded")
+	assert.Contains(t, nodeBody(t, mail, services.MailHTML), "Restarts:")
+	assert.Contains(t, nodeBody(t, mail, services.MailText), "Node restarts")
+	assert.Contains(t, nodeBody(t, mail, services.MailText), "no query's text is recorded")
 }
 
 // "I DONT VARE ABOUT X 4XX'S"
@@ -195,8 +195,8 @@ func TestAStatusIsThePathThatWasAskedFor(t *testing.T) {
 	s := rootKnowingServer(t)
 	mail, err := renderReport(s.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil))
 	require.NoError(t, err)
-	assert.Contains(t, mail.HTML, "/api/attestations")
-	assert.Contains(t, mail.Text, "  404 /api/attestations\n")
+	assert.Contains(t, nodeBody(t, mail, services.MailHTML), "/api/attestations")
+	assert.Contains(t, nodeBody(t, mail, services.MailText), "  404 /api/attestations\n")
 }
 
 // The graph stands in the report's window, drawn in QNTX's own colours.
@@ -232,13 +232,13 @@ func TestAReportWithoutSentrySaysWhy(t *testing.T) {
 	mail, err := renderReport(r)
 	require.NoError(t, err)
 	assert.Empty(t, mail.Inline)
-	assert.Contains(t, mail.Text, "Node restarts")
+	assert.Contains(t, nodeBody(t, mail, services.MailText), "Node restarts")
 
 	// Why Sentry was not asked is said once, not under every section it
 	// would have filled.
-	assert.Equal(t, 1, strings.Count(mail.Text, "sentry.read_token"), mail.Text)
-	assert.Equal(t, 1, strings.Count(mail.HTML, "sentry.read_token"))
-	assert.NotContains(t, mail.Text, "CPU over 7 days")
+	assert.Equal(t, 1, strings.Count(nodeBody(t, mail, services.MailText), "sentry.read_token"), nodeBody(t, mail, services.MailText))
+	assert.Equal(t, 1, strings.Count(nodeBody(t, mail, services.MailHTML), "sentry.read_token"))
+	assert.NotContains(t, nodeBody(t, mail, services.MailText), "CPU over 7 days")
 }
 
 // A token created after the node started is read by the next report: Sentry's
@@ -307,4 +307,12 @@ func TestNoReportGoesToARootUserWithoutAnAddress(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no email address")
 	assert.Empty(t, box.mails)
+}
+
+// nodeBody is the body of a kind a node mail is sent in.
+func nodeBody(t *testing.T, m services.NodeMail, kind services.MailBodyKind) string {
+	t.Helper()
+	body, err := services.BodyOf(m.Bodies, kind)
+	require.NoError(t, err)
+	return body
 }

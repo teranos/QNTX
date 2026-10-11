@@ -44,13 +44,19 @@ func (t SESTransport) Send(ctx context.Context, m OutgoingMail) (string, error) 
 		return "", err
 	}
 
-	// A part the mail holds nothing in is a part it is not sent in.
+	// The mail goes out in each body it names.
 	body := &sestypes.Body{}
-	if html, htmlErr := named.TextOf("html", m.HTML); htmlErr == nil {
-		body.Html = &sestypes.Content{Data: aws.String(html.String()), Charset: aws.String("UTF-8")}
-	}
-	if text, textErr := named.TextOf("text", m.Text); textErr == nil {
-		body.Text = &sestypes.Content{Data: aws.String(text.String()), Charset: aws.String("UTF-8")}
+	for _, b := range m.Bodies.All() {
+		content := &sestypes.Content{Data: aws.String(b.Content), Charset: aws.String("UTF-8")}
+		switch b.Kind {
+		case MailHTML:
+			body.Html = content
+			continue
+		case MailText:
+			body.Text = content
+			continue
+		}
+		return "", errors.Newf("the mail to %s names a %q body, which SES does not send", m.To, b.Kind)
 	}
 
 	// An inline image is referenced from the html by cid:<ContentID>.
@@ -104,16 +110,20 @@ func (t SESTransport) Account(ctx context.Context) (SESAccount, error) {
 	if err != nil {
 		return SESAccount{}, errors.Wrapf(err, "SES in %s did not say what the account is", region)
 	}
-	account := SESAccount{
+	// An answer naming no quota is not an account with a quota of 0. The SDK
+	// hands the quota as a pointer, so its absence is asked of the pointer,
+	// once, and refused.
+	quota := out.SendQuota
+	if quota == nil {
+		return SESAccount{}, errors.Newf("SES in %s answered for the account without its sending quota", region)
+	}
+	return SESAccount{
 		Region:            region,
 		ProductionAccess:  out.ProductionAccessEnabled,
 		SendingEnabled:    out.SendingEnabled,
 		EnforcementStatus: aws.ToString(out.EnforcementStatus),
-	}
-	if q := out.SendQuota; q != nil {
-		account.Max24HourSend = q.Max24HourSend
-		account.MaxSendRate = q.MaxSendRate
-		account.SentLast24Hours = q.SentLast24Hours
-	}
-	return account, nil
+		Max24HourSend:     quota.Max24HourSend,
+		MaxSendRate:       quota.MaxSendRate,
+		SentLast24Hours:   quota.SentLast24Hours,
+	}, nil
 }

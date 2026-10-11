@@ -16,8 +16,17 @@ export const protobufPackage = "protocol";
  */
 export interface MailTemplate {
   subject: string;
-  html: string;
-  text: string;
+  /**
+   * The bodies a mail is sent in, each named: its html, its text, or both. A
+   * template naming none is refused, and so is one naming a body twice.
+   */
+  bodies: MailTemplateBody[];
+}
+
+/** MailTemplateBody is one body a mail is sent in, named by what it is. */
+export interface MailTemplateBody {
+  html?: string | undefined;
+  text?: string | undefined;
 }
 
 export interface SetMailTemplateRequest {
@@ -153,9 +162,9 @@ export interface MailTemplateRow {
   version: string;
   name: string;
   subject: string;
-  html: string;
-  text: string;
   values: string[];
+  /** The bodies the template's mail is sent in, each named. */
+  bodies: MailTemplateBody[];
 }
 
 /** NodeMail is one mail the node writes itself, whole. */
@@ -167,22 +176,22 @@ export interface NodeMail {
 /** MailTemplates is what mail templates answers. */
 export interface MailTemplates {
   /**
-   * QNTX's own template, filled when a plugin names none: its subject, html
-   * and text, and the values it takes.
+   * QNTX's own template, filled when a plugin names none: its subject and
+   * bodies, and the values it takes.
    */
   neutral:
     | MailTemplateRow
     | undefined;
   /**
    * QNTX's own template drawn as a QNTX window, filled when a plugin names
-   * dark: its subject, html and text, and the values it takes.
+   * dark: its subject and bodies, and the values it takes.
    */
   dark:
     | MailTemplateRow
     | undefined;
   /**
    * One row per plugin and name: its attestation, when it was set, the
-   * plugin, its version, the name, and the subject, html and text.
+   * plugin, its version, the name, and the subject and bodies.
    */
   templates: MailTemplateRow[];
   /**

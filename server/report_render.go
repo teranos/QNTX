@@ -64,8 +64,7 @@ func renderReport(r Report) (services.NodeMail, error) {
 	return services.NodeMail{
 		Name:    reportHandlerName,
 		Subject: "QNTX week " + start + " to " + end,
-		HTML:    html,
-		Text:    renderReportText(r),
+		Bodies:  []services.MailBody{services.HTMLBody(html), services.TextBody(renderReportText(r))},
 		Inline:  images,
 	}, nil
 }

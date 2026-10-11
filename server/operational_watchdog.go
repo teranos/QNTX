@@ -296,8 +296,7 @@ func stalledMail(waited time.Duration, p operationalPatience, pool operationalPo
 	return services.NodeMail{
 		Name:    "operational.stalled",
 		Subject: subject,
-		Text:    text.String(),
-		HTML:    "<pre>" + html.EscapeString(text.String()) + "</pre>",
+		Bodies:  []services.MailBody{services.TextBody(text.String()), services.HTMLBody("<pre>" + html.EscapeString(text.String()) + "</pre>")},
 	}
 }
 
@@ -315,7 +314,6 @@ func recoveredMail(stalled, answered time.Time, longest time.Duration, lifted []
 	return services.NodeMail{
 		Name:    "operational.recovered",
 		Subject: fmt.Sprintf("The operational store answers again, after %s", took),
-		Text:    text.String(),
-		HTML:    "<pre>" + html.EscapeString(text.String()) + "</pre>",
+		Bodies:  []services.MailBody{services.TextBody(text.String()), services.HTMLBody("<pre>" + html.EscapeString(text.String()) + "</pre>")},
 	}
 }

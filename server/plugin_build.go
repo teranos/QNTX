@@ -641,8 +641,7 @@ func buildFailureMail(b pluginBuild, revs []string, failed error) services.NodeM
 	return services.NodeMail{
 		Name:    "build.failed",
 		Subject: b.name + " did not build",
-		Text:    text.String(),
-		HTML:    "<pre>" + html.EscapeString(text.String()) + "</pre>",
+		Bodies:  []services.MailBody{services.TextBody(text.String()), services.HTMLBody("<pre>" + html.EscapeString(text.String()) + "</pre>")},
 	}
 }
 

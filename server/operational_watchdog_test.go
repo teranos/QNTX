@@ -76,12 +76,14 @@ func (b *inbox) Send(_ context.Context, m services.OutgoingMail) (string, error)
 	return "ses-" + m.Subject, nil
 }
 
-func (b *inbox) texts() []string {
+func (b *inbox) texts(t *testing.T) []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	var said []string
 	for _, m := range b.mails {
-		said = append(said, m.Text)
+		text, err := services.BodyOf(m.Bodies.All(), services.MailText)
+		require.NoError(t, err)
+		said = append(said, text)
 	}
 	return said
 }
@@ -362,7 +364,7 @@ func TestTheHeaviestTokenIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
 	require.NoError(t, held.Close())
 	clock.step(t, shortPatience.every)
 	if !assert.Eventually(t, func() bool {
-		for _, text := range box.texts() {
+		for _, text := range box.texts(t) {
 			if strings.Contains(text, "Let back in: ground") {
 				return true
 			}

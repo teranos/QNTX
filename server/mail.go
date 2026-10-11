@@ -221,12 +221,12 @@ func (s *QNTXServer) mailTemplates(_ context.Context, _ sigil.Sent) (any, *proto
 	answer := &protocol.MailTemplates{
 		Neutral: &protocol.MailTemplateRow{
 			At: never.Format(time.RFC3339Nano), Plugin: "qntx", Name: services.NeutralTemplateName,
-			Subject: neutral.Subject, Html: neutral.Html, Text: neutral.Text,
+			Subject: neutral.Subject, Bodies: neutral.GetBodies(),
 			Values: values,
 		},
 		Dark: &protocol.MailTemplateRow{
 			At: never.Format(time.RFC3339Nano), Plugin: "qntx", Name: services.DarkTemplateName,
-			Subject: dark.Subject, Html: dark.Html, Text: dark.Text,
+			Subject: dark.Subject, Bodies: dark.GetBodies(),
 			Values: values,
 		},
 		Node: []*protocol.NodeMail{{
@@ -260,11 +260,14 @@ func (s *QNTXServer) mailTemplates(_ context.Context, _ sigil.Sent) (any, *proto
 	}
 	templates := []*protocol.MailTemplateRow{}
 	for _, as := range newest {
-		kept := services.TemplateOf(as)
+		kept, err := services.TemplateOf(as)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the mail templates could not be read: " + err.Error()}
+		}
 		templates = append(templates, &protocol.MailTemplateRow{
 			Id: as.ID, At: as.Timestamp.Format(time.RFC3339Nano),
 			Plugin: attr(as, "plugin"), Version: attr(as, "source_version"), Name: attr(as, "name"),
-			Subject: kept.Subject, Html: kept.Html, Text: kept.Text,
+			Subject: kept.Subject, Bodies: kept.GetBodies(),
 			Values: []string{},
 		})
 	}

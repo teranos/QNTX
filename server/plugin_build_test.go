@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"go.uber.org/zap"
 )
 
@@ -57,12 +58,12 @@ func TestAFailedBuildsMailNamesEverySourceAndWhy(t *testing.T) {
 		t.Fatalf("subject: %q", mail.Subject)
 	}
 	for _, want := range []string{"teranos/datapunt@main at c0ffee", "abcd-nl/clean@main:competitor.cue at not read", "dub build: <exit 1>"} {
-		if !strings.Contains(mail.Text, want) {
-			t.Errorf("text lacks %q:\n%s", want, mail.Text)
+		if !strings.Contains(nodeBody(t, mail, services.MailText), want) {
+			t.Errorf("text lacks %q:\n%s", want, nodeBody(t, mail, services.MailText))
 		}
 	}
-	if !strings.Contains(mail.HTML, "&lt;exit 1&gt;") {
-		t.Errorf("html not escaped: %s", mail.HTML)
+	if !strings.Contains(nodeBody(t, mail, services.MailHTML), "&lt;exit 1&gt;") {
+		t.Errorf("html not escaped: %s", nodeBody(t, mail, services.MailHTML))
 	}
 }
 

@@ -145,10 +145,10 @@ func TestRootInvitesAndBothAreMailed(t *testing.T) {
 	require.Len(t, box.sent, 2)
 	invitee, rootCopy := box.sent[0], box.sent[1]
 	assert.Equal(t, "ada@gmail.com", invitee.to)
-	assert.Contains(t, invitee.mail.HTML, invitePage+"/?invitation=")
+	assert.Contains(t, nodeBody(t, invitee.mail, services.MailHTML), invitePage+"/?invitation=")
 	assert.Equal(t, root.ID, rootCopy.userID)
-	assert.Contains(t, rootCopy.mail.HTML, invitePage+"/?invitation-cancel=")
-	assert.Contains(t, rootCopy.mail.Text, "ada@gmail.com")
+	assert.Contains(t, nodeBody(t, rootCopy.mail, services.MailHTML), invitePage+"/?invitation-cancel=")
+	assert.Contains(t, nodeBody(t, rootCopy.mail, services.MailText), "ada@gmail.com")
 }
 
 // The links open on the page ROOT invited from, when that page is this node's
@@ -160,8 +160,8 @@ func TestTheLinksOpenOnThePageRootInvitedFrom(t *testing.T) {
 
 	rec := inviting(h, rootSession, `{"email":"ada@gmail.com","accounts":[{"provider":"google","account":"ada@gmail.com"}],"page":"`+branch+`"}`)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
-	assert.Contains(t, box.sent[0].mail.HTML, invitePage+"/branch/root-invites-a-user/?invitation=")
-	assert.Contains(t, box.sent[1].mail.HTML, invitePage+"/branch/root-invites-a-user/?invitation-cancel=")
+	assert.Contains(t, nodeBody(t, box.sent[0].mail, services.MailHTML), invitePage+"/branch/root-invites-a-user/?invitation=")
+	assert.Contains(t, nodeBody(t, box.sent[1].mail, services.MailHTML), invitePage+"/branch/root-invites-a-user/?invitation-cancel=")
 
 	rec = inviting(h, rootSession, `{"email":"ada@gmail.com","accounts":[{"provider":"google","account":"ada@gmail.com"}],"page":"https://elsewhere.example/"}`)
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
@@ -201,7 +201,7 @@ func TestAnInvitationNamesAnAddressAndAnAccount(t *testing.T) {
 func TestTheLinkNamesTheProvidersRootSet(t *testing.T) {
 	h, _, rootSession, box, _ := invitingHandler(t)
 	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaAnywhere).Code)
-	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
+	token := tokenIn(t, nodeBody(t, box.sent[0].mail, services.MailHTML), "?invitation=")
 
 	rec := onInvitation(h, "", http.MethodGet, "/auth/invitations/"+token)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -219,7 +219,7 @@ func TestTheLinkNamesTheProvidersRootSet(t *testing.T) {
 func TestEitherProviderRootSetAdmitsTheInvitee(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)
 	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaAnywhere).Code)
-	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
+	token := tokenIn(t, nodeBody(t, box.sent[0].mail, services.MailHTML), "?invitation=")
 
 	browser := newBrowser(t)
 	rec := inviteeArrives(t, h, browser, token, []SignedBinding{
@@ -236,7 +236,7 @@ func TestTheInviteeSignsInWithTheAccountRootNamed(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)
 	root := store.held[0]
 	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaInvite).Code)
-	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
+	token := tokenIn(t, nodeBody(t, box.sent[0].mail, services.MailHTML), "?invitation=")
 
 	browser := newBrowser(t)
 	vouched := vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:110", "ada@gmail.com")
@@ -268,8 +268,8 @@ func TestTheInviteeCarriesTheNameRootGave(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)
 	rec := inviting(h, rootSession, adaAnywhere)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
-	assert.Contains(t, box.sent[1].mail.Text, "Ada")
-	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
+	assert.Contains(t, nodeBody(t, box.sent[1].mail, services.MailText), "Ada")
+	token := tokenIn(t, nodeBody(t, box.sent[0].mail, services.MailHTML), "?invitation=")
 
 	browser := newBrowser(t)
 	arrived := inviteeArrives(t, h, browser, token, []SignedBinding{
@@ -302,7 +302,7 @@ func TestAnInvitationRaisesAPublicRegistration(t *testing.T) {
 		}))
 	}
 	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaAnywhere).Code)
-	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
+	token := tokenIn(t, nodeBody(t, box.sent[0].mail, services.MailHTML), "?invitation=")
 
 	browser := newBrowser(t)
 	rec := inviteeArrives(t, h, browser, token, []SignedBinding{
@@ -325,7 +325,7 @@ func TestAnInvitationRaisesAPublicRegistration(t *testing.T) {
 func TestAnotherAccountIsNotApplicable(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)
 	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaInvite).Code)
-	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
+	token := tokenIn(t, nodeBody(t, box.sent[0].mail, services.MailHTML), "?invitation=")
 
 	browser := newBrowser(t)
 	for _, b := range []SignedBinding{
@@ -362,8 +362,8 @@ func TestAnInvitationCancelledAtZeroIsCancelled(t *testing.T) {
 func TestRootCancelsTheInvitation(t *testing.T) {
 	h, store, rootSession, box, signer := invitingHandler(t)
 	require.Equal(t, http.StatusCreated, inviting(h, rootSession, adaInvite).Code)
-	token := tokenIn(t, box.sent[0].mail.HTML, "?invitation=")
-	id := tokenIn(t, box.sent[1].mail.HTML, "?invitation-cancel=")
+	token := tokenIn(t, nodeBody(t, box.sent[0].mail, services.MailHTML), "?invitation=")
+	id := tokenIn(t, nodeBody(t, box.sent[1].mail, services.MailHTML), "?invitation-cancel=")
 
 	rec := onInvitation(h, rootSession, http.MethodPost, "/auth/invitations/"+id+"/cancel")
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -375,4 +375,12 @@ func TestRootCancelsTheInvitation(t *testing.T) {
 	})
 	assert.Equal(t, http.StatusForbidden, arrived.Code, arrived.Body.String())
 	assert.Len(t, store.held, 1)
+}
+
+// nodeBody is the body of a kind a node mail is sent in.
+func nodeBody(t *testing.T, m services.NodeMail, kind services.MailBodyKind) string {
+	t.Helper()
+	body, err := services.BodyOf(m.Bodies, kind)
+	require.NoError(t, err)
+	return body
 }

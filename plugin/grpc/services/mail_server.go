@@ -74,13 +74,12 @@ func (r MailRecipient) Address() (named.Text, error) {
 // MailRecipients finds one User by id. False is no User holding it.
 type MailRecipients func(userID string) (MailRecipient, bool, error)
 
-// OutgoingMail is a filled mail, addressed.
+// OutgoingMail is a filled mail, addressed, and the bodies it is sent in.
 type OutgoingMail struct {
 	From    string
 	To      string
 	Subject string
-	HTML    string
-	Text    string
+	Bodies  named.Items[MailBody]
 	Inline  []InlineImage
 }
 
@@ -94,12 +93,12 @@ type InlineImage struct {
 
 // NodeMail is a mail the node writes itself, whole (ADR-042): no plugin, and
 // no template to fill. Name is what the node calls it, recorded where a
-// plugin's mail records its template.
+// plugin's mail records its template. Bodies are what it is sent in, each
+// named; a node mail naming none is refused.
 type NodeMail struct {
 	Name    string
 	Subject string
-	HTML    string
-	Text    string
+	Bodies  []MailBody
 	Inline  []InlineImage
 }
 
@@ -219,12 +218,20 @@ func (s *MailServer) SetTemplate(_ context.Context, req *protocol.SetMailTemplat
 
 	ref := templateRef(source.String(), name.String())
 	kept := parsed.source
+	// The bodies are kept as the named list they were sent as.
+	bodies := make([]any, 0, len(kept.GetBodies()))
+	for i, body := range kept.GetBodies() {
+		entry, err := keptBody(i, body)
+		if err != nil {
+			return refuse(errors.Wrapf(err, "template %s", ref))
+		}
+		bodies = append(bodies, entry)
+	}
 	id, err := s.attest(store, w.Actor, ref, PredicateMailTemplate, source.String(), source.String(), map[string]any{
 		"plugin":  source.String(),
 		"name":    name.String(),
 		"subject": kept.GetSubject(),
-		"html":    kept.GetHtml(),
-		"text":    kept.GetText(),
+		"bodies":  bodies,
 	})
 	if err != nil {
 		return refuse(errors.Wrapf(err, "template %s was not attested", ref))
@@ -306,7 +313,7 @@ func (s *MailServer) Send(ctx context.Context, req *protocol.SendMailRequest) (*
 		return refuse(err)
 	}
 
-	mail := OutgoingMail{From: w.from.String(), To: to.String(), Subject: filled.Subject, HTML: filled.HTML, Text: filled.Text, Inline: inline}
+	mail := OutgoingMail{From: w.from.String(), To: to.String(), Subject: filled.Subject, Bodies: filled.Bodies, Inline: inline}
 	messageID, attestationID, sendErr := s.deliver(ctx, w, user.String(), source.String(), ref, mail)
 	if sendErr != nil {
 		return &protocol.SendMailResponse{Success: false, Error: sendErr.Error(), MessageId: messageID, AttestationId: attestationID}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
@@ -360,18 +367,28 @@ func inlineImages(images []*protocol.MailImage) ([]InlineImage, error) {
 // held to what a plugin's mail is held to — a transport, an address to send
 // from, a User who is on and has an address — and attested the same way.
 func (s *MailServer) SendAsNode(ctx context.Context, userID string, m NodeMail) (messageID, attestationID string, err error) {
+	bodies, err := mailBodies("node mail "+m.Name, m.Bodies)
+	if err != nil {
+		s.logger.Warnw("Node mail not sent", "mail", m.Name, "user", userID, "error", err)
+		return "", "", err
+	}
 	w, to, err := s.ready(userID)
 	if err != nil {
 		s.logger.Warnw("Node mail not sent", "mail", m.Name, "user", userID, "error", err)
 		return "", "", err
 	}
-	mail := OutgoingMail{From: w.from.String(), To: to.String(), Subject: m.Subject, HTML: m.HTML, Text: m.Text, Inline: m.Inline}
+	mail := OutgoingMail{From: w.from.String(), To: to.String(), Subject: m.Subject, Bodies: bodies, Inline: m.Inline}
 	return s.deliver(ctx, w, userID, NodeSource, m.Name, mail)
 }
 
 // SendAsNodeTo is SendAsNode to a User read before, so a mail saying the store
 // the Users are in does not answer is not held up behind that store.
 func (s *MailServer) SendAsNodeTo(ctx context.Context, u MailRecipient, m NodeMail) (messageID, attestationID string, err error) {
+	bodies, err := mailBodies("node mail "+m.Name, m.Bodies)
+	if err != nil {
+		s.logger.Warnw("Node mail not sent", "mail", m.Name, "user", u.ID, "error", err)
+		return "", "", err
+	}
 	w, err := s.wiring()
 	if err != nil {
 		s.logger.Warnw("Node mail not sent", "mail", m.Name, "user", u.ID, "error", err)
@@ -382,7 +399,7 @@ func (s *MailServer) SendAsNodeTo(ctx context.Context, u MailRecipient, m NodeMa
 		s.logger.Warnw("Node mail not sent", "mail", m.Name, "user", u.ID, "error", err)
 		return "", "", err
 	}
-	mail := OutgoingMail{From: w.from.String(), To: to.String(), Subject: m.Subject, HTML: m.HTML, Text: m.Text, Inline: m.Inline}
+	mail := OutgoingMail{From: w.from.String(), To: to.String(), Subject: m.Subject, Bodies: bodies, Inline: m.Inline}
 	return s.deliver(ctx, w, u.ID, NodeSource, m.Name, mail)
 }
 
@@ -447,8 +464,10 @@ func (s *MailServer) deliver(ctx context.Context, w *mailSending, userID, source
 		"to":       mail.To,
 		"from":     mail.From,
 		"subject":  mail.Subject,
-		"html":     mail.HTML,
-		"text":     mail.Text,
+	}
+	// Each body the mail went out in is kept under what it is.
+	for _, body := range mail.Bodies.All() {
+		attrs[string(body.Kind)] = body.Content
 	}
 	// "i would have expected to be able to click the main and see exactly what was sent."
 	//
@@ -553,18 +572,73 @@ func NewestMailTemplate(store ats.AttestationStore, plugin, name string) (*proto
 	if !found {
 		return nil, false, nil
 	}
-	return TemplateOf(newest), true, nil
+	template, err := TemplateOf(newest)
+	if err != nil {
+		return nil, false, err
+	}
+	return template, true, nil
 }
 
-// TemplateOf reads a template back out of the attestation it was kept as.
-func TemplateOf(as *types.As) *protocol.MailTemplate {
-	part := func(key string) string {
-		if v, ok := as.Attributes[key].(string); ok {
-			return v
-		}
-		return ""
+// keptBody is one of a template's bodies as its record keeps it: what it is,
+// and its source.
+func keptBody(i int, body *protocol.MailTemplateBody) (map[string]any, error) {
+	switch is := body.GetIs().(type) {
+	case *protocol.MailTemplateBody_Html:
+		return map[string]any{"kind": string(MailHTML), "source": is.Html}, nil
+	case *protocol.MailTemplateBody_Text:
+		return map[string]any{"kind": string(MailText), "source": is.Text}, nil
 	}
-	return &protocol.MailTemplate{Subject: part("subject"), Html: part("html"), Text: part("text")}
+	return nil, errors.Newf("body %d names neither html nor text", i)
+}
+
+// TemplateOf reads a template back out of the attestation it was kept as: its
+// subject and the bodies it named. A template kept before its bodies were
+// named is refused, saying so: set it again.
+func TemplateOf(as *types.As) (*protocol.MailTemplate, error) {
+	subject, ok := as.Attributes["subject"].(string)
+	if !ok {
+		return nil, errors.Newf("template record %s keeps no subject", as.ID)
+	}
+	listed, keptBodies := as.Attributes["bodies"]
+	if !keptBodies {
+		return nil, errors.Newf("template record %s was kept before a template's bodies were named: the plugin sets it again", as.ID)
+	}
+	bodies, ok := listed.([]any)
+	if !ok {
+		return nil, errors.Newf("template record %s keeps its bodies as %T, not a list", as.ID, listed)
+	}
+	template := &protocol.MailTemplate{Subject: subject}
+	for i, entry := range bodies {
+		body, err := readKeptBody(as.ID, i, entry)
+		if err != nil {
+			return nil, err
+		}
+		template.Bodies = append(template.Bodies, body)
+	}
+	return template, nil
+}
+
+// readKeptBody is one body a template record keeps, as the template named it.
+func readKeptBody(id string, i int, entry any) (*protocol.MailTemplateBody, error) {
+	kept, ok := entry.(map[string]any)
+	if !ok {
+		return nil, errors.Newf("template record %s keeps body %d as %T, not a body", id, i, entry)
+	}
+	kind, ok := kept["kind"].(string)
+	if !ok {
+		return nil, errors.Newf("template record %s keeps body %d without saying what it is", id, i)
+	}
+	source, ok := kept["source"].(string)
+	if !ok {
+		return nil, errors.Newf("template record %s keeps body %d without its source", id, i)
+	}
+	switch MailBodyKind(kind) {
+	case MailHTML:
+		return TemplateHTML(source), nil
+	case MailText:
+		return TemplateText(source), nil
+	}
+	return nil, errors.Newf("template record %s keeps body %d as %q, which is neither html nor text", id, i, kind)
 }
 
 // templateRef names a plugin's template: the plugin, then its name.

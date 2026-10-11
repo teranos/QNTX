@@ -36,10 +36,13 @@ export interface MailTemplateRow {
     version: string;
     name: string;
     subject: string;
-    html: string;
-    text: string;
+    /** Each body the template's mail is sent in, named by what it is. */
+    bodies: MailTemplateBody[];
     values: string[];
 }
+
+/** One body a template's mail is sent in: its html, or its text. */
+export type MailTemplateBody = { html: string } | { text: string };
 
 export interface MailTemplates {
     neutral: MailTemplateRow;
@@ -161,8 +164,7 @@ function templateParts(t: MailTemplateRow): HTMLDetailsElement {
     const summary = document.createElement('summary');
     summary.textContent = t.subject;
     details.appendChild(summary);
-    for (const [label, body] of [['html', t.html], ['text', t.text]] as const) {
-        if (!body) continue;
+    for (const [label, body] of t.bodies.flatMap(b => Object.entries(b))) {
         const h = document.createElement('div');
         h.className = 'label';
         h.textContent = label;

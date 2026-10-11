@@ -75,6 +75,49 @@ func attested(t *testing.T, store ats.AttestationStore, predicate string) []*typ
 	return found
 }
 
+// bodyIn is the body of a kind a mail went out in.
+func bodyIn(t *testing.T, m OutgoingMail, kind MailBodyKind) string {
+	t.Helper()
+	body, err := BodyOf(m.Bodies.All(), kind)
+	require.NoError(t, err)
+	return body
+}
+
+// A template names each body it is sent in, at least one, none twice.
+func TestATemplateNamesItsBodies(t *testing.T) {
+	s, _ := wiredMail(t, &sentBox{}, tim)
+	for what, template := range map[string]*protocol.MailTemplate{
+		"bodies":                {Subject: "x"},
+		"text body twice":       {Subject: "x", Bodies: []*protocol.MailTemplateBody{TemplateText("a"), TemplateText("b")}},
+		"neither html nor text": {Subject: "x", Bodies: []*protocol.MailTemplateBody{{}}},
+		"names nothing":         {Subject: "x", Bodies: []*protocol.MailTemplateBody{TemplateHTML("  ")}},
+	} {
+		set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
+			AuthToken: mailToken, Source: "garden", Name: "reminder", Template: template,
+		})
+		require.NoError(t, err)
+		assert.False(t, set.Success, what)
+		assert.Contains(t, set.Error, what)
+	}
+}
+
+// "nil is nil": a template kept before its bodies were named is not read as
+// one with none.
+func TestATemplateKeptBeforeItsBodiesWereNamedIsRefused(t *testing.T) {
+	_, err := TemplateOf(&types.As{ID: "ASold", Attributes: map[string]any{"subject": "x", "html": "<p>y</p>"}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "before a template's bodies were named")
+}
+
+// A node mail names what it is sent in.
+func TestANodeMailNamingNoBodyIsNotSent(t *testing.T) {
+	box := &sentBox{}
+	s, _ := wiredMail(t, box, tim)
+	_, _, err := s.SendAsNode(context.Background(), "UStim", NodeMail{Name: "report.weekly", Subject: "Week 39"})
+	require.Error(t, err)
+	assert.Empty(t, box.sent)
+}
+
 func neutralSend(user string, values map[string]string) *protocol.SendMailRequest {
 	return &protocol.SendMailRequest{AuthToken: mailToken, Source: "garden", UserId: user, Template: NeutralTemplateName, Values: values}
 }
@@ -98,11 +141,11 @@ func TestTimIsMailedAtHisPrimaryAddressFromTheNeutralTemplate(t *testing.T) {
 	assert.Equal(t, "tim@defacile.nl", mail.To)
 	assert.Equal(t, mailFrom, mail.From)
 	assert.Equal(t, "Welkom", mail.Subject)
-	assert.Contains(t, mail.Text, "Je bent geregistreerd.")
-	assert.Contains(t, mail.Text, "https://garden.test/app")
-	assert.Contains(t, mail.HTML, "Je bent geregistreerd.")
-	assert.Contains(t, mail.HTML, `href="https://garden.test/app"`)
-	assert.Contains(t, mail.HTML, "Download de app")
+	assert.Contains(t, bodyIn(t, mail, MailText), "Je bent geregistreerd.")
+	assert.Contains(t, bodyIn(t, mail, MailText), "https://garden.test/app")
+	assert.Contains(t, bodyIn(t, mail, MailHTML), "Je bent geregistreerd.")
+	assert.Contains(t, bodyIn(t, mail, MailHTML), `href="https://garden.test/app"`)
+	assert.Contains(t, bodyIn(t, mail, MailHTML), "Download de app")
 
 	sent := attested(t, store, PredicateMailSent)
 	require.Len(t, sent, 1)
@@ -125,8 +168,7 @@ func TestAPluginSetsItsOwnTemplateAndMailsFromIt(t *testing.T) {
 		AuthToken: mailToken, Source: "garden", Name: "harvest-ready",
 		Template: &protocol.MailTemplate{
 			Subject: "Harvest ready on {{.date}}",
-			Text:    "Pick on {{.date}}.",
-			Html:    "<p>Pick on {{.date}}.</p>",
+			Bodies:  []*protocol.MailTemplateBody{TemplateText("Pick on {{.date}}."), TemplateHTML("<p>Pick on {{.date}}.</p>")},
 		},
 	})
 	require.NoError(t, err)
@@ -146,7 +188,7 @@ func TestAPluginSetsItsOwnTemplateAndMailsFromIt(t *testing.T) {
 	require.True(t, resp.Success, resp.Error)
 	require.Len(t, box.sent, 1)
 	assert.Equal(t, "Harvest ready on Monday 29 September", box.sent[0].Subject)
-	assert.Equal(t, "<p>Pick on Monday 29 September.</p>", box.sent[0].HTML)
+	assert.Equal(t, "<p>Pick on Monday 29 September.</p>", bodyIn(t, box.sent[0], MailHTML))
 	assert.Equal(t, "garden/harvest-ready", attested(t, store, PredicateMailSent)[0].Attributes["template"])
 }
 
@@ -159,7 +201,7 @@ func TestTheNewestTemplateUnderANameIsTheOneFilled(t *testing.T) {
 	for _, subject := range []string{"Eerste", "Tweede"} {
 		set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
 			AuthToken: mailToken, Source: "garden", Name: "reminder",
-			Template: &protocol.MailTemplate{Subject: subject, Text: "Tot morgen."},
+			Template: &protocol.MailTemplate{Subject: subject, Bodies: []*protocol.MailTemplateBody{TemplateText("Tot morgen.")}},
 		})
 		require.NoError(t, err)
 		require.True(t, set.Success, set.Error)
@@ -181,7 +223,7 @@ func TestAPluginMailsOnlyFromTemplatesItSet(t *testing.T) {
 
 	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
 		AuthToken: mailToken, Source: "garden", Name: "welcome",
-		Template: &protocol.MailTemplate{Subject: "Welkom", Text: "Hallo."},
+		Template: &protocol.MailTemplate{Subject: "Welkom", Bodies: []*protocol.MailTemplateBody{TemplateText("Hallo.")}},
 	})
 	require.NoError(t, err)
 	require.True(t, set.Success, set.Error)
@@ -231,7 +273,7 @@ func TestATemplateThatDoesNotParseIsNotKept(t *testing.T) {
 
 	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
 		AuthToken: mailToken, Source: "garden", Name: "broken",
-		Template: &protocol.MailTemplate{Subject: "Harvest {{.date", Text: "Hallo."},
+		Template: &protocol.MailTemplate{Subject: "Harvest {{.date", Bodies: []*protocol.MailTemplateBody{TemplateText("Hallo.")}},
 	})
 	require.NoError(t, err)
 	assert.False(t, set.Success)
@@ -306,8 +348,8 @@ func TestTheNodeMailsAUserInItsOwnName(t *testing.T) {
 	s, store := wiredMail(t, box, tim)
 
 	messageID, attestationID, err := s.SendAsNode(context.Background(), "UStim", NodeMail{
-		Name: "report.weekly", Subject: "Week 39", Text: "The week.",
-		HTML:   `<p>The week.</p><img src="cid:cpu">`,
+		Name: "report.weekly", Subject: "Week 39",
+		Bodies: []MailBody{TextBody("The week."), HTMLBody(`<p>The week.</p><img src="cid:cpu">`)},
 		Inline: []InlineImage{{ContentID: "cpu", ContentType: "image/png", FileName: "cpu.png", Data: []byte{0x89, 'P', 'N', 'G'}}},
 	})
 	require.NoError(t, err)
@@ -343,7 +385,7 @@ func TestTheNodeDoesNotMailAUserWithoutAnAddress(t *testing.T) {
 	box := &sentBox{}
 	s, store := wiredMail(t, box, UserRecipient(access.User{ID: "USroot"}))
 
-	_, _, err := s.SendAsNode(context.Background(), "USroot", NodeMail{Name: "report.weekly", Subject: "Week 39", Text: "The week."})
+	_, _, err := s.SendAsNode(context.Background(), "USroot", NodeMail{Name: "report.weekly", Subject: "Week 39", Bodies: []MailBody{TextBody("The week.")}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no email address")
 	assert.Empty(t, box.sent)
@@ -365,15 +407,15 @@ func TestAPluginMailsFromQNTXsDarkTemplateByName(t *testing.T) {
 	// A QNTX window on the canvas, carried by bgcolor where a client drops styles.
 	l, err := readLook()
 	require.NoError(t, err)
-	assert.Contains(t, box.sent[0].HTML, `bgcolor="`+l.canvas+`"`)
-	assert.Contains(t, box.sent[0].HTML, `bgcolor="`+l.window+`"`)
-	assert.Contains(t, box.sent[0].HTML, "Welkom</td>", "the subject titles the window")
-	assert.Contains(t, box.sent[0].HTML, "Hallo.")
-	assert.Contains(t, box.sent[0].HTML, `href="https://garden.test/app"`)
+	assert.Contains(t, bodyIn(t, box.sent[0], MailHTML), `bgcolor="`+l.canvas+`"`)
+	assert.Contains(t, bodyIn(t, box.sent[0], MailHTML), `bgcolor="`+l.window+`"`)
+	assert.Contains(t, bodyIn(t, box.sent[0], MailHTML), "Welkom</td>", "the subject titles the window")
+	assert.Contains(t, bodyIn(t, box.sent[0], MailHTML), "Hallo.")
+	assert.Contains(t, bodyIn(t, box.sent[0], MailHTML), `href="https://garden.test/app"`)
 
 	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
 		AuthToken: mailToken, Source: "garden", Name: DarkTemplateName,
-		Template: &protocol.MailTemplate{Subject: "x", Text: "y"},
+		Template: &protocol.MailTemplate{Subject: "x", Bodies: []*protocol.MailTemplateBody{TemplateText("y")}},
 	})
 	require.NoError(t, err)
 	assert.False(t, set.Success, "QNTX's own template names are QNTX's")
@@ -400,7 +442,7 @@ func TestAPluginMailsAnImageItsHTMLShows(t *testing.T) {
 	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
 		AuthToken: mailToken, Source: "garden", Name: "bed",
 		Template: &protocol.MailTemplate{
-			Subject: "Je bed", Text: "Je bed.", Html: `<p>Je bed.</p><img src="cid:bed">`,
+			Subject: "Je bed", Bodies: []*protocol.MailTemplateBody{TemplateText("Je bed."), TemplateHTML(`<p>Je bed.</p><img src="cid:bed">`)},
 		},
 	})
 	require.NoError(t, err)
@@ -414,7 +456,7 @@ func TestAPluginMailsAnImageItsHTMLShows(t *testing.T) {
 	require.True(t, resp.Success, resp.Error)
 
 	require.Len(t, box.sent, 1)
-	assert.Contains(t, box.sent[0].HTML, `src="cid:bed"`)
+	assert.Contains(t, bodyIn(t, box.sent[0], MailHTML), `src="cid:bed"`)
 	require.Len(t, box.sent[0].Inline, 1)
 	assert.Equal(t, InlineImage{ContentID: "bed", ContentType: "image/png", FileName: "bed.png", Data: tinyPNG}, box.sent[0].Inline[0])
 

@@ -154,7 +154,7 @@ func TestTheMailWindowShowsTheNeutralTemplateAndEachPluginsNewest(t *testing.T) 
 	for _, subject := range []string{"Eerste", "Tweede"} {
 		set, err := mail.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
 			AuthToken: "token", Source: "garden", Name: "reminder",
-			Template: &protocol.MailTemplate{Subject: subject, Text: "Tot morgen."},
+			Template: &protocol.MailTemplate{Subject: subject, Bodies: []*protocol.MailTemplateBody{services.TemplateText("Tot morgen.")}},
 		})
 		require.NoError(t, err)
 		require.True(t, set.Success, set.Error)
@@ -166,14 +166,14 @@ func TestTheMailWindowShowsTheNeutralTemplateAndEachPluginsNewest(t *testing.T) 
 
 	neutral := answer.(*protocol.MailTemplates).GetNeutral()
 	assert.Equal(t, services.NeutralTemplateName, neutral.GetName())
-	assert.Equal(t, services.NeutralTemplate().Html, neutral.GetHtml())
+	assert.True(t, proto.Equal(&protocol.MailTemplate{Bodies: services.NeutralTemplate().GetBodies()}, &protocol.MailTemplate{Bodies: neutral.GetBodies()}), "the neutral template is listed with its bodies")
 
 	// "why not? i want it to be listed there as well"
 	dark := answer.(*protocol.MailTemplates).GetDark()
 	own, err := services.DarkTemplate()
 	require.NoError(t, err)
 	assert.Equal(t, services.DarkTemplateName, dark.GetName())
-	assert.Equal(t, own.Html, dark.GetHtml())
+	assert.True(t, proto.Equal(&protocol.MailTemplate{Bodies: own.GetBodies()}, &protocol.MailTemplate{Bodies: dark.GetBodies()}), "the dark template is listed with its bodies")
 
 	templates := answer.(*protocol.MailTemplates).GetTemplates()
 	require.Len(t, templates, 1, "a template set twice is one template")
@@ -187,8 +187,8 @@ func TestOneMailIsReadBackWholeAsItWasSent(t *testing.T) {
 	s, mail := mailingNode(t, &kept{})
 
 	_, attestationID, err := mail.SendAsNode(context.Background(), "UStim", services.NodeMail{
-		Name: "report.weekly", Subject: "Week 39", Text: "The week.",
-		HTML:   `<p>The week.</p><img src="cid:cpu">`,
+		Name: "report.weekly", Subject: "Week 39",
+		Bodies: []services.MailBody{services.TextBody("The week."), services.HTMLBody(`<p>The week.</p><img src="cid:cpu">`)},
 		Inline: []services.InlineImage{{ContentID: "cpu", ContentType: "image/png", FileName: "cpu.png", Data: []byte{0x89, 'P', 'N', 'G'}}},
 	})
 	require.NoError(t, err)
