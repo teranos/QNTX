@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -112,5 +114,30 @@ func TestAnsweringOnTheWayOutStillLeaves(t *testing.T) {
 		if got := len(hits["carryon"]) > 0; got != counted {
 			t.Errorf("%s counted %v, want %v", source, got, counted)
 		}
+	}
+}
+
+// -write rewrites the counts and keeps why they moved.
+func TestWritingKeepsTheNotes(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nil")
+	before := "# old header\n# old instead\n# 3 in 1 files.\n" +
+		"# From 1: a note.\n# a.go: +1, another.\n\n3\ta.go\n"
+	if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := save(path, kinds[0], map[string][]int{"a.go": {1, 2}, "b.go": {3}}); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "# " + kinds[0].what + ", per file. Debt: each number may fall and may not rise.\n" +
+		"# Instead: " + kinds[0].do + ".\n# 3 in 2 files.\n" +
+		"# From 1: a note.\n# a.go: +1, another.\n\n2\ta.go\n1\tb.go\n"
+	if string(after) != want {
+		t.Errorf("got\n%s\nwant\n%s", after, want)
 	}
 }

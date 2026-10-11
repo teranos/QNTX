@@ -570,11 +570,41 @@ func load(path string) (map[string]int, error) {
 	return baseline, nil
 }
 
+// notes reads what a person wrote under a baseline's header: why a number
+// moved. The header and the counts are the tool's to rewrite, the notes are not.
+func notes(path string) ([]string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the baseline at %s could not be read for its notes", path)
+	}
+
+	var kept []string
+	for i, line := range strings.Split(string(content), "\n") {
+		if i < 3 {
+			continue
+		}
+		if !strings.HasPrefix(line, "#") {
+			break
+		}
+		kept = append(kept, line)
+	}
+	return kept, nil
+}
+
 func save(path string, k kind, hits map[string][]int) error {
+	kept, err := notes(path)
+	if err != nil {
+		return err
+	}
+
 	var out strings.Builder
 	fmt.Fprintf(&out, "# %s, per file. Debt: each number may fall and may not rise.\n", k.what)
 	fmt.Fprintf(&out, "# Instead: %s.\n", k.do)
-	fmt.Fprintf(&out, "# %d in %d files.\n\n", total(hits), len(hits))
+	fmt.Fprintf(&out, "# %d in %d files.\n", total(hits), len(hits))
+	for _, note := range kept {
+		fmt.Fprintf(&out, "%s\n", note)
+	}
+	out.WriteString("\n")
 
 	for _, file := range sortedHits(hits) {
 		fmt.Fprintf(&out, "%d\t%s\n", len(hits[file]), file)
