@@ -302,7 +302,7 @@ func runnerStats(stats grpcplugin.RunnerStats) *protocol.RunnerStats {
 			At: build.At.Format(time.RFC3339Nano), Changed: build.Changed, Older: build.Older})
 	}
 	return &protocol.RunnerStats{Path: stats.Path, Name: stats.Name, GithubUrl: stats.GitHubURL,
-		Workspaces: stats.Workspaces, Jobs: jobs, Taken: taken}
+		Workspaces: stats.Workspaces, Jobs: jobs, Taken: taken, Unread: stats.Unread}
 }
 
 // StartRunner watches the runner the node's settings name, or stops watching

@@ -688,6 +688,7 @@
   "protocol.RouteInfo": "RouteInfo is one route a plugin declares.",
   "protocol.RunnerStats": "RunnerStats is the runner as its directory says it is now. Mirrors grpc.RunnerStats.",
   "protocol.RunnerStats.jobs": "When each job the runner ran was last written, oldest first, each RFC 3339 to the nanosecond.",
+  "protocol.RunnerStats.unread": "What of the runner's directory could not be read, and why: what the stats above leave out.",
   "protocol.SESAccount": "SESAccount is what SES says of the account, as it is now.",
   "protocol.SamplerStageProto": "Snapshot of token distribution after a sampler stage",
   "protocol.SamplerStageSignal": "SamplerStageSignal is a snapshot of the token distribution after one stage of the sampler chain.",

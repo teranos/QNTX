@@ -525,6 +525,9 @@ message RunnerStats {
   // 3339 to the nanosecond.
   repeated string jobs = 5;
   repeated TakenBuild taken = 6;
+  // What of the runner's directory could not be read, and why: what the
+  // stats above leave out.
+  repeated string unread = 7;
 }
 
 // GitHubRunner is the runner as the Actions section shows it.

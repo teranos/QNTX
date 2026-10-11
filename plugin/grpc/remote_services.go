@@ -198,17 +198,47 @@ func (c *remoteConfig) GetStringSlice(key string) []string {
 // listIn is the list a string holds: a JSON array, or values separated by
 // commas, each trimmed. A string holding no value holds no list.
 func listIn(str string) []string {
-	if strings.HasPrefix(str, "[") {
-		var slice []string
-		if err := json.Unmarshal([]byte(str), &slice); err == nil {
-			return slice
-		}
-	}
-	parts := strings.FieldsFunc(str, func(r rune) bool { return r == ',' })
+	return listOf(str).values()
+}
+
+// listSaid is how a string holds a list: as a JSON array, or as values
+// separated by commas.
+type listSaid interface {
+	values() []string
+}
+
+// jsonArray is a string beginning with [ that reads as a JSON array.
+type jsonArray struct {
+	held []string
+}
+
+// commaSeparated is a string whose commas separate its values, and, for one
+// beginning with [, why it does not read as a JSON array.
+type commaSeparated struct {
+	str     string
+	notJSON error
+}
+
+func (a jsonArray) values() []string { return a.held }
+
+func (c commaSeparated) values() []string {
+	parts := strings.FieldsFunc(c.str, func(r rune) bool { return r == ',' })
 	for i, part := range parts {
 		parts[i] = strings.TrimSpace(part)
 	}
 	return parts
+}
+
+// listOf is how a string holds its list.
+func listOf(str string) listSaid {
+	if !strings.HasPrefix(str, "[") {
+		return commaSeparated{str: str, notJSON: errors.Newf("%q does not begin with [", str)}
+	}
+	var slice []string
+	if err := json.Unmarshal([]byte(str), &slice); err != nil {
+		return commaSeparated{str: str, notJSON: err}
+	}
+	return jsonArray{held: slice}
 }
 
 func (c *remoteConfig) Get(key string) any {

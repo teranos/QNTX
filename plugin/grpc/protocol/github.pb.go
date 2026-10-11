@@ -619,8 +619,11 @@ type RunnerStats struct {
 	Workspaces []string               `protobuf:"bytes,4,rep,name=workspaces,proto3" json:"workspaces,omitempty"`
 	// When each job the runner ran was last written, oldest first, each RFC
 	// 3339 to the nanosecond.
-	Jobs          []string      `protobuf:"bytes,5,rep,name=jobs,proto3" json:"jobs,omitempty"`
-	Taken         []*TakenBuild `protobuf:"bytes,6,rep,name=taken,proto3" json:"taken,omitempty"`
+	Jobs  []string      `protobuf:"bytes,5,rep,name=jobs,proto3" json:"jobs,omitempty"`
+	Taken []*TakenBuild `protobuf:"bytes,6,rep,name=taken,proto3" json:"taken,omitempty"`
+	// What of the runner's directory could not be read, and why: what the
+	// stats above leave out.
+	Unread        []string `protobuf:"bytes,7,rep,name=unread,proto3" json:"unread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -693,6 +696,13 @@ func (x *RunnerStats) GetJobs() []string {
 func (x *RunnerStats) GetTaken() []*TakenBuild {
 	if x != nil {
 		return x.Taken
+	}
+	return nil
+}
+
+func (x *RunnerStats) GetUnread() []string {
+	if x != nil {
+		return x.Unread
 	}
 	return nil
 }
@@ -1269,7 +1279,7 @@ const file_plugin_grpc_protocol_github_proto_rawDesc = "" +
 	"\x06digest\x18\x03 \x01(\tR\x06digest\x12\x0e\n" +
 	"\x02at\x18\x04 \x01(\tR\x02at\x12\x18\n" +
 	"\achanged\x18\x05 \x01(\bR\achanged\x12\x14\n" +
-	"\x05older\x18\x06 \x01(\bR\x05older\"\xb4\x01\n" +
+	"\x05older\x18\x06 \x01(\bR\x05older\"\xcc\x01\n" +
 	"\vRunnerStats\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
@@ -1279,7 +1289,8 @@ const file_plugin_grpc_protocol_github_proto_rawDesc = "" +
 	"workspaces\x18\x04 \x03(\tR\n" +
 	"workspaces\x12\x12\n" +
 	"\x04jobs\x18\x05 \x03(\tR\x04jobs\x12*\n" +
-	"\x05taken\x18\x06 \x03(\v2\x14.protocol.TakenBuildR\x05taken\"\x7f\n" +
+	"\x05taken\x18\x06 \x03(\v2\x14.protocol.TakenBuildR\x05taken\x12\x16\n" +
+	"\x06unread\x18\a \x03(\tR\x06unread\"\x7f\n" +
 	"\fGitHubRunner\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x12\x14\n" +

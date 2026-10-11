@@ -26,6 +26,35 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// logLine is a line a plugin wrote: a JSON entry, or plain text, which does
+// not read as JSON.
+type logLine interface {
+	isLogLine()
+}
+
+// jsonLine is a JSON log entry.
+type jsonLine struct {
+	entry map[string]any
+}
+
+// plainText is a line that is not a JSON entry, and why it does not read as
+// one.
+type plainText struct {
+	notJSON error
+}
+
+func (jsonLine) isLogLine()  {}
+func (plainText) isLogLine() {}
+
+// lineOf is what a line a plugin wrote is: a JSON entry, or plain text.
+func lineOf(line string) logLine {
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(line), &entry); err != nil {
+		return plainText{notJSON: err}
+	}
+	return jsonLine{entry: entry}
+}
+
 // alongside is err with alsoErr said beside it, or whichever of the two
 // happened when only one did.
 func alongside(err, alsoErr error) error {
@@ -1700,13 +1729,14 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 			continue
 		}
 
-		// A JSON log entry says its own level.
+		// A JSON log entry says its own level; plain text is at its stream's.
 		actualLevel := l.level
-		var logEntry map[string]any
-		if err := json.Unmarshal([]byte(line), &logEntry); err == nil {
-			if level, says := logEntry["level"].(string); says {
+		switch said := lineOf(line).(type) {
+		case jsonLine:
+			if level, says := said.entry["level"].(string); says {
 				actualLevel = level
 			}
+		case plainText:
 		}
 
 		// Write to log buffer for live streaming

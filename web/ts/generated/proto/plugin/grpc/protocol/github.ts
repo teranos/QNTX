@@ -106,6 +106,11 @@ export interface RunnerStats {
    */
   jobs: string[];
   taken: TakenBuild[];
+  /**
+   * What of the runner's directory could not be read, and why: what the
+   * stats above leave out.
+   */
+  unread: string[];
 }
 
 /** GitHubRunner is the runner as the Actions section shows it. */

@@ -87,6 +87,9 @@ type configWithEndpoints struct {
 	logger    *zap.SugaredLogger
 	// readErr is every failure to hand the plugin its config, kept for Err.
 	readErr error
+	// recordFailureSaid is whether why the record handed no config is kept in
+	// readErr: each read of it fails the same way, and is said once.
+	recordFailureSaid bool
 }
 
 // held is the plugin's config as its record holds it. The interface has no
@@ -94,13 +97,23 @@ type configWithEndpoints struct {
 // record, is kept once for Err.
 func (c *configWithEndpoints) held() map[string]string {
 	record, found, err := pluginRecord(c.domain)
-	if err != nil && c.readErr == nil {
-		c.readErr = errors.Wrapf(err, "plugin %s handed no config: its record was not read", c.domain)
+	if err != nil {
+		c.recordFailed(errors.Wrapf(err, "plugin %s handed no config: its record was not read", c.domain))
+		return record.Config
 	}
-	if !found && c.readErr == nil {
-		c.readErr = errors.Newf("plugin %s handed no config: it has no record, so nothing says its config", c.domain)
+	if !found {
+		c.recordFailed(errors.Newf("plugin %s handed no config: it has no record, so nothing says its config", c.domain))
 	}
 	return record.Config
+}
+
+// recordFailed keeps why the record handed no config, once.
+func (c *configWithEndpoints) recordFailed(err error) {
+	if c.recordFailureSaid {
+		return
+	}
+	c.recordFailureSaid = true
+	c.failed(err)
 }
 
 // Err is every reason the plugin was not handed its config, so Initialize

@@ -333,6 +333,26 @@ func depthUnder(work, path string) int {
 	return len(strings.Split(rel, string(filepath.Separator)))
 }
 
+// readRegistration is the runner's name and repository, as its registration
+// says them.
+func (r *Runner) readRegistration(stats *RunnerStats) error {
+	registeredPath := filepath.Join(r.path, runnerFile)
+	raw, err := os.ReadFile(registeredPath)
+	if err != nil {
+		return errors.Wrapf(err, "the runner's name and repository were not read from %s", registeredPath)
+	}
+	var registered struct {
+		AgentName string `json:"agentName"`
+		GitHubURL string `json:"gitHubUrl"`
+	}
+	// The runner is a .NET program, and a UTF-8 byte order mark is not JSON.
+	if err := json.Unmarshal(bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF}), &registered); err != nil {
+		return errors.Wrapf(err, "%s does not read as the runner's registration", registeredPath)
+	}
+	stats.Name, stats.GitHubURL = registered.AgentName, registered.GitHubURL
+	return nil
+}
+
 // RunnerStats is what the GitHub element shows of the runner, read off its directory.
 type RunnerStats struct {
 	Path       string   `json:"path"`
@@ -344,40 +364,49 @@ type RunnerStats struct {
 	Taken []TakenBuild `json:"taken"`
 	// Faults is what the watch could not do, oldest first.
 	Faults []string `json:"faults"`
+	// Unread is what of the runner's directory could not be read now, and why:
+	// what the stats above leave out.
+	Unread []string `json:"unread"`
 }
 
 // Stats is the runner as its directory says it is now.
 func (r *Runner) Stats() RunnerStats {
-	stats := RunnerStats{Path: r.path, Workspaces: []string{}, Jobs: []time.Time{}, Taken: []TakenBuild{}, Faults: []string{}}
-	if raw, err := os.ReadFile(filepath.Join(r.path, runnerFile)); err == nil {
-		var registered struct {
-			AgentName string `json:"agentName"`
-			GitHubURL string `json:"gitHubUrl"`
-		}
-		// The runner is a .NET program, and a UTF-8 byte order mark is not JSON.
-		if err := json.Unmarshal(bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF}), &registered); err == nil {
-			stats.Name, stats.GitHubURL = registered.AgentName, registered.GitHubURL
+	stats := RunnerStats{Path: r.path, Workspaces: []string{}, Jobs: []time.Time{}, Taken: []TakenBuild{}, Faults: []string{}, Unread: []string{}}
+	unread := func(err error) { stats.Unread = append(stats.Unread, err.Error()) }
+
+	if err := r.readRegistration(&stats); err != nil {
+		unread(err)
+	}
+
+	workPath := filepath.Join(r.path, runnerWork)
+	workspaces, err := os.ReadDir(workPath)
+	if err != nil {
+		unread(errors.Wrapf(err, "the runner's workspaces were not listed from %s", workPath))
+	}
+	for _, entry := range workspaces {
+		if entry.IsDir() && !runnerOwn[entry.Name()] {
+			stats.Workspaces = append(stats.Workspaces, entry.Name())
 		}
 	}
-	if entries, err := os.ReadDir(filepath.Join(r.path, runnerWork)); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir() && !runnerOwn[entry.Name()] {
-				stats.Workspaces = append(stats.Workspaces, entry.Name())
-			}
-		}
-	}
+
 	// A job leaves a Worker_<time>.log in _diag.
-	if entries, err := os.ReadDir(filepath.Join(r.path, "_diag")); err == nil {
-		for _, entry := range entries {
-			if !strings.HasPrefix(entry.Name(), "Worker_") {
-				continue
-			}
-			if info, err := entry.Info(); err == nil {
-				stats.Jobs = append(stats.Jobs, info.ModTime())
-			}
-		}
-		sort.Slice(stats.Jobs, func(i, j int) bool { return stats.Jobs[i].Before(stats.Jobs[j]) })
+	diagPath := filepath.Join(r.path, "_diag")
+	logs, err := os.ReadDir(diagPath)
+	if err != nil {
+		unread(errors.Wrapf(err, "the runner's jobs were not listed from %s", diagPath))
 	}
+	for _, entry := range logs {
+		if !strings.HasPrefix(entry.Name(), "Worker_") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			unread(errors.Wrapf(err, "when job log %s was written was not read", filepath.Join(diagPath, entry.Name())))
+			continue
+		}
+		stats.Jobs = append(stats.Jobs, info.ModTime())
+	}
+	sort.Slice(stats.Jobs, func(i, j int) bool { return stats.Jobs[i].Before(stats.Jobs[j]) })
 	r.mu.Lock()
 	stats.Taken = append(stats.Taken, r.taken...)
 	stats.Faults = append(stats.Faults, r.faults...)
