@@ -1,6 +1,9 @@
 package auth
 
 import (
+	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,6 +30,27 @@ func TestForgettingDeletesTheCredential(t *testing.T) {
 	kept, err := store.ownersOf([]byte("phone"))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"did:key:zphone"}, kept)
+}
+
+// Forgetting is offered the person's own devices (§7.2 step 6). A stranger's
+// passkey at the same door is neither named to them nor theirs to delete.
+func TestForgettingIsOfferedOnlyThePersonsOwnDevices(t *testing.T) {
+	h := handlerWithDoors(t, garden())
+	one := User{ID: "US-ONE", Level: LevelRoot, Accounts: []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}}}
+	h.users = &memUsers{held: []User{one}}
+	require.NoError(t, h.creds.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, "garden", "US-ONE"))
+	require.NoError(t, h.creds.saveAt(credential("stranger"), "did:key:zother", "google:stranger", "garden", "US-TWO"))
+	token, err := h.sessions.create(mastodonAccount, one)
+	require.NoError(t, err)
+
+	r := httptest.NewRequest(http.MethodPost, "/auth/forget/begin", nil)
+	r.Header.Set("Origin", "https://portal.garden.test")
+	r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
+	w := httptest.NewRecorder()
+	h.handleForgetBegin(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, []string{base64.RawURLEncoding.EncodeToString([]byte("laptop"))}, credentialsOffered(t, w.Body.Bytes()))
 }
 
 // Deleting nothing is a failure, not a success. Reporting it as done would let
