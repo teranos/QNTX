@@ -1,6 +1,6 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 304 in 135 files.
+# 301 in 132 files.
 
 1	ats/attrs/attrs.go
 1	ats/identity/quickdev.go
@@ -49,9 +49,6 @@
 1	internal/nodedid/store.go
 2	internal/pi/pin.go
 4	internal/testing/database.go
-1	plugin/grpc/client.go
-1	plugin/grpc/services/atsstore_server.go
-1	plugin/grpc/services/mail_template.go
 3	pulse/async/store.go
 1	pulse/async/worker.go
 1	pulse/schedule/execution_store.go

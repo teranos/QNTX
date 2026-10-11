@@ -1,8 +1,8 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2912 in 414 files.
+# 2774 in 392 files.
 
-6	ai/provider/grpc_client.go
+5	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
 2	ats/ax/executor.go
 4	ats/ax/fixtures.go
@@ -134,7 +134,7 @@
 1	internal/access/derive.go
 4	internal/access/tokens.go
 6	internal/access/users.go
-4	internal/admission/admission.go
+3	internal/admission/admission.go
 5	internal/claudecode/login.go
 12	internal/claudecode/run.go
 7	internal/config/am.go
@@ -143,7 +143,7 @@
 14	internal/config/load.go
 2	internal/config/one_root.go
 1	internal/config/plugin_source.go
-36	internal/config/validate.go
+33	internal/config/validate.go
 2	internal/config/watcher.go
 3	internal/logger/collect.go
 5	internal/logger/fields.go
@@ -153,6 +153,7 @@
 4	internal/logger/sentry.go
 2	internal/logger/verbosity.go
 5	internal/measure/measure.go
+1	internal/named/items.go
 1	internal/named/named.go
 1	internal/nodedid/handlers.go
 13	internal/pi/run.go
@@ -167,31 +168,11 @@
 2	internal/tools/spawncheck/main.go
 6	internal/tools/tagcheck/main.go
 1	internal/util/strings.go
-1	plugin/grpc/client.go
-1	plugin/grpc/config_provider.go
-1	plugin/grpc/pulse_handler.go
 2	plugin/grpc/remote_atsstore.go
 1	plugin/grpc/remote_queue.go
-7	plugin/grpc/services/atsstore_server.go
-3	plugin/grpc/services/embedding_server.go
-11	plugin/grpc/services/fetch_server.go
-1	plugin/grpc/services/github_installation.go
-10	plugin/grpc/services/github_server.go
-3	plugin/grpc/services/ground_server.go
 1	plugin/grpc/services/llm_queue.go
-5	plugin/grpc/services/llm_server.go
-3	plugin/grpc/services/mail_look.go
-14	plugin/grpc/services/mail_server.go
-5	plugin/grpc/services/mail_ses.go
-4	plugin/grpc/services/mail_sheet.go
-4	plugin/grpc/services/mail_template.go
-8	plugin/grpc/services/queue_server.go
-3	plugin/grpc/services/schedule_server.go
-6	plugin/grpc/services/vector_search_server.go
-1	plugin/grpc/services_manager.go
-4	plugin/grpc/watchers.go
-3	plugin/grpc/websocket_keepalive.go
-1	plugin/registry.go
+1	plugin/grpc/services/mail_ses.go
+3	plugin/grpc/services/queue_server.go
 4	pulse/async/emitter.go
 3	pulse/async/handler.go
 6	pulse/async/job.go
@@ -311,19 +292,19 @@
 6	server/embeddings_pulse.go
 4	server/exposure.go
 1	server/files.go
-12	server/github.go
+11	server/github.go
 2	server/github_credential.go
 2	server/github_deliveries.go
 1	server/github_parity.go
 3	server/github_webhook.go
 2	server/ground_bridge.go
-11	server/handlers.go
+8	server/handlers.go
 4	server/host_gauges.go
 3	server/i_sigils.go
-14	server/init.go
+12	server/init.go
 5	server/invitations.go
-20	server/lifecycle.go
-8	server/mail.go
+19	server/lifecycle.go
+6	server/mail.go
 14	server/mcp.go
 11	server/namespace_handlers.go
 2	server/namespace_run.go
@@ -345,15 +326,13 @@
 11	server/parity/tsdecl.go
 5	server/parity_sigils.go
 2	server/pi.go
-7	server/plugin_build.go
+2	server/plugin_build.go
 1	server/plugin_check.go
-8	server/plugin_config_handlers.go
+5	server/plugin_config_handlers.go
 2	server/plugin_handlers.go
-1	server/plugin_health_cache.go
-2	server/plugin_log_handlers.go
-3	server/plugin_records.go
-14	server/plugin_sigils.go
-1	server/plugin_stores.go
+1	server/plugin_log_handlers.go
+1	server/plugin_records.go
+3	server/plugin_sigils.go
 1	server/pprof.go
 25	server/prompt_handlers.go
 2	server/prose_handlers.go
@@ -381,7 +360,7 @@
 4	server/routes.go
 5	server/routing.go
 10	server/search_observer.go
-5	server/server.go
+2	server/server.go
 5	server/sigil/ask.go
 15	server/sigil/sigil.go
 13	server/signa.go
@@ -402,7 +381,6 @@
 8	server/sub_auth.go
 6	server/sub_canvas.go
 7	server/sub_embedding.go
-1	server/sub_plugins.go
 1	server/sub_store_proof.go
 2	server/sub_ticker.go
 1	server/syscap/parser_qntx.go
@@ -414,5 +392,5 @@
 2	server/vault_fill.go
 10	server/vault_send.go
 35	server/watcher_handler.go
-13	server/watcher_handlers.go
+11	server/watcher_handlers.go
 5	server/watcher_reload.go
