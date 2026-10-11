@@ -512,10 +512,14 @@ message PluginHealthProbe {
 message PluginsList {
   // One row per plugin.
   repeated PluginInfo plugins = 1;
-  // When the health in the rows was probed. Null before the first probe.
-  PluginHealthProbe health = 2;
-  // Why the last probe did not complete, when it did not.
-  string health_probe_failure = 3;
+  // The health in the rows: when it was probed, or why no probe has
+  // completed.
+  oneof probe {
+    // When the health in the rows was probed.
+    PluginHealthProbe health = 2;
+    // Why no probe has completed.
+    string health_probe_failure = 3;
+  }
   // Why the node's plugin records did not read, when they did not.
   string records_failure = 4;
 }

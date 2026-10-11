@@ -18,9 +18,9 @@ import (
 type PluginHandler struct {
 	registry *plugin.Registry
 	logger   *zap.SugaredLogger
-	// health reads the last probe: the results, when it was taken, and why the
-	// most recent attempt failed if it did. It reaches no plugin.
-	health func() (map[string]plugin.HealthStatus, time.Time, string)
+	// health reads the last probe and when it was taken, or why none has
+	// completed. It reaches no plugin.
+	health func() pluginProbe
 	// sigils is one plugin's sigils, with who reaches each, and why any signum
 	// it handed is not served.
 	sigils func(name string) ([]*protocol.SigilRow, []string)
@@ -30,7 +30,7 @@ type PluginHandler struct {
 
 // NewPluginHandler creates a handler for plugin info endpoints.
 func NewPluginHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
-	health func() (map[string]plugin.HealthStatus, time.Time, string),
+	health func() pluginProbe,
 	sigils func(name string) ([]*protocol.SigilRow, []string),
 	records func() ([]plugingrpc.PluginRecord, error)) *PluginHandler {
 	return &PluginHandler{registry: registry, logger: logger, health: health, sigils: sigils, records: records}
@@ -42,7 +42,8 @@ func (h *PluginHandler) list() *protocol.PluginsList {
 
 	// Read the last probe rather than making one. Probing here cost gRPC calls
 	// per request and held the registry's read lock across them.
-	healthResults, probedAt, probeFailure := h.health()
+	probe := h.health()
+	healthResults := healthOf(probe)
 	stateResults := h.registry.GetAllStates()
 
 	known := map[string]plugingrpc.PluginRecord{}
@@ -130,13 +131,15 @@ func (h *PluginHandler) list() *protocol.PluginsList {
 
 	// Health here is a probe with an age. Saying when it was taken is what keeps
 	// a stale answer from reading as a current one.
-	if !probedAt.IsZero() {
-		answer.Health = &protocol.PluginHealthProbe{
-			ProbedAt: probedAt.UTC().Format(time.RFC3339),
-			AgeMs:    float64(time.Since(probedAt).Milliseconds()),
-		}
+	switch held := probe.(type) {
+	case probed:
+		answer.Probe = &protocol.PluginsList_Health{Health: &protocol.PluginHealthProbe{
+			ProbedAt: held.at.UTC().Format(time.RFC3339),
+			AgeMs:    float64(time.Since(held.at).Milliseconds()),
+		}}
+	case notProbedYet:
+		answer.Probe = &protocol.PluginsList_HealthProbeFailure{HealthProbeFailure: held.why}
 	}
-	answer.HealthProbeFailure = probeFailure
 	return answer
 }
 

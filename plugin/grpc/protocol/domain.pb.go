@@ -2732,10 +2732,14 @@ type PluginsList struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// One row per plugin.
 	Plugins []*PluginInfo `protobuf:"bytes,1,rep,name=plugins,proto3" json:"plugins,omitempty"`
-	// When the health in the rows was probed. Null before the first probe.
-	Health *PluginHealthProbe `protobuf:"bytes,2,opt,name=health,proto3" json:"health,omitempty"`
-	// Why the last probe did not complete, when it did not.
-	HealthProbeFailure string `protobuf:"bytes,3,opt,name=health_probe_failure,json=healthProbeFailure,proto3" json:"health_probe_failure,omitempty"`
+	// The health in the rows: when it was probed, or why no probe has
+	// completed.
+	//
+	// Types that are valid to be assigned to Probe:
+	//
+	//	*PluginsList_Health
+	//	*PluginsList_HealthProbeFailure
+	Probe isPluginsList_Probe `protobuf_oneof:"probe"`
 	// Why the node's plugin records did not read, when they did not.
 	RecordsFailure string `protobuf:"bytes,4,opt,name=records_failure,json=recordsFailure,proto3" json:"records_failure,omitempty"`
 	unknownFields  protoimpl.UnknownFields
@@ -2779,16 +2783,27 @@ func (x *PluginsList) GetPlugins() []*PluginInfo {
 	return nil
 }
 
+func (x *PluginsList) GetProbe() isPluginsList_Probe {
+	if x != nil {
+		return x.Probe
+	}
+	return nil
+}
+
 func (x *PluginsList) GetHealth() *PluginHealthProbe {
 	if x != nil {
-		return x.Health
+		if x, ok := x.Probe.(*PluginsList_Health); ok {
+			return x.Health
+		}
 	}
 	return nil
 }
 
 func (x *PluginsList) GetHealthProbeFailure() string {
 	if x != nil {
-		return x.HealthProbeFailure
+		if x, ok := x.Probe.(*PluginsList_HealthProbeFailure); ok {
+			return x.HealthProbeFailure
+		}
 	}
 	return ""
 }
@@ -2799,6 +2814,24 @@ func (x *PluginsList) GetRecordsFailure() string {
 	}
 	return ""
 }
+
+type isPluginsList_Probe interface {
+	isPluginsList_Probe()
+}
+
+type PluginsList_Health struct {
+	// When the health in the rows was probed.
+	Health *PluginHealthProbe `protobuf:"bytes,2,opt,name=health,proto3,oneof"`
+}
+
+type PluginsList_HealthProbeFailure struct {
+	// Why no probe has completed.
+	HealthProbeFailure string `protobuf:"bytes,3,opt,name=health_probe_failure,json=healthProbeFailure,proto3,oneof"`
+}
+
+func (*PluginsList_Health) isPluginsList_Probe() {}
+
+func (*PluginsList_HealthProbeFailure) isPluginsList_Probe() {}
 
 // RouteEndpoint is a core endpoint a plugin's role is asked through.
 type RouteEndpoint struct {
@@ -3432,12 +3465,13 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"G\n" +
 	"\x11PluginHealthProbe\x12\x1b\n" +
 	"\tprobed_at\x18\x01 \x01(\tR\bprobedAt\x12\x15\n" +
-	"\x06age_ms\x18\x02 \x01(\x01R\x05ageMs\"\xcd\x01\n" +
+	"\x06age_ms\x18\x02 \x01(\x01R\x05ageMs\"\xda\x01\n" +
 	"\vPluginsList\x12.\n" +
-	"\aplugins\x18\x01 \x03(\v2\x14.protocol.PluginInfoR\aplugins\x123\n" +
-	"\x06health\x18\x02 \x01(\v2\x1b.protocol.PluginHealthProbeR\x06health\x120\n" +
-	"\x14health_probe_failure\x18\x03 \x01(\tR\x12healthProbeFailure\x12'\n" +
-	"\x0frecords_failure\x18\x04 \x01(\tR\x0erecordsFailure\"]\n" +
+	"\aplugins\x18\x01 \x03(\v2\x14.protocol.PluginInfoR\aplugins\x125\n" +
+	"\x06health\x18\x02 \x01(\v2\x1b.protocol.PluginHealthProbeH\x00R\x06health\x122\n" +
+	"\x14health_probe_failure\x18\x03 \x01(\tH\x00R\x12healthProbeFailure\x12'\n" +
+	"\x0frecords_failure\x18\x04 \x01(\tR\x0erecordsFailureB\a\n" +
+	"\x05probe\"]\n" +
 	"\rRouteEndpoint\x12\x16\n" +
 	"\x06method\x18\x01 \x01(\tR\x06method\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12 \n" +
@@ -3643,6 +3677,10 @@ func file_plugin_grpc_protocol_domain_proto_init() {
 	file_plugin_grpc_protocol_domain_proto_msgTypes[23].OneofWrappers = []any{
 		(*PluginElement_ContentUrl)(nil),
 		(*PluginElement_ModuleUrl)(nil),
+	}
+	file_plugin_grpc_protocol_domain_proto_msgTypes[30].OneofWrappers = []any{
+		(*PluginsList_Health)(nil),
+		(*PluginsList_HealthProbeFailure)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

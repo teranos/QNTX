@@ -19,9 +19,9 @@ func TestTheHandlerReadsTheProbeRatherThanMakingOne(t *testing.T) {
 	probes := 0
 	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.NewNop().Sugar()}
 	h := NewPluginHandler(plugin.NewRegistry("test", zap.NewNop().Sugar()), zap.NewNop().Sugar(),
-		func() (map[string]plugin.HealthStatus, time.Time, string) {
+		func() pluginProbe {
 			probes++
-			return map[string]plugin.HealthStatus{}, time.Now(), ""
+			return probed{results: map[string]plugin.HealthStatus{}, at: time.Now()}
 		}, noSigils, noRecords)
 	_ = s
 
@@ -41,8 +41,8 @@ func TestTheHandlerReadsTheProbeRatherThanMakingOne(t *testing.T) {
 func TestTheAnswerSaysWhenItWasProbed(t *testing.T) {
 	probedAt := time.Now().Add(-90 * time.Second)
 	h := NewPluginHandler(plugin.NewRegistry("test", zap.NewNop().Sugar()), zap.NewNop().Sugar(),
-		func() (map[string]plugin.HealthStatus, time.Time, string) {
-			return map[string]plugin.HealthStatus{}, probedAt, ""
+		func() pluginProbe {
+			return probed{results: map[string]plugin.HealthStatus{}, at: probedAt}
 		}, noSigils, noRecords)
 
 	said := answeredAsJSON(t, h.list())
@@ -78,8 +78,8 @@ func TestTheAnswerSaysWhenItWasProbed(t *testing.T) {
 // carries the reason through so the two are different answers.
 func TestAnUnansweredProbeIsSaidRatherThanHidden(t *testing.T) {
 	h := NewPluginHandler(plugin.NewRegistry("test", zap.NewNop().Sugar()), zap.NewNop().Sugar(),
-		func() (map[string]plugin.HealthStatus, time.Time, string) {
-			return nil, time.Time{}, "no probe has completed yet"
+		func() pluginProbe {
+			return notProbedYet{why: "no probe has completed yet"}
 		}, noSigils, noRecords)
 
 	said := answeredAsJSON(t, h.list())
@@ -115,14 +115,11 @@ func TestNoProbeYetIsNotAnEmptyAnswer(t *testing.T) {
 	// As NewQNTXServer holds it before the refresher's first probe.
 	s.pluginHealthCache.Store(notProbed())
 
-	results, at, failure := s.pluginHealth()
-	if results != nil {
-		t.Errorf("results = %v, want nil before any probe", results)
+	held, notYet := s.pluginHealth().(notProbedYet)
+	if !notYet {
+		t.Fatalf("before any probe the node holds %#v", s.pluginHealth())
 	}
-	if !at.IsZero() {
-		t.Errorf("at = %v, want zero before any probe", at)
-	}
-	if failure == "" {
+	if held.why == "" {
 		t.Error("no probe has completed and nothing says so")
 	}
 }

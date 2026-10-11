@@ -586,12 +586,14 @@ export interface PluginHealthProbe {
 export interface PluginsList {
   /** One row per plugin. */
   plugins: PluginInfo[];
-  /** When the health in the rows was probed. Null before the first probe. */
-  health:
+  /** When the health in the rows was probed. */
+  health?:
     | PluginHealthProbe
     | undefined;
-  /** Why the last probe did not complete, when it did not. */
-  health_probe_failure: string;
+  /** Why no probe has completed. */
+  health_probe_failure?:
+    | string
+    | undefined;
   /** Why the node's plugin records did not read, when they did not. */
   records_failure: string;
 }
