@@ -670,6 +670,16 @@
         "ANYONE"
       ]
     },
+    "/auth/elsewhere": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/elsewhere/back": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/forget": {
       "x-qntx-reach": [
         "ANYONE"
