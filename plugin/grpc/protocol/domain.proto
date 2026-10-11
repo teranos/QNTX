@@ -320,8 +320,20 @@ message ExecuteJobRequest {
   string handler_name = 2;     // Which handler to invoke
   bytes payload = 3;           // Job-specific data (JSON)
   optional int64 timeout_secs = 4;  // Execution timeout. If not set, no timeout.
-  string store_token = 5;      // Reaches the store of the namespace the schedule's creator acted in, for this run. Empty is a job no caller made.
-  string user_id = 6;          // The User whose sigil call created the schedule
+  reserved 5, 6;
+  reserved "store_token", "user_id";
+  // Who made the schedule this run is for: a caller, as whom it runs, or no
+  // caller, and the plugin runs it as itself.
+  oneof made {
+    JobCaller caller = 7;
+    bool no_caller = 8;        // No caller made it. False is refused.
+  }
+}
+
+// JobCaller is the caller whose sigil call made the schedule a run is for.
+message JobCaller {
+  string store_token = 1;      // Reaches the store of the namespace the caller acted in, for this run
+  string user_id = 2;          // The User whose sigil call created the schedule
 }
 
 // ExecuteJobResponse is returned after job execution

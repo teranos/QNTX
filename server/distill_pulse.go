@@ -151,6 +151,7 @@ func (s *QNTXServer) setupDistillSchedule(cfg *appcfg.Config) {
 
 	now := time.Now()
 	job := &schedule.Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              fmt.Sprintf("SPJ_distill_%d", now.Unix()),
 		HandlerName:     distillHandlerName,
 		IntervalSeconds: int32(intervalSeconds),

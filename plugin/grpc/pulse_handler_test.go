@@ -157,29 +157,41 @@ func TestARunOfACallersScheduleCarriesTheirStoreTokenAndUser(t *testing.T) {
 	}
 	p := &runPlugin{}
 	var openDuring bool
-	p.during = func(req *protocol.ExecuteJobRequest) { _, openDuring = open[req.StoreToken] }
+	p.during = func(req *protocol.ExecuteJobRequest) { _, openDuring = open[req.GetCaller().GetStoreToken()] }
 	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), openRun)
 
-	err := h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBtim", UserID: "UStim", Namespace: "defacile"}))
+	err := h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBtim", MadeBy: async.MadeByCaller, UserID: "UStim", Namespace: "defacile"}))
 	require.NoError(t, err)
 
 	require.Len(t, p.handed, 1)
-	assert.Equal(t, "run-token", p.handed[0].StoreToken)
-	assert.Equal(t, "UStim", p.handed[0].UserId)
+	caller, isCaller := p.handed[0].GetMade().(*protocol.ExecuteJobRequest_Caller)
+	require.True(t, isCaller, "a caller's run was handed %#v", p.handed[0].GetMade())
+	assert.Equal(t, "run-token", caller.Caller.GetStoreToken())
+	assert.Equal(t, "UStim", caller.Caller.GetUserId())
 	assert.True(t, openDuring, "the run's token was not open while the plugin ran")
 	assert.Empty(t, open, "the run's token outlived the run")
 }
 
-// A job no caller made is handed no store token.
+// A job no caller made says so, and is handed no store token.
 func TestARunNoCallerMadeCarriesNoStoreToken(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	p := &runPlugin{}
 	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), NewServicesManager(config.LLMConfig{}, config.FetchConfig{}, "did:key:znode", zap.NewNop().Sugar()).OpenRunFor)
 
-	require.NoError(t, h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBnobody"})))
+	require.NoError(t, h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBnobody", MadeBy: async.MadeByNoCaller})))
 	require.Len(t, p.handed, 1)
-	assert.Empty(t, p.handed[0].StoreToken)
-	assert.Empty(t, p.handed[0].UserId)
+	assert.Equal(t, &protocol.ExecuteJobRequest_NoCaller{NoCaller: true}, p.handed[0].GetMade())
+}
+
+// "Name every meaning": a job naming neither a caller nor no caller is
+// refused, not run as the plugin.
+func TestARunNamingNoMakerIsRefused(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	p := &runPlugin{}
+	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), nil)
+
+	require.Error(t, h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBunsaid"})))
+	assert.Empty(t, p.handed, "a run naming no maker reached the plugin")
 }
 
 // jobIn is job, held by the queue as a worker would find it.
@@ -201,7 +213,7 @@ func TestARunKeepsThePluginVersionOnTheJob(t *testing.T) {
 	p := &runPlugin{version: "0.4.3"}
 	h := NewPluginProxyHandler("datapunt", "observe", &ExternalDomainProxy{client: p}, db, zap.NewNop().Sugar(), nil)
 
-	require.NoError(t, h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBversion"})))
+	require.NoError(t, h.Execute(context.Background(), jobIn(t, db, &async.Job{ID: "JBversion", MadeBy: async.MadeByNoCaller})))
 	var version string
 	require.NoError(t, db.QueryRow(`SELECT plugin_version FROM async_ix_jobs WHERE id = ?`, "JBversion").Scan(&version))
 	assert.Equal(t, "0.4.3", version)

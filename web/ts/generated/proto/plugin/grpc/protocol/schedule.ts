@@ -176,10 +176,12 @@ export interface ScheduledJob {
   /** RFC3339 timestamp */
   updated_at: string;
   created_from_doc: string;
-  /** The User whose sigil call created it; empty is none */
+  /** The User whose sigil call created it, when made_by is "caller" */
   user_id: string;
-  /** The namespace that caller acted in; empty is none */
+  /** The namespace that caller acted in, when made_by is "caller" */
   namespace: string;
+  /** Who made it: "caller", in a sigil call, or "no caller". Anything else is refused. */
+  made_by: string;
 }
 
 export interface CreateScheduleRequest {

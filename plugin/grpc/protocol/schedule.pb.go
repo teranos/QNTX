@@ -1028,8 +1028,9 @@ type ScheduledJob struct {
 	CreatedAt       string                 `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // RFC3339 timestamp
 	UpdatedAt       string                 `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // RFC3339 timestamp
 	CreatedFromDoc  string                 `protobuf:"bytes,14,opt,name=created_from_doc,json=createdFromDoc,proto3" json:"created_from_doc,omitempty"`
-	UserId          string                 `protobuf:"bytes,15,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // The User whose sigil call created it; empty is none
-	Namespace       string                 `protobuf:"bytes,16,opt,name=namespace,proto3" json:"namespace,omitempty"`         // The namespace that caller acted in; empty is none
+	UserId          string                 `protobuf:"bytes,15,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // The User whose sigil call created it, when made_by is "caller"
+	Namespace       string                 `protobuf:"bytes,16,opt,name=namespace,proto3" json:"namespace,omitempty"`         // The namespace that caller acted in, when made_by is "caller"
+	MadeBy          string                 `protobuf:"bytes,17,opt,name=made_by,json=madeBy,proto3" json:"made_by,omitempty"` // Who made it: "caller", in a sigil call, or "no caller". Anything else is refused.
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1165,6 +1166,13 @@ func (x *ScheduledJob) GetUserId() string {
 func (x *ScheduledJob) GetNamespace() string {
 	if x != nil {
 		return x.Namespace
+	}
+	return ""
+}
+
+func (x *ScheduledJob) GetMadeBy() string {
+	if x != nil {
+		return x.MadeBy
 	}
 	return ""
 }
@@ -2387,7 +2395,7 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"\trun_count\x18\x01 \x01(\x03R\brunCount\x12#\n" +
 	"\x0elast_run_at_ms\x18\x02 \x01(\x03R\vlastRunAtMs\x12*\n" +
 	"\x11last_execution_id\x18\x03 \x01(\tR\x0flastExecutionId\x12#\n" +
-	"\x0enext_run_at_ms\x18\x04 \x01(\x03R\vnextRunAtMs\"\xf2\x03\n" +
+	"\x0enext_run_at_ms\x18\x04 \x01(\x03R\vnextRunAtMs\"\x8b\x04\n" +
 	"\fScheduledJob\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x03 \x01(\tR\vhandlerName\x12\x18\n" +
@@ -2407,7 +2415,8 @@ const file_plugin_grpc_protocol_schedule_proto_rawDesc = "" +
 	"updated_at\x18\r \x01(\tR\tupdatedAt\x12(\n" +
 	"\x10created_from_doc\x18\x0e \x01(\tR\x0ecreatedFromDoc\x12\x17\n" +
 	"\auser_id\x18\x0f \x01(\tR\x06userId\x12\x1c\n" +
-	"\tnamespace\x18\x10 \x01(\tR\tnamespaceJ\x04\b\x02\x10\x03R\bats_code\"\xf0\x02\n" +
+	"\tnamespace\x18\x10 \x01(\tR\tnamespace\x12\x17\n" +
+	"\amade_by\x18\x11 \x01(\tR\x06madeByJ\x04\b\x02\x10\x03R\bats_code\"\xf0\x02\n" +
 	"\x15CreateScheduleRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12!\n" +

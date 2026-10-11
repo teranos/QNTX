@@ -539,7 +539,13 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 		err = errors.WithDetail(err, fmt.Sprintf("Scheduled job ID: %s", scheduled.Id))
 		return "", err
 	}
-	// The run goes where the schedule's creator acted, as them.
+	// The run goes where the schedule's creator acted, as them, or is made by
+	// no caller, as the schedule says.
+	made, err := async.MadeByOf(scheduled.MadeBy)
+	if err != nil {
+		return "", errors.Wrapf(err, "scheduled job %s (handler %s) says who made it", scheduled.Id, handlerName)
+	}
+	job.MadeBy = made
 	job.UserID = scheduled.UserId
 	job.Namespace = scheduled.Namespace
 

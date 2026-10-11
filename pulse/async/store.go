@@ -47,9 +47,9 @@ func (s *Store) CreateJob(job *Job) error {
 			parent_job_id, retry_count,
 			plugin_version,
 			trace_context, trace_baggage,
-			user_id, namespace,
+			made_by, user_id, namespace,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	// exec_trace_* is absent on purpose: it is written when the job runs, by
 	// SetExecutionTrace, and a job being created has not run.
@@ -75,6 +75,7 @@ func (s *Store) CreateJob(job *Job) error {
 		job.PluginVersion,
 		job.TraceContext,
 		job.TraceBaggage,
+		job.MadeBy,
 		job.UserID,
 		job.Namespace,
 		job.CreatedAt,

@@ -229,6 +229,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 	// Regular scheduled job creation
 	job := &schedule.Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              jobID,
 		HandlerName:     handlerName,
 		Payload:         payload,

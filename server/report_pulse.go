@@ -119,6 +119,7 @@ func (s *QNTXServer) setupWeeklyReport(cfg *appcfg.Config) {
 
 	now := time.Now()
 	job := &schedule.Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              fmt.Sprintf("SPJ_report_%d", now.Unix()),
 		HandlerName:     reportHandlerName,
 		IntervalSeconds: int32(interval),

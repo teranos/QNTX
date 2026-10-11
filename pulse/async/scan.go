@@ -46,6 +46,7 @@ func GetJobScanTargets(job *Job, args *JobScanArgs) []any {
 		&job.TraceBaggage,
 		&job.ExecTraceContext,
 		&job.ExecTraceBaggage,
+		&job.MadeBy,
 		&job.UserID,
 		&job.Namespace,
 		&job.CreatedAt,
@@ -129,6 +130,6 @@ func StandardJobSelectColumns() string {
 		parent_job_id, retry_count, plugin_version,
 		trace_context, trace_baggage,
 		exec_trace_context, exec_trace_baggage,
-		user_id, namespace,
+		made_by, user_id, namespace,
 		created_at, started_at, completed_at, updated_at`
 }

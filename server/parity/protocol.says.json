@@ -527,6 +527,7 @@
   "protocol.InitializeResponse.vector_search_provider": "vector_search_provider indicates this plugin implements VectorSearchService (ADR-016). Core registers it as a vector search backend in the service mesh.",
   "protocol.InitializeResponse.watchers": "Watchers this plugin wants registered on its behalf. Core creates watchers with action_type=plugin_execute targeting this plugin. On match, core calls ExecuteJob with the matching attestation as payload.",
   "protocol.Job": "Job represents an async operation",
+  "protocol.JobCaller": "JobCaller is the caller whose sigil call made the schedule a run is for.",
   "protocol.JobLogEntry": "JobLogEntry is a single log line from plugin job execution",
   "protocol.JobStagesResponse": "GET /jobs/{job_id}/stages",
   "protocol.JobUpdateMessage": "JobUpdateMessage represents async job update sent to clients",

@@ -172,8 +172,9 @@ message ScheduledJob {
   string created_at = 12;    // RFC3339 timestamp
   string updated_at = 13;    // RFC3339 timestamp
   string created_from_doc = 14;
-  string user_id = 15;       // The User whose sigil call created it; empty is none
-  string namespace = 16;     // The namespace that caller acted in; empty is none
+  string user_id = 15;       // The User whose sigil call created it, when made_by is "caller"
+  string namespace = 16;     // The namespace that caller acted in, when made_by is "caller"
+  string made_by = 17;       // Who made it: "caller", in a sigil call, or "no caller". Anything else is refused.
 }
 
 message CreateScheduleRequest {

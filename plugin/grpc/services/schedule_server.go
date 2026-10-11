@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -72,7 +73,7 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 	}
 
 	// "a schedule remembers who created it and where"
-	caller, err := s.madeBy(req)
+	caller, madeBy, err := s.madeBy(req)
 	if err != nil {
 		return &protocol.CreateScheduleResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload
 	}
@@ -141,6 +142,7 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 		Metadata:        metadata,
 		UserId:          caller.UserID,
 		Namespace:       caller.Namespace,
+		MadeBy:          string(madeBy),
 	}
 
 	if err := s.store.CreateJob(job); err != nil {
@@ -165,22 +167,22 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 }
 
 // madeBy is the caller of the sigil call a schedule is made in, or no caller
-// for one the plugin made itself.
-func (s *ScheduleServer) madeBy(req *protocol.CreateScheduleRequest) (Caller, error) {
+// for one the plugin made itself, which keeps no User and no namespace.
+func (s *ScheduleServer) madeBy(req *protocol.CreateScheduleRequest) (Caller, async.MadeBy, error) {
 	switch made := req.GetMade().(type) {
 	case *protocol.CreateScheduleRequest_StoreToken:
 		caller, open := s.callerOf(made.StoreToken)
 		if !open {
-			return Caller{}, errors.Newf("store_token names no open sigil call, so schedule %s has no caller to remember", req.HandlerName)
+			return Caller{}, "", errors.Newf("store_token names no open sigil call, so schedule %s has no caller to remember", req.HandlerName)
 		}
-		return caller, nil
+		return caller, async.MadeByCaller, nil
 	case *protocol.CreateScheduleRequest_ByPlugin:
 		if !made.ByPlugin {
-			return Caller{}, errors.Newf("by_plugin is false: schedule %s is made in a sigil call, or by the plugin", req.HandlerName)
+			return Caller{}, "", errors.Newf("by_plugin is false: schedule %s is made in a sigil call, or by the plugin", req.HandlerName)
 		}
-		return Caller{}, nil
+		return Caller{}, async.MadeByNoCaller, nil
 	}
-	return Caller{}, errors.Newf("schedule %s names who made it: the store_token of a sigil call, or by_plugin", req.HandlerName)
+	return Caller{}, "", errors.Newf("schedule %s names who made it: the store_token of a sigil call, or by_plugin", req.HandlerName)
 }
 
 // PauseSchedule pauses an active schedule

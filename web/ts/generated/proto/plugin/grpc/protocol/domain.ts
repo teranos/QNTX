@@ -363,10 +363,17 @@ export interface ExecuteJobRequest {
   /** Job-specific data (JSON) */
   payload: Uint8Array;
   /** Execution timeout. If not set, no timeout. */
-  timeout_secs?:
-    | number
+  timeout_secs?: number | undefined;
+  caller?:
+    | JobCaller
     | undefined;
-  /** Reaches the store of the namespace the schedule's creator acted in, for this run. Empty is a job no caller made. */
+  /** No caller made it. False is refused. */
+  no_caller?: boolean | undefined;
+}
+
+/** JobCaller is the caller whose sigil call made the schedule a run is for. */
+export interface JobCaller {
+  /** Reaches the store of the namespace the caller acted in, for this run */
   store_token: string;
   /** The User whose sigil call created the schedule */
   user_id: string;

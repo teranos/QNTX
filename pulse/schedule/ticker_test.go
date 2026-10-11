@@ -31,6 +31,7 @@ func TestEnqueueAsyncJob_WithPrecomputedHandler(t *testing.T) {
 
 	// Create scheduled job with pre-computed handler/payload (new approach)
 	scheduledJob := &Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              "SPJ_precomputed_test",
 		HandlerName:     "role.jd-ingestion",
 		Payload:         []byte(`{"jd_url":"https://example.com/job/precomputed","actor":"pulse:SPJ_precomputed_test"}`),
@@ -61,6 +62,7 @@ func TestEnqueueAsyncJob_RequiresHandlerName(t *testing.T) {
 
 	// Create scheduled job WITHOUT pre-computed handler (should fail)
 	scheduledJob := &Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              "SPJ_missing_handler",
 		HandlerName:     "", // Empty - should cause error
 		IntervalSeconds: 3600,
@@ -84,6 +86,7 @@ func TestEnqueueAsyncJob_Deduplication(t *testing.T) {
 	sourceURL := "https://example.com/job/dedup"
 
 	scheduledJob := &Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              "SPJ_dedup1",
 		HandlerName:     "role.jd-ingestion",
 		Payload:         []byte(`{"jd_url":"` + sourceURL + `"}`),
@@ -125,6 +128,7 @@ func TestCheckJobs_Integration(t *testing.T) {
 	// Create scheduled job with pre-computed handler (new approach)
 	now := time.Now()
 	scheduledJob := &Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              "SPJ_integration_test",
 		HandlerName:     "role.jd-ingestion",
 		Payload:         []byte(`{"jd_url":"https://example.com/job/integration","actor":"pulse:SPJ_integration_test"}`),
@@ -167,6 +171,7 @@ func TestCheckJobs_FailsWithoutHandlerName(t *testing.T) {
 	// Create scheduled job WITHOUT pre-computed handler (should fail at execution)
 	now := time.Now()
 	scheduledJob := &Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              "SPJ_missing_handler_integration",
 		HandlerName:     "", // Empty - should cause execution to fail
 		IntervalSeconds: 3600,
@@ -212,6 +217,7 @@ func TestCheckJobs_ShortJobID_DoesNotPanic(t *testing.T) {
 	// logs `scheduled.ID[:8]` — panics today on the 3-char string.
 	now := time.Now()
 	scheduledJob := &Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              "SPJ",
 		HandlerName:     "",
 		IntervalSeconds: 3600,
@@ -288,8 +294,8 @@ func TestEnqueueAsyncJob_CarriesTheSchedulesCaller(t *testing.T) {
 	queue := async.NewQueue(db)
 	ticker := NewTicker(store, queue, nil, &mockBroadcaster{}, DefaultTickerConfig(), logger.Logger)
 
-	tims := &Job{Id: "SPJ_tim", HandlerName: "datapunt/observe", IntervalSeconds: 3600, State: StateActive, UserId: "UStim", Namespace: "defacile"}
-	anns := &Job{Id: "SPJ_ann", HandlerName: "datapunt/observe", IntervalSeconds: 3600, State: StateActive, UserId: "USann", Namespace: "garden"}
+	tims := &Job{Id: "SPJ_tim", HandlerName: "datapunt/observe", IntervalSeconds: 3600, State: StateActive, MadeBy: string(async.MadeByCaller), UserId: "UStim", Namespace: "defacile"}
+	anns := &Job{Id: "SPJ_ann", HandlerName: "datapunt/observe", IntervalSeconds: 3600, State: StateActive, MadeBy: string(async.MadeByCaller), UserId: "USann", Namespace: "garden"}
 
 	timsRun, err := ticker.enqueueAsyncJob(tims)
 	require.NoError(t, err)
@@ -311,6 +317,7 @@ func TestCheckJobs_ZeroIntervalNeverRuns(t *testing.T) {
 
 	now := time.Now()
 	require.NoError(t, store.CreateJob(&Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              "SPJ_zero_interval",
 		HandlerName:     "role.jd-ingestion",
 		IntervalSeconds: 0,

@@ -523,6 +523,7 @@ func (a *watcherPluginAdapter) ExecutePluginJob(ctx context.Context, pluginName 
 		JobId:       fmt.Sprintf("watcher-%d", time.Now().UnixNano()),
 		HandlerName: handlerName,
 		Payload:     payload,
+		Made:        &protocol.ExecuteJobRequest_NoCaller{NoCaller: true},
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "gRPC ExecuteJob failed for plugin %s handler %s", pluginName, handlerName)

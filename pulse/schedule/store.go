@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/errors"
 )
 
@@ -28,7 +29,7 @@ const (
 const jobColumns = `id, handler_name, payload, source_url,
 		       interval_seconds, next_run_at, last_run_at,
 		       last_execution_id, state, created_from_doc_id, metadata,
-		       created_at, updated_at, user_id, namespace`
+		       created_at, updated_at, user_id, namespace, made_by`
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows.
 type rowScanner interface {
@@ -66,6 +67,7 @@ func scanJob(row rowScanner) (*Job, error) {
 		&job.UpdatedAt,
 		&job.UserId,
 		&job.Namespace,
+		&job.MadeBy,
 	); err != nil {
 		return nil, err
 	}
@@ -101,8 +103,8 @@ func (s *Store) CreateJob(job *Job) error {
 			id, handler_name, payload, source_url,
 			interval_seconds, next_run_at, last_run_at,
 			last_execution_id, state, created_from_doc_id, metadata,
-			created_at, updated_at, user_id, namespace
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			created_at, updated_at, user_id, namespace, made_by
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// An empty string is a column that was never set, and NULL is how this
@@ -125,6 +127,7 @@ func (s *Store) CreateJob(job *Job) error {
 		now,
 		job.UserId,
 		job.Namespace,
+		job.MadeBy,
 	)
 
 	if err != nil {
@@ -505,9 +508,9 @@ func (s *Store) CreateForceTriggerExecution(params *ForceTriggerParams) (result 
 			scheduledJobID = fmt.Sprintf("SPJ_force_%s_%d", params.HandlerName, now.Unix())
 
 			_, err = tx.Exec(`
-				INSERT INTO scheduled_pulse_jobs (id, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc_id)
-				VALUES (?, ?, ?, ?, 'inactive', 0, ?, ?, '__force_trigger__')
-			`, scheduledJobID, params.HandlerName, params.Payload, params.SourceUrl, nowStr, nowStr)
+				INSERT INTO scheduled_pulse_jobs (id, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc_id, made_by)
+				VALUES (?, ?, ?, ?, 'inactive', 0, ?, ?, '__force_trigger__', ?)
+			`, scheduledJobID, params.HandlerName, params.Payload, params.SourceUrl, nowStr, nowStr, async.MadeByNoCaller)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to create tracking job for handler %s", params.HandlerName)
 			}

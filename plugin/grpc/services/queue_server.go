@@ -212,6 +212,7 @@ func ProtoToJob(proto *protocol.Job) (*async.Job, error) {
 			Current: int(proto.Progress.Current),
 			Total:   int(proto.Progress.Total),
 		},
+		MadeBy:      async.MadeByNoCaller,
 		Pulse:       pulse,
 		Error:       proto.Error,
 		ParentJobID: proto.ParentJobId,

@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/errors"
 	"go.uber.org/zap"
@@ -174,6 +175,7 @@ func createPluginSchedule(db *sql.DB, pluginName string, s *protocol.ScheduleInf
 	now := time.Now()
 	nextRunAt := now // For immediate first run
 	if err := schedule.NewStore(db).CreateJob(&schedule.Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              jobID,
 		HandlerName:     PluginHandlerName(pluginName, s.HandlerName),
 		IntervalSeconds: s.IntervalSeconds,

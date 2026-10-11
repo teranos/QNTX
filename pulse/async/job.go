@@ -93,8 +93,9 @@ type Job struct {
 	ExecTraceContext string `json:"exec_trace_context,omitempty"`
 	ExecTraceBaggage string `json:"exec_trace_baggage,omitempty"`
 
-	// UserID and Namespace are the caller of the sigil call that created the
-	// schedule this job runs for. Empty is a job no caller made.
+	// MadeBy is who made the schedule this job runs for: a caller, or no
+	// caller. UserID and Namespace are that caller and where they acted.
+	MadeBy    MadeBy `json:"made_by"`
 	UserID    string `json:"user_id,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
 
@@ -104,6 +105,33 @@ type Job struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// MadeBy is who a job, or the schedule that starts it, says made it, as its
+// column holds it.
+type MadeBy string
+
+const (
+	// MadeByCaller is a caller, in a sigil call: the User, and the namespace
+	// they acted in, are kept with it.
+	MadeByCaller MadeBy = "caller"
+	// MadeByNoCaller is no caller: the node, or a plugin itself.
+	MadeByNoCaller MadeBy = "no caller"
+)
+
+// MadeByOf is who a column says made a job or a schedule. Anything but a
+// caller or no caller is refused.
+func MadeByOf(said string) (MadeBy, error) {
+	switch made := MadeBy(said); made {
+	case MadeByCaller, MadeByNoCaller:
+		return made, nil
+	}
+	return "", errors.Newf("made_by is %q: a caller, or no caller", said)
+}
+
+// Made is who made the schedule a job runs for: a Caller, or NoCaller.
+type Made interface {
+	madeTheSchedule()
+}
+
 // Caller is the caller whose sigil call made the schedule a job runs for: the
 // User, and the namespace they acted in.
 type Caller struct {
@@ -111,14 +139,26 @@ type Caller struct {
 	Namespace named.Text
 }
 
-// Caller is who made the schedule this job runs for, or why the job has
-// none: a job no caller made names no namespace.
-func (j *Job) Caller() (Caller, error) {
-	namespace, err := named.TextOf("the namespace of the caller of job "+j.ID, j.Namespace)
-	if err != nil {
-		return Caller{}, errors.Wrapf(err, "job %s (handler %s) was made by no caller", j.ID, j.HandlerName)
+// NoCaller is a job no caller made: the node, or a plugin itself.
+type NoCaller struct{}
+
+func (Caller) madeTheSchedule()   {}
+func (NoCaller) madeTheSchedule() {}
+
+// Made is who made the schedule this job runs for, as it says. A job a caller
+// made naming no namespace, or one naming neither, is refused.
+func (j *Job) Made() (Made, error) {
+	switch j.MadeBy {
+	case MadeByCaller:
+		namespace, err := named.TextOf("the namespace of the caller of job "+j.ID, j.Namespace)
+		if err != nil {
+			return nil, errors.Wrapf(err, "job %s (handler %s) was made by a caller", j.ID, j.HandlerName)
+		}
+		return Caller{UserID: j.UserID, Namespace: namespace}, nil
+	case MadeByNoCaller:
+		return NoCaller{}, nil
 	}
-	return Caller{UserID: j.UserID, Namespace: namespace}, nil
+	return nil, errors.Newf("job %s (handler %s) says it was made by %q: a caller, or no caller", j.ID, j.HandlerName, j.MadeBy)
 }
 
 // NewJobWithPayload creates a new generic job with handler name and typed payload.
@@ -158,6 +198,7 @@ func NewChildJobWithPayload(handlerName string, source string, payload json.RawM
 		Status:      JobStatusQueued,
 		Progress:    Progress{Current: 0, Total: totalOps},
 		ParentJobID: parentJobID,
+		MadeBy:      MadeByNoCaller,
 		Pulse:       NoPulse(),
 		CreatedAt:   now,
 		Started:     NotYet(),

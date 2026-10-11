@@ -6,6 +6,7 @@ import (
 
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/projectctx"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 )
@@ -81,6 +82,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 
 	now := time.Now()
 	job := &schedule.Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              fmt.Sprintf("SPJ_recluster_%d", now.Unix()),
 		HandlerName:     serverembeddings.ReclusterHandlerName,
 		IntervalSeconds: int32(interval),
@@ -168,6 +170,7 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 
 	now := time.Now()
 	job := &schedule.Job{
+		MadeBy:          string(async.MadeByNoCaller),
 		Id:              fmt.Sprintf("SPJ_reproject_%d", now.Unix()),
 		HandlerName:     serverembeddings.ReprojectHandlerName,
 		IntervalSeconds: int32(interval),
