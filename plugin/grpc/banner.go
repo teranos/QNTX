@@ -36,11 +36,28 @@ type BannerInfo struct {
 	UnfilteredWatchers []string          // watcher IDs with empty filters (receive all attestations)
 	Status             string            // from Health().Message
 	Details            map[string]string // from Health().Details
-	Err                error             // why the plugin failed; a failed banner says only this
+	Outcome            BannerOutcome     // the plugin stands, or failed and why; a failed banner says only why
 	ConfigDiff         []string          // "url changed: old → new"
 	HTTPRoutes         []string          // what its signa bind: "GET /api/datapunt/read", etc.
 
 }
+
+// BannerOutcome is how a plugin's lifecycle came out: it stands, or it failed,
+// and why.
+type BannerOutcome interface {
+	cameOut()
+}
+
+// BannerStanding is a plugin that stands.
+type BannerStanding struct{}
+
+// BannerFailed is a plugin that failed, and why.
+type BannerFailed struct {
+	Why error
+}
+
+func (BannerStanding) cameOut() {}
+func (BannerFailed) cameOut()   {}
 
 // bannerPalette contains 8 distinct ANSI colors for plugin identity.
 // Selected for contrast on dark and light terminals.
@@ -111,17 +128,29 @@ func FormatBanner(info BannerInfo) string {
 	b.WriteString(ansiReset)
 	b.WriteByte('\n')
 
-	if info.Err != nil {
-		// Error banner
-		b.WriteString("   ")
-		b.WriteString(ansiRed)
-		b.WriteString("✗ ")
-		b.WriteString(info.Err.Error())
-		b.WriteString(ansiReset)
-		b.WriteByte('\n')
-		return b.String()
+	switch outcome := info.Outcome.(type) {
+	case BannerFailed:
+		return failedBanner(&b, outcome.Why)
+	case BannerStanding:
+		return standingBanner(&b, info, color)
 	}
+	return failedBanner(&b, errors.Newf("the banner of %s says neither that it stands nor that it failed", info.Name))
+}
 
+// failedBanner is a failed plugin's banner: only why.
+func failedBanner(b *strings.Builder, why error) string {
+	b.WriteString("   ")
+	b.WriteString(ansiRed)
+	b.WriteString("✗ ")
+	b.WriteString(why.Error())
+	b.WriteString(ansiReset)
+	b.WriteByte('\n')
+	return b.String()
+}
+
+// standingBanner is a standing plugin's banner: its roles and health, what it
+// handles, schedules and watches, its sigils, and how its config changed.
+func standingBanner(b *strings.Builder, info BannerInfo, color string) string {
 	// Roles, then what its health says
 	b.WriteString("   ")
 	b.WriteString(color)
@@ -273,7 +302,7 @@ func (a *PluginAccumulator) getOrCreate(name string) *BannerInfo {
 	if info, ok := a.plugins[name]; ok {
 		return info
 	}
-	info := &BannerInfo{Name: name}
+	info := &BannerInfo{Name: name, Outcome: BannerStanding{}}
 	a.plugins[name] = info
 	return info
 }
@@ -321,7 +350,7 @@ func (a *PluginAccumulator) SetHealth(name string, healthy bool, message string,
 	info.Status = message
 	info.Details = details
 	if !healthy {
-		info.Err = errors.Newf("unhealthy: %s", message)
+		info.Outcome = BannerFailed{Why: errors.Newf("unhealthy: %s", message)}
 	}
 }
 
@@ -330,7 +359,7 @@ func (a *PluginAccumulator) SetFailed(name string, err string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	info := a.getOrCreate(name)
-	info.Err = errors.New(err)
+	info.Outcome = BannerFailed{Why: errors.New(err)}
 }
 
 // SnapshotConfig saves the current config for later diffing.

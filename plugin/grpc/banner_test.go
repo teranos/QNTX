@@ -12,6 +12,7 @@ import (
 
 func TestFormatBanner_Boot(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "meili",
 		Version: "0.4.0",
 		Reason:  BannerBoot,
@@ -39,6 +40,7 @@ func TestFormatBanner_Boot(t *testing.T) {
 
 func TestFormatBanner_Restart(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "meili",
 		Version: "0.4.0",
 		Reason:  BannerRestart,
@@ -54,6 +56,7 @@ func TestFormatBanner_Restart(t *testing.T) {
 
 func TestFormatBanner_Recovered(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "meili",
 		Version: "0.4.0",
 		Reason:  BannerRecovered,
@@ -69,6 +72,7 @@ func TestFormatBanner_Recovered(t *testing.T) {
 
 func TestFormatBanner_Reconfigured(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "meili",
 		Version: "0.4.0",
 		Reason:  BannerReconfigured,
@@ -93,7 +97,7 @@ func TestFormatBanner_Failed(t *testing.T) {
 		Name:    "meili",
 		Version: "0.4.0",
 		Reason:  BannerBoot,
-		Err:     errors.New("MeiliSearch at 10.195.67.11:7700 not accessible"),
+		Outcome: BannerFailed{Why: errors.New("MeiliSearch at 10.195.67.11:7700 not accessible")},
 	}
 	banner := FormatBanner(info)
 
@@ -111,6 +115,7 @@ func TestFormatBanner_Failed(t *testing.T) {
 
 func TestFormatBanner_HandlersSchedulesWatchers(t *testing.T) {
 	info := BannerInfo{
+		Outcome:       BannerStanding{},
 		Name:          "python",
 		Version:       "1.0.0",
 		Handlers:      []string{"ingest", "process"},
@@ -133,6 +138,7 @@ func TestFormatBanner_HandlersSchedulesWatchers(t *testing.T) {
 
 func TestFormatBanner_Details_SkipBackend(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "x",
 		Version: "1.0",
 		Details: map[string]string{"backend": "sqlite"},
@@ -148,6 +154,7 @@ func TestFormatBanner_Details_SkipBackend(t *testing.T) {
 
 func TestFormatBanner_Details_DedupStatusSubstring(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "x",
 		Version: "1.0",
 		Status:  "running on host alpha",
@@ -161,6 +168,7 @@ func TestFormatBanner_Details_DedupStatusSubstring(t *testing.T) {
 
 func TestFormatBanner_Details_BoolTrue(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "x",
 		Version: "1.0",
 		Details: map[string]string{"streaming": "true"},
@@ -176,6 +184,7 @@ func TestFormatBanner_Details_BoolTrue(t *testing.T) {
 
 func TestFormatBanner_Details_BoolFalse(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "x",
 		Version: "1.0",
 		Details: map[string]string{"streaming": "false"},
@@ -191,6 +200,7 @@ func TestFormatBanner_Details_BoolFalse_NoDanglingDim(t *testing.T) {
 	// `continue`-ing, leaving an unclosed dim escape that leaked into the next
 	// rendered section.
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "x",
 		Version: "1.0",
 		Details: map[string]string{"streaming": "false"},
@@ -203,6 +213,7 @@ func TestFormatBanner_Details_BoolFalse_NoDanglingDim(t *testing.T) {
 
 func TestFormatBanner_Details_Sorted(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "x",
 		Version: "1.0",
 		Details: map[string]string{"zulu": "z", "alpha": "a"},
@@ -220,6 +231,7 @@ func TestFormatBanner_Details_Sorted(t *testing.T) {
 
 func TestFormatBanner_StatusWithoutRoles(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "x",
 		Version: "1.0",
 		Status:  "MyStatusLine",
@@ -232,6 +244,7 @@ func TestFormatBanner_StatusWithoutRoles(t *testing.T) {
 
 func TestFormatBanner_NoRoutesAdvertised(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "x",
 		Version: "1.0",
 	}
@@ -243,6 +256,7 @@ func TestFormatBanner_NoRoutesAdvertised(t *testing.T) {
 
 func TestFormatBanner_NoRoutesAdvertised_Disabled(t *testing.T) {
 	info := BannerInfo{
+		Outcome: BannerStanding{},
 		Name:    "x",
 		Version: "1.0",
 		Reason:  BannerDisabled,
@@ -257,7 +271,7 @@ func TestFormatBanner_NoRoutesAdvertised_SkipOnError(t *testing.T) {
 	info := BannerInfo{
 		Name:    "x",
 		Version: "1.0",
-		Err:     errors.New("broken"),
+		Outcome: BannerFailed{Why: errors.New("broken")},
 	}
 	plain := stripANSI(FormatBanner(info))
 	if strings.Contains(plain, "sigils") {
@@ -268,6 +282,7 @@ func TestFormatBanner_NoRoutesAdvertised_SkipOnError(t *testing.T) {
 func TestFormatBanner_CountsTruncated(t *testing.T) {
 	handlers := []string{"h01", "h02", "h03", "h04", "h05", "h06", "h07", "h08", "h09", "h10", "h11"}
 	info := BannerInfo{
+		Outcome:  BannerStanding{},
 		Name:     "x",
 		Version:  "1.0",
 		Handlers: handlers,
@@ -289,6 +304,7 @@ func TestFormatBanner_CountsTruncated(t *testing.T) {
 
 func TestFormatBanner_WatchersUnfilteredSuffix(t *testing.T) {
 	info := BannerInfo{
+		Outcome:            BannerStanding{},
 		Name:               "x",
 		Version:            "1.0",
 		WatcherNames:       []string{"w1", "w2"},
@@ -393,8 +409,17 @@ func TestAccumulator_SetFailed(t *testing.T) {
 	info := acc.plugins["meili"]
 	acc.mu.Unlock()
 
-	require.Error(t, info.Err)
-	assert.Equal(t, "connection refused", info.Err.Error())
+	failed, isFailed := info.Outcome.(BannerFailed)
+	require.True(t, isFailed, "a failed plugin's banner came out %#v", info.Outcome)
+	assert.Equal(t, "connection refused", failed.Why.Error())
+}
+
+// "nil is nil": a banner saying neither that its plugin stands nor that it
+// failed is not drawn as standing.
+func TestFormatBanner_NoOutcomeIsNotStanding(t *testing.T) {
+	plain := stripANSI(FormatBanner(BannerInfo{Name: "x", Version: "1.0", Reason: BannerBoot}))
+	assert.Contains(t, plain, "says neither that it stands nor that it failed")
+	assert.NotContains(t, plain, "sigils")
 }
 
 func TestAccumulator_SnapshotAndDiff(t *testing.T) {
