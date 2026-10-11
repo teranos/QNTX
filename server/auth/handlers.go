@@ -6,27 +6,42 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
+	errors "github.com/teranos/sacred-error"
 )
 
+// ownerUserID keys the ceremony a browser has in progress.
 const ownerUserID = "qntx-owner"
-const ownerUserName = "owner"
+
+// legacyUserHandle is the user handle every passkey made before per-User
+// handles was made under (migration 078).
+const legacyUserHandle = ownerUserID
 
 // maxCeremonyBodyBytes bounds a ceremony response. An attestation object plus
 // a DID proof is kilobytes; anything past this is not a ceremony.
 const maxCeremonyBodyBytes = 256 << 10
 
-// ownerUser implements webauthn.User for the single QNTX owner
-type ownerUser struct {
+// passkeyUser is the user account a ceremony is for, as WebAuthn names it
+// (§5.4.3): the User's id as the handle, and what the person reads it by.
+type passkeyUser struct {
+	handle      []byte
+	name        string
 	credentials []webauthn.Credential
 }
 
-func (u *ownerUser) WebAuthnID() []byte                         { return []byte(ownerUserID) }
-func (u *ownerUser) WebAuthnName() string                       { return ownerUserName }
-func (u *ownerUser) WebAuthnDisplayName() string                { return "QNTX Owner" }
-func (u *ownerUser) WebAuthnCredentials() []webauthn.Credential { return u.credentials }
+func (u *passkeyUser) WebAuthnID() []byte                         { return u.handle }
+func (u *passkeyUser) WebAuthnName() string                       { return u.name }
+func (u *passkeyUser) WebAuthnDisplayName() string                { return u.name }
+func (u *passkeyUser) WebAuthnCredentials() []webauthn.Credential { return u.credentials }
+
+// passkeyName is what a passkey manager lists the account as: the first
+// address the person gave, and the account they came by after it (§5.4.1).
+func passkeyName(u User, route string) string {
+	return append(slices.Clone(u.EmailAddresses), route)[0]
+}
 
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	// A node whose people log in elsewhere has no login of its own to show.
@@ -139,13 +154,41 @@ func (h *Handler) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := &ownerUser{}
+	// The passkey is made for the User this enrolment speaks for, under their
+	// own id: a handle shared by two accounts makes the second evict the first.
+	enrolling, ok := h.presented(r).Enrolling()
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, errRefused.Error())
+		return
+	}
+	person, found, err := h.users.ByRoute(enrolling)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "the User store did not answer")
+		h.logger.Errorw("could not read the User a passkey is enrolled for", "route", enrolling, "error", err)
+		return
+	}
+	if !found {
+		h.refusePasskey(w, "enrolment", enrolling, "no User holds this route",
+			"nobody is reached by this account", "no User holds "+enrolling)
+		return
+	}
+	// Every passkey this person already holds at this door, so an authenticator
+	// holding one makes no second (§5.4 excludeCredentials).
+	held, err := h.devicesOf(arrived.namespace, enrolling)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
+		h.logger.Errorw("could not read the passkeys a User already holds", "route", enrolling, "error", err)
+		return
+	}
+
+	user := &passkeyUser{handle: []byte(person.ID), name: passkeyName(person, enrolling)}
 	options, session, err := arrived.rp.BeginRegistration(user,
 		// Enrolment makes a passkey on the device enrolling. Firefox 156 below
 		// macOS 26.4 sends a PRF enrolment that does not ask for the platform to
 		// its security-key stack. Set before the resident key, which it replaces.
 		webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{AuthenticatorAttachment: protocol.Platform}),
 		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementDiscouraged),
+		webauthn.WithExclusions(webauthn.Credentials(held).CredentialDescriptors()),
 	)
 	if err != nil {
 		h.logger.Errorw("WebAuthn BeginRegistration failed", "error", err)
@@ -196,7 +239,8 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := &ownerUser{}
+	// Made under the handle the ceremony began with; who that is, is asked below.
+	user := &passkeyUser{handle: session.UserID}
 	credential, err := arrived.rp.CreateCredential(user, *session, parsed)
 	if err != nil {
 		h.logger.Errorw("WebAuthn FinishRegistration failed", "error", err)
@@ -267,7 +311,15 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.creds.saveAt(*credential, ownerDID, admittedAs, arrived.namespace); err != nil {
+	// The ceremony began for one User and is finished by this session. A handle
+	// that is not this session's User is a passkey made for somebody else.
+	if string(session.UserID) != person.ID {
+		h.refusePasskey(w, "enrolment", admittedAs, "the passkey was made for another User",
+			"the ceremony was begun for somebody else", "the passkey was made for "+string(session.UserID))
+		return
+	}
+
+	if err := h.creds.saveAt(*credential, ownerDID, admittedAs, arrived.namespace, person.ID); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential was not written")
 		return
@@ -340,8 +392,7 @@ func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := &ownerUser{credentials: creds}
-	options, session, err := arrived.rp.BeginLogin(user)
+	options, session, err := arrived.rp.BeginLogin(&passkeyUser{credentials: creds})
 	if err != nil {
 		h.logger.Errorw("WebAuthn BeginLogin failed", "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the ceremony was not started")
@@ -405,8 +456,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := &ownerUser{credentials: creds}
-	credential, err := arrived.rp.ValidateLogin(user, *session, parsed)
+	credential, err := h.validateAssertion(arrived.rp, *session, parsed, creds)
 	if err != nil {
 		h.logger.Errorw("WebAuthn FinishLogin failed", "error", err)
 		h.writeError(w, http.StatusUnauthorized, "the assertion did not validate")
@@ -494,6 +544,22 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	})
 	h.logger.Infow("WebAuthn authentication successful", "admitted_as", admittedAs)
 	h.writeJSON(w, http.StatusOK, h.finished(w, r, token, admittedAs))
+}
+
+// validateAssertion checks an assertion against the user handle the answering
+// passkey was made under, which the authenticator hands back (§7.2 step 6).
+func (h *Handler) validateAssertion(rp *webauthn.WebAuthn, session webauthn.SessionData, parsed *protocol.ParsedCredentialAssertionData, creds []webauthn.Credential) (*webauthn.Credential, error) {
+	handle, held, err := h.creds.userHandleOf(parsed.RawID)
+	if err != nil {
+		return nil, err
+	}
+	if !held {
+		return nil, errors.Newf("no passkey %x is held here", parsed.RawID)
+	}
+	// A person's passkeys carry more than one handle, so the ceremony is bound
+	// to the handle of the passkey that answered.
+	session.UserID = []byte(handle)
+	return rp.ValidateLogin(&passkeyUser{handle: []byte(handle), credentials: creds}, session, parsed)
 }
 
 func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {

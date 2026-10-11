@@ -15,8 +15,8 @@ import (
 func TestCredentialsComeBackPerDoor(t *testing.T) {
 	store := credentialStoreForTest(t)
 
-	require.NoError(t, store.saveAt(credential("at-default"), "did:key:zone", mastodonAccount, NamespaceDefault))
-	require.NoError(t, store.saveAt(credential("at-garden"), "did:key:ztwo", mastodonAccount, "garden"))
+	require.NoError(t, store.saveAt(credential("at-default"), "did:key:zone", mastodonAccount, NamespaceDefault, legacyUserHandle))
+	require.NoError(t, store.saveAt(credential("at-garden"), "did:key:ztwo", mastodonAccount, "garden", legacyUserHandle))
 
 	atDefault, err := store.doorCredentials(NamespaceDefault)
 	require.NoError(t, err)
@@ -36,9 +36,9 @@ func TestCredentialsComeBackPerDoor(t *testing.T) {
 func TestCredentialsComeBackPerRoutesAtADoor(t *testing.T) {
 	store := credentialStoreForTest(t)
 
-	require.NoError(t, store.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, NamespaceDefault))
-	require.NoError(t, store.saveAt(credential("phone"), "did:key:zphone", "apple:001750", NamespaceDefault))
-	require.NoError(t, store.saveAt(credential("stranger"), "did:key:zother", "google:stranger", NamespaceDefault))
+	require.NoError(t, store.saveAt(credential("laptop"), "did:key:zlaptop", mastodonAccount, NamespaceDefault, legacyUserHandle))
+	require.NoError(t, store.saveAt(credential("phone"), "did:key:zphone", "apple:001750", NamespaceDefault, legacyUserHandle))
+	require.NoError(t, store.saveAt(credential("stranger"), "did:key:zother", "google:stranger", NamespaceDefault, legacyUserHandle))
 
 	both, err := store.doorCredentialsFor(NamespaceDefault, []string{mastodonAccount, "apple:001750"})
 	require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestCredentialsComeBackPerRoutesAtADoor(t *testing.T) {
 func TestADoorWithNoRegistrationsIsEmpty(t *testing.T) {
 	store := credentialStoreForTest(t)
 
-	require.NoError(t, store.saveAt(credential("at-default"), "did:key:zone", mastodonAccount, NamespaceDefault))
+	require.NoError(t, store.saveAt(credential("at-default"), "did:key:zone", mastodonAccount, NamespaceDefault, legacyUserHandle))
 
 	none, err := store.doorCredentials("pond")
 	require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestTheDoorACredentialWasMadeAtIsReadable(t *testing.T) {
 	store := credentialStoreForTest(t)
 
 	cred := credential("at-garden")
-	require.NoError(t, store.saveAt(cred, "did:key:ztwo", mastodonAccount, "garden"))
+	require.NoError(t, store.saveAt(cred, "did:key:ztwo", mastodonAccount, "garden", legacyUserHandle))
 
 	door, err := store.doorOf(cred.ID)
 	require.NoError(t, err)
