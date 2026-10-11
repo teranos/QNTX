@@ -209,8 +209,10 @@ func (s *QNTXServer) Stop() error {
 	// A plugin closing is not a plugin failing: health polling restarted
 	// plugins mid-shutdown, and the stop hung until systemd killed it.
 	// A node running without a plugin manager has no plugins to stop watching.
-	if pm, err := s.getPluginManager(); err == nil {
-		pm.StopWatching()
+	switch managing := s.pluginManager.(type) {
+	case managerRuns:
+		managing.manager.StopWatching()
+	case noPluginManager:
 	}
 
 	// Stop daemon FIRST before stopping server goroutines

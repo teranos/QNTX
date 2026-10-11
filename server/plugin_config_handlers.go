@@ -69,8 +69,10 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 	// A plugin that is not running has no schema to say; its config is still its
 	// record's. A node running without a plugin manager runs no plugin.
 	var schema map[string]any
-	if pm, err := s.getPluginManager(); err == nil {
-		if pluginClient, ok := pm.GetPlugin(pluginName); ok {
+	switch managing := s.pluginManager.(type) {
+	case noPluginManager:
+	case managerRuns:
+		if pluginClient, ok := managing.manager.GetPlugin(pluginName); ok {
 			// Try to get schema from plugin
 			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 			defer cancel()
@@ -174,10 +176,11 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	// A running plugin says what its config may hold; one that is not running
 	// has nobody to ask, so its config is taken as written. A node running
 	// without a plugin manager runs no plugin.
-	pm, managerErr := s.getPluginManager()
 	var running bool
-	if managerErr == nil {
-		if proxy, ok := pm.GetPlugin(pluginName); ok {
+	switch managing := s.pluginManager.(type) {
+	case noPluginManager:
+	case managerRuns:
+		if proxy, ok := managing.manager.GetPlugin(pluginName); ok {
 			running = true
 			if extProxy, ok := proxy.(*grpcplugin.ExternalDomainProxy); ok {
 				ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -217,6 +220,11 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 
+		pm, err := s.getPluginManager()
+		if err != nil {
+			s.writeRichError(w, errors.Wrapf(err, "the config of plugin %s was saved, and the plugin was not reinitialized with it", pluginName), http.StatusInternalServerError)
+			return
+		}
 		if err := pm.ReinitializePlugin(ctx, pluginName, s.services); err != nil {
 			s.writeRichError(w, errors.Wrapf(err, "the config of plugin %s was saved, and the plugin was not reinitialized with it", pluginName), http.StatusInternalServerError)
 			return

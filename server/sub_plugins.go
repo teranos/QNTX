@@ -92,8 +92,10 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	// Wire services manager to plugin manager for LLM provider re-registration
 	// after restart. A node running without a plugin manager has nothing to
 	// wire, and says why to whoever asks it for one.
-	if pm, err := s.getPluginManager(); err == nil {
-		pm.SetServicesManager(servicesManager)
+	switch managing := s.pluginManager.(type) {
+	case managerRuns:
+		managing.manager.SetServicesManager(servicesManager)
+	case noPluginManager:
 	}
 
 	// Log plugin registry state — plugins load asynchronously, so the manager
@@ -111,23 +113,35 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	return nil
 }
 
-// pluginManaging is the node's plugin manager, or why the node runs without
-// one.
-type pluginManaging struct {
-	manager *grpcplugin.PluginManager
-	why     error
+// pluginManaging is how the node runs plugins: with its plugin manager, or
+// with none, and why.
+type pluginManaging interface {
+	managesPlugins()
 }
+
+// managerRuns is the plugin manager the node runs plugins with.
+type managerRuns struct {
+	manager *grpcplugin.PluginManager
+}
+
+// noPluginManager is a node running no plugins, and why.
+type noPluginManager struct {
+	why error
+}
+
+func (managerRuns) managesPlugins()     {}
+func (noPluginManager) managesPlugins() {}
 
 var (
 	handedPluginManagerMu sync.RWMutex
-	handedPluginManager   = pluginManaging{why: errors.New("no plugin manager was handed to the node")}
+	handedPluginManager   pluginManaging = noPluginManager{why: errors.New("no plugin manager was handed to the node")}
 )
 
 // HandPluginManager hands the node the plugin manager it runs plugins with.
 func HandPluginManager(manager *grpcplugin.PluginManager) {
 	handedPluginManagerMu.Lock()
 	defer handedPluginManagerMu.Unlock()
-	handedPluginManager = pluginManaging{manager: manager}
+	handedPluginManager = managerRuns{manager: manager}
 }
 
 // RunWithoutPluginManager says the node runs no plugins, and why: every
@@ -135,7 +149,7 @@ func HandPluginManager(manager *grpcplugin.PluginManager) {
 func RunWithoutPluginManager(why error) {
 	handedPluginManagerMu.Lock()
 	defer handedPluginManagerMu.Unlock()
-	handedPluginManager = pluginManaging{why: why}
+	handedPluginManager = noPluginManager{why: why}
 }
 
 // handedManaging is the plugin manager the node was handed, or why it has none.
@@ -147,5 +161,11 @@ func handedManaging() pluginManaging {
 
 // getPluginManager returns the plugin manager, or why the node runs without one.
 func (s *QNTXServer) getPluginManager() (*grpcplugin.PluginManager, error) {
-	return s.pluginManager.manager, s.pluginManager.why
+	switch managing := s.pluginManager.(type) {
+	case managerRuns:
+		return managing.manager, nil
+	case noPluginManager:
+		return nil, managing.why
+	}
+	return nil, errors.Newf("the node says neither the plugin manager it runs plugins with, nor why it runs none: %T", s.pluginManager)
 }

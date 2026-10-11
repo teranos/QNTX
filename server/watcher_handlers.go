@@ -536,11 +536,14 @@ func (a *watcherPluginAdapter) ExecutePluginJob(ctx context.Context, pluginName 
 	return resp.Result, nil
 }
 
+// IsPluginLoaded is whether the node runs a plugin by this name. A node running
+// no plugin manager runs none.
 func (a *watcherPluginAdapter) IsPluginLoaded(pluginName string) bool {
-	pm, err := a.server.getPluginManager()
-	if err != nil {
-		return false
+	switch managing := a.server.pluginManager.(type) {
+	case managerRuns:
+		_, ok := managing.manager.GetPlugin(pluginName)
+		return ok
+	case noPluginManager:
 	}
-	_, ok := pm.GetPlugin(pluginName)
-	return ok
+	return false
 }

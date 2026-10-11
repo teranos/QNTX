@@ -49,7 +49,7 @@ func rootKnowingServer(t *testing.T) *QNTXServer {
 	s := &QNTXServer{nodeDB: db, authHandler: h, logger: zap.NewNop().Sugar(), daemon: daemon,
 		pluginRegistry: plugin.GetDefaultRegistry(),
 		nodeDID:        &nodedid.Handler{DID: "did:key:z6Mkgardennode"},
-		pluginManager:  pluginManaging{why: errors.New("this test runs no plugin manager")}}
+		pluginManager:  noPluginManager{why: errors.New("this test runs no plugin manager")}}
 	s.held = servingOne(db, store)
 	s.held.SetSystem(oneNamespace("system", system))
 	return s
