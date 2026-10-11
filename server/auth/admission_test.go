@@ -219,3 +219,19 @@ func TestNoCallerWithoutAuthentication(t *testing.T) {
 	assert.False(t, reached)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
+
+// "DEFAULT DENY" (ADR-034): "root should be allowed to do anything, the rest
+// not". A level nobody named is not a rung above the ladder; it reaches nothing.
+func TestALevelNobodyNamedReachesNothing(t *testing.T) {
+	for _, level := range []Level{"", LevelOAuth, LevelRefresh, LevelGitHub, LevelUser, LevelPublicRegistration} {
+		admitted := Admitted(level)
+		assert.False(t, admitted.MayRead("anything"), "%q reads", level)
+		assert.False(t, admitted.MayWrite("anything"), "%q writes", level)
+		assert.False(t, admitted.ReachesAStore(), "%q reaches a store", level)
+		_, narrowed := admitted.ReadScope()
+		assert.True(t, narrowed, "%q is narrowed by nothing", level)
+	}
+	for _, level := range []Level{LevelRoot, LevelSuper, LevelToken, LevelAttestor} {
+		assert.True(t, Admitted(level).ReachesAStore(), "%q reaches no store", level)
+	}
+}

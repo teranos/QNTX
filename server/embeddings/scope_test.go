@@ -13,9 +13,14 @@ func attestationWith(predicates ...string) *types.As {
 	return &types.As{Predicates: predicates}
 }
 
-// A passkey session carries no grant, so nothing narrows it.
+// A ROOT session carries no grant, so nothing narrows it.
 func TestASessionReadsEverything(t *testing.T) {
-	assert.True(t, readable(auth.Admission{}, attestationWith("anything")))
+	assert.True(t, readable(auth.Admitted(auth.LevelRoot), attestationWith("anything")))
+}
+
+// "DEFAULT DENY" (ADR-034): an admission Middleware never resolved reads nothing.
+func TestNoAdmissionReadsNothing(t *testing.T) {
+	assert.False(t, readable(auth.Admission{}, attestationWith("anything")))
 }
 
 // Semantic search returns whole attestations. Without this a token scoped to
