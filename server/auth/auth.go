@@ -498,6 +498,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(authorizePath, h.handleAuthorize)
 	mux.answer(authorizeDonePath, h.handleAuthorizeDone)
 	mux.answer(tokenPath, h.handleToken)
+	// A node asks whether a token this node issued is live, signing as itself.
+	mux.answer(introspectPath, h.handleIntrospect)
 	// Discovery documents: how a client that has never seen this node finds
 	// its doors without being configured by hand.
 	mux.answer(authorizationServerPath, h.handleAuthorizationServerMetadata)
