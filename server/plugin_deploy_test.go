@@ -64,6 +64,25 @@ func TestAPushedDeployIsOneDeployFromQueuedToFailed(t *testing.T) {
 	assert.Equal(t, deployBuilding, lines[deployPredicate+deployFailed].Attributes["failed_at"])
 }
 
+// A build ended from outside it ends its deploy as interrupted, not failed,
+// at the stage it was at.
+func TestAnInterruptedBuildEndsItsDeployAsInterrupted(t *testing.T) {
+	s := deployingServer(t)
+	s.deploys.begin(pluginDeploy{plugin: "cleanAPI", rev: "c0ffee", revs: []string{"c0ffee"}, stage: deployBuilding})
+	s.deploys.interrupt("cleanAPI", errors.New("Compiling writeable v0.6.4: signal: terminated"))
+	assert.False(t, s.deploys.inFlight("cleanAPI"), "an interrupted deploy is still in flight")
+
+	d := heldDeploy(t, s, "cleanAPI")
+	assert.Equal(t, deployInterrupted, d.stage)
+	assert.Equal(t, deployBuilding, d.failedAt)
+
+	lines, err := newestLines(s, "cleanAPI@c0ffee", "deploys")
+	require.NoError(t, err)
+	assert.NotContains(t, lines, deployPredicate+deployFailed)
+	require.Contains(t, lines, deployPredicate+deployInterrupted)
+	assert.Equal(t, deployBuilding, lines[deployPredicate+deployInterrupted].Attributes["interrupted_at"])
+}
+
 // A build at the revs already installed lands nothing, and the deploy ends.
 func TestADeployThatChangesNothingEnds(t *testing.T) {
 	s := deployingServer(t)

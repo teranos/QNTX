@@ -24,10 +24,12 @@ const (
 	deployUnchanged  = "unchanged"
 	deployDisabled   = "disabled"
 	deployFailed     = "failed"
+	// Ended from outside the deploy; the next build takes it up again.
+	deployInterrupted = "interrupted"
 )
 
 // deployEnded is every stage a deploy stops at.
-var deployEnded = []string{deployLive, deployUnchanged, deployDisabled, deployFailed}
+var deployEnded = []string{deployLive, deployUnchanged, deployDisabled, deployFailed, deployInterrupted}
 
 // pluginDeploy is one plugin's deploy as far as it went.
 type pluginDeploy struct {
@@ -40,7 +42,7 @@ type pluginDeploy struct {
 	replacesRevs []string
 	revs         []string
 	stage        string
-	// The stage it failed at, and why.
+	// The stage it failed or was interrupted at, and why.
 	failedAt, failure string
 	// When each stage began.
 	began map[string]time.Time
@@ -130,11 +132,23 @@ func (t *deployTracker) stage(plugin, stage string) {
 
 // fail ends plugin's deploy at the stage it was at, saying why.
 func (t *deployTracker) fail(plugin string, failed error) {
+	t.endShort(plugin, deployFailed, failed)
+}
+
+// interrupt ends plugin's deploy at the stage it was at: something outside it
+// ended it, and why is said.
+func (t *deployTracker) interrupt(plugin string, ended error) {
+	t.endShort(plugin, deployInterrupted, ended)
+}
+
+// endShort ends plugin's deploy at end, before it went live, saying the stage
+// it was at and why.
+func (t *deployTracker) endShort(plugin, end string, why error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if d, flying := t.flying(plugin); flying {
-		d.failedAt, d.failure = d.stage, failed.Error()
-		t.moved(d, deployFailed, map[string]any{"failed_at": d.failedAt, "error": d.failure})
+		d.failedAt, d.failure = d.stage, why.Error()
+		t.moved(d, end, map[string]any{end + "_at": d.failedAt, "error": d.failure})
 	}
 }
 
