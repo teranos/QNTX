@@ -58,7 +58,7 @@ func sentToTheIssuer(t *testing.T, issuer, node *Handler, going string) *url.URL
 	finish.AddCookie(&http.Cookie{Name: homewardCookieName, Value: ticket.Value})
 	session, err := issuer.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
-	next, _ := issuer.finished(httptest.NewRecorder(), finish, session, mastodonAccount)["return"].(string)
+	next := finishedReturn(t, issuer, finish, session)
 
 	done := httptest.NewRecorder()
 	issuer.handleAuthorizeDone(done, httptest.NewRequest(http.MethodGet, next, nil))

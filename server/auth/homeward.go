@@ -67,21 +67,26 @@ func (h *Handler) handleHomeward(w http.ResponseWriter, r *http.Request) {
 	}
 	h.homewards.Store(ticket, homeward{door: door, startedAt: time.Now()})
 
-	// An app that already proved a route carries its half-admission home, so
-	// home asks for the passkey and not for the provider a second time. Only
-	// one this node opened and still holds; anything else is nothing.
-	if pending := r.URL.Query().Get("pending"); pending != "" {
-		if _, live := h.pendingLogins.peek(pending); live {
-			// peek answers the half-admission; only whether it is live is asked here.
-			h.setPendingCookie(w, pending)
-		}
-	}
+	h.carryPending(w, r)
 
 	h.openJourney(w, ticket)
 	// The cookie is ours and HttpOnly, so the page at home cannot see it. The
 	// mark is how it knows a journey is open and must draw the door even for a
 	// browser already signed in here — otherwise nothing ever calls sentHome.
 	http.Redirect(w, r, h.homeOrigin()+"?homeward=1", http.StatusFound)
+}
+
+// carryPending is an app that already proved a route carrying its
+// half-admission home, so home asks for the passkey and not for the provider
+// a second time. Only one this node opened and still holds; anything else is
+// nothing. A door's way home and a client's authorize request carry it alike.
+func (h *Handler) carryPending(w http.ResponseWriter, r *http.Request) {
+	if pending := r.URL.Query().Get("pending"); pending != "" {
+		if _, live := h.pendingLogins.peek(pending); live {
+			// peek answers the half-admission; only whether it is live is asked here.
+			h.setPendingCookie(w, pending)
+		}
+	}
 }
 
 // openJourney hands the browser its ticket: a cookie set first-party here,
@@ -110,18 +115,24 @@ func (h *Handler) homeOrigin() string {
 // that came from a door is told where to take it: the door, with the ticket on
 // the URL, because no cookie this node sets reaches there. Empty is a login
 // that began at home and ends here.
-func (h *Handler) sentHome(w http.ResponseWriter, r *http.Request, token, identity string) string {
+//
+// layeKey is the key the half-admission was proved with. Sent home from an
+// app's door, it is enrolled as the App (app_clients.go).
+func (h *Handler) sentHome(w http.ResponseWriter, r *http.Request, token, identity, layeKey string) (string, error) {
 	cookie, err := r.Cookie(homewardCookieName)
 	if err != nil {
-		return ""
+		return "", nil
 	}
 	val, ok := h.homewards.LoadAndDelete(cookie.Value)
 	if !ok {
-		return ""
+		return "", nil
 	}
 	journey, ok := val.(homeward)
 	if !ok || time.Since(journey.startedAt) > homewardTTL {
-		return ""
+		return "", nil
+	}
+	if err := h.enrolApp(identity, journey.door, layeKey); err != nil {
+		return "", err
 	}
 
 	user := h.userFor(identity)
@@ -140,7 +151,7 @@ func (h *Handler) sentHome(w http.ResponseWriter, r *http.Request, token, identi
 	})
 
 	h.logger.Infow("Sent home from a passkey, back to the door", "admitted_as", identity, "door", journey.door)
-	return journey.door + "?home=" + urlEncode(cookie.Value)
+	return journey.door + "?home=" + urlEncode(cookie.Value), nil
 }
 
 // handleHomewardResult is the door collecting the session. Only the door the

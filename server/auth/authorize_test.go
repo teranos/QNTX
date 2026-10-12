@@ -48,6 +48,15 @@ func authorizingHandler(t *testing.T) (*Handler, *memTokenStore, string) {
 	return h, store, listed[0].DID
 }
 
+// finishedReturn is where a passkey finish sends the browser next.
+func finishedReturn(t *testing.T, h *Handler, finish *http.Request, session string) string {
+	t.Helper()
+	answer, err := h.finished(httptest.NewRecorder(), finish, session, mastodonAccount, "")
+	require.NoError(t, err)
+	next, _ := answer["return"].(string)
+	return next
+}
+
 func authorizeRequest(did, redirect, challenge string) *http.Request {
 	q := url.Values{}
 	q.Set("client_id", did)
@@ -79,8 +88,7 @@ func TestAClientSendsSomebodyHomeAndTheCodeGoesBack(t *testing.T) {
 	finish.AddCookie(&http.Cookie{Name: homewardCookieName, Value: ticket.Value})
 	session, err := h.sessions.create(mastodonAccount, User{ID: "US-1", DisplayName: "onf"})
 	require.NoError(t, err)
-	answer := h.finished(httptest.NewRecorder(), finish, session, mastodonAccount)
-	next, _ := answer["return"].(string)
+	next := finishedReturn(t, h, finish, session)
 	require.Equal(t, nodeOrigin+authorizeDonePath+"?home="+url.QueryEscape(ticket.Value), next)
 
 	done := httptest.NewRecorder()
@@ -111,7 +119,7 @@ func TestTheCodeCarriesWhoSaidYes(t *testing.T) {
 	finish.AddCookie(&http.Cookie{Name: homewardCookieName, Value: ticket.Value})
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
-	next := h.finished(httptest.NewRecorder(), finish, session, mastodonAccount)["return"].(string)
+	next := finishedReturn(t, h, finish, session)
 	done := httptest.NewRecorder()
 	h.handleAuthorizeDone(done, httptest.NewRequest(http.MethodGet, next, nil))
 	require.Equal(t, http.StatusSeeOther, done.Code, done.Body.String())
@@ -188,7 +196,7 @@ func TestAClientRevokedMidJourneyGetsNoCode(t *testing.T) {
 	finish.AddCookie(&http.Cookie{Name: homewardCookieName, Value: ticket.Value})
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
-	next := h.finished(httptest.NewRecorder(), finish, session, mastodonAccount)["return"].(string)
+	next := finishedReturn(t, h, finish, session)
 
 	listed, err := store.List()
 	require.NoError(t, err)

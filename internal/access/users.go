@@ -16,6 +16,12 @@ const (
 type UserKey struct {
 	DID    string `json:"did"`
 	Origin string `json:"origin"`
+	// Door is the app door this key signs in at as a client of the node, the
+	// way a peer does: written by the passkey at home, for the key the App
+	// proved itself with. Empty is a key that is no client.
+	//
+	// "Why wouldn't the phone be one in the same way ? The App"
+	Door string `json:"door,omitempty"`
 }
 
 // UserAccount is one provider account a User holds. CanonicalID is what the

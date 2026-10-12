@@ -30,6 +30,11 @@ pub struct KeyRecord {
 
     /// `BROWSER` or `DEVICE`.
     pub origin: String,
+
+    /// The app door this key signs in at as a client of the node, as Go wrote
+    /// it. Absent on a key that is no client.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub door: String,
 }
 
 /// One provider account a User holds. Adding a provider adds a vocabulary
@@ -233,6 +238,7 @@ mod tests {
             keys: vec![KeyRecord {
                 did: route.to_string(),
                 origin: "BROWSER".to_string(),
+                door: String::new(),
             }],
             accounts: Vec::new(),
             created_at: 1,
@@ -278,6 +284,33 @@ mod tests {
         assert_eq!(
             held[0].standing, "pond",
             "the step was written and read back as nowhere"
+        );
+    }
+
+    /// The door the passkey at home enrolled the App's key at survives the
+    /// write, or the App is a client until the next read.
+    #[test]
+    fn an_apps_door_survives_the_write_that_records_it() {
+        let body = r#"{"id":"US-TIM-2","display_name":"","email_addresses":null,
+            "phone_numbers":null,"level":"ROOT","created_by":"",
+            "keys":[{"did":"did:key:zApp","origin":"BROWSER","door":"qntx://door"}],
+            "accounts":null,"created_at":1}"#;
+
+        let record: UserRecord = serde_json::from_str(body).expect("a User Go wrote");
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let location = format!("file://{}", dir.path().display());
+        let store = UserStore::open(&location).expect("open");
+        store.put(&record).expect("put");
+
+        let held = UserStore::open(&location)
+            .expect("reopen")
+            .all()
+            .expect("all");
+        assert_eq!(held.len(), 1);
+        assert_eq!(
+            held[0].keys[0].door, "qntx://door",
+            "the door was written and read back as none"
         );
     }
 
@@ -419,6 +452,7 @@ mod tests {
         u.keys.push(KeyRecord {
             did: "did:key:zSecond".to_string(),
             origin: "BROWSER".to_string(),
+            door: String::new(),
         });
         store.put(&u).expect("put again");
 
