@@ -164,15 +164,6 @@ func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 	}
 }
 
-// runs is the version the node runs plugin at, when it runs it.
-func (h *StatusLineHandler) runs(plugin string) (string, bool) {
-	p, ok := h.registry.Get(plugin)
-	if !ok {
-		return "", false
-	}
-	return p.Metadata().Version, true
-}
-
 // pluginFrameSlots is how many frames the plugin tick sweeps before it slows.
 // Each plugin has its own number of frames and takes this index modulo its own,
 // so the slots move together rather than each on its own clock.
@@ -504,7 +495,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 	// A deploy underway outranks everything, and the carousel waits for it. ug
 	// draws it on the plugin's own name, from the JSON row.
-	deploys := deployItems(h.deploys(), time.Now(), news, h.runs)
+	deploys := deployItems(h.deploys(), time.Now(), news)
 	if format == FormatJSON {
 		items = append(deploys.items, items...)
 	}

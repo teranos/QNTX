@@ -37,8 +37,6 @@ func drawDeploys(t *testing.T, format string, deploys ...pluginDeploy) *httptest
 	return rec
 }
 
-func runsNothing(string) (string, bool) { return "", false }
-
 // A deploy outranks everything on the row, and the carousel waits for it.
 func TestADeployLeadsTheRowAndHoldsTheCarousel(t *testing.T) {
 	rec := drawDeploys(t, FormatJSON, buildingDeploy(time.Now()))
@@ -48,13 +46,10 @@ func TestADeployLeadsTheRowAndHoldsTheCarousel(t *testing.T) {
 
 	deploy := body.Items[0]
 	assert.Equal(t, "datapunt", deploy.Name)
-	assert.Contains(t, deploy.Note, "f7cf853")
+	assert.Equal(t, "f7cf853", deploy.Note, "the note is the version coming in")
 	require.Len(t, deploy.Bars, 2)
-	assert.Equal(t, DeployBar{Kind: barChecks, Text: "checks 2/3", Done: 2, Of: 3}, deploy.Bars[0])
-	assert.Equal(t, barNode, deploy.Bars[1].Kind)
-	assert.Equal(t, "building 1m20s", deploy.Bars[1].Text)
-	assert.Equal(t, 1, deploy.Bars[1].Done)
-	assert.Equal(t, 3, deploy.Bars[1].Of)
+	assert.Equal(t, DeployBar{Kind: barChecks, Done: 2, Of: 3}, deploy.Bars[0])
+	assert.Equal(t, DeployBar{Kind: barNode, Done: 1, Of: 3}, deploy.Bars[1])
 }
 
 // A live deploy is over: the row is the carousel's again.
@@ -108,10 +103,11 @@ func TestAFailedCheckEndsTheDeployAtItsChecks(t *testing.T) {
 	s.deploys.checksAre("datapunt", "c0ffee", map[string]string{"test": checkFailed})
 	s.deploys.fail("datapunt", errors.New("checks on teranos/datapunt@c0ffee did not pass: test"))
 
-	row := deployItems(s.deploys.held(), time.Now(), []News{}, runsNothing)
+	row := deployItems(s.deploys.held(), time.Now(), []News{})
 	require.Len(t, row.items, 1)
 	assert.True(t, row.items[0].Bars[0].Failed, "the checks bar is not red")
-	assert.Equal(t, "failed at checks", row.items[0].Bars[1].Text)
+	assert.True(t, row.items[0].Bars[1].Failed, "the node's bar is not red")
+	assert.Equal(t, 0, row.items[0].Bars[1].Done, "the node built nothing")
 }
 
 // A failed stage turns its bar red, and the deploy stays until its hold is
@@ -122,12 +118,11 @@ func TestAFailedDeployStaysUntilTimeOrNews(t *testing.T) {
 	failed.stage, failed.failedAt, failed.failure = deployFailed, deployBuilding, "dub build: exit 1"
 	failed.began[deployFailed] = now.Add(-time.Minute)
 
-	row := deployItems([]pluginDeploy{failed}, now, []News{}, runsNothing)
+	row := deployItems([]pluginDeploy{failed}, now, []News{})
 	require.Len(t, row.items, 1)
 	assert.False(t, row.underway, "a failed deploy held the carousel")
-	assert.True(t, row.items[0].Bars[1].Failed)
-	assert.Equal(t, "failed at building", row.items[0].Bars[1].Text)
+	assert.Equal(t, DeployBar{Kind: barNode, Done: 1, Of: 3, Failed: true}, row.items[0].Bars[1])
 
-	assert.Empty(t, deployItems([]pluginDeploy{failed}, now.Add(newsHold), []News{}, runsNothing).items, "time did not clear it")
-	assert.Empty(t, deployItems([]pluginDeploy{failed}, now, []News{{AtMs: now.UnixMilli()}}, runsNothing).items, "news did not clear it")
+	assert.Empty(t, deployItems([]pluginDeploy{failed}, now.Add(newsHold), []News{}).items, "time did not clear it")
+	assert.Empty(t, deployItems([]pluginDeploy{failed}, now, []News{{AtMs: now.UnixMilli()}}).items, "news did not clear it")
 }

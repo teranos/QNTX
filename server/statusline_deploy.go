@@ -7,16 +7,14 @@ package server
 import (
 	"slices"
 	"sort"
-	"strconv"
 	"time"
 )
 
-// DeployBar is one bar of a deploy: its text on a background filled Done of Of
-// of the way, or failed.
+// DeployBar is one progress bar of a deploy, drawn as the background behind
+// the plugin's name: filled Done of Of of the way, or failed.
 type DeployBar struct {
 	// Kind is which: GitHub's checks, or the node's own build.
 	Kind   string `json:"kind"`
-	Text   string `json:"text"`
 	Done   int    `json:"done"`
 	Of     int    `json:"of"`
 	Failed bool   `json:"failed,omitempty"`
@@ -40,8 +38,8 @@ type deployRow struct {
 }
 
 // deployItems is each deploy the row draws now: every one underway, and a
-// failed one while it is still the news. version is what a plugin runs.
-func deployItems(deploys []pluginDeploy, now time.Time, news []News, version func(plugin string) (string, bool)) deployRow {
+// failed one while it is still the news.
+func deployItems(deploys []pluginDeploy, now time.Time, news []News) deployRow {
 	sort.Slice(deploys, func(i, j int) bool { return deploys[i].plugin < deploys[j].plugin })
 
 	row := deployRow{items: []StatusItem{}}
@@ -55,7 +53,7 @@ func deployItems(deploys []pluginDeploy, now time.Time, news []News, version fun
 		} else {
 			row.underway = true
 		}
-		row.items = append(row.items, deployItem(d, now, version))
+		row.items = append(row.items, deployItem(d))
 	}
 	return row
 }
@@ -85,14 +83,11 @@ func failureStands(failed pluginDeploy, deploys []pluginDeploy, news []News, now
 	return true
 }
 
-// deployItem is one deploy: the plugin, the version it runs going to the rev
-// coming in, the checks on the commit pushed, and how far the node is.
-func deployItem(d pluginDeploy, now time.Time, version func(plugin string) (string, bool)) StatusItem {
-	note := shownRev(d.rev)
-	if running, runs := version(d.plugin); runs {
-		note = running + " → " + note
-	}
-	item := StatusItem{Name: d.plugin, Note: note, Symbol: SymbolWell}
+// deployItem is one deploy: the plugin, the version coming in, the checks on
+// the commit pushed, and how far the node is.
+func deployItem(d pluginDeploy) StatusItem {
+	// The note is the version coming in; ug alternates it with the name.
+	item := StatusItem{Name: d.plugin, Note: shownRev(d.rev), Symbol: SymbolWell}
 
 	// A deploy no push began has no commit for checks to run on.
 	if d.pushed {
@@ -105,29 +100,17 @@ func deployItem(d pluginDeploy, now time.Time, version func(plugin string) (stri
 				failed = true
 			}
 		}
-		item.Bars = append(item.Bars, DeployBar{
-			Kind: barChecks,
-			Text: "checks " + strconv.Itoa(passed) + "/" + strconv.Itoa(len(d.checks)),
-			Done: passed, Of: len(d.checks), Failed: failed,
-		})
+		item.Bars = append(item.Bars, DeployBar{Kind: barChecks, Done: passed, Of: len(d.checks), Failed: failed})
 	}
 
 	of := len(deployOrder) - 1
 	if d.stage == deployFailed {
 		item.Symbol = SymbolUnwell
-		item.Bars = append(item.Bars, DeployBar{
-			Kind: barNode,
-			Text: "failed at " + d.failedAt,
-			Done: max(slices.Index(deployOrder, d.failedAt), 0), Of: of, Failed: true,
-		})
+		item.Bars = append(item.Bars, DeployBar{Kind: barNode, Done: max(slices.Index(deployOrder, d.failedAt), 0), Of: of, Failed: true})
 		return item
 	}
 	// Waiting on the checks, the node's build has not begun.
-	item.Bars = append(item.Bars, DeployBar{
-		Kind: barNode,
-		Text: d.stage + " " + readout(now.Sub(d.began[d.stage]), time.Second),
-		Done: max(slices.Index(deployOrder, d.stage), 0), Of: of,
-	})
+	item.Bars = append(item.Bars, DeployBar{Kind: barNode, Done: max(slices.Index(deployOrder, d.stage), 0), Of: of})
 	return item
 }
 
