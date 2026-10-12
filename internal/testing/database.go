@@ -148,6 +148,27 @@ func (s *sqlTestStore) GetAttestations(filters ats.AttestationFilter) (_ []*type
 			args = append(args, "%"+actor+"%")
 		}
 	}
+	// The time range is held to as the real store holds it: a side naming
+	// neither a time nor unbounded is refused, so a read that would fail on
+	// the node fails here first.
+	startAt, starts, err := filters.TimeStart.At("start")
+	if err != nil {
+		return nil, err
+	}
+	endAt, ends, err := filters.TimeEnd.At("end")
+	if err != nil {
+		return nil, err
+	}
+	// The driver writes a time.Time in its own layout, not RFC3339, so both
+	// sides are compared as SQLite reads them.
+	if starts {
+		clauses = append(clauses, "datetime(timestamp) >= datetime(?)")
+		args = append(args, startAt.UTC().Format(time.RFC3339))
+	}
+	if ends {
+		clauses = append(clauses, "datetime(timestamp) <= datetime(?)")
+		args = append(args, endAt.UTC().Format(time.RFC3339))
+	}
 
 	if len(clauses) > 0 {
 		query += " WHERE "

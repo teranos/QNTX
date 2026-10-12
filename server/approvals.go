@@ -139,7 +139,7 @@ func (s *QNTXServer) approvalLines() ([]*types.As, error) {
 	// of them at once, which no line is.
 	var lines []*types.As
 	for _, predicate := range watcher.ApprovalPredicates {
-		found, err := reading.GetAttestations(ats.AttestationFilter{Predicates: []string{predicate}, Limit: ats.EveryRow})
+		found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: ats.EveryRow})
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read the %s lines in %s", predicate, where)
 		}

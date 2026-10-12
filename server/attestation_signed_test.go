@@ -106,7 +106,7 @@ func TestASignedAttestationIsStoredAsSigned(t *testing.T) {
 		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
 	}
 
-	found, err := store.GetAttestations(ats.AttestationFilter{Limit: 1})
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 1})
 	if err != nil || len(found) != 1 {
 		t.Fatalf("read back %v, %v", found, err)
 	}
