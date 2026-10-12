@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,8 @@ type StatusItem struct {
 	Name   string `json:"name"`
 	Note   string `json:"note,omitempty"`
 	Symbol string `json:"symbol"`
+	// Bars is set on a deploy only (statusline_deploy.go).
+	Bars []DeployBar `json:"bars,omitempty"`
 }
 
 // StatusLineResponse carries the items in the order they should be read.
@@ -137,6 +140,8 @@ type StatusLineHandler struct {
 	tmux *rowAsks
 	// The peers' rows, asked as the caller (statusline_peers.go). Nil draws none.
 	peers peerRows
+	// Each plugin's newest deploy (plugin_deploy.go). Nil draws none.
+	deploys func() []pluginDeploy
 }
 
 // NewStatusLineHandler builds the handler behind /statusline.
@@ -155,7 +160,17 @@ func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 		node:            node,
 		tmux:            newRowAsks(),
 		peers:           noPeers,
+		deploys:         func() []pluginDeploy { return []pluginDeploy{} },
 	}
+}
+
+// runs is the version the node runs plugin at, when it runs it.
+func (h *StatusLineHandler) runs(plugin string) (string, bool) {
+	p, ok := h.registry.Get(plugin)
+	if !ok {
+		return "", false
+	}
+	return p.Metadata().Version, true
 }
 
 // pluginFrameSlots is how many frames the plugin tick sweeps before it slows.
@@ -470,21 +485,33 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	if r.URL.Query().Get("for") == forPrimary {
 		items = []StatusItem{}
 	}
-	items = append(items, h.newsFor(admitted)...)
-	items = append(items, h.carouselItem()...)
+	news := h.heldNews(admitted)
+	items = append(items, newsItems(news)...)
+	carousel := h.carouselItem()
 
 	// A failing handler is a fix-now kind of event, and it is drawn inside its
 	// own plugin's slot below rather than as a separate item. Watchers belong to
 	// no plugin, so theirs still lead the row; nor does a built-in, so its
 	// failure draws its own item here or it is invisible.
 	failures := h.recentHandlerFailures()
-	items = append(items, watcherFailureItemsFor(h.recentWatcherFailures(r.Context()))...)
-	items = append(items, handlerFailureItemsFor(builtinRuns(failures))...)
+	failing := append(watcherFailureItemsFor(h.recentWatcherFailures(r.Context())),
+		handlerFailureItemsFor(builtinRuns(failures))...)
 
 	if h == nil || h.registry == nil {
-		h.noteWriteFailure(writeStatusLine(w, format, items))
+		h.noteWriteFailure(writeStatusLine(w, format, slices.Concat(items, carousel, failing)))
 		return
 	}
+
+	// A deploy underway outranks everything, and the carousel waits for it. ug
+	// draws it on the plugin's own name, from the JSON row.
+	deploys := deployItems(h.deploys(), time.Now(), news, h.runs)
+	if format == FormatJSON {
+		items = append(deploys.items, items...)
+	}
+	if !deploys.underway {
+		items = append(items, carousel...)
+	}
+	items = append(items, failing...)
 
 	// The last probe, not a fresh one. Probing per request cost gRPC calls and
 	// held the registry's read lock across them.
