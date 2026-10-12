@@ -722,7 +722,7 @@ func (s *QNTXServer) staandsList(_ context.Context, sent sigil.Sent) (any, *prot
 	live, err := s.liveStaands(since, until)
 	if err != nil {
 		s.logger.Errorw("could not list the stands", "error", err)
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "cannot list the stands"}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "cannot list the stands: " + err.Error()}
 	}
 	return &protocol.Staands{Staands: live}, nil
 }
@@ -742,7 +742,7 @@ func (s *QNTXServer) staandsCreate(ctx context.Context, sent sigil.Sent) (any, *
 	}
 	if err := s.writeStaandDef(ctx, market, slug, staandCreated, nil); err != nil {
 		s.logger.Errorw("could not create a stand", "market", market, "slug", slug, "error", err)
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not create the stand in " + market}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not create the stand in " + market + ": " + err.Error()}
 	}
 	return &protocol.StaandCreated{Slug: slug, Url: staandPathPrefix + market + "/" + slug}, nil
 }
@@ -757,7 +757,7 @@ func (s *QNTXServer) staandsTakeDown(ctx context.Context, sent sigil.Sent) (any,
 	}
 	if err := s.writeStaandDef(ctx, market, slug, staandDeleted, nil); err != nil {
 		s.logger.Errorw("could not remove a stand", "market", market, "slug", slug, "error", err)
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not remove the stand in " + market}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not remove the stand in " + market + ": " + err.Error()}
 	}
 	return &protocol.StaandTakenDown{Slug: slug, Status: "removed"}, nil
 }
@@ -1039,7 +1039,7 @@ func (s *QNTXServer) staandArrivals(reading, market, slug string, since, until t
 	if err != nil {
 		s.logger.Errorw("could not read arrivals for "+reading,
 			"market", market, "slug", slug, "error", err)
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the store did not answer"}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the store did not answer: " + err.Error()}
 	}
 	return arrivals, nil
 }

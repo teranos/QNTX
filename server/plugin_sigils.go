@@ -331,7 +331,7 @@ func (s *QNTXServer) pluginAnswer(plugin string, held *protocol.Sigil, declared 
 	return func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 		failed := func(err error) (any, *protocol.Refusal) {
 			s.logger.Errorw("a plugin's sigil failed", "plugin", plugin, "sigil", held.GetName(), "error", err)
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: held.GetName() + " of " + plugin + " failed"}
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: held.GetName() + " of " + plugin + " failed: " + err.Error()}
 		}
 
 		p, ok := s.pluginRegistry.Get(plugin)
