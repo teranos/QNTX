@@ -20,7 +20,9 @@ import (
 func (s *QNTXServer) rolesSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "roles",
+			Name:        "roles",
+			Description: "The lines the gate reads about roles: REACH, WRITE and READ lines, and each grant and revoke.",
+			Tags:        []string{"roles", "reach", "lines"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "list",

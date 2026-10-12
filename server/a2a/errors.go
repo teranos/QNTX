@@ -45,6 +45,12 @@ func Unsupported(op Operation) *Error {
 	return &Error{Name: "UnsupportedOperationError", Message: op.Name + " is not one this node does yet"}
 }
 
+// Unauthenticated is a request that came with no credential the node took:
+// the extended card "MUST require authentication" (§13.3).
+func Unauthenticated(message string) *Error {
+	return &Error{Message: message, status: http.StatusUnauthorized, grpc: "UNAUTHENTICATED"}
+}
+
 func invalid(message string) *Error {
 	return &Error{Message: message, status: http.StatusBadRequest, grpc: "INVALID_ARGUMENT"}
 }
