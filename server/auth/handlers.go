@@ -240,9 +240,14 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "the attestation did not validate")
 		return
 	}
+	if err := createdAsExpected(parsed, credential); err != nil {
+		h.writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-	if len(credential.ID) > 1024 {
-		h.writeError(w, http.StatusBadRequest, "the credential id is longer than 1024 bytes")
+	// §7.1 step 25.
+	if len(credential.ID) > 1023 {
+		h.writeError(w, http.StatusBadRequest, "the credential id is longer than 1023 bytes")
 		return
 	}
 	if len(credential.PublicKey) > 4096 {
@@ -534,6 +539,20 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, h.finished(w, r, token, admittedAs))
 }
 
+// createdAsExpected holds a registration to what the library leaves to the
+// Relying Party.
+func createdAsExpected(parsed *protocol.ParsedCredentialCreationData, credential *webauthn.Credential) error {
+	// §7.1 step 10: the node never runs a ceremony framed by another origin.
+	if parsed.Response.CollectedClientData.CrossOrigin {
+		return errors.New("the passkey was made inside a frame of another origin, which this node never expects")
+	}
+	// §7.1 step 17: a passkey that cannot be backed up cannot be backed up.
+	if !credential.Flags.BackupEligible && credential.Flags.BackupState {
+		return errors.New("the authenticator says the passkey is backed up and cannot be")
+	}
+	return nil
+}
+
 // validateAssertion checks an assertion against the user handle the answering
 // passkey was made under, which the authenticator hands back (§7.2 step 6).
 func (h *Handler) validateAssertion(rp *webauthn.WebAuthn, session webauthn.SessionData, parsed *protocol.ParsedCredentialAssertionData, creds []webauthn.Credential) (*webauthn.Credential, error) {
@@ -543,6 +562,10 @@ func (h *Handler) validateAssertion(rp *webauthn.WebAuthn, session webauthn.Sess
 	}
 	if !held {
 		return nil, errors.Newf("no passkey %x is held here", parsed.RawID)
+	}
+	// §7.2 step 13: the node never runs a ceremony framed by another origin.
+	if parsed.Response.CollectedClientData.CrossOrigin {
+		return nil, errors.New("the sign-in ran inside a frame of another origin, which this node never expects")
 	}
 	// A person's passkeys carry more than one handle, so the ceremony is bound
 	// to the handle of the passkey that answered.
