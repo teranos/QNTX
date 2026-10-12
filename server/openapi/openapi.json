@@ -716,6 +716,11 @@
         "ANYONE"
       ]
     },
+    "/auth/lines": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/login": {
       "x-qntx-reach": [
         "ANYONE"

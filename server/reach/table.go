@@ -53,6 +53,8 @@ REACH is '/auth/token'                                                    of ANY
 # Another node asks whether a token this one issued is live, holding no session:
 # its signed assertion is the credential, checked at the endpoint itself.
 REACH is '/auth/introspect'                                               of ANYONE
+# A peer asks for the lines about the namespace it serves, the same way.
+REACH is '/auth/lines'                                                    of ANYONE
 # A node whose people log in at another sends them there and takes them back,
 # before they hold any session here.
 REACH is '/auth/elsewhere' '/auth/elsewhere/back'                         of ANYONE
