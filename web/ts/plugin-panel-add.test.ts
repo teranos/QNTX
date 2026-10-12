@@ -236,7 +236,8 @@ describe('Jenny: configured while it does not run, then enabled', () => {
         await flush();
 
         const put = asked.find(a => a.method === 'PUT' && a.path === '/api/plugins/garden/config');
-        expect(put?.body).toEqual({ config: { token_name: 'garden-bot' } });
+        // The node keeps every key a PUT does not name, so the removed key is sent holding nothing.
+        expect(put?.body).toEqual({ config: { token_name: 'garden-bot', region: '' } });
     });
 
     test('enabled and running, it can be disabled', async () => {

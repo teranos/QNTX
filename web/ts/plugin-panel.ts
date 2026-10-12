@@ -1222,7 +1222,10 @@ async function savePluginConfig(): Promise<void> {
     }
 
     try {
-        const requestPayload = { config: configState.newConfig };
+        // The node keeps every key a PUT does not name, so a removed key is sent holding nothing.
+        const { currentConfig, newConfig } = configState;
+        const removed = Object.keys(currentConfig).filter(key => !(key in newConfig));
+        const requestPayload = { config: { ...Object.fromEntries(removed.map(key => [key, ''])), ...newConfig } };
         log.debug(SEG.UI, 'Saving config for', configState.pluginName);
         log.debug(SEG.UI, 'Request payload:', requestPayload);
         log.debug(SEG.UI, 'Payload JSON:', JSON.stringify(requestPayload, null, 2));

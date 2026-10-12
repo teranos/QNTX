@@ -19,6 +19,27 @@ func TestTheBuildKeysAndTheNamespaceAreNotThePluginsToValidate(t *testing.T) {
 	}
 }
 
+// What is validated is the config the record holds after the PUT: a required
+// key the body does not name is still there, and one the body removes is not.
+func TestValidationSeesTheConfigTheRecordHoldsAfter(t *testing.T) {
+	schema := map[string]*protocol.ConfigFieldSchema{
+		"bucket": {Type: "string", Required: true},
+		"region": {Type: "string"},
+	}
+	held := map[string]string{"bucket": "media", buildCore: "teranos/staands@main"}
+
+	if errs, refused := validateConfigAgainstSchema(configAfter(held, map[string]string{"region": "eu"}), schema); refused != nil {
+		t.Fatalf("a PUT naming only region: %v (%v)", errs, refused)
+	}
+	if errs, refused := validateConfigAgainstSchema(configAfter(held, map[string]string{"region": ""}), schema); refused != nil {
+		t.Fatalf("a PUT removing region: %v (%v)", errs, refused)
+	}
+	errs, refused := validateConfigAgainstSchema(configAfter(held, map[string]string{"bucket": ""}), schema)
+	if refused == nil || errs["bucket"] != "This field is required" {
+		t.Fatalf("a PUT removing bucket: %v (%v)", errs, refused)
+	}
+}
+
 func TestValidateConfigAgainstSchema(t *testing.T) {
 	tests := []struct {
 		name         string
