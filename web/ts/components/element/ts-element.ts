@@ -98,7 +98,8 @@ function buildQntxApi(outputLines: string[], refused: Refused) {
                 actors,
                 timestamp: now,
                 source: 'ts-element',
-                attributes: opts.attributes ?? {},
+                // None named is none stored: the node and the signature both read absent as nothing.
+                attributes: opts.attributes,
                 created_at: now,
                 signature: '' as unknown as Uint8Array, // base64 string for proto JSON wire format
                 signer_did: '',
