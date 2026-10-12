@@ -12,7 +12,8 @@ export type ElementSyncState =
     | 'unsynced'    // Never sent to backend, or local changes not yet synced
     | 'syncing'     // Request in flight
     | 'synced'      // Confirmed by backend
-    | 'failed';     // Sync attempt failed
+    | 'failed'      // Sync attempt failed, and is tried again
+    | 'refused';    // The node said no, and asking again gets the same answer
 
 type SyncStateCallback = (state: ElementSyncState) => void;
 

@@ -53,7 +53,10 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
  *  - qntx.query(queryString) — parse AX query, run against local IndexedDB
  *  - qntx.log(...args) — append to output collector
  */
-function buildQntxApi(outputLines: string[]) {
+/** The node refused an attestation this run made, in its own words. */
+type Refused = (id: string, why: string, afterMs: number) => void;
+
+function buildQntxApi(outputLines: string[], refused: Refused) {
     return {
         /** Create an attestation in local IndexedDB */
         async attest(opts: {
@@ -94,6 +97,9 @@ function buildQntxApi(outputLines: string[]) {
             // Enqueue for server sync (lazy import to avoid circular deps)
             try {
                 const { syncQueue } = await import('../../api/attestation-sync');
+                const queued = performance.now();
+                syncQueue.onRefused(attestation.id, (why) =>
+                    refused(attestation.id, why, Math.round(performance.now() - queued)));
                 syncQueue.add(attestation.id);
             } catch (err) {
                 // The attestation stays in IndexedDB but nothing will push
@@ -170,7 +176,16 @@ export async function createTsElement(item: Element): Promise<HTMLElement> {
         const currentCode = editor.state.doc.toString();
         const startTime = performance.now();
         const outputLines: string[] = [];
-        const qntxApi = buildQntxApi(outputLines);
+        // A refusal can come after the run has finished — when the browser is
+        // back online — so it is its own result beside this element.
+        const qntxApi = buildQntxApi(outputLines, (id, why, afterMs) => ui.spawnResult({
+            success: false,
+            stdout: '',
+            stderr: '',
+            result: null,
+            error: `The node refused ${id}: ${why}`,
+            duration_ms: afterMs,
+        }));
 
         try {
             const fn = new AsyncFunction('qntx', currentCode);
