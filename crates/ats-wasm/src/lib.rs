@@ -181,138 +181,36 @@ mod wazero {
             Err(e) => write_error(&format!("{}", e)),
         }
     }
-    /// Parse an AX query with temporal resolution. Takes JSON input:
-    /// `{"query": "ALICE is author since 3 days ago", "now_ms": 1718457000000}`
-    ///
-    /// Returns JSON with resolved temporal (epoch ms) instead of raw strings:
-    /// ```json
-    /// {
-    ///   "subjects": ["ALICE"],
-    ///   "predicates": ["author"],
-    ///   "temporal": {"Since": 1718197800000},
-    ///   "error": ""
-    /// }
-    /// ```
+    /// An AX query as the filter it asks for. Takes JSON
+    /// `{"query": "ALICE is author since last month", "now_ms": 1718457000000, "limit": 100}`
+    /// and returns `{"filter": {"subjects": ["ALICE"], ..., "time_start": .., "limit": 100}, "actions": []}`,
+    /// or `{"error": ".."}`. The browser calls the same [`ats::ax_filter`].
     #[no_mangle]
-    pub extern "C" fn parse_ax_query_resolved(ptr: u32, len: u32) -> u64 {
+    pub extern "C" fn ax_filter(ptr: u32, len: u32) -> u64 {
         let input = unsafe { read_str(ptr, len) };
-        write_result(&parse_ax_query_resolved_impl(input))
+        write_result(&ax_filter_impl(input))
     }
 
-    /// Inner logic for parse_ax_query_resolved — testable without WASM memory ABI.
-    fn parse_ax_query_resolved_impl(input: &str) -> String {
-        use ats::temporal::{resolve_day, resolve_temporal, ResolvedTemporal};
-
+    /// Inner logic for ax_filter — testable without WASM memory ABI.
+    fn ax_filter_impl(input: &str) -> String {
         #[derive(serde::Deserialize)]
         struct Input {
             query: String,
             now_ms: i64,
+            limit: usize,
         }
 
-        let parsed_input: Input = match serde_json::from_str(input) {
+        let parsed: Input = match serde_json::from_str(input) {
             Ok(v) => v,
             Err(e) => return error_json(&format!("invalid input: {}", e)),
         };
 
-        let query = match Parser::parse(&parsed_input.query) {
-            Ok(q) => q,
-            Err(e) => return error_json(&format!("{}", e)),
-        };
-
-        // Validate "over" unit
-        if let Some(ats::parser::TemporalClause::Over(ref dur)) = query.temporal {
-            if dur.value.is_some() && dur.unit.is_none() {
-                return error_json(&format!("missing unit in '{}'", dur.raw));
-            }
-        }
-
-        // Resolve temporal
-        let resolved_temporal = match &query.temporal {
-            Some(ats::parser::TemporalClause::Since(expr)) => {
-                match resolve_temporal(expr, parsed_input.now_ms) {
-                    Some(ms) => Some(ResolvedTemporal::Since(ms)),
-                    None => {
-                        return error_json(&format!(
-                            "unable to parse temporal expression: {}",
-                            expr
-                        ))
-                    }
-                }
-            }
-            Some(ats::parser::TemporalClause::Until(expr)) => {
-                match resolve_temporal(expr, parsed_input.now_ms) {
-                    Some(ms) => Some(ResolvedTemporal::Until(ms)),
-                    None => {
-                        return error_json(&format!(
-                            "unable to parse temporal expression: {}",
-                            expr
-                        ))
-                    }
-                }
-            }
-            Some(ats::parser::TemporalClause::On(expr)) => {
-                match resolve_day(expr, parsed_input.now_ms) {
-                    Some(day) => Some(ResolvedTemporal::On {
-                        start_ms: day.start_ms,
-                        end_ms: day.end_ms,
-                    }),
-                    None => {
-                        return error_json(&format!(
-                            "unable to parse temporal expression: {}",
-                            expr
-                        ))
-                    }
-                }
-            }
-            Some(ats::parser::TemporalClause::Between(start, end)) => {
-                let start_ms = match resolve_temporal(start, parsed_input.now_ms) {
-                    Some(ms) => ms,
-                    None => {
-                        return error_json(&format!(
-                            "unable to parse temporal expression: {}",
-                            start
-                        ))
-                    }
-                };
-                let end_ms = match resolve_temporal(end, parsed_input.now_ms) {
-                    Some(ms) => ms,
-                    None => {
-                        return error_json(&format!("unable to parse temporal expression: {}", end))
-                    }
-                };
-                Some(ResolvedTemporal::Between { start_ms, end_ms })
-            }
-            Some(ats::parser::TemporalClause::Over(dur)) => Some(ResolvedTemporal::Over {
-                raw: dur.raw.to_string(),
-                value: dur.value,
-                unit: dur.unit.map(|u| u.to_string()),
-            }),
-            None => None,
-        };
-
-        #[derive(serde::Serialize)]
-        struct Output {
-            subjects: Vec<String>,
-            predicates: Vec<String>,
-            contexts: Vec<String>,
-            actors: Vec<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            temporal: Option<ResolvedTemporal>,
-            actions: Vec<String>,
-        }
-
-        let output = Output {
-            subjects: query.subjects.iter().map(|s| s.to_string()).collect(),
-            predicates: query.predicates.iter().map(|s| s.to_string()).collect(),
-            contexts: query.contexts.iter().map(|s| s.to_string()).collect(),
-            actors: query.actors.iter().map(|s| s.to_string()).collect(),
-            temporal: resolved_temporal,
-            actions: query.actions.iter().map(|s| s.to_string()).collect(),
-        };
-
-        match serde_json::to_string(&output) {
-            Ok(json) => json,
-            Err(e) => error_json(&format!("serialization failed: {}", e)),
+        match ats::ax_filter(&parsed.query, parsed.now_ms, parsed.limit) {
+            Ok(request) => match serde_json::to_string(&request) {
+                Ok(json) => json,
+                Err(e) => error_json(&format!("serialization failed: {}", e)),
+            },
+            Err(e) => error_json(&e.to_string()),
         }
     }
 
@@ -658,18 +556,26 @@ mod wazero {
 
         #[test]
         fn ax_since_and_resolve_read_last_month_alike() {
-            let ax = parse_ax_query_resolved_impl(
-                &serde_json::json!({"query": "ALICE since last month", "now_ms": MARCH_31})
+            let ax = ax_filter_impl(
+                &serde_json::json!({"query": "ALICE since last month", "now_ms": MARCH_31, "limit": 100})
                     .to_string(),
             );
             let ax: serde_json::Value = serde_json::from_str(&ax).unwrap();
-            assert_eq!(ax["temporal"]["Since"], 1_772_272_800_000_i64);
+            assert_eq!(ax["filter"]["time_start"], 1_772_272_800_000_i64);
+            assert_eq!(ax["filter"]["limit"], 100);
 
-            let on = parse_ax_query_resolved_impl(
-                &serde_json::json!({"query": "ALICE on yesterday", "now_ms": MARCH_31}).to_string(),
+            let on = ax_filter_impl(
+                &serde_json::json!({"query": "ALICE on yesterday", "now_ms": MARCH_31, "limit": 100})
+                    .to_string(),
             );
             let on: serde_json::Value = serde_json::from_str(&on).unwrap();
-            assert_eq!(on["temporal"]["On"]["start_ms"], 1_774_828_800_000_i64);
+            assert_eq!(on["filter"]["time_start"], 1_774_828_800_000_i64);
+
+            let refused = ax_filter_impl(
+                &serde_json::json!({"query": "ALICE over 5q", "now_ms": MARCH_31, "limit": 100})
+                    .to_string(),
+            );
+            assert_eq!(refused, r#"{"error":"missing unit in '5q'"}"#);
         }
 
         #[test]

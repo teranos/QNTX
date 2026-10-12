@@ -582,11 +582,11 @@ impl<'a> Parser<'a> {
             Some(_) | None => return self.collect_temporal_expr(),
         };
         let mut last = first.clone();
-        while let Some(t) = self
-            .peek()
-            .filter(|t| t.kind == TokenKind::Identifier)
-            .cloned()
-        {
+        // A date's slashes lex apart (`2025/01/15`); the expression runs across them.
+        let continues = |t: &&Token<'a>| {
+            t.kind == TokenKind::Identifier || (t.kind == TokenKind::Unknown && t.text == "/")
+        };
+        while let Some(t) = self.peek().filter(continues).cloned() {
             self.next();
             last = t;
         }
@@ -742,6 +742,8 @@ mod tests {
             query.temporal,
             Some(TemporalClause::Between("last friday", "2 days ago"))
         );
+        let query = Parser::parse("ALICE since 2025/01/15").unwrap();
+        assert_eq!(query.temporal, Some(TemporalClause::Since("2025/01/15")));
         let query = Parser::parse("ALICE on 'last monday'").unwrap();
         assert_eq!(query.temporal, Some(TemporalClause::On("last monday")));
     }

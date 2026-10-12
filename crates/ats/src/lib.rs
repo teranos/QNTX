@@ -43,7 +43,9 @@ pub mod temporal;
 pub mod watcher;
 // Re-export main types at crate root
 pub use attestation::{Attestation, AttestationBuilder, AxFilter, AxResult, Conflict, EVERY_ROW};
-pub use ax::{execute, execute_with_aliases, expand_aliases, resolve};
+pub use ax::{
+    ax_filter, execute, execute_with_aliases, expand_aliases, resolve, AxRequest, AxRequestError,
+};
 pub use classify::{
     classify_claims, ActorCredibility, ClaimGroup, ClaimInput, ClaimTiming, ClaimWithTiming,
     ClassificationResult, ClassifyInput, ClassifyOutput, ConfidenceCalculator, ConflictType,

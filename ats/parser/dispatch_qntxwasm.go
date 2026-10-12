@@ -17,121 +17,96 @@ func parseAxQueryDispatch(args []string, verbosity int, ctx ErrorContext) (*type
 	return parseAxQueryWasm(args)
 }
 
-// resolvedInput is the JSON input for parse_ax_query_resolved.
-type resolvedInput struct {
+// axFilterInput is the JSON input for ax_filter.
+type axFilterInput struct {
 	Query string `json:"query"`
 	NowMs int64  `json:"now_ms"`
+	Limit int    `json:"limit"`
 }
 
-// resolvedOutput is the JSON output from parse_ax_query_resolved.
-type resolvedOutput struct {
-	Subjects   []string         `json:"subjects"`
-	Predicates []string         `json:"predicates"`
-	Contexts   []string         `json:"contexts"`
-	Actors     []string         `json:"actors"`
-	Temporal   *resolvedTimeral `json:"temporal,omitempty"`
-	Actions    []string         `json:"actions"`
-	Error      string           `json:"error,omitempty"`
+// axFilterOutput is ax_filter's answer: the filter the query names, and its
+// `so` actions. The browser reads queries with the same function.
+type axFilterOutput struct {
+	Filter struct {
+		Subjects   []string        `json:"subjects"`
+		Predicates []string        `json:"predicates"`
+		Contexts   []string        `json:"contexts"`
+		Actors     []string        `json:"actors"`
+		TimeStart  json.RawMessage `json:"time_start"`
+		TimeEnd    json.RawMessage `json:"time_end"`
+		Limit      int             `json:"limit"`
+	} `json:"filter"`
+	Actions []string `json:"actions"`
 }
 
-// resolvedTimeral represents resolved temporal clauses from Rust.
-type resolvedTimeral struct {
-	Since   *int64              `json:"Since,omitempty"`
-	Until   *int64              `json:"Until,omitempty"`
-	On      *resolvedOnClause   `json:"On,omitempty"`
-	Between *resolvedBetween    `json:"Between,omitempty"`
-	Over    *resolvedOverClause `json:"Over,omitempty"`
-}
-
+// resolvedOnClause is a UTC day span: start inclusive, end exclusive.
 type resolvedOnClause struct {
 	StartMs int64 `json:"start_ms"`
 	EndMs   int64 `json:"end_ms"`
 }
 
-type resolvedBetween struct {
-	StartMs int64 `json:"start_ms"`
-	EndMs   int64 `json:"end_ms"`
-}
-
-type resolvedOverClause struct {
-	Raw   string   `json:"raw"`
-	Value *float64 `json:"value"`
-	Unit  *string  `json:"unit"`
-}
+// axLimit is how many rows a CLI ax query reads.
+const axLimit = 100
 
 func parseAxQueryWasm(args []string) (*types.AxFilter, error) {
+	query := strings.Join(args, " ")
+
 	engine, err := wasm.GetEngine()
 	if err != nil {
 		return nil, errors.Wrap(err, "wasm engine init")
 	}
 
-	input := resolvedInput{
-		Query: strings.Join(args, " "),
-		NowMs: timeNow().UnixMilli(),
-	}
-
-	inputJSON, err := json.Marshal(input)
+	inputJSON, err := json.Marshal(axFilterInput{Query: query, NowMs: timeNow().UnixMilli(), Limit: axLimit})
 	if err != nil {
-		return nil, errors.Wrap(err, "marshal input")
+		return nil, errors.Wrapf(err, "marshal ax_filter input %q", query)
 	}
 
-	resultJSON, err := engine.Call("parse_ax_query_resolved", string(inputJSON))
+	resultJSON, err := engine.Call("ax_filter", string(inputJSON))
 	if err != nil {
-		return nil, errors.Wrap(err, "wasm parse_ax_query_resolved")
+		return nil, errors.Wrapf(err, "wasm ax_filter %q", query)
 	}
 
-	var out resolvedOutput
-	if err := json.Unmarshal([]byte(resultJSON), &out); err != nil {
-		return nil, errors.Wrap(err, "unmarshal wasm result")
+	var out axFilterOutput
+	if err := answer("ax_filter", resultJSON, &out); err != nil {
+		return nil, errors.Wrapf(err, "ax parse %q", query)
 	}
 
-	if out.Error != "" {
-		return nil, errors.Newf("ax parse: %s", out.Error)
+	start, err := timeBoundOf("time_start", out.Filter.TimeStart)
+	if err != nil {
+		return nil, errors.Wrapf(err, "ax_filter answered %q with %s", query, resultJSON)
+	}
+	end, err := timeBoundOf("time_end", out.Filter.TimeEnd)
+	if err != nil {
+		return nil, errors.Wrapf(err, "ax_filter answered %q with %s", query, resultJSON)
 	}
 
-	return convertResolvedOutput(&out)
+	// The node's stores match subjects upper case and contexts and actors
+	// lower; the browser's store matches as written, so the folding is Go's.
+	return &types.AxFilter{
+		Subjects:   nilIfEmpty(uppercaseTokens(out.Filter.Subjects)),
+		Predicates: nilIfEmpty(out.Filter.Predicates),
+		Contexts:   nilIfEmpty(lowercaseTokens(out.Filter.Contexts)),
+		Actors:     nilIfEmpty(lowercaseTokens(out.Filter.Actors)),
+		SoActions:  nilIfEmpty(out.Actions),
+		TimeStart:  start,
+		TimeEnd:    end,
+		Limit:      out.Filter.Limit,
+		Format:     "table",
+	}, nil
 }
 
-// convertResolvedOutput maps the resolved WASM output to Go's AxFilter.
-func convertResolvedOutput(out *resolvedOutput) (*types.AxFilter, error) {
-	filter := &types.AxFilter{
-		Limit:  100,
-		Format: "table",
-		// A query naming no time is unbounded on both sides.
-		TimeStart: types.Unbounded(),
-		TimeEnd:   types.Unbounded(),
+// timeBoundOf reads one side of ax_filter's range: epoch milliseconds, or
+// null where the query names no time on that side, which is unbounded. A side
+// the answer leaves out is refused.
+func timeBoundOf(side string, raw json.RawMessage) (types.TimeBound, error) {
+	if string(raw) == "null" {
+		return types.Unbounded(), nil
 	}
-
-	filter.Subjects = nilIfEmpty(uppercaseTokens(out.Subjects))
-	filter.Predicates = nilIfEmpty(out.Predicates)
-	filter.Contexts = nilIfEmpty(lowercaseTokens(out.Contexts))
-	filter.Actors = nilIfEmpty(lowercaseTokens(out.Actors))
-	filter.SoActions = nilIfEmpty(out.Actions)
-
-	if out.Temporal != nil {
-		if out.Temporal.Since != nil {
-			t := time.UnixMilli(*out.Temporal.Since)
-			filter.TimeStart = types.BoundAt(t)
-		}
-		if out.Temporal.Until != nil {
-			t := time.UnixMilli(*out.Temporal.Until)
-			filter.TimeEnd = types.BoundAt(t)
-		}
-		if out.Temporal.On != nil {
-			start := time.UnixMilli(out.Temporal.On.StartMs)
-			end := time.UnixMilli(out.Temporal.On.EndMs)
-			filter.TimeStart = types.BoundAt(start)
-			filter.TimeEnd = types.BoundAt(end)
-		}
-		if out.Temporal.Between != nil {
-			start := time.UnixMilli(out.Temporal.Between.StartMs)
-			end := time.UnixMilli(out.Temporal.Between.EndMs)
-			filter.TimeStart = types.BoundAt(start)
-			filter.TimeEnd = types.BoundAt(end)
-		}
+	var ms int64
+	if err := json.Unmarshal(raw, &ms); err != nil {
+		return types.TimeBound{}, errors.Wrapf(err, "%s is %s, neither epoch milliseconds nor null", side, raw)
 	}
-
-	return filter, nil
+	return types.BoundAt(timeAtMs(ms)), nil
 }
 
 // temporalInput is the JSON input for resolve_temporal_expr.
