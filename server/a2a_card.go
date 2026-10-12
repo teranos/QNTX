@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/a2a"
@@ -50,8 +51,8 @@ func (s *QNTXServer) cardBase(r *http.Request) a2a.Card {
 // system capabilities as am syscap says them, and where its MCP answers.
 func (s *QNTXServer) nodeExtension(r *http.Request) a2a.Extension {
 	params := map[string]any{}
-	if s.nodeDID != nil && s.nodeDID.DID != "" {
-		params["did"] = s.nodeDID.DID
+	if node, held := s.nodeKey(); held {
+		params["did"] = node.DID
 	}
 	_, params["health"] = s.health(r.Context())
 	// "it lets agents figure out MCP surface amongst other things"
@@ -68,6 +69,15 @@ func (s *QNTXServer) nodeExtension(r *http.Request) a2a.Extension {
 		Description: "The node's DID, its health, what this build can do, and where its MCP answers.",
 		Params:      params,
 	}
+}
+
+// nodeKey is the node's own identity, when it holds one: its DID, and the key
+// that signs as it.
+func (s *QNTXServer) nodeKey() (*nodedid.Handler, bool) {
+	if s.nodeDID != nil && s.nodeDID.DID != "" {
+		return s.nodeDID, true
+	}
+	return nil, false
 }
 
 // skillOf is a signum as a skill. Its id is the signum.
@@ -138,6 +148,19 @@ func (s *QNTXServer) HandleAgentCard(w http.ResponseWriter, r *http.Request) {
 	if missing := a2a.Missing(card); len(missing) > 0 {
 		s.logger.Errorw("The agent card lacks what the spec requires, so it is not served", "missing", missing)
 		writeError(w, http.StatusInternalServerError, "the agent card lacks what the spec requires: "+strings.Join(missing, ", "))
+		return
+	}
+	// Signed with the node's own key (§8.4), under the key id its DID
+	// document names: a node that started has one, and a card it cannot sign
+	// is not served unsigned.
+	node, held := s.nodeKey()
+	if !held {
+		writeError(w, http.StatusInternalServerError, "the agent card is signed with the node's key, and this node holds none")
+		return
+	}
+	if err := a2a.Sign(card, node.PrivateKey, node.KeyID()); err != nil {
+		writeError(w, http.StatusInternalServerError, "the agent card was not signed: "+err.Error())
+		s.logger.Errorw("The agent card was not signed", "did", node.DID, "error", err)
 		return
 	}
 	marshalled, err := protojson.Marshal(card.Interface())
