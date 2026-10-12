@@ -5,7 +5,7 @@ import { unitFor, seriesOf, byLastSeen, formatIn, windowOf, timeOfBucket, seenOv
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
-const at = (y: number, m: number, d: number, h = 0, min = 0): number => new Date(y, m - 1, d, h, min).getTime();
+const at = (y: number, m: number, d: number, h = 0, min = 0): number => Date.UTC(y, m - 1, d, h, min);
 
 describe("Umami's unit for a range (getMinimumUnit, date range)", () => {
     const t0 = at(2026, 3, 10, 12);
@@ -93,5 +93,17 @@ describe('A line answers pointing', () => {
         const w = { start: at(2026, 3, 10, 12), end: at(2026, 3, 10, 14, 30), unit: 'hour' as const };
         expect(labelsOf(w)).toEqual(['2026-03-10 12', '2026-03-10 13', '2026-03-10 14']);
         expect(labelsOf(w).length).toBe(seriesOf([], w).length);
+    });
+});
+
+describe('UTC, wherever the browser is', () => {
+    test('a day the node keys is one bucket and reads back as the day it keys', () => {
+        // Run under TZ=America/Los_Angeles too: the node's 2026-09-11 is not
+        // the 10th there, and its two hours are not split across two days.
+        const seen = seenOver('page_view', { '2026-09-11T00': 2, '2026-09-11T23': 1 }, '2026-09-11T23:30:00Z');
+        const w = { start: at(2026, 9, 10), end: at(2026, 9, 12, 12), unit: 'day' as const };
+        expect(seriesOf(seen.times, w, seen.weights)).toEqual([0, 3, 0]);
+        expect(labelsOf(w)).toEqual(['2026-09-10', '2026-09-11', '2026-09-12']);
+        expect(formatIn(at(2026, 9, 11, 23, 30), 'day')).toBe('2026-09-11');
     });
 });
