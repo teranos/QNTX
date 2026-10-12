@@ -359,6 +359,7 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 			// Said where the builds are shown, and mailed to ROOT.
 			s.builds.set(b.name, PluginBuildState{At: time.Now(),
 				Error: "the rev of " + source.String() + " was not read, so the plugin is not built: " + err.Error()})
+			s.deploys.fail(b.name, err)
 			s.mailBuildFailure(ctx, b, nil, err, logger)
 			return
 		}
@@ -367,12 +368,18 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 	if s.builds.builtFrom(b.name, revs) {
 		return
 	}
+	deploy := pluginDeploy{plugin: b.name, rev: revs[0], revs: revs, stage: deployBuilding}
+	if replaces, built := installedRevs(b.name); built {
+		deploy.replacesRevs = replaces
+	}
+	s.deploys.begin(deploy)
 	// A build that failed fails again at the same revs with the same recipe,
 	// and ROOT was mailed the first time.
 	key := b.failedKey(revs)
 	if failedBefore(b.name, key) {
 		logger.Infow("Not building again: this build failed before, and ROOT was told", "plugin", b.name, "revs", revs)
 		s.builds.set(b.name, PluginBuildState{Revs: revs, At: time.Now(), Error: "this build failed before at these revs; a push or a change to its record builds it again"})
+		s.deploys.fail(b.name, errors.New("this build failed before at these revs"))
 		return
 	}
 
@@ -396,6 +403,7 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 		}
 		state.Error = strings.Join(append([]string{err.Error()}, unkept...), "; ")
 		s.builds.set(b.name, state)
+		s.deploys.fail(b.name, err)
 		s.mailBuildFailure(ctx, b, revs, err, logger)
 		return
 	}
@@ -408,9 +416,11 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 	}
 	state.Error = strings.Join(unkept, "; ")
 	s.builds.set(b.name, state)
-	if done.changed {
-		s.buildLanded(b.name)
+	if !done.changed {
+		s.deploys.unchanged(b.name)
+		return
 	}
+	s.buildLanded(b.name)
 }
 
 // stoppedWithTheNode reports whether a build ended because the node is

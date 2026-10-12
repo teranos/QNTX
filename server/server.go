@@ -98,6 +98,8 @@ type QNTXServer struct {
 	// What QNTX last built of each plugin it builds itself, one build at a time.
 	builds   pluginBuilds
 	building sync.Mutex
+	// Each plugin's newest deploy, from the push to the plugin running it.
+	deploys deployTracker
 	// The calls plugins are answering: the token handed for each, and the store
 	// of the caller it was handed for (plugin_sigils.go).
 	callStores sync.Map
