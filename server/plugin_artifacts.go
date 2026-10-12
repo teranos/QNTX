@@ -30,12 +30,14 @@ type gitHubWorkflowRun struct {
 	WorkflowRun struct {
 		ID         int64     `json:"id"`
 		HeadSha    string    `json:"head_sha"`
+		HeadBranch string    `json:"head_branch"`
 		Conclusion string    `json:"conclusion"`
 		HTMLURL    string    `json:"html_url"`
 		CreatedAt  time.Time `json:"created_at"`
 	} `json:"workflow_run"`
 	Repository struct {
-		FullName string `json:"full_name"`
+		FullName      string `json:"full_name"`
+		DefaultBranch string `json:"default_branch"`
 	} `json:"repository"`
 }
 
@@ -46,8 +48,9 @@ type pluginOfRun struct {
 }
 
 // pluginsOfRun is each enabled plugin whose record names repo, as GitHub
-// names it. A record naming no repository on GitHub is of no run.
-func pluginsOfRun(records []grpcplugin.PluginRecord, repo string) []pluginOfRun {
+// names it, and branch: the branch its URL names, or the repository's default
+// branch when it names none. A record naming no repository on GitHub is of no run.
+func pluginsOfRun(records []grpcplugin.PluginRecord, repo, branch, defaultBranch string) []pluginOfRun {
 	var of []pluginOfRun
 	for _, record := range records {
 		if !record.Enabled {
@@ -55,6 +58,13 @@ func pluginsOfRun(records []grpcplugin.PluginRecord, repo string) []pluginOfRun 
 		}
 		source, err := readGitHubSource(record.Repo)
 		if err != nil || !strings.EqualFold(source.Owner+"/"+source.Repo, repo) {
+			continue
+		}
+		named := defaultBranch
+		if source.RefNamed {
+			named = source.Ref
+		}
+		if branch != named {
 			continue
 		}
 		of = append(of, pluginOfRun{name: record.Name, source: source})
@@ -75,7 +85,7 @@ func (s *QNTXServer) buildsOfRun(run gitHubWorkflowRun) ([]string, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "%s succeeded and the plugin records were not read", run.WorkflowRun.HTMLURL)
 	}
-	for _, of := range pluginsOfRun(records, run.Repository.FullName) {
+	for _, of := range pluginsOfRun(records, run.Repository.FullName, run.WorkflowRun.HeadBranch, run.Repository.DefaultBranch) {
 		names = append(names, of.name)
 		logger.Infow("A workflow run succeeded in a plugin's repository", "plugin", of.name, "run", run.WorkflowRun.HTMLURL, "head_sha", run.WorkflowRun.HeadSha)
 		// The take runs on its own, with no caller to hand an error to: what it

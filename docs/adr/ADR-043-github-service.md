@@ -69,6 +69,10 @@ the `.sha256` as it checks a build under the runner, and a run older than the
 one whose build is installed is not installed over it. A repository no enabled
 plugin record names has nothing downloaded from it.
 
+A plugin record's URL names the repository and the branch the plugin is built
+from: a tree URL's branch, or the repository's default branch when it names
+none. A run counts for the plugin only on that repository and that branch.
+
 "yes, i want this."
 
 "When a new namespace get's created, it doesnt have access to the service by default"
