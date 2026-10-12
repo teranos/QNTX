@@ -304,6 +304,8 @@ func (authSubsystem) Init(s *QNTXServer) error {
 			return err
 		}
 	}
+	// The status row asks them for theirs, as the person asking (statusline_peers.go).
+	s.askPeers = authHandler.AskPeers
 	// Every other door am.toml names. The node's own relying party is
 	// already the door onto default; a door that cannot work is refused here
 	// rather than when somebody arrives at it, and one bad door does not take

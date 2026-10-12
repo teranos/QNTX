@@ -135,6 +135,8 @@ type StatusLineHandler struct {
 	news func() *newsLog
 	// When each person's tmux bar last asked for the row (statusline_asks.go).
 	tmux *rowAsks
+	// The peers' rows, asked as the caller (statusline_peers.go). Nil draws none.
+	peers peerRows
 }
 
 // NewStatusLineHandler builds the handler behind /statusline.
@@ -152,6 +154,7 @@ func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 		pluginCarousel:  newCarousel(),
 		node:            node,
 		tmux:            newRowAsks(),
+		peers:           noPeers,
 	}
 }
 
@@ -440,7 +443,12 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 	// Who is looking is pinned leftmost, what was left for them comes next, the
 	// plugins are pinned right; the rotating slot sits between.
-	items := append([]StatusItem{callerItem(admitted)}, h.newsFor(admitted)...)
+	items := []StatusItem{callerItem(admitted)}
+	// A primary asking for its own row drew the person already (statusline_peers.go).
+	if r.URL.Query().Get("for") == forPrimary {
+		items = []StatusItem{}
+	}
+	items = append(items, h.newsFor(admitted)...)
 	items = append(items, h.carouselItem()...)
 
 	// A failing handler is a fix-now kind of event, and it is drawn inside its
@@ -508,6 +516,8 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	// The peers' rows come last: the primary's own row reads as it did.
+	items = append(items, h.peerItems(r.Context(), admitted)...)
 	h.noteWriteFailure(writeStatusLine(w, format, items))
 }
 
@@ -573,6 +583,10 @@ func (h *StatusLineHandler) item(ctx context.Context, name string) (any, *protoc
 		}
 	}
 	if full == "" {
+		// Not this node's: a peer's row is on this row too, so its items are asked of it.
+		if detail, ok := h.peerItemDetail(ctx, admitted, name); ok {
+			return detail, nil
+		}
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: "no such item: " + name}
 	}
 
