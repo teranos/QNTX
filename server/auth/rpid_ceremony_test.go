@@ -62,10 +62,17 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 	require.NoError(t, err)
 
 	// The ceremony under test is RPID, but enrolling still stands on an
-	// admission, so this is the half-admission laye would have left behind.
-	pending, err := h.pendingLogins.open(mastodonAccount)
+	// admission: a session for a key route, held by its User, which begins and
+	// finishes the ceremony as one browser.
+	ownerPub, ownerPriv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
-	admitted := &http.Cookie{Name: pendingCookieName, Value: pending}
+	route := EncodeDIDKey(ownerPub)
+	h.SetIdentities([]string{route}, nil)
+	tim.Keys = []UserKey{{DID: route, Origin: OriginBrowser}}
+	h.users = &memUsers{held: []User{tim}}
+	sessionToken, err := h.sessions.create(route, tim)
+	require.NoError(t, err)
+	admitted := &http.Cookie{Name: sessionCookieName, Value: sessionToken}
 
 	// --- POST /auth/register/begin ---
 	beginReq := httptest.NewRequest(http.MethodPost, "/auth/register/begin", nil)
@@ -136,8 +143,6 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 	// The browser derives this from the PRF output and signs the challenge
 	// with it. A credential cannot be stored without one, so the ceremony
 	// carries it even in a test that is about the RPID.
-	ownerPub, ownerPriv, err := ed25519.GenerateKey(rand.Reader)
-	require.NoError(t, err)
 	ownerSig := ed25519.Sign(ownerPriv, []byte(beginResp.PublicKey.Challenge))
 
 	finishBody, err := json.Marshal(map[string]any{
@@ -153,20 +158,11 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Enrolment records the identity whose session authorized it, so the
-	// ceremony needs one to speak for: a key route, held by its User.
-	route := EncodeDIDKey(ownerPub)
-	h.SetIdentities([]string{route}, nil)
-	tim.Keys = []UserKey{{DID: route, Origin: OriginBrowser}}
-	h.users = &memUsers{held: []User{tim}}
-	sessionToken, err := h.sessions.create(route, tim)
-	require.NoError(t, err)
-
 	// --- POST /auth/register/finish ---
 	finishReq := httptest.NewRequest(http.MethodPost, "/auth/register/finish", bytes.NewReader(finishBody))
 	finishReq.Header.Set("Origin", origin)
 	finishReq.Header.Set("Content-Type", "application/json")
-	finishReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessionToken})
+	finishReq.AddCookie(admitted)
 	finishRec := httptest.NewRecorder()
 	h.handleRegisterFinish(finishRec, finishReq)
 
