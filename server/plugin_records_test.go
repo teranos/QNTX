@@ -95,6 +95,33 @@ func TestALineThatDoesNotReadAsAPluginIsAnError(t *testing.T) {
 	assert.Contains(t, err.Error(), "pyre")
 }
 
+// An archived plugin is gone from the node: not listed, not known by name,
+// and its name is free to be added again from another repository.
+func TestAnArchivedPluginIsGoneAndItsNameIsFree(t *testing.T) {
+	s := rootKnowingServer(t)
+	records := s.pluginRecords()
+	_, err := records.AddPlugin(rootAccount, "https://github.com/teranos/QNTX/tree/real-inboxes/qntx-plugins/inbox")
+	require.NoError(t, err)
+	time.Sleep(2 * time.Millisecond)
+	require.NoError(t, records.EnablePlugin(rootAccount, "inbox", true))
+	time.Sleep(2 * time.Millisecond)
+	require.NoError(t, records.ArchivePlugin(rootAccount, "inbox"))
+
+	_, found, err := records.Plugin("inbox")
+	require.NoError(t, err)
+	assert.False(t, found, "an archived plugin is still known by name")
+	all, err := records.Plugins()
+	require.NoError(t, err)
+	assert.Empty(t, all, "an archived plugin is still listed")
+	require.Error(t, records.EnablePlugin(rootAccount, "inbox", true), "an archived plugin was enabled")
+
+	time.Sleep(2 * time.Millisecond)
+	added, err := records.AddPlugin(rootAccount, "https://github.com/sbvh-nl/inbox")
+	require.NoError(t, err)
+	assert.Equal(t, "https://github.com/sbvh-nl/inbox", added.Repo)
+	assert.False(t, added.Enabled)
+}
+
 // Enabling and configuring are for a plugin that was added.
 func TestAPluginNobodyAddedIsRefused(t *testing.T) {
 	s := rootKnowingServer(t)
