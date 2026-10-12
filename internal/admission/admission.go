@@ -99,10 +99,15 @@ func (a Admission) ReachesAStore() bool {
 	return !reachesNothingAlone(a.level) || len(a.roles) > 0
 }
 
-// reachesNothingAlone is the rungs that reach no store without a line:
-// PUBLIC_REGISTRATION and USER.
+// reachesNothingAlone is every level but the rungs that reach a store on their
+// own: ROOT, SUPER, TOKEN and ATTESTOR. "DEFAULT DENY" (ADR-034): a level
+// nobody named, the empty one included, reaches nothing.
 func reachesNothingAlone(level Level) bool {
-	return level == access.LevelPublicRegistration || level == access.LevelUser
+	switch level {
+	case access.LevelRoot, access.LevelSuper, access.LevelToken, access.LevelAttestor:
+		return false
+	}
+	return true
 }
 
 // MaySeeSystem reports whether the system namespace is visible to this

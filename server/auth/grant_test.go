@@ -281,6 +281,7 @@ func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
 // a token does rather than something everyone suffers.
 func TestASessionCallerIsUnrestricted(t *testing.T) {
 	h, _ := grantHandler(t)
+	h.SetIdentities([]string{mastodonAccount}, nil)
 	session, err := h.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
@@ -292,8 +293,10 @@ func TestASessionCallerIsUnrestricted(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
-	handler.ServeHTTP(httptest.NewRecorder(), req)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
 
+	require.Equal(t, http.StatusOK, rec.Code, "the session did not get past the gate")
 	assert.Nil(t, seen.Grant)
 	assert.True(t, seen.MayRead("anything"))
 	assert.True(t, seen.MayWrite("anything"))

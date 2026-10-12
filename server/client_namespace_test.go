@@ -62,7 +62,8 @@ func nodeUnderTest(t *testing.T) *QNTXServer {
 // it is cannot be told apart from anyone else's.
 func TestASocketCarriesWhatItsUpgradeWasAdmittedAs(t *testing.T) {
 	srv := nodeUnderTest(t)
-	caller := auth.Admission{Identity: "did:key:someone", Namespaces: []string{auth.NamespaceDefault}}
+	caller := auth.Admitted(auth.LevelAttestor, auth.NamespaceDefault)
+	caller.Identity = "did:key:someone"
 
 	held := socketAs(t, srv, func(r *http.Request) *http.Request {
 		return r.WithContext(auth.WithAdmission(r.Context(), caller))
