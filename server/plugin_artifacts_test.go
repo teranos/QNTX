@@ -69,6 +69,8 @@ func pyreArtifact(t *testing.T, version string, binary []byte) []byte {
 func artifactServingServer(t *testing.T, runs map[int64][]map[string]any, zips map[int64][]byte) (*QNTXServer, func() []string) {
 	t.Helper()
 	s := githubKnowingServer(t)
+	// An install lands as a deploy, as it does on a node that started (init.go).
+	s.deploys.writesWith(s.deployLine)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	s.authHandler.SetGitHubApp("Iv23li-the-app", string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})))
