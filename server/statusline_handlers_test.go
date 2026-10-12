@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/server/auth"
 )
 
@@ -136,7 +137,7 @@ const admittedRoute = "https://mastodon.example/@tim"
 
 func rowFor(t *testing.T, caller auth.Admission) *httptest.ResponseRecorder {
 	t.Helper()
-	var h *StatusLineHandler
+	h := NewStatusLineHandler(nil, nil, nil, func() storage.Watchers { return nil }, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil)
 	req = req.WithContext(auth.WithAdmission(req.Context(), caller))

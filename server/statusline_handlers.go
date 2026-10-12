@@ -50,15 +50,16 @@ const (
 // Escapes for one surface. The symbol stays the whole of what crosses; this is
 // only how it is spelled.
 type palette struct {
-	well   string
-	unwell string
-	note   string
-	reset  string
+	well      string
+	unwell    string
+	deploying string
+	note      string
+	reset     string
 }
 
 var palettes = map[string]palette{
-	FormatANSI: {well: "\033[32m", unwell: "\033[31m", note: "\033[2m", reset: "\033[0m"},
-	FormatTmux: {well: "#[fg=colour34]", unwell: "#[fg=colour160]", note: "#[fg=colour244]", reset: "#[default]"},
+	FormatANSI: {well: "\033[32m", unwell: "\033[31m", deploying: "\033[33m", note: "\033[2m", reset: "\033[0m"},
+	FormatTmux: {well: "#[fg=colour34]", unwell: "#[fg=colour160]", deploying: "#[fg=colour214]", note: "#[fg=colour244]", reset: "#[default]"},
 }
 
 // One line, whatever the items are. tmux keeps the first line of a #() and
@@ -71,8 +72,11 @@ func renderLine(items []StatusItem, p palette, clickable bool) string {
 			out += "  "
 		}
 		colour := p.unwell
-		if it.Symbol == SymbolWell {
+		switch it.Symbol {
+		case SymbolWell:
 			colour = p.well
+		case SymbolDeploying:
+			colour = p.deploying
 		}
 
 		// tmux hands the name of the clicked span back in mouse_status_range,
@@ -137,6 +141,8 @@ type StatusLineHandler struct {
 	tmux *rowAsks
 	// The peers' rows, asked as the caller (statusline_peers.go). Nil draws none.
 	peers peerRows
+	// Each plugin's newest deploy (statusline_deploys.go), or noDeploys.
+	deploys func() []deployShown
 }
 
 // NewStatusLineHandler builds the handler behind /statusline.
@@ -155,6 +161,7 @@ func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 		node:            node,
 		tmux:            newRowAsks(),
 		peers:           noPeers,
+		deploys:         noDeploys,
 	}
 }
 
@@ -463,6 +470,14 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// A deploy in flight is the whole row. Neither carousel is asked for a
+	// frame, so each holds where it was until the deploy ends.
+	deploys := h.deploys()
+	if flying, inFlight := h.deploysInFlight(deploys); inFlight {
+		h.noteWriteFailure(writeStatusLine(w, format, flying))
+		return
+	}
+
 	// Who is looking is pinned leftmost, what was left for them comes next, the
 	// plugins are pinned right; the rotating slot sits between.
 	items := []StatusItem{callerItem(admitted)}
@@ -470,6 +485,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	if r.URL.Query().Get("for") == forPrimary {
 		items = []StatusItem{}
 	}
+	items = append(items, h.deploysFailed(deploys, h.heldNews(admitted))...)
 	items = append(items, h.newsFor(admitted)...)
 	items = append(items, h.carouselItem()...)
 
