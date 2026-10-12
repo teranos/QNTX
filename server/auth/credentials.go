@@ -3,6 +3,7 @@ package auth
 import (
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"github.com/teranos/QNTX/internal/sqlclose"
 
 	"github.com/go-webauthn/webauthn/protocol"
@@ -37,11 +38,17 @@ func (s *credentialStore) save(cred webauthn.Credential, ownerDID, admittedAs st
 // refused by every browser at any other.
 func (s *credentialStore) saveAt(cred webauthn.Credential, ownerDID, admittedAs, door, userHandle string) error {
 	id := keyOf(cred.ID)
-	_, err := s.db.Exec(
-		`INSERT INTO webauthn_credentials (id, credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state, owner_did, admitted_as, door, user_handle)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	// §7.1 step 27: the transports the authenticator reported, and whether it verified the user.
+	transports, err := json.Marshal(cred.Transport)
+	if err != nil {
+		return errors.Wrapf(err, "failed to write down the transports of credential %s", id)
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO webauthn_credentials (id, credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state, owner_did, admitted_as, door, user_handle, transports, uv_initialized)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, cred.ID, cred.PublicKey, cred.AttestationType, cred.Authenticator.AAGUID, cred.Authenticator.SignCount,
 		cred.Flags.BackupEligible, cred.Flags.BackupState, ownerDID, admittedAs, door, userHandle,
+		string(transports), cred.Flags.UserVerified,
 	)
 	if err != nil {
 		return errors.Wrapf(err, "failed to save credential %s for %s at door %q (admitted as %q)", id, ownerDID, door, admittedAs)
@@ -183,7 +190,7 @@ func (s *credentialStore) forget(credID []byte) error {
 
 // credentialColumns is what a webauthn.Credential is built from. The two
 // readers below differ only in what they ask for, so the shape is named once.
-const credentialColumns = `credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state`
+const credentialColumns = `credential_id, public_key, attestation_type, aaguid, sign_count, backup_eligible, backup_state, transports`
 
 // doorCredentials returns the keys made at one door. A ceremony runs against
 // one relying party, so it is offered the keys that relying party made and no
@@ -269,19 +276,23 @@ func scanCredentials(rows *sql.Rows) ([]webauthn.Credential, error) {
 			signCount       uint32
 			backupEligible  bool
 			backupState     bool
+			transportsKept  string
+			transports      []protocol.AuthenticatorTransport
 		)
-		if err := rows.Scan(&credID, &publicKey, &attestationType, &aaguid, &signCount, &backupEligible, &backupState); err != nil {
+		if err := rows.Scan(&credID, &publicKey, &attestationType, &aaguid, &signCount, &backupEligible, &backupState, &transportsKept); err != nil {
 			return nil, errors.Wrap(err, "failed to scan webauthn credential row")
+		}
+		if err := json.Unmarshal([]byte(transportsKept), &transports); err != nil {
+			return nil, errors.Wrapf(err, "the transports kept for credential %x do not read", credID)
 		}
 		creds = append(creds, webauthn.Credential{
 			ID:              credID,
 			PublicKey:       publicKey,
 			AttestationType: attestationType,
-			// A credential is a platform passkey: enrolment asks for the platform
-			// authenticator. Firefox 156 below macOS 26.4 sends a PRF sign-in whose
-			// allow list names neither transport to its security-key stack, which
-			// never asks macOS for the passkey.
-			Transport: []protocol.AuthenticatorTransport{protocol.Internal, protocol.Hybrid},
+			// §5.8.3: the transports kept for it. Firefox 156 below macOS 26.4
+			// sends a sign-in whose allow list names neither internal nor hybrid
+			// to its security-key stack, so a platform passkey reports both.
+			Transport: transports,
 			Flags: webauthn.CredentialFlags{
 				BackupEligible: backupEligible,
 				BackupState:    backupState,
@@ -295,14 +306,16 @@ func scanCredentials(rows *sql.Rows) ([]webauthn.Credential, error) {
 	return creds, rows.Err()
 }
 
-func (s *credentialStore) updateSignCount(credID []byte, newCount uint32) error {
-	id := keyOf(credID)
+// answered records what a sign-in said of the credential (§7.2 step 24): its
+// counter, whether it is backed up now, and that it verified the user once it has.
+func (s *credentialStore) answered(cred webauthn.Credential) error {
+	id := keyOf(cred.ID)
 	_, err := s.db.Exec(
-		`UPDATE webauthn_credentials SET sign_count = ? WHERE id = ?`,
-		newCount, id,
+		`UPDATE webauthn_credentials SET sign_count = ?, backup_state = ?, uv_initialized = (uv_initialized OR ?) WHERE id = ?`,
+		cred.Authenticator.SignCount, cred.Flags.BackupState, cred.Flags.UserVerified, id,
 	)
 	if err != nil {
-		return errors.Wrapf(err, "failed to update sign count for credential %s", id)
+		return errors.Wrapf(err, "failed to record what credential %s answered with", id)
 	}
 	return nil
 }

@@ -476,6 +476,14 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// §7.2 step 22: a counter that did not advance is a sign the authenticator
+	// was copied. This node does not sign in on one.
+	if credential.Authenticator.CloneWarning {
+		h.refusePasskey(w, "login", admittedAs, "the signature counter did not advance",
+			"this passkey's counter went backwards, a sign it was copied", "the passkey's counter did not advance")
+		return
+	}
+
 	if !h.stillAdmitted(admittedAs) {
 		// Who this passkey speaks for, and what the deployment is checking
 		// against, are both answers to a caller who has not been admitted.
@@ -514,8 +522,11 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.creds.updateSignCount(credential.ID, credential.Authenticator.SignCount); err != nil {
-		h.logger.Errorw("Credential sign count not advanced; clone detection for this key is now blind", "error", err)
+	// §7.2 step 24, after every check above held.
+	if err := h.creds.answered(*credential); err != nil {
+		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer")
+		h.logger.Errorw("what a passkey answered with was not recorded, so its next counter is read against a stale one", "error", err)
+		return
 	}
 
 	// A half-admission from laye is spent by the device that answers it.
