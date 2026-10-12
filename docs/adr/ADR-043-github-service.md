@@ -48,14 +48,26 @@ A `GITHUB` token is the third kind, after `OAUTH` and `REFRESH`.
 
 "the node should be the root identity github for github as a base"
 
-The plugin's workflow runs on the box runner and its package step writes
+A plugin's workflow that runs on the box runner has its package step write
 `qntx-<name>-plugin-<ver>-<os>-<arch>.tar.gz` and its `.sha256` under the
 runner. QNTX sees the file land, checks it against the `.sha256`, takes it into
-its own plugin directory and restarts the plugin. Nothing is downloaded from
-GitHub.
+its own plugin directory and restarts the plugin.
 
 A build is looked for at the root of a job's workspace, `<runner>/_work/<repo>/<repo>/`, and
-no deeper. Its workflow runs on `[self-hosted, q-box]`.
+no deeper.
+
+"do you want plugin builds downloaded from GitHub?"
+
+"yes"
+
+A plugin built by a runner on another machine reaches the node as a GitHub
+Actions artifact of a successful workflow run in the plugin record's
+repository. The artifact is named as the archive is, and holds the archive and
+its `.sha256`. The App's `workflow_run` delivery is what has the node download
+it, as the App's installation where the repository is; QNTX checks it against
+the `.sha256` as it checks a build under the runner, and a run older than the
+one whose build is installed is not installed over it. A repository no enabled
+plugin record names has nothing downloaded from it.
 
 "yes, i want this."
 
