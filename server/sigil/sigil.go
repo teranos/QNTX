@@ -68,8 +68,8 @@ const (
 	NotFound = "not found"
 	// NotAllowed is something the caller may not do, whoever they are.
 	NotAllowed = "not allowed"
-	// Failed is the node's own fault: a store that did not answer. What went
-	// wrong is in the log, and the caller is told only that it did.
+	// Failed is the node's own fault: a store that did not answer. The caller
+	// is told what went wrong, and the log keeps it too.
 	Failed = "failed"
 )
 
