@@ -108,3 +108,19 @@ func TestALineNotWrittenIsHeldOnTheDeploy(t *testing.T) {
 	assert.Equal(t, deployRestarting, d.stage)
 	assert.Len(t, d.unwritten, 2)
 }
+
+// A deploy's lines are about the plugin at its short rev, a name and not an
+// identifier; the full rev is on the line that begins it.
+func TestADeployIsAboutThePluginAtItsShortRev(t *testing.T) {
+	s := deployingServer(t)
+	after := "8ed95ffc2a6b0d4e1f3a5c7b9d0e2f4a6c8b0d1e"
+	s.deploys.begin(pluginDeploy{plugin: "datapunt", rev: after, after: after, stage: deployQueued})
+
+	lines, err := newestLines(s, "datapunt@8ed95ff", "deploys")
+	require.NoError(t, err)
+	require.Contains(t, lines, deployPredicate+deployQueued, "no queued line about datapunt@8ed95ff")
+	queued := lines[deployPredicate+deployQueued]
+	assert.Equal(t, []string{"datapunt@8ed95ff"}, queued.Subjects)
+	assert.Equal(t, after, queued.Attributes["rev"])
+	assert.Equal(t, after, queued.Attributes["after"])
+}

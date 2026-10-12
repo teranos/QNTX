@@ -32,7 +32,7 @@ var deployEnded = []string{deployLive, deployUnchanged, deployDisabled, deployFa
 // pluginDeploy is one plugin's deploy as far as it went.
 type pluginDeploy struct {
 	plugin string
-	// rev is what the deploy's lines are about: plugin@rev.
+	// rev is what the deploy's lines are about: plugin@rev, the rev short.
 	rev string
 	// What the push said: the repository, the ref and the commit it moved to.
 	repo, ref, after string
@@ -46,6 +46,19 @@ type pluginDeploy struct {
 	began map[string]time.Time
 	// The lines about it that were not written, and why.
 	unwritten []string
+}
+
+// shortRev is how much of a rev names it in a deploy's subject.
+const shortRev = 7
+
+// subject is what d's lines are about: the plugin at its short rev. A full rev
+// is a run of hex the store takes for an identifier, not a name.
+func (d *pluginDeploy) subject() string {
+	rev := d.rev
+	if len(rev) > shortRev {
+		rev = rev[:shortRev]
+	}
+	return d.plugin + "@" + rev
 }
 
 // deployWriter writes one line about a deploy, in the plugin's context.
@@ -73,7 +86,7 @@ func (s *QNTXServer) deployLine(subject, predicate, plugin string, attributes ma
 // line writes what d did, and holds on d what was not written. Called with mu
 // held.
 func (t *deployTracker) line(d *pluginDeploy, predicate string, attributes map[string]any) {
-	subject := d.plugin + "@" + d.rev
+	subject := d.subject()
 	if err := t.write(subject, predicate, d.plugin, attributes); err != nil {
 		d.unwritten = append(d.unwritten, errors.Wrapf(err, "the %s line about %s was not written", predicate, subject).Error())
 	}
@@ -98,7 +111,7 @@ func (t *deployTracker) begin(d pluginDeploy) {
 	}
 	t.deploys[d.plugin] = &d
 	t.moved(&d, d.stage, map[string]any{
-		"repo": d.repo, "ref": d.ref, "after": d.after,
+		"rev": d.rev, "repo": d.repo, "ref": d.ref, "after": d.after,
 		"revs": strings.Join(d.revs, " "), "replaces_revs": strings.Join(d.replacesRevs, " "),
 	})
 }
