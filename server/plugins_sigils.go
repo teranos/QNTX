@@ -25,7 +25,7 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        "plugins",
-			Description: "The plugins this node runs: what each serves and how healthy it is; added from a repository after it is checked, enabled, disabled, paused, resumed and restarted.",
+			Description: "The plugins this node runs: what each serves and how healthy it is; added from a repository after it is checked, enabled, disabled, paused, resumed, restarted and archived.",
 			Tags:        []string{"plugins", "extensions", "health"},
 			Sigils: []*protocol.Sigil{
 				{
@@ -67,6 +67,7 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 				action("restart", "Restart an enabled plugin with its config read again. It answers at once; the restart completes after."),
 				action("enable", "Enable a plugin and start it from its build. With no build yet, it says why, and it starts when its build lands under the runner."),
 				action("disable", "Disable a plugin, stop it, and remove its handlers and watchers."),
+				action("archive", "Archive a plugin: disable and stop it, and take it off the node. Its record stays; it is listed no more, and its name can be added again."),
 			},
 		},
 		Answers: map[string]sigil.Answer{
@@ -100,6 +101,7 @@ func (s *QNTXServer) pluginsSignum() sigil.Signum {
 			"restart": s.pluginActionAnswer("restart"),
 			"enable":  s.pluginActionAnswer("enable"),
 			"disable": s.pluginActionAnswer("disable"),
+			"archive": s.pluginActionAnswer("archive"),
 		},
 	}
 }

@@ -61,8 +61,18 @@ func (r PluginRecords) newest() (map[string]*types.As, error) {
 	return newestLines(r.s, pluginSubject, "plugins")
 }
 
-// pluginLine writes one plugin whole, as a new line.
-func (r PluginRecords) pluginLine(actor string, record grpcplugin.PluginRecord) error {
+// archivedLine is a line that took its plugin off the node.
+const archivedLine = "archived"
+
+// archived is whether a PLUGIN line took its plugin off the node.
+func archived(as *types.As) bool {
+	off, said := as.Attributes[archivedLine].(bool)
+	return said && off
+}
+
+// pluginLine writes one plugin whole, as a new line, and what else the line
+// says of it.
+func (r PluginRecords) pluginLine(actor string, record grpcplugin.PluginRecord, also map[string]any) error {
 	config := make(map[string]any, len(record.Config))
 	for key, value := range record.Config {
 		config[key] = value
@@ -73,10 +83,14 @@ func (r PluginRecords) pluginLine(actor string, record grpcplugin.PluginRecord) 
 		return errors.Wrapf(err, "failed to name the %s line about %s", pluginSubject, record.Name)
 	}
 	at := time.Now()
+	attributes := map[string]any{"enabled": record.Enabled, "config": config}
+	for key, value := range also {
+		attributes[key] = value
+	}
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{pluginSubject}, Predicates: []string{record.Name}, Contexts: []string{record.Repo},
 		Actors: []string{actor}, Timestamp: at, CreatedAt: at, Source: pluginSource,
-		Attributes: map[string]any{"enabled": record.Enabled, "config": config},
+		Attributes: attributes,
 	}); err != nil {
 		return errors.Wrapf(err, "the %s line about %s was not written", pluginSubject, record.Name)
 	}
@@ -124,6 +138,9 @@ func (r PluginRecords) Plugins() ([]grpcplugin.PluginRecord, error) {
 	}
 	records := make([]grpcplugin.PluginRecord, 0, len(newest))
 	for _, as := range newest {
+		if archived(as) {
+			continue
+		}
 		record, err := asPluginRecord(as)
 		if err != nil {
 			return nil, err
@@ -134,14 +151,15 @@ func (r PluginRecords) Plugins() ([]grpcplugin.PluginRecord, error) {
 	return records, nil
 }
 
-// Plugin is one plugin the node knows. False is a plugin nobody added.
+// Plugin is one plugin the node knows. False is a plugin nobody added, or one
+// that was archived.
 func (r PluginRecords) Plugin(name string) (grpcplugin.PluginRecord, bool, error) {
 	newest, err := r.newest()
 	if err != nil {
 		return grpcplugin.PluginRecord{}, false, err
 	}
 	as, ok := newest[name]
-	if !ok {
+	if !ok || archived(as) {
 		return grpcplugin.PluginRecord{}, false, nil
 	}
 	record, err := asPluginRecord(as)
@@ -179,7 +197,7 @@ func (r PluginRecords) AddPlugin(actor, repo string) (grpcplugin.PluginRecord, e
 		return grpcplugin.PluginRecord{}, errors.Newf("plugin %s is already added, from %s, and %q on %s names it again", name, held.Repo, repo, host)
 	}
 	record := grpcplugin.PluginRecord{Name: name, Repo: repo, Config: map[string]string{}}
-	if err := r.pluginLine(actor, record); err != nil {
+	if err := r.pluginLine(actor, record, map[string]any{}); err != nil {
 		return grpcplugin.PluginRecord{}, err
 	}
 	return record, nil
@@ -197,6 +215,17 @@ func (r PluginRecords) added(name string) (grpcplugin.PluginRecord, error) {
 	return record, nil
 }
 
+// ArchivePlugin takes a plugin off the node. Its lines stay; the newest says it
+// is disabled and archived, and its name can be added again.
+func (r PluginRecords) ArchivePlugin(actor, name string) error {
+	record, err := r.added(name)
+	if err != nil {
+		return err
+	}
+	record.Enabled = false
+	return r.pluginLine(actor, record, map[string]any{archivedLine: true})
+}
+
 // EnablePlugin switches a plugin on or off, keeping its config.
 func (r PluginRecords) EnablePlugin(actor, name string, enabled bool) error {
 	record, err := r.added(name)
@@ -204,7 +233,7 @@ func (r PluginRecords) EnablePlugin(actor, name string, enabled bool) error {
 		return err
 	}
 	record.Enabled = enabled
-	return r.pluginLine(actor, record)
+	return r.pluginLine(actor, record, map[string]any{})
 }
 
 // ConfigurePlugin replaces a plugin's config, keeping whether it is enabled.
@@ -214,5 +243,5 @@ func (r PluginRecords) ConfigurePlugin(actor, name string, settings map[string]s
 		return err
 	}
 	record.Config = settings
-	return r.pluginLine(actor, record)
+	return r.pluginLine(actor, record, map[string]any{})
 }

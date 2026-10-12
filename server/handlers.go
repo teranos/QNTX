@@ -416,12 +416,18 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 		s.refreshPluginHealth()
 		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin enabled")
 
-	case "disable":
+	case "disable", "archive":
 		pm, err := s.getPluginManager()
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
-		if err := s.pluginRecords().EnablePlugin(actorOf(ctx), name, false); err != nil {
+		// Archive is disable that also takes the plugin off the node; either
+		// line is written before the plugin stops.
+		written := map[string]func() error{
+			"disable": func() error { return s.pluginRecords().EnablePlugin(actorOf(ctx), name, false) },
+			"archive": func() error { return s.pluginRecords().ArchivePlugin(actorOf(ctx), name) },
+		}[action]
+		if err := written(); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 		}
 		if _, loaded := pm.GetPlugin(name); !loaded {
@@ -453,11 +459,11 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 			acc.SetHealth(name, true, status, nil)
 			acc.Emit(name, plugingrpc.BannerDisabled)
 		}
-		s.BroadcastPluginHealth(name, false, string(plugin.StateStopped), "Plugin disabled")
+		s.BroadcastPluginHealth(name, false, string(plugin.StateStopped), "Plugin "+action+"d")
 
 	default:
 		return nil, &protocol.Refusal{Why: sigil.Failed,
-			Says: fmt.Sprintf("Unknown action: %s (expected 'pause', 'resume', 'restart', 'enable', or 'disable')", action)}
+			Says: fmt.Sprintf("Unknown action: %s (expected 'pause', 'resume', 'restart', 'enable', 'disable' or 'archive')", action)}
 	}
 
 	// Return updated state
