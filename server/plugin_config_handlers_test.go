@@ -11,7 +11,7 @@ import (
 )
 
 // "nil is nil": a body naming no config, or naming null, writes nothing to a
-// plugin's record; {} is a plugin configured with no keys.
+// plugin's record; {} names no key, so the record keeps every key it holds.
 func TestAConfigNamingNothingIsRefused(t *testing.T) {
 	s := rootKnowingServer(t)
 	_, err := s.pluginRecords().AddPlugin(rootAccount, "https://github.com/teranos/pyre")
@@ -32,4 +32,46 @@ func TestAConfigNamingNothingIsRefused(t *testing.T) {
 	refused := put(http.MethodPost, `{"config":{}}`)
 	assert.Equal(t, http.StatusMethodNotAllowed, refused.Code)
 	assert.Equal(t, "GET, PUT", refused.Header().Get("Allow"))
+}
+
+// An MCP caller sent each plugin's schema keys alone, and every build key was
+// dropped, so a push had nothing to build. A PUT keeps every key of the record
+// its body does not name, and a key sent holding nothing is removed.
+func TestAPutKeepsTheKeysItDoesNotName(t *testing.T) {
+	s := rootKnowingServer(t)
+	records := s.pluginRecords()
+	_, err := records.AddPlugin(rootAccount, "https://github.com/teranos/staands")
+	require.NoError(t, err)
+	require.NoError(t, records.ConfigurePlugin(rootAccount, "staands", map[string]string{
+		buildCore:   "teranos/staands@main",
+		"namespace": "Clean",
+		"bucket":    "media",
+	}))
+
+	put := func(body string) {
+		r := httptest.NewRequest(http.MethodPut, "/api/plugins/staands/config", bytes.NewBufferString(body))
+		r.SetPathValue("name", "staands")
+		w := httptest.NewRecorder()
+		s.HandlePluginConfig(w, r)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	}
+	held := func() map[string]string {
+		record, found, err := records.Plugin("staands")
+		require.NoError(t, err)
+		require.True(t, found)
+		return record.Config
+	}
+
+	put(`{"config":{"bucket":"media.cleanamsterdam.nl"}}`)
+	assert.Equal(t, map[string]string{
+		buildCore:   "teranos/staands@main",
+		"namespace": "Clean",
+		"bucket":    "media.cleanamsterdam.nl",
+	}, held(), "a PUT naming only bucket")
+
+	put(`{"config":{"build.core":""}}`)
+	assert.Equal(t, map[string]string{
+		"namespace": "Clean",
+		"bucket":    "media.cleanamsterdam.nl",
+	}, held(), "build.core sent holding nothing")
 }

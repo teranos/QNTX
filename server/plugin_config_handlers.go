@@ -128,9 +128,9 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 	respond(w, s.logger, http.StatusOK, response)
 }
 
-// handleUpdatePluginConfig writes a plugin's config into its record (ADR-043)
-// and reinitializes the plugin with it when it is running. A plugin that is not
-// running is configured all the same, and starts with this config.
+// handleUpdatePluginConfig writes the keys a body names into a plugin's record
+// (ADR-043) and reinitializes the plugin when it is running. A plugin that is
+// not running is configured all the same, and starts with its record's config.
 func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Request, pluginName string) {
 	var body map[string]json.RawMessage
 	if err := readJSON(w, r, &body); err != nil {
@@ -138,7 +138,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	// A plugin nobody added has no record to configure, or to validate for.
-	found, err := s.pluginRecords().Added(pluginName)
+	record, found, err := s.pluginRecords().Plugin(pluginName)
 	if err != nil {
 		s.writeRichError(w, errors.Wrapf(err, "failed to read the record of plugin %s", pluginName), http.StatusInternalServerError)
 		return
@@ -148,22 +148,24 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// The config is what the record holds after: {} is a plugin with no keys,
-	// and a body naming none, or naming null, says nothing to write.
+	// The config is the keys to write: each key it does not name is kept, and a
+	// key it sends holding nothing is removed, whoever sends it. A body naming
+	// no config, or naming null, says nothing to write.
 	raw, named := body["config"]
 	if !named {
 		s.writeRichError(w, errors.Newf("the config of plugin %s was not sent: the body names no config", pluginName), http.StatusBadRequest)
 		return
 	}
 	if string(raw) == "null" {
-		s.writeRichError(w, errors.Newf("the config of plugin %s was sent as null: send {} for a plugin with no keys", pluginName), http.StatusBadRequest)
+		s.writeRichError(w, errors.Newf("the config of plugin %s was sent as null: send {} to change no key", pluginName), http.StatusBadRequest)
 		return
 	}
-	var config map[string]string
-	if err := json.Unmarshal(raw, &config); err != nil {
+	var sent map[string]string
+	if err := json.Unmarshal(raw, &sent); err != nil {
 		s.writeRichError(w, errors.Wrapf(err, "the config of plugin %s is not an object of text values", pluginName), http.StatusBadRequest)
 		return
 	}
+	config := configAfter(record.Config, sent)
 	// validate asks whether the config would be taken, without writing it.
 	var validate bool
 	if raw, named := body["validate"]; named {
@@ -237,6 +239,25 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		"plugin":  pluginName,
 		"config":  config,
 	})
+}
+
+// configAfter is the config a record holds once a PUT's config is written onto
+// it: every key the PUT does not name is kept, a key it sends holding nothing
+// is removed, and every other key it names is set.
+func configAfter(held, sent map[string]string) map[string]string {
+	after := make(map[string]string, len(held)+len(sent))
+	for key, value := range held {
+		after[key] = value
+	}
+	for key, value := range sent {
+		text, err := named.TextOf(key, value)
+		if err != nil {
+			delete(after, key)
+			continue
+		}
+		after[key] = text.String()
+	}
+	return after
 }
 
 // validateConfigAgainstSchema validates config values against plugin schema

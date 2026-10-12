@@ -27,7 +27,7 @@ The + is an empty plugin at the end of the list. Press it and enter the plugin's
 | `plugins_restart` | `POST /api/plugins/{name}/restart` |
 | `plugins_list` | `GET /api/plugins` |
 | | `GET /api/plugins/{name}/config` |
-| | `PUT /api/plugins/{name}/config` body: config |
+| | `PUT /api/plugins/{name}/config` body: config, the keys it sets; a key sent holding nothing is removed, and every key it does not name is kept |
 
 Enable and disable return JSON with the plugin's new state:
 
