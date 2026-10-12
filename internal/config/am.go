@@ -90,6 +90,7 @@ type NodesConfig struct {
 type PeerConfig struct {
 	Name          string `mapstructure:"name"`           // What it is called here.
 	DID           string `mapstructure:"did"`            // Its did:key, which it signs as.
+	Namespace     string `mapstructure:"namespace"`      // The namespace it serves: the tokens it is told about act there.
 	Origin        string `mapstructure:"origin"`         // Where it answers.
 	ReturnAddress string `mapstructure:"return_address"` // Where its people are sent back to, + /auth/elsewhere/back.
 }

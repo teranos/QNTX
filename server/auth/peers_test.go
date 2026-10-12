@@ -37,7 +37,7 @@ func primaryAndPeer(t *testing.T, peerDID string) (primary *Handler, served stri
 		w.WriteHeader(http.StatusTeapot)
 	}))
 	t.Cleanup(peer.Close)
-	require.NoError(t, primary.DeclarePeer(peerName, peerDID, peer.URL, peer.URL))
+	require.NoError(t, primary.DeclarePeer(peerName, peerDID, NamespaceDefault, peer.URL, peer.URL))
 	return primary, primaryServed.URL, got
 }
 
