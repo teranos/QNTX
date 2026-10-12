@@ -31,7 +31,9 @@ func (s *QNTXServer) reachSignum() sigil.Signum {
 		Says: "A role, or a level (SUPER, TOKEN, ATTESTOR, PUBLIC_REGISTRATION, ANYONE), which opens only a plugin's route or sigil the compiled table does not name."}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "reach",
+			Name:        "reach",
+			Description: "Who reaches what at runtime: the reach lines in the store, granted and revoked, beside what the compiled-in table says.",
+			Tags:        []string{"reach", "access", "lines"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "list",

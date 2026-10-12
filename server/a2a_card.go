@@ -86,11 +86,16 @@ func skillOf(signum *protocol.Signum) a2a.Skill {
 }
 
 // a2aCard is the card the node can give the caller of r, with a skill per
-// signum the caller reaches over A2A (ADR-039). GetExtendedAgentCard does not
-// serve it until a public card declares the capability (§3.3.4).
+// signum the caller reaches over A2A (ADR-039). GetExtendedAgentCard answers
+// it (§3.1.11), and am node shows it.
 func (s *QNTXServer) a2aCard(r *http.Request) a2a.Card {
-	card := s.cardBase(r)
 	admitted, known := auth.AdmissionFrom(r.Context())
+	return s.a2aCardOf(r, admitted, known)
+}
+
+// a2aCardOf is a2aCard for a caller already read off r.
+func (s *QNTXServer) a2aCardOf(r *http.Request, admitted auth.Admission, known bool) a2a.Card {
+	card := s.cardBase(r)
 	for _, signum := range s.checkedSigna() {
 		// "make am the card, not a skill on it": the Agent Card describes the
 		// node, and a skill is a capability the node can perform.

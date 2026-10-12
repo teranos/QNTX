@@ -14,7 +14,9 @@ import (
 func (s *QNTXServer) openapiSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "openapi",
+			Name:        "openapi",
+			Description: "The document of what the node serves: every path the reach table names, who reaches it, and what each sigil does there.",
+			Tags:        []string{"openapi", "document", "reach"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "document",
