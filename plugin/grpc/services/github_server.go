@@ -149,7 +149,27 @@ func (s *GitHubServer) Tarball(ctx context.Context, namespace, owner, repo, ref 
 	if err != nil {
 		return nil, errors.Wrapf(err, "no GitHub credential for namespace %q", namespace)
 	}
-	path := "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo) + "/tarball/" + url.PathEscape(ref)
+	return s.download(ctx, "/repos/"+url.PathEscape(owner)+"/"+url.PathEscape(repo)+"/tarball/"+url.PathEscape(ref), token, key)
+}
+
+// Artifact is a workflow run's artifact as GitHub zips it, read as the App's
+// installation where owner/repo is. GitHub answers at a signed URL, which the
+// client follows.
+func (s *GitHubServer) Artifact(ctx context.Context, owner, repo string, artifactID int64) (io.ReadCloser, error) {
+	if !s.enabled() {
+		return nil, errors.New(githubDisabled)
+	}
+	minted, err := s.InstallationToken(ctx, owner, repo)
+	if err != nil {
+		return nil, err
+	}
+	path := "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo) + "/actions/artifacts/" + strconv.FormatInt(artifactID, 10) + "/zip"
+	return s.download(ctx, path, minted.Token, "installation:"+owner)
+}
+
+// download is what GitHub answers at path, read with token and its rate limit
+// kept under key, following where GitHub points.
+func (s *GitHubServer) download(ctx context.Context, path, token, key string) (io.ReadCloser, error) {
 	s.mu.Lock()
 	target := s.baseURL + path
 	s.mu.Unlock()
@@ -173,7 +193,7 @@ func (s *GitHubServer) Tarball(ctx context.Context, namespace, owner, repo, ref 
 		}
 		return nil, errors.Newf("GitHub GET %s answered %d: %s", path, httpResp.StatusCode, githubMessage(raw))
 	}
-	// The archive is the caller's to read and close.
+	// What GitHub answered is the caller's to read and close.
 	return httpResp.Body, nil
 }
 

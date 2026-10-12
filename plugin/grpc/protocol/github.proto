@@ -500,7 +500,7 @@ message GitHubNamespace {
   GitHubCoreRate rate = 8;
 }
 
-// TakenBuild is one plugin build the runner made and the node took. Mirrors
+// TakenBuild is one plugin build a runner made and the node took. Mirrors
 // grpc.TakenBuild.
 message TakenBuild {
   string plugin = 1;
@@ -512,6 +512,9 @@ message TakenBuild {
   // A build that landed before the installed one was installed, and so is not
   // installed over it.
   bool older = 6;
+  // The workflow run whose artifact the build was, by its URL; empty for a
+  // build under the runner.
+  string run = 7;
 }
 
 // RunnerStats is the runner as its directory says it is now. Mirrors
@@ -573,6 +576,10 @@ message GitHubStatus {
   string webhook_url = 7;
   // What a push to a repo's branch dispatches, per follow ROOT set.
   repeated GitHubFollow follows = 8;
+  // Each plugin build the node downloaded as a workflow run's artifact.
+  repeated TakenBuild artifacts = 9;
+  // What of a workflow run's build was not installed, and why, oldest first.
+  repeated string artifact_faults = 10;
 }
 
 // GitHubFollow is a push to repo's branch dispatching workflow of dispatches at

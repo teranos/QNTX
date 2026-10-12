@@ -135,10 +135,12 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	status := &protocol.GitHubStatus{
-		Enabled:    settings.Enabled,
-		Namespaces: []*protocol.GitHubNamespace{},
-		Runner:     s.runnerStatus(settings),
-		Builds:     map[string]*protocol.PluginBuild{},
+		Enabled:        settings.Enabled,
+		Namespaces:     []*protocol.GitHubNamespace{},
+		Runner:         s.runnerStatus(settings),
+		Builds:         map[string]*protocol.PluginBuild{},
+		Artifacts:      takenBuilds(s.artifacts.all()),
+		ArtifactFaults: s.artifacts.faulted(),
 	}
 	for name, build := range s.builds.all() {
 		status.Builds[name] = &protocol.PluginBuild{Revs: build.Revs, Digest: build.Digest,
@@ -296,13 +298,18 @@ func runnerStats(stats grpcplugin.RunnerStats) *protocol.RunnerStats {
 	for _, at := range stats.Jobs {
 		jobs = append(jobs, at.Format(time.RFC3339Nano))
 	}
-	taken := make([]*protocol.TakenBuild, 0, len(stats.Taken))
-	for _, build := range stats.Taken {
-		taken = append(taken, &protocol.TakenBuild{Plugin: build.Plugin, Archive: build.Archive, Digest: build.Digest,
-			At: build.At.Format(time.RFC3339Nano), Changed: build.Changed, Older: build.Older})
-	}
 	return &protocol.RunnerStats{Path: stats.Path, Name: stats.Name, GithubUrl: stats.GitHubURL,
-		Workspaces: stats.Workspaces, Jobs: jobs, Taken: taken, Unread: stats.Unread}
+		Workspaces: stats.Workspaces, Jobs: jobs, Taken: takenBuilds(stats.Taken), Unread: stats.Unread}
+}
+
+// takenBuilds is the builds the node took as the GitHub element is given them.
+func takenBuilds(builds []grpcplugin.TakenBuild) []*protocol.TakenBuild {
+	taken := make([]*protocol.TakenBuild, 0, len(builds))
+	for _, build := range builds {
+		taken = append(taken, &protocol.TakenBuild{Plugin: build.Plugin, Archive: build.Archive, Digest: build.Digest,
+			At: build.At.Format(time.RFC3339Nano), Changed: build.Changed, Older: build.Older, Run: build.Run})
+	}
+	return taken
 }
 
 // StartRunner watches the runner the node's settings name, or stops watching
