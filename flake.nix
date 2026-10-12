@@ -430,6 +430,9 @@
             pkgs.protobuf
             pkgs.onnxruntime
             pkgs.wasm-pack
+            # nixpkgs' rustc links wasm32 with lld from PATH, which `make ats`
+            # needs and ats-wasm above adds for the same reason.
+            pkgs.lld
             pkgs.bun
           ] ++ pre-commit-check.enabledPackages;
 
