@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -209,4 +210,48 @@ func TestGitHubServiceListsWhatCanBeAsked(t *testing.T) {
 	assert.Contains(t, pulls.Takes, "title")
 	assert.Contains(t, pulls.Takes, "head")
 	assert.NotContains(t, pulls.Takes, "namespace", "namespace is GitHubService's own, and an installation spends none")
+}
+
+// A plugin built on another machine is its workflow run's artifact, read as
+// the App's installation where the repository is. GitHub answers at a signed
+// URL, which the client follows.
+func TestAnArtifactIsReadAsTheInstallation(t *testing.T) {
+	s, seen := fakeGitHubAs(t, gardenApp{gardenTokens: gardenCreds, jwt: "the-apps-jwt"},
+		installedOn(time.Now().Add(time.Hour), func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/repos/teranos/QNTX/actions/artifacts/42/zip":
+				http.Redirect(w, r, "/signed/artifact.zip", http.StatusFound)
+			case "/signed/artifact.zip":
+				_, _ = w.Write([]byte("zip bytes"))
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+
+	body, err := s.Artifact(context.Background(), "teranos", "QNTX", 42)
+	require.NoError(t, err)
+	got, err := io.ReadAll(body)
+	require.NoError(t, err)
+	require.NoError(t, body.Close())
+	assert.Equal(t, "zip bytes", string(got))
+
+	assert.Equal(t, []string{
+		"GET /repos/teranos/QNTX/installation",
+		"POST /app/installations/7/access_tokens",
+		"GET /repos/teranos/QNTX/actions/artifacts/42/zip",
+		"GET /signed/artifact.zip",
+	}, routesOf(seen))
+	assert.Equal(t, "Bearer ghs_minted", (*seen)[2].Header.Get("Authorization"))
+}
+
+// An artifact GitHub no longer holds is refused in GitHub's words, naming the call.
+func TestAnArtifactGitHubRefusesNamesTheCall(t *testing.T) {
+	s, _ := fakeGitHubAs(t, gardenApp{gardenTokens: gardenCreds, jwt: "the-apps-jwt"},
+		installedOn(time.Now().Add(time.Hour), answerJSON(410, `{"message": "Artifact has expired"}`)))
+
+	_, err := s.Artifact(context.Background(), "teranos", "QNTX", 42)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "GET /repos/teranos/QNTX/actions/artifacts/42/zip")
+	assert.Contains(t, err.Error(), "410")
+	assert.Contains(t, err.Error(), "Artifact has expired")
 }

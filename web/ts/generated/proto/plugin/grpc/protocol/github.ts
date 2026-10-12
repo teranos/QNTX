@@ -74,7 +74,7 @@ export interface GitHubNamespace {
 }
 
 /**
- * TakenBuild is one plugin build the runner made and the node took. Mirrors
+ * TakenBuild is one plugin build a runner made and the node took. Mirrors
  * grpc.TakenBuild.
  */
 export interface TakenBuild {
@@ -89,6 +89,11 @@ export interface TakenBuild {
    * installed over it.
    */
   older: boolean;
+  /**
+   * The workflow run whose artifact the build was, by its URL; empty for a
+   * build under the runner.
+   */
+  run: string;
 }
 
 /**
@@ -170,6 +175,10 @@ export interface GitHubStatus {
   webhook_url: string;
   /** What a push to a repo's branch dispatches, per follow ROOT set. */
   follows: GitHubFollow[];
+  /** Each plugin build the node downloaded as a workflow run's artifact. */
+  artifacts: TakenBuild[];
+  /** What of a workflow run's build was not installed, and why, oldest first. */
+  artifact_faults: string[];
 }
 
 export interface GitHubStatus_BuildsEntry {

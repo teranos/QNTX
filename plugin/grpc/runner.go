@@ -1,7 +1,7 @@
 package grpc
 
 // The Actions runner on this box builds plugins, and QNTX takes each build
-// the moment it lands (ADR-043). Nothing is downloaded from GitHub.
+// the moment it lands (ADR-043).
 // "A plugin's new build lands under the runner, and QNTX has it running as fast as it can. Nothing polls."
 
 import (
@@ -71,7 +71,8 @@ type Runner struct {
 	faults []string
 }
 
-// TakenBuild is a build QNTX installed from the runner.
+// TakenBuild is a build QNTX installed from the runner, or from a workflow
+// run's artifact.
 type TakenBuild struct {
 	Plugin  string    `json:"plugin"`
 	Archive string    `json:"archive"`
@@ -81,6 +82,9 @@ type TakenBuild struct {
 	// Older is a build that landed before the installed one was installed, and
 	// so is not installed over it.
 	Older bool `json:"older"`
+	// Run is the workflow run whose artifact the build was, by its URL; empty
+	// for a build under the runner.
+	Run string `json:"run,omitempty"`
 }
 
 // OpenRunner is the runner at path, or an error naming why there is none.
@@ -112,24 +116,13 @@ func (r *Runner) Take(digestFile string, logger *zap.SugaredLogger) (TakenBuild,
 	if err != nil {
 		return TakenBuild{}, errors.Wrapf(err, "failed to read the digest %s", digestFile)
 	}
-	// sha256sum writes the digest, then the file it is of.
-	var first string
-	if read, err := fmt.Sscan(string(said), &first); err != nil {
-		return TakenBuild{}, errors.Wrapf(err, "%s holds no sha256 digest (%d fields read)", digestFile, read)
-	}
-	sum, err := hex.DecodeString(first)
-	if err != nil || len(sum) != sha256.Size {
-		return TakenBuild{}, errors.Newf("%s holds no sha256 digest: %q is not %d hex bytes", digestFile, first, sha256.Size)
-	}
-	want := hex.EncodeToString(sum)
-
 	archive, err := os.ReadFile(archivePath)
 	if err != nil {
 		return TakenBuild{}, errors.Wrapf(err, "failed to read the build %s", archivePath)
 	}
-	got := hex.EncodeToString(sha256Of(archive))
-	if got != want {
-		return TakenBuild{}, errors.Newf("build %s has digest %s and %s says %s; nothing was installed", archivePath, got, digestFile, want)
+	got, err := checkedDigest(archivePath, archive, digestFile, said)
+	if err != nil {
+		return TakenBuild{}, err
 	}
 
 	taken := TakenBuild{Plugin: name, Archive: archivePath, Digest: got, At: time.Now()}
@@ -171,6 +164,26 @@ func (r *Runner) Take(digestFile string, logger *zap.SugaredLogger) (TakenBuild,
 
 	r.record(taken)
 	return taken, nil
+}
+
+// checkedDigest is archive's sha256, when said, the .sha256 the package step
+// wrote beside it, names that digest. Each is named in the error by where it was read.
+func checkedDigest(archiveName string, archive []byte, digestName string, said []byte) (string, error) {
+	// sha256sum writes the digest, then the file it is of.
+	var first string
+	if read, err := fmt.Sscan(string(said), &first); err != nil {
+		return "", errors.Wrapf(err, "%s holds no sha256 digest (%d fields read)", digestName, read)
+	}
+	sum, err := hex.DecodeString(first)
+	if err != nil || len(sum) != sha256.Size {
+		return "", errors.Newf("%s holds no sha256 digest: %q is not %d hex bytes", digestName, first, sha256.Size)
+	}
+	want := hex.EncodeToString(sum)
+	got := hex.EncodeToString(sha256Of(archive))
+	if got != want {
+		return "", errors.Newf("build %s has digest %s and %s says %s; nothing was installed", archiveName, got, digestName, want)
+	}
+	return got, nil
 }
 
 // landedBeforeInstall is whether archive was written before dir's build was
