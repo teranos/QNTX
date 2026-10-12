@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2701 in 380 files.
+# 2689 in 378 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -26,12 +26,10 @@
 6	ats/attrs/attrs.go
 2	ats/ax/executor.go
 4	ats/ax/fixtures.go
-7	ats/parser/as.go
 2	ats/parser/ax.go
 6	ats/parser/dispatch_qntxwasm.go
 5	ats/parser/error.go
 6	ats/parser/query_convert.go
-4	ats/parser/temporal.go
 4	ats/signing/signing.go
 2	ats/so/action.go
 13	ats/so/actions/prompt/action.go
@@ -131,7 +129,7 @@
 9	crates/ats/src/parser/mod.rs
 9	crates/ats/src/storage/memory.rs
 1	crates/ats/src/storage/traits.rs
-7	crates/ats/src/temporal.rs
+6	crates/ats/src/temporal.rs
 5	crates/ats/src/watcher.rs
 1	crates/laye-error/src/lib.rs
 1	crates/laye-me/src/lib.rs

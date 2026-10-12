@@ -67,7 +67,7 @@ func parseAxQueryWasm(args []string) (*types.AxFilter, error) {
 
 	input := resolvedInput{
 		Query: strings.Join(args, " "),
-		NowMs: time.Now().UnixMilli(),
+		NowMs: timeNow().UnixMilli(),
 	}
 
 	inputJSON, err := json.Marshal(input)
@@ -132,4 +132,111 @@ func convertResolvedOutput(out *resolvedOutput) (*types.AxFilter, error) {
 	}
 
 	return filter, nil
+}
+
+// temporalInput is the JSON input for resolve_temporal_expr.
+type temporalInput struct {
+	Expr  string `json:"expr"`
+	NowMs int64  `json:"now_ms"`
+	Span  string `json:"span"`
+}
+
+// answer reads an export's answer into into, or why it refused when it names
+// an error.
+func answer(fnName, resultJSON string, into any) error {
+	var out map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(resultJSON), &out); err != nil {
+		return errors.Wrapf(err, "unmarshal %s result %s", fnName, resultJSON)
+	}
+	if why, refused := out["error"]; refused {
+		var says string
+		if err := json.Unmarshal(why, &says); err != nil {
+			return errors.Wrapf(err, "%s refused with %s", fnName, why)
+		}
+		return errors.New(says)
+	}
+	if err := json.Unmarshal([]byte(resultJSON), into); err != nil {
+		return errors.Wrapf(err, "unmarshal %s result %s", fnName, resultJSON)
+	}
+	return nil
+}
+
+// resolveTemporalWasm resolves expr as span ("moment" or "day") and answers
+// with the value under the key the span names ("ms" or "day").
+func resolveTemporalWasm(expr string, now time.Time, span, key string, into any) error {
+	engine, err := wasm.GetEngine()
+	if err != nil {
+		return errors.Wrap(err, "wasm engine init")
+	}
+
+	inputJSON, err := json.Marshal(temporalInput{Expr: expr, NowMs: now.UnixMilli(), Span: span})
+	if err != nil {
+		return errors.Wrapf(err, "marshal temporal input %q", expr)
+	}
+
+	resultJSON, err := engine.Call("resolve_temporal_expr", string(inputJSON))
+	if err != nil {
+		return errors.Wrapf(err, "wasm resolve_temporal_expr %q", expr)
+	}
+
+	var out map[string]json.RawMessage
+	if err := answer("resolve_temporal_expr", resultJSON, &out); err != nil {
+		return err
+	}
+	value, answered := out[key]
+	if !answered {
+		return errors.Newf("resolve_temporal_expr answered %q with %s, which names no %s", expr, resultJSON, key)
+	}
+	if err := json.Unmarshal(value, into); err != nil {
+		return errors.Wrapf(err, "resolve_temporal_expr answered %q with %s", expr, resultJSON)
+	}
+	return nil
+}
+
+// resolveTemporalDispatch resolves one expression through the Rust resolver.
+func resolveTemporalDispatch(expr string, now time.Time) (int64, error) {
+	var ms int64
+	if err := resolveTemporalWasm(expr, now, "moment", "ms", &ms); err != nil {
+		return 0, err
+	}
+	return ms, nil
+}
+
+// resolveTemporalDayDispatch resolves the UTC day an expression falls on.
+func resolveTemporalDayDispatch(expr string, now time.Time) (int64, int64, error) {
+	var day resolvedOnClause
+	if err := resolveTemporalWasm(expr, now, "day", "day", &day); err != nil {
+		return 0, 0, err
+	}
+	return day.StartMs, day.EndMs, nil
+}
+
+// asInput is the JSON input for parse_as_command.
+type asInput struct {
+	Args  []string `json:"args"`
+	NowMs int64    `json:"now_ms"`
+}
+
+// parseAsCommandDispatch parses an AS command through the Rust parser.
+func parseAsCommandDispatch(args []string, now time.Time) (*asParsed, error) {
+	engine, err := wasm.GetEngine()
+	if err != nil {
+		return nil, errors.Wrap(err, "wasm engine init")
+	}
+
+	inputJSON, err := json.Marshal(asInput{Args: args, NowMs: now.UnixMilli()})
+	if err != nil {
+		return nil, errors.Wrapf(err, "marshal as input %v", args)
+	}
+
+	resultJSON, err := engine.Call("parse_as_command", string(inputJSON))
+	if err != nil {
+		return nil, errors.Wrapf(err, "wasm parse_as_command %v", args)
+	}
+
+	var parsed asParsed
+	if err := answer("parse_as_command", resultJSON, &parsed); err != nil {
+		return nil, err
+	}
+	return &parsed, nil
 }

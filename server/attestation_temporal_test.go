@@ -51,6 +51,15 @@ func TestOnSpansTheFullDay(t *testing.T) {
 	assert.Equal(t, from.Add(24*time.Hour), to)
 }
 
+// A date that is not year first is refused rather than guessed at: 03/04/2025
+// is April 3 to some and March 4 to others.
+func TestSinceRefusesDatesThatAreNotYearFirst(t *testing.T) {
+	for _, expr := range []string{"01/15/2025", "03/04/2025", "01-15-2025"} {
+		_, _, errMsg := parseTemporalParams(expr, "", "")
+		assert.NotEmpty(t, errMsg, expr)
+	}
+}
+
 // Temporal is one clause in the grammar; on beside since or until is refused
 // rather than silently picking one.
 func TestOnRefusesToCombineWithSinceOrUntil(t *testing.T) {

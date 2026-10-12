@@ -1,10 +1,9 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 296 in 129 files.
+# 295 in 128 files.
 
 1	ats/attrs/attrs.go
 1	ats/identity/quickdev.go
-1	ats/parser/temporal.go
 1	ats/so/actions/prompt/template.go
 3	ats/storage/alias_store.go
 1	ats/storage/bounded_store.go
