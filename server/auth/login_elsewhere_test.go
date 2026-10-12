@@ -79,7 +79,7 @@ func sessionCookieOf(w *httptest.ResponseRecorder) (*http.Cookie, bool) {
 }
 
 // The whole of it: logged in at the issuer, a session here, as the same person,
-// back where they were going.
+// back where they were going on this node's page, which the node does not serve.
 func TestSomebodyLoggedInAtTheIssuerHasASessionHere(t *testing.T) {
 	issuer, node := loginElsewhere(t)
 	back := sentToTheIssuer(t, issuer, node, "/canvas")
@@ -87,7 +87,8 @@ func TestSomebodyLoggedInAtTheIssuerHasASessionHere(t *testing.T) {
 	w := httptest.NewRecorder()
 	node.handleElsewhereBack(w, httptest.NewRequest(http.MethodGet, elsewhereBackPath+"?"+back.RawQuery, nil))
 	require.Equal(t, http.StatusSeeOther, w.Code, w.Body.String())
-	assert.Equal(t, "/canvas", w.Header().Get("Location"))
+	assert.Equal(t, node.homeOrigin()+"/canvas", w.Header().Get("Location"))
+	assert.NotEqual(t, elsewhereOrigin, node.homeOrigin(), "the page and the node are one origin here, which proves nothing")
 
 	cookie, set := sessionCookieOf(w)
 	require.True(t, set, "no session was set")
@@ -128,7 +129,7 @@ func TestTheWayBackAnswersOnlyAJourneyThisNodeStarted(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, again.Code, again.Body.String())
 }
 
-// Where somebody goes after logging in is a place on this node.
+// Where somebody goes after logging in is a place on this node's page.
 func TestTheWayBackStaysOnThisNode(t *testing.T) {
 	issuer, node := loginElsewhere(t)
 	for _, going := range []string{"https://other.example/", "//other.example/", "canvas"} {
@@ -136,7 +137,7 @@ func TestTheWayBackStaysOnThisNode(t *testing.T) {
 		w := httptest.NewRecorder()
 		node.handleElsewhereBack(w, httptest.NewRequest(http.MethodGet, elsewhereBackPath+"?"+back.RawQuery, nil))
 		require.Equal(t, http.StatusSeeOther, w.Code, w.Body.String())
-		assert.Equal(t, "/", w.Header().Get("Location"), going)
+		assert.Equal(t, node.homeOrigin()+"/", w.Header().Get("Location"), going)
 	}
 }
 

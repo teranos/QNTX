@@ -217,6 +217,60 @@ describe('Attestation Sync - Spike (Edge Cases)', () => {
         expect(flushCount).toBe(1);
     });
 
+    test('Spike is refused (400), attestation leaves the queue and Spike is told why', async () => {
+        const why = '{"error":"AS-1 is signed by did:key:zX naming actors [], and this node writes it as [node]"}';
+        const heard: string[] = [];
+        syncQueue.onRefused('att-1', (said) => heard.push(said));
+        syncQueue.add('att-1');
+        mockApiFetch = async () => new Response(why, { status: 400 });
+
+        await syncQueue.flush();
+
+        expect(syncStateManager.getState('att-1')).toBe('refused');
+        expect(heard).toEqual([why]);
+        expect(localStorage.getItem(STORAGE_KEY)).toBe('[]');
+    });
+
+    test('Spike is refused for size (413), attestation leaves the queue', async () => {
+        syncQueue.add('att-1');
+        mockApiFetch = async () => new Response('too large', { status: 413 });
+
+        await syncQueue.flush();
+
+        expect(syncStateManager.getState('att-1')).toBe('refused');
+        expect(localStorage.getItem(STORAGE_KEY)).toBe('[]');
+    });
+
+    // Who is signed in can change, and a login with this browser's key makes
+    // the same attestation the person's.
+    test('Spike is forbidden (403), attestation stays queued for after a login', async () => {
+        const heard: string[] = [];
+        syncQueue.onRefused('att-1', (said) => heard.push(said));
+        syncQueue.add('att-1');
+        mockApiFetch = async () => new Response('a key User UStim does not hold', { status: 403 });
+
+        await syncQueue.flush();
+
+        expect(syncStateManager.getState('att-1')).toBe('failed');
+        expect(heard).toEqual([]);
+        expect(localStorage.getItem(STORAGE_KEY)).toBe('["att-1"]');
+    });
+
+    test('Spike is refused once, then the queue moves on to the rest', async () => {
+        syncQueue.add('att-1');
+        syncQueue.add('att-2');
+        mockApiFetch = async (_path, init) => {
+            const body = JSON.parse(init?.body as string);
+            return new Response(null, { status: body.id === 'att-1' ? 400 : 200 });
+        };
+
+        await syncQueue.flush();
+
+        expect(syncStateManager.getState('att-1')).toBe('refused');
+        expect(syncStateManager.getState('att-2')).toBe('synced');
+        expect(localStorage.getItem(STORAGE_KEY)).toBe('[]');
+    });
+
     test('Spike flushes empty queue, nothing happens', async () => {
         let fetchCalled = false;
         mockApiFetch = async () => {

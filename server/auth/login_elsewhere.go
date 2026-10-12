@@ -59,8 +59,8 @@ func (h *Handler) SetPrimary(origin string) error {
 	return nil
 }
 
-// goingOnThisNode is where somebody asked to go, kept to a path on this node.
-// Anywhere else is the root.
+// goingOnThisNode is where somebody asked to go, kept to a path on this node's
+// page. Anywhere else is the root.
 func goingOnThisNode(asked string) string {
 	if !strings.HasPrefix(asked, "/") || strings.HasPrefix(asked, "//") || strings.HasPrefix(asked, "/\\") {
 		return "/"
@@ -166,7 +166,8 @@ func (h *Handler) handleElsewhereBack(w http.ResponseWriter, r *http.Request) {
 	h.setSessionCookie(w, token)
 	h.attest(PredicateLoggedIn, grant.MintedBy, map[string]any{"provider": h.loginAt, "via": "login_at"})
 	h.logger.Infow("Logged in elsewhere, a session here", "login_at", h.loginAt, "identity", quoteIdentity(grant.MintedBy))
-	http.Redirect(w, r, gone.going, http.StatusSeeOther)
+	// To the page, which is not the node: the node serves none.
+	http.Redirect(w, r, h.homeOrigin()+gone.going, http.StatusSeeOther)
 }
 
 // exchangeElsewhere spends a code at the node logged in at, as this node, for

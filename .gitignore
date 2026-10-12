@@ -57,7 +57,6 @@ qntx-plugins/ix-json/qntx-ix-json-plugin
 .DS_Store
 bin/
 coverage*.out
-server/docs_embedded/
 /qntx
 
 # Tauri

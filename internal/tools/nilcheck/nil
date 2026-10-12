@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2689 in 378 files.
+# 2686 in 377 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -311,7 +311,7 @@
 1	server/github_parity.go
 3	server/github_webhook.go
 2	server/ground_bridge.go
-8	server/handlers.go
+7	server/handlers.go
 4	server/host_gauges.go
 3	server/i_sigils.go
 12	server/init.go
@@ -341,7 +341,6 @@
 2	server/pi.go
 1	server/pprof.go
 25	server/prompt_handlers.go
-2	server/prose_handlers.go
 5	server/pulse_async_jobs.go
 6	server/pulse_execution_handlers.go
 5	server/pulse_execution_poller.go
