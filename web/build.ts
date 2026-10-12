@@ -1,13 +1,12 @@
 /**
  * QNTX Web Bundle Builder
  *
- * Bundles all web assets into internal/server/dist/ for embedding in Go binary
+ * Bundles all web assets into internal/server/dist/, which a static host
+ * serves. The node serves no page.
  *
  * This is sacred infrastructure code. Every line has blast radius across:
- * - Go embedding (go:embed path)
  * - Deployment (CloudFront/S3, Vercel)
  * - Developer workflow (build step in Makefile)
- * - Binary size and structure
  */
 
 import { cp, mkdir, readdir, rm } from "fs/promises";

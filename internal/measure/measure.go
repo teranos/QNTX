@@ -48,7 +48,7 @@ const (
 
 	// RouteUnmatched is a request no line in the reach table names at all —
 	// it never reaches the door Admitted and Refused are counted at.
-	// HandleStatic's catch-all is where these land: a stray path, not a
+	// HandleUnmatched's catch-all is where these land: a stray path, not a
 	// caller turned away from somewhere real.
 	RouteUnmatched = "qntx.route.unmatched"
 

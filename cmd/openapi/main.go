@@ -79,7 +79,7 @@ type Info struct {
 type PathItem struct {
 	Reached []string `json:"x-qntx-reach"`
 	// Prefix is a path Go's mux matches by prefix rather than exactly —
-	// /api/prose/ answers /api/prose/anything. It is not OpenAPI templating,
+	// /api/pulse/jobs/ answers /api/pulse/jobs/anything. It is not OpenAPI templating,
 	// and saying so is the difference between a path and a family of them.
 	Prefix bool `json:"x-qntx-prefix,omitempty"`
 }
