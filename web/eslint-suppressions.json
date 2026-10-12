@@ -426,7 +426,7 @@
   },
   "ts/components/element/ts-element.ts": {
     "no-restricted-syntax": {
-      "count": 11
+      "count": 6
     }
   },
   "ts/components/element/type-element.ts": {

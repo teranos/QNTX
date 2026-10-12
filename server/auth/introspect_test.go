@@ -85,6 +85,20 @@ func TestARevokedTokenIsInactiveToTheAskingNode(t *testing.T) {
 	assert.False(t, introspected(t, h, key, did, "one", token).Active)
 }
 
+// A peer serving a namespace is told about the tokens that act there, and not
+// about the ones that act where it does not.
+func TestAPeerLearnsWhoATokenInTheNamespaceItServesIs(t *testing.T) {
+	h, store, _ := authorizingHandler(t)
+	key, did := otherNode(t)
+	require.NoError(t, h.DeclarePeer(peerName, did, "Ground", elsewhereOrigin, elsewhereOrigin))
+
+	answer := introspected(t, h, key, did, "one", mintedIn(t, store, "ground-writer", "Ground"))
+	assert.True(t, answer.Active)
+	assert.Equal(t, []string{"Ground"}, answer.Namespaces)
+
+	assert.False(t, introspected(t, h, key, did, "two", mintedIn(t, store, "default-writer", NamespaceDefault)).Active)
+}
+
 // A token nobody issued is inactive, and says nothing more.
 func TestATokenNobodyIssuedIsInactive(t *testing.T) {
 	h, _, key, did := registered(t)

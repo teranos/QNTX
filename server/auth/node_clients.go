@@ -129,12 +129,17 @@ func names(word string) bool {
 }
 
 // DeclarePeer makes a peer a client of this node, as nodes.peers names it:
-// what it is called here, its did:key, the origin it answers at, and the
-// origin its people's browsers come back to.
-func (h *Handler) DeclarePeer(name, did, origin, returnAddress string) error {
-	name, did = strings.TrimSpace(name), strings.TrimSpace(did)
+// what it is called here, its did:key, the namespace it serves, the origin it
+// answers at, and the origin its people's browsers come back to.
+func (h *Handler) DeclarePeer(name, did, namespace, origin, returnAddress string) error {
+	name, did, namespace = strings.TrimSpace(name), strings.TrimSpace(did), strings.TrimSpace(namespace)
 	if !names(name) || strings.ContainsAny(name, "/?#") {
 		return errors.Newf("nodes.peers names %s as %q, which is no name a path can carry", did, name)
+	}
+	// What it is told about a token is whether it acts there, so a peer
+	// declared without one would be told about none.
+	if !names(namespace) {
+		return errors.Newf("nodes.peers names %s with no namespace it serves", did)
 	}
 	key, err := DecodeUserDID(did)
 	if err != nil {
@@ -162,7 +167,7 @@ func (h *Handler) DeclarePeer(name, did, origin, returnAddress string) error {
 	peers := map[string]Client{did: {
 		DID:           did,
 		Label:         name,
-		Namespace:     NamespaceDefault,
+		Namespace:     namespace,
 		ReturnAddress: returnTo.String() + elsewhereBackPath,
 		Origin:        parsed,
 		Node:          true,

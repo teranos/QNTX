@@ -180,6 +180,17 @@ export function sign(bytes: Uint8Array): Uint8Array {
 const ED25519_SIGNATURE_BYTES = 64;
 
 /**
+ * The did:key this browser signs as: the actor of what it attests. Throws when
+ * laye did not start, so nothing is attested by nobody.
+ */
+export async function signerDID(): Promise<string> {
+    if (!await whenReady()) {
+        throw new Error('laye did not start, so this browser has no key to attest as');
+    }
+    return laye.did();
+}
+
+/**
  * What an attestation carries for the node to verify rather than sign on this
  * browser's behalf: the signature over the bytes the node checks, made with
  * the key that never leaves this tab, and the did:key naming that key.

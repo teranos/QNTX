@@ -20,7 +20,7 @@ import { connectivity } from '../../client';
 import { createElementUI } from './element-ui';
 import { putAttestation, queryAttestations, parseQuery, generateASUID, EVERY_ROW } from '../../ats-wasm';
 import type { Attestation } from '../../ats-wasm';
-import { signAttestation } from '../../laye';
+import { signAttestation, signerDID } from '../../laye';
 
 export const TS_DEFAULT_CODE = `// Generate a random attestation — each run creates a unique ASUID
 const subjects = ["alice", "bob", "charlie", "diana", "eve"]
@@ -53,6 +53,14 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
  *  - qntx.query(queryString) — parse AX query, run against local IndexedDB
  *  - qntx.log(...args) — append to output collector
  */
+/** A list the attestation needs at least one of, refused when it has none. */
+export function named(field: string, list: unknown): [string, ...string[]] {
+    if (!Array.isArray(list) || list.length < 1 || !list.every(item => typeof item === 'string')) {
+        throw new Error(`qntx.attest names its ${field} as a list of at least one string, and was given ${JSON.stringify(list)}`);
+    }
+    return list as [string, ...string[]];
+}
+
 /** The node refused an attestation this run made, in its own words. */
 type Refused = (id: string, why: string, afterMs: number) => void;
 
@@ -62,16 +70,26 @@ function buildQntxApi(outputLines: string[], refused: Refused) {
         async attest(opts: {
             subjects: string[];
             predicates: string[];
-            contexts?: string[];
+            contexts: string[];
             actors?: string[];
             attributes?: Record<string, unknown>;
         }): Promise<Attestation> {
             const now = Math.floor(Date.now() / 1000);
+            // An attestation names who, what and where. A script's code is
+            // not typed when it runs, so each is asked for, not assumed.
+            const [subject] = named('subjects', opts.subjects);
+            const [predicate] = named('predicates', opts.predicates);
+            const [context] = named('contexts', opts.contexts);
             const subjects = opts.subjects;
             const predicates = opts.predicates;
-            const contexts = opts.contexts ?? ['_'];
-            const actors = opts.actors ?? ['ts-element'];
-            const { full: asuid } = generateASUID('AS', subjects[0] ?? '', predicates[0] ?? '', contexts[0] ?? '');
+            const contexts = opts.contexts;
+            // The key that signs is who wrote it, so it leads; what the
+            // script names stands after it.
+            const actors = [await signerDID()];
+            if (opts.actors) {
+                actors.push(...named('actors', opts.actors));
+            }
+            const { full: asuid } = generateASUID('AS', subject, predicate, context);
             const attestation: Attestation = {
                 id: asuid,
                 subjects,
