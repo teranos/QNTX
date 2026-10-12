@@ -16,8 +16,33 @@ import { syncStateManager } from '../state/sync-state';
 // TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)
 const STORAGE_KEY = 'qntx-attestation-sync-queue';
 
+/**
+ * The answers about the attestation itself: its signature, its fields, its
+ * size. It is signed, so it cannot change, and asking again gets the same
+ * answer. Every other failure — who is signed in (401, 403), the node or the
+ * network — can change, and the attestation stays queued.
+ */
+const REFUSED = new Set([400, 413, 422]);
+
+type Refused = (why: string) => void;
+
 class SyncQueueImpl {
     private flushing = false;
+    private refusedListeners = new Map<string, Set<Refused>>();
+
+    /**
+     * Be told if the node refuses this attestation, in the node's own words.
+     * A refused attestation leaves the queue; it stays in IndexedDB. The
+     * listener is let go once the node has answered either way.
+     */
+    onRefused(id: string, listener: Refused): void {
+        let listeners = this.refusedListeners.get(id);
+        if (!listeners) {
+            listeners = new Set();
+            this.refusedListeners.set(id, listeners);
+        }
+        listeners.add(listener);
+    }
 
     private get queue(): string[] {
         const stored = localStorage.getItem(STORAGE_KEY);
@@ -86,7 +111,14 @@ class SyncQueueImpl {
 
                     if (response.ok) {
                         syncStateManager.setState(id, 'synced');
+                        this.refusedListeners.delete(id);
                         log.debug(SEG.ELEMENT, `[SyncQueue] Synced ${id}`);
+                    } else if (REFUSED.has(response.status)) {
+                        const why = await response.text();
+                        syncStateManager.setState(id, 'refused');
+                        log.error(SEG.ELEMENT, `[SyncQueue] The node refused ${id} (${response.status}); it leaves the queue and stays local: ${why}`);
+                        this.refusedListeners.get(id)?.forEach(listener => listener(why));
+                        this.refusedListeners.delete(id);
                     } else {
                         syncStateManager.setState(id, 'failed');
                         remaining.push(id);
