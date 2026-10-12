@@ -52,46 +52,56 @@ type wasmMatchOutput struct {
 	Error string `json:"error,omitempty"`
 }
 
+// listOf is xs as a list Rust reads: a Go slice holding nothing is written
+// null, and match_watchers reads a list, so it goes as the empty list it is.
+func listOf[T any](xs []T) []T {
+	return append(make([]T, 0, len(xs)), xs...)
+}
+
 // matchAttestationOf is an attestation as match_watchers reads it.
 func matchAttestationOf(as *types.As) wasmMatchAttestation {
 	return wasmMatchAttestation{
-		Subjects:    as.Subjects,
-		Predicates:  as.Predicates,
-		Contexts:    as.Contexts,
-		Actors:      as.Actors,
+		Subjects:    listOf(as.Subjects),
+		Predicates:  listOf(as.Predicates),
+		Contexts:    listOf(as.Contexts),
+		Actors:      listOf(as.Actors),
 		TimestampMs: as.Timestamp.UnixMilli(),
 		Attributes:  as.Attributes,
 	}
 }
 
 // batchMatchStructural matches an attestation against all structural watchers
-// in Rust, and returns the set of matched watcher IDs. A watcher asking `over`
-// is measured by the definitions of the types the attestation is of, read
-// through read when Rust asks for them.
-func batchMatchStructural(as *types.As, watchers []*storage.Watcher, read typesReader) (map[string]bool, error) {
+// in Rust, and returns the set of matched watcher IDs, and why each watcher it
+// could not ask about was refused. A watcher asking `over` is measured by the
+// definitions of the types the attestation is of, read through read when Rust
+// asks for them.
+func batchMatchStructural(as *types.As, watchers []*storage.Watcher, read typesReader) (map[string]bool, map[string]error, error) {
 	engine, err := wasm.GetEngine()
 	if err != nil {
-		return nil, errors.Wrapf(err, "wasm engine init, matching attestation %s", as.ID)
+		return nil, nil, errors.Wrapf(err, "wasm engine init, matching attestation %s", as.ID)
 	}
 
+	refused := make(map[string]error)
 	filters := make([]wasmWatcherFilter, 0, len(watchers))
 	for _, w := range watchers {
 		f := wasmWatcherFilter{
 			ID:               w.ID,
-			Subjects:         w.Filter.Subjects,
-			Predicates:       w.Filter.Predicates,
-			Contexts:         w.Filter.Contexts,
-			Actors:           w.Filter.Actors,
-			AttributeFilters: w.AttributeFilters,
+			Subjects:         listOf(w.Filter.Subjects),
+			Predicates:       listOf(w.Filter.Predicates),
+			Contexts:         listOf(w.Filter.Contexts),
+			Actors:           listOf(w.Filter.Actors),
+			AttributeFilters: listOf(w.AttributeFilters),
 			Over:             w.Filter.Over,
 		}
 		start, starts, err := w.Filter.TimeStart.At("start")
 		if err != nil {
-			return nil, errors.Wrapf(err, "watcher %s does not say its time range", w.ID)
+			refused[w.ID] = errors.Wrapf(err, "watcher %s does not say its time range", w.ID)
+			continue
 		}
 		end, ends, err := w.Filter.TimeEnd.At("end")
 		if err != nil {
-			return nil, errors.Wrapf(err, "watcher %s does not say its time range", w.ID)
+			refused[w.ID] = errors.Wrapf(err, "watcher %s does not say its time range", w.ID)
+			continue
 		}
 		if starts {
 			ms := start.UnixMilli()
@@ -110,13 +120,13 @@ func batchMatchStructural(as *types.As, watchers []*storage.Watcher, read typesR
 	}
 	output, err := matchWatchers(engine, as.ID, input)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// Rust asks once, and the call that gives the types is answered whole.
 	for _, asked := range output.Read {
 		definitions, err := read(asked.Types)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read the types attestation %s is of to measure it by", as.ID)
+			return nil, nil, errors.Wrapf(err, "failed to read the types attestation %s is of to measure it by", as.ID)
 		}
 		given := make([]wasmMatchAttestation, 0, len(definitions))
 		for _, d := range definitions {
@@ -125,7 +135,7 @@ func batchMatchStructural(as *types.As, watchers []*storage.Watcher, read typesR
 		input.Types = &given
 		output, err = matchWatchers(engine, as.ID, input)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -133,7 +143,7 @@ func batchMatchStructural(as *types.As, watchers []*storage.Watcher, read typesR
 	for _, id := range output.MatchedIDs {
 		matched[id] = true
 	}
-	return matched, nil
+	return matched, refused, nil
 }
 
 // matchWatchers is one match_watchers call.

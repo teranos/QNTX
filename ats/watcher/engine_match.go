@@ -41,12 +41,15 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 	// Batch structural match: one WASM call for all watchers, and one more
 	// when a watcher asking `over` needs the definitions of the types the
 	// attestation is of. A watcher that cannot be answered is told why.
-	matched, err := batchMatchStructural(as, structural, e.typesOf)
+	matched, refused, err := batchMatchStructural(as, structural, e.typesOf)
 	if err != nil {
 		for _, w := range structural {
 			e.recordError(w.ID, err.Error(), as.ID)
 		}
 		return
+	}
+	for id, why := range refused {
+		e.recordError(id, why.Error(), as.ID)
 	}
 
 	for _, watcher := range structural {
@@ -296,9 +299,12 @@ func (e *Engine) matchesWatcher(as *types.As, watcher *storage.Watcher, read typ
 // about one watcher. The type definitions an `over` measures by are read
 // through read.
 func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher, read typesReader) (bool, error) {
-	matched, err := batchMatchStructural(as, []*storage.Watcher{watcher}, read)
+	matched, refused, err := batchMatchStructural(as, []*storage.Watcher{watcher}, read)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to match attestation %s against watcher %s", as.ID, watcher.ID)
+	}
+	if why, ok := refused[watcher.ID]; ok {
+		return false, why
 	}
 	return matched[watcher.ID], nil
 }
