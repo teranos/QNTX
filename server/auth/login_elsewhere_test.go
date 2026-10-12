@@ -97,6 +97,25 @@ func TestSomebodyLoggedInAtTheIssuerHasASessionHere(t *testing.T) {
 	assert.Equal(t, mastodonAccount, who)
 }
 
+// On a node nobody owns, a listed route back from the issuer is the claim: one
+// ROOT User, reached by an account the issuer vouched for, and only once.
+func TestTheFirstListedRouteBackFromTheIssuerClaimsTheNode(t *testing.T) {
+	issuer, node := loginElsewhere(t)
+	for range 2 {
+		back := sentToTheIssuer(t, issuer, node, "/")
+		w := httptest.NewRecorder()
+		node.handleElsewhereBack(w, httptest.NewRequest(http.MethodGet, elsewhereBackPath+"?"+back.RawQuery, nil))
+		require.Equal(t, http.StatusSeeOther, w.Code, w.Body.String())
+	}
+
+	held, err := node.users.List()
+	require.NoError(t, err)
+	require.Len(t, held, 1, "a second return made a second User")
+	assert.Equal(t, LevelRoot, held[0].Level)
+	assert.Equal(t, []UserAccount{{Provider: node.loginAt, CanonicalID: mastodonAccount}}, held[0].Accounts)
+	assert.Empty(t, held[0].Keys, "the route was written as a key")
+}
+
 // The issuer says who somebody is. Whether they are let in is this node's list.
 func TestTheNodesOwnListDecidesWhoLogsInElsewhere(t *testing.T) {
 	issuer, node := loginElsewhere(t)
