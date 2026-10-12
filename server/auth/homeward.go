@@ -119,11 +119,11 @@ func (h *Handler) homeOrigin() string {
 // layeKey is the key the half-admission was proved with. Sent home from an
 // app's door, it is enrolled as the App (app_clients.go).
 func (h *Handler) sentHome(w http.ResponseWriter, r *http.Request, token, identity, layeKey string) (string, error) {
-	cookie, err := r.Cookie(homewardCookieName)
-	if err != nil {
+	ticket, carried := homewardTicket(r)
+	if !carried {
 		return "", nil
 	}
-	val, ok := h.homewards.LoadAndDelete(cookie.Value)
+	val, ok := h.homewards.LoadAndDelete(ticket)
 	if !ok {
 		return "", nil
 	}
@@ -136,7 +136,7 @@ func (h *Handler) sentHome(w http.ResponseWriter, r *http.Request, token, identi
 	}
 
 	user := h.userFor(identity)
-	h.heldSessions.Store(cookie.Value, heldSession{
+	h.heldSessions.Store(ticket, heldSession{
 		token:    token,
 		identity: identity,
 		userID:   user.ID,
@@ -151,7 +151,18 @@ func (h *Handler) sentHome(w http.ResponseWriter, r *http.Request, token, identi
 	})
 
 	h.logger.Infow("Sent home from a passkey, back to the door", "admitted_as", identity, "door", journey.door)
-	return journey.door + "?home=" + urlEncode(cookie.Value), nil
+	return journey.door + "?home=" + urlEncode(ticket), nil
+}
+
+// homewardTicket is the journey ticket the browser carries, or false: a login
+// that began at home carries none.
+func homewardTicket(r *http.Request) (string, bool) {
+	for _, held := range r.Cookies() {
+		if held.Name == homewardCookieName {
+			return held.Value, true
+		}
+	}
+	return "", false
 }
 
 // handleHomewardResult is the door collecting the session. Only the door the
