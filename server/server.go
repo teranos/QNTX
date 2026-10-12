@@ -100,6 +100,8 @@ type QNTXServer struct {
 	building sync.Mutex
 	// Each plugin's newest deploy, from the push to the plugin running it.
 	deploys deployTracker
+	// The builds the node downloaded as workflow runs' artifacts.
+	artifacts artifactTakes
 	// The calls plugins are answering: the token handed for each, and the store
 	// of the caller it was handed for (plugin_sigils.go).
 	callStores sync.Map

@@ -70,6 +70,6 @@ func InstallBuild(name string, archive []byte, logger *zap.SugaredLogger) (bool,
 	if err := removeLegacyInstall(name, logger); err != nil {
 		return false, digest, err
 	}
-	logger.Infow("Installed the plugin build QNTX made", "plugin", name, "binary", binary, "files", files, "sha256", digest)
+	logger.Infow("Installed a plugin build", "plugin", name, "binary", binary, "files", files, "sha256", digest)
 	return true, digest, nil
 }
