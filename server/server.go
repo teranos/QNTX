@@ -60,6 +60,7 @@ type QNTXServer struct {
 	storageEventsPoller *StorageEventsPoller  // Poller for storage events (warnings/evictions)
 	handlerFailures     *handlerFailureLog    // Recent failed handler executions, for the status row
 	news                *newsLog              // What built-ins left on the status row, per caller
+	askPeers            peerRows              // How the peers' rows are asked for the status row; noPeers until auth declares them
 	builtin             *builtinExecutor      // What a builtin_execute action reaches; nil until the daemon is wired
 	standing            *standingObserver     // The standing table, run for whichever namespace a row lands in
 	clients             map[*Client]bool

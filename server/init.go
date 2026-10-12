@@ -139,6 +139,7 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		// What built-ins leave on the status row, and the handlers that failed:
 		// the node has both from its start, so nothing makes one when it is late.
 		news:            newNewsLog(),
+		askPeers:        noPeers,
 		handlerFailures: newHandlerFailureLog(),
 		rlAuth:          newRateLimitGroup(rl.AuthRate, rl.AuthBurst),
 		rlWS:            newRateLimitGroup(rl.WSRate, rl.WSBurst),
