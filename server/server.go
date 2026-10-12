@@ -193,17 +193,20 @@ type QNTXServer struct {
 	// Embedding service for semantic search (provided by embedding_provider plugin)
 	embeddingService            serverembeddings.Service
 	embeddingStore              *storage.EmbeddingStore
-	embeddingClusterInvalidator func()             // called after re-cluster to invalidate centroid cache
-	watcherDB                   *sql.DB            // Separate DB connection for watcher engine (avoids RustStore contention)
-	pulseReadDB                 *sql.DB            // Dedicated read connection for pulse API (no _txlock=immediate, no write lock contention)
-	walCheckpointer             WALCheckpointer    // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
-	ageDistiller                AgeDistiller       // Rust-side age distillation (fold old attestations into sigmas)
-	writeLockInspector          WriteLockInspector // Rust-side write lock holder tracking
-	shed                        *auth.Shed         // the tokens the gate turns away while the operational store is slow
-	recordReporters             []RecordReporter   // What reading the record off-node has cost, per reader
-	saidSpend                   map[Spend]int64    // What of that was already said as a metric, so the next say is a delta
-	landingReporter             LandingReporter    // The database per namespace a read is answered from (ADR-037)
-	onReady                     func()             // Called once when server is fully ready (routes, DB, listeners)
+	embeddingClusterInvalidator func() // called after re-cluster to invalidate centroid cache
+	// How ci.watch asks GitHub and with what: this node's own token, or its primary's way (sub_auth.go).
+	ciGitHubGet        func(ctx context.Context, token, url string) ([]byte, error)
+	ciGitHubToken      func(ctx context.Context) (string, error)
+	watcherDB          *sql.DB            // Separate DB connection for watcher engine (avoids RustStore contention)
+	pulseReadDB        *sql.DB            // Dedicated read connection for pulse API (no _txlock=immediate, no write lock contention)
+	walCheckpointer    WALCheckpointer    // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
+	ageDistiller       AgeDistiller       // Rust-side age distillation (fold old attestations into sigmas)
+	writeLockInspector WriteLockInspector // Rust-side write lock holder tracking
+	shed               *auth.Shed         // the tokens the gate turns away while the operational store is slow
+	recordReporters    []RecordReporter   // What reading the record off-node has cost, per reader
+	saidSpend          map[Spend]int64    // What of that was already said as a metric, so the next say is a delta
+	landingReporter    LandingReporter    // The database per namespace a read is answered from (ADR-037)
+	onReady            func()             // Called once when server is fully ready (routes, DB, listeners)
 
 	// Cached database stats — refreshed every 30s in the background.
 	// Element opens return instantly from cache instead of blocking on 4+ queries.

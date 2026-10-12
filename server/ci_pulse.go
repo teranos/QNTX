@@ -61,6 +61,26 @@ func githubToken(ctx context.Context) (string, error) {
 	return token, nil
 }
 
+// githubForPeers is one GET of GitHub's API with this node's own token, for
+// the peers that ask through it (server/auth/github_for_peers.go).
+func githubForPeers(ctx context.Context, url string) ([]byte, error) {
+	token, err := githubToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return githubGet(ctx, token, url)
+}
+
+// "can k make use of the github integration setup on q ?"
+// githubThroughThePrimary is a peer's ask of GitHub: through its primary,
+// which holds the token, so the peer carries none.
+func githubThroughThePrimary(through auth.GitHubGet) func(ctx context.Context, token, url string) ([]byte, error) {
+	return func(ctx context.Context, _ string, url string) ([]byte, error) { return through(ctx, url) }
+}
+
+// noGitHubToken is the credential of a node that asks through its primary: none.
+func noGitHubToken(context.Context) (string, error) { return "", nil }
+
 // rateLimited is GitHub refusing until a moment: the hour's quota is spent.
 // The quota is the user's, shared with every tool of theirs, so the ask is
 // not failed — it waits.
@@ -742,8 +762,9 @@ func (s *QNTXServer) rearmFailed(namespace string, err error) {
 // because whatever was waiting on them before this process is gone.
 func (s *QNTXServer) setupCIWatch() {
 	h := &ciWatchHandler{
-		get:      githubGet,
-		token:    githubToken,
+		// A node with a primary was handed its primary's way to GitHub (sub_auth.go).
+		get:      s.ciGitHubGet,
+		token:    s.ciGitHubToken,
 		sleep:    sleepUnder,
 		news:     s.news,
 		mintedBy: s.authHandler.MintedBy,

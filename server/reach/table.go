@@ -55,6 +55,8 @@ REACH is '/auth/token'                                                    of ANY
 REACH is '/auth/introspect'                                               of ANYONE
 # A peer asks for the lines about the namespace it serves, the same way.
 REACH is '/auth/lines'                                                    of ANYONE
+# A peer asks GitHub through its primary, the same way: the token stays here.
+REACH is '/auth/github'                                                   of ANYONE
 # A node whose people log in at another sends them there and takes them back,
 # before they hold any session here.
 REACH is '/auth/elsewhere' '/auth/elsewhere/back'                         of ANYONE

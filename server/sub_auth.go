@@ -329,6 +329,13 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		authHandler.SetRoleReader(held)
 		s.keepPrimaryLines(held)
 	}
+	// A peer's ci.watch asks GitHub through this node, with this node's token;
+	// this node, when it is a peer, asks through its own primary.
+	authHandler.SetGitHubForPeers(githubForPeers)
+	if through, hasPrimary := authHandler.GitHubThroughThePrimary(); hasPrimary {
+		s.ciGitHubGet = githubThroughThePrimary(through)
+		s.ciGitHubToken = noGitHubToken
+	}
 	// Where a person may stand is what the stores serve, asked at the same
 	// door a write goes through.
 	authHandler.SetFooting(s.footing)
