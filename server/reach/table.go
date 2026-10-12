@@ -189,7 +189,6 @@ REACH is '/a2a/'                                                          of ROO
 # here without regenerating fails the build.
 REACH is '/openapi.json'                                                  of ROOT SUPER
 REACH is '/api/dev' '/api/debug' '/api/crash-test'                        of ROOT
-REACH is '/api/prose' '/api/prose/'                                       of ROOT
 REACH is '/api/pulse/executions/'                                         of ROOT SUPER
 REACH is '/api/pulse/schedules' '/api/pulse/schedules/'                   of ROOT SUPER
 REACH is '/api/pulse/jobs' '/api/pulse/jobs/'                             of ROOT SUPER

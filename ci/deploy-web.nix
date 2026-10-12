@@ -153,7 +153,7 @@ in
 
       # `web` is wasm plus bundle. What the bundle needs is the Makefile's to
       # say, so a revision builds whatever it declares. Output lands in
-      # internal/server/dist/ — web/build.ts hardcodes it for the Go embed.
+      # internal/server/dist/, where web/build.ts writes it.
       {
         name = "Build web bundle";
         env = {

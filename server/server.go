@@ -30,8 +30,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// webFiles is defined in embed_prod.go (production) or embed_stub.go (testing)
-
 // QNTXServer provides live-updating graph visualization for Ax queries
 type QNTXServer struct {
 	// nodeDB is what the node knows about itself: its identity, the passkeys at

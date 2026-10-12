@@ -450,17 +450,6 @@
       ],
       "x-qntx-prefix": true
     },
-    "/api/prose": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/prose/": {
-      "x-qntx-reach": [
-        "ROOT"
-      ],
-      "x-qntx-prefix": true
-    },
     "/api/pulse/executions/": {
       "x-qntx-reach": [
         "ROOT",

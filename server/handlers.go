@@ -3,15 +3,13 @@ package server
 // This file contains HTTP handler methods for QNTXServer.
 // It provides HTTP endpoints for:
 // - WebSocket connections (HandleWebSocket)
-// - Static file serving (HandleStatic)
+// - Paths no route claims (HandleUnmatched)
 // - Health checks (HandleHealth)
 
 import (
 	"context"
 	"fmt"
 	"net/http"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/internal/measure"
@@ -259,68 +257,12 @@ func (s *QNTXServer) sendJobToClient(client *Client, job *async.Job, isInitial b
 	}
 }
 
-// contentTypeMap maps file extensions to MIME types for static file serving.
-var contentTypeMap = map[string]string{
-	".html": "text/html; charset=utf-8",
-	".css":  "text/css; charset=utf-8",
-	".js":   "application/javascript; charset=utf-8",
-	".jpg":  "image/jpeg",
-	".jpeg": "image/jpeg",
-	".png":  "image/png",
-	".ico":  "image/x-icon",
-}
-
-// resolveStaticPath converts a URL path to an embedded filesystem path.
-func resolveStaticPath(urlPath string) string {
-	path := strings.TrimPrefix(urlPath, "/")
-	if path == "" {
-		return "dist/index.html"
-	}
-	// All assets (css/, js/, fonts/, images) are embedded in dist/
-	return "dist/" + path
-}
-
-// setContentType sets the Content-Type header based on file extension.
-// Returns true if the file is HTML (for CSP header handling).
-func setContentType(w http.ResponseWriter, path string) bool {
-	ext := filepath.Ext(path)
-	if contentType, ok := contentTypeMap[ext]; ok {
-		w.Header().Set("Content-Type", contentType)
-		return ext == ".html"
-	}
-	return false
-}
-
-// HandleStatic serves the static HTML/JS/CSS frontend
-func (s *QNTXServer) HandleStatic(w http.ResponseWriter, r *http.Request) {
-	path := resolveStaticPath(r.URL.Path)
-
-	if isHTML := setContentType(w, path); isHTML {
-		// Block browser extension content scripts (especially MetaMask's lockdown-install.js)
-		w.Header().Set("Content-Security-Policy", "script-src 'self' 'unsafe-inline' https://d3js.org; object-src 'none';")
-	}
-
-	w.Header().Set("Cache-Control", "no-cache")
-
-	// Read and serve the file
-	data, err := webFiles.ReadFile(path)
-	if err != nil {
-		// A path no route claims ends here. That is the caller asking for
-		// something the node does not have, which the 404 already says; the
-		// node did not break, so this is not an error. A node built without
-		// the frontend answers every stray path this way.
-		s.logger.Debugw("No route and no file", "path", r.URL.Path)
-		measure.Count(measure.RouteUnmatched, 1, measure.String(measure.AttrMethod, r.Method))
-		http.Error(w, "File not found", http.StatusNotFound)
-		return
-	}
-
-	if _, err := w.Write(data); err != nil {
-		s.logger.Errorw("Failed to write response",
-			"path", path,
-			"error", err,
-		)
-	}
+// HandleUnmatched answers a path no route claims. The node serves no page: the
+// web is served beside it, by its dev server or a static host.
+func (s *QNTXServer) HandleUnmatched(w http.ResponseWriter, r *http.Request) {
+	s.logger.Debugw("No route", "path", r.URL.Path)
+	measure.Count(measure.RouteUnmatched, 1, measure.String(measure.AttrMethod, r.Method))
+	http.Error(w, "nothing answers "+r.URL.Path+" on this node; its web is served beside it", http.StatusNotFound)
 }
 
 // HandleHealth serves the unauthenticated liveness probe.

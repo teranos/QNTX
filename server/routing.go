@@ -104,8 +104,6 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/dev", s.HandleDevMode)                                              // Dev mode status
 	s.answer("/api/debug", s.HandleDebug)                                              // Browser console debugging (dev mode only)
 	s.answer("/api/crash-test", s.HandleCrashTest)                                     // Flight recorder crash test (dev mode only)
-	s.answer("/api/prose", s.HandleProse)                                              // Prose content tree
-	s.answer("/api/prose/", s.HandleProseContent)                                      // Individual prose files
 	s.answer("/api/pulse/executions/", s.HandlePulseExecution)                         // Individual execution (GET) and logs (GET /logs)
 	s.answer("/api/pulse/schedules/", s.HandlePulseSchedule)                           // Individual schedule (GET/PATCH/DELETE)
 	s.answer("/api/pulse/schedules", s.HandlePulseSchedules)                           // List/create schedules (GET/POST)
@@ -159,7 +157,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/embeddings/unembedded", s.embeddingsHandler.HandleUnembeddedPage)               // Paginated unembedded IDs (GET)
 	s.answer("/api/embeddings/project", s.embeddingsHandler.HandleProject)                         // UMAP projection (POST)
 	s.answer("/api/embeddings/projections", s.embeddingsHandler.HandleEmbeddingProjections)        // Get 2D projections (GET)
-	s.answer("/", s.HandleStatic)
+	s.answer("/", s.HandleUnmatched)
 
 }
 
