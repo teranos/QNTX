@@ -17,6 +17,8 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // sigilPlugin is fakePlugin handing the node signa, answering what a sigil
@@ -30,6 +32,8 @@ type sigilPlugin struct {
 	handed []*protocol.HTTPRequest
 	// during is what the plugin does while the call is open, before answering.
 	during func(*protocol.HTTPRequest)
+	// unanswered is the call failing, as a plugin's connection does.
+	unanswered error
 }
 
 func (p *sigilPlugin) GetSigilsFrom() protocol.SigilsFrom { return p.from }
@@ -42,6 +46,9 @@ func (p *sigilPlugin) AnswerHTTP(_ context.Context, req *protocol.HTTPRequest) (
 	p.handed = append(p.handed, req)
 	if p.during != nil {
 		p.during(req)
+	}
+	if p.unanswered != nil {
+		return nil, p.unanswered
 	}
 	return p.answer, nil
 }
@@ -137,12 +144,13 @@ func TestAPluginsSigilIsServedOnItsPath(t *testing.T) {
 	assert.Len(t, p.handed, 2, "the plugin was asked something its sigil refuses")
 
 	// An answer that carries what the sigil never said it gives is the plugin
-	// failing, and the caller is told only that it did.
-	p.answer = &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true,"secret":"x"}`)}
+	// failing, and the caller is told why, not what it carried.
+	p.answer = &protocol.HTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"observed":true,"secret":"hush"}`)}
 	w = httptest.NewRecorder()
 	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/stub/read?kind=competitor", tokens[auth.LevelRoot]))
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.NotContains(t, w.Body.String(), "secret")
+	assert.Contains(t, w.Body.String(), "read of stub failed: the answer carries secret, which read never said it gives")
+	assert.NotContains(t, w.Body.String(), "hush")
 
 	// The plugin says no in the sigil's terms, and the caller gets it as the
 	// node's own sigils give theirs.
@@ -157,6 +165,24 @@ func TestAPluginsSigilIsServedOnItsPath(t *testing.T) {
 	w = httptest.NewRecorder()
 	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/stub/read?kind=competitor", tokens[auth.LevelSuper]))
 	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+// datapunt's connection went down mid-call, and its caller read only that
+// read of datapunt failed. A plugin's sigil that failed tells its caller why.
+func TestAPluginsSigilThatFailedSaysWhy(t *testing.T) {
+	p := &sigilPlugin{
+		fakePlugin: fakePlugin{name: "stub"},
+		signa:      []*protocol.Signum{stubSignum("stub")},
+		from:       protocol.SigilsFrom_SIGILS_FROM_SIGNA,
+		unanswered: status.Error(codes.Unavailable, "error reading from server: EOF"),
+	}
+	srv, tokens := sigilServingServer(t, p)
+
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/api/stub/read?kind=competitor", tokens[auth.LevelRoot]))
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), "read of stub failed: ")
+	assert.Contains(t, w.Body.String(), "rpc error: code = Unavailable desc = error reading from server: EOF")
 }
 
 // Who is asking reaches the plugin as the node admitted them, and a caller
