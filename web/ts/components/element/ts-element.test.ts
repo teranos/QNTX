@@ -78,7 +78,7 @@ mock.module('@codemirror/lang-javascript', () => ({
     javascript: () => [],
 }));
 
-const { createTsElement } = await import('./ts-element');
+const { createTsElement, named } = await import('./ts-element');
 
 function makeElement(id: string, extras: Partial<Element> = {}): Element {
     return {
@@ -141,5 +141,25 @@ describe('TS Element - Tim (Happy Path)', () => {
 
         const editor = element.querySelector('.ts-element-editor');
         expect(editor).toBeTruthy();
+    });
+});
+
+// "nil is nil": an attestation's who, what and where are asked for, never
+// filled in. A script that leaves one out is told, not given a placeholder.
+describe('TS Element - Spike (an attestation names its parts)', () => {
+    test('Spike leaves contexts out, and the attest is refused naming them', () => {
+        expect(() => named('contexts', undefined)).toThrow('contexts');
+    });
+
+    test('Spike passes no context, and the attest is refused', () => {
+        expect(() => named('contexts', [])).toThrow('at least one');
+    });
+
+    test('Spike passes a context that is not a string, and the attest is refused', () => {
+        expect(() => named('contexts', [7])).toThrow('[7]');
+    });
+
+    test('Tim names his contexts, and they stand as named', () => {
+        expect(named('contexts', ['work', 'home'])).toEqual(['work', 'home']);
     });
 });
