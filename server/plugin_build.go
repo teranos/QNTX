@@ -396,6 +396,14 @@ func (s *QNTXServer) buildIfMoved(ctx context.Context, b pluginBuild, logger *za
 		s.builds.set(b.name, state)
 		return
 	}
+	if err != nil && interrupted(err) {
+		// Not a failure of the build either: the next push or start builds it.
+		logger.Infow("A plugin's build was interrupted, and the next push or start builds it", "plugin", b.name, "revs", revs, "error", err)
+		state.Error = strings.Join(append([]string{"the build was interrupted: " + err.Error()}, unkept...), "; ")
+		s.builds.set(b.name, state)
+		s.deploys.interrupt(b.name, err)
+		return
+	}
 	// A failed build is said where the builds are shown, and mailed to ROOT.
 	if err != nil {
 		if keptErr := keepFailed(b.name, key); keptErr != nil {
@@ -431,6 +439,16 @@ func (s *QNTXServer) stoppedWithTheNode(ctx context.Context) bool {
 		return true
 	}
 	return s.getState() != ServerStateRunning
+}
+
+// interrupted is whether a build step was ended from outside it: by a signal,
+// or by nix saying it was interrupted, which it does on a signal of its own.
+func interrupted(err error) bool {
+	var exited *exec.ExitError
+	if errors.As(err, &exited) && exited.ExitCode() == -1 {
+		return true
+	}
+	return strings.Contains(err.Error(), "error: interrupted by the user")
 }
 
 // buildRev is the commit source's branch points at now, or the last commit

@@ -236,3 +236,22 @@ func TestABuildCutOffWhileTheNodeDrainsIsNotAFailure(t *testing.T) {
 		t.Fatal("a build in a draining node does not read as stopped with it")
 	}
 }
+
+// cleanAPI's build was terminated by a signal and datapunt's nix said it was
+// interrupted by the user, each with the node running, and each was kept as
+// failed. A build ended from outside it is not a build that failed.
+func TestABuildEndedFromOutsideItIsInterrupted(t *testing.T) {
+	work := t.TempDir()
+	for name, step := range map[string]string{
+		"signalled":         "kill -TERM $$",
+		"nix interrupted":   "echo 'error: interrupted by the user' >&2; exit 1",
+		"killed mid-output": "echo 'Compiling writeable v0.6.4' >&2; kill -KILL $$",
+	} {
+		if err := runBuild(context.Background(), work, nil, "sh", "-c", step); !interrupted(err) {
+			t.Errorf("%s: not interrupted: %v", name, err)
+		}
+	}
+	if err := runBuild(context.Background(), work, nil, "sh", "-c", "echo 'error[E0425]: cannot find value' >&2; exit 101"); interrupted(err) {
+		t.Errorf("a build that failed reads as interrupted: %v", err)
+	}
+}
