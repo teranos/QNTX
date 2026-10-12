@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -20,62 +19,74 @@ func buildingDeploy(now time.Time) pluginDeploy {
 	return pluginDeploy{
 		plugin: "datapunt", rev: "f7cf853732c0aee6", repo: "teranos/datapunt", after: "f7cf853732c0aee6", pushed: true,
 		stage:  deployBuilding,
-		began:  map[string]time.Time{deployQueued: now.Add(-2 * time.Minute), deployBuilding: now.Add(-80 * time.Second)},
+		began:  map[string]time.Time{deployChecking: now.Add(-3 * time.Minute), deployQueued: now.Add(-2 * time.Minute), deployBuilding: now.Add(-80 * time.Second)},
 		checks: map[string]string{"test": checkDone, "lint": checkDone, "e2e": checkRunning},
 	}
 }
 
-func drawDeploys(t *testing.T, format string, deploys ...pluginDeploy) *httptest.ResponseRecorder {
+func drawRowWith(t *testing.T, deploys ...pluginDeploy) StatusLineResponse {
 	t.Helper()
 	h := aNodeWithPeers(noPeers)
 	h.node = fullNode{}
 	h.deploys = func() []pluginDeploy { return deploys }
-	req := httptest.NewRequest(http.MethodGet, "/statusline?format="+format, nil)
+	req := httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil)
 	req = req.WithContext(auth.WithAdmission(req.Context(), auth.Admitted(auth.LevelSuper)))
 	rec := httptest.NewRecorder()
 	h.HandleStatusLine(rec, req)
-	return rec
-}
-
-// A deploy outranks everything on the row, and the carousel waits for it.
-func TestADeployLeadsTheRowAndHoldsTheCarousel(t *testing.T) {
-	rec := drawDeploys(t, FormatJSON, buildingDeploy(time.Now()))
 	var body StatusLineResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	require.Len(t, body.Items, 2, "the row is the deploy and the caller, and no carousel: %+v", body.Items)
+	return body
+}
 
-	deploy := body.Items[0]
-	assert.Equal(t, "datapunt", deploy.Name)
-	assert.Empty(t, deploy.Note, "a version said before any build said it")
+// The row carries each deploy as the node holds it, for the surface to draw,
+// and the carousel waits while one is in flight.
+func TestTheRowCarriesTheDeploysAsData(t *testing.T) {
+	now := time.Now()
+	body := drawRowWith(t, buildingDeploy(now))
+	require.Len(t, body.Items, 1, "the carousel drew while a deploy is in flight: %+v", body.Items)
+	require.Len(t, body.Deploys, 1)
 
-	// Once the build said its version, that is the note ug alternates with the name.
+	d := body.Deploys[0]
+	assert.Equal(t, "datapunt", d.Plugin)
+	assert.Equal(t, deployBuilding, d.Stage)
+	assert.True(t, d.Pushed)
+	assert.Equal(t, "teranos/datapunt", d.Repo)
+	assert.Equal(t, "f7cf853732c0aee6", d.Rev)
+	assert.Equal(t, map[string]string{"test": checkDone, "lint": checkDone, "e2e": checkRunning}, d.Checks)
+	assert.Empty(t, d.Version, "a version said before any build said it")
+	assert.Contains(t, d.Began, deployChecking)
+	assert.Contains(t, d.Began, deployBuilding)
+}
+
+// Once the build said its version, the deploy carries it.
+func TestADeployCarriesTheVersionItsBuildSaid(t *testing.T) {
 	built := buildingDeploy(time.Now())
 	built.version, built.versioned = "0.3.11-8ed95ff65b864797", true
-	assert.Equal(t, "0.3.11-8ed95ff65b864797", deployItem(built).Note)
-	require.Len(t, deploy.Bars, 2)
-	assert.Equal(t, DeployBar{Kind: barChecks, Done: 2, Of: 3}, deploy.Bars[0])
-	assert.Equal(t, DeployBar{Kind: barNode, Done: 1, Of: 3}, deploy.Bars[1])
+	data, inFlight := deployData([]pluginDeploy{built})
+	assert.True(t, inFlight)
+	assert.Equal(t, "0.3.11-8ed95ff65b864797", data[0].Version)
 }
 
-// A live deploy is over: the row is the carousel's again.
-func TestALiveDeployLeavesTheRow(t *testing.T) {
+// An ended deploy is still sent; it holds the carousel no longer.
+func TestAnEndedDeployIsSentAndTheCarouselIsBack(t *testing.T) {
 	live := buildingDeploy(time.Now())
 	live.stage = deployLive
-	rec := drawDeploys(t, FormatJSON, live)
-	var body StatusLineResponse
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	body := drawRowWith(t, live)
 	require.Len(t, body.Items, 2, "the caller and the carousel: %+v", body.Items)
-	assert.Empty(t, body.Items[0].Bars)
-	assert.Empty(t, body.Items[1].Bars)
+	require.Len(t, body.Deploys, 1)
+	assert.Equal(t, deployLive, body.Deploys[0].Stage)
 }
 
-// ug draws a deploy on the plugin's own name from the JSON row; the tmux line
-// carries no copy of it, and no carousel while it is underway.
-func TestTheTmuxLineLeavesTheDeployToUg(t *testing.T) {
-	line := drawDeploys(t, FormatTmux, buildingDeploy(time.Now())).Body.String()
-	assert.NotContains(t, line, "datapunt")
-	assert.NotContains(t, line, "up")
-	assert.False(t, strings.Contains(line, "\n"))
+// The tmux line carries no deploy: it is data, on the JSON row.
+func TestTheTmuxLineCarriesNoDeploy(t *testing.T) {
+	h := aNodeWithPeers(noPeers)
+	h.node = fullNode{}
+	h.deploys = func() []pluginDeploy { return []pluginDeploy{buildingDeploy(time.Now())} }
+	req := httptest.NewRequest(http.MethodGet, "/statusline?format=tmux", nil)
+	req = req.WithContext(auth.WithAdmission(req.Context(), auth.Admitted(auth.LevelSuper)))
+	rec := httptest.NewRecorder()
+	h.HandleStatusLine(rec, req)
+	assert.NotContains(t, rec.Body.String(), "datapunt")
 }
 
 // A pushed deploy waits on its checks; their passing queues it, once.
@@ -96,38 +107,23 @@ func TestAPushedDeployIsQueuedOnceItsChecksPass(t *testing.T) {
 
 	// The build takes up the deploy its checks queued, checks and all.
 	s.deploys.begin(pluginDeploy{plugin: "datapunt", rev: "c0ffee", stage: deployBuilding})
+	s.deploys.incoming("datapunt", "0.3.11-8ed95ff65b864797")
 	held = s.deploys.held()
 	assert.Equal(t, map[string]string{"test": checkDone}, held[0].checks)
 	assert.True(t, held[0].pushed)
+	assert.Equal(t, "0.3.11-8ed95ff65b864797", held[0].version)
 }
 
-// A check that failed ends the deploy at its checks, red.
+// A check that failed ends the deploy at its checks.
 func TestAFailedCheckEndsTheDeployAtItsChecks(t *testing.T) {
 	s := deployingServer(t)
 	s.deploys.begin(pluginDeploy{plugin: "datapunt", rev: "c0ffee", repo: "teranos/datapunt", after: "c0ffee", pushed: true, stage: deployChecking})
 	s.deploys.checksAre("datapunt", "c0ffee", map[string]string{"test": checkFailed})
 	s.deploys.fail("datapunt", errors.New("checks on teranos/datapunt@c0ffee did not pass: test"))
 
-	row := deployItems(s.deploys.held(), time.Now(), []News{})
-	require.Len(t, row.items, 1)
-	assert.True(t, row.items[0].Bars[0].Failed, "the checks bar is not red")
-	assert.True(t, row.items[0].Bars[1].Failed, "the node's bar is not red")
-	assert.Equal(t, 0, row.items[0].Bars[1].Done, "the node built nothing")
-}
-
-// A failed stage turns its bar red, and the deploy stays until its hold is
-// over or other news is left.
-func TestAFailedDeployStaysUntilTimeOrNews(t *testing.T) {
-	now := time.Now()
-	failed := buildingDeploy(now)
-	failed.stage, failed.failedAt, failed.failure = deployFailed, deployBuilding, "dub build: exit 1"
-	failed.began[deployFailed] = now.Add(-time.Minute)
-
-	row := deployItems([]pluginDeploy{failed}, now, []News{})
-	require.Len(t, row.items, 1)
-	assert.False(t, row.underway, "a failed deploy held the carousel")
-	assert.Equal(t, DeployBar{Kind: barNode, Done: 1, Of: 3, Failed: true}, row.items[0].Bars[1])
-
-	assert.Empty(t, deployItems([]pluginDeploy{failed}, now.Add(newsHold), []News{}).items, "time did not clear it")
-	assert.Empty(t, deployItems([]pluginDeploy{failed}, now, []News{{AtMs: now.UnixMilli()}}).items, "news did not clear it")
+	data, inFlight := deployData(s.deploys.held())
+	assert.False(t, inFlight)
+	assert.Equal(t, deployFailed, data[0].Stage)
+	assert.Equal(t, deployChecking, data[0].FailedAt)
+	assert.Equal(t, map[string]string{"test": checkFailed}, data[0].Checks)
 }

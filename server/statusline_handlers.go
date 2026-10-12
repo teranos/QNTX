@@ -32,13 +32,13 @@ type StatusItem struct {
 	Name   string `json:"name"`
 	Note   string `json:"note,omitempty"`
 	Symbol string `json:"symbol"`
-	// Bars is set on a deploy only (statusline_deploy.go).
-	Bars []DeployBar `json:"bars,omitempty"`
 }
 
-// StatusLineResponse carries the items in the order they should be read.
+// StatusLineResponse carries the items in the order they should be read, and
+// each plugin's newest deploy (statusline_deploy.go).
 type StatusLineResponse struct {
-	Items []StatusItem `json:"items"`
+	Items   []StatusItem `json:"items"`
+	Deploys []DeployData `json:"deploys"`
 }
 
 // A surface draws in its own escapes and cannot read another's: tmux prints
@@ -476,8 +476,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	if r.URL.Query().Get("for") == forPrimary {
 		items = []StatusItem{}
 	}
-	news := h.heldNews(admitted)
-	items = append(items, newsItems(news)...)
+	items = append(items, h.newsFor(admitted)...)
 	carousel := h.carouselItem()
 
 	// A failing handler is a fix-now kind of event, and it is drawn inside its
@@ -493,13 +492,9 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// A deploy underway outranks everything, and the carousel waits for it. ug
-	// draws it on the plugin's own name, from the JSON row.
-	deploys := deployItems(h.deploys(), time.Now(), news)
-	if format == FormatJSON {
-		items = append(deploys.items, items...)
-	}
-	if !deploys.underway {
+	// The deploys go out as data; the carousel waits while one is in flight.
+	deploys, inFlight := deployData(h.deploys())
+	if !inFlight {
 		items = append(items, carousel...)
 	}
 	items = append(items, failing...)
@@ -558,6 +553,10 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 	// The peers' rows come last: the primary's own row reads as it did.
 	items = append(items, h.peerItems(r.Context(), admitted)...)
+	if format == FormatJSON {
+		h.noteWriteFailure(writeJSON(w, http.StatusOK, StatusLineResponse{Items: items, Deploys: deploys}))
+		return
+	}
 	h.noteWriteFailure(writeStatusLine(w, format, items))
 }
 
@@ -652,7 +651,7 @@ func (h *StatusLineHandler) item(ctx context.Context, name string) (any, *protoc
 // the caller is owed that, the same way writeJSON owes it.
 func writeStatusLine(w http.ResponseWriter, format string, items []StatusItem) error {
 	if format == FormatJSON {
-		return writeJSON(w, http.StatusOK, StatusLineResponse{Items: items})
+		return writeJSON(w, http.StatusOK, StatusLineResponse{Items: items, Deploys: []DeployData{}})
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
