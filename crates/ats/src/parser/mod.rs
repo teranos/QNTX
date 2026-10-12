@@ -26,10 +26,12 @@
 //! assert_eq!(query.contexts, vec!["GitHub"]);
 //! ```
 
+mod as_command;
 mod ast;
 mod lexer;
 mod token;
 
+pub use as_command::{parse_as_command, AsBy, AsCommand, AsError, AsWhen};
 pub use ast::{AxQuery, DurationExpr, DurationUnit, TemporalClause};
 pub use lexer::Lexer;
 pub use token::{Token, TokenKind};
@@ -83,6 +85,7 @@ enum ParserState {
 
 /// AX query parser using a state machine
 pub struct Parser<'a> {
+    input: &'a str,
     lexer: std::iter::Peekable<Lexer<'a>>,
     state: ParserState,
     query: AxQuery<'a>,
@@ -93,6 +96,7 @@ impl<'a> Parser<'a> {
     /// Create a new parser from input string
     pub fn new(input: &'a str) -> Self {
         Self {
+            input,
             lexer: Lexer::new(input).peekable(),
             state: ParserState::Start,
             query: AxQuery::new(),
@@ -501,7 +505,12 @@ impl<'a> Parser<'a> {
         let keyword_text = keyword_token.as_ref().map(|t| t.text).unwrap_or("");
         let keyword_pos = keyword_token.as_ref().map(|t| t.offset).unwrap_or(0);
 
-        let expr = self.collect_temporal_expr()?;
+        // `over 5y` is one duration token; the rest read words to the next keyword.
+        let expr = if keyword == Some(TokenKind::Over) {
+            self.collect_temporal_expr()?
+        } else {
+            self.collect_temporal_words()?
+        };
 
         if expr.is_empty() {
             return Err(ParseError::MissingElement {
@@ -561,7 +570,32 @@ impl<'a> Parser<'a> {
         }
         self.next();
 
-        self.collect_temporal_expr()
+        self.collect_temporal_words()
+    }
+
+    /// The words of a temporal expression, up to the next keyword: `since last
+    /// month` is since "last month", `since 3 days ago` is since "3 days ago".
+    /// A quoted expression is the one token it is.
+    fn collect_temporal_words(&mut self) -> Result<&'a str, ParseError> {
+        let first = match self.peek() {
+            Some(t) if t.kind == TokenKind::Identifier => t.clone(),
+            Some(_) | None => return self.collect_temporal_expr(),
+        };
+        let mut last = first.clone();
+        // A date's slashes lex apart (`2025/01/15`); the expression runs across them.
+        let continues = |t: &&Token<'a>| {
+            t.kind == TokenKind::Identifier || (t.kind == TokenKind::Unknown && t.text == "/")
+        };
+        while let Some(t) = self.peek().filter(continues).cloned() {
+            self.next();
+            last = t;
+        }
+        let span = self.input.get(first.offset..last.offset + last.text.len());
+        span.ok_or_else(|| ParseError::UnexpectedToken {
+            expected: "a temporal expression".to_string(),
+            found: format!("{} .. {}", first.text, last.text),
+            position: first.offset,
+        })
     }
 
     fn transition_after_temporal(&mut self) -> Result<(), ParseError> {
@@ -694,6 +728,24 @@ mod tests {
         assert_eq!(query.actors, vec!["CHARLIE"]);
         assert_eq!(query.temporal, Some(TemporalClause::Since("2024-01-01")));
         assert_eq!(query.actions, vec!["notify"]);
+    }
+
+    #[test]
+    fn test_temporal_spans_words_to_the_next_keyword() {
+        let query = Parser::parse("ALICE since last month").unwrap();
+        assert_eq!(query.temporal, Some(TemporalClause::Since("last month")));
+        let query = Parser::parse("ALICE until 3 days ago so notify").unwrap();
+        assert_eq!(query.temporal, Some(TemporalClause::Until("3 days ago")));
+        assert_eq!(query.actions, vec!["notify"]);
+        let query = Parser::parse("ALICE between last friday and 2 days ago").unwrap();
+        assert_eq!(
+            query.temporal,
+            Some(TemporalClause::Between("last friday", "2 days ago"))
+        );
+        let query = Parser::parse("ALICE since 2025/01/15").unwrap();
+        assert_eq!(query.temporal, Some(TemporalClause::Since("2025/01/15")));
+        let query = Parser::parse("ALICE on 'last monday'").unwrap();
+        assert_eq!(query.temporal, Some(TemporalClause::On("last monday")));
     }
 
     #[test]

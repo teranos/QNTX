@@ -5,61 +5,88 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Resolved temporal clause with epoch milliseconds.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ResolvedTemporal {
-    Since(i64),
-    Until(i64),
-    On {
-        start_ms: i64,
-        end_ms: i64,
-    },
-    Between {
-        start_ms: i64,
-        end_ms: i64,
-    },
-    Over {
-        raw: String,
-        value: Option<f64>,
-        unit: Option<String>,
-    },
+const DAY_MS: i64 = 86_400_000;
+
+/// How far a word moves from now: a fixed span, or calendar months.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Step {
+    Ms(i64),
+    Months(i64),
+}
+
+/// The words that name a moment relative to now. A month and a year are
+/// calendar steps: last month from March 31 is the last day of February, not
+/// 30 days back and not Go's overflow into March 3.
+const WORDS: &[(&str, Step)] = &[
+    ("now", Step::Ms(0)),
+    ("today", Step::Ms(0)),
+    ("yesterday", Step::Ms(-DAY_MS)),
+    ("tomorrow", Step::Ms(DAY_MS)),
+    ("last week", Step::Ms(-7 * DAY_MS)),
+    ("next week", Step::Ms(7 * DAY_MS)),
+    ("last month", Step::Months(-1)),
+    ("next month", Step::Months(1)),
+    ("last year", Step::Months(-12)),
+    ("next year", Step::Months(12)),
+];
+
+/// The units a relative duration counts in, and one of each as a step.
+const UNITS: &[(&[&str], Step)] = &[
+    (&["second", "seconds", "sec", "secs"], Step::Ms(1_000)),
+    (&["minute", "minutes", "min", "mins"], Step::Ms(60_000)),
+    (&["hour", "hours", "hr", "hrs"], Step::Ms(3_600_000)),
+    (&["day", "days"], Step::Ms(DAY_MS)),
+    (&["week", "weeks"], Step::Ms(7 * DAY_MS)),
+    (&["month", "months"], Step::Months(1)),
+    (&["year", "years"], Step::Months(12)),
+];
+
+/// Day names, Monday = 0.
+const DAY_NAMES: &[(&str, i64)] = &[
+    ("monday", 0),
+    ("mon", 0),
+    ("tuesday", 1),
+    ("tue", 1),
+    ("wednesday", 2),
+    ("wed", 2),
+    ("thursday", 3),
+    ("thu", 3),
+    ("friday", 4),
+    ("fri", 4),
+    ("saturday", 5),
+    ("sat", 5),
+    ("sunday", 6),
+    ("sun", 6),
+];
+
+/// The UTC calendar day a moment falls on, as a half-open span.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct DaySpan {
+    pub start_ms: i64,
+    pub end_ms: i64,
 }
 
 /// Resolve a temporal expression string to epoch milliseconds.
 /// Returns None if the expression cannot be parsed.
 pub fn resolve_temporal(expr: &str, now_ms: i64) -> Option<i64> {
     let expr = expr.trim();
-    if expr.is_empty() {
-        return None;
-    }
-
     let lower = expr.to_ascii_lowercase();
 
-    // Exact matches
-    match lower.as_str() {
-        "now" | "today" => return Some(now_ms),
-        "yesterday" => return Some(now_ms - 86_400_000),
-        "tomorrow" => return Some(now_ms + 86_400_000),
-        "last week" => return Some(now_ms - 7 * 86_400_000),
-        "next week" => return Some(now_ms + 7 * 86_400_000),
-        "last month" => return Some(now_ms - 30 * 86_400_000),
-        "next month" => return Some(now_ms + 30 * 86_400_000),
-        "last year" => return Some(now_ms - 365 * 86_400_000),
-        "next year" => return Some(now_ms + 365 * 86_400_000),
-        _ => {}
+    if let Some((_, step)) = WORDS.iter().find(|(word, _)| *word == lower) {
+        return apply(now_ms, *step, 1);
     }
 
     // Relative: "3 days ago"
     if let Some(rel) = lower.strip_suffix(" ago") {
-        if let Some(ms) = parse_relative_duration(rel) {
-            return Some(now_ms - ms);
+        if let Some(step) = parse_relative_duration(rel) {
+            return apply(now_ms, step, -1);
         }
     }
 
     // Future relative: "in 3 days"
     if let Some(rel) = lower.strip_prefix("in ") {
-        if let Some(ms) = parse_relative_duration(rel) {
-            return Some(now_ms + ms);
+        if let Some(step) = parse_relative_duration(rel) {
+            return apply(now_ms, step, 1);
         }
     }
 
@@ -68,16 +95,49 @@ pub fn resolve_temporal(expr: &str, now_ms: i64) -> Option<i64> {
         return Some(ms);
     }
 
-    // ISO date formats
-    if let Some(ms) = parse_iso_date(expr) {
-        return Some(ms);
-    }
-
-    None
+    parse_iso_date(expr)
 }
 
-/// Parse relative duration like "3 days", "2 weeks" → milliseconds
-fn parse_relative_duration(expr: &str) -> Option<i64> {
+/// Resolve an expression to the UTC calendar day it falls on: `on yesterday`
+/// is yesterday from midnight to midnight, not the 24 hours ending now.
+pub fn resolve_day(expr: &str, now_ms: i64) -> Option<DaySpan> {
+    let ms = resolve_temporal(expr, now_ms)?;
+    let start_ms = ms.div_euclid(DAY_MS) * DAY_MS;
+    Some(DaySpan {
+        start_ms,
+        end_ms: start_ms + DAY_MS,
+    })
+}
+
+/// Move `now_ms` by `step`, `sign` times.
+fn apply(now_ms: i64, step: Step, sign: i64) -> Option<i64> {
+    match step {
+        Step::Ms(ms) => now_ms.checked_add(ms.checked_mul(sign)?),
+        Step::Months(months) => add_months(now_ms, months.checked_mul(sign)?),
+    }
+}
+
+/// Add calendar months, clamping the day to the target month's last day and
+/// keeping the time of day.
+fn add_months(now_ms: i64, months: i64) -> Option<i64> {
+    let days = now_ms.div_euclid(DAY_MS);
+    let time_of_day = now_ms.rem_euclid(DAY_MS);
+    let (year, month, day) = civil_from_days(days);
+
+    let index = year
+        .checked_mul(12)?
+        .checked_add(i64::from(month) - 1)?
+        .checked_add(months)?;
+    let target_year = i32::try_from(index.div_euclid(12)).ok()?;
+    let target_month = u32::try_from(index.rem_euclid(12) + 1).ok()?;
+    let target_day = day.min(days_in_month(target_year, target_month));
+
+    let target_days = days_from_epoch(target_year, target_month, target_day)?;
+    target_days.checked_mul(DAY_MS)?.checked_add(time_of_day)
+}
+
+/// Parse relative duration like "3 days", "2 months" → a step
+fn parse_relative_duration(expr: &str) -> Option<Step> {
     let parts: Vec<&str> = expr.split_whitespace().collect();
     let [num_str, unit] = parts[..] else {
         return None;
@@ -88,18 +148,11 @@ fn parse_relative_duration(expr: &str) -> Option<i64> {
         return None;
     }
 
-    let ms_per_unit = match unit {
-        "second" | "seconds" | "sec" | "secs" => 1_000i64,
-        "minute" | "minutes" | "min" | "mins" => 60_000,
-        "hour" | "hours" | "hr" | "hrs" => 3_600_000,
-        "day" | "days" => 86_400_000,
-        "week" | "weeks" => 7 * 86_400_000,
-        "month" | "months" => 30 * 86_400_000,
-        "year" | "years" => 365 * 86_400_000,
-        _ => return None,
-    };
-
-    Some(num * ms_per_unit)
+    let (_, per_unit) = UNITS.iter().find(|(names, _)| names.contains(&unit))?;
+    match per_unit {
+        Step::Ms(ms) => Some(Step::Ms(num.checked_mul(*ms)?)),
+        Step::Months(months) => Some(Step::Months(num.checked_mul(*months)?)),
+    }
 }
 
 /// Parse named day expressions: "last friday", "next monday"
@@ -109,71 +162,51 @@ fn parse_named_day(expr: &str, now_ms: i64) -> Option<i64> {
         return None;
     };
 
-    let target_dow = match day_name {
-        "monday" | "mon" => 0i64, // Monday = 0
-        "tuesday" | "tue" => 1,
-        "wednesday" | "wed" => 2,
-        "thursday" | "thu" => 3,
-        "friday" | "fri" => 4,
-        "saturday" | "sat" => 5,
-        "sunday" | "sun" => 6,
-        _ => return None,
+    let (_, target_dow) = DAY_NAMES.iter().find(|(name, _)| *name == day_name)?;
+    let target_dow = *target_dow;
+
+    // Unix epoch (1970-01-01) was a Thursday, Monday-based weekday 3.
+    let current_dow = (now_ms.div_euclid(DAY_MS) + 3).rem_euclid(7);
+
+    let offset_days = if direction == "last" {
+        let back = (current_dow - target_dow).rem_euclid(7);
+        if back == 0 {
+            -7
+        } else {
+            -back
+        }
+    } else if direction == "next" {
+        let forward = (target_dow - current_dow).rem_euclid(7);
+        if forward == 0 {
+            7
+        } else {
+            forward
+        }
+    } else if direction == "this" {
+        target_dow - current_dow
+    } else {
+        return None;
     };
 
-    // Calculate current day of week from epoch ms.
-    // Unix epoch (1970-01-01) was a Thursday = dow 3.
-    // We work in days from epoch, then find the weekday.
-    let now_days = now_ms.div_euclid(86_400_000);
-    // Thursday = 3, so (now_days + 3) % 7 gives Monday=0 weekday
-    let current_dow = (now_days + 3).rem_euclid(7);
-
-    let offset_days = match direction {
-        "last" => {
-            let back = (current_dow - target_dow).rem_euclid(7);
-            if back == 0 {
-                -7
-            } else {
-                -back
-            }
-        }
-        "next" => {
-            let forward = (target_dow - current_dow).rem_euclid(7);
-            if forward == 0 {
-                7
-            } else {
-                forward
-            }
-        }
-        "this" => target_dow - current_dow,
-        _ => return None,
-    };
-
-    Some(now_ms + offset_days * 86_400_000)
+    Some(now_ms + offset_days * DAY_MS)
 }
 
-/// Parse ISO date/datetime strings to epoch milliseconds (UTC).
+/// Parse ISO date/datetime strings to epoch milliseconds (UTC). Only
+/// year-first dates read: 03/04/2025 is April 3 to some and March 4 to others,
+/// so it is refused rather than guessed at.
 fn parse_iso_date(expr: &str) -> Option<i64> {
-    // Try formats from most specific to least specific.
-    // We implement a minimal parser to avoid pulling in chrono.
-
-    // RFC3339 / ISO 8601 with time: 2024-01-15T14:30:00Z or 2024-01-15T14:30:00+02:00
-    if expr.contains('T') || expr.contains('t') {
-        return parse_iso_datetime(expr);
+    // 2024-01-15T14:30:00Z, 2024-01-15t14:30, 2024-01-15 14:30:00
+    if let Some((date_part, time_part)) = expr.split_once(['T', 't', ' ']) {
+        return parse_iso_datetime(date_part, time_part);
     }
 
     // Date only: 2024-01-15 or 2024/01/15
-    if let Some(ms) = parse_date_only(expr) {
-        return Some(ms);
-    }
-
-    None
+    let (year, month, day) = parse_ymd(expr)?;
+    Some(days_from_epoch(year, month, day)? * DAY_MS)
 }
 
-/// Parse ISO datetime: 2024-01-15T14:30:00Z, 2024-01-15T14:30:00.123Z, 2024-01-15T14:30:00+02:00
-fn parse_iso_datetime(expr: &str) -> Option<i64> {
-    // Split at T
-    let (date_part, time_part) = expr.split_once('T').or_else(|| expr.split_once('t'))?;
-
+/// Parse the time half of an ISO datetime: 14:30:00Z, 14:30:00.123Z, 14:30:00+02:00
+fn parse_iso_datetime(date_part: &str, time_part: &str) -> Option<i64> {
     let (year, month, day) = parse_ymd(date_part)?;
 
     // Parse time, stripping timezone
@@ -186,17 +219,10 @@ fn parse_iso_datetime(expr: &str) -> Option<i64> {
     let day_ms =
         hour as i64 * 3_600_000 + minute as i64 * 60_000 + second as i64 * 1_000 + frac_ms as i64;
 
-    Some(epoch_days * 86_400_000 + day_ms - tz_offset_ms)
+    Some(epoch_days * DAY_MS + day_ms - tz_offset_ms)
 }
 
-/// Parse date-only: 2024-01-15, 2024/01/15
-fn parse_date_only(expr: &str) -> Option<i64> {
-    let (year, month, day) = parse_ymd(expr)?;
-    let epoch_days = days_from_epoch(year, month, day)?;
-    Some(epoch_days * 86_400_000)
-}
-
-/// Parse YYYY-MM-DD or YYYY/MM/DD
+/// Parse YYYY-MM-DD or YYYY/MM/DD: a four-digit year first, one separator.
 fn parse_ymd(s: &str) -> Option<(i32, u32, u32)> {
     let sep = if s.contains('-') { '-' } else { '/' };
     let parts: Vec<&str> = s.splitn(3, sep).collect();
@@ -204,16 +230,23 @@ fn parse_ymd(s: &str) -> Option<(i32, u32, u32)> {
         return None;
     };
 
-    let year: i32 = year_str.parse().ok()?;
-    let month: u32 = month_str.parse().ok()?;
-    let day: u32 = day_str.parse().ok()?;
+    let year = i32::try_from(digits(year_str, 4, 4)?).ok()?;
+    let month = digits(month_str, 1, 2)?;
+    let day = digits(day_str, 1, 2)?;
 
-    // Basic validation
     if !(1..=12).contains(&month) || day < 1 || day > days_in_month(year, month) {
         return None;
     }
 
     Some((year, month, day))
+}
+
+/// A run of `min` to `max` ASCII digits; no sign, no space.
+fn digits(s: &str, min: usize, max: usize) -> Option<u32> {
+    if s.len() < min || s.len() > max || !s.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    s.parse().ok()
 }
 
 /// Parse HH:MM:SS.frac or HH:MM
@@ -225,25 +258,22 @@ fn parse_hms(s: &str) -> Option<(u32, u32, u32, u32)> {
         _ => return None,
     };
 
-    let hour: u32 = hour_str.parse().ok()?;
-    let minute: u32 = minute_str.parse().ok()?;
+    let hour = digits(hour_str, 2, 2)?;
+    let minute = digits(minute_str, 2, 2)?;
 
     let (second, frac_ms) = match second_str {
         Some(sec_str) => {
             // May have fractional part
             if let Some((sec_part, frac_str)) = sec_str.split_once('.') {
-                let sec: u32 = sec_part.parse().ok()?;
+                let sec = digits(sec_part, 2, 2)?;
                 // Normalize to milliseconds (3 digits)
                 let ms = match frac_str.get(..3) {
-                    Some(first_three) => first_three.parse::<u32>().ok()?,
-                    None => {
-                        let padded = format!("{:0<3}", frac_str);
-                        padded.parse::<u32>().ok()?
-                    }
+                    Some(first_three) => digits(first_three, 3, 3)?,
+                    None => digits(&format!("{:0<3}", frac_str), 3, 3)?,
                 };
                 (sec, ms)
             } else {
-                (sec_str.parse::<u32>().ok()?, 0)
+                (digits(sec_str, 2, 2)?, 0)
             }
         }
         None => (0, 0),
@@ -299,6 +329,21 @@ fn days_from_epoch(year: i32, month: u32, day: u32) -> Option<i64> {
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
     let days = era * 146097 + doe - 719468;
     Some(days)
+}
+
+/// The (year, month, day) a count of days from the Unix epoch falls on.
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    // Algorithm from http://howardhinnant.github.io/date_algorithms.html
+    let z = days + 719468;
+    let era = z.div_euclid(146097);
+    let doe = z.rem_euclid(146097);
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    (year, month, day)
 }
 
 /// Number of days in a given month.
@@ -486,5 +531,120 @@ mod tests {
         // We're on Saturday. "next saturday" should go forward 7 days, not 0.
         let result = resolve_temporal("next saturday", MOCK_NOW_MS).unwrap();
         assert_eq!(result, MOCK_NOW_MS + 7 * 86_400_000);
+    }
+
+    fn at(y: i32, m: u32, d: u32, h: i64, min: i64) -> i64 {
+        days_from_epoch(y, m, d).unwrap() * DAY_MS + h * 3_600_000 + min * 60_000
+    }
+
+    #[test]
+    fn last_month_is_a_calendar_month_clamped_to_its_last_day() {
+        // Go's AddDate overflowed this into March 3; 30 days back is March 1.
+        let now = at(2026, 3, 31, 10, 0);
+        assert_eq!(
+            resolve_temporal("last month", now),
+            Some(at(2026, 2, 28, 10, 0))
+        );
+        let leap = at(2024, 3, 31, 10, 0);
+        assert_eq!(
+            resolve_temporal("last month", leap),
+            Some(at(2024, 2, 29, 10, 0))
+        );
+        let jan = at(2025, 1, 31, 8, 15);
+        assert_eq!(
+            resolve_temporal("next month", jan),
+            Some(at(2025, 2, 28, 8, 15))
+        );
+        let mid = at(2026, 10, 12, 9, 23);
+        assert_eq!(
+            resolve_temporal("last month", mid),
+            Some(at(2026, 9, 12, 9, 23))
+        );
+    }
+
+    #[test]
+    fn last_year_is_a_calendar_year() {
+        let leap_day = at(2024, 2, 29, 12, 0);
+        assert_eq!(
+            resolve_temporal("last year", leap_day),
+            Some(at(2023, 2, 28, 12, 0))
+        );
+        let now = at(2026, 3, 31, 10, 0);
+        assert_eq!(
+            resolve_temporal("last year", now),
+            Some(at(2025, 3, 31, 10, 0))
+        );
+    }
+
+    #[test]
+    fn months_and_years_ago_are_calendar_steps_like_last_month() {
+        let now = at(2026, 3, 31, 10, 0);
+        assert_eq!(
+            resolve_temporal("1 month ago", now),
+            resolve_temporal("last month", now)
+        );
+        assert_eq!(
+            resolve_temporal("2 months ago", now),
+            Some(at(2026, 1, 31, 10, 0))
+        );
+        assert_eq!(
+            resolve_temporal("in 1 year", now),
+            Some(at(2027, 3, 31, 10, 0))
+        );
+    }
+
+    #[test]
+    fn dates_that_are_not_year_first_are_refused() {
+        // 03/04/2025 is April 3 to some and March 4 to others.
+        for expr in [
+            "01/15/2025",
+            "01-15-2025",
+            "03/04/2025",
+            "12/11/10",
+            "25-01-15",
+            "+2024-01-01",
+        ] {
+            assert_eq!(resolve_temporal(expr, MOCK_NOW_MS), None, "{expr}");
+        }
+        assert_eq!(
+            resolve_temporal("2025/01/15", MOCK_NOW_MS),
+            Some(at(2025, 1, 15, 0, 0))
+        );
+    }
+
+    #[test]
+    fn a_space_separates_date_and_time_as_a_t_does() {
+        assert_eq!(
+            resolve_temporal("2025-01-15 10:30:00", MOCK_NOW_MS),
+            resolve_temporal("2025-01-15T10:30:00", MOCK_NOW_MS)
+        );
+        assert_eq!(
+            resolve_temporal("2025-01-15 10:30", MOCK_NOW_MS),
+            Some(at(2025, 1, 15, 10, 30))
+        );
+    }
+
+    #[test]
+    fn on_spans_the_utc_calendar_day() {
+        // MOCK_NOW is 2024-06-15 14:30 UTC: yesterday is all of June 14.
+        let day = resolve_day("yesterday", MOCK_NOW_MS).unwrap();
+        assert_eq!(day.start_ms, at(2024, 6, 14, 0, 0));
+        assert_eq!(day.end_ms, at(2024, 6, 15, 0, 0));
+        let iso = resolve_day("2025-01-15T23:59:00+02:00", MOCK_NOW_MS).unwrap();
+        assert_eq!(iso.start_ms, at(2025, 1, 15, 0, 0));
+    }
+
+    #[test]
+    fn civil_from_days_inverts_days_from_epoch() {
+        for (y, m, d) in [
+            (1970, 1, 1),
+            (2000, 2, 29),
+            (2024, 12, 31),
+            (1969, 12, 31),
+            (2100, 3, 1),
+        ] {
+            let days = days_from_epoch(y, m, d).unwrap();
+            assert_eq!(civil_from_days(days), (i64::from(y), m, d));
+        }
     }
 }

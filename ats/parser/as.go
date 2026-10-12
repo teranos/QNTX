@@ -1,9 +1,6 @@
 package parser
 
 import (
-	"strings"
-	"time"
-
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/named"
 	errors "github.com/teranos/sacred-error"
@@ -11,170 +8,77 @@ import (
 
 // ParseAsCommand parses CLI arguments into an AsCommand. An attestation that
 // says no `by` is made by the node: whoever writes it names who wrote it. One
-// that says no `on` is made now.
+// that says no `on` is made now. The grammar is read in
+// crates/ats/src/parser/as_command.rs, where `on` reads time as ax does.
 // Grammar: qntx as SUBJECTS [is PREDICATES] [of CONTEXTS] [by ACTOR] [on DATE]
 func ParseAsCommand(args []string) (*types.AsCommand, error) {
-	if len(args) == 0 {
-		return nil, errors.New("no arguments provided")
-	}
-
-	cmd := &types.AsCommand{
-		Subjects:   []string{},
-		Predicates: []string{},
-		Contexts:   []string{},
-		By:         types.ByNode{},
-		When:       types.Now{},
-		Attributes: make(map[string]any),
-	}
-
-	// Tokenize with quote handling
-	tokens := tokenizeWithQuotes(args)
-	if len(tokens) == 0 {
-		return nil, errors.New("no valid tokens found")
-	}
-
-	// Parse tokens
-	err := parseAsTokens(tokens, cmd)
+	parsed, err := parseAsCommandDispatch(args, timeNow())
 	if err != nil {
 		return nil, err
 	}
 
-	// Validate that we have at least subjects
-	if len(cmd.Subjects) == 0 {
-		return nil, errors.New("at least one subject is required")
-	}
-
-	return cmd, nil
-}
-
-// tokenizeWithQuotes handles single-quoted strings
-func tokenizeWithQuotes(args []string) []string {
-	var tokens []string
-	var currentToken strings.Builder
-	inQuotes := false
-
-	for _, arg := range args {
-		if !inQuotes {
-			if strings.HasPrefix(arg, "'") {
-				// Starting a quoted string
-				inQuotes = true
-				if strings.HasSuffix(arg, "'") && len(arg) > 1 {
-					// Single word in quotes
-					tokens = append(tokens, strings.Trim(arg, "'"))
-					inQuotes = false
-				} else {
-					currentToken.WriteString(strings.TrimPrefix(arg, "'"))
-				}
-			} else {
-				// Regular token
-				tokens = append(tokens, arg)
-			}
-		} else {
-			// Inside quotes
-			if strings.HasSuffix(arg, "'") {
-				// Ending quoted string
-				currentToken.WriteString(" ")
-				currentToken.WriteString(strings.TrimSuffix(arg, "'"))
-				tokens = append(tokens, currentToken.String())
-				currentToken.Reset()
-				inQuotes = false
-			} else {
-				// Continue building quoted string
-				if currentToken.Len() > 0 {
-					currentToken.WriteString(" ")
-				}
-				currentToken.WriteString(arg)
-			}
-		}
-	}
-
-	// Handle unclosed quotes
-	if inQuotes {
-		tokens = append(tokens, currentToken.String())
-	}
-
-	return tokens
-}
-
-// parseAsTokens parses the tokenized input for as command
-func parseAsTokens(tokens []string, cmd *types.AsCommand) error {
-	i := 0
-	state := "subjects" // subjects, predicates, contexts, actors, timestamp
-
-	for i < len(tokens) {
-		token := tokens[i]
-
-		switch token {
-		case "is", "are":
-			state = "predicates"
-			i++
-			continue
-		case "of":
-			state = "contexts"
-			i++
-			continue
-		case "by":
-			state = "actors"
-			i++
-			continue
-		case "on":
-			state = "timestamp"
-			i++
-			continue
-		}
-
-		switch state {
-		case "subjects":
-			cmd.Subjects = append(cmd.Subjects, strings.ToUpper(token))
-		case "predicates":
-			cmd.Predicates = append(cmd.Predicates, token)
-		case "contexts":
-			cmd.Contexts = append(cmd.Contexts, strings.ToUpper(token))
-		case "actors":
-			var actors []string
-			switch by := cmd.By.(type) {
-			case types.ActorsNamed:
-				actors = append(by.Actors.All(), token)
-			case types.ByNode:
-				// the first actor `by` names
-				actors = []string{token}
-			}
-			said, err := named.ItemsOf("by", actors)
-			if err != nil {
-				return err
-			}
-			cmd.By = types.ActorsNamed{Actors: said}
-		case "timestamp":
-			// Parse timestamp (simplified for now)
-			parsedTime, err := parseTimeExpression(token)
-			if err != nil {
-				return errors.Wrapf(err, "invalid timestamp '%s'", token)
-			}
-			cmd.When = types.At{Time: parsedTime}
-			state = "subjects" // Reset to subjects for any remaining tokens
-		}
-
-		i++
-	}
-
-	// Apply grammar inference ONLY for exactly 3 subjects without keywords
-	if len(cmd.Subjects) == 3 && len(cmd.Predicates) == 0 && len(cmd.Contexts) == 0 {
-		// Infer: JACK manager IBM -> JACK is manager of IBM
-		pred := strings.ToLower(cmd.Subjects[1]) // Keep original case for predicates
-		context := cmd.Subjects[2]
-		cmd.Subjects = cmd.Subjects[:1] // Keep only first subject
-		cmd.Predicates = []string{pred}
-		cmd.Contexts = []string{context}
-	}
-
-	return nil
-}
-
-// parseTimeExpression parses temporal expressions using shared temporal logic
-func parseTimeExpression(expr string) (time.Time, error) {
-	result, err := ParseTemporalExpression(expr)
+	by, err := parsed.By.authors()
 	if err != nil {
-		return time.Time{}, err
+		return nil, err
 	}
-	return *result, nil
+	when, err := parsed.When.moment()
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.AsCommand{
+		Subjects:   parsed.Subjects,
+		Predicates: parsed.Predicates,
+		Contexts:   parsed.Contexts,
+		By:         by,
+		When:       when,
+		Attributes: make(map[string]any),
+	}, nil
+}
+
+// asParsed is the command as the Rust parser returns it.
+type asParsed struct {
+	Subjects   []string `json:"subjects"`
+	Predicates []string `json:"predicates"`
+	Contexts   []string `json:"contexts"`
+	By         asBy     `json:"by"`
+	When       asWhen   `json:"when"`
+}
+
+// asBy is who the parser says made it: kind "node", or kind "actors" with the
+// actors `by` named.
+type asBy struct {
+	Kind   string   `json:"kind"`
+	Actors []string `json:"actors"`
+}
+
+// asWhen is when the parser says it was made: kind "now", or kind "at" with
+// the epoch milliseconds `on` named.
+type asWhen struct {
+	Kind string `json:"kind"`
+	Ms   int64  `json:"ms"`
+}
+
+func (b asBy) authors() (types.Authors, error) {
+	if b.Kind == "node" {
+		return types.ByNode{}, nil
+	}
+	if b.Kind == "actors" {
+		said, err := named.ItemsOf("by", b.Actors)
+		if err != nil {
+			return nil, err
+		}
+		return types.ActorsNamed{Actors: said}, nil
+	}
+	return nil, errors.Newf("the as parser says by is %q, which names neither the node nor actors", b.Kind)
+}
+
+func (w asWhen) moment() (types.Moment, error) {
+	if w.Kind == "now" {
+		return types.Now{}, nil
+	}
+	if w.Kind == "at" {
+		return types.At{Time: timeAtMs(w.Ms)}, nil
+	}
+	return nil, errors.Newf("the as parser says when is %q, which names neither now nor a time", w.Kind)
 }

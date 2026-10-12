@@ -191,7 +191,7 @@ func pageOf(v string) (limit int, errMsg string) {
 
 // parseTemporalParams reads the since/until/on query parameters into a time
 // range, accepting the same expressions the ax language accepts ("yesterday",
-// "3 days ago", "2025-01-15"). on spans the full day its expression falls on,
+// "3 days ago", "2025-01-15"). on spans the full UTC day its expression falls on,
 // matching the ax grammar's on clause; temporal is one clause there, so on
 // combined with since or until is refused rather than guessed at.
 // A side no parameter names is unbounded, as an ax query naming no time is.
@@ -202,12 +202,10 @@ func parseTemporalParams(since, until, on string) (start, end types.TimeBound, e
 	}
 
 	if on != "" {
-		t, err := parser.ParseTemporalExpression(on)
+		startOfDay, endOfDay, err := parser.ParseTemporalDay(on)
 		if err != nil {
 			return types.TimeBound{}, types.TimeBound{}, fmt.Sprintf("invalid on expression %q: %v", on, err)
 		}
-		startOfDay := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-		endOfDay := startOfDay.Add(24 * time.Hour)
 		return types.BoundAt(startOfDay), types.BoundAt(endOfDay), ""
 	}
 

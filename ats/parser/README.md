@@ -63,8 +63,12 @@ today, now          → current timestamp
 yesterday           → now - 1 day
 tomorrow            → now + 1 day
 last week           → now - 7 days
-last month          → now - 1 month
+last month          → same time, one calendar month back (Mar 31 → Feb 28)
+last year           → same time, one calendar year back (Feb 29 → Feb 28)
 ```
+
+There is one resolver, `crates/ats/src/temporal.rs`. `ax`, `as ... on`, and
+the HTTP `since`/`until`/`on` parameters all read time through it, in UTC.
 
 ### Relative Expressions
 
@@ -72,7 +76,11 @@ last month          → now - 1 month
 3 days ago          → now - 3 days
 2 weeks ago         → now - 14 days
 5 hours ago         → now - 5 hours
+2 months ago        → two calendar months back, as last month
 ```
+
+Words after `since`, `until`, `on` and `between` run to the next keyword, so
+`since last month` and `since 3 days ago` need no quotes.
 
 ### ISO Date Formats
 
@@ -81,7 +89,11 @@ last month          → now - 1 month
 2025-01-15T10:30:00Z          # ISO 8601 + timezone
 2025-01-15T10:30:00           # ISO 8601 local
 2025-01-15 10:30:00           # Space-separated
+2025/01/15                    # Slashes, year first
 ```
+
+Dates must be year first with a four-digit year. `01/15/2025` and
+`03/04/2025` are refused: the second is April 3 to some and March 4 to others.
 
 ### Time Ranges
 
@@ -90,8 +102,9 @@ last month          → now - 1 month
 since yesterday              # From yesterday to now
 until tomorrow               # From start to tomorrow
 
-# Specific day (spans full day 00:00:00-23:59:59)
+# Specific day (the UTC calendar day, midnight to midnight)
 on 2025-01-15
+on yesterday
 
 # Range
 between 2025-01-01 and 2025-02-01
@@ -175,9 +188,7 @@ Partial parsing allows valid segments to be processed even when later segments f
 
 ## Implementation Files
 
-- `ax.go` / `ax_test.go` - AX query parser
-- `as.go` / `as_test.go` - AS command parser
-- `temporal.go` / `temporal_test.go` - Time expression parser
-- `semantic.go` / `semantic_test.go` - Semantic analysis
-- `error.go` - Error types and formatting
-- `position.go` / `position_test.go` - Position tracking for errors
+- `crates/ats/src/parser/` - AX query parser (`mod.rs`) and AS command parser (`as_command.rs`)
+- `crates/ats/src/temporal.rs` - Temporal expression resolver
+- `ats/parser/dispatch_qntxwasm.go` - Go's calls into them through the ats WASM module
+- `ats/parser/error.go` - Error types and formatting
