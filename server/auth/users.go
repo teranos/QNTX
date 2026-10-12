@@ -51,7 +51,7 @@ func (h *Handler) joinUser(route string, matched *SignedBinding, layeDID string)
 	}
 
 	if !found {
-		u, err = h.reachRoot(route, matched)
+		u, err = h.reachRoot(route, func(u User) User { return withRoute(u, route, matched) })
 		if err != nil {
 			return User{}, errors.Wrapf(err, "failed to create the User %q reaches", route)
 		}
@@ -128,12 +128,36 @@ func (h *Handler) joinDeviceKey(route, ownerDID string) {
 	}
 }
 
-// reachRoot records a proven route against the User it belongs to.
+// userFromThePrimary is the User a route the primary vouched for reaches here.
+// On a node nobody owns, a listed route back from the primary is the claim.
+func (h *Handler) userFromThePrimary(route string) (User, error) {
+	u, found, err := h.users.ByRoute(route)
+	if err != nil {
+		return User{}, errors.Wrapf(err, "failed to read the User %q reaches", route)
+	}
+	// An unlisted route reaches the User it already had, or none.
+	if found || h.levelOf(route) != LevelRoot {
+		return u, nil
+	}
+	return h.reachRoot(route, vouchedBy(h.loginAt, route))
+}
+
+// vouchedBy writes a route onto a User as an account the primary proved. No
+// binding is kept: the primary's word is the proof, asked again at each login.
+func vouchedBy(primary, route string) func(User) User {
+	return func(u User) User {
+		u.Accounts = append(u.Accounts, UserAccount{Provider: primary, CanonicalID: route})
+		return u
+	}
+}
+
+// reachRoot records a proven route against the User it belongs to, written on
+// by onto as the key or the account it is.
 
 // Every route reaching here is listed in auth.root_identities, and listing
 // several is how one User is reached from more than one place (ADR-030). A
 // Mastodon account and an atproto DID are two routes to one person.
-func (h *Handler) reachRoot(route string, matched *SignedBinding) (User, error) {
+func (h *Handler) reachRoot(route string, onto func(User) User) (User, error) {
 	// Read then write, with a network round trip in between. Two routes proving
 	// themselves at once would each find no ROOT and each create one, and a node
 	// with two ROOT Users has no owner.
@@ -149,7 +173,7 @@ func (h *Handler) reachRoot(route string, matched *SignedBinding) (User, error) 
 		if held.Level != LevelRoot {
 			continue
 		}
-		u := withRoute(held, route, matched)
+		u := onto(held)
 		if err := h.users.Put(u); err != nil {
 			return User{}, errors.Wrapf(err, "failed to add %q to ROOT User %s", route, u.ID)
 		}
@@ -165,7 +189,7 @@ func (h *Handler) reachRoot(route string, matched *SignedBinding) (User, error) 
 		return User{}, errors.Wrapf(err, "failed to generate a User id for %q", route)
 	}
 
-	u = withRoute(u, route, matched)
+	u = onto(u)
 	if err := h.users.Put(u); err != nil {
 		return User{}, errors.Wrapf(err, "failed to write the User created for %q", route)
 	}

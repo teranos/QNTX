@@ -158,7 +158,13 @@ func (h *Handler) handleElsewhereBack(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusForbidden, "logged in at "+h.loginAt+", and not admitted here")
 		return
 	}
-	token, err := h.sessions.create(grant.MintedBy, h.userFor(grant.MintedBy))
+	user, err := h.userFromThePrimary(grant.MintedBy)
+	if err != nil {
+		h.attest(PredicateUnanswered, grant.MintedBy, map[string]any{"asked": "User store", "doing": "join", "error": err.Error()})
+		h.writeError(w, http.StatusServiceUnavailable, "the User store did not answer: "+err.Error())
+		return
+	}
+	token, err := h.sessions.create(grant.MintedBy, user)
 	if err != nil {
 		h.writeError(w, http.StatusInternalServerError, "the session was not created: "+err.Error())
 		return
