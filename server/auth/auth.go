@@ -512,6 +512,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(tokenPath, h.handleToken)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
+	// A peer asks for the lines about the namespace it serves, signing as itself.
+	mux.answer(linesPath, h.handleLines)
 	// A node whose people log in at another sends them there and takes them back.
 	mux.answer(elsewherePath, h.handleElsewhere)
 	mux.answer(elsewhereBackPath, h.handleElsewhereBack)

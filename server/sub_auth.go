@@ -322,6 +322,11 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// The read half that package does not have. A role is a line in the system
 	// store, and this is what reads it back — who is of what, in a namespace.
 	authHandler.SetRoleReader(roleLines{s: s})
+	// A peer's lines are the primary's, held here and asked for again.
+	if held, fromThePrimary := authHandler.LinesFromThePrimary(); fromThePrimary {
+		authHandler.SetRoleReader(held)
+		s.keepPrimaryLines(held)
+	}
 	// Where a person may stand is what the stores serve, asked at the same
 	// door a write goes through.
 	authHandler.SetFooting(s.footing)
@@ -335,6 +340,31 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		"rp_origins", s.deps.cfg.Auth.RPOrigins,
 	)
 	return nil
+}
+
+// keepPrimaryLines asks the primary for this node's lines now and every
+// auth.LinesEvery, until the node stops. A primary that does not answer is
+// said, and the lines last heard stand.
+func (s *QNTXServer) keepPrimaryLines(held *auth.PrimaryLines) {
+	ask := func() {
+		if err := held.Refresh(time.Now()); err != nil {
+			s.logger.Errorw("The primary did not say what the lines are; the ones last heard stand", "error", err)
+			return
+		}
+	}
+	s.wg.Go("auth.primaryLines", func() {
+		ask()
+		ticker := time.NewTicker(auth.LinesEvery)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-ticker.C:
+				ask()
+			}
+		}
+	})
 }
 
 // lastUsedFlushInterval is how often the last-used the gate keeps in memory is
