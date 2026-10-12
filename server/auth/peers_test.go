@@ -103,6 +103,36 @@ func TestThePeerAdmitsThePersonCarried(t *testing.T) {
 	assert.Equal(t, mastodonAccount, admission.Identity)
 }
 
+// The person the primary carried is this node's own User for their route, or
+// none when it keeps none: the primary's User is the primary's record.
+func TestThePeerAdmitsThePersonCarriedAsItsOwnUser(t *testing.T) {
+	key, did := otherNode(t)
+	primary, served, got := primaryAndPeer(t, did)
+	session, err := primary.sessions.create(mastodonAccount, User{ID: "US-AT-THE-PRIMARY"})
+	require.NoError(t, err)
+	r := toPeer("/api/attestations")
+	r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+	primary.handlePeer(httptest.NewRecorder(), r)
+
+	carried := func(node *Handler) Admission {
+		node.tokens = newMemTokenStore()
+		node.nodeKey = key
+		require.NoError(t, node.SetPrimary(served))
+		req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+		req.Header.Set("Authorization", got.authorization)
+		admission, admitted := node.admissionOf(node.presented(req))
+		require.True(t, admitted)
+		return admission
+	}
+
+	keepsNone := carried(handlerWithDoors(t))
+	assert.Empty(t, keepsNone.UserID, "the primary's User was named on a node that does not hold it")
+
+	holding := handlerWithDoors(t)
+	holding.users = &memUsers{held: []User{{ID: "US-HERE", Level: LevelRoot, Accounts: []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}}}}}
+	assert.Equal(t, "US-HERE", carried(holding).UserID)
+}
+
 // A request that carries its own token goes as it came: the peer reads it.
 func TestABearerGoesToThePeerAsItCame(t *testing.T) {
 	primary, got, _ := anyPeer(t)
