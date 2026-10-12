@@ -49,14 +49,14 @@ mock.module('../../state/sync-state', () => ({
     },
 }));
 
-// Mock ats-wasm so parseQuery resolves synchronously (no real WASM in test).
+// Mock ats-wasm so axFilter resolves synchronously (no real WASM in test).
 // Must include ALL exports any consumer needs — mock.module is process-global,
 // so this mock may be used by ts-element.ts (which imports putAttestation) too.
 mock.module('../../ats-wasm', () => ({
     putAttestation: async (a: unknown) => a,
     queryAttestations: () => [],
     EVERY_ROW: 2147483647,
-    parseQuery: () => ({ ok: false, error: 'no wasm in test' }),
+    axFilter: () => ({ ok: false, error: 'no wasm in test' }),
     generateASUID: () => ({ full: 'AS-TEST-MOCK-QNTX-XXXXXXXX', short: 'AS-TEST-MOCK-QNTX-XXXX' }),
 }));
 

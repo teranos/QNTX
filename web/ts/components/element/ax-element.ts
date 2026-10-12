@@ -28,7 +28,7 @@ import { preventDrag, storeCleanup, setupElementResizeObserver } from '@teranos/
 import { canvasPlaced, createSymbolSpan, settleSymbolSpan } from '@teranos/elements';
 import { sendMessage, connectivity } from '../../client';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
-import { queryAttestations, parseQuery, EVERY_ROW } from '../../ats-wasm';
+import { queryAttestations, axFilter, EVERY_ROW } from '../../ats-wasm';
 import { tooltip } from '../tooltip';
 import { isSigmaAttestation, renderSigmaResultLine } from './sigma-element';
 import { isTypeAttestation, groupTypeAttestations, renderTypeResultLine } from './type-result-line';
@@ -137,9 +137,9 @@ export function createAxElement(item: Element): HTMLElement {
         resultsContainer.appendChild(searchingEl);
 
         try {
-            const parsed = parseQuery(query);
+            const parsed = axFilter(query, EVERY_ROW);
             if (parsed.ok) {
-                const localResults = await queryAttestations(parsed.query, EVERY_ROW);
+                const localResults = await queryAttestations(parsed.filter);
                 searchingEl.remove();
                 const displayedIds = new Set<string>();
                 // Separate type attestations for subject grouping

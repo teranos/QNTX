@@ -18,7 +18,7 @@ import { createAutoSave } from './element-autosave';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivity } from '../../client';
 import { createElementUI } from './element-ui';
-import { putAttestation, queryAttestations, parseQuery, generateASUID, EVERY_ROW } from '../../ats-wasm';
+import { putAttestation, queryAttestations, axFilter, generateASUID, EVERY_ROW } from '../../ats-wasm';
 import type { Attestation } from '../../ats-wasm';
 import { signAttestation, signerDID } from '../../laye';
 
@@ -130,11 +130,11 @@ function buildQntxApi(outputLines: string[], refused: Refused) {
 
         /** Query local IndexedDB attestations with an AX query string */
         async query(queryString: string): Promise<Attestation[]> {
-            const result = parseQuery(queryString);
+            const result = axFilter(queryString, EVERY_ROW);
             if (!result.ok) {
-                throw new Error(`Query parse error: ${result.error}`);
+                throw new Error(`Query parse error in ${JSON.stringify(queryString)}: ${result.error}`);
             }
-            return queryAttestations(result.query, EVERY_ROW);
+            return queryAttestations(result.filter);
         },
 
         /** Append to script output */

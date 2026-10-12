@@ -5,26 +5,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Resolved temporal clause with epoch milliseconds.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ResolvedTemporal {
-    Since(i64),
-    Until(i64),
-    On {
-        start_ms: i64,
-        end_ms: i64,
-    },
-    Between {
-        start_ms: i64,
-        end_ms: i64,
-    },
-    Over {
-        raw: String,
-        value: Option<f64>,
-        unit: Option<String>,
-    },
-}
-
 const DAY_MS: i64 = 86_400_000;
 
 /// How far a word moves from now: a fixed span, or calendar months.
