@@ -1,6 +1,8 @@
 //! Attestation type definitions
 
 use serde::{Deserialize, Serialize};
+
+use crate::span::Span;
 use std::collections::HashMap;
 
 /// An attestation - a verifiable claim about subjects, predicates, and contexts
@@ -223,6 +225,12 @@ pub struct AxFilter {
     /// Maximum results. A filter that leaves it out is refused, 0 is 0 rows,
     /// and every row is [`EVERY_ROW`].
     pub limit: usize,
+
+    /// `over 5y`: only attestations longer than the span, measured between
+    /// the start and the end their type names ([`crate::ax::over`]). Read on
+    /// the ax path, not by a store's own query.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub over: Option<Span>,
 }
 
 /// The limit that reads every row, said; Go's `ats.EveryRow`.

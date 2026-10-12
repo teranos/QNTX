@@ -293,11 +293,7 @@ func (e *Engine) loadWatchers() error {
 	for _, w := range watchers {
 		// If watcher has an AX query string, parse it into the Filter
 		if w.AxQuery != "" {
-			filter, err := parser.ParseAxCommandWithContext(
-				strings.Fields(w.AxQuery),
-				0,
-				parser.ErrorContextPlain,
-			)
+			filter, err := parser.ParseAxWatcherQuery(strings.Fields(w.AxQuery))
 			if err != nil {
 				// Wrap error with watcher context before storing
 				enrichedErr := errors.Wrapf(err, "failed to parse AX query for watcher %s: %q", w.ID, w.AxQuery)

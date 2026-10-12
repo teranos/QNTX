@@ -174,10 +174,24 @@ impl fmt::Display for Part {
     }
 }
 
-/// A span: one or more parts, largest unit first, no unit twice.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// A span: one or more parts, largest unit first, no unit twice. It crosses
+/// every boundary as its text, `2d3h`, and is read back by [`Span::parse`].
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
     parts: Vec<Part>,
+}
+
+impl Serialize for Span {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for Span {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Span, D::Error> {
+        let text = String::deserialize(deserializer)?;
+        Span::parse(&text).map_err(serde::de::Error::custom)
+    }
 }
 
 /// Why text is not a span.
@@ -627,5 +641,13 @@ mod tests {
             assert_eq!(span.to_string(), case["short"], "{case}");
             assert_eq!(span.long(), case["long"], "{case}");
         }
+    }
+
+    #[test]
+    fn crosses_boundaries_as_its_text() {
+        let span = Span::parse("2 days 3 hours").unwrap();
+        assert_eq!(serde_json::to_string(&span).unwrap(), r#""2d3h""#);
+        assert_eq!(serde_json::from_str::<Span>(r#""2d3h""#).unwrap(), span);
+        assert!(serde_json::from_str::<Span>(r#""3h2d""#).is_err());
     }
 }

@@ -559,6 +559,10 @@ pub extern "C" fn read_conn_query(
             Err(e) => return AttestationResultC::error(&format!("invalid filter JSON: {}", e)),
         };
 
+        if let Some(over) = &filter.over {
+            return AttestationResultC::error(&raw_over(over));
+        }
+
         // Build the same query as QueryStore::query but using rc.conn
         use crate::store::build_query_sql;
         let (sql, params) = build_query_sql(&filter);
@@ -1133,6 +1137,10 @@ pub extern "C" fn storage_query(
             Err(e) => return AttestationResultC::error(&format!("invalid filter JSON: {}", e)),
         };
 
+        if let Some(over) = &filter.over {
+            return AttestationResultC::error(&raw_over(over));
+        }
+
         // Query attestations
         use ats::storage::QueryStore;
         let result = match store.query(&filter) {
@@ -1220,7 +1228,8 @@ pub extern "C" fn read_conn_query_resolved(
         Err(e) => return AttestationResultC::error(&format!("alias expansion failed: {}", e)),
     };
 
-    let attestations = match read_conn_attestations(rc, &expanded) {
+    let attestations = match ats::ax::over::read_over(&expanded, |f| read_conn_attestations(rc, f))
+    {
         Ok(a) => a,
         Err(e) => return AttestationResultC::error(&e),
     };
@@ -1232,6 +1241,12 @@ pub extern "C" fn read_conn_query_resolved(
     );
 
     serialize_attestations(result.attestations)
+}
+
+/// Why a raw query refuses `over`: it is read on the resolved ax path, which
+/// reads the type definitions that say where an attestation starts and ends.
+fn raw_over(over: &ats::span::Span) -> String {
+    format!("over {over} is read on the resolved ax path, not by a raw query: it needs the type definitions that say where an attestation starts and ends")
 }
 
 /// Read and validate an `AxFilter` from a C string.

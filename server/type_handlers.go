@@ -65,10 +65,8 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 		}
 		seen[typeName] = true
 
+		// A map with no attributes reads every key as absent.
 		attributes := as.Attributes
-		if attributes == nil {
-			attributes = make(map[string]any)
-		}
 
 		typeObj := map[string]any{
 			"name":               typeName,
@@ -78,6 +76,8 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 			"deprecated":         attributes["deprecated"],
 			"rich_string_fields": attributes["rich_string_fields"],
 			"array_fields":       attributes["array_fields"],
+			"start_field":        attributes["start_field"],
+			"end_field":          attributes["end_field"],
 		}
 		typeList = append(typeList, typeObj)
 	}
@@ -103,10 +103,8 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 		return
 	}
 
+	// A map with no attributes reads every key as absent.
 	attributes := results[0].Attributes
-	if attributes == nil {
-		attributes = make(map[string]any)
-	}
 
 	typeObj := map[string]any{
 		"name":               typeName,
@@ -116,6 +114,8 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 		"deprecated":         attributes["deprecated"],
 		"rich_string_fields": attributes["rich_string_fields"],
 		"array_fields":       attributes["array_fields"],
+		"start_field":        attributes["start_field"],
+		"end_field":          attributes["end_field"],
 	}
 
 	respond(w, s.logger, http.StatusOK, typeObj)
@@ -145,6 +145,9 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		Deprecated       bool     `json:"deprecated"`
 		RichStringFields []string `json:"rich_string_fields"`
 		ArrayFields      []string `json:"array_fields"`
+		// Where the type's attestations start and end, for `over`: both or neither.
+		StartField string `json:"start_field"`
+		EndField   string `json:"end_field"`
 	}
 
 	if err := readJSON(w, r, &req); err != nil {
@@ -201,6 +204,23 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		"rich_string_fields": req.RichStringFields,
 		"array_fields":       req.ArrayFields,
 	}
+
+	// "An attested type should designate what we see as start and end for the
+	// purpose of over": both ends, or neither. One end is no length.
+	switch [2]bool{req.StartField != "", req.EndField != ""} {
+	case [2]bool{true, true}:
+		for _, end := range []struct{ key, name string }{{"start_field", req.StartField}, {"end_field", req.EndField}} {
+			if err := validateFieldName(end.name); err != nil {
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid %s '%s': %v", end.key, end.name, err))
+				return
+			}
+			attributes[end.key] = end.name
+		}
+	case [2]bool{true, false}, [2]bool{false, true}:
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("start_field %q and end_field %q: a type names where its attestations start and end, both or neither", req.StartField, req.EndField))
+		return
+	case [2]bool{false, false}:
+	}
 	if req.Opacity != nil {
 		attributes["opacity"] = *req.Opacity
 	}
@@ -234,6 +254,8 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		"deprecated":         req.Deprecated,
 		"rich_string_fields": req.RichStringFields,
 		"array_fields":       req.ArrayFields,
+		"start_field":        attributes["start_field"],
+		"end_field":          attributes["end_field"],
 	}
 
 	respond(w, s.logger, http.StatusCreated, response)

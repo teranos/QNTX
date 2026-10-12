@@ -747,3 +747,52 @@ fn test_query_with_multiple_values_in_filter() {
         .iter()
         .any(|a| a.subjects.contains(&"BOB".to_string())));
 }
+
+// "over means longer than": a type definition stored in SQLite names the
+// ends, and the resolved ax path reads it through the same store.
+#[test]
+fn test_over_reads_the_type_definition_from_the_store() {
+    use serde_json::json;
+    let mut store = SqliteStore::in_memory().unwrap();
+    store
+        .put(
+            AttestationBuilder::new()
+                .id("TYPE-employed")
+                .subject("employed")
+                .predicate("type")
+                .actor("employed")
+                .source("test")
+                .timestamp(1)
+                .attribute("start_field", json!("from"))
+                .attribute("end_field", json!("until"))
+                .build(),
+        )
+        .unwrap();
+    for (id, from, until) in [
+        ("LONG", "2010-01-01", "2020-01-01"),
+        ("SHORT", "2019-06-01", "2020-01-01"),
+    ] {
+        store
+            .put(
+                AttestationBuilder::new()
+                    .id(id)
+                    .subject("ALICE")
+                    .predicate("employed")
+                    .context(id)
+                    .actor("human:hr")
+                    .source("test")
+                    .timestamp(2)
+                    .attribute("from", json!(from))
+                    .attribute("until", json!(until))
+                    .build(),
+            )
+            .unwrap();
+    }
+
+    let request = ats::ax_filter("ALICE is employed over 5y", 0, EVERY_ROW).unwrap();
+    let result =
+        ats::execute_with_aliases(&store, &request.filter, &ats::TemporalConfig::default(), 0)
+            .unwrap();
+    let ids: Vec<&str> = result.attestations.iter().map(|a| a.id.as_str()).collect();
+    assert_eq!(ids, vec!["LONG"]);
+}

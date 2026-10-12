@@ -46,6 +46,11 @@ type TypeDef struct {
 	Deprecated       bool     `json:"deprecated" attr:"deprecated"`                                     // Whether this type is being phased out
 	RichStringFields []string `json:"rich_string_fields,omitempty" attr:"rich_string_fields,omitempty"` // Metadata field names containing rich text for semantic search (e.g., ["notes", "description"])
 	ArrayFields      []string `json:"array_fields,omitempty" attr:"array_fields,omitempty"`             // Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
+	// StartField and EndField name the attributes where the type's attestations
+	// start and end: what `over 5y` measures (crates/ats/src/ax/over.rs). A
+	// type names both or neither.
+	StartField string `json:"start_field,omitempty" attr:"start_field,omitempty"`
+	EndField   string `json:"end_field,omitempty" attr:"end_field,omitempty"`
 }
 
 // AttestType creates a type definition attestation with arbitrary attributes.

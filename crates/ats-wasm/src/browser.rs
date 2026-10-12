@@ -168,13 +168,37 @@ pub async fn query_attestations(filter_json: &str) -> Result<String, JsValue> {
         .map_err(|e| JsValue::from_str(&format!("Invalid filter JSON: {}", e)))?;
 
     let store = get_store();
-    let result = store
-        .query(&filter)
-        .await
-        .map_err(|e| JsValue::from_str(&format!("Query error: {:?}", e)))?;
+    let store = &store;
+    let query = |f: AxFilter| async move {
+        store
+            .query(&f)
+            .await
+            .map(|r| r.attestations)
+            .map_err(|e| JsValue::from_str(&format!("Query error: {:?}", e)))
+    };
 
-    let proto_attestations: Vec<ProtoAttestation> = result
-        .attestations
+    // `over` is read here, as on the node (ats::ax::over::read_over): every
+    // row the rest of the filter names, the definitions of their types, the
+    // longer than the span kept, then the limit.
+    let attestations = match filter.over.clone() {
+        None => query(filter).await?,
+        Some(span) => {
+            use ats::ax::over;
+            let limit = filter.limit;
+            let rows = query(AxFilter {
+                limit: ats::EVERY_ROW,
+                over: None,
+                ..filter
+            })
+            .await?;
+            let definitions = query(over::types_of(&rows)).await?;
+            let mut kept = over::keep_over(rows, &span, &over::ends_of(&definitions));
+            kept.truncate(limit);
+            kept
+        }
+    };
+
+    let proto_attestations: Vec<ProtoAttestation> = attestations
         .into_iter()
         .map(qntx_proto::proto_convert::to_proto)
         .collect();
