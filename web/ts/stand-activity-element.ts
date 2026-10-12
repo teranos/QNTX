@@ -9,6 +9,7 @@
  * right edge and took their tails with them.
  */
 
+import { readout, shortAll } from './span';
 import type { Element } from '@teranos/elements';
 import { renderPager } from './components/pager.ts';
 import { renderSparklines, windowOf } from './components/sparkline.ts';
@@ -103,10 +104,8 @@ export function spanOf(steps: StandStep[]): string {
     const from = Date.parse(steps[0].at);
     const to = Date.parse(steps[steps.length - 1].at);
     if (Number.isNaN(from) || Number.isNaN(to)) return '';
-    const secs = Math.round((to - from) / 1000);
-    if (secs < 60) return `${secs}s`;
-    if (secs < 3600) return `${Math.floor(secs / 60)}m${secs % 60}s`;
-    return `${Math.floor(secs / 3600)}h${Math.floor((secs % 3600) / 60)}m`;
+    // Two units to the second, in the span grammar the ax language reads back.
+    return shortAll(readout(to - from, 'second'));
 }
 
 /** Repeats folded, order kept: `page_view ×2 · hover` rather than three names.

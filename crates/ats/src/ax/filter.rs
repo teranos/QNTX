@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::attestation::AxFilter;
-use crate::parser::{DurationExpr, ParseError, Parser, TemporalClause};
+use crate::parser::{ParseError, Parser, TemporalClause};
 use crate::temporal::{resolve_day, resolve_temporal};
 
 /// What an AX query asks for: the rows, and what to do with them (`so`).
@@ -26,8 +26,6 @@ pub struct AxRequest {
 pub enum AxRequestError {
     #[error("{0}")]
     Parse(#[from] ParseError),
-    #[error("missing unit in '{0}'")]
-    MissingUnit(String),
     #[error("unable to parse temporal expression: {0}")]
     Temporal(String),
 }
@@ -52,14 +50,9 @@ pub fn ax_filter(query: &str, now_ms: i64, limit: usize) -> Result<AxRequest, Ax
             (Some(day.start_ms), Some(day.end_ms))
         }
         Some(TemporalClause::Between(start, end)) => (Some(at(start)?), Some(at(end)?)),
-        // `over 5y` is a duration, not a range: it bounds no rows. A number
-        // with no unit it reads is refused.
-        Some(TemporalClause::Over(DurationExpr {
-            raw,
-            value: Some(_),
-            unit: None,
-        })) => return Err(AxRequestError::MissingUnit(raw.to_string())),
-        Some(TemporalClause::Over(DurationExpr { .. })) => (None, None),
+        // `over 5y` is a span, not a range: it bounds no rows. One the span
+        // grammar does not read was refused by the parser.
+        Some(TemporalClause::Over(_)) => (None, None),
     };
 
     let owned = |words: &[&str]| words.iter().map(|w| w.to_string()).collect::<Vec<_>>();
@@ -131,10 +124,10 @@ mod tests {
         );
         let slashes = ax_filter("ALICE since 2025/01/15", MARCH_31, 10).unwrap();
         assert_eq!(slashes.filter.time_start, Some(1_736_899_200_000));
-        assert_eq!(
+        assert!(matches!(
             ax_filter("ALICE over 5q", MARCH_31, 10),
-            Err(AxRequestError::MissingUnit("5q".to_string()))
-        );
+            Err(AxRequestError::Parse(ParseError::Span { .. }))
+        ));
         assert!(matches!(
             ax_filter("", MARCH_31, 10),
             Err(AxRequestError::Parse(_))

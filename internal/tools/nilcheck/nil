@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2684 in 378 files.
+# 2660 in 375 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -119,12 +119,12 @@
 1	crates/ats-sqlite/tests/query_tests.rs
 2	crates/ats-wasm/src/browser.rs
 2	crates/ats-wasm/src/identity.rs
-4	crates/ats-wasm/src/lib.rs
+3	crates/ats-wasm/src/lib.rs
 13	crates/ats/src/ax/mod.rs
 1	crates/ats/src/classify/classifier.rs
 1	crates/ats/src/classify/confidence.rs
 1	crates/ats/src/expand.rs
-13	crates/ats/src/parser/ast.rs
+12	crates/ats/src/parser/ast.rs
 9	crates/ats/src/parser/mod.rs
 9	crates/ats/src/storage/memory.rs
 1	crates/ats/src/storage/traits.rs
@@ -372,7 +372,7 @@
 4	server/statusline_asks.go
 3	server/statusline_carousel.go
 16	server/statusline_handler_failures.go
-30	server/statusline_handlers.go
+28	server/statusline_handlers.go
 12	server/statusline_news.go
 14	server/statusline_node.go
 1	server/statusline_plugin_frames.go

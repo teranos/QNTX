@@ -1,6 +1,6 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 293 in 128 files.
+# 291 in 126 files.
 
 1	ats/attrs/attrs.go
 1	ats/identity/quickdev.go
@@ -28,7 +28,6 @@
 2	cmd/qntx/main.go
 1	crates/ats-duckdb/src/schedules.rs
 4	crates/ats/benches/classify_large_actors.rs
-1	crates/ats/src/parser/ast.rs
 3	crates/laye-p2p/src/wasm.rs
 4	db/connection.go
 3	db/migrate.go

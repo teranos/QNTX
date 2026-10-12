@@ -1,6 +1,8 @@
 //! AST types for parsed AX queries
 
 use serde::{Deserialize, Serialize};
+
+use crate::span::Span;
 use std::fmt;
 
 /// A fully parsed AX query
@@ -65,7 +67,8 @@ pub enum TemporalClause<'a> {
     Until(&'a str),
     On(&'a str),
     Between(&'a str, &'a str),
-    Over(DurationExpr<'a>),
+    /// `over 5y`: a span, read in the one grammar (crate::span).
+    Over(Span),
 }
 
 impl fmt::Display for TemporalClause<'_> {
@@ -76,81 +79,6 @@ impl fmt::Display for TemporalClause<'_> {
             TemporalClause::On(date) => write!(f, "on {}", date),
             TemporalClause::Between(start, end) => write!(f, "between {} and {}", start, end),
             TemporalClause::Over(dur) => write!(f, "over {}", dur),
-        }
-    }
-}
-
-/// Duration expression for "over" comparisons
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DurationExpr<'a> {
-    pub raw: &'a str,
-    pub value: Option<f64>,
-    pub unit: Option<DurationUnit>,
-}
-
-impl<'a> DurationExpr<'a> {
-    pub fn parse(raw: &'a str) -> Self {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
-            return Self {
-                raw,
-                value: None,
-                unit: None,
-            };
-        }
-
-        let mut num_end = 0;
-        for (i, c) in trimmed.char_indices() {
-            if c.is_ascii_digit() || c == '.' {
-                num_end = i + c.len_utf8();
-            } else {
-                break;
-            }
-        }
-
-        // num_end came from char_indices, so it is a boundary within bounds.
-        let (num_str, unit_str) = trimmed.split_at(num_end);
-        let value = num_str.parse::<f64>().ok();
-        let unit = DurationUnit::parse(unit_str);
-
-        Self { raw, value, unit }
-    }
-}
-
-impl fmt::Display for DurationExpr<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.raw)
-    }
-}
-
-/// Duration unit types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DurationUnit {
-    Years,
-    Months,
-    Weeks,
-    Days,
-}
-
-impl DurationUnit {
-    pub fn parse(s: &str) -> Option<Self> {
-        match s.to_ascii_lowercase().as_str() {
-            "y" | "yr" | "yrs" | "year" | "years" => Some(DurationUnit::Years),
-            "m" | "mo" | "mos" | "month" | "months" => Some(DurationUnit::Months),
-            "w" | "wk" | "wks" | "week" | "weeks" => Some(DurationUnit::Weeks),
-            "d" | "day" | "days" => Some(DurationUnit::Days),
-            _ => None,
-        }
-    }
-}
-
-impl fmt::Display for DurationUnit {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DurationUnit::Years => write!(f, "y"),
-            DurationUnit::Months => write!(f, "m"),
-            DurationUnit::Weeks => write!(f, "w"),
-            DurationUnit::Days => write!(f, "d"),
         }
     }
 }

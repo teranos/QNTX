@@ -95,8 +95,10 @@ describe('one column says whether a token is on and when it was last used', () =
                 [6 * DAY, '6 days ago', 'days'],
                 [7 * DAY, '1 week ago', 'weeks'],
                 [29 * DAY, '4 weeks ago', 'weeks'],
-                [30 * DAY, '1 month ago', 'months'],
-                [400 * DAY, '13 months ago', 'months'],
+                // A month is the calendar's: from August 16 a month has not passed by September 15.
+                [30 * DAY, '4 weeks ago', 'weeks'],
+                [31 * DAY, '1 month ago', 'months'],
+                [400 * DAY, '1 year ago', 'years'],
             ];
             for (const [elapsed, text, age] of cases) {
                 expect(ago(before(elapsed), NOW)).toEqual({ text, age: age as ReturnType<typeof ago>['age'] });

@@ -32,11 +32,13 @@ mod lexer;
 mod token;
 
 pub use as_command::{parse_as_command, AsBy, AsCommand, AsError, AsWhen};
-pub use ast::{AxQuery, DurationExpr, DurationUnit, TemporalClause};
+pub use ast::{AxQuery, TemporalClause};
 pub use lexer::Lexer;
 pub use token::{Token, TokenKind};
 
 use thiserror::Error;
+
+use crate::span::{Span, SpanError};
 
 /// Parser errors
 #[derive(Debug, Error, Clone, PartialEq)]
@@ -68,6 +70,13 @@ pub enum ParseError {
 
     #[error("pipe '|' is not supported in ax queries - it is the claim key separator")]
     PipeNotSupported,
+
+    #[error("after '{keyword}' at position {position}: {why}")]
+    Span {
+        keyword: String,
+        position: usize,
+        why: SpanError,
+    },
 }
 
 /// Parser state machine states
@@ -505,12 +514,9 @@ impl<'a> Parser<'a> {
         let keyword_text = keyword_token.as_ref().map(|t| t.text).unwrap_or("");
         let keyword_pos = keyword_token.as_ref().map(|t| t.offset).unwrap_or(0);
 
-        // `over 5y` is one duration token; the rest read words to the next keyword.
-        let expr = if keyword == Some(TokenKind::Over) {
-            self.collect_temporal_expr()?
-        } else {
-            self.collect_temporal_words()?
-        };
+        // Every clause reads words to the next keyword: `since last month`,
+        // `over 5 years`.
+        let expr = self.collect_temporal_words()?;
 
         if expr.is_empty() {
             return Err(ParseError::MissingElement {
@@ -524,7 +530,13 @@ impl<'a> Parser<'a> {
             Some(TokenKind::Since) => TemporalClause::Since(expr),
             Some(TokenKind::Until) => TemporalClause::Until(expr),
             Some(TokenKind::On) => TemporalClause::On(expr),
-            Some(TokenKind::Over) => TemporalClause::Over(DurationExpr::parse(expr)),
+            Some(TokenKind::Over) => {
+                TemporalClause::Over(Span::parse(expr).map_err(|why| ParseError::Span {
+                    keyword: keyword_text.to_string(),
+                    position: keyword_pos,
+                    why,
+                })?)
+            }
             Some(TokenKind::Between) => {
                 let end_expr = self.collect_between_end(keyword_pos)?;
                 TemporalClause::Between(expr, end_expr)
@@ -759,13 +771,27 @@ mod tests {
 
     #[test]
     fn test_temporal_over() {
+        use crate::span::Unit;
         let query = Parser::parse("ALICE is experienced over 5y").unwrap();
-        if let Some(TemporalClause::Over(dur)) = query.temporal {
-            assert_eq!(dur.value, Some(5.0));
-            assert_eq!(dur.unit, Some(DurationUnit::Years));
-        } else {
-            panic!("Expected Over clause");
-        }
+        assert_eq!(
+            query.temporal,
+            Some(TemporalClause::Over(Span::one(5, Unit::Year)))
+        );
+        // The span grammar's words, and `m` is minutes: months are `mo`.
+        let query = Parser::parse("ALICE over 5 years so notify").unwrap();
+        assert_eq!(
+            query.temporal,
+            Parser::parse("ALICE over 5y").unwrap().temporal
+        );
+        let query = Parser::parse("ALICE over 5m").unwrap();
+        assert_eq!(
+            query.temporal,
+            Some(TemporalClause::Over(Span::one(5, Unit::Minute)))
+        );
+        assert!(matches!(
+            Parser::parse("ALICE over 5q"),
+            Err(ParseError::Span { .. })
+        ));
     }
 
     #[test]
