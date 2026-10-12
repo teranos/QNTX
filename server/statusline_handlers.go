@@ -341,23 +341,45 @@ func pctItem(name string, pct float64, ok bool) StatusItem {
 	return StatusItem{Name: name, Note: strconv.Itoa(int(pct)) + "%", Symbol: SymbolWell}
 }
 
-// Days and hours, or hours and minutes, or minutes. A status line has room for
+// Two units to the minute, in the span grammar the ax language reads back
+// (crates/ats/src/span.rs readout): 3d4h, 1h30m, 9m. A status line has room for
 // two units and no room for a decimal.
 func shortDuration(d time.Duration) string {
+	return readout(d, time.Minute)
+}
+
+// readout is a length as its largest whole fixed unit, then the unit right
+// below it when that counts any, down to finest: what Span::readout writes,
+// held to it by crates/ats/testdata/spans.json. Under finest is 0 of it.
+func readout(d time.Duration, finest time.Duration) string {
 	if d < 0 {
 		d = 0
 	}
-	days := int(d.Hours()) / 24
-	hours := int(d.Hours()) % 24
-	minutes := int(d.Minutes()) % 60
-
-	if days > 0 {
-		return strconv.Itoa(days) + "d" + strconv.Itoa(hours) + "h"
+	var ladder []spanUnit
+	for _, u := range readoutUnits {
+		if u.per >= finest {
+			ladder = append(ladder, u)
+		}
 	}
-	if hours > 0 {
-		return strconv.Itoa(hours) + "h" + strconv.Itoa(minutes) + "m"
+	said := ""
+	shown := false
+	for i, u := range ladder {
+		count := d / u.per
+		if shown {
+			// The unit right below the first is the only other one shown.
+			if count >= 1 {
+				said += strconv.FormatInt(int64(count), 10) + u.short
+			}
+			break
+		}
+		// Under the finest unit is 0 of it.
+		if count >= 1 || i == len(ladder)-1 {
+			said += strconv.FormatInt(int64(count), 10) + u.short
+			d -= count * u.per
+			shown = true
+		}
 	}
-	return strconv.Itoa(minutes) + "m"
+	return said
 }
 
 // The one frame the row is showing. A handler with no node behind it draws

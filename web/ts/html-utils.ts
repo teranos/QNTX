@@ -5,6 +5,8 @@
  * Extracted from duplicated implementations across panel components.
  */
 
+import { readout, relative, shortAll } from './span';
+
 /**
  * Escape HTML special characters to prevent XSS
  *
@@ -25,37 +27,11 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * Core: convert millisecond delta to relative time string.
- * Positive = past, negative = future.
- */
-function relativeTimeFromMs(diffMs: number): string {
-    const absDiff = Math.abs(diffMs);
-    const isPast = diffMs > 0;
-
-    const seconds = Math.floor(absDiff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    let timeStr: string;
-    if (days > 0) {
-        timeStr = `${days}d`;
-    } else if (hours > 0) {
-        timeStr = `${hours}h`;
-    } else if (minutes > 0) {
-        timeStr = `${minutes}m`;
-    } else {
-        timeStr = `${seconds}s`;
-    }
-
-    return isPast ? `${timeStr} ago` : `${timeStr} from now`;
-}
-
-/**
- * Format ISO/RFC3339 timestamp as relative time ("5m ago", "2h from now").
+ * Format ISO/RFC3339 timestamp as relative time ("5m ago", "in 2h"), in the
+ * span grammar the ax language reads back (span.ts).
  */
 export function formatRelativeTime(timestamp: string): string {
-    return relativeTimeFromMs(Date.now() - new Date(timestamp).getTime());
+    return relative(new Date(timestamp).getTime(), Date.now());
 }
 
 /**
@@ -64,7 +40,7 @@ export function formatRelativeTime(timestamp: string): string {
  */
 export function formatRelativeTimeUnix(unixSeconds: number): string {
     if (!unixSeconds) return 'never';
-    return relativeTimeFromMs(Date.now() - unixSeconds * 1000);
+    return relative(unixSeconds * 1000, Date.now());
 }
 
 /**
@@ -92,8 +68,8 @@ export function formatBuildTime(timestamp?: string | number): string | null {
     const diffMs = Date.now() - date.getTime();
     if (diffMs < 0) return date.toLocaleString();
 
-    const relative = diffMs < 60000 ? 'just now' : relativeTimeFromMs(diffMs);
-    return `${relative} (${date.toLocaleString()})`;
+    const said = diffMs < 60000 ? 'just now' : relative(date.getTime(), Date.now());
+    return `${said} (${date.toLocaleString()})`;
 }
 
 /**
@@ -230,18 +206,13 @@ export function stripHtml(html: string): string {
 }
 
 /**
- * Format duration in milliseconds to human-readable string
+ * Format duration in milliseconds as a two-unit readout in the span grammar
+ * the ax language reads back (span.ts): "150ms", "5s", "2m30s".
  *
  * @param durationMs - Duration in milliseconds
- * @returns Human-readable duration (e.g., "150ms", "5s", "2m 30s")
  */
 export function formatDuration(durationMs: number): string {
-    if (durationMs < 1000) return `${durationMs}ms`;
-    const seconds = Math.floor(durationMs / 1000);
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
+    return shortAll(readout(durationMs, 'millisecond'));
 }
 
 /**

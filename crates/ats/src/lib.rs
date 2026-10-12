@@ -38,6 +38,7 @@ pub mod classify;
 pub mod expand;
 pub mod parser;
 pub mod similarity;
+pub mod span;
 pub mod storage;
 pub mod temporal;
 pub mod watcher;

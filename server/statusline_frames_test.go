@@ -125,7 +125,8 @@ func TestATokenRefusedIsUnwell(t *testing.T) {
 	}
 }
 
-// Two units and no decimal, because that is the room a row has.
+// Two units and no decimal, because that is the room a row has, in the span
+// grammar: a hundred days is 14w2d, which reads back.
 func TestShortDuration(t *testing.T) {
 	for _, c := range []struct {
 		in   time.Duration
@@ -136,7 +137,8 @@ func TestShortDuration(t *testing.T) {
 		{9 * time.Minute, "9m"},
 		{90 * time.Minute, "1h30m"},
 		{26*time.Hour + 11*time.Minute, "1d2h"},
-		{100 * 24 * time.Hour, "100d0h"},
+		{48 * time.Hour, "2d"},
+		{100 * 24 * time.Hour, "14w2d"},
 		{-time.Hour, "0m"},
 	} {
 		if got := shortDuration(c.in); got != c.want {

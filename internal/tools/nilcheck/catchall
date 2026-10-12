@@ -1,6 +1,6 @@
 # default: branches and _ => arms, per file. Debt: each number may fall and may not rise.
 # Instead: name every case; an unknown value is refused, not let through.
-# 146 in 103 files.
+# 144 in 101 files.
 
 1	ats/parser/error.go
 1	ats/so/actions/prompt/action.go
@@ -27,7 +27,6 @@
 1	crates/ats-sqlite/src/sql_ffi.rs
 1	crates/ats-sqlite/src/store.rs
 1	crates/ats/src/classify/classifier.rs
-1	crates/ats/src/parser/ast.rs
 2	crates/ats/src/parser/lexer.rs
 4	crates/ats/src/parser/mod.rs
 2	crates/ats/src/temporal.rs
@@ -98,7 +97,6 @@
 1	server/routes.go
 1	server/sigil/sigil.go
 2	server/signa.go
-1	server/statusline_watchers.go
 2	server/storage_events.go
 1	server/syscap/parser_qntx.go
 1	server/transcripts.go

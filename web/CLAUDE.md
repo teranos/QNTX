@@ -8,7 +8,7 @@ All tray creation via `createGlyphElement`; canvas via `canvasPlaced`. Register 
 
 ## WASM
 
-`ats-wasm.ts` wraps the browser WASM module (crates/ats-wasm). Must call `initialize(dbName)` before any WASM operation except `parseQuery` (synchronous, no init needed).
+`ats-wasm.ts` wraps the browser WASM module (crates/ats-wasm). Must call `initialize(dbName)` before any WASM operation except `axFilter` (synchronous, no init needed).
 
 WASM files live in `web/wasm/` and must be built (`make ats`) before `make build`.
 

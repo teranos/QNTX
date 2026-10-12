@@ -541,7 +541,7 @@
   },
   "ts/ground-element.ts": {
     "no-restricted-syntax": {
-      "count": 47
+      "count": 45
     }
   },
   "ts/ground-scene.ts": {
@@ -561,7 +561,7 @@
   },
   "ts/html-utils.ts": {
     "no-restricted-syntax": {
-      "count": 10
+      "count": 6
     }
   },
   "ts/http-utils.ts": {
@@ -750,11 +750,6 @@
     }
   },
   "ts/pulse/system-status.ts": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "ts/pulse/types.ts": {
     "no-restricted-syntax": {
       "count": 1
     }

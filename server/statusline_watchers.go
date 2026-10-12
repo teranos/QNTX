@@ -92,15 +92,34 @@ func (h *StatusLineHandler) watcherFailureDetail(ctx context.Context, name strin
 	return nil, false
 }
 
-// One unit, no decimals: 4s, 2m, 1h. The row has no room for more and the
-// exact moment is in the detail.
+// One unit, no decimals: 4s, 2m, 1h, 3d. The row has no room for more and the
+// exact moment is in the detail. Written in the span grammar the ax language
+// reads back (crates/ats/src/span.rs), held to it by testdata/spans.json: a
+// length with no start, weeks at most.
 func shortAgo(d time.Duration) string {
-	switch {
-	case d < time.Minute:
-		return strconv.Itoa(int(d.Seconds())) + "s"
-	case d < time.Hour:
-		return strconv.Itoa(int(d.Minutes())) + "m"
-	default:
-		return strconv.Itoa(int(d.Hours())) + "h"
+	for _, u := range spanUnits {
+		if d >= u.per {
+			return strconv.FormatInt(int64(d/u.per), 10) + u.short
+		}
 	}
+	return "0s"
 }
+
+// spanUnit is one fixed unit of the span grammar and how it is written.
+type spanUnit struct {
+	per   time.Duration
+	short string
+}
+
+// spanUnits are the fixed units of the span grammar a single-unit length is
+// written in, largest first: weeks down to seconds.
+var spanUnits = []spanUnit{
+	{7 * 24 * time.Hour, "w"},
+	{24 * time.Hour, "d"},
+	{time.Hour, "h"},
+	{time.Minute, "m"},
+	{time.Second, "s"},
+}
+
+// readoutUnits are spanUnits and milliseconds: what a readout counts down to.
+var readoutUnits = append(append([]spanUnit{}, spanUnits...), spanUnit{time.Millisecond, "ms"})

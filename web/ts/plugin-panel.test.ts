@@ -208,7 +208,8 @@ describe('Plugin Panel Build Time Display', () => {
             const veryOld = new Date('2020-01-01T00:00:00Z');
             const result = formatBuildTime(veryOld.toISOString());
 
-            expect(result).toContain('d ago');
+            // Counted on the calendar, in the span grammar: years, not thousands of days.
+            expect(result).toMatch(/^\d+y ago /);
             expect(result).toContain(veryOld.toLocaleString());
         });
 
