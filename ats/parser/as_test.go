@@ -1,3 +1,5 @@
+//go:build qntxwasm
+
 package parser
 
 import (
@@ -222,140 +224,12 @@ func TestParseAsCommand(t *testing.T) {
 
 			// Check timestamp for yesterday test
 			if strings.Contains(tt.name, "yesterday") {
-				yesterday := time.Now().AddDate(0, 0, -1)
+				yesterday := time.Now().UTC().AddDate(0, 0, -1)
 				if when.Year() != yesterday.Year() ||
 					when.Month() != yesterday.Month() ||
 					when.Day() != yesterday.Day() {
 					t.Errorf("ParseAsCommand() timestamp should be yesterday, got %v", when)
 				}
-			}
-		})
-	}
-}
-
-func TestTokenizeWithQuotes(t *testing.T) {
-	tests := []struct {
-		name     string
-		args     []string
-		expected []string
-	}{
-		{
-			name:     "no quotes",
-			args:     []string{"ALICE", "is", "specialist"},
-			expected: []string{"ALICE", "is", "specialist"},
-		},
-		{
-			name:     "single word in quotes",
-			args:     []string{"ALICE", "is", "'specialist'"},
-			expected: []string{"ALICE", "is", "specialist"},
-		},
-		{
-			name:     "multi-word in quotes",
-			args:     []string{"ALICE", "is", "'primary", "care", "physician'"},
-			expected: []string{"ALICE", "is", "primary care physician"},
-		},
-		{
-			name:     "multiple quoted sections",
-			args:     []string{"'John", "Doe'", "is", "'senior", "researcher'", "of", "'Research", "Institute'"},
-			expected: []string{"John Doe", "is", "senior researcher", "of", "Research Institute"},
-		},
-		{
-			name:     "unclosed quotes",
-			args:     []string{"ALICE", "is", "'senior", "researcher"},
-			expected: []string{"ALICE", "is", "senior researcher"},
-		},
-		{
-			name:     "empty quotes",
-			args:     []string{"ALICE", "is", "''"},
-			expected: []string{"ALICE", "is", ""},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := tokenizeWithQuotes(tt.args)
-			if !equalStringSlices(result, tt.expected) {
-				t.Errorf("tokenizeWithQuotes() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestParseTimeExpression(t *testing.T) {
-	tests := []struct {
-		name    string
-		expr    string
-		wantErr bool
-		checkFn func(time.Time) bool
-	}{
-		{
-			name: "now",
-			expr: "now",
-			checkFn: func(t time.Time) bool {
-				return time.Since(t) < time.Minute // Should be very recent
-			},
-		},
-		{
-			name: "today",
-			expr: "today",
-			checkFn: func(t time.Time) bool {
-				now := time.Now()
-				return t.Year() == now.Year() && t.Month() == now.Month() && t.Day() == now.Day()
-			},
-		},
-		{
-			name: "yesterday",
-			expr: "yesterday",
-			checkFn: func(t time.Time) bool {
-				yesterday := time.Now().AddDate(0, 0, -1)
-				return t.Year() == yesterday.Year() && t.Month() == yesterday.Month() && t.Day() == yesterday.Day()
-			},
-		},
-		{
-			name: "ISO date",
-			expr: "2025-01-15",
-			checkFn: func(t time.Time) bool {
-				expected := time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC)
-				return t.Equal(expected)
-			},
-		},
-		{
-			name: "ISO datetime",
-			expr: "2025-01-15T14:30:00Z",
-			checkFn: func(t time.Time) bool {
-				expected := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
-				return t.Equal(expected)
-			},
-		},
-		{
-			name:    "invalid format",
-			expr:    "not-a-date",
-			wantErr: true,
-		},
-		{
-			name:    "empty string",
-			expr:    "",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseTimeExpression(tt.expr)
-
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("parseTimeExpression() expected error but got none")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("parseTimeExpression() error = %v", err)
-			}
-
-			if tt.checkFn != nil && !tt.checkFn(result) {
-				t.Errorf("parseTimeExpression() = %v, failed validation check", result)
 			}
 		})
 	}
@@ -399,14 +273,5 @@ func BenchmarkParseAsCommand(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-	}
-}
-
-func BenchmarkTokenizeWithQuotes(b *testing.B) {
-	args := []string{"'John", "Doe'", "is", "'primary", "care", "physician'", "of", "'Medical", "Center'"}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = tokenizeWithQuotes(args)
 	}
 }

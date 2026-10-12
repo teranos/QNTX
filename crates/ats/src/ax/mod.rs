@@ -30,6 +30,10 @@
 //! attached to a [`Conflict`] follow `ConflictOutput::source_ids`, which is
 //! sorted.
 
+mod filter;
+
+pub use filter::{ax_filter, AxRequest, AxRequestError};
+
 use std::collections::{HashMap, HashSet};
 
 use crate::attestation::{Attestation, AxFilter, AxResult, AxSummary, Conflict};

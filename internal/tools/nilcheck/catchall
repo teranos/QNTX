@@ -1,9 +1,8 @@
 # default: branches and _ => arms, per file. Debt: each number may fall and may not rise.
 # Instead: name every case; an unknown value is refused, not let through.
-# 151 in 104 files.
+# 146 in 103 files.
 
 1	ats/parser/error.go
-1	ats/parser/temporal.go
 1	ats/so/actions/prompt/action.go
 1	ats/so/actions/prompt/store.go
 3	ats/so/actions/prompt/template.go
@@ -31,7 +30,7 @@
 1	crates/ats/src/parser/ast.rs
 2	crates/ats/src/parser/lexer.rs
 4	crates/ats/src/parser/mod.rs
-6	crates/ats/src/temporal.rs
+2	crates/ats/src/temporal.rs
 1	crates/ats/src/watcher.rs
 1	crates/laye-me/src/lib.rs
 1	crates/laye-net/src/swarm.rs

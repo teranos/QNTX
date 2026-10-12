@@ -1,7 +1,7 @@
 /**
  * QNTX WASM module - Browser attestation storage with IndexedDB
  *
- * Provides parser and minimal storage functions for browser-based
+ * Provides the AX query filter and minimal storage functions for browser-based
  * attestation management. Automatically initialized on import.
  *
  * Uses proto-generated types (ADR-006, ADR-007) for type consistency
@@ -15,19 +15,24 @@ import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstor
 // Re-export proto-generated Attestation type for convenience
 export type { Attestation };
 
-/** Parsed AX query */
-export interface AxQuery {
+/**
+ * The rows an AX query asks for: Rust's `AxFilter`. Time is resolved to epoch
+ * milliseconds; null is unbounded on that side.
+ */
+export interface AxFilter {
     subjects: string[];
     predicates: string[];
     contexts: string[];
     actors: string[];
-    temporal?: unknown;
-    [key: string]: unknown;
+    time_start: number | null;
+    time_end: number | null;
+    source: string | null;
+    limit: number;
 }
 
-/** Query parse result */
-export type ParseResult =
-    | { ok: true; query: AxQuery }
+/** An AX query read as a filter, or why it names no rows */
+export type AxFilterResult =
+    | { ok: true; filter: AxFilter; actions: string[] }
     | { ok: false; error: string };
 
 /** Promise that resolves when WASM is initialized */
@@ -90,26 +95,25 @@ async function ensureInit(): Promise<void> {
 }
 
 /**
- * Parse an AX query string.
- * Synchronous operation, no initialization required.
+ * Read an AX query as the filter it asks for, its time resolved against now:
+ * the same Rust `ax_filter` the node reads queries with, so `since last month`
+ * bounds the same rows offline as on the server.
+ * Synchronous; the module must be initialized.
  *
  * @example
- * const result = parseQuery("ALICE author ARTICLE");
+ * const result = axFilter("ALICE since last month", EVERY_ROW);
  * if (result.ok) {
- *   console.log(result.query);
- * } else {
- *   console.error(result.error);
+ *   const rows = await queryAttestations(result.filter);
  * }
  */
-export function parseQuery(input: string): ParseResult {
-    const json = wasm.parse_query(input);
-    const parsed = JSON.parse(json);
+export function axFilter(query: string, limit: number): AxFilterResult {
+    const answer = JSON.parse(wasm.ax_filter(query, Date.now(), limit));
 
-    if ('error' in parsed) {
-        return { ok: false, error: parsed.error };
+    if ('error' in answer) {
+        return { ok: false, error: answer.error };
     }
 
-    return { ok: true, query: parsed };
+    return { ok: true, filter: answer.filter, actions: answer.actions };
 }
 
 /**
@@ -154,12 +158,12 @@ export async function existsAttestation(id: string): Promise<boolean> {
 export const EVERY_ROW = 2147483647;
 
 /**
- * Query attestations from IndexedDB using an AxFilter.
+ * Query attestations from IndexedDB with the filter `axFilter` read.
  * Returns matching attestations in proto format. A limit of 0 is 0 rows.
  */
-export async function queryAttestations(filter: AxQuery, limit: number): Promise<Attestation[]> {
+export async function queryAttestations(filter: AxFilter): Promise<Attestation[]> {
     await ensureInit();
-    const json = await wasm.query_attestations(JSON.stringify({ ...filter, limit }));
+    const json = await wasm.query_attestations(JSON.stringify(filter));
     return JSON.parse(json);
 }
 

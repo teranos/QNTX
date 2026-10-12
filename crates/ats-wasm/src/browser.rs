@@ -14,7 +14,6 @@
 //! - JSON matches proto schema (timestamps as numbers, attributes as object)
 //! - Converted to ats::Attestation for internal storage operations
 
-use ats::parser::Parser;
 use ats_indexeddb::IndexedDbStore;
 use qntx_proto::Attestation as ProtoAttestation;
 use std::cell::RefCell;
@@ -67,27 +66,21 @@ fn get_store() -> Rc<IndexedDbStore> {
 // Parser (same as wazero target, but with wasm-bindgen)
 // ============================================================================
 
-/// Parse an AX query string. Returns JSON-serialized AxQuery or error.
+/// An AX query as the filter it asks for, its time resolved against `now_ms`
+/// (`Date.now()`): the same [`ats::ax_filter`] the server reads queries with.
 ///
-/// Returns: `{"subjects":["ALICE"],"predicates":["author"],...}` on success
+/// Returns: `{"filter":{"subjects":["ALICE"],...,"time_start":..,"limit":..},"actions":[]}`
 ///          `{"error":"description"}` on error
 #[wasm_bindgen]
-pub fn parse_query(input: &str) -> String {
-    match Parser::parse(input) {
-        Ok(query) => {
-            // Same validation hack as wazero target for bug-for-bug compatibility
-            if let Some(ats::parser::TemporalClause::Over(ref dur)) = query.temporal {
-                if dur.value.is_some() && dur.unit.is_none() {
-                    return format!(r#"{{"error":"missing unit in '{}'"}}"#, dur.raw);
-                }
-            }
-
-            match serde_json::to_string(&query) {
-                Ok(json) => json,
-                Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
-            }
-        }
-        Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+pub fn ax_filter(query: &str, now_ms: f64, limit: u32) -> String {
+    let error = |msg: &str| serde_json::json!({ "error": msg }).to_string();
+    // Date.now() is a whole number of milliseconds well inside i64.
+    match ats::ax_filter(query, now_ms as i64, limit as usize) {
+        Ok(request) => match serde_json::to_string(&request) {
+            Ok(json) => json,
+            Err(e) => error(&format!("serialization failed: {}", e)),
+        },
+        Err(e) => error(&e.to_string()),
     }
 }
 

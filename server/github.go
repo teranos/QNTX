@@ -360,25 +360,38 @@ func (s *QNTXServer) lifetime() context.Context {
 
 // buildLanded runs a plugin's new build, when the plugin is enabled.
 func (s *QNTXServer) buildLanded(name string) {
+	// A build the runner delivered, or one started again because what it loads
+	// from was collected, is a deploy of the archive installed. One installed
+	// with no digest recorded names no rev, and begins none.
+	if s.deploys.inFlight(name) {
+		s.deploys.stage(name, deployRestarting)
+	} else if digest, recorded := grpcplugin.InstalledDigest(name); recorded {
+		s.deploys.begin(pluginDeploy{plugin: name, rev: digest, stage: deployRestarting})
+	}
 	record, found, err := s.pluginRecords().Plugin(name)
 	if err != nil {
+		s.deploys.fail(name, err)
 		s.logger.Errorw("A build landed and the plugin records were not read", "plugin", name, "error", err)
 		return
 	}
 	if !found || !record.Enabled {
+		s.deploys.stage(name, deployDisabled)
 		s.logger.Infow("A build landed for a plugin that is not enabled; it runs once enabled", "plugin", name, "known", found)
 		return
 	}
 	pm, err := s.getPluginManager()
 	if err != nil {
+		s.deploys.fail(name, err)
 		s.logger.Errorw("A build landed and there is no plugin manager to run it", "plugin", name, "error", err)
 		return
 	}
 	s.pluginMuxes.Delete(name)
 	s.pluginMuxInit.Delete(name)
 	if err := pm.RestartPlugin(s.lifetime(), name, pluginSearchPaths(), s.pluginRegistry, s.services); err != nil {
+		s.deploys.fail(name, err)
 		s.logger.Errorw("A build landed and the plugin did not start from it", "plugin", name, "error", err)
 		return
 	}
+	s.deploys.stage(name, deployLive)
 	s.BroadcastPluginHealth(name, true, "running", "Started from the build the runner delivered")
 }

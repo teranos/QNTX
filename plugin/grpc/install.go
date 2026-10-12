@@ -125,6 +125,16 @@ func installedDigest(dir string) (string, bool) {
 	return digest, true
 }
 
+// InstalledDigest is the archive name's installed build was unpacked from.
+// False is a plugin with no digest recorded, for installedDigest's reasons.
+func InstalledDigest(name string) (string, bool) {
+	dir, err := PluginInstallPath(name)
+	if err != nil {
+		return "", false
+	}
+	return installedDigest(dir)
+}
+
 // sha256Of hashes the downloaded bytes.
 func sha256Of(data []byte) []byte {
 	sum := sha256.Sum256(data)
