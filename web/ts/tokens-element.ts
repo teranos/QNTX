@@ -14,6 +14,7 @@ import { openTokenMintElement } from './token-mint-element';
 import { openTokenElement } from './token-element';
 import { log, SEG } from './logger';
 import { person } from './self-person';
+import { long, spanBetween } from './span';
 
 interface TokenInfo {
     id: string;
@@ -95,26 +96,17 @@ function didCell(did: string | undefined): HTMLTableCellElement {
     return td;
 }
 
-export type Age = 'now' | 'minutes' | 'hours' | 'days' | 'weeks' | 'months';
+export type Age = 'now' | 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years';
 
-function counted(n: number, unit: string): string {
-    return `${n} ${unit}${n === 1 ? '' : 's'} ago`;
-}
-
-/** How long ago, in the one unit it reads in, rounded down. Under a minute,
- *  and a moment the clock has not reached, is now. */
+/** How long ago, in the one unit it reads in, rounded down and counted on the
+ *  calendar: the span grammar's long form (span.ts), so it reads back. Under
+ *  a minute, and a moment the clock has not reached, is now. */
 export function ago(then: string, now: Date): { text: string; age: Age } {
-    const elapsed = now.getTime() - new Date(then).getTime();
-    if (Number.isNaN(elapsed)) return { text: then, age: 'months' };
-    const minutes = Math.floor(elapsed / 60000);
-    if (minutes < 1) return { text: 'now', age: 'now' };
-    if (minutes < 60) return { text: counted(minutes, 'minute'), age: 'minutes' };
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return { text: counted(hours, 'hour'), age: 'hours' };
-    const days = Math.floor(hours / 24);
-    if (days < 7) return { text: counted(days, 'day'), age: 'days' };
-    if (days < 30) return { text: counted(Math.floor(days / 7), 'week'), age: 'weeks' };
-    return { text: counted(Math.floor(days / 30), 'month'), age: 'months' };
+    const at = new Date(then).getTime();
+    if (Number.isNaN(at)) return { text: then, age: 'months' };
+    const span = spanBetween(at, now.getTime());
+    if (at > now.getTime() || span.unit === 'second') return { text: 'now', age: 'now' };
+    return { text: `${long(span)} ago`, age: `${span.unit}s` };
 }
 
 function segment(text: string, className: string): HTMLSpanElement {

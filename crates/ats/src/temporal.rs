@@ -5,40 +5,94 @@
 
 use serde::{Deserialize, Serialize};
 
-const DAY_MS: i64 = 86_400_000;
+use crate::span::{Span, Unit};
 
-/// How far a word moves from now: a fixed span, or calendar months.
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Step {
-    Ms(i64),
-    Months(i64),
-}
+pub(crate) const DAY_MS: i64 = 86_400_000;
 
-/// The words that name a moment relative to now. A month and a year are
-/// calendar steps: last month from March 31 is the last day of February, not
-/// 30 days back and not Go's overflow into March 3.
-const WORDS: &[(&str, Step)] = &[
-    ("now", Step::Ms(0)),
-    ("today", Step::Ms(0)),
-    ("yesterday", Step::Ms(-DAY_MS)),
-    ("tomorrow", Step::Ms(DAY_MS)),
-    ("last week", Step::Ms(-7 * DAY_MS)),
-    ("next week", Step::Ms(7 * DAY_MS)),
-    ("last month", Step::Months(-1)),
-    ("next month", Step::Months(1)),
-    ("last year", Step::Months(-12)),
-    ("next year", Step::Months(12)),
-];
-
-/// The units a relative duration counts in, and one of each as a step.
-const UNITS: &[(&[&str], Step)] = &[
-    (&["second", "seconds", "sec", "secs"], Step::Ms(1_000)),
-    (&["minute", "minutes", "min", "mins"], Step::Ms(60_000)),
-    (&["hour", "hours", "hr", "hrs"], Step::Ms(3_600_000)),
-    (&["day", "days"], Step::Ms(DAY_MS)),
-    (&["week", "weeks"], Step::Ms(7 * DAY_MS)),
-    (&["month", "months"], Step::Months(1)),
-    (&["year", "years"], Step::Months(12)),
+/// The words that name a moment relative to now, as a span and a direction.
+/// A month and a year are calendar steps: last month from March 31 is the
+/// last day of February, not 30 days back and not Go's overflow into March 3.
+const WORDS: &[(&str, Span, i64)] = &[
+    (
+        "now",
+        Span {
+            count: 0,
+            unit: Unit::Second,
+        },
+        1,
+    ),
+    (
+        "today",
+        Span {
+            count: 0,
+            unit: Unit::Second,
+        },
+        1,
+    ),
+    (
+        "yesterday",
+        Span {
+            count: 1,
+            unit: Unit::Day,
+        },
+        -1,
+    ),
+    (
+        "tomorrow",
+        Span {
+            count: 1,
+            unit: Unit::Day,
+        },
+        1,
+    ),
+    (
+        "last week",
+        Span {
+            count: 1,
+            unit: Unit::Week,
+        },
+        -1,
+    ),
+    (
+        "next week",
+        Span {
+            count: 1,
+            unit: Unit::Week,
+        },
+        1,
+    ),
+    (
+        "last month",
+        Span {
+            count: 1,
+            unit: Unit::Month,
+        },
+        -1,
+    ),
+    (
+        "next month",
+        Span {
+            count: 1,
+            unit: Unit::Month,
+        },
+        1,
+    ),
+    (
+        "last year",
+        Span {
+            count: 1,
+            unit: Unit::Year,
+        },
+        -1,
+    ),
+    (
+        "next year",
+        Span {
+            count: 1,
+            unit: Unit::Year,
+        },
+        1,
+    ),
 ];
 
 /// Day names, Monday = 0.
@@ -72,21 +126,21 @@ pub fn resolve_temporal(expr: &str, now_ms: i64) -> Option<i64> {
     let expr = expr.trim();
     let lower = expr.to_ascii_lowercase();
 
-    if let Some((_, step)) = WORDS.iter().find(|(word, _)| *word == lower) {
-        return apply(now_ms, *step, 1);
+    if let Some((_, span, sign)) = WORDS.iter().find(|(word, _, _)| *word == lower) {
+        return span.step(now_ms, *sign);
     }
 
-    // Relative: "3 days ago"
+    // Relative: "3 days ago", "3d ago"; a span in the one grammar (crate::span)
     if let Some(rel) = lower.strip_suffix(" ago") {
-        if let Some(step) = parse_relative_duration(rel) {
-            return apply(now_ms, step, -1);
+        if let Ok(span) = Span::parse(rel) {
+            return span.step(now_ms, -1);
         }
     }
 
-    // Future relative: "in 3 days"
+    // Future relative: "in 3 days", "in 2w"
     if let Some(rel) = lower.strip_prefix("in ") {
-        if let Some(step) = parse_relative_duration(rel) {
-            return apply(now_ms, step, 1);
+        if let Ok(span) = Span::parse(rel) {
+            return span.step(now_ms, 1);
         }
     }
 
@@ -109,17 +163,9 @@ pub fn resolve_day(expr: &str, now_ms: i64) -> Option<DaySpan> {
     })
 }
 
-/// Move `now_ms` by `step`, `sign` times.
-fn apply(now_ms: i64, step: Step, sign: i64) -> Option<i64> {
-    match step {
-        Step::Ms(ms) => now_ms.checked_add(ms.checked_mul(sign)?),
-        Step::Months(months) => add_months(now_ms, months.checked_mul(sign)?),
-    }
-}
-
 /// Add calendar months, clamping the day to the target month's last day and
 /// keeping the time of day.
-fn add_months(now_ms: i64, months: i64) -> Option<i64> {
+pub(crate) fn add_months(now_ms: i64, months: i64) -> Option<i64> {
     let days = now_ms.div_euclid(DAY_MS);
     let time_of_day = now_ms.rem_euclid(DAY_MS);
     let (year, month, day) = civil_from_days(days);
@@ -134,25 +180,6 @@ fn add_months(now_ms: i64, months: i64) -> Option<i64> {
 
     let target_days = days_from_epoch(target_year, target_month, target_day)?;
     target_days.checked_mul(DAY_MS)?.checked_add(time_of_day)
-}
-
-/// Parse relative duration like "3 days", "2 months" → a step
-fn parse_relative_duration(expr: &str) -> Option<Step> {
-    let parts: Vec<&str> = expr.split_whitespace().collect();
-    let [num_str, unit] = parts[..] else {
-        return None;
-    };
-
-    let num: i64 = num_str.parse().ok()?;
-    if num < 0 {
-        return None;
-    }
-
-    let (_, per_unit) = UNITS.iter().find(|(names, _)| names.contains(&unit))?;
-    match per_unit {
-        Step::Ms(ms) => Some(Step::Ms(num.checked_mul(*ms)?)),
-        Step::Months(months) => Some(Step::Months(num.checked_mul(*months)?)),
-    }
 }
 
 /// Parse named day expressions: "last friday", "next monday"
@@ -319,7 +346,7 @@ fn split_timezone(time_str: &str) -> (&str, i64) {
 }
 
 /// Days from Unix epoch (1970-01-01) to a given date.
-fn days_from_epoch(year: i32, month: u32, day: u32) -> Option<i64> {
+pub(crate) fn days_from_epoch(year: i32, month: u32, day: u32) -> Option<i64> {
     // Algorithm from http://howardhinnant.github.io/date_algorithms.html
     let y = if month <= 2 { year - 1 } else { year } as i64;
     let m = if month <= 2 { month + 9 } else { month - 3 } as i64;
@@ -332,7 +359,7 @@ fn days_from_epoch(year: i32, month: u32, day: u32) -> Option<i64> {
 }
 
 /// The (year, month, day) a count of days from the Unix epoch falls on.
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
+pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     // Algorithm from http://howardhinnant.github.io/date_algorithms.html
     let z = days + 719468;
     let era = z.div_euclid(146097);

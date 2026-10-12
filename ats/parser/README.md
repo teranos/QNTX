@@ -73,14 +73,22 @@ the HTTP `since`/`until`/`on` parameters all read time through it, in UTC.
 ### Relative Expressions
 
 ```
-3 days ago          → now - 3 days
-2 weeks ago         → now - 14 days
-5 hours ago         → now - 5 hours
-2 months ago        → two calendar months back, as last month
+3 days ago, 3d ago  → now - 3 days
+2 weeks ago, 2w ago → now - 14 days
+5 hours ago, 5h ago → now - 5 hours
+5m ago              → now - 5 minutes
+2mo ago             → two calendar months back, as last month
+in 2w               → now + 14 days
 ```
 
-Words after `since`, `until`, `on` and `between` run to the next keyword, so
-`since last month` and `since 3 days ago` need no quotes.
+`3d`, `3 days` and `over 5y` are spans, read in one grammar
+(`crates/ats/src/span.rs`): a whole number, then `s`, `m`, `h`, `d`, `w`, `mo`
+or `y`, or their words. `m` is minutes; months are `mo`. Every place that shows
+a length of time writes it in this grammar, so what is shown reads back:
+`3d ago` on screen is `since 3d ago` in a query.
+
+Words after `since`, `until`, `on`, `between` and `over` run to the next
+keyword, so `since last month` and `over 5 years` need no quotes.
 
 ### ISO Date Formats
 

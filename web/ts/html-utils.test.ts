@@ -74,14 +74,14 @@ describe('formatRelativeTime', () => {
         const now = Date.now();
         // +5ms padding: exact boundary is flaky because formatRelativeTime calls Date.now() slightly later
         const tenMinutesFromNow = new Date(now + 10 * 60 * 1000 + 5).toISOString();
-        expect(formatRelativeTime(tenMinutesFromNow)).toBe('10m from now');
+        expect(formatRelativeTime(tenMinutesFromNow)).toBe('in 10m');
     });
 
     test('formats future time (hours from now)', () => {
         const now = Date.now();
         // +5ms padding: exact boundary is flaky because formatRelativeTime calls Date.now() slightly later
         const threeHoursFromNow = new Date(now + 3 * 60 * 60 * 1000 + 5).toISOString();
-        expect(formatRelativeTime(threeHoursFromNow)).toBe('3h from now');
+        expect(formatRelativeTime(threeHoursFromNow)).toBe('in 3h');
     });
 
     test('prefers larger units (90 minutes -> 1h)', () => {
@@ -105,8 +105,8 @@ describe('formatRelativeTime', () => {
     test('handles just now (0 seconds)', () => {
         const now = new Date().toISOString();
         const result = formatRelativeTime(now);
-        // Should be 0s ago or "0s from now" depending on microsecond timing
-        expect(result).toMatch(/^0s (ago|from now)$/);
+        // Should be 0s ago or "in 0s" depending on microsecond timing
+        expect(result).toMatch(/^(0s ago|in 0s)$/);
     });
 });
 

@@ -34,6 +34,7 @@ import { cloud, cloudBank, comets, core, horizon, nebula, seam, starburst, starF
 import { openCometElement } from './comet-element';
 import { labelsOf, seenOver, seriesOf, type Window as Span } from './components/sparkline';
 import { apiError, sacredEntry, type SacredError } from './components/sacred';
+import { relative } from './span';
 
 const ELEMENT_ID = 'ground-element';
 
@@ -273,10 +274,9 @@ export function upFor(started: string, now: number): string {
     return `${minutes}m`;
 }
 
-// How long ago, to the second under a minute and in the status line's words past it.
+// How long ago, in the span grammar the ax language reads back (span.ts).
 export function agoFor(at: string, now: number): string {
-    const seconds = Math.max(0, Math.floor((now - Date.parse(at)) / 1000));
-    return seconds < 60 ? `${seconds}s ago` : `${upFor(at, now)} ago`;
+    return relative(Date.parse(at), now);
 }
 
 // How many of what ci.watch said are written under the stars; the count of the rest is said.

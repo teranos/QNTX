@@ -127,7 +127,8 @@
     color: color-mix(in srgb, var(--age-fresh) 25%, var(--age-old));
 }
 
-.token-age-months {
+.token-age-months,
+.token-age-years {
     color: var(--age-old);
 }
 

@@ -14,6 +14,8 @@ export type {
   ListScheduledJobsResponse,
 } from '../../types';
 
+import { short, spanOfMs } from '../span';
+
 /**
  * Common interval presets for UI
  * First item is the default selection
@@ -28,38 +30,9 @@ export const INTERVAL_PRESETS = [
 ] as const;
 
 /**
- * Format interval seconds to human-readable string
+ * An interval, in the span grammar the ax language reads back (span.ts).
+ * A length with no start: weeks at most, never months.
  */
 export function formatInterval(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-}
-
-/**
- * Parse interval string to seconds (for custom intervals)
- */
-export function parseInterval(input: string): number | null {
-  const match = input.match(/^(\d+)\s*(s|m|h|d)$/);
-  if (!match) return null;
-
-  const [, value, unit] = match;
-  const num = parseInt(value, 10);
-
-  switch (unit) {
-    case "s":
-      return num;
-    case "m":
-      return num * 60;
-    case "h":
-      return num * 60 * 60;
-    case "d":
-      return num * 24 * 60 * 60;
-    default:
-      return null;
-  }
+  return short(spanOfMs(seconds * 1000));
 }
