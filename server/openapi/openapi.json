@@ -689,6 +689,11 @@
         "ANYONE"
       ]
     },
+    "/auth/github": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/introspect": {
       "x-qntx-reach": [
         "ANYONE"
