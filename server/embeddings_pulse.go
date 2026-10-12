@@ -36,8 +36,6 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		Invalidator:           s.embeddingClusterInvalidator,
 		MinClusterSize:        minClusterSize,
 		ClusterMatchThreshold: cfg.Embeddings.ClusterMatchThreshold,
-		GroundDBPath:          cfg.GroundDBPath,
-		GroundWrite:           writeToGround,
 		Models:                modelNames,
 		Logger:                s.logger.Named("recluster"),
 	}

@@ -120,28 +120,10 @@ func SetDefaults(v *viper.Viper) {
 	}
 	v.SetDefault("plugin.paths", pluginPaths)
 
-	// Ground database auto-detection — Ground always stores at ~/.local/share/ground/ground.db
-	if groundDB := findGroundDB(); groundDB != "" {
-		v.SetDefault("ground_db_path", groundDB)
-	}
-
 	// Runtime defaults - auto-detect QNTX root or use env var
 	if tsRuntime := findTypeScriptRuntime(); tsRuntime != "" {
 		v.SetDefault("plugin.runtime.typescript_runtime", tsRuntime)
 	}
-}
-
-// findGroundDB locates Ground's database at ~/.local/share/ground/ground.db
-func findGroundDB() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	dbPath := filepath.Join(home, ".local", "share", "ground", "ground.db")
-	if _, err := os.Stat(dbPath); err == nil {
-		return dbPath
-	}
-	return ""
 }
 
 // findTypeScriptRuntime locates the TypeScript runtime (main.ts)

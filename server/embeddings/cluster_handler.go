@@ -71,8 +71,6 @@ func (h *Handler) HandleCluster(w http.ResponseWriter, r *http.Request) {
 		clusterMatchThreshold,
 		h.ATSStore,
 		projectCtx,
-		h.GroundDBPath,
-		h.GroundWrite,
 		h.Logger,
 		model,
 	)

@@ -9,7 +9,6 @@ type embeddingSubsystem struct{}
 func (embeddingSubsystem) Name() string { return "embedding" }
 
 func (embeddingSubsystem) Init(s *QNTXServer) error {
-	s.groundDBPath = s.deps.cfg.GroundDBPath
 	// The vectors are the served namespace's from boot; only the service that
 	// makes them waits for an embedding_provider plugin.
 	s.embeddingStore = s.held.ServedUniverse().Embeddings()
@@ -18,16 +17,14 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 	// Use the primary rustsqlite connection for reads — the Rust driver
 	// separates reads/writes internally (muRead/muWrite).
 	s.embeddingsHandler = &serverembeddings.Handler{
-		DB:           s.held.ServedUniverse().Operational(),
-		ReadDB:       s.held.ServedUniverse().Operational(),
-		Store:        s.embeddingStore,
-		Service:      s.embeddingService,
-		ATSStore:     s.held.Served(),
-		Logger:       s.logger,
-		CallReduce:   s.callReducePlugin,
-		Invalidator:  s.embeddingClusterInvalidator,
-		GroundDBPath: s.deps.cfg.GroundDBPath,
-		GroundWrite:  writeToGround,
+		DB:          s.held.ServedUniverse().Operational(),
+		ReadDB:      s.held.ServedUniverse().Operational(),
+		Store:       s.embeddingStore,
+		Service:     s.embeddingService,
+		ATSStore:    s.held.Served(),
+		Logger:      s.logger,
+		CallReduce:  s.callReducePlugin,
+		Invalidator: s.embeddingClusterInvalidator,
 	}
 	s.setupDistillSchedule(s.deps.cfg)
 	s.setupCheckpointSchedule()

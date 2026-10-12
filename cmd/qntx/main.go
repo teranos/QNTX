@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -273,23 +272,6 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 			pm.SetOnPythonProviderReady(func(name string, client protocol.PythonServiceClient) {
 				defaultServer.AddPythonProvider(client)
 				pluginLogger.Debugw("Registered Python provider after restart", "plugin", name)
-			})
-			groundDBPath := cfg.GroundDBPath
-			pm.SetOnLifecycleEvent(func(pluginName, version, event string, routes []string) {
-				ts := time.Now().Format("15:04:05")
-				detail := fmt.Sprintf("%s %s %s at %s", pluginName, version, event, ts)
-				if len(routes) > 0 {
-					detail += " — " + strings.Join(routes, ", ")
-				}
-				attrs := map[string]any{
-					"event":          event,
-					"plugin_version": version,
-					"log_path":       filepath.Join(filepath.Dir(cfg.GetLogPath(config.GetServerPort())), pluginName+".log"),
-				}
-				if len(routes) > 0 {
-					attrs["routes"] = routes
-				}
-				server.WriteImmediateNews(groundDBPath, pluginName, "plugin-lifecycle", pluginName, detail, attrs, pluginLogger)
 			})
 		}
 

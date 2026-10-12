@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"os"
 	"os/exec"
@@ -229,8 +228,6 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 	case err := <-errChan:
 		// Either it never started or it stopped being able to run. Both end the
 		// process, and "failed to start" would have lied about the second.
-		server.WriteDeferredNews(cfg.GroundDBPath, "qntx", "crash",
-			"qntx-server", fmt.Sprintf("QNTX stopped: %v", err), nil, bootLog)
 		return errors.Wrap(err, "server stopped")
 	case <-sigChan:
 		// First Ctrl+C - graceful shutdown

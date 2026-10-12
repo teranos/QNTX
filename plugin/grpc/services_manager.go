@@ -29,7 +29,6 @@ type ServiceEndpoints struct {
 	LLM          ServiceEndpoint
 	Embedding    ServiceEndpoint
 	VectorSearch ServiceEndpoint
-	Ground       ServiceEndpoint
 	Search       ServiceEndpoint
 	Fetch        ServiceEndpoint
 	Mail         ServiceEndpoint
@@ -55,8 +54,6 @@ type ServicesManager struct {
 	embeddingRouter    *services.EmbeddingServer // Exposed for late backend registration
 	vectorSearchServer *grpc.Server
 	vectorSearchRouter *services.VectorSearchServer // Exposed for provider registration after plugin init
-	groundServer       *grpc.Server
-	groundDBPath       string
 	searchServer       *grpc.Server
 	search             routing[*services.SearchServer]
 	fetchServer        *grpc.Server
@@ -137,8 +134,6 @@ func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, no
 
 // Start starts the gRPC service servers with dynamic port allocation.
 // filesDir is the path to stored files (for the FileService).
-// groundDBPath is the path to Ground's SQLite database; with none, the Ground
-// service refuses each write, saying ground_db_path is not configured.
 //
 // The services the node hands things to after Start (the ATS store, schedule,
 // fetch and mail services) are made before any listens, so each is there
@@ -147,8 +142,7 @@ func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, no
 // The ATS store, queue, schedule and file services are what every plugin is
 // joined by, so one that does not start fails Start. Each other one that does
 // not start is held with why, and the node boots without it.
-func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore, queue *async.Queue, scheduleStore *schedule.Store, filesDir string, groundDBPath string) error {
-	m.groundDBPath = groundDBPath
+func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore, queue *async.Queue, scheduleStore *schedule.Store, filesDir string) error {
 	// The token plugins reach every service with
 	authToken := rand.Text()
 	m.atsStore = services.NewATSStoreServer(store, authToken, m.node, m.logger)
@@ -208,11 +202,6 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	// Start VectorSearch service (starts empty, provider registers after plugin init)
 	m.endpoints.VectorSearch = m.startOptional("vectorsearch", func() (string, error) {
 		return m.startVectorSearchService(ctx, authToken)
-	})
-
-	// Start Ground service
-	m.endpoints.Ground = m.startOptional("ground", func() (string, error) {
-		return m.startGroundService(ctx, groundDBPath, authToken)
 	})
 
 	// Start Search service (starts empty, provider registers after plugin init)
@@ -417,25 +406,6 @@ func (m *ServicesManager) startVectorSearchService(ctx context.Context, authToke
 
 	addr := listener.Addr().String()
 	m.logger.Debugw("VectorSearch service started", "address", addr)
-
-	return addr, nil
-}
-
-// startGroundService starts the Ground gRPC service
-func (m *ServicesManager) startGroundService(ctx context.Context, dbPath string, authToken string) (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
-	}
-
-	m.groundServer = grpc.NewServer()
-	groundServer := services.NewGroundServer(dbPath, authToken, m.logger)
-	protocol.RegisterGroundServiceServer(m.groundServer, groundServer)
-
-	m.serve(ctx, "Ground", m.groundServer, listener, &m.endpoints.Ground)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("Ground service started", "address", addr)
 
 	return addr, nil
 }

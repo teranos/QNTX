@@ -129,7 +129,7 @@ type mockConfig struct{}
 // ServiceEndpoints hands a node running none of the services it boots without.
 func (c *mockConfig) ServiceEndpoints() (ServiceEndpoints, error) {
 	return ServiceEndpoints{
-		LLM: notServed, Embedding: notServed, VectorSearch: notServed, Ground: notServed,
+		LLM: notServed, Embedding: notServed, VectorSearch: notServed,
 		Search: notServed, Fetch: notServed, Mail: notServed,
 	}, nil
 }

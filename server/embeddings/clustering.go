@@ -2,10 +2,8 @@ package embeddings
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/binary"
 	"fmt"
-	"github.com/teranos/QNTX/internal/sqlclose"
 	"math"
 	"sort"
 	"time"
@@ -205,8 +203,6 @@ func RunHDBSCANClustering(
 	clusterMatchThreshold float64,
 	atsStore ats.AttestationStore,
 	projectCtx string,
-	groundDBPath string,
-	groundWrite GroundWriteFunc,
 	logger *zap.SugaredLogger,
 	model string,
 ) (*EmbeddingClusterResult, error) {
@@ -405,7 +401,7 @@ func RunHDBSCANClustering(
 			}
 			emitClusterLifecycleAttestation(atsStore, ev, memberCounts[ev.ClusterID], runID, projectCtx, logger)
 		}
-		emitClusterDeferredNews(store, atsStore, matchResult.events, memberCounts, swept, runID, projectCtx, groundDBPath, groundWrite, logger)
+		emitClusterDeferredNews(store, atsStore, matchResult.events, memberCounts, swept, projectCtx, logger)
 	}
 
 	summary, err := store.GetClusterSummary()
@@ -473,49 +469,9 @@ func emitClusterLifecycleAttestation(atsStore ats.AttestationStore, ev storage.C
 	}
 }
 
-// getUndeliveredDetail returns the detail text from the most recent undelivered
-// deferred:cluster-update attestation. Returns empty string if all news has been
-// delivered or no prior news exists.
-//
-// Delivery acks are written by Ground into Ground's DB, so we check there.
-func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string, groundDBPath string, logger *zap.SugaredLogger) string {
-	// Find the latest deferred:cluster-update in QNTX's store
-	deferred, err := atsStore.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
-		Predicates: []string{"deferred:cluster-update"},
-		Contexts:   []string{projectCtx},
-		Limit:      1,
-	})
-	if err != nil || len(deferred) == 0 {
-		return ""
-	}
-
-	// Check Ground's DB for delivery ack
-	if groundDBPath != "" {
-		db, err := sql.Open("sqlite3", groundDBPath+"?_journal_mode=WAL&_busy_timeout=5000&mode=ro")
-		if err == nil {
-			defer func() { sqlclose.Log(db.Close(), logger, "the ground db") }()
-			var ackTS string
-			err = db.QueryRow(`SELECT timestamp FROM attestations
-				WHERE predicates LIKE '%delivered:cluster-update%'
-				AND contexts LIKE ?
-				ORDER BY rowid DESC LIMIT 1`, "%"+projectCtx+"%").Scan(&ackTS)
-			if err == nil {
-				// Ack exists — news was delivered
-				return ""
-			}
-		}
-	}
-
-	// Extract detail from the undelivered news
-	if detail, ok := deferred[0].Attributes["detail"].(string); ok {
-		return detail
-	}
-	return ""
-}
-
-// emitClusterDeferredNews writes a deferred message attestation for Ground to pick up
-// on Stop. If there's undelivered news from a previous run, accumulates by prepending it.
-func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.AttestationStore, events []storage.ClusterEvent, memberCounts map[int]int, staleSwept int, runID string, projectCtx string, groundDBPath string, groundWrite GroundWriteFunc, logger *zap.SugaredLogger) {
+// emitClusterDeferredNews attests what this run changed in the cluster
+// topology: births with samples, deaths, and what was swept.
+func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.AttestationStore, events []storage.ClusterEvent, memberCounts map[int]int, staleSwept int, projectCtx string, logger *zap.SugaredLogger) {
 	type birthInfo struct {
 		clusterID int
 		nMembers  int
@@ -587,12 +543,6 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		detail += fmt.Sprintf(" Swept %d stale embeddings (source attestations deleted).", staleSwept)
 	}
 
-	// Accumulate: if there's undelivered news from a previous run, prepend it
-	if prior := getUndeliveredDetail(atsStore, projectCtx, groundDBPath, logger); prior != "" {
-		detail = prior + " " + detail
-		logger.Infow("Accumulating with undelivered prior news")
-	}
-
 	asid, err := identity.GenerateASUID("AS", "embeddings", "deferred:cluster-update", projectCtx)
 	if err != nil {
 		logger.Warnw("Failed to generate ASID for cluster deferred news", "error", err)
@@ -620,11 +570,7 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		logger.Warnw("Failed to create cluster deferred news",
 			"asid", asid, "error", err)
 	} else {
-		logger.Infow("Deferred cluster news for Ground",
+		logger.Infow("Attested the cluster update",
 			"asid", asid, "births", len(births), "deaths", len(deaths))
-	}
-
-	if groundWrite != nil {
-		groundWrite(groundDBPath, as, logger)
 	}
 }

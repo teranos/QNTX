@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2698 in 379 files.
+# 2684 in 378 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
@@ -95,7 +95,7 @@
 3	cmd/qntx/commands/git.go
 5	cmd/qntx/commands/handler.go
 3	cmd/qntx/commands/server.go
-32	cmd/qntx/main.go
+30	cmd/qntx/main.go
 2	cmd/qntx/tauri_windows.go
 1	crates/ats-duckdb/src/error.rs
 1	crates/ats-duckdb/src/ffi.rs
@@ -158,7 +158,7 @@
 5	internal/claudecode/login.go
 12	internal/claudecode/run.go
 7	internal/config/am.go
-8	internal/config/defaults.go
+7	internal/config/defaults.go
 3	internal/config/introspection.go
 14	internal/config/load.go
 2	internal/config/one_root.go
@@ -294,7 +294,7 @@
 10	server/element_module_handlers.go
 7	server/embeddings/cluster_handler.go
 1	server/embeddings/cluster_memberships.go
-23	server/embeddings/clustering.go
+19	server/embeddings/clustering.go
 5	server/embeddings/clusters.go
 2	server/embeddings/handler.go
 32	server/embeddings/handlers.go
@@ -302,7 +302,7 @@
 6	server/embeddings/plugin_service.go
 6	server/embeddings/project_handler.go
 5	server/embeddings/projection.go
-12	server/embeddings/pulse.go
+11	server/embeddings/pulse.go
 4	server/embeddings_handlers.go
 6	server/embeddings_pulse.go
 4	server/exposure.go
@@ -312,13 +312,12 @@
 2	server/github_deliveries.go
 1	server/github_parity.go
 3	server/github_webhook.go
-2	server/ground_bridge.go
 7	server/handlers.go
 4	server/host_gauges.go
 3	server/i_sigils.go
 12	server/init.go
 2	server/invitations.go
-19	server/lifecycle.go
+15	server/lifecycle.go
 6	server/mail.go
 14	server/mcp.go
 11	server/namespace_handlers.go

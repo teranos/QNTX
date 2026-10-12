@@ -2,24 +2,23 @@ package config
 
 // Config represents the core QNTX configuration
 type Config struct {
-	Storage      StorageConfig    `mapstructure:"storage"`
-	Server       ServerConfig     `mapstructure:"server"`
-	Auth         AuthConfig       `mapstructure:"auth"`
-	Pulse        PulseConfig      `mapstructure:"pulse"`
-	LLM          LLMConfig        `mapstructure:"llm"`
-	Code         CodeConfig       `mapstructure:"code"`
-	Ax           AxConfig         `mapstructure:"ax"`
-	Plugin       PluginConfig     `mapstructure:"plugin"`
-	Embeddings   EmbeddingsConfig `mapstructure:"embeddings"`
-	Watcher      WatcherConfig    `mapstructure:"watcher"`
-	Fetch        FetchConfig      `mapstructure:"fetch"`
-	Mail         MailConfig       `mapstructure:"mail"`
-	Distill      DistillConfig    `mapstructure:"distill"`
-	Sentry       SentryConfig     `mapstructure:"sentry"`
-	Node         NodeConfig       `mapstructure:"node"`
-	Nodes        NodesConfig      `mapstructure:"nodes"`
-	Agent        AgentConfig      `mapstructure:"agent"`
-	GroundDBPath string           `mapstructure:"ground_db_path"` // Path to Ground's database for deferred news delivery
+	Storage    StorageConfig    `mapstructure:"storage"`
+	Server     ServerConfig     `mapstructure:"server"`
+	Auth       AuthConfig       `mapstructure:"auth"`
+	Pulse      PulseConfig      `mapstructure:"pulse"`
+	LLM        LLMConfig        `mapstructure:"llm"`
+	Code       CodeConfig       `mapstructure:"code"`
+	Ax         AxConfig         `mapstructure:"ax"`
+	Plugin     PluginConfig     `mapstructure:"plugin"`
+	Embeddings EmbeddingsConfig `mapstructure:"embeddings"`
+	Watcher    WatcherConfig    `mapstructure:"watcher"`
+	Fetch      FetchConfig      `mapstructure:"fetch"`
+	Mail       MailConfig       `mapstructure:"mail"`
+	Distill    DistillConfig    `mapstructure:"distill"`
+	Sentry     SentryConfig     `mapstructure:"sentry"`
+	Node       NodeConfig       `mapstructure:"node"`
+	Nodes      NodesConfig      `mapstructure:"nodes"`
+	Agent      AgentConfig      `mapstructure:"agent"`
 }
 
 // AgentConfig is the agents this node runs (ADR-048).

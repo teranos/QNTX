@@ -533,7 +533,6 @@
   "protocol.InitializeRequest.embedding_endpoint": "embedding_endpoint: gRPC endpoint for [EmbeddingService](https://qntx.sbvh.nl/api/grpc-embedding.html) Provides: Text-to-vector embedding generation",
   "protocol.InitializeRequest.fetch_endpoint": "fetch_endpoint: gRPC endpoint for [FetchService](https://qntx.sbvh.nl/api/grpc-fetch.html) Provides: HTTP GET with attestation — QNTX fetches and attests, plugins stay pure orchestration",
   "protocol.InitializeRequest.file_service_endpoint": "file_service_endpoint: gRPC endpoint for [FileService](https://qntx.sbvh.nl/api/grpc-fileservice.html) Provides: Read stored files (for multimodal attachments)",
-  "protocol.InitializeRequest.ground_endpoint": "ground_endpoint: gRPC endpoint for [GroundService](https://qntx.sbvh.nl/api/grpc-ground.html) Provides: Write attestations to Ground's deferred news database",
   "protocol.InitializeRequest.llm_endpoint": "llm_endpoint: gRPC endpoint for [LLMService](https://qntx.sbvh.nl/api/grpc-llm.html) Provides: Provider-agnostic LLM chat (routed through core to provider plugins)",
   "protocol.InitializeRequest.mail_endpoint": "mail_endpoint: gRPC endpoint for MailService (plugin/grpc/protocol/mail.proto, ADR-041) Provides: mail to a User, from the plugin's template — QNTX sends and attests",
   "protocol.InitializeRequest.queue_endpoint": "queue_endpoint: gRPC endpoint for [QueueService](https://qntx.sbvh.nl/api/grpc-queue.html) Provides: Async job enqueue, status, and management",

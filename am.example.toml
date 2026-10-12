@@ -3,18 +3,6 @@
 # All settings shown here are defaults - uncomment to override
 
 # ════════════════════════════════════════════════════════════════
-# Ground Integration
-# https://github.com/teranos/ground
-# Ground Control Layer for Agentic AI Systems
-# ════════════════════════════════════════════════════════════════
-
-# Path to Ground's database for deferred news delivery.
-# When set, QNTX writes cluster lifecycle and Pulse news directly
-# to Ground's db so it can deliver them on session Stop.
-# Default: "" (disabled)
-# ground_db_path = "/Users/you/.local/share/ground/ground.db"
-
-# ════════════════════════════════════════════════════════════════
 # Storage Backend (ADR-023, ADR-024)
 # Which store holds attestations. Backend chosen at startup.
 # ════════════════════════════════════════════════════════════════
