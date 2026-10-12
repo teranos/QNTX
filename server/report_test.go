@@ -55,10 +55,20 @@ func TestAWeekOfAttestationsIsCountedPastTheReadLimit(t *testing.T) {
 	assert.Equal(t, 7, n)
 }
 
+// timelessStore reads every row whatever window it is asked for: the store
+// this test is about, since the test store now reads by time as the node's does.
+type timelessStore struct{ ats.AttestationStore }
+
+func (s timelessStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
+	filter.TimeStart, filter.TimeEnd = types.Unbounded(), types.Unbounded()
+	return s.AttestationStore.GetAttestations(filter)
+}
+
 // A store that does not read by time cannot be counted by splitting the week,
 // and says so rather than splitting forever or answering a wrong number.
 func TestAStoreThatDoesNotReadByTimeIsNotCounted(t *testing.T) {
-	store, _ := createTestStore(t)
+	reading, _ := createTestStore(t)
+	store := timelessStore{reading}
 	start := reportEnd.Add(-reportWeek)
 	madeAt(t, store, "AS-IN", start.Add(time.Hour), "said", "tim")
 	for i := range 3 {
