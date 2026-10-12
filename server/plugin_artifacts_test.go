@@ -253,16 +253,36 @@ func TestARunIsOfThePluginsWhoseRepositoryItIsIn(t *testing.T) {
 		{Name: "duif", Repo: "https://github.com/teranos/duif", Enabled: false},
 		{Name: "elsewhere", Repo: "https://gitlab.com/teranos/pyre", Enabled: true},
 	}
-	ran := func(repo string) []string {
+	ran := func(repo, branch string) []string {
 		names := []string{}
-		for _, of := range pluginsOfRun(records, repo) {
+		for _, of := range pluginsOfRun(records, repo, branch, "main") {
 			names = append(names, of.name)
 		}
 		return names
 	}
-	assert.Equal(t, []string{"pyre"}, ran("Teranos/Pyre"))
-	assert.Equal(t, []string{"kern"}, ran("teranos/QNTX"))
-	assert.Empty(t, ran("teranos/duif"))
+	assert.Equal(t, []string{"pyre"}, ran("Teranos/Pyre", "main"))
+	assert.Equal(t, []string{"kern"}, ran("teranos/QNTX", "main"))
+	assert.Empty(t, ran("teranos/duif", "main"))
+}
+
+// A record's URL names the repository and the branch a plugin is built from,
+// and a run counts for the plugin only there (ADR-043).
+func TestARunCountsOnlyOnTheBranchItsRecordNames(t *testing.T) {
+	records := []grpcplugin.PluginRecord{
+		{Name: "inbox", Repo: "https://github.com/teranos/QNTX/tree/real-inboxes/qntx-plugins/inbox", Enabled: true},
+	}
+	counts := func(branch string) bool { return len(pluginsOfRun(records, "teranos/QNTX", branch, "main")) == 1 }
+	assert.True(t, counts("real-inboxes"))
+	assert.False(t, counts("main"), "a run on main is not of a plugin whose record names real-inboxes")
+	assert.False(t, counts("plugin-builds-from-artifacts"))
+}
+
+// A record naming no branch is the repository's default branch, not every branch.
+func TestARecordNamingNoBranchIsTheDefaultBranch(t *testing.T) {
+	records := []grpcplugin.PluginRecord{{Name: "pyre", Repo: "https://github.com/teranos/pyre", Enabled: true}}
+	counts := func(branch string) bool { return len(pluginsOfRun(records, "teranos/pyre", branch, "main")) == 1 }
+	assert.True(t, counts("main"))
+	assert.False(t, counts("a-branch"))
 }
 
 // The App's workflow_run delivery is read for the builds it carries.
