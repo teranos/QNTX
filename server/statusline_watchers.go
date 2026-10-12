@@ -105,14 +105,21 @@ func shortAgo(d time.Duration) string {
 	return "0s"
 }
 
-// spanUnits are the fixed units of the span grammar, largest first.
-var spanUnits = []struct {
+// spanUnit is one fixed unit of the span grammar and how it is written.
+type spanUnit struct {
 	per   time.Duration
 	short string
-}{
+}
+
+// spanUnits are the fixed units of the span grammar a single-unit length is
+// written in, largest first: weeks down to seconds.
+var spanUnits = []spanUnit{
 	{7 * 24 * time.Hour, "w"},
 	{24 * time.Hour, "d"},
 	{time.Hour, "h"},
 	{time.Minute, "m"},
 	{time.Second, "s"},
 }
+
+// readoutUnits are spanUnits and milliseconds: what a readout counts down to.
+var readoutUnits = append(append([]spanUnit{}, spanUnits...), spanUnit{time.Millisecond, "ms"})

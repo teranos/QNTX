@@ -564,7 +564,7 @@ mod wazero {
             );
             assert_eq!(
                 refused,
-                r#"{"error":"after 'over' at position 6: 'q' in '5q' is not a unit: s, m, h, d, w, mo, y or their words"}"#
+                r#"{"error":"after 'over' at position 6: 'q' in '5q' is not a unit: ms, s, m, h, d, w, mo, y or their words"}"#
             );
         }
 

@@ -541,7 +541,7 @@
   },
   "ts/ground-element.ts": {
     "no-restricted-syntax": {
-      "count": 47
+      "count": 45
     }
   },
   "ts/ground-scene.ts": {

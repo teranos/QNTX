@@ -5,7 +5,7 @@
  * Extracted from duplicated implementations across panel components.
  */
 
-import { relative } from './span';
+import { readout, relative, shortAll } from './span';
 
 /**
  * Escape HTML special characters to prevent XSS
@@ -206,18 +206,13 @@ export function stripHtml(html: string): string {
 }
 
 /**
- * Format duration in milliseconds to human-readable string
+ * Format duration in milliseconds as a two-unit readout in the span grammar
+ * the ax language reads back (span.ts): "150ms", "5s", "2m30s".
  *
  * @param durationMs - Duration in milliseconds
- * @returns Human-readable duration (e.g., "150ms", "5s", "2m 30s")
  */
 export function formatDuration(durationMs: number): string {
-    if (durationMs < 1000) return `${durationMs}ms`;
-    const seconds = Math.floor(durationMs / 1000);
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
+    return shortAll(readout(durationMs, 'millisecond'));
 }
 
 /**

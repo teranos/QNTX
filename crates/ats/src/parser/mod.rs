@@ -775,10 +775,7 @@ mod tests {
         let query = Parser::parse("ALICE is experienced over 5y").unwrap();
         assert_eq!(
             query.temporal,
-            Some(TemporalClause::Over(Span {
-                count: 5,
-                unit: Unit::Year
-            }))
+            Some(TemporalClause::Over(Span::one(5, Unit::Year)))
         );
         // The span grammar's words, and `m` is minutes: months are `mo`.
         let query = Parser::parse("ALICE over 5 years so notify").unwrap();
@@ -789,10 +786,7 @@ mod tests {
         let query = Parser::parse("ALICE over 5m").unwrap();
         assert_eq!(
             query.temporal,
-            Some(TemporalClause::Over(Span {
-                count: 5,
-                unit: Unit::Minute
-            }))
+            Some(TemporalClause::Over(Span::one(5, Unit::Minute)))
         );
         assert!(matches!(
             Parser::parse("ALICE over 5q"),

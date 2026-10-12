@@ -81,9 +81,10 @@ the HTTP `since`/`until`/`on` parameters all read time through it, in UTC.
 in 2w               → now + 14 days
 ```
 
-`3d`, `3 days` and `over 5y` are spans, read in one grammar
-(`crates/ats/src/span.rs`): a whole number, then `s`, `m`, `h`, `d`, `w`, `mo`
-or `y`, or their words. `m` is minutes; months are `mo`. Every place that shows
+`3d`, `3 days`, `2d3h`, `3m12s` and `over 5y` are spans, read in one grammar
+(`crates/ats/src/span.rs`): whole numbers each followed by `ms`, `s`, `m`, `h`,
+`d`, `w`, `mo` or `y`, or their words, largest unit first and each unit once.
+`m` is minutes; months are `mo`. Every place that shows
 a length of time writes it in this grammar, so what is shown reads back:
 `3d ago` on screen is `since 3d ago` in a query.
 

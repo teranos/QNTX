@@ -7,10 +7,11 @@
  * the showing side, kept here so a toast never waits on the wasm module, and
  * held to Rust by crates/ats/testdata/spans.json: span.test.ts checks every
  * vector there. `m` is minutes and `mo` months; a length with no start is
- * never called months.
+ * never called months. A readout is a span of two adjacent parts, `3h5m`, which
+ * reads back as one compound span.
  */
 
-export type Unit = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
+export type Unit = 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
 
 export interface Span {
     count: number;
@@ -18,6 +19,7 @@ export interface Span {
 }
 
 const SHORT: Record<Unit, string> = {
+    millisecond: 'ms',
     second: 's',
     minute: 'm',
     hour: 'h',
@@ -35,6 +37,16 @@ const FIXED: Array<[Unit, number]> = [
     ['hour', 3600000],
     ['minute', 60000],
     ['second', 1000],
+];
+
+/** The fixed units a readout counts in, down to milliseconds. */
+const READOUT: Array<[Unit, number]> = [
+    ['week', 604800000],
+    ['day', 86400000],
+    ['hour', 3600000],
+    ['minute', 60000],
+    ['second', 1000],
+    ['millisecond', 1],
 ];
 
 /** The short form: `3d`, `2mo`. */
@@ -66,6 +78,42 @@ export function spanBetween(aMs: number, bMs: number): Span {
     if (months >= 12) return { count: Math.floor(months / 12), unit: 'year' };
     if (months >= 1) return { count: months, unit: 'month' };
     return spanOfMs(to - from);
+}
+
+/** A length with no start as a two-unit readout: its largest whole fixed
+ *  unit, then the unit right below it when that counts any, down to `finest`.
+ *  `3h5m`, `3m12s`, `2d`, `500ms`; under `finest` is 0 of it. What Rust's
+ *  Span::readout writes. */
+export function readout(ms: number, finest: Unit): Span[] {
+    const ladder = READOUT.slice(0, READOUT.findIndex(([unit]) => unit === finest) + 1);
+    const parts: Span[] = [];
+    let left = Math.max(0, ms);
+    let shown = false;
+    for (const [i, [unit, per]] of ladder.entries()) {
+        const count = Math.floor(left / per);
+        if (shown) {
+            // The unit right below the first is the only other one shown.
+            if (count >= 1) parts.push({ count, unit });
+            break;
+        }
+        // Under the finest unit is 0 of it.
+        if (count >= 1 || i === ladder.length - 1) {
+            parts.push({ count, unit });
+            left -= count * per;
+            shown = true;
+        }
+    }
+    return parts;
+}
+
+/** A readout's short form: `3h5m`. */
+export function shortAll(parts: Span[]): string {
+    return parts.map(short).join('');
+}
+
+/** A readout's long form: `3 hours 5 minutes`. */
+export function longAll(parts: Span[]): string {
+    return parts.map(long).join(' ');
 }
 
 /** `<span> ago` for a moment past, `in <span>` for one to come: both read

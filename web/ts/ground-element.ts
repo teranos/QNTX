@@ -34,7 +34,7 @@ import { cloud, cloudBank, comets, core, horizon, nebula, seam, starburst, starF
 import { openCometElement } from './comet-element';
 import { labelsOf, seenOver, seriesOf, type Window as Span } from './components/sparkline';
 import { apiError, sacredEntry, type SacredError } from './components/sacred';
-import { relative } from './span';
+import { readout, relative, shortAll } from './span';
 
 const ELEMENT_ID = 'ground-element';
 
@@ -264,14 +264,10 @@ const COMET_SEEN = 'Observing a comet, and the build it starts, are not in the n
 const DROPS = [14, 104, 28, 118];
 
 // How long the node has been answering, in the words its own status line uses
-// (server/statusline_handlers.go shortDuration): two units, no decimal.
+// (server/statusline_handlers.go shortDuration): two units to the minute, in
+// the span grammar the ax language reads back (span.ts).
 export function upFor(started: string, now: number): string {
-    const minutes = Math.max(0, Math.floor((now - Date.parse(started)) / 60000));
-    const days = Math.floor(minutes / 1440);
-    const hours = Math.floor(minutes / 60) % 24;
-    if (days > 0) return `${days}d${hours}h`;
-    if (hours > 0) return `${hours}h${minutes % 60}m`;
-    return `${minutes}m`;
+    return shortAll(readout(now - Date.parse(started), 'minute'));
 }
 
 // How long ago, in the span grammar the ax language reads back (span.ts).

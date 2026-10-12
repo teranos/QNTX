@@ -5,17 +5,17 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::span::{Span, Unit};
+use crate::span::{Part, Span, Unit};
 
 pub(crate) const DAY_MS: i64 = 86_400_000;
 
 /// The words that name a moment relative to now, as a span and a direction.
 /// A month and a year are calendar steps: last month from March 31 is the
 /// last day of February, not 30 days back and not Go's overflow into March 3.
-const WORDS: &[(&str, Span, i64)] = &[
+const WORDS: &[(&str, Part, i64)] = &[
     (
         "now",
-        Span {
+        Part {
             count: 0,
             unit: Unit::Second,
         },
@@ -23,7 +23,7 @@ const WORDS: &[(&str, Span, i64)] = &[
     ),
     (
         "today",
-        Span {
+        Part {
             count: 0,
             unit: Unit::Second,
         },
@@ -31,7 +31,7 @@ const WORDS: &[(&str, Span, i64)] = &[
     ),
     (
         "yesterday",
-        Span {
+        Part {
             count: 1,
             unit: Unit::Day,
         },
@@ -39,7 +39,7 @@ const WORDS: &[(&str, Span, i64)] = &[
     ),
     (
         "tomorrow",
-        Span {
+        Part {
             count: 1,
             unit: Unit::Day,
         },
@@ -47,7 +47,7 @@ const WORDS: &[(&str, Span, i64)] = &[
     ),
     (
         "last week",
-        Span {
+        Part {
             count: 1,
             unit: Unit::Week,
         },
@@ -55,7 +55,7 @@ const WORDS: &[(&str, Span, i64)] = &[
     ),
     (
         "next week",
-        Span {
+        Part {
             count: 1,
             unit: Unit::Week,
         },
@@ -63,7 +63,7 @@ const WORDS: &[(&str, Span, i64)] = &[
     ),
     (
         "last month",
-        Span {
+        Part {
             count: 1,
             unit: Unit::Month,
         },
@@ -71,7 +71,7 @@ const WORDS: &[(&str, Span, i64)] = &[
     ),
     (
         "next month",
-        Span {
+        Part {
             count: 1,
             unit: Unit::Month,
         },
@@ -79,7 +79,7 @@ const WORDS: &[(&str, Span, i64)] = &[
     ),
     (
         "last year",
-        Span {
+        Part {
             count: 1,
             unit: Unit::Year,
         },
@@ -87,7 +87,7 @@ const WORDS: &[(&str, Span, i64)] = &[
     ),
     (
         "next year",
-        Span {
+        Part {
             count: 1,
             unit: Unit::Year,
         },

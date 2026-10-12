@@ -105,7 +105,7 @@ export function ago(then: string, now: Date): { text: string; age: Age } {
     const at = new Date(then).getTime();
     if (Number.isNaN(at)) return { text: then, age: 'months' };
     const span = spanBetween(at, now.getTime());
-    if (at > now.getTime() || span.unit === 'second') return { text: 'now', age: 'now' };
+    if (at > now.getTime() || span.unit === 'second' || span.unit === 'millisecond') return { text: 'now', age: 'now' };
     return { text: `${long(span)} ago`, age: `${span.unit}s` };
 }
 
