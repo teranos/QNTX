@@ -163,11 +163,20 @@ func (h *Handler) askIssuer(issuer, raw string, now time.Time) (Grant, bool, err
 	if said.Issuer != issuer {
 		return Grant{}, false, errors.Newf("the answer says it is from %q, and this node asked %s", said.Issuer, issuer)
 	}
+	// The issuer's User is the issuer's record. Here the route reaches this
+	// node's own, the one a session from logging in there is given.
+	here, found, err := h.users.ByRoute(said.Subject)
+	if err != nil {
+		return Grant{}, false, errors.Wrapf(err, "the User store did not answer for %s", said.Subject)
+	}
+	if !found {
+		here = User{}
+	}
 	return Grant{
 		Label:               said.Label,
 		DID:                 said.DID,
 		MintedBy:            said.Subject,
-		MintedByUser:        said.User,
+		MintedByUser:        here.ID,
 		MintedByDisplayName: said.Name,
 		Level:               Level(said.Level),
 		Namespaces:          said.Namespaces,
