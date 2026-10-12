@@ -33,7 +33,7 @@ func registered(t *testing.T) (*Handler, *memTokenStore, ed25519.PrivateKey, str
 	t.Helper()
 	h, store, _ := authorizingHandler(t)
 	key, did := otherNode(t)
-	require.NoError(t, h.DeclarePeer(peerName, did, elsewhereOrigin, elsewhereOrigin))
+	require.NoError(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin, elsewhereOrigin))
 	return h, store, key, did
 }
 
@@ -104,7 +104,7 @@ func TestANodeNotDeclaredIsRefused(t *testing.T) {
 func TestNoClientGetsATokenOfItsOwn(t *testing.T) {
 	h, store, appDID := authorizingHandler(t)
 	key, nodeDID := otherNode(t)
-	require.NoError(t, h.DeclarePeer(peerName, nodeDID, elsewhereOrigin, elsewhereOrigin))
+	require.NoError(t, h.DeclarePeer(peerName, nodeDID, NamespaceDefault, elsewhereOrigin, elsewhereOrigin))
 
 	app := url.Values{}
 	app.Set("grant_type", "client_credentials")
@@ -146,7 +146,7 @@ func TestAPeerOverATunnelIsSentPeopleBackAtItsReturnAddress(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
 	_, did := otherNode(t)
 	const tunnel, loopback = "http://10.0.0.2:8770", "http://peer.localhost:8770"
-	require.NoError(t, h.DeclarePeer(peerName, did, tunnel, loopback))
+	require.NoError(t, h.DeclarePeer(peerName, did, NamespaceDefault,tunnel, loopback))
 	_, challenge := pkcePair()
 
 	refused := httptest.NewRecorder()
@@ -167,19 +167,20 @@ func TestDeclaringAPeerSaysWhatItRefuses(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
 	_, did := otherNode(t)
 	_, other := otherNode(t)
-	assert.Error(t, h.DeclarePeer(peerName, "did:web:node.example", elsewhereOrigin, elsewhereOrigin), "not a did:key")
-	assert.Error(t, h.DeclarePeer(peerName, "", elsewhereOrigin, elsewhereOrigin), "no did")
-	assert.Error(t, h.DeclarePeer(peerName, did, "", elsewhereOrigin), "no origin")
-	assert.Error(t, h.DeclarePeer(peerName, did, "elsewhere.node.test", elsewhereOrigin), "not an absolute origin")
-	assert.Error(t, h.DeclarePeer(peerName, did, elsewhereOrigin+"/somewhere", elsewhereOrigin), "a path is no origin")
-	assert.Error(t, h.DeclarePeer("", did, elsewhereOrigin, elsewhereOrigin), "no name")
-	assert.Error(t, h.DeclarePeer("a/b", did, elsewhereOrigin, elsewhereOrigin), "a name a path cannot carry")
-	assert.Error(t, h.DeclarePeer(peerName, did, elsewhereOrigin, ""), "no return address")
-	assert.Error(t, h.DeclarePeer(peerName, did, elsewhereOrigin, "peer.localhost"), "a return address that is not an origin")
-	assert.Error(t, h.DeclarePeer(peerName, did, elsewhereOrigin, "http://peer.localhost/back"), "a return address with a path")
-	require.NoError(t, h.DeclarePeer(peerName, did, elsewhereOrigin+"/", elsewhereOrigin))
-	assert.Error(t, h.DeclarePeer("again", did, elsewhereOrigin, elsewhereOrigin), "the same peer twice")
-	assert.Error(t, h.DeclarePeer(peerName, other, elsewhereOrigin, elsewhereOrigin), "two peers by one name")
+	assert.Error(t, h.DeclarePeer(peerName, "did:web:node.example", NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "not a did:key")
+	assert.Error(t, h.DeclarePeer(peerName, "", NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "no did")
+	assert.Error(t, h.DeclarePeer(peerName, did, "", elsewhereOrigin, elsewhereOrigin), "no namespace")
+	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,"", elsewhereOrigin), "no origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,"elsewhere.node.test", elsewhereOrigin), "not an absolute origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin+"/somewhere", elsewhereOrigin), "a path is no origin")
+	assert.Error(t, h.DeclarePeer("", did, NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "no name")
+	assert.Error(t, h.DeclarePeer("a/b", did, NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "a name a path cannot carry")
+	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin, ""), "no return address")
+	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin, "peer.localhost"), "a return address that is not an origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin, "http://peer.localhost/back"), "a return address with a path")
+	require.NoError(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin+"/", elsewhereOrigin))
+	assert.Error(t, h.DeclarePeer("again", did, NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "the same peer twice")
+	assert.Error(t, h.DeclarePeer(peerName, other, NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "two peers by one name")
 
 	client, ok := h.clientByDID(did)
 	require.True(t, ok)
