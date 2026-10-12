@@ -293,7 +293,11 @@ func (e *Engine) loadWatchers() error {
 	for _, w := range watchers {
 		// If watcher has an AX query string, parse it into the Filter
 		if w.AxQuery != "" {
-			filter, err := parser.ParseAxWatcherQuery(strings.Fields(w.AxQuery))
+			filter, err := parser.ParseAxCommandWithContext(
+				strings.Fields(w.AxQuery),
+				0,
+				parser.ErrorContextPlain,
+			)
 			if err != nil {
 				// Wrap error with watcher context before storing
 				enrichedErr := errors.Wrapf(err, "failed to parse AX query for watcher %s: %q", w.ID, w.AxQuery)
@@ -641,10 +645,16 @@ func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Wa
 		return errors.Wrapf(err, "failed to read attestations for watcher %s", watcherID)
 	}
 
+	// Many rows are of the same few types: each is read once for the run.
+	read := e.typesRemembered()
 	matchCount := 0
 	for _, as := range attestations {
-		// Post-filter for attribute filters (can't be pushed to SQL)
-		if matched, score := e.matchesWatcher(as, watcher); matched {
+		// Post-filter for attribute filters and `over` (can't be pushed to SQL)
+		matched, score, err := e.matchesWatcher(as, watcher, read)
+		if err != nil {
+			return errors.Wrapf(err, "failed to match historical attestations for watcher %s", watcherID)
+		}
+		if matched {
 			matchCount++
 			if e.broadcastMatch != nil && watcher.ActionType != storage.ActionTypePluginExecute {
 				e.broadcastMatch(watcherID, as, score)
@@ -658,6 +668,44 @@ func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Wa
 		"matches_found", matchCount)
 
 	return nil
+}
+
+// typesReader reads the definitions of the named types: every `[name] is type`.
+type typesReader func(names []string) ([]*types.As, error)
+
+// typesOf reads the definitions of the named types through the engine's reader.
+func (e *Engine) typesOf(names []string) ([]*types.As, error) {
+	definitions, err := e.reader.GetAttestations(ats.AttestationFilter{
+		Subjects:   names,
+		Predicates: []string{typePredicate},
+		TimeStart:  types.Unbounded(),
+		TimeEnd:    types.Unbounded(),
+		Limit:      ats.EveryRow,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read the type definitions of %v", names)
+	}
+	return definitions, nil
+}
+
+// typePredicate is the predicate a type definition is attested with.
+const typePredicate = "type"
+
+// typesRemembered is typesOf reading each set of types once.
+func (e *Engine) typesRemembered() typesReader {
+	read := make(map[string][]*types.As)
+	return func(names []string) ([]*types.As, error) {
+		key := strings.Join(names, "\x00")
+		if definitions, ok := read[key]; ok {
+			return definitions, nil
+		}
+		definitions, err := e.typesOf(names)
+		if err != nil {
+			return nil, err
+		}
+		read[key] = definitions
+		return definitions, nil
+	}
 }
 
 // attestationFilter converts a watcher's AX filter into the store's filter.

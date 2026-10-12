@@ -8,6 +8,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/wasm"
+	errors "github.com/teranos/sacred-error"
 )
 
 // wasmMatchAttestation is the JSON shape Rust expects.
@@ -30,37 +31,47 @@ type wasmWatcherFilter struct {
 	TimeStartMs      *int64                    `json:"time_start_ms,omitempty"`
 	TimeEndMs        *int64                    `json:"time_end_ms,omitempty"`
 	AttributeFilters []storage.AttributeFilter `json:"attribute_filters"`
+	Over             *string                   `json:"over,omitempty"`
 }
 
-// wasmMatchInput is the full input for match_watchers.
+// wasmMatchInput is the full input for match_watchers. Types are the
+// definitions of the types the attestation is of, once read.
 type wasmMatchInput struct {
-	Attestation wasmMatchAttestation `json:"attestation"`
-	Watchers    []wasmWatcherFilter  `json:"watchers"`
+	Attestation wasmMatchAttestation    `json:"attestation"`
+	Watchers    []wasmWatcherFilter     `json:"watchers"`
+	Types       *[]wasmMatchAttestation `json:"types,omitempty"`
 }
 
-// wasmMatchOutput is the result from match_watchers.
+// wasmMatchOutput is the result from match_watchers. Read is what a watcher
+// asking `over` needs before it is answered: the definitions of these types.
 type wasmMatchOutput struct {
 	MatchedIDs []string `json:"matched_ids"`
-	Error      string   `json:"error,omitempty"`
+	Read       []struct {
+		Types []string `json:"types"`
+	} `json:"read"`
+	Error string `json:"error,omitempty"`
 }
 
-// batchMatchStructural calls Rust WASM to match an attestation against all structural watchers.
-// Falls back to Go logic if the WASM engine is unavailable.
-// Returns the set of matched watcher IDs.
-func batchMatchStructural(as *types.As, watchers []*storage.Watcher) map[string]bool {
-	engine, err := wasm.GetEngine()
-	if err != nil {
-		return batchMatchStructuralGo(as, watchers)
-	}
-
-	// Build input
-	att := wasmMatchAttestation{
+// matchAttestationOf is an attestation as match_watchers reads it.
+func matchAttestationOf(as *types.As) wasmMatchAttestation {
+	return wasmMatchAttestation{
 		Subjects:    as.Subjects,
 		Predicates:  as.Predicates,
 		Contexts:    as.Contexts,
 		Actors:      as.Actors,
 		TimestampMs: as.Timestamp.UnixMilli(),
 		Attributes:  as.Attributes,
+	}
+}
+
+// batchMatchStructural matches an attestation against all structural watchers
+// in Rust, and returns the set of matched watcher IDs. A watcher asking `over`
+// is measured by the definitions of the types the attestation is of, read
+// through read when Rust asks for them.
+func batchMatchStructural(as *types.As, watchers []*storage.Watcher, read typesReader) (map[string]bool, error) {
+	engine, err := wasm.GetEngine()
+	if err != nil {
+		return nil, errors.Wrapf(err, "wasm engine init, matching attestation %s", as.ID)
 	}
 
 	filters := make([]wasmWatcherFilter, 0, len(watchers))
@@ -72,16 +83,15 @@ func batchMatchStructural(as *types.As, watchers []*storage.Watcher) map[string]
 			Contexts:         w.Filter.Contexts,
 			Actors:           w.Filter.Actors,
 			AttributeFilters: w.AttributeFilters,
+			Over:             w.Filter.Over,
 		}
-		// A watcher whose filter names neither side of its time range is
-		// refused by the Go matcher, which says so.
 		start, starts, err := w.Filter.TimeStart.At("start")
 		if err != nil {
-			return batchMatchStructuralGo(as, watchers)
+			return nil, errors.Wrapf(err, "watcher %s does not say its time range", w.ID)
 		}
 		end, ends, err := w.Filter.TimeEnd.At("end")
 		if err != nil {
-			return batchMatchStructuralGo(as, watchers)
+			return nil, errors.Wrapf(err, "watcher %s does not say its time range", w.ID)
 		}
 		if starts {
 			ms := start.UnixMilli()
@@ -95,32 +105,53 @@ func batchMatchStructural(as *types.As, watchers []*storage.Watcher) map[string]
 	}
 
 	input := wasmMatchInput{
-		Attestation: att,
+		Attestation: matchAttestationOf(as),
 		Watchers:    filters,
 	}
-
-	inputJSON, err := json.Marshal(input)
+	output, err := matchWatchers(engine, as.ID, input)
 	if err != nil {
-		return batchMatchStructuralGo(as, watchers)
+		return nil, err
 	}
-
-	resultJSON, err := engine.Call("match_watchers", string(inputJSON))
-	if err != nil {
-		return batchMatchStructuralGo(as, watchers)
-	}
-
-	var output wasmMatchOutput
-	if err := json.Unmarshal([]byte(resultJSON), &output); err != nil {
-		return batchMatchStructuralGo(as, watchers)
-	}
-
-	if output.Error != "" {
-		return batchMatchStructuralGo(as, watchers)
+	// Rust asks once, and the call that gives the types is answered whole.
+	for _, asked := range output.Read {
+		definitions, err := read(asked.Types)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read the types attestation %s is of to measure it by", as.ID)
+		}
+		given := make([]wasmMatchAttestation, 0, len(definitions))
+		for _, d := range definitions {
+			given = append(given, matchAttestationOf(d))
+		}
+		input.Types = &given
+		output, err = matchWatchers(engine, as.ID, input)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	matched := make(map[string]bool, len(output.MatchedIDs))
 	for _, id := range output.MatchedIDs {
 		matched[id] = true
 	}
-	return matched
+	return matched, nil
+}
+
+// matchWatchers is one match_watchers call.
+func matchWatchers(engine *wasm.Engine, id string, input wasmMatchInput) (wasmMatchOutput, error) {
+	var output wasmMatchOutput
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return output, errors.Wrapf(err, "failed to marshal match_watchers input for attestation %s", id)
+	}
+	resultJSON, err := engine.Call("match_watchers", string(inputJSON))
+	if err != nil {
+		return output, errors.Wrapf(err, "match_watchers for attestation %s", id)
+	}
+	if err := json.Unmarshal([]byte(resultJSON), &output); err != nil {
+		return output, errors.Wrapf(err, "match_watchers answered attestation %s with %s", id, resultJSON)
+	}
+	if output.Error != "" {
+		return output, errors.Newf("match_watchers refused attestation %s: %s", id, output.Error)
+	}
+	return output, nil
 }

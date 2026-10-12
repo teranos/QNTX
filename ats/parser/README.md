@@ -108,9 +108,8 @@ ax ALICE is employed over 5y
 Length is counted on the calendar from the start (`crates/ats/src/ax/over.rs`):
 from 2020-02-29, five years ends 2025-02-28, and an end must be past it. An
 attestation whose type names no ends, or whose ends hold no ISO time, has no
-length and is not over. The limit counts what is kept. A watcher refuses
-`over`: it matches each attestation as it arrives and reads no type
-definitions to measure it with.
+length and is not over. The limit counts what is kept. A watcher measures each
+attestation as it arrives, by the definitions of the types it is of.
 
 ### ISO Date Formats
 

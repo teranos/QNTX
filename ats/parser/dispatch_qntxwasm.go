@@ -53,14 +53,7 @@ func parseAxQueryWasm(args []string) (*types.AxFilter, error) {
 	return readAxQueryWasm("ax_filter", args)
 }
 
-// parseAxWatcherDispatch reads a watcher's query through watch_filter, which
-// refuses `over`: a watcher matches each attestation as it arrives and reads no
-// type definitions to measure it with.
-func parseAxWatcherDispatch(args []string) (*types.AxFilter, error) {
-	return readAxQueryWasm("watch_filter", args)
-}
-
-// readAxQueryWasm reads a query through fnName, ax_filter or watch_filter.
+// readAxQueryWasm reads a query through fnName.
 func readAxQueryWasm(fnName string, args []string) (*types.AxFilter, error) {
 	query := strings.Join(args, " ")
 
