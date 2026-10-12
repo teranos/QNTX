@@ -25,7 +25,8 @@ func (h *Handler) handleForgetBegin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if _, ok := h.presented(r).Admitted(); !ok {
+	route, ok := h.presented(r).Admitted()
+	if !ok {
 		h.writeError(w, http.StatusForbidden, "no session")
 		return
 	}
@@ -36,8 +37,9 @@ func (h *Handler) handleForgetBegin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Forgetting is asserting the key first, so it runs at the door that made
-	// it. A device is forgotten from where it was enrolled or from nowhere.
-	creds, err := h.creds.doorCredentials(arrived.namespace)
+	// it, and is offered this person's devices alone (§7.2 step 6). Another
+	// account's passkey is neither named to them nor theirs to delete.
+	creds, err := h.devicesOf(arrived.namespace, route)
 	if err != nil {
 		h.logger.Errorw("could not read the credentials for a forget", "door", arrived.namespace, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer: "+err.Error())
@@ -101,7 +103,7 @@ func (h *Handler) handleForget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := h.creds.doorCredentials(arrived.namespace)
+	creds, err := h.devicesOf(arrived.namespace, route)
 	if err != nil {
 		h.logger.Errorw("could not read the credentials for a forget", "route", route, "door", arrived.namespace, "error", err)
 		h.writeError(w, http.StatusInternalServerError, "the credential store did not answer: "+err.Error())
