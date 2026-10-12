@@ -4,9 +4,7 @@ package server
 // node holds each plugin's newest deploy, and each step is a line in system.
 
 import (
-	"maps"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -14,7 +12,7 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// deployPredicate begins every deploy line; the stage, or deployChecked, ends it.
+// deployPredicate begins every deploy line; the stage ends it.
 const deployPredicate = "deploy:"
 
 // The stages of a deploy.
@@ -28,9 +26,6 @@ const (
 	deployFailed     = "failed"
 )
 
-// deployChecked ends the line a check on the deploy's commit is.
-const deployChecked = "checked"
-
 // deployEnded is every stage a deploy stops at.
 var deployEnded = []string{deployLive, deployUnchanged, deployDisabled, deployFailed}
 
@@ -41,28 +36,16 @@ type pluginDeploy struct {
 	rev string
 	// What the push said: the repository, the ref and the commit it moved to.
 	repo, ref, after string
-	// What it replaces, and what it installs.
-	replacesRevs    []string
-	replacesVersion string
-	revs            []string
-	version         string
-	stage           string
+	// The revs it replaces, and the revs it installs.
+	replacesRevs []string
+	revs         []string
+	stage        string
 	// The stage it failed at, and why.
 	failedAt, failure string
-	// Each check on the pushed commit, by name, as checkState draws it.
-	checks map[string]string
 	// When each stage began.
 	began map[string]time.Time
 	// The lines about it that were not written, and why.
 	unwritten []string
-}
-
-// copied is d sharing nothing with the tracker.
-func (d *pluginDeploy) copied() pluginDeploy {
-	c := *d
-	c.replacesRevs, c.revs, c.unwritten = slices.Clone(d.replacesRevs), slices.Clone(d.revs), slices.Clone(d.unwritten)
-	c.checks, c.began = maps.Clone(d.checks), maps.Clone(d.began)
-	return c
 }
 
 // deployWriter writes one line about a deploy, in the plugin's context.
@@ -108,15 +91,15 @@ func (t *deployTracker) moved(d *pluginDeploy, stage string, attributes map[stri
 func (t *deployTracker) begin(d pluginDeploy) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	d.checks, d.began = map[string]string{}, map[string]time.Time{}
+	d.began = map[string]time.Time{}
 	if queued, held := t.deploys[d.plugin]; held && queued.stage == deployQueued {
 		d.rev, d.repo, d.ref, d.after = queued.rev, queued.repo, queued.ref, queued.after
-		d.checks, d.began, d.unwritten = queued.checks, queued.began, queued.unwritten
+		d.began, d.unwritten = queued.began, queued.unwritten
 	}
 	t.deploys[d.plugin] = &d
 	t.moved(&d, d.stage, map[string]any{
 		"repo": d.repo, "ref": d.ref, "after": d.after,
-		"revs": strings.Join(d.revs, " "), "replaces_revs": strings.Join(d.replacesRevs, " "), "replaces_version": d.replacesVersion,
+		"revs": strings.Join(d.revs, " "), "replaces_revs": strings.Join(d.replacesRevs, " "),
 	})
 }
 
@@ -158,29 +141,4 @@ func (t *deployTracker) fail(plugin string, failed error) {
 // unchanged ends plugin's deploy: what it built is what was installed.
 func (t *deployTracker) unchanged(plugin string) {
 	t.stage(plugin, deployUnchanged)
-}
-
-// check writes a check run on every deploy of repo pushed to sha.
-func (t *deployTracker) check(repo, sha, name, state string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	for _, d := range t.deploys {
-		if d.repo != repo || d.after != sha {
-			continue
-		}
-		d.checks[name] = state
-		t.line(d, deployPredicate+deployChecked, map[string]any{"sha": sha, "name": name, "state": state})
-	}
-}
-
-// active is every plugin's newest deploy, by the plugin's name.
-func (t *deployTracker) active() []pluginDeploy {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	held := make([]pluginDeploy, 0, len(t.deploys))
-	for _, d := range t.deploys {
-		held = append(held, d.copied())
-	}
-	sort.Slice(held, func(i, j int) bool { return held[i].plugin < held[j].plugin })
-	return held
 }

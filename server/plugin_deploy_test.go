@@ -22,6 +22,16 @@ func deployingServer(t *testing.T) *QNTXServer {
 	return s
 }
 
+// heldDeploy is the deploy the tracker holds for plugin.
+func heldDeploy(t *testing.T, s *QNTXServer, plugin string) *pluginDeploy {
+	t.Helper()
+	s.deploys.mu.Lock()
+	defer s.deploys.mu.Unlock()
+	d, held := s.deploys.deploys[plugin]
+	require.True(t, held, "no deploy of %s is held", plugin)
+	return d
+}
+
 // A push queues the deploy, and the build that takes it up is the same deploy:
 // its lines are all about the plugin at the commit pushed.
 func TestAPushedDeployIsOneDeployFromQueuedToFailed(t *testing.T) {
@@ -33,9 +43,7 @@ func TestAPushedDeployIsOneDeployFromQueuedToFailed(t *testing.T) {
 	s.deploys.fail("datapunt", errors.New("dub build: <exit 1>"))
 	assert.False(t, s.deploys.inFlight("datapunt"), "a failed deploy is still in flight")
 
-	held := s.deploys.active()
-	require.Len(t, held, 1)
-	d := held[0]
+	d := heldDeploy(t, s, "datapunt")
 	assert.Equal(t, "teranos/datapunt", d.repo, "the build forgot the push it took up")
 	assert.Equal(t, "c0ffee", d.after)
 	assert.Equal(t, []string{"beef", "f00d"}, d.replacesRevs)
@@ -68,43 +76,6 @@ func TestADeployThatChangesNothingEnds(t *testing.T) {
 	assert.Contains(t, lines, deployPredicate+deployUnchanged)
 }
 
-// A check run is written on the deploy of the commit it ran on, and on no other.
-func TestACheckLandsOnTheDeployOfItsCommit(t *testing.T) {
-	s := deployingServer(t)
-	s.deploys.begin(pluginDeploy{plugin: "datapunt", rev: "c0ffee", repo: "teranos/datapunt", ref: "refs/heads/main", after: "c0ffee", stage: deployQueued})
-	s.deploys.begin(pluginDeploy{plugin: "inbox", rev: "beef", repo: "teranos/QNTX", ref: "refs/heads/main", after: "beef", stage: deployQueued})
-
-	s.deploys.check("teranos/datapunt", "c0ffee", "Go", checkRunning)
-	s.deploys.check("teranos/datapunt", "c0ffee", "Go", checkDone)
-
-	for _, d := range s.deploys.active() {
-		switch d.plugin {
-		case "datapunt":
-			assert.Equal(t, map[string]string{"Go": checkDone}, d.checks)
-		case "inbox":
-			assert.Empty(t, d.checks, "a check on teranos/datapunt landed on inbox")
-		}
-	}
-	lines, err := newestLines(s, "datapunt@c0ffee", "deploys")
-	require.NoError(t, err)
-	assert.Equal(t, checkDone, lines[deployPredicate+deployChecked].Attributes["state"])
-}
-
-// What active hands out is a copy: the statusline reading it changes nothing.
-func TestWhatActiveHandsOutIsACopy(t *testing.T) {
-	s := deployingServer(t)
-	s.deploys.begin(pluginDeploy{plugin: "datapunt", rev: "c0ffee", repo: "teranos/datapunt", after: "c0ffee", stage: deployQueued})
-	s.deploys.check("teranos/datapunt", "c0ffee", "Go", checkRunning)
-
-	held := s.deploys.active()
-	held[0].checks["Go"] = checkFailed
-	held[0].stage = deployLive
-
-	again := s.deploys.active()
-	assert.Equal(t, checkRunning, again[0].checks["Go"])
-	assert.Equal(t, deployQueued, again[0].stage)
-}
-
 // A build the runner delivered is a deploy of its own, about the archive it
 // installed, and a plugin that is not enabled ends it.
 func TestABuildLandingWithNoDeployInFlightBeginsOne(t *testing.T) {
@@ -118,11 +89,10 @@ func TestABuildLandingWithNoDeployInFlightBeginsOne(t *testing.T) {
 
 	s.buildLanded("inbox")
 
-	held := s.deploys.active()
-	require.Len(t, held, 1)
-	assert.Equal(t, digest, held[0].rev)
-	assert.Equal(t, deployDisabled, held[0].stage)
-	assert.Contains(t, held[0].began, deployRestarting)
+	d := heldDeploy(t, s, "inbox")
+	assert.Equal(t, digest, d.rev)
+	assert.Equal(t, deployDisabled, d.stage)
+	assert.Contains(t, d.began, deployRestarting)
 }
 
 // A line that is not written is said on the deploy, which carries on.
@@ -134,8 +104,7 @@ func TestALineNotWrittenIsHeldOnTheDeploy(t *testing.T) {
 	s.deploys.begin(pluginDeploy{plugin: "inbox", rev: "c0ffee", stage: deployBuilding})
 	s.deploys.stage("inbox", deployRestarting)
 
-	held := s.deploys.active()
-	require.Len(t, held, 1)
-	assert.Equal(t, deployRestarting, held[0].stage)
-	assert.Len(t, held[0].unwritten, 2)
+	d := heldDeploy(t, s, "inbox")
+	assert.Equal(t, deployRestarting, d.stage)
+	assert.Len(t, d.unwritten, 2)
 }
