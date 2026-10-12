@@ -60,6 +60,12 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			refused.write(w, undelivered)
 			return
 		}
+		// A tenant can arrive in the query or the body as well as the path, and
+		// is the same resource wherever it arrived.
+		if tenant, named := tenantOf(request); named && !served(tenant) {
+			notFound("no agent is served at tenant "+tenant).write(w, undelivered)
+			return
+		}
 		if refused := lacking(op, request); refused != nil {
 			refused.write(w, undelivered)
 			return
@@ -85,6 +91,20 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			undelivered(op.Name, err)
 		}
 	})
+}
+
+// tenantOf is the tenant a request message names, when it names one: the
+// routing identifier every request carries (AgentInterface.tenant, §8.3.2).
+func tenantOf(request proto.Message) (string, bool) {
+	tenant, named := "", false
+	request.ProtoReflect().Range(func(field protoreflect.FieldDescriptor, value protoreflect.Value) bool {
+		if field.Name() != "tenant" || field.Kind() != protoreflect.StringKind {
+			return true
+		}
+		tenant, named = value.String(), true
+		return false
+	})
+	return tenant, named
 }
 
 // version is §3.6.2: the A2A-Version header or request parameter, an empty

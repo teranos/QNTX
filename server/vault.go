@@ -161,7 +161,9 @@ func sendsOf(sends map[string]string) map[string]any {
 func (s *QNTXServer) vaultSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "vault",
+			Name:        "vault",
+			Description: "Every Obsidian vault the node keeps a copy of, and each of its folders bound to a folder of a GitHub repository.",
+			Tags:        []string{"vault", "obsidian", "github"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "list",
