@@ -41,6 +41,9 @@ type pluginDeploy struct {
 	repo, ref, after string
 	// pushed is a deploy a push began, at a commit checks run on.
 	pushed bool
+	// version is what the build says it is, once there is a build to ask.
+	version   string
+	versioned bool
 	// The revs it replaces, and the revs it installs.
 	replacesRevs []string
 	revs         []string
@@ -216,6 +219,15 @@ func (t *deployTracker) checksPassed(plugin, sha string) bool {
 		t.moved(d, deployQueued, map[string]any{"checks": len(d.checks)})
 	}
 	return waits
+}
+
+// incoming is the version plugin's deploy is bringing, as its build said it.
+func (t *deployTracker) incoming(plugin, version string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if d, flying := t.flying(plugin); flying {
+		d.version, d.versioned = version, true
+	}
 }
 
 // held is each plugin's newest deploy, as it is now.

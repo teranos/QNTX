@@ -23,14 +23,6 @@ type DeployBar struct {
 // deployOrder is how far along the node a deploy is.
 var deployOrder = []string{deployQueued, deployBuilding, deployRestarting, deployLive}
 
-// shownRev is a rev as short as a deploy's subject says it.
-func shownRev(rev string) string {
-	if len(rev) > shortRev {
-		return rev[:shortRev]
-	}
-	return rev
-}
-
 // deployRow is what the row draws of the deploys, and whether one is underway.
 type deployRow struct {
 	items    []StatusItem
@@ -86,8 +78,12 @@ func failureStands(failed pluginDeploy, deploys []pluginDeploy, news []News, now
 // deployItem is one deploy: the plugin, the version coming in, the checks on
 // the commit pushed, and how far the node is.
 func deployItem(d pluginDeploy) StatusItem {
-	// The note is the version coming in; ug alternates it with the name.
-	item := StatusItem{Name: d.plugin, Note: shownRev(d.rev), Symbol: SymbolWell}
+	item := StatusItem{Name: d.plugin, Symbol: SymbolWell}
+	// The version coming in, once its build said it; ug alternates it with the
+	// name. Before the build there is no version to say.
+	if d.versioned {
+		item.Note = d.version
+	}
 
 	// A deploy no push began has no commit for checks to run on.
 	if d.pushed {

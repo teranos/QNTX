@@ -46,7 +46,12 @@ func TestADeployLeadsTheRowAndHoldsTheCarousel(t *testing.T) {
 
 	deploy := body.Items[0]
 	assert.Equal(t, "datapunt", deploy.Name)
-	assert.Equal(t, "f7cf853", deploy.Note, "the note is the version coming in")
+	assert.Empty(t, deploy.Note, "a version said before any build said it")
+
+	// Once the build said its version, that is the note ug alternates with the name.
+	built := buildingDeploy(time.Now())
+	built.version, built.versioned = "0.3.11-8ed95ff65b864797", true
+	assert.Equal(t, "0.3.11-8ed95ff65b864797", deployItem(built).Note)
 	require.Len(t, deploy.Bars, 2)
 	assert.Equal(t, DeployBar{Kind: barChecks, Done: 2, Of: 3}, deploy.Bars[0])
 	assert.Equal(t, DeployBar{Kind: barNode, Done: 1, Of: 3}, deploy.Bars[1])
