@@ -95,11 +95,8 @@
       "cmd/parity/main.go",
       "cmd/qntx/commands/db.go",
       "internal/testing/database.go",
-      "plugin/grpc/services/ground_server.go",
       "server/db_stats_cache.go",
-      "server/embeddings/clustering.go",
-      "server/embeddings/handlers.go",
-      "server/ground_bridge.go"
+      "server/embeddings/handlers.go"
     ]
   },
   {
