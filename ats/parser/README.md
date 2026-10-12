@@ -91,6 +91,27 @@ a length of time writes it in this grammar, so what is shown reads back:
 Words after `since`, `until`, `on`, `between` and `over` run to the next
 keyword, so `since last month` and `over 5 years` need no quotes.
 
+### Over: longer than
+
+`over 5y` keeps attestations longer than five years. An attestation's type is
+its predicate, and a type names where its attestations start and end with two
+attributes, `start_field` and `end_field`, the way it names `rich_string_fields`:
+
+```bash
+# the employed type says where an employment starts and ends
+POST /api/types {"name": "employed", "start_field": "from", "end_field": "until"}
+
+# employments of ALICE that lasted longer than five years
+ax ALICE is employed over 5y
+```
+
+Length is counted on the calendar from the start (`crates/ats/src/ax/over.rs`):
+from 2020-02-29, five years ends 2025-02-28, and an end must be past it. An
+attestation whose type names no ends, or whose ends hold no ISO time, has no
+length and is not over. The limit counts what is kept. A watcher refuses
+`over`: it matches each attestation as it arrives and reads no type
+definitions to measure it with.
+
 ### ISO Date Formats
 
 ```

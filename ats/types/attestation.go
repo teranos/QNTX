@@ -230,6 +230,10 @@ type AxFilter struct {
 	Limit      int       `json:"limit"`      // Maximum results
 	Format     string    `json:"format"`     // Output format: table, json
 	SoActions  []string  `json:"so_actions"` // Actions to perform after query: ex csv, summarize, etc
+	// Over is an `over 5y` clause as span text, read in Rust: only attestations
+	// longer than it, between the start and end their type names. It crosses to
+	// Rust as it came from Rust's ax_filter, and a query saying none carries none.
+	Over *string `json:"over,omitempty"`
 }
 
 // AxResult represents the result of an ax query

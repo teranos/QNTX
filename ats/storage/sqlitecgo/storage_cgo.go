@@ -634,6 +634,9 @@ type rustQueryFilter struct {
 	// Limit always goes: a limit of 0 is 0 rows, and Rust refuses a filter
 	// that leaves it out.
 	Limit int `json:"limit"`
+	// Over is an ax query's `over` clause, read on the resolved path and
+	// refused by a raw one (crates/ats-sqlite/src/ffi.rs raw_over).
+	Over *string `json:"over,omitempty"`
 }
 
 // rustTimes is a query's time range as Rust reads it: Unix milliseconds on a
@@ -726,6 +729,7 @@ func axAsRust(filter types.AxFilter) (rustQueryFilter, error) {
 		TimeStart:  times.from,
 		TimeEnd:    times.to,
 		Limit:      filter.Limit,
+		Over:       filter.Over,
 	}, nil
 }
 

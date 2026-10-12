@@ -31,8 +31,9 @@
 //! sorted.
 
 mod filter;
+pub mod over;
 
-pub use filter::{ax_filter, AxRequest, AxRequestError};
+pub use filter::{ax_filter, watch_filter, AxRequest, AxRequestError};
 
 use std::collections::{HashMap, HashSet};
 
@@ -55,8 +56,8 @@ pub fn execute<S: QueryStore + ?Sized>(
     config: &TemporalConfig,
     now_ms: i64,
 ) -> StoreResult<AxResult> {
-    let raw = store.query(filter)?;
-    Ok(resolve(raw.attestations, config, now_ms))
+    let attestations = over::read_over(filter, |f| Ok(store.query(f)?.attestations))?;
+    Ok(resolve(attestations, config, now_ms))
 }
 
 /// [`expand_aliases`], then [`execute`] — the whole read path for a backend
@@ -103,6 +104,7 @@ pub fn expand_aliases<A: AliasStore + ?Sized>(
         time_end: filter.time_end,
         source: filter.source.clone(),
         limit: filter.limit,
+        over: filter.over.clone(),
     })
 }
 
@@ -476,6 +478,60 @@ mod tests {
                 "ordering must not vary between runs"
             );
         }
+    }
+
+    // "over means longer than": the type names the ends, and the limit counts
+    // what is kept, not what was read.
+    #[test]
+    fn over_keeps_what_its_type_measures_longer_and_then_limits() {
+        use serde_json::json;
+        let mut store = MemoryStore::new();
+        store
+            .put(
+                AttestationBuilder::new()
+                    .id("TYPE-employed")
+                    .subject("employed")
+                    .predicate("type")
+                    .actor("employed")
+                    .source("test")
+                    .timestamp(NOW - 10)
+                    .attribute("start_field", json!("from"))
+                    .attribute("end_field", json!("until"))
+                    .build(),
+            )
+            .unwrap();
+        let held = |id: &str, from: &str, until: &str, ts: i64| {
+            AttestationBuilder::new()
+                .id(id)
+                .subject("ALICE")
+                .predicate("employed")
+                .context(id)
+                .actor("human:hr")
+                .source("test")
+                .timestamp(ts)
+                .attribute("from", json!(from))
+                .attribute("until", json!(until))
+                .build()
+        };
+        for a in [
+            held("LONG-1", "2010-01-01", "2020-01-01", NOW - 3),
+            held("SHORT", "2019-01-01", "2020-01-01", NOW - 2),
+            held("LONG-2", "2012-01-01", "2020-01-01", NOW - 1),
+            held("LONG-3", "2001-01-01", "2020-01-01", NOW),
+        ] {
+            store.put(a).unwrap();
+        }
+
+        let filter = AxFilter {
+            subjects: vec!["ALICE".to_string()],
+            limit: 2,
+            over: Some(crate::span::Span::parse("5y").unwrap()),
+            ..Default::default()
+        };
+        let result = execute(&store, &filter, &TemporalConfig::default(), NOW).unwrap();
+        let kept = ids(&result);
+        assert_eq!(kept.len(), 2, "{kept:?}");
+        assert!(kept.iter().all(|id| id.starts_with("LONG")), "{kept:?}");
     }
 
     #[test]

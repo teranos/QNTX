@@ -51,6 +51,14 @@ func ParseAxCommandWithContext(args []string, verbosity int, ctx ErrorContext) (
 	return parseAxQueryDispatch(args, verbosity, ctx)
 }
 
+// ParseAxWatcherQuery parses a watcher's ax query. It is ParseAxCommand with
+// `over` refused: a watcher matches each attestation as it arrives and reads no
+// type definitions to measure it with, so a watcher asking `over` is told so
+// rather than firing as if it had not asked.
+func ParseAxWatcherQuery(args []string) (*types.AxFilter, error) {
+	return parseAxWatcherDispatch(args)
+}
+
 type axToken struct {
 	value           string
 	quoted          bool

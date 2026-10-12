@@ -178,8 +178,26 @@ mod wazero {
         write_result(&ax_filter_impl(input))
     }
 
+    /// A watcher's query as the filter it asks for: [`ax_filter`], with `over`
+    /// refused, since a watcher matches each attestation as it arrives and
+    /// reads no type definitions to measure it with.
+    #[no_mangle]
+    pub extern "C" fn watch_filter(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&filter_impl(input, ats::watch_filter))
+    }
+
     /// Inner logic for ax_filter — testable without WASM memory ABI.
     fn ax_filter_impl(input: &str) -> String {
+        filter_impl(input, ats::ax_filter)
+    }
+
+    /// A query read by `read` (ax_filter or watch_filter), from the JSON
+    /// input both exports take.
+    fn filter_impl(
+        input: &str,
+        read: fn(&str, i64, usize) -> Result<ats::AxRequest, ats::AxRequestError>,
+    ) -> String {
         #[derive(serde::Deserialize)]
         struct Input {
             query: String,
@@ -192,7 +210,7 @@ mod wazero {
             Err(e) => return error_json(&format!("invalid input: {}", e)),
         };
 
-        match ats::ax_filter(&parsed.query, parsed.now_ms, parsed.limit) {
+        match read(&parsed.query, parsed.now_ms, parsed.limit) {
             Ok(request) => match serde_json::to_string(&request) {
                 Ok(json) => json,
                 Err(e) => error_json(&format!("serialization failed: {}", e)),
@@ -493,6 +511,32 @@ mod wazero {
 
         // 2026-03-31T10:00:00Z
         const MARCH_31: i64 = 1_774_951_200_000;
+
+        #[test]
+        fn over_crosses_as_its_text_and_watchers_refuse_it() {
+            let input =
+                serde_json::json!({"query": "ALICE over 2 years 3 months", "now_ms": MARCH_31, "limit": 10})
+                    .to_string();
+            let asked: serde_json::Value = serde_json::from_str(&ax_filter_impl(&input)).unwrap();
+            assert_eq!(asked["filter"]["over"], "2y3mo");
+
+            let watched: serde_json::Value =
+                serde_json::from_str(&filter_impl(&input, ats::watch_filter)).unwrap();
+            assert!(
+                watched["error"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("over 2y3mo: a watcher"),
+                "{watched}"
+            );
+
+            let plain =
+                serde_json::json!({"query": "ALICE", "now_ms": MARCH_31, "limit": 10}).to_string();
+            let plain: serde_json::Value =
+                serde_json::from_str(&filter_impl(&plain, ats::watch_filter)).unwrap();
+            assert_eq!(plain["filter"]["subjects"][0], "ALICE");
+            assert_eq!(plain["filter"].get("over"), None, "{plain}");
+        }
 
         #[test]
         fn resolve_temporal_expr_answers_a_moment_or_a_day() {

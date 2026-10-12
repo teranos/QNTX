@@ -21,6 +21,17 @@ pub struct AxRequest {
     pub actions: Vec<String>,
 }
 
+/// The filter a watcher's query names. A watcher matches each attestation as
+/// it arrives, and reads no type definitions to measure it with, so `over` is
+/// refused rather than matched as if it were not there.
+pub fn watch_filter(query: &str, now_ms: i64, limit: usize) -> Result<AxRequest, AxRequestError> {
+    let request = ax_filter(query, now_ms, limit)?;
+    match &request.filter.over {
+        Some(span) => Err(AxRequestError::NotWatched(span.to_string())),
+        None => Ok(request),
+    }
+}
+
 /// Why a query names no rows.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum AxRequestError {
@@ -28,6 +39,8 @@ pub enum AxRequestError {
     Parse(#[from] ParseError),
     #[error("unable to parse temporal expression: {0}")]
     Temporal(String),
+    #[error("over {0}: a watcher matches each attestation as it arrives and reads no type definitions to measure it with")]
+    NotWatched(String),
 }
 
 /// The filter an AX query names, its time resolved against `now_ms`, reading
@@ -50,8 +63,8 @@ pub fn ax_filter(query: &str, now_ms: i64, limit: usize) -> Result<AxRequest, Ax
             (Some(day.start_ms), Some(day.end_ms))
         }
         Some(TemporalClause::Between(start, end)) => (Some(at(start)?), Some(at(end)?)),
-        // `over 5y` is a span, not a range: it bounds no rows. One the span
-        // grammar does not read was refused by the parser.
+        // `over 5y` is longer than, not a range: it bounds no time. It is read
+        // after the rows are (crate::ax::over).
         Some(TemporalClause::Over(_)) => (None, None),
     };
 
@@ -67,6 +80,14 @@ pub fn ax_filter(query: &str, now_ms: i64, limit: usize) -> Result<AxRequest, Ax
             time_end,
             source: None,
             limit,
+            over: match parsed.temporal {
+                Some(TemporalClause::Over(span)) => Some(span),
+                Some(TemporalClause::Since(_))
+                | Some(TemporalClause::Until(_))
+                | Some(TemporalClause::On(_))
+                | Some(TemporalClause::Between(_, _))
+                | None => None,
+            },
         },
         actions: owned(&parsed.actions),
     })

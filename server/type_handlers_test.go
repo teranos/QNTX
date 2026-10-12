@@ -302,3 +302,53 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 		// Health Dept --[inspected]--> Chez Laurent
 	})
 }
+
+// "An attested type should designate what we see as start and end for the
+// purpose of over": the type API writes both ends, reads them back, and
+// refuses one without the other.
+func TestATypeNamesWhereItsAttestationsStartAndEnd(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	testDB, err := sql.Open("sqlite3", dbPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Close() })
+	_, err = testDB.Exec("PRAGMA journal_mode=WAL")
+	require.NoError(t, err)
+	require.NoError(t, db.Migrate(testDB, nil))
+
+	testStore, _ := createTestStore(t)
+	srv, err := NewQNTXServer(testDB, servingOne(testDB, testStore), dbPath, 0)
+	require.NoError(t, err)
+	defer srv.Stop()
+
+	post := func(payload map[string]any) *httptest.ResponseRecorder {
+		body, err := json.Marshal(payload)
+		require.NoError(t, err)
+		req := httptest.NewRequest("POST", "/api/types", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		srv.HandleTypes(w, req)
+		return w
+	}
+
+	w := post(map[string]any{"name": "employed", "start_field": "from", "end_field": "until"})
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+	req := httptest.NewRequest("GET", "/api/types/employed", nil)
+	got := httptest.NewRecorder()
+	srv.HandleTypes(got, req)
+	require.Equal(t, http.StatusOK, got.Code)
+	var typeResp map[string]any
+	require.NoError(t, json.Unmarshal(got.Body.Bytes(), &typeResp))
+	assert.Equal(t, "from", typeResp["start_field"])
+	assert.Equal(t, "until", typeResp["end_field"])
+
+	one := post(map[string]any{"name": "halfway", "start_field": "from"})
+	assert.Equal(t, http.StatusBadRequest, one.Code)
+	assert.Contains(t, one.Body.String(), "both or neither")
+
+	bad := post(map[string]any{"name": "badly", "start_field": "from", "end_field": "until!"})
+	assert.Equal(t, http.StatusBadRequest, bad.Code)
+
+	neither := post(map[string]any{"name": "plain"})
+	assert.Equal(t, http.StatusCreated, neither.Code, neither.Body.String())
+}

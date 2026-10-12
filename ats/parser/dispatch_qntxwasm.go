@@ -35,6 +35,7 @@ type axFilterOutput struct {
 		TimeStart  json.RawMessage `json:"time_start"`
 		TimeEnd    json.RawMessage `json:"time_end"`
 		Limit      int             `json:"limit"`
+		Over       *string         `json:"over"`
 	} `json:"filter"`
 	Actions []string `json:"actions"`
 }
@@ -49,6 +50,18 @@ type resolvedOnClause struct {
 const axLimit = 100
 
 func parseAxQueryWasm(args []string) (*types.AxFilter, error) {
+	return readAxQueryWasm("ax_filter", args)
+}
+
+// parseAxWatcherDispatch reads a watcher's query through watch_filter, which
+// refuses `over`: a watcher matches each attestation as it arrives and reads no
+// type definitions to measure it with.
+func parseAxWatcherDispatch(args []string) (*types.AxFilter, error) {
+	return readAxQueryWasm("watch_filter", args)
+}
+
+// readAxQueryWasm reads a query through fnName, ax_filter or watch_filter.
+func readAxQueryWasm(fnName string, args []string) (*types.AxFilter, error) {
 	query := strings.Join(args, " ")
 
 	engine, err := wasm.GetEngine()
@@ -61,23 +74,23 @@ func parseAxQueryWasm(args []string) (*types.AxFilter, error) {
 		return nil, errors.Wrapf(err, "marshal ax_filter input %q", query)
 	}
 
-	resultJSON, err := engine.Call("ax_filter", string(inputJSON))
+	resultJSON, err := engine.Call(fnName, string(inputJSON))
 	if err != nil {
-		return nil, errors.Wrapf(err, "wasm ax_filter %q", query)
+		return nil, errors.Wrapf(err, "wasm %s %q", fnName, query)
 	}
 
 	var out axFilterOutput
-	if err := answer("ax_filter", resultJSON, &out); err != nil {
+	if err := answer(fnName, resultJSON, &out); err != nil {
 		return nil, errors.Wrapf(err, "ax parse %q", query)
 	}
 
 	start, err := timeBoundOf("time_start", out.Filter.TimeStart)
 	if err != nil {
-		return nil, errors.Wrapf(err, "ax_filter answered %q with %s", query, resultJSON)
+		return nil, errors.Wrapf(err, "%s answered %q with %s", fnName, query, resultJSON)
 	}
 	end, err := timeBoundOf("time_end", out.Filter.TimeEnd)
 	if err != nil {
-		return nil, errors.Wrapf(err, "ax_filter answered %q with %s", query, resultJSON)
+		return nil, errors.Wrapf(err, "%s answered %q with %s", fnName, query, resultJSON)
 	}
 
 	// The node's stores match subjects upper case and contexts and actors
@@ -92,6 +105,7 @@ func parseAxQueryWasm(args []string) (*types.AxFilter, error) {
 		TimeEnd:    end,
 		Limit:      out.Filter.Limit,
 		Format:     "table",
+		Over:       out.Filter.Over,
 	}, nil
 }
 

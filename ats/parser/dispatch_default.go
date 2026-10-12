@@ -17,6 +17,11 @@ func parseAxQueryDispatch(args []string, verbosity int, ctx ErrorContext) (*type
 	return nil, errors.New("ax query parsing " + rebuild)
 }
 
+// parseAxWatcherDispatch returns an error when WASM parser is not available.
+func parseAxWatcherDispatch(args []string) (*types.AxFilter, error) {
+	return nil, errors.New("watcher query parsing " + rebuild)
+}
+
 // resolveTemporalDispatch returns an error when WASM parser is not available.
 func resolveTemporalDispatch(expr string, now time.Time) (int64, error) {
 	return 0, errors.Newf("resolving %q %s", expr, rebuild)

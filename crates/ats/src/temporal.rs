@@ -221,7 +221,7 @@ fn parse_named_day(expr: &str, now_ms: i64) -> Option<i64> {
 /// Parse ISO date/datetime strings to epoch milliseconds (UTC). Only
 /// year-first dates read: 03/04/2025 is April 3 to some and March 4 to others,
 /// so it is refused rather than guessed at.
-fn parse_iso_date(expr: &str) -> Option<i64> {
+pub(crate) fn parse_iso_date(expr: &str) -> Option<i64> {
     // 2024-01-15T14:30:00Z, 2024-01-15t14:30, 2024-01-15 14:30:00
     if let Some((date_part, time_part)) = expr.split_once(['T', 't', ' ']) {
         return parse_iso_datetime(date_part, time_part);
