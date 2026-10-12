@@ -1,8 +1,9 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2660 in 375 files.
+# 2661 in 376 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
+# server/a2a_route.go: 1, an extended card lacking what the spec requires is refused, as the public card is (a2a_card.go).
 # From 3033: Go's x > 0 and x <= 0, and Rust's tests against nothing, are counted now; each was there before it was counted.
 # ats/types/attestation.go: +1, NamesItsActor refuses a command naming no actor: one check every store's generate path calls, where four filled one in.
 # server/attestation_handlers.go: +1, the node authors what its caller named nobody for.
@@ -221,6 +222,7 @@
 14	server/a2a/http.go
 4	server/a2a/operations.go
 5	server/a2a_card.go
+1	server/a2a_route.go
 9	server/agent_harness.go
 2	server/agent_turn.go
 20	server/agents.go
