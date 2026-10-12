@@ -40,22 +40,17 @@ type ClusterFunc func(data []float32, nPoints, dims, minClusterSize int) (*Clust
 // ReduceFunc calls the reduce plugin via gRPC for projection operations.
 type ReduceFunc func(ctx context.Context, method, path string, body []byte) ([]byte, error)
 
-// GroundWriteFunc writes an attestation to Ground's standalone database.
-type GroundWriteFunc func(dbPath string, as *types.As, logger *zap.SugaredLogger)
-
 // Handler handles HTTP requests for the embedding service.
 type Handler struct {
-	DB           *sql.DB
-	ReadDB       *sql.DB // read-only connection, no write lock contention
-	Store        *storage.EmbeddingStore
-	Service      Service
-	ATSStore     ats.AttestationStore
-	Logger       *zap.SugaredLogger
-	CallReduce   ReduceFunc      // optional: for projection via reduce plugin
-	ClusterFunc  ClusterFunc     // required: clustering via plugin gRPC
-	Invalidator  func()          // cluster cache invalidation callback
-	GroundDBPath string          // for cluster lifecycle attestations
-	GroundWrite  GroundWriteFunc // writes deferred news to Ground's DB
+	DB          *sql.DB
+	ReadDB      *sql.DB // read-only connection, no write lock contention
+	Store       *storage.EmbeddingStore
+	Service     Service
+	ATSStore    ats.AttestationStore
+	Logger      *zap.SugaredLogger
+	CallReduce  ReduceFunc  // optional: for projection via reduce plugin
+	ClusterFunc ClusterFunc // required: clustering via plugin gRPC
+	Invalidator func()      // cluster cache invalidation callback
 }
 
 // readDB returns ReadDB if set, otherwise falls back to DB.

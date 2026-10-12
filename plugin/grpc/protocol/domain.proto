@@ -107,9 +107,9 @@ message InitializeRequest {
   // Provides: Nearest-neighbor search over dense vector indexes (ADR-016)
   ServiceEndpoint vector_search_endpoint = 16;
 
-  // ground_endpoint: gRPC endpoint for [GroundService](https://qntx.sbvh.nl/api/grpc-ground.html)
-  // Provides: Write attestations to Ground's deferred news database
-  ServiceEndpoint ground_endpoint = 17;
+  // 17 was ground_endpoint: a write into ground's own file. Ground reads the
+  // node's status line instead, and nothing writes its file.
+  reserved 17;
 
   // search_endpoint: gRPC endpoint for [SearchService](https://qntx.sbvh.nl/api/grpc-search.html)
   // Provides: Full-text search over indexed documents (routed through core to provider plugin)

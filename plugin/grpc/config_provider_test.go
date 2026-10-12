@@ -80,7 +80,7 @@ func TestAServiceTheNodeRunsWithoutIsHandedAsWhy(t *testing.T) {
 
 	every := ServiceEndpoints{
 		LLM: ServingAt("localhost:1"), Embedding: ServingAt("localhost:2"), VectorSearch: ServingAt("localhost:3"),
-		Ground: ServingAt("localhost:4"), Search: ServingAt("localhost:5"), Fetch: ServingAt("localhost:6"),
+		Search: ServingAt("localhost:5"), Fetch: ServingAt("localhost:6"),
 		Mail: NotRunning(why),
 	}
 	config := NewConfigProvider(ServedEndpoints(every), nil, zap.NewNop().Sugar()).GetPluginConfig("x")

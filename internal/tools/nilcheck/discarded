@@ -1,6 +1,6 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 294 in 128 files.
+# 293 in 128 files.
 
 1	ats/attrs/attrs.go
 1	ats/identity/quickdev.go
@@ -39,7 +39,7 @@
 1	internal/access/derive.go
 1	internal/access/tokens.go
 2	internal/claudecode/claudecode.go
-5	internal/config/defaults.go
+4	internal/config/defaults.go
 1	internal/config/introspection.go
 3	internal/config/load.go
 1	internal/config/one_root.go
@@ -96,7 +96,6 @@
 2	server/github.go
 2	server/github_deliveries.go
 1	server/github_tag.go
-1	server/ground_bridge.go
 2	server/handlers.go
 1	server/host_gauges.go
 2	server/mcp.go

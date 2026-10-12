@@ -407,8 +407,7 @@ func (m *PluginManager) SetOnPluginRestarted(fn func(name string)) {
 }
 
 // SetOnLifecycleEvent adds fn to what is told of plugin lifecycle events
-// (started, stopped, restarted, enabled, disabled). The server uses this to
-// write deferred news attestations to Ground.
+// (started, stopped, restarted, enabled, disabled).
 func (m *PluginManager) SetOnLifecycleEvent(fn func(pluginName, version, event string, routes []string)) {
 	m.wiringMu.Lock()
 	defer m.wiringMu.Unlock()

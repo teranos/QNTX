@@ -29,8 +29,6 @@ type ReclusterHandler struct {
 	Invalidator           func()
 	MinClusterSize        int
 	ClusterMatchThreshold float64
-	GroundDBPath          string
-	GroundWrite           GroundWriteFunc
 	Models                []string // model names to cluster; empty = all models mixed (legacy)
 	Logger                *zap.SugaredLogger
 }
@@ -58,7 +56,7 @@ func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
 			fmt.Sprintf("Starting HDBSCAN re-clustering for model %s", modelLabel),
 			fmt.Sprintf(`{"min_cluster_size":%d,"model":"%s"}`, h.MinClusterSize, model))
 
-		result, err := RunHDBSCANClustering(h.Store, h.Svc, h.ClusterFunc, h.Invalidator, h.MinClusterSize, h.ClusterMatchThreshold, h.ATSStore, h.ProjectCtx, h.GroundDBPath, h.GroundWrite, h.Logger, model)
+		result, err := RunHDBSCANClustering(h.Store, h.Svc, h.ClusterFunc, h.Invalidator, h.MinClusterSize, h.ClusterMatchThreshold, h.ATSStore, h.ProjectCtx, h.Logger, model)
 		if err != nil {
 			h.writeLog(job.ID, "clustering", "error", fmt.Sprintf("Clustering failed for model %s: %s", modelLabel, err), "")
 			continue
@@ -71,7 +69,7 @@ func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
 				model, result.Summary.NTotal, result.Summary.NClusters, result.Summary.NNoise, result.TimeMS))
 	}
 
-	EmitPulseDeferredNews(h.DB, h.ATSStore, h.ProjectCtx, h.GroundDBPath, h.GroundWrite, h.Logger)
+	EmitPulseDeferredNews(h.DB, h.ATSStore, h.ProjectCtx, h.Logger)
 	return nil
 }
 
@@ -147,10 +145,10 @@ func (h *ReprojectHandler) writeLog(jobID, stage, level, message, metadata strin
 	}
 }
 
-// EmitPulseDeferredNews queries recent Pulse execution stats and writes a deferred
-// news attestation for Ground. Emitted after every recluster run (success or failure)
-// as the recluster heartbeat is the natural place for periodic Pulse health reporting.
-func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx string, groundDBPath string, groundWrite GroundWriteFunc, logger *zap.SugaredLogger) {
+// EmitPulseDeferredNews queries recent Pulse execution stats and attests a
+// summary. Emitted after every recluster run (success or failure) as the
+// recluster heartbeat is the natural place for periodic Pulse health reporting.
+func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx string, logger *zap.SugaredLogger) {
 	if atsStore == nil {
 		return
 	}
@@ -250,11 +248,7 @@ func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 		logger.Warnw("Failed to create Pulse deferred news",
 			"asid", asid, "error", err)
 	} else {
-		logger.Infow("Deferred Pulse news for Ground",
+		logger.Infow("Attested the Pulse summary",
 			"asid", asid, "completed", completed, "failed", failed)
-	}
-
-	if groundWrite != nil {
-		groundWrite(groundDBPath, as, logger)
 	}
 }

@@ -102,13 +102,6 @@ export interface InitializeRequest {
     | ServiceEndpoint
     | undefined;
   /**
-   * ground_endpoint: gRPC endpoint for [GroundService](https://qntx.sbvh.nl/api/grpc-ground.html)
-   * Provides: Write attestations to Ground's deferred news database
-   */
-  ground_endpoint:
-    | ServiceEndpoint
-    | undefined;
-  /**
    * search_endpoint: gRPC endpoint for [SearchService](https://qntx.sbvh.nl/api/grpc-search.html)
    * Provides: Full-text search over indexed documents (routed through core to provider plugin)
    */
