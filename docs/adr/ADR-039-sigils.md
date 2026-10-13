@@ -22,8 +22,9 @@ Status: In-progress
 - Reach lines name sigils and signa, per surface where that matters. The const
   table is the floor, lines in system govern at runtime, and a caller is shown
   only what they reach.
--  The boundary to other systems is deferred, and it will be runtime lines
-  in the attestation DSL.
+
+
+
 - Some routes are not sigils: .well-known, the /auth ceremony, / and /health,
   /g/, /s/, the sockets, /mcp.
 
@@ -49,3 +50,5 @@ Status: In-progress
   picture, a2a, debug, dev, crash test.
 - server/a2a_card.go builds a card's skills from signa alone, so none of
   these is reached over A2A until it is a sigil.
+
+
