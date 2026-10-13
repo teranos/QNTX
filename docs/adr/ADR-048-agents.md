@@ -30,7 +30,7 @@ QNTX hosts agents for use by ROOT.
 
 
 - ROOT's are Opus and  Fable at minimum 
-- Switching model 
+- Switching model in the same session is 
 
 
 ## The host agent
