@@ -29,11 +29,9 @@ QNTX hosts agents for use by ROOT.
 
 
 
-- ROOT's are Opus and  Fable at 
+- ROOT's are Opus and  Fable at minimum 
 
-"So a conversation I have with Mistral as ROOT is one long Mistral conversation"
 
-- Each of ROOT's agents is one session with ROOT, and it continues.
 
 ## The host agent
 
