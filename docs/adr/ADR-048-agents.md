@@ -25,10 +25,10 @@ QNTX hosts agents for use by ROOT.
 
 ---
 
+
 "I feel like Opus and Fable are two distinct identities"
 
-"each model would be its own agent session, independent of each other but still
-reachable by each other."
+
 
 - An agent is one model in one place: its own DID, its own session, its own
   context. Two models are two agents, and so is one model in two places.
