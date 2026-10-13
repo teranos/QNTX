@@ -22,9 +22,7 @@ Status: In-progress
 - Reach lines name sigils and signa, per surface where that matters. The const
   table is the floor, lines in system govern at runtime, and a caller is shown
   only what they reach.
-- A2A is ROOT's alone for the foreseeable future, and it is for the owner's own
-  agents first: an agent is a token, and what it says is written under its own
-  DID. The boundary to other systems is deferred, and it will be runtime lines
+-  The boundary to other systems is deferred, and it will be runtime lines
   in the attestation DSL.
 - Some routes are not sigils: .well-known, the /auth ceremony, / and /health,
   /g/, /s/, the sockets, /mcp.
