@@ -26,17 +26,8 @@ QNTX hosts agents for use by ROOT.
 ---
 
 
-"I feel like Opus and Fable are two distinct identities"
 
 
-
-- An agent is one model in one place: its own DID, its own session, its own
-  context. Two models are two agents, and so is one model in two places.
-- They reach each other, each an A2A Server to the others and their A2A
-  Client.
-
-"So the first persistent Agent swarm is really three, or four if we include
-something we run on Pi"
 
 - ROOT's are Opus, Fable and Sonnet in Claude Code, and the one in Pi.
 
