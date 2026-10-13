@@ -33,7 +33,7 @@ QNTX hosts agents for use by ROOT.
 - Switching model in the same session is a deliberate act
 
 
-## The host agent
+
 
 "the ROOT host agent is QNTX as ROOT would talk to it."
 
