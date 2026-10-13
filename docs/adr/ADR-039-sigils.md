@@ -8,7 +8,7 @@ It is a way to define what goes in, what comes out, how it refuses.
 
 A Sigil results into: HTTP routes, MCP, openapi
 
-- The HTTP API and MCP are surfaces of a sigil. 
+
 - A2A describes the node to other agents.
 - The Agent Card describes the node's identity, capabilities, skills, service
   endpoint and authentication requirements. The node's MCP is not one of its
