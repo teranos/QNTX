@@ -31,6 +31,7 @@ func askingTheExtendedCard(srv *QNTXServer, path, token string) *httptest.Respon
 func TestThePublicCardDeclaresTheExtendedCard(t *testing.T) {
 	namedNode(t)
 	srv, _ := pluginServingServer(t, "fake")
+	keyedNode(srv)
 
 	w := httptest.NewRecorder()
 	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, agentCardPath, nil))

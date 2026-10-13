@@ -225,6 +225,15 @@
     color: #3498db;
 }
 
+/* Where an attestation of the type starts and ends, for `over` */
+.start-indicator,
+.end-indicator {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    cursor: default;
+}
+
 /* Add field input */
 .add-field {
     display: flex;
