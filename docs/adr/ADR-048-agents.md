@@ -23,7 +23,7 @@ QNTX hosts agents for use by ROOT.
 - To A2A an agent is described by its Agent Card, and its skills are what it
   can perform (ADR-039).
 
-## An agent per model
+---
 
 "I feel like Opus and Fable are two distinct identities"
 
