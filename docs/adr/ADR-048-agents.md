@@ -35,7 +35,7 @@ QNTX hosts agents for use by ROOT.
 
 
 
-"the ROOT host agent is QNTX as ROOT would talk to it."
+"the ROOT host agent is QNTX as ROOT User would talk to it."
 
 "It is the ROOT agent, one persistent session that is QNTX itself as expressed as ROOT."
 
