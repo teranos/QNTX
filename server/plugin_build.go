@@ -1,6 +1,6 @@
 package server
 
-// QNTX builds a plugin itself (ADR-045): from the sources its record names, as
+// QNTX builds a plugin itself (ADR-002): from the sources its record names, as
 // their branches are now, with the node's nix, and runs what it built.
 // "it is qntx that actually owns this"
 
