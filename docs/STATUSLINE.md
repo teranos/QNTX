@@ -68,8 +68,8 @@ the answer to the sieve being the same move as ritual_position.
 
 ## A plugin's deploy
 
-Built. The node holds each plugin's newest deploy (server/plugin_deploy.go); the row
-relays it, first, on a background of its own.
+Built. `/am/statusline?format=json` carries `deploys` beside `items`
+(server/statusline_deploy.go); ug draws each on its plugin's name (ground, ug/tmux.d).
 
 "i wish ug would poll from QNTX some kind of indication that it knows a new plugin build and version is underway"
 
@@ -98,6 +98,24 @@ What clears a failed deploy:
 "building on qntx"
 
 "another line beign filled"
+
+"WHEN ITS BUILDING IN GITHUB THE AREA BEHIND THE C NEEDS TO BE GREEN, THE OTHER LETTER YELLOW"
+
+"nothing next to name"
+
+"not 2/3 or 3/4"
+
+"the colored bg behind the text should communicate how far we are"
+
+"my tmux only goes so wide, its alreayd not wide enough and you want to add more to it"
+
+"yes alternating"
+
+"no, i said version number"
+
+"i dont want blinking bg when its building, just slight blink on finish"
+
+"just give me the data"
 
 ## The carousel
 
