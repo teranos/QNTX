@@ -102,22 +102,22 @@ type verificationMethod struct {
 	PublicKeyMultibase string `json:"publicKeyMultibase"`
 }
 
-// keyIDOf is the id a did:key's one verification method goes by: the DID, and
+// KeyIDOf is the id a did:key's one verification method goes by: the DID, and
 // for its fragment the multibase-encoded public key, which is the
 // method-specific-id.
-func keyIDOf(did string) string {
+func KeyIDOf(did string) string {
 	return did + "#" + did[len("did:key:"):]
 }
 
 // KeyID is the id the node's DID document gives its key, which a signature
 // made with the node's key names it by.
 func (h *Handler) KeyID() string {
-	return keyIDOf(h.DID)
+	return KeyIDOf(h.DID)
 }
 
 func buildDIDDocument(did string, pub ed25519.PublicKey) ([]byte, error) {
 	fragment := did[len("did:key:"):]
-	vmID := keyIDOf(did)
+	vmID := KeyIDOf(did)
 
 	doc := didDocument{
 		Context: "https://www.w3.org/ns/did/v1",

@@ -110,6 +110,20 @@ func (c Card) Message() (protoreflect.Message, error) {
 	return card, nil
 }
 
+// ReadCard is an AgentCard as another node served it, read through the pinned
+// spec.
+func ReadCard(body []byte) (protoreflect.Message, error) {
+	descriptor, err := message(AgentCard)
+	if err != nil {
+		return nil, err
+	}
+	card := dynamicpb.NewMessage(descriptor)
+	if err := protojson.Unmarshal(body, card); err != nil {
+		return nil, errors.Wrapf(err, "what was handed over is not an %s", AgentCard)
+	}
+	return card, nil
+}
+
 // bearerRequired is a SecurityRequirement naming the bearer scheme the card
 // declares, with no scopes.
 var bearerRequired = []map[string]any{{"schemes": map[string]any{"bearer": map[string]any{"list": []string{}}}}}
