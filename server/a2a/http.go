@@ -32,8 +32,9 @@ type Answer func(ctx context.Context, op Operation, request proto.Message) (prot
 // no trace anywhere else.
 type Undelivered func(what string, err error)
 
-// Served is whether an agent is served at tenant (AgentInterface.tenant).
-type Served func(tenant string) bool
+// Served is whether an agent is served at tenant (AgentInterface.tenant), or
+// why that was not answered.
+type Served func(tenant string) (bool, error)
 
 // HTTP serves the operations on their routes, relative to wherever it is
 // mounted. Every request is read the same way before any operation answers.
@@ -44,8 +45,13 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 		// answers as no operation does: "MUST return a not found error when a
 		// requested resource does not exist", and "SHOULD NOT distinguish
 		// between 'does not exist' and 'not authorized'" (§3.3.2).
-		if tenant, named := params["tenant"]; found && named && !served(tenant) {
-			found = false
+		if tenant, named := params["tenant"]; found && named {
+			at, err := served(tenant)
+			if err != nil {
+				(&Error{Message: "whether an agent is served at tenant " + tenant + " was not answered: " + err.Error()}).write(w, undelivered)
+				return
+			}
+			found = at
 		}
 		if !found {
 			notFound(r.Method+" "+r.URL.Path+" is no A2A operation").write(w, undelivered)
@@ -62,9 +68,16 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 		}
 		// A tenant can arrive in the query or the body as well as the path, and
 		// is the same resource wherever it arrived.
-		if tenant, named := tenantOf(request); named && !served(tenant) {
-			notFound("no agent is served at tenant "+tenant).write(w, undelivered)
-			return
+		if tenant, named := TenantOf(request); named {
+			at, err := served(tenant)
+			if err != nil {
+				(&Error{Message: "whether an agent is served at tenant " + tenant + " was not answered: " + err.Error()}).write(w, undelivered)
+				return
+			}
+			if !at {
+				notFound("no agent is served at tenant "+tenant).write(w, undelivered)
+				return
+			}
 		}
 		if refused := lacking(op, request); refused != nil {
 			refused.write(w, undelivered)
@@ -93,9 +106,9 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 	})
 }
 
-// tenantOf is the tenant a request message names, when it names one: the
+// TenantOf is the tenant a request message names, when it names one: the
 // routing identifier every request carries (AgentInterface.tenant, §8.3.2).
-func tenantOf(request proto.Message) (string, bool) {
+func TenantOf(request proto.Message) (string, bool) {
 	tenant, named := "", false
 	request.ProtoReflect().Range(func(field protoreflect.FieldDescriptor, value protoreflect.Value) bool {
 		if field.Name() != "tenant" || field.Kind() != protoreflect.StringKind {

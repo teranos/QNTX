@@ -74,13 +74,9 @@ type agentLine struct {
 // agentLineOf reads the newest AGENT line of the namespace. False is a
 // namespace that opted into no agent.
 func (s *QNTXServer) agentLineOf(namespace string) (agentLine, bool, error) {
-	reading, err := s.held.Read(namespace)
+	found, err := s.agentLinesIn(namespace)
 	if err != nil {
-		return agentLine{}, false, errors.Wrapf(err, "failed to read the %s line of %s", agentLineSubject, namespace)
-	}
-	found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{agentLineSubject}, Limit: ats.EveryRow})
-	if err != nil {
-		return agentLine{}, false, errors.Wrapf(err, "failed to read the %s line of %s", agentLineSubject, namespace)
+		return agentLine{}, false, err
 	}
 	var newest *types.As
 	held := false
@@ -109,6 +105,29 @@ func (s *QNTXServer) agentLineOf(namespace string) (agentLine, bool, error) {
 		return agentLine{}, false, err
 	}
 	return line, true, nil
+}
+
+// agentLinesIn is every AGENT line of the namespace, newest or not.
+func (s *QNTXServer) agentLinesIn(namespace string) ([]*types.As, error) {
+	reading, err := s.held.Read(namespace)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read the %s line of %s", agentLineSubject, namespace)
+	}
+	found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{agentLineSubject}, Limit: ats.EveryRow})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read the %s line of %s", agentLineSubject, namespace)
+	}
+	return found, nil
+}
+
+// optedIntoAgent is whether the namespace opted into an agent: it holds an
+// AGENT line for one.
+func (s *QNTXServer) optedIntoAgent(namespace string) (bool, error) {
+	found, err := s.agentLinesIn(namespace)
+	if err != nil {
+		return false, err
+	}
+	return slices.ContainsFunc(found, func(as *types.As) bool { return slices.Contains(as.Predicates, agentLineClaude) }), nil
 }
 
 // textOf is a line's attribute that is one text, and a line without it is a
