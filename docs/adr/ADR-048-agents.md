@@ -50,12 +50,10 @@ QNTX hosts agents for use by ROOT.
 - It is one session: In the case of Claude Code `--resume` continues it, and compacts automatically.
 - Its key is derived from the node's own, for its model, so it is the same DID  wherever the node is rebuilt from its record, and nothing more is kept for  it.
 - It reaches sigils through the node's own MCP, with a token of its own. The  token is ROOT's kind, which minting hands to nobody, and the node writes it  down for this agent alone.
-- `say` says something to it and answers with what it said back.
-- What it is told, what it reaches for and what it answers, it attests under
-  its session by its own DID, as the hook events a transcript is read from.
+- `say` speaks something to it and answers with what it said back.
+- What it is told, what it reaches for and what it answers, it attests under  its session by its own DID, as the hook events a transcript is read from.
 
 "ROOT is ROOT"
-
 "i want to be able to do anything"
 
 - It is privileged, and it has hands on the box as well as sigils: a package
