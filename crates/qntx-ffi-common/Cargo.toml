@@ -10,6 +10,9 @@ description = "Common FFI utilities for QNTX C-compatible interfaces"
 workspace = true
 
 [dependencies]
+ats.workspace = true
+laye-error = { path = "../laye-error" }
+serde_json.workspace = true
 # No dependencies - this is a minimal utility crate
 
 [features]

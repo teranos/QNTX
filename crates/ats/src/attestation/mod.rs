@@ -19,7 +19,9 @@
 //! ```
 
 mod types;
+mod writable;
 
 pub use types::{
     Attestation, AttestationBuilder, AxFilter, AxResult, AxSummary, Conflict, EVERY_ROW,
 };
+pub use writable::{Unwritable, MAX_NAMES, MAX_NAME_BYTES};

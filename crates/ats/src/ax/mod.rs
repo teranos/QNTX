@@ -56,7 +56,7 @@ pub fn execute<S: QueryStore + ?Sized>(
     config: &TemporalConfig,
     now_ms: i64,
 ) -> StoreResult<AxResult> {
-    let attestations = over::read_over(filter, |f| Ok(store.query(f)?.attestations))?;
+    let attestations = over::read_over(filter, |f| store.query(f).map(|r| r.attestations))?;
     Ok(resolve(attestations, config, now_ms))
 }
 

@@ -1,24 +1,25 @@
+//go:build cgo && !quickdev
+
+// The batch is answered by the Rust store, which is what refuses an
+// attestation with no subject.
+
 package server
 
 import (
 	"encoding/json"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/server/auth"
-	"go.uber.org/zap"
 )
 
 // "what i want is to move from 30 per minute to 1 per 30 sec"
 // "but batch them"
 func TestABatchIsAnsweredOnePerAttestation(t *testing.T) {
-	store, db := createTestStore(t)
-	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), nodeDB: db, logger: zap.NewNop().Sugar()}
-	s.held = servingOne(db, store)
+	s, store := rustWritingServer(t)
 
 	body := `[` +
 		`{"id":"ground:one","subjects":["qntx"],"predicates":["noted"],"actors":["ground"]},` +

@@ -13,6 +13,10 @@ pub enum StoreError {
     #[error("attestation not found: {0}")]
     NotFound(String),
 
+    /// An attestation no store takes: see `Attestation::writable`
+    #[error("{0}")]
+    Unwritable(#[from] crate::attestation::Unwritable),
+
     /// Invalid attestation data
     #[error("invalid attestation data: {0}")]
     InvalidData(String),

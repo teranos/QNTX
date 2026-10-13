@@ -238,7 +238,7 @@ impl Crosses for DuckdbError {
 
 impl Crosses for StoreError {
     fn crosses(self, call: &str) -> String {
-        store_sacred(self, call)
+        qntx_ffi_common::store::sacred(self, crate::error::SURFACE, call)
     }
 }
 
@@ -257,50 +257,6 @@ impl Crosses for qntx_ffi_common::CStrError {
         }
         .sacred_json(call)
     }
-}
-
-/// The trait's error as the sacred shape. A `Backend` already carries the
-/// shape as its string; the trait's own variants are built into one here.
-fn store_sacred(e: StoreError, call: &str) -> String {
-    let region = match &e {
-        StoreError::AlreadyExists(_) => "already-exists",
-        StoreError::NotFound(_) => "not-found",
-        StoreError::InvalidData(_) => "invalid-data",
-        StoreError::Backend(_) => "backend",
-        StoreError::Query(_) => "query",
-        StoreError::Serialization(_) => "serialization",
-        StoreError::QuotaExceeded { .. } => "quota-exceeded",
-    };
-    if let StoreError::Backend(json) = &e {
-        if serde_json::from_str::<laye_error::Error>(json).is_ok() {
-            return json.clone();
-        }
-    }
-    let at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis().to_string())
-        .unwrap_or_default();
-    let sacred = laye_error::Error {
-        id: format!("err-{}-{at}", crate::error::SURFACE),
-        severity: laye_error::Severity::Error,
-        context: laye_error::Context {
-            surface: crate::error::SURFACE.to_string(),
-            region: Some(region.to_string()),
-            anchor: None,
-        },
-        title: e.to_string(),
-        why: String::new(),
-        trace: Vec::new(),
-        raw: Some(format!("{e:?}")),
-        at,
-        source: None,
-        ffi_call: (!call.is_empty()).then(|| call.to_string()),
-        location: None,
-        js_stack: None,
-        raw_stderr: None,
-        requires_reload: false,
-    };
-    serde_json::to_string(&sacred).unwrap_or_default()
 }
 
 /// Open a DuckDB-backed store at the given location URL.

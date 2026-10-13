@@ -58,6 +58,7 @@ impl IndexedDbStore {
     /// Store an attestation.
     /// If an attestation with the same ID already exists, returns `StoreError::AlreadyExists`.
     pub async fn put(&self, attestation: Attestation) -> StoreResult<()> {
+        attestation.writable()?;
         // Check for duplicates
         if self.exists(&attestation.id).await? {
             return Err(StoreError::AlreadyExists(attestation.id));
@@ -149,6 +150,7 @@ impl IndexedDbStore {
     /// Update an existing attestation.
     /// Returns `StoreError::NotFound` if the attestation doesn't exist.
     pub async fn update(&self, attestation: Attestation) -> StoreResult<()> {
+        attestation.writable()?;
         if !self.exists(&attestation.id).await? {
             return Err(StoreError::NotFound(attestation.id));
         }

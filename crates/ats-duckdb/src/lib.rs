@@ -864,6 +864,7 @@ impl DuckdbStore {
 
 impl AttestationStore for DuckdbStore {
     fn put(&mut self, attestation: Attestation) -> StoreResult<()> {
+        attestation.writable()?;
         if self.exists(&attestation.id)? {
             return Err(StoreError::AlreadyExists(attestation.id.clone()));
         }
@@ -919,6 +920,7 @@ impl AttestationStore for DuckdbStore {
     }
 
     fn update(&mut self, attestation: Attestation) -> StoreResult<()> {
+        attestation.writable()?;
         if !self.exists(&attestation.id)? {
             return Err(StoreError::NotFound(attestation.id.clone()));
         }

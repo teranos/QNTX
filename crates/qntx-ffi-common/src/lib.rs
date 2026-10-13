@@ -20,6 +20,8 @@
 //! - Callers must use corresponding `free_*` functions to deallocate
 //! - NULL pointers are handled safely (no-op for free functions)
 
+pub mod store;
+
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::os::raw::c_char;
