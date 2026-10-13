@@ -68,10 +68,7 @@ QNTX hosts agents for use by ROOT.
   tools it may use without being asked (`allow`), by Claude Code's own names.
 - Claude Code refuses `bypassPermissions` to a process run as root, which is  how the node runs on the box. Its hands there are what `allow` names.
 
-## The loop
-
-The loop is Claude Code's, not the node's: "accepted." The node hosts the
-process. It starts it, resumes it and stops it.
+## s it and stops it.
 
 ## Its harnesses
 
