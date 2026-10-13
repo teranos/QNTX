@@ -57,13 +57,13 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "nowhere to write the session of " + agent.called + ": " + err.Error()}
 	}
-	return s.turnIn(ctx, spokenBy(caller), store, agent, says, t, "")
+	return s.turnIn(ctx, spokenBy(caller), store, agent, says, t, map[string]any{})
 }
 
 // turnIn is one turn of agent in the harness t is the part of, said by by and
-// written down in store. picksUp is the turn it picks up, by the id of what was
-// said in it, and empty for a turn said afresh.
-func (s *QNTXServer) turnIn(ctx context.Context, by string, store ats.AttestationStore, agent *rootAgent, says string, t aTurn, picksUp string) (any, *protocol.Refusal) {
+// written down in store. marks is what is said on what was said beyond what
+// and by whom: the turn a picked-up turn picks up.
+func (s *QNTXServer) turnIn(ctx context.Context, by string, store ats.AttestationStore, agent *rootAgent, says string, t aTurn, marks map[string]any) (any, *protocol.Refusal) {
 	select {
 	case t.in.turn <- struct{}{}:
 		defer func() { <-t.in.turn }()
@@ -114,15 +114,17 @@ func (s *QNTXServer) turnIn(ctx context.Context, by string, store ats.Attestatio
 		}
 	}
 	told, err := writes.told(says, by, time.Now())
-	if err == nil && picksUp != "" {
-		told.Attributes[picksUpKey] = picksUp
+	if err == nil {
+		for name, value := range marks {
+			told.Attributes[name] = value
+		}
 	}
 	write([]*types.As{told}, err)
 
 	answer, err := t.run(turnRun{says: says, session: session, resumes: resumes, env: itsGit, writes: writes, write: write})
 	// The node stopping is what ended it, whatever the harness said on its way
 	// out: written down, it is a turn the node picks up once it is up again.
-	if s.ctx.Err() != nil {
+	if nodeErr := s.ctx.Err(); nodeErr != nil {
 		stopped, err := writes.row("StopFailure", time.Now(), map[string]any{"error": nodeStopped, "last_assistant_message": "the node stopped while this turn was going"})
 		write([]*types.As{stopped}, err)
 	}

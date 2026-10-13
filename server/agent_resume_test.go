@@ -21,20 +21,26 @@ func TestACutOffTurnIsTheLastOneSaidAndNotEnded(t *testing.T) {
 	firstEnded := sessionRow("stop-1", "Stop", at.Add(time.Minute), map[string]any{})
 	second := sessionRow("said-2", "UserPromptSubmit", at.Add(2*time.Minute), map[string]any{"prompt": "two"})
 
-	assert.Nil(t, cutOff(nil), "no turn, nothing cut off")
-	assert.Nil(t, cutOff([]*types.As{first, firstEnded}), "the last turn ended")
+	none, wasCutOff := cutOff([]*types.As{})
+	assert.False(t, wasCutOff, "no turn, nothing cut off")
+	assert.Empty(t, none)
+	ended, wasCutOff := cutOff([]*types.As{first, firstEnded})
+	assert.False(t, wasCutOff, "the last turn ended")
+	assert.Equal(t, "said-1", ended.ID)
 
-	killed := cutOff([]*types.As{second, firstEnded, first})
-	require.NotNil(t, killed, "a turn with no end was cut off, read in time order")
+	killed, wasCutOff := cutOff([]*types.As{second, firstEnded, first})
+	require.True(t, wasCutOff, "a turn with no end was cut off, read in time order")
 	assert.Equal(t, "said-2", killed.ID)
 
 	stopped := sessionRow("fail-2", "StopFailure", at.Add(3*time.Minute), map[string]any{"error": nodeStopped})
-	byStopping := cutOff([]*types.As{first, firstEnded, second, stopped})
-	require.NotNil(t, byStopping, "a turn the node's stopping ended was cut off")
+	byStopping, wasCutOff := cutOff([]*types.As{first, firstEnded, second, stopped})
+	require.True(t, wasCutOff, "a turn the node's stopping ended was cut off")
 	assert.Equal(t, "said-2", byStopping.ID)
 
 	failed := sessionRow("fail-2", "StopFailure", at.Add(3*time.Minute), map[string]any{"error": "error_during_execution"})
-	assert.Nil(t, cutOff([]*types.As{first, firstEnded, second, failed}), "a turn that failed on its own is not picked up")
+	failedTurn, wasCutOff := cutOff([]*types.As{first, firstEnded, second, failed})
+	assert.False(t, wasCutOff, "a turn that failed on its own is not picked up")
+	assert.Equal(t, "said-2", failedTurn.ID)
 }
 
 func TestWhatThePickedUpTurnIsTold(t *testing.T) {
