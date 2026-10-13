@@ -64,10 +64,9 @@ QNTX hosts agents for use by ROOT.
 - Who may talk to it is the whole of what guards it.
 
 
-- am.toml gives the mode used when none is named (`permission_mode`) and the
+- am.toml gives the permission mode used when none is named (`permission_mode`) and the
   tools it may use without being asked (`allow`), by Claude Code's own names.
-- Claude Code refuses `bypassPermissions` to a process run as root, which is
-  how the node runs on the box. Its hands there are what `allow` names.
+- Claude Code refuses `bypassPermissions` to a process run as root, which is  how the node runs on the box. Its hands there are what `allow` names.
 
 ## The loop
 
