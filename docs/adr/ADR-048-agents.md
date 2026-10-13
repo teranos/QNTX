@@ -47,8 +47,7 @@ QNTX hosts agents for use by ROOT.
 - am.toml names each under `[agent.root]`: its model, its effort, and a
   reference to the Claude plan token. A node that names no model has no ROOT
   agent, and nothing stands in for the model named.
-- It is one session: In the case of Claude Code `--resume` continues it, and Claude Code compacts its own
-  context.
+- It is one session: In the case of Claude Code `--resume` continues it, and compacts automatically .
 - Its key is derived from the node's own, for its model, so it is the same DID
   wherever the node is rebuilt from its record, and nothing more is kept for
   it.
