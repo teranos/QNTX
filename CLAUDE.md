@@ -46,7 +46,7 @@ Who may log in, the provider ceremony, and what a passkey carries: [ADR-030](doc
 1. `plugins_add` a repo or tree URL. Its last segment is the plugin's name, and equals `Metadata().Name`; the binary is `qntx-<name>-plugin`.
 2. `PUT /api/plugins/<name>/config` writes the record: the plugin's own keys, `namespace` (ADR-046), and `build.core`, `build.command`, `build.output`, `build.packages`, `build.inputs`, `build.inputs_env` ([server/plugin_build.go](server/plugin_build.go)).
 3. `plugins_enable`.
-4. A push to a `build.*` source reaches the GitHub App's webhook; the node builds with its own nix, installs and restarts the plugin.
+4. A push to a `build.*` source reaches the GitHub App's webhook; once every GitHub Actions check on the pushed commit passed, the node builds with its own nix, installs and restarts the plugin. A failed check ends the deploy.
 
 A plugin declares routes; QNTX makes each a sigil and an MCP tool. Go: `DeclaredRoutes()`.
 
