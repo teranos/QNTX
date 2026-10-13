@@ -6,8 +6,9 @@ Status: In-progress
 Sigils represent expressed capability surface.
 It is a way to define what goes in, what comes out, how it refuses.
 
-- A sigil is the one place something QNTX does is defined: what it is for, what goes in, what comes out and how it refuses.
-- The HTTP API and MCP are surfaces of a sigil. Both do the same thing.
+A 
+
+- The HTTP API and MCP are surfaces of a sigil. 
 - A2A describes the node to other agents.
 - The Agent Card describes the node's identity, capabilities, skills, service
   endpoint and authentication requirements. The node's MCP is not one of its
