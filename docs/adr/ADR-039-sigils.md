@@ -6,7 +6,7 @@ Status: In-progress
 Sigils represent expressed capability surface.
 It is a way to define what goes in, what comes out, how it refuses.
 
-A 
+A Sigil 
 
 - The HTTP API and MCP are surfaces of a sigil. 
 - A2A describes the node to other agents.
