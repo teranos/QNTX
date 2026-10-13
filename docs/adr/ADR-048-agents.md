@@ -43,8 +43,7 @@ QNTX hosts agents for use by ROOT.
 
 "we cant just have any ai be the ROOT agent"
 
-- In Claude Code it is Claude, run by the node: Opus, Fable and Sonnet, each a
-  ROOT agent of its own. Only Claude runs there.
+
 - am.toml names each under `[agent.root]`: its model, its effort, and a
   reference to the Claude plan token. A node that names no model has no ROOT
   agent, and nothing stands in for the model named.
