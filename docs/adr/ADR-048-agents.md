@@ -40,7 +40,8 @@ QNTX hosts agents for use by ROOT.
 "It is the ROOT agent, one persistent session that is QNTX itself as expressed as ROOT."
 
 - It has a DID of its own and attests as itself, as any agent does.
-- It is not one of the agents the node hosts. A ritual's performer is an agent of its own.
+- It is not one of the agents the node hosts. (Like namespace agents)
+- A ritual's performer is an agent of its own.
 
 "we cant just have any ai be the ROOT agent"
 
