@@ -1,6 +1,6 @@
 package server
 
-// QNTX builds a plugin itself (ADR-045): from the sources its record names, as
+// QNTX builds a plugin itself (ADR-002): from the sources its record names, as
 // their branches are now, with the node's nix, and runs what it built.
 // "it is qntx that actually owns this"
 
@@ -575,11 +575,34 @@ func (s *QNTXServer) buildIn(ctx context.Context, b pluginBuild, revs []string, 
 		return false, "", errors.Wrapf(err, "the build of %s at %s failed", b.name, revs[0])
 	}
 
-	archive, err := grpcplugin.PackageBuild(b.name, filepath.Join(src, b.output))
+	// The version coming in is the built binary's own word for it.
+	binary := filepath.Join(src, b.output)
+	incoming, err := builtVersion(ctx, b.name, binary)
+	if err != nil {
+		return false, "", err
+	}
+	s.deploys.incoming(b.name, incoming)
+
+	archive, err := grpcplugin.PackageBuild(b.name, binary)
 	if err != nil {
 		return false, "", err
 	}
 	return grpcplugin.InstallBuild(b.name, archive, s.logger.Named("build"))
+}
+
+// builtVersion is what a built plugin says its version is: every plugin
+// answers --version with qntx-<name>-plugin <version> (plugin/grpc/run.go).
+func builtVersion(ctx context.Context, name, binary string) (string, error) {
+	said, err := exec.CommandContext(ctx, binary, "--version").Output()
+	if err != nil {
+		return "", errors.Wrapf(err, "%s --version did not answer", binary)
+	}
+	first := strings.SplitN(string(said), "\n", 2)[0]
+	version, ok := strings.CutPrefix(strings.TrimSpace(first), grpcplugin.PluginBinaryName(name)+" ")
+	if !ok {
+		return "", errors.Newf("%s --version said %q, not %s <version>", binary, first, grpcplugin.PluginBinaryName(name))
+	}
+	return version, nil
 }
 
 // fetchCore writes the core's archive at rev to path.

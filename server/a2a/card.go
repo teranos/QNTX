@@ -45,7 +45,10 @@ type Card struct {
 	Description string
 	Version     string
 	// URL is where the HTTP+JSON binding answers, for the interface entry.
-	URL        string
+	URL string
+	// Tenant is the agent the interface routes to behind URL
+	// (AgentInterface.tenant); the node's own card names none.
+	Tenant     string
 	Skills     []Skill
 	Extensions []Extension
 }
@@ -77,15 +80,16 @@ func (c Card) Message() (protoreflect.Message, error) {
 	// interacting with the agent (a2a.proto line 334), so the node's MCP is
 	// said in the node extension.
 	interfaces := []map[string]any{
-		{"url": c.URL, "protocolBinding": "HTTP+JSON", "protocolVersion": Version},
+		{"url": c.URL, "protocolBinding": "HTTP+JSON", "protocolVersion": Version, "tenant": c.Tenant},
 	}
 	body, err := json.Marshal(map[string]any{
 		"name":                c.Name,
 		"description":         c.Description,
 		"version":             c.Version,
 		"supportedInterfaces": interfaces,
-		// What the node does not do is said as false (§3.3.4).
-		"capabilities": map[string]any{"streaming": false, "pushNotifications": false, "extensions": extensions},
+		// What the node does not do is said as false (§3.3.4). The extended card
+		// is the card its caller reaches (§3.1.11), so it is always there to ask.
+		"capabilities": map[string]any{"streaming": false, "pushNotifications": false, "extendedAgentCard": true, "extensions": extensions},
 		// The node's token is a bearer token (§3.1.11: the extended card is
 		// authenticated with a scheme the card declares).
 		"securitySchemes": map[string]any{
@@ -102,6 +106,20 @@ func (c Card) Message() (protoreflect.Message, error) {
 	card := dynamicpb.NewMessage(descriptor)
 	if err := protojson.Unmarshal(body, card); err != nil {
 		return nil, errors.Wrapf(err, "the card is not an %s", AgentCard)
+	}
+	return card, nil
+}
+
+// ReadCard is an AgentCard as another node served it, read through the pinned
+// spec.
+func ReadCard(body []byte) (protoreflect.Message, error) {
+	descriptor, err := message(AgentCard)
+	if err != nil {
+		return nil, err
+	}
+	card := dynamicpb.NewMessage(descriptor)
+	if err := protojson.Unmarshal(body, card); err != nil {
+		return nil, errors.Wrapf(err, "what was handed over is not an %s", AgentCard)
 	}
 	return card, nil
 }

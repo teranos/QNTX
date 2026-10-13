@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -33,9 +34,11 @@ type StatusItem struct {
 	Symbol string `json:"symbol"`
 }
 
-// StatusLineResponse carries the items in the order they should be read.
+// StatusLineResponse carries the items in the order they should be read, and
+// each plugin's newest deploy (statusline_deploy.go).
 type StatusLineResponse struct {
-	Items []StatusItem `json:"items"`
+	Items   []StatusItem `json:"items"`
+	Deploys []DeployData `json:"deploys"`
 }
 
 // A surface draws in its own escapes and cannot read another's: tmux prints
@@ -137,6 +140,8 @@ type StatusLineHandler struct {
 	tmux *rowAsks
 	// The peers' rows, asked as the caller (statusline_peers.go). Nil draws none.
 	peers peerRows
+	// Each plugin's newest deploy (plugin_deploy.go). Nil draws none.
+	deploys func() []pluginDeploy
 }
 
 // NewStatusLineHandler builds the handler behind /statusline.
@@ -155,6 +160,7 @@ func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 		node:            node,
 		tmux:            newRowAsks(),
 		peers:           noPeers,
+		deploys:         func() []pluginDeploy { return []pluginDeploy{} },
 	}
 }
 
@@ -471,20 +477,27 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		items = []StatusItem{}
 	}
 	items = append(items, h.newsFor(admitted)...)
-	items = append(items, h.carouselItem()...)
+	carousel := h.carouselItem()
 
 	// A failing handler is a fix-now kind of event, and it is drawn inside its
 	// own plugin's slot below rather than as a separate item. Watchers belong to
 	// no plugin, so theirs still lead the row; nor does a built-in, so its
 	// failure draws its own item here or it is invisible.
 	failures := h.recentHandlerFailures()
-	items = append(items, watcherFailureItemsFor(h.recentWatcherFailures(r.Context()))...)
-	items = append(items, handlerFailureItemsFor(builtinRuns(failures))...)
+	failing := append(watcherFailureItemsFor(h.recentWatcherFailures(r.Context())),
+		handlerFailureItemsFor(builtinRuns(failures))...)
 
 	if h == nil || h.registry == nil {
-		h.noteWriteFailure(writeStatusLine(w, format, items))
+		h.noteWriteFailure(writeStatusLine(w, format, slices.Concat(items, carousel, failing)))
 		return
 	}
+
+	// The deploys go out as data; the carousel waits while one is in flight.
+	deploys, inFlight := deployData(h.deploys())
+	if !inFlight {
+		items = append(items, carousel...)
+	}
+	items = append(items, failing...)
 
 	// The last probe, not a fresh one. Probing per request cost gRPC calls and
 	// held the registry's read lock across them.
@@ -540,6 +553,10 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 	// The peers' rows come last: the primary's own row reads as it did.
 	items = append(items, h.peerItems(r.Context(), admitted)...)
+	if format == FormatJSON {
+		h.noteWriteFailure(writeJSON(w, http.StatusOK, StatusLineResponse{Items: items, Deploys: deploys}))
+		return
+	}
 	h.noteWriteFailure(writeStatusLine(w, format, items))
 }
 
@@ -634,7 +651,7 @@ func (h *StatusLineHandler) item(ctx context.Context, name string) (any, *protoc
 // the caller is owed that, the same way writeJSON owes it.
 func writeStatusLine(w http.ResponseWriter, format string, items []StatusItem) error {
 	if format == FormatJSON {
-		return writeJSON(w, http.StatusOK, StatusLineResponse{Items: items})
+		return writeJSON(w, http.StatusOK, StatusLineResponse{Items: items, Deploys: []DeployData{}})
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")

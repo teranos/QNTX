@@ -4,6 +4,7 @@ package server
 // node holds each plugin's newest deploy, and each step is a line in system.
 
 import (
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -38,6 +39,11 @@ type pluginDeploy struct {
 	rev string
 	// What the push said: the repository, the ref and the commit it moved to.
 	repo, ref, after string
+	// pushed is a deploy a push began, at a commit checks run on.
+	pushed bool
+	// version is what the build says it is, once there is a build to ask.
+	version   string
+	versioned bool
 	// The revs it replaces, and the revs it installs.
 	replacesRevs []string
 	revs         []string
@@ -48,6 +54,8 @@ type pluginDeploy struct {
 	began map[string]time.Time
 	// The lines about it that were not written, and why.
 	unwritten []string
+	// What each check run on the commit pushed last said, by its name.
+	checks map[string]string
 }
 
 // shortRev is how much of a rev names it in a deploy's subject.
@@ -106,10 +114,10 @@ func (t *deployTracker) moved(d *pluginDeploy, stage string, attributes map[stri
 func (t *deployTracker) begin(d pluginDeploy) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	d.began = map[string]time.Time{}
+	d.began, d.checks = map[string]time.Time{}, map[string]string{}
 	if queued, held := t.deploys[d.plugin]; held && queued.stage == deployQueued {
-		d.rev, d.repo, d.ref, d.after = queued.rev, queued.repo, queued.ref, queued.after
-		d.began, d.unwritten = queued.began, queued.unwritten
+		d.rev, d.repo, d.ref, d.after, d.pushed = queued.rev, queued.repo, queued.ref, queued.after, queued.pushed
+		d.began, d.unwritten, d.checks = queued.began, queued.unwritten, queued.checks
 	}
 	t.deploys[d.plugin] = &d
 	t.moved(&d, d.stage, map[string]any{
@@ -168,4 +176,70 @@ func (t *deployTracker) endShort(plugin, end string, why error) {
 // unchanged ends plugin's deploy: what it built is what was installed.
 func (t *deployTracker) unchanged(plugin string) {
 	t.stage(plugin, deployUnchanged)
+}
+
+// waiting is plugin's deploy while it waits on the checks of sha. Called with
+// mu held.
+func (t *deployTracker) waiting(plugin, sha string) (*pluginDeploy, bool) {
+	return t.deploys[plugin], t.waits(plugin, sha)
+}
+
+// waits is whether plugin's deploy waits on the checks of sha. Called with mu
+// held.
+func (t *deployTracker) waits(plugin, sha string) bool {
+	d, held := t.deploys[plugin]
+	return held && d.stage == deployChecking && d.after == sha
+}
+
+// awaiting is whether plugin's deploy still waits on the checks of sha: a
+// newer push, or an end, is a deploy that does not.
+func (t *deployTracker) awaiting(plugin, sha string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.waits(plugin, sha)
+}
+
+// checksAre is what each check run on sha last said, held on plugin's deploy
+// while it waits on them.
+func (t *deployTracker) checksAre(plugin, sha string, states map[string]string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if d, waits := t.waiting(plugin, sha); waits {
+		d.checks = maps.Clone(states)
+	}
+}
+
+// checksPassed queues plugin's deploy for its build: every check on sha
+// passed. False is a deploy that no longer waits on them, and is not built.
+func (t *deployTracker) checksPassed(plugin, sha string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	d, waits := t.waiting(plugin, sha)
+	if waits {
+		t.moved(d, deployQueued, map[string]any{"checks": len(d.checks)})
+	}
+	return waits
+}
+
+// incoming is the version plugin's deploy is bringing, as its build said it.
+func (t *deployTracker) incoming(plugin, version string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if d, flying := t.flying(plugin); flying {
+		d.version, d.versioned = version, true
+	}
+}
+
+// held is each plugin's newest deploy, as it is now.
+func (t *deployTracker) held() []pluginDeploy {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	out := make([]pluginDeploy, 0, len(t.deploys))
+	for _, d := range t.deploys {
+		copied := *d
+		copied.began = maps.Clone(d.began)
+		copied.checks = maps.Clone(d.checks)
+		out = append(out, copied)
+	}
+	return out
 }

@@ -46,7 +46,9 @@ func everySignumFollows() []*protocol.Follows {
 func (s *QNTXServer) paritySignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name: "parity",
+			Name:        "parity",
+			Description: "Each signum held to the references it follows, and what each storage backend holds of what QNTX persists.",
+			Tags:        []string{"parity", "spec", "storage"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "hold",

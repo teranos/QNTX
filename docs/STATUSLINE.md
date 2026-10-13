@@ -66,6 +66,57 @@ the answer to the sieve being the same move as ritual_position.
 
 "i do think that what i want to have is, a ritual to kick off automatically after an hour"
 
+## A plugin's deploy
+
+Built. `/am/statusline?format=json` carries `deploys` beside `items`
+(server/statusline_deploy.go); ug draws each on its plugin's name (ground, ug/tmux.d).
+
+"i wish ug would poll from QNTX some kind of indication that it knows a new plugin build and version is underway"
+
+"consider an ongoing deploy a higher priority thing to express than any other information at that moment"
+
+"until its actually active at which point it resumes the carriousel"
+
+"in a way that is a lot more distinct from what i see now"
+
+What clears a failed deploy:
+
+"Time, or other news"
+
+"distict can mean though the text bg"
+
+"nothing functional should be changign except for the states in ug how it looks like"
+
+"like yellow bg for building"
+
+"o rmake it based on checks"
+
+"like percentage filled"
+
+"yellow to green"
+
+"building on qntx"
+
+"another line beign filled"
+
+"WHEN ITS BUILDING IN GITHUB THE AREA BEHIND THE C NEEDS TO BE GREEN, THE OTHER LETTER YELLOW"
+
+"nothing next to name"
+
+"not 2/3 or 3/4"
+
+"the colored bg behind the text should communicate how far we are"
+
+"my tmux only goes so wide, its alreayd not wide enough and you want to add more to it"
+
+"yes alternating"
+
+"no, i said version number"
+
+"i dont want blinking bg when its building, just slight blink on finish"
+
+"just give me the data"
+
 ## The carousel
 
 Built, unlike the rest of this file. The row is one line and holds more than one line's

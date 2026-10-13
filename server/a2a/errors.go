@@ -45,9 +45,19 @@ func Unsupported(op Operation) *Error {
 	return &Error{Name: "UnsupportedOperationError", Message: op.Name + " is not one this node does yet"}
 }
 
+// Unauthenticated is a request that came with no credential the node took:
+// the extended card "MUST require authentication" (§13.3).
+func Unauthenticated(message string) *Error {
+	return &Error{Message: message, status: http.StatusUnauthorized, grpc: "UNAUTHENTICATED"}
+}
+
 func invalid(message string) *Error {
 	return &Error{Message: message, status: http.StatusBadRequest, grpc: "INVALID_ARGUMENT"}
 }
+
+// NotFound is a resource that does not exist, or that the caller may not
+// know of: the two are not told apart (§3.3.2).
+func NotFound(message string) *Error { return notFound(message) }
 
 func notFound(message string) *Error {
 	return &Error{Message: message, status: http.StatusNotFound, grpc: "NOT_FOUND"}

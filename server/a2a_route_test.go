@@ -13,7 +13,8 @@ import (
 )
 
 // The binding is served at /a2a/ behind its reach line: ROOT reaches every
-// operation in scope and is told it is not one the node does yet, and a tenant
+// operation in scope and is told it is not one the node does yet, but for the
+// extended card (TestTheExtendedCardIsWhatTheCallerReaches), and a tenant
 // no agent is served at is not found (§3.3.2); SUPER is refused at the gate
 // before any operation is asked.
 func TestA2AIsServedToRootAlone(t *testing.T) {
@@ -34,8 +35,8 @@ func TestA2AIsServedToRootAlone(t *testing.T) {
 		{http.MethodGet, "/a2a/tasks/abc", ""},
 		{http.MethodGet, "/a2a/tasks", ""},
 		{http.MethodPost, "/a2a/tasks/abc:cancel", ""},
-		{http.MethodGet, "/a2a/extendedAgentCard", ""},
 		{http.MethodPost, "/a2a/garden/tasks/abc:cancel", ""},
+		{http.MethodGet, "/a2a/garden/extendedAgentCard", ""},
 	} {
 		tenant := strings.HasPrefix(route.path, "/a2a/garden/")
 		r := asked(route.method, route.path, route.body, tokens[auth.LevelRoot])

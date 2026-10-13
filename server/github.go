@@ -72,8 +72,10 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 	}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name:    "github",
-			Follows: follows,
+			Name:        "github",
+			Description: "The node's GitHub: the GitHubService it spends, the switch that turns GitHub off on the node entirely, and the Actions runner whose builds it runs.",
+			Tags:        []string{"github", "app", "runner"},
+			Follows:     follows,
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "status",

@@ -10,6 +10,10 @@
  * window is (getMinimumUnit, umami v3.3.1 src/lib/date.ts) and the last-seen
  * label is written in that unit's format (DATE_FORMATS there).
  *
+ * Buckets are cut on the UTC calendar, where spans and queries count: a day
+ * here is the day `on 2026-03-07` reads and the day the node keys its buckets
+ * by, wherever the browser is.
+ *
  * The caller decides what a name is — text, or something you can press.
  */
 
@@ -27,7 +31,7 @@ const HOUR = 60 * MINUTE;
 function calendarMonthsBetween(start: number, end: number): number {
     const a = new Date(start);
     const b = new Date(end);
-    return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+    return (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth());
 }
 
 /** The unit Umami groups a date range by: getMinimumUnit(start, end, true). */
@@ -39,15 +43,16 @@ export function unitFor(start: number, end: number): Unit {
     return 'year';
 }
 
-/** The start of the bucket a moment falls in, in local time. */
+/** The start of the bucket a moment falls in, on the UTC calendar: the day
+ *  `on 2026-03-07` reads, and the day the node keys its buckets by. */
 export function bucketStart(t: number, unit: Unit): number {
     const d = new Date(t);
     switch (unit) {
-        case 'minute': d.setSeconds(0, 0); break;
-        case 'hour': d.setMinutes(0, 0, 0); break;
-        case 'day': d.setHours(0, 0, 0, 0); break;
-        case 'month': d.setDate(1); d.setHours(0, 0, 0, 0); break;
-        case 'year': d.setMonth(0, 1); d.setHours(0, 0, 0, 0); break;
+        case 'minute': d.setUTCSeconds(0, 0); break;
+        case 'hour': d.setUTCMinutes(0, 0, 0); break;
+        case 'day': d.setUTCHours(0, 0, 0, 0); break;
+        case 'month': d.setUTCDate(1); d.setUTCHours(0, 0, 0, 0); break;
+        case 'year': d.setUTCMonth(0, 1); d.setUTCHours(0, 0, 0, 0); break;
     }
     return d.getTime();
 }
@@ -55,11 +60,11 @@ export function bucketStart(t: number, unit: Unit): number {
 function nextBucket(t: number, unit: Unit): number {
     const d = new Date(t);
     switch (unit) {
-        case 'minute': d.setMinutes(d.getMinutes() + 1); break;
-        case 'hour': d.setHours(d.getHours() + 1); break;
-        case 'day': d.setDate(d.getDate() + 1); break;
-        case 'month': d.setMonth(d.getMonth() + 1); break;
-        case 'year': d.setFullYear(d.getFullYear() + 1); break;
+        case 'minute': d.setUTCMinutes(d.getUTCMinutes() + 1); break;
+        case 'hour': d.setUTCHours(d.getUTCHours() + 1); break;
+        case 'day': d.setUTCDate(d.getUTCDate() + 1); break;
+        case 'month': d.setUTCMonth(d.getUTCMonth() + 1); break;
+        case 'year': d.setUTCFullYear(d.getUTCFullYear() + 1); break;
     }
     return d.getTime();
 }
@@ -103,16 +108,17 @@ export function labelsOf(w: Window): string[] {
     return labels;
 }
 
-/** A moment in its unit's format: Umami's DATE_FORMATS. */
+/** A moment in its unit's format, Umami's DATE_FORMATS, on the UTC calendar
+ *  its bucket was cut on. */
 export function formatIn(t: number, unit: Unit): string {
     const d = new Date(t);
-    const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const day = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
     switch (unit) {
-        case 'minute': return `${day} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        case 'hour': return `${day} ${pad(d.getHours())}`;
+        case 'minute': return `${day} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+        case 'hour': return `${day} ${pad(d.getUTCHours())}`;
         case 'day': return day;
-        case 'month': return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-        case 'year': return String(d.getFullYear());
+        case 'month': return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
+        case 'year': return String(d.getUTCFullYear());
     }
 }
 

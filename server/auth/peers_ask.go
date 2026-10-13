@@ -52,6 +52,12 @@ func (h *Handler) AskPeers(ctx context.Context, admitted Admission, path string)
 	return answers
 }
 
+// AskPeer asks one peer one GET of path as the person admitted here, as
+// AskPeers asks each.
+func (h *Handler) AskPeer(ctx context.Context, admitted Admission, peer Client, path string) PeerAnswer {
+	return h.askPeer(ctx, admitted, peer, path)
+}
+
 func (h *Handler) askPeer(ctx context.Context, admitted Admission, peer Client, path string) PeerAnswer {
 	answer := PeerAnswer{Name: peer.Label}
 	person, err := named.TextOf("the person asking", admitted.Identity)

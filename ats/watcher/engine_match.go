@@ -8,6 +8,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/sacred"
+	errors "github.com/teranos/sacred-error"
 	"golang.org/x/time/rate"
 )
 
@@ -37,8 +38,19 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 		}
 	}
 
-	// Batch structural match — one WASM call (or Go fallback) for all watchers.
-	matched := batchMatchStructural(as, structural)
+	// Batch structural match: one WASM call for all watchers, and one more
+	// when a watcher asking `over` needs the definitions of the types the
+	// attestation is of. A watcher that cannot be answered is told why.
+	matched, refused, err := batchMatchStructural(as, structural, e.typesOf)
+	if err != nil {
+		for _, w := range structural {
+			e.recordError(w.ID, err.Error(), as.ID)
+		}
+		return
+	}
+	for id, why := range refused {
+		e.recordError(id, why.Error(), as.ID)
+	}
 
 	for _, watcher := range structural {
 		if !matched[watcher.ID] {
@@ -125,7 +137,12 @@ func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []floa
 		}
 
 		// Structural filter must also pass (semantic + structural are ANDed)
-		if !e.matchesFilter(as, watcher) {
+		structural, err := e.matchesFilter(as, watcher, e.typesOf)
+		if err != nil {
+			e.recordError(watcher.ID, err.Error(), as.ID)
+			continue
+		}
+		if !structural {
 			continue
 		}
 
@@ -232,15 +249,20 @@ func (e *Engine) cacheQueryEmbedding(id string, embedding []float32) {
 // Structural filters (AxQuery / Filter fields) and semantic queries are ANDed:
 // if both are set, both must pass.
 // Returns (matched, similarity score). Score is 0 for structural-only matches.
-func (e *Engine) matchesWatcher(as *types.As, watcher *storage.Watcher) (bool, float32) {
+func (e *Engine) matchesWatcher(as *types.As, watcher *storage.Watcher, read typesReader) (bool, float32, error) {
 	// Structural filter check (empty filter passes all)
-	if !e.matchesFilter(as, watcher) {
-		return false, 0
+	structural, err := e.matchesFilter(as, watcher, read)
+	if err != nil {
+		return false, 0, err
+	}
+	if !structural {
+		return false, 0, nil
 	}
 
 	// Semantic check — only if this watcher has a query embedding cached
 	if _, hasSemantic := e.queryEmbeddings[watcher.ID]; hasSemantic {
-		return e.matchesSemantic(as, watcher)
+		matched, score := e.matchesSemantic(as, watcher)
+		return matched, score, nil
 	}
 
 	// No semantic embedding cached — try lazy initialization if embedding service
@@ -258,53 +280,33 @@ func (e *Engine) matchesWatcher(as *types.As, watcher *storage.Watcher) (bool, f
 					e.cacheQueryEmbedding(watcher.ID, embedding)
 				})
 				// Use the embedding for this match immediately
-				return e.matchesSemanticWithEmbedding(as, watcher, embedding)
+				matched, score := e.matchesSemanticWithEmbedding(as, watcher, embedding)
+				return matched, score, nil
 			}
 			e.logger.Debugw("Lazy embedding generation failed for semantic watcher",
 				"watcher_id", watcher.ID,
 				"semantic_query", watcher.SemanticQuery,
 				"error", err)
 		}
-		return false, 0
+		return false, 0, nil
 	}
 
-	return true, 0
+	return true, 0, nil
 }
 
-// matchesFilter checks if an attestation matches a watcher's filter using exact field matching
-func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher) bool {
-	filter := &watcher.Filter
-
-	// Empty filter = match all
-	if len(filter.Subjects) > 0 && !hasOverlap(filter.Subjects, as.Subjects) {
-		return false
-	}
-	if len(filter.Predicates) > 0 && !hasOverlap(filter.Predicates, as.Predicates) {
-		return false
-	}
-	if len(filter.Contexts) > 0 && !hasOverlap(filter.Contexts, as.Contexts) {
-		return false
-	}
-	if len(filter.Actors) > 0 && !hasOverlap(filter.Actors, as.Actors) {
-		return false
-	}
-	within, err := withinTime(as.Timestamp, filter)
+// matchesFilter is whether an attestation matches a watcher's structural
+// filter, `over` included: the one matcher OnAttestationCreated uses, asked
+// about one watcher. The type definitions an `over` measures by are read
+// through read.
+func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher, read typesReader) (bool, error) {
+	matched, refused, err := batchMatchStructural(as, []*storage.Watcher{watcher}, read)
 	if err != nil {
-		e.logger.Warnw("Watcher not matched: its filter does not say its time range", "watcher_id", watcher.ID, "error", err)
-		return false
+		return false, errors.Wrapf(err, "failed to match attestation %s against watcher %s", as.ID, watcher.ID)
 	}
-	if !within {
-		return false
+	if why, ok := refused[watcher.ID]; ok {
+		return false, why
 	}
-
-	// Attribute filters — match inside Attributes JSON
-	for _, af := range watcher.AttributeFilters {
-		if !matchesAttributeFilter(as.Attributes, af) {
-			return false
-		}
-	}
-
-	return true
+	return matched[watcher.ID], nil
 }
 
 // matchesAttributeFilter checks a single attribute filter against an attestation's attributes.

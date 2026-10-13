@@ -65,6 +65,36 @@ interface TypeDefinition {
     deprecated?: boolean;
     rich_string_fields?: string[];
     array_fields?: string[];
+    /** Where each attestation of this type starts and ends, for `over`: "An
+     *  attested type should designate what we see as start and end for the
+     *  purpose of over, like rich_string". Both or neither. The node sends
+     *  null for a type that names none. */
+    start_field?: string | null;
+    end_field?: string | null;
+}
+
+/** Which end of an attestation a field holds. */
+type End = 'start_field' | 'end_field';
+
+/** The ends a type names, as the node takes them: both, or neither. One
+ *  without the other is refused, as the node refuses it. */
+export function endsOf(type: TypeDefinition): { start_field: string; end_field: string } | Record<string, never> {
+    const start = type.start_field;
+    const end = type.end_field;
+    if (typeof start === 'string' && typeof end === 'string') return { start_field: start, end_field: end };
+    if (typeof start === 'string') throw new Error(`'${type.name}' starts at '${start}' and names no end: a type names where its attestations start and end, both or neither`);
+    if (typeof end === 'string') throw new Error(`'${type.name}' ends at '${end}' and names no start: a type names where its attestations start and end, both or neither`);
+    return {};
+}
+
+/** Where a type's attestations start and end, as it is shown: `from → until`. */
+function endsShown(type: TypeDefinition): string {
+    const start = type.start_field;
+    const end = type.end_field;
+    if (typeof start === 'string' && typeof end === 'string') return `${start} → ${end}`;
+    if (typeof start === 'string') return `${start} → (no end)`;
+    if (typeof end === 'string') return `(no start) → ${end}`;
+    return '';
 }
 
 interface FieldInfo {
@@ -72,6 +102,16 @@ interface FieldInfo {
     value: any;
     isRichString: boolean;
     isArray: boolean;
+}
+
+/** Every field the type names an end at is a field of it, whether or not an
+ *  attestation carrying it has been seen. */
+function holdEnds(type: TypeDefinition): void {
+    for (const name of [type.start_field, type.end_field]) {
+        if (typeof name === 'string' && !fields.has(name)) {
+            fields.set(name, { name, value: null, isRichString: false, isArray: false });
+        }
+    }
 }
 
 // ── Module state ──────────────────────────────────────────────────────
@@ -164,6 +204,7 @@ function populateFieldsFromType(type: TypeDefinition): void {
             }
         }
     }
+    holdEnds(type);
 }
 
 // ── Edit mode content ────────────────────────────────────────────────
@@ -200,6 +241,7 @@ function buildEditUI(container: HTMLElement): void {
         <div class="type-def-title" style="display:flex;align-items:center;gap:8px;">
             <span class="type-def-name" style="color:var(--text-primary);font-weight:600;">${escapeHtml(currentType.name)}</span>
             <span class="type-def-color" style="width:14px;height:14px;border-radius:3px;background:${safeColor};display:inline-block;"></span>
+            <span class="type-def-ends" style="color:var(--text-secondary);font-size:11px;">${escapeHtml(endsShown(currentType))}</span>
         </div>
     `;
     container.appendChild(header);
@@ -245,6 +287,16 @@ function buildEditUI(container: HTMLElement): void {
                 <span>Array Field</span>
                 <span class="field-option-desc">Display as interactive tag badges</span>
             </label>
+            <label class="field-option">
+                <input type="checkbox" id="start-field-toggle">
+                <span>Start</span>
+                <span class="field-option-desc">Where each attestation starts, for <code>over</code></span>
+            </label>
+            <label class="field-option">
+                <input type="checkbox" id="end-field-toggle">
+                <span>End</span>
+                <span class="field-option-desc">Where each attestation ends, for <code>over</code></span>
+            </label>
         </div>
     `;
     container.appendChild(controlsSection);
@@ -282,6 +334,8 @@ function createFieldElement(field: FieldInfo, container: HTMLElement): HTMLEleme
         <div class="field-indicators">
             ${field.isRichString ? '<span class="indicator search-indicator" title="Searchable">🔍</span>' : ''}
             ${field.isArray ? '<span class="indicator array-indicator" title="Array Field">📦</span>' : ''}
+            ${currentType?.start_field === field.name ? '<span class="indicator start-indicator">start</span>' : ''}
+            ${currentType?.end_field === field.name ? '<span class="indicator end-indicator">end</span>' : ''}
         </div>
     `;
 
@@ -331,6 +385,13 @@ function attachEditListeners(container: HTMLElement): void {
         if (selectedField) toggleFieldOption(selectedField, 'array_fields', arrayToggle.checked, container);
     });
 
+    for (const [id, end] of [['#start-field-toggle', 'start_field'], ['#end-field-toggle', 'end_field']] as const) {
+        const toggle = container.querySelector(id) as HTMLInputElement;
+        toggle?.addEventListener('change', () => {
+            if (selectedField) toggleEnd(selectedField, end, toggle.checked, container);
+        });
+    }
+
     // Save button
     const saveBtn = container.querySelector('#save-type-btn') as HTMLButtonElement;
 
@@ -341,7 +402,7 @@ function attachEditListeners(container: HTMLElement): void {
             await persistTypeDefinition();
             showStatus(container, '✓ Attested', 'var(--success-color, #2ecc71)');
         } catch (error) {
-            showStatus(container, '✗ Failed to attest', 'var(--error-color, #e74c3c)', 0);
+            showStatus(container, `✗ Failed to attest: ${error instanceof Error ? error.message : String(error)}`, 'var(--error-color, #e74c3c)', 0);
             log.error(SEG.ERROR, 'Failed to attest type definition:', error);
         } finally {
             saveBtn.disabled = false;
@@ -366,7 +427,24 @@ function selectFieldUI(fieldName: string, container: HTMLElement): void {
         const arrayToggle = container.querySelector('#array-toggle') as HTMLInputElement;
         if (richToggle) richToggle.checked = field.isRichString;
         if (arrayToggle) arrayToggle.checked = field.isArray;
+        const startToggle = container.querySelector('#start-field-toggle') as HTMLInputElement;
+        const endToggle = container.querySelector('#end-field-toggle') as HTMLInputElement;
+        if (startToggle) startToggle.checked = currentType?.start_field === fieldName;
+        if (endToggle) endToggle.checked = currentType?.end_field === fieldName;
     }
+}
+
+/** A type has one start and one end: naming a field one takes it from the
+ *  field that held it. */
+function toggleEnd(fieldName: string, end: End, enabled: boolean, container: HTMLElement): void {
+    if (!currentType) return;
+    if (enabled) {
+        currentType[end] = fieldName;
+    } else {
+        delete currentType[end];
+    }
+    buildEditUI(container);
+    selectFieldUI(fieldName, container);
 }
 
 function toggleFieldOption(fieldName: string, listKey: 'rich_string_fields' | 'array_fields', enabled: boolean, container: HTMLElement): void {
@@ -430,6 +508,7 @@ function processFieldData(data: any): void {
             isArray: currentType.array_fields?.includes(name) || false,
         });
     }
+    holdEnds(currentType);
 }
 
 // ── Persistence ──────────────────────────────────────────────────────
@@ -437,9 +516,11 @@ function processFieldData(data: any): void {
 async function persistTypeDefinition(): Promise<void> {
     if (!currentType) return;
 
+    const ends = endsOf(currentType);
     const allFields = [
         ...(currentType.rich_string_fields || []),
-        ...(currentType.array_fields || [])
+        ...(currentType.array_fields || []),
+        ...Object.values(ends),
     ];
 
     if (allFields.length > 50) {
@@ -460,7 +541,8 @@ async function persistTypeDefinition(): Promise<void> {
         opacity: currentType.opacity || 1.0,
         deprecated: currentType.deprecated || false,
         rich_string_fields: currentType.rich_string_fields || [],
-        array_fields: currentType.array_fields || []
+        array_fields: currentType.array_fields || [],
+        ...ends,
     }));
     await assertOk(response, `Failed to persist type definition for '${currentType.name}'`);
 }
@@ -553,6 +635,11 @@ async function loadExistingTypes(typesList: HTMLElement, container: HTMLElement)
             const total = rCount + aCount;
             fieldCount.textContent = total > 0 ? `${total} field${total > 1 ? 's' : ''}` : '';
 
+            const ends = document.createElement('span');
+            ends.className = 'type-def-ends';
+            ends.style.cssText = 'font-size:11px;color:var(--text-secondary);';
+            ends.textContent = endsShown(type);
+
             if (type.deprecated) {
                 name.style.textDecoration = 'line-through';
                 name.style.opacity = '0.6';
@@ -561,6 +648,7 @@ async function loadExistingTypes(typesList: HTMLElement, container: HTMLElement)
             item.appendChild(colorDot);
             item.appendChild(name);
             item.appendChild(fieldCount);
+            item.appendChild(ends);
 
             item.addEventListener('mouseenter', () => { item.style.background = 'var(--hover-bg, rgba(255,255,255,0.05))'; });
             item.addEventListener('mouseleave', () => { item.style.background = ''; });

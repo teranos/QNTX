@@ -26,6 +26,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 		func() *handlerFailureLog { return s.handlerFailures },
 		s)
 	s.statusLineHandler.news = func() *newsLog { return s.news }
+	s.statusLineHandler.deploys = s.deploys.held
 	// The auth subsystem ran first and left how the peers are asked, or noPeers.
 	s.statusLineHandler.peers = s.askPeers
 

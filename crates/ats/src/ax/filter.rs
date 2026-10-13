@@ -21,17 +21,6 @@ pub struct AxRequest {
     pub actions: Vec<String>,
 }
 
-/// The filter a watcher's query names. A watcher matches each attestation as
-/// it arrives, and reads no type definitions to measure it with, so `over` is
-/// refused rather than matched as if it were not there.
-pub fn watch_filter(query: &str, now_ms: i64, limit: usize) -> Result<AxRequest, AxRequestError> {
-    let request = ax_filter(query, now_ms, limit)?;
-    match &request.filter.over {
-        Some(span) => Err(AxRequestError::NotWatched(span.to_string())),
-        None => Ok(request),
-    }
-}
-
 /// Why a query names no rows.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum AxRequestError {
@@ -39,8 +28,6 @@ pub enum AxRequestError {
     Parse(#[from] ParseError),
     #[error("unable to parse temporal expression: {0}")]
     Temporal(String),
-    #[error("over {0}: a watcher matches each attestation as it arrives and reads no type definitions to measure it with")]
-    NotWatched(String),
 }
 
 /// The filter an AX query names, its time resolved against `now_ms`, reading
