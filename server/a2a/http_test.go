@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	errors "github.com/teranos/sacred-error"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -67,7 +68,7 @@ func unsupported(_ context.Context, op Operation, _ proto.Message) (proto.Messag
 var v1 = map[string]string{"A2A-Version": "1.0"}
 
 // garden is the one tenant an agent is served at here.
-func garden(tenant string) bool { return tenant == "garden" }
+func garden(tenant string) (bool, error) { return tenant == "garden", nil }
 
 // §3.6.2: an empty A2A-Version is 0.3, which this node does not speak, and the
 // refusal is VersionNotSupportedError as §11.6 writes an A2A error.
@@ -261,5 +262,22 @@ func TestMatchPath(t *testing.T) {
 				t.Errorf("%s on %s: %s is %q", c.template, c.path, k, params[k])
 			}
 		}
+	}
+}
+
+// Whether an agent is served at a tenant that could not be answered is an
+// error, not an agent that does not exist.
+func TestATenantThatCouldNotBeAskedIsAnError(t *testing.T) {
+	operations, err := Operations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	broken := func(string) (bool, error) { return false, errors.New("the store did not answer") }
+	r := httptest.NewRequest("GET", "/garden/extendedAgentCard", nil)
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	HTTP(operations, broken, unsupported, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }).ServeHTTP(w, r)
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "the store did not answer") {
+		t.Errorf("a tenant that could not be asked answered %d %s", w.Code, w.Body.String())
 	}
 }

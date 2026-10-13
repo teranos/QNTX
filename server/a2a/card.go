@@ -45,7 +45,10 @@ type Card struct {
 	Description string
 	Version     string
 	// URL is where the HTTP+JSON binding answers, for the interface entry.
-	URL        string
+	URL string
+	// Tenant is the agent the interface routes to behind URL
+	// (AgentInterface.tenant); the node's own card names none.
+	Tenant     string
 	Skills     []Skill
 	Extensions []Extension
 }
@@ -77,7 +80,7 @@ func (c Card) Message() (protoreflect.Message, error) {
 	// interacting with the agent (a2a.proto line 334), so the node's MCP is
 	// said in the node extension.
 	interfaces := []map[string]any{
-		{"url": c.URL, "protocolBinding": "HTTP+JSON", "protocolVersion": Version},
+		{"url": c.URL, "protocolBinding": "HTTP+JSON", "protocolVersion": Version, "tenant": c.Tenant},
 	}
 	body, err := json.Marshal(map[string]any{
 		"name":                c.Name,
