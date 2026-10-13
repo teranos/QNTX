@@ -213,12 +213,10 @@ func (s *QNTXServer) buildsMovedBy(push gitHubPush) []string {
 		}
 		names = append(names, b.name)
 		logger.Infow("A push moves a plugin's source", "plugin", b.name, "repo", push.Repository.FullName, "ref", push.Ref, "after", push.After)
-		// Queued while another plugin's build holds the node's one build.
-		s.deploys.begin(pluginDeploy{plugin: b.name, rev: push.After, repo: push.Repository.FullName, ref: push.Ref, after: push.After, stage: deployQueued})
+		// Built once GitHub's checks on the commit pushed have passed.
+		s.deploys.begin(pluginDeploy{plugin: b.name, rev: push.After, repo: push.Repository.FullName, ref: push.Ref, after: push.After, pushed: true, stage: deployChecking})
 		sacred.Go("plugin.build."+b.name, func() {
-			s.building.Lock()
-			defer s.building.Unlock()
-			s.buildIfMoved(s.lifetime(), b, logger)
+			s.awaitChecks(s.lifetime(), b, push.Repository.FullName, push.After, logger)
 		})
 	}
 	return names

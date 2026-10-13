@@ -155,10 +155,19 @@ func newsKey(a auth.Admission) string {
 
 // newsFor is the caller's items as the row draws them.
 func (h *StatusLineHandler) newsFor(a auth.Admission) []StatusItem {
+	return newsItems(h.heldNews(a))
+}
+
+// heldNews is what is on the row for the caller now.
+func (h *StatusLineHandler) heldNews(a auth.Admission) []News {
 	if h == nil || h.news == nil {
 		return nil
 	}
-	held := h.news().since(newsKey(a), time.Now().UnixMilli())
+	return h.news().since(newsKey(a), time.Now().UnixMilli())
+}
+
+// newsItems is news as the row draws it.
+func newsItems(held []News) []StatusItem {
 	items := make([]StatusItem, 0, len(held))
 	for _, n := range held {
 		it := n.Item

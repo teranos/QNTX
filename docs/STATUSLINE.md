@@ -66,6 +66,39 @@ the answer to the sieve being the same move as ritual_position.
 
 "i do think that what i want to have is, a ritual to kick off automatically after an hour"
 
+## A plugin's deploy
+
+Built. The node holds each plugin's newest deploy (server/plugin_deploy.go); the row
+relays it, first, on a background of its own.
+
+"i wish ug would poll from QNTX some kind of indication that it knows a new plugin build and version is underway"
+
+"consider an ongoing deploy a higher priority thing to express than any other information at that moment"
+
+"until its actually active at which point it resumes the carriousel"
+
+"in a way that is a lot more distinct from what i see now"
+
+What clears a failed deploy:
+
+"Time, or other news"
+
+"distict can mean though the text bg"
+
+"nothing functional should be changign except for the states in ug how it looks like"
+
+"like yellow bg for building"
+
+"o rmake it based on checks"
+
+"like percentage filled"
+
+"yellow to green"
+
+"building on qntx"
+
+"another line beign filled"
+
 ## The carousel
 
 Built, unlike the rest of this file. The row is one line and holds more than one line's
