@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { getFieldInfo, openTypeDefinition } from './type-definition-window';
+import { endsOf, getFieldInfo, openTypeDefinition } from './type-definition-window';
 
 describe('TypeDefinitionWindow', () => {
     beforeEach(() => {
@@ -43,5 +43,29 @@ describe('TypeDefinitionWindow', () => {
         expect(getFieldInfo('review_text')?.isRichString).toBe(true);
         expect(getFieldInfo('reviewer_name')?.isRichString).toBe(true);
         expect(getFieldInfo('tags')?.isArray).toBe(true);
+    });
+
+    test('a type that names where its attestations start and end shows both as fields', () => {
+        openTypeDefinition('employed', {
+            name: 'employed',
+            label: 'Employed',
+            color: '#2ecc71',
+            rich_string_fields: [],
+            array_fields: [],
+            start_field: 'from',
+            end_field: 'until',
+        });
+
+        expect(getFieldInfo('from')?.name).toBe('from');
+        expect(getFieldInfo('until')?.name).toBe('until');
+    });
+
+    test('ends are posted both or neither', () => {
+        const type = { name: 'employed', label: 'Employed', color: '#2ecc71' };
+        expect(endsOf({ ...type, start_field: 'from', end_field: 'until' })).toEqual({ start_field: 'from', end_field: 'until' });
+        expect(endsOf({ ...type, start_field: null, end_field: null })).toEqual({});
+        expect(endsOf(type)).toEqual({});
+        expect(() => endsOf({ ...type, start_field: 'from' })).toThrow('both or neither');
+        expect(() => endsOf({ ...type, end_field: 'until' })).toThrow('both or neither');
     });
 });
