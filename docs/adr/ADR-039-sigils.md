@@ -1,7 +1,7 @@
 # ADR-039: SIGILS
 
 Date: 2026-09-17
-Status: Proposed
+Status: In-progress 
 
 - A sigil is the one place something QNTX does is defined: what it is for, what
   goes in, what comes out and how it refuses.
