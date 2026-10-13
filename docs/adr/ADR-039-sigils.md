@@ -3,6 +3,8 @@
 Date: 2026-09-17
 Status: In-progress 
 
+An expressed capability 
+
 - A sigil is the one place something QNTX does is defined: what it is for, what goes in, what comes out and how it refuses.
 - The HTTP API and MCP are surfaces of a sigil. Both do the same thing.
 - A2A describes the node to other agents.
@@ -52,3 +54,6 @@ Status: In-progress
   these is reached over A2A until it is a sigil.
 
 
+---
+
+-  The boundary to other systems is deferred, and it will be runtime lines in the attestation DSL.
