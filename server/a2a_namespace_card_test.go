@@ -23,6 +23,7 @@ func servingGardens(t *testing.T) (*QNTXServer, map[auth.Level]string) {
 	t.Helper()
 	namedNode(t)
 	srv, tokens := pluginServingServer(t, "fake")
+	keyedNode(srv)
 	in := gardens{store: map[string]*handed{}, owner: map[string]string{}}
 	for _, name := range []string{"garden", "orchard"} {
 		store, _ := createTestStore(t)
@@ -52,6 +53,7 @@ func TestANamespaceAgentIsDescribedAtItsTenant(t *testing.T) {
 		served := dynamicpb.NewMessage(built.Descriptor())
 		require.NoError(t, protojson.Unmarshal(w.Body.Bytes(), served), path+": what was served is not an "+a2a.AgentCard)
 		assert.Empty(t, a2a.Missing(served), path)
+		require.NoError(t, a2a.Verify(served, srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), path+": the card is not signed by the node")
 
 		var card struct {
 			Name       string `json:"name"`

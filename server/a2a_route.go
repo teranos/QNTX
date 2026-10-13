@@ -3,9 +3,13 @@ package server
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
+	"github.com/teranos/QNTX/internal/nodedid"
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
@@ -57,6 +61,11 @@ func (s *QNTXServer) a2aServed(r *http.Request) a2a.Served {
 		if !gated || tenant == auth.NamespaceSystem || !admitted.MayActIn(tenant) {
 			return false, nil
 		}
+		// A namespace a peer serves is the peer's to say: its card is asked of
+		// it, and the peer answers whether it has an agent there.
+		if slices.ContainsFunc(s.peers(), serving(tenant)) {
+			return true, nil
+		}
 		opted, err := s.optedIntoAgent(tenant)
 		var notServed namespaces.NotServed
 		var disabled namespaces.Disabled
@@ -77,6 +86,10 @@ func (s *QNTXServer) a2aAnswer(r *http.Request) a2a.Answer {
 			return nil, a2a.Unsupported(op)
 		}
 		if tenant, named := a2a.TenantOf(request); named {
+			peers := s.peers()
+			if at := slices.IndexFunc(peers, serving(tenant)); at >= 0 {
+				return s.peersAgentCard(r, peers[at], tenant)
+			}
 			return s.namespaceAgentCard(r, tenant)
 		}
 		return s.extendedCard(r)
@@ -110,7 +123,65 @@ func (s *QNTXServer) namespaceAgentCard(r *http.Request, namespace string) (prot
 	if err != nil {
 		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the card of the agent of " + namespace + " was not built: " + err.Error()}
 	}
+	// Signed with the node's key (§8.4), so a primary handing it over can
+	// verify it came from here.
+	node, held := s.nodeKey()
+	if !held {
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the card of the agent of " + namespace + " is signed with the node's key, and this node holds none"}
+	}
+	if err := a2a.Sign(built, node.PrivateKey, node.KeyID()); err != nil {
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the card of the agent of " + namespace + " was not signed: " + err.Error()}
+	}
 	return given(built, "the card of the agent of "+namespace)
+}
+
+// peers is the nodes this one is the primary of (nodes.peers). A node running
+// without auth declares none.
+func (s *QNTXServer) peers() []auth.Client {
+	if s.authHandler == nil {
+		return []auth.Client{}
+	}
+	return s.authHandler.Peers()
+}
+
+// serving is whether a peer serves namespace, as nodes.peers declares it.
+func serving(namespace string) func(auth.Client) bool {
+	return func(peer auth.Client) bool { return slug.Of(peer.Namespace) == slug.Of(namespace) }
+}
+
+// peersAgentCard is the card of the agent a peer serves at namespace, asked of
+// the peer as the person asking here and handed over as the peer signed it.
+// The peer is known by the did:key nodes.peers pins, which is the key store
+// its signature is verified against (§8.4.3). The card's interface is the
+// peer's own, so whoever holds it talks to the peer.
+func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace string) (proto.Message, *a2a.Error) {
+	admitted, gated := auth.AdmissionFrom(r.Context())
+	if !gated {
+		return nil, a2a.Unauthenticated("the card of an agent a peer serves is asked of it as the person asking here, and this one came through no gate")
+	}
+	path := a2aPrefix + url.PathEscape(namespace) + "/extendedAgentCard?A2A-Version=" + a2a.Version
+	answer := s.authHandler.AskPeer(r.Context(), admitted, peer, path)
+	if answer.Err != nil {
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: peer.Label + " did not hand over the card of the agent of " + namespace + ": " + answer.Err.Error()}
+	}
+	if answer.Status == http.StatusNotFound {
+		return nil, a2a.NotFound(peer.Label + " serves no agent at tenant " + namespace)
+	}
+	if answer.Status != http.StatusOK {
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: peer.Label + " answered " + strconv.Itoa(answer.Status) + " for the card of the agent of " + namespace + ": " + string(answer.Body)}
+	}
+	card, err := a2a.ReadCard(answer.Body)
+	if err != nil {
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: peer.Label + " handed over no card for the agent of " + namespace + ": " + err.Error()}
+	}
+	key, err := auth.DecodeUserDID(peer.DID)
+	if err != nil {
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "nodes.peers names " + peer.Label + " by " + peer.DID + ", which is no key to verify its card with: " + err.Error()}
+	}
+	if err := a2a.Verify(card, key, nodedid.KeyIDOf(peer.DID)); err != nil {
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the card " + peer.Label + " handed over for the agent of " + namespace + " is not one it signed: " + err.Error()}
+	}
+	return given(card, "the card "+peer.Label+" handed over for the agent of "+namespace)
 }
 
 // given is a card as GetExtendedAgentCard answers it: one lacking what the

@@ -55,6 +55,10 @@ func invalid(message string) *Error {
 	return &Error{Message: message, status: http.StatusBadRequest, grpc: "INVALID_ARGUMENT"}
 }
 
+// NotFound is a resource that does not exist, or that the caller may not
+// know of: the two are not told apart (§3.3.2).
+func NotFound(message string) *Error { return notFound(message) }
+
 func notFound(message string) *Error {
 	return &Error{Message: message, status: http.StatusNotFound, grpc: "NOT_FOUND"}
 }
