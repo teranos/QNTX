@@ -63,10 +63,7 @@ QNTX hosts agents for use by ROOT.
 
 - Who may talk to it is the whole of what guards it.
 
-"make sure --permission-mode is configurable in the Claude Element"
 
-- The permission mode a turn runs in is named by whoever speaks, and the
-  Claude element offers every mode Claude Code has.
 - am.toml gives the mode used when none is named (`permission_mode`) and the
   tools it may use without being asked (`allow`), by Claude Code's own names.
 - Claude Code refuses `bypassPermissions` to a process run as root, which is
