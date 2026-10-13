@@ -3,8 +3,7 @@
 Date: 2026-09-17
 Status: In-progress 
 
-- A sigil is the one place something QNTX does is defined: what it is for, what
-  goes in, what comes out and how it refuses.
+- A sigil is the one place something QNTX does is defined: what it is for, what goes in, what comes out and how it refuses.
 - The HTTP API and MCP are surfaces of a sigil. Both do the same thing.
 - A2A describes the node to other agents.
 - The Agent Card describes the node's identity, capabilities, skills, service
