@@ -29,7 +29,7 @@ QNTX hosts agents for use by ROOT.
 
 
 
-- ROOT's are Opus, Fable and Sonnet in Claude Code, and the one in Pi.
+- ROOT's are Opus and  Fable at 
 
 "So a conversation I have with Mistral as ROOT is one long Mistral conversation"
 
