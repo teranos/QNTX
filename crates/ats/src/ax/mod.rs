@@ -33,7 +33,7 @@
 mod filter;
 pub mod over;
 
-pub use filter::{ax_filter, watch_filter, AxRequest, AxRequestError};
+pub use filter::{ax_filter, AxRequest, AxRequestError};
 
 use std::collections::{HashMap, HashSet};
 

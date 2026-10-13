@@ -3,9 +3,21 @@
 //! Given an attestation and a set of watcher filters, determines which watchers
 //! match. Designed for batched evaluation: one call per attestation, all watchers
 //! checked in a single pass.
+//!
+//! A watcher asking `over` measures each attestation as it arrives, between the
+//! start and end the types it is of name (crate::ax::over). Those definitions
+//! live in the store, which this crate does not reach from here: a call without
+//! them answers every other watcher and says which types to read, and the call
+//! that gives them answers the rest.
+
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+use crate::attestation::Attestation;
+use crate::ax::over;
+use crate::span::Span;
 
 /// A watcher's structural filter — the fields an attestation must overlap with.
 #[derive(Debug, Clone, Deserialize)]
@@ -25,6 +37,9 @@ pub struct WatcherFilter {
     pub time_end_ms: Option<i64>,
     #[serde(default)]
     pub attribute_filters: Vec<AttributeFilter>,
+    /// `over 5y`: only attestations longer than the span.
+    #[serde(default)]
+    pub over: Option<Span>,
 }
 
 /// A single attribute filter — dot-path navigation + operator.
@@ -57,25 +72,85 @@ pub struct MatchAttestation {
 pub struct MatchInput {
     pub attestation: MatchAttestation,
     pub watchers: Vec<WatcherFilter>,
+    /// The definitions of the types the attestation is of, once read: every
+    /// `[type] is type` attestation naming one of its predicates.
+    #[serde(default)]
+    pub types: Option<Vec<MatchAttestation>>,
 }
 
 /// Output from batch watcher matching.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchOutput {
     pub matched_ids: Vec<String>,
+    /// What to read before the watchers asking `over` are answered: given no
+    /// type definitions, a watcher that matches but for its length is in
+    /// neither `matched_ids` nor out of them. Read these, give them as
+    /// `types`, and ask again. Never more than one.
+    #[serde(default)]
+    pub read: Vec<TypesRead>,
+}
+
+/// The definitions to read: the types an attestation is of.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypesRead {
+    pub types: Vec<String>,
 }
 
 /// Match an attestation against all watcher filters, return IDs of matched watchers.
 pub fn match_watchers(input: &MatchInput) -> MatchOutput {
-    let mut matched_ids = Vec::new();
+    let attestation = as_attestation(&input.attestation);
+    let ends: Option<HashMap<String, over::Ends>> = input
+        .types
+        .as_ref()
+        .map(|types| over::ends_of(&types.iter().map(as_attestation).collect::<Vec<_>>()));
 
+    let mut matched_ids = Vec::new();
+    let mut unmeasured = false;
     for watcher in &input.watchers {
-        if matches_filter(&input.attestation, watcher) {
+        if !matches_filter(&input.attestation, watcher) {
+            continue;
+        }
+        let longer = match (&watcher.over, &ends) {
+            (None, _) => true,
+            (Some(span), Some(ends)) => over::is_over(&attestation, span, ends),
+            (Some(_), None) => {
+                unmeasured = true;
+                false
+            }
+        };
+        if longer {
             matched_ids.push(watcher.id.clone());
         }
     }
 
-    MatchOutput { matched_ids }
+    let read = match unmeasured {
+        true => vec![TypesRead {
+            types: over::types_of(std::slice::from_ref(&attestation)).subjects,
+        }],
+        false => Vec::new(),
+    };
+    MatchOutput { matched_ids, read }
+}
+
+/// The attestation as the over reading takes it. What it is not given, an id
+/// and a source, plays no part in a length.
+fn as_attestation(a: &MatchAttestation) -> Attestation {
+    Attestation {
+        id: String::new(),
+        subjects: a.subjects.clone(),
+        predicates: a.predicates.clone(),
+        contexts: a.contexts.clone(),
+        actors: a.actors.clone(),
+        timestamp: a.timestamp_ms,
+        source: String::new(),
+        attributes: match &a.attributes {
+            Some(Value::Object(map)) => map.clone().into_iter().collect(),
+            Some(_) | None => HashMap::new(),
+        },
+        created_at: a.timestamp_ms,
+        signature: None,
+        signer_did: None,
+    }
 }
 
 /// Check if an attestation matches a single watcher's structural filter.
@@ -206,6 +281,7 @@ mod tests {
             time_start_ms: None,
             time_end_ms: None,
             attribute_filters: Vec::new(),
+            over: None,
         }
     }
 
@@ -214,6 +290,7 @@ mod tests {
         let att = make_attestation(&["ALICE"], &["crawled"], &["web"], &["levi"]);
         let watcher = make_filter("w1", &[], &[]);
         let input = MatchInput {
+            types: None,
             attestation: att,
             watchers: vec![watcher],
         };
@@ -227,6 +304,7 @@ mod tests {
         let w1 = make_filter("w1", &["ALICE"], &[]);
         let w2 = make_filter("w2", &["BOB"], &[]);
         let input = MatchInput {
+            types: None,
             attestation: att,
             watchers: vec![w1, w2],
         };
@@ -239,6 +317,7 @@ mod tests {
         let att = make_attestation(&["Alice"], &["Crawled"], &[], &[]);
         let w1 = make_filter("w1", &["alice"], &["crawled"]);
         let input = MatchInput {
+            types: None,
             attestation: att,
             watchers: vec![w1],
         };
@@ -251,6 +330,7 @@ mod tests {
         let att = make_attestation(&["ALICE"], &["crawled"], &[], &[]);
         let w1 = make_filter("w1", &["ALICE"], &["announced"]);
         let input = MatchInput {
+            types: None,
             attestation: att,
             watchers: vec![w1],
         };
@@ -271,6 +351,7 @@ mod tests {
         w2.time_start_ms = Some(6000);
 
         let input = MatchInput {
+            types: None,
             attestation: att,
             watchers: vec![w1, w2],
         };
@@ -296,9 +377,11 @@ mod tests {
                 op: "equals".to_string(),
                 value: "complete".to_string(),
             }],
+            over: None,
         };
 
         let input = MatchInput {
+            types: None,
             attestation: att,
             watchers: vec![w1],
         };
@@ -324,9 +407,11 @@ mod tests {
                 op: "contains".to_string(),
                 value: "example.com".to_string(),
             }],
+            over: None,
         };
 
         let input = MatchInput {
+            types: None,
             attestation: att,
             watchers: vec![w1],
         };
@@ -352,9 +437,11 @@ mod tests {
                 op: "contains".to_string(),
                 value: "git".to_string(),
             }],
+            over: None,
         };
 
         let input = MatchInput {
+            types: None,
             attestation: att,
             watchers: vec![w1],
         };
@@ -377,6 +464,7 @@ mod tests {
         let w4 = make_filter("w4", &[], &["announced"]);
 
         let input = MatchInput {
+            types: None,
             attestation: att,
             watchers: vec![w1, w2, w3, w4],
         };
@@ -404,5 +492,94 @@ mod tests {
         let result = match_watchers_json(input_json);
         let output: MatchOutput = serde_json::from_str(&result).unwrap();
         assert_eq!(output.matched_ids, vec!["w1"]);
+    }
+
+    fn employed(from: &str, until: &str) -> MatchAttestation {
+        MatchAttestation {
+            attributes: Some(json!({"from": from, "until": until})),
+            ..make_attestation(&["ALICE"], &["employed"], &[], &["hr"])
+        }
+    }
+
+    fn employed_type() -> MatchAttestation {
+        MatchAttestation {
+            attributes: Some(json!({"start_field": "from", "end_field": "until"})),
+            ..make_attestation(&["employed"], &["type"], &[], &["employed"])
+        }
+    }
+
+    fn over(id: &str, span: &str) -> WatcherFilter {
+        WatcherFilter {
+            over: Some(Span::parse(span).unwrap()),
+            ..make_filter(id, &["ALICE"], &[])
+        }
+    }
+
+    #[test]
+    fn over_asks_for_the_types_then_measures_by_them() {
+        let watchers = vec![
+            over("long", "5y"),
+            over("short", "1mo"),
+            make_filter("any", &[], &[]),
+        ];
+        let first = match_watchers(&MatchInput {
+            attestation: employed("2018-03-01", "2020-03-01"),
+            watchers: watchers.clone(),
+            types: None,
+        });
+        // Every watcher not asking over is answered; the rest wait on the types.
+        assert_eq!(first.matched_ids, vec!["any"]);
+        assert_eq!(
+            first.read,
+            vec![TypesRead {
+                types: vec!["employed".into()]
+            }]
+        );
+
+        let second = match_watchers(&MatchInput {
+            attestation: employed("2018-03-01", "2020-03-01"),
+            watchers,
+            types: Some(vec![employed_type()]),
+        });
+        assert_eq!(second.matched_ids, vec!["short", "any"]);
+        assert_eq!(second.read, vec![]);
+    }
+
+    #[test]
+    fn over_reads_nothing_for_an_attestation_no_watcher_could_match() {
+        let output = match_watchers(&MatchInput {
+            attestation: MatchAttestation {
+                subjects: vec!["BOB".into()],
+                ..employed("2018-03-01", "2020-03-01")
+            },
+            watchers: vec![over("long", "1y")],
+            types: None,
+        });
+        assert_eq!(output.matched_ids, Vec::<String>::new());
+        assert_eq!(output.read, vec![]);
+    }
+
+    #[test]
+    fn a_type_naming_no_ends_gives_no_length() {
+        let output = match_watchers(&MatchInput {
+            attestation: employed("2018-03-01", "2030-03-01"),
+            watchers: vec![over("long", "1y")],
+            types: Some(vec![]),
+        });
+        assert_eq!(output.matched_ids, Vec::<String>::new());
+        assert_eq!(output.read, vec![]);
+    }
+
+    #[test]
+    fn over_crosses_as_its_text() {
+        let input = r#"{
+            "attestation": {"subjects": ["ALICE"], "predicates": ["employed"], "timestamp_ms": 1,
+                            "attributes": {"from": "2018-03-01", "until": "2024-03-01"}},
+            "watchers": [{"id": "w", "over": "5y"}],
+            "types": [{"subjects": ["employed"], "predicates": ["type"], "timestamp_ms": 1,
+                       "attributes": {"start_field": "from", "end_field": "until"}}]
+        }"#;
+        let output: MatchOutput = serde_json::from_str(&match_watchers_json(input)).unwrap();
+        assert_eq!(output.matched_ids, vec!["w"]);
     }
 }
