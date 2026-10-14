@@ -54,13 +54,22 @@ func (o *standingObserver) OnAttestationCreated(as *types.As) {
 		if w.ActionType != storage.ActionTypeBuiltinExecute {
 			continue
 		}
-		if !watcher.StandingMatches(as, w) {
-			continue
-		}
 		var action watcher.BuiltinExecuteAction
 		if err := json.Unmarshal([]byte(w.ActionData), &action); err != nil || action.HandlerName == "" {
 			o.logger.Errorw("A standing row names no built-in to run",
 				"watcher_id", w.ID, "action_data", w.ActionData, "error", err)
+			continue
+		}
+		matched, err := watcher.StandingMatches(as, w)
+		if err != nil {
+			// Not knowing is not "it did not match": the row's built-in is
+			// owed a run it may not get, and that is said where failures are.
+			o.failed(action.HandlerName, err.Error(), as)
+			o.logger.Errorw("A standing row could not be matched",
+				"watcher_id", w.ID, "attestation_id", as.ID, "error", err)
+			continue
+		}
+		if !matched {
 			continue
 		}
 		exec := o.builtins()

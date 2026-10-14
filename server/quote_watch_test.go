@@ -110,8 +110,8 @@ func TestStandingQuoteRowWatchesClaims(t *testing.T) {
 		t.Fatal("no standing row watches quote claims")
 	}
 	claim := &types.As{ID: "c", Predicates: []string{watcher.QuoteClaimedPredicate}}
-	if !watcher.StandingMatches(claim, row) {
-		t.Error("the standing row does not match a claim")
+	if matched, err := watcher.StandingMatches(claim, row); err != nil || !matched {
+		t.Errorf("the standing row does not match a claim: %v", err)
 	}
 	if !strings.Contains(row.ActionData, watcher.QuoteProvenanceHandlerName) {
 		t.Errorf("the standing row reaches %s, not the quote built-in", row.ActionData)

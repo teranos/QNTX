@@ -118,11 +118,11 @@ func TestEngineRunsNoStandingBuiltIn(t *testing.T) {
 // observer, so the two cannot drift.
 func TestStandingMatchesIsTheEnginesFilter(t *testing.T) {
 	row := watcher.Standing()[1]
-	if !watcher.StandingMatches(&types.As{Predicates: []string{watcher.CIPushedPredicate}}, row) {
-		t.Fatal("the standing CI row does not match a ci-status attestation")
+	if matched, err := watcher.StandingMatches(&types.As{Predicates: []string{watcher.CIPushedPredicate}}, row); err != nil || !matched {
+		t.Fatalf("the standing CI row does not match a ci-status attestation: %v", err)
 	}
-	if watcher.StandingMatches(&types.As{Predicates: []string{"other"}}, row) {
-		t.Fatal("the standing CI row matched something else")
+	if matched, err := watcher.StandingMatches(&types.As{Predicates: []string{"other"}}, row); err != nil || matched {
+		t.Fatalf("the standing CI row matched something else: %v", err)
 	}
 }
 
