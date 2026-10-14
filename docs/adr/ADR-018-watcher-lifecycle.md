@@ -118,7 +118,7 @@ A watcher must declare at least one filter dimension. The storage layer (`valida
 - A watcher fires when an attestation's predicates contain **any** of the watcher's predicates (OR semantics)
 - Match is exact string equality, not prefix
 - Multiple filter dimensions are ANDed: if a watcher sets both predicates and subjects, both must match
-- Structural matching runs through Rust WASM (batch, one call per attestation for all watchers) with Go fallback
+- Structural matching runs through Rust WASM (batch, one call per attestation for all watchers), and only there: a build without `qntxwasm` matches no watcher and says so
 - Rate limiting is per-watcher, not per-predicate
 
 ### UI signal: ⏿
