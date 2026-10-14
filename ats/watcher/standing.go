@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/element"
+	errors "github.com/teranos/sacred-error"
 )
 
 // StandingElementPublished is the id of the row below. Named because the engine
@@ -176,11 +177,25 @@ func Standing() []*storage.Watcher {
 // namespace's and the engine is one namespace's, so what runs a standing
 // built-in (server/standing_observer.go) asks here rather than keeping a
 // second filter that could drift from the engine's.
-func StandingMatches(as *types.As, w *storage.Watcher) bool {
+func StandingMatches(as *types.As, w *storage.Watcher) (bool, error) {
 	if as == nil || w == nil || !w.Enabled {
-		return false
+		return false, nil
 	}
-	return matchesFilterStandalone(as, w)
+	matched, refused, err := batchMatchStructural(as, []*storage.Watcher{w}, standingReadsNoType)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to match attestation %s against standing row %s", as.ID, w.ID)
+	}
+	if why, ok := refused[w.ID]; ok {
+		return false, why
+	}
+	return matched[w.ID], nil
+}
+
+// standingReadsNoType is the types a standing row reads: none, since no
+// standing row asks `over`. One asked is refused rather than measured by
+// nothing.
+func standingReadsNoType(names []string) ([]*types.As, error) {
+	return nil, errors.Newf("a standing row asked for the definitions of %v, and no standing row asks over", names)
 }
 
 // IsStanding reports whether an id belongs to the table. The routes that write

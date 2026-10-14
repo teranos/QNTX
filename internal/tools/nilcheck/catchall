@@ -1,6 +1,6 @@
 # default: branches and _ => arms, per file. Debt: each number may fall and may not rise.
 # Instead: name every case; an unknown value is refused, not let through.
-# 144 in 101 files.
+# 143 in 100 files.
 
 1	ats/parser/error.go
 1	ats/so/actions/prompt/action.go
@@ -10,7 +10,6 @@
 1	ats/storage/rich_search.go
 1	ats/watcher/engine.go
 2	ats/watcher/engine_execute.go
-1	ats/watcher/engine_match.go
 1	cmd/qntx/commands/am.go
 1	cmd/qntx/commands/database.go
 1	crates/ats-duckdb/build.rs

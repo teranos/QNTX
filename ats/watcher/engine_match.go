@@ -2,11 +2,9 @@ package watcher
 
 import (
 	"strings"
-	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/sacred"
 	errors "github.com/teranos/sacred-error"
 	"golang.org/x/time/rate"
@@ -309,52 +307,6 @@ func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher, read type
 	return matched[watcher.ID], nil
 }
 
-// matchesAttributeFilter checks a single attribute filter against an attestation's attributes.
-// Path uses dot-separated keys (e.g., "tool_input.command") to navigate nested maps.
-func matchesAttributeFilter(attrs map[string]any, af storage.AttributeFilter) bool {
-	if attrs == nil {
-		return false
-	}
-
-	value := resolveAttrPath(attrs, af.Path)
-	if value == "" {
-		return false
-	}
-
-	switch af.Op {
-	case "equals":
-		return value == af.Value
-	case "contains":
-		return strings.Contains(value, af.Value)
-	default:
-		return false
-	}
-}
-
-// resolveAttrPath navigates a dot-separated path through nested maps and returns the string value.
-// Returns "" if the path doesn't resolve to a string.
-func resolveAttrPath(attrs map[string]any, path string) string {
-	parts := strings.Split(path, ".")
-	var current any = attrs
-
-	for _, part := range parts {
-		m, ok := current.(map[string]any)
-		if !ok {
-			return ""
-		}
-		current, ok = m[part]
-		if !ok {
-			return ""
-		}
-	}
-
-	s, ok := current.(string)
-	if !ok {
-		return ""
-	}
-	return s
-}
-
 // matchesSemantic checks using the cached query embedding.
 func (e *Engine) matchesSemantic(as *types.As, watcher *storage.Watcher) (bool, float32) {
 	queryEmbedding := e.queryEmbeddings[watcher.ID]
@@ -439,82 +391,4 @@ func extractAttestationText(as *types.As) string {
 	}
 
 	return strings.Join(parts, " ")
-}
-
-// batchMatchStructuralGo matches an attestation against all structural watchers using Go logic.
-func batchMatchStructuralGo(as *types.As, watchers []*storage.Watcher) map[string]bool {
-	matched := make(map[string]bool)
-	for _, w := range watchers {
-		if matchesFilterStandalone(as, w) {
-			matched[w.ID] = true
-		}
-	}
-	return matched
-}
-
-// withinTime is whether t falls in a filter's time range: from its start and
-// up to and including its end, on each side that is bounded. A side naming
-// neither is refused.
-func withinTime(t time.Time, f *types.AxFilter) (bool, error) {
-	start, starts, err := f.TimeStart.At("start")
-	if err != nil {
-		return false, err
-	}
-	end, ends, err := f.TimeEnd.At("end")
-	if err != nil {
-		return false, err
-	}
-	if starts && t.Before(start) {
-		return false, nil
-	}
-	if ends && t.After(end) {
-		return false, nil
-	}
-	return true, nil
-}
-
-// matchesFilterStandalone checks structural filter match without requiring an Engine receiver.
-func matchesFilterStandalone(as *types.As, watcher *storage.Watcher) bool {
-	filter := &watcher.Filter
-
-	if len(filter.Subjects) > 0 && !hasOverlap(filter.Subjects, as.Subjects) {
-		return false
-	}
-	if len(filter.Predicates) > 0 && !hasOverlap(filter.Predicates, as.Predicates) {
-		return false
-	}
-	if len(filter.Contexts) > 0 && !hasOverlap(filter.Contexts, as.Contexts) {
-		return false
-	}
-	if len(filter.Actors) > 0 && !hasOverlap(filter.Actors, as.Actors) {
-		return false
-	}
-	within, err := withinTime(as.Timestamp, filter)
-	if err != nil {
-		logger.Logger.Warnw("Watcher not matched: its filter does not say its time range", "watcher_id", watcher.ID, "error", err)
-		return false
-	}
-	if !within {
-		return false
-	}
-	for _, af := range watcher.AttributeFilters {
-		if !matchesAttributeFilter(as.Attributes, af) {
-			return false
-		}
-	}
-	return true
-}
-
-// hasOverlap returns true if there's any overlap between two string slices
-func hasOverlap(a, b []string) bool {
-	set := make(map[string]bool, len(a))
-	for _, v := range a {
-		set[strings.ToLower(v)] = true
-	}
-	for _, v := range b {
-		if set[strings.ToLower(v)] {
-			return true
-		}
-	}
-	return false
 }

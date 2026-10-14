@@ -139,8 +139,8 @@ func TestStandingQuoteRemovedRowWatchesRemovals(t *testing.T) {
 		t.Fatal("no standing row watches quote removals")
 	}
 	removal := &types.As{ID: "r", Predicates: []string{watcher.QuoteRemovedPredicate}}
-	if !watcher.StandingMatches(removal, row) {
-		t.Error("the standing row does not match a removal")
+	if matched, err := watcher.StandingMatches(removal, row); err != nil || !matched {
+		t.Errorf("the standing row does not match a removal: %v", err)
 	}
 	if !strings.Contains(row.ActionData, watcher.QuoteRemovalHandlerName) {
 		t.Errorf("the standing row reaches %s, not the removal built-in", row.ActionData)
