@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -256,24 +257,31 @@ func mergeConfigFiles(v *viper.Viper) error {
 
 	// Process each config file and track sources
 	for _, cf := range configFiles {
-		if _, err := os.Stat(cf.path); err == nil {
-			// Config file exists, merge it
-			tempViper := viper.New()
-			tempViper.SetConfigFile(cf.path)
-			tempViper.SetConfigType("toml")
+		// A file that is not there said nothing. One that is there and cannot
+		// be looked at is not the same as one that is not there.
+		if _, err := os.Stat(cf.path); errors.Is(err, fs.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return errors.Wrapf(err, "the config at %s cannot be looked at", cf.path)
+		}
+		tempViper := viper.New()
+		tempViper.SetConfigFile(cf.path)
+		tempViper.SetConfigType("toml")
 
-			if err := tempViper.ReadInConfig(); err == nil {
-				// Track sources for all settings in this file
-				allSettings := tempViper.AllSettings()
-				TrackNestedSources(allSettings, "", cf.source, cf.path)
+		// A file that is there and does not read is not a file that said
+		// nothing: the node is not started as if it had not been written.
+		if err := tempViper.ReadInConfig(); err != nil {
+			return errors.Wrapf(err, "the config at %s does not read", cf.path)
+		}
+		// Track sources for all settings in this file
+		allSettings := tempViper.AllSettings()
+		TrackNestedSources(allSettings, "", cf.source, cf.path)
 
-				// Merge this config into the main viper instance
-				// Using MergeConfigMap preserves Viper's natural precedence order,
-				// allowing environment variables to override config files properly
-				if err := v.MergeConfigMap(allSettings); err != nil {
-					return errors.Wrapf(err, "failed to merge config from %s", cf.path)
-				}
-			}
+		// Merge this config into the main viper instance
+		// Using MergeConfigMap preserves Viper's natural precedence order,
+		// allowing environment variables to override config files properly
+		if err := v.MergeConfigMap(allSettings); err != nil {
+			return errors.Wrapf(err, "failed to merge config from %s", cf.path)
 		}
 	}
 

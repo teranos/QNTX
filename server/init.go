@@ -50,7 +50,7 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 
 	cfg, err := appcfg.Load()
 	if err != nil {
-		cfg = &appcfg.Config{}
+		return nil, errors.Wrap(err, "the config did not load, so the node does not start")
 	}
 	logPath := cfg.GetLogPath(appcfg.GetServerPort())
 	serverLogger := createServerLogger(verbosity)
