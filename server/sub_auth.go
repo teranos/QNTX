@@ -196,9 +196,12 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		return nil
 	}
 
-	serverPort := appcfg.DefaultServerPort
-	if s.deps.cfg.Server.Port != nil {
-		serverPort = *s.deps.cfg.Server.Port
+	serverPort := s.port
+	// A frontend port nobody said is no separate frontend: New adds a frontend
+	// origin only for a port other than the node's own.
+	frontendPort := serverPort
+	if s.deps.cfg.Said("server.frontend_port") {
+		frontendPort = s.deps.cfg.Server.FrontendPort
 	}
 
 	// authGate is where the CORS-outside-the-limiter order lives, so a test can
@@ -271,7 +274,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		s.deps.cfg.Auth.RPID,
 		s.deps.cfg.Auth.RPOrigins,
 		serverPort,
-		s.deps.cfg.Server.FrontendPort,
+		frontendPort,
 		s.deps.cfg.Auth.SessionExpiryHours,
 		s.logger,
 		authCorsWrap,

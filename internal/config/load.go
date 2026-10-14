@@ -79,9 +79,6 @@ func LoadFromFile(configPath string) (*Config, error) {
 	v.SetConfigFile(configPath)
 	v.SetConfigType("toml")
 
-	// Set defaults but don't bind environment variables for this specific load
-	SetDefaults(v)
-
 	if err := v.ReadInConfig(); err != nil {
 		return nil, errors.Wrapf(err, "failed to read config file %s", configPath)
 	}
@@ -108,7 +105,7 @@ func Reset() {
 	configSourcesMu.Unlock()
 }
 
-// initViper initializes Viper with configuration sources and defaults
+// initViper initializes Viper with its configuration sources
 func initViper() (*viper.Viper, error) {
 	viperOnce.Do(func() {
 		v := viper.New()
@@ -118,11 +115,14 @@ func initViper() (*viper.Viper, error) {
 		v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 		v.AutomaticEnv()
 
+		// Every key the Config reads reaches it from its environment variable.
+		if err := bindEveryKey(v); err != nil {
+			viperInitErr = err
+			return
+		}
+
 		// Bind specific sensitive configuration values to environment variables
 		BindSensitiveEnvVars(v)
-
-		// Set defaults first
-		SetDefaults(v)
 
 		// Manually merge configs in precedence order: system -> user -> project -> env vars
 		if err := mergeConfigFiles(v); err != nil {

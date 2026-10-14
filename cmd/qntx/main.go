@@ -73,17 +73,29 @@ func init() {
 	// Add file output to the global logger before plugin loading starts.
 	// This makes plugin-loader logs visible in the structured log file.
 	if cfg, err := config.Load(); err == nil {
-		logPath := cfg.GetLogPath(config.GetServerPort())
-		if err := logger.AddFileOutput(logPath); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Failed to add file output to logger: %v\n", err)
+		// The file log is named by the port the node listens on; a config that
+		// says no port names no file, and nothing is written to one.
+		if port, said := cfg.Port(); said {
+			logPath := cfg.GetLogPath(port)
+			if err := logger.AddFileOutput(logPath); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to add file output to logger: %v\n", err)
+			}
 		}
 
 		// Sentry goes on last, so plugin loading is already in the stream it
 		// ships. Failing to reach Sentry is not a reason for a node not to run;
 		// it is a reason to say so on the terminal that can still be read.
-		opt := sentryOptions(cfg)
-		if err := logger.AddSentryOutput(opt); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Failed to start Sentry log shipping: %v\n", err)
+		// No sentry.dsn is no Sentry.
+		var opt logger.SentryOptions
+		if cfg.Said("sentry.dsn") {
+			var err error
+			opt, err = sentryOptions(cfg)
+			if err == nil {
+				err = logger.AddSentryOutput(opt)
+			}
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to start Sentry log shipping: %v\n", err)
+			}
 		}
 
 		// After every output is on, so one count decides for all of them.
@@ -143,13 +155,20 @@ func initializePluginRegistry() {
 		return
 	}
 
+	// A plugin's pid file and log are the node's, named by the port it listens on.
+	port, said := cfg.Port()
+	if !said {
+		server.RunWithoutPluginManager(errors.New("server.port is not said, so the node runs no plugin manager: its plugins are named by the port it listens on"))
+		return
+	}
+
 	// Always create a plugin manager: the plugin element enables plugins at runtime
 	manager := grpc.NewPluginManager(pluginLogger, logger.Logger, cfg.Plugin.Runtime.TypeScriptRuntime)
 	manager.SetAccumulator(grpc.NewPluginAccumulator(pluginLogger))
 	if home, err := os.UserHomeDir(); err == nil {
-		manager.SetPidFile(filepath.Join(home, ".qntx"), config.GetServerPort())
+		manager.SetPidFile(filepath.Join(home, ".qntx"), port)
 	}
-	logPath := cfg.GetLogPath(config.GetServerPort())
+	logPath := cfg.GetLogPath(port)
 	manager.SetLogDir(filepath.Dir(logPath))
 	grpc.SetDefaultPluginManager(manager)
 	server.HandPluginManager(manager)
@@ -643,12 +662,14 @@ func findTauriBinary() string {
 // sentryOptions turns the [sentry] section into what the logger needs. The
 // release is the build, taken from the same place `qntx version` reads, so an
 // issue in Sentry names the commit that produced it.
-func sentryOptions(cfg *config.Config) logger.SentryOptions {
+func sentryOptions(cfg *config.Config) (logger.SentryOptions, error) {
+	if err := cfg.RefuseUnsaid("sentry.dsn is said, and Sentry ships as am.toml says or not at all",
+		"sentry.min_level", "sentry.capture_errors", "sentry.flush_seconds", "sentry.debug"); err != nil {
+		return logger.SentryOptions{}, err
+	}
 	level, err := zapcore.ParseLevel(cfg.Sentry.MinLevel)
 	if err != nil {
-		// config.Validate refuses an unreadable level when a DSN is set. This
-		// is the path where there is no DSN and the field was never read.
-		level = zapcore.InfoLevel
+		return logger.SentryOptions{}, errors.Wrapf(err, "sentry.min_level %q is not a level", cfg.Sentry.MinLevel)
 	}
 
 	return logger.SentryOptions{
@@ -663,7 +684,7 @@ func sentryOptions(cfg *config.Config) logger.SentryOptions {
 		Debug:            cfg.Sentry.Debug,
 		FlushTimeout:     time.Duration(cfg.Sentry.FlushSeconds) * time.Second,
 		TracesSampleRate: cfg.Sentry.TracesSampleRate,
-	}
+	}, nil
 }
 
 func main() {

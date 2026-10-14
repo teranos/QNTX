@@ -41,9 +41,6 @@ func (h *Handler) HandleCluster(w http.ResponseWriter, r *http.Request) {
 
 	// Parse optional clustering parameters from body
 	minClusterSize := appcfg.GetInt("embeddings.min_cluster_size")
-	if minClusterSize <= 0 {
-		minClusterSize = 5
-	}
 	clusterMatchThreshold := appcfg.GetFloat64("embeddings.cluster_match_threshold")
 
 	var req ClusterRequest

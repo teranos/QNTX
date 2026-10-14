@@ -11,11 +11,10 @@ import (
 // "how many instances of the same thing are there in it that can easily be
 // derived and overwritten on divergence ?"
 
-// loadAm reads an am.toml the way the node does, from defaults up.
+// loadAm reads an am.toml the way the node does.
 func loadAm(t *testing.T, amToml string) (*Config, *viper.Viper) {
 	t.Helper()
 	v := viper.New()
-	SetDefaults(v)
 	v.SetConfigType("toml")
 	if err := v.ReadConfig(strings.NewReader(amToml)); err != nil {
 		t.Fatalf("am.toml did not parse: %v\n%s", err, amToml)

@@ -1,6 +1,7 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 291 in 126 files.
+# 287 in 125 files.
+# internal/config/environ.go: defaults.go renamed, 4 to none with its defaults gone.
 
 1	ats/attrs/attrs.go
 1	ats/identity/quickdev.go
@@ -38,7 +39,6 @@
 1	internal/access/derive.go
 1	internal/access/tokens.go
 2	internal/claudecode/claudecode.go
-4	internal/config/defaults.go
 1	internal/config/introspection.go
 3	internal/config/load.go
 1	internal/config/one_root.go

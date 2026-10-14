@@ -93,7 +93,11 @@ func mintedByTheNode(owner, repo string) (string, string, error) {
 	if err != nil {
 		return "", "", errors.Wrap(err, "the repository asked about did not marshal")
 	}
-	answered, err := ask("POST", nodeURL()+"/api/github/credential", body)
+	to, err := nodeURL()
+	if err != nil {
+		return "", "", err
+	}
+	answered, err := ask("POST", to+"/api/github/credential", body)
 	if err != nil {
 		return "", "", err
 	}

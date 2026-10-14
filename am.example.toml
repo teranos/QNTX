@@ -1,6 +1,10 @@
 # QNTX Configuration Example
-# Copy this file to ~/.qntx/am.toml and customize as needed
-# All settings shown here are defaults - uncomment to override
+# Copy this file to ~/.qntx/am.toml and change what is yours to change.
+#
+# A node runs on what its am.toml says and on nothing else: a key left out is
+# not a value. What every node runs with is written out below, uncommented,
+# and `qntx server` refuses a node whose am.toml leaves any of it out, naming
+# every key at once. A commented key, left out, is something that does not run.
 
 # ════════════════════════════════════════════════════════════════
 # Storage Backend (ADR-023, ADR-024)
@@ -8,28 +12,31 @@
 # ════════════════════════════════════════════════════════════════
 
 [storage]
-# Accepted values: "sqlite" (default) or "parquet".
+# Accepted values: "sqlite" or "parquet".
 backend = "sqlite"
 
 # ── SQLite backend ──────────────────────────────────────────────
 
 [storage.sqlite]
-# SQLite database path (relative to working directory or absolute)
-# Default: "qntx.db"
+# SQLite database path (relative to working directory or absolute). Left out,
+# with no --db-path or DB_PATH, no store is opened.
 # Environment: QNTX_STORAGE_SQLITE_PATH
 path = "qntx.db"
+
+# Hot backup interval (seconds). 0, or left out, backs nothing up.
+backup_interval_seconds = 3600
 
 [storage.sqlite.bounded_storage]
 # Bounded storage limits prevent unbounded database growth.
 # Oldest attestations are deleted when a limit is exceeded.
 
-# Maximum attestations per (actor, context) pair. Default: 32
+# Maximum attestations per (actor, context) pair.
 actor_context_limit = 32
 
-# Maximum contexts per actor. Default: 64
+# Maximum contexts per actor.
 actor_contexts_limit = 64
 
-# Maximum actors per entity (subject). Default: 64
+# Maximum actors per entity (subject).
 entity_actors_limit = 64
 
 # ── Parquet backend (ADR-024) ───────────────────────────────────
@@ -46,22 +53,15 @@ entity_actors_limit = 64
 # ════════════════════════════════════════════════════════════════
 
 [distill]
-# How often the age-based distill cycle runs (seconds).
-# Omit or comment out to disable age-based distillation.
-# Default: disabled
+# How often the age-based distill cycle runs (seconds). Left out, nothing
+# is distilled. Said, the two below are said with it.
 # interval_seconds = 300
 
 # Attestations older than this are candidates for distillation.
-# Default: 720 (30 days)
 # max_age_hours = 720
 
 # Maximum attestations to process per cycle.
-# Default: 500
 # batch_size = 500
-
-# Log what would be distilled without doing it.
-# Default: false
-# dry_run = false
 
 # ════════════════════════════════════════════════════════════════
 # Sentry
@@ -93,7 +93,8 @@ entity_actors_limit = 64
 #
 # Metrics ride this same switch. min_level and the levels below are
 # about log lines; the numbers are emitted whenever a DSN is set.
-# Default: "" (nothing is shipped)
+# Left out, nothing is shipped. Said, min_level, capture_errors,
+# flush_seconds and debug are said with it.
 # dsn = "https://<key>@<org>.ingest.<region>.sentry.io/<project>"
 
 # Which node this is, in Sentry's own vocabulary. Where it runs, not
@@ -107,13 +108,11 @@ entity_actors_limit = 64
 
 # The lowest level that leaves the process. Below it stays in the
 # console and the log file. One of: debug, info, warn, error.
-# Default: "info"
 # min_level = "info"
 
 # Raise an issue, and not only a log line, at error and above. An
 # issue is grouped across occurrences and carries the error's stack;
 # a log line is one entry in a stream.
-# Default: true
 # capture_errors = true
 
 # Nothing is redacted on the way out. A value on a log line is
@@ -123,12 +122,10 @@ entity_actors_limit = 64
 
 # How long the process waits at exit for the batch to drain. The SDK
 # buffers, and the error that ended the process is in that buffer.
-# Default: 2
 # flush_seconds = 2
 
 # Print what the SDK is doing to stderr. Answers "did the log leave"
 # without guessing.
-# Default: false
 # debug = false
 
 # The share of Pulse job executions shipped as spans, 0 to 1.
@@ -161,8 +158,8 @@ entity_actors_limit = 64
 # from = "Garden <mail@garden.test>"
 
 [mail.ses]
-# Send through Amazon SES, with the node's AWS credentials.
-# Default: false
+# Send through Amazon SES, with the node's AWS credentials. Left out,
+# nothing is sent through SES.
 # enabled = true
 # The region the SES account sends from.
 # Default: "" (the AWS default chain's region)
@@ -178,19 +175,19 @@ entity_actors_limit = 64
 # ════════════════════════════════════════════════════════════════
 
 [server]
-# HTTP server port for QNTX backend API
-# Default: 8770 (development), fallback 7878 (production)
+# HTTP server port for QNTX backend API. The node listens on this port and
+# on no other: a port already taken stops the node.
 port = 8770
 
-# Frontend dev server port (bun/vite hot-reload)
-# Default: 8820
+# Frontend dev server port (bun/vite hot-reload). Left out, there is no
+# separate frontend and no origin stands for one.
 # frontend_port = 8820
 
 # Network interface to bind
-# "127.0.0.1" = local only (default), "0.0.0.0" = all interfaces
+# "127.0.0.1" = local only, "0.0.0.0" = all interfaces
 # Non-loopback requires auth.enabled = true
 # Environment: QNTX_BIND_ADDRESS
-# bind_address = "127.0.0.1"
+bind_address = "127.0.0.1"
 
 # Allowed CORS origins for web UI access
 # Default: localhost and 127.0.0.1 (HTTP and HTTPS), plus the App, which is at
@@ -207,25 +204,26 @@ allowed_origins = [
     "https://tauri.localhost"
 ]
 
-# Log output color theme: "everforest" or "gruvbox"
-# Default: "everforest"
-log_theme = "everforest"
-
-# [server.rate_limit]
-# Per-IP token bucket limits.
-# auth_rate = 2        # /auth/* requests per second
-# auth_burst = 5
-# ws_rate = 2          # WebSocket upgrades per second
-# ws_burst = 10
-# write_rate = 20      # POST/PUT/DELETE per second
-# write_burst = 40
-# read_rate = 60       # GET per second
-# read_burst = 120
-# public_rate = 10     # /health, static per second
-# public_burst = 20
+[server.rate_limit]
+# Per-IP token bucket limits. A burst of 0 admits nothing.
+auth_rate = 2        # /auth/* requests per second
+auth_burst = 5
+ws_rate = 2          # WebSocket upgrades per second
+ws_burst = 10
+write_rate = 20      # POST/PUT/DELETE per second
+write_burst = 40
+read_rate = 60       # GET per second
+read_burst = 120
+public_rate = 10     # /health, static per second
+public_burst = 20
+staand_rate = 20     # per staand, not per IP
+staand_burst = 40
+opened_rate = 1      # per caller per path a line opened to strangers
+opened_burst = 1
 
 # /debug/pprof, on its own listener bound to 127.0.0.1 whatever bind_address
 # says. The public listener answers 404 for that path.
+# Left out, or 0, there is no profiling listener.
 # pprof_port = 8771
 
 # ════════════════════════════════════════════════════════════════
@@ -236,6 +234,7 @@ log_theme = "everforest"
 # Biometric passkey gate. Said, true or false: a node whose am.toml leaves it
 # out does not start. Required true when server.bind_address is non-loopback.
 enabled = false
+# Said whenever enabled is true.
 # session_expiry_hours = 168
 #
 # WebAuthn Relying Party ID and Origins. MUST be set for any public
@@ -306,13 +305,42 @@ enabled = false
 # ════════════════════════════════════════════════════════════════
 
 [pulse]
-# Number of concurrent job workers
-# Default: 1 (sequential processing)
+# Number of concurrent job workers. 0 is no workers.
 workers = 1
 
-# How often to check for scheduled jobs (seconds)
-# Default: 1
+# How often to check for scheduled jobs (seconds). 0 is no ticking.
 ticker_interval_seconds = 1
+
+# ════════════════════════════════════════════════════════════════
+# LLM, fetch and watchers: the limits the node holds its services to
+# ════════════════════════════════════════════════════════════════
+
+[llm]
+max_concurrent = 1         # inference runs at once; 0 serves none
+max_calls_per_minute = 60  # sliding window
+max_queue_depth = 20       # waiting requests beyond this are refused
+cooldown_seconds = 3       # pause between inference runs
+
+[fetch]
+max_requests_per_window = 100  # 0 makes no requests
+window_seconds = 300
+# Left out, or 0, the fetch pulse does not log.
+pulse_interval_seconds = 30
+
+[watcher]
+# For a watcher made without its own; 0 never fires.
+max_fires_per_second = 3
+
+# ════════════════════════════════════════════════════════════════
+# Embeddings: how clusters and projections are made, once an embedding
+# service arrives with a plugin
+# ════════════════════════════════════════════════════════════════
+
+[embeddings]
+cluster_threshold = 0.5        # minimum cosine similarity for cluster prediction
+min_cluster_size = 5           # HDBSCAN
+cluster_match_threshold = 0.7  # cosine similarity for stable cluster matching
+projection_methods = ["umap"]
 
 # ════════════════════════════════════════════════════════════════
 # Plugin Configuration
@@ -320,6 +348,13 @@ ticker_interval_seconds = 1
 
 [plugin]
 # Plugins are added, configured and enabled in the plugin element.
+
+# Where plugin binaries are looked for. Left out, nowhere: no plugin is found.
+paths = ["~/.qntx/plugins"]
+
+# The TypeScript plugin runtime. Left out, TypeScript plugins do not run.
+# [plugin.runtime]
+# typescript_runtime = "/path/to/QNTX/plugin/typescript/runtime/main.ts"
 
 # Forge credentials, one per host, needed only for private repos.
 # The host is a value, not a key — the config keyspace is dot-delimited and

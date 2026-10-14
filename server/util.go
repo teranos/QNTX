@@ -1,14 +1,11 @@
 package server
 
 import (
-	"fmt"
-	"net"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/websocket"
 	appcfg "github.com/teranos/QNTX/internal/config"
-	errors "github.com/teranos/sacred-error"
 )
 
 // getAxUpgrader creates a WebSocket upgrader with origin checking from config
@@ -65,51 +62,6 @@ func matchOrigin(origin, allowed string) bool {
 	// After the prefix, must be end-of-string or ":" (port separator)
 	rest := origin[len(allowed):]
 	return rest == "" || rest[0] == ':'
-}
-
-// isPortAvailable checks if a port is available for binding
-func isPortAvailable(port int) bool {
-	addr := fmt.Sprintf(":%d", port)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return false
-	}
-	// A close that failed means this function is still holding the port it
-	// just called free, and the caller's bind will fail on us.
-	if err := listener.Close(); err != nil {
-		return false
-	}
-	return true
-}
-
-// findAvailablePort tries to find an available port starting from the requested port
-// It tries: requested port, preferred fallbacks (8770, 7878), then high-range ports (56787-56796)
-func findAvailablePort(requestedPort int) (int, error) {
-	// Try the requested port first
-	if isPortAvailable(requestedPort) {
-		return requestedPort, nil
-	}
-
-	// Preferred fallback ports for development and production
-	preferredPorts := []int{appcfg.DefaultServerPort, appcfg.FallbackServerPort}
-
-	// Try preferred ports if they differ from requested
-	for _, port := range preferredPorts {
-		if port != requestedPort && isPortAvailable(port) {
-			return port, nil
-		}
-	}
-
-	// Try high-range fallback ports as last resort (56787-56796)
-	fallbackStart := 56787
-	for i := 0; i < 10; i++ {
-		port := fallbackStart + i
-		if isPortAvailable(port) {
-			return port, nil
-		}
-	}
-
-	return 0, errors.Newf("no available ports found (tried %d, %d, %d, and range 56787-56796)", requestedPort, appcfg.DefaultServerPort, appcfg.FallbackServerPort)
 }
 
 // extractPathParts extracts path segments after removing a prefix

@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2632 in 375 files.
+# 2610 in 375 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # server/a2a_route.go: 2, an extended card lacking what the spec requires is refused, as the public card is (a2a_card.go); and a node running without auth has no handler, so it declares no peers.
@@ -23,6 +23,7 @@
 # From 3267: the Sacred Error shape went to teranos/sacred-error with its 6, moved and not burned.
 # internal/named: +3, items.go, named.go and pointer.go each hold the one check that refuses an empty value where it is made, so what holds one never asks again.
 # From 3260: the plugin code gives nothing a meaning, and its 635 absences fall to none.
+# internal/config/environ.go: defaults.go renamed, 7 to 2 with its defaults gone.
 
 5	ai/provider/grpc_client.go
 6	ats/attrs/attrs.go
@@ -86,7 +87,7 @@
 2	cmd/parity/statements.go
 6	cmd/qntx/commands/am.go
 1	cmd/qntx/commands/banner.go
-3	cmd/qntx/commands/database.go
+2	cmd/qntx/commands/database.go
 12	cmd/qntx/commands/database_parquet.go
 3	cmd/qntx/commands/database_sqlite.go
 7	cmd/qntx/commands/element.go
@@ -155,7 +156,7 @@
 5	internal/claudecode/login.go
 12	internal/claudecode/run.go
 7	internal/config/am.go
-7	internal/config/defaults.go
+2	internal/config/environ.go
 3	internal/config/introspection.go
 14	internal/config/load.go
 2	internal/config/one_root.go
@@ -288,23 +289,23 @@
 1	server/db_performance.go
 17	server/db_stats_cache.go
 4	server/debug_handlers.go
-14	server/distill_pulse.go
+12	server/distill_pulse.go
 8	server/element_config_handlers.go
 10	server/element_module_handlers.go
-7	server/embeddings/cluster_handler.go
+6	server/embeddings/cluster_handler.go
 1	server/embeddings/cluster_memberships.go
 19	server/embeddings/clustering.go
 5	server/embeddings/clusters.go
 2	server/embeddings/handler.go
-32	server/embeddings/handlers.go
+31	server/embeddings/handlers.go
 12	server/embeddings/observer.go
 6	server/embeddings/plugin_service.go
-6	server/embeddings/project_handler.go
+5	server/embeddings/project_handler.go
 5	server/embeddings/projection.go
 11	server/embeddings/pulse.go
-4	server/embeddings_handlers.go
-6	server/embeddings_pulse.go
-4	server/exposure.go
+3	server/embeddings_handlers.go
+4	server/embeddings_pulse.go
+3	server/exposure.go
 1	server/files.go
 11	server/github.go
 2	server/github_credential.go
@@ -314,7 +315,7 @@
 7	server/handlers.go
 4	server/host_gauges.go
 3	server/i_sigils.go
-12	server/init.go
+7	server/init.go
 2	server/invitations.go
 15	server/lifecycle.go
 6	server/mail.go
@@ -383,8 +384,8 @@
 4	server/storage_events.go
 1	server/strict_transport.go
 3	server/sub_agent.go
-8	server/sub_auth.go
-5	server/sub_canvas.go
+7	server/sub_auth.go
+4	server/sub_canvas.go
 7	server/sub_embedding.go
 1	server/sub_store_proof.go
 2	server/sub_ticker.go

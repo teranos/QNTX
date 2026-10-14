@@ -44,3 +44,26 @@ func TestTheKeysAreTheTablesKeys(t *testing.T) {
 		t.Error("the record of what was said is read as a key")
 	}
 }
+
+// A key named nowhere but the environment reaches the Config, under its own
+// name and under the names documented for it.
+func TestTheEnvironmentSaysAKey(t *testing.T) {
+	Reset()
+	t.Cleanup(Reset)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Chdir(home)
+	t.Setenv("QNTX_PULSE_WORKERS", "3")
+	t.Setenv("QNTX_BIND_ADDRESS", "0.0.0.0")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Said("pulse.workers") || cfg.Pulse.Workers != 3 {
+		t.Errorf("QNTX_PULSE_WORKERS=3 reads as said %v, %d", cfg.Said("pulse.workers"), cfg.Pulse.Workers)
+	}
+	if !cfg.Said("server.bind_address") || cfg.Server.BindAddress != "0.0.0.0" {
+		t.Errorf("QNTX_BIND_ADDRESS=0.0.0.0 reads as said %v, %q", cfg.Said("server.bind_address"), cfg.Server.BindAddress)
+	}
+}

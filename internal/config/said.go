@@ -2,10 +2,13 @@ package config
 
 import (
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/spf13/viper"
+
+	errors "github.com/teranos/sacred-error"
 )
 
 // "absence is absence": a key am.toml left out is not a value. What was said
@@ -55,6 +58,15 @@ func (c *Config) record(v *viper.Viper) {
 // Said reports whether am.toml, the environment or a flag said key.
 func (c *Config) Said(key string) bool {
 	return c.said[key]
+}
+
+// RefuseUnsaid is a refusal naming every one of keys nothing said, and why
+// it stops what was asked; nil when each was said.
+func (c *Config) RefuseUnsaid(why string, keys ...string) error {
+	if !slices.ContainsFunc(keys, func(key string) bool { return !c.said[key] }) {
+		return nil
+	}
+	return errors.Newf("am.toml does not say %s: %s", strings.Join(c.Unsaid(keys...), ", "), why)
 }
 
 // Unsaid is the keys of these that nothing said, in order.

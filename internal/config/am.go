@@ -314,13 +314,6 @@ type RateLimitConfig struct {
 	OpenedBurst int     `mapstructure:"opened_burst"` // Its burst capacity (default: 1)
 }
 
-// Server port constants
-const (
-	DefaultServerPort     = 8770 // Development port
-	DefaultGraphEventPort = 8780 // Event viewer port
-	FallbackServerPort    = 7878 // Production fallback port
-)
-
 // PulseConfig configures the Pulse async job system (core infrastructure)
 type PulseConfig struct {
 	// Worker concurrency configuration

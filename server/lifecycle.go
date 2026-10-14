@@ -97,21 +97,11 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	// Start all background services
 	s.startBackgroundServices()
 
-	// Find an available port
-	actualPort, err := findAvailablePort(port)
-	if err != nil {
-		return errors.Wrapf(err, "failed to find available port starting from %d", port)
-	}
-
-	if actualPort != port {
-		s.logger.Infow("Port in use, using alternative",
-			"requested_port", port,
-			"actual_port", actualPort,
-		)
-	}
+	// The node listens on the port am.toml says, and on no other: a port taken
+	// stops the node at the bind below rather than moving it somewhere unsaid.
 
 	// Where an agent the node runs reaches the node's own MCP.
-	s.ownURL = ownURLOf(s.bindAddress, actualPort)
+	s.ownURL = ownURLOf(s.bindAddress, port)
 
 	// What this node can answer, and then what the table grants reach to. A
 	// compiled grant naming a path nothing answers stops the node here.
@@ -120,11 +110,11 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		return errors.Wrap(err, "the node cannot serve what server/reach grants")
 	}
 
-	url := fmt.Sprintf("http://localhost:%d", actualPort)
+	url := fmt.Sprintf("http://localhost:%d", port)
 	s.logger.Infow("Server ready",
 		"url", url,
 		"bind", s.bindAddress,
-		"port", actualPort,
+		"port", port,
 	)
 
 	// Attest startup via ground delivery
@@ -149,7 +139,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	sacred.Go("server.pprof", func() { s.servePprof(s.deps.cfg.Server.PprofPort) })
 
 	s.httpServer = &http.Server{
-		Addr: fmt.Sprintf("%s:%d", s.bindAddress, actualPort),
+		Addr: fmt.Sprintf("%s:%d", s.bindAddress, port),
 		// The node's own mux. Anything registered on http.DefaultServeMux —
 		// net/http/pprof's init, or a route someone forgot to declare — is not
 		// on this one and answers 404.
@@ -163,7 +153,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to listen on %s", s.httpServer.Addr)
 	}
-	s.logger.Debugw(fmt.Sprintf("HTTP server listening on %s:%d", s.bindAddress, actualPort))
+	s.logger.Debugw(fmt.Sprintf("HTTP server listening on %s:%d", s.bindAddress, port))
 	// Listening already, so what GitHub sends again waits at the socket rather
 	// than being refused before Serve takes it.
 	s.wg.Go("github.deliveriesCatchUp", s.CatchUpDeliveries)
