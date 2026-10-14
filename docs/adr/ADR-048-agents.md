@@ -10,7 +10,8 @@ QNTX hosts agents for use by ROOT.
 - In A2A's terms QNTX is the A2A Server: the endpoint, authentication and
   authorization are the node's. Each agent it hosts is described by an Agent
   Card and reached by its tenant (AgentInterface.tenant).
-- An agent has its own DID and attests as itself: `by` on what it writes is  the agent.
+- An agent has its own DID and attests as itself: `by` on what it writes is
+  the agent.
 - What an agent may reach is its own lines in system, as any actor's are.
 - An agent's work outlives the request that brought it, and every call it
   makes carries its own credential. The credential of whoever sent the work
