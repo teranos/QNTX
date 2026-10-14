@@ -73,6 +73,11 @@ var storeWriters = map[string]string{
 		"store through Write as the setter is admitted, after maySetAgent says they own the namespace, " +
 		"or are ROOT or SUPER",
 
+	"a2aSend": "a namespace agent's Tasks (ADR-048: \"Who may see its Tasks is REACH on its namespace\"), " +
+		"in the namespace's own store through Write as the sender is admitted, reached from SendMessage at the " +
+		"namespace's tenant under /a2a/, which the reach table gives to ROOT, after a2aServed says the sender " +
+		"acts in the namespace",
+
 	"systemAttestor": "what the node writes about itself at the door. The /auth/… routes " +
 		"are ANYONE because logging in cannot ask you to be logged in, so no admission " +
 		"stands behind this one. The closed predicate vocabulary in server/auth does",

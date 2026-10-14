@@ -96,14 +96,11 @@ func TestNoAgentIsServedWhereNoneWasOptedInto(t *testing.T) {
 }
 
 // At a tenant an agent is served at, an operation the node does not do yet
-// says so, as it does without one.
+// says so, as it does without one: the card declares no streaming (§3.3.4).
 func TestAnAgentsTenantAnswersWhatTheNodeDoesNotDoYet(t *testing.T) {
 	srv, tokens := servingGardens(t)
 
-	r := asBearer(http.MethodGet, "/a2a/garden/tasks", tokens[auth.LevelRoot])
-	r.Header.Set("A2A-Version", "1.0")
-	w := httptest.NewRecorder()
-	srv.served.ServeHTTP(w, r)
+	w := a2aAsked(srv, http.MethodPost, "/a2a/garden/message:stream", tokens[auth.LevelRoot], sendBody("m-1", "hi", ""))
 	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	assert.Contains(t, w.Body.String(), "UNSUPPORTED_OPERATION")
 }

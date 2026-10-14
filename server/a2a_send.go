@@ -25,7 +25,7 @@ const a2aSkill = "say"
 // a2aAgentAt is the agent served at namespace for the caller of r, when the
 // a2a: lines let the caller reach its skill (ADR-039: "a2a:<signum> lines say
 // who reaches a skill").
-func (s *QNTXServer) a2aAgentAt(r *http.Request, namespace string) (anAgentHeld, *a2a.Error) {
+func (s *QNTXServer) a2aAgentAt(r *http.Request, namespace string) (anAgentHeld, error) {
 	agents := s.agentsSignum()
 	at := slices.IndexFunc(agents.GetSigils(), func(held *protocol.Sigil) bool { return held.GetName() == a2aSkill })
 	if at < 0 {
@@ -36,6 +36,7 @@ func (s *QNTXServer) a2aAgentAt(r *http.Request, namespace string) (anAgentHeld,
 	if !offeredTo(admitted, known, reaching, anyone) {
 		return anAgentHeld{}, a2a.NotFound("no skill " + a2aSkill + " of the agent of " + namespace + " that you reach over A2A")
 	}
+	// A sigil's refusal is a pointer, nil when it answered.
 	held, refused := s.namespaceAgent(sigil.WithCaller(r.Context(), r), sigil.Sent{"namespace": namespace})
 	if refused != nil {
 		return anAgentHeld{}, a2aRefusal(refused)
@@ -66,13 +67,13 @@ func (s *QNTXServer) a2aSession(held anAgentHeld) (string, bool, error) {
 // a2aContext refuses a contextId the agent does not continue: "If an agent
 // cannot accept a client-provided contextId, it MUST reject the request with
 // an error and MUST NOT generate a new contextId" (§3.4.1).
-func (s *QNTXServer) a2aContext(held anAgentHeld, send a2a.Send) *a2a.Error {
+func (s *QNTXServer) a2aContext(held anAgentHeld, send a2a.Send) error {
 	if !send.NamesContext {
 		return nil
 	}
 	session, kept, err := s.a2aSession(held)
 	if err != nil {
-		return &a2a.Error{Message: err.Error()}
+		return err
 	}
 	if !kept {
 		return a2a.Invalid("contextId " + send.ContextID + " is no session of " + held.agent.called + ": it has not been spoken to yet, and its first turn begins the one session it continues")
@@ -86,14 +87,14 @@ func (s *QNTXServer) a2aContext(held anAgentHeld, send a2a.Send) *a2a.Error {
 // turnBegun is what was said, written down as the turn's first row, or why it
 // was not.
 type turnBegun struct {
-	told      *types.As
-	unwritten error
+	told *types.As
+	err  error
 }
 
 // turnEnded is how the turn ended: what the agent answered, or why it did not.
 type turnEnded struct {
-	said    *protocol.ClaudeSaid
-	refused *a2a.Error
+	said *protocol.ClaudeSaid
+	err  error
 }
 
 // a2aSay says text to the agent for the caller of r, on a turn of its own: the
@@ -105,14 +106,14 @@ func (s *QNTXServer) a2aSay(r *http.Request, held anAgentHeld, text string) (<-c
 	sent := sigil.Sent{"namespace": held.agent.namespace, "says": text}
 	go func() {
 		answer, refused := s.sayHeard(sigil.WithCaller(caller.Context(), caller), s.claudeHarness(), held.agent, held.line.spec, sent,
-			func(told *types.As, unwritten error) { begun <- turnBegun{told: told, unwritten: unwritten} })
+			func(told *types.As, unwritten error) { begun <- turnBegun{told: told, err: unwritten} })
 		if refused != nil {
-			ended <- turnEnded{refused: a2aRefusal(refused)}
+			ended <- turnEnded{err: a2aRefusal(refused)}
 			return
 		}
 		said, isClaude := answer.(*protocol.ClaudeSaid)
 		if !isClaude {
-			ended <- turnEnded{refused: &a2a.Error{Name: "InvalidAgentResponseError", Message: held.agent.called + " did not answer as Claude Code"}}
+			ended <- turnEnded{err: &a2a.Error{Name: "InvalidAgentResponseError", Message: held.agent.called + " did not answer as Claude Code"}}
 			return
 		}
 		ended <- turnEnded{said: said}

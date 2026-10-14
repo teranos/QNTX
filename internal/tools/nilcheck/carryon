@@ -1,7 +1,8 @@
 # errors and warnings logged and carried on from, per file. Debt: each number may fall and may not rise.
 # Instead: return the error, or say in a value why carrying on is the answer.
-# 311 in 99 files.
+# 312 in 100 files.
 # cmd/qntx/commands/database_sqlite.go: +1, a call into the store that held it past a second is said with its statement; nothing failed to carry on from.
+# server/a2a_tasks.go: 1, a task sent to return immediately has nobody waiting on its turn: when its end is not written down, the task stays as last written and the node's log is where that is said.
 # From 437: the plugin code returns what it used to log and carry on from.
 
 6	ats/storage/embedding_store.go
@@ -35,6 +36,7 @@
 2	qntx-plugins/qntx-github/plugin.go
 3	server/a2a_card.go
 1	server/a2a_route.go
+1	server/a2a_tasks.go
 1	server/agent_turn.go
 1	server/attestation_handlers.go
 1	server/auth/attest.go

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/teranos/QNTX/server/parity"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -94,7 +95,7 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			(&Error{Name: "InvalidAgentResponseError", Message: op.Name + " answered without a stream"}).write(w, undelivered)
 			return
 		}
-		body, err := protojson.Marshal(response)
+		body, err := written(response)
 		if err != nil {
 			(&Error{Name: "InvalidAgentResponseError", Message: err.Error()}).write(w, undelivered)
 			return
@@ -104,6 +105,51 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			undelivered(op.Name, err)
 		}
 	})
+}
+
+// written is a response as JSON, protojson's, with every REQUIRED field the
+// message leaves at its default written as that default: proto3 JSON leaves
+// such a field out, and "The nextPageToken field MUST always be present in
+// the response" (§3.1.4). A response that leaves none is protojson's bytes.
+func written(response proto.Message) ([]byte, error) {
+	body, err := protojson.Marshal(response)
+	if err != nil {
+		return nil, err
+	}
+	m := response.ProtoReflect()
+	fields := m.Descriptor().Fields()
+	added, adds := map[string]json.RawMessage{}, false
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		if m.Has(field) || !parity.Required(field) {
+			continue
+		}
+		switch {
+		case field.IsList():
+			added[field.JSONName()] = json.RawMessage(`[]`)
+			adds = true
+		case field.Kind() == protoreflect.StringKind:
+			added[field.JSONName()] = json.RawMessage(`""`)
+			adds = true
+		case field.Kind() == protoreflect.BoolKind:
+			added[field.JSONName()] = json.RawMessage(`false`)
+			adds = true
+		case field.Kind() == protoreflect.Int32Kind, field.Kind() == protoreflect.Int64Kind:
+			added[field.JSONName()] = json.RawMessage(`0`)
+			adds = true
+		}
+	}
+	if !adds {
+		return body, nil
+	}
+	whole := map[string]json.RawMessage{}
+	if err := json.Unmarshal(body, &whole); err != nil {
+		return nil, err
+	}
+	for name, value := range added {
+		whole[name] = value
+	}
+	return json.Marshal(whole)
 }
 
 // TenantOf is the tenant a request message names, when it names one: the
