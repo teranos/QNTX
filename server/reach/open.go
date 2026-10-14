@@ -117,7 +117,7 @@ const (
 //	'mcp:staands:metrics'    the sigil over one surface
 //
 // Together they admit whoever any of them admits. A line only ever adds, which
-// is what a line in the const and a line in the store both do already, so
+// is what a line in the tablet and a line in the store both do already, so
 // reaching a sigil over MCP and not over HTTP is a line that names MCP and no
 // line that does not.
 func (s *Served) ReachingSigil(surface, signum, sigil, path string) (reaching auth.Reach, anyone bool) {
@@ -194,7 +194,7 @@ func Open(answering map[string]Answering, with Wrapping, runtime Runtime) (*Serv
 // A reach line written at runtime arrives the same way: the store is read
 // again and the mux is rebuilt, never patched.
 func (s *Served) Reopen(answering map[string]Answering, with Wrapping, runtime Runtime) ([]string, error) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	if err != nil {
 		return nil, err
 	}
