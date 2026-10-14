@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	errors "github.com/teranos/sacred-error"
+	"strings"
 	"testing"
 	"time"
 
@@ -124,28 +125,17 @@ func (s *sqlTestStore) GetAttestations(filters ats.AttestationFilter) (_ []*type
 	var clauses []string
 	var args []any
 
-	if len(filters.Subjects) > 0 {
-		for _, subj := range filters.Subjects {
-			clauses = append(clauses, "json_extract(subjects, '$') LIKE ?")
-			args = append(args, "%"+subj+"%")
-		}
-	}
-	if len(filters.Predicates) > 0 {
-		for _, pred := range filters.Predicates {
-			clauses = append(clauses, "json_extract(predicates, '$') LIKE ?")
-			args = append(args, "%"+pred+"%")
-		}
-	}
-	if len(filters.Contexts) > 0 {
-		for _, ctx := range filters.Contexts {
-			clauses = append(clauses, "json_extract(contexts, '$') LIKE ?")
-			args = append(args, "%"+ctx+"%")
-		}
-	}
-	if len(filters.Actors) > 0 {
-		for _, actor := range filters.Actors {
-			clauses = append(clauses, "json_extract(actors, '$') LIKE ?")
-			args = append(args, "%"+actor+"%")
+	// Each field matches as the store's does: a row naming any of the values
+	// given, each whole (ats.AttestationFilter, "OR logic").
+	for _, field := range []struct {
+		column string
+		values []string
+	}{{"subjects", filters.Subjects}, {"predicates", filters.Predicates}, {"contexts", filters.Contexts}, {"actors", filters.Actors}} {
+		if len(field.values) > 0 {
+			clauses = append(clauses, "EXISTS (SELECT 1 FROM json_each("+field.column+") WHERE value IN ("+strings.TrimSuffix(strings.Repeat("?, ", len(field.values)), ", ")+"))")
+			for _, value := range field.values {
+				args = append(args, value)
+			}
 		}
 	}
 	// The time range is held to as the real store holds it: a side naming

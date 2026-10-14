@@ -25,12 +25,17 @@ import (
 // over A2A is a2a:<signum> lines (ADR-039), asked when a message reaches one.
 const a2aPrefix = "/a2a/"
 
-// getExtendedAgentCard is the one operation the node does: the card its
+// getExtendedAgentCard is the operation the node does itself: the card its
 // caller reaches (§3.1.11).
 const getExtendedAgentCard = "GetExtendedAgentCard"
 
+// taskOperations are what a namespace agent does at its tenant: a message
+// sent to it, and the Tasks that come of one (§3.1.1 to §3.1.5).
+var taskOperations = []string{"SendMessage", "GetTask", "ListTasks", "CancelTask"}
+
 // a2aHTTP is the binding with every operation in scope but the extended card
-// answering UnsupportedOperationError, until the node does it.
+// and a namespace agent's Tasks answering UnsupportedOperationError, until the
+// node does it.
 func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	operations, err := a2a.Operations()
 	if err != nil {
@@ -82,6 +87,18 @@ func (s *QNTXServer) a2aServed(r *http.Request) a2a.Served {
 // a2aAnswer answers the operations for the caller of r.
 func (s *QNTXServer) a2aAnswer(r *http.Request) a2a.Answer {
 	return func(_ context.Context, op a2a.Operation, request proto.Message) (proto.Message, *a2a.Error) {
+		if slices.Contains(taskOperations, op.Name) {
+			// A Task is a namespace agent's (ADR-048), and the node is no agent
+			// that takes one: without a tenant there is none to send it to.
+			tenant, named := a2a.TenantOf(request)
+			if !named {
+				return nil, a2a.Unsupported(op)
+			}
+			if at := slices.IndexFunc(s.peers(), serving(tenant)); at >= 0 {
+				return nil, a2a.UnsupportedBecause(s.peers()[at].Label + " serves the agent of " + tenant + ", and its card's interface is where it is spoken to")
+			}
+			return s.a2aTask(r, op.Name, tenant, request)
+		}
 		if op.Name != getExtendedAgentCard {
 			return nil, a2a.Unsupported(op)
 		}

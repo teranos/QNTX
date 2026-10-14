@@ -1,6 +1,7 @@
 package a2a
 
 import (
+	"cmp"
 	"encoding/base64"
 	"encoding/json"
 	"slices"
@@ -66,7 +67,7 @@ type History struct {
 
 // historyOf reads historyLength off a request's JSON: present or not, since
 // 0 is a request for none and absent is a request for all.
-func historyOf(fields map[string]json.RawMessage, named string) (History, *Error) {
+func historyOf(fields map[string]json.RawMessage, named string) (History, error) {
 	raw, set := fields[named]
 	if !set {
 		return History{}, nil
@@ -91,7 +92,7 @@ func (h History) of(history []map[string]any) []map[string]any {
 
 // fieldsOf is a request message as its JSON fields, read as protojson writes
 // them: camelCase, and an optional field present when it was set, 0 or not.
-func fieldsOf(request proto.Message) (map[string]json.RawMessage, *Error) {
+func fieldsOf(request proto.Message) (map[string]json.RawMessage, error) {
 	body, err := protojson.Marshal(request)
 	if err != nil {
 		return nil, invalid("the request did not marshal: " + err.Error())
@@ -104,7 +105,7 @@ func fieldsOf(request proto.Message) (map[string]json.RawMessage, *Error) {
 }
 
 // textOf is one string field of a request, and whether it was sent.
-func textOf(fields map[string]json.RawMessage, named string) (string, bool, *Error) {
+func textOf(fields map[string]json.RawMessage, named string) (string, bool, error) {
 	raw, set := fields[named]
 	if !set {
 		return "", false, nil
@@ -134,10 +135,10 @@ type Send struct {
 // ReadSend reads a SendMessageRequest. Its parts are text: the node takes no
 // file and no data (ContentTypeNotSupportedError), and a Message sent to the
 // agent is the user's (Role, §4.1.5).
-func ReadSend(request proto.Message) (Send, *Error) {
-	fields, refused := fieldsOf(request)
-	if refused != nil {
-		return Send{}, refused
+func ReadSend(request proto.Message) (Send, error) {
+	fields, err := fieldsOf(request)
+	if err != nil {
+		return Send{}, err
 	}
 	var sent struct {
 		Message struct {
@@ -197,8 +198,8 @@ func ReadSend(request proto.Message) (Send, *Error) {
 			return Send{}, invalid("configuration.returnImmediately is not true or false: " + err.Error())
 		}
 	}
-	if send.History, refused = historyOf(sent.Configuration, "historyLength"); refused != nil {
-		return Send{}, refused
+	if send.History, err = historyOf(sent.Configuration, "historyLength"); err != nil {
+		return Send{}, err
 	}
 	return send, nil
 }
@@ -210,30 +211,41 @@ type Get struct {
 }
 
 // ReadGet reads a GetTaskRequest.
-func ReadGet(request proto.Message) (Get, *Error) {
-	fields, refused := fieldsOf(request)
-	if refused != nil {
-		return Get{}, refused
+func ReadGet(request proto.Message) (Get, error) {
+	fields, err := fieldsOf(request)
+	if err != nil {
+		return Get{}, err
 	}
-	id, _, refused := textOf(fields, "id")
-	if refused != nil {
-		return Get{}, refused
+	id, err := idOf(fields)
+	if err != nil {
+		return Get{}, err
 	}
-	history, refused := historyOf(fields, "historyLength")
-	if refused != nil {
-		return Get{}, refused
+	history, err := historyOf(fields, "historyLength")
+	if err != nil {
+		return Get{}, err
 	}
 	return Get{ID: id, History: history}, nil
 }
 
-// ReadCancel reads a CancelTaskRequest's task (§3.1.5).
-func ReadCancel(request proto.Message) (string, *Error) {
-	fields, refused := fieldsOf(request)
-	if refused != nil {
-		return "", refused
+// idOf is the task a request names: its id, which the spec requires.
+func idOf(fields map[string]json.RawMessage) (string, error) {
+	id, named, err := textOf(fields, "id")
+	if err != nil {
+		return "", err
 	}
-	id, _, refused := textOf(fields, "id")
-	return id, refused
+	if !named {
+		return "", invalid("id is required: the task asked about")
+	}
+	return id, nil
+}
+
+// ReadCancel reads a CancelTaskRequest's task (§3.1.5).
+func ReadCancel(request proto.Message) (string, error) {
+	fields, err := fieldsOf(request)
+	if err != nil {
+		return "", err
+	}
+	return idOf(fields)
 }
 
 // List is a ListTasksRequest (§3.1.4).
@@ -242,10 +254,12 @@ type List struct {
 	ByContext, ByState bool
 	// After is statusTimestampAfter: a Task whose status is this recent or
 	// more.
-	After    time.Time
-	ByAfter  bool
-	Size     int
+	After   time.Time
+	ByAfter bool
+	Size    int
+	// Token is where the page starts, when a previous page gave one.
 	Token    string
+	ByToken  bool
 	History  History
 	Artifact bool
 }
@@ -260,20 +274,20 @@ const (
 
 // ReadList reads a ListTasksRequest. A page size outside 1 to 100 is refused,
 // not moved into it.
-func ReadList(request proto.Message) (List, *Error) {
-	fields, refused := fieldsOf(request)
-	if refused != nil {
-		return List{}, refused
+func ReadList(request proto.Message) (List, error) {
+	fields, err := fieldsOf(request)
+	if err != nil {
+		return List{}, err
 	}
 	list := List{Size: unspecifiedPage}
-	if list.ContextID, list.ByContext, refused = textOf(fields, "contextId"); refused != nil {
-		return List{}, refused
+	if list.ContextID, list.ByContext, err = textOf(fields, "contextId"); err != nil {
+		return List{}, err
 	}
-	if list.Status, list.ByState, refused = textOf(fields, "status"); refused != nil {
-		return List{}, refused
+	if list.Status, list.ByState, err = textOf(fields, "status"); err != nil {
+		return List{}, err
 	}
-	if list.Token, _, refused = textOf(fields, "pageToken"); refused != nil {
-		return List{}, refused
+	if list.Token, list.ByToken, err = textOf(fields, "pageToken"); err != nil {
+		return List{}, err
 	}
 	if raw, set := fields["pageSize"]; set {
 		if err := json.Unmarshal(raw, &list.Size); err != nil {
@@ -283,9 +297,9 @@ func ReadList(request proto.Message) (List, *Error) {
 			return List{}, invalid("pageSize is " + strconv.Itoa(list.Size) + ", and a page is 1 to 100 tasks")
 		}
 	}
-	after, byAfter, refused := textOf(fields, "statusTimestampAfter")
-	if refused != nil {
-		return List{}, refused
+	after, byAfter, err := textOf(fields, "statusTimestampAfter")
+	if err != nil {
+		return List{}, err
 	}
 	if byAfter {
 		at, err := time.Parse(time.RFC3339Nano, after)
@@ -294,8 +308,8 @@ func ReadList(request proto.Message) (List, *Error) {
 		}
 		list.After, list.ByAfter = at, true
 	}
-	if list.History, refused = historyOf(fields, "historyLength"); refused != nil {
-		return List{}, refused
+	if list.History, err = historyOf(fields, "historyLength"); err != nil {
+		return List{}, err
 	}
 	if raw, set := fields["includeArtifacts"]; set {
 		if err := json.Unmarshal(raw, &list.Artifact); err != nil {
@@ -318,14 +332,12 @@ func (t Task) json(h History, artifacts bool) map[string]any {
 		history = append(history, message)
 	}
 	status := map[string]any{"state": string(t.State), "timestamp": t.At.UTC().Format(time.RFC3339Nano)}
-	if t.State.Terminal() && len(t.History) > 0 {
-		if last := t.History[len(t.History)-1]; last["role"] == "ROLE_AGENT" {
-			message := map[string]any{"taskId": t.ID, "contextId": t.ContextID}
-			for name, value := range last {
-				message[name] = value
-			}
-			status["message"] = message
+	if last, said := t.saidLast(); said && t.State.Terminal() {
+		message := map[string]any{"taskId": t.ID, "contextId": t.ContextID}
+		for name, value := range last {
+			message[name] = value
 		}
+		status["message"] = message
 	}
 	task := map[string]any{"id": t.ID, "contextId": t.ContextID, "status": status, "history": history}
 	// The agent's answer is the Message it said: no Task here has an artifact.
@@ -333,6 +345,15 @@ func (t Task) json(h History, artifacts bool) map[string]any {
 		task["artifacts"] = []any{}
 	}
 	return task
+}
+
+// saidLast is the agent's Message when it said the last one of the Task. A
+// Task with no Message said none.
+func (t Task) saidLast() (map[string]any, bool) {
+	for _, last := range slices.Backward(t.History) {
+		return last, last["role"] == "ROLE_AGENT"
+	}
+	return map[string]any{}, false
 }
 
 // Message is the Task as lf.a2a.v1.Task.
@@ -348,28 +369,20 @@ func (t Task) Sent(h History) (proto.Message, error) {
 // Listed is ListTasks' answer: the Tasks the request names, newest status
 // first, one page of them. The page token is where the page ended: the status
 // time and id of the last Task on it, which the next page starts after.
-func Listed(tasks []Task, asked List) (proto.Message, *Error) {
-	var kept []Task
-	for _, t := range tasks {
-		switch {
-		case asked.ByContext && t.ContextID != asked.ContextID:
-		case asked.ByState && string(t.State) != asked.Status:
-		case asked.ByAfter && t.At.Before(asked.After):
-		default:
-			kept = append(kept, t)
-		}
-	}
+func Listed(tasks []Task, asked List) (proto.Message, error) {
+	kept := slices.DeleteFunc(slices.Clone(tasks), func(t Task) bool {
+		return (asked.ByContext && t.ContextID != asked.ContextID) ||
+			(asked.ByState && string(t.State) != asked.Status) ||
+			(asked.ByAfter && t.At.Before(asked.After))
+	})
 	slices.SortFunc(kept, func(a, b Task) int {
-		if c := b.At.Compare(a.At); c != 0 {
-			return c
-		}
-		return strings.Compare(b.ID, a.ID)
+		return cmp.Or(b.At.Compare(a.At), strings.Compare(b.ID, a.ID))
 	})
 	from := 0
-	if asked.Token != "" {
-		at, id, refused := readToken(asked.Token)
-		if refused != nil {
-			return nil, refused
+	if asked.ByToken {
+		at, id, err := readToken(asked.Token)
+		if err != nil {
+			return nil, err
 		}
 		from = len(kept)
 		for i, t := range kept {
@@ -400,7 +413,7 @@ func Listed(tasks []Task, asked List) (proto.Message, *Error) {
 }
 
 // readToken is a page token as Listed writes it.
-func readToken(token string) (time.Time, string, *Error) {
+func readToken(token string) (time.Time, string, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
 		return time.Time{}, "", invalid("pageToken is not one this node gave: " + err.Error())
@@ -448,7 +461,20 @@ func TaskNotCancelable(message string) *Error {
 	return &Error{Name: "TaskNotCancelableError", Message: message}
 }
 
-// Unsupported is UnsupportedOperationError, saying why.
+// Error is the A2A error it is, wherever it was wrapped.
+func (e *Error) Error() string { return e.Message }
+
+// Refused is err as the binding writes it: the A2A error inside it, or the
+// node's failing.
+func Refused(err error) *Error {
+	var refused *Error
+	if errors.As(err, &refused) {
+		return refused
+	}
+	return &Error{Message: err.Error()}
+}
+
+// UnsupportedBecause is UnsupportedOperationError, saying why.
 func UnsupportedBecause(message string) *Error {
 	return &Error{Name: "UnsupportedOperationError", Message: message}
 }
