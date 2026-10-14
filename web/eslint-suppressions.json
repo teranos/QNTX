@@ -926,12 +926,12 @@
   },
   "ts/users-element.test.ts": {
     "no-restricted-syntax": {
-      "count": 3
+      "count": 1
     }
   },
   "ts/users-element.ts": {
     "no-restricted-syntax": {
-      "count": 10
+      "count": 4
     }
   },
   "ts/watcher-predicates.ts": {

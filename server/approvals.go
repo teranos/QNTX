@@ -41,8 +41,9 @@ const (
 // The two options a merge approval has, and what each press of them says.
 // The element shows the same words; the node takes no others.
 const (
-	optionMerge     = "Merge"
-	optionDontMerge = "Don’t merge"
+	// "Approvals should be simple YES / NO"
+	optionMerge     = "YES"
+	optionDontMerge = "NO"
 
 	saysMergeWhenReady = "merge when main CI passes"
 	saysForceMerge     = "force merge"

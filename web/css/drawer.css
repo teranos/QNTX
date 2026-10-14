@@ -207,16 +207,6 @@
     animation: fadeLoop 1.5s ease-in-out infinite;
 }
 
-/* Pulse Indicator States */
-.status-indicator.pulse-active .status-dot {
-    background: #2ecc71;
-    box-shadow: 0 0 4px rgba(46, 204, 113, 0.5);
-}
-
-.status-indicator.pulse-inactive .status-dot {
-    background: #888;
-    box-shadow: none;
-}
 
 /* Grey by default. Green was the default, so an indicator nobody had wired to
    a state — sigma, database — was lit from the moment it existed and could

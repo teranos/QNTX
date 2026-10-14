@@ -60,28 +60,18 @@ describe('Status Indicators DOM Lifecycle', () => {
         expect(container).toBeTruthy();
         expect(container?.className).toBe('status-indicators');
 
-        // Assert both default indicators exist
         const connectionStatus = document.getElementById('connection-status');
-        const pulseStatus = document.getElementById('pulse-status');
-
         expect(connectionStatus).toBeTruthy();
-        expect(pulseStatus).toBeTruthy();
 
         // Verify structure of connection indicator
         expect(connectionStatus?.querySelector('.status-dot')).toBeTruthy();
         expect(connectionStatus?.querySelector('.status-text')).toBeTruthy();
         expect(connectionStatus?.getAttribute('role')).toBe('status');
-
-        // Verify structure of pulse indicator (reports only — Pulse starts because the node starts)
-        expect(pulseStatus?.querySelector('.status-dot')).toBeTruthy();
-        expect(pulseStatus?.querySelector('.status-text')).toBeTruthy();
-        expect(pulseStatus?.getAttribute('role')).toBe('status');
     });
 
-    // Pulse is not the node's to switch off from a drawer. Clicking the
-    // indicator did nothing at the node anyway — it sent a message type the
-    // server never routed — while the label claimed it was stopping.
-    test('Pulse indicator is not a control', () => {
+    // "if Pulse isnt working it means the system does not work, and btw, this
+    // is another remnant of the time that pulse could be ran as a separate daemon"
+    test('there is no Pulse indicator', () => {
         document.body.innerHTML = `
             <div id="system-drawer-header">
                 <span id="system-version"></span>
@@ -91,16 +81,7 @@ describe('Status Indicators DOM Lifecycle', () => {
 
         statusIndicators.init();
 
-        const pulseIndicator = document.getElementById('pulse-status');
-        const pulseText = pulseIndicator?.querySelector('.status-text') as HTMLElement;
-
-        expect(pulseIndicator?.classList.contains('clickable')).toBe(false);
-        expect(pulseIndicator?.getAttribute('tabindex')).toBeNull();
-
-        pulseIndicator?.click();
-
-        expect(pulseText?.textContent).toBe('Pulse: OFF');
-        expect(pulseIndicator?.classList.contains('pulse-inactive')).toBe(true);
+        expect(document.getElementById('pulse-status')).toBeNull();
     });
 
     test('Connection indicator updates via updateIndicator', () => {

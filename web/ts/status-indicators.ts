@@ -7,7 +7,6 @@
  */
 
 import { connectivity, type Admission, type ConnectivityState } from './client';
-import type { DaemonStatusMessage } from '../types/websocket';
 import { DB, Sigma } from './sym';
 import { openDoor, signedIn, standAtTheDoor } from './signin';
 import { log, SEG } from './logger';
@@ -57,7 +56,6 @@ class StatusIndicatorManager {
 
         // Add default indicators
         this.addConnectionIndicator();
-        this.addPulseIndicator();
         this.addDatabaseIndicator();
         this.addSigmaIndicator();
 
@@ -212,19 +210,6 @@ class StatusIndicatorManager {
     }
 
     /**
-     * Add Pulse indicator
-     */
-    private addPulseIndicator(): void {
-        // Pulse starts because the node starts. This reports it and nothing more.
-        this.addIndicator({
-            id: 'pulse',
-            label: 'Pulse: OFF',
-            clickable: false,
-            initialState: 'inactive'
-        });
-    }
-
-    /**
      * Add Database indicator
      */
     private addDatabaseIndicator(): void {
@@ -322,20 +307,6 @@ class StatusIndicatorManager {
      */
     private showDatabaseInfo(): void {
         tray.open('database-element');
-    }
-
-    /**
-     * Handle Pulse status updates
-     */
-    handlePulseDaemonStatus(data: DaemonStatusMessage): void {
-        // Determine state from daemon status
-        const state: 'active' | 'inactive' = data.running ? 'active' : 'inactive';
-
-        this.updateIndicator(
-            'pulse',
-            state,
-            `Pulse: ${state === 'active' ? 'ON' : 'OFF'}`
-        );
     }
 
     /**

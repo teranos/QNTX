@@ -31,13 +31,13 @@ const ANSWER_PATH = '/api/approvals/answer';
 // The node takes these words and no others (server/approvals.go).
 const MERGE_OPTIONS: ApprovalOption[] = [
     {
-        label: 'Merge', means: 'yes', steps: [
+        label: 'YES', means: 'yes', steps: [
             { says: 'merge when main CI passes', settles: 'when-ready' },
             { says: 'force merge', settles: 'now' },
         ],
     },
     {
-        label: 'Don’t merge', means: 'no', steps: [
+        label: 'NO', means: 'no', steps: [
             { says: 'cancel the merge' },
             { says: 'definitely no' },
         ],
@@ -78,7 +78,7 @@ export function cardOf(approval: Approval, said: HTMLElement, now = Date.now()):
             context.style.display = 'flex';
             context.style.flexDirection = 'column';
             context.style.gap = '6px';
-            const about = [`${approval.subject} → ${approval.base}`, `at ${approval.sha.slice(0, 7)}`];
+            const about = [`${approval.subject} → ${approval.base}`];
             if (approval.said) about.push(`standing: ${approval.said}`);
             context.appendChild(lines(about));
             context.appendChild(said);

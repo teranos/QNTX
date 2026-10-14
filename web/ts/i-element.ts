@@ -101,11 +101,14 @@ function renderI(): void {
     const actions = document.createElement('div');
     actions.className = 'element-actions';
 
-    // Entry point to the Access Tokens element (ADR-025).
-    const tokensBtn = createGhostButton('⚿ Access Tokens', async () => {
-        openTokensElement();
-    });
-    actions.appendChild(tokensBtn.element);
+    // Entry point to the Access Tokens element (ADR-025), for the levels /auth/tokens admits.
+    // "the ui needs to stop suggesting things that arent possible, needs to stop handing out dead birds"
+    if (iPerson?.level === 'ROOT' || iPerson?.level === 'SUPER') {
+        const tokensBtn = createGhostButton('⚿ Access Tokens', async () => {
+            openTokensElement();
+        });
+        actions.appendChild(tokensBtn.element);
+    }
 
     // Every User is ROOT's to see and to switch (ADR-031). The table refuses
     // anyone else at /auth/users, so nobody else is offered the way there.
