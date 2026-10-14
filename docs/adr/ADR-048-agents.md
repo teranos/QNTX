@@ -10,7 +10,8 @@ QNTX hosts agents for use by ROOT.
 - In A2A's terms QNTX is the A2A Server: the endpoint, authentication and
   authorization are the node's. Each agent it hosts is described by an Agent
   Card and reached by its tenant (AgentInterface.tenant).
-- An agent has its own DID and attests as itself: `by` on what it writes is the agent.
+- An agent has its own DID and attests as itself: `by` on what it writes is
+  the agent.
 - What an agent may reach is its own lines in system, as any actor's are.
 - An agent's work outlives the request that brought it, and every call it
   makes carries its own credential. The credential of whoever sent the work
@@ -23,37 +24,59 @@ QNTX hosts agents for use by ROOT.
 - To A2A an agent is described by its Agent Card, and its skills are what it
   can perform (ADR-039).
 
----
+## An agent per model
+
+"I feel like Opus and Fable are two distinct identities"
+
+"each model would be its own agent session, independent of each other but still
+reachable by each other."
+
+- An agent is one model in one place: its own DID, its own session, its own
+  context. Two models are two agents, and so is one model in two places.
+- They reach each other, each an A2A Server to the others and their A2A
+  Client.
+
+"So the first persistent Agent swarm is really three, or four if we include
+something we run on Pi"
+
+- ROOT's are Opus, Fable and Sonnet in Claude Code, and the one in Pi.
+
+"So a conversation I have with Mistral as ROOT is one long Mistral conversation"
+
+- Each of ROOT's agents is one session with ROOT, and it continues.
 
 ## The host agent
 
+"the ROOT host agent is QNTX as ROOT would talk to it."
 
-
-- ROOT's are Opus and  Fable at minimum 
-- Switching model in the same session is a deliberate act
-
-
-
-
-"the ROOT host agent is QNTX as ROOT User would talk to it, one persistent session that is QNTX itself as expressed as ROOT."
+"It is the ROOT agent, one persistent session agent that is QNTX itself as
+expressed to ROOT."
 
 - It has a DID of its own and attests as itself, as any agent does.
-- It is not one of the agents the node hosts. (Like namespace agents)
-- A ritual's performer is an agent of its own.
+- It is not one of the agents the node hosts. A ritual's performer is an agent
+  of its own.
 
 "we cant just have any ai be the ROOT agent"
 
-
+- In Claude Code it is Claude, run by the node: Opus, Fable and Sonnet, each a
+  ROOT agent of its own. Only Claude runs there.
 - am.toml names each under `[agent.root]`: its model, its effort, and a
   reference to the Claude plan token. A node that names no model has no ROOT
   agent, and nothing stands in for the model named.
-- It is one session: In the case of Claude Code `--resume` continues it, and compacts automatically.
-- Its key is derived from the node's own, for its model, so it is the same DID  wherever the node is rebuilt from its record, and nothing more is kept for  it.
-- It reaches sigils through the node's own MCP, with a token of its own. The  token is ROOT's kind, which minting hands to nobody, and the node writes it  down for this agent alone.
-- `say` speaks something to it and answers with what it said back.
-- What it is told, what it reaches for and what it answers, it attests under  its session by its own DID, as the hook events a transcript is read from.
+- It is one session: `--resume` continues it, and Claude Code compacts its own
+  context.
+- Its key is derived from the node's own, for its model, so it is the same DID
+  wherever the node is rebuilt from its record, and nothing more is kept for
+  it.
+- It reaches sigils through the node's own MCP, with a token of its own. The
+  token is ROOT's kind, which minting hands to nobody, and the node writes it
+  down for this agent alone.
+- `claude say` says something to it and answers with what it said back.
+- What it is told, what it reaches for and what it answers, it attests under
+  its session by its own DID, as the hook events a transcript is read from.
 
 "ROOT is ROOT"
+
 "i want to be able to do anything"
 
 - It is privileged, and it has hands on the box as well as sigils: a package
@@ -63,12 +86,19 @@ QNTX hosts agents for use by ROOT.
 
 - Who may talk to it is the whole of what guards it.
 
+"make sure --permission-mode is configurable in the Claude Element"
 
-- am.toml gives the permission mode used when none is named (`permission_mode`) and the
+- The permission mode a turn runs in is named by whoever speaks, and the
+  Claude element offers every mode Claude Code has.
+- am.toml gives the mode used when none is named (`permission_mode`) and the
   tools it may use without being asked (`allow`), by Claude Code's own names.
-- Claude Code refuses `bypassPermissions` to a process run as root, which is  how the node runs on the box. Its hands there are what `allow` names.
+- Claude Code refuses `bypassPermissions` to a process run as root, which is
+  how the node runs on the box. Its hands there are what `allow` names.
 
+## The loop
 
+The loop is Claude Code's, not the node's: "accepted." The node hosts the
+process. It starts it, resumes it and stops it.
 
 ## Its harnesses
 
