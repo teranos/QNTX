@@ -186,7 +186,8 @@ export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: 
             mode.hidden = is.permission_modes.length === 0;
             // am.toml that gives no mode leaves the choice here, and none is made for the speaker.
             if (!is.permission_mode && !mode.hidden) mode.appendChild(choice('', 'permission mode'));
-            for (const name of is.permission_modes) mode.appendChild(choice(name, name));
+            // "claude element 'dontask' doesnt make sense there"
+            for (const name of is.permission_modes) if (name !== 'dontAsk') mode.appendChild(choice(name, name));
             mode.value = is.permission_mode;
             reading = is.session;
             if (reading) void read();

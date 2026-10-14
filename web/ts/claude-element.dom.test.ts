@@ -113,13 +113,13 @@ describe('Claude - Tim', () => {
     });
 
     // "make sure --permission-mode is configurable in the Claude Element"
-    test('every permission mode is offered, and the one am.toml gives is chosen', async () => {
+    // "claude element 'dontask' doesnt make sense there"
+    test('every permission mode but dontAsk is offered', async () => {
         const body = document.createElement('div');
         const stop = drawClaude(body, node());
         await settled();
         const mode = body.querySelector<HTMLSelectElement>('.claude-mode')!;
-        expect([...mode.options].map(o => o.value)).toEqual(MODES);
-        expect(mode.value).toBe('dontAsk');
+        expect([...mode.options].map(o => o.value)).toEqual(MODES.filter(m => m !== 'dontAsk'));
         stop();
     });
 
