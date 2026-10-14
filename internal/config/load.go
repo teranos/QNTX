@@ -39,6 +39,7 @@ func Load() (*Config, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 	config.fromOneRoot(v)
+	config.record(v)
 
 	globalConfig = &config
 	return globalConfig, nil
@@ -67,6 +68,7 @@ func LoadWithViper(v *viper.Viper) (*Config, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 	config.fromOneRoot(v)
+	config.record(v)
 	return &config, nil
 }
 
@@ -88,6 +90,7 @@ func LoadFromFile(configPath string) (*Config, error) {
 		return nil, errors.Wrapf(err, "failed to unmarshal config from %s", configPath)
 	}
 	config.fromOneRoot(v)
+	config.record(v)
 
 	return &config, nil
 }

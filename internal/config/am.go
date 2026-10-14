@@ -19,6 +19,9 @@ type Config struct {
 	Node       NodeConfig       `mapstructure:"node"`
 	Nodes      NodesConfig      `mapstructure:"nodes"`
 	Agent      AgentConfig      `mapstructure:"agent"`
+
+	// said is the keys something said, recorded as the config is read.
+	said map[string]bool
 }
 
 // AgentConfig is the agents this node runs (ADR-048).
