@@ -33,6 +33,9 @@ type aTurn struct {
 	// halfway. It writes each row its stream says happened, and a row of its
 	// failing when it does not answer.
 	run func(t turnRun) (proto.Message, error)
+	// heard is told the row of what was said once it is written down, or why
+	// it was not, before the harness is asked anything: the turn has begun.
+	heard func(told *types.As, unwritten error)
 }
 
 // turnRun is what a harness runs a turn with.
@@ -85,22 +88,28 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	// does not land is said with the answer and never stops the turn.
 	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: t.effort}
 	unwritten := ""
+	land := func(row *types.As) error {
+		if err := agent.signer.Sign(row); err != nil {
+			return err
+		}
+		return store.CreateAttestation(row)
+	}
+	note := func(err error) {
+		s.logger.Errorw("a row of the agent's session was not written", "agent", agent.did, "session", session, "harness", t.called, "error", err)
+		if unwritten == "" {
+			unwritten = err.Error()
+		}
+	}
 	write := func(rows []*types.As, err error) {
 		if err == nil {
 			for _, row := range rows {
-				if err = agent.signer.Sign(row); err != nil {
-					break
-				}
-				if err = store.CreateAttestation(row); err != nil {
+				if err = land(row); err != nil {
 					break
 				}
 			}
 		}
 		if err != nil {
-			s.logger.Errorw("a row of the agent's session was not written", "agent", agent.did, "session", session, "harness", t.called, "error", err)
-			if unwritten == "" {
-				unwritten = err.Error()
-			}
+			note(err)
 		}
 	}
 	// The ROOT agent's git is its own (ADR-048, Its git). A namespace agent has
@@ -112,7 +121,13 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 		}
 	}
 	told, err := writes.told(says, spokenBy(caller), time.Now())
-	write([]*types.As{told}, err)
+	if err == nil {
+		err = land(told)
+	}
+	if err != nil {
+		note(err)
+	}
+	t.heard(told, err)
 
 	answer, err := t.run(turnRun{says: says, session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
 		unwritten: func() string { return unwritten }})

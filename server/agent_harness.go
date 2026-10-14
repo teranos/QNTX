@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 	"google.golang.org/protobuf/proto"
@@ -130,6 +131,13 @@ func (s *QNTXServer) harnessSay(ctx context.Context, h *harness, sent sigil.Sent
 
 // sayTo says something to one agent in h, running as spec says.
 func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, spec agentSpec, sent sigil.Sent) (any, *protocol.Refusal) {
+	// A sigil's caller waits for the answer, which says the turn began.
+	return s.sayHeard(ctx, h, agent, spec, sent, func(*types.As, error) {})
+}
+
+// sayHeard is sayTo, telling heard when what was said is written down: the
+// turn has begun, and the row is what it begins with.
+func (s *QNTXServer) sayHeard(ctx context.Context, h *harness, agent *rootAgent, spec agentSpec, sent sigil.Sent, heard func(*types.As, error)) (any, *protocol.Refusal) {
 	caller := sigil.Caller(ctx)
 	if caller == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to " + agent.called + " is written down with who said it, and this asking carried no request"}
@@ -138,7 +146,7 @@ func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, sp
 	if refused != nil {
 		return nil, refused
 	}
-	t.in, t.called = agent.in(h), h.called
+	t.in, t.called, t.heard = agent.in(h), h.called, heard
 	return s.sayInHarness(ctx, caller, agent, sent["says"], t)
 }
 
