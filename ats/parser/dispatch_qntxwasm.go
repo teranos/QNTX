@@ -86,13 +86,13 @@ func readAxQueryWasm(fnName string, args []string) (*types.AxFilter, error) {
 		return nil, errors.Wrapf(err, "%s answered %q with %s", fnName, query, resultJSON)
 	}
 
-	// The node's stores match subjects upper case and contexts and actors
-	// lower; the browser's store matches as written, so the folding is Go's.
+	// Names go as they were typed: every store meets a name whatever its
+	// ASCII case (crates/ats/src/attestation/admits.rs).
 	return &types.AxFilter{
-		Subjects:   nilIfEmpty(uppercaseTokens(out.Filter.Subjects)),
+		Subjects:   nilIfEmpty(out.Filter.Subjects),
 		Predicates: nilIfEmpty(out.Filter.Predicates),
-		Contexts:   nilIfEmpty(lowercaseTokens(out.Filter.Contexts)),
-		Actors:     nilIfEmpty(lowercaseTokens(out.Filter.Actors)),
+		Contexts:   nilIfEmpty(out.Filter.Contexts),
+		Actors:     nilIfEmpty(out.Filter.Actors),
 		SoActions:  nilIfEmpty(out.Actions),
 		TimeStart:  start,
 		TimeEnd:    end,

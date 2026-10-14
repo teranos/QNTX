@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2654 in 376 files.
+# 2632 in 375 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # server/a2a_route.go: 2, an extended card lacking what the spec requires is refused, as the public card is (a2a_card.go); and a node running without auth has no handler, so it declares no peers.
@@ -28,9 +28,8 @@
 6	ats/attrs/attrs.go
 2	ats/ax/executor.go
 4	ats/ax/fixtures.go
-2	ats/parser/ax.go
 5	ats/parser/error.go
-6	ats/parser/query_convert.go
+1	ats/parser/query_convert.go
 4	ats/signing/signing.go
 2	ats/so/action.go
 13	ats/so/actions/prompt/action.go
@@ -97,7 +96,7 @@
 30	cmd/qntx/main.go
 2	cmd/qntx/tauri_windows.go
 1	crates/ats-duckdb/src/error.rs
-20	crates/ats-duckdb/src/lib.rs
+17	crates/ats-duckdb/src/lib.rs
 6	crates/ats-duckdb/src/namespace_store.rs
 1	crates/ats-duckdb/src/nodeidentity.rs
 3	crates/ats-duckdb/src/objects.rs
@@ -106,7 +105,7 @@
 5	crates/ats-duckdb/src/users.rs
 5	crates/ats-duckdb/src/watchers.rs
 9	crates/ats-id/src/asuid.rs
-6	crates/ats-indexeddb/src/store.rs
+2	crates/ats-indexeddb/src/store.rs
 2	crates/ats-sqlite/src/alias.rs
 14	crates/ats-sqlite/src/distill.rs
 8	crates/ats-sqlite/src/enforcement.rs
@@ -127,10 +126,10 @@
 1	crates/ats/src/expand.rs
 12	crates/ats/src/parser/ast.rs
 9	crates/ats/src/parser/mod.rs
-9	crates/ats/src/storage/memory.rs
+5	crates/ats/src/storage/memory.rs
 1	crates/ats/src/storage/traits.rs
 6	crates/ats/src/temporal.rs
-5	crates/ats/src/watcher.rs
+1	crates/ats/src/watcher.rs
 1	crates/laye-error/src/lib.rs
 1	crates/laye-me/src/lib.rs
 2	crates/laye-net/src/swarm.rs

@@ -92,30 +92,6 @@ func IsAxKeyword(value string) bool {
 	return false
 }
 
-// Utility functions
-
-func uppercaseTokens(tokens []string) []string {
-	if tokens == nil {
-		return nil
-	}
-	result := make([]string, len(tokens))
-	for i, token := range tokens {
-		result[i] = strings.ToUpper(token)
-	}
-	return result
-}
-
-func lowercaseTokens(tokens []string) []string {
-	if tokens == nil {
-		return nil
-	}
-	result := make([]string, len(tokens))
-	for i, token := range tokens {
-		result[i] = strings.ToLower(token)
-	}
-	return result
-}
-
 // ParseWarning represents best-effort parsing with warnings
 type ParseWarning struct {
 	Filter   *types.AxFilter

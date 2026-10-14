@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::attestation::Attestation;
+use crate::attestation::{names_meet, Attestation};
 use crate::ax::over;
 use crate::span::Span;
 
@@ -155,16 +155,11 @@ fn as_attestation(a: &MatchAttestation) -> Attestation {
 
 /// Check if an attestation matches a single watcher's structural filter.
 fn matches_filter(att: &MatchAttestation, watcher: &WatcherFilter) -> bool {
-    if !watcher.subjects.is_empty() && !has_overlap_ci(&watcher.subjects, &att.subjects) {
-        return false;
-    }
-    if !watcher.predicates.is_empty() && !has_overlap_ci(&watcher.predicates, &att.predicates) {
-        return false;
-    }
-    if !watcher.contexts.is_empty() && !has_overlap_ci(&watcher.contexts, &att.contexts) {
-        return false;
-    }
-    if !watcher.actors.is_empty() && !has_overlap_ci(&watcher.actors, &att.actors) {
+    let named = names_meet(&watcher.subjects, &att.subjects)
+        && names_meet(&watcher.predicates, &att.predicates)
+        && names_meet(&watcher.contexts, &att.contexts)
+        && names_meet(&watcher.actors, &att.actors);
+    if !named {
         return false;
     }
 
@@ -186,19 +181,6 @@ fn matches_filter(att: &MatchAttestation, watcher: &WatcherFilter) -> bool {
     }
 
     true
-}
-
-/// Case-insensitive overlap check between two string slices.
-fn has_overlap_ci(filter: &[String], values: &[String]) -> bool {
-    for v in values {
-        let lower = v.to_ascii_lowercase();
-        for f in filter {
-            if f.to_ascii_lowercase() == lower {
-                return true;
-            }
-        }
-    }
-    false
 }
 
 /// Check a single attribute filter against attestation attributes.

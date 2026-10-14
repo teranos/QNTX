@@ -18,9 +18,11 @@
 //! assert_eq!(attestation.subjects, vec!["ALICE"]);
 //! ```
 
+mod admits;
 mod types;
 mod writable;
 
+pub use admits::names_meet;
 pub use types::{
     Attestation, AttestationBuilder, AxFilter, AxResult, AxSummary, Conflict, EVERY_ROW,
 };
