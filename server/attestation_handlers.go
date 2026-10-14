@@ -30,10 +30,6 @@ const (
 	// An attestation that can't survive the WebSocket shouldn't enter the store.
 	// TODO: Make configurable via am.toml when image-carrying attestations ship.
 	maxAttestationBody = 10 * 1024 * 1024 // 10 MB
-
-	// Semantic field limits — these fields are short identifiers, not free text.
-	maxArrayElements = 100
-	maxStringLength  = 1000
 )
 
 // One page of attestations: what a caller gets when it asks for nothing, and
@@ -431,34 +427,6 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		}
 	}
 
-	// Validate required fields
-	if len(req.Subjects) == 0 {
-		writeError(w, http.StatusBadRequest, "subjects must not be empty")
-		return
-	}
-	if len(req.Predicates) == 0 {
-		writeError(w, http.StatusBadRequest, "predicates must not be empty")
-		return
-	}
-
-	// Validate semantic field sizes
-	if err := validateStringArray("subjects", req.Subjects); err != "" {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	if err := validateStringArray("predicates", req.Predicates); err != "" {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	if err := validateStringArray("contexts", req.Contexts); err != "" {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	if err := validateStringArray("actors", req.Actors); err != "" {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-
 	// A role is an attestation, so granting one is a write like any other and
 	// there is no new endpoint. Who may make it is not like any other:
 	// MayGrantRoles decides, and nothing else here does.
@@ -597,6 +565,14 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 				"an attestation signed by %s names its id: the node generates none under a signature", req.SignerDID))
 			return
 		}
+		// The id is seeded from the first subject and predicate, so there
+		// must be one of each to seed it from.
+		if len(req.Subjects) == 0 || len(req.Predicates) == 0 {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf(
+				"an id is seeded from the first subject and predicate, and the attestation names subjects %v and predicates %v",
+				req.Subjects, req.Predicates))
+			return
+		}
 		subject := req.Subjects[0]
 		predicate := req.Predicates[0]
 		context := "_"
@@ -671,6 +647,12 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		createErr = store.CreateAttestation(as)
 	}
 	tookPut = time.Since(putAt)
+	// What the store takes is the store's to say, for this door and every
+	// other: an attestation it refuses is the writer's to fix.
+	if ats.Unwritable(createErr) {
+		writeError(w, http.StatusBadRequest, createErr.Error())
+		return
+	}
 	if err := createErr; err != nil {
 		writeWrappedError(w, s.logger, err,
 			fmt.Sprintf("failed to create attestation %s (subjects: %v, predicates: %v, source: %s)",
@@ -726,18 +708,4 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 	}
 
 	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
-}
-
-// validateStringArray checks that an array doesn't exceed element count or string length limits.
-// Returns an error message, or empty string if valid.
-func validateStringArray(field string, values []string) string {
-	if len(values) > maxArrayElements {
-		return fmt.Sprintf("%s: too many elements (%d, max %d)", field, len(values), maxArrayElements)
-	}
-	for _, v := range values {
-		if len(v) > maxStringLength {
-			return fmt.Sprintf("%s: element too long (%d bytes, max %d)", field, len(v), maxStringLength)
-		}
-	}
-	return ""
 }

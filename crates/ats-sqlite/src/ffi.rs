@@ -23,6 +23,9 @@ use rusqlite::OptionalExtension;
 use crate::store::ReadConn;
 use crate::SqliteStore;
 
+/// The surface a refusal crossing this FFI names.
+const SURFACE: &str = "ats-sqlite";
+
 // Safety limits
 const MAX_ID_LENGTH: usize = 256;
 const MAX_JSON_LENGTH: usize = 1_000_000; // 1MB
@@ -939,7 +942,9 @@ pub extern "C" fn storage_put(
 
         match store.put(attestation) {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => {
+                StorageResultC::error(&qntx_ffi_common::store::sacred(e, SURFACE, "storage_put"))
+            }
         }
     })
 }
@@ -1052,7 +1057,11 @@ pub extern "C" fn storage_update(
 
         match store.update(attestation) {
             Ok(()) => StorageResultC::ok(),
-            Err(e) => StorageResultC::error(&format!("{}", e)),
+            Err(e) => StorageResultC::error(&qntx_ffi_common::store::sacred(
+                e,
+                SURFACE,
+                "storage_update",
+            )),
         }
     })
 }

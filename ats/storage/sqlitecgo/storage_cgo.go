@@ -340,7 +340,7 @@ func (rs *RustStore) createAttestationWithPriority(as *types.As, high bool) erro
 		result := C.storage_put(rs.store, cJSON)
 		defer C.storage_result_free(result)
 		if !result.success {
-			return errors.New(C.GoString(result.error_msg))
+			return errors.Decode(C.GoString(result.error_msg))
 		}
 		return nil
 	})
@@ -487,8 +487,7 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 	defer C.storage_result_free(result)
 
 	if !result.success {
-		errMsg := C.GoString(result.error_msg)
-		return errors.New(errMsg)
+		return errors.Decode(C.GoString(result.error_msg))
 	}
 
 	return nil
@@ -564,7 +563,7 @@ func (rs *RustStore) putLocked(jsonBytes []byte) error {
 	result := C.storage_put(rs.store, cJSON)
 	defer C.storage_result_free(result)
 	if !result.success {
-		return errors.New(C.GoString(result.error_msg))
+		return errors.Decode(C.GoString(result.error_msg))
 	}
 	return nil
 }

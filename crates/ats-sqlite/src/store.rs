@@ -614,6 +614,7 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
 
 impl AttestationStore for SqliteStore {
     fn put(&mut self, attestation: Attestation) -> StoreResult<()> {
+        attestation.writable()?;
         if self.exists(&attestation.id)? {
             return Err(StoreError::AlreadyExists(attestation.id.clone()));
         }
@@ -740,6 +741,7 @@ impl AttestationStore for SqliteStore {
     }
 
     fn update(&mut self, attestation: Attestation) -> StoreResult<()> {
+        attestation.writable()?;
         if !self.exists(&attestation.id)? {
             return Err(StoreError::NotFound(attestation.id.clone()));
         }

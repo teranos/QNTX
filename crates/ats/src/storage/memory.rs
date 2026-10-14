@@ -51,6 +51,7 @@ impl MemoryStore {
 
 impl AttestationStore for MemoryStore {
     fn put(&mut self, attestation: Attestation) -> StoreResult<()> {
+        attestation.writable()?;
         if self.attestations.contains_key(&attestation.id) {
             return Err(StoreError::AlreadyExists(attestation.id));
         }
@@ -68,6 +69,7 @@ impl AttestationStore for MemoryStore {
     }
 
     fn update(&mut self, attestation: Attestation) -> StoreResult<()> {
+        attestation.writable()?;
         if !self.attestations.contains_key(&attestation.id) {
             return Err(StoreError::NotFound(attestation.id));
         }

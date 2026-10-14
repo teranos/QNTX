@@ -4296,6 +4296,11 @@ dependencies = [
 [[package]]
 name = "qntx-ffi-common"
 version = "0.2.44"
+dependencies = [
+ "laye-error",
+ "qntx-ats",
+ "serde_json",
+]
 
 [[package]]
 name = "qntx-grpc"
