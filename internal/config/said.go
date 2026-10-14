@@ -22,8 +22,8 @@ func keysOf(t reflect.Type, prefix string) []string {
 		if !field.IsExported() || !tagged {
 			continue
 		}
-		name, option, _ := strings.Cut(tag, ",")
-		if option == "squash" {
+		name, option, optioned := strings.Cut(tag, ",")
+		if optioned && option == "squash" {
 			keys = append(keys, keysOf(field.Type, prefix)...)
 			continue
 		}
