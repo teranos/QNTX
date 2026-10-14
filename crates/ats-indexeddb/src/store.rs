@@ -235,14 +235,7 @@ impl IndexedDbStore {
 
     /// Execute an AX query filter and return matching attestations.
     pub async fn query(&self, filter: &AxFilter) -> StoreResult<AxResult> {
-        let all = self.get_all().await?;
-
-        let mut matching: Vec<Attestation> = all
-            .into_iter()
-            .filter(|a| matches_filter(a, filter))
-            .collect();
-
-        matching.truncate(filter.limit);
+        let matching = filter.select(self.get_all().await?);
 
         let summary = build_summary(&matching);
 
@@ -483,63 +476,6 @@ fn string_vec_to_js_array(vec: &[String]) -> JsValue {
         array.set(i as u32, JsValue::from_str(s));
     }
     array.into()
-}
-
-// ============================================================================
-// Query filtering (same logic as MemoryStore)
-// ============================================================================
-
-/// Check if an attestation matches the given filter.
-fn matches_filter(attestation: &Attestation, filter: &AxFilter) -> bool {
-    if !filter.subjects.is_empty() {
-        let has_match = attestation
-            .subjects
-            .iter()
-            .any(|s| filter.subjects.contains(s));
-        if !has_match {
-            return false;
-        }
-    }
-
-    if !filter.predicates.is_empty() {
-        let has_match = attestation
-            .predicates
-            .iter()
-            .any(|p| filter.predicates.contains(p));
-        if !has_match {
-            return false;
-        }
-    }
-
-    if !filter.contexts.is_empty() {
-        let has_match = attestation
-            .contexts
-            .iter()
-            .any(|c| filter.contexts.contains(c));
-        if !has_match {
-            return false;
-        }
-    }
-
-    if !filter.actors.is_empty() {
-        let has_match = attestation.actors.iter().any(|a| filter.actors.contains(a));
-        if !has_match {
-            return false;
-        }
-    }
-
-    if let Some(start) = filter.time_start {
-        if attestation.timestamp < start {
-            return false;
-        }
-    }
-    if let Some(end) = filter.time_end {
-        if attestation.timestamp > end {
-            return false;
-        }
-    }
-
-    true
 }
 
 /// Build a summary from a list of attestations.

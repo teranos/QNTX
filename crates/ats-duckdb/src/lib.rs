@@ -216,6 +216,22 @@ fn str_list_json(v: &[String]) -> serde_json::Result<String> {
     serde_json::to_string(v)
 }
 
+/// A list column meeting a bound list of names, ASCII case aside: the column
+/// folded here, the names folded before binding.
+macro_rules! names_meet {
+    ($col:literal) => {
+        concat!(
+            "list_has_any(list_transform(",
+            $col,
+            ", lambda x: translate(x, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')), CAST(? AS VARCHAR[]))"
+        )
+    };
+}
+const NAMES_MEET_SUBJECTS: &str = names_meet!("subjects");
+const NAMES_MEET_PREDICATES: &str = names_meet!("predicates");
+const NAMES_MEET_CONTEXTS: &str = names_meet!("contexts");
+const NAMES_MEET_ACTORS: &str = names_meet!("actors");
+
 /// Convert a DuckDB Value read back from a LIST<VARCHAR> cell into Vec<String>.
 fn value_to_string_vec(v: Value) -> Result<Vec<String>> {
     match v {
@@ -704,7 +720,7 @@ impl DuckdbStore {
     ///   [LIMIT N]
     ///
     /// Each list filter (subjects, predicates, contexts, actors) becomes
-    /// `list_has_any(<col>, CAST(? AS VARCHAR[]))` with the parameter bound as
+    /// `list_has_any(<col folded>, CAST(? AS VARCHAR[]))` with the parameter bound as
     /// a JSON-serialized string — same shape as the write path, forced by
     /// duckdb-rs at the pinned version not supporting `Value::List` as a bind parameter
     /// (see `str_list_json` doc comment).
@@ -723,21 +739,19 @@ impl DuckdbStore {
         let mut conds: Vec<&'static str> = Vec::new();
         let mut binds: Vec<Value> = Vec::new();
 
-        if !filter.subjects.is_empty() {
-            conds.push("list_has_any(subjects, CAST(? AS VARCHAR[]))");
-            binds.push(Value::Text(str_list_json(&filter.subjects)?));
-        }
-        if !filter.predicates.is_empty() {
-            conds.push("list_has_any(predicates, CAST(? AS VARCHAR[]))");
-            binds.push(Value::Text(str_list_json(&filter.predicates)?));
-        }
-        if !filter.contexts.is_empty() {
-            conds.push("list_has_any(contexts, CAST(? AS VARCHAR[]))");
-            binds.push(Value::Text(str_list_json(&filter.contexts)?));
-        }
-        if !filter.actors.is_empty() {
-            conds.push("list_has_any(actors, CAST(? AS VARCHAR[]))");
-            binds.push(Value::Text(str_list_json(&filter.actors)?));
+        // A name meets its other case, ASCII only, as SQLite's NOCASE does:
+        // both sides folded with translate, which touches nothing past Z.
+        for (field, names) in [
+            (NAMES_MEET_SUBJECTS, &filter.subjects),
+            (NAMES_MEET_PREDICATES, &filter.predicates),
+            (NAMES_MEET_CONTEXTS, &filter.contexts),
+            (NAMES_MEET_ACTORS, &filter.actors),
+        ] {
+            if let [_, ..] = names.as_slice() {
+                conds.push(field);
+                let folded: Vec<String> = names.iter().map(|n| n.to_ascii_lowercase()).collect();
+                binds.push(Value::Text(str_list_json(&folded)?));
+            }
         }
         if !filter.source.is_empty() {
             conds.push("source = ?");
@@ -1072,6 +1086,37 @@ mod tests {
         assert_eq!(got.subjects, vec!["ALICE"]);
         assert_eq!(got.predicates, vec!["knows"]);
         assert_eq!(got.actors, vec!["human:bob"]);
+    }
+
+    /// A name meets its other case as on SQLite's NOCASE: `as` writes
+    /// subjects upper case and a query names them as typed. ASCII only.
+    #[test]
+    fn a_name_meets_its_other_case_ascii_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = store(&dir);
+        store.put(sample_attestation("AS-1")).unwrap();
+        let mut accented = sample_attestation("AS-2");
+        accented.subjects = vec!["É".to_string()];
+        store.put(accented).unwrap();
+
+        let ids = |filter: QueryFilter| -> Vec<String> {
+            store
+                .query(&filter)
+                .unwrap()
+                .into_iter()
+                .map(|a| a.id)
+                .collect()
+        };
+        let named = |subjects: &[&str], contexts: &[&str], actors: &[&str]| QueryFilter {
+            subjects: subjects.iter().map(|s| s.to_string()).collect(),
+            contexts: contexts.iter().map(|s| s.to_string()).collect(),
+            actors: actors.iter().map(|s| s.to_string()).collect(),
+            limit: 10,
+            ..QueryFilter::default()
+        };
+        assert_eq!(ids(named(&["alice"], &["WORK"], &["HUMAN:BOB"])), ["AS-1"]);
+        assert_eq!(ids(named(&["É"], &[], &[])), ["AS-2"]);
+        assert!(ids(named(&["é"], &[], &[])).is_empty());
     }
 
     #[test]
