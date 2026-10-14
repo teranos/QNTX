@@ -79,7 +79,7 @@ describe('Tim: what the node says is a card', () => {
         expect(card.link).toEqual({ label: 'GitHub', href: 'https://github.com/teranos/elements/pull/29' });
         expect(card.arrivedMinutesAgo).toBe(15);
         expect(card.checks).toEqual([{ name: 'TypeScript', state: 'done' }, { name: 'Browser', state: 'done' }]);
-        expect(card.options.map((o) => o.label)).toEqual(['Merge', 'Don’t merge']);
+        expect(card.options.map((o) => o.label)).toEqual(['YES', 'NO']);
         expect(card.merges).toEqual({ label: 'main CI' });
     });
 
@@ -96,7 +96,8 @@ describe('Tim: what the node says is a card', () => {
         const titles = Array.from(body.querySelectorAll('[data-title]')).map((t) => t.textContent);
         expect(titles).toContain('A panel on a phone reads at a phone’s size');
         expect(titles).toContain('Version 1.14.0');
-        expect(body.textContent).toContain('at abe92a9');
+        // "at 11cdaa7 <- not signal, i dont give a shit"
+        expect(body.textContent).not.toContain('abe92a9');
         // Read again, the same cards stay: nothing is drawn twice.
         await load();
         expect(body.querySelectorAll('[data-title]').length).toBe(2);
@@ -109,11 +110,11 @@ describe('Spike: shut, and refused', () => {
         const { body, load } = approvalsRoll();
         document.body.appendChild(body);
         await load();
-        expect(button(body, 'Merge').disabled).toBe(true);
-        expect(note(button(body, 'Merge'))).toBe('checks running');
+        expect(button(body, 'YES').disabled).toBe(true);
+        expect(note(button(body, 'YES'))).toBe('checks running');
         listed = { approvals: [pr29()] };
         await load();
-        expect(button(body, 'Merge').disabled).toBe(false);
+        expect(button(body, 'YES').disabled).toBe(false);
     });
 
     test('a refusal from the node is said under the card', async () => {
@@ -122,7 +123,7 @@ describe('Spike: shut, and refused', () => {
         const { body, load } = approvalsRoll();
         document.body.appendChild(body);
         await load();
-        button(body, 'Merge').click();
+        button(body, 'YES').click();
         await new Promise((r) => setTimeout(r, 10));
         expect(body.querySelector('.element-error')?.textContent).toContain('moved');
     });
@@ -142,18 +143,18 @@ describe('Jenny: the PR story, through the node', () => {
         document.body.appendChild(body);
         await load();
 
-        button(body, 'Merge').click();
+        button(body, 'YES').click();
         await new Promise((r) => setTimeout(r, 10));
         expect(sent[0]).toEqual({ path: '/api/approvals/answer', body: {
-            subject: 'teranos/elements#29', sha: 'abe92a9bcc6cdc2a8308777f6b455fa16ddd44e6', option: 'Merge', said: 'merge when main CI passes',
+            subject: 'teranos/elements#29', sha: 'abe92a9bcc6cdc2a8308777f6b455fa16ddd44e6', option: 'YES', said: 'merge when main CI passes',
         } });
         expect(body.textContent).toContain('merges when main CI passes');
 
-        button(body, 'Merge').click();
+        button(body, 'YES').click();
         await new Promise((r) => setTimeout(r, 10));
         expect(sent[1]!.body.said).toBe('force merge');
         expect(body.textContent).toContain('merged as m3rg3d0');
-        expect(button(body, 'Merge').disabled).toBe(true);
+        expect(button(body, 'YES').disabled).toBe(true);
     });
 
     test('gone from the node’s list while a merge waited, the card settles: what stood took effect', async () => {
@@ -165,12 +166,12 @@ describe('Jenny: the PR story, through the node', () => {
         const { body, load } = approvalsRoll();
         document.body.appendChild(body);
         await load();
-        button(body, 'Merge').click();
+        button(body, 'YES').click();
         await new Promise((r) => setTimeout(r, 10));
-        expect(button(body, 'Don’t merge').disabled).toBe(false);
+        expect(button(body, 'NO').disabled).toBe(false);
         listed = { approvals: [] };
         await load();
-        expect(button(body, 'Merge').disabled).toBe(true);
-        expect(note(button(body, 'Merge'))).toBe('merge when main CI passes');
+        expect(button(body, 'YES').disabled).toBe(true);
+        expect(note(button(body, 'YES'))).toBe('merge when main CI passes');
     });
 });
