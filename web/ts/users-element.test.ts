@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { fmt, reachedBy, renderList, type UserRecord } from './users-element';
+import { fmt, renderList, type UserRecord } from './users-element';
 
 function root(): UserRecord {
     return {
@@ -18,14 +18,6 @@ function root(): UserRecord {
     } as UserRecord;
 }
 
-// The row carries the count and the hover carries every route, so a User
-// with many keys stays one row wide and nothing is hidden.
-test('the row counts the routes and the hover names them', () => {
-    const reached = reachedBy(root());
-    expect(reached.shown).toBe('2 accounts, 2 keys');
-    expect(reached.whole).toBe('me@abcd.nl\napple:001750\nbrowser …eGmoRUQ1\ndevice …Zv8gaGJS');
-});
-
 // created_at is milliseconds, the way the node writes it.
 test('created reads as the day it was, in UTC', () => {
     expect(fmt(1789342756348)).toBe('2026-09-13 23:39:16');
@@ -37,7 +29,17 @@ test('the list switches nobody: the switch is in the User', () => {
     const container = document.createElement('div');
     renderList(container, [root()]);
     expect(container.querySelector('button')).toBeNull();
-    expect(container.querySelectorAll('th').length).toBe(8);
+    expect(container.querySelectorAll('th').length).toBe(6);
+});
+
+// "Not interested in Phone in Users glyph"
+// "i can find it in the user itself,"
+test('the list has no Phone and no Reached by', () => {
+    const container = document.createElement('div');
+    renderList(container, [root()]);
+    const heads = Array.from(container.querySelectorAll('th')).map(th => th.textContent);
+    expect(heads).toEqual(['Name', 'Level', 'Door', 'Email', 'Created', 'Status']);
+    expect(container.querySelector('tbody tr')!.children.length).toBe(6);
 });
 
 // "but why dont i see my outgoing invitations in the same list, and a way for me to open the would-be-user"
@@ -60,10 +62,4 @@ test('an open invitation is a row of its own, invited, among the Users', () => {
     expect(rows[0]).toContain('ada@gmail.com');
     expect(rows.join()).not.toContain('Bob');
     expect(rows.join()).not.toContain('Cy');
-});
-
-test('one of a thing is not plural, and none is a dash', () => {
-    const one = { ...root(), accounts: (root().accounts ?? []).slice(0, 1), keys: (root().keys ?? []).slice(0, 1) };
-    expect(reachedBy(one).shown).toBe('1 account, 1 key');
-    expect(reachedBy({ ...root(), accounts: [], keys: [] })).toEqual({ shown: '—', whole: '' });
 });

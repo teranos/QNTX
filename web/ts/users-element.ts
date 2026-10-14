@@ -86,25 +86,6 @@ function statusPill(u: UserRecord): HTMLTableCellElement {
     return td;
 }
 
-/** How a User is reached. The row carries the count; the hover carries every
- *  route, each account by what it calls itself and each key by the tail of
- *  its DID. */
-export function reachedBy(u: UserRecord): { shown: string; whole: string } {
-    const accounts = u.accounts ?? [];
-    const keys = u.keys ?? [];
-    if (accounts.length === 0 && keys.length === 0) return { shown: '—', whole: '' };
-
-    const routes: string[] = [];
-    for (const a of accounts) routes.push(a.handle || a.canonical_id);
-    for (const k of keys) routes.push(`${k.origin.toLowerCase()} …${k.did.slice(-8)}`);
-
-    const count = (n: number, what: string) => `${n} ${what}${n === 1 ? '' : 's'}`;
-    const parts: string[] = [];
-    if (accounts.length > 0) parts.push(count(accounts.length, 'account'));
-    if (keys.length > 0) parts.push(count(keys.length, 'key'));
-    return { shown: parts.join(', '), whole: routes.join('\n') };
-}
-
 /** Exported for tests: every User, a row each. A row is a way in to the
  *  User and nothing else. */
 export function renderList(container: HTMLElement, users: UserRecord[], invitations: InvitationRecord[] = []): void {
@@ -126,9 +107,7 @@ export function renderList(container: HTMLElement, users: UserRecord[], invitati
         <th>Name</th>
         <th>Level</th>
         <th>Door</th>
-        <th>Reached by</th>
         <th>Email</th>
-        <th>Phone</th>
         <th>Created</th>
         <th>Status</th>
     </tr>`;
@@ -153,12 +132,7 @@ export function renderList(container: HTMLElement, users: UserRecord[], invitati
         tr.appendChild(name);
         tr.appendChild(cell(u.level));
         tr.appendChild(cell(u.namespace || '—'));
-        const reached = reachedBy(u);
-        const routes = cell(reached.shown, 'element-time');
-        routes.title = reached.whole;
-        tr.appendChild(routes);
         tr.appendChild(cell(u.email_addresses?.length ? u.email_addresses.join(', ') : '—'));
-        tr.appendChild(cell(u.phone_numbers?.length ? u.phone_numbers.join(', ') : '—'));
         tr.appendChild(cell(fmt(u.created_at), 'element-time'));
         tr.appendChild(statusPill(u));
 
@@ -179,11 +153,7 @@ function invitationRow(inv: InvitationRecord): HTMLTableRowElement {
     tr.appendChild(name);
     tr.appendChild(cell('invited'));
     tr.appendChild(cell('—'));
-    const routes = cell(inv.accounts.map(a => a.provider).join(', '), 'element-time');
-    routes.title = inv.accounts.map(a => `${a.provider}: ${a.account}`).join('\n');
-    tr.appendChild(routes);
     tr.appendChild(cell(inv.email));
-    tr.appendChild(cell('—'));
     tr.appendChild(cell(fmt(inv.created_at), 'element-time'));
     const status = document.createElement('td');
     const pill = document.createElement('span');
