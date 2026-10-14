@@ -1,10 +1,10 @@
 # Web Frontend
 
-## Glyph Axiom
+## Element Axioma
 
-A glyph is exactly ONE DOM element for its entire lifetime. FORBIDDEN: cloneNode, createElement for existing glyph, re-rendering via diffing, two elements with same data-glyph-id. ALLOWED: reparenting, transform changes, delaying content mount until morph completes.
+An element is exactly ONE DOM element for its entire lifetime (@teranos/elements AXIOMAS.md). FORBIDDEN: cloneNode, createElement for an existing element, re-rendering via diffing, two elements with the same data-element-id. ALLOWED: reparenting, transform changes, delaying content mount until morph completes.
 
-All tray creation via `createGlyphElement`; canvas via `canvasPlaced`. Register new types in `glyph/glyph-registry.ts`.
+All tray creation via `tray.add`; canvas via `canvasPlaced`. Register new types in `components/element/element-registry.ts`.
 
 ## WASM
 
