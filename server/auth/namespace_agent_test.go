@@ -22,11 +22,11 @@ func namespaceAgentToken(t *testing.T) (raw, did string) {
 
 const theGardener = "https://example.org/theGardener"
 
-// namespaceAgentHandler is rootAgentHandler with the theGardener a USER the node
+// namespaceAgentHandler is nodeAgentHandler with the theGardener a USER the node
 // invited: a token speaks for whoever minted it, and the gate asks that they
 // are still admitted.
 func namespaceAgentHandler() (*Handler, *memTokenStore) {
-	h, store := rootAgentHandler(mastodonAccount)
+	h, store := nodeAgentHandler(mastodonAccount)
 	h.users = &memUsers{held: []User{{ID: "US-GARDENER", Level: LevelUser, DisplayName: "The theGardener",
 		Accounts: []UserAccount{{CanonicalID: theGardener}}}}}
 	return h, store
@@ -99,7 +99,7 @@ func presentingAt(h *Handler, raw string, reach Reach) (int, Admission) {
 // It speaks for whoever opted the namespace in, so a line that names nobody
 // gives it nobody to speak for.
 func TestANamespaceAgentSpeaksForWhoeverSetItUp(t *testing.T) {
-	h, store := rootAgentHandler(mastodonAccount)
+	h, store := nodeAgentHandler(mastodonAccount)
 	raw, did := namespaceAgentToken(t)
 	require.Error(t, h.HoldNamespaceAgent(raw, did, "agent:garden:claude-sonnet-5-5", "", "garden"))
 	held, err := store.List()

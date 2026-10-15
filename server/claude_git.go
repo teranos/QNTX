@@ -10,13 +10,13 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// The ROOT agent's git (ADR-048, Its git): who its commits are by, and how its
+// The Node Agent's git (ADR-048, Its git): who its commits are by, and how its
 // git comes by what carries a push.
 
-// gitIdentityOf is who an agent's commits are by: the ROOT agent of the node
+// gitIdentityOf is who an agent's commits are by: the Node Agent of the node
 // named, at the address its DID is at the host the node answers on.
 func gitIdentityOf(did, nodeName, publicOrigin string) (name, email string) {
-	name = "ROOT agent"
+	name = "Node Agent"
 	if nodeName != "" {
 		name = nodeName + " " + name
 	}

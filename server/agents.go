@@ -55,8 +55,8 @@ func agentPurpose(namespace, model string) string {
 }
 
 // agentHome is where the node keeps a namespace's agent: beside ROOT's, by the
-// namespace and the model. Where agents are kept is set with the ROOT agent
-// (nameRootAgent), and a node that set none keeps them nowhere.
+// namespace and the model. Where agents are kept is set with the Node Agent
+// (nameNodeAgent), and a node that set none keeps them nowhere.
 func (s *QNTXServer) agentHome(namespace, model string) (string, error) {
 	if s.agentsDir == "" {
 		return "", errors.Newf("this node keeps agents nowhere: am.toml names no [agent.root], which is what sets where they are kept")
@@ -177,7 +177,7 @@ func agentNamespaceOf(ctx context.Context, sent sigil.Sent) (anAsking, *protocol
 		return anAsking{}, &protocol.Refusal{Why: sigil.Missing, Param: "namespace", Says: "namespace is required"}
 	}
 	if namespace == auth.NamespaceSystem {
-		return anAsking{}, &protocol.Refusal{Why: sigil.NotAllowed, Param: "namespace", Says: "system has no agent of its own: the ROOT agent is the node's (claude say)"}
+		return anAsking{}, &protocol.Refusal{Why: sigil.NotAllowed, Param: "namespace", Says: "system has no agent of its own: the Node Agent is the node's (claude say)"}
 	}
 	if !admitted.MayActIn(namespace) {
 		return anAsking{}, &protocol.Refusal{Why: sigil.NotFound, Param: "namespace", Says: "no namespace " + namespace + " that you act in"}

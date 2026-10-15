@@ -95,7 +95,7 @@ func holdPi(ctx context.Context, flake string, spawn func(string, func()), logge
 		}
 		held.err = err
 		if err != nil {
-			logger.Errorw("Pi was not built, so the ROOT agent runs in Claude Code alone", "flake", flake, "error", err)
+			logger.Errorw("Pi was not built, so the Node Agent runs in Claude Code alone", "flake", flake, "error", err)
 			return
 		}
 		logger.Infow("Pi is on this node", "version", pi.PinnedVersion, "path", held.path)
@@ -119,7 +119,7 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	}
 	// The node serves without its agent, so why there is none is kept for
 	// whoever speaks to it.
-	defer func() { s.noRootAgent = err }()
+	defer func() { s.noNodeAgent = err }()
 	pin, err := claudecode.Pinned()
 	if err != nil {
 		return errors.Wrap(err, "the Claude Code this build pins did not read")
@@ -133,30 +133,30 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 		s.holdHarness("pi", holdPi(s.ctx, pi.PinnedFlake, s.wg.Go, s.logger))
 	}
 
-	home, err := rootAgentHome()
+	home, err := nodeAgentHome()
 	if err != nil {
 		return err
 	}
 	// Every agent the node runs is kept beside ROOT's (ADR-048).
 	s.agentsDir = filepath.Dir(home)
-	return s.nameRootAgent(home)
+	return s.nameNodeAgent(home)
 }
 
-// nameRootAgent makes the ROOT agent this node's: a key of its own from the
+// nameNodeAgent makes the Node Agent this node's: a key of its own from the
 // node's, and its token written down where the gate reads tokens. A node with
 // no login has no gate to tell.
-func (s *QNTXServer) nameRootAgent(home string) error {
-	agent, err := theRootAgent(s.nodeDID.PrivateKey, home)
+func (s *QNTXServer) nameNodeAgent(home string) error {
+	agent, err := theNodeAgent(s.nodeDID.PrivateKey, home)
 	if err != nil {
-		return errors.Wrap(err, "the ROOT agent has no key of its own")
+		return errors.Wrap(err, "the Node Agent has no key of its own")
 	}
 	if s.authHandler != nil {
-		if err := s.authHandler.HoldRootAgent(agent.token, agent.did); err != nil {
-			return errors.Wrap(err, "the ROOT agent's token is not held, so it would reach none of the node's sigils")
+		if err := s.authHandler.HoldNodeAgent(agent.token, agent.did); err != nil {
+			return errors.Wrap(err, "the Node Agent's token is not held, so it would reach none of the node's sigils")
 		}
 	}
-	s.rootAgent = agent
-	s.logger.Infow("The ROOT agent is this node's", "did", agent.did, "home", home)
+	s.nodeAgent = agent
+	s.logger.Infow("The Node Agent is this node's", "did", agent.did, "home", home)
 	return nil
 }
 

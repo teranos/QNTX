@@ -60,7 +60,7 @@ func TestSaidStartsASessionAndAnswers(t *testing.T) {
 	home := t.TempDir()
 	said := Said{
 		Binary: binary, Home: home, Session: "s-1", Says: "what does uname -s print?",
-		Model: "claude-opus-5-5", Effort: "low", Mode: "dontAsk", Token: "the-plan-token", System: "You are the ROOT agent.",
+		Model: "claude-opus-5-5", Effort: "low", Mode: "dontAsk", Token: "the-plan-token", System: "You are the Node Agent.",
 	}
 
 	var seen []string
@@ -86,7 +86,7 @@ func TestSaidStartsASessionAndAnswers(t *testing.T) {
 		{"--effort", "low"},
 		{"--output-format", "stream-json"},
 		{"--permission-mode", "dontAsk"},
-		{"--append-system-prompt", "You are the ROOT agent."},
+		{"--append-system-prompt", "You are the Node Agent."},
 	} {
 		at := slices.Index(args, pair[0])
 		if at < 0 || at+1 >= len(args) || args[at+1] != pair[1] {

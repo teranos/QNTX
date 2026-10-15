@@ -47,9 +47,9 @@ type QNTXServer struct {
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes
 	nodeDID             *nodedid.Handler      // node's decentralized identity
-	harnessBinaries     harnessesHeld         // Each harness the ROOT agent runs in, as this node holds its binary, by the harness's name (ADR-048)
-	rootAgent           *rootAgent            // The ROOT agent this node runs; nil when am.toml names none (ADR-048)
-	noRootAgent         error                 // Why the ROOT agent am.toml names did not start, for whoever speaks to it
+	harnessBinaries     harnessesHeld         // Each harness the Node Agent runs in, as this node holds its binary, by the harness's name (ADR-048)
+	nodeAgent           *rootAgent            // The Node Agent this node runs; nil when am.toml names none (ADR-048)
+	noNodeAgent         error                 // Why the Node Agent am.toml names did not start, for whoever speaks to it
 	namespaceAgents     agentsHeld            // Each namespace agent this node has held, by its purpose (ADR-048)
 	agentsDir           string                // Where agents are kept; empty is ~/.qntx/agents
 	ownURL              string                // Where this node answers on its own machine; empty until it listens

@@ -80,8 +80,8 @@ entity_actors_limit = 64
 # description = "What this node is for."
 
 [agent.root]
-# The ROOT agent (ADR-048): QNTX itself as ROOT talks to it.
-# Named whole or not at all. Default: none, and the node has no ROOT agent.
+# The Node Agent (ADR-048): QNTX itself as ROOT talks to it.
+# Named whole or not at all. Default: none, and the node has no Node Agent.
 # model = 'claude-opus-5-5'
 
 # effort = 'low'

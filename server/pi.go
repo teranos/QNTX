@@ -10,21 +10,21 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// The ROOT agent in Pi, its other harness (ADR-048).
+// The Node Agent in Pi, its other harness (ADR-048).
 // "NOT BE ENTIRELY DEPENDENT ON ONE HARNESS"
 
 // piGatewayProvider is what Pi calls the node's gateway among its providers.
 const piGatewayProvider = "qntx"
 
-// piHarness is the ROOT agent in Pi.
+// piHarness is the Node Agent in Pi.
 func (s *QNTXServer) piHarness() *harness {
 	named := func() appcfg.PiConfig { return s.deps.cfg.Agent.Root.Pi }
 	return &harness{
 		name: "pi", called: "Pi", file: piSessionFile,
-		description: "The ROOT agent in Pi: the same agent as in Claude Code, in its other harness and a session of its own.",
-		sayDoes:     "Says something to the ROOT agent in Pi and gives what it answered. It is its session in Pi, beside the one in Claude Code, read with pi session.",
-		amDoes:      "Who the ROOT agent is in Pi and how the node runs it there.",
-		sessionDoes: "The ROOT agent's session in Pi, whole: everything said to it there, as a transcript.",
+		description: "The Node Agent in Pi: the same agent as in Claude Code, in its other harness and a session of its own.",
+		sayDoes:     "Says something to the Node Agent in Pi and gives what it answered. It is its session in Pi, beside the one in Claude Code, read with pi session.",
+		amDoes:      "Who the Node Agent is in Pi and how the node runs it there.",
+		sessionDoes: "The Node Agent's session in Pi, whole: everything said to it there, as a transcript.",
 		sayAnswer:   "protocol.PiSaid",
 		amAnswer:    "protocol.PiAm",
 		named:       func() bool { return named().Named() },
@@ -44,12 +44,12 @@ func (s *QNTXServer) piHarness() *harness {
 	}
 }
 
-// thereIsNoPi is why the ROOT agent cannot be spoken to in Pi on this node.
+// thereIsNoPi is why the Node Agent cannot be spoken to in Pi on this node.
 func (s *QNTXServer) thereIsNoPi() *protocol.Refusal {
-	if s.rootAgent == nil {
-		return s.thereIsNoRootAgent()
+	if s.nodeAgent == nil {
+		return s.thereIsNoNodeAgent()
 	}
-	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the ROOT agent ([agent.root.pi]), so it runs in Claude Code alone"}
+	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the Node Agent ([agent.root.pi]), so it runs in Claude Code alone"}
 }
 
 // piPart is Pi's part of one turn.
@@ -89,7 +89,7 @@ func (s *QNTXServer) piSaid(agent *rootAgent, named appcfg.PiConfig, binary, ses
 		System: agent.isSaidToBe(), Env: env,
 	}
 	if s.ownURL != "" {
-		said.MCP = []pi.MCPServer{{Name: rootAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
+		said.MCP = []pi.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
 		said.Provider = &pi.Provider{
 			Name: piGatewayProvider, BaseURL: s.ownURL + "/api/" + named.Gateway + "/v1",
 			Key: agent.token, Models: []string{named.Model},

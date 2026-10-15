@@ -83,7 +83,7 @@ export function registerDefaultElements(hasCanvas: boolean = true): void {
     // Ground Element — aware of anything Ground; the sessions it recorded, each opened as a Transcript
     tray.add(createGroundElement());
 
-    // ✻ — the ROOT agent: said to, and read as the session it continues (ADR-048)
+    // ✻ — the Node Agent: said to, and read as the session it continues (ADR-048)
     tray.add(createClaudeElement());
     tray.add(createPiElement());
 
