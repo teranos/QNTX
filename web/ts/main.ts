@@ -54,6 +54,7 @@ import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts'
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { tray } from '@teranos/elements';
 import { configureElements } from '@teranos/elements';
+import { MELDABILITY } from './components/element/meld/meldability';
 import { canvasToScreen, screenToCanvas, getTransform } from './components/element/canvas/canvas-pan.ts';
 import { isElementSelected, getSelectedElementIds } from './components/element/canvas/selection.ts';
 import { addComposition, removeComposition, findCompositionByElement } from './state/compositions.ts';
@@ -440,6 +441,8 @@ async function init(): Promise<void> {
             findCompositionByElement: (elementId) => findCompositionByElement(elementId),
             flushSync: () => canvasSyncQueue.flush(),
         },
+        // Which kinds meld is QNTX's to say since @teranos/elements 1.18.0.
+        meldability: MELDABILITY,
         // The resting dot's size is the package's own since 1.12.0: 13px on a
         // phone, 15px up to 900px, 10px above, the sizes this passed.
     });

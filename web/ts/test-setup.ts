@@ -144,3 +144,8 @@ if (USE_JSDOM) {
         globalThis.CSS = { escape: (s: string) => s.replace(/([^\w-])/g, '\\$1') };
     }
 }
+
+// Which kinds meld is QNTX's to say (main.ts); a test that melds is told the same.
+const { configureElements } = await import('@teranos/elements');
+const { MELDABILITY } = await import('./components/element/meld/meldability');
+configureElements({ meldability: MELDABILITY });
