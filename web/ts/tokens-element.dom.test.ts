@@ -66,7 +66,7 @@ describe('Access tokens element rows', () => {
         ]);
 
         const label = container.querySelector<HTMLElement>('tbody td');
-        expect(label?.textContent).toBe('laptop-cron');
+        expect(label?.firstChild?.textContent).toBe('laptop-cron');
         expect(label?.title).toBe('press to open this token');
     });
 });

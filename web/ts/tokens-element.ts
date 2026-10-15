@@ -7,7 +7,7 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { createTable, tray } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { createGhostButton } from './components/button';
 import { openTokenMintElement } from './token-mint-element';
@@ -15,6 +15,7 @@ import { openTokenElement } from './token-element';
 import { log, SEG } from './logger';
 import { person } from './self-person';
 import { long, spanBetween } from './span';
+import { stacked } from './table-cell';
 
 interface TokenInfo {
     id: string;
@@ -150,10 +151,8 @@ function statusPill(t: TokenInfo, now: Date): HTMLTableCellElement {
 /** Whether the list shows only the tokens that still work. */
 let liveOnly = false;
 
-/** The Status header, and the switch in it that hides what no longer works. */
-function statusHeader(onToggle: () => void): HTMLTableCellElement {
-    const th = document.createElement('th');
-    th.append('Status ');
+/** The switch in the Status header that hides what no longer works. */
+function liveOnlyToggle(onToggle: () => void): HTMLButtonElement {
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'tokens-live-only';
@@ -171,8 +170,7 @@ function statusHeader(onToggle: () => void): HTMLTableCellElement {
         liveOnly = !liveOnly;
         onToggle();
     });
-    th.appendChild(toggle);
-    return th;
+    return toggle;
 }
 
 /** Exported for tests. Revoking and enabling are the token element's: a row is
@@ -188,61 +186,39 @@ export function renderList(container: HTMLElement, tokens: TokenInfo[], now = ne
         return;
     }
 
-    const table = document.createElement('table');
-    table.className = 'element-table tokens-table';
-
-    const thead = document.createElement('thead');
-    const headings = document.createElement('tr');
-    for (const name of ['Label', 'Kind', 'Owner', 'DID', 'Namespace', 'Created']) {
-        const th = document.createElement('th');
-        th.textContent = name;
-        headings.appendChild(th);
-    }
-    headings.appendChild(statusHeader(() => { renderList(container, tokens, now); }));
-    thead.appendChild(headings);
-    table.appendChild(thead);
-
-    function cell(text: string, className = '', title = ''): HTMLTableCellElement {
-        const td = document.createElement('td');
-        td.className = className;
-        td.textContent = text;
-        if (title) td.title = title;
-        return td;
-    }
-
-    const tbody = document.createElement('tbody');
+    // "TABLES BEING MAX 4 col": the label carries the kind and the namespaces
+    // it acts in, and the owner the day it was minted.
+    const rows = [];
     for (const t of tokens) {
         // What a client issued, an access token each hour and a refresh token
         // beside it, is listed in the client's element.
         if (t.client_did) continue;
         if (liveOnly && ended(t, now)) continue;
-        const tr = document.createElement('tr');
 
-        const label = document.createElement('td');
-        label.textContent = t.label;
+        const label = stacked(t.label, `${t.level || '—'} · ${t.namespaces?.length ? t.namespaces.join(', ') : '—'}`);
         // The label is the way in to the token's own element, where it is
         // revoked and enabled.
         label.style.cursor = 'pointer';
         label.title = 'press to open this token';
         label.addEventListener('click', () => { openTokenElement(t.id, t.label); });
-        tr.appendChild(label);
 
-        tr.appendChild(cell(t.level || '—'));
         // Tokens are owned by someone: the name, and on the hover the identity
         // it was minted under.
-        tr.appendChild(cell(owner(t), '', t.minted_by || ''));
+        // "Created date should not also have to include time, unless hover"
+        const minted = stacked(owner(t), day(t.created_at), fmt(t.created_at));
+        minted.title = t.minted_by || '';
 
         // The DID is how a token's own attestations are found (?actor=).
-        tr.appendChild(didCell(t.did));
-        tr.appendChild(cell(t.namespaces?.length ? t.namespaces.join(', ') : '—'));
         // What a token may read and write is not on the token: the roles its
         // name holds say, through their lines (ADR-034).
-        tr.appendChild(cell(day(t.created_at), 'element-time', fmt(t.created_at)));
-        tr.appendChild(statusPill(t, now));
-
-        tbody.appendChild(tr);
+        rows.push({ cells: [label, minted, didCell(t.did), statusPill(t, now)] as const });
     }
-    table.appendChild(tbody);
+
+    const table = createTable('tokens', ['Label', 'Owner', 'DID', 'Status'], rows);
+    // "I wish the status col would give me a way to filter out everything revoked and expired."
+    const statusHead = table.tHead?.rows[0].cells[3];
+    if (!statusHead) throw new Error('the tokens table has no Status head');
+    statusHead.append(' ', liveOnlyToggle(() => { renderList(container, tokens, now); }));
     container.appendChild(table);
 }
 

@@ -46,7 +46,8 @@ describe('one column says whether a token is on and when it was last used', () =
             const container = document.createElement('div');
             renderList(container, [token()], NOW);
             const headers = [...container.querySelectorAll('th')].map(th => th.firstChild?.textContent?.trim());
-            expect(headers).toEqual(['Label', 'Kind', 'Owner', 'DID', 'Namespace', 'Created', 'Status']);
+            // "TABLES BEING MAX 4 col": the kind and namespaces under the label, the day under the owner.
+            expect(headers).toEqual(['Label', 'Owner', 'DID', 'Status']);
         });
 
         test('an active token nobody has used reads active, never used', () => {
@@ -121,19 +122,19 @@ describe('what a row says', () => {
         // "it should just say Owner, tokens are Owned by someone."
         test('the owner is the name of whoever minted it, and the identity is on the hover', () => {
             const cells = row({ minted_by_display_name: 'root' });
-            expect(cells.Owner.textContent).toBe('root');
+            expect(cells.Owner.firstChild?.textContent).toBe('root');
             expect(cells.Owner.title).toBe('apple:001750');
         });
 
-        test('the kind is a column of its own', () => {
-            expect(row({ level: 'REFRESH' }).Kind.textContent).toBe('REFRESH');
+        test('the kind and the namespaces are under the label', () => {
+            expect(row({ level: 'REFRESH' }).Label.querySelector('.element-under')?.textContent).toBe('REFRESH · clean');
         });
 
         // "Created date should not also have to include time, unless hover"
         test('created is the day, and the time is on the hover', () => {
-            const cells = row();
-            expect(cells.Created.textContent).toBe('2026-09-14');
-            expect(cells.Created.title).toBe('2026-09-14 00:43:56');
+            const created = row().Owner.querySelector<HTMLElement>('.element-under');
+            expect(created?.textContent).toBe('2026-09-14');
+            expect(created?.title).toBe('2026-09-14 00:43:56');
         });
 
         // "same for expired date, does not need to show immediately, unless hover"
@@ -177,8 +178,8 @@ test('a token a client issued is listed under its client, not here', () => {
         token({ id: 'AT_3', label: 'claude.ai-default', level: 'ROOT', client_did: 'did:key:zClient' }),
         token({ id: 'AT_4', label: 'cron', level: 'ATTESTOR' }),
     ], NOW);
-    const kinds = [...container.querySelectorAll('tbody tr')].map(tr => tr.children[1].textContent);
-    expect(kinds).toEqual(['OAUTH', 'ATTESTOR']);
+    const kinds = [...container.querySelectorAll('tbody tr td:first-child .element-under')].map(u => u.textContent);
+    expect(kinds).toEqual(['OAUTH · clean', 'ATTESTOR · clean']);
 });
 
 // "I wish the status col would give me a way to filter out everything revoked and expired."
@@ -189,7 +190,7 @@ test('the switch in the Status header hides what no longer works, and shows it a
         token({ id: 'AT_2', label: 'revoked', revoked_at: before(DAY) }),
         token({ id: 'AT_3', label: 'expired', expires_at: before(HOUR) }),
     ], NOW);
-    const labels = () => [...container.querySelectorAll('tbody tr td:first-child')].map(td => td.textContent);
+    const labels = () => [...container.querySelectorAll('tbody tr td:first-child')].map(td => td.firstChild?.textContent);
     expect(labels()).toEqual(['live', 'revoked', 'expired']);
 
     container.querySelector<HTMLButtonElement>('.tokens-live-only')!.click();
