@@ -117,7 +117,7 @@ Key technical decisions and why:
 - **Attestations as the primitive** — not documents, not rows, not objects. Structured claims that compose, sync, and verify.
 - **Local-first** — SQLite on your machine, llama.cpp on your machine. Cloud is opt-in, not required.
 - **Core is minimal** — [ATS](https://github.com/teranos/QNTX/blob/main/ats/README.md) (incl. ⋈ ax), DB, ≡ config, ꩜ Pulse. Everything else is a plugin over gRPC.
-- **Rust/WASM for cross-runtime logic** — parser, fuzzy engine, Merkle tree. One implementation, three runtimes (server via wazero, browser via wasm-bindgen, native tests via cargo).
+- **Rust for cross-runtime logic** — parsing, filters, query resolution, watcher matching, identity, signing. One implementation, reached by the server through wazero and cgo, by the browser through wasm-bindgen.
 See [Design Philosophy](design-philosophy.md) and [Release](release.md).
 
 ---
@@ -131,17 +131,14 @@ See [Design Philosophy](design-philosophy.md) and [Release](release.md).
 │  internal/config/  Configuration (5-layer precedence)│
 │  pulse/     Async execution + scheduling     │
 │  server/    HTTP, WebSocket                  │
-│  sync/      Merkle reconciliation            │
 └──────────────────────────────────────────────┘
          │                    │
     gRPC (plugins)      WASM (ats)
          │                    │
 ┌────────┴────────┐  ┌───────┴────────────────┐
 │ Domain plugins  │  │ Rust crates            │
-│ (Go, Python,    │  │  ats (parser,    │
-│  Rust)          │  │   fuzzy, sync, merkle) │
-│                 │  │  qntx-proto (types)    │
-│                 │  │  ats-wasm (bindings)  │
+│ (Go, Python,    │  │  qntx-proto (types)    │
+│  Rust)          │  │  ats-wasm (bindings)   │
 └─────────────────┘  └────────────────────────┘
 ```
 
@@ -307,7 +304,7 @@ See [Design Philosophy](design-philosophy.md).
 | Cold start — empty store = no value | Poor first-run experience | Prioritize connectors: git, files, APIs |
 | Complexity budget — ATS + Pulse + Elements + Sync each carry weight | Layers compound instead of compose | Each layer independently useful, clear contracts |
 | Single steward — bus factor of one | Project continuity | Community formation, honest docs, public good model |
-| Parser migration — ATS parser moving Go → Rust/WASM | Temporary dual implementations | ADR-005; WASM already serving browser |
+| ATS parser is Rust's alone | A build without `qntxwasm` parses nothing (`ats/parser/dispatch_default.go`) | ADR-005; the node reaches it through wazero, the browser through wasm-bindgen |
 
 ---
 
