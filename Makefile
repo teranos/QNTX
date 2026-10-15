@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-spawn-write nil-writetest-web test-jsdom test test-suite test-parquet test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-web sacred-go sacred-rs sacred-spawn-write nil-writetest-web test-jsdom test test-suite test-parquet test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -59,27 +59,41 @@ says: ## Write what the specs and our protocol say of themselves for the parity 
 # ground rite that declares no catch is given 1, which means "not yet".
 # The Go half was the whole of it, so a red Rust tree shipped while CI was
 # still going red about it. Both halves, one gate.
-sacred-error: ## Fail on any dropped failure this branch adds (.golangci.yml, clippy)
-	@command -v nix >/dev/null 2>&1 || { echo "sacred-error needs nix: the linters are pinned in flake.nix" >&2; exit 1; }
-	@# The web bans, the TypeScript half of nilcheck among them.
+SACRED_NIX = command -v nix >/dev/null 2>&1 || { echo "$@ needs nix: the linters are pinned in flake.nix" >&2; exit 1; }
+
+# tagcheck first: golangci reads only what its build-tags list lets it, so a
+# wrong list makes everything after it a pass over less code than ships.
+SACRED_GO_BRANCH = go run ./internal/tools/tagcheck; \
+	golangci-lint run --issues-exit-code 2 --new-from-merge-base origin/main ./...
+# spawncheck and nilcheck last, and over the whole tree rather than the
+# branch — the count each holds is a debt, and merge-base cannot see a debt.
+SACRED_GO = $(SACRED_GO_BRANCH); \
+	go run ./internal/tools/spawncheck; \
+	go run ./internal/tools/nilcheck
+
+# The clippy exclusions are the ones .github/workflows/rs.yml names —
+# ats-duckdb needs libduckdb, qntx-reduce-plugin builds only through Nix.
+SACRED_RS = export RUSTFLAGS=-Dwarnings; \
+	cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets || exit 2; \
+	cargo clippy --package ats-duckdb --all-targets || exit 2
+
+# The web bans, the TypeScript half of nilcheck among them.
+sacred-web: ## Fail on any dropped failure this branch adds (eslint)
 	@$(MAKE) --no-print-directory lint
-	@# One shell for all three: entering it costs ~55s and the linting itself
-	@# costs five, so three entries would be two minutes of flake evaluation.
-	@# The clippy exclusions are the ones .github/workflows/rs.yml names —
-	@# ats-duckdb needs libduckdb, qntx-reduce-plugin builds only through Nix.
-	@# tagcheck first: golangci reads only what its build-tags list lets it, so a
-	@# wrong list makes everything after it a pass over less code than ships.
-	@# spawncheck and nilcheck last, and over the whole tree rather than the
-	@# branch — the count each holds is a debt, and merge-base cannot see a debt.
-	@nix develop .#default --command bash -c '\
-		set -e; \
-		go run ./internal/tools/tagcheck; \
-		golangci-lint run --issues-exit-code 2 --new-from-merge-base origin/main ./...; \
-		go run ./internal/tools/spawncheck; \
-		go run ./internal/tools/nilcheck; \
-		export RUSTFLAGS=-Dwarnings; \
-		cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets || exit 2; \
-		cargo clippy --package ats-duckdb --all-targets || exit 2'
+
+sacred-go: ## Fail on any dropped failure this branch adds (.golangci.yml)
+	@$(SACRED_NIX)
+	@nix develop .#default --command bash -c 'set -e; $(SACRED_GO)'
+
+sacred-rs: ## Fail on any dropped failure this branch adds (clippy)
+	@$(SACRED_NIX)
+	@nix develop .#default --command bash -c 'set -e; $(SACRED_RS)'
+
+# One shell for Go and Rust: entering it costs ~55s and the linting itself
+# costs five, so an entry per half would be flake evaluation twice.
+sacred-error: sacred-web ## sacred-web, sacred-go and sacred-rs
+	@$(SACRED_NIX)
+	@nix develop .#default --command bash -c 'set -e; $(SACRED_GO); $(SACRED_RS)'
 
 # The baseline falls when a goroutine starts going through sacred. Running this
 # is how that lands as a diff somebody can read, which is the whole mechanism.
