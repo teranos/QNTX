@@ -80,6 +80,7 @@ impl PostgresError {
             PostgresError::Store(e) => match e {
                 ats::storage::StoreError::AlreadyExists(_) => "already-exists",
                 ats::storage::StoreError::NotFound(_) => "not-found",
+                ats::storage::StoreError::Unwritable(_) => qntx_ffi_common::store::UNWRITABLE,
                 ats::storage::StoreError::InvalidData(_) => "invalid-data",
                 ats::storage::StoreError::Backend(_) => "backend",
                 ats::storage::StoreError::Query(_) => "query",
