@@ -69,29 +69,21 @@ path = "am.db"
 		assert.Contains(t, ConfigSources["server.port"].Path, "config.toml")
 	})
 
-	t.Run("Default values are tracked", func(t *testing.T) {
-		// Reset global state
+	t.Run("A key nothing said is not tracked", func(t *testing.T) {
 		Reset()
 		defer Reset()
 
-		// Create empty temp directory (no configs)
 		tempDir := t.TempDir()
 		os.Chdir(tempDir)
 		os.Setenv("HOME", tempDir)
 		defer os.Unsetenv("HOME")
 
-		// Load configuration (all defaults)
 		cfg, err := Load()
 		require.NoError(t, err)
 
-		// Check a known default
-		assert.Equal(t, 1, cfg.Pulse.TickerIntervalSeconds)
-
-		// Verify it's tracked as default
-		source, exists := ConfigSources["pulse.ticker_interval_seconds"]
-		assert.True(t, exists, "Default should be tracked")
-		assert.Equal(t, SourceDefault, source.Source)
-		assert.Equal(t, "", source.Path, "Defaults have no path")
+		assert.False(t, cfg.Said("pulse.ticker_interval_seconds"))
+		_, tracked := ConfigSources["pulse.ticker_interval_seconds"]
+		assert.False(t, tracked, "a key nothing said has a source")
 	})
 
 	t.Run("Multiple files at same level", func(t *testing.T) {

@@ -335,38 +335,23 @@ cooldown_seconds = 300
 	})
 }
 
-// TestSourceTrackingDefaults verifies that default values are properly tracked
-func TestSourceTrackingDefaults(t *testing.T) {
-	// Reset global state
+// A config that says nothing has nothing to list: no key appears with a value
+// nobody gave it.
+func TestAKeyNothingSaidIsNotListed(t *testing.T) {
 	Reset()
 	defer Reset()
 
-	// Create empty temp directory (no config files)
 	tempDir := t.TempDir()
 	os.Chdir(tempDir)
 	os.Setenv("HOME", tempDir)
 	defer os.Unsetenv("HOME")
 
-	// Load configuration (should use all defaults)
 	_, err := Load()
 	require.NoError(t, err)
 
-	// Get introspection
 	intro, err := GetConfigIntrospection()
 	require.NoError(t, err)
-
-	// Find a known default setting
-	var ticker *SettingInfo
-	for i := range intro.Settings {
-		if intro.Settings[i].Key == "pulse.ticker_interval_seconds" {
-			ticker = &intro.Settings[i]
-			break
-		}
+	for _, setting := range intro.Settings {
+		assert.NotEqual(t, "pulse.ticker_interval_seconds", setting.Key, "a key nothing said is listed as %v", setting.Value)
 	}
-
-	// Verify it's marked as default with no path
-	require.NotNil(t, ticker, "Default pulse.ticker_interval_seconds should be present")
-	assert.Equal(t, SourceDefault, ticker.Source)
-	assert.Equal(t, "", ticker.SourcePath, "Default values should have empty source path")
-	assert.Equal(t, 1, ticker.Value, "Should have the default value")
 }

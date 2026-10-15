@@ -95,9 +95,6 @@ func (s *QNTXServer) projectToCanvas(embeddingID string, embedding []float32) {
 	}
 
 	methods := appcfg.GetStringSlice("embeddings.projection_methods")
-	if len(methods) == 0 {
-		methods = []string{"umap"}
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

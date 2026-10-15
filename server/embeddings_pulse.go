@@ -21,9 +21,6 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	projectCtx := projectctx.Namespace()
 
 	minClusterSize := cfg.Embeddings.MinClusterSize
-	if minClusterSize <= 0 {
-		minClusterSize = 5
-	}
 
 	modelNames := serverembeddings.ModelNamesFromPaths(appcfg.GetStringSlice("cyrnel.models"))
 
@@ -113,9 +110,6 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 	}
 
 	methods := cfg.Embeddings.ProjectionMethods
-	if len(methods) == 0 {
-		methods = []string{"umap"}
-	}
 
 	modelNames := serverembeddings.ModelNamesFromPaths(appcfg.GetStringSlice("cyrnel.models"))
 

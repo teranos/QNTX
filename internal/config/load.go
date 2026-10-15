@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,6 +40,7 @@ func Load() (*Config, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 	config.fromOneRoot(v)
+	config.record(v)
 
 	globalConfig = &config
 	return globalConfig, nil
@@ -67,6 +69,7 @@ func LoadWithViper(v *viper.Viper) (*Config, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 	config.fromOneRoot(v)
+	config.record(v)
 	return &config, nil
 }
 
@@ -75,9 +78,6 @@ func LoadFromFile(configPath string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigFile(configPath)
 	v.SetConfigType("toml")
-
-	// Set defaults but don't bind environment variables for this specific load
-	SetDefaults(v)
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, errors.Wrapf(err, "failed to read config file %s", configPath)
@@ -88,6 +88,7 @@ func LoadFromFile(configPath string) (*Config, error) {
 		return nil, errors.Wrapf(err, "failed to unmarshal config from %s", configPath)
 	}
 	config.fromOneRoot(v)
+	config.record(v)
 
 	return &config, nil
 }
@@ -104,7 +105,7 @@ func Reset() {
 	configSourcesMu.Unlock()
 }
 
-// initViper initializes Viper with configuration sources and defaults
+// initViper initializes Viper with its configuration sources
 func initViper() (*viper.Viper, error) {
 	viperOnce.Do(func() {
 		v := viper.New()
@@ -114,11 +115,14 @@ func initViper() (*viper.Viper, error) {
 		v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 		v.AutomaticEnv()
 
+		// Every key the Config reads reaches it from its environment variable.
+		if err := bindEveryKey(v); err != nil {
+			viperInitErr = err
+			return
+		}
+
 		// Bind specific sensitive configuration values to environment variables
 		BindSensitiveEnvVars(v)
-
-		// Set defaults first
-		SetDefaults(v)
 
 		// Manually merge configs in precedence order: system -> user -> project -> env vars
 		if err := mergeConfigFiles(v); err != nil {
@@ -253,24 +257,31 @@ func mergeConfigFiles(v *viper.Viper) error {
 
 	// Process each config file and track sources
 	for _, cf := range configFiles {
-		if _, err := os.Stat(cf.path); err == nil {
-			// Config file exists, merge it
-			tempViper := viper.New()
-			tempViper.SetConfigFile(cf.path)
-			tempViper.SetConfigType("toml")
+		// A file that is not there said nothing. One that is there and cannot
+		// be looked at is not the same as one that is not there.
+		if _, err := os.Stat(cf.path); errors.Is(err, fs.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return errors.Wrapf(err, "the config at %s cannot be looked at", cf.path)
+		}
+		tempViper := viper.New()
+		tempViper.SetConfigFile(cf.path)
+		tempViper.SetConfigType("toml")
 
-			if err := tempViper.ReadInConfig(); err == nil {
-				// Track sources for all settings in this file
-				allSettings := tempViper.AllSettings()
-				TrackNestedSources(allSettings, "", cf.source, cf.path)
+		// A file that is there and does not read is not a file that said
+		// nothing: the node is not started as if it had not been written.
+		if err := tempViper.ReadInConfig(); err != nil {
+			return errors.Wrapf(err, "the config at %s does not read", cf.path)
+		}
+		// Track sources for all settings in this file
+		allSettings := tempViper.AllSettings()
+		TrackNestedSources(allSettings, "", cf.source, cf.path)
 
-				// Merge this config into the main viper instance
-				// Using MergeConfigMap preserves Viper's natural precedence order,
-				// allowing environment variables to override config files properly
-				if err := v.MergeConfigMap(allSettings); err != nil {
-					return errors.Wrapf(err, "failed to merge config from %s", cf.path)
-				}
-			}
+		// Merge this config into the main viper instance
+		// Using MergeConfigMap preserves Viper's natural precedence order,
+		// allowing environment variables to override config files properly
+		if err := v.MergeConfigMap(allSettings); err != nil {
+			return errors.Wrapf(err, "failed to merge config from %s", cf.path)
 		}
 	}
 

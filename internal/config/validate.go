@@ -29,7 +29,7 @@ var KnownSentryLevels = map[string]bool{
 // Validate checks that the configuration is valid
 func (c *Config) Validate() error {
 	// Storage backend must be one of the known values (ADR-023).
-	if !KnownStorageBackends[c.Storage.Backend] {
+	if c.Said("storage.backend") && !KnownStorageBackends[c.Storage.Backend] {
 		return errors.Newf("storage.backend must be one of [sqlite, parquet], got %q", c.Storage.Backend)
 	}
 
@@ -44,9 +44,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Server port: 0 is invalid (omit for default), negative is invalid
+	// Server port: the node listens on one, and 0 is none
 	if c.Server.Port != nil && *c.Server.Port == 0 {
-		return errors.New("server.port cannot be 0 (omit for default port 8770)")
+		return errors.New("server.port cannot be 0: say the port the node listens on")
 	}
 	if c.Server.Port != nil && *c.Server.Port < 0 {
 		return errors.Newf("server.port must be positive, got %d", *c.Server.Port)
@@ -127,15 +127,15 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Bounded storage limits: must be positive (omit for defaults: 32/64/64)
-	if c.Storage.Sqlite.BoundedStorage.ActorContextLimit <= 0 {
-		return errors.Newf("storage.sqlite.bounded_storage.actor_context_limit must be > 0, got %d (omit for default 32)", c.Storage.Sqlite.BoundedStorage.ActorContextLimit)
+	// Bounded storage limits: positive where said
+	if c.Said("storage.sqlite.bounded_storage.actor_context_limit") && c.Storage.Sqlite.BoundedStorage.ActorContextLimit <= 0 {
+		return errors.Newf("storage.sqlite.bounded_storage.actor_context_limit must be > 0, got %d", c.Storage.Sqlite.BoundedStorage.ActorContextLimit)
 	}
-	if c.Storage.Sqlite.BoundedStorage.ActorContextsLimit <= 0 {
-		return errors.Newf("storage.sqlite.bounded_storage.actor_contexts_limit must be > 0, got %d (omit for default 64)", c.Storage.Sqlite.BoundedStorage.ActorContextsLimit)
+	if c.Said("storage.sqlite.bounded_storage.actor_contexts_limit") && c.Storage.Sqlite.BoundedStorage.ActorContextsLimit <= 0 {
+		return errors.Newf("storage.sqlite.bounded_storage.actor_contexts_limit must be > 0, got %d", c.Storage.Sqlite.BoundedStorage.ActorContextsLimit)
 	}
-	if c.Storage.Sqlite.BoundedStorage.EntityActorsLimit <= 0 {
-		return errors.Newf("storage.sqlite.bounded_storage.entity_actors_limit must be > 0, got %d (omit for default 64)", c.Storage.Sqlite.BoundedStorage.EntityActorsLimit)
+	if c.Said("storage.sqlite.bounded_storage.entity_actors_limit") && c.Storage.Sqlite.BoundedStorage.EntityActorsLimit <= 0 {
+		return errors.Newf("storage.sqlite.bounded_storage.entity_actors_limit must be > 0, got %d", c.Storage.Sqlite.BoundedStorage.EntityActorsLimit)
 	}
 
 	// Embeddings intervals: nil = not scheduled (default), must be positive when set

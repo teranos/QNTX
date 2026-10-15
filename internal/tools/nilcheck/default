@@ -1,7 +1,7 @@
 # config keys that turn into a value when left out, per file. Debt: each number may fall and may not rise.
 # Instead: a missing key is refused at load, or the field is omitted and nothing runs.
-# 63 in 3 files.
+# 2 in 2 files.
+# From 1267: "absence is absence": SetDefaults and its 61 are gone. A key left out is refused where the node needs it, or what it names does not run.
 
 1	cmd/qntx/commands/database_parquet.go
-61	internal/config/defaults.go
 1	server/namespaces/universe.go

@@ -6,7 +6,6 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/watcher"
-	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/namespaces"
 	errors "github.com/teranos/sacred-error"
 )
@@ -72,7 +71,7 @@ func (s *QNTXServer) startEngineIn(u *namespaces.Universe) error {
 		before.Stop()
 	}
 
-	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", config.GetServerPort())
+	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", s.port)
 	engine := watcher.NewEngine(u.Sqlite(), reader, apiBaseURL, s.logger.With("namespace", name))
 	engine.SetWatcherStore(u.Watchers())
 	engine.SetAvailableElementTypes([]string{"prompt", "se"})

@@ -190,20 +190,6 @@ func TestServerConcurrentRegistration(t *testing.T) {
 	}
 }
 
-// Test port availability checking
-func TestIsPortAvailable(t *testing.T) {
-	// Port 0 should always be available (OS picks)
-	if !isPortAvailable(0) {
-		t.Error("Port 0 should be available")
-	}
-
-	// Very high port numbers should generally be available
-	if !isPortAvailable(65432) {
-		// This might fail on some systems, but is unlikely
-		t.Log("Port 65432 not available (this may be environment-specific)")
-	}
-}
-
 // Test WebSocket upgrade handler
 func TestHandleWebSocket(t *testing.T) {
 	store, db := createTestStore(t)

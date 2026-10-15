@@ -8,30 +8,24 @@ import (
 	"github.com/spf13/viper"
 )
 
-func TestLoad_Defaults(t *testing.T) {
-	// Create isolated viper instance without loading user/system config
-	v := viper.New()
-	SetDefaults(v)
-
-	// Load config from isolated viper
-	cfg, err := LoadWithViper(v)
+// "absence is absence": a config that says nothing has nothing in it, and
+// nothing reads as said.
+func TestAConfigThatSaysNothingHasNothing(t *testing.T) {
+	cfg, err := LoadWithViper(viper.New())
 	if err != nil {
 		t.Fatalf("LoadWithViper() failed: %v", err)
 	}
-
-	// Check default values are applied
-	if cfg.Storage.Sqlite.Path != "qntx.db" {
-		t.Errorf("expected default storage.sqlite.path 'qntx.db', got %q", cfg.Storage.Sqlite.Path)
+	if port, said := cfg.Port(); said {
+		t.Errorf("a config that said nothing has port %d", port)
 	}
-
-	if cfg.Server.Port == nil || *cfg.Server.Port != DefaultServerPort {
-		t.Errorf("expected default port %d, got %v", DefaultServerPort, cfg.Server.Port)
+	for _, key := range []string{"storage.backend", "storage.sqlite.path", "pulse.workers", "server.rate_limit.auth_burst"} {
+		if cfg.Said(key) {
+			t.Errorf("%s reads as said in a config that said nothing", key)
+		}
 	}
-
-	if cfg.Pulse.Workers != 1 {
-		t.Errorf("expected default workers 1, got %d", cfg.Pulse.Workers)
+	if cfg.Storage.Backend != "" || cfg.Storage.Sqlite.Path != "" {
+		t.Errorf("a config that said nothing names a store: %q at %q", cfg.Storage.Backend, cfg.Storage.Sqlite.Path)
 	}
-
 }
 
 func TestValidate_ZeroValues(t *testing.T) {
@@ -86,34 +80,6 @@ func TestValidate_ZeroValues(t *testing.T) {
 			err := tt.config.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestSetDefaults(t *testing.T) {
-	v := viper.New()
-	SetDefaults(v)
-
-	// Verify critical defaults are set
-	tests := []struct {
-		key      string
-		expected any
-	}{
-		{"storage.backend", "sqlite"},
-		{"storage.sqlite.path", "qntx.db"},
-		{"server.port", DefaultServerPort},
-		{"server.log_theme", "everforest"},
-		{"pulse.workers", 1},
-		{"pulse.ticker_interval_seconds", 1},
-		{"ax.default_actor", "ax@user"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.key, func(t *testing.T) {
-			got := v.Get(tt.key)
-			if got != tt.expected {
-				t.Errorf("default %s = %v, want %v", tt.key, got, tt.expected)
 			}
 		})
 	}
@@ -186,41 +152,8 @@ func TestFindProjectConfig(t *testing.T) {
 	})
 }
 
-func TestGetServerPort(t *testing.T) {
-	// Create isolated viper instance without loading user/system/project config
-	v := viper.New()
-	SetDefaults(v)
-
-	cfg, err := LoadWithViper(v)
-	if err != nil {
-		t.Fatalf("LoadWithViper() failed: %v", err)
-	}
-
-	// Test that default port is set correctly
-	if cfg.Server.Port == nil || *cfg.Server.Port != DefaultServerPort {
-		t.Errorf("expected default port %d, got %v", DefaultServerPort, cfg.Server.Port)
-	}
-}
-
-func TestGetDatabasePath(t *testing.T) {
-	// Create isolated viper instance without loading user/system config
-	v := viper.New()
-	SetDefaults(v)
-
-	cfg, err := LoadWithViper(v)
-	if err != nil {
-		t.Fatalf("LoadWithViper() failed: %v", err)
-	}
-
-	path := cfg.GetDatabasePath()
-	if path != "qntx.db" {
-		t.Errorf("expected default path 'qntx.db', got %q", path)
-	}
-}
-
 func TestGetServerAllowedOrigins_IncludesWildcardPorts(t *testing.T) {
 	v := viper.New()
-	SetDefaults(v)
 
 	cfg, err := LoadWithViper(v)
 	if err != nil {
@@ -258,7 +191,6 @@ func TestGetServerAllowedOrigins_IncludesWildcardPorts(t *testing.T) {
 // showed only that api.q.sbvh.nl did not respond.
 func TestGetServerAllowedOrigins_IncludesEveryAppOrigin(t *testing.T) {
 	v := viper.New()
-	SetDefaults(v)
 
 	cfg, err := LoadWithViper(v)
 	if err != nil {
@@ -352,30 +284,13 @@ func TestValidate_StorageBackend(t *testing.T) {
 					// on backend-value validation only.
 					Parquet: ParquetConfig{Location: "s3://bucket/prefix"},
 				},
+				// Each case says its backend; one left out is RefuseUnsaid's.
+				said: map[string]bool{"storage.backend": true},
 			}
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
-	}
-}
-
-// TestLoad_Defaults_StorageBackend verifies ADR-023: backend defaults to
-// "sqlite" and SQLite-specific config lives under [storage.sqlite].
-func TestLoad_Defaults_StorageBackend(t *testing.T) {
-	v := viper.New()
-	SetDefaults(v)
-
-	cfg, err := LoadWithViper(v)
-	if err != nil {
-		t.Fatalf("LoadWithViper() failed: %v", err)
-	}
-
-	if cfg.Storage.Backend != "sqlite" {
-		t.Errorf("expected default storage backend %q, got %q", "sqlite", cfg.Storage.Backend)
-	}
-	if cfg.Storage.Sqlite.Path != "qntx.db" {
-		t.Errorf("expected default storage.sqlite.path %q, got %q", "qntx.db", cfg.Storage.Sqlite.Path)
 	}
 }

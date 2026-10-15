@@ -1,9 +1,12 @@
 package server
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
 	appcfg "github.com/teranos/QNTX/internal/config"
 )
 
@@ -33,10 +36,18 @@ func TestPublicBindRefusesEmptyPublicOrigin(t *testing.T) {
 }
 
 func TestLoopbackAsksForNothing(t *testing.T) {
-	for _, addr := range []string{"", "127.0.0.1", "::1", "localhost"} {
+	for _, addr := range []string{"127.0.0.1", "::1", "localhost"} {
 		if err := refusePublicDeploy(addr, appcfg.AuthConfig{}); err != nil {
 			t.Fatalf("bind %q is loopback and answered %v", addr, err)
 		}
+	}
+}
+
+// An empty address is no address: it is not loopback, so it is held to what
+// a public bind is held to.
+func TestAnEmptyBindIsNotLoopback(t *testing.T) {
+	if err := refusePublicDeploy("", appcfg.AuthConfig{}); err == nil {
+		t.Fatal("bind \"\" was read as loopback")
 	}
 }
 
@@ -137,22 +148,69 @@ func TestUnparseableOriginRefuses(t *testing.T) {
 
 // "nil is nil"
 
-// Whether a gate stands is said: a config that left auth.enabled out does not
-// start a node, and one that said false does.
+// "absence is absence": a node whose am.toml left out what it runs with does
+// not start, and the refusal names every key left out at once.
+func TestWhatANodeRunsWithIsSaid(t *testing.T) {
+	cfg := loadedFrom(t, "[auth]\nenabled = false\n")
+	err := RefuseUnsaid(cfg)
+	if err == nil {
+		t.Fatal("a config that said only auth.enabled started a node")
+	}
+	for _, key := range []string{"server.port", "storage.backend", "server.rate_limit.auth_burst", "pulse.ticker_interval_seconds"} {
+		if !strings.Contains(err.Error(), key) {
+			t.Errorf("the refusal does not name %s: %v", key, err)
+		}
+	}
+	if strings.Contains(err.Error(), "auth.enabled") {
+		t.Errorf("the refusal names auth.enabled, which was said: %v", err)
+	}
+}
+
+// Whether a gate stands is said, true or false, and leaving it out does not
+// open one.
 func TestAGateLeftOutIsRefused(t *testing.T) {
-	appcfg.Reset()
-	t.Cleanup(appcfg.Reset)
-	t.Cleanup(func() { delete(appcfg.ConfigSources, "auth.enabled") })
-
-	appcfg.ConfigSources["auth.enabled"] = appcfg.SourceInfo{Source: appcfg.SourceDefault}
-	if err := RefuseUnsaidGate(); err == nil {
-		t.Fatal("a config that left auth.enabled out started a node")
+	err := RefuseUnsaid(loadedFrom(t, ""))
+	if err == nil || !strings.Contains(err.Error(), "auth.enabled") {
+		t.Fatalf("a config that left auth.enabled out was not refused for it: %v", err)
 	}
+}
 
-	appcfg.ConfigSources["auth.enabled"] = appcfg.SourceInfo{Source: appcfg.SourceProject, Path: "am.toml"}
-	if err := RefuseUnsaidGate(); err != nil {
-		t.Fatalf("a config that said auth.enabled was refused: %v", err)
+// A gate that stands asks how long its sessions last.
+func TestAGateSaysHowLongASessionLasts(t *testing.T) {
+	err := RefuseUnsaid(loadedFrom(t, "[auth]\nenabled = true\n"))
+	if err == nil || !strings.Contains(err.Error(), "auth.session_expiry_hours") {
+		t.Fatalf("a gate that stands was not asked for its session length: %v", err)
 	}
+}
+
+// The example am.toml is a node that starts: it says everything a node runs
+// with, and what it says holds.
+func TestTheExampleConfigStartsANode(t *testing.T) {
+	example, err := os.ReadFile(filepath.Join("..", "am.example.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := loadedFrom(t, string(example))
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("am.example.toml does not hold: %v", err)
+	}
+	if err := RefuseUnsaid(cfg); err != nil {
+		t.Errorf("am.example.toml leaves out what a node runs with: %v", err)
+	}
+}
+
+func loadedFrom(t *testing.T, amToml string) *appcfg.Config {
+	t.Helper()
+	v := viper.New()
+	v.SetConfigType("toml")
+	if err := v.ReadConfig(strings.NewReader(amToml)); err != nil {
+		t.Fatalf("am.toml did not parse: %v", err)
+	}
+	cfg, err := appcfg.LoadWithViper(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg
 }
 
 // The refusal names the address it read, so a deployment that is public by

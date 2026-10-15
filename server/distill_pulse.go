@@ -116,14 +116,9 @@ func (s *QNTXServer) setupDistillSchedule(cfg *appcfg.Config) {
 	}
 	intervalSeconds := *cfg.Distill.IntervalSeconds
 
+	// Said, since RefuseUnsaid holds a scheduled distill to both.
 	maxAge := time.Duration(cfg.Distill.MaxAgeHours) * time.Hour
-	if maxAge <= 0 {
-		maxAge = 54 * time.Hour
-	}
 	batchSize := cfg.Distill.BatchSize
-	if batchSize <= 0 {
-		batchSize = 500
-	}
 
 	handler := &distillHandler{
 		server:    s,

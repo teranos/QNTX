@@ -21,10 +21,13 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, er
 	if err != nil {
 		return nil, nil, "", nil, errors.Wrap(err, "failed to load config for openDatabase")
 	}
+	if !cfg.Said("storage.backend") {
+		return nil, nil, "", nil, errors.New("storage.backend is not said: am.toml names sqlite or parquet, and no store is opened on a guess")
+	}
 	switch cfg.Storage.Backend {
 	case "parquet":
 		return openParquetDatabase(cfg, dbPath)
-	case "sqlite", "":
+	case "sqlite":
 		return openSqliteDatabase(dbPath)
 	default:
 		return nil, nil, "", nil, errors.Newf("unknown storage backend: %q", cfg.Storage.Backend)
@@ -32,7 +35,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, er
 }
 
 // sqlitePath is the SQLite file a node opens: the one asked for, else the
-// configured one, else qntx.db.
+// configured one. Neither is no file, and none is opened.
 func sqlitePath(dbPath string) (string, error) {
 	if dbPath != "" {
 		return dbPath, nil
@@ -42,7 +45,7 @@ func sqlitePath(dbPath string) (string, error) {
 		return "", errors.Wrapf(err, "failed to get database path")
 	}
 	if path == "" {
-		return "qntx.db", nil
+		return "", errors.New("storage.sqlite.path is not said, and no --db-path or DB_PATH names a file: no store is opened on a guess")
 	}
 	return path, nil
 }

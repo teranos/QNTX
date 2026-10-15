@@ -43,6 +43,7 @@ type QNTXServer struct {
 	store               string                // Configured storage backend, "sqlite" or "parquet" (ADR-023)
 	held                *namespaces.Held      // The node's universes, and the only way to reach one
 	bindAddress         string                // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
+	port                int                   // The port am.toml says the node listens on
 	authHandler         *auth.Handler         // nil when auth.enabled = false
 	authEnabled         bool                  // resolved at init, never changes
 	nodeDID             *nodedid.Handler      // node's decentralized identity

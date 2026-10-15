@@ -89,12 +89,20 @@ func init() {
 }
 
 // nodeURL is the node a command reaches: what --to said, or the one this
-// machine runs.
-func nodeURL() string {
+// machine runs on the port its am.toml says.
+func nodeURL() (string, error) {
 	if elementTo != "" {
-		return strings.TrimSuffix(elementTo, "/")
+		return strings.TrimSuffix(elementTo, "/"), nil
 	}
-	return fmt.Sprintf("http://127.0.0.1:%d", config.GetServerPort())
+	cfg, err := config.Load()
+	if err != nil {
+		return "", errors.Wrap(err, "the config did not load, so the node this machine runs is not known")
+	}
+	port, said := cfg.Port()
+	if !said {
+		return "", errors.New("no --to, and server.port is not said: which node to reach is not known")
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d", port), nil
 }
 
 // bearer is the token to present, and where it came from, so a refusal can say
@@ -179,7 +187,10 @@ func runElementPublish(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "the attestation could not be written as JSON")
 	}
 
-	to := nodeURL()
+	to, err := nodeURL()
+	if err != nil {
+		return err
+	}
 	answer, err := ask(http.MethodPost, to+"/api/attestations", body)
 	if err != nil {
 		return err
@@ -199,7 +210,10 @@ func runElementPublish(cmd *cobra.Command, args []string) error {
 }
 
 func runElementList(cmd *cobra.Command, args []string) error {
-	to := nodeURL()
+	to, err := nodeURL()
+	if err != nil {
+		return err
+	}
 	answer, err := ask(http.MethodGet, to+"/g/", nil)
 	if err != nil {
 		return err

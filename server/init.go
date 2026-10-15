@@ -50,9 +50,13 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 
 	cfg, err := appcfg.Load()
 	if err != nil {
-		cfg = &appcfg.Config{}
+		return nil, errors.Wrap(err, "the config did not load, so the node does not start")
 	}
-	logPath := cfg.GetLogPath(appcfg.GetServerPort())
+	port, said := cfg.Port()
+	if !said {
+		return nil, errors.New("server.port is not said: the node listens on the port am.toml names")
+	}
+	logPath := cfg.GetLogPath(port)
 	serverLogger := createServerLogger(verbosity)
 
 	deps, err := createServerDependencies(db, cfg, serverLogger)
@@ -64,11 +68,7 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 
 	// Worker pool with server's context for proper shutdown coordination
 	poolConfig := async.DefaultWorkerPoolConfig()
-	if deps.cfg.Pulse.Workers == 0 {
-		poolConfig.Workers = 0
-	} else if deps.cfg.Pulse.Workers > 0 {
-		poolConfig.Workers = deps.cfg.Pulse.Workers
-	}
+	poolConfig.Workers = deps.cfg.Pulse.Workers
 	registry := async.NewHandlerRegistry()
 	daemon := async.NewWorkerPoolWithRegistry(ctx, db, deps.cfg, poolConfig, serverLogger, registry, nil)
 
@@ -76,11 +76,7 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 	// ticks. A namespace has its schedules the way it has its attestations.
 	scheduleStore := held.ServedUniverse().Schedules()
 	tickerCfg := schedule.DefaultTickerConfig()
-	if deps.cfg.Pulse.TickerIntervalSeconds == 0 {
-		tickerCfg.Interval = 0
-	} else if deps.cfg.Pulse.TickerIntervalSeconds > 0 {
-		tickerCfg.Interval = time.Duration(deps.cfg.Pulse.TickerIntervalSeconds) * time.Second
-	}
+	tickerCfg.Interval = time.Duration(deps.cfg.Pulse.TickerIntervalSeconds) * time.Second
 
 	// Console buffer for browser log forwarding
 	consoleBuffer := NewConsoleBuffer(100)
@@ -104,9 +100,6 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 	}
 
 	bindAddr := deps.cfg.Server.BindAddress
-	if bindAddr == "" {
-		bindAddr = "127.0.0.1"
-	}
 	if err := refusePublicDeploy(bindAddr, deps.cfg.Auth); err != nil {
 		cancel()
 		return nil, err
@@ -125,6 +118,7 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		deps:           deps,
 		store:          deps.cfg.Storage.Backend,
 		bindAddress:    bindAddr,
+		port:           port,
 		daemon:         daemon,
 		pluginRegistry: pluginRegistry,
 		pluginManager:  deps.pluginManager,

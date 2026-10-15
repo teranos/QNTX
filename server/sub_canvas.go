@@ -8,7 +8,6 @@ import (
 
 	"github.com/teranos/QNTX/element/handlers"
 	elementstorage "github.com/teranos/QNTX/element/storage"
-	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 )
@@ -34,10 +33,7 @@ func (canvasSubsystem) Init(s *QNTXServer) error {
 	if s.watcherEngine != nil {
 		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(s.watcherEngine))
 	}
-	serverPort := appcfg.DefaultServerPort
-	if s.deps.cfg.Server.Port != nil {
-		serverPort = *s.deps.cfg.Server.Port
-	}
+	serverPort := s.port
 	canvasOpts = append(canvasOpts, handlers.WithServerPort(serverPort))
 	canvasOpts = append(canvasOpts, handlers.WithCanvasFor(s.canvasFor))
 	if s.authHandler != nil {

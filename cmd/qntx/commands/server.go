@@ -75,9 +75,6 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		verbosity = 1
 	}
 
-	// Get server port from config system (env > project > user > system > default)
-	serverPort := config.GetServerPort()
-
 	// Determine database path - priority: --db-path flag > --test-mode > DB_PATH env > config
 	var dbPath string
 	if serverDBPath != "" {
@@ -106,8 +103,15 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return errors.Wrap(err, "the config did not load, so the node does not start")
 	}
-	if err := server.RefuseUnsaidGate(); err != nil {
+	if err := cfg.Validate(); err != nil {
+		return errors.Wrap(err, "the config does not hold, so the node does not start")
+	}
+	if err := server.RefuseUnsaid(cfg); err != nil {
 		return err
+	}
+	serverPort, said := cfg.Port()
+	if !said {
+		return errors.New("server.port is not said: the node listens on the port am.toml names")
 	}
 	logPath := cfg.GetLogPath(serverPort)
 

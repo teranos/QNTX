@@ -606,9 +606,6 @@ func (h *Handler) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	minCS := appcfg.GetInt("embeddings.min_cluster_size")
-	if minCS <= 0 {
-		minCS = 5
-	}
 	resp.HDBSCANConfig = &HDBSCANConfig{
 		MinClusterSize:        minCS,
 		ClusterThreshold:      appcfg.GetFloat64("embeddings.cluster_threshold"),

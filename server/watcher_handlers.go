@@ -11,7 +11,6 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/db/rustdriver"
-	"github.com/teranos/QNTX/internal/config"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
@@ -249,7 +248,7 @@ func (s *QNTXServer) broadcastElementFired(in string, elementID string, attestat
 
 // initWatcherEngine initializes the watcher engine and registers it as an observer
 func (s *QNTXServer) initWatcherEngine() error {
-	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", config.GetServerPort())
+	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", s.port)
 
 	// Open a separate DB connection for watcher engine operations (enqueue, recordFire,
 	// edge cursors). This eliminates contention with the main RustStore connection —

@@ -23,9 +23,6 @@ func (h *Handler) HandleProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	methods := appcfg.GetStringSlice("embeddings.projection_methods")
-	if len(methods) == 0 {
-		methods = []string{"umap"}
-	}
 
 	var params *ProjectionParams
 	if r.Body != nil {

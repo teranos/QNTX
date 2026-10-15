@@ -219,9 +219,9 @@ func (s *FetchServer) storeFor(token string) (ats.AttestationStore, error) {
 	return nil, errors.New("invalid authentication token")
 }
 
-// NewFetchServer takes the fetch config as said: its defaults are am.toml's
-// (config.SetDefaults), and a 0 is 0 — no requests in a window, no pulse. node
-// is the node's DID.
+// NewFetchServer takes the fetch config as said: `qntx server` refuses a node
+// whose am.toml leaves the window out, and a 0 is 0 — no requests in a window,
+// no pulse. node is the node's DID.
 func NewFetchServer(store ats.AttestationStore, authToken, node string, cfg appcfg.FetchConfig, logger *zap.SugaredLogger) *FetchServer {
 	maxReqs := cfg.MaxRequestsPerWindow
 	windowSecs := cfg.WindowSeconds

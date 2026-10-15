@@ -19,6 +19,9 @@ type Config struct {
 	Node       NodeConfig       `mapstructure:"node"`
 	Nodes      NodesConfig      `mapstructure:"nodes"`
 	Agent      AgentConfig      `mapstructure:"agent"`
+
+	// said is the keys something said, recorded as the config is read.
+	said map[string]bool
 }
 
 // AgentConfig is the agents this node runs (ADR-048).
@@ -312,13 +315,6 @@ type RateLimitConfig struct {
 	OpenedRate  float64 `mapstructure:"opened_rate"`  // A plugin path a line opened to strangers, per caller per path per second (default: 1)
 	OpenedBurst int     `mapstructure:"opened_burst"` // Its burst capacity (default: 1)
 }
-
-// Server port constants
-const (
-	DefaultServerPort     = 8770 // Development port
-	DefaultGraphEventPort = 8780 // Event viewer port
-	FallbackServerPort    = 7878 // Production fallback port
-)
 
 // PulseConfig configures the Pulse async job system (core infrastructure)
 type PulseConfig struct {
