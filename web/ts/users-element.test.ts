@@ -29,7 +29,7 @@ test('the list switches nobody: the switch is in the User', () => {
     const container = document.createElement('div');
     renderList(container, [root()]);
     expect(container.querySelector('button')).toBeNull();
-    expect(container.querySelectorAll('th').length).toBe(6);
+    expect(container.querySelectorAll('th').length).toBe(4);
 });
 
 // "Not interested in Phone in Users glyph"
@@ -38,8 +38,9 @@ test('the list has no Phone and no Reached by', () => {
     const container = document.createElement('div');
     renderList(container, [root()]);
     const heads = Array.from(container.querySelectorAll('th')).map(th => th.textContent);
-    expect(heads).toEqual(['Name', 'Level', 'Door', 'Email', 'Created', 'Status']);
-    expect(container.querySelector('tbody tr')!.children.length).toBe(6);
+    // "TABLES BEING MAX 4 col": the mail is under the name, the door under the level.
+    expect(heads).toEqual(['Name', 'Level', 'Created', 'Status']);
+    expect(container.querySelector('tbody tr')!.children.length).toBe(4);
 });
 
 // "but why dont i see my outgoing invitations in the same list, and a way for me to open the would-be-user"

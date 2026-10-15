@@ -82,6 +82,12 @@
     white-space: nowrap;
 }
 
+/* What goes with a cell, under what it says: a table is four columns at most. */
+.element-under {
+    color: var(--text-on-dark-tertiary);
+    font-size: var(--font-size-xs);
+}
+
 /* Active, and when it was last used: one pill, two halves. */
 .token-pill {
     display: inline-flex;

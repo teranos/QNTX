@@ -10,7 +10,7 @@
 // nobody else's. The first address is the one mail goes to (ADR-041).
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { createTable, tableCell, tray, type TableRow } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { Button, createDangerButton, createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
@@ -30,19 +30,15 @@ function when(ms: number): string {
     return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
 }
 
-function row(label: string, value: string): HTMLTableRowElement {
-    const tr = document.createElement('tr');
-    const th = document.createElement('th');
-    th.textContent = label;
-    th.style.textAlign = 'left';
-    th.style.paddingRight = '12px';
-    th.style.verticalAlign = 'top';
-    const td = document.createElement('td');
-    td.textContent = value;
+function row(label: string, value: string): TableRow<readonly [string, string]> {
+    const name = tableCell(label);
+    // A label reads as the head does.
+    name.style.color = 'var(--text-on-dark-tertiary)';
+    name.style.paddingRight = '12px';
+    name.style.verticalAlign = 'top';
+    const td = tableCell(value);
     td.style.overflowWrap = 'break-word';
-    tr.appendChild(th);
-    tr.appendChild(td);
-    return tr;
+    return { cells: [name, td] };
 }
 
 /** Exported for tests: the addresses, the primary one named as such. */
@@ -140,21 +136,20 @@ export function becomable(u: UserRecord, viewerIsRoot: boolean): boolean {
 export function renderUser(container: HTMLElement, u: UserRecord, own: boolean, onAdded: () => void = () => {}, switches = false, viewerIsRoot = false): void {
     container.innerHTML = '';
 
-    const table = document.createElement('table');
-    table.className = 'user-record';
-    table.style.borderCollapse = 'collapse';
+    // The record is headed by who it is.
+    const table = createTable('user-record', ['Name', nameOf(u)], [
+        row('Id', u.id),
+        row('Level', u.level),
+        row('Door', u.namespace || '—'),
+        row('Email', addressesOf(u)),
+        row('Phone', u.phone_numbers?.length ? u.phone_numbers.join('\n') : '—'),
+        row('Accounts', (u.accounts ?? []).map(a => `${a.provider || 'account'}: ${a.handle || a.canonical_id}`).join('\n') || '—'),
+        row('Keys', (u.keys ?? []).map(k => `${k.origin.toLowerCase()} ${k.did}`).join('\n') || '—'),
+        row('Created', when(u.created_at)),
+        row('Created by', u.created_by || '—'),
+        row('Status', u.disabled_by ? `off, by ${u.disabled_by}` : 'on'),
+    ]);
     table.style.whiteSpace = 'pre-line';
-    table.appendChild(row('Name', nameOf(u)));
-    table.appendChild(row('Id', u.id));
-    table.appendChild(row('Level', u.level));
-    table.appendChild(row('Door', u.namespace || '—'));
-    table.appendChild(row('Email', addressesOf(u)));
-    table.appendChild(row('Phone', u.phone_numbers?.length ? u.phone_numbers.join('\n') : '—'));
-    table.appendChild(row('Accounts', (u.accounts ?? []).map(a => `${a.provider || 'account'}: ${a.handle || a.canonical_id}`).join('\n') || '—'));
-    table.appendChild(row('Keys', (u.keys ?? []).map(k => `${k.origin.toLowerCase()} ${k.did}`).join('\n') || '—'));
-    table.appendChild(row('Created', when(u.created_at)));
-    table.appendChild(row('Created by', u.created_by || '—'));
-    table.appendChild(row('Status', u.disabled_by ? `off, by ${u.disabled_by}` : 'on'));
     container.appendChild(table);
 
     if (switches) {

@@ -4,7 +4,7 @@ import { Sigma, Watcher } from './sym';
 import { spawnSigmaAsWindow } from './components/element/sigma-element';
 import { getWatchersByPredicate, refresh as refreshWatcherPredicates, onWatcherPredicatesChanged, eyeStyle } from './watcher-predicates';
 import type { Element } from '@teranos/elements';
-import { renderSparkline } from '@teranos/elements';
+import { createTable, renderSparkline, tableCell } from '@teranos/elements';
 import { windowOf, seriesOf, labelsOf, seenOver, lastOf, formatIn } from './components/sparkline';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 
@@ -181,28 +181,18 @@ function renderPanel(): void {
             `<span style="position: absolute; left: ${g.pct}%; transform: translateX(-50%); white-space: nowrap;">${g.label}</span>`
         ).join('');
 
-        // Table header
-        html += `<table style="width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 4px;">
-        <thead>
-            <tr style="color: #7c6f64; font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
-                <th style="text-align: right; padding: 1px 4px; white-space: nowrap;">Obs</th>
-                <th style="text-align: left; padding: 1px 4px;">Predicate</th>
-                <th style="text-align: right; padding: 1px 4px; white-space: nowrap;">Subj</th>
-                <th style="text-align: right; padding: 1px 4px; white-space: nowrap;">Bat</th>
-                <th style="text-align: left; padding: 1px 4px; min-width: 40%; position: relative;">
-                    <span style="float: left;">${axisStart}</span>
-                    ${gridLabels}
-                    <span style="float: right;">${axisEnd}</span>
-                </th>
-            </tr>
-        </thead>
-        <tbody>`;
+        // A cell the panel colours itself, numbers lined up on the right.
+        const numberCell = (text: string, color: string): HTMLTableCellElement => {
+            const td = tableCell(text);
+            td.style.cssText = `padding: 1px 4px; text-align: right; color: ${color}; white-space: nowrap; font-variant-numeric: tabular-nums;`;
+            return td;
+        };
 
-        for (const sigma of topSigmas) {
+        // "TABLES BEING MAX 4 col": the observations carry how many batches made them.
+        const table = createTable('sigma-panel', ['Obs', 'Predicate', 'Subj', 'Timeline'], topSigmas.map(sigma => {
             const attrs = getAttrs(sigma);
             const total = attrs?._total || attrs?._count || 0;
             const count = attrs?._count || 0;
-            const predicate = extractPredicate(sigma);
 
             // Subjects count
             const subjCount = attrs?._subjects_count || 0;
@@ -216,37 +206,46 @@ function renderPanel(): void {
             // Gruvbox palette — brighter for heavier sigmas
             const barColor = total > 100000 ? '#fe8019' : total > 10000 ? '#d65d0e' : '#af3a03';
 
-            html += `<tr class="sigma-panel-row" data-sigma-id="${sigma.id}" style="cursor: pointer; border-bottom: 1px solid #3c3836; line-height: 1.1;">
-                <td style="padding: 1px 4px; text-align: right; color: #ebdbb2; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums;">${formatNum(total)}</td>
-                <td style="padding: 1px 4px; color: #bdae93;">${predicate}</td>
-                <td style="padding: 1px 4px; text-align: right; color: #7c6f64; white-space: nowrap; font-variant-numeric: tabular-nums;">${subjCount > 0 ? formatNum(subjCount) : ''}</td>
-                <td style="padding: 1px 4px; text-align: right; color: #7c6f64; white-space: nowrap; font-variant-numeric: tabular-nums;">${count}</td>
-                <td style="padding: 1px 4px;">
-                    <div style="position: relative; width: 100%; height: 6px; background: #3c3836; border-radius: 3px;">
-                        ${gridlineOverlay}
-                        <div style="position: absolute; left: ${left}%; width: ${width}%; height: 100%; background: ${barColor}; border-radius: 3px; min-width: 2px; z-index: 1;"></div>
-                    </div>
-                </td>
-            </tr>`;
-        }
+            const obs = numberCell(formatNum(total), '#ebdbb2');
+            obs.style.fontWeight = '600';
+            const batches = document.createElement('div');
+            batches.style.cssText = 'color: #7c6f64; font-weight: normal;';
+            batches.textContent = `${count} bat`;
+            obs.appendChild(batches);
 
-        html += '</tbody></table>';
-    } else {
-        html += '<div style="padding: 16px 0; text-align: center; color: #7c6f64; font-size: 11px;">No sigmas with >= 100 observations yet</div>';
+            const predicate = tableCell(extractPredicate(sigma));
+            predicate.style.cssText = 'padding: 1px 4px; color: #bdae93;';
+
+            const timeline = tableCell('');
+            timeline.style.padding = '1px 4px';
+            timeline.innerHTML = `<div style="position: relative; width: 100%; height: 6px; background: #3c3836; border-radius: 3px;">
+                    ${gridlineOverlay}
+                    <div style="position: absolute; left: ${left}%; width: ${width}%; height: 100%; background: ${barColor}; border-radius: 3px; min-width: 2px; z-index: 1;"></div>
+                </div>`;
+
+            return {
+                id: sigma.id,
+                cells: [obs, predicate, numberCell(subjCount > 0 ? formatNum(subjCount) : '', '#7c6f64'), timeline] as const,
+                onPress: () => { spawnSigmaAsWindow(sigmaToAttestation(sigma)); },
+            };
+        }));
+        table.style.fontSize = '10px';
+        table.style.marginTop = '4px';
+        const heads = table.tHead?.rows[0];
+        if (!heads) throw new Error('the sigma table has no heads');
+        heads.style.cssText = 'color: #7c6f64; font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px;';
+        // The timeline's head is its axis: the first day, each day between, and the last.
+        const axis = heads.cells[3];
+        axis.style.cssText = 'min-width: 40%; position: relative;';
+        axis.innerHTML = `<span style="float: left;">${axisStart}</span>${gridLabels}<span style="float: right;">${axisEnd}</span>`;
+
+        panelElement.innerHTML = html;
+        panelElement.appendChild(table);
+        return;
     }
 
+    html += '<div style="padding: 16px 0; text-align: center; color: #7c6f64; font-size: 11px;">No sigmas with >= 100 observations yet</div>';
     panelElement.innerHTML = html;
-
-    // Wire click handlers
-    panelElement.querySelectorAll('.sigma-panel-row').forEach(row => {
-        row.addEventListener('click', () => {
-            const sigmaId = (row as HTMLElement).dataset.sigmaId;
-            const sigma = topSigmas.find((s: any) => s.id === sigmaId);
-            if (sigma) {
-                spawnSigmaAsWindow(sigmaToAttestation(sigma));
-            }
-        });
-    });
 }
 
 export function createSigmaPanel(): Element {
