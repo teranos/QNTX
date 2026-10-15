@@ -1,7 +1,7 @@
 # ADR-053: The Primary
 
 Date: 2026-10-15
-Status: Proposed
+Status: Accepted
 
 "Node X writing into Y without X needing to tell its Plugin's about Y is a capability i want."
 
