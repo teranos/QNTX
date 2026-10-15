@@ -20,7 +20,7 @@ Current subsystems:
 
 - **꩜ Pulse** — provides async execution with resource-aware scheduling
 - **Elements ⧉** — persistent interactive UI primitive
-- **Plugins** — domain logic via gRPC, isolated from core (e.g. local AI via llama.cpp)
+- **Plugins** — domain logic via gRPC, isolated from core (e.g. local AI)
 
 ### Quality Goals
 
@@ -40,7 +40,7 @@ See [Design Philosophy](design-philosophy.md).
 |-------------|-------------|
 | Creator / steward | System works, vision intact, honest documentation |
 | Community (forming) | Participation, transparency, shared governance |
-| Organizations wanting local AI | Private LLM capabilities, no cloud dependency, llama.cpp integration |
+| Organizations wanting local AI | Private LLM capabilities, no cloud dependency |
 | The public | A public good — intelligence tooling |
 
 The intent is public good. Governance is centralized now, with decentralized stakeholdership as a future direction.
@@ -90,7 +90,7 @@ Full definitions: [AXIOMS.md](AXIOMS.md)
 ```
 ┌──────────── Core ─────────────┐
 │  ATS (attestation type system) │
-│  ⊔ DB (SQLite, migrations)    │
+│  ⊔ DB (storage)               │
 │  ≡ config (configuration)     │
 │  ꩜ Pulse (async execution)    │
 │  ⋈ ax (query)                 │
@@ -100,10 +100,8 @@ Full definitions: [AXIOMS.md](AXIOMS.md)
         │          │
   ┌─────┴───┐  ┌──┴──────────────┐
   │ Domain  │  │ Web UI           │
-  │ plugins │  │  CodeMirror (ATS)│
-  │         │  │  Canvas (⧉)     │
-  └─────────┘  │  WASM (ats)│
-               └──────────────────┘
+  │ plugins │  │  Canvas (⧉)      │
+  └─────────┘  └──────────────────┘
 ```
 
 See [Understanding QNTX](understanding-qntx.md).
@@ -115,9 +113,9 @@ See [Understanding QNTX](understanding-qntx.md).
 Key technical decisions and why:
 
 - **Attestations as the primitive** — not documents, not rows, not objects. Structured claims that compose, sync, and verify.
-- **Local-first** — SQLite on your machine, llama.cpp on your machine. Cloud is opt-in, not required.
+- **Local-first** — storage and inference on your machine. Cloud is opt-in, not required.
 - **Core is minimal** — [ATS](https://github.com/teranos/QNTX/blob/main/ats/README.md) (incl. ⋈ ax), DB, ≡ config, ꩜ Pulse. Everything else is a plugin over gRPC.
-- **Rust for cross-runtime logic** — parsing, filters, query resolution, watcher matching, identity, signing. One implementation, reached by the server through wazero and cgo, by the browser through wasm-bindgen.
+- **One core for every runtime** — parsing, filters, query resolution, watcher matching, identity and signing are implemented once, in Rust, and the node and the browser run the same code.
 See [Design Philosophy](design-philosophy.md) and [Release](release.md).
 
 ---
@@ -126,19 +124,18 @@ See [Design Philosophy](design-philosophy.md) and [Release](release.md).
 
 ```
 ┌──────────────────── Core ────────────────────┐
-│  ats/       Attestation Type System          │
-│  db/        SQLite + migrations              │
-│  internal/config/  Configuration (5-layer precedence)│
-│  pulse/     Async execution + scheduling     │
-│  server/    HTTP, WebSocket                  │
+│  ATS        Attestation Type System          │
+│  ⊔ DB       Storage                          │
+│  ≡ config   Configuration                    │
+│  ꩜ Pulse    Async execution + scheduling     │
+│  Server     HTTP, WebSocket                  │
 └──────────────────────────────────────────────┘
          │                    │
-    gRPC (plugins)      WASM (ats)
+    gRPC (plugins)       shared core
          │                    │
 ┌────────┴────────┐  ┌───────┴────────────────┐
-│ Domain plugins  │  │ Rust crates            │
-│ (Go, Python,    │  │  qntx-proto (types)    │
-│  Rust)          │  │  ats-wasm (bindings)   │
+│ Domain plugins  │  │ Rust core              │
+│                 │  │  node and browser      │
 └─────────────────┘  └────────────────────────┘
 ```
 
@@ -151,8 +148,6 @@ Architecture deep-dives:
 - [Resource Coordination](architecture/pulse-resource-coordination.md)
 - [Client State](architecture/client-state-storage.md)
 - [Plugin-Pulse Integration](architecture/plugin-pulse-integration.md)
-
-Type system: the [.proto files](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/), which every language generates from (ADR-006)
 
 ---
 
@@ -169,25 +164,19 @@ schedule tick → resource check → job dispatch → worker execution → resul
 **Element meld DAG:**
 meld detection → edge creation → subscription activates → attestation arrives → downstream element fires
 
-**Node-to-node sync:**
-hello (root hash) → group hashes → need → attestations → done
-
-**Browser ↔ Server:**
-WebSocket: semantic tokens, ꩜ Pulse updates.
-REST: CRUD, sync triggers, status.
+**Browser ↔ node:**
+live updates over WebSocket, requests over REST.
 
 Detailed flows:
 
 - [Element Attestation Flow](development/element-attestation-flow.md)
 - [GRACE](adr/ADR-036-GRACE.md) (❀ PulseClose)
-- What the node serves: [openapi.json](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json), written by `make openapi`
-- What plugins speak: the [.proto files](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/)
 
 ---
 
 ## 7. Deployment View
 
-Single Go binary, embedded web UI. Zero configuration required.
+A single binary with the web UI inside. Zero configuration required.
 
 Same binary everywhere:
 
@@ -198,12 +187,8 @@ Same binary everywhere:
 Clients:
 
 - **Browser** (any) — connects via WebSocket + REST
-- **Tauri** — desktop/mobile wrapper around the web UI
+- **Desktop and mobile app** — a wrapper around the web UI
 - **CLI**
-
-WASM (ats) runs in both server (wazero) and browser (wasm-bindgen) — same Rust logic, two runtimes.
-
-Development: `make dev` (Go on :8770, TS hot-reload on :8820)
 
 See [Installation](installation.md), [Nix Development](nix-development.md), [Release](release.md).
 
@@ -279,7 +264,7 @@ Data visibility
 
 Performance
 ├── System fonts, minimal dependencies
-├── Real-time updates via WebSocket
+├── Real-time updates
 └── Efficient rendering, no decorative overhead
 
 Semantic clarity
@@ -289,7 +274,7 @@ Semantic clarity
 Extensibility
 ├── Plugin architecture via gRPC
 ├── Attestable elements — plugins attest new UI elements
-└── WASM for cross-platform core logic
+└── One core shared across platforms
 ```
 
 See [Design Philosophy](design-philosophy.md).
@@ -304,7 +289,7 @@ See [Design Philosophy](design-philosophy.md).
 | Cold start — empty store = no value | Poor first-run experience | Prioritize connectors: git, files, APIs |
 | Complexity budget — ATS + Pulse + Elements + Sync each carry weight | Layers compound instead of compose | Each layer independently useful, clear contracts |
 | Single steward — bus factor of one | Project continuity | Community formation, honest docs, public good model |
-| ATS parser is Rust's alone | A build without `qntxwasm` parses nothing (`ats/parser/dispatch_default.go`) | ADR-005; the node reaches it through wazero, the browser through wasm-bindgen |
+| ATS parser is Rust's alone | A build without the Rust core parses nothing | ADR-005 |
 
 ---
 
