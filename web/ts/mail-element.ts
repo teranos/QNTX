@@ -9,10 +9,11 @@
 // and every mail sent or refused. Nothing here sends.
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { createTable, tray } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
+import { stacked } from './table-cell';
 
 /** One mail the node sent or tried to, as /api/mail gives it. */
 export interface MailRow {
@@ -207,26 +208,20 @@ export function renderTemplates(container: HTMLElement, t: MailTemplates): void 
         return;
     }
 
-    const table = document.createElement('table');
-    table.className = 'element-table mail-templates-table';
-    const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>Plugin</th><th>Name</th><th>Set</th><th>Subject</th></tr>';
-    table.appendChild(thead);
-    const tbody = document.createElement('tbody');
-    for (const kept of t.templates) {
-        const tr = document.createElement('tr');
-        const plugin = cell(kept.version ? `${kept.plugin} v${kept.version}` : kept.plugin);
-        tr.appendChild(plugin);
+    const table = createTable('mail-templates', ['Plugin', 'Name', 'Set', 'Subject'], t.templates.map(kept => {
         const name = cell(kept.name);
         name.title = kept.id;
-        tr.appendChild(name);
-        tr.appendChild(cell(fmt(kept.at), 'element-time'));
         const parts = document.createElement('td');
         parts.appendChild(templateParts(kept));
-        tr.appendChild(parts);
-        tbody.appendChild(tr);
-    }
-    table.appendChild(tbody);
+        return {
+            cells: [
+                cell(kept.version ? `${kept.plugin} v${kept.version}` : kept.plugin),
+                name,
+                cell(fmt(kept.at), 'element-time'),
+                parts,
+            ] as const,
+        };
+    }));
     s.appendChild(table);
     container.appendChild(s);
 }
@@ -266,30 +261,18 @@ export function renderSent(container: HTMLElement, mails: MailRow[]): void {
         return;
     }
 
-    const table = document.createElement('table');
-    table.className = 'element-table mail-sent-table';
-    const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>When</th><th>User</th><th>To</th><th>Plugin</th><th>Template</th><th>Subject</th><th>Outcome</th></tr>';
-    table.appendChild(thead);
-    const tbody = document.createElement('tbody');
-    for (const m of mails) {
-        const tr = document.createElement('tr');
-        // Pressing a mail opens it as it was sent.
-        tr.style.cursor = 'pointer';
-        tr.addEventListener('click', () => { openMailMessage(m); });
+    // "TABLES BEING MAX 4 col": who it went to carries the User it was for,
+    // and the subject carries the plugin and template that wrote it.
+    const table = createTable('mail-sent', ['When', 'To', 'Mail', 'Outcome'], mails.map(m => {
         const when = cell(fmt(m.at), 'element-time');
         // The attestation is the mail's record, and its id is on the row.
         when.title = m.id;
-        tr.appendChild(when);
-        tr.appendChild(cell(m.user));
-        tr.appendChild(cell(m.to));
-        tr.appendChild(cell(m.plugin));
-        tr.appendChild(cell(m.template));
-        tr.appendChild(cell(m.subject));
-        tr.appendChild(outcome(m));
-        tbody.appendChild(tr);
-    }
-    table.appendChild(tbody);
+        return {
+            cells: [when, stacked(m.to, m.user), stacked(m.subject, `${m.plugin} · ${m.template}`), outcome(m)] as const,
+            // Pressing a mail opens it as it was sent.
+            onPress: () => { openMailMessage(m); },
+        };
+    }));
     s.appendChild(table);
     container.appendChild(s);
 }

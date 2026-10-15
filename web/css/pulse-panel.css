@@ -63,25 +63,15 @@
   font-size: var(--font-size-sm);
 }
 
-.pulse-schedule-table thead th:first-child {
-  width: 28px;
-  padding-right: 0;
-}
-
-.pulse-table-row td {
+.pulse-schedule-table tbody td {
   padding: 6px 8px;
   vertical-align: middle;
   border-bottom: 1px solid var(--border-on-dark);
   color: var(--text-on-dark);
 }
 
-.pulse-table-row:hover td {
+.pulse-schedule-table tbody tr:hover td {
   background: var(--bg-dark-hover);
-}
-
-.pulse-table-expand {
-  width: 28px;
-  padding-right: 0 !important;
 }
 
 .pulse-table-code code {
@@ -120,7 +110,7 @@
 
 .pulse-table-actions {
   white-space: nowrap;
-  display: flex;
+  display: inline-flex;
   gap: 4px;
 }
 
@@ -136,8 +126,9 @@
   color: var(--text-on-dark-tertiary);
 }
 
-.pulse-table-expansion td {
-  padding: 0 8px 12px 36px;
+/* An expanded job's history, under the table and named by its job. */
+.pulse-table-expansion {
+  padding: 8px 8px 12px;
   border-bottom: 1px solid var(--border-on-dark);
 }
 

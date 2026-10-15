@@ -14,7 +14,7 @@ This package provides parsers for:
 ### Production Rules
 
 ```
-query      ::= subjects? predicates? contexts? actors? temporal? flags?
+query      ::= subjects? predicates? contexts? actors? temporal? over? actions?
 subjects   ::= TOKEN+
 predicates ::= ("is" | "are") TOKEN+
 contexts   ::= ("of" | "from") TOKEN+
@@ -22,7 +22,8 @@ actors     ::= ("by" | "via") TOKEN+
 temporal   ::= timeExpr | timeRange
 timeExpr   ::= ("since" | "until" | "on") EXPR
 timeRange  ::= "between" EXPR "and" EXPR
-flags      ::= ("--limit" INT | "--format" STRING)*
+over       ::= "over" SPAN
+actions    ::= ("so" | "therefore") TOKEN+
 ```
 
 ### Semantic Symbols
@@ -39,10 +40,10 @@ flags      ::= ("--limit" INT | "--format" STRING)*
 ax PATIENT-123
 
 # Relationship query (healthcare)
-ax PATIENT-456 has diagnosis of TYPE_2_DIABETES
+ax PATIENT-456 is diagnosis of TYPE_2_DIABETES
 
 # Corporate hierarchy query
-ax SUBSIDIARY-XYZ has parent_org of HOLDINGS_INC
+ax SUBSIDIARY-XYZ is parent_org of HOLDINGS_INC
 
 # Actor filtering (legal domain)
 ax by court-system since yesterday
@@ -51,7 +52,7 @@ ax by court-system since yesterday
 ax by court-clerk filing-system
 
 # Complex query with time range (education)
-ax STUDENT-789 enrolled_in COURSE-CS101 by registrar on 2025-01-15
+ax STUDENT-789 is enrolled_in of COURSE-CS101 by registrar on 2025-01-15
 ```
 
 ## Temporal Expression Parsing
@@ -144,32 +145,30 @@ between 2025-01-01 and 2025-02-01
 ### Production Rules
 
 ```
-command    ::= subjects predicates contexts? actors? temporal? attributes?
+command    ::= subjects predicates contexts? actors? temporal?
 subjects   ::= TOKEN+
-predicates ::= ("is" | "are" | "has") TOKEN+
-contexts   ::= ("of" | "from" | "in") TOKEN+
-actors     ::= ("by" | "via") TOKEN+
-temporal   ::= ("on" | "since" | "until") EXPR
-attributes ::= ("--" KEY VALUE)*
+predicates ::= ("is" | "are") TOKEN+
+contexts   ::= "of" TOKEN+
+actors     ::= "by" TOKEN+
+temporal   ::= "on" EXPR
 ```
+
+Subjects and contexts are written upper case.
 
 ### Command Examples
 
 ```bash
 # Healthcare: patient diagnosis
-as PATIENT-123 has diagnosis of HYPERTENSION
+as PATIENT-123 is diagnosis of HYPERTENSION
 
 # Legal: case filing
-as CASE-456 filed_in DISTRICT_COURT
+as CASE-456 is filed_in of DISTRICT_COURT
 
 # Education: student enrollment
-as STUDENT-789 enrolled_in COURSE-BIO201 on 2025-01-15
+as STUDENT-789 is enrolled_in of COURSE-BIO201 on 2025-01-15
 
 # Corporate: subsidiary relationship with temporal marker
-as COMPANY-XYZ has parent_org of HOLDINGS_INC since 2024-01-01
-
-# With attributes (any domain)
-as ENTITY-999 has property of VALUE-ABC --verified true
+as COMPANY-XYZ is parent_org of HOLDINGS_INC on 2024-01-01
 ```
 
 ## Parsing Architecture
@@ -200,20 +199,6 @@ SUBJECTS → (is/are) → PREDICATES → (of/from) → CONTEXTS
 ```
 
 All states are valid terminating states (query can end at any stage).
-
-## Error Handling
-
-The parser provides detailed error messages with suggestions:
-
-```go
-type ParseError struct {
-    Message         string
-    Suggestions     []string
-    PartiallyParsed *Filter  // What was successfully parsed
-}
-```
-
-Partial parsing allows valid segments to be processed even when later segments fail.
 
 ## Implementation Files
 

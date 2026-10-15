@@ -148,7 +148,8 @@ function renderSchedules(): void {
         const sortedJobs = Array.from(jobs.values())
             .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-        container.innerHTML = renderJobTable(sortedJobs, state);
+        container.innerHTML = '';
+        container.appendChild(renderJobTable(sortedJobs, state));
 
         // Hydrate buttons for each job
         hydrateJobButtons(container as HTMLElement);

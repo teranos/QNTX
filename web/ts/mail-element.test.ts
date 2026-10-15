@@ -83,7 +83,7 @@ test('the neutral template and each plugin template are shown as source, never r
         },
         dark: {
             id: '', at: '', plugin: 'qntx', version: '', name: 'dark',
-            subject: '{{.subject}}', bodies: [{ html: '<table><tr><td>{{.body}}</td></tr></table>' }, { text: '{{.body}}' }],
+            subject: '{{.subject}}', bodies: [{ html: '<div style="background:#1d2021">{{.body}}</div>' }, { text: '{{.body}}' }],
             values: ['subject', 'body'],
         },
         templates: [{
@@ -98,7 +98,7 @@ test('the neutral template and each plugin template are shown as source, never r
     expect(container.textContent).toContain('takes subject, body');
     // "why not? i want it to be listed there as well"
     expect(container.textContent).toContain('filled when a plugin names dark');
-    expect(container.textContent).toContain('<table><tr><td>{{.body}}</td></tr></table>');
+    expect(container.textContent).toContain('<div style="background:#1d2021">{{.body}}</div>');
     expect(container.textContent).toContain('garden v0.4.1');
     expect(container.textContent).toContain('harvest-ready');
     expect(container.textContent).toContain('<p>Pick on {{.date}}.</p>');

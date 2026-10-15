@@ -35,7 +35,8 @@ describe('Users element rows', () => {
 
         expect(container.textContent).toContain('Tim de Facile');
         expect(container.textContent).toContain('tim@example.com');
-        expect(container.textContent).toContain('+31612345678, 0201234567');
+        // "Not interested in Phone in Users glyph" / "i can find it in the user itself,"
+        expect(container.textContent).not.toContain('+31612345678');
         expect(container.textContent).not.toContain('Switch');
     });
 

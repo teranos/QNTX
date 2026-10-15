@@ -11,6 +11,7 @@ import type { RichError } from '../base-panel-error.ts';
 import { extractHttpStatus } from '../http-utils.ts';
 import { buildTooltipText } from '../components/tooltip.ts';
 import { buttonPlaceholder } from '../components/button.ts';
+import { createTable, tableCell } from '@teranos/elements';
 
 /**
  * Build a rich error for execution history failures
@@ -133,11 +134,22 @@ function buildTimeTooltip(isoTime: string | null | undefined, label: string): st
     return `${label}: ${date.toLocaleString()}`;
 }
 
+/** A cell of the schedule table, its content the markup given. */
+function markupCell(className: string, html: string): HTMLTableCellElement {
+    const td = tableCell('', className);
+    td.innerHTML = html;
+    return td;
+}
+
 /**
- * Render all scheduled jobs as a compact table
+ * Render all scheduled jobs as a compact table, and under it the execution
+ * history of each job that is expanded.
  */
-export function renderJobTable(jobs: ScheduledJobResponse[], state: PulsePanelState): string {
-    const rows = jobs.map(job => {
+export function renderJobTable(jobs: ScheduledJobResponse[], state: PulsePanelState): HTMLElement {
+    const histories: HTMLElement[] = [];
+    // "TABLES BEING MAX 4 col": the expand toggle is the job's own, the
+    // interval is under the state, and the last run under the next.
+    const table = createTable('pulse-schedule', ['Job', 'State', 'Next', 'Actions'], jobs.map(job => {
         const isActive = job.state === 'active';
         const nextRun = formatRelativeTime(job.next_run_at);
         const lastRun = job.last_run_at ? formatRelativeTime(job.last_run_at) : '—';
@@ -148,45 +160,41 @@ export function renderJobTable(jobs: ScheduledJobResponse[], state: PulsePanelSt
         const lastRunTooltip = escapeHtml(buildTimeTooltip(job.last_run_at, 'Last run'));
         const code = job.handler_name;
         const shortId = job.id ? job.id.slice(-6) : '';
+        const label = `<code>${escapeHtml(code)}</code>${shortId ? ` <span class="pulse-schedule-label">${escapeHtml(shortId)}</span>` : ''}`;
 
-        const executionHistoryHtml = isExpanded ? renderExecutionHistory(job, state) : '';
+        if (isExpanded) {
+            const history = document.createElement('div');
+            history.className = 'pulse-table-expansion';
+            history.dataset.jobId = job.id;
+            history.innerHTML = `<div class="pulse-table-code">${label}</div>${renderExecutionHistory(job, state)}`;
+            histories.push(history);
+        }
 
-        return `
-            <tr class="pulse-table-row ${isExpanded ? 'expanded' : ''}" data-job-id="${job.id}">
-                <td class="pulse-table-expand">
-                    <button class="pulse-expand-toggle" data-action="toggle-expand">${isExpanded ? '▼' : '▶'}</button>
-                </td>
-                <td class="pulse-table-code"><code>${escapeHtml(code)}</code>${shortId ? ` <span class="pulse-schedule-label">${escapeHtml(shortId)}</span>` : ''}</td>
-                <td class="pulse-table-state"><span class="pulse-badge-inline pulse-badge-${job.state} has-tooltip" data-tooltip="${statusTooltip}">${job.state}</span></td>
-                <td class="pulse-table-interval has-tooltip" data-tooltip="${intervalTooltip}">${formatInterval(job.interval_seconds ?? 0)}</td>
-                <td class="pulse-table-time has-tooltip" data-tooltip="${nextRunTooltip}">${nextRun}</td>
-                <td class="pulse-table-time has-tooltip" data-tooltip="${lastRunTooltip}">${lastRun}</td>
-                <td class="pulse-table-actions">
+        const jobCell = markupCell('pulse-table-code', `<button class="pulse-expand-toggle" data-action="toggle-expand">${isExpanded ? '▼' : '▶'}</button> ${label}`);
+        // The toggle finds its job by the nearest data-job-id.
+        jobCell.dataset.jobId = job.id;
+
+        return {
+            id: job.id,
+            cells: [
+                jobCell,
+                markupCell('pulse-table-state', `<span class="pulse-badge-inline pulse-badge-${job.state} has-tooltip" data-tooltip="${statusTooltip}">${job.state}</span>
+                    <div class="pulse-table-interval has-tooltip" data-tooltip="${intervalTooltip}">${formatInterval(job.interval_seconds ?? 0)}</div>`),
+                markupCell('pulse-table-time', `<div class="has-tooltip" data-tooltip="${nextRunTooltip}">${nextRun}</div>
+                    <div class="element-under has-tooltip" data-tooltip="${lastRunTooltip}">last ${lastRun}</div>`),
+                markupCell('', `<span class="pulse-table-actions">
                     ${buttonPlaceholder(`force-trigger-${job.id}`, '▶')}
                     ${buttonPlaceholder(`toggle-state-${job.id}`, isActive ? '⏸' : '▶')}
                     ${buttonPlaceholder(`delete-${job.id}`, '✕')}
-                </td>
-            </tr>
-            ${isExpanded ? `<tr class="pulse-table-expansion" data-job-id="${job.id}"><td colspan="7">${executionHistoryHtml}</td></tr>` : ''}
-        `;
-    }).join('');
+                </span>`),
+            ] as const,
+        };
+    }));
 
-    return `
-        <table class="pulse-schedule-table">
-            <thead>
-                <tr>
-                    <th></th>
-                    <th>Job</th>
-                    <th>State</th>
-                    <th>Interval</th>
-                    <th>Next</th>
-                    <th>Last</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>
-    `;
+    const section = document.createElement('div');
+    section.appendChild(table);
+    for (const history of histories) section.appendChild(history);
+    return section;
 }
 
 /**

@@ -56,11 +56,6 @@ QNTX keeps a second template, dark.
 
 "it just needs to fit with the rest of qntx"
 
-A mail QNTX draws is an element window on its canvas, as ≡ am is: a title
-bar, then sections of labelled rows. Its values are read from web/css, which
-the binary embeds. Tables and inline styles carry it, because every mail
-client lays those out the same way. The weekly report is drawn the same way.
-
 ## Not done
 
 - Bounces, complaints and replies coming back.

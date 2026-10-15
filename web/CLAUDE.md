@@ -6,6 +6,10 @@ An element is exactly ONE DOM element for its entire lifetime (@teranos/elements
 
 All tray creation via `tray.add`; canvas via `canvasPlaced`. Register new types in `components/element/element-registry.ts`.
 
+## Tables
+
+**A table is @teranos/elements'.** "The elements package should own Tables" "TABLES BEING MAX 4 col". Build one with `createTable(name, heads, rows)`: one to four heads, every row as wide, or it does not compile. A table built by hand (`createElement('table' | 'thead' | 'tbody' | 'tr' | 'th')`, or table markup in a string) stops the build (ESLint `NO_RAW_TABLE`). A cell may be the host's own `td`.
+
 ## WASM
 
 `ats-wasm.ts` wraps the browser WASM module (crates/ats-wasm). Must call `initialize(dbName)` before any WASM operation except `axFilter` (synchronous, no init needed).
