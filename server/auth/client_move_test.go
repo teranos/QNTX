@@ -48,7 +48,7 @@ func TestRootMovesAClientToAnotherNamespace(t *testing.T) {
 
 	client, ok := h.clientByDID(did)
 	require.True(t, ok)
-	assert.Equal(t, "pond", client.Namespace)
+	assert.Equal(t, []string{"pond"}, client.Namespaces)
 }
 
 // The namespace a connector acts in is its client's, so a connector already in
@@ -114,7 +114,7 @@ func TestOnlyRootMovesAClient(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 	client, ok := h.clientByDID(did)
 	require.True(t, ok)
-	assert.Equal(t, NamespaceDefault, client.Namespace)
+	assert.Equal(t, []string{NamespaceDefault}, client.Namespaces)
 }
 
 // "A TOKEN CAN BE PUT INTO SOME NAMESPACE / A TOKEN CAN BE TAKEN OUT OF IT /
@@ -158,7 +158,7 @@ func TestAClientIsPutIntoANamespaceWithoutBeingMovedThere(t *testing.T) {
 	assert.Equal(t, []string{NamespaceDefault, "pond"}, namespacesOfClient(t, store, id))
 	client, ok := h.clientByDID(did)
 	require.True(t, ok)
-	assert.Equal(t, NamespaceDefault, client.Namespace, "putting it in pond made it active there")
+	assert.Equal(t, []string{NamespaceDefault}, client.Namespaces, "putting it in pond made it active there")
 }
 
 func TestMakingANamespaceActiveKeepsTheOthers(t *testing.T) {
@@ -178,7 +178,7 @@ func TestMakingANamespaceActiveKeepsTheOthers(t *testing.T) {
 	assert.Equal(t, []string{"pond", NamespaceDefault}, namespacesOfClient(t, store, id))
 	client, ok := h.clientByDID(did)
 	require.True(t, ok)
-	assert.Equal(t, "pond", client.Namespace)
+	assert.Equal(t, []string{"pond"}, client.Namespaces)
 }
 
 func TestAClientIsTakenOutOfANamespaceItIsNotActiveIn(t *testing.T) {

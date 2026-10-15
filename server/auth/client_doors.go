@@ -21,9 +21,9 @@ type Client struct {
 	Label string
 	// MintedBy is who wrote the door, the way ROOT writes one in am.toml.
 	MintedBy string
-	// Namespace is the door the client was minted at, which is where a token
-	// issued through it acts.
-	Namespace     string
+	// Namespaces are where a token issued through it acts: the door a client
+	// was minted at, or the namespaces a peer serves.
+	Namespaces    []string
 	ReturnAddress string
 	// Origin is where a peer answers, which requests for it are carried to.
 	Origin *url.URL
@@ -64,7 +64,7 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 			DID:           t.DID,
 			Label:         t.Label,
 			MintedBy:      t.MintedBy,
-			Namespace:     namespace,
+			Namespaces:    []string{namespace},
 			ReturnAddress: t.ReturnAddress,
 		}, true
 	}

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/internal/nodedid"
-	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
@@ -146,7 +145,7 @@ func (s *QNTXServer) peers() []auth.Client {
 
 // serving is whether a peer serves namespace, as nodes.peers declares it.
 func serving(namespace string) func(auth.Client) bool {
-	return func(peer auth.Client) bool { return slug.Of(peer.Namespace) == slug.Of(namespace) }
+	return func(peer auth.Client) bool { return peer.Serves(namespace) }
 }
 
 // peersAgentCard is the card of the agent a peer serves at namespace, asked of

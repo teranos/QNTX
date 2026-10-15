@@ -37,7 +37,7 @@ func TestAClientIsAnsweredByItsDID(t *testing.T) {
 	assert.Equal(t, did, found.DID)
 	assert.Equal(t, "app", found.Label)
 	assert.Equal(t, mastodonAccount, found.MintedBy)
-	assert.Equal(t, "pond", found.Namespace)
+	assert.Equal(t, []string{"pond"}, found.Namespaces)
 	assert.Equal(t, appReturn, found.ReturnAddress)
 }
 

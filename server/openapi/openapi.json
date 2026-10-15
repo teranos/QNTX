@@ -721,7 +721,7 @@
         "ANYONE"
       ]
     },
-    "/auth/lines": {
+    "/auth/lines/served": {
       "x-qntx-reach": [
         "ANYONE"
       ]

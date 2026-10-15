@@ -19,7 +19,7 @@ func primaryAskingGitHub(t *testing.T, github GitHubGet) (primary *Handler, peer
 	t.Helper()
 	primary, _, _ = authorizingHandler(t)
 	key, did := otherNode(t)
-	require.NoError(t, primary.DeclarePeer(peerName, did, "Ground", elsewhereOrigin, elsewhereOrigin))
+	require.NoError(t, primary.DeclarePeer(peerName, did, []string{"Ground"}, elsewhereOrigin, elsewhereOrigin))
 	primary.SetGitHubForPeers(github)
 	mux := http.NewServeMux()
 	for path, handle := range primary.Routes() {

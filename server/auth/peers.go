@@ -117,7 +117,7 @@ func (h *Handler) carriedFor(identity string, p Presented, peer Client, now time
 		MintedByUser:        p.UserID,
 		MintedByDisplayName: p.DisplayName,
 		Level:               h.levelOf(identity),
-		Namespaces:          []string{peer.Namespace},
+		Namespaces:          peer.Namespaces,
 		ExpiresAt:           &ends,
 		ClientDID:           peer.DID,
 	})

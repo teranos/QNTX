@@ -15,25 +15,32 @@ import (
 
 // "do you think k could keep a trusted cached copy ?"
 // The primary is the only writer of a line. A peer asks it for the ones about
-// the namespace it serves, keeps the answer, and answers from it.
+// the namespaces it serves, keeps the answer, and answers from it.
 
-// linesPath is where a node asks the primary for its lines.
-const linesPath = "/auth/lines"
+// linesPath is where a node asks the primary for its lines. A peer still asking
+// at /auth/lines, which answered one namespace, is answered nothing there and
+// keeps the lines it last heard.
+const linesPath = "/auth/lines/served"
 
 // LinesEvery is how often a peer asks again, and so the longest a revoke on the
 // primary still acts here.
 const LinesEvery = 30 * time.Second
 
-// heldLines is what the primary said: the grants in one namespace, and what the
-// roles those grants name may say.
+// heldLines is what the primary said: the grants in each namespace a peer
+// serves, and what the roles those grants name may say.
 type heldLines struct {
+	Namespaces []namespaceLines `json:"namespaces"`
+	Words      []WordLine       `json:"words"`
+}
+
+// namespaceLines is the grants in one namespace.
+type namespaceLines struct {
 	Namespace string     `json:"namespace"`
 	Roles     []RoleLine `json:"roles"`
-	Words     []WordLine `json:"words"`
 }
 
 // handleLines answers a peer, signing as its did:key, with the lines about the
-// namespace it was declared serving and nothing else.
+// namespaces it was declared serving and nothing else.
 func (h *Handler) handleLines(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -58,17 +65,21 @@ func (h *Handler) handleLines(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusUnauthorized, "only a node asks for lines")
 		return
 	}
-	h.writeJSON(w, http.StatusOK, h.linesAbout(asker.Namespace))
+	h.writeJSON(w, http.StatusOK, h.linesAbout(asker.Namespaces))
 }
 
-// linesAbout is every grant in a namespace, and every word line naming a role
-// one of them names. A word line about roles nobody here holds is not the
-// peer's business.
-func (h *Handler) linesAbout(namespace string) heldLines {
-	answer := heldLines{Namespace: namespace, Roles: h.roleLines(namespace)}
+// linesAbout is every grant in each namespace served, and every word line
+// naming a role one of them names. A word line about roles nobody there holds
+// is not the peer's business.
+func (h *Handler) linesAbout(served []string) heldLines {
+	answer := heldLines{Namespaces: make([]namespaceLines, 0, len(served))}
 	var named []string
-	for _, line := range answer.Roles {
-		named = append(named, line.Roles...)
+	for _, namespace := range served {
+		roles := h.roleLines(namespace)
+		answer.Namespaces = append(answer.Namespaces, namespaceLines{Namespace: namespace, Roles: roles})
+		for _, line := range roles {
+			named = append(named, line.Roles...)
+		}
 	}
 	for _, line := range h.wordLines() {
 		if slices.ContainsFunc(line.Roles, func(role string) bool { return slices.Contains(named, role) }) {
@@ -96,18 +107,21 @@ func (h *Handler) LinesFromThePrimary() (*PrimaryLines, bool) {
 	return &PrimaryLines{h: h}, true
 }
 
-// RoleLines is the primary's grants, in the one namespace it said they are
-// about. Any other namespace holds none here.
+// RoleLines is the primary's grants, in a namespace it said they are about.
+// Any other namespace holds none here.
 func (p *PrimaryLines) RoleLines(namespace string) ([]RoleLine, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.heard {
 		return nil, errors.Newf("%s has not said what the lines are yet", p.h.loginAt)
 	}
-	if slug.Of(namespace) != slug.Of(p.held.Namespace) {
+	at := slices.IndexFunc(p.held.Namespaces, func(held namespaceLines) bool {
+		return slug.Of(held.Namespace) == slug.Of(namespace)
+	})
+	if at < 0 {
 		return []RoleLine{}, nil
 	}
-	return p.held.Roles, nil
+	return p.held.Namespaces[at].Roles, nil
 }
 
 // WordLines is what the roles the primary granted here may say.

@@ -33,7 +33,7 @@ func registered(t *testing.T) (*Handler, *memTokenStore, ed25519.PrivateKey, str
 	t.Helper()
 	h, store, _ := authorizingHandler(t)
 	key, did := otherNode(t)
-	require.NoError(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin, elsewhereOrigin))
+	require.NoError(t, h.DeclarePeer(peerName, did, []string{NamespaceDefault}, elsewhereOrigin, elsewhereOrigin))
 	return h, store, key, did
 }
 
@@ -104,7 +104,7 @@ func TestANodeNotDeclaredIsRefused(t *testing.T) {
 func TestNoClientGetsATokenOfItsOwn(t *testing.T) {
 	h, store, appDID := authorizingHandler(t)
 	key, nodeDID := otherNode(t)
-	require.NoError(t, h.DeclarePeer(peerName, nodeDID, NamespaceDefault, elsewhereOrigin, elsewhereOrigin))
+	require.NoError(t, h.DeclarePeer(peerName, nodeDID, []string{NamespaceDefault}, elsewhereOrigin, elsewhereOrigin))
 
 	app := url.Values{}
 	app.Set("grant_type", "client_credentials")
@@ -146,7 +146,7 @@ func TestAPeerOverATunnelIsSentPeopleBackAtItsReturnAddress(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
 	_, did := otherNode(t)
 	const tunnel, loopback = "http://10.0.0.2:8770", "http://peer.localhost:8770"
-	require.NoError(t, h.DeclarePeer(peerName, did, NamespaceDefault,tunnel, loopback))
+	require.NoError(t, h.DeclarePeer(peerName, did, []string{NamespaceDefault}, tunnel, loopback))
 	_, challenge := pkcePair()
 
 	refused := httptest.NewRecorder()
@@ -167,22 +167,47 @@ func TestDeclaringAPeerSaysWhatItRefuses(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
 	_, did := otherNode(t)
 	_, other := otherNode(t)
-	assert.Error(t, h.DeclarePeer(peerName, "did:web:node.example", NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "not a did:key")
-	assert.Error(t, h.DeclarePeer(peerName, "", NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "no did")
-	assert.Error(t, h.DeclarePeer(peerName, did, "", elsewhereOrigin, elsewhereOrigin), "no namespace")
-	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,"", elsewhereOrigin), "no origin")
-	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,"elsewhere.node.test", elsewhereOrigin), "not an absolute origin")
-	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin+"/somewhere", elsewhereOrigin), "a path is no origin")
-	assert.Error(t, h.DeclarePeer("", did, NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "no name")
-	assert.Error(t, h.DeclarePeer("a/b", did, NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "a name a path cannot carry")
-	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin, ""), "no return address")
-	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin, "peer.localhost"), "a return address that is not an origin")
-	assert.Error(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin, "http://peer.localhost/back"), "a return address with a path")
-	require.NoError(t, h.DeclarePeer(peerName, did, NamespaceDefault,elsewhereOrigin+"/", elsewhereOrigin))
-	assert.Error(t, h.DeclarePeer("again", did, NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "the same peer twice")
-	assert.Error(t, h.DeclarePeer(peerName, other, NamespaceDefault, elsewhereOrigin, elsewhereOrigin), "two peers by one name")
+	assert.Error(t, h.DeclarePeer(peerName, "did:web:node.example", []string{NamespaceDefault}, elsewhereOrigin, elsewhereOrigin), "not a did:key")
+	assert.Error(t, h.DeclarePeer(peerName, "", []string{NamespaceDefault}, elsewhereOrigin, elsewhereOrigin), "no did")
+	assert.Error(t, h.DeclarePeer(peerName, did, nil, elsewhereOrigin, elsewhereOrigin), "no namespace")
+	assert.Error(t, h.DeclarePeer(peerName, did, []string{"Ground", " "}, elsewhereOrigin, elsewhereOrigin), "a namespace that names none")
+	assert.Error(t, h.DeclarePeer(peerName, did, []string{"Ground", "ground"}, elsewhereOrigin, elsewhereOrigin), "one namespace twice")
+	assert.Error(t, h.DeclarePeer(peerName, did, []string{NamespaceDefault}, "", elsewhereOrigin), "no origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, []string{NamespaceDefault}, "elsewhere.node.test", elsewhereOrigin), "not an absolute origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, []string{NamespaceDefault}, elsewhereOrigin+"/somewhere", elsewhereOrigin), "a path is no origin")
+	assert.Error(t, h.DeclarePeer("", did, []string{NamespaceDefault}, elsewhereOrigin, elsewhereOrigin), "no name")
+	assert.Error(t, h.DeclarePeer("a/b", did, []string{NamespaceDefault}, elsewhereOrigin, elsewhereOrigin), "a name a path cannot carry")
+	assert.Error(t, h.DeclarePeer(peerName, did, []string{NamespaceDefault}, elsewhereOrigin, ""), "no return address")
+	assert.Error(t, h.DeclarePeer(peerName, did, []string{NamespaceDefault}, elsewhereOrigin, "peer.localhost"), "a return address that is not an origin")
+	assert.Error(t, h.DeclarePeer(peerName, did, []string{NamespaceDefault}, elsewhereOrigin, "http://peer.localhost/back"), "a return address with a path")
+	require.NoError(t, h.DeclarePeer(peerName, did, []string{NamespaceDefault}, elsewhereOrigin+"/", elsewhereOrigin))
+	assert.Error(t, h.DeclarePeer("again", did, []string{NamespaceDefault}, elsewhereOrigin, elsewhereOrigin), "the same peer twice")
+	assert.Error(t, h.DeclarePeer(peerName, other, []string{"orchard"}, elsewhereOrigin, elsewhereOrigin), "two peers by one name")
 
 	client, ok := h.clientByDID(did)
 	require.True(t, ok)
 	assert.Equal(t, nodeReturn, client.ReturnAddress)
+}
+
+// A namespace lives at one peer, and the primary says which.
+func TestANamespaceLivesAtOnePeer(t *testing.T) {
+	h, _, _ := authorizingHandler(t)
+	_, north := otherNode(t)
+	_, south := otherNode(t)
+	require.NoError(t, h.DeclarePeer("north", north, []string{"Ground", "pond"}, elsewhereOrigin, elsewhereOrigin))
+	assert.Error(t, h.DeclarePeer("south", south, []string{NamespaceDefault, "Pond"}, "http://10.0.0.3:8770", "http://south.localhost:8770"),
+		"pond lives at north, so south does not serve it too")
+	require.NoError(t, h.DeclarePeer("south", south, []string{NamespaceDefault}, "http://10.0.0.3:8770", "http://south.localhost:8770"))
+
+	home, lives := h.HomeOf("pond")
+	require.True(t, lives)
+	assert.Equal(t, north, home.DID)
+	home, lives = h.HomeOf("ground")
+	require.True(t, lives, "a namespace is reached by its slug")
+	assert.Equal(t, north, home.DID)
+	home, lives = h.HomeOf(NamespaceDefault)
+	require.True(t, lives)
+	assert.Equal(t, south, home.DID)
+	_, lives = h.HomeOf("orchard")
+	assert.False(t, lives, "no peer serves orchard")
 }

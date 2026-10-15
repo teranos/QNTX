@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -453,7 +454,7 @@ func (s *oauthStore) GetRefreshTokenSession(_ context.Context, signature string,
 		MintedByDisplayName: grant.MintedByDisplayName,
 		// The client's, as it is now: a client moved since is where the
 		// connector acts from this refresh on.
-		Namespace: client.Namespace,
+		Namespaces: slices.Clone(client.Namespaces),
 	}
 	session.SetExpiresAt(fosite.RefreshToken, until)
 	request := fosite.NewRequest()
@@ -497,12 +498,12 @@ func namespaceOf(grant Grant) string {
 }
 
 // namespacesOf is where a token issued under this session acts: the client's
-// door, or none.
+// door or the namespaces a peer serves, or none.
 func namespacesOf(session *TokenSession) []string {
-	if session.Namespace == "" {
+	if len(session.Namespaces) == 0 {
 		return nil
 	}
-	return []string{session.Namespace}
+	return slices.Clone(session.Namespaces)
 }
 
 // clientFor is the client as fosite holds it. A node is sent a code for the
@@ -589,7 +590,7 @@ func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {
 	if session, ok := request.GetSession().(*TokenSession); ok {
 		h.logger.Infow("A code was exchanged for a token",
 			"client", request.GetClient().GetID(), "did", session.DID, "minted_by", session.MintedBy,
-			"namespace", session.Namespace)
+			"namespaces", session.Namespaces)
 	}
 	provider.WriteAccessResponse(ctx, w, request, response)
 }
@@ -704,7 +705,7 @@ func (h *Handler) handleAuthorizeDone(w http.ResponseWriter, r *http.Request) {
 		MintedBy:            held.identity,
 		MintedByUser:        held.userID,
 		MintedByDisplayName: held.name,
-		Namespace:           client.Namespace,
+		Namespaces:          slices.Clone(client.Namespaces),
 	}
 	response, err := provider.NewAuthorizeResponse(ctx, parked.request, session)
 	if err != nil {
