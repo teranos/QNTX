@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -102,6 +103,36 @@ func TestANodeWithNoNamespacesSaysNothing(t *testing.T) {
 	logs := heard(nil, map[string]appcfg.DoorConfig{"pond": {RPID: "pond.example"}})
 
 	assert.Zero(t, logs.Len())
+}
+
+// "i would want to give each invited user their own namespace for their startup"
+
+// An invitation into pond, on a node that keeps Pond, names Pond: met at the
+// slug, the way a door is.
+func TestAnInvitationNamesANamespaceTheNodeKeeps(t *testing.T) {
+	kept := invitationNamespace(func() storage.Namespaces { return heldNamespaces{names: []string{"garden", "Pond"}} })
+	name, err := kept("pond")
+	require.NoError(t, err)
+	assert.Equal(t, "Pond", name)
+}
+
+// A namespace the node does not keep is refused, naming it.
+func TestAnInvitationIntoANamespaceTheNodeDoesNotKeepIsRefused(t *testing.T) {
+	kept := invitationNamespace(func() storage.Namespaces { return heldNamespaces{names: []string{"garden"}} })
+	_, err := kept("pond")
+	var refused auth.NamespaceRefused
+	require.True(t, errors.As(err, &refused), "%v", err)
+	assert.Contains(t, refused.Said, "pond")
+}
+
+// A node that keeps every attestation in one namespace refuses any.
+func TestAnInvitationOnANodeWithNoNamespacesIsRefused(t *testing.T) {
+	kept := invitationNamespace(func() storage.Namespaces { return nil })
+	_, err := kept("pond")
+	var refused auth.NamespaceRefused
+	require.True(t, errors.As(err, &refused), "%v", err)
+	assert.Contains(t, refused.Said, "this node keeps every attestation in one namespace")
+	assert.Contains(t, refused.Said, "pond")
 }
 
 // A store that will not answer is the node's problem, not the door's. It is

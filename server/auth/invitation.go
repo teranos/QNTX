@@ -50,6 +50,7 @@ type Invitation struct {
 	ID          string              `json:"id"`
 	Email       string              `json:"email"`
 	DisplayName string              `json:"display_name,omitempty"`
+	Namespace   string              `json:"namespace"` // where the User it makes stands; empty is none
 	Accounts    []InvitationAccount `json:"accounts"`
 	InvitedBy   string              `json:"invited_by"`
 	CreatedAt   int64               `json:"created_at"`
@@ -126,6 +127,29 @@ func (h *Handler) SetInvitationMail(mailer InvitationMailer, page string) {
 	h.invitePage = strings.TrimSuffix(page, "/")
 }
 
+// "i would want to give each invited user their own namespace for their startup"
+
+// NamespacesKept is the node's own name for the namespace an invitation
+// names, or NamespaceRefused saying why the node keeps no such namespace.
+type NamespacesKept func(asked string) (string, error)
+
+// NamespaceRefused is a namespace an invitation cannot name, and why.
+type NamespaceRefused struct{ Said string }
+
+func (e NamespaceRefused) Error() string { return e.Said }
+
+// SetNamespaces hands the handler what an invitation's namespace is held
+// against: what the doors are held against at startup.
+func (h *Handler) SetNamespaces(kept NamespacesKept) {
+	h.kept = kept
+}
+
+// namesANamespace is whether ROOT wrote a namespace at all: a character that
+// is not a space. One that writes none makes a User that stands in none.
+func namesANamespace(asked string) bool {
+	return strings.ContainsFunc(asked, func(r rune) bool { return !unicode.IsSpace(r) })
+}
+
 // invitationTable keeps invitations in the operational db.
 type invitationTable struct{ db *sql.DB }
 
@@ -136,12 +160,12 @@ func newInvitationTable(db *sql.DB) *invitationTable {
 	return &invitationTable{db: db}
 }
 
-const invitationColumns = `id, email, display_name, invited_by, created_at,
+const invitationColumns = `id, email, display_name, namespace, invited_by, created_at,
 	cancelled_at, accepted_by, accepted_at`
 
 func scanInvitation(row interface{ Scan(...any) error }) (Invitation, error) {
 	var inv Invitation
-	err := row.Scan(&inv.ID, &inv.Email, &inv.DisplayName, &inv.InvitedBy, &inv.CreatedAt,
+	err := row.Scan(&inv.ID, &inv.Email, &inv.DisplayName, &inv.Namespace, &inv.InvitedBy, &inv.CreatedAt,
 		&inv.CancelledAt, &inv.AcceptedBy, &inv.AcceptedAt)
 	inv.State = stateOf(inv)
 	return inv, err
@@ -161,9 +185,9 @@ func (t *invitationTable) put(inv Invitation, token string) (err error) {
 			}
 		}
 	}()
-	if _, err = tx.Exec(`INSERT INTO invitations (id, token_hash, email, display_name, invited_by, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		inv.ID, hashOf(token), inv.Email, inv.DisplayName, inv.InvitedBy, inv.CreatedAt); err != nil {
+	if _, err = tx.Exec(`INSERT INTO invitations (id, token_hash, email, display_name, namespace, invited_by, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		inv.ID, hashOf(token), inv.Email, inv.DisplayName, inv.Namespace, inv.InvitedBy, inv.CreatedAt); err != nil {
 		return errors.Wrapf(err, "failed to write invitation %s for %s", inv.ID, inv.Email)
 	}
 	for _, a := range inv.Accounts {
@@ -319,6 +343,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		DisplayName string              `json:"display_name"`
 		Email       string              `json:"email"`
 		Accounts    []InvitationAccount `json:"accounts"`
+		Namespace   string              `json:"namespace"`
 		// The page ROOT invited from, which the links open on.
 		Page string `json:"page"`
 	}
@@ -362,6 +387,20 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		seen[a.Provider] = true
 		accounts = append(accounts, a)
 	}
+	namespace := strings.TrimSpace(body.Namespace)
+	if namesANamespace(namespace) {
+		kept, err := h.kept(namespace)
+		var refused NamespaceRefused
+		if errors.As(err, &refused) {
+			h.writeError(w, http.StatusBadRequest, refused.Said)
+			return
+		}
+		if err != nil {
+			h.writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		namespace = kept
+	}
 	page, ok := h.ownPage(body.Page)
 	if !ok {
 		h.writeError(w, http.StatusBadRequest, "page "+body.Page+" is not on an origin in auth.rp_origins")
@@ -379,7 +418,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		return
 	}
 	inv := Invitation{
-		ID: id, Email: email, DisplayName: name, Accounts: accounts,
+		ID: id, Email: email, DisplayName: name, Namespace: namespace, Accounts: accounts,
 		InvitedBy: p.UserID, CreatedAt: time.Now().UTC().UnixMilli(), State: invitationOpen,
 	}
 	if err := h.invitations.put(inv, token); err != nil {
@@ -387,7 +426,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request, p Presented) {
 		return
 	}
 	h.attest(PredicateInvited, route, map[string]any{
-		"invitation": id, "email": email, "display_name": name, "accounts": accounts, "by": p.UserID,
+		"invitation": id, "email": email, "display_name": name, "namespace": namespace, "accounts": accounts, "by": p.UserID,
 	})
 
 	inviter := p.DisplayName
@@ -577,6 +616,7 @@ func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (strin
 			Level:          LevelUser,
 			CreatedBy:      inv.InvitedBy,
 			DisplayName:    inv.DisplayName,
+			Namespace:      inv.Namespace,
 			CreatedAt:      now,
 			EmailAddresses: []string{inv.Email},
 		}, route, matched)
@@ -597,7 +637,7 @@ func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (strin
 	}
 	h.logger.Infow("User made USER by an invitation", "user", u.ID, "route", route, "invitation", inv.ID, "by", inv.InvitedBy, "was", existing.Level)
 	h.attest(PredicateUserCreated, route, map[string]any{
-		"user": u.ID, "invitation": inv.ID, "level": string(u.Level), "by": inv.InvitedBy, "email": inv.Email,
+		"user": u.ID, "invitation": inv.ID, "level": string(u.Level), "by": inv.InvitedBy, "email": inv.Email, "namespace": inv.Namespace,
 	})
 	return route, matched, true, nil
 }
@@ -608,11 +648,12 @@ func (h *Handler) acceptInvitation(token string, vouched []SignedBinding) (strin
 
 // "instead of SUPER, lets just mke a new level called USER"
 
-// raised is a public registration made USER by ROOT's invitation: no longer
-// at one door, made by ROOT, and holding what the provider just vouched.
+// raised is a public registration made USER by ROOT's invitation: standing
+// where the invitation names rather than at its door, made by ROOT, and
+// holding what the provider just vouched.
 func raised(u User, inv Invitation, route string, matched *SignedBinding) User {
 	u.Level = LevelUser
-	u.Namespace = ""
+	u.Namespace = inv.Namespace
 	u.CreatedBy = inv.InvitedBy
 	if u.DisplayName == "" {
 		u.DisplayName = inv.DisplayName

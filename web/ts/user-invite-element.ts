@@ -40,6 +40,8 @@ export interface InvitationAccount {
 export interface InvitationBody {
     display_name: string;
     email: string;
+    /** Where the User it makes stands. Empty is none. */
+    namespace: string;
     accounts: InvitationAccount[];
 }
 
@@ -161,6 +163,8 @@ export function renderInvite(
 
     const name = textField('display_name', 'text', 'what to call them');
     const email = textField('email', 'email', 'friend@example.com');
+    // "i would want to give each invited user their own namespace for their startup"
+    const namespace = textField('namespace', 'text', 'none');
 
     // In the order the node lists the providers, whichever were pressed.
     const accounts = document.createElement('div');
@@ -207,7 +211,7 @@ export function renderInvite(
             if (!at) throw new Error(`no ${row.provider.label} account`);
             named.push({ provider: row.provider.id, account: at });
         }
-        await send({ display_name: name.value.trim(), email: address, accounts: named });
+        await send({ display_name: name.value.trim(), email: address, namespace: namespace.value.trim(), accounts: named });
         said.textContent = `invitation sent to ${address}`;
         onInvited?.();
     });
@@ -215,6 +219,7 @@ export function renderInvite(
     content.append(
         labelled('Name', name),
         labelled('Invitation mail', email),
+        labelled('Namespace', namespace),
         labelled('Signs in with', toggles, 'div'),
         accounts,
         sendButton.element,
@@ -254,6 +259,8 @@ export interface InvitationRecord {
     id: string;
     email: string;
     display_name?: string;
+    /** Where the User it makes stands. Empty is none. */
+    namespace: string;
     accounts: InvitationAccount[];
     invited_by: string;
     created_at: number;
