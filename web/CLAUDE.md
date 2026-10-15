@@ -28,6 +28,8 @@ Handlers register via `registerHandler(type, handler)` and MUST `unregisterHandl
 
 Dark-mode first. Design tokens in `tokens.css`. **`!important` is banned.** Fix specificity at the source.
 
+**Text size is @teranos/elements'.** "There's no doubt in my mind that Elements owns it's own font sizes." Size text with `sizeText(node, 'xs' | 'sm' | 'md' | 'lg')`; a font size written anywhere in QNTX web stops the build: in TypeScript by ESLint (`NO_FONT_SIZE`), in a stylesheet or `index.html` by `font-size-ban.ts`. Both run in `bun run lint`.
+
 Z-index hierarchy:
 
 - Loading screen: 200000

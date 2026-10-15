@@ -85,6 +85,8 @@
         "web/package.json",
         "web/eslint.config.js",
         "web/eslint-suppressions.json",
+        "web/**/*.css",
+        "web/index.html",
         ".github/workflows/ts.yml",
         "web/browser/**"
       ]
