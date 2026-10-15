@@ -41,6 +41,7 @@ export const Comet = '☄';       // one repository as a comet: the ground built
 export const Parity = '≍';     // a signum held to a reference it follows
 export const Claude = '✻';     // the ROOT agent: Claude Code, run by the node as itself
 export const Pi = 'π';         // the ROOT agent in Pi, its other harness
+export const Agent = '✦';      // the agent of a namespace, shared by everyone who has reach on it, on its own sign-in
 
 /** Segment to its glyph. */
 export const CommandToSymbol: Record<string, string> = {

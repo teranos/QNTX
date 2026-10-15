@@ -25,6 +25,9 @@ export interface ClaudeAm {
     answering: boolean;
     claude_code: string;
     not_ready: string;
+    // Whether Claude Code says it is signed in, by claude login, and how.
+    signed_in: boolean;
+    auth_method: string;
 }
 
 // What it answered (claude say).
