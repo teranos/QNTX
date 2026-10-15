@@ -138,7 +138,7 @@ function invitationRow(inv: InvitationRecord): TableRow<typeof HEADS> {
     pill.className = 'element-pill element-pill-invited';
     pill.textContent = 'invited';
     status.appendChild(pill);
-    return { cells: [name, stacked('invited', '—'), cell(fmt(inv.created_at), 'element-time'), status] };
+    return { cells: [name, stacked('invited', inv.namespace), cell(fmt(inv.created_at), 'element-time'), status] };
 }
 
 /** The invitations ROOT sent. A node that will not list them still lists its

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -375,6 +376,117 @@ func TestRootCancelsTheInvitation(t *testing.T) {
 	})
 	assert.Equal(t, http.StatusForbidden, arrived.Code, arrived.Body.String())
 	assert.Len(t, store.held, 1)
+}
+
+// "i would want to give each invited user their own namespace for their startup"
+
+// keeping is a node that keeps the namespaces named, and refuses every other
+// as the server does (server/sub_auth.go invitationNamespace, tested there).
+func keeping(h *Handler, names ...string) {
+	h.SetNamespaces(func(asked string) (string, error) {
+		if slices.Contains(names, asked) {
+			return asked, nil
+		}
+		return "", NamespaceRefused{Said: "the node does not serve " + asked}
+	})
+}
+
+const timToPond = `{"display_name":"Tim","email":"tim@example.com","namespace":"pond","accounts":[{"provider":"google","account":"tim@example.com"}]}`
+
+// ROOT invites Tim into pond: the invitation, the list, and identity:invited
+// all say pond.
+func TestAnInvitationNamesANamespaceTheNodeKeeps(t *testing.T) {
+	h, _, rootSession, _, _ := invitingHandler(t)
+	keeping(h, "pond", "garden")
+	wrote := &memAttestor{}
+	attestingNode(t, h, wrote)
+
+	rec := inviting(h, rootSession, timToPond)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	var made Invitation
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &made))
+	assert.Equal(t, "pond", made.Namespace)
+
+	held, err := h.invitations.list()
+	require.NoError(t, err)
+	require.Len(t, held, 1)
+	assert.Equal(t, "pond", held[0].Namespace)
+
+	require.Equal(t, []string{PredicateInvited}, wrote.predicates())
+	assert.Equal(t, "pond", wrote.wrote[0].Attributes["namespace"])
+}
+
+// A namespace the node does not keep is refused by name, and nothing is sent.
+func TestAnInvitationToANamespaceTheNodeDoesNotKeepIsRefused(t *testing.T) {
+	h, _, rootSession, box, _ := invitingHandler(t)
+	keeping(h, "garden")
+
+	rec := inviting(h, rootSession, timToPond)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "the node does not serve pond")
+	assert.Empty(t, box.sent)
+}
+
+// No namespace written is a User that stands in none, asked of nobody.
+func TestAnInvitationWithNoNamespaceStandsInNone(t *testing.T) {
+	h, _, rootSession, _, _ := invitingHandler(t)
+	rec := inviting(h, rootSession, `{"email":"spike@example.com","namespace":"  ","accounts":[{"provider":"google","account":"spike@example.com"}]}`)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	var made Invitation
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &made))
+	assert.Empty(t, made.Namespace)
+}
+
+// Tim arrives and stands in pond; identity:created says so.
+func TestTheInviteeStandsInTheNamespaceTheInvitationNames(t *testing.T) {
+	h, store, rootSession, box, signer := invitingHandler(t)
+	keeping(h, "pond")
+	wrote := &memAttestor{}
+	attestingNode(t, h, wrote)
+	require.Equal(t, http.StatusCreated, inviting(h, rootSession, timToPond).Code)
+	token := tokenIn(t, nodeBody(t, box.sent[0].mail, services.MailHTML), "?invitation=")
+
+	browser := newBrowser(t)
+	rec := inviteeArrives(t, h, browser, token, []SignedBinding{
+		vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:210", "tim@example.com"),
+	})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Len(t, store.held, 2)
+	assert.Equal(t, "pond", store.held[1].Namespace)
+
+	var created map[string]any
+	for _, as := range wrote.wrote {
+		if as.Predicates[0] == PredicateUserCreated {
+			created = as.Attributes
+		}
+	}
+	require.NotNil(t, created, "identity:created was not attested")
+	assert.Equal(t, "pond", created["namespace"])
+}
+
+// Spike registered at the garden door; ROOT's invitation into pond raises him
+// to stand in pond.
+func TestARaisedPublicRegistrationStandsWhereTheInvitationNames(t *testing.T) {
+	h, store, rootSession, box, signer := invitingHandler(t)
+	keeping(h, "pond", "garden")
+	require.NoError(t, store.Put(User{
+		ID: "US-SPIKE-garden", Level: LevelPublicRegistration, Namespace: "garden",
+		Accounts: []UserAccount{{Provider: "google", CanonicalID: "google:310", Handle: "spike@example.com"}},
+	}))
+	require.Equal(t, http.StatusCreated, inviting(h, rootSession,
+		`{"email":"spike@example.com","namespace":"pond","accounts":[{"provider":"google","account":"spike@example.com"}]}`).Code)
+	token := tokenIn(t, nodeBody(t, box.sent[0].mail, services.MailHTML), "?invitation=")
+
+	browser := newBrowser(t)
+	rec := inviteeArrives(t, h, browser, token, []SignedBinding{
+		vouch(t, signer, browser.Public().(ed25519.PublicKey), "google", "google:310", "spike@example.com"),
+	})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	raised, found, err := store.ByRoute("google:310")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, LevelUser, raised.Level)
+	assert.Equal(t, "pond", raised.Namespace)
 }
 
 // nodeBody is the body of a kind a node mail is sent in.
