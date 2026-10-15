@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { resolveBackend, resolveCredential, resolveOrigin, resolveDevPluginDirs, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath, prefixesOf } from './dev-proxy';
+import { resolveBackend, resolveCredential, resolveOrigin, resolveDevPluginDirs, backendHeaders, dropSetCookie, fromBackend, backendWsUrl, isBackendPath, prefixesOf } from './dev-proxy';
 
 describe('resolveBackend', () => {
     test('a port on this machine is still the default', () => {
@@ -74,6 +74,13 @@ describe('backendHeaders', () => {
         const h = backendHeaders(new Headers({ Host: 'localhost:8820' }), {}, '');
         expect(h.get('Host')).toBeNull();
     });
+
+    test('to a node on this machine the browser’s own cookie goes through as it came', () => {
+        const incoming = new Headers({ Cookie: 'qntx_session=mine', Authorization: 'Bearer made-up' });
+        const h = backendHeaders(incoming, { browser: true }, '');
+        expect(h.get('Cookie')).toBe('qntx_session=mine');
+        expect(h.get('Authorization')).toBeNull();
+    });
 });
 
 describe('resolveOrigin', () => {
@@ -97,6 +104,28 @@ describe('resolveCredential', () => {
 
     test('neither is empty, not a guess', () => {
         expect(resolveCredential({})).toEqual({});
+    });
+
+    test('a node on this machine is the browser’s own, whatever token is held', () => {
+        const local = resolveBackend({ QNTX_BACKEND: 'http://127.0.0.1:8780' }, 8770);
+        expect(resolveCredential({ QNTX_TOKEN: 'tok_7' }, 'held', local)).toEqual({ browser: true });
+    });
+
+    test('a node elsewhere is still presented the held token', () => {
+        const remote = resolveBackend({ QNTX_BACKEND: 'https://q.sbvh.nl' }, 8770);
+        expect(resolveCredential({}, 'held', remote)).toEqual({ token: 'held' });
+    });
+});
+
+describe('fromBackend', () => {
+    test('a node on this machine sets the browser’s cookie, so a login there lands', () => {
+        const r = new Response('ok', { headers: { 'Set-Cookie': 'qntx_session=x; HttpOnly' } });
+        expect(fromBackend(r, { browser: true }).headers.getSetCookie()).toEqual(['qntx_session=x; HttpOnly']);
+    });
+
+    test('a node elsewhere never hands the browser its cookie', () => {
+        const r = new Response('ok', { headers: { 'Set-Cookie': 'qntx_session=x; Secure' } });
+        expect(fromBackend(r, { token: 'tok_7' }).headers.getSetCookie()).toEqual([]);
     });
 });
 

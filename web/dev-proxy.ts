@@ -25,6 +25,8 @@ export function resolveBackend(env: Record<string, string | undefined>, backendP
 export interface Credential {
     token?: string;
     session?: string;
+    // A node on this machine is the browser's own: its cookie goes through as it came.
+    browser?: true;
 }
 
 /** A token is preferred: it is minted, scoped and revocable on its own (ADR-025). */
@@ -32,7 +34,12 @@ export interface Credential {
 // `held` is what ~/.qntx/token holds, which is where this machine keeps the one
 // every other tool here already uses. Asking the operator to hand it over again
 // through the environment is asking for a thing they have already given.
-export function resolveCredential(env: Record<string, string | undefined>, held = ''): Credential {
+export function resolveCredential(env: Record<string, string | undefined>, held = '', backend?: Backend): Credential {
+    // The page and a node on this machine share a host, so the browser already
+    // holds the node's cookie, and the relay presents nothing of its own.
+    if (backend && !backend.isRemote) {
+        return { browser: true };
+    }
     if (env.QNTX_TOKEN) {
         return { token: env.QNTX_TOKEN };
     }
@@ -64,6 +71,13 @@ export function backendHeaders(incoming: Headers, credential: Credential, origin
     }
     h.delete('host');
 
+    // To a node on this machine the browser speaks for itself: its cookie is the
+    // node's own, set at the same host, and only a bearer the page made up is dropped.
+    if (credential.browser) {
+        h.delete('authorization');
+        return h;
+    }
+
     // The relay authenticates as itself. Whatever the browser held is for the
     // dev server's own origin and means nothing to the node.
     h.delete('cookie');
@@ -88,6 +102,18 @@ export function dropSetCookie(response: Response): Response {
     const headers = new Headers(response.headers);
     headers.delete('set-cookie');
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+/**
+ * What goes back to the browser. From a node on this machine, everything: a
+ * login or a logout there sets the browser's own cookie. From anywhere else,
+ * never the node's cookie.
+ */
+export function fromBackend(response: Response, credential: Credential): Response {
+    if (credential.browser) {
+        return response;
+    }
+    return dropSetCookie(response);
 }
 
 /** What the node answers, by first segment. The root is the prefix of every

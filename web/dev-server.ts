@@ -10,7 +10,7 @@ import { promisify } from "util";
 import { parse as parseToml } from "smol-toml";
 import { readFileSync, existsSync } from "fs";
 import { join, extname } from "path";
-import { resolveBackend, resolveCredential, resolveOrigin, resolveDevPluginDirs, backendHeaders, dropSetCookie, backendWsUrl, isBackendPath } from "./dev-proxy";
+import { resolveBackend, resolveCredential, resolveOrigin, resolveDevPluginDirs, backendHeaders, fromBackend, backendWsUrl, isBackendPath } from "./dev-proxy";
 
 const execAsync = promisify(exec);
 
@@ -67,7 +67,8 @@ function heldToken(): string {
     }
 }
 
-const BACKEND_CREDENTIAL = resolveCredential(process.env, heldToken());
+// A node on this machine is spoken to by the browser itself, so the token is read only for one elsewhere.
+const BACKEND_CREDENTIAL = resolveCredential(process.env, BACKEND.isRemote ? heldToken() : '', BACKEND);
 
 // An anonymous relay renders every page signed out, and looks from the browser
 // exactly like a node that refused you.
@@ -97,12 +98,15 @@ const BUILD_DEBOUNCE = 300; // ms to wait before rebuilding
 interface WsRelay {
     path: string;
     origin: string;
+    // The browser's own cookie, which a node on this machine is handed as it came.
+    cookie: string;
     upstream?: WebSocket;
     pending?: (string | Uint8Array)[];
 }
 
 // Says which credential is in play without printing it.
 function credentialLabel(): string {
+    if (BACKEND_CREDENTIAL.browser) return "the browser's own cookie, as it came";
     if (BACKEND_CREDENTIAL.token) return "QNTX_TOKEN (bearer)";
     if (BACKEND_CREDENTIAL.session) return "QNTX_SESSION (cookie)";
     return "nothing — the node will refuse anything it gates";
@@ -214,6 +218,7 @@ async function startServer() {
                 const relay: WsRelay = {
                     path: url.pathname + url.search,
                     origin: req.headers.get("origin") || `http://localhost:${port}`,
+                    cookie: req.headers.get("cookie") || "",
                 };
                 if (srv.upgrade(req, { data: relay })) {
                     return undefined as unknown as Response;
@@ -327,7 +332,7 @@ async function startServer() {
                         body: req.body,
                         redirect: "manual",
                     });
-                    return dropSetCookie(response);
+                    return fromBackend(response, BACKEND_CREDENTIAL);
                 } catch (error) {
                     console.error(`${darkPink}Proxy error: ${req.method} ${url.pathname} -> ${backendUrl}${reset}`, error);
                     return new Response(`Backend unavailable at ${backendUrl}`, { status: 503 });
@@ -392,12 +397,12 @@ async function startServer() {
             open(ws) {
                 const path = (ws.data as { path: string }).path;
                 const target = backendWsUrl(BACKEND_URL, path);
+                const browserHeaders = new Headers({ Origin: (ws.data as WsRelay).origin });
+                if ((ws.data as WsRelay).cookie) {
+                    browserHeaders.set("Cookie", (ws.data as WsRelay).cookie);
+                }
                 const upstream = new WebSocket(target, {
-                    headers: backendHeaders(
-                        new Headers({ Origin: (ws.data as WsRelay).origin }),
-                        BACKEND_CREDENTIAL,
-                        BACKEND_ORIGIN,
-                    ),
+                    headers: backendHeaders(browserHeaders, BACKEND_CREDENTIAL, BACKEND_ORIGIN),
                 } as unknown as string[]);
 
                 const pending: (string | Uint8Array)[] = [];
@@ -444,9 +449,7 @@ async function startServer() {
 
     console.log(`${lightPink}Dev server: http://localhost:${port}${reset}`);
     console.log(`${lightPink}Backend: ${BACKEND_URL}${BACKEND.isRemote ? " (relayed)" : ""}${reset}`);
-    if (BACKEND.isRemote) {
-        console.log(`${dim}Presenting: ${credentialLabel()}${reset}`);
-    }
+    console.log(`${dim}Presenting: ${credentialLabel()}${reset}`);
     if (DEV_PLUGIN_DIRS.size > 0) {
         const listed = [...DEV_PLUGIN_DIRS].map(([name, dir]) => `${name} <- ${dir}`).join(", ");
         console.log(`${lightPink}Dev plugins: ${listed}${reset}`);
