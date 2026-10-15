@@ -396,4 +396,14 @@
 .claude-brand .claude-send:disabled { opacity: 0.5; }
 .claude-says { flex: 1; min-width: 0; resize: none; background: var(--bg-almost-black); color: var(--text-on-dark); border: 1px solid var(--border-on-dark); font: inherit; padding: 2px 4px; }
 
+/* Agent element: a namespace's agent, its sign-in by Claude Code's own flow over the Claude element's conversation */
+.agent-head { padding: 3px 6px; border-bottom: 1px solid var(--border-on-dark); color: var(--text-on-dark-secondary); font-size: var(--font-size-xs, 10px); overflow-wrap: break-word; word-break: break-word; flex-shrink: 0; }
+.agent-signin:not(:empty) { display: flex; flex-direction: column; gap: 6px; padding: 8px 6px; flex-shrink: 0; }
+.agent-said { color: var(--text-on-dark-secondary); font-size: 11px; line-height: 1.4; overflow-wrap: break-word; word-break: break-word; }
+.agent-url { color: var(--accent-on-dark); font-size: 11px; overflow-wrap: break-word; word-break: break-word; }
+.agent-code { background: var(--bg-almost-black); color: var(--text-on-dark); border: 1px solid var(--border-on-dark); font: inherit; padding: 2px 4px; }
+.agent-begin, .agent-finish { align-self: flex-start; }
+.agent-failed { padding: 0 6px; flex-shrink: 0; }
+.agent-talk { display: contents; }
+
 /* Ground and Comet wear ground.css. */

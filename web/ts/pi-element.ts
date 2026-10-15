@@ -44,6 +44,8 @@ export function asAm(is: PiAm): ClaudeAm {
         permission_mode: '', permission_modes: [], allow: [],
         session: is.session, answering: is.answering, claude_code: is.pi,
         not_ready: is.not_ready,
+        // Pi signs in by its gateway, not by claude login.
+        signed_in: true, auth_method: is.gateway,
     };
 }
 
