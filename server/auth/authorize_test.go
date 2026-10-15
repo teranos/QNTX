@@ -125,7 +125,7 @@ func TestTheCodeCarriesWhoSaidYes(t *testing.T) {
 		carried, ok := parked.request.GetSession().(*TokenSession)
 		require.True(t, ok, "the code's session is %T", parked.request.GetSession())
 		assert.Equal(t, mastodonAccount, carried.MintedBy)
-		assert.Equal(t, NamespaceDefault, carried.Namespace)
+		assert.Equal(t, []string{NamespaceDefault}, carried.Namespaces)
 		assert.Equal(t, did, parked.request.GetClient().GetID())
 		assert.False(t, parked.spent)
 	}

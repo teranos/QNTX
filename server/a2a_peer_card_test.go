@@ -65,7 +65,7 @@ func primaryOf(t *testing.T, peer *standInPeer) (*QNTXServer, map[auth.Level]str
 	namedNode(t)
 	srv, tokens := pluginServingServer(t, "fake")
 	keyedNode(srv)
-	require.NoError(t, srv.authHandler.DeclarePeer("orchardnode", peer.did, "orchard", peer.server.URL, peer.server.URL))
+	require.NoError(t, srv.authHandler.DeclarePeer("orchardnode", peer.did, []string{"orchard"}, peer.server.URL, peer.server.URL))
 	return srv, tokens
 }
 

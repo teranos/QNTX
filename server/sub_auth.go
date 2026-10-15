@@ -300,7 +300,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	}
 	// On the primary, its peers.
 	for _, peer := range s.deps.cfg.Nodes.Peers {
-		if err := authHandler.DeclarePeer(peer.Name, peer.DID, peer.Namespace, peer.Origin, peer.ReturnAddress); err != nil {
+		if err := authHandler.DeclarePeer(peer.Name, peer.DID, peer.Namespaces, peer.Origin, peer.ReturnAddress); err != nil {
 			return err
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/ory/fosite"
+	"github.com/teranos/QNTX/internal/named"
+	"github.com/teranos/QNTX/internal/slug"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -128,18 +131,37 @@ func names(word string) bool {
 	return strings.IndexFunc(word, unicode.IsLetter) >= 0
 }
 
+// The primary keeps where every namespace lives: at the peer nodes.peers
+// declares serving it, or here.
+
 // DeclarePeer makes a peer a client of this node, as nodes.peers names it:
-// what it is called here, its did:key, the namespace it serves, the origin it
+// what it is called here, its did:key, the namespaces it serves, the origin it
 // answers at, and the origin its people's browsers come back to.
-func (h *Handler) DeclarePeer(name, did, namespace, origin, returnAddress string) error {
-	name, did, namespace = strings.TrimSpace(name), strings.TrimSpace(did), strings.TrimSpace(namespace)
+func (h *Handler) DeclarePeer(name, did string, namespaces []string, origin, returnAddress string) error {
+	name, did = strings.TrimSpace(name), strings.TrimSpace(did)
 	if !names(name) || strings.ContainsAny(name, "/?#") {
 		return errors.Newf("nodes.peers names %s as %q, which is no name a path can carry", did, name)
 	}
 	// What it is told about a token is whether it acts there, so a peer
 	// declared without one would be told about none.
-	if !names(namespace) {
-		return errors.Newf("nodes.peers names %s with no namespace it serves", did)
+	declared, err := named.ItemsOf("nodes.peers, for the namespaces "+did+" serves,", namespaces)
+	if err != nil {
+		return err
+	}
+	served := make([]string, 0, len(declared.All()))
+	for _, written := range declared.All() {
+		namespace := strings.TrimSpace(written)
+		if !names(namespace) {
+			return errors.Newf("nodes.peers names %s serving %q, which names no namespace", did, written)
+		}
+		if slices.ContainsFunc(served, sameNamespace(namespace)) {
+			return errors.Newf("nodes.peers names %s serving %s twice", did, namespace)
+		}
+		// A namespace lives at one peer.
+		if home, lives := h.HomeOf(namespace); lives {
+			return errors.Newf("nodes.peers names %s and %s both serving %s, and a namespace lives at one", home.DID, did, namespace)
+		}
+		served = append(served, namespace)
 	}
 	key, err := DecodeUserDID(did)
 	if err != nil {
@@ -167,7 +189,7 @@ func (h *Handler) DeclarePeer(name, did, namespace, origin, returnAddress string
 	peers := map[string]Client{did: {
 		DID:           did,
 		Label:         name,
-		Namespace:     namespace,
+		Namespaces:    served,
 		ReturnAddress: returnTo.String() + elsewhereBackPath,
 		Origin:        parsed,
 		Node:          true,
@@ -198,4 +220,26 @@ func (h *Handler) peerNamed(name string) (Client, bool) {
 		}
 	}
 	return Client{}, false
+}
+
+// HomeOf is the peer a namespace lives at, as nodes.peers declares it, or
+// false for one no peer serves.
+func (h *Handler) HomeOf(namespace string) (Client, bool) {
+	for _, peer := range h.nodes {
+		if peer.Serves(namespace) {
+			return peer, true
+		}
+	}
+	return Client{}, false
+}
+
+// Serves is whether a client serves namespace: a peer, one of the namespaces
+// nodes.peers declares it serving; any other client, the door it was minted at.
+func (c Client) Serves(namespace string) bool {
+	return slices.ContainsFunc(c.Namespaces, sameNamespace(namespace))
+}
+
+// sameNamespace is whether a name is namespace, as a door reaches it: by slug.
+func sameNamespace(namespace string) func(string) bool {
+	return func(named string) bool { return slug.Of(named) == slug.Of(namespace) }
 }

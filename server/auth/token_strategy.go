@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/hex"
+	"slices"
 	"strings"
 	"time"
 
@@ -42,21 +43,23 @@ type TokenSession struct {
 	MintedBy            string `json:"minted_by"`
 	MintedByUser        string `json:"minted_by_user"`
 	MintedByDisplayName string `json:"minted_by_display_name"`
-	// Namespace is the door the client was minted at (ADR-032), which is
-	// where the token acts.
-	Namespace string `json:"namespace"`
+	// Namespaces are the client's (ADR-032): the door it was minted at, or the
+	// namespaces a peer serves, which is where the token acts.
+	Namespaces []string `json:"namespaces"`
 }
 
 // Clone is the whole session rather than the half a promoted method copies.
 // fosite clones the session on a refresh (flow_refresh.go), and
 // fosite.DefaultSession is embedded by value: the promoted Clone answers a
-// *DefaultSession, and the DID, the person and the namespace are gone with it.
-// The two maps are copied because a shared one is the same bug one level down.
+// *DefaultSession, and the DID, the person and the namespaces are gone with it.
+// The two maps and the namespaces are copied because a shared one is the same
+// bug one level down.
 func (s *TokenSession) Clone() fosite.Session {
 	if s == nil {
 		return nil
 	}
 	copied := *s
+	copied.Namespaces = slices.Clone(s.Namespaces)
 	copied.ExpiresAt = make(map[fosite.TokenType]time.Time, len(s.ExpiresAt))
 	for kind, at := range s.ExpiresAt {
 		copied.ExpiresAt[kind] = at

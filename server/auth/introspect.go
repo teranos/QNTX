@@ -2,12 +2,13 @@ package auth
 
 import (
 	"net/http"
+	"slices"
 	"time"
 )
 
 // Introspection (RFC 7662): a node asks this node whether a token it was
 // handed is live, and who and where it is. Only a node may ask, signing as
-// its did:key, and only about tokens that act where the node was registered.
+// its did:key, and only about tokens that act in a namespace it serves.
 
 // introspectPath is where a node asks.
 const introspectPath = "/auth/introspect"
@@ -66,10 +67,10 @@ func (h *Handler) handleIntrospect(w http.ResponseWriter, r *http.Request) {
 		h.writeJSON(w, http.StatusOK, introspection{})
 		return
 	}
-	// Where the asking node was registered, or every namespace by level (ADR-027).
-	if !admitted.MayActIn(asker.Namespace) {
+	// A namespace the asking node serves, or every namespace by level (ADR-027).
+	if !slices.ContainsFunc(asker.Namespaces, admitted.MayActIn) {
 		h.logger.Infow("Introspection answered inactive",
-			"asker", asker.DID, "asker_namespace", asker.Namespace, "token_namespaces", admitted.Namespaces)
+			"asker", asker.DID, "asker_namespaces", asker.Namespaces, "token_namespaces", admitted.Namespaces)
 		h.writeJSON(w, http.StatusOK, introspection{})
 		return
 	}

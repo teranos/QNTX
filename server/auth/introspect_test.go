@@ -90,13 +90,26 @@ func TestARevokedTokenIsInactiveToTheAskingNode(t *testing.T) {
 func TestAPeerLearnsWhoATokenInTheNamespaceItServesIs(t *testing.T) {
 	h, store, _ := authorizingHandler(t)
 	key, did := otherNode(t)
-	require.NoError(t, h.DeclarePeer(peerName, did, "Ground", elsewhereOrigin, elsewhereOrigin))
+	require.NoError(t, h.DeclarePeer(peerName, did, []string{"Ground"}, elsewhereOrigin, elsewhereOrigin))
 
 	answer := introspected(t, h, key, did, "one", mintedIn(t, store, "ground-writer", "Ground"))
 	assert.True(t, answer.Active)
 	assert.Equal(t, []string{"Ground"}, answer.Namespaces)
 
 	assert.False(t, introspected(t, h, key, did, "two", mintedIn(t, store, "default-writer", NamespaceDefault)).Active)
+}
+
+// A peer serving two namespaces is told about the tokens acting in either.
+func TestAPeerServingTwoNamespacesLearnsOfATokenInEither(t *testing.T) {
+	h, store, _ := authorizingHandler(t)
+	key, did := otherNode(t)
+	require.NoError(t, h.DeclarePeer(peerName, did, []string{"Ground", "pond"}, elsewhereOrigin, elsewhereOrigin))
+
+	assert.True(t, introspected(t, h, key, did, "one", mintedIn(t, store, "ground-writer", "Ground")).Active)
+	answer := introspected(t, h, key, did, "two", mintedIn(t, store, "pond-writer", "pond"))
+	assert.True(t, answer.Active)
+	assert.Equal(t, []string{"pond"}, answer.Namespaces)
+	assert.False(t, introspected(t, h, key, did, "three", mintedIn(t, store, "default-writer", NamespaceDefault)).Active)
 }
 
 // A token nobody issued is inactive, and says nothing more.
