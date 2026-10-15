@@ -474,12 +474,13 @@ export function field(label: string, type: string, placeholder = ''): DoorField 
 }
 
 /**
- * Whether the dev server is serving this against a node that is not this origin.
- * The relay omits __BACKEND_URL__ exactly then, to keep the node unnamed here.
+ * Whether the dev server presents a credential of its own to the node, so the
+ * session is the relay's and not this browser's. It says so exactly then; a
+ * node on the same machine is spoken to with the browser's own cookie.
  */
 export function relayed(): boolean {
-    const w = window as { __DEV__?: boolean; __BACKEND_URL__?: string };
-    return Boolean(w.__DEV__) && !w.__BACKEND_URL__;
+    const w = window as { __DEV__?: boolean; __RELAYED__?: boolean };
+    return Boolean(w.__DEV__) && Boolean(w.__RELAYED__);
 }
 
 /** The key: the way in where a passkey cannot reach, because a passkey is bound

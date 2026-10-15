@@ -342,11 +342,12 @@ async function startServer() {
             // Serve static files from dist
             if (url.pathname === "/" || url.pathname === "") {
                 const html = await Bun.file("../internal/server/dist/index.html").text();
-                // A relayed node is never named to the browser: backendUrl()
-                // falls back to this origin, so the credential stays on the hop.
-                const backendScript = BACKEND.isRemote
+                // The node is never named to the browser: backendUrl() falls back
+                // to this origin, so every cookie the node sets lands on one host.
+                // Relayed is said only when the credential on the hop is this server's.
+                const backendScript = BACKEND_CREDENTIAL.browser
                     ? ""
-                    : `<script>window.__BACKEND_URL__ = "${BACKEND_URL}";</script>`;
+                    : `<script>window.__RELAYED__ = true;</script>`;
                 // The Go binary serves this same file without it, so nothing
                 // gated on this can reach a deployment.
                 const devScript = `<script>window.__DEV__ = true;</script>`;
