@@ -29,9 +29,19 @@ let
       };
     }
   ];
+
+  # "when i do something, i want that the system understands that i am not to be scrutinised"
+  # The PR QNTX opens from the vault (syncbvh, docs-pr) is not built or checked.
+  notTheVault = "!(github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbvh-qntx[bot]' && github.head_ref == 'docs-pr')";
 in
 {
   name = "Nix";
+
+  # A newer push to the same ref makes this run's answer stale.
+  concurrency = {
+    group = "\${{ github.workflow }}-\${{ github.ref }}";
+    cancel-in-progress = true;
+  };
 
   on = {
     push.branches = [ "main" ];
@@ -49,6 +59,7 @@ in
   jobs = {
     # Fast formatting and pre-commit checks (run on both OS)
     lint = {
+      "if" = notTheVault;
       strategy.matrix.os = [ "ubuntu-latest" "macos-latest" ];
       runs-on = "\${{ matrix.os }}";
       steps = setup ++ [
@@ -66,6 +77,7 @@ in
 
     # Core Go binaries (parallel builds per OS)
     build-go = {
+      "if" = notTheVault;
       strategy.matrix = {
         os = [ "ubuntu-latest" "macos-latest" ];
         package = [ "qntx" ];
@@ -88,6 +100,7 @@ in
 
     # Documentation (single OS, includes link checking)
     build-docs = {
+      "if" = notTheVault;
       runs-on = "ubuntu-latest";
       steps = setup ++ [
         {

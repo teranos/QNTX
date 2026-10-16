@@ -1,6 +1,11 @@
 {
+  "concurrency": {
+    "cancel-in-progress": true,
+    "group": "${{ github.workflow }}-${{ github.ref }}"
+  },
   "jobs": {
     "build": {
+      "if": "!(github.event_name == 'push' && github.event.head_commit.author.name == 'sbvh-qntx[bot]' && startsWith(github.event.head_commit.message, 'syncbvh:'))",
       "permissions": {
         "contents": "write"
       },

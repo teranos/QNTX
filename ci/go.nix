@@ -71,10 +71,16 @@ in
 {
   name = "Go";
 
+  # A newer push to the same ref makes this run's answer stale.
+  concurrency = {
+    group = "\${{ github.workflow }}-\${{ github.ref }}";
+    cancel-in-progress = true;
+  };
+
   on = {
     pull_request = {
       branches = [ "main" ];
-      paths = goPaths ++ [ ".github/workflows/go.yml" ];
+      paths = goPaths ++ [ "internal/tools/nilcheck/**" "**/*.rs" ".github/workflows/go.yml" ];
     };
     push = {
       branches = [ "main" ];
@@ -96,6 +102,11 @@ in
           };
         })
       ] ++ toolchain ++ [
+        {
+          name = "nil is nil";
+          run = "go run ./internal/tools/nilcheck";
+        }
+
         {
           name = "Run tests";
           # Test with core tags to ensure we test what we ship

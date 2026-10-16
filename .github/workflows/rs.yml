@@ -1,4 +1,8 @@
 {
+  "concurrency": {
+    "cancel-in-progress": true,
+    "group": "${{ github.workflow }}-${{ github.ref }}"
+  },
   "jobs": {
     "ats-duckdb": {
       "name": "DuckDB Backend",

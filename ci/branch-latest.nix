@@ -17,7 +17,16 @@
     workflow_dispatch = null;
   };
 
+  # A newer push to the same branch makes this run's binary stale before it ships.
+  concurrency = {
+    group = "\${{ github.workflow }}-\${{ github.ref }}";
+    cancel-in-progress = true;
+  };
+
   jobs.build = {
+    # "when i do something, i want that the system understands that i am not to be scrutinised"
+    # A vault edit QNTX syncs (syncbvh) changes no code: no binary is built for it.
+    "if" = "!(github.event_name == 'push' && github.event.head_commit.author.name == 'sbvh-qntx[bot]' && startsWith(github.event.head_commit.message, 'syncbvh:'))";
     runs-on = "\${{ matrix.runner }}";
     permissions.contents = "write";
     strategy = {
