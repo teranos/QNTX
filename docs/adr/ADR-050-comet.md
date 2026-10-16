@@ -18,8 +18,8 @@ right?"
 
 
 - Normally, ground is compiled where it executes:
-	- `make install`, 
-	- from GitHub Releases (teranos/ground README).
+	- `make install`
+	- GitHub Releases
 - Its SessionStart asks GitHub for the latest tag once a day and tells the session when a newer one exists.
 - The latest release is v0.19.1, 2026-06-30. The operator's machine runs  v0.19.1-439-g4ec8488.
 
