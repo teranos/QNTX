@@ -27,7 +27,7 @@ right?"
 
 "And also a generalised project, 
 like universal ground scope"
-"that is 'normal' ground"
+"that is 'normal' ground not abstracted "
 
 "but also, tailed to the repo ground `project` pbt, which has more CTFE'able material assuredly"
 
