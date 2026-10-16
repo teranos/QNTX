@@ -3,12 +3,10 @@
 Date: 2026-10-16
 Status: Revised
 
-QNTX interacts with the Node Agent agents for use by ROOT.
+QNTX interacts with the Node Agent for use by ROOT.
 
-"an agent is itself"
 
-- In A2A's terms QNTX is the A2A Server: the endpoint, authentication and
-  authorization are the node's. Each agent it hosts is described by an Agent
+- In A2A's terms QNTX is the A2A Server: the endpoint, authentication and authorization are the node's. Each agent it hosts is described by an Agent
   Card and reached by its tenant (AgentInterface.tenant).
 - An agent has its own DID and attests as itself: `by` on what it writes is
   the agent.
