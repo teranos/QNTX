@@ -87,5 +87,4 @@ NO."
 - Jev's confidence on a merge: "the percentage doesn't make sense" there.
 - A press from the element that already stood when the page opened: the card
   starts undecided and says what stands in its context.
-- The second approval: "everyone get's their own mail address, and they get
-  it via ROOT approval" ([[ADR-047]]), and anything an agent asks. Out of scope.
+- The second approval: "everyone get's their own mail address, and they get it via ROOT approval" ([[ADR-047]]), and anything an agent asks. Out of scope.
