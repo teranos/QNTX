@@ -12,7 +12,7 @@ like earth,
 right?"
 
 - The node builds ground, and the build lands on the machine ground runs on.
-  [[ADR-027-Permissions]] 27-2 waits on this. 2026-10-16: but a
+  [[ADR-027-Permissions]] 27-2 waits on this. 2026-10-16: but actually, i think some work was done there, perhps check
 
 ## The flip
 
