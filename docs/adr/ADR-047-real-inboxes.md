@@ -40,8 +40,7 @@ the identity system, [[ADR-030-identity-providers]], and [[ADR-031-the-user]] at
 An `Email` is an attestation, not a JMAP object: `mail:received` and
 `mail:sent` of the address, the text in its attributes, an attachment by name, size and sha256 beside the stored mail. Its id is the ASID.
 
-A mailbox is one of three roles, `inbox`, `junk` and `sent`, and has no
-object of its own. SES's spam verdict is what puts mail in `junk`.
+A mailbox is one of three roles, `inbox`, `junk` and `sent`, and has no object of its own. SES's spam verdict is what puts mail in `junk`.
 
 A message SES's virus scan fails is never an `Email`: it is `mail:dropped`,
 and the stored copy is deleted.
