@@ -1,7 +1,7 @@
 # ADR-046: A plugin stands in a namespace
 
 Date: 2026-09-30
-Status: Proposed
+Status: Proposed (Accepted, please remove business )
 ## The problem
 
 Every plugin's services are started on the served universe, which is default
