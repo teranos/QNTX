@@ -23,7 +23,7 @@ right?"
 
 ## Per ground project
 
-"Tailored to the repository ground `project` pbt, which has CTFE'able material assuredly, for exampl"
+"Tailored to the repository ground `project` pbt, which has CTFE'able material assuredly, for example: filename paths for the "
 
 "so we can still have super fast hooks, and actually even faster when the builds are done by QNTX"
 
