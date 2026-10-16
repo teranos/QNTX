@@ -38,9 +38,30 @@
     cursor: pointer;
 }
 
+/* A row of presses wraps to the width it has: on a phone, ⍟'s ways ran 653px into 329px. */
 .element-actions {
-    text-align: right;
-    white-space: nowrap;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+/* The package injects its own `.element-table th { white-space: nowrap }` after
+   this sheet (table.ts ensureStyle), so this is said one step more specific: a
+   head wraps on a phone, where four heads do not fit on one line each. */
+table.element-table th {
+    white-space: normal;
+}
+
+/* The webhook's path is typed into the width the row has, not the input's own. */
+.github-webhook-path {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.github-webhook-url {
+    overflow-wrap: anywhere;
 }
 
 .element-pill {
@@ -79,7 +100,7 @@
 .element-pill-when {
     margin-left: 6px;
     color: var(--text-on-dark-tertiary);
-    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
 
 /* What goes with a cell, under what it says: a table is four columns at most. */

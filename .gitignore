@@ -31,6 +31,10 @@ web/wasm/*.d.ts
 
 # Test coverage
 web/coverage/
+web/browser/test-results/
+web/browser/playwright-report/
+# The gate answers every call from these, session.json among them (sess* above)
+!web/browser/fixtures/**
 
 # Binaries (NEVER commit these!)
 *.exe

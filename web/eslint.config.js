@@ -98,6 +98,14 @@ const NO_RAW_TABLE = [
     { selector: "CallExpression[callee.name='createTable'][arguments.1.type='ArrayExpression'][arguments.1.elements.length=2]", message: 'a record, a label beside its value, is record() from ts/table-cell.ts: its labels never break inside a word.' },
 ];
 
+// "if it overflows width, hard fail, die"
+// What makes content wider than its element, as far as the code says it: a line held unbroken.
+const WIDTH = "WIDTH: a line held unbroken is wider than a phone (@teranos/elements drops the element dead). Let it wrap: pre-wrap, pre-line or normal.";
+const NO_FIXED_WIDTH = [
+    { selector: "AssignmentExpression[left.object.property.name='style'][left.property.name='whiteSpace'][right.value=/^(nowrap|pre)$/]", message: WIDTH },
+    { selector: "CallExpression[callee.property.name='setProperty'][arguments.0.value='white-space'][arguments.1.value=/^(nowrap|pre)$/]", message: WIDTH },
+];
+
 // "ban 1, 2, 3, 4, 5"
 
 // An absence becoming behaviour, the same kinds nilcheck holds in Go and Rust.
@@ -130,7 +138,7 @@ export default [
             'no-empty': 'error',
             'no-restricted-globals': ['error', ...BANNED_GLOBALS],
             'no-restricted-imports': ['error', NO_SHOW_TOAST],
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -151,14 +159,14 @@ export default [
         // client/ is where apiFetch lives.
         files: ['ts/client/**/*.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
         // These load a .wasm binary by URL.
         files: ['ts/laye.ts', 'ts/ats-wasm.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -166,7 +174,7 @@ export default [
         // reports every answer to the connectivity manager.
         files: ['ts/liveness.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -177,7 +185,7 @@ export default [
         // "i want tooltip to be propagated more"
         files: ['ts/market-element.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
 ];

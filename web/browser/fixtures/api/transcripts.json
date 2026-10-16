@@ -1,0 +1,29 @@
+{
+  "transcripts": [
+    {
+      "session": "df5be86a-08f4-462a-9b73-f6cf8101e2e7",
+      "subjects": [
+        "QNTX"
+      ],
+      "started": "2026-10-16T18:00:00Z",
+      "ended": "2026-10-16T20:25:00Z",
+      "turns": [
+        {
+          "at": "2026-10-16T18:00:00Z",
+          "speaker": "person",
+          "text": "can i still not change the role of a User ?",
+          "of": "person"
+        },
+        {
+          "at": "2026-10-16T18:00:30Z",
+          "speaker": "agent",
+          "text": "No. The verbs on a User are disable, enable, name and become.",
+          "of": "agent"
+        }
+      ],
+      "folded": 0,
+      "model": "claude-fable-5-1",
+      "effort": "high"
+    }
+  ]
+}

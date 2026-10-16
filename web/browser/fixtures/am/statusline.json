@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "id": "q",
+      "name": "q",
+      "note": "up",
+      "symbol": "●"
+    },
+    {
+      "id": "l",
+      "name": "l",
+      "note": "labels-never-break",
+      "symbol": "●"
+    }
+  ]
+}

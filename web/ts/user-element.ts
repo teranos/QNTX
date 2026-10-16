@@ -198,6 +198,8 @@ export function userContent(): HTMLDivElement {
     content.style.padding = '12px';
     content.style.width = '80ch';
     content.style.maxWidth = '100%';
+    // The padding is inside the width, or on a phone the content is 100% plus 24px.
+    content.style.boxSizing = 'border-box';
     return content;
 }
 

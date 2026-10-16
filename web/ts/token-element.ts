@@ -482,7 +482,6 @@ export function renderIssued(container: HTMLElement, issued: TokenInfo[], now: D
         const line = document.createElement('div');
         line.className = 'token-issued-line';
         line.style.cursor = 'pointer';
-        line.style.whiteSpace = 'nowrap';
         line.textContent = `${t.level || '—'} ${fmt(t.created_at).slice(0, 10)} ${stateOf(t, now)}`;
         line.title = `created ${fmt(t.created_at)}`;
         if (stateOf(t, now) !== 'active') line.style.color = 'var(--text-on-dark-tertiary)';

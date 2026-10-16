@@ -32,6 +32,7 @@
   },
   "include": [
     "ts/**/*.ts",
+    "browser/*.browser.ts",
     "ts/**/*.js",
     "types/**/*.ts",
     "types/**/*.d.ts"

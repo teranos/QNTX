@@ -1,0 +1,13 @@
+{
+  "signa": [
+    {
+      "signum": "github",
+      "declares": [
+        "openapi:github"
+      ],
+      "by_shape": [
+        "openapi:gitea"
+      ]
+    }
+  ]
+}

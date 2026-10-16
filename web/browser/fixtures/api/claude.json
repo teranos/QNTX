@@ -1,0 +1,20 @@
+{
+  "did": "did:key:z6MkfJ6s3wYqRz2XgY1mcjn6tWkJXVHdq4GHyV9aNrKQ5rXk",
+  "model": "claude-fable-5-1",
+  "effort": "high",
+  "permission_mode": "default",
+  "permission_modes": [
+    "default",
+    "acceptEdits",
+    "plan"
+  ],
+  "allow": [
+    "Bash(git *)"
+  ],
+  "session": "df5be86a-08f4-462a-9b73-f6cf8101e2e7",
+  "answering": false,
+  "claude_code": "2.1.0",
+  "not_ready": "",
+  "signed_in": true,
+  "auth_method": "claude.ai"
+}

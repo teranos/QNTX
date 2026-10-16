@@ -76,7 +76,8 @@ test('a label in the record never breaks inside a word, and a value wraps', () =
     expect(rows.length).toBe(10);
     for (const tr of rows) {
         const [label, value] = Array.from(tr.querySelectorAll('td'));
-        expect(label.style.whiteSpace).toBe('nowrap');
+        // Not held whole: between two words it may wrap. Inside a word it never breaks.
+        expect(label.style.whiteSpace).toBe('');
         expect(label.style.wordBreak).toBe('normal');
         expect(label.style.overflowWrap).toBe('normal');
         expect(value.style.overflowWrap).toBe('break-word');
@@ -86,4 +87,5 @@ test('a label in the record never breaks inside a word, and a value wraps', () =
 // "also, on desktop, i see no reason to have this odd sized element."
 test('the User content is as wide as its record before the record arrives', () => {
     expect(userContent().style.width).toBe('80ch');
+    expect(userContent().style.boxSizing).toBe('border-box');
 });

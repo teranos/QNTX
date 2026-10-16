@@ -1,0 +1,56 @@
+{
+  "enabled": true,
+  "namespaces": [
+    {
+      "namespace": "default",
+      "source": "oauth",
+      "login": "tim-de-facile",
+      "minted_by": "US-TIM-1",
+      "revoked": false,
+      "auth_ok": true,
+      "rate": {
+        "limit": 5000,
+        "remaining": 4990,
+        "reset": "2026-10-16T21:00:00Z"
+      }
+    },
+    {
+      "namespace": "system",
+      "source": "system",
+      "minted_by": "US-ROOT-1",
+      "revoked": false,
+      "auth_ok": true
+    }
+  ],
+  "runner": {
+    "path": "/opt/actions-runner",
+    "enabled": true,
+    "stats": {
+      "path": "/opt/actions-runner",
+      "name": "q-runner",
+      "github_url": "https://github.com/sbvh-nl",
+      "workspaces": [
+        "QNTX",
+        "ground",
+        "q.sbvh.nl"
+      ],
+      "jobs": [
+        "2026-10-16T19:40:00Z",
+        "2026-10-16T20:10:00Z"
+      ],
+      "taken": [
+        {
+          "plugin": "github",
+          "archive": "qntx-github-plugin-linux-arm64.tar.gz",
+          "digest": "sha256:9f2c1e4b7a6d5c3f8e0b1a2d4c6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e",
+          "at": "2026-10-16T20:12:00Z",
+          "changed": true
+        }
+      ],
+      "unread": []
+    }
+  },
+  "webhook": true,
+  "webhook_path": "/github/webhook/9f2c1e4b7a6d5c3f",
+  "webhook_url": "https://api.q.example/github/webhook/9f2c1e4b7a6d5c3f"
+}

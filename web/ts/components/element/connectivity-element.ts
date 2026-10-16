@@ -57,10 +57,8 @@ function renderConnectivityContent(): HTMLElement {
 
     const list = document.createElement('pre');
     list.style.margin = '0';
-    // Let the widest line drive the window's intrinsic width via the
-    // ResizeObserver in @teranos/elements window/window.ts. maxWidth
-    // (viewport * MAX_VIEWPORT_WIDTH_RATIO) still caps very long URLs.
-    list.style.whiteSpace = 'pre';
+    // One failure a line, and a URL longer than a phone breaks where it must.
+    list.style.whiteSpace = 'pre-wrap';
     list.style.color = '#e06060';
     copyable(list);
 

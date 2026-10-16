@@ -19,7 +19,7 @@ export function stacked(text: string, under: string, underTitle = ''): HTMLTable
 export function record(name: string, heads: readonly [string, string], rows: readonly (readonly [string, string])[]): HTMLTableElement {
     return createTable(name, heads, rows.map(([label, value]) => {
         const said = tableCell(label);
-        said.style.whiteSpace = 'nowrap';
+        // Inside a word, never; between two words, where the width runs out. A line held whole is wider than a phone.
         said.style.wordBreak = 'normal';
         said.style.overflowWrap = 'normal';
         // A label reads as the head does.
