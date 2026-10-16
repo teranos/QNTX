@@ -582,6 +582,14 @@ message GitHubStatus {
   repeated string artifact_faults = 10;
 }
 
+// GitHubFrom is what github from answers: which GitHub a namespace spends now.
+message GitHubFrom {
+  // The namespace, as it was created.
+  string namespace = 1;
+  // system is the system namespace's GitHub; namespace is its own.
+  string from = 2;
+}
+
 // GitHubFollow is a push to repo's branch dispatching workflow of dispatches at
 // ref. Mirrors server.GitHubFollow.
 message GitHubFollow {

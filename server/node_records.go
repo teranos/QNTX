@@ -18,6 +18,14 @@ const (
 	// A GITHUB line is about the node's GitHub; its predicate says which part.
 	githubSubject  = "GITHUB"
 	githubNodeLine = "node"
+	// A GITHUB_FROM line says which GitHub one namespace spends; its predicate is the namespace.
+	githubFromSubject = "GITHUB_FROM"
+)
+
+// Which GitHub a namespace spends, as ROOT sets it in the GitHub element.
+const (
+	GitHubFromSystem    = "system"
+	GitHubFromNamespace = "namespace"
 )
 
 // DefaultRunnerPath is where the Actions runner is installed on a box.
@@ -122,6 +130,30 @@ func (r NodeRecords) GitHub() (GitHubSettings, error) {
 		settings.WebhookPath = path
 	}
 	return settings, nil
+}
+
+// GitHubFrom is which GitHub each namespace ROOT set spends. A namespace ROOT
+// never set spends its own.
+func (r NodeRecords) GitHubFrom() (map[string]string, error) {
+	newest, err := r.newest(githubFromSubject)
+	if err != nil {
+		return nil, err
+	}
+	from := make(map[string]string, len(newest))
+	for namespace, as := range newest {
+		said, ok := as.Attributes["from"].(string)
+		if !ok || (said != GitHubFromSystem && said != GitHubFromNamespace) {
+			return nil, errors.Newf("%s line %s about %s: from is %v, not %s or %s",
+				githubFromSubject, as.ID, namespace, as.Attributes["from"], GitHubFromSystem, GitHubFromNamespace)
+		}
+		from[namespace] = said
+	}
+	return from, nil
+}
+
+// SetGitHubFrom writes which GitHub a namespace spends.
+func (r NodeRecords) SetGitHubFrom(actor, namespace, from string) error {
+	return r.nodeRecord(actor, githubFromSubject, namespace, "_", map[string]any{"from": from})
 }
 
 // SetGitHub writes the node's GitHub settings whole.

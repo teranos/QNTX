@@ -122,6 +122,10 @@ message InitializeRequest {
   // mail_endpoint: gRPC endpoint for MailService (plugin/grpc/protocol/mail.proto, ADR-041)
   // Provides: mail to a User, from the plugin's template — QNTX sends and attests
   ServiceEndpoint mail_endpoint = 20;
+
+  // github_endpoint: GitHubService (github.proto, ADR-043), as the namespace the plugin stands in.
+  // Each call carries auth_token as its authorization metadata, a bearer token.
+  ServiceEndpoint github_endpoint = 21;
 }
 
 // ServiceEndpoint is where a service the node runs for plugins answers, or why

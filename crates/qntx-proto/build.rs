@@ -110,6 +110,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
     config.compile_protos(&protos, &[&repo_root])?;
 
+    // A plugin calling GitHubService needs its messages: the github protos
+    // import only each other, so they are their own module, without serde.
+    #[cfg(feature = "github")]
+    {
+        let github: Vec<PathBuf> = std::fs::read_dir(&proto_dir)
+            .map_err(|e| format!("cannot read proto dir {}: {}", proto_dir.display(), e))?
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                let named = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("github"));
+                (named && path.extension().is_some_and(|ext| ext == "proto")).then_some(path)
+            })
+            .collect();
+        let out = PathBuf::from(std::env::var("OUT_DIR")?).join("github");
+        std::fs::create_dir_all(&out)
+            .map_err(|e| format!("cannot make {}: {}", out.display(), e))?;
+        prost_build::Config::new()
+            .out_dir(&out)
+            .compile_protos(&github, &[&repo_root])?;
+        println!(
+            "cargo:github_protos={}",
+            std::env::join_paths(&github)?.to_string_lossy()
+        );
+        for proto in &github {
+            println!("cargo:rerun-if-changed={}", proto.display());
+        }
+    }
+
     // The one place that says which protos the Rust build carries. qntx-grpc
     // generates services against these messages and reads this list instead
     // of walking the directory itself (DEP_QNTX_PROTO_PROTOS, DEP_QNTX_PROTO_INCLUDE).

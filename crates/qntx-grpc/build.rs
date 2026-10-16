@@ -29,6 +29,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for proto in &protos {
             println!("cargo:rerun-if-changed={}", proto.display());
         }
+
+        // GitHubService (ADR-043), against the messages qntx-proto's github module holds.
+        let github_var = std::env::var_os("DEP_QNTX_PROTO_GITHUB_PROTOS").ok_or(
+            "DEP_QNTX_PROTO_GITHUB_PROTOS not set: qntx-proto was built without its github feature",
+        )?;
+        let github: Vec<PathBuf> = std::env::split_paths(&github_var).collect();
+        let out = PathBuf::from(std::env::var("OUT_DIR")?).join("github");
+        std::fs::create_dir_all(&out)?;
+        tonic_build::configure()
+            .build_server(true)
+            .build_client(true)
+            .compile_well_known_types(false)
+            .extern_path(".protocol", "::qntx_proto::github")
+            .out_dir(&out)
+            .compile_protos(&github, &[&repo_root])?;
+        println!("cargo:rerun-if-env-changed=DEP_QNTX_PROTO_GITHUB_PROTOS");
     }
 
     println!("cargo:rerun-if-changed=build.rs");

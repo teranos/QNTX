@@ -42,6 +42,16 @@ func (s *QNTXServer) pluginToken(plugin, namespace string) (string, error) {
 	return token, nil
 }
 
+// namespaceOfPlugin is the namespace a plugin's own token stands in.
+func (s *QNTXServer) namespaceOfPlugin(token string) (string, bool) {
+	held, standing := s.pluginStores.Load(token)
+	if !standing {
+		return "", false
+	}
+	p, ok := held.(standingPlugin)
+	return p.namespace, ok
+}
+
 // storeOfPlugin is the store a plugin's own token reaches.
 func (s *QNTXServer) storeOfPlugin(token string) (ats.AttestationStore, bool) {
 	held, standing := s.pluginStores.Load(token)
