@@ -7,15 +7,10 @@ Status: Proposed
 approve something."
 
 "Do you hear how little it matters what the 'thing' is to approve?"
-
 "approvals are attestations obviously"
 
 "Approvals is human only"
 "And only through it's element"
-
-"approvals is ROOT only for now"
-
-"Two things, and right now only one is in scope: the github PR approval"
 
 "APPROVALS INTEGRATE DIRECTLY WITH THE GITHUB APP"
 
