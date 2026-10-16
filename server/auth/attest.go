@@ -28,6 +28,9 @@ const (
 	// writes in between is the User's, and these say when that was.
 	PredicateBecame   = "identity:became"
 	PredicateUnbecame = "identity:unbecame"
+	// ROOT setting the level a User holds (ADR-027). The record carries the
+	// level and this carries the act: who, from which level, to which.
+	PredicateLeveled = "identity:leveled"
 )
 
 // Predicates for a role somebody holds. A role is an attestation and not a Go

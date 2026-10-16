@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -39,6 +40,7 @@ func (h *Handler) usersCollection(w http.ResponseWriter, r *http.Request, _ Pres
 //	POST /auth/users/{id}/enable
 //	POST /auth/users/{id}/name
 //	POST /auth/users/{id}/become
+//	POST /auth/users/{id}/level
 func (h *Handler) handleUserByID(w http.ResponseWriter, r *http.Request, p Presented) {
 	if r.Method != http.MethodPost {
 		h.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -60,6 +62,8 @@ func (h *Handler) handleUserByID(w http.ResponseWriter, r *http.Request, p Prese
 		h.nameUser(w, r, p, id)
 	case "become":
 		h.become(w, r, p, id)
+	case "level":
+		h.levelUser(w, r, p, id)
 	default:
 		h.writeError(w, http.StatusNotFound, "no such verb on a User: "+verb)
 	}
@@ -153,4 +157,71 @@ func (h *Handler) switchUser(w http.ResponseWriter, r *http.Request, p Presented
 	h.logger.Infow("User switched on", "user", u.ID, "by", by, "path", r.URL.Path)
 	h.attest(PredicateUserEnabled, route, map[string]any{"user": u.ID, "by": by})
 	h.writeJSON(w, http.StatusOK, map[string]string{"status": "on", "user": u.ID})
+}
+
+// "can i still not change the role of a User ?"
+
+// The rungs a User is set to: the ones a route reaching a User is admitted at
+// (userLevelOf). ROOT is one User and is not set (ADR-031). A User at SUPER or
+// ATTESTOR is admitted at no gate yet, so neither is offered.
+var userLevels = []Level{LevelUser, LevelPublicRegistration}
+
+func userLevelsSaid() string {
+	said := make([]string, len(userLevels))
+	for i, level := range userLevels {
+		said[i] = string(level)
+	}
+	return strings.Join(said, ", ")
+}
+
+// levelUser is ROOT setting the level a User holds.
+func (h *Handler) levelUser(w http.ResponseWriter, r *http.Request, p Presented, id string) {
+	route, _ := p.Admitted()
+	if p.BecomingBy != "" || h.levelOf(route) != LevelRoot {
+		h.writeError(w, http.StatusForbidden, "a User's level is set by ROOT")
+		return
+	}
+	var body struct {
+		Level Level `json:"level"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+		h.writeError(w, http.StatusBadRequest, "the body is not a JSON object of level")
+		return
+	}
+	if !slices.Contains(userLevels, body.Level) {
+		h.writeError(w, http.StatusBadRequest, "a User is one of "+userLevelsSaid()+", not "+string(body.Level))
+		return
+	}
+	u, found, err := h.userByID(id)
+	if err != nil {
+		h.attest(PredicateUnanswered, route, map[string]any{
+			"asked": "User store", "doing": "read", "user": id, "error": err.Error(),
+		})
+		h.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !found {
+		h.writeError(w, http.StatusNotFound, "no User "+id)
+		return
+	}
+	if u.Level == LevelRoot {
+		h.writeError(w, http.StatusBadRequest, "there is one ROOT User, and ROOT stays ROOT")
+		return
+	}
+	from := u.Level
+	if from == body.Level {
+		h.writeError(w, http.StatusConflict, "User "+u.ID+" is "+string(from)+" already")
+		return
+	}
+	u.Level = body.Level
+	if err := h.users.Put(u); err != nil {
+		h.attest(PredicateUnanswered, route, map[string]any{
+			"asked": "User store", "doing": "write", "user": u.ID, "error": err.Error(),
+		})
+		h.writeError(w, http.StatusInternalServerError, "User "+u.ID+" was not written: "+err.Error())
+		return
+	}
+	h.logger.Infow("User leveled", "user", u.ID, "by", p.UserID, "from", from, "to", u.Level, "path", r.URL.Path)
+	h.attest(PredicateLeveled, route, map[string]any{"user": u.ID, "by": p.UserID, "from": string(from), "to": string(u.Level)})
+	h.writeJSON(w, http.StatusOK, map[string]string{"user": u.ID, "level": string(u.Level), "was": string(from)})
 }
