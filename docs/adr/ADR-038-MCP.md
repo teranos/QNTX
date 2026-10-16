@@ -24,7 +24,7 @@ The handlers are the source, and MCP is not made from the API: the two are mirro
 
 "we don't need to reinvent every single endpoint"
 
-"a new thing is a new handler is a new mcp tool is a new api endpoint"
+"a new thing is a new handler is a new MCP tool is a new api endpoint"
 
 A tool call is a request on the served API carrying the caller's own credential, so it meets the gate its path's line sets and no second one.
 
