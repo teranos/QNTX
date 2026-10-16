@@ -12,7 +12,6 @@ import { startField, type Field, type Mood } from './door-field';
 import { createButton } from './components/button';
 
 const DOOR_ID = 'door';
-const OPEN_MS = 620;
 
 // Long enough to read a node's name while it is letting you in.
 const NAMED_MS = 2600;
@@ -310,9 +309,7 @@ export function showDoor(): void {
 
     const loading = scrim();
     if (!loading) return;
-    loading.style.transition = `opacity ${OPEN_MS}ms ease-out`;
-    loading.style.opacity = '0';
-    setTimeout(() => { loading.style.display = 'none'; }, OPEN_MS);
+    loading.style.display = 'none';
 }
 
 // One panel at a time. The indicator rail is built before the door now, so a
@@ -355,25 +352,19 @@ export function stepThrough(): void {
     bar.classList.remove('door-held');
     bar.classList.add('door-opening');
     document.getElementById(DOOR_ID)?.classList.add('door-opening');
-    bar.style.height = '6px';
-
     // Handing the height back is what lets the bar behave like a bar again.
-    // The panel goes out of the layout entirely: a bar minimised to six pixels
-    // still shows the top of a hundred-pixel lamp through them.
-    setTimeout(() => {
-        bar.classList.remove('door-opening');
-        bar.style.height = barHeight ?? '';
-        barHeight = null;
+    bar.classList.remove('door-opening');
+    bar.style.height = barHeight ?? '';
+    barHeight = null;
 
-        const panel = document.getElementById(DOOR_ID);
-        if (panel) {
-            panel.style.display = 'none';
-            panel.classList.remove('door-opening');
-        }
+    const panel = document.getElementById(DOOR_ID);
+    if (panel) {
+        panel.style.display = 'none';
+        panel.classList.remove('door-opening');
+    }
 
-        lit?.stop();
-        lit = null;
-    }, OPEN_MS);
+    lit?.stop();
+    lit = null;
 }
 
 /** What the door is saying. Falls back to the loader's own line before the

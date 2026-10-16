@@ -17,19 +17,11 @@ import { inApp, homeInSheet, APP_DOOR } from './app-door';
 import { login as layeLogin, LayeLoginRefused, type HalfAdmission } from './laye';
 import { fetchProviders, renderCeremony } from './ceremony';
 import { heldInvitation, invited, letGoOfInvitation, onlyInvited, signsInWith } from './invitation';
-import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, tokenMark, relayed, pressable, skippable, say, step, stumbled, mood, verdict, nameYourself, sentBy } from './door';
+import { doorHost, doorStand, showDoor, stepThrough, hazard, engageDoor, doorEngaged, fingerprint, tokenMark, relayed, pressable, skippable, say, step, stumbled, mood, verdict, sentBy } from './door';
 import { log, SEG } from './logger';
 import { enrolPasskey, assertPasskey, forgetPasskey, cancelled } from './passkey';
 import { profile } from './arrival';
 import { connectivity } from './client/connectivity';
-
-// Long enough to read the refusal before the door goes back to waiting. Longer
-// than the reward below: getting in needs no explanation, being turned away
-// does, and the red is the whole of what says so.
-const REFUSAL_MS = 2600;
-
-// Long enough for the burst to be the reward rather than a flicker on the way out.
-const REWARD_MS = 1600;
 
 // One door at a time. Every 401 asks for one, and a second would be drawn over
 // the first with both waiting on the same press.
@@ -121,7 +113,6 @@ async function pressed(next: HalfAdmission['next'], afresh = false): Promise<voi
  */
 export async function standOnADevice(admission: HalfAdmission): Promise<void> {
     if (inApp() && await standAtHome(admission)) return;
-    await pressed(admission.next);
 
     if (admission.next === 'enrol') {
         await enrol();
@@ -130,7 +121,7 @@ export async function standOnADevice(admission: HalfAdmission): Promise<void> {
     say('confirm with your passkey');
     let done;
     try {
-        done = await assertPasskey(say);
+        done = await withAPress('assert', () => assertPasskey(say));
     } catch (e) {
         if (!cancelled(e)) throw e;
         await enrolAfresh();
@@ -139,6 +130,19 @@ export async function standOnADevice(admission: HalfAdmission): Promise<void> {
     step('signed in');
     admitted();
     sentBack(done.return);
+}
+
+// A browser that gives the authenticator only to a document that was just
+// pressed says so with NotAllowedError while no press is live; then the print
+// is drawn, and the one press asks again.
+async function withAPress<T>(next: HalfAdmission['next'], ask: () => Promise<T>): Promise<T> {
+    try {
+        return await ask();
+    } catch (e) {
+        if (!cancelled(e) || navigator.userActivation?.isActive) throw e;
+        await pressed(next, true);
+        return await ask();
+    }
 }
 
 // This device holds none of the person's passkeys, or the person said so by
@@ -151,7 +155,7 @@ async function enrolAfresh(): Promise<void> {
 
 async function enrol(): Promise<void> {
     say('set up this device as your passkey');
-    const done = await enrolPasskey(say);
+    const done = await withAPress('enrol', () => enrolPasskey(say));
     step('this device is now a passkey');
     admitted();
     sentBack(done.return);
@@ -240,22 +244,23 @@ export function openDoor(): Promise<void> {
         const stand = doorStand();
         // Signing in is not an unusual condition, whatever the door wore last.
         hazard(false);
-        shut();
+        shut(true);
         showDoor();
 
-        function shut() {
+        // After a refusal the print waits for a press, and what the node said
+        // stays on the line.
+        function shut(atOnce: boolean) {
             mood('rest');
             stand.replaceChildren();
             host.replaceChildren();
+            if (atOnce) say('');
             // A passkey belongs to the node's origin, so pressing a fingerprint
             // here could never complete. The key is what completes instead.
             if (relayed()) {
                 const key = tokenMark(() => { key.disabled = true; void turn(key); });
                 stand.append(key);
-                say('');
                 return;
             }
-            say('');
             // "i think on this screen we dont need to actyually see the fingerprint, just the available provider for given user"
             if (heldInvitation()) {
                 void offer();
@@ -267,15 +272,12 @@ export function openDoor(): Promise<void> {
             // person is not the origin they are looking at, and nothing else
             // in front of them says who will hold the token.
             void whoSentYou();
-            // Sent home with a route already proven, the press is the passkey,
-            // and the door says so rather than looking like a login.
-            void halfAdmitted().then((half) => {
-                if (!half) return;
-                say(half.next === 'enrol'
-                    ? 'press to set this device up as your passkey'
-                    : 'press to confirm with your passkey');
-            });
             void offer();
+            if (atOnce) {
+                print.disabled = true;
+                mood('committed');
+                void press(print);
+            }
         }
 
         // The relay authenticates as itself, so this asks the node whether the
@@ -283,8 +285,7 @@ export function openDoor(): Promise<void> {
         async function turn(key: HTMLButtonElement) {
             host.replaceChildren();
             mood('committed');
-            say('asking the node about the token the dev server carries...');
-            nameYourself();
+            say('asking the node about the token the dev server carries');
             try {
                 if (!await signedIn()) {
                     throw new Error('the node does not honour the token the dev server is carrying');
@@ -296,9 +297,8 @@ export function openDoor(): Promise<void> {
                 stumbled('signing in with the relay token', e);
                 mood('refused');
                 verdict('no');
-                await new Promise((rest) => setTimeout(rest, REFUSAL_MS));
                 key.disabled = false;
-                shut();
+                shut(false);
             }
         }
 
@@ -332,8 +332,7 @@ export function openDoor(): Promise<void> {
             try {
                 await renderCeremony(host, providers, say);
                 host.replaceChildren();
-                say('signing in...');
-                nameYourself();
+                say('signing in');
                 const half = await layeLogin(heldInvitation());
                 // The node made the User the invitation was for; the link is spent.
                 letGoOfInvitation();
@@ -343,15 +342,13 @@ export function openDoor(): Promise<void> {
                 stumbled('linking an account', e);
                 mood('refused');
                 verdict('no');
-                await new Promise((rest) => setTimeout(rest, REFUSAL_MS));
-                shut();
+                shut(false);
             }
         }
 
         async function press(print: HTMLButtonElement) {
             host.replaceChildren();
-            say('signing in...');
-            nameYourself();
+            say('signing in');
             try {
                 // A half-admission already held is the route proven; proving
                 // it again with this browser's key would ask for the provider
@@ -363,23 +360,18 @@ export function openDoor(): Promise<void> {
                 if (cancelled(e)) say('cancelled');
                 else if (needsCeremony(e)) say('this browser speaks for no account this node lists');
                 else stumbled('signing in', e);
-                // Cancelling is not a refusal — the node said nothing, so the
-                // fingerprint says nothing. A refusal is held long enough to
-                // be read, because shut() builds a fresh white one.
+                // Cancelling is not a refusal: the node said nothing, so the
+                // fingerprint says nothing.
                 if (!cancelled(e)) {
                     mood('refused');
                     verdict('no');
-                    await new Promise((rest) => setTimeout(rest, REFUSAL_MS));
                 }
                 print.disabled = false;
-                shut();
+                shut(false);
             }
         }
 
         async function through() {
-            // The burst is the reward for coming in, so the door does not begin
-            // closing over it until it has been there long enough to be one.
-            await new Promise((seen) => setTimeout(seen, REWARD_MS));
             stepThrough();
             standing = null;
             engageDoor(false);

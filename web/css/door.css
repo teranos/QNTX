@@ -46,7 +46,6 @@
 /* The drawer is the frame, and the door is the whole of what it holds. */
 #system-drawer.door-held {
     height: var(--door-height);
-    transition: height 620ms cubic-bezier(.65, 0, .2, 1);
     /* Above the element tray and the toast. A tray floating over a door nobody
        has opened offers the app before the app is reachable. */
     z-index: 100003;
@@ -180,36 +179,6 @@
     width: 100%;
 }
 
-/* The field is looked at alone, then the way in, then whose door it is, then
-   what else is on offer. None of them is conditional on anything: the
-   fingerprint is always there. */
-.door-stand {
-    animation: doorArrives 1000ms ease-out 2000ms both;
-}
-
-.door-mark {
-    animation: doorArrives 1000ms ease-out 2600ms both;
-}
-
-.door-plate,
-.door-say {
-    animation: doorArrives 1000ms ease-out 3200ms both;
-}
-
-@keyframes doorArrives {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .door-mark,
-    .door-stand,
-    .door-plate,
-    .door-say {
-        animation: none;
-    }
-}
-
 .door-mark { grid-column: 1; grid-row: 1; justify-self: end; }
 .door-stand { grid-column: 2; grid-row: 1; }
 .door-plate { grid-column: 3; grid-row: 1; justify-self: start; }
@@ -298,30 +267,8 @@
     opacity: 1;
 }
 
-/* Nothing moves on this door until you touch it. What a press asks for should
-   arrive rather than appear — the door answering, not performing. */
-.door-fields > *,
-.door-continue {
-    animation: doorArrive 190ms ease-out both;
-}
-
-@keyframes doorArrive {
-    from {
-        opacity: 0;
-        transform: translateY(-5px);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .door-fields > *,
-    .door-continue {
-        animation: none;
-    }
-}
-
 #door.door-opening {
     opacity: 0;
-    transition: opacity 320ms ease-out;
 }
 
 /* The node's own face, at the top of the door. Colour and text both come from
