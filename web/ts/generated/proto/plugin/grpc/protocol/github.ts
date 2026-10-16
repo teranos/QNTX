@@ -186,6 +186,14 @@ export interface GitHubStatus_BuildsEntry {
   value: PluginBuild | undefined;
 }
 
+/** GitHubFrom is what github from answers: which GitHub a namespace spends now. */
+export interface GitHubFrom {
+  /** The namespace, as it was created. */
+  namespace: string;
+  /** system is the system namespace's GitHub; namespace is its own. */
+  from: string;
+}
+
 /**
  * GitHubFollow is a push to repo's branch dispatching workflow of dispatches at
  * ref. Mirrors server.GitHubFollow.

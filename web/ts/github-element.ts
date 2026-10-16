@@ -165,6 +165,7 @@ async function send(path: string, body: Record<string, string>): Promise<void> {
 export function sourceInWords(source: string): string {
     if (source === 'oauth') return 'OAuth';
     if (source === 'access_token') return 'access token';
+    if (source === 'system') return 'system namespace';
     return source;
 }
 
@@ -296,6 +297,27 @@ export function renderNamespaces(container: HTMLElement, namespaces: GitHubNames
     container.appendChild(s);
 }
 
+// "ROOT will determine what GitHub integration is active there, either system or have the namespace take responsibility"
+/** Exported for tests: per namespace the node serves, which GitHub it spends, and the press that changes it. */
+export function renderFrom(container: HTMLElement, served: string[], namespaces: GitHubNamespace[], reload: () => Promise<void>): void {
+    container.innerHTML = '';
+    const s = section('From');
+    const sources = new Map(namespaces.map(ns => [ns.namespace, ns.source]));
+    for (const name of served.filter(n => n !== 'system')) {
+        const fromSystem = sources.get(name) === 'system';
+        const press = new Button({
+            label: fromSystem ? 'Its own GitHub' : 'System’s GitHub',
+            variant: fromSystem ? 'ghost' : 'primary',
+            onClick: async () => {
+                await send('/api/github/from', { namespace: name, from: fromSystem ? 'namespace' : 'system' });
+                await reload();
+            },
+        });
+        s.appendChild(row(`${name}:`, press.element));
+    }
+    container.appendChild(s);
+}
+
 /** The builds the runner delivered and the node took, newest as the runner kept them. */
 function takenTable(taken: TakenBuild[]): HTMLElement {
     if (taken.length === 0) return said('No build taken yet.');
@@ -380,24 +402,38 @@ function refused(container: HTMLElement, err: unknown): void {
 }
 
 /** Exported for tests: ask the node once and draw every section from its answer. */
-export async function load(node: HTMLElement, namespaces: HTMLElement, actions: HTMLElement, webhook?: HTMLElement): Promise<void> {
-    const reload = () => load(node, namespaces, actions, webhook);
+export async function load(node: HTMLElement, namespaces: HTMLElement, actions: HTMLElement, webhook?: HTMLElement, from?: HTMLElement): Promise<void> {
+    const reload = () => load(node, namespaces, actions, webhook, from);
     try {
         const status = await apiJson<GitHubStatus>('/api/github');
         renderNode(node, status, reload);
         if (webhook) renderWebhook(webhook, status, reload);
         renderNamespaces(namespaces, status.namespaces);
         renderActions(actions, status.runner, reload);
+        if (from) await loadFrom(from, status.namespaces, reload);
     } catch (err: unknown) {
         refused(node, err);
         namespaces.innerHTML = '';
         actions.innerHTML = '';
         if (webhook) webhook.innerHTML = '';
+        if (from) from.innerHTML = '';
     }
 }
 
 // Who this is for: whoever reaches these (audience.ts).
 export const needs = ['/api/github'] as const;
+
+/** The From section, from the namespaces the node serves; a node that keeps none says why there. */
+async function loadFrom(from: HTMLElement, namespaces: GitHubNamespace[], reload: () => Promise<void>): Promise<void> {
+    const response = await apiFetch('/api/namespaces');
+    if (!response.ok) {
+        from.innerHTML = '';
+        from.appendChild(errorText(`the node did not say its namespaces: ${await refusal(response)}`));
+        return;
+    }
+    const listed = await response.json() as { namespaces: { name: string }[] };
+    renderFrom(from, listed.namespaces.map(ns => ns.name), namespaces, reload);
+}
 
 export function createGitHubElement(): Element {
     return {
@@ -415,14 +451,16 @@ export function createGitHubElement(): Element {
             const node = document.createElement('div');
             const webhook = document.createElement('div');
             const namespaces = document.createElement('div');
+            const from = document.createElement('div');
             const actions = document.createElement('div');
             node.appendChild(said('Loading the node’s GitHub…'));
             content.appendChild(node);
             content.appendChild(webhook);
             content.appendChild(namespaces);
+            content.appendChild(from);
             content.appendChild(actions);
 
-            void load(node, namespaces, actions, webhook);
+            void load(node, namespaces, actions, webhook, from);
             return content;
         },
     };

@@ -38,6 +38,9 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	servicesManager := grpcplugin.NewServicesManager(s.deps.cfg.LLM, s.deps.cfg.Fetch, s.nodeDID.DID, s.logger)
 	filesDir := filepath.Join(filepath.Dir(s.dbPath), "files")
 
+	// A plugin calls GitHub as the namespace its record names (ADR-043, ADR-046).
+	servicesManager.SetGitHub(s.gitHubService(), s.namespaceOfPlugin)
+
 	// Services that did not start are held with why: each plugin asking for
 	// one in its Initialize is refused with it, and the node boots without.
 	var endpoints grpcplugin.Endpoints
@@ -55,6 +58,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 			"embedding", started.Embedding,
 			"search", started.Search,
 			"mail", started.Mail,
+			"github", started.GitHub,
 		)
 	}
 

@@ -340,9 +340,12 @@ type InitializeRequest struct {
 	FetchEndpoint *ServiceEndpoint `protobuf:"bytes,19,opt,name=fetch_endpoint,json=fetchEndpoint,proto3" json:"fetch_endpoint,omitempty"`
 	// mail_endpoint: gRPC endpoint for MailService (plugin/grpc/protocol/mail.proto, ADR-041)
 	// Provides: mail to a User, from the plugin's template — QNTX sends and attests
-	MailEndpoint  *ServiceEndpoint `protobuf:"bytes,20,opt,name=mail_endpoint,json=mailEndpoint,proto3" json:"mail_endpoint,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	MailEndpoint *ServiceEndpoint `protobuf:"bytes,20,opt,name=mail_endpoint,json=mailEndpoint,proto3" json:"mail_endpoint,omitempty"`
+	// github_endpoint: GitHubService (github.proto, ADR-043), as the namespace the plugin stands in.
+	// Each call carries auth_token as its authorization metadata, a bearer token.
+	GithubEndpoint *ServiceEndpoint `protobuf:"bytes,21,opt,name=github_endpoint,json=githubEndpoint,proto3" json:"github_endpoint,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *InitializeRequest) Reset() {
@@ -455,6 +458,13 @@ func (x *InitializeRequest) GetFetchEndpoint() *ServiceEndpoint {
 func (x *InitializeRequest) GetMailEndpoint() *ServiceEndpoint {
 	if x != nil {
 		return x.MailEndpoint
+	}
+	return nil
+}
+
+func (x *InitializeRequest) GetGithubEndpoint() *ServiceEndpoint {
+	if x != nil {
+		return x.GithubEndpoint
 	}
 	return nil
 }
@@ -3231,7 +3241,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fqntx_version\x18\x03 \x01(\tR\vqntxVersion\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06author\x18\x05 \x01(\tR\x06author\x12\x18\n" +
-	"\alicense\x18\x06 \x01(\tR\alicense\"\x8f\x06\n" +
+	"\alicense\x18\x06 \x01(\tR\alicense\"\xd3\x06\n" +
 	"\x11InitializeRequest\x12,\n" +
 	"\x12ats_store_endpoint\x18\x01 \x01(\tR\x10atsStoreEndpoint\x12%\n" +
 	"\x0equeue_endpoint\x18\x02 \x01(\tR\rqueueEndpoint\x12\x1d\n" +
@@ -3245,7 +3255,8 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x16vector_search_endpoint\x18\x10 \x01(\v2\x19.protocol.ServiceEndpointR\x14vectorSearchEndpoint\x12B\n" +
 	"\x0fsearch_endpoint\x18\x12 \x01(\v2\x19.protocol.ServiceEndpointR\x0esearchEndpoint\x12@\n" +
 	"\x0efetch_endpoint\x18\x13 \x01(\v2\x19.protocol.ServiceEndpointR\rfetchEndpoint\x12>\n" +
-	"\rmail_endpoint\x18\x14 \x01(\v2\x19.protocol.ServiceEndpointR\fmailEndpoint\x1a9\n" +
+	"\rmail_endpoint\x18\x14 \x01(\v2\x19.protocol.ServiceEndpointR\fmailEndpoint\x12B\n" +
+	"\x0fgithub_endpoint\x18\x15 \x01(\v2\x19.protocol.ServiceEndpointR\x0egithubEndpoint\x1a9\n" +
 	"\vConfigEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\a\x10\x0eJ\x04\b\x11\x10\x12\"Y\n" +
@@ -3585,57 +3596,58 @@ var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
 	6,  // 4: protocol.InitializeRequest.search_endpoint:type_name -> protocol.ServiceEndpoint
 	6,  // 5: protocol.InitializeRequest.fetch_endpoint:type_name -> protocol.ServiceEndpoint
 	6,  // 6: protocol.InitializeRequest.mail_endpoint:type_name -> protocol.ServiceEndpoint
-	9,  // 7: protocol.HTTPRequest.headers:type_name -> protocol.HTTPHeader
-	9,  // 8: protocol.HTTPResponse.headers:type_name -> protocol.HTTPHeader
-	1,  // 9: protocol.WebSocketMessage.type:type_name -> protocol.WebSocketMessage.Type
-	39, // 10: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
-	40, // 11: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
-	41, // 12: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
-	13, // 13: protocol.ConfigFieldSchema.unbounded_below:type_name -> protocol.Unbounded
-	13, // 14: protocol.ConfigFieldSchema.unbounded_above:type_name -> protocol.Unbounded
-	15, // 15: protocol.InitializeResponse.schedules:type_name -> protocol.ScheduleInfo
-	18, // 16: protocol.InitializeResponse.watchers:type_name -> protocol.WatcherRegistration
-	17, // 17: protocol.InitializeResponse.http_routes:type_name -> protocol.RouteInfo
-	44, // 18: protocol.InitializeResponse.signa:type_name -> protocol.Signum
-	0,  // 19: protocol.InitializeResponse.sigils_from:type_name -> protocol.SigilsFrom
-	20, // 20: protocol.ExecuteJobRequest.caller:type_name -> protocol.JobCaller
-	22, // 21: protocol.ExecuteJobResponse.log_entries:type_name -> protocol.JobLogEntry
-	24, // 22: protocol.ElementDefResponse.elements:type_name -> protocol.ElementDef
-	25, // 23: protocol.PluginElements.elements:type_name -> protocol.PluginElement
-	45, // 24: protocol.SigilRow.takes:type_name -> protocol.Param
-	46, // 25: protocol.SigilRow.gives:type_name -> protocol.Field
-	42, // 26: protocol.SigilRow.reach:type_name -> protocol.SigilRow.ReachEntry
-	43, // 27: protocol.PluginInfo.details:type_name -> protocol.PluginInfo.DetailsEntry
-	29, // 28: protocol.PluginInfo.sigils:type_name -> protocol.SigilRow
-	30, // 29: protocol.PluginsList.plugins:type_name -> protocol.PluginInfo
-	31, // 30: protocol.PluginsList.health:type_name -> protocol.PluginHealthProbe
-	33, // 31: protocol.PluginRoute.endpoints:type_name -> protocol.RouteEndpoint
-	34, // 32: protocol.PluginRoutes.routes:type_name -> protocol.PluginRoute
-	14, // 33: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
-	28, // 34: protocol.SigilRow.ReachEntry.value:type_name -> protocol.SigilReach
-	2,  // 35: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
-	5,  // 36: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
-	2,  // 37: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
-	7,  // 38: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
-	10, // 39: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
-	2,  // 40: protocol.DomainPluginService.Health:input_type -> protocol.Empty
-	2,  // 41: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
-	2,  // 42: protocol.DomainPluginService.RegisterElements:input_type -> protocol.Empty
-	19, // 43: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
-	4,  // 44: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
-	16, // 45: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
-	3,  // 46: protocol.DomainPluginService.Shutdown:output_type -> protocol.ShutdownResponse
-	8,  // 47: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
-	10, // 48: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
-	11, // 49: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
-	12, // 50: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
-	23, // 51: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
-	21, // 52: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
-	44, // [44:53] is the sub-list for method output_type
-	35, // [35:44] is the sub-list for method input_type
-	35, // [35:35] is the sub-list for extension type_name
-	35, // [35:35] is the sub-list for extension extendee
-	0,  // [0:35] is the sub-list for field type_name
+	6,  // 7: protocol.InitializeRequest.github_endpoint:type_name -> protocol.ServiceEndpoint
+	9,  // 8: protocol.HTTPRequest.headers:type_name -> protocol.HTTPHeader
+	9,  // 9: protocol.HTTPResponse.headers:type_name -> protocol.HTTPHeader
+	1,  // 10: protocol.WebSocketMessage.type:type_name -> protocol.WebSocketMessage.Type
+	39, // 11: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
+	40, // 12: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
+	41, // 13: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
+	13, // 14: protocol.ConfigFieldSchema.unbounded_below:type_name -> protocol.Unbounded
+	13, // 15: protocol.ConfigFieldSchema.unbounded_above:type_name -> protocol.Unbounded
+	15, // 16: protocol.InitializeResponse.schedules:type_name -> protocol.ScheduleInfo
+	18, // 17: protocol.InitializeResponse.watchers:type_name -> protocol.WatcherRegistration
+	17, // 18: protocol.InitializeResponse.http_routes:type_name -> protocol.RouteInfo
+	44, // 19: protocol.InitializeResponse.signa:type_name -> protocol.Signum
+	0,  // 20: protocol.InitializeResponse.sigils_from:type_name -> protocol.SigilsFrom
+	20, // 21: protocol.ExecuteJobRequest.caller:type_name -> protocol.JobCaller
+	22, // 22: protocol.ExecuteJobResponse.log_entries:type_name -> protocol.JobLogEntry
+	24, // 23: protocol.ElementDefResponse.elements:type_name -> protocol.ElementDef
+	25, // 24: protocol.PluginElements.elements:type_name -> protocol.PluginElement
+	45, // 25: protocol.SigilRow.takes:type_name -> protocol.Param
+	46, // 26: protocol.SigilRow.gives:type_name -> protocol.Field
+	42, // 27: protocol.SigilRow.reach:type_name -> protocol.SigilRow.ReachEntry
+	43, // 28: protocol.PluginInfo.details:type_name -> protocol.PluginInfo.DetailsEntry
+	29, // 29: protocol.PluginInfo.sigils:type_name -> protocol.SigilRow
+	30, // 30: protocol.PluginsList.plugins:type_name -> protocol.PluginInfo
+	31, // 31: protocol.PluginsList.health:type_name -> protocol.PluginHealthProbe
+	33, // 32: protocol.PluginRoute.endpoints:type_name -> protocol.RouteEndpoint
+	34, // 33: protocol.PluginRoutes.routes:type_name -> protocol.PluginRoute
+	14, // 34: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
+	28, // 35: protocol.SigilRow.ReachEntry.value:type_name -> protocol.SigilReach
+	2,  // 36: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
+	5,  // 37: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
+	2,  // 38: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
+	7,  // 39: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
+	10, // 40: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
+	2,  // 41: protocol.DomainPluginService.Health:input_type -> protocol.Empty
+	2,  // 42: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
+	2,  // 43: protocol.DomainPluginService.RegisterElements:input_type -> protocol.Empty
+	19, // 44: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
+	4,  // 45: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
+	16, // 46: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
+	3,  // 47: protocol.DomainPluginService.Shutdown:output_type -> protocol.ShutdownResponse
+	8,  // 48: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
+	10, // 49: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
+	11, // 50: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
+	12, // 51: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
+	23, // 52: protocol.DomainPluginService.RegisterElements:output_type -> protocol.ElementDefResponse
+	21, // 53: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
+	45, // [45:54] is the sub-list for method output_type
+	36, // [36:45] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_domain_proto_init() }

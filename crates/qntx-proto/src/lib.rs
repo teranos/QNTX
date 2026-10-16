@@ -21,6 +21,12 @@ pub mod protocol {
     include!(concat!(env!("OUT_DIR"), "/protocol.rs"));
 }
 
+// GitHubService's messages (ADR-043), for a plugin that calls it.
+#[cfg(feature = "github")]
+pub mod github {
+    include!(concat!(env!("OUT_DIR"), "/github/protocol.rs"));
+}
+
 // Re-export commonly used types at crate root for convenience
 pub use protocol::*;
 

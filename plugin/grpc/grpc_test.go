@@ -130,7 +130,7 @@ type mockConfig struct{}
 func (c *mockConfig) ServiceEndpoints() (ServiceEndpoints, error) {
 	return ServiceEndpoints{
 		LLM: notServed, Embedding: notServed, VectorSearch: notServed,
-		Search: notServed, Fetch: notServed, Mail: notServed,
+		Search: notServed, Fetch: notServed, Mail: notServed, GitHub: notServed,
 	}, nil
 }
 
