@@ -14,7 +14,7 @@ Existing MCP servers can run on one box, behind QNTX.
 
 A token presented to QNTX is never passed on to an MCP server behind it; the MCP spec forbids passthrough.
 
-QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk), pinned at v1.8.0.
+QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk), pinned a
 
 "WE USE IT"
 
