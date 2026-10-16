@@ -1,7 +1,7 @@
-# ADR-048: Agents
+# ADR-048: Node-Agent
 
 Date: 2026-10-04
-Status: Proposed
+Status: Revised
 
 QNTX hosts agents for use by ROOT.
 
