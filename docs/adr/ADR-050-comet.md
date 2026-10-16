@@ -25,7 +25,9 @@ right?"
 
 "Tailored to that repository ground `project` .pbt specifies,
 
-which has CTFE-able material, for example: filename paths for the (mentioned a file, didn't read it, please read it - `control`)"
+It has CTFE-able material, 
+for example: 
+- filename paths for the (mentioned a file, didn't read it, please read it - `control`)"
 
 "so we can still have super fast hooks, and actually even faster when the builds are done by QNTX"
 
