@@ -152,3 +152,11 @@ message Standing {
   // Where the person now stands. Never empty.
   string namespace = 1;
 }
+
+// Reaches is what i reaches answers: of the paths asked, the ones the person
+// asking reaches, in the order asked. An element needing a path not here is
+// not offered to them.
+message Reaches {
+  // The paths asked that the person asking reaches. Empty is none of them.
+  repeated string paths = 1;
+}

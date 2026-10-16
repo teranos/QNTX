@@ -543,6 +543,54 @@ func (x *Standing) GetNamespace() string {
 	return ""
 }
 
+// Reaches is what i reaches answers: of the paths asked, the ones the person
+// asking reaches, in the order asked. An element needing a path not here is
+// not offered to them.
+type Reaches struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The paths asked that the person asking reaches. Empty is none of them.
+	Paths         []string `protobuf:"bytes,1,rep,name=paths,proto3" json:"paths,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Reaches) Reset() {
+	*x = Reaches{}
+	mi := &file_plugin_grpc_protocol_user_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Reaches) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Reaches) ProtoMessage() {}
+
+func (x *Reaches) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_user_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Reaches.ProtoReflect.Descriptor instead.
+func (*Reaches) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_user_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Reaches) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
 var File_plugin_grpc_protocol_user_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_user_proto_rawDesc = "" +
@@ -579,7 +627,9 @@ const file_plugin_grpc_protocol_user_proto_rawDesc = "" +
 	"\rsignature_hex\x18\x03 \x01(\tR\fsignatureHex\x12*\n" +
 	"\x11signer_pubkey_hex\x18\x04 \x01(\tR\x0fsignerPubkeyHex\"(\n" +
 	"\bStanding\x12\x1c\n" +
-	"\tnamespace\x18\x01 \x01(\tR\tnamespace*V\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\"\x1f\n" +
+	"\aReaches\x12\x14\n" +
+	"\x05paths\x18\x01 \x03(\tR\x05paths*V\n" +
 	"\tKeyOrigin\x12\x1a\n" +
 	"\x16KEY_ORIGIN_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12KEY_ORIGIN_BROWSER\x10\x01\x12\x15\n" +
@@ -602,7 +652,7 @@ func file_plugin_grpc_protocol_user_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_user_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_plugin_grpc_protocol_user_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_plugin_grpc_protocol_user_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_plugin_grpc_protocol_user_proto_goTypes = []any{
 	(KeyOrigin)(0),   // 0: protocol.KeyOrigin
 	(AccessLevel)(0), // 1: protocol.AccessLevel
@@ -611,6 +661,7 @@ var file_plugin_grpc_protocol_user_proto_goTypes = []any{
 	(*Account)(nil),  // 4: protocol.Account
 	(*Binding)(nil),  // 5: protocol.Binding
 	(*Standing)(nil), // 6: protocol.Standing
+	(*Reaches)(nil),  // 7: protocol.Reaches
 }
 var file_plugin_grpc_protocol_user_proto_depIdxs = []int32{
 	3, // 0: protocol.User.keys:type_name -> protocol.Key
@@ -636,7 +687,7 @@ func file_plugin_grpc_protocol_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_user_proto_rawDesc), len(file_plugin_grpc_protocol_user_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

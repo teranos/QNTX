@@ -88,6 +88,9 @@ REACH is '/i/unbecome'                                                    of ANY
 REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 REACH is '/i/picture'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
+# Which of the paths asked the caller reaches, so the tray offers no element
+# its viewer cannot use: "a caller learns its paths and not its grants".
+REACH is '/i/reaches'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 
 # First-time setup: the ways in this node offers, and claiming it.
 REACH is '/setup' '/setup/claim'                                          of ANYONE

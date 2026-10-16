@@ -856,6 +856,16 @@
         "USER"
       ]
     },
+    "/i/reaches": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION",
+        "USER"
+      ]
+    },
     "/i/standing": {
       "x-qntx-reach": [
         "ROOT",

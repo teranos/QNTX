@@ -1,12 +1,16 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
 )
@@ -19,10 +23,58 @@ func TestStandingIsReadAndSteppedOnOnePath(t *testing.T) {
 
 	methods := map[string]string{}
 	for _, held := range signum.GetSigils() {
-		assert.Equal(t, "/i/standing", held.GetHttp().GetPath())
-		methods[held.GetName()] = held.GetHttp().GetMethod()
+		methods[held.GetName()] = held.GetHttp().GetMethod() + " " + held.GetHttp().GetPath()
 	}
-	assert.Equal(t, map[string]string{"standing": http.MethodGet, "step": http.MethodPost}, methods)
+	assert.Equal(t, map[string]string{
+		"standing": http.MethodGet + " /i/standing",
+		"step":     http.MethodPost + " /i/standing",
+		"reaches":  http.MethodGet + " /i/reaches",
+	}, methods)
+}
+
+// "an Element should know about its intended audience"
+
+// A USER reaches i and the canvas, and not approvals: the gate's own answer.
+func TestIReachesIsTheGatesAnswerForEachPathAsked(t *testing.T) {
+	s := rootKnowingServer(t)
+	s.answering = map[string]reach.Answering{}
+	for _, path := range reach.Paths() {
+		s.answer(path, func(http.ResponseWriter, *http.Request) {})
+	}
+	served, _, err := reach.Open(s.answering, s.wrapping(), s.runtime())
+	require.NoError(t, err)
+	s.served = served
+
+	asked := sigil.Sent{"paths": "/i/,/api/canvas,/api/approvals,/.well-known/did.json"}
+	for level, want := range map[auth.Level][]string{
+		auth.LevelUser: {"/i/", "/api/canvas", "/.well-known/did.json"},
+		auth.LevelRoot: {"/i/", "/api/canvas", "/api/approvals", "/.well-known/did.json"},
+	} {
+		ctx := auth.WithAdmission(context.Background(), auth.Admitted(level, "garden"))
+		answered, refusal := s.iReaches(ctx, asked)
+		require.Nil(t, refusal, "%s", level)
+		assert.Equal(t, want, answered.(*protocol.Reaches).GetPaths(), "%s", level)
+	}
+}
+
+// A node with no login serves every route to whoever asks, and says so.
+func TestANodeWithNoLoginReachesEveryPathAsked(t *testing.T) {
+	srv := servedForTest(t)
+
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/i/reaches?paths=/api/approvals,/i/", nil))
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.JSONEq(t, `{"paths":["/api/approvals","/i/"]}`, w.Body.String())
+}
+
+// Asking about no path is a question with nothing in it.
+func TestIReachesRefusesAskingAboutNoPath(t *testing.T) {
+	s := rootKnowingServer(t)
+	ctx := auth.WithAdmission(context.Background(), auth.Admitted(auth.LevelUser, "garden"))
+	_, refusal := s.iReaches(ctx, sigil.Sent{"paths": " , "})
+	require.NotNil(t, refusal)
+	assert.Equal(t, sigil.Missing, refusal.GetWhy())
 }
 
 // A node with no login has no person to say where they stand, and says so
