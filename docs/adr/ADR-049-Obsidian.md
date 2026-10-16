@@ -9,8 +9,7 @@ Status: Developed in pr #1094 - I think its merged because i am using obsidian t
 
 ## How it flows
 
-Both ways: what is written in the vault reaches QNTX, and what QNTX holds
-reaches the vault.
+Both ways: what is written in the vault reaches QNTX, and what QNTX holds reaches the vault.
 
 "1. a persistent branch exists for all repo's that the Vault we assign directory space to."
 
