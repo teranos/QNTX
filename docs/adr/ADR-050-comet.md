@@ -15,9 +15,7 @@ right?"
 - [[ADR-027-Permissions]] 27-2 waits on this. 
 	- 2026-10-16: but actually, i think some work was done there, perhps check
 
-## The flip
 
-"instead of remembering to run make install for ground, i want to flip the model" "optionally"
 
 - ground is built where it runs: `make install`, or a binary from GitHub Releases (teranos/ground README).
 - Its SessionStart asks GitHub for the latest tag once a day and tells the session when a newer one exists.
