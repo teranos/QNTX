@@ -29,7 +29,7 @@ right?"
 
 "that is normal ground"
 
-"btu also, tailed to the repo ground, wich has more CTFE'able material potentially"
+"but also, tailed to the repo ground, which has more CTFE'able material potentially"
 
 "so we can still have super fast hooks, and actually even faster when the builds are done by QNTX"
 
