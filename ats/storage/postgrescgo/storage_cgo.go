@@ -32,7 +32,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/internal/sacred"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -48,7 +47,7 @@ type PostgresStore struct {
 // failed reads the error slot of a result that said success=false, which the
 // crate always writes; the caller still frees the struct.
 func failed(said *C.char, format string, args ...any) error {
-	return errors.Wrapf(sacred.Decode(C.GoString(said)), format, args...)
+	return errors.Wrapf(errors.Decode(C.GoString(said)), format, args...)
 }
 
 // NewPostgresStore connects to url, over TLS against the CA file ca unless the
@@ -180,9 +179,23 @@ func (s *PostgresStore) GetAttestations(filter ats.AttestationFilter) ([]*types.
 		Contexts:   filter.Contexts,
 		Actors:     filter.Actors,
 		Source:     filter.Source,
-		TimeStart:  (*millis)(filter.TimeStart),
-		TimeEnd:    (*millis)(filter.TimeEnd),
 		Limit:      filter.Limit,
+	}
+	start, starts, err := filter.TimeStart.At("start")
+	if err != nil {
+		return nil, err
+	}
+	end, ends, err := filter.TimeEnd.At("end")
+	if err != nil {
+		return nil, err
+	}
+	if starts {
+		at := millis(start)
+		rustFilter.TimeStart = &at
+	}
+	if ends {
+		at := millis(end)
+		rustFilter.TimeEnd = &at
 	}
 	body, err := json.Marshal(rustFilter)
 	if err != nil {
