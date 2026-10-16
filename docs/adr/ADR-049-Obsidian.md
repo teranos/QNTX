@@ -32,8 +32,7 @@ Both ways: what is written in the vault reaches QNTX, and what QNTX holds reache
 
 Obsidian Headless (`obsidian-headless`, open beta, Node.js 22 or later) is
 Obsidian's own client for Sync without the app: `ob login`, `ob sync-setup`,
-`ob sync --continuous`. On the box it keeps a copy of the vault, which is how
-the ROOT agent reaches it as files, and what is written into that copy reaches
+`ob sync --continuous`. On the box it keeps a copy of the vault, which is how the ROOT agent reaches it as files, and what is written into that copy reaches
 every device through Sync.
 
 "Fine, i will deal with this"
