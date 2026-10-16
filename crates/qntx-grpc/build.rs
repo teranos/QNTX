@@ -31,8 +31,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // GitHubService (ADR-043), against the messages qntx-proto's github module holds.
-        let github_var = std::env::var_os("DEP_QNTX_PROTO_GITHUB_PROTOS")
-            .ok_or("DEP_QNTX_PROTO_GITHUB_PROTOS not set: qntx-proto was built without its github feature")?;
+        let github_var = std::env::var_os("DEP_QNTX_PROTO_GITHUB_PROTOS").ok_or(
+            "DEP_QNTX_PROTO_GITHUB_PROTOS not set: qntx-proto was built without its github feature",
+        )?;
         let github: Vec<PathBuf> = std::env::split_paths(&github_var).collect();
         let out = PathBuf::from(std::env::var("OUT_DIR")?).join("github");
         std::fs::create_dir_all(&out)?;

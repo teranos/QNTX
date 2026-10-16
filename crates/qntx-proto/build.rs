@@ -118,16 +118,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|e| format!("cannot read proto dir {}: {}", proto_dir.display(), e))?
             .filter_map(|entry| {
                 let path = entry.ok()?.path();
-                let named = path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("github"));
+                let named = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("github"));
                 (named && path.extension().is_some_and(|ext| ext == "proto")).then_some(path)
             })
             .collect();
         let out = PathBuf::from(std::env::var("OUT_DIR")?).join("github");
-        std::fs::create_dir_all(&out).map_err(|e| format!("cannot make {}: {}", out.display(), e))?;
+        std::fs::create_dir_all(&out)
+            .map_err(|e| format!("cannot make {}: {}", out.display(), e))?;
         prost_build::Config::new()
             .out_dir(&out)
             .compile_protos(&github, &[&repo_root])?;
-        println!("cargo:github_protos={}", std::env::join_paths(&github)?.to_string_lossy());
+        println!(
+            "cargo:github_protos={}",
+            std::env::join_paths(&github)?.to_string_lossy()
+        );
         for proto in &github {
             println!("cargo:rerun-if-changed={}", proto.display());
         }
