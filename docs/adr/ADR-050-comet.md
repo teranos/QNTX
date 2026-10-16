@@ -31,7 +31,7 @@ for example:
 	- mentioned a file, didn't read it, please read it
 
 We can still have super fast hooks.
-actually even faster when the builds are done by QNTX
+Even faster when the builds are done by QNTX as Comet
 "
 
 - ground compiles one file, .ctfe/sand. wind folds it from three places on the operator's disk: ground's own controls/, controls/local/, and each declared project's controls/ with that project's `git ls-files` (ground tools/wind.d).
