@@ -10,7 +10,6 @@ Does an MCP client require dynamic client registration, or does it accept a clie
 A client minted in QNTX is what the [MCP authorization spec](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization) calls pre-registration, so QNTX needs no dynamic client registration.
 
 Existing MCP servers can run on one box, behind QNTX.
-
 "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS"
 
 A token presented to QNTX is never passed on to an MCP server behind it; the MCP spec forbids passthrough.
