@@ -28,9 +28,9 @@ Status: Proposed
 
 ## Decided
 
-"that means no am.toml"
 
-The plugin element is the only place a plugin is added, configured and enabled.
+
+
 
 The App's own credentials are the operator's, and they are in am.toml under
 `[auth.provider.github]`, each secret an `ssm://` or `env:` reference, as
