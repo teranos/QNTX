@@ -176,8 +176,9 @@ func userLevelsSaid() string {
 
 // levelUser is ROOT setting the level a User holds.
 func (h *Handler) levelUser(w http.ResponseWriter, r *http.Request, p Presented, id string) {
-	route, _ := p.Admitted()
-	if p.BecomingBy != "" || h.levelOf(route) != LevelRoot {
+	// ROOT being somebody is presented as them (asBecome), so their route is not ROOT's and is refused here.
+	route, admitted := p.Admitted()
+	if !admitted || h.levelOf(route) != LevelRoot {
 		h.writeError(w, http.StatusForbidden, "a User's level is set by ROOT")
 		return
 	}
