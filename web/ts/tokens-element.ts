@@ -164,7 +164,7 @@ function liveOnlyToggle(onToggle: () => void): HTMLButtonElement {
     toggle.style.border = '1px solid var(--border-on-dark)';
     toggle.style.borderRadius = 'var(--border-radius)';
     toggle.style.color = 'inherit';
-    toggle.style.font = 'inherit';
+    toggle.style.fontFamily = 'inherit';
     toggle.style.padding = '0 6px';
     toggle.addEventListener('click', () => {
         liveOnly = !liveOnly;
@@ -239,7 +239,6 @@ function renderMintLink(container: HTMLElement, listContainer: HTMLElement): voi
     });
     mint.element.title = 'mint a token';
     mint.element.setAttribute('aria-label', 'Mint a token');
-    mint.element.style.fontSize = '16px';
     mint.element.style.lineHeight = '1';
     mint.element.style.padding = '4px 10px';
     container.appendChild(mint.element);

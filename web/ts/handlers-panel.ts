@@ -275,7 +275,7 @@ async function mountEditors(): Promise<void> {
                     EditorState.readOnly.of(true),
                     EditorView.editable.of(false),
                     EditorView.theme({
-                        '&': { fontSize: '12px', maxHeight: '300px' },
+                        '&': { maxHeight: '300px' },
                         '.cm-scroller': { overflow: 'auto' },
                         '.cm-gutters': { display: 'none' },
                         '.cm-content': { padding: '8px 0' },
@@ -366,7 +366,7 @@ function mountResultRows(): void {
                 tooltip: `${f.attestation.id || ''} — fired ${agoOf(f.at_ms)}`,
                 body: renderTriple(f.attestation, {
                     tag: 'div',
-                    fontSize: '11px',
+                    
                     palette: RESULT_ROW_PALETTE,
                 }),
                 trailing: whenBadge(f.at_ms),
@@ -402,7 +402,7 @@ async function fetchProduced(): Promise<void> {
                 className: 'handlers-result-item',
                 padding: '4px 8px',
                 marginBottom: '2px',
-                body: renderTriple(as, { tag: 'div', fontSize: '11px', palette: RESULT_ROW_PALETTE }),
+                body: renderTriple(as, { tag: 'div', palette: RESULT_ROW_PALETTE }),
                 trailing: whenBadge(new Date(as.timestamp || 0).getTime()),
             }));
         }
@@ -429,7 +429,6 @@ export function errorFireRow(f: Fire): HTMLElement {
 
 function whenBadge(atMs: number): HTMLElement {
     const badge = document.createElement('span');
-    badge.style.fontSize = '10px';
     badge.style.fontFamily = 'var(--font-mono)';
     badge.style.color = 'var(--text-secondary)';
     badge.style.flexShrink = '0';

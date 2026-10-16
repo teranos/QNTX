@@ -131,7 +131,7 @@ const META_KEYS = new Set([
 /** Build the sigma report content (used in both canvas and window) */
 function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLElement {
     const container = el('div', {
-        style: { padding: '8px 12px', fontFamily: 'monospace', fontSize: '12px' },
+        style: { padding: '8px 12px', fontFamily: 'monospace' },
     });
 
     // ── Header: big number + predicate ──
@@ -140,21 +140,21 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
     const total = attrs._total || attrs._count || 0;
     const bigNumber = el('div', {
         text: `${Sigma} ${formatNum(total)}`,
-        style: { fontSize: '24px', fontWeight: 'bold', color: AMBER, lineHeight: '1.2' },
+        style: { fontWeight: 'bold', color: AMBER, lineHeight: '1.2' },
     });
     header.appendChild(bigNumber);
 
     const batchNote = attrs._count && attrs._count !== total ? ` (batch of ${attrs._count})` : '';
     const subtitle = el('div', {
         text: `observations${batchNote}`,
-        style: { fontSize: '11px', color: AMBER_DIM },
+        style: { color: AMBER_DIM },
     });
     header.appendChild(subtitle);
 
     const pred = extractPredicate(attestation);
     const predLine = el('div', {
         text: pred,
-        style: { fontSize: '13px', color: AMBER_VALUE, marginTop: '2px' },
+        style: { color: AMBER_VALUE, marginTop: '2px' },
     });
     const eye = watcherEyeSpan(pred);
     if (eye) predLine.appendChild(eye);
@@ -170,7 +170,7 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
         const timeRow = el('div', {
             style: {
                 marginBottom: '10px', display: 'flex', alignItems: 'center',
-                gap: '6px', fontSize: '11px', color: AMBER_DIM,
+                gap: '6px', color: AMBER_DIM,
             },
         }, [startLabel, line, endLabel]);
         container.appendChild(timeRow);
@@ -213,7 +213,7 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
             histSection.appendChild(el('div', {
                 style: {
                     display: 'flex', justifyContent: 'space-between',
-                    fontSize: '9px', color: AMBER_DIM, marginTop: '2px',
+                    color: AMBER_DIM, marginTop: '2px',
                 },
             }, [firstKey, lastKey]));
 
@@ -221,7 +221,7 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
             const histTotal = entries.reduce((s, e) => s + e[1], 0);
             histSection.appendChild(el('div', {
                 text: `${entries.length} buckets · ${formatNum(histTotal)} placed`,
-                style: { fontSize: '9px', color: AMBER_DIM, marginTop: '2px' },
+                style: { color: AMBER_DIM, marginTop: '2px' },
             }));
         }
 
@@ -236,7 +236,7 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
 
         const label = el('div', {
             text: key,
-            style: { fontSize: '10px', color: AMBER_DIM, marginBottom: '3px' },
+            style: { color: AMBER_DIM, marginBottom: '3px' },
         });
         section.appendChild(label);
 
@@ -312,7 +312,7 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
 
                 // Legend
                 const legend = el('div', {
-                    style: { display: 'flex', flexWrap: 'wrap', gap: '3px 8px', fontSize: '10px' },
+                    style: { display: 'flex', flexWrap: 'wrap', gap: '3px 8px' },
                 });
 
                 for (let i = 0; i < slices.length; i++) {
@@ -349,7 +349,7 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
                     tagRow.appendChild(el('span', {
                         text: String(v),
                         style: {
-                            fontSize: '11px', color: AMBER_VALUE, padding: '1px 5px',
+                            color: AMBER_VALUE, padding: '1px 5px',
                             backgroundColor: AMBER_BAR_BG, borderRadius: '2px',
                         },
                     }));
@@ -357,7 +357,7 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
                 if (value.count > 20) {
                     tagRow.appendChild(el('span', {
                         text: `+${value.count - 20} more`,
-                        style: { fontSize: '10px', color: AMBER_DIM },
+                        style: { color: AMBER_DIM },
                     }));
                 }
                 section.appendChild(tagRow);
@@ -366,7 +366,7 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
             // Number aggregate — range bar
             const minLabel = el('span', {
                 text: formatNum(value.min),
-                style: { fontSize: '11px', color: AMBER_VALUE },
+                style: { color: AMBER_VALUE },
             });
 
             const bar = el('div', {
@@ -393,13 +393,13 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
 
             const maxLabel = el('span', {
                 text: formatNum(value.max),
-                style: { fontSize: '11px', color: AMBER_VALUE },
+                style: { color: AMBER_VALUE },
             });
 
             const avg = value.count > 0 ? Math.round(value.sum / value.count) : 0;
             const avgLabel = el('span', {
                 text: `avg ${formatNum(avg)}`,
-                style: { fontSize: '10px', color: AMBER_DIM, flexShrink: '0' },
+                style: { color: AMBER_DIM, flexShrink: '0' },
             });
 
             const rangeRow = el('div', {
@@ -410,14 +410,14 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
             // Scalar constant
             section.appendChild(el('div', {
                 text: String(value),
-                style: { fontSize: '11px', color: AMBER_VALUE },
+                style: { color: AMBER_VALUE },
             }));
         } else {
             // Unknown shape — JSON fallback
             section.appendChild(el('div', {
                 text: JSON.stringify(value, null, 2),
                 style: {
-                    fontSize: '11px', color: AMBER_DIM,
+                    color: AMBER_DIM,
                     whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                 },
             }));
@@ -432,14 +432,14 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
 
         const label = el('div', {
             text: `${attrs._subjects_count || 0} subjects`,
-            style: { fontSize: '10px', color: AMBER_DIM, marginBottom: '3px' },
+            style: { color: AMBER_DIM, marginBottom: '3px' },
         });
         section.appendChild(label);
 
         if (attrs._subjects_sample && attrs._subjects_sample.length > 0) {
             section.appendChild(el('div', {
                 text: attrs._subjects_sample.join(' · '),
-                style: { fontSize: '11px', color: AMBER_VALUE, wordBreak: 'break-word' },
+                style: { color: AMBER_VALUE, wordBreak: 'break-word' },
             }));
         }
 
@@ -453,7 +453,7 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
         if (attrs._version && typeof attrs._version === 'string') parts.push(attrs._version.split(' ')[0]); // just version, not hash
         const footer = el('div', {
             text: parts.join(' · '),
-            style: { fontSize: '9px', color: AMBER_DIM, marginTop: '4px', textAlign: 'right' },
+            style: { color: AMBER_DIM, marginTop: '4px', textAlign: 'right' },
         });
         container.appendChild(footer);
     }
@@ -488,7 +488,7 @@ export function createSigmaElement(item: Element): HTMLElement {
         const total = attrs._total || attrs._count || 0;
         const titleText = el('span', {
             text: `${formatNum(total)} obs · ${extractPredicate(attestation)}${watcherEyes(extractPredicate(attestation))}`,
-            style: { fontSize: '12px', fontFamily: 'monospace', color: AMBER_VALUE },
+            style: { fontFamily: 'monospace', color: AMBER_VALUE },
         });
         titleBar.appendChild(titleText);
     }
@@ -637,7 +637,7 @@ export function renderSigmaResultLine(attestation: Attestation): HTMLElement {
 
     const text = el('div', {
         style: {
-            fontSize: '11px', fontFamily: 'monospace',
+            fontFamily: 'monospace',
             wordBreak: 'break-word', overflowWrap: 'break-word',
         },
     });

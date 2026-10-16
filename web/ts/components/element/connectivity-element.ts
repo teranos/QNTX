@@ -39,19 +39,16 @@ function renderConnectivityContent(): HTMLElement {
     container.style.gap = '8px';
     container.style.padding = '10px 12px';
     container.style.fontFamily = 'var(--font-mono)';
-    container.style.fontSize = '11px';
     container.style.color = 'var(--text-on-dark)';
 
     const header = document.createElement('div');
     header.textContent = 'Connectivity failures';
-    header.style.fontSize = '11px';
     header.style.opacity = '0.7';
     header.style.textTransform = 'uppercase';
     header.style.letterSpacing = '0.5px';
 
     const buildLine = document.createElement('div');
     buildLine.textContent = webBuildLine();
-    buildLine.style.fontSize = '10px';
     buildLine.style.opacity = '0.55';
     copyable(buildLine);
 

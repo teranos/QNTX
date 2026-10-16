@@ -120,7 +120,7 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
     // Pick first method with data, prefer umap
     const methods = Object.keys(allPoints).filter(m => allPoints[m]?.length > 0);
     if (methods.length === 0) {
-        container.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px">No projection data</div>';
+        container.innerHTML = '<div style="color:#6b7280;padding:8px">No projection data</div>';
         return;
     }
     let activeMethod = methods.includes('umap') ? 'umap' : methods[0];
@@ -137,7 +137,7 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
     const statusEl = el('div', {
         style: {
             position: 'absolute', top: '8px', left: '8px', color: '#888',
-            fontSize: '11px', fontFamily: 'monospace', pointerEvents: 'none',
+            fontFamily: 'monospace', pointerEvents: 'none',
         },
     });
     container.appendChild(statusEl);
@@ -152,7 +152,7 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
             const btn = el('button', {
                 text: m.toUpperCase(),
                 style: {
-                    padding: '2px 8px', fontSize: '11px', fontFamily: 'monospace',
+                    padding: '2px 8px', fontFamily: 'monospace',
                     border: '1px solid #555', borderRadius: '3px', cursor: 'pointer',
                     background: '#2a2a3e', color: '#ccc',
                 },
@@ -524,7 +524,7 @@ function renderEmbeddings(): void {
                 <span class="label" style="padding-left:12px">${escapeHtml(m.name)}${dimLabel}</span>
                 <span class="element-value" style="display:flex;align-items:center;gap:6px">
                     ${m.count}
-                    ${m.count >= 5 ? `<button class="emb-model-cluster-btn panel-btn" data-model="${escapeHtml(m.name)}" style="padding:1px 6px;font-size:10px;line-height:1.2" title="Cluster ${escapeHtml(m.name)}">cluster</button>` : ''}
+                    ${m.count >= 5 ? `<button class="emb-model-cluster-btn panel-btn" data-model="${escapeHtml(m.name)}" style="padding:1px 6px;line-height:1.2" title="Cluster ${escapeHtml(m.name)}">cluster</button>` : ''}
                 </span>
             </div>`;
         }).join('');
@@ -588,7 +588,7 @@ function renderEmbeddings(): void {
                         ${reembedding ? 'disabled' : ''}>
                         ${reembedding ? 'Embedding...' : `Embed ${Math.min(1000, unembedded)} oldest of ${unembedded} unembedded`}
                     </button>
-                    <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7">${resultMsg}</div>
+                    <div class="emb-result" style="margin-top:6px;opacity:0.7">${resultMsg}</div>
                 </div>
             `;
             sectionReembed.querySelector('.emb-reembed-btn')?.addEventListener('click', reembedAll);
@@ -624,11 +624,11 @@ function renderEmbeddings(): void {
                         // Show model name inline — abbreviated for single, badges for multi
                         let modelBadges = '';
                         if (byModel && byModel.length > 1) {
-                            modelBadges = byModel.map(m => `<span style="color:#6b7280;font-size:9px">${escapeHtml(m.model.slice(0, 3))}:${m.count}</span>`).join(' ');
+                            modelBadges = byModel.map(m => `<span style="color:#6b7280;">${escapeHtml(m.model.slice(0, 3))}:${m.count}</span>`).join(' ');
                         } else if (byModel && byModel.length === 1) {
-                            modelBadges = `<span style="color:#6b7280;font-size:9px">${escapeHtml(byModel[0].model)}</span>`;
+                            modelBadges = `<span style="color:#6b7280;">${escapeHtml(byModel[0].model)}</span>`;
                         }
-                        return `<span class="emb-cluster-pill has-tooltip" data-cluster-id="${id}" data-tooltip="${escapeHtml(tooltipText)}" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${c}22;border:1px solid ${c}55;cursor:pointer;white-space:nowrap;font-size:11px;line-height:1.4"><span style="color:${c};font-weight:bold">#${id}</span>${labelText ? `<span style="color:#a0aec0">${labelText}</span>` : ''}<span style="color:#9ca3af">:${count}</span>${modelBadges ? ` ${modelBadges}` : ''}</span>`;
+                        return `<span class="emb-cluster-pill has-tooltip" data-cluster-id="${id}" data-tooltip="${escapeHtml(tooltipText)}" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${c}22;border:1px solid ${c}55;cursor:pointer;white-space:nowrap;line-height:1.4"><span style="color:${c};font-weight:bold">#${id}</span>${labelText ? `<span style="color:#a0aec0">${labelText}</span>` : ''}<span style="color:#9ca3af">:${count}</span>${modelBadges ? ` ${modelBadges}` : ''}</span>`;
                     })
                     .join('');
                 clusterRows = `
@@ -658,16 +658,16 @@ function renderEmbeddings(): void {
                 <div class="element-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                     <h3 class="element-section-title">HDBSCAN Clustering</h3>
                     ${clusterRows}
-                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11px;align-items:center">
-                        <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">size<input class="emb-param emb-param-min-cluster-size" type="number" min="2" max="50" step="1" value="${minCS}" style="width:36px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
-                        <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">thresh<input class="emb-param emb-param-cluster-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${ct}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
-                        <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">match<input class="emb-param emb-param-match-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${cmt}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
-                        <button class="emb-cluster-btn panel-btn" style="margin-left:auto;padding:2px 10px;font-size:11px"
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center">
+                        <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">size<input class="emb-param emb-param-min-cluster-size" type="number" min="2" max="50" step="1" value="${minCS}" style="width:36px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;text-align:right"></label>
+                        <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">thresh<input class="emb-param emb-param-cluster-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${ct}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;text-align:right"></label>
+                        <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">match<input class="emb-param emb-param-match-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${cmt}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;text-align:right"></label>
+                        <button class="emb-cluster-btn panel-btn" style="margin-left:auto;padding:2px 10px;"
                             ${clustering ? 'disabled' : ''}>
                             ${clustering ? 'Clustering...' : 'Recompute'}
                         </button>
                     </div>
-                    <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7">${clusterResultMsg}</div>
+                    <div class="emb-cluster-result" style="margin-top:6px;opacity:0.7">${clusterResultMsg}</div>
                 </div>
             `;
             sectionCluster.querySelector('.emb-cluster-btn')?.addEventListener('click', () => recluster());
@@ -718,7 +718,7 @@ function renderEmbeddings(): void {
                 // Destroy 3D if switching back to 2D
                 if (regl3d) { regl3d.cleanup(); regl3d = null; }
 
-                const inputStyle = 'padding:2px 4px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right;-moz-appearance:textfield';
+                const inputStyle = 'padding:2px 4px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;text-align:right;-moz-appearance:textfield';
 
                 // Read current projection param values before replacing
                 const prevNeighbors = (sectionScatter.querySelector('.emb-param-n-neighbors') as HTMLInputElement)?.value;
@@ -748,9 +748,9 @@ function renderEmbeddings(): void {
                             // Single model — render as before
                             const nClusters = new Set(pts.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
                             return `<div style="flex:1;min-width:0">
-                                <div style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()} (${pts.length}pts, ${nClusters}cl)</div>
+                                <div style="color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()} (${pts.length}pts, ${nClusters}cl)</div>
                                 <div class="emb-scatter" data-method="${m}"></div>
-                                ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;font-size:11px;justify-content:center">${params}</div>` : ''}
+                                ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;justify-content:center">${params}</div>` : ''}
                             </div>`;
                         }
 
@@ -759,16 +759,16 @@ function renderEmbeddings(): void {
                             const modelPts = modelGroups.get(model)!;
                             const nClusters = new Set(modelPts.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
                             return `<div style="flex:1;min-width:0">
-                                <div style="font-size:10px;color:#9ca3af;text-align:center;margin-bottom:2px">${escapeHtml(model)}</div>
-                                <div style="font-size:10px;color:#6b7280;text-align:center;margin-bottom:4px">${modelPts.length}pts, ${nClusters}cl</div>
+                                <div style="color:#9ca3af;text-align:center;margin-bottom:2px">${escapeHtml(model)}</div>
+                                <div style="color:#6b7280;text-align:center;margin-bottom:4px">${modelPts.length}pts, ${nClusters}cl</div>
                                 <div class="emb-scatter" data-method="${m}" data-model="${model}"></div>
                             </div>`;
                         }).join('');
 
                         return `<div style="flex:1;min-width:0">
-                            <div style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()}</div>
+                            <div style="color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()}</div>
                             <div style="display:flex;gap:6px">${modelScatters}</div>
-                            ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;font-size:11px;justify-content:center">${params}</div>` : ''}
+                            ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;justify-content:center">${params}</div>` : ''}
                         </div>`;
                     }).join('');
                 const has3D = methodNames.some(m => projections[m]?.some(p => p.z != null));
@@ -776,19 +776,19 @@ function renderEmbeddings(): void {
                     <div class="element-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                         <div style="display:flex;align-items:center;justify-content:space-between">
                             <h3 class="element-section-title" style="margin:0">Projections</h3>
-                            ${has3D ? `<button class="emb-3d-toggle panel-btn" style="padding:2px 10px;font-size:11px">${view3d ? '2D' : '3D'}</button>` : ''}
+                            ${has3D ? `<button class="emb-3d-toggle panel-btn" style="padding:2px 10px;">${view3d ? '2D' : '3D'}</button>` : ''}
                         </div>
                         <div class="emb-scatter-2d" ${view3d ? 'style="display:none"' : ''}>
                             <div style="display:flex;gap:6px">${scatterSlots}</div>
                         </div>
                         <div class="emb-scatter-3d" ${view3d ? '' : 'style="display:none"'}></div>
                         <div style="display:flex;justify-content:flex-end;margin-top:6px">
-                            <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
+                            <button class="emb-project-btn panel-btn" style="padding:2px 10px;"
                                 ${projecting ? 'disabled' : ''}>
                                 ${projecting ? 'Projecting...' : 'Re-project'}
                             </button>
                         </div>
-                        <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+                        <div class="emb-project-result" style="margin-top:6px;opacity:0.7"></div>
                     </div>
                 `;
 
@@ -814,12 +814,12 @@ function renderEmbeddings(): void {
                             <span class="element-value" style="color:#6b7280">not computed</span>
                         </div>
                         <div style="display:flex;justify-content:flex-end;margin-top:6px">
-                            <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
+                            <button class="emb-project-btn panel-btn" style="padding:2px 10px;"
                                 ${projecting ? 'disabled' : ''}>
                                 ${projecting ? 'Projecting...' : 'Project'}
                             </button>
                         </div>
-                        <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+                        <div class="emb-project-result" style="margin-top:6px;opacity:0.7"></div>
                     </div>
                 `;
             }
@@ -866,7 +866,7 @@ function renderEmbeddings(): void {
             sectionTimeline.innerHTML = `
                 <div class="element-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                     <h3 class="element-section-title">Cluster Timeline</h3>
-                    <div style="font-size:12px;color:#6b7280">Need 2+ clustering runs for timeline</div>
+                    <div style="color:#6b7280">Need 2+ clustering runs for timeline</div>
                 </div>
             `;
         } else {
@@ -915,12 +915,12 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
     const detailView = el('div', { class: 'emb-detail-view element-content' });
     detailView.innerHTML = `
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                <button class="emb-back-btn panel-btn" style="padding:2px 10px;font-size:12px">\u2190 Back</button>
-                ${prevID !== null ? `<button class="emb-prev-btn panel-btn" style="padding:2px 8px;font-size:12px">\u2190</button>` : ''}
+                <button class="emb-back-btn panel-btn" style="padding:2px 10px;">\u2190 Back</button>
+                ${prevID !== null ? `<button class="emb-prev-btn panel-btn" style="padding:2px 8px;">\u2190</button>` : ''}
                 <span style="font-weight:bold;color:${color}">${title}</span>
-                <span style="color:#9ca3af;font-size:12px">${memberCount} members</span>
-                ${nextID !== null ? `<button class="emb-next-btn panel-btn" style="padding:2px 8px;font-size:12px">\u2192</button>` : ''}
-                <span style="color:#6b7280;font-size:10px;margin-left:auto">${idx + 1}/${clusterIDs.length} \u2190 \u2192</span>
+                <span style="color:#9ca3af;">${memberCount} members</span>
+                ${nextID !== null ? `<button class="emb-next-btn panel-btn" style="padding:2px 8px;">\u2192</button>` : ''}
+                <span style="color:#6b7280;margin-left:auto">${idx + 1}/${clusterIDs.length} \u2190 \u2192</span>
             </div>
 
             <div style="display:flex;gap:12px;margin-top:4px">
@@ -985,7 +985,7 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
             const wrapper = el('div', { style: { flex: '1', minWidth: '0' } });
             const methodLabel = el('div', {
                 text: method.toUpperCase(),
-                style: { fontSize: '11px', color: '#9ca3af', textAlign: 'center', marginBottom: '4px' },
+                style: { color: '#9ca3af', textAlign: 'center', marginBottom: '4px' },
             });
             wrapper.appendChild(methodLabel);
             const canvas = el('div');
@@ -1012,7 +1012,7 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
                         style: {
                             padding: '4px 8px', marginBottom: '2px',
                             backgroundColor: 'rgba(31, 61, 31, 0.35)', borderRadius: '2px',
-                            cursor: 'pointer', fontSize: '11px', fontFamily: 'monospace',
+                            cursor: 'pointer', fontFamily: 'monospace',
                             wordBreak: 'break-word', overflowWrap: 'break-word',
                         },
                     });
@@ -1056,9 +1056,9 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
     if (clusterTimeline.length >= 2) {
         renderClusterHistoryChart(tlContainer, clusterTimeline);
     } else if (clusterTimeline.length === 1) {
-        tlContainer.innerHTML = `<div style="font-size:12px;color:#9ca3af">First seen: ${new Date(clusterTimeline[0].run_time).toLocaleString()} (${clusterTimeline[0].n_members} members)</div>`;
+        tlContainer.innerHTML = `<div style="color:#9ca3af">First seen: ${new Date(clusterTimeline[0].run_time).toLocaleString()} (${clusterTimeline[0].n_members} members)</div>`;
     } else {
-        tlContainer.innerHTML = '<div style="font-size:12px;color:#6b7280">No history available</div>';
+        tlContainer.innerHTML = '<div style="color:#6b7280">No history available</div>';
     }
 }
 
@@ -1174,11 +1174,11 @@ function renderClusterHistoryChart(container: HTMLElement, data: TimelinePoint[]
             const date = d as Date;
             return `${date.getMonth() + 1}/${date.getDate()}`;
         }))
-        .selectAll('text').style('fill', '#9ca3af').style('font-size', '9px');
+        .selectAll('text').style('fill', '#9ca3af');
 
     g.append('g')
         .call(d3.axisLeft(yScale).ticks(3))
-        .selectAll('text').style('fill', '#9ca3af').style('font-size', '9px');
+        .selectAll('text').style('fill', '#9ca3af');
 
     g.selectAll('.domain').attr('stroke', '#374151');
     g.selectAll('.tick line').attr('stroke', '#374151');
@@ -1369,8 +1369,7 @@ function renderTimeline(container: HTMLElement, data: TimelinePoint[]): void {
             return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
         }))
         .selectAll('text')
-        .style('fill', '#9ca3af')
-        .style('font-size', '9px');
+        .style('fill', '#9ca3af');
 
     g.selectAll('.tick line').attr('stroke', '#374151');
     g.select('.domain').attr('stroke', '#374151');
@@ -1379,8 +1378,7 @@ function renderTimeline(container: HTMLElement, data: TimelinePoint[]): void {
     g.append('g')
         .call(d3.axisLeft(yScale).ticks(4))
         .selectAll('text')
-        .style('fill', '#9ca3af')
-        .style('font-size', '9px');
+        .style('fill', '#9ca3af');
 
     g.selectAll('.tick line').attr('stroke', '#374151');
     g.selectAll('.domain').attr('stroke', '#374151');
@@ -1421,7 +1419,6 @@ function renderTimeline(container: HTMLElement, data: TimelinePoint[]): void {
         .style('border', '1px solid #374151')
         .style('border-radius', '4px')
         .style('padding', '4px 8px')
-        .style('font-size', '11px')
         .style('color', '#e2e8f0')
         .style('pointer-events', 'none')
         .style('opacity', '0')

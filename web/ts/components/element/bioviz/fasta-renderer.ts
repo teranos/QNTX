@@ -61,7 +61,6 @@ export function isAminoAcidSequence(s: string): boolean {
 export function renderAminoAcidSequence(seq: string): HTMLElement {
     const el = document.createElement('div');
     el.style.fontFamily = 'var(--font-mono)';
-    el.style.fontSize = '11px';
     el.style.letterSpacing = '0.5px';
     el.style.lineHeight = '1.5';
     el.style.wordBreak = 'break-all';
@@ -101,7 +100,6 @@ function parseFasta(data: string): FastaEntry[] {
 function renderSequence(seq: string): HTMLElement {
     const el = document.createElement('div');
     el.style.fontFamily = 'var(--font-mono)';
-    el.style.fontSize = '13px';
     el.style.letterSpacing = '1px';
     el.style.lineHeight = '1.6';
     el.style.wordBreak = 'break-all';
@@ -152,7 +150,6 @@ export function buildFastaViewer(data: string): HTMLElement {
     prevBtn.style.color = AZURE_VALUE;
     prevBtn.style.cursor = 'pointer';
     prevBtn.style.padding = '2px 6px';
-    prevBtn.style.fontSize = '11px';
     prevBtn.style.borderRadius = '3px';
 
     const nextBtn = document.createElement('button');
@@ -162,12 +159,10 @@ export function buildFastaViewer(data: string): HTMLElement {
     nextBtn.style.color = AZURE_VALUE;
     nextBtn.style.cursor = 'pointer';
     nextBtn.style.padding = '2px 6px';
-    nextBtn.style.fontSize = '11px';
     nextBtn.style.borderRadius = '3px';
 
     const counter = document.createElement('span');
     counter.style.color = AZURE_KEYWORD;
-    counter.style.fontSize = '11px';
     counter.style.fontFamily = 'var(--font-mono)';
 
     preventDrag(prevBtn);
@@ -192,7 +187,6 @@ export function buildFastaViewer(data: string): HTMLElement {
 
             const headerEl = document.createElement('div');
             headerEl.style.color = AZURE_KEYWORD;
-            headerEl.style.fontSize = '11px';
             headerEl.style.marginBottom = '2px';
             headerEl.style.fontFamily = 'var(--font-mono)';
             headerEl.textContent = '>' + entries[i].header;

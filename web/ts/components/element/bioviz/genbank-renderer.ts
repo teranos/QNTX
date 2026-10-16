@@ -137,7 +137,6 @@ export function buildGenbankViewer(genbankText: string): HTMLElement {
 
     // Header: LOCUS — length bp
     const header = document.createElement('div');
-    header.style.fontSize = '11px';
     header.style.fontFamily = 'var(--font-mono)';
     header.style.marginBottom = '4px';
     header.style.color = AZURE_VALUE;
@@ -217,7 +216,6 @@ export function buildGenbankViewer(genbankText: string): HTMLElement {
         text.setAttribute('y', String(labelY));
         text.setAttribute('text-anchor', 'middle');
         text.setAttribute('font-family', 'monospace');
-        text.setAttribute('font-size', '9');
         text.setAttribute('fill', color);
         text.textContent = f.label;
         svg.appendChild(text);
@@ -231,7 +229,6 @@ export function buildGenbankViewer(genbankText: string): HTMLElement {
         tick.setAttribute('y', String(barY - 4));
         tick.setAttribute('text-anchor', anchor);
         tick.setAttribute('font-family', 'monospace');
-        tick.setAttribute('font-size', '8');
         tick.setAttribute('fill', AZURE_KEYWORD);
         tick.textContent = String(pos);
         svg.appendChild(tick);

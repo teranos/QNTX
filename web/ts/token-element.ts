@@ -109,7 +109,6 @@ function field(name: string, value: string, copyable = false, hover = ''): HTMLE
 
     const caption = document.createElement('span');
     caption.style.color = 'var(--text-on-dark-tertiary)';
-    caption.style.fontSize = '11px';
     caption.textContent = name;
 
     const held = document.createElement('div');
@@ -211,7 +210,6 @@ function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
     caption.style.alignItems = 'center';
     caption.style.gap = '6px';
     caption.style.color = 'var(--text-on-dark-tertiary)';
-    caption.style.fontSize = '11px';
     caption.textContent = 'Roles';
 
     const held = document.createElement('div');
@@ -258,7 +256,6 @@ function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
     });
     add.element.title = 'grant a role';
     add.element.setAttribute('aria-label', 'Grant a role');
-    add.element.style.fontSize = '14px';
     add.element.style.lineHeight = '1';
     add.element.style.padding = '2px 8px';
     caption.appendChild(add.element);
@@ -469,7 +466,6 @@ function stateOf(t: TokenInfo, now: Date): string {
 export function renderIssued(container: HTMLElement, issued: TokenInfo[], now: Date): void {
     container.innerHTML = '';
     // Smaller than the list it stands in for, not larger.
-    container.style.fontSize = '11px';
     container.style.lineHeight = '1.4';
     container.style.gap = '0';
     const caption = document.createElement('span');

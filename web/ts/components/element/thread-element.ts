@@ -106,7 +106,6 @@ function applyPlacedState(element: HTMLElement, item: Element): void {
         ?? element.querySelector('.symbol');
     const sym = carried ? settleSymbolSpan(carried) : createSymbolSpan('〽');
     if (sym.parentElement !== element) element.appendChild(sym);
-    sym.style.fontSize = '20px';
     sym.style.color = color;
 }
 

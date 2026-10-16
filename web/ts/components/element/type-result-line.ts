@@ -100,7 +100,7 @@ export function renderTypeResultLine(group: TypeGroup): HTMLElement {
 
     const text = el('div', {
         style: {
-            fontSize: '11px', fontFamily: 'monospace',
+            fontFamily: 'monospace',
             wordBreak: 'break-word', overflowWrap: 'break-word',
         },
     });

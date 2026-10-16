@@ -139,7 +139,7 @@ body.disconnected #container {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: #888;
 }
 
@@ -169,13 +169,13 @@ body.disconnected #container {
 }
 
 #who-name {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--text-primary);
     white-space: nowrap;
 }
 
 #who-namespace {
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     font-family: var(--font-mono);
     color: var(--text-secondary);
     white-space: nowrap;
@@ -183,7 +183,7 @@ body.disconnected #container {
 
 #header h1 {
     margin: 0 0 4px 0;
-    font-size: 16px;
+    font-size: var(--font-size-lg);
     font-weight: 600;
     color: #000;
 }
@@ -215,7 +215,7 @@ body.disconnected #container {
 }
 
 .llm-model, .llm-stage {
-    font-size: 9px;
+    font-size: var(--font-size-xs);
     padding: 2px 6px;
     border-radius: var(--border-radius);
     margin-left: 8px;

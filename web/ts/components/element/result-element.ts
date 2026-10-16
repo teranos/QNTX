@@ -113,7 +113,7 @@ function renderStatsLine(container: HTMLElement, stats: GenerationStats): void {
     const statsEl = el('div', {
         class: 'result-element-stats',
         text: parts.join(' · '),
-        style: { fontSize: '10px', color: 'var(--text-muted)', padding: '4px 8px 2px', textAlign: 'right', opacity: '0.6' },
+        style: { color: 'var(--text-muted)', padding: '4px 8px 2px', textAlign: 'right', opacity: '0.6' },
     });
     container.appendChild(statsEl);
 }
@@ -302,7 +302,7 @@ export function createResultElement(
             text: prompt,
             style: {
                 flex: '1', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                padding: '0 8px', color: 'var(--text-on-dark)', fontSize: '12px',
+                padding: '0 8px', color: 'var(--text-on-dark)', 
             },
         });
         header.appendChild(promptLabel);
@@ -452,7 +452,7 @@ export function createResultElement(
     const output = el('div', {
         class: 'result-element-output content-area',
         style: {
-            position: 'relative', zIndex: '1', fontFamily: 'monospace', fontSize: '12px',
+            position: 'relative', zIndex: '1', fontFamily: 'monospace', 
             whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'break-word',
             backgroundColor: 'transparent', color: 'var(--text-on-dark)',
         },
@@ -475,7 +475,7 @@ export function createResultElement(
     const nebulaStatus = el('div', {
         style: {
             position: 'absolute', bottom: '2px', right: '6px',
-            font: '9px monospace', color: 'rgba(255,255,255,0.25)', zIndex: '1',
+            color: 'rgba(255,255,255,0.25)', zIndex: '1',
         },
     });
 
@@ -531,7 +531,7 @@ export function createResultElement(
                         text: '\u2500 fork ' + branchId,
                         style: {
                             borderTop: '1px solid rgba(100,180,255,0.4)', margin: '6px 0 4px',
-                            padding: '2px 0 0', font: '9px monospace', color: 'rgba(100,180,255,0.5)',
+                            padding: '2px 0 0', color: 'rgba(100,180,255,0.5)',
                         },
                     });
                     output.appendChild(forkMarker);
@@ -1009,7 +1009,7 @@ export function buildResultTitleBar(
             text: promptText,
             style: {
                 flex: '1', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                padding: '0 8px', color: 'var(--text-on-dark)', fontSize: '12px',
+                padding: '0 8px', color: 'var(--text-on-dark)', 
             },
         });
         header.appendChild(promptLabel);
@@ -1057,14 +1057,14 @@ export function renderResultContent(
             text: promptText,
             style: {
                 padding: '0 0 8px', borderBottom: '1px solid var(--border-on-dark)',
-                marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '12px',
+                marginBottom: '8px', color: 'var(--text-secondary)', 
             },
         });
         wrapper.appendChild(promptDiv);
     }
 
     const outputDiv = el('div', {
-        style: { fontFamily: 'monospace', fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+        style: { fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
     });
 
     if (tokens.length > 0) {

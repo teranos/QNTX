@@ -169,7 +169,6 @@ export function renderInviteLink(container: HTMLElement, invited?: () => void): 
     });
     invite.element.title = 'invite a user';
     invite.element.setAttribute('aria-label', 'Invite a user');
-    invite.element.style.fontSize = '16px';
     invite.element.style.lineHeight = '1';
     invite.element.style.padding = '4px 10px';
     container.appendChild(invite.element);

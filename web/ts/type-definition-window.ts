@@ -224,7 +224,7 @@ function buildEditUI(container: HTMLElement): void {
     // Back button
     const backBtn = document.createElement('button');
     backBtn.textContent = '← Back';
-    backBtn.style.cssText = 'background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:4px 0;font-size:12px;margin-bottom:4px;';
+    backBtn.style.cssText = 'background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:4px 0;margin-bottom:4px;';
     backBtn.addEventListener('mouseenter', () => { backBtn.style.color = 'var(--text-primary)'; });
     backBtn.addEventListener('mouseleave', () => { backBtn.style.color = 'var(--text-secondary)'; });
     backBtn.addEventListener('click', () => {
@@ -241,7 +241,7 @@ function buildEditUI(container: HTMLElement): void {
         <div class="type-def-title" style="display:flex;align-items:center;gap:8px;">
             <span class="type-def-name" style="color:var(--text-primary);font-weight:600;">${escapeHtml(currentType.name)}</span>
             <span class="type-def-color" style="width:14px;height:14px;border-radius:3px;background:${safeColor};display:inline-block;"></span>
-            <span class="type-def-ends" style="color:var(--text-secondary);font-size:11px;">${escapeHtml(endsShown(currentType))}</span>
+            <span class="type-def-ends" style="color:var(--text-secondary);">${escapeHtml(endsShown(currentType))}</span>
         </div>
     `;
     container.appendChild(header);
@@ -249,7 +249,7 @@ function buildEditUI(container: HTMLElement): void {
     // Fields section
     const fieldsSection = document.createElement('div');
     fieldsSection.className = 'type-def-fields';
-    fieldsSection.innerHTML = '<h3 style="color:var(--text-primary);font-size:13px;">Fields</h3>';
+    fieldsSection.innerHTML = '<h3 style="color:var(--text-primary);">Fields</h3>';
 
     const fieldList = document.createElement('div');
     fieldList.className = 'field-list';
@@ -313,7 +313,7 @@ function buildEditUI(container: HTMLElement): void {
     `;
     saveSection.innerHTML = `
         <button class="btn btn-primary" id="save-type-btn">Attest Type Definition</button>
-        <div class="save-status" id="save-status" style="font-size: 11px; color: var(--text-secondary);"></div>
+        <div class="save-status" id="save-status" style=" color: var(--text-secondary);"></div>
     `;
     container.appendChild(saveSection);
 
@@ -559,7 +559,7 @@ function renderCreateContent(): HTMLElement {
     typesSection.innerHTML = '<h4>Existing Types</h4>';
     const typesList = document.createElement('div');
     typesList.className = 'type-def-types-list';
-    typesList.style.cssText = 'font-size:12px;color:var(--text-secondary);max-height:200px;overflow-y:auto;';
+    typesList.style.cssText = 'color:var(--text-secondary);max-height:200px;overflow-y:auto;';
     typesList.textContent = 'Loading...';
     typesSection.appendChild(typesList);
     container.appendChild(typesSection);
@@ -625,11 +625,11 @@ async function loadExistingTypes(typesList: HTMLElement, container: HTMLElement)
             colorDot.style.cssText = `width:10px;height:10px;border-radius:50%;background:${safeColor};flex-shrink:0;`;
 
             const name = document.createElement('span');
-            name.style.cssText = 'font-size:12px;font-weight:500;';
+            name.style.cssText = 'font-weight:500;';
             name.textContent = type.label || type.name;
 
             const fieldCount = document.createElement('span');
-            fieldCount.style.cssText = 'font-size:11px;color:var(--text-secondary);margin-left:auto;';
+            fieldCount.style.cssText = 'color:var(--text-secondary);margin-left:auto;';
             const rCount = type.rich_string_fields?.length || 0;
             const aCount = type.array_fields?.length || 0;
             const total = rCount + aCount;
@@ -637,7 +637,7 @@ async function loadExistingTypes(typesList: HTMLElement, container: HTMLElement)
 
             const ends = document.createElement('span');
             ends.className = 'type-def-ends';
-            ends.style.cssText = 'font-size:11px;color:var(--text-secondary);';
+            ends.style.cssText = 'color:var(--text-secondary);';
             ends.textContent = endsShown(type);
 
             if (type.deprecated) {
@@ -707,7 +707,7 @@ function attachCreateListeners(container: HTMLElement): void {
         if (!validation.valid) {
             const errorEl = document.createElement('div');
             errorEl.className = 'field-error';
-            errorEl.style.cssText = 'color: #e74c3c; font-size: 12px; margin-top: 4px;';
+            errorEl.style.cssText = 'color: #e74c3c; margin-top: 4px;';
             errorEl.textContent = validation.error || 'Invalid type name';
 
             nameInput.parentElement?.querySelector('.field-error')?.remove();

@@ -473,7 +473,6 @@ function buildAttestationContent(
         // Triple
         const triple = document.createElement('div');
         triple.style.padding = '8px';
-        triple.style.fontSize = '12px';
         triple.style.fontFamily = 'var(--font-mono)';
         triple.style.color = AZURE_VALUE;
         triple.style.wordBreak = 'break-word';
@@ -488,7 +487,6 @@ function buildAttestationContent(
         if (metaLines.length > 0) {
             const meta = document.createElement('div');
             meta.style.padding = '4px 8px';
-            meta.style.fontSize = '11px';
             meta.style.color = 'var(--text-secondary)';
             meta.innerHTML = metaLines.join('<br>');
             wrapper.appendChild(meta);

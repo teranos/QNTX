@@ -129,7 +129,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     color: var(--door-text);
     background: var(--door-face-low);
     border-left: 1px solid var(--door-line);
@@ -144,7 +144,7 @@
 
 .door-dials button {
     font: inherit;
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     padding: 3px 6px;
     cursor: pointer;
     color: var(--door-text);
@@ -228,6 +228,15 @@
     gap: 6px;
 }
 
+.door-fields label {
+    font-size: var(--font-size-xs);
+}
+
+/* Under the field size, iOS zooms the page when the field is tapped. */
+.door-fields input {
+    font-size: var(--font-size-field);
+}
+
 /* A way in wears its own mark and says nothing. Square, because the one round
    thing on this door is the fingerprint. */
 .door-provider {
@@ -277,7 +286,7 @@
     position: absolute;
     top: 14px;
     font-family: var(--font-mono);
-    font-size: var(--font-size-xs, 11px);
+    font-size: var(--font-size-xs);
     letter-spacing: .08em;
     color: var(--door-text-dim);
     padding: 3px 10px;
@@ -307,7 +316,7 @@
     margin: 0 auto;
     width: fit-content;
     font-family: var(--font-mono);
-    font-size: var(--font-size-xs, 11px);
+    font-size: var(--font-size-xs);
     letter-spacing: .08em;
     color: var(--door-text-dim);
     padding: 3px 10px;
@@ -381,7 +390,7 @@
     top: calc(50% + 86px);
     margin: 0 auto;
     z-index: 1;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     letter-spacing: .14em;
     text-transform: lowercase;
     color: var(--door-text-dim);
@@ -467,7 +476,7 @@
 
 .door-press {
     font: inherit;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     letter-spacing: .1em;
     text-transform: lowercase;
     color: var(--door-text);
@@ -499,7 +508,7 @@
 }
 
 .door-skip {
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     letter-spacing: .08em;
     color: var(--door-text);
     text-align: center;
@@ -527,7 +536,7 @@
     padding: 7px 9px;
     border: 1px solid var(--door-line);
     background: var(--door-well);
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     line-height: 1.55;
     color: var(--door-text-dim);
     text-align: left;
@@ -547,14 +556,14 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     letter-spacing: .1em;
     color: var(--door-text-dim);
 }
 
 .door-field input {
     font: inherit;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     letter-spacing: normal;
     width: 100%;
     box-sizing: border-box;
@@ -575,7 +584,7 @@
    focus for a field under 16px, and 44 is Apple's touch target. */
 @media (pointer: coarse) {
     .door-field input {
-        font-size: 16px;
+        font-size: var(--font-size-field);
         min-height: 44px;
     }
 }
@@ -592,7 +601,7 @@
     box-sizing: border-box;
     padding: 0;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     line-height: 1;
     color: var(--door-lamp-dim);
     background: transparent;

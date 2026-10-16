@@ -17,7 +17,6 @@ import { renderSparklines, windowOf, type Seen } from './components/sparkline.ts
 import type { StaandInfo } from './market-element.ts';
 
 const FONT = 'var(--font-mono)';
-const SIZE = '13px';
 const EDGE = '12px';
 const MUTE = 'var(--text-on-dark-tertiary)';
 const LINE = 'var(--border-on-dark)';
@@ -100,7 +99,6 @@ export function renderPageStats(container: HTMLElement, s: StaandInfo, page: str
 
     const title = document.createElement('div');
     title.textContent = page;
-    title.style.fontSize = '15px';
     title.style.marginBottom = '2px';
     title.style.overflowWrap = 'break-word';
     title.style.wordBreak = 'break-word';
@@ -150,7 +148,6 @@ export function openPageElement(s: StaandInfo, page: string, site: string): void
             const content = document.createElement('div');
             content.className = 'page-element-content';
             content.style.fontFamily = FONT;
-            content.style.fontSize = SIZE;
             content.style.padding = EDGE;
             renderPageStats(content, s, page, site);
             return content;

@@ -84,7 +84,7 @@ export function createSemanticElement(item: Element): HTMLElement {
     const editor = el('input', {
         class: 'se-query-input',
         style: {
-            flex: '1', padding: '4px 8px', fontSize: '13px', fontFamily: 'monospace',
+            flex: '1', padding: '4px 8px', fontFamily: 'monospace',
             border: 'none', outline: 'none', backgroundColor: 'rgba(25, 25, 30, 0.95)',
             color: '#d4f0d4', borderRadius: '2px',
         },
@@ -99,7 +99,7 @@ export function createSemanticElement(item: Element): HTMLElement {
     const clusterSelect = el('select', {
         class: 'se-cluster-select',
         style: {
-            padding: '2px 4px', fontSize: '11px', fontFamily: 'monospace',
+            padding: '2px 4px', fontFamily: 'monospace',
             border: 'none', outline: 'none', backgroundColor: 'rgba(25, 25, 30, 0.95)',
             color: 'var(--text-secondary)', borderRadius: '2px', cursor: 'pointer',
             flexShrink: '0',
@@ -130,7 +130,7 @@ export function createSemanticElement(item: Element): HTMLElement {
                 const notice = el('div', {
                     class: 'se-element-unavailable',
                     style: {
-                        padding: '16px', color: 'var(--text-secondary)', fontSize: '12px',
+                        padding: '16px', color: 'var(--text-secondary)', 
                         fontFamily: 'monospace', textAlign: 'center', lineHeight: '1.6',
                     },
                 });
@@ -199,7 +199,7 @@ export function createSemanticElement(item: Element): HTMLElement {
 
     const thresholdLabel = el('span', {
         text: currentThreshold.toFixed(2),
-        style: { fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace', minWidth: '28px' },
+        style: { color: 'var(--text-secondary)', fontFamily: 'monospace', minWidth: '28px' },
     });
 
     thresholdContainer.appendChild(thresholdSlider);
@@ -228,7 +228,7 @@ export function createSemanticElement(item: Element): HTMLElement {
         style: {
             backgroundColor: 'rgba(25, 25, 30, 0.95)',
             borderTop: '1px solid var(--border)',
-            fontSize: '12px', fontFamily: 'monospace',
+            fontFamily: 'monospace',
         },
     });
 
@@ -423,7 +423,7 @@ function renderAttestation(attestation: Attestation, score?: number): HTMLElemen
     const badge = score !== undefined && score > 0
         ? el('span', {
             text: `${Math.round(score * 100)}%`,
-            style: { fontSize: '10px', fontFamily: 'monospace', color: 'var(--text-secondary)', flexShrink: '0' },
+            style: { fontFamily: 'monospace', color: 'var(--text-secondary)', flexShrink: '0' },
         })
         : undefined;
 
@@ -436,7 +436,7 @@ function renderAttestation(attestation: Attestation, score?: number): HTMLElemen
         body: el('div', {
             text: extractRichText(attestation),
             style: {
-                fontSize: '11px', color: RESULT_ROW_PALETTE.value, fontFamily: 'monospace',
+                color: RESULT_ROW_PALETTE.value, fontFamily: 'monospace',
                 wordBreak: 'break-word', overflowWrap: 'break-word',
             },
         }),

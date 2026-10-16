@@ -23,7 +23,6 @@ import type { StaandInfo, StandSeen, StandStep, StandWalk } from './market-eleme
 // Literals, not references to another module's constants: the bundler resolves
 // a const that points at an imported const to undefined (web/CLAUDE.md).
 const FONT = 'var(--font-mono)';
-const SIZE = '13px';
 const EDGE = '12px';
 const MUTE = 'var(--text-on-dark-tertiary)';
 const LINE = 'var(--border-on-dark)';
@@ -204,7 +203,6 @@ export function renderStandActivity(container: HTMLElement, s: StaandInfo, now: 
 
     const title = document.createElement('div');
     title.textContent = s.market + ' / ' + s.slug;
-    title.style.fontSize = '15px';
     title.style.marginBottom = '2px';
     container.appendChild(title);
 
@@ -361,7 +359,6 @@ export function standActivity(s: StaandInfo): Element {
             const content = document.createElement('div');
             content.className = 'stand-activity-content';
             content.style.fontFamily = FONT;
-            content.style.fontSize = SIZE;
             content.style.padding = EDGE;
             renderStandActivity(content, s);
             void renderCampaigns(content, s);

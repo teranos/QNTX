@@ -82,7 +82,6 @@ export function createAxElement(item: Element): HTMLElement {
     editor.placeholder = 'Enter ax query (e.g., ALICE, is git)';
     editor.style.flex = '1';
     editor.style.padding = '4px 8px';
-    editor.style.fontSize = '13px';
     editor.style.fontFamily = 'monospace';
     editor.style.border = 'none';
     editor.style.outline = 'none';
@@ -111,7 +110,6 @@ export function createAxElement(item: Element): HTMLElement {
     resultsContainer.className = 'ax-element-results content-area';
     resultsContainer.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
     resultsContainer.style.borderTop = '1px solid var(--border)';
-    resultsContainer.style.fontSize = '12px';
     resultsContainer.style.fontFamily = 'monospace';
 
     appendEmptyState(resultsContainer, 'ax-element-empty-state');
@@ -130,7 +128,6 @@ export function createAxElement(item: Element): HTMLElement {
         resultsContainer.innerHTML = '';
         const searchingEl = document.createElement('div');
         searchingEl.style.padding = '8px';
-        searchingEl.style.fontSize = '11px';
         searchingEl.style.color = 'var(--text-secondary)';
         searchingEl.style.fontFamily = 'monospace';
         searchingEl.textContent = 'searching...';
@@ -302,7 +299,7 @@ function renderAttestation(attestation: Attestation): HTMLElement {
         className: 'ax-element-result-item',
         body: renderTriple(attestation, {
             tag: 'div',
-            fontSize: '11px',
+            
             palette: RESULT_ROW_PALETTE,
         }),
     });
