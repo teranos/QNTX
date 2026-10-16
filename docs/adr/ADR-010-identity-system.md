@@ -14,7 +14,8 @@ QNTX's identity system has four orthogonal layers, each with distinct properties
 | **Node DID** | Signer identity | Globally unique (ed25519 keypair) | Generated once per node | `did:key:z6Mk...` |
 | **User DID** | The person | Globally unique (ed25519 keypair) | Derived from biometrics via WebAuthn PRF | `did:key:z6Mk...` |
 
-A node was a server when this table was written. Since [[ADR-012-browser-wasm-parity]] it is also a browser, and `internal/nodedid/` cannot reach one.
+A node was a server when this table was written. Since ADR-012 it is also a
+browser, and `internal/nodedid/` cannot reach one.
 
 User DID was written here before anything derived one. It is real since [[ADR-030-identity-providers]] passkey gate: the browser asks the authenticator for a PRF output
 and derives the key from it, so the same finger gives the same DID.
