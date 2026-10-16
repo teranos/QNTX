@@ -1,9 +1,9 @@
 # ADR-048: Node-Agent
 
-Date: 2026-10-04
+Date: 2026-10-16
 Status: Revised
 
-QNTX hosts agents for use by ROOT.
+QNTX interacts with the Node Agent agents for use by ROOT.
 
 "an agent is itself"
 
