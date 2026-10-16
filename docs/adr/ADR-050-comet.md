@@ -29,7 +29,7 @@ right?"
 like universal ground scope"
 "that is normal ground"
 
-"but also, tailed to the repo ground, which has more CTFE'able material potentially"
+"but also, tailed to the repo ground `project` pbt, which has more CTFE'able material potentially"
 
 "so we can still have super fast hooks, and actually even faster when the builds are done by QNTX"
 
