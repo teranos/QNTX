@@ -1,7 +1,7 @@
 # ADR-047: Real inboxes
 
 Date: 2026-10-01
-Status: Proposed
+Status: Accepted
 
 "mail, per user, in the system"
 
