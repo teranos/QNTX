@@ -19,7 +19,8 @@ right?"
 
 "instead of remembering to run make install for ground, i want to flip the model" "optionally"
 
-- ground is built where it runs: `make install`, or a binary from GitHub Releases (teranos/ground README). Its SessionStart asks GitHub for the latest tag once a day and tells the session when a newer one exists (ground source/checks.d).
+- ground is built where it runs: `make install`, or a binary from GitHub Releases (teranos/ground README).
+- Its SessionStart asks GitHub for the latest tag once a day and tells the session when a newer one exists.
 - The latest release is v0.19.1, 2026-06-30. The operator's machine runs  v0.19.1-439-g4ec8488.
 
 ## Per ground project
