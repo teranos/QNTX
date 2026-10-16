@@ -14,11 +14,7 @@ Existing MCP servers can run on one box, behind QNTX.
 
 A token presented to QNTX is never passed on to an MCP server behind it; the MCP spec forbids passthrough.
 
-QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk), pinned via parity.
-
-The token the OAuth flow issues is the person who said yes at the passkey, so a connector may do what that person may do and nothing else.
-
-"my oauth should hjust have that permission"
+QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk), pinned through parity.
 
 A refresh token is an ordinary token row, thirty days, rotated — so a connector in use never returns to the passkey and one left alone for a month is finished.
 
