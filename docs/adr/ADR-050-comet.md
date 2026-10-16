@@ -24,7 +24,7 @@ right?"
 ## Per ground project
 
 "i want a comet per ground project essentially"
-"but also, tailed to the repo ground `project` pbt, which has more CTFE'able material assuredly"
+"tailored to the repo ground `project` pbt, which has CTFE'able material assuredly"
 
 "so we can still have super fast hooks, and actually even faster when the builds are done by QNTX"
 
