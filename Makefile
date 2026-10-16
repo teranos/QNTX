@@ -25,6 +25,11 @@ BUILD_TAGS := rustsqlite,qntxwasm
 cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM parser)
 	@echo "Building QNTX CLI with Rust optimizations (sqlite) and WASM (parser, fuzzy)..."
 	$(call ground-notify,go-build,Go: building qntx cli)
+	@# cargo writes libats_sqlite as a shared library beside the static one, and
+	@# the linker takes the shared one, at this tree's absolute path: the darwin
+	@# release loaded on no machine but the runner that built it. Gone, the
+	@# binary carries the static library, as a plugin's does.
+	@rm -f target/release/libats_sqlite.dylib target/release/deps/libats_sqlite.dylib target/release/libats_sqlite.so target/release/deps/libats_sqlite.so
 	@go build -tags "$(BUILD_TAGS)" $(GO_LDFLAGS) -o bin/qntx ./cmd/qntx || { \
 		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
