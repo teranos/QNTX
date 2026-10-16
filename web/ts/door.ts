@@ -13,9 +13,6 @@ import { createButton } from './components/button';
 
 const DOOR_ID = 'door';
 
-// Long enough to read a node's name while it is letting you in.
-const NAMED_MS = 2600;
-
 // Lit while the door is up, and only while it is up. The door outlives every
 // face it wears, so this is tied to being shown rather than to being built.
 let lit: Field | null = null;
@@ -35,17 +32,6 @@ export function mood(next: Mood): void {
     lit?.mood(next);
     // The door wears where it has got to, so what is drawn on it can answer.
     document.getElementById(DOOR_ID)?.setAttribute('data-mood', next);
-}
-
-/**
- * Shows the node's name for a moment. Signing in is the one time the door says
- * which node it is without being asked — you are about to be let into it.
- */
-export function nameYourself(): void {
-    const band = document.getElementById(DOOR_ID)?.querySelector('.door-node');
-    if (!band || band.classList.contains('door-node-shown')) return;
-    band.classList.add('door-node-shown');
-    setTimeout(() => { band.classList.remove('door-node-shown'); }, NAMED_MS);
 }
 
 /**
