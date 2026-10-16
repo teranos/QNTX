@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-22
-**Related:** [[ADR-027-Permissions]], ADR-030 , ADR-031 (The User)
+**Related:** [[ADR-027-Permissions]], [[ADR-030-identity-providers]], [[ADR-031-the-user]] 
 
 ## Decision
 
