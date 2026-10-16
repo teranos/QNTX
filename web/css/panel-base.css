@@ -93,7 +93,7 @@
 }
 
 .panel-empty-icon {
-    font-size: 48px;
+    font-size: var(--font-size-lg);
     opacity: 0.3;
     margin-bottom: 12px;
 }

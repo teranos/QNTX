@@ -7,7 +7,7 @@
     "build": "bun run build.ts",
     "dev": "bun run dev-server.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ts --max-warnings 0",
+    "lint": "eslint ts --max-warnings 0 && bun run font-size-ban.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",

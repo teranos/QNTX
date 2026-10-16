@@ -14,7 +14,15 @@ in
   name = "TypeScript";
 
   on = {
-    pull_request.paths = tsPaths ++ [ "web/eslint.config.js" "web/eslint-suppressions.json" ".github/workflows/ts.yml" "web/browser/**" ];
+    pull_request.paths = tsPaths ++ [
+      "web/eslint.config.js"
+      "web/eslint-suppressions.json"
+      # A size written in a stylesheet stops the build (web/font-size-ban.ts).
+      "web/**/*.css"
+      "web/index.html"
+      ".github/workflows/ts.yml"
+      "web/browser/**"
+    ];
     push = {
       branches = [ "main" ];
       paths = tsPaths;

@@ -169,7 +169,6 @@ describe('Toast Notification Lifecycle', () => {
                     color: #fff;
                     padding: 12px 20px;
                     border-radius: 4px;
-                    font-size: 12px;
                     z-index: 10000;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                     animation: slideInRight 0.3s ease-out;

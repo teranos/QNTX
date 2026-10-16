@@ -158,7 +158,6 @@ function createModuleErrorElement(item: Element, def: PluginElementDef, err: unk
     content.style.padding = '16px';
     content.style.color = 'var(--color-error, #ef4444)';
     content.style.fontFamily = 'var(--font-mono)';
-    content.style.fontSize = '12px';
 
     const title = document.createElement('div');
     title.style.fontWeight = 'bold';

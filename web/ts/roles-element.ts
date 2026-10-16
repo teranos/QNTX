@@ -378,7 +378,6 @@ export function createRolesElement(): Element {
             });
             open.element.title = 'write a line';
             open.element.setAttribute('aria-label', 'Write a line');
-            open.element.style.fontSize = '16px';
             open.element.style.lineHeight = '1';
             open.element.style.padding = '4px 10px';
 

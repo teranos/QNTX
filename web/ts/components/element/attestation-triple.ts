@@ -23,8 +23,6 @@ export interface TriplePalette {
 export interface TripleOptions {
     /** Tag for the wrapper element */
     tag?: 'div' | 'span';
-    /** Font size (default: '12px') */
-    fontSize?: string;
     /** Color palette for value spans and keyword spans */
     palette: TriplePalette;
     /** Pass to show ⏿ next to watched predicates; omit for no eyes */
@@ -44,8 +42,6 @@ export interface TripleOptions {
 export interface PredicateOptions {
     /** Tag for the element */
     tag?: 'div' | 'span';
-    /** Font size. Inherited when omitted. */
-    fontSize?: string;
     /** Colour of the predicate text */
     color: string;
     /** Shown in place of the joined predicates. The predicates stay the identity. */
@@ -106,7 +102,6 @@ function segmentPart(values: string[], segment: string, options: SegmentPartOpti
 export function renderPredicate(predicates: string[], options: PredicateOptions): HTMLElement {
     const joined = predicates.join(', ') || 'N/A';
     const style: Partial<CSSStyleDeclaration> = { color: options.color };
-    if (options.fontSize !== undefined) style.fontSize = options.fontSize;
     if (options.onPress) style.cursor = 'pointer';
 
     const span: HTMLElement = el(options.tag || 'span', { text: options.label ?? joined, style });
@@ -136,12 +131,11 @@ export function renderTriple(attestation: Attestation, options: TripleOptions): 
     const predicates = attestation.predicates?.join(', ') || 'N/A';
     const contexts = attestation.contexts?.join(', ') || 'N/A';
     const tag = options.tag || 'span';
-    const fontSize = options.fontSize || '12px';
     const { value, keyword } = options.palette;
     const clickable = !!options.onKeywordClick;
 
     const wrapper = el(tag, {
-        style: { fontSize, fontFamily: 'monospace', lineHeight: '1.4', wordBreak: 'break-word', overflowWrap: 'break-word' },
+        style: { fontFamily: 'monospace', lineHeight: '1.4', wordBreak: 'break-word', overflowWrap: 'break-word' },
     });
 
     const keywordStyle = clickable
@@ -163,7 +157,7 @@ export function renderTriple(attestation: Attestation, options: TripleOptions): 
                     text: AX,
                     style: {
                         position: 'absolute', right: '100%', top: '0',
-                        color: keyword, fontSize: 'inherit', fontFamily: 'inherit',
+                        color: keyword, fontFamily: 'inherit',
                         opacity: '0', transition: 'opacity 0.3s ease',
                         pointerEvents: 'none', whiteSpace: 'nowrap',
                     },

@@ -28,6 +28,12 @@ Handlers register via `registerHandler(type, handler)` and MUST `unregisterHandl
 
 Dark-mode first. Design tokens in `tokens.css`. **`!important` is banned.** Fix specificity at the source.
 
+**Text size is @teranos/elements'.**
+
+"There's no doubt in my mind that Elements owns it's own font sizes."
+
+TypeScript writes no size: inside an element, `sizeText(node, 'xs' | 'sm' | 'md' | 'lg')`; ESLint (`NO_FONT_SIZE`) stops any other. A stylesheet or `index.html` picks one of the package's sizes by its token, `font-size: var(--font-size-xs | sm | md | lg | field)`, and `tokens.css` says the package's number for each; `font-size-ban.ts` stops anything else, a token off the package's number among them. Both run in `bun run lint`.
+
 Z-index hierarchy:
 
 - Loading screen: 200000

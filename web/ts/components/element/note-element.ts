@@ -121,14 +121,14 @@ export async function setupNoteElement(element: HTMLElement, item: Element): Pro
     const expandBtn = document.createElement('button');
     expandBtn.textContent = '\u2B06'; // ⬆
     expandBtn.title = 'Expand to window';
-    expandBtn.style.cssText = 'width:20px;height:18px;font-size:11px;padding:0;background:transparent;border:none;color:#8a7a5a;cursor:pointer;opacity:0;transition:opacity 0.15s ease;display:flex;align-items:center;justify-content:center;';
+    expandBtn.style.cssText = 'width:20px;height:18px;padding:0;background:transparent;border:none;color:#8a7a5a;cursor:pointer;opacity:0;transition:opacity 0.15s ease;display:flex;align-items:center;justify-content:center;';
     preventDrag(expandBtn);
 
     // Close button
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '\u00D7'; // ×
     closeBtn.title = 'Close';
-    closeBtn.style.cssText = 'width:16px;height:12px;font-size:11px;padding:0;background:transparent;border:none;color:#8a7a5a;cursor:pointer;opacity:0;transition:opacity 0.15s ease;display:flex;align-items:center;justify-content:center;';
+    closeBtn.style.cssText = 'width:16px;height:12px;padding:0;background:transparent;border:none;color:#8a7a5a;cursor:pointer;opacity:0;transition:opacity 0.15s ease;display:flex;align-items:center;justify-content:center;';
     preventDrag(closeBtn);
 
     // Show all buttons on hover — including standard window controls added by morphCanvasPlacedToWindow
@@ -183,7 +183,6 @@ export async function setupNoteElement(element: HTMLElement, item: Element): Pro
     editorContainer.style.flex = '1';
     editorContainer.style.padding = '4px';
     editorContainer.style.overflow = 'auto';
-    editorContainer.style.fontSize = '14px';
     editorContainer.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
     editorContainer.style.color = '#2a2a2a'; // Almost black text
     editorContainer.style.lineHeight = '1.2'; // Tight line spacing for note aesthetic
@@ -217,7 +216,7 @@ export async function setupNoteElement(element: HTMLElement, item: Element): Pro
         }
         .note-editor-container .ProseMirror h1 {
             margin: 0 0 0.2em 0;
-            font-size: 1.4em;
+ 
             font-weight: bold;
         }
         .note-editor-container .ProseMirror strong {

@@ -9,7 +9,7 @@
 
 /* Ground element: a night over the earth, in cross-section, read from the stars down.
  * What the picture says in its own voice is set in the serif; what the node answered, in the mono. */
-.ground { width: 520px; height: 640px; max-width: 100%; max-height: 100%; min-height: 0; overflow-x: hidden; overflow-y: auto; white-space: normal; text-align: left; font-family: var(--ground-mono); font-size: 12px; line-height: 1.4; color: var(--earth-chalk); background: var(--earth-bedrock); scrollbar-width: thin; scrollbar-color: var(--earth-soil-hover) var(--earth-bedrock); }
+.ground { width: 520px; height: 640px; max-width: 100%; max-height: 100%; min-height: 0; overflow-x: hidden; overflow-y: auto; white-space: normal; text-align: left; font-family: var(--ground-mono); font-size: var(--font-size-sm); line-height: 1.4; color: var(--earth-chalk); background: var(--earth-bedrock); scrollbar-width: thin; scrollbar-color: var(--earth-soil-hover) var(--earth-bedrock); }
 .ground, .comet { --gr-line: color-mix(in srgb, var(--earth-ochre) 26%, transparent); --gr-hatch: repeating-linear-gradient(45deg, var(--gr-line) 0 1px, transparent 1px 7px), repeating-linear-gradient(-45deg, var(--gr-line) 0 1px, transparent 1px 7px); }
 .gr-stratum { position: relative; background: var(--gr-bg); }
 .gr-scry { --gr-bg: var(--night-void); min-height: 128px; }
@@ -26,11 +26,11 @@
 .gr-stars .gr-body { padding-top: 0; }
 .gr-comet .gr-body { max-width: 62%; }
 .gr-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
-.gr-name b { font-family: var(--ground-serif); font-size: 16px; font-weight: 400; font-variant: small-caps; letter-spacing: 0.08em; color: var(--earth-ochre); }
-.gr-is { font-family: var(--ground-serif); font-style: italic; font-size: 12px; color: var(--earth-dust); }
-.gr-label { font-family: var(--ground-serif); font-size: 12px; color: var(--earth-dust); }
+.gr-name b { font-family: var(--ground-serif); font-size: var(--font-size-lg); font-weight: 400; font-variant: small-caps; letter-spacing: 0.08em; color: var(--earth-ochre); }
+.gr-is { font-family: var(--ground-serif); font-style: italic; font-size: var(--font-size-sm); color: var(--earth-dust); }
+.gr-label { font-family: var(--ground-serif); font-size: var(--font-size-sm); color: var(--earth-dust); }
 .gr-says { display: flex; flex-direction: column; gap: 6px; }
-.ground .tr-said { padding: 4px 0; font-family: var(--ground-serif); font-size: 12px; color: var(--earth-dust); }
+.ground .tr-said { padding: 4px 0; font-family: var(--ground-serif); font-size: var(--font-size-sm); color: var(--earth-dust); }
 
 /* The plates: what each stratum is drawn as (ground-scene.ts) */
 .gr-plate { position: relative; display: block; width: 100%; height: auto; }
@@ -77,13 +77,13 @@
 .gr-comet-hits { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .gr-comet-hit { position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; pointer-events: auto; }
 .gr-comet-hit:focus-visible { outline: 1px solid var(--earth-ochre); outline-offset: 1px; }
-.gr-comet-name { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 2px; padding: 1px 5px; font-family: var(--ground-mono); font-size: 11px; white-space: nowrap; color: var(--earth-chalk); background: var(--night-navy); border: 1px solid var(--gr-line); opacity: 0; pointer-events: none; }
+.gr-comet-name { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 2px; padding: 1px 5px; font-family: var(--ground-mono); font-size: var(--font-size-sm); white-space: nowrap; color: var(--earth-chalk); background: var(--night-navy); border: 1px solid var(--gr-line); opacity: 0; pointer-events: none; }
 .gr-comet-hit:hover .gr-comet-name, .gr-comet-hit:focus-visible .gr-comet-name { opacity: 1; }
 
 /* What is not real yet is hatched, and its limitation is written on tape of
  * the stratum's own colour. */
 .gr-unreal::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background-image: var(--gr-hatch); }
-.gr-limit { position: relative; margin: 0; padding: 7px 9px; font-family: var(--ground-serif); font-size: 12px; line-height: 1.6; color: var(--earth-dust); background-image: var(--gr-hatch); }
+.gr-limit { position: relative; margin: 0; padding: 7px 9px; font-family: var(--ground-serif); font-size: var(--font-size-sm); line-height: 1.6; color: var(--earth-dust); background-image: var(--gr-hatch); }
 .gr-limit span { padding: 1px 4px; background: var(--gr-bg); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .gr-unreal .gr-limit { padding: 0; background-image: none; }
 .gr-unreal .gr-name b, .gr-unreal .gr-is { padding: 0 4px; background: var(--gr-bg); }
@@ -92,8 +92,8 @@
  * thread; news, and what takes longer to say, is written under them. */
 .gr-hung { position: relative; height: 196px; }
 .gr-hung:empty { height: 96px; }
-.gr-fact-name { font-size: var(--font-size-xs, 10px); font-weight: 700; color: var(--star-gold); overflow-wrap: break-word; word-break: break-word; }
-.gr-fact-note { font-size: var(--font-size-xs, 10px); color: var(--earth-chalk); overflow-wrap: break-word; word-break: break-word; }
+.gr-fact-name { font-size: var(--font-size-xs); font-weight: 700; color: var(--star-gold); overflow-wrap: break-word; word-break: break-word; }
+.gr-fact-note { font-size: var(--font-size-xs); color: var(--earth-chalk); overflow-wrap: break-word; word-break: break-word; }
 .gr-hung .gr-said { position: absolute; top: 0; padding-top: var(--drop); display: flex; flex-direction: column; align-items: center; text-align: center; transform: translateX(-50%); transition: left 0.5s ease; }
 .gr-hung .gr-said::before { content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: var(--drop); background: var(--earth-ochre); opacity: 0.6; }
 .gr-hung .gr-fact-name { margin-top: 3px; }
@@ -101,7 +101,7 @@
 .gr-written:empty { display: none; }
 .gr-written .gr-said { display: flex; align-items: baseline; gap: 6px; }
 .gr-written .gr-burst { width: 12px; height: 12px; align-self: center; }
-.gr-written .gr-fact-name, .gr-written .gr-fact-note { font-size: 11px; }
+.gr-written .gr-fact-name, .gr-written .gr-fact-note { font-size: var(--font-size-sm); }
 .gr-written .gr-fact-name { flex-shrink: 0; }
 .gr-written .gr-fact-note { min-width: 0; }
 .gr-unwell .gr-burst-rays { fill: var(--earth-clay); }
@@ -113,7 +113,7 @@
 /* Sky: each agent is a cloud, the ones that ran a session in chalk, the ones they sent out in the sky's own colour */
 .gr-flight { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; }
 .gr-agent { display: flex; flex-direction: column; align-items: center; gap: 2px; max-width: 128px; text-align: center; }
-.gr-agent-name { font-size: var(--font-size-xs, 10px); color: var(--earth-chalk); overflow-wrap: break-word; word-break: break-word; }
+.gr-agent-name { font-size: var(--font-size-xs); color: var(--earth-chalk); overflow-wrap: break-word; word-break: break-word; }
 .gr-cloudlet { display: block; }
 .gr-puff { stroke-width: 1; }
 .gr-puff-ring { fill: none; stroke-width: 0.8; }
@@ -125,21 +125,21 @@
 /* Underground: each ug is a line over time, a name, its sparkline and where it stands now */
 .gr-label:empty, .gr-lines:empty { display: none; }
 .gr-lines { display: flex; flex-direction: column; gap: 3px; }
-.gr-line { display: grid; grid-template-columns: minmax(0, 1fr) 80px minmax(72px, auto); align-items: center; gap: 10px; font-size: 11px; }
+.gr-line { display: grid; grid-template-columns: minmax(0, 1fr) 80px minmax(72px, auto); align-items: center; gap: 10px; font-size: var(--font-size-sm); }
 .gr-line-name { color: var(--earth-chalk); overflow-wrap: break-word; word-break: break-word; }
 .gr-line-spark { display: inline-flex; width: 80px; height: 16px; }
-.gr-line-last { text-align: right; font-size: var(--font-size-xs, 10px); font-variant-numeric: tabular-nums; color: var(--earth-dust); }
+.gr-line-last { text-align: right; font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; color: var(--earth-dust); }
 .ground .sparkline-line polyline { stroke: var(--earth-ochre); }
 
 /* What was counted, and the sessions under their place */
-.gr-told { font-family: var(--ground-serif); font-size: 13px; overflow-wrap: break-word; word-break: break-word; }
+.gr-told { font-family: var(--ground-serif); font-size: var(--font-size-md); overflow-wrap: break-word; word-break: break-word; }
 .gr-told:empty { display: none; }
-.gr-counted { display: flex; flex-wrap: wrap; gap: 1px 12px; font-size: var(--font-size-xs, 10px); overflow-wrap: break-word; word-break: break-word; }
+.gr-counted { display: flex; flex-wrap: wrap; gap: 1px 12px; font-size: var(--font-size-xs); overflow-wrap: break-word; word-break: break-word; }
 .gr-counted b { margin-left: 4px; font-weight: 500; color: var(--earth-ochre); }
 .gr-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.gr-chip { padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--earth-ochre) 38%, transparent); border-radius: 2px; font-size: var(--font-size-xs, 10px); color: var(--earth-chalk); overflow-wrap: break-word; word-break: break-word; }
+.gr-chip { padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--earth-ochre) 38%, transparent); border-radius: 2px; font-size: var(--font-size-xs); color: var(--earth-chalk); overflow-wrap: break-word; word-break: break-word; }
 .gr-chip b { margin-left: 5px; font-weight: 500; color: var(--earth-ochre); }
-.gr-count { font-size: var(--font-size-xs, 10px); color: var(--earth-dust); }
+.gr-count { font-size: var(--font-size-xs); color: var(--earth-dust); }
 .gr-place { display: flex; flex-direction: column; }
 .gr-place-name { display: flex; align-items: baseline; gap: 8px; padding: 6px 6px 3px; border-bottom: 1px solid color-mix(in srgb, var(--earth-ochre) 45%, transparent); }
 .gr-place-name b { font-weight: 700; color: var(--star-gold); overflow-wrap: break-word; word-break: break-word; }
@@ -172,19 +172,19 @@
 .gr-heart-ring { fill: none; stroke: var(--star-gold); stroke-width: 0.9; }
 .gr-sacred { display: flex; flex-direction: column; gap: 6px; }
 .gr-sacred:empty { display: none; }
-.gr-err-when { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: var(--font-size-xs, 10px); color: var(--earth-dust); }
+.gr-err-when { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: var(--font-size-xs); color: var(--earth-dust); }
 .gr-err-open { padding: 0; font: inherit; color: var(--star-gold); background: none; border: 0; cursor: pointer; }
 
 /* As a panel Ground is the whole screen, and the picture fills what the panel holds */
 .panel .ground { width: 100%; height: 100%; }
 
 /* The Comet element: one comet alone, and what state it is in (comet-element.ts) */
-.comet { --gr-bg: var(--night-navy); width: 520px; max-width: 100%; display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; font-family: var(--ground-mono); font-size: 12px; line-height: 1.4; color: var(--earth-chalk); background: var(--night-navy); white-space: normal; text-align: left; }
+.comet { --gr-bg: var(--night-navy); width: 520px; max-width: 100%; display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; font-family: var(--ground-mono); font-size: var(--font-size-sm); line-height: 1.4; color: var(--earth-chalk); background: var(--night-navy); white-space: normal; text-align: left; }
 .comet-plate { position: relative; height: 230px; }
 .comet-plate .gr-plate { position: absolute; top: 0; left: 0; height: 100%; }
 .comet-plate .gr-name { position: relative; z-index: 2; padding: 10px 14px 0; }
 .comet-repo { font-weight: 700; color: var(--earth-chalk); }
-.comet-state { padding: 0 14px; font-size: 14px; }
+.comet-state { padding: 0 14px; font-size: var(--font-size-lg); }
 .comet-state-observed { color: var(--star-gold); }
 .comet-state-observing { color: var(--night-glow); }
 .comet-state-unobserved { color: var(--earth-dust); }

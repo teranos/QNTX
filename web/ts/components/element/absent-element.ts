@@ -58,7 +58,7 @@ export function createAbsentElement(item: Element, name: string): HTMLElement {
 
     const titleText = el('span', {
         text: `${name} (absent)`,
-        style: { fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.4', color: MUTED },
+        style: { fontFamily: 'monospace', lineHeight: '1.4', color: MUTED },
     });
     element.appendChild(el('div', { class: 'title-bar title-bar--auto' }, [symbol, titleText]));
 
@@ -66,7 +66,7 @@ export function createAbsentElement(item: Element, name: string): HTMLElement {
         class: 'element-absent-content',
         style: {
             flex: '1', padding: '16px', color: 'var(--text-secondary)',
-            fontSize: '12px', fontFamily: 'monospace', textAlign: 'center',
+            fontFamily: 'monospace', textAlign: 'center',
             lineHeight: '1.6', display: 'flex', flexDirection: 'column',
             justifyContent: 'center', alignItems: 'center', gap: '10px',
         },
@@ -92,7 +92,7 @@ function say(content: HTMLElement, headline: string, detail: string, tone = MUTE
         el('div', {
             text: detail,
             style: {
-                fontSize: '11px', color: tone, maxWidth: '360px',
+                color: tone, maxWidth: '360px',
                 wordBreak: 'break-word', overflowWrap: 'break-word',
             },
         }),

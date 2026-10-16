@@ -98,7 +98,7 @@
 }
 
 .parity-required {
-    font-size: 9px;
+    font-size: var(--font-size-xs);
     font-weight: 400;
     letter-spacing: 0.06em;
     padding: 1px 5px;

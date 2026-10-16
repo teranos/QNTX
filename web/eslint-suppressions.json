@@ -146,7 +146,7 @@
   },
   "ts/components/element/attestation-triple.ts": {
     "no-restricted-syntax": {
-      "count": 16
+      "count": 14
     }
   },
   "ts/components/element/ax-element.ts": {

@@ -80,13 +80,13 @@
         <img src="/qntx.jpg" alt="qntx" style="width: 80px; height: 80px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); opacity: 0.6; filter: brightness(0.7);">
 
         <!-- Status text -->
-        <div style="font-size: 14px; margin-bottom: 12px;">Loading</div>
+        <div style="font-size: var(--font-size-lg); margin-bottom: 12px;">Loading</div>
 
         <!-- Status details -->
-        <div id="loading-status" style="font-size: 11px; color: #666; margin-bottom: 16px;">Initializing...</div>
+        <div id="loading-status" style="font-size: var(--font-size-sm); color: #666; margin-bottom: 16px;">Initializing...</div>
 
         <!-- Log panel - shows initialization steps -->
-        <div id="loader-logs" style="width: 300px; max-height: 120px; overflow-y: auto; background: #0f0f0f; border: 1px solid #2a2a2a; border-radius: 4px; padding: 8px 10px; font-family: 'Monaco', 'Courier New', monospace; font-size: 10px; color: #666; line-height: 1.6; margin-bottom: 16px;">
+        <div id="loader-logs" style="width: 300px; max-height: 120px; overflow-y: auto; background: #0f0f0f; border: 1px solid #2a2a2a; border-radius: 4px; padding: 8px 10px; font-family: 'Monaco', 'Courier New', monospace; font-size: var(--font-size-xs); color: #666; line-height: 1.6; margin-bottom: 16px;">
             <div style="color: #888;">Starting initialization...</div>
         </div>
     </div>
@@ -241,7 +241,7 @@
         <div id="system-drawer-header">
             <!-- Status indicators and search input inserted dynamically by TypeScript -->
             <div class="controls">
-                <span id="system-version" style="font-size: 9px; color: #555; margin-right: 8px;"></span>
+                <span id="system-version" style="font-size: var(--font-size-xs); color: #555; margin-right: 8px;"></span>
             </div>
         </div>
         <div id="search-results-container"></div>

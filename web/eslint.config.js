@@ -106,6 +106,19 @@ const NO_FIXED_WIDTH = [
     { selector: "CallExpression[callee.property.name='setProperty'][arguments.0.value='white-space'][arguments.1.value=/^(nowrap|pre)$/]", message: WIDTH },
 ];
 
+// "There's no doubt in my mind that Elements owns it's own font sizes."
+// "I WANT QNTX WEB TO FAIL"
+// Text size is @teranos/elements': sizeText(node, size) with a size from TEXT_SIZES. Written
+// anywhere else, it stops the build. A stylesheet is read by font-size-ban.ts.
+const TEXT_SIZE_IS_ELEMENTS = "text size is @teranos/elements': sizeText(node, 'xs' | 'sm' | 'md' | 'lg'). QNTX does not size text.";
+const NO_FONT_SIZE = [
+    { selector: "AssignmentExpression[left.property.name=/^(fontSize|font)$/]", message: TEXT_SIZE_IS_ELEMENTS },
+    { selector: "CallExpression[callee.property.name='setProperty'][arguments.0.value=/^font(-size)?$/]", message: TEXT_SIZE_IS_ELEMENTS },
+    { selector: "Property[key.name=/^(fontSize|font)$/]", message: TEXT_SIZE_IS_ELEMENTS },
+    { selector: "Literal[value=/font-size|(^|[\\s;{\"'])font:/]", message: TEXT_SIZE_IS_ELEMENTS },
+    { selector: "TemplateElement[value.raw=/font-size|(^|[\\s;{\"'])font:/]", message: TEXT_SIZE_IS_ELEMENTS },
+];
+
 // "ban 1, 2, 3, 4, 5"
 
 // An absence becoming behaviour, the same kinds nilcheck holds in Go and Rust.
@@ -138,7 +151,7 @@ export default [
             'no-empty': 'error',
             'no-restricted-globals': ['error', ...BANNED_GLOBALS],
             'no-restricted-imports': ['error', NO_SHOW_TOAST],
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_FONT_SIZE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -159,14 +172,14 @@ export default [
         // client/ is where apiFetch lives.
         files: ['ts/client/**/*.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
         // These load a .wasm binary by URL.
         files: ['ts/laye.ts', 'ts/ats-wasm.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -174,7 +187,7 @@ export default [
         // reports every answer to the connectivity manager.
         files: ['ts/liveness.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -185,7 +198,7 @@ export default [
         // "i want tooltip to be propagated more"
         files: ['ts/market-element.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE, ...NO_FIXED_WIDTH],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_FONT_SIZE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
 ];

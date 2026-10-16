@@ -136,7 +136,7 @@ export function timeAxis(attestations: Attestation[], w?: Window, now: number = 
     axis.appendChild(el('span', {
         class: 'sparkline-last',
         text: formatIn(Math.max(...timestamps), w.unit),
-        style: { color: TRIPLET_DIM, fontSize: '10px', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums' },
+        style: { color: TRIPLET_DIM, fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums' },
     }));
     return axis;
 }
@@ -205,7 +205,7 @@ function buildTripletMetaPill(attestations: Attestation[]): HTMLElement | null {
         if (!small) {
             section.appendChild(el('div', {
                 text: label,
-                style: { color: TRIPLET_DIM, fontSize: '11px', fontFamily: 'monospace', marginBottom: '2px' },
+                style: { color: TRIPLET_DIM, fontFamily: 'monospace', marginBottom: '2px' },
             }));
         }
 
@@ -214,7 +214,7 @@ function buildTripletMetaPill(attestations: Attestation[]): HTMLElement | null {
             const item = el('div', {
                 text: name,
                 style: {
-                    fontSize: '10px', color: TRIPLET_DIM, padding: '1px 0',
+                    color: TRIPLET_DIM, padding: '1px 0',
                     cursor: 'pointer', wordBreak: 'break-word',
                     transition: 'color 0.1s',
                 },
@@ -246,7 +246,7 @@ function buildTripletMetaPill(attestations: Attestation[]): HTMLElement | null {
             const moreLabel = el('div', {
                 text: `+${overflow.length} more`,
                 style: {
-                    fontSize: '9px', color: TRIPLET_DIM, marginLeft: '8px',
+                    color: TRIPLET_DIM, marginLeft: '8px',
                     paddingLeft: '6px', cursor: 'pointer', fontStyle: 'italic',
                 },
             });
@@ -275,7 +275,7 @@ function buildTripletMetaPill(attestations: Attestation[]): HTMLElement | null {
     if (meta.timeRange) {
         popover.appendChild(el('div', {
             text: meta.timeRange,
-            style: { fontSize: '10px', color: TRIPLET_DIM, padding: '2px 0', fontFamily: 'monospace' },
+            style: { color: TRIPLET_DIM, padding: '2px 0', fontFamily: 'monospace' },
         }));
     }
 
@@ -286,7 +286,7 @@ function buildTripletMetaPill(attestations: Attestation[]): HTMLElement | null {
 /** Build browsable content for a group of attestations */
 function buildTripletContent(attestations: Attestation[]): HTMLElement {
     const container = el('div', {
-        style: { padding: '8px 12px', fontFamily: 'monospace', fontSize: '12px' },
+        style: { padding: '8px 12px', fontFamily: 'monospace' },
     });
 
     if (attestations.length === 0) return container;
@@ -313,7 +313,7 @@ function buildTripletContent(attestations: Attestation[]): HTMLElement {
         if (meta.length > 0) {
             detail.appendChild(el('div', {
                 text: meta.join(' · '),
-                style: { fontSize: '10px', color: TRIPLET_DIM, marginBottom: '6px' },
+                style: { color: TRIPLET_DIM, marginBottom: '6px' },
             }));
         }
 
@@ -321,7 +321,7 @@ function buildTripletContent(attestations: Attestation[]): HTMLElement {
         if (att.id) {
             detail.appendChild(el('div', {
                 text: att.id,
-                style: { fontSize: '9px', color: TRIPLET_DIM, marginBottom: '6px', wordBreak: 'break-word' },
+                style: { color: TRIPLET_DIM, marginBottom: '6px', wordBreak: 'break-word' },
             }));
         }
 
@@ -497,7 +497,7 @@ export function renderTripletResultLine(attestations: Attestation[], now: number
     const text = el('div', {
         style: {
             display: 'flex', alignItems: 'baseline', gap: '6px',
-            fontSize: '11px', fontFamily: 'monospace',
+            fontFamily: 'monospace',
             wordBreak: 'break-word', overflowWrap: 'break-word',
         },
     });
@@ -511,7 +511,7 @@ export function renderTripletResultLine(attestations: Attestation[], now: number
     // Triple text
     const tripleSpan = renderTriple(representative, {
         tag: 'span',
-        fontSize: '11px',
+        
         palette: { value: TRIPLET_VALUE, keyword: TRIPLET_KEYWORD },
         showWatcherEyes: true,
     });

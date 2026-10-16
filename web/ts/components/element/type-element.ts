@@ -26,14 +26,14 @@ const TYPE_VALUE = '#e0d0f0';
 /** Build the type definition content */
 function buildTypeContent(group: TypeGroup): HTMLElement {
     const container = el('div', {
-        style: { padding: '8px 12px', fontFamily: 'monospace', fontSize: '12px' },
+        style: { padding: '8px 12px', fontFamily: 'monospace' },
     });
 
     // Header: turnstile + type name in its own color
     const header = el('div', { style: { marginBottom: '8px' } });
 
     const nameRow = el('div', {
-        style: { fontSize: '20px', fontWeight: 'bold', color: group.color, lineHeight: '1.2' },
+        style: { fontWeight: 'bold', color: group.color, lineHeight: '1.2' },
     });
     nameRow.appendChild(el('span', { text: `${Type} ${group.subject}` }));
 
@@ -51,7 +51,7 @@ function buildTypeContent(group: TypeGroup): HTMLElement {
     if (group.label !== group.subject) {
         header.appendChild(el('div', {
             text: group.label,
-            style: { fontSize: '13px', color: TYPE_VALUE, marginTop: '2px' },
+            style: { color: TYPE_VALUE, marginTop: '2px' },
         }));
     }
 
@@ -59,7 +59,7 @@ function buildTypeContent(group: TypeGroup): HTMLElement {
     if (group.deprecated) {
         header.appendChild(el('div', {
             text: 'deprecated',
-            style: { fontSize: '11px', color: '#8a5050', fontStyle: 'italic', marginTop: '2px' },
+            style: { color: '#8a5050', fontStyle: 'italic', marginTop: '2px' },
         }));
     }
 
@@ -75,7 +75,7 @@ function buildTypeContent(group: TypeGroup): HTMLElement {
 
         fieldSection.appendChild(el('div', {
             text: 'fields',
-            style: { fontSize: '10px', color: TYPE_DIM, marginBottom: '4px' },
+            style: { color: TYPE_DIM, marginBottom: '4px' },
         }));
 
         const fieldList = el('div', {
@@ -86,7 +86,7 @@ function buildTypeContent(group: TypeGroup): HTMLElement {
             fieldList.appendChild(el('span', {
                 text: f,
                 style: {
-                    fontSize: '11px', color: TYPE_VALUE, padding: '1px 5px',
+                    color: TYPE_VALUE, padding: '1px 5px',
                     backgroundColor: 'rgba(100, 80, 140, 0.25)', borderRadius: '2px',
                 },
             }));
@@ -95,7 +95,7 @@ function buildTypeContent(group: TypeGroup): HTMLElement {
             fieldList.appendChild(el('span', {
                 text: `${f}[]`,
                 style: {
-                    fontSize: '11px', color: TYPE_COLOR, padding: '1px 5px',
+                    color: TYPE_COLOR, padding: '1px 5px',
                     backgroundColor: 'rgba(100, 80, 140, 0.15)', borderRadius: '2px',
                 },
             }));
@@ -115,7 +115,7 @@ function buildTypeContent(group: TypeGroup): HTMLElement {
         }
         container.appendChild(el('div', {
             text: parts.join(' · '),
-            style: { fontSize: '9px', color: TYPE_DIM, marginTop: '4px' },
+            style: { color: TYPE_DIM, marginTop: '4px' },
         }));
     }
 
@@ -161,7 +161,7 @@ export function createTypeElement(item: Element): HTMLElement {
     if (group) {
         const titleText = el('span', {
             text: `${group.subject}${group.label !== group.subject ? ` · ${group.label}` : ''}`,
-            style: { fontSize: '12px', fontFamily: 'monospace', color: TYPE_VALUE },
+            style: { fontFamily: 'monospace', color: TYPE_VALUE },
         });
         titleBar.appendChild(titleText);
     }

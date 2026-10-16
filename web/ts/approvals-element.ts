@@ -153,7 +153,6 @@ export function approvalsRoll(): { body: HTMLElement; load: () => Promise<void> 
             }
             const said = document.createElement('div');
             said.style.fontFamily = 'var(--font-mono)';
-            said.style.fontSize = '12px';
             const card = cardOf(approval, said);
             const handle = roll.add(card);
             const made = { approval, handle, said };

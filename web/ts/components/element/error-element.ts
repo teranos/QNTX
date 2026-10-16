@@ -61,7 +61,6 @@ export function createErrorElement(
     element.style.border = '1px solid #ff6060'; // Bright red border
     element.style.color = '#e09999'; // Brighter red for content
     element.style.fontFamily = 'var(--font-mono)';
-    element.style.fontSize = '11px';
     element.style.overflow = 'hidden';
     element.style.display = 'flex';
     element.style.flexDirection = 'column';
@@ -87,13 +86,11 @@ export function createErrorElement(
     const symbol = document.createElement('span');
     symbol.textContent = '✕';
     symbol.style.color = '#ff6060'; // More pure red for error emphasis
-    symbol.style.fontSize = '16px';
     symbol.style.fontWeight = 'bold';
     leftSection.appendChild(symbol);
 
     const title = document.createElement('span');
     title.style.fontWeight = 'bold';
-    title.style.fontSize = '12px';
     title.style.color = '#ff6060'; // More pure red than default error text
     title.textContent = 'Element Rendering Error';
     leftSection.appendChild(title);
@@ -166,7 +163,6 @@ export function createErrorElement(
     content.style.lineHeight = '1.5';
     content.style.backgroundColor = 'rgba(36, 18, 18, 0.85)'; // 15% transparency
     content.style.color = '#ff8282'; // More pure red
-    content.style.fontSize = '11px';
 
     const lines = [
         `Failed Element: ${failedSymbol}`,

@@ -95,7 +95,6 @@ export async function setupPromptElement(element: HTMLElement, item: Element): P
     textarea.value = savedTemplate;
     textarea.style.flex = '1';
     textarea.style.padding = '8px';
-    textarea.style.fontSize = '13px';
     textarea.style.fontFamily = 'var(--font-mono)';
     textarea.style.backgroundColor = 'var(--bg-almost-black)';
     textarea.style.color = 'var(--accent-lavender)';
@@ -122,7 +121,6 @@ export async function setupPromptElement(element: HTMLElement, item: Element): P
     statusSection.className = 'prompt-status-section';
     statusSection.style.display = 'none';
     statusSection.style.padding = '4px 8px';
-    statusSection.style.fontSize = '11px';
     statusSection.style.fontFamily = 'var(--font-mono)';
     statusSection.style.whiteSpace = 'pre-wrap'; // Allow wrapping, preserve formatting
     statusSection.style.wordBreak = 'break-word'; // Break long words if needed
@@ -311,7 +309,6 @@ export async function setupPromptElement(element: HTMLElement, item: Element): P
     // Style the label span created by canvasPlaced
     const labelSpan = element.querySelector('.title-bar > span:first-child') as HTMLElement;
     if (labelSpan) {
-        labelSpan.style.fontSize = '16px';
         labelSpan.style.color = 'var(--accent-lavender)';
         labelSpan.style.fontWeight = 'bold';
         labelSpan.style.flex = '1';

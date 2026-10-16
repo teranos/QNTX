@@ -207,15 +207,13 @@ export function renderEvictionChart(container: HTMLElement): void {
         .attr('transform', `translate(0,${innerH})`)
         .call(d3.axisBottom(xScale).ticks(4).tickFormat(d => d3.timeFormat('%H:%M')(d as Date)))
         .selectAll('text')
-        .attr('fill', '#94a3b8')
-        .style('font-size', '9px');
+        .attr('fill', '#94a3b8');
 
     // Y axis
     g.append('g')
         .call(d3.axisLeft(yScale).ticks(3).tickFormat(d3.format('d')))
         .selectAll('text')
-        .attr('fill', '#94a3b8')
-        .style('font-size', '9px');
+        .attr('fill', '#94a3b8');
 
     // Style axis lines
     svg.selectAll('.domain, .tick line').attr('stroke', '#334155');
@@ -228,7 +226,6 @@ export function renderEvictionChart(container: HTMLElement): void {
             .style('display', 'flex')
             .style('gap', '12px')
             .style('margin-top', '4px')
-            .style('font-size', '10px')
             .style('color', '#94a3b8');
 
         for (const policy of policies) {

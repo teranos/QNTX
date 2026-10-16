@@ -181,7 +181,7 @@ function commonHTML(label: string, common: Common[] | null, w: Window): string {
     if (!common || common.length === 0) {
         return '';
     }
-    return `<div style="padding: 1px 0 3px 12px; font-size: 11px; max-width: ${LANDING_WIDTH};">${sparklinesHTML(label, seenOfCommon(common), w)}</div>`;
+    return `<div style="padding: 1px 0 3px 12px; max-width: ${LANDING_WIDTH};">${sparklinesHTML(label, seenOfCommon(common), w)}</div>`;
 }
 
 // A read is answered from the database of its namespace and never from the
@@ -192,7 +192,7 @@ function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: str
         return renderStatsError(failed);
     }
     if (!landings || landings.length === 0) {
-        return `<div style="padding: 6px 0; font-size: 11px;">
+        return `<div style="padding: 6px 0;">
             <span class="label">Path:</span> <span class="element-value">${escapeHtml(onePath)}</span>
         </div>`;
     }
@@ -200,7 +200,7 @@ function landingsHTML(landings: Landing[] | undefined, failed: any, onePath: str
     const held = landings.reduce((sum, one) => sum + one.attestations, 0);
     const w = windowOfSeen(landings.flatMap(one => [...seenOfCommon(one.top_predicates), ...seenOfCommon(one.top_contexts)]), now);
     const rows = landings.map(one => `
-        <div style="display: grid; grid-template-columns: ${LANDING_COLUMNS}; gap: 8px; font-size: 11px; padding: 2px 0; max-width: ${LANDING_WIDTH};">
+        <div style="display: grid; grid-template-columns: ${LANDING_COLUMNS}; gap: 8px; padding: 2px 0; max-width: ${LANDING_WIDTH};">
             <span style="color: #e2e8f0; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(one.namespace)}</span>
             <span style="color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left;">${escapeHtml(one.path)}</span>
             <span style="color: #64748b; text-align: right;">db ${formatBytes(one.bytes)}</span>
@@ -249,7 +249,7 @@ function recordSpendHTML(spend: Spend[] | undefined, failed: any): string {
     // (ADR-037). Said on the row, because a large number there is a defect
     // and the same number beside "on the node" is the record doing its job.
     const rows = spend.map(one => `
-        <div style="display: grid; grid-template-columns: ${SPEND_COLUMNS}; gap: 8px; font-size: 11px; padding: 2px 0;">
+        <div style="display: grid; grid-template-columns: ${SPEND_COLUMNS}; gap: 8px; padding: 2px 0;">
             <span style="color: ${one.held_on_node ? '#e2e8f0' : '#f59e0b'}; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(one.of)}</span>
             <span style="color: ${one.held_on_node ? '#475569' : '#f59e0b'};">${one.held_on_node ? 'on the node' : 'record only'}</span>
             <span style="color: #64748b;">${escapeHtml(one.request)}</span>
@@ -308,7 +308,7 @@ function renderDbStats(): void {
             : '';
 
     sectionOverview.innerHTML = `
-        <div style="display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border-color, #333); font-size: 11px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
             <span><span class="label">Backend:</span> <span class="element-value">${storageBackend}</span></span>
             ${countSpan('Attestations', dbStats.total_attestations)}
             ${countSpan('Actors', dbStats.unique_actors)}
@@ -328,7 +328,7 @@ function renderDbStats(): void {
         if (isEnhanced) {
             // Each over time, the most recently carried first.
             const seen = (richFields as RichField[]).map(f => seenOver(f.field, f.over, f.last));
-            predicatesHTML += `<div style="margin-bottom: 8px; font-size: 11px;">${sparklinesHTML(`Types (${richFields.length})`, seen, windowOfSeen(seen))}</div>`;
+            predicatesHTML += `<div style="margin-bottom: 8px;">${sparklinesHTML(`Types (${richFields.length})`, seen, windowOfSeen(seen))}</div>`;
         } else {
             const fieldItems = richFields.sort().map((f: string) => `<span class="element-type-link" data-type="${escapeHtml(f)}" style="cursor: pointer; margin-right: 8px;">${escapeHtml(f)}</span>`).join('');
             predicatesHTML += `
@@ -373,7 +373,7 @@ function renderDbStats(): void {
                 const line = renderSparkline(keys.map(k => hist[k] ?? 0), keys, predicate);
                 const info = watcherMap.get(predicate);
                 const eyes = info ? (() => { const s = eyeStyle(info); return `<span style="color: ${s.color}; text-shadow: ${s.shadow}; cursor: default;" title="${info.names.join(', ')}">${Watcher.repeat(info.names.length)}</span>`; })() : '';
-                return `<div class="distillation-row" style="display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 2px 0;">
+                return `<div class="distillation-row" style="display: flex; align-items: center; gap: 6px; padding: 2px 0;">
                     <span style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; flex-shrink: 0;"></span>
                     <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word; flex: 1;">${predicate}${eyes}</span>
                     <span style="flex-shrink: 0; display: inline-flex;">${line}</span>
@@ -413,7 +413,7 @@ function renderDbStats(): void {
             const w = windowOf(breakdown.flatMap(b => b.evictedAt));
             const items = breakdown.map((b, i) => {
                 const age = b.oldestEvicted ? formatAge(b.oldestEvicted) : '';
-                return `<div class="eviction-pred-row" data-pred-idx="${i}" style="display: flex; align-items: center; gap: 8px; font-size: 11px; padding: 2px 0; cursor: pointer;">
+                return `<div class="eviction-pred-row" data-pred-idx="${i}" style="display: flex; align-items: center; gap: 8px; padding: 2px 0; cursor: pointer;">
                     <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word; flex: 1;">${b.predicate}</span>
                     ${age ? `<span style="color: #64748b; white-space: nowrap;" title="oldest evicted">${age}</span>` : ''}
                     <span style="flex-shrink: 0; display: inline-flex;">${renderSparkline(seriesOf(b.evictedAt, w), labelsOf(w), b.predicate)}</span>
@@ -423,7 +423,7 @@ function renderDbStats(): void {
             }).join('');
             predicateRows = `
                 <div style="margin-top: 6px;" class="eviction-predicates-container">
-                    <span class="label" style="font-size: 11px;">Evicted predicates:</span>
+                    <span class="label" style="">Evicted predicates:</span>
                     ${items}
                 </div>
             `;
@@ -494,7 +494,7 @@ function byRecent(histograms: Record<string, Record<string, number>>): string[] 
 
 function renderChartWithControls(container: HTMLElement, histograms: Record<string, Record<string, number>> | null): void {
     if (!histograms) {
-        container.innerHTML = '<div style="padding: 16px; color: #64748b; font-size: 11px;">No histogram data yet (waiting for distillation)</div>';
+        container.innerHTML = '<div style="padding: 16px; color: #64748b;">No histogram data yet (waiting for distillation)</div>';
         return;
     }
 
@@ -580,13 +580,13 @@ function renderViewport(chartArea: HTMLElement, histograms: Record<string, Recor
 // Render multi-series timeseries chart from predicate histogram data. Exported for tests.
 export function renderTimeseriesChart(container: HTMLElement, histograms: Record<string, Record<string, number>> | null, rangeLabel?: string): void {
     if (!histograms) {
-        container.innerHTML = '<div style="padding: 16px; color: #64748b; font-size: 11px;">No histogram data yet (waiting for distillation)</div>';
+        container.innerHTML = '<div style="padding: 16px; color: #64748b;">No histogram data yet (waiting for distillation)</div>';
         return;
     }
 
     const predicates = Object.keys(histograms);
     if (predicates.length === 0) {
-        container.innerHTML = '<div style="padding: 16px; color: #64748b; font-size: 11px;">No histogram data</div>';
+        container.innerHTML = '<div style="padding: 16px; color: #64748b;">No histogram data</div>';
         return;
     }
 
@@ -653,7 +653,7 @@ export function renderTimeseriesChart(container: HTMLElement, histograms: Record
         const val = (maxValue / yTicks) * i;
         const y = yScale(val);
         const label = val >= 1000 ? `${(val / 1000).toFixed(1)}k` : Math.round(val).toString();
-        yLabels.push(`<text x="${marginLeft - 4}" y="${y}" text-anchor="end" dominant-baseline="middle" fill="#64748b" font-size="9">${label}</text>`);
+        yLabels.push(`<text x="${marginLeft - 4}" y="${y}" text-anchor="end" dominant-baseline="middle" fill="#64748b">${label}</text>`);
         yLabels.push(`<line x1="${marginLeft}" y1="${y}" x2="${marginLeft + plotWidth}" y2="${y}" stroke="#1e293b" stroke-width="0.5" />`);
     }
 
@@ -688,7 +688,7 @@ export function renderTimeseriesChart(container: HTMLElement, histograms: Record
         } else {
             label = key;
         }
-        xLabels.push(`<text x="${x}" y="${chartHeight - 4}" text-anchor="middle" fill="#64748b" font-size="9">${label}</text>`);
+        xLabels.push(`<text x="${x}" y="${chartHeight - 4}" text-anchor="middle" fill="#64748b">${label}</text>`);
     }
 
     // Legend
@@ -697,7 +697,7 @@ export function renderTimeseriesChart(container: HTMLElement, histograms: Record
         const last = lastActiveKey(histograms[s.predicate]);
         const info = watcherMap.get(s.predicate);
         const eyes = info ? (() => { const st = eyeStyle(info); return `<span style="color: ${st.color}; text-shadow: ${st.shadow}; cursor: default;" title="${info.names.join(', ')}">${Watcher.repeat(info.names.length)}</span>`; })() : '';
-        return `<span style="display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-size: var(--font-size-sm);">
+        return `<span style="display: inline-flex; align-items: center; gap: 4px; margin-right: 12px;">
             <span style="width: 8px; height: 8px; border-radius: 50%; background: ${s.color};"></span>
             <span style="color: #e2e8f0;">${s.predicate}${eyes}</span>
             <span style="color: #64748b;">${last}</span>
@@ -705,7 +705,7 @@ export function renderTimeseriesChart(container: HTMLElement, histograms: Record
     }).join('');
 
     const rangeIndicator = rangeLabel
-        ? `<div style="font-size: var(--font-size-xs); color: #475569; text-align: right; padding: 2px 0;">${rangeLabel} \u2014 scroll to zoom, swipe to pan</div>`
+        ? `<div style=" color: #475569; text-align: right; padding: 2px 0;">${rangeLabel} \u2014 scroll to zoom, swipe to pan</div>`
         : '';
 
     container.innerHTML = `
@@ -765,12 +765,12 @@ function renderLiveStatus(live: LiveStatus): string {
     if (wl) {
         const heldSec = wl.held_ms / 1000;
         const color = heldSec > 30 ? '#ef4444' : heldSec > 5 ? '#f59e0b' : '#4ade80';
-        lines.push(`<div style="display: flex; align-items: center; gap: 6px; font-size: var(--font-size-sm);">
+        lines.push(`<div style="display: flex; align-items: center; gap: 6px;">
             <span style="width: 6px; height: 6px; border-radius: 50%; background: ${color};"></span>
             <span style="color: #e2e8f0;">write: <b>${wl.holder}</b> ${formatMs(wl.held_ms)}</span>
         </div>`);
     } else {
-        lines.push(`<div style="display: flex; align-items: center; gap: 6px; font-size: var(--font-size-sm);">
+        lines.push(`<div style="display: flex; align-items: center; gap: 6px;">
             <span style="width: 6px; height: 6px; border-radius: 50%; background: #4ade80;"></span>
             <span style="color: #64748b;">write: idle</span>
         </div>`);
@@ -784,7 +784,7 @@ function renderLiveStatus(live: LiveStatus): string {
         const mem = live.mem_pct != null ? `${live.mem_pct.toFixed(0)}% mem` : '';
         const cpu = live.cpu_pct != null ? `${live.cpu_pct.toFixed(0)}% cpu` : '';
         const pressure = [mem, cpu].filter(Boolean).join(' · ');
-        lines.push(`<div style="font-size: var(--font-size-sm); color: #94a3b8;">
+        lines.push(`<div style=" color: #94a3b8;">
             dilation <span style="color: ${color};">${d.toFixed(2)}x</span>${pressure ? ` · ${pressure}` : ''}
         </div>`);
     }
@@ -794,7 +794,7 @@ function renderLiveStatus(live: LiveStatus): string {
     if (live.db_bytes != null) sizes.push(`db ${formatBytes(live.db_bytes)}`);
     if (live.wal_bytes != null) sizes.push(`wal ${formatBytes(live.wal_bytes)}`);
     if (sizes.length > 0) {
-        lines.push(`<div style="font-size: var(--font-size-sm); color: #64748b;">${sizes.join(' · ')}</div>`);
+        lines.push(`<div style=" color: #64748b;">${sizes.join(' · ')}</div>`);
     }
 
     return lines.join('');
@@ -835,7 +835,7 @@ function renderPerformanceSection(container: HTMLElement, perf: PerfData | null,
         const sparkSvg = sparkData ? renderSparkline(sparkData) : '';
 
         return `<div style="margin-bottom: 6px;">
-            <div style="display: flex; justify-content: space-between; font-size: var(--font-size-sm); color: #e2e8f0; margin-bottom: 2px;">
+            <div style="display: flex; justify-content: space-between; color: #e2e8f0; margin-bottom: 2px;">
                 <span style="word-break: break-word; overflow-wrap: break-word;">${label} <span style="color: #64748b;">\u00D7${entry.count}</span></span>
                 <span style="white-space: nowrap; margin-left: 8px; color: #94a3b8;">${formatMs(entry.avg)}</span>
             </div>
@@ -843,7 +843,7 @@ function renderPerformanceSection(container: HTMLElement, perf: PerfData | null,
                 <div style="position: absolute; left: ${minPx}px; width: ${Math.max(2, maxPx - minPx)}px; height: 100%; background: ${color}; opacity: 0.3; border-radius: 4px;"></div>
                 <div style="position: absolute; left: ${avgPx}px; width: 2px; height: 100%; background: ${color};"></div>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: var(--font-size-xs); color: #475569;">
+            <div style="display: flex; justify-content: space-between; color: #475569;">
                 <span>${formatMs(entry.min)}</span>
                 <span>${formatMs(entry.max)}</span>
             </div>
@@ -854,7 +854,7 @@ function renderPerformanceSection(container: HTMLElement, perf: PerfData | null,
     container.innerHTML = `
         <div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
             ${liveHTML}
-            <span class="label" style="font-size: 11px;">Performance (5m windows):</span>
+            <span class="label" style="">Performance (5m windows):</span>
             <div style="margin-top: 4px;">${rows}</div>
         </div>
     `;
@@ -874,7 +874,7 @@ function formatAge(timestamp: string | number): string {
 function renderPredicateDetail(container: HTMLElement, detail: PredicateDetail): void {
     const rows: string[] = [];
     const s = (label: string, value: string) =>
-        `<div style="font-size: var(--font-size-sm); color: #94a3b8; padding: 1px 0;"><span style="color: #64748b;">${label}:</span> ${value}</div>`;
+        `<div style=" color: #94a3b8; padding: 1px 0;"><span style="color: #64748b;">${label}:</span> ${value}</div>`;
 
     const cap = (items: string[], limit: number) => {
         if (items.length <= limit) return items.join(', ');

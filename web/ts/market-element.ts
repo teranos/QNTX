@@ -170,7 +170,6 @@ export function standSnippet(url: string): string {
 // One font scale, one margin: the element sets these once and every part reads
 // them, so nothing drifts (UI-wide, ADR-035).
 const FONT = 'var(--font-mono)';
-const SIZE = '13px';
 const EDGE = '12px';
 const MUTE = 'var(--text-on-dark-tertiary)';
 const LINE = 'var(--border-on-dark)';
@@ -235,7 +234,6 @@ export function renderStandList(container: HTMLElement, stands: StaandInfo[], on
         row.style.padding = '8px ' + EDGE;
         row.style.borderBottom = '1px solid ' + LINE;
         row.style.cursor = 'pointer';
-        row.style.fontSize = SIZE;
 
         const left = document.createElement('span');
         const market = document.createElement('span');
@@ -267,7 +265,6 @@ function fact(label: string, value: HTMLElement | string, tip?: string): HTMLEle
     row.style.flexWrap = 'wrap';
     row.style.gap = '10px';
     row.style.padding = '3px 0';
-    row.style.fontSize = SIZE;
     const key = document.createElement('span');
     key.textContent = label;
     key.style.color = MUTE;
@@ -334,7 +331,6 @@ export function renderStandDetail(
 
     const title = document.createElement('div');
     title.textContent = s.market + ' / ' + s.slug;
-    title.style.fontSize = '15px';
     title.style.margin = '8px 0';
     container.appendChild(title);
 
@@ -364,7 +360,6 @@ export function renderStandDetail(
     summary.textContent = 'Snippet — paste on your site; you name the event';
     summary.style.cursor = 'pointer';
     summary.style.color = MUTE;
-    summary.style.fontSize = SIZE;
     summary.style.margin = '10px 0 4px';
     snippetBox.appendChild(summary);
 
@@ -373,7 +368,6 @@ export function renderStandDetail(
     pre.className = 'has-tooltip stand-snippet';
     pre.setAttribute('data-tooltip', 'press to copy');
     pre.textContent = snippet;
-    pre.style.fontSize = '12px';
     pre.style.whiteSpace = 'pre-wrap';
     pre.style.wordBreak = 'break-all';
     pre.style.padding = '8px ' + EDGE;
@@ -420,7 +414,6 @@ export function buildCreateForm(
     form.style.gap = '2px';
     form.style.padding = '10px ' + EDGE;
     form.style.fontFamily = FONT;
-    form.style.fontSize = SIZE;
 
     const fixed = (text: string): HTMLElement => {
         const el = document.createElement('span');
@@ -436,7 +429,6 @@ export function buildCreateForm(
     const ns = document.createElement('select');
     ns.className = 'stand-market';
     ns.style.fontFamily = FONT;
-    ns.style.fontSize = SIZE;
     ns.style.padding = '3px 4px';
     const placeholder = document.createElement('option');
     placeholder.value = '';
@@ -460,7 +452,6 @@ export function buildCreateForm(
     slug.value = unusedSlug(usedSlugs);
     slug.size = 12;
     slug.style.fontFamily = FONT;
-    slug.style.fontSize = SIZE;
     slug.style.padding = '3px 4px';
     form.appendChild(slug);
 
@@ -549,7 +540,6 @@ export function createMarketElement(): Element {
             const content = document.createElement('div');
             content.className = 'stands-element-content';
             content.style.fontFamily = FONT;
-            content.style.fontSize = SIZE;
 
             const root = document.createElement('div');
             content.appendChild(root);

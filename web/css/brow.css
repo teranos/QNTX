@@ -15,7 +15,7 @@
     z-index: 100004; /* above the door (100003): a shut door still shows the node's vitals, the way a locked phone still shows its clock */
     pointer-events: none;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     user-select: none;
 }
 
