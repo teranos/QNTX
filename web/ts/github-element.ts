@@ -10,12 +10,13 @@
 // the Actions runner. Asked on open and after each press; nothing polls.
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { createTable, tray } from '@teranos/elements';
 import { apiFetch, apiJson } from './client';
 import { jsonBody } from './http-utils';
 import { Button } from './components/button';
 import { refusal } from './self-person';
 import { log, SEG } from './logger';
+import { stacked } from './table-cell';
 import { renderSparklines, windowOf } from './components/sparkline';
 
 /** GitHub's core rate limit for one namespace's token. */
@@ -277,25 +278,20 @@ export function renderNamespaces(container: HTMLElement, namespaces: GitHubNames
         return;
     }
 
-    const table = document.createElement('table');
-    table.className = 'element-table github-namespaces-table';
-    const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>Namespace</th><th>Source</th><th>Login</th><th>Minted by</th><th>Auth</th><th>Rate</th></tr>';
-    table.appendChild(thead);
-    const tbody = document.createElement('tbody');
-    for (const ns of namespaces) {
-        const tr = document.createElement('tr');
-        tr.appendChild(cell(ns.namespace));
-        tr.appendChild(cell(sourceInWords(ns.source)));
-        tr.appendChild(cell(ns.login || '—'));
-        tr.appendChild(cell(ns.minted_by));
-        tr.appendChild(auth(ns));
+    // "TABLES BEING MAX 4 col": the namespace carries where its token came
+    // from, and the login who minted it.
+    const table = createTable('github-namespaces', ['Namespace', 'Login', 'Auth', 'Rate'], namespaces.map(ns => {
         const rate = cell(ns.rate ? `${ns.rate.remaining} / ${ns.rate.limit}` : '—');
         if (ns.rate) rate.title = `resets ${fmt(ns.rate.reset)} UTC`;
-        tr.appendChild(rate);
-        tbody.appendChild(tr);
-    }
-    table.appendChild(tbody);
+        return {
+            cells: [
+                stacked(ns.namespace, sourceInWords(ns.source)),
+                stacked(ns.login || '—', `minted by ${ns.minted_by}`),
+                auth(ns),
+                rate,
+            ] as const,
+        };
+    }));
     s.appendChild(table);
     container.appendChild(s);
 }
@@ -303,22 +299,15 @@ export function renderNamespaces(container: HTMLElement, namespaces: GitHubNames
 /** The builds the runner delivered and the node took, newest as the runner kept them. */
 function takenTable(taken: TakenBuild[]): HTMLElement {
     if (taken.length === 0) return said('No build taken yet.');
-    const table = document.createElement('table');
-    table.className = 'element-table github-taken-table';
-    const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>When</th><th>Plugin</th><th>Archive</th><th>Digest</th><th>Changed</th></tr>';
-    table.appendChild(thead);
-    const tbody = document.createElement('tbody');
-    for (const t of taken) {
-        const tr = document.createElement('tr');
-        tr.appendChild(cell(fmt(t.at), 'element-time'));
-        tr.appendChild(cell(t.plugin));
-        tr.appendChild(cell(t.archive));
-        tr.appendChild(cell(t.digest));
-        tr.appendChild(cell(t.changed ? 'yes' : t.older ? 'no, older than installed' : 'no'));
-        tbody.appendChild(tr);
-    }
-    table.appendChild(tbody);
+    // "TABLES BEING MAX 4 col": the plugin carries the archive it came in.
+    const table = createTable('github-taken', ['When', 'Plugin', 'Digest', 'Changed'], taken.map(t => ({
+        cells: [
+            cell(fmt(t.at), 'element-time'),
+            stacked(t.plugin, t.archive),
+            cell(t.digest),
+            cell(t.changed ? 'yes' : t.older ? 'no, older than installed' : 'no'),
+        ] as const,
+    })));
     return table;
 }
 

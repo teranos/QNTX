@@ -29,7 +29,7 @@ test('the list switches nobody: the switch is in the User', () => {
     const container = document.createElement('div');
     renderList(container, [root()]);
     expect(container.querySelector('button')).toBeNull();
-    expect(container.querySelectorAll('th').length).toBe(6);
+    expect(container.querySelectorAll('th').length).toBe(4);
 });
 
 // "Not interested in Phone in Users glyph"
@@ -38,15 +38,16 @@ test('the list has no Phone and no Reached by', () => {
     const container = document.createElement('div');
     renderList(container, [root()]);
     const heads = Array.from(container.querySelectorAll('th')).map(th => th.textContent);
-    expect(heads).toEqual(['Name', 'Level', 'Door', 'Email', 'Created', 'Status']);
-    expect(container.querySelector('tbody tr')!.children.length).toBe(6);
+    // "TABLES BEING MAX 4 col": the mail is under the name, the door under the level.
+    expect(heads).toEqual(['Name', 'Level', 'Created', 'Status']);
+    expect(container.querySelector('tbody tr')!.children.length).toBe(4);
 });
 
 // "but why dont i see my outgoing invitations in the same list, and a way for me to open the would-be-user"
 test('an open invitation is a row of its own, invited, among the Users', () => {
     const container = document.createElement('div');
     const open = {
-        id: 'inv1', email: 'ada@gmail.com', display_name: 'Ada',
+        id: 'inv1', email: 'ada@gmail.com', display_name: 'Ada', namespace: '',
         accounts: [{ provider: 'google', account: 'ada@gmail.com' }],
         invited_by: 'US-USER-Y3BNGXYR', created_at: 1789342756348, state: 'open' as const,
     };
@@ -62,4 +63,17 @@ test('an open invitation is a row of its own, invited, among the Users', () => {
     expect(rows[0]).toContain('ada@gmail.com');
     expect(rows.join()).not.toContain('Bob');
     expect(rows.join()).not.toContain('Cy');
+});
+
+// "i would want to give each invited user their own namespace for their startup"
+test('an invitation into pond says pond under invited', () => {
+    const container = document.createElement('div');
+    renderList(container, [root()], [{
+        id: 'inv-spike', email: 'spike@example.com', display_name: 'Spike', namespace: 'pond',
+        accounts: [{ provider: 'google', account: 'spike@example.com' }],
+        invited_by: 'US-USER-Y3BNGXYR', created_at: 1789342756348, state: 'open' as const,
+    }]);
+    const level = container.querySelector('tbody tr')!.children[1].textContent;
+    expect(level).toContain('invited');
+    expect(level).toContain('pond');
 });

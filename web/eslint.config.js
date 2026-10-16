@@ -86,6 +86,16 @@ const NO_RAW_FETCH = [
     },
 ];
 
+// "The elements package should own Tables" "TABLES BEING MAX 4 col"
+// A table is createTable from @teranos/elements, whose heads are one to four and whose rows are
+// as wide: a fifth column does not compile. A table built by hand stops the build.
+const TABLE_IS_ELEMENTS = "a table is @teranos/elements': createTable(name, heads, rows), four columns at most. QNTX does not build a table.";
+const NO_RAW_TABLE = [
+    { selector: "CallExpression[callee.property.name='createElement'][arguments.0.value=/^(table|thead|tbody|tr|th)$/]", message: TABLE_IS_ELEMENTS },
+    { selector: "Literal[value=/<(table|thead|tbody|tr|th)[\\s>]/]", message: TABLE_IS_ELEMENTS },
+    { selector: "TemplateElement[value.raw=/<(table|thead|tbody|tr|th)[\\s>]/]", message: TABLE_IS_ELEMENTS },
+];
+
 // "ban 1, 2, 3, 4, 5"
 
 // An absence becoming behaviour, the same kinds nilcheck holds in Go and Rust.
@@ -118,7 +128,7 @@ export default [
             'no-empty': 'error',
             'no-restricted-globals': ['error', ...BANNED_GLOBALS],
             'no-restricted-imports': ['error', NO_SHOW_TOAST],
-            'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE],
         },
     },
     {
@@ -139,14 +149,14 @@ export default [
         // client/ is where apiFetch lives.
         files: ['ts/client/**/*.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
         },
     },
     {
         // These load a .wasm binary by URL.
         files: ['ts/laye.ts', 'ts/ats-wasm.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
         },
     },
     {
@@ -154,7 +164,7 @@ export default [
         // reports every answer to the connectivity manager.
         files: ['ts/liveness.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
         },
     },
     {
@@ -165,7 +175,7 @@ export default [
         // "i want tooltip to be propagated more"
         files: ['ts/market-element.ts'],
         rules: {
-            'no-restricted-syntax': ['error', NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE],
         },
     },
 ];

@@ -8,11 +8,12 @@
 // holds them; pressing a name opens that User, where the switch on them is.
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { createTable, tray, type TableRow } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { createGhostButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
+import { stacked } from './table-cell';
 import { openUserElement } from './user-element';
 import { openInvitationCancel, openUserInviteElement, type InvitationRecord } from './user-invite-element';
 
@@ -86,6 +87,8 @@ function statusPill(u: UserRecord): HTMLTableCellElement {
     return td;
 }
 
+const HEADS = ['Name', 'Level', 'Created', 'Status'] as const;
+
 /** Exported for tests: every User, a row each. A row is a way in to the
  *  User and nothing else. */
 export function renderList(container: HTMLElement, users: UserRecord[], invitations: InvitationRecord[] = []): void {
@@ -99,69 +102,43 @@ export function renderList(container: HTMLElement, users: UserRecord[], invitati
         return;
     }
 
-    const table = document.createElement('table');
-    table.className = 'element-table users-table';
-
-    const thead = document.createElement('thead');
-    thead.innerHTML = `<tr>
-        <th>Name</th>
-        <th>Level</th>
-        <th>Door</th>
-        <th>Email</th>
-        <th>Created</th>
-        <th>Status</th>
-    </tr>`;
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
+    // "TABLES BEING MAX 4 col": the name carries the User's mail, and the
+    // level the door they came in by.
+    const rows: TableRow<typeof HEADS>[] = [];
     // "but why dont i see my outgoing invitations in the same list, and a way for me to open the would-be-user"
     for (const inv of invitations) {
         if (inv.state !== 'open') continue;
-        tbody.appendChild(invitationRow(inv));
+        rows.push(invitationRow(inv));
     }
     for (const u of users) {
-        const tr = document.createElement('tr');
-
-        const name = cell(nameOf(u));
+        const name = stacked(nameOf(u), u.email_addresses?.length ? u.email_addresses.join(', ') : '—');
         // The id is the one thing about a User that never changes, and it is
         // on the row rather than in a hover.
         name.title = u.id;
         // Pressing a name opens that User whole.
         name.style.cursor = 'pointer';
         name.addEventListener('click', () => { openUserElement(u); });
-        tr.appendChild(name);
-        tr.appendChild(cell(u.level));
-        tr.appendChild(cell(u.namespace || '—'));
-        tr.appendChild(cell(u.email_addresses?.length ? u.email_addresses.join(', ') : '—'));
-        tr.appendChild(cell(fmt(u.created_at), 'element-time'));
-        tr.appendChild(statusPill(u));
-
-        tbody.appendChild(tr);
+        rows.push({
+            cells: [name, stacked(u.level, u.namespace || '—'), cell(fmt(u.created_at), 'element-time'), statusPill(u)],
+        });
     }
-    table.appendChild(tbody);
+    const table = createTable('users', HEADS, rows);
     container.appendChild(table);
 }
 
 /** An open invitation, as the would-be User it is. Pressing the name opens
  *  it, with its cancel. */
-function invitationRow(inv: InvitationRecord): HTMLTableRowElement {
-    const tr = document.createElement('tr');
-    const name = cell(inv.display_name || UNNAMED);
+function invitationRow(inv: InvitationRecord): TableRow<typeof HEADS> {
+    const name = stacked(inv.display_name || UNNAMED, inv.email);
     name.title = inv.id;
     name.style.cursor = 'pointer';
     name.addEventListener('click', () => { openInvitationCancel(inv.id); });
-    tr.appendChild(name);
-    tr.appendChild(cell('invited'));
-    tr.appendChild(cell('—'));
-    tr.appendChild(cell(inv.email));
-    tr.appendChild(cell(fmt(inv.created_at), 'element-time'));
     const status = document.createElement('td');
     const pill = document.createElement('span');
     pill.className = 'element-pill element-pill-invited';
     pill.textContent = 'invited';
     status.appendChild(pill);
-    tr.appendChild(status);
-    return tr;
+    return { cells: [name, stacked('invited', inv.namespace), cell(fmt(inv.created_at), 'element-time'), status] };
 }
 
 /** The invitations ROOT sent. A node that will not list them still lists its

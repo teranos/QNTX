@@ -98,6 +98,28 @@ describe('Tim, as ROOT, invites a friend', () => {
         ]);
     });
 
+    // "i would want to give each invited user their own namespace for their startup"
+    test('Spike is invited into pond: the namespace goes in the body', async () => {
+        renderInvite(container, PROVIDERS, send);
+        expect(container.textContent).toContain('Namespace');
+        type('email', 'spike@example.com');
+        type('namespace', ' pond ');
+        press('google');
+        type('account-google', 'spike@example.com');
+        await sendIt();
+        expect(sent).toHaveLength(1);
+        expect(sent[0].namespace).toBe('pond');
+    });
+
+    test('a namespace left empty is sent empty: a User that stands in none', async () => {
+        renderInvite(container, PROVIDERS, send);
+        type('email', 'spike@example.com');
+        press('google');
+        type('account-google', 'spike@example.com');
+        await sendIt();
+        expect(sent[0].namespace).toBe('');
+    });
+
     test('pressing a provider again takes it off the invitation', () => {
         renderInvite(container, PROVIDERS, send);
         press('apple');
@@ -121,7 +143,7 @@ describe('Tim, as ROOT, invites a friend', () => {
 describe('Tim, as ROOT, opens the cancel in his copy of the mail', () => {
     let container: HTMLElement;
     const ada = {
-        id: 'inv1', email: 'ada@gmail.com', display_name: 'Ada',
+        id: 'inv1', email: 'ada@gmail.com', display_name: 'Ada', namespace: '',
         accounts: [{ provider: 'google', account: 'ada@gmail.com' }, { provider: 'github', account: 'adalovelace' }],
         invited_by: 'US-TIM', created_at: 1, state: 'open' as const,
     };

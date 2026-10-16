@@ -9,7 +9,7 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { createTable, tableCell, tray } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { createGhostButton, createPrimaryButton } from './components/button';
 import { el } from './html-utils';
@@ -99,32 +99,13 @@ export function renderList(container: HTMLElement, lines: Line[]): void {
         return;
     }
 
-    const table = document.createElement('table');
-    table.className = 'element-table roles-table';
-
-    const thead = document.createElement('thead');
-    thead.innerHTML = `<tr>
-        <th>Line</th>
-        <th>by</th>
-        <th>at</th>
-    </tr>`;
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-    for (const line of lines) {
-        const tr = document.createElement('tr');
-        tr.dataset.id = line.id;
-
-        const sentence = document.createElement('td');
-        sentence.textContent = said(line);
+    const rows = lines.map(line => {
+        const sentence = tableCell(said(line));
         // The whole of it on hover, DIDs unshortened.
         sentence.title = `${line.subjects.join(' ')} is ${line.predicates.join(' ')} of ${line.contexts.join(' ')} by ${line.actors.join(' ')}`;
-        tr.appendChild(sentence);
 
         // The writer is a way in: a token to its own element, a person to Users.
-        const by = document.createElement('td');
-        by.className = 'element-did';
-        by.textContent = short(line.by) || '—';
+        const by = tableCell(short(line.by) || '—', 'element-did');
         if (by.textContent !== line.by) by.title = line.by;
         if (line.by_token) {
             by.title = `open ${line.by}`;
@@ -133,16 +114,10 @@ export function renderList(container: HTMLElement, lines: Line[]): void {
             by.title = `open Users: ${line.by}`;
             by.addEventListener('click', () => { openUsersElement(); });
         }
-        tr.appendChild(by);
 
-        const at = document.createElement('td');
-        at.className = 'element-time';
-        at.textContent = fmt(line.at);
-        tr.appendChild(at);
-
-        tbody.appendChild(tr);
-    }
-    table.appendChild(tbody);
+        return { id: line.id, cells: [sentence, by, tableCell(fmt(line.at), 'element-time')] as const };
+    });
+    const table = createTable('roles', ['Line', 'by', 'at'], rows);
     container.appendChild(table);
 }
 
