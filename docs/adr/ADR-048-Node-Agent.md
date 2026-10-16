@@ -13,7 +13,7 @@ QNTX interacts with a Node Agent; Claude Code in this case.
 - An agent's work outlives the request that brought it, and every call it makes carries its own credential. The credential of whoever sent the work never reaches what the agent calls [[ADR-038-MCP]].
 - A Task's messages have two roles, user and agent: the user is who sent it, the agent is the one doing it. Who may see the Task is the sender's admission; what the agent touches is the agent's.
 - To A2A an agent is described by its Agent Card, and its skills are what it
-  can perform [[ADR-039-sigils]].
+  can perform [[ADR-039-Sigils]].
 
 ## An agent per model
 
