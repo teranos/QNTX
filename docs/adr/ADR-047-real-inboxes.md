@@ -21,9 +21,6 @@ Status: Accepted
 
 "A user can have multiple inboxes"
 
-"Add SUPER to it"
-
-"ROOT should be able to read other user's mail as well, but doing so is an attested event."
 
 "[At least 7 characters]@domain.tld"
 
