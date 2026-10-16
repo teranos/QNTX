@@ -67,3 +67,18 @@ test('ROOT is offered to become a User that is not ROOT, and is on', () => {
     renderUser(container, other, false, () => {}, false, false);
     expect(container.textContent).not.toContain('Become');
 });
+
+// "Leve l Door Emai l Acco unts ?????????? i wish very deeply that this was made structurally impossible"
+test('a label in the record never breaks inside a word, and a value wraps', () => {
+    const container = document.createElement('div');
+    renderUser(container, root(['root@garden.test']), false);
+    const rows = Array.from(container.querySelectorAll('.user-record-table tbody tr'));
+    expect(rows.length).toBe(10);
+    for (const tr of rows) {
+        const [label, value] = Array.from(tr.querySelectorAll('td'));
+        expect(label.style.whiteSpace).toBe('nowrap');
+        expect(label.style.wordBreak).toBe('normal');
+        expect(label.style.overflowWrap).toBe('normal');
+        expect(value.style.overflowWrap).toBe('break-word');
+    }
+});

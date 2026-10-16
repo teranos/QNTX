@@ -94,6 +94,8 @@ const NO_RAW_TABLE = [
     { selector: "CallExpression[callee.property.name='createElement'][arguments.0.value=/^(table|thead|tbody|tr|th)$/]", message: TABLE_IS_ELEMENTS },
     { selector: "Literal[value=/<(table|thead|tbody|tr|th)[\\s>]/]", message: TABLE_IS_ELEMENTS },
     { selector: "TemplateElement[value.raw=/<(table|thead|tbody|tr|th)[\\s>]/]", message: TABLE_IS_ELEMENTS },
+    // "i wish very deeply that this was made structurally impossible, it should simply not be a thing, ci should fail on it"
+    { selector: "CallExpression[callee.name='createTable'][arguments.1.type='ArrayExpression'][arguments.1.elements.length=2]", message: 'a record, a label beside its value, is record() from ts/table-cell.ts: its labels never break inside a word.' },
 ];
 
 // "ban 1, 2, 3, 4, 5"
