@@ -3,14 +3,20 @@
 Date: 2026-10-10
 Status: Proposed
 
-"There is an interactive element that I want to prototype here. It lets me approve something."
+"There is an interactive element that I want to prototype here. It lets me
+approve something."
 
+"Do you hear how little it matters what the 'thing' is to approve?"
 
-"approvals are attestations 
-obviously"
+"approvals are attestations obviously"
 
 "Approvals is human only"
+
 "And only through it's element"
+
+"approvals is ROOT only for now"
+
+"Two things, and right now only one is in scope: the github PR approval"
 
 "APPROVALS INTEGRATE DIRECTLY WITH THE GITHUB APP"
 
@@ -81,4 +87,5 @@ NO."
 - Jev's confidence on a merge: "the percentage doesn't make sense" there.
 - A press from the element that already stood when the page opened: the card
   starts undecided and says what stands in its context.
-- The second approval: "everyone get's their own mail address, and they get it via ROOT approval" ([[ADR-047-inboxes]]), and anything an agent asks. Out of scope.
+- The second approval: "everyone get's their own mail address, and they get
+  it via ROOT approval" (ADR-047), and anything an agent asks. Out of scope.
