@@ -28,7 +28,8 @@ right?"
 It has CTFE-able material, 
 for example: 
 - filename paths for the `control`:
-	- (mentioned a file, didn't read it, please read it - `control`)"
+	- mentioned a file, didn't read it, please read it
+	"
 
 "so we can still have super fast hooks, and actually even faster when the builds are done by QNTX"
 
