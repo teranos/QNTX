@@ -58,15 +58,15 @@
           "run": "cd web && bunx playwright install --with-deps chromium webkit"
         },
         {
-          "name": "Every element on a phone and on a desktop: nothing in it wider than it",
-          "run": "cd web && bun run test:browser",
           "env": {
             "CI": "1"
-          }
+          },
+          "name": "Every element on a phone and on a desktop: nothing in it wider than it",
+          "run": "cd web && bun run test:browser"
         },
         {
-          "name": "What the browser saw",
           "if": "failure()",
+          "name": "What the browser saw",
           "uses": "actions/upload-artifact@v4",
           "with": {
             "name": "browser-report",
