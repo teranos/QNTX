@@ -23,7 +23,7 @@ right?"
 - Its SessionStart asks GitHub for the latest tag once a day and tells the session when a newer one exists.
 - The latest release is v0.19.1, 2026-06-30. The operator's machine runs  v0.19.1-439-g4ec8488.
 
-## Per ground project
+## Per each ground project's repo
 
 "Tailored to that repository ground `project` .pbt specifies,
 
