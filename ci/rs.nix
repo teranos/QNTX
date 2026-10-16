@@ -274,7 +274,7 @@ in
 
         {
           name = "Install wasm-pack";
-          run = "cargo install wasm-pack";
+          run = "cargo install wasm-pack --locked";
         }
 
         {
