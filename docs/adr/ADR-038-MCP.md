@@ -22,7 +22,7 @@ The MCP surface is a mirror of the server handlers, the way the HTTP API is, so 
 
 The handlers are the source, and MCP is not made from the API: the two are mirrors of the same handlers.
 
-"we dont need to reinvent every single endpoint"
+"we don't need to reinvent every single endpoint"
 
 "a new thing is a new handler is a new mcp tool is a new api endpoint"
 
