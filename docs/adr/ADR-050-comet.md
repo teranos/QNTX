@@ -8,8 +8,7 @@ Status: Proposed
 "if QNTX is heaven"
 "and ground is here, as in earth"
 "Comets are what slowly creates a body in space, 
-like earth, 
-right?"
+like earth, right?"
 
 - The node builds ground, and the build lands on the machine ground runs on. 
 - [[ADR-027-Permissions]] 27-2 waits on this. 
@@ -21,7 +20,6 @@ right?"
 	- `make install`
 	- GitHub Releases
 - Its SessionStart asks GitHub for the latest tag once a day and tells the session when a newer one exists.
-- The latest release is v0.19.1, 2026-06-30. The operator's machine runs  v0.19.1-439-g4ec8488.
 
 ## Per each ground project's repo
 
