@@ -11,7 +11,6 @@ approve something."
 "approvals are attestations obviously"
 
 "Approvals is human only"
-
 "And only through it's element"
 
 "approvals is ROOT only for now"
