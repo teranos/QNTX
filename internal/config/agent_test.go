@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// The ROOT agent as am.toml names it (ADR-048): which model, at what effort,
+// The Node Agent as am.toml names it (ADR-048): which model, at what effort,
 // and where the Claude plan token is kept.
-func TestRootAgentLoads(t *testing.T) {
+func TestNodeAgentLoads(t *testing.T) {
 	path := writeConfig(t, `
 [agent.root]
 model  = "claude-opus-5-5"
@@ -21,7 +21,7 @@ token  = "ssm:///q/box/claude/oauth-token"
 	}
 	root := cfg.Agent.Root
 	if root.Model != "claude-opus-5-5" || root.Effort != "low" || root.TokenRef != "ssm:///q/box/claude/oauth-token" {
-		t.Errorf("the ROOT agent loaded as %+v", root)
+		t.Errorf("the Node Agent loaded as %+v", root)
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("Validate = %v, want nil", err)
@@ -30,7 +30,7 @@ token  = "ssm:///q/box/claude/oauth-token"
 
 // What it runs in when whoever speaks to it names no mode, and the tools it
 // may use without being asked, are am.toml's to say.
-func TestRootAgentPermissionsLoad(t *testing.T) {
+func TestNodeAgentPermissionsLoad(t *testing.T) {
 	path := writeConfig(t, `
 [agent.root]
 model           = "claude-opus-5-5"
@@ -44,7 +44,7 @@ allow           = ["mcp__qntx", "Bash", "Read"]
 	}
 	root := cfg.Agent.Root
 	if root.Mode != "dontAsk" || len(root.Allow) != 3 || root.Allow[0] != "mcp__qntx" {
-		t.Errorf("the ROOT agent's permissions loaded as mode %q, allow %v", root.Mode, root.Allow)
+		t.Errorf("the Node Agent's permissions loaded as mode %q, allow %v", root.Mode, root.Allow)
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("Validate = %v, want nil", err)
@@ -53,7 +53,7 @@ allow           = ["mcp__qntx", "Bash", "Read"]
 
 // A mode Claude Code does not have is a typo, and a typo that loaded would be
 // an agent that fails at the first thing said to it.
-func TestRootAgentModeClaudeCodeDoesNotHaveIsRefused(t *testing.T) {
+func TestNodeAgentModeClaudeCodeDoesNotHaveIsRefused(t *testing.T) {
 	path := writeConfig(t, `
 [agent.root]
 model           = "claude-opus-5-5"
@@ -70,14 +70,14 @@ permission_mode = "everything"
 	}
 }
 
-// A node that names no ROOT agent has none, and that is valid.
-func TestNoRootAgentIsValid(t *testing.T) {
+// A node that names no Node Agent has none, and that is valid.
+func TestNoNodeAgentIsValid(t *testing.T) {
 	cfg, err := LoadFromFile(writeConfig(t, ``))
 	if err != nil {
 		t.Fatalf("LoadFromFile = %v", err)
 	}
 	if cfg.Agent.Root.Named() {
-		t.Errorf("a node that names no ROOT agent has one: %+v", cfg.Agent.Root)
+		t.Errorf("a node that names no Node Agent has one: %+v", cfg.Agent.Root)
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("Validate = %v, want nil", err)
@@ -85,7 +85,7 @@ func TestNoRootAgentIsValid(t *testing.T) {
 }
 
 // A literal token in a world-readable am.toml is already disclosed.
-func TestRootAgentTokenLiteralRejected(t *testing.T) {
+func TestNodeAgentTokenLiteralRejected(t *testing.T) {
 	path := writeConfig(t, `
 [agent.root]
 model  = "claude-opus-5-5"
@@ -110,7 +110,7 @@ token  = "sk-ant-oat01-a-literal"
 
 // Nothing stands in for the model or the effort: an agent named by half is
 // refused, saying which half is missing.
-func TestRootAgentNamedByHalfIsRefused(t *testing.T) {
+func TestNodeAgentNamedByHalfIsRefused(t *testing.T) {
 	for missing, body := range map[string]string{
 		"agent.root.model":  "[agent.root]\neffort = \"low\"\n",
 		"agent.root.effort": "[agent.root]\nmodel = \"claude-opus-5-5\"\n",
@@ -128,7 +128,7 @@ func TestRootAgentNamedByHalfIsRefused(t *testing.T) {
 
 // The other harness it runs in: the model Pi runs, at what thinking, and the
 // gateway plugin every model call goes through.
-func TestRootAgentPiLoads(t *testing.T) {
+func TestNodeAgentPiLoads(t *testing.T) {
 	path := writeConfig(t, `
 [agent.root]
 model  = "claude-opus-5-5"
@@ -153,7 +153,7 @@ gateway  = "openrouter-qntx"
 }
 
 // Pi named by half, or at a thinking level it does not have, is refused.
-func TestRootAgentPiNamedByHalfIsRefused(t *testing.T) {
+func TestNodeAgentPiNamedByHalfIsRefused(t *testing.T) {
 	for want, body := range map[string]string{
 		"both or neither":        "[agent.root.pi]\nmodel = \"m\"\n",
 		"agent.root.pi.thinking": "[agent.root.pi]\nmodel = \"m\"\ngateway = \"g\"\nthinking = \"loud\"\n",

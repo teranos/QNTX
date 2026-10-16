@@ -73,7 +73,7 @@ const answered = `{"type":"session","version":3,"id":"s-1","timestamp":"2026-10-
 func said(binary, home string) Said {
 	return Said{
 		Binary: binary, Home: home, Session: "s-1", Says: "how long has the box been up?",
-		Model: "qntx/anthropic/claude-sonnet-4.6", Thinking: "low", System: "You are the ROOT agent.",
+		Model: "qntx/anthropic/claude-sonnet-4.6", Thinking: "low", System: "You are the Node Agent.",
 		MCP:      []MCPServer{{Name: "qntx", URL: "http://127.0.0.1:8770/mcp", Bearer: "the-agent-token"}},
 		Provider: &Provider{Name: "qntx", BaseURL: "http://127.0.0.1:8770/api/openrouter-qntx/v1", Key: "the-agent-token", Models: []string{"anthropic/claude-sonnet-4.6"}},
 		Env:      []string{"GIT_CONFIG_GLOBAL=/agent/gitconfig"},
@@ -104,7 +104,7 @@ func TestSaidRunsPiAndReadsItsAnswer(t *testing.T) {
 	args := linesOf(t, filepath.Join(ran, "args"))
 	for flag, want := range map[string]string{
 		"--mode": "json", "--session-id": "s-1", "--model": "qntx/anthropic/claude-sonnet-4.6",
-		"--thinking": "low", "--append-system-prompt": "You are the ROOT agent.",
+		"--thinking": "low", "--append-system-prompt": "You are the Node Agent.",
 		"--session-dir": filepath.Join(home, "pi", "sessions"),
 	} {
 		if got := after(args, flag); got != want {

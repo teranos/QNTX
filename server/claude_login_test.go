@@ -33,7 +33,7 @@ func loggingIn(s *QNTXServer, sent sigil.Sent) (map[string]any, *protocol.Refusa
 // URL Claude Code printed, the code shown there is handed back, and what the
 // sign-in leaves is in the agent's own config dir. The node holds nothing.
 func TestSigningInIsClaudeCodesOwnFlow(t *testing.T) {
-	s, ran := runningTheRootAgent(t, opusLow)
+	s, ran := runningTheNodeAgent(t, opusLow)
 
 	begun, refused := loggingIn(s, sigil.Sent{})
 	require.Nil(t, refused)
@@ -43,7 +43,7 @@ func TestSigningInIsClaudeCodesOwnFlow(t *testing.T) {
 
 	args := ranWith(t, ran, "0", "args")
 	assert.Equal(t, []string{"auth", "login", "--claudeai"}, args)
-	assert.Contains(t, ranWith(t, ran, "0", "env"), "CLAUDE_CONFIG_DIR="+filepath.Join(s.rootAgent.home, "claude"))
+	assert.Contains(t, ranWith(t, ran, "0", "env"), "CLAUDE_CONFIG_DIR="+filepath.Join(s.nodeAgent.home, "claude"))
 
 	finished, refused := loggingIn(s, sigil.Sent{"code": "the-code-shown"})
 	require.Nil(t, refused)
@@ -52,7 +52,7 @@ func TestSigningInIsClaudeCodesOwnFlow(t *testing.T) {
 	assert.Equal(t, "claude.ai", finished["auth_method"])
 	holds(t, s.harnessSignum(s.claudeHarness()), "login", finished)
 
-	kept, err := os.ReadFile(filepath.Join(s.rootAgent.home, "claude", ".credentials.json"))
+	kept, err := os.ReadFile(filepath.Join(s.nodeAgent.home, "claude", ".credentials.json"))
 	require.NoError(t, err)
 	assert.Equal(t, "the-code-shown\n", string(kept), "what the sign-in leaves is Claude Code's, in the agent's config dir")
 
@@ -66,7 +66,7 @@ func TestSigningInIsClaudeCodesOwnFlow(t *testing.T) {
 
 // The Console pays when asked; the subscription otherwise.
 func TestWhoseAccountPaysIsNamed(t *testing.T) {
-	s, ran := runningTheRootAgent(t, opusLow)
+	s, ran := runningTheNodeAgent(t, opusLow)
 	_, refused := loggingIn(s, sigil.Sent{"billing": "console"})
 	require.Nil(t, refused)
 	assert.Equal(t, []string{"auth", "login", "--console"}, ranWith(t, ran, "0", "args"))
@@ -74,7 +74,7 @@ func TestWhoseAccountPaysIsNamed(t *testing.T) {
 
 // A code with no sign-in begun has nothing to finish, and says what to do.
 func TestACodeWithNoSignInBegunIsRefused(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
+	s, _ := runningTheNodeAgent(t, opusLow)
 	_, refused := loggingIn(s, sigil.Sent{"code": "the-code-shown"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.GetWhy())
@@ -83,33 +83,33 @@ func TestACodeWithNoSignInBegunIsRefused(t *testing.T) {
 
 // A code Claude Code refuses is refused in its words, and nothing is signed in.
 func TestACodeClaudeCodeRefusesIsSaid(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
+	s, _ := runningTheNodeAgent(t, opusLow)
 	_, refused := loggingIn(s, sigil.Sent{})
 	require.Nil(t, refused)
 	_, refused = loggingIn(s, sigil.Sent{"code": "bad-code"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.Failed, refused.GetWhy())
 	assert.Contains(t, refused.GetSays(), "Invalid code")
-	_, err := os.Stat(filepath.Join(s.rootAgent.home, "claude", ".credentials.json"))
+	_, err := os.Stat(filepath.Join(s.nodeAgent.home, "claude", ".credentials.json"))
 	assert.True(t, os.IsNotExist(err))
 }
 
 // A sign-in begun over one not finished ends the first: one URL is live.
 func TestASecondSignInEndsTheFirst(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
+	s, _ := runningTheNodeAgent(t, opusLow)
 	_, refused := loggingIn(s, sigil.Sent{})
 	require.Nil(t, refused)
-	first := s.rootAgent.signingIn.pending
+	first := s.nodeAgent.signingIn.pending
 	_, refused = loggingIn(s, sigil.Sent{})
 	require.Nil(t, refused)
-	assert.NotSame(t, first, s.rootAgent.signingIn.pending)
+	assert.NotSame(t, first, s.nodeAgent.signingIn.pending)
 	assert.Error(t, first.Finish("the-code-shown"), "the first sign-in is ended")
 }
 
 // A node whose am.toml names no plan token runs Claude Code on its own
 // sign-in, so a turn before it is signed in is not run, and says what to do.
 func TestATurnWithNoCredentialIsToldToSignIn(t *testing.T) {
-	s, ran := runningTheRootAgent(t, opusLow)
+	s, ran := runningTheNodeAgent(t, opusLow)
 	s.deps.cfg.Agent.Root.TokenRef = ""
 
 	_, refused := saying(s, sigil.Sent{"says": "hello"})

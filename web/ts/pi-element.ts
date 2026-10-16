@@ -1,4 +1,4 @@
-// Pi Element — the ROOT agent in Pi: the same agent as in the Claude element,
+// Pi Element — the Node Agent in Pi: the same agent as in the Claude element,
 // in its other harness and a session of its own (ADR-048).
 // "IT MEANS WE ALSO NEED A PI ELEMENT"
 
@@ -6,12 +6,12 @@ import type { Element } from '@teranos/elements';
 import { tray } from '@teranos/elements';
 import { apiJson } from './client';
 import { Pi } from './sym';
-import { drawClaude, type ClaudeAm, type ClaudeSaid, type RootAgent } from './claude-element';
+import { drawClaude, type ClaudeAm, type ClaudeSaid, type NodeAgent } from './claude-element';
 import type { TranscriptRead } from './components/element/transcript-element';
 
 const ELEMENT_ID = 'pi-element';
 
-// Who the ROOT agent is in Pi and how the node runs it there (pi am).
+// Who the Node Agent is in Pi and how the node runs it there (pi am).
 export interface PiAm {
     did: string;
     model: string;
@@ -61,7 +61,7 @@ export function asSaid(said: PiSaid): ClaudeSaid {
 
 // The node, as the Pi element asks it: its session in Pi, beside the one the
 // Claude element reads.
-const theNodeInPi: RootAgent = {
+const theNodeInPi: NodeAgent = {
     am: () => apiJson<PiAm>('/api/pi').then(asAm),
     say: (says) => apiJson<PiSaid>('/api/pi/say', {
         method: 'POST',

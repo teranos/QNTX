@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// A turn is the same in every harness the ROOT agent runs in (ADR-048): who
+// A turn is the same in every harness the Node Agent runs in (ADR-048): who
 // said it, one at a time, written down as the agent, and the session kept.
 // What differs is the harness's part, an aTurn.
 
@@ -103,12 +103,12 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 			}
 		}
 	}
-	// The ROOT agent's git is its own (ADR-048, Its git). A namespace agent has
+	// The Node Agent's git is its own (ADR-048, Its git). A namespace agent has
 	// none: nothing of it is written for one yet.
 	var itsGit []string
 	if agent.namespace == auth.NamespaceSystem {
 		if itsGit, err = s.gitEnvironment(agent); err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent's git was not set up, so nothing was said to it: " + err.Error()}
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's git was not set up, so nothing was said to it: " + err.Error()}
 		}
 	}
 	told, err := writes.told(says, spokenBy(caller), time.Now())

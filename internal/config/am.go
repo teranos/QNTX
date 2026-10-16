@@ -26,12 +26,12 @@ type Config struct {
 
 // AgentConfig is the agents this node runs (ADR-048).
 type AgentConfig struct {
-	Root RootAgentConfig `mapstructure:"root"`
+	Root NodeAgentConfig `mapstructure:"root"`
 }
 
-// RootAgentConfig names the ROOT agent: QNTX itself as ROOT talks to it, run
+// NodeAgentConfig names the Node Agent: QNTX itself as ROOT talks to it, run
 // by the node as Claude Code. Nothing stands in for the model or the effort.
-type RootAgentConfig struct {
+type NodeAgentConfig struct {
 	Model    string `mapstructure:"model"`  // The Claude model it is, by its full name.
 	Effort   string `mapstructure:"effort"` // The effort it runs at: low, medium, high, xhigh or max.
 	TokenRef string `mapstructure:"token"`  // ssm:// or env: reference to the Claude plan token — a literal is rejected
@@ -44,7 +44,7 @@ type RootAgentConfig struct {
 	Pi PiConfig `mapstructure:"pi"`
 }
 
-// PiConfig names how the ROOT agent runs in Pi. A node that names no model
+// PiConfig names how the Node Agent runs in Pi. A node that names no model
 // runs it in Claude Code alone.
 type PiConfig struct {
 	Model    string `mapstructure:"model"`    // The model, by the id the gateway knows it as.
@@ -54,7 +54,7 @@ type PiConfig struct {
 	Gateway string `mapstructure:"gateway"`
 }
 
-// Named reports whether am.toml names Pi for the ROOT agent.
+// Named reports whether am.toml names Pi for the Node Agent.
 func (p PiConfig) Named() bool {
 	return p.Model != "" || p.Gateway != ""
 }
@@ -63,8 +63,8 @@ func (p PiConfig) Named() bool {
 // names them.
 var ThinkingLevels = []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"}
 
-// Named reports whether am.toml names a ROOT agent at all.
-func (r RootAgentConfig) Named() bool {
+// Named reports whether am.toml names a Node Agent at all.
+func (r NodeAgentConfig) Named() bool {
 	return r.Model != "" || r.Effort != "" || r.TokenRef != "" || r.Mode != "" || len(r.Allow) > 0
 }
 

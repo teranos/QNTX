@@ -39,8 +39,8 @@ export const Transcript = '⏦'; // one session Ground recorded, read as what wa
 export const Ground = '⏚';      // the Ground element, aware of anything Ground
 export const Comet = '☄';       // one repository as a comet: the ground built from it, landing on earth
 export const Parity = '≍';     // a signum held to a reference it follows
-export const Claude = '✻';     // the ROOT agent: Claude Code, run by the node as itself
-export const Pi = 'π';         // the ROOT agent in Pi, its other harness
+export const Claude = '✻';     // the Node Agent: Claude Code, run by the node as itself
+export const Pi = 'π';         // the Node Agent in Pi, its other harness
 export const Agent = '✦';      // the agent of a namespace, shared by everyone who has reach on it, on its own sign-in
 
 /** Segment to its glyph. */

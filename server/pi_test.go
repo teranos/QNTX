@@ -32,13 +32,13 @@ const piAnswered = `{"type":"session","version":3,"id":"s-1","timestamp":"2026-1
 
 var sonnetThroughTheGateway = appcfg.PiConfig{Model: "anthropic/claude-sonnet-4.6", Thinking: "low", Gateway: "openrouter-qntx"}
 
-// runningPiToo is the ROOT agent of runningTheRootAgent, with Pi named and a
+// runningPiToo is the Node Agent of runningTheNodeAgent, with Pi named and a
 // stand-in for it held.
 func runningPiToo(t *testing.T) (s *QNTXServer, claudeRan, piRan string) {
 	t.Helper()
 	named := opusLow
 	named.Pi = sonnetThroughTheGateway
-	s, claudeRan = runningTheRootAgent(t, named)
+	s, claudeRan = runningTheNodeAgent(t, named)
 	binary, piRan := claudeStandIn(t, piAnswered)
 	fetched := make(chan struct{})
 	close(fetched)
@@ -73,18 +73,18 @@ func TestWhatIsSaidToPiIsAnsweredByPi(t *testing.T) {
 	assert.Equal(t, "qntx/anthropic/claude-sonnet-4.6", after(args, "--model"))
 	assert.Equal(t, "low", after(args, "--thinking"))
 	assert.Equal(t, answer.GetSession(), after(args, "--session-id"))
-	assert.Contains(t, after(args, "--append-system-prompt"), s.rootAgent.did)
+	assert.Contains(t, after(args, "--append-system-prompt"), s.nodeAgent.did)
 
 	env := ranWith(t, ran, "0", "env")
-	assert.Contains(t, env, "QNTX_MCP_BEARER_QNTX="+s.rootAgent.token)
-	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.rootAgent.token)
+	assert.Contains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token)
+	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.nodeAgent.token)
 
 	var models struct {
 		Providers map[string]struct {
 			BaseURL string `json:"baseUrl"`
 		} `json:"providers"`
 	}
-	raw, err := os.ReadFile(filepath.Join(s.rootAgent.home, "pi", "models.json"))
+	raw, err := os.ReadFile(filepath.Join(s.nodeAgent.home, "pi", "models.json"))
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(raw, &models))
 	assert.Equal(t, "http://127.0.0.1:8770/api/openrouter-qntx/v1", models.Providers["qntx"].BaseURL)
@@ -106,7 +106,7 @@ func TestClaudeCodeAndPiAreTwoSessionsOfOneAgent(t *testing.T) {
 	require.NoError(t, err)
 	for _, row := range system.(*handed).rows {
 		require.NoError(t, signing.Verify(row))
-		assert.Equal(t, s.rootAgent.did, row.SignerDID)
+		assert.Equal(t, s.nodeAgent.did, row.SignerDID)
 	}
 
 	claudeSaid := sessionSaid(t, s)
@@ -126,8 +126,8 @@ func TestClaudeCodeAndPiAreTwoSessionsOfOneAgent(t *testing.T) {
 // other: Pi answers while Claude Code is in a turn.
 func TestPiAnswersWhileClaudeCodeIsInATurn(t *testing.T) {
 	s, _, _ := runningPiToo(t)
-	s.rootAgent.in(s.claudeHarness()).turn <- struct{}{}
-	defer func() { <-s.rootAgent.in(s.claudeHarness()).turn }()
+	s.nodeAgent.in(s.claudeHarness()).turn <- struct{}{}
+	defer func() { <-s.nodeAgent.in(s.claudeHarness()).turn }()
 
 	answer, refused := sayingToPi(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
@@ -150,7 +150,7 @@ func piSessionSaid(t *testing.T, s *QNTXServer) [][2]string {
 // A node whose am.toml names no Pi has none to speak to, and says where to
 // name one.
 func TestANodeThatNamesNoPiHasNoneToSpeakTo(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
+	s, _ := runningTheNodeAgent(t, opusLow)
 	_, refused := sayingToPi(s, sigil.Sent{"says": "hello"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.GetWhy())
@@ -163,7 +163,7 @@ func TestPiSaysWhoItIs(t *testing.T) {
 	is, refused := s.harnessAm(s.piHarness())
 	require.Nil(t, refused)
 	am := is.(*protocol.PiAm)
-	assert.Equal(t, s.rootAgent.did, am.GetDid())
+	assert.Equal(t, s.nodeAgent.did, am.GetDid())
 	assert.Equal(t, "anthropic/claude-sonnet-4.6", am.GetModel())
 	assert.Equal(t, "openrouter-qntx", am.GetGateway())
 	assert.Equal(t, pi.PinnedVersion, am.GetPiVersion())
@@ -189,7 +189,7 @@ func TestATurnInPiCarriesOnlyItsOwnCredential(t *testing.T) {
 	require.Nil(t, refused)
 
 	env := ranWith(t, ran, "0", "env")
-	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.rootAgent.token)
+	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.nodeAgent.token)
 	assert.NotContains(t, env, "QNTX_TEST_PLAN_TOKEN=the-plan-token")
 	assert.NotContains(t, env, "QNTX_NODE_SECRET=the node's")
 }

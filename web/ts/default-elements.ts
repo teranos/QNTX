@@ -73,7 +73,7 @@ export async function registerDefaultElements(hasCanvas: boolean = true): Promis
         { needs: obsidianNeeds, create: createObsidianElement },
         // Ground Element — aware of anything Ground; the sessions it recorded, each opened as a Transcript
         { needs: groundNeeds, create: createGroundElement },
-        // ✻ — the ROOT agent: said to, and read as the session it continues (ADR-048)
+        // ✻ — the Node Agent: said to, and read as the session it continues (ADR-048)
         { needs: claudeNeeds, create: createClaudeElement },
         { needs: piNeeds, create: createPiElement },
         // ✦ — the agent of the namespace this person stands in, on its own sign-in (ADR-048)

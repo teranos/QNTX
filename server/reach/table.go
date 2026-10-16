@@ -172,7 +172,7 @@ REACH is '/api/vault/unbind' '/api/vault/disable' '/api/vault/enable'     of ROO
 REACH is '/api/vault/send'                                                of ROOT
 REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROOT
 
-# The ROOT agent (the claude signum, ADR-048). Who may talk to it is the whole
+# The Node Agent (the claude signum, ADR-048). Who may talk to it is the whole
 # of what guards it, and that is ROOT.
 REACH is '/api/claude' '/api/claude/say' '/api/claude/session' '/api/claude/login' of ROOT
 REACH is '/api/pi' '/api/pi/say' '/api/pi/session'                        of ROOT

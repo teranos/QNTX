@@ -255,6 +255,7 @@
 4	server/auth/laye.go
 4	server/auth/mastodon.go
 1	server/auth/may_register.go
+4	server/auth/node_agent.go
 20	server/auth/oauth.go
 2	server/auth/owner_match.go
 6	server/auth/person.go
@@ -264,7 +265,6 @@
 7	server/auth/public_user.go
 1	server/auth/refusals.go
 15	server/auth/roles.go
-4	server/auth/root_agent.go
 7	server/auth/sessions.go
 5	server/auth/setup.go
 1	server/auth/shed.go

@@ -62,14 +62,14 @@ func (c *Config) Validate() error {
 		return errors.Newf("pulse.ticker_interval_seconds must be >= 0, got %d", c.Pulse.TickerIntervalSeconds)
 	}
 
-	// The ROOT agent is named whole or not at all (ADR-048): a model nothing
+	// The Node Agent is named whole or not at all (ADR-048): a model nothing
 	// named would be a model something chose for it.
 	if root := c.Agent.Root; root.Named() {
 		if root.Model == "" {
-			return errors.New("agent.root.model is required: the ROOT agent is the model am.toml names, and nothing stands in for it")
+			return errors.New("agent.root.model is required: the Node Agent is the model am.toml names, and nothing stands in for it")
 		}
 		if root.Effort == "" {
-			return errors.New("agent.root.effort is required: the ROOT agent runs at the effort am.toml names")
+			return errors.New("agent.root.effort is required: the Node Agent runs at the effort am.toml names")
 		}
 		if err := secretref.Validate(root.TokenRef); err != nil {
 			return errors.Wrap(err, "agent.root.token is invalid")

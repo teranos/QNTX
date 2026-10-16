@@ -23,15 +23,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// The ROOT agent, as the node runs it. What it is and why is ADR-048's.
+// The Node Agent, as the node runs it. What it is and why is ADR-048's.
 
-// rootAgentPurpose is what the ROOT agent's key is derived from the node's for.
-const rootAgentPurpose = "agent:root"
+// nodeAgentPurpose is what the Node Agent's key is derived from the node's for.
+const nodeAgentPurpose = "agent:root"
 
-// rootAgentMCP is the name the node's own MCP has to the agent.
-const rootAgentMCP = "qntx"
+// nodeAgentMCP is the name the node's own MCP has to the agent.
+const nodeAgentMCP = "qntx"
 
-// rootAgent is the ROOT agent this node runs: who it is, where it works, and
+// rootAgent is the Node Agent this node runs: who it is, where it works, and
 // the one session it continues.
 type rootAgent struct {
 	did    string
@@ -62,8 +62,8 @@ type agentSpec struct {
 	TokenRef string
 }
 
-// specOf is how am.toml says the ROOT agent runs in Claude Code.
-func specOf(root appcfg.RootAgentConfig) agentSpec {
+// specOf is how am.toml says the Node Agent runs in Claude Code.
+func specOf(root appcfg.NodeAgentConfig) agentSpec {
 	return agentSpec{Model: root.Model, Effort: root.Effort, Mode: root.Mode, Allow: root.Allow, TokenRef: root.TokenRef}
 }
 
@@ -82,7 +82,7 @@ func (a *rootAgent) in(h *harness) *inHarness {
 	return held
 }
 
-// inHarness is the ROOT agent's session in one harness: where it is kept, and
+// inHarness is the Node Agent's session in one harness: where it is kept, and
 // the turn it is in.
 type inHarness struct {
 	// file is where the session is kept, under the agent's home.
@@ -107,13 +107,13 @@ const (
 // turnInSession is a turn going on, by the session it is in.
 type turnInSession struct{ session string }
 
-// theRootAgent is the ROOT agent of the node holding this key, working in home.
-func theRootAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {
-	agent, err := theAgent(node, rootAgentPurpose, home)
+// theNodeAgent is the Node Agent of the node holding this key, working in home.
+func theNodeAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {
+	agent, err := theAgent(node, nodeAgentPurpose, home)
 	if err != nil {
 		return nil, err
 	}
-	agent.namespace, agent.called = auth.NamespaceSystem, "the ROOT agent"
+	agent.namespace, agent.called = auth.NamespaceSystem, "the Node Agent"
 	return agent, nil
 }
 
@@ -132,12 +132,12 @@ func theAgent(node ed25519.PrivateKey, purpose, home string) (*rootAgent, error)
 	return &rootAgent{did: did, signer: signing.NewSigner(key, did), token: token, home: home}, nil
 }
 
-// rootAgentHome is where a node keeps its ROOT agent: its Claude Code
+// nodeAgentHome is where a node keeps its Node Agent: its Claude Code
 // configuration, its work, and the session it continues.
-func rootAgentHome() (string, error) {
+func nodeAgentHome() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to resolve the home directory the ROOT agent is kept under")
+		return "", errors.Wrap(err, "failed to resolve the home directory the Node Agent is kept under")
 	}
 	return filepath.Join(home, ".qntx", "agents", "root"), nil
 }
@@ -149,7 +149,7 @@ func (a *rootAgent) sessionIn(file string) (id string, kept bool, err error) {
 		return uuid.NewString(), false, nil
 	}
 	if err != nil {
-		return "", false, errors.Wrapf(err, "the ROOT agent's session in %s did not read", file)
+		return "", false, errors.Wrapf(err, "the Node Agent's session in %s did not read", file)
 	}
 	return strings.TrimSpace(string(held)), true, nil
 }
@@ -163,41 +163,41 @@ func (a *rootAgent) keepIn(file, id string) error {
 	return errors.Wrapf(os.WriteFile(path, []byte(id+"\n"), 0o600), "could not write %s", path)
 }
 
-// isSaidToBe is what the ROOT agent additionally is, said to Claude Code with
+// isSaidToBe is what the Node Agent additionally is, said to Claude Code with
 // everything said to it.
 func (a *rootAgent) isSaidToBe() string {
 	if a.namespace != auth.NamespaceSystem {
 		return "You are the agent of the namespace " + a.namespace + " on a QNTX node, shared by everyone who has reach on that namespace. " +
 			"Your DID is " + a.did + ". " +
-			"The node's sigils are the tools of the MCP server named " + rootAgentMCP + ", which you reach with your own token; they act in " + a.namespace + " and nowhere else. " +
+			"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token; they act in " + a.namespace + " and nowhere else. " +
 			"You hold no git and no credential of the node's: never ask for, read, print or store one."
 	}
-	return "You are the ROOT agent of a QNTX node: the node itself, as ROOT speaks to it. " +
+	return "You are the Node Agent of a QNTX node: the node itself, as ROOT speaks to it. " +
 		"You run on the machine the node runs on, as the user the node runs as. " +
 		"Your DID is " + a.did + ". " +
-		"The node's sigils are the tools of the MCP server named " + rootAgentMCP + ", which you reach with your own token. " +
+		"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " +
 		"Your git is your own: commits are authored as you, and when you push to GitHub your git asks the node for what carries the push. " +
 		"Never ask for, read, print or store a GitHub credential yourself. " +
 		"What GitHub answers over its API, a pull request opened or a run read, you ask with the github_ask tool; github_operations lists what it can be asked."
 }
 
-// claudeHarness is the ROOT agent in Claude Code.
+// claudeHarness is the Node Agent in Claude Code.
 func (s *QNTXServer) claudeHarness() *harness {
-	named := func() appcfg.RootAgentConfig { return s.deps.cfg.Agent.Root }
+	named := func() appcfg.NodeAgentConfig { return s.deps.cfg.Agent.Root }
 	h := &harness{
 		name: "claude", called: "Claude Code", file: claudeSessionFile,
-		description: "The ROOT agent: Claude Code, run by the node as itself.",
-		sayDoes:     "Says something to the ROOT agent and gives what it answered. It is one session that continues, written down by the agent as it goes and read with claude session.",
-		amDoes:      "Who the ROOT agent is and how the node runs it.",
-		sessionDoes: "The ROOT agent's one session, whole: everything said to it by whoever said it, as a transcript.",
+		description: "The Node Agent: Claude Code, run by the node as itself.",
+		sayDoes:     "Says something to the Node Agent and gives what it answered. It is one session that continues, written down by the agent as it goes and read with claude session.",
+		amDoes:      "Who the Node Agent is and how the node runs it.",
+		sessionDoes: "The Node Agent's one session, whole: everything said to it by whoever said it, as a transcript.",
 		sayTakes: []*protocol.Param{
 			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "The permission mode Claude Code runs this in. Not sent, it is the one am.toml gives."},
 		},
 		sayAnswer: "protocol.ClaudeSaid",
 		amAnswer:  "protocol.ClaudeAm",
-		// am.toml naming the ROOT agent names it in Claude Code.
+		// am.toml naming the Node Agent names it in Claude Code.
 		named:    func() bool { return true },
-		absent:   s.thereIsNoRootAgent,
+		absent:   s.thereIsNoNodeAgent,
 		fetching: "Claude Code is still being fetched",
 		spec:     func() agentSpec { return specOf(named()) },
 		part: func(ctx context.Context, sent sigil.Sent, agent *rootAgent, spec agentSpec) (aTurn, *protocol.Refusal) {
@@ -237,13 +237,13 @@ func spokenBy(caller *http.Request) string {
 	return admitted.Identity
 }
 
-// thereIsNoRootAgent is why this node has no ROOT agent to speak to: am.toml
+// thereIsNoNodeAgent is why this node has no Node Agent to speak to: am.toml
 // names none, or the one it names did not start.
-func (s *QNTXServer) thereIsNoRootAgent() *protocol.Refusal {
-	if s.noRootAgent != nil {
-		return &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent am.toml names did not start: " + s.noRootAgent.Error()}
+func (s *QNTXServer) thereIsNoNodeAgent() *protocol.Refusal {
+	if s.noNodeAgent != nil {
+		return &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent am.toml names did not start: " + s.noNodeAgent.Error()}
 	}
-	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no ROOT agent ([agent.root]), so there is none to speak to"}
+	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Node Agent ([agent.root]), so there is none to speak to"}
 }
 
 // claudePart is Claude Code's part of one turn: run in the permission mode
@@ -291,7 +291,7 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
 			}
 			if s.ownURL != "" {
-				said.MCP = []claudecode.MCPServer{{Name: rootAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
+				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
 			}
 			answer, err := said.Run(s.ctx, func(m claudecode.Message) { t.write(t.writes.rowsOf(m, t.now())) })
 			if err != nil {

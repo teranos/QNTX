@@ -57,11 +57,11 @@ const (
 	visitor  = "https://example.org/visitor"
 )
 
-// runningNamespaceAgents is a node running the ROOT agent that also holds the
+// runningNamespaceAgents is a node running the Node Agent that also holds the
 // namespaces garden and orchard, garden owned by the gardener.
 func runningNamespaceAgents(t *testing.T) (s *QNTXServer, ran string, in gardens) {
 	t.Helper()
-	s, ran = runningTheRootAgent(t, opusLow)
+	s, ran = runningTheNodeAgent(t, opusLow)
 	seed := make([]byte, ed25519.SeedSize)
 	seed[0] = 9
 	s.nodeDID = &nodedid.Handler{PrivateKey: ed25519.NewKeyFromSeed(seed)}
@@ -143,7 +143,7 @@ func TestANamespaceOptsIntoAnAgentOfItsOwn(t *testing.T) {
 	assert.Equal(t, "dontAsk", am.GetAgent().GetPermissionMode())
 	assert.Equal(t, []string{"Read", "mcp__qntx"}, am.GetAgent().GetAllow())
 	assert.False(t, am.GetAgent().GetSignedIn())
-	assert.NotEqual(t, s.rootAgent.did, am.GetAgent().GetDid(), "the namespace agent is not the ROOT agent")
+	assert.NotEqual(t, s.nodeAgent.did, am.GetAgent().GetDid(), "the namespace agent is not the Node Agent")
 	holds(t, s.agentsSignum(), "set", am)
 
 	require.Len(t, in.store["garden"].rows, 1, "the AGENT line is in the namespace's own store")
@@ -233,7 +233,7 @@ func TestWhatIsSaidToANamespaceAgentIsWrittenInTheNamespace(t *testing.T) {
 	assert.Contains(t, after(args, "--append-system-prompt"), am.GetAgent().GetDid())
 	env := ranWith(t, ran, run, "env")
 	assert.NotContains(t, env, "CLAUDE_CODE_OAUTH_TOKEN=the-plan-token", "ROOT's plan token is not the namespace agent's")
-	assert.NotContains(t, env, "QNTX_MCP_BEARER_QNTX="+s.rootAgent.token, "ROOT's token is not the namespace agent's")
+	assert.NotContains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token, "ROOT's token is not the namespace agent's")
 	for _, line := range env {
 		assert.False(t, len(line) > 13 && line[:13] == "GIT_CONFIG_GL", "the namespace agent holds no git: %s", line)
 	}

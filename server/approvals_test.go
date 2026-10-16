@@ -211,7 +211,7 @@ func TestOnlyTheHumanAtROOTAnswers(t *testing.T) {
 
 	token := auth.Admitted(auth.LevelRoot, "garden")
 	token.Identity = rootAccount
-	token.Grant = &auth.Grant{Label: "ROOT agent", DID: "did:key:z6Mkagent", MintedBy: rootAccount}
+	token.Grant = &auth.Grant{Label: "Node Agent", DID: "did:key:z6Mkagent", MintedBy: rootAccount}
 	status, answered := press(s, auth.WithAdmission(context.Background(), token), "teranos/elements#29", "abe92a9", optionMerge, saysForceMerge)
 	assert.Equal(t, http.StatusForbidden, status)
 	assert.Contains(t, answered["error"], "token")

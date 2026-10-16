@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// A harness the ROOT agent runs in (ADR-048). Its sigils, its session and its
+// A harness the Node Agent runs in (ADR-048). Its sigils, its session and its
 // binary have one shape in every harness: one adds what it is called, what its
 // sigils say beyond that shape, and its part of a turn.
 type harness struct {
@@ -33,7 +33,7 @@ type harness struct {
 	absent func() *protocol.Refusal
 	// fetching is what am says while the binary has not arrived.
 	fetching string
-	// spec is how the ROOT agent runs in it, as am.toml names it.
+	// spec is how the Node Agent runs in it, as am.toml names it.
 	spec func() agentSpec
 	// part is its part of one turn for an agent running as spec says, or why
 	// nothing is said to it.
@@ -51,7 +51,7 @@ type harnessSigil struct {
 	answer sigil.Answer
 }
 
-// harnesses is every harness the ROOT agent runs in.
+// harnesses is every harness the Node Agent runs in.
 func (s *QNTXServer) harnesses() []*harness {
 	return []*harness{s.claudeHarness(), s.piHarness()}
 }
@@ -111,13 +111,13 @@ func (s *QNTXServer) harnessSignum(h *harness) sigil.Signum {
 
 // harnessAgent is the agent, when it can be spoken to in h.
 func (s *QNTXServer) harnessAgent(h *harness) (*rootAgent, *protocol.Refusal) {
-	if s.rootAgent == nil {
-		return nil, s.thereIsNoRootAgent()
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
 	}
 	if !h.named() || s.harnessHeldBy(h.name) == nil {
 		return nil, h.absent()
 	}
-	return s.rootAgent, nil
+	return s.nodeAgent, nil
 }
 
 func (s *QNTXServer) harnessSay(ctx context.Context, h *harness, sent sigil.Sent) (any, *protocol.Refusal) {

@@ -23,20 +23,20 @@ func gitSays(t *testing.T, config, key string) string {
 }
 
 // "another thing i want it to have is its own git user so it can develop and create branches and so on."
-func TestTheRootAgentHasAGitUserOfItsOwn(t *testing.T) {
-	s, ran := runningTheRootAgent(t, opusLow)
+func TestTheNodeAgentHasAGitUserOfItsOwn(t *testing.T) {
+	s, ran := runningTheNodeAgent(t, opusLow)
 	_, refused := saying(s, sigil.Sent{"says": "do you have git?"})
 	require.Nil(t, refused)
 
-	config := filepath.Join(s.rootAgent.home, "gitconfig")
+	config := filepath.Join(s.nodeAgent.home, "gitconfig")
 	env := ranWith(t, ran, "0", "env")
 	assert.Contains(t, env, "GIT_CONFIG_GLOBAL="+config)
 	// What its git asks the node, it asks as itself.
-	assert.Contains(t, env, "QNTX_TOKEN="+s.rootAgent.token)
+	assert.Contains(t, env, "QNTX_TOKEN="+s.nodeAgent.token)
 
 	// Its author is itself: its DID, at the node it is the agent of.
-	assert.Equal(t, "ROOT agent", gitSays(t, config, "user.name"))
-	key, isKey := strings.CutPrefix(s.rootAgent.did, "did:key:")
+	assert.Equal(t, "Node Agent", gitSays(t, config, "user.name"))
+	key, isKey := strings.CutPrefix(s.nodeAgent.did, "did:key:")
 	require.True(t, isKey)
 	assert.Equal(t, key+"@localhost", gitSays(t, config, "user.email"))
 
@@ -50,9 +50,9 @@ func TestTheRootAgentHasAGitUserOfItsOwn(t *testing.T) {
 // On the box it was not told how its git works, asked for a credential as a
 // tool and carried the token by hand. It is told: its git asks the node, a
 // credential is never its to handle, and GitHub's API is one tool.
-func TestTheRootAgentIsToldHowItsGitWorks(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
-	told := s.rootAgent.isSaidToBe()
+func TestTheNodeAgentIsToldHowItsGitWorks(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	told := s.nodeAgent.isSaidToBe()
 	assert.Contains(t, told, "your git asks the node")
 	assert.Contains(t, told, "Never ask for, read, print or store a GitHub credential")
 	assert.Contains(t, told, "github_ask")
@@ -72,7 +72,7 @@ func TestGitAsksTheHelperTheNodeConfigured(t *testing.T) {
 		"printf 'username=x-access-token\\npassword=ghs_minted\\n'\n"), 0o755))
 
 	agent := &rootAgent{home: filepath.Join(dir, "home")}
-	config, err := agent.writeGitConfig("QNTX ROOT agent", "z6MkAgent@localhost", bin, "http://127.0.0.1:8770")
+	config, err := agent.writeGitConfig("QNTX Node Agent", "z6MkAgent@localhost", bin, "http://127.0.0.1:8770")
 	require.NoError(t, err)
 
 	fill := exec.Command("git", "credential", "fill")
@@ -92,13 +92,13 @@ func TestGitAsksTheHelperTheNodeConfigured(t *testing.T) {
 }
 
 // The address is its DID at the host the node answers on, and its name says
-// which node's ROOT agent it is when the node has a name.
+// which node's Node Agent it is when the node has a name.
 func TestAnAgentsGitIdentityIsItsDIDAtItsNode(t *testing.T) {
 	name, email := gitIdentityOf("did:key:z6MkAgent", "QNTX", "https://api.example.org")
-	assert.Equal(t, "QNTX ROOT agent", name)
+	assert.Equal(t, "QNTX Node Agent", name)
 	assert.Equal(t, "z6MkAgent@api.example.org", email)
 
 	name, email = gitIdentityOf("did:key:z6MkAgent", "", "")
-	assert.Equal(t, "ROOT agent", name)
+	assert.Equal(t, "Node Agent", name)
 	assert.Equal(t, "z6MkAgent@localhost", email)
 }

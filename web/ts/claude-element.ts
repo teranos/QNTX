@@ -1,4 +1,4 @@
-// Claude Element — the ROOT agent: said to, and read as the session it continues.
+// Claude Element — the Node Agent: said to, and read as the session it continues.
 // "in terms of ui, this will be the Claude Element"
 // What it is and why is ADR-048's; this draws what the claude signum answers.
 
@@ -13,7 +13,7 @@ import { renderTranscript, type TranscriptRead } from './components/element/tran
 
 const ELEMENT_ID = 'claude-element';
 
-// Who the ROOT agent is and how the node runs it (claude am).
+// Who the Node Agent is and how the node runs it (claude am).
 export interface ClaudeAm {
     did: string;
     model: string;
@@ -46,13 +46,13 @@ export interface ClaudeSaid {
 }
 
 // The node, as this element asks it.
-export interface RootAgent {
+export interface NodeAgent {
     am(): Promise<ClaudeAm>;
     say(says: string, mode: string): Promise<ClaudeSaid>;
     read(): Promise<TranscriptRead | undefined>;
 }
 
-const theNode: RootAgent = {
+const theNode: NodeAgent = {
     am: () => apiJson<ClaudeAm>('/api/claude'),
     say: (says, mode) => apiJson<ClaudeSaid>('/api/claude/say', {
         method: 'POST',
@@ -85,10 +85,10 @@ function wordsOf(err: unknown): string {
 }
 
 /**
- * The ROOT agent drawn into body: who it is, its session, and where something
+ * The Node Agent drawn into body: who it is, its session, and where something
  * is said to it. What it gives back stops reading a turn that is going.
  */
-export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: number = FOLLOW_MS): () => void {
+export function drawClaude(body: HTMLElement, node: NodeAgent = theNode, every: number = FOLLOW_MS): () => void {
     const who = part('div', 'claude-who');
     who.textContent = 'Asking the node who answers…';
     const session = part('div', 'claude-session tr');
@@ -100,7 +100,7 @@ export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: 
     mode.title = 'The permission mode Claude Code runs this turn in';
     const says = part('textarea', 'claude-says');
     says.rows = 2;
-    says.placeholder = 'Say something to the ROOT agent';
+    says.placeholder = 'Say something to the Node Agent';
     const send = part('button', 'qntx-btn qntx-btn-small claude-send');
     send.textContent = 'Say';
     const form = part('div', 'claude-say');

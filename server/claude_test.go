@@ -111,9 +111,9 @@ func (h *handed) CreateAttestation(as *types.As) error {
 	return h.AttestationStore.CreateAttestation(as)
 }
 
-// runningTheRootAgent is a node whose am.toml names the ROOT agent, holding a
+// runningTheNodeAgent is a node whose am.toml names the Node Agent, holding a
 // stand-in for Claude Code.
-func runningTheRootAgent(t *testing.T, named appcfg.RootAgentConfig) (s *QNTXServer, ran string) {
+func runningTheNodeAgent(t *testing.T, named appcfg.NodeAgentConfig) (s *QNTXServer, ran string) {
 	t.Helper()
 	under, db := createTestStore(t)
 	store := &handed{AttestationStore: under}
@@ -123,7 +123,7 @@ func runningTheRootAgent(t *testing.T, named appcfg.RootAgentConfig) (s *QNTXSer
 
 	seed := make([]byte, ed25519.SeedSize)
 	seed[0] = 7
-	agent, err := theRootAgent(ed25519.NewKeyFromSeed(seed), t.TempDir())
+	agent, err := theNodeAgent(ed25519.NewKeyFromSeed(seed), t.TempDir())
 	require.NoError(t, err)
 
 	t.Setenv("QNTX_TEST_PLAN_TOKEN", "the-plan-token")
@@ -136,7 +136,7 @@ func runningTheRootAgent(t *testing.T, named appcfg.RootAgentConfig) (s *QNTXSer
 		held:           held,
 		logger:         zaptest.NewLogger(t).Sugar(),
 		deps:           &serverDependencies{cfg: &appcfg.Config{Agent: appcfg.AgentConfig{Root: named}}},
-		rootAgent:      agent,
+		nodeAgent:      agent,
 		ctx:            context.Background(),
 		ownURL:         "http://127.0.0.1:8770",
 	}
@@ -153,14 +153,14 @@ func saying(s *QNTXServer, sent sigil.Sent) (*protocol.ClaudeSaid, *protocol.Ref
 	return answer.(*protocol.ClaudeSaid), nil
 }
 
-var opusLow = appcfg.RootAgentConfig{
+var opusLow = appcfg.NodeAgentConfig{
 	Model: "claude-opus-5-5", Effort: "low", Mode: "dontAsk", Allow: []string{"Bash", "Read", "mcp__qntx"},
 }
 
 // What is said to the node is said to Claude Code, run as am.toml names it,
 // and what it answered is given back (ADR-048).
-func TestWhatIsSaidToTheRootAgentIsAnsweredByClaudeCode(t *testing.T) {
-	s, ran := runningTheRootAgent(t, opusLow)
+func TestWhatIsSaidToTheNodeAgentIsAnsweredByClaudeCode(t *testing.T) {
+	s, ran := runningTheNodeAgent(t, opusLow)
 
 	answer, refused := saying(s, sigil.Sent{"says": "how long has the box been up?"})
 	require.Nil(t, refused)
@@ -178,20 +178,20 @@ func TestWhatIsSaidToTheRootAgentIsAnsweredByClaudeCode(t *testing.T) {
 	assert.Equal(t, "dontAsk", after(args, "--permission-mode"))
 	assert.Equal(t, "Bash,Read,mcp__qntx", after(args, "--allowedTools"))
 	assert.Equal(t, answer.GetSession(), after(args, "--session-id"))
-	assert.Contains(t, after(args, "--append-system-prompt"), s.rootAgent.did)
+	assert.Contains(t, after(args, "--append-system-prompt"), s.nodeAgent.did)
 
 	env := ranWith(t, ran, "0", "env")
 	assert.Contains(t, env, "CLAUDE_CODE_OAUTH_TOKEN=the-plan-token")
 	// It reaches the node's own MCP with its own token.
-	assert.Contains(t, env, "QNTX_MCP_BEARER_QNTX="+s.rootAgent.token)
+	assert.Contains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token)
 	written, err := os.ReadFile(after(args, "--mcp-config"))
 	require.NoError(t, err)
 	assert.Contains(t, string(written), "http://127.0.0.1:8770/mcp")
 }
 
 // It is one session: what is said next is said to the same one.
-func TestTheRootAgentContinuesItsOneSession(t *testing.T) {
-	s, ran := runningTheRootAgent(t, opusLow)
+func TestTheNodeAgentContinuesItsOneSession(t *testing.T) {
+	s, ran := runningTheNodeAgent(t, opusLow)
 
 	first, refused := saying(s, sigil.Sent{"says": "remember 7"})
 	require.Nil(t, refused)
@@ -206,8 +206,8 @@ func TestTheRootAgentContinuesItsOneSession(t *testing.T) {
 
 // Its session is its own to write down: every row is signed by its DID, in
 // system, which is where the node keeps its own record.
-func TestTheRootAgentsSessionReadsAsATranscriptItSigned(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
+func TestTheNodeAgentsSessionReadsAsATranscriptItSigned(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
 	_, refused := saying(s, sigil.Sent{"says": "how long has the box been up?"})
 	require.Nil(t, refused)
 
@@ -217,9 +217,9 @@ func TestTheRootAgentsSessionReadsAsATranscriptItSigned(t *testing.T) {
 	require.True(t, kept, "the system store is not the one this test handed it")
 	require.Len(t, wrote.rows, 4)
 	for _, row := range wrote.rows {
-		assert.Equal(t, s.rootAgent.did, row.SignerDID, "%s is not signed by the agent", row.Predicates[0])
+		assert.Equal(t, s.nodeAgent.did, row.SignerDID, "%s is not signed by the agent", row.Predicates[0])
 		assert.NotEmpty(t, row.Signature)
-		assert.Equal(t, []string{s.rootAgent.did}, row.Actors)
+		assert.Equal(t, []string{s.nodeAgent.did}, row.Actors)
 		require.NoError(t, signing.Verify(row))
 	}
 	served, _ := s.held.Served().(*handed)
@@ -235,8 +235,8 @@ func TestTheRootAgentsSessionReadsAsATranscriptItSigned(t *testing.T) {
 
 // "In my mental model, the ROOT agent is the same session"
 // Spoken to from two namespaces, it is one session, read whole by either.
-func TestTheRootAgentIsOneSessionWhereverItsSpeakersStand(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
+func TestTheNodeAgentIsOneSessionWhereverItsSpeakersStand(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
 	from := func(namespace, says string) {
 		root := auth.Admitted(auth.LevelRoot, namespace)
 		root.Identity = "https://example.org/" + namespace
@@ -273,7 +273,7 @@ func sessionSaid(t *testing.T, s *QNTXServer) [][2]string {
 
 // "make sure --permission-mode is configurable in the Claude Element"
 func TestThePermissionModeIsNamedByWhoeverSpeaks(t *testing.T) {
-	s, ran := runningTheRootAgent(t, opusLow)
+	s, ran := runningTheNodeAgent(t, opusLow)
 
 	answer, refused := saying(s, sigil.Sent{"says": "plan it", "permission_mode": "plan"})
 	require.Nil(t, refused)
@@ -281,7 +281,7 @@ func TestThePermissionModeIsNamedByWhoeverSpeaks(t *testing.T) {
 	assert.Equal(t, "plan", after(ranWith(t, ran, "0", "args"), "--permission-mode"))
 
 	// am.toml that gives none leaves it to the speaker, and nothing is assumed.
-	bare, _ := runningTheRootAgent(t, appcfg.RootAgentConfig{Model: "claude-opus-5-5", Effort: "low"})
+	bare, _ := runningTheNodeAgent(t, appcfg.NodeAgentConfig{Model: "claude-opus-5-5", Effort: "low"})
 	_, refused = saying(bare, sigil.Sent{"says": "hello"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.Missing, refused.GetWhy())
@@ -289,8 +289,8 @@ func TestThePermissionModeIsNamedByWhoeverSpeaks(t *testing.T) {
 }
 
 // Who said it is written down with what was said.
-func TestWhoSpokeToTheRootAgentIsWrittenDown(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
+func TestWhoSpokeToTheNodeAgentIsWrittenDown(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
 	root := auth.Admitted(auth.LevelRoot)
 	root.Identity = "https://github.com/tim"
 	asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
@@ -311,10 +311,10 @@ func TestWhoSpokeToTheRootAgentIsWrittenDown(t *testing.T) {
 
 // Its token is ROOT's kind, so the gate would let it speak to itself, from
 // inside the turn it would then wait on. It is told no.
-func TestTheRootAgentDoesNotSpeakToItself(t *testing.T) {
-	s, ran := runningTheRootAgent(t, opusLow)
+func TestTheNodeAgentDoesNotSpeakToItself(t *testing.T) {
+	s, ran := runningTheNodeAgent(t, opusLow)
 	itself := auth.Admitted(auth.LevelRoot)
-	itself.Grant = &auth.Grant{DID: s.rootAgent.did}
+	itself.Grant = &auth.Grant{DID: s.nodeAgent.did}
 	asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
 	asked = asked.WithContext(auth.WithAdmission(asked.Context(), itself))
 
@@ -326,10 +326,10 @@ func TestTheRootAgentDoesNotSpeakToItself(t *testing.T) {
 	assert.Empty(t, runs, "Claude Code was run for what the agent said to itself")
 }
 
-// A node whose am.toml names no ROOT agent has none to speak to.
-func TestANodeThatNamesNoRootAgentHasNoneToSpeakTo(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
-	s.rootAgent = nil
+// A node whose am.toml names no Node Agent has none to speak to.
+func TestANodeThatNamesNoNodeAgentHasNoneToSpeakTo(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	s.nodeAgent = nil
 	_, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.GetWhy())
@@ -337,9 +337,9 @@ func TestANodeThatNamesNoRootAgentHasNoneToSpeakTo(t *testing.T) {
 
 // One that am.toml names and that did not start says why, in the words the
 // start failed in.
-func TestARootAgentThatDidNotStartSaysWhy(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
-	s.rootAgent, s.noRootAgent = nil, errors.New("the ROOT agent's token tok-1 is switched off")
+func TestANodeAgentThatDidNotStartSaysWhy(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	s.nodeAgent, s.noNodeAgent = nil, errors.New("the Node Agent's token tok-1 is switched off")
 
 	_, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.NotNil(t, refused)
@@ -353,13 +353,13 @@ func TestARootAgentThatDidNotStartSaysWhy(t *testing.T) {
 
 // The agent says who it is and how it runs, which is what the Claude element
 // draws before anything is said.
-func TestTheRootAgentSaysWhoItIs(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
+func TestTheNodeAgentSaysWhoItIs(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
 
 	before, refused := s.harnessAm(s.claudeHarness())
 	require.Nil(t, refused)
 	is := before.(*protocol.ClaudeAm)
-	assert.Equal(t, s.rootAgent.did, is.GetDid())
+	assert.Equal(t, s.nodeAgent.did, is.GetDid())
 	assert.Equal(t, "claude-opus-5-5", is.GetModel())
 	assert.Equal(t, "low", is.GetEffort())
 	assert.Equal(t, "dontAsk", is.GetPermissionMode())
@@ -376,8 +376,8 @@ func TestTheRootAgentSaysWhoItIs(t *testing.T) {
 
 // While it is answering, it says so and in which session, so what it is doing
 // can be read as it does it, from the first thing ever said to it.
-func TestTheRootAgentSaysWhenItIsAnswering(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
+func TestTheNodeAgentSaysWhenItIsAnswering(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
 	am := func() *protocol.ClaudeAm {
 		is, refused := s.harnessAm(s.claudeHarness())
 		require.Nil(t, refused)
@@ -385,7 +385,7 @@ func TestTheRootAgentSaysWhenItIsAnswering(t *testing.T) {
 	}
 	assert.False(t, am().GetAnswering())
 
-	s.rootAgent.in(s.claudeHarness()).answering.Store(&turnInSession{session: "s-first"})
+	s.nodeAgent.in(s.claudeHarness()).answering.Store(&turnInSession{session: "s-first"})
 	during := am()
 	assert.True(t, during.GetAnswering())
 	assert.Equal(t, "s-first", during.GetSession())
@@ -396,31 +396,31 @@ func TestTheRootAgentSaysWhenItIsAnswering(t *testing.T) {
 }
 
 // Its DID is its own: derived from the node's key, and not the node's.
-func TestTheRootAgentIsItself(t *testing.T) {
+func TestTheNodeAgentIsItself(t *testing.T) {
 	seed := make([]byte, ed25519.SeedSize)
 	seed[0] = 7
 	node := ed25519.NewKeyFromSeed(seed)
-	agent, err := theRootAgent(node, t.TempDir())
+	agent, err := theNodeAgent(node, t.TempDir())
 	require.NoError(t, err)
 
 	nodePub, _ := node.Public().(ed25519.PublicKey)
 	assert.NotEqual(t, access.EncodeDIDKey(nodePub), agent.did)
-	_, did, err := access.DeriveToken(node, rootAgentPurpose)
+	_, did, err := access.DeriveToken(node, nodeAgentPurpose)
 	require.NoError(t, err)
 	assert.Equal(t, did, agent.did)
 }
 
 func TestTheClaudeSignumSaysWhatItHolds(t *testing.T) {
-	s, _ := runningTheRootAgent(t, opusLow)
+	s, _ := runningTheNodeAgent(t, opusLow)
 	require.NoError(t, s.harnessSignum(s.claudeHarness()).Check())
 }
 
 // "remove SUPER"
 // The only guard is who may talk to it, and that is ROOT.
-func TestWhoMayTalkToTheRootAgent(t *testing.T) {
+func TestWhoMayTalkToTheNodeAgent(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
-	s, _ := runningTheRootAgent(t, opusLow)
+	s, _ := runningTheNodeAgent(t, opusLow)
 	for _, held := range s.harnessSignum(s.claudeHarness()).GetSigils() {
 		assert.Equal(t, []string{"ROOT"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
 	}
@@ -431,7 +431,7 @@ func TestWhoMayTalkToTheRootAgent(t *testing.T) {
 // Claude Code as the agent's credential and is not in its environment beside it.
 func TestATurnInClaudeCodeCarriesOnlyItsOwnCredential(t *testing.T) {
 	t.Setenv("QNTX_NODE_SECRET", "the node's")
-	s, ran := runningTheRootAgent(t, opusLow)
+	s, ran := runningTheNodeAgent(t, opusLow)
 	_, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
 

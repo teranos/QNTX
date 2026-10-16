@@ -11,7 +11,7 @@ import { apiJson } from './client';
 import { log, SEG } from './logger.ts';
 import { Agent } from './sym';
 import { standingNamespace } from './standing.ts';
-import { drawClaude, type ClaudeAm, type ClaudeSaid, type RootAgent } from './claude-element';
+import { drawClaude, type ClaudeAm, type ClaudeSaid, type NodeAgent } from './claude-element';
 import type { TranscriptRead } from './components/element/transcript-element';
 import { apiError, sacredEntry } from './components/sacred';
 
@@ -35,7 +35,7 @@ export interface SignedIn {
 }
 
 // The node, as this element asks it about one namespace's agent.
-export interface NamespaceAgent extends RootAgent {
+export interface NamespaceAgent extends NodeAgent {
     begin(): Promise<SignedIn>;
     finish(code: string): Promise<SignedIn>;
 }
