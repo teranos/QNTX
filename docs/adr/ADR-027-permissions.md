@@ -19,8 +19,17 @@ Status: Stub, except TOKATTEST. The statements are made; the phases say what is 
 - A role is lines (attestations) in system, not a level compiled into the binary (ADR-034).
 - An admission naming no namespace reaches none. ROOT and SUPER reach every
   namespace by their level, not by naming none.
+- An element names the paths it needs, and the tray adds it only for a viewer
+  the node says reaches every one of them (`GET /i/reaches`). The browser asks
+  about paths and never sees the table.
 
 "nil is nil"
+
+"a caller learns its paths and not its grants"
+
+"the ui needs to stop suggesting things that arent possible, needs to stop handing out dead birds"
+
+"an Element should know about its intended audience"
 
 ## The credential does not carry the permission
 
