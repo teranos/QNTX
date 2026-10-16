@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -86,15 +87,12 @@ func (s *QNTXServer) iReaches(ctx context.Context, sent sigil.Sent) (any, *proto
 	}
 	var asked []string
 	for _, path := range strings.Split(sent["paths"], ",") {
-		if path = strings.TrimSpace(path); path != "" {
-			asked = append(asked, path)
+		path = strings.TrimSpace(path)
+		// A path starts at /, as every line in server/reach names one.
+		if !strings.HasPrefix(path, "/") {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "paths", Says: "paths names " + strconv.Quote(path) + ", which is no path"}
 		}
-	}
-	if len(asked) == 0 {
-		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "paths", Says: "paths names no path to ask about"}
-	}
-	if s.served == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the node is not serving, so nothing is reached"}
+		asked = append(asked, path)
 	}
 	bound := map[string][]heldBy{}
 	for _, signum := range s.checkedSigna() {
@@ -105,25 +103,28 @@ func (s *QNTXServer) iReaches(ctx context.Context, sent sigil.Sent) (any, *proto
 	}
 	reached := []string{}
 	for _, path := range asked {
-		if s.reachedBy(admitted, path, bound[path]) {
+		sigils, sigilPath := bound[path]
+		if sigilPath && s.reachesASigil(admitted, sigils) || !sigilPath && s.reachesTheRow(admitted, path) {
 			reached = append(reached, path)
 		}
 	}
 	return &protocol.Reaches{Paths: reached}, nil
 }
 
-// reachedBy is the gate's answer on one path. Sigils bound there are asked as
-// their own gate asks them (reachingOver), and one reached is enough.
-func (s *QNTXServer) reachedBy(admitted auth.Admission, path string, bound []heldBy) bool {
-	for _, held := range bound {
+// reachesASigil is the gate's answer on a path sigils are bound to: each is
+// asked as its own gate asks it (reachingOver), and one reached is enough.
+func (s *QNTXServer) reachesASigil(admitted auth.Admission, sigils []heldBy) bool {
+	for _, held := range sigils {
 		if reaching, anyone := s.reachingOver(reach.OverHTTP, held); anyone || reaching.Admits(admitted) {
 			return true
 		}
 	}
-	if len(bound) > 0 {
-		return false
-	}
-	// No sigil: the path's own row, and a path no line names is ROOT's alone.
+	return false
+}
+
+// reachesTheRow is the gate's answer on any other path: its own row, and a
+// path no line names is ROOT's alone.
+func (s *QNTXServer) reachesTheRow(admitted auth.Admission, path string) bool {
 	reaching, anyone := s.served.Reaching(path)
 	return anyone || reaching.Admits(admitted)
 }

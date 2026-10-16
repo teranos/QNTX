@@ -68,13 +68,15 @@ func TestANodeWithNoLoginReachesEveryPathAsked(t *testing.T) {
 	assert.JSONEq(t, `{"paths":["/api/approvals","/i/"]}`, w.Body.String())
 }
 
-// Asking about no path is a question with nothing in it.
-func TestIReachesRefusesAskingAboutNoPath(t *testing.T) {
+// A path starts at /. Anything else asked, nothing included, is refused.
+func TestIReachesRefusesWhatIsNoPath(t *testing.T) {
 	s := rootKnowingServer(t)
 	ctx := auth.WithAdmission(context.Background(), auth.Admitted(auth.LevelUser, "garden"))
-	_, refusal := s.iReaches(ctx, sigil.Sent{"paths": " , "})
-	require.NotNil(t, refusal)
-	assert.Equal(t, sigil.Missing, refusal.GetWhy())
+	for _, asked := range []string{" , ", "/i/,", "api/approvals"} {
+		_, refusal := s.iReaches(ctx, sigil.Sent{"paths": asked})
+		require.NotNil(t, refusal, asked)
+		assert.Equal(t, sigil.Invalid, refusal.GetWhy(), asked)
+	}
 }
 
 // A node with no login has no person to say where they stand, and says so
