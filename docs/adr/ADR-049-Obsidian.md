@@ -12,16 +12,13 @@ Status: Developed in pr #1094 - I think its merged because i am using obsidian t
 Both ways: what is written in the vault reaches QNTX, and what QNTX holds
 reaches the vault.
 
-"1. a persistent branch exists for all repo's that the Vault we assign
-directory space to."
+"1. a persistent branch exists for all repo's that the Vault we assign directory space to."
 
-"2. meaning, for a given doc folder in one of our repositories, an indication
-of some sorts is made,"
+"2. meaning, for a given doc folder in one of our repositories, an indication of some sorts is made,"
 
 "3. QNTX receives webhooks on most events github dispatches"
 
-"4. And the persistent branch is obsidian-[nameofvault] and it always contains
-the abcdsync diff, and people may merge it at times"
+"4. And the persistent branch is obsidian-[nameofvault] and it always contains the abcdsync diff, and people may merge it at times"
 
 "5. And QNTX ensures changes flow back into the Obsidian Vault as well"
 
