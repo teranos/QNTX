@@ -35,8 +35,7 @@ JMAP for Mail, RFC 8621. The message is RFC 5322; mailbox roles are RFC 6154.
 ## Divergence
 
 RFC 8621's `Identity` is `MailIdentity`. In QNTX identity is taken: ADR-010 is
-the identity system, ADR-030 covers identity providers, and ADR-031 attests
-`identity:disabled` and `identity:enabled`.
+the identity system, [[ADR-030-identity-providers]] covers identity providers, and ADR-031 attests `identity:disabled` and `identity:enabled`.
 
 An `Email` is an attestation, not a JMAP object: `mail:received` and
 `mail:sent` of the address, the text in its attributes, an attachment by name, size and sha256 beside the stored mail. Its id is the ASID.
