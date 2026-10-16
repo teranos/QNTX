@@ -7,7 +7,9 @@ Status: Proposed
 
 "if QNTX is heaven"
 "and ground is here, as in earth"
-"Comets is what slowly creates a body in earth, like space, right?"
+"Comets is what slowly creates a body in earth, 
+like space, 
+right?"
 
 - The node builds ground, and the build lands on the machine ground runs on.
   ADR-027 27-2 waits on this.
