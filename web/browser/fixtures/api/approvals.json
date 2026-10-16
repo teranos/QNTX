@@ -1,0 +1,29 @@
+{
+  "approvals": [
+    {
+      "subject": "teranos/QNTX#1316",
+      "title": "@teranos/elements 1.20.1: an element too wide for its screen drops dead",
+      "link": "https://github.com/teranos/QNTX/pull/1316",
+      "repo": "teranos/QNTX",
+      "pull": 1316,
+      "sha": "8215bb07",
+      "base": "main",
+      "asked_at": "2026-10-16T20:00:00Z",
+      "checks": [
+        {
+          "name": "TypeScript Tests",
+          "state": "done",
+          "link": ""
+        },
+        {
+          "name": "build (arm64, ubuntu-24.04-arm)",
+          "state": "running",
+          "link": ""
+        }
+      ],
+      "option": "",
+      "said": "",
+      "waits": true
+    }
+  ]
+}

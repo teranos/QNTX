@@ -1,0 +1,38 @@
+{
+  "started": "2026-10-16T18:00:00Z",
+  "left": 3,
+  "watches": [
+    {
+      "id": "W-1",
+      "name": "deploy",
+      "predicates": [
+        "ritual:walked"
+      ]
+    }
+  ],
+  "news": [
+    {
+      "id": "N-1",
+      "name": "deploy-1792178594",
+      "note": "live on labels-never-break",
+      "symbol": "⟟",
+      "waiting": false,
+      "at": "2026-10-16T20:25:00Z",
+      "on_row": true,
+      "workflows": [
+        {
+          "name": "TypeScript",
+          "conclusion": "success",
+          "url": "https://github.com/teranos/QNTX/actions/runs/1"
+        }
+      ]
+    }
+  ],
+  "failed": [
+    {
+      "at": "2026-10-16T19:30:00Z",
+      "error": "exec CHECKLIVE: exit 1: the rite answered with a code it does not declare",
+      "execution_id": "deploy-1792171221"
+    }
+  ]
+}

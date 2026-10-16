@@ -1,0 +1,11 @@
+{
+  "type": "system_capabilities",
+  "store": "sqlite",
+  "storage_backend": "rust",
+  "storage_optimized": true,
+  "storage_version": "0.52.0",
+  "parser_backend": "rust",
+  "parser_optimized": true,
+  "parser_version": "0.52.0",
+  "parser_size": "1.2 MB"
+}

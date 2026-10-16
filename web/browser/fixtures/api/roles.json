@@ -1,0 +1,39 @@
+{
+  "lines": [
+    {
+      "id": "AT-ROLE-1",
+      "subjects": [
+        "US-TIM-1"
+      ],
+      "predicates": [
+        "operator"
+      ],
+      "contexts": [
+        "default"
+      ],
+      "actors": [
+        "US-ROOT-1"
+      ],
+      "by": "US-ROOT-1",
+      "at": "2026-10-16T20:25:00Z"
+    },
+    {
+      "id": "AT-ROLE-2",
+      "subjects": [
+        "US-TIM-1"
+      ],
+      "predicates": [
+        "tester"
+      ],
+      "contexts": [
+        "default"
+      ],
+      "actors": [
+        "US-ROOT-1"
+      ],
+      "by": "US-ROOT-1",
+      "at": "2026-10-16T20:25:00Z"
+    }
+  ],
+  "count": 2
+}

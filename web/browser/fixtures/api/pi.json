@@ -1,0 +1,11 @@
+{
+  "did": "did:key:z6MkPiAgentKeyR2d2C3po7xW9yZ4vB6nM8kL1jH5gF3dS",
+  "model": "pi-1",
+  "thinking": "medium",
+  "gateway": "https://pi.example",
+  "session": "df5be86a-08f4-462a-9b73-f6cf8101e2e7",
+  "answering": false,
+  "pi": "0.4.0",
+  "pi_version": "0.4.0",
+  "not_ready": ""
+}

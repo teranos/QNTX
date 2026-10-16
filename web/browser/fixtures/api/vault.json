@@ -1,0 +1,11 @@
+{
+  "vaults": [
+    {
+      "name": "notes",
+      "path": "/srv/vaults/notes",
+      "folders": [
+        "sbvh-nl/notes@main:docs=docs"
+      ]
+    }
+  ]
+}

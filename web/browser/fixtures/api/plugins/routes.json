@@ -1,0 +1,16 @@
+{
+  "routes": [
+    {
+      "name": "openrouter",
+      "roles": [
+        "llm-provider"
+      ]
+    },
+    {
+      "name": "llama-cpp",
+      "roles": [
+        "llm-provider"
+      ]
+    }
+  ]
+}

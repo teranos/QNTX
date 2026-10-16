@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-web sacred-go sacred-rs sacred-spawn-write nil-writetest-web test-jsdom test test-suite test-parquet test-postgres test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-web sacred-go sacred-rs sacred-spawn-write nil-writetest-web test-jsdom test-browser test test-suite test-parquet test-postgres test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -194,6 +194,13 @@ test-jsdom: ## Run web UI tests including JSDOM DOM tests
 		cd web && bun install; \
 	fi
 	@cd web && USE_JSDOM=1 bun test
+
+test-browser: ## Every element in a real browser, on a phone and on a desktop: nothing in it wider than it
+	@if [ ! -d "web/node_modules" ]; then \
+		echo "Installing web dependencies..."; \
+		cd web && bun install; \
+	fi
+	@cd web && bun run test:browser
 
 lint: ## Check the frontend bans (web/eslint.config.js)
 	@if [ ! -d "web/node_modules" ]; then \

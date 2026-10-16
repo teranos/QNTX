@@ -1,0 +1,25 @@
+{
+  "user": "US-ROOT-1",
+  "display_name": "root",
+  "name": "root",
+  "picture": "",
+  "level": "ROOT",
+  "namespaces": [
+    "default",
+    "system"
+  ],
+  "door": "default",
+  "standing": "default",
+  "identity": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+  "via": "session",
+  "accounts": [
+    {
+      "provider": "github",
+      "canonical_id": "github:1",
+      "handle": "root"
+    }
+  ],
+  "keys": [
+    "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+  ]
+}

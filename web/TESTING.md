@@ -25,6 +25,10 @@ ts/prose-navigation.test.ts
 
 **DOM Testing** — `test-setup.ts` provides happy-dom by default or JSDOM when `USE_JSDOM=1` is set. Tests using basic DOM APIs (document.createElement, etc.) work as regular `.test.ts` files with happy-dom. Tests requiring full browser APIs (Web Animations API, ResizeObserver) use `.dom.test.ts` with the JSDOM skip pattern.
 
+**Width** — neither test DOM lays anything out, so an element wider than its screen is measured in a real browser and nowhere else: `bun run test:browser` (`make test-browser`) opens every element of `ts/specimens.ts` in Chromium and WebKit, on a Pixel 7, an iPhone 15 and a desktop, and fails on anything wider than the element (`browser/too-wide.browser.ts`). The node's answers come from `browser/fixtures/<path>.json`; a call with no fixture, or an element drawing a refusal, fails too. CI runs it on every pull request.
+
+"if it overflows width, hard fail, die"
+
 **localStorage Mocking** (see `prose-navigation.test.ts`):
 ```typescript
 const mockLocalStorage = (() => {

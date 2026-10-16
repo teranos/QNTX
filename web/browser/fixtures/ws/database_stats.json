@@ -1,0 +1,40 @@
+{
+  "type": "database_stats",
+  "path": "/srv/l/qntx.db",
+  "storage_backend": "rust",
+  "storage_optimized": true,
+  "storage_version": "0.52.0",
+  "total_attestations": 140,
+  "unique_actors": 3,
+  "unique_subjects": 41,
+  "unique_contexts": 2,
+  "rich_fields": [],
+  "distillation": {
+    "predicates": [
+      {
+        "predicate": "ritual:walked",
+        "count": 60
+      },
+      {
+        "predicate": "identity:admitted",
+        "count": 40
+      }
+    ]
+  },
+  "predicate_histograms": {
+    "ritual:walked": [
+      1,
+      2,
+      3,
+      5,
+      8
+    ],
+    "identity:admitted": [
+      2,
+      2,
+      1,
+      4,
+      3
+    ]
+  }
+}
