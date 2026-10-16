@@ -382,6 +382,12 @@
         "SUPER"
       ]
     },
+    "/api/namespaces/{name}/store": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
     "/api/parity/follows": {
       "x-qntx-reach": [
         "ROOT"

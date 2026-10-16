@@ -15,6 +15,30 @@ pub struct Definition {
     pub owner: String,
     pub enabled: bool,
     pub created_at: String,
+    /// Where its attestations are kept. A file written before a namespace
+    /// had storage says nothing of it, and reads as none.
+    #[serde(default)]
+    pub record: Record,
+}
+
+/// "what I want is for a Namespace to begin life dbless and enable either
+/// SQLite or parquet or Supabase later on"
+///
+/// A namespace's storage, as its `[record]` says. Every kind lands its writes
+/// in the namespace's SQLite file first (ADR-037); the kind is what that file
+/// sends to. None is no storage: a namespace that has none is not opened.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase", deny_unknown_fields)]
+pub enum Record {
+    #[default]
+    None,
+    /// The SQLite file alone, on the node that holds it.
+    Sqlite,
+    /// Parquet at this location.
+    Parquet,
+    /// Postgres, at the connection string `url` names: an ssm:// or env:
+    /// reference, never the password itself.
+    Postgres { url: String },
 }
 
 /// A namespace as found at a location: its name, what its `ns.toml` says when
@@ -211,6 +235,32 @@ impl NamespaceStore {
             .put(Object::NamespaceDefinition, &path, body.into_bytes())
     }
 
+    /// Give `name` its storage. A namespace is given storage once, from none;
+    /// the owner, whether it is enabled and the date it was made are written
+    /// again unchanged.
+    pub fn set_record(&self, name: &str, record: Record) -> Result<()> {
+        check_name(name)?;
+        let Some(current) = self.definition(name)? else {
+            return Err(DuckdbError::NotFound {
+                what: Object::NamespaceDefinition,
+                id: name.to_string(),
+                operation: "set record".to_string(),
+            });
+        };
+        if current.record != Record::None {
+            return Err(DuckdbError::BadName {
+                which: Name::NamespaceName,
+                value: name.to_string(),
+                why: Refusal::StorageAlreadyGiven,
+            });
+        }
+
+        let body = format!("{}\n", render(&Definition { record, ..current })?);
+        let path = ns_file(&self.location, name);
+        self.objects
+            .put(Object::NamespaceDefinition, &path, body.into_bytes())
+    }
+
     /// Move the attestations `name` holds into `into`, and answer how many
     /// files moved.
     ///
@@ -344,8 +394,17 @@ fn parse(path: &str, content: &str) -> Result<Definition> {
 fn render(definition: &Definition) -> Result<String> {
     plain_enough("owner", &definition.owner)?;
     plain_enough("created_at", &definition.created_at)?;
+    let record = match &definition.record {
+        Record::None => "kind = \"none\"".to_string(),
+        Record::Sqlite => "kind = \"sqlite\"".to_string(),
+        Record::Parquet => "kind = \"parquet\"".to_string(),
+        Record::Postgres { url } => {
+            plain_enough("record.url", url)?;
+            format!("kind = \"postgres\"\nurl = \"{url}\"")
+        }
+    };
     Ok(format!(
-        "owner = \"{}\"\nenabled = {}\ncreated_at = \"{}\"",
+        "owner = \"{}\"\nenabled = {}\ncreated_at = \"{}\"\n\n[record]\n{record}",
         definition.owner, definition.enabled, definition.created_at
     ))
 }
@@ -419,6 +478,7 @@ mod tests {
             owner: "google:104729".to_string(),
             enabled: true,
             created_at: "2026-08-17T09:00:00Z".to_string(),
+            record: Record::None,
         }
     }
 
@@ -468,8 +528,98 @@ mod tests {
             let wrote = std::fs::read_to_string(dir.path().join("pond/ns.toml")).expect("read");
             assert_eq!(
                 wrote,
-                "owner = \"google:104729\"\nenabled = true\ncreated_at = \"2026-08-17T09:00:00Z\"\n"
+                "owner = \"google:104729\"\nenabled = true\ncreated_at = \"2026-08-17T09:00:00Z\"\n\n[record]\nkind = \"none\"\n"
             );
+        }
+    }
+
+    mod record {
+        use super::*;
+
+        fn written(dir: &tempfile::TempDir, name: &str, body: &str) {
+            std::fs::create_dir_all(dir.path().join(name)).expect("mkdir");
+            std::fs::write(dir.path().join(name).join("ns.toml"), body).expect("write");
+        }
+
+        // "begin life dbless": a file written before namespaces had storage
+        // says nothing of it, and that is none, not parquet.
+        #[test]
+        fn a_file_that_says_nothing_of_its_record_has_none() {
+            let (dir, store) = park();
+            written(
+                &dir,
+                "pond",
+                "owner = \"google:104729\"\nenabled = true\ncreated_at = \"2026-08-17T09:00:00Z\"\n",
+            );
+            let found = store
+                .definition("pond")
+                .expect("definition")
+                .expect("defined");
+            assert_eq!(found.record, Record::None);
+        }
+
+        #[test]
+        fn storage_is_given_once_from_none() {
+            let (_dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            store.set_record("pond", Record::Parquet).expect("give");
+            assert_eq!(
+                store
+                    .definition("pond")
+                    .expect("definition")
+                    .expect("defined")
+                    .record,
+                Record::Parquet
+            );
+            assert!(store.set_record("pond", Record::Sqlite).is_err());
+        }
+
+        #[test]
+        fn postgres_names_its_url_and_reads_back() {
+            let (dir, store) = park();
+            store.create("pond", &defined()).expect("create");
+            let record = Record::Postgres {
+                url: "ssm:///q/pond/postgres-url".to_string(),
+            };
+            store.set_record("pond", record.clone()).expect("give");
+
+            let wrote = std::fs::read_to_string(dir.path().join("pond/ns.toml")).expect("read");
+            assert!(wrote.ends_with(
+                "[record]\nkind = \"postgres\"\nurl = \"ssm:///q/pond/postgres-url\"\n"
+            ));
+            let found = store
+                .definition("pond")
+                .expect("definition")
+                .expect("defined");
+            assert_eq!(found.record, record);
+        }
+
+        #[test]
+        fn a_kind_nobody_named_is_refused() {
+            let (dir, store) = park();
+            written(
+                &dir,
+                "pond",
+                "owner = \"o\"\nenabled = true\ncreated_at = \"t\"\n\n[record]\nkind = \"mysql\"\n",
+            );
+            assert!(store.definition("pond").is_err());
+        }
+
+        #[test]
+        fn postgres_without_a_url_is_refused() {
+            let (dir, store) = park();
+            written(
+                &dir,
+                "pond",
+                "owner = \"o\"\nenabled = true\ncreated_at = \"t\"\n\n[record]\nkind = \"postgres\"\n",
+            );
+            assert!(store.definition("pond").is_err());
+        }
+
+        #[test]
+        fn a_namespace_nobody_defined_cannot_be_given_storage() {
+            let (_dir, store) = park();
+            assert!(store.set_record("pond", Record::Parquet).is_err());
         }
     }
 

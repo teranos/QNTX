@@ -53,7 +53,8 @@ func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
 	// Both are named, so dropping the second is a failing test rather than a
 	// route nobody reaches.
 	for _, path := range []string{"/api/namespaces", "/api/namespaces/{name}",
-		"/api/namespaces/{name}/disable", "/api/namespaces/{name}/enable"} {
+		"/api/namespaces/{name}/disable", "/api/namespaces/{name}/enable",
+		"/api/namespaces/{name}/store"} {
 		row, said := granted[path]
 		require.True(t, said, path+" is granted to nobody at all")
 		assert.False(t, row.anyone, path+" is served without asking who is calling")

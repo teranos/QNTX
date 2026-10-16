@@ -1,6 +1,6 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 287 in 125 files.
+# 285 in 124 files.
 # internal/config/environ.go: defaults.go renamed, 4 to none with its defaults gone.
 
 1	ats/attrs/attrs.go
@@ -101,7 +101,6 @@
 1	server/namespace_handlers.go
 1	server/namespace_route.go
 2	server/operational_watchdog.go
-2	server/parity/engines.go
 1	server/parity/prisma.go
 1	server/parity/references.go
 3	server/parity/tsdecl.go

@@ -1,0 +1,31 @@
+[package]
+name = "ats-postgres"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Postgres storage backend for QNTX attestations"
+
+[lints]
+workspace = true
+
+[dependencies]
+qntx-proto.workspace = true
+ats.workspace = true
+qntx-ffi-common = { path = "../qntx-ffi-common" }
+laye-error = { path = "../laye-error" }
+serde.workspace = true
+serde_json.workspace = true
+
+# The client speaks the wire protocol itself, so there is no libpq to link.
+postgres = "0.19"
+# TLS is rustls on ring, which this workspace already builds.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-postgres-rustls = "0.13"
+
+[lib]
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[features]
+default = []
+ffi = []
