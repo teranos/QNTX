@@ -42,5 +42,4 @@ An `Email` is an attestation, not a JMAP object: `mail:received` and
 
 A mailbox is one of three roles, `inbox`, `junk` and `sent`, and has no object of its own. SES's spam verdict is what puts mail in `junk`.
 
-A message SES's virus scan fails is never an `Email`: it is `mail:dropped`,
-and the stored copy is deleted.
+A message SES's virus scan fails is never an `Email`: it is `mail:dropped`, and the stored copy is deleted.
