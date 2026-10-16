@@ -12,8 +12,7 @@ QNTX interacts with the Node Agent for use by ROOT.
 - An agent's work outlives the request that brought it, and every call it
   makes carries its own credential. The credential of whoever sent the work never reaches what the agent calls ([[ADR-038-mcp]]).
 - A Task's messages have two roles, user and agent: the user is who sent it, the agent is the one doing it. Who may see the Task is the sender's admission; what the agent touches is the agent's.
-- ROOT's agents are ROOT, and no namespace holds them: their sessions are the
-  node's own record, in system, whoever spoke to them and wherever they stand.
+- Node agents are ROOT, and no namespace holds them: their sessions are the node's own record, in system, whoever spoke to them and wherever they stand.
 - To A2A an agent is described by its Agent Card, and its skills are what it
   can perform (ADR-039).
 
