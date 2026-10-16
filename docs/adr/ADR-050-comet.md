@@ -25,8 +25,8 @@ right?"
 
 "i want a comet per ground project essentially"
 
-"And also a generalised project, like universal ground"
-
+"And also a generalised project, 
+like universal ground scope"
 "that is normal ground"
 
 "but also, tailed to the repo ground, which has more CTFE'able material potentially"
