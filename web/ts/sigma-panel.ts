@@ -248,6 +248,9 @@ function renderPanel(): void {
     panelElement.innerHTML = html;
 }
 
+// Who this is for: whoever reaches these (audience.ts). It draws what /ws sends.
+export const needs = ['/ws'] as const;
+
 export function createSigmaPanel(): Element {
     return {
         id: 'sigma-panel',

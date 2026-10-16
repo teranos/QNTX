@@ -87,7 +87,7 @@ export interface MailAccount {
     unanswered: string;
 }
 
-const ELEMENT_ID = 'mail-element';
+export const ELEMENT_ID = 'mail-element';
 
 /** An attestation's time, to the second, in UTC. */
 export function fmt(at: string): string {
@@ -409,6 +409,9 @@ function load(account: HTMLElement, templates: HTMLElement, sent: HTMLElement): 
         .then((r) => renderSent(sent, r.mails))
         .catch((err: unknown) => refused(sent, 'what mail it sent', err));
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/mail'] as const;
 
 export function createMailElement(): Element {
     return {

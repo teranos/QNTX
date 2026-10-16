@@ -179,6 +179,9 @@ export function reloadApprovals(): Promise<void> {
     });
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/approvals'] as const;
+
 export function createApprovalsElement(): Element {
     return {
         id: ELEMENT_ID,
