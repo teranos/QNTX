@@ -3,7 +3,7 @@
 Date: 2026-09-30
 Status: Proposed
 
-Asked on 2026-09-30 whether cleanAPI belongs in the Clean namespace, and
+
 answered yes, by ROOT, in that business's own week file.
 
 ## The problem
