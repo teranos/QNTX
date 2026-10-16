@@ -36,7 +36,7 @@ interface TokenInfo {
     revoked_at?: string;
 }
 
-const ELEMENT_ID = 'tokens-element';
+export const ELEMENT_ID = 'tokens-element';
 
 /** A refresh token is spent at the token endpoint and never presented as a
  *  bearer, so it is never "used" in the sense the pill counts. */
@@ -255,6 +255,9 @@ function renderMintLink(container: HTMLElement, listContainer: HTMLElement): voi
         log.error(SEG.UI, '[TokensElement] the node did not say who is looking', err);
     });
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/auth/tokens'] as const;
 
 export function createTokensElement(): Element {
     return {

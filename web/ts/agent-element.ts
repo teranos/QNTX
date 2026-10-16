@@ -172,6 +172,9 @@ export function drawAgent(body: HTMLElement, namespace: string, node: NamespaceA
     return () => settle();
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/agents/{namespace}'] as const;
+
 export function createAgentElement(): Element {
     return {
         id: ELEMENT_ID,

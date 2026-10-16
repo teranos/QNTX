@@ -159,3 +159,13 @@ export interface Standing {
   /** Where the person now stands. Never empty. */
   namespace: string;
 }
+
+/**
+ * Reaches is what i reaches answers: of the paths asked, the ones the person
+ * asking reaches, in the order asked. An element needing a path not here is
+ * not offered to them.
+ */
+export interface Reaches {
+  /** The paths asked that the person asking reaches. Empty is none of them. */
+  paths: string[];
+}

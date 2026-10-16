@@ -88,6 +88,9 @@ REACH is '/i/unbecome'                                                    of ANY
 REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 REACH is '/i/picture'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
+# Which of the paths asked the caller reaches, so the tray offers no element
+# its viewer cannot use: "a caller learns its paths and not its grants".
+REACH is '/i/reaches'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 
 # First-time setup: the ways in this node offers, and claiming it.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
@@ -113,6 +116,7 @@ REACH is '/api/attestations'                                              of ROO
 # The standing guard is the handler's, not this line's.
 REACH is '/api/namespaces' '/api/namespaces/{name}'                       of ROOT SUPER
 REACH is '/api/namespaces/{name}/disable' '/api/namespaces/{name}/enable' of ROOT SUPER
+REACH is '/api/namespaces/{name}/store'                                 of ROOT SUPER
 
 # The lines the gate reads (ADR-034). Writing one is gated at the
 # attestation handler, not by this line.

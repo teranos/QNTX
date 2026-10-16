@@ -71,6 +71,7 @@ target/
 
 # Nix build outputs
 result
+result-*
 
 # Generated documentation site (built by GitHub Actions)
 web/site/

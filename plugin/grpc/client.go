@@ -452,6 +452,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"search_endpoint", req.SearchEndpoint,
 		"fetch_endpoint", req.FetchEndpoint,
 		"mail_endpoint", req.MailEndpoint,
+		"github_endpoint", req.GithubEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)
@@ -717,6 +718,7 @@ func handOptionalEndpoints(req *protocol.InitializeRequest, config plugin.Config
 		{"search", endpoints.Search, &req.SearchEndpoint},
 		{"fetch", endpoints.Fetch, &req.FetchEndpoint},
 		{"mail", endpoints.Mail, &req.MailEndpoint},
+		{"github", endpoints.GitHub, &req.GithubEndpoint},
 	} {
 		endpoint, err := service.at.toProto(service.name)
 		if err != nil {

@@ -144,11 +144,43 @@ func doorClients(logger *zap.SugaredLogger, namespace string, configured appcfg.
 	return clients
 }
 
+// keptNamespaces is the namespaces this node keeps, and whether it keeps any:
+// only the parquet backend does (ADR-026). The doors and the invitations are
+// both held against it.
+func keptNamespaces(known storage.Namespaces) (storage.Namespaces, bool) {
+	return known, known != nil
+}
+
+// "i would want to give each invited user their own namespace for their startup"
+
+// invitationNamespace is the node's own name for the namespace an invitation
+// names, met at its slug the way a door meets its namespace.
+func invitationNamespace(known func() storage.Namespaces) auth.NamespacesKept {
+	return func(asked string) (string, error) {
+		held, keeps := keptNamespaces(known())
+		if !keeps {
+			return "", auth.NamespaceRefused{Said: "this node keeps every attestation in one namespace, so an invitation cannot name " + asked}
+		}
+		listed, err := held.List()
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to read the namespaces to hold %s against", asked)
+		}
+		found, err := namespaces.Named(listed, asked)
+		var notServed namespaces.NotServed
+		var ambiguous namespaces.Ambiguous
+		if errors.As(err, &notServed) || errors.As(err, &ambiguous) {
+			return "", auth.NamespaceRefused{Said: err.Error()}
+		}
+		return found.Name, err
+	}
+}
+
 // sayDoorsOntoNothing names every door whose namespace this node does not have.
 // Said and not refused: the namespace can be created after the door.
-func sayDoorsOntoNothing(known storage.Namespaces, cfg *appcfg.Config, logger *zap.SugaredLogger) {
+func sayDoorsOntoNothing(asked storage.Namespaces, cfg *appcfg.Config, logger *zap.SugaredLogger) {
 	// A backend that keeps no namespaces has nothing to compare.
-	if known == nil || len(cfg.Auth.Door) == 0 {
+	known, keeps := keptNamespaces(asked)
+	if !keeps || len(cfg.Auth.Door) == 0 {
 		return
 	}
 
@@ -314,6 +346,8 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// rather than when somebody arrives at it, and one bad door does not take
 	// down the ones that are correct.
 	sayDoorsOntoNothing(s.held.Known(), s.deps.cfg, s.logger)
+	// What the doors are held against, an invitation is held against too.
+	authHandler.SetNamespaces(invitationNamespace(s.held.Known))
 	if err := setDoors(authHandler, s.deps.cfg, s.logger); err != nil {
 		return errors.Wrap(err, "failed to open the front doors")
 	}

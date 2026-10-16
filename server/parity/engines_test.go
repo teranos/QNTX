@@ -3,21 +3,24 @@ package parity
 import "testing"
 
 // TestEnginesArePinned: each storage engine has exactly one pin here, and the
-// pin names its version.
+// pin names its version and commit.
 func TestEnginesArePinned(t *testing.T) {
-	for _, engine := range []string{"sqlite", "duckdb"} {
-		version, err := Pinned(".", engine)
+	for _, engine := range []string{"sqlite", "duckdb", "postgres"} {
+		pin, err := PinOf(".", engine)
 		if err != nil {
-			t.Fatalf("Pinned(%q): %v", engine, err)
+			t.Fatalf("PinOf(%q): %v", engine, err)
 		}
-		if version == "" {
-			t.Errorf("Pinned(%q) names no version", engine)
+		if pin.Version == "" {
+			t.Errorf("PinOf(%q) names no version", engine)
+		}
+		if pin.Rev == "" {
+			t.Errorf("PinOf(%q) names no commit", engine)
 		}
 	}
 }
 
 func TestAnEngineNotPinnedIsAnError(t *testing.T) {
-	if got, err := Pinned(".", "postgres"); err == nil {
-		t.Errorf("Pinned(%q) = %q, want an error", "postgres", got)
+	if got, err := PinOf(".", "mysql"); err == nil {
+		t.Errorf("PinOf(%q) = %v, want an error", "mysql", got)
 	}
 }

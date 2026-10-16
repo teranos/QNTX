@@ -81,12 +81,13 @@ func TestAServiceTheNodeRunsWithoutIsHandedAsWhy(t *testing.T) {
 	every := ServiceEndpoints{
 		LLM: ServingAt("localhost:1"), Embedding: ServingAt("localhost:2"), VectorSearch: ServingAt("localhost:3"),
 		Search: ServingAt("localhost:5"), Fetch: ServingAt("localhost:6"),
-		Mail: NotRunning(why),
+		Mail: NotRunning(why), GitHub: ServingAt("localhost:7"),
 	}
 	config := NewConfigProvider(ServedEndpoints(every), nil, zap.NewNop().Sugar()).GetPluginConfig("x")
 	require.NoError(t, handOptionalEndpoints(req, config))
 	assert.Equal(t, "localhost:1", req.GetLlmEndpoint().GetAddress())
 	assert.Equal(t, why.Error(), req.GetMailEndpoint().GetNotRunning())
+	assert.Equal(t, "localhost:7", req.GetGithubEndpoint().GetAddress())
 
 	_, err := EndpointFrom("mail", req.GetMailEndpoint()).Address()
 	require.Error(t, err)

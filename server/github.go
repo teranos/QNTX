@@ -15,6 +15,7 @@ import (
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
 )
@@ -24,9 +25,17 @@ const githubPath = "/api/github"
 // gitHubCredentials hands GitHubService the GITHUB token a namespace spends.
 type gitHubCredentials struct{ s *QNTXServer }
 
+// "ROOT will determine what GitHub integration is active there, either system or have the namespace take responsibility"
 func (c gitHubCredentials) Token(ctx context.Context, namespace string) (string, string, error) {
 	if c.s.authHandler == nil {
 		return "", "", errors.Newf("this node has no login, so namespace %q has no GitHub", namespace)
+	}
+	from, err := c.s.nodeRecords().GitHubFrom()
+	if err != nil {
+		return "", "", errors.Wrapf(err, "which GitHub namespace %q spends was not read", namespace)
+	}
+	if from[namespace] == GitHubFromSystem {
+		return c.s.authHandler.GitHubToken(ctx, auth.NamespaceSystem)
 	}
 	return c.s.authHandler.GitHubToken(ctx, namespace)
 }
@@ -104,6 +113,16 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/node"},
 				},
 				{
+					Name: "from",
+					Does: "Set which GitHub a namespace spends: the system namespace's, or its own.",
+					Takes: []*protocol.Param{
+						{Name: "namespace", Required: true, Says: "A namespace the node serves, other than system."},
+						{Name: "from", Required: true, Says: GitHubFromSystem + " or " + GitHubFromNamespace + "."},
+					},
+					Answer: "protocol.GitHubFrom",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/from"},
+				},
+				{
 					Name: "runner",
 					Does: "Set where the Actions runner is and turn taking its plugin builds on or off. Refused when turned on where there is no runner.",
 					Takes: []*protocol.Param{
@@ -121,6 +140,7 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 		Answers: map[string]sigil.Answer{
 			"status":       s.githubStatus,
 			"node":         s.githubNode,
+			"from":         s.githubFrom,
 			"runner":       s.githubRunner,
 			"webhook":      s.githubWebhook,
 			"webhook_path": s.githubWebhookPath,
@@ -170,35 +190,82 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	from, err := s.nodeRecords().GitHubFrom()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
 	for _, token := range held {
 		namespace := strings.Join(token.Namespaces, ",")
-		row := &protocol.GitHubNamespace{
+		// A namespace set to spend system's GitHub is shown as that, below.
+		if from[namespace] == GitHubFromSystem {
+			continue
+		}
+		status.Namespaces = append(status.Namespaces, s.githubRow(ctx, &protocol.GitHubNamespace{
 			Namespace: namespace,
 			Source:    token.GitHub.Source,
 			Login:     token.GitHub.Login,
 			MintedBy:  token.MintedBy,
 			Revoked:   token.RevokedAt != nil,
+		}))
+	}
+	system, systemHas, err := keeper.GitHubIn(auth.NamespaceSystem)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	for namespace, spends := range from {
+		if spends != GitHubFromSystem {
+			continue
 		}
-		// Whether the token works is asked of GitHub, not remembered.
-		said, err := s.gitHubService().RateLimit(ctx, &protocol.GitHubRateLimitRequest{Namespace: namespace})
-		switch {
-		case err != nil:
-			row.AuthError = err.Error()
-		case !said.Success:
-			row.AuthError = said.Error
-		default:
-			row.AuthOk = true
-			if core, ok := said.Resources["core"]; ok {
-				row.Rate = &protocol.GitHubCoreRate{Limit: uint32(core.Limit), Remaining: uint32(core.Remaining),
-					Reset_: time.Unix(core.Reset_, 0).UTC().Format(time.RFC3339Nano)}
-			}
+		row := &protocol.GitHubNamespace{Namespace: namespace, Source: GitHubFromSystem}
+		if systemHas {
+			row.Login, row.MintedBy = system.GitHub.Login, system.MintedBy
 		}
-		status.Namespaces = append(status.Namespaces, row)
+		status.Namespaces = append(status.Namespaces, s.githubRow(ctx, row))
 	}
 	slices.SortFunc(status.Namespaces, func(a, b *protocol.GitHubNamespace) int {
 		return strings.Compare(a.GetNamespace(), b.GetNamespace())
 	})
 	return status, nil
+}
+
+// githubRow is a namespace's row with whether its GitHub works, asked of
+// GitHub and not remembered, and its rate limit.
+func (s *QNTXServer) githubRow(ctx context.Context, row *protocol.GitHubNamespace) *protocol.GitHubNamespace {
+	said, err := s.gitHubService().RateLimit(ctx, &protocol.GitHubRateLimitRequest{Namespace: row.Namespace})
+	switch {
+	case err != nil:
+		row.AuthError = err.Error()
+	case !said.Success:
+		row.AuthError = said.Error
+	default:
+		row.AuthOk = true
+		if core, ok := said.Resources["core"]; ok {
+			row.Rate = &protocol.GitHubCoreRate{Limit: uint32(core.Limit), Remaining: uint32(core.Remaining),
+				Reset_: time.Unix(core.Reset_, 0).UTC().Format(time.RFC3339Nano)}
+		}
+	}
+	return row
+}
+
+// githubFrom sets which GitHub a namespace spends: the system namespace's, or its own.
+func (s *QNTXServer) githubFrom(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	from := strings.TrimSpace(sent["from"])
+	if from != GitHubFromSystem && from != GitHubFromNamespace {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "from",
+			Says: "from is " + GitHubFromSystem + " or " + GitHubFromNamespace + ", and this said " + sent["from"]}
+	}
+	namespace := strings.TrimSpace(sent["namespace"])
+	if namespace == auth.NamespaceSystem {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "namespace", Says: "the system namespace's GitHub is ROOT's own, and comes from nowhere else"}
+	}
+	served, err := s.held.Serves(namespace)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "namespace", Says: err.Error()}
+	}
+	if err := s.nodeRecords().SetGitHubFrom(actorOf(ctx), served, from); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	return &protocol.GitHubFrom{Namespace: served, From: from}, nil
 }
 
 func (s *QNTXServer) githubNode(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {

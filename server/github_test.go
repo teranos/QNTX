@@ -140,3 +140,75 @@ func TestTheRunnerPathIsPrefilled(t *testing.T) {
 	require.Nil(t, refused)
 	assert.Equal(t, "/opt/actions-runner", said.(*protocol.GitHubStatus).Runner.Path)
 }
+
+// githubWithClean is a node whose system GitHub is ROOT's, serving Clean, which has none of its own.
+func githubWithClean(t *testing.T) *QNTXServer {
+	t.Helper()
+	s := githubKnowingServer(t)
+	keeper, err := s.authHandler.GitHubKeeper()
+	require.NoError(t, err)
+	_, err = keeper.KeepGitHub(auth.NamespaceSystem, rootAccount, auth.GitHubSecret{Token: "ghu_good", Source: auth.GitHubSourceOAuth, Login: "teranos"})
+	require.NoError(t, err)
+	store, _ := createTestStore(t)
+	in := gardens{store: map[string]*handed{"Clean": {AttestationStore: store}}, owner: map[string]string{}}
+	s.held.SetKnown(in)
+	s.held.SetOpener(in)
+	return s
+}
+
+// "whether it comes from an access token, OAuth or system namespace"
+func TestTheGitHubElementSeesANamespaceThatSpendsSystems(t *testing.T) {
+	s := githubWithClean(t)
+	_, refused := answer(t, s, "from", sigil.Sent{"namespace": "Clean", "from": GitHubFromSystem})
+	require.Nil(t, refused)
+
+	said, refused := answer(t, s, "status", sigil.Sent{})
+	require.Nil(t, refused)
+	byName := map[string]*protocol.GitHubNamespace{}
+	for _, ns := range said.(*protocol.GitHubStatus).Namespaces {
+		byName[ns.Namespace] = ns
+	}
+	require.Contains(t, byName, "Clean")
+	assert.Equal(t, GitHubFromSystem, byName["Clean"].Source)
+	assert.Equal(t, "teranos", byName["Clean"].Login)
+	assert.True(t, byName["Clean"].AuthOk, byName["Clean"].AuthError)
+}
+
+// "ROOT will determine what GitHub integration is active there, either system or have the namespace take responsibility"
+func TestRootGivesANamespaceTheSystemNamespacesGitHub(t *testing.T) {
+	s := githubWithClean(t)
+
+	before, err := s.gitHubService().RateLimit(context.Background(), &protocol.GitHubRateLimitRequest{Namespace: "Clean"})
+	require.NoError(t, err)
+	assert.False(t, before.Success, "a namespace nobody set up has no GitHub")
+
+	said, refused := answer(t, s, "from", sigil.Sent{"namespace": "Clean", "from": GitHubFromSystem})
+	require.Nil(t, refused)
+	assert.Equal(t, &protocol.GitHubFrom{Namespace: "Clean", From: GitHubFromSystem}, said)
+
+	after, err := s.gitHubService().RateLimit(context.Background(), &protocol.GitHubRateLimitRequest{Namespace: "Clean"})
+	require.NoError(t, err)
+	assert.True(t, after.Success, after.Error)
+
+	_, refused = answer(t, s, "from", sigil.Sent{"namespace": "Clean", "from": GitHubFromNamespace})
+	require.Nil(t, refused)
+	taken, err := s.gitHubService().RateLimit(context.Background(), &protocol.GitHubRateLimitRequest{Namespace: "Clean"})
+	require.NoError(t, err)
+	assert.False(t, taken.Success, "the namespace takes responsibility, and holds no GitHub yet")
+}
+
+// The system namespace's GitHub is ROOT's own, and a namespace the node does not serve takes none.
+func TestOnlyAServedNamespaceOtherThanSystemTakesSystems(t *testing.T) {
+	s := githubWithClean(t)
+	_, refused := answer(t, s, "from", sigil.Sent{"namespace": auth.NamespaceSystem, "from": GitHubFromSystem})
+	require.NotNil(t, refused)
+	assert.Equal(t, "namespace", refused.Param)
+
+	_, refused = answer(t, s, "from", sigil.Sent{"namespace": "Dirty", "from": GitHubFromSystem})
+	require.NotNil(t, refused)
+	assert.Equal(t, "namespace", refused.Param)
+
+	_, refused = answer(t, s, "from", sigil.Sent{"namespace": "Clean", "from": "everywhere"})
+	require.NotNil(t, refused)
+	assert.Equal(t, "from", refused.Param)
+}

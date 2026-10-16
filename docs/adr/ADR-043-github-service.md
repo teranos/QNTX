@@ -9,7 +9,6 @@ Status: Proposed
 
 "the GitHubService is per namespace, QNTX should be able to deal with multiple tokens set by Authenticated users"
 
-"to disable it on the Node entirely"
 
 "to see which namespaces have it enabled and if their auth is correct, and wheter is comes from them setting an access token or via OAuth (Oauth path doesnt exist yet, but will)"
 
@@ -17,7 +16,7 @@ Status: Proposed
 
 - [ ] I log in to QNTX, open the plugin element, press +, enter a repository URL and confirm. The plugin starts disabled; I edit its config and enable it, and I don't think about it anymore.
 - [ ] In the GitHub element, I can disable GitHub on the Node entirely.
-- [ ] In the GitHub element, I see which namespaces have it enabled, whether their auth is correct, and whether it comes from an access token or OAuth.
+- [ ] In the GitHub element, I see which namespaces have it enabled, whether their auth is correct, and whether it comes from an access token, OAuth or system namespace
 - [ ] In the GitHub element's Actions section, at the bottom, I set the runner path (prefilled `/opt/actions-runner`) and a toggle to enable it; it errors when there is no runner. When enabled, runner stats show there.
 - [ ] A plugin's new build lands under the runner, and QNTX has it running as fast as it can. Nothing polls.
 

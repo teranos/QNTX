@@ -33,7 +33,7 @@ export interface Line {
     at: string;
 }
 
-const ELEMENT_ID = 'roles-element';
+export const ELEMENT_ID = 'roles-element';
 
 /** The same sentinel datapunt reads by, `SINCE` in clean/tools/datapunt/src/records.d.
  *  Attestations before it were written in a shape nobody reads any more. */
@@ -340,6 +340,9 @@ function renderComposer(container: HTMLElement, listContainer: HTMLElement, k: K
     container.append(sentence, row, impliedBox);
     drawSlots();
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/roles'] as const;
 
 export function createRolesElement(): Element {
     return {

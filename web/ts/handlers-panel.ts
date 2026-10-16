@@ -605,6 +605,9 @@ function attachEventDelegation(el: HTMLElement): void {
     });
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/attestations', '/api/pulse/schedules', '/api/watchers'] as const;
+
 export function createHandlersElement(): Element {
     return {
         id: 'handlers-element',

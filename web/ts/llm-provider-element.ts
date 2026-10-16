@@ -21,6 +21,9 @@ interface PluginRoute {
     roles?: string[];
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/plugins/routes'] as const;
+
 export function createLlmProviderElement(): Element {
     return {
         id: 'llm-provider-element',

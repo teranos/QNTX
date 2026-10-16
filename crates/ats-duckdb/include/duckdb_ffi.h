@@ -280,6 +280,12 @@ StorageResultC duckdb_namespaces_create(const NamespaceStore *store, const char 
 StorageResultC duckdb_namespaces_set_enabled(const NamespaceStore *store, const char *name,
                                              bool enabled);
 
+/** Give name its storage: record_json is {"kind": "none" | "sqlite" | "parquet"}
+ *  or {"kind": "postgres", "url": "<ssm:// or env: reference>"}. Given once,
+ *  from none; owner, enabled and created_at are kept. */
+StorageResultC duckdb_namespaces_set_record(const NamespaceStore *store, const char *name,
+                                            const char *record_json);
+
 /** Delete name, draining its attestations into default first. Refuses system,
  *  default, and any namespace still enabled. */
 StorageResultC duckdb_namespaces_delete(const NamespaceStore *store, const char *name);

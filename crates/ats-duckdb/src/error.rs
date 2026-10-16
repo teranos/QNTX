@@ -109,6 +109,9 @@ pub enum Refusal {
     /// A delete on a namespace still in service. Turning it off is reversible
     /// and comes first.
     StillEnabled,
+    /// Storage given to a namespace that already has its storage. A namespace
+    /// is given storage once, from none.
+    StorageAlreadyGiven,
 }
 /// No `Display`: a value that cannot be formatted cannot be flattened. The one
 /// way out is `sacred`, typed to typed.

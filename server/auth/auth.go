@@ -122,8 +122,11 @@ type Handler struct {
 	invitations  *invitationTable
 	inviteMailer InvitationMailer
 	invitePage   string
-	logger       *zap.SugaredLogger
-	corsWrap     func(http.HandlerFunc) http.HandlerFunc
+	// kept is what an invitation's namespace is held against. Set whenever
+	// auth is, by SetNamespaces.
+	kept     NamespacesKept
+	logger   *zap.SugaredLogger
+	corsWrap func(http.HandlerFunc) http.HandlerFunc
 }
 
 // New creates an auth handler. corsWrap is the server's CORS middleware —

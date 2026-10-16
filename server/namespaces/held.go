@@ -27,7 +27,7 @@ import (
 // Opener opens one namespace: everything it holds, named at once. A backend
 // that keeps namespaces has one; the rest keep a single universe and set none.
 type Opener interface {
-	OpenNamespace(name string) (*Universe, error)
+	OpenNamespace(name string, record storage.NamespaceRecord) (*Universe, error)
 }
 
 // Closer stops what a namespace runs for itself. An Opener that starts nothing
@@ -277,6 +277,16 @@ func (h *Held) Universe(admitted auth.Admission, namespace string) (*Universe, e
 	return h.universeIn(namespace)
 }
 
+// Serves is a namespace's name as it was created, refused when the node does
+// not serve it. It hands back no store to read or write.
+func (h *Held) Serves(namespace string) (string, error) {
+	u, err := h.universeIn(namespace)
+	if err != nil {
+		return "", err
+	}
+	return u.Name(), nil
+}
+
 // ScheduledRun hands back the universe a schedule's run acts in: the namespace
 // its creator acted in, as the sigil call that created it was admitted.
 func (h *Held) ScheduledRun(namespace string) (*Universe, error) {
@@ -456,11 +466,16 @@ func openOne(known storage.Namespaces, opener Opener, namespace string) (*Univer
 		return nil, err
 	}
 	// A disabled namespace refuses reads (ADR-027). Nothing wrote an ns.toml for
-	// the ones that predate the file, and nobody said those were off.
-	if d := found.Definition; d != nil && !d.Enabled {
-		return nil, Disabled{Asked: found.Name}
+	// the ones that predate the file, and nobody said those were off; what
+	// they hold is Parquet at the location, which is all they are made of.
+	record := storage.NamespaceRecord{Kind: storage.RecordParquet}
+	if d := found.Definition; d != nil {
+		if !d.Enabled {
+			return nil, Disabled{Asked: found.Name}
+		}
+		record = d.Record
 	}
-	u, err := opener.OpenNamespace(found.Name)
+	u, err := opener.OpenNamespace(found.Name, record)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the universe %s", found.Name)
 	}

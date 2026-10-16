@@ -206,6 +206,9 @@ export function drawClaude(body: HTMLElement, node: NodeAgent = theNode, every: 
     return settle;
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/claude'] as const;
+
 export function createClaudeElement(): Element {
     return {
         id: ELEMENT_ID,

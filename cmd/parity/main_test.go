@@ -29,21 +29,21 @@ func TestRender_EachEngine(t *testing.T) {
 	out := Render([]Thing{
 		{Name: "access_tokens"},
 		{Name: "embeddings", SQLite: true},
-		{Name: "attestations", SQLite: true, DuckDB: true},
+		{Name: "attestations", SQLite: true, DuckDB: true, Postgres: true},
 		{Name: "future_thing", DuckDB: true},
 	})
 
 	for _, want := range []string{
-		"access_tokens  NO      NO\n",
-		"embeddings     YES     NO\n",
-		"attestations   YES     YES\n",
-		"future_thing   NO      YES\n",
+		"access_tokens  NO      NO      NO\n",
+		"embeddings     YES     NO      NO\n",
+		"attestations   YES     YES     YES\n",
+		"future_thing   NO      YES     NO\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing line %q in:\n%s", want, out)
 		}
 	}
-	if !strings.Contains(out, "SQLITE  DUCKDB") {
+	if !strings.Contains(out, "SQLITE  DUCKDB  POSTGRES") {
 		t.Errorf("missing header in:\n%s", out)
 	}
 }
@@ -51,7 +51,7 @@ func TestRender_EachEngine(t *testing.T) {
 // TestRender_Rebuilt: a table whose rows cascade from attestations says so.
 func TestRender_Rebuilt(t *testing.T) {
 	out := Render([]Thing{{Name: "attestation_subjects", SQLite: true, Rebuilt: true}})
-	if !strings.Contains(out, "attestation_subjects  YES     NO      rebuilt from attestations") {
+	if !strings.Contains(out, "attestation_subjects  YES     NO      NO        rebuilt from attestations") {
 		t.Errorf("rebuilt table not said so in:\n%s", out)
 	}
 }

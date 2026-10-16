@@ -119,7 +119,14 @@ export interface InitializeRequest {
    * mail_endpoint: gRPC endpoint for MailService (plugin/grpc/protocol/mail.proto, ADR-041)
    * Provides: mail to a User, from the plugin's template — QNTX sends and attests
    */
-  mail_endpoint: ServiceEndpoint | undefined;
+  mail_endpoint:
+    | ServiceEndpoint
+    | undefined;
+  /**
+   * github_endpoint: GitHubService (github.proto, ADR-043), as the namespace the plugin stands in.
+   * Each call carries auth_token as its authorization metadata, a bearer token.
+   */
+  github_endpoint: ServiceEndpoint | undefined;
 }
 
 export interface InitializeRequest_ConfigEntry {

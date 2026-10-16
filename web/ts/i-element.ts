@@ -6,8 +6,8 @@
  * node calls them, how they got in, where they act, and what is joined to
  * them. What the node itself is went to ≡, which is the sibling `am` names.
  *
- * The person is answered to everyone admitted (`/i/` of ROOT SUPER TOKEN
- * ATTESTOR PUBLIC_REGISTRATION), which is a wider reach than anything ≡ draws.
+ * The person is answered to everyone admitted (`/i/` in server/reach), which
+ * is a wider reach than anything ≡ draws.
  */
 
 import { apiFetch } from './client';
@@ -16,13 +16,26 @@ import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
 import { createGhostButton } from './components/button.ts';
 import { person, personSection, personSwitch, personUnbecome, type Person } from './self-person.ts';
-import { openTokensElement } from './tokens-element.ts';
-import { openRolesElement } from './roles-element.ts';
-import { openUsersElement } from './users-element.ts';
-import { openMarketElement } from './market-element.ts';
-import { openMailElement } from './mail-element.ts';
-import { openGitHubElement } from './github-element.ts';
-import { openApprovalsElement } from './approvals-element.ts';
+import { tray } from '@teranos/elements';
+import { openTokensElement, ELEMENT_ID as TOKENS_ID } from './tokens-element.ts';
+import { openRolesElement, ELEMENT_ID as ROLES_ID } from './roles-element.ts';
+import { openUsersElement, ELEMENT_ID as USERS_ID } from './users-element.ts';
+import { openMarketElement, ELEMENT_ID as MARKET_ID } from './market-element.ts';
+import { openMailElement, ELEMENT_ID as MAIL_ID } from './mail-element.ts';
+import { openGitHubElement, ELEMENT_ID as GITHUB_ID } from './github-element.ts';
+import { openApprovalsElement, ELEMENT_ID as APPROVALS_ID } from './approvals-element.ts';
+
+// The elements opened from ⍟: Access Tokens (ADR-025), Users (ADR-031), Roles
+// (ADR-034), Stands (ADR-035), Mail (ADR-041), GitHub (ADR-043), Approvals (ADR-052).
+const WAYS = [
+    { id: TOKENS_ID, label: '⚿ Access Tokens', open: openTokensElement },
+    { id: USERS_ID, label: '⚇ Users', open: openUsersElement },
+    { id: ROLES_ID, label: '⚙ Roles', open: openRolesElement },
+    { id: MARKET_ID, label: '⛬ Stands', open: openMarketElement },
+    { id: MAIL_ID, label: '✉ Mail', open: openMailElement },
+    { id: GITHUB_ID, label: '⎇ GitHub', open: openGitHubElement },
+    { id: APPROVALS_ID, label: '✓ Approvals', open: openApprovalsElement },
+];
 
 // Who the node thinks is looking, and what it said instead when it would not
 // say. Both empty is nothing asked yet, which draws no section at all.
@@ -101,47 +114,11 @@ function renderI(): void {
     const actions = document.createElement('div');
     actions.className = 'element-actions';
 
-    // Entry point to the Access Tokens element (ADR-025), for the levels /auth/tokens admits.
     // "the ui needs to stop suggesting things that arent possible, needs to stop handing out dead birds"
-    if (iPerson?.level === 'ROOT' || iPerson?.level === 'SUPER') {
-        const tokensBtn = createGhostButton('⚿ Access Tokens', async () => {
-            openTokensElement();
-        });
-        actions.appendChild(tokensBtn.element);
-    }
-
-    // Every User is ROOT's to see and to switch (ADR-031). The table refuses
-    // anyone else at /auth/users, so nobody else is offered the way there.
-    if (iPerson?.level === 'ROOT') {
-        const usersBtn = createGhostButton('⚇ Users', async () => {
-            openUsersElement();
-        });
-        actions.appendChild(usersBtn.element);
-        // The lines a role is are ROOT's to write and to read back (ADR-034).
-        const rolesBtn = createGhostButton('⚙ Roles', async () => {
-            openRolesElement();
-        });
-        actions.appendChild(rolesBtn.element);
-        // Stands are ROOT's to create and delete (ADR-035).
-        const marketBtn = createGhostButton('⛬ Stands', async () => {
-            openMarketElement();
-        });
-        actions.appendChild(marketBtn.element);
-        // What the node mails on plugins' behalf is ROOT's to watch (ADR-041).
-        const mailBtn = createGhostButton('✉ Mail', async () => {
-            openMailElement();
-        });
-        actions.appendChild(mailBtn.element);
-        // The node's GitHub and its Actions runner are ROOT's to set (ADR-043).
-        const githubBtn = createGhostButton('⎇ GitHub', async () => {
-            openGitHubElement();
-        });
-        actions.appendChild(githubBtn.element);
-        // What waits on the human is ROOT's to answer (ADR-052).
-        const approvalsBtn = createGhostButton('✓ Approvals', async () => {
-            openApprovalsElement();
-        });
-        actions.appendChild(approvalsBtn.element);
+    // A way to an element is offered when the tray holds it, which is when the node said the viewer reaches it.
+    for (const way of WAYS) {
+        if (!tray.has(way.id)) continue;
+        actions.appendChild(createGhostButton(way.label, async () => way.open()).element);
     }
 
     // ROOT being somebody gets back to itself here (ADR-031).
@@ -157,6 +134,9 @@ function renderI(): void {
 
     iElement.appendChild(actions);
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/i/'] as const;
 
 /** ⍟ in the tray. The id is the word, and migration 061 renamed what was written down. */
 export function createIElement() {

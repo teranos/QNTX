@@ -33,7 +33,7 @@ export interface UserRecord {
     created_at: number;
 }
 
-const ELEMENT_ID = 'users-element';
+export const ELEMENT_ID = 'users-element';
 
 /** What the ROOT User is called before they say otherwise (ADR-031). */
 const ROOT_NAME = 'root';
@@ -138,7 +138,7 @@ function invitationRow(inv: InvitationRecord): TableRow<typeof HEADS> {
     pill.className = 'element-pill element-pill-invited';
     pill.textContent = 'invited';
     status.appendChild(pill);
-    return { cells: [name, stacked('invited', '—'), cell(fmt(inv.created_at), 'element-time'), status] };
+    return { cells: [name, stacked('invited', inv.namespace), cell(fmt(inv.created_at), 'element-time'), status] };
 }
 
 /** The invitations ROOT sent. A node that will not list them still lists its
@@ -184,6 +184,9 @@ export function renderInviteLink(container: HTMLElement, invited?: () => void): 
         log.error(SEG.UI, '[UsersElement] the node did not say who is looking', err);
     });
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/auth/users', '/auth/invitations'] as const;
 
 export function createUsersElement(): Element {
     return {
