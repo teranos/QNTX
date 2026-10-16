@@ -21,7 +21,7 @@ right?"
 - ground is built where it runs: `make install`, or a binary from GitHub Releases (teranos/ground README). Its SessionStart asks GitHub for the latest tag once a day and tells the session when a newer one exists (ground source/checks.d).
 - The latest release is v0.19.1, 2026-06-30. The operator's machine runs  v0.19.1-439-g4ec8488.
 
-## Per project
+## Per ground project
 
 "i want a comet per project essentially"
 
