@@ -23,9 +23,9 @@ right?"
 
 ## Per ground project
 
-"i want a comet per project essentially"
+"i want a comet per ground project essentially"
 
-"or like, a generalised project, like universal ground"
+"And also a generalised project, like universal ground"
 
 "that is normal ground"
 
