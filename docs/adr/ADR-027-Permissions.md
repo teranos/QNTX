@@ -1,7 +1,7 @@
 # ADR-027: Permissions
 
 Date: 2026-08-05
-Status: Stub, except TOKATTEST. The statements are made; the phases say what is decided. 2026-10-
+Status: Stub, except TOKATTEST. The statements are made; the phases say what is decided. 2026-10-16: Not really a stub right, damn this is a mess.
 
 ## Statements
 
