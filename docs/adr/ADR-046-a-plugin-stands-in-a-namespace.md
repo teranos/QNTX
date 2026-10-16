@@ -1,7 +1,11 @@
 # ADR-046: A plugin stands in a namespace
 
 Date: 2026-09-30
-Status: Proposed (Accepted, please remove business specific info)
+Status: Proposed
+
+Asked on 2026-09-30 whether cleanAPI belongs in the Clean namespace, and
+answered yes, by ROOT, in that business's own week file.
+
 ## The problem
 
 Every plugin's services are started on the served universe, which is default
