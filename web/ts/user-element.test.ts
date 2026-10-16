@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { addressesOf, becomable, renderUser } from './user-element';
+import { addressesOf, becomable, renderUser, userContent } from './user-element';
 import type { UserRecord } from './users-element';
 
 function root(emails: string[] = []): UserRecord {
@@ -81,4 +81,9 @@ test('a label in the record never breaks inside a word, and a value wraps', () =
         expect(label.style.overflowWrap).toBe('normal');
         expect(value.style.overflowWrap).toBe('break-word');
     }
+});
+
+// "also, on desktop, i see no reason to have this odd sized element."
+test('the User content is as wide as its record before the record arrives', () => {
+    expect(userContent().style.width).toBe('80ch');
 });

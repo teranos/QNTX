@@ -189,11 +189,15 @@ function refused(container: HTMLElement, err: unknown): void {
     container.appendChild(box);
 }
 
+// "also, on desktop, i see no reason to have this odd sized element."
+// The window measures this content before the record arrives: the width is the record's.
 /** Exported for tests: what the User window holds. */
 export function userContent(): HTMLDivElement {
     const content = document.createElement('div');
     content.className = 'user-element-content';
     content.style.padding = '12px';
+    content.style.width = '80ch';
+    content.style.maxWidth = '100%';
     return content;
 }
 
