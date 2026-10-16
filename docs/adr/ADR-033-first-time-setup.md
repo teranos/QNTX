@@ -2,11 +2,12 @@
 
 **Status:** Accepted
 **Date:** 2026-08-22
-**Related:** [[ADR-027-Permissions]], [[ADR-030-identity-providers]], [[ADR-031-the-user]] 
+**Related:** ADR-027 (Permissions), ADR-030 (Identity Providers), ADR-031 (The User)
 
 ## Decision
 
-A node with `auth.root_identities` set and no User belongs to nobody, and that is not an auth state.
+A node with `auth.root_identities` set and no User belongs to nobody, and that is not an
+auth state.
 
 "Because this is a new root box without a user and only root_identities set, the first glyph you see isnt the auth glyph"
 
