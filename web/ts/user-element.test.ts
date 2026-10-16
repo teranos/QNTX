@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { addressesOf, becomable, renderUser, userContent } from './user-element';
+import { addressesOf, becomable, levelable, renderUser, userContent } from './user-element';
 import type { UserRecord } from './users-element';
 
 function root(emails: string[] = []): UserRecord {
@@ -88,4 +88,23 @@ test('a label in the record never breaks inside a word, and a value wraps', () =
 test('the User content is as wide as its record before the record arrives', () => {
     expect(userContent().style.width).toBe('80ch');
     expect(userContent().style.boxSizing).toBe('border-box');
+});
+
+// "can i still not change the role of a User ?"
+test('ROOT is offered to set the level of a User that is not ROOT, to a rung and never to ROOT', () => {
+    const other: UserRecord = { ...root(), id: 'US-OTHER-1', level: 'PUBLIC_REGISTRATION' };
+    expect(levelable(other, true)).toBe(true);
+    expect(levelable(other, false)).toBe(false);
+    expect(levelable(root(), true)).toBe(false);
+
+    const container = document.createElement('div');
+    renderUser(container, other, false, () => {}, false, true);
+    const choice = container.querySelector<HTMLSelectElement>('.user-level-choice');
+    expect(choice).not.toBeNull();
+    expect(Array.from(choice!.options).map(o => o.value)).toEqual(['USER', 'PUBLIC_REGISTRATION']);
+    expect(choice!.value).toBe('PUBLIC_REGISTRATION');
+    expect(container.textContent).toContain('Set level');
+
+    renderUser(container, other, false, () => {}, false, false);
+    expect(container.querySelector('.user-level-choice')).toBeNull();
 });

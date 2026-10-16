@@ -92,6 +92,18 @@ cannot be made up later.
 
 "And the Becoming and Unbecoming of another User, will be removed, the entire feature and capability will be removed before we can 1.0.0 this repo"
 
+## level
+
+"can i still not change the role of a User ?"
+
+- ROOT sets the level a User holds, to USER or PUBLIC_REGISTRATION, the rungs a route
+  reaching a User is admitted at: `POST /auth/users/{id}/level`, from the User in the
+  Users element.
+- Nobody is made ROOT, and ROOT stays ROOT: there is one ROOT User. A User at SUPER or
+  ATTESTOR is admitted at no gate yet, so neither is set.
+- The act is attested as `identity:leveled`, naming who, the level they had and the
+  level they hold.
+
 ## What is recorded
 
 A User is one object per person under `<location>/system/users/` on the parquet

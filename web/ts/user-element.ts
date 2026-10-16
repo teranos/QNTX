@@ -117,6 +117,50 @@ export function becomable(u: UserRecord, viewerIsRoot: boolean): boolean {
     return viewerIsRoot && u.level !== 'ROOT' && !u.disabled_by;
 }
 
+// "can i still not change the role of a User ?"
+
+/** The rungs ROOT sets a User to: the ones the gate admits a User at. ROOT is one User and is not set (ADR-031). */
+export const USER_LEVELS = ['USER', 'PUBLIC_REGISTRATION'] as const;
+
+/** Exported for tests: whether ROOT is offered to set this User's level. */
+export function levelable(u: UserRecord, viewerIsRoot: boolean): boolean {
+    return viewerIsRoot && u.level !== 'ROOT';
+}
+
+/** Sets the level one User holds. The node's refusal is the error. */
+async function setLevel(id: string, level: string): Promise<void> {
+    await apiJson(`/auth/users/${encodeURIComponent(id)}/level`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level }),
+    });
+}
+
+/** The level ROOT sets: the rungs to choose from, the User's own chosen, and the press. */
+function levelForm(u: UserRecord, onSet: () => void): HTMLElement {
+    const form = document.createElement('div');
+    form.className = 'element-actions';
+    const choice = document.createElement('select');
+    choice.className = 'input user-level-choice';
+    for (const level of USER_LEVELS) {
+        const option = document.createElement('option');
+        option.value = level;
+        option.textContent = level;
+        choice.appendChild(option);
+    }
+    choice.value = u.level;
+    const set = createDangerButton('Set level', `Set the level of ${nameOf(u)}`, async () => {
+        if (choice.value === u.level) {
+            throw new Error(`${nameOf(u)} is ${u.level} already`);
+        }
+        await setLevel(u.id, choice.value);
+        onSet();
+    });
+    form.appendChild(choice);
+    form.appendChild(set.element);
+    return form;
+}
+
 /**
  * Exported for tests: one User's record. `own` is whether the viewer is this
  * User in a session, the one case the node takes an addition from. `switches`
@@ -156,6 +200,10 @@ export function renderUser(container: HTMLElement, u: UserRecord, own: boolean, 
             onClick: () => become(u),
         }).element);
         container.appendChild(actions);
+    }
+
+    if (levelable(u, viewerIsRoot)) {
+        container.appendChild(levelForm(u, onAdded));
     }
 
     if (own) {
