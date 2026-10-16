@@ -3,7 +3,7 @@
 Date: 2026-10-16
 Status: Revised
 
-QNTX interacts with a Node Agent.
+QNTX interacts with a Node Agent; Claude Code in this case.
 
 - Node agents are ROOT, and no namespace holds them: their sessions are the node's own record, in system, whoever spoke to them and wherever they stand.
 ### A2A
