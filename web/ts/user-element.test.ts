@@ -86,4 +86,5 @@ test('a label in the record never breaks inside a word, and a value wraps', () =
 // "also, on desktop, i see no reason to have this odd sized element."
 test('the User content is as wide as its record before the record arrives', () => {
     expect(userContent().style.width).toBe('80ch');
+    expect(userContent().style.boxSizing).toBe('border-box');
 });

@@ -11,6 +11,8 @@ export default defineConfig({
     testMatch: '*.browser.ts',
     outputDir: './test-results',
     fullyParallel: true,
+    // Four WebKits on an 8GB laptop starve the page of its 30s to stand; two do not.
+    workers: 2,
     forbidOnly: !!process.env.CI,
     retries: 0,
     reporter: process.env.CI ? [['list'], ['html', { open: 'never', outputFolder: './playwright-report' }]] : 'list',
