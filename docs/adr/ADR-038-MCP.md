@@ -1,11 +1,8 @@
 # ADR-038: MCP
 
 Date: 2026-09-15
-Status: Implemented, tracked by parit
+Status: Implemented, tracked by parity
 
-Is QNTX's role in MCP to be the host?
-
-"YES, AND THE MCP FOR QNTX ITSELF IS THE FIRST ONE TO OCCUPY, BUT WE COULD EVEN DO OTHER ONES"
 
 Does an MCP client require dynamic client registration, or does it accept a client minted by hand?
 
