@@ -1,7 +1,7 @@
 # ADR-009: Edge-Based Composition DAG for Multi-Directional Melding
 
 ## Status
-Phase 3 Complete (Composition extension + cross-axis sub-containers) 2026-10-16: I mean like, I actually think this doc should be owned by the Elements package actually, kind of forgot abou
+Phase 3 Complete (Composition extension + cross-axis sub-containers) 2026-10-16: I mean like, I actually think this doc should be owned by the Elements package actually, kind of forgot about this one tbh.
 
 ## Context
 
