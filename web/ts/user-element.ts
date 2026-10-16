@@ -10,11 +10,12 @@
 // nobody else's. The first address is the one mail goes to (ADR-041).
 
 import type { Element } from '@teranos/elements';
-import { createTable, tableCell, tray, type TableRow } from '@teranos/elements';
+import { tray } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { Button, createDangerButton, createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
+import { record } from './table-cell';
 import type { UserRecord } from './users-element';
 
 /** The ROOT User is root until they say otherwise (ADR-031). */
@@ -28,17 +29,6 @@ function nameOf(u: UserRecord): string {
 function when(ms: number): string {
     if (!ms) return '—';
     return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
-}
-
-function row(label: string, value: string): TableRow<readonly [string, string]> {
-    const name = tableCell(label);
-    // A label reads as the head does.
-    name.style.color = 'var(--text-on-dark-tertiary)';
-    name.style.paddingRight = '12px';
-    name.style.verticalAlign = 'top';
-    const td = tableCell(value);
-    td.style.overflowWrap = 'break-word';
-    return { cells: [name, td] };
 }
 
 /** Exported for tests: the addresses, the primary one named as such. */
@@ -137,17 +127,17 @@ export function renderUser(container: HTMLElement, u: UserRecord, own: boolean, 
     container.innerHTML = '';
 
     // The record is headed by who it is.
-    const table = createTable('user-record', ['Name', nameOf(u)], [
-        row('Id', u.id),
-        row('Level', u.level),
-        row('Door', u.namespace || '—'),
-        row('Email', addressesOf(u)),
-        row('Phone', u.phone_numbers?.length ? u.phone_numbers.join('\n') : '—'),
-        row('Accounts', (u.accounts ?? []).map(a => `${a.provider || 'account'}: ${a.handle || a.canonical_id}`).join('\n') || '—'),
-        row('Keys', (u.keys ?? []).map(k => `${k.origin.toLowerCase()} ${k.did}`).join('\n') || '—'),
-        row('Created', when(u.created_at)),
-        row('Created by', u.created_by || '—'),
-        row('Status', u.disabled_by ? `off, by ${u.disabled_by}` : 'on'),
+    const table = record('user-record', ['Name', nameOf(u)], [
+        ['Id', u.id],
+        ['Level', u.level],
+        ['Door', u.namespace || '—'],
+        ['Email', addressesOf(u)],
+        ['Phone', u.phone_numbers?.length ? u.phone_numbers.join('\n') : '—'],
+        ['Accounts', (u.accounts ?? []).map(a => `${a.provider || 'account'}: ${a.handle || a.canonical_id}`).join('\n') || '—'],
+        ['Keys', (u.keys ?? []).map(k => `${k.origin.toLowerCase()} ${k.did}`).join('\n') || '—'],
+        ['Created', when(u.created_at)],
+        ['Created by', u.created_by || '—'],
+        ['Status', u.disabled_by ? `off, by ${u.disabled_by}` : 'on'],
     ]);
     table.style.whiteSpace = 'pre-line';
     container.appendChild(table);
@@ -199,6 +189,18 @@ function refused(container: HTMLElement, err: unknown): void {
     container.appendChild(box);
 }
 
+// "also, on desktop, i see no reason to have this odd sized element."
+// The window measures this content before the record arrives: the width is the record's.
+/** Exported for tests: what the User window holds. */
+export function userContent(): HTMLDivElement {
+    const content = document.createElement('div');
+    content.className = 'user-element-content';
+    content.style.padding = '12px';
+    content.style.width = '80ch';
+    content.style.maxWidth = '100%';
+    return content;
+}
+
 /** Opens one User as its own element. Called from Users. */
 export function openUserElement(u: UserRecord): void {
     const elementId = `user-element-${u.id}`;
@@ -213,9 +215,7 @@ export function openUserElement(u: UserRecord): void {
         symbol: '⚇',
         onClose: () => { tray.remove(elementId); },
         renderContent: () => {
-            const content = document.createElement('div');
-            content.className = 'user-element-content';
-            content.style.padding = '12px';
+            const content = userContent();
             content.innerHTML = '<div class="element-loading">Loading User…</div>';
             redraw(content, u.id).catch((err: unknown) => refused(content, err));
             return content;
