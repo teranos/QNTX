@@ -30,7 +30,9 @@ for example:
 - filename paths for the `control`:
 	- mentioned a file, didn't read it, please read it
 
-We can still have super fast hooks, actually even faster when the builds are done by QNTX"
+We can still have super fast hooks.
+actually even faster when the builds are done by QNTX
+"
 
 - ground compiles one file, .ctfe/sand. wind folds it from three places on the operator's disk: ground's own controls/, controls/local/, and each declared project's controls/ with that project's `git ls-files` (ground tools/wind.d).
 - controls/local on the operator's machine holds 31 pbt files today: the qntx block with the node's URL and the token's path, seven projects by absolute path, permissions, org and sentry.
